@@ -1,303 +1,223 @@
-use std::{fs, time::Duration};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    process::exit,
+};
 
-use icy_net::{
-    Connection,
-    pattern_recognizer::PatternRecognizer,
-    telnet::{TelnetConnection, TermCaps, TerminalEmulation},
-    zconnect::{
-        BlockCode, EndTransmission, ZConnectBlock, ZConnectState,
-        commands::{Execute, ZConnectCommandBlock, mails},
-        header::{Acer, TransferProtocol, ZConnectHeaderBlock},
+use argh::FromArgs;
+use icy_board_engine::{
+    Res,
+    icy_board::{
+        IcyBoard,
+        ftn::{FtnConfig, FtnLink},
     },
 };
-use tokio::time::Instant;
+use icy_net::binkp::{BinkpIdentity, PollRequest};
 
-async fn try_connect(connection: &mut dyn Connection, pattern: Vec<&[u8]>, send: &[u8]) -> bool {
-    let mut buf = [0; 1024];
+mod zconnect_experiment;
 
-    let mut login_pattern = pattern.iter().map(|p| PatternRecognizer::from(*p, true)).collect::<Vec<_>>();
-    let mut instant = Instant::now();
-    loop {
-        let size = connection.read(&mut buf).await.unwrap();
-        for b in &buf[0..size] {
-            // print!("{}", *b as char);
-            for p in &mut login_pattern {
-                if p.push_ch(*b) {
-                    println!("got trigger string SEND {}", String::from_utf8_lossy(send));
-                    connection.send(send).await.unwrap();
-                    return true;
-                }
-            }
-        }
-
-        if size > 0 && instant.elapsed() > Duration::from_secs(1) {
-            connection.send(b"\r").await.unwrap();
-            instant = Instant::now();
-        }
-    }
+#[derive(FromArgs)]
+/// Exchange fidonet mail with the systems listed in ftn.toml
+struct Cli {
+    #[argh(subcommand)]
+    command: Command,
 }
 
-enum Begin {
-    ZConnect,
-    ZModemSend,
-    ZModem,
+#[derive(FromArgs)]
+#[argh(subcommand)]
+enum Command {
+    Links(Links),
+    Poll(Poll),
 }
 
-async fn begin_zconnect(connection: &mut dyn Connection) -> Begin {
-    let mut buf = [0; 1024];
-    let mut zconnect_pattern = PatternRecognizer::from(b"begin", true);
-    let mut zmodem_send_pattern = PatternRecognizer::from(b"B01", false); // ZRINIT for send starts with B01
-    let mut zmodem_recv_pattern = PatternRecognizer::from(b"B00", false); // ZRQINIT starts with B00
-
-    let mut instant = Instant::now();
-    println!("Waiting for ZConnect or ZModem");
-    loop {
-        let size = connection.read(&mut buf).await.unwrap();
-
-        for b in &buf[0..size] {
-            print!("{}", *b as char);
-            if zconnect_pattern.push_ch(*b) {
-                println!("Begin ZConnect");
-                return Begin::ZConnect;
-            }
-            if zmodem_send_pattern.push_ch(*b) {
-                println!("Begin ZModem send");
-                return Begin::ZModemSend;
-            }
-            if zmodem_recv_pattern.push_ch(*b) {
-                println!("Begin ZModem recv");
-                return Begin::ZModem;
-            }
-        }
-        if size > 0 && instant.elapsed() > Duration::from_secs(1) {
-            connection.send(b"\r").await.unwrap();
-            instant = Instant::now();
-        }
-    }
+#[derive(FromArgs)]
+#[argh(subcommand, name = "links")]
+/// list the configured links and what is waiting for them
+struct Links {
+    #[argh(positional)]
+    /// path/file name of the icyboard.toml configuration file
+    config: PathBuf,
 }
 
-struct ZConnect {
-    cur_block: BlockCode,
-}
+#[derive(FromArgs)]
+#[argh(subcommand, name = "poll")]
+/// call a link, hand over what is waiting for it and take what it has
+struct Poll {
+    #[argh(positional)]
+    /// path/file name of the icyboard.toml configuration file
+    config: PathBuf,
 
-pub async fn read_string(connection: &mut dyn Connection) -> String {
-    let mut res = String::new();
+    #[argh(positional)]
+    /// the address to call, every link when left out
+    address: Option<String>,
 
-    println!("Reading string...");
-    let mut buf = [0; 1024];
-    let mut last = 0;
-    loop {
-        let size = connection.read(&mut buf).await.unwrap();
-        for b in &buf[0..size] {
-            print!("{}", *b as char);
-            res.push(*b as char);
-            if *b == b'\r' && last == b'\r' {
-                return res;
-            }
-            last = *b;
-        }
-    }
-}
+    #[argh(switch, short = 'k')]
+    /// leave delivered files in the outbound instead of deleting them
+    keep: bool,
 
-impl ZConnect {
-    pub async fn send_block(&mut self, connection: &mut dyn Connection, block: &dyn ZConnectBlock) -> icy_net::Result<()> {
-        println!("---- sending block:\n{}", block.display());
-        connection.send(block.display().as_bytes()).await.unwrap();
-        loop {
-            let res = read_string(connection).await;
-            println!("---- got block:");
-            println!("{}", res);
-            match ZConnectCommandBlock::parse(&res) {
-                Ok(blk) => {
-                    if blk.state() == ZConnectState::Ack(self.cur_block) {
-                        let mut nak_block = ZConnectCommandBlock::default();
-                        nak_block.set_state(ZConnectState::Tme(self.cur_block));
-                        connection.send(nak_block.display().as_bytes()).await.unwrap();
-                    }
-                    break;
-                }
-                Err(err) => {
-                    log::error!("Error parsing block: {}", err);
-                    println!("Error parsing block: {}", err);
-                    let mut nak_block = ZConnectCommandBlock::default();
-                    nak_block.set_state(ZConnectState::Nak0);
-                    connection.send(nak_block.display().as_bytes()).await.unwrap();
-                }
-            }
-        }
-        self.cur_block = self.cur_block.next();
-
-        Ok(())
-    }
-
-    pub async fn recv_block(&mut self, connection: &mut dyn Connection) -> icy_net::Result<ZConnectCommandBlock> {
-        loop {
-            let res = read_string(connection).await;
-            println!("---------------");
-            println!("Received: {}", res);
-            println!("---------------");
-
-            match ZConnectCommandBlock::parse(&res) {
-                Ok(blk) => {
-                    if let ZConnectState::Block(block_code) = blk.state() {
-                        let mut ack_block = ZConnectCommandBlock::default();
-                        ack_block.set_state(ZConnectState::Ack(block_code));
-                        connection.send(ack_block.display().as_bytes()).await.unwrap();
-                        self.cur_block = block_code.next();
-                        // read TME
-                        read_string(connection).await;
-                    }
-                    return Ok(blk);
-                }
-                Err(err) => {
-                    println!("Error parsing block: {}", err);
-                    log::error!("Error parsing block: {}", err);
-                    let mut nak_block = ZConnectCommandBlock::default();
-                    nak_block.set_state(ZConnectState::Nak0);
-                    connection.send(nak_block.display().as_bytes()).await.unwrap();
-                    continue;
-                }
-            }
-        }
-    }
-}
-/*
-async fn zconnect_login(connection: &mut dyn Connection) -> bool {
-    try_connect(connection, vec![b"ogin", b"ame"], b"zconnect\r").await &&
-    try_connect(connection, vec![b"word", b"wort"], b"0zconnec\r").await
-}*/
-
-async fn janus_login(connection: &mut dyn Connection, system: &str, password: &str) -> bool {
-    println!("logging in...");
-    if !try_connect(connection, vec![b"Username:"], b"JANUS\r").await {
-        return false;
-    }
-    println!("send system name...");
-    if !try_connect(connection, vec![b"Systemname:"], system.as_bytes()).await {
-        return false;
-    }
-    println!("send password...");
-    if !try_connect(connection, vec![b"word", b"wort"], password.as_bytes()).await {
-        return false;
-    }
-    println!("logged in");
-    true
+    #[argh(switch, short = 'v')]
+    /// report what the session is doing
+    verbose: bool,
 }
 
 #[tokio::main]
 async fn main() {
-    let caps = TermCaps {
-        window_size: (80, 25),
-        terminal: TerminalEmulation::Ascii,
+    let arguments: Cli = argh::from_env();
+    let result = match arguments.command {
+        Command::Links(arguments) => list_links(&arguments.config),
+        Command::Poll(arguments) => {
+            set_up_logging(arguments.verbose);
+            poll_links(&arguments.config, arguments.address.as_deref(), arguments.keep).await
+        }
     };
-
-    let mut connection = TelnetConnection::open("ip", caps, Duration::from_secs(2)).await.unwrap();
-    if !janus_login(&mut connection, "name\r", "pw\r").await {
-        return;
-    }
-    loop {
-        match begin_zconnect(&mut connection).await {
-            Begin::ZConnect => {
-                let mut header = ZConnectHeaderBlock::default();
-                header.add_acer(0, Acer::ZIP);
-                header.add_acer(0, Acer::Arj);
-                header.add_acer(0, Acer::ZOO);
-                header.add_acer(0, Acer::LHArc);
-                header.add_acer(0, Acer::LHA);
-                header.add_iso2(0, "V.32");
-                header.set_password("IcyBoardTest");
-                header.set_port(0);
-                header.add_protocol(0, TransferProtocol::ZModem);
-                header.add_protocol(0, TransferProtocol::ZModem8k);
-                header.set_system("Icy Shadow BBS");
-                header.set_sysop("SYSOP");
-                header.add_phone(0, "1234567890");
-
-                let mut zcon = ZConnect { cur_block: BlockCode::Block1 };
-                println!("send header...");
-
-                zcon.send_block(&mut connection, &header).await.unwrap();
-                let _header = zcon.recv_block(&mut connection).await.unwrap();
-
-                println!("send get request...");
-                let get_mail = ZConnectCommandBlock::default().get(mails::ALL);
-                zcon.send_block(&mut connection, &get_mail).await.unwrap();
-
-                let _header = zcon.recv_block(&mut connection).await.unwrap();
-
-                let execute = ZConnectCommandBlock::default().execute(Execute::Yes);
-                println!("send execute now...");
-                zcon.send_block(&mut connection, &execute).await.unwrap();
-
-                let _header = zcon.recv_block(&mut connection).await.unwrap();
-
-                println!("send eot & begin...");
-                zcon.send_block(&mut connection, &ZConnectCommandBlock::EOT4).await.unwrap();
-                zcon.send_block(&mut connection, &ZConnectCommandBlock::EOT4).await.unwrap();
-                zcon.send_block(&mut connection, &ZConnectCommandBlock::EOT4).await.unwrap();
-                zcon.send_block(&mut connection, &ZConnectCommandBlock::BEG5).await.unwrap();
-
-                println!("wait for receive...");
-                for _ in 0..3 {
-                    let header = zcon.recv_block(&mut connection).await.unwrap();
-                    println!("Received block: {}", header.display());
-                    if header.state() != ZConnectState::Eot(EndTransmission::Prot5) {
-                        let execute = ZConnectCommandBlock::default().logoff();
-                        zcon.send_block(&mut connection, &execute).await.unwrap();
-                        return;
-                    }
-                }
-                initate_download(&mut zcon, &mut connection).await;
-                return;
-            }
-            Begin::ZModemSend => {
-                let mut zcon = ZConnect { cur_block: BlockCode::Block1 };
-                initate_upload(&mut zcon, &mut connection).await;
-                continue;
-            }
-            Begin::ZModem => {
-                let mut zcon = ZConnect { cur_block: BlockCode::Block1 };
-                initate_download(&mut zcon, &mut connection).await;
-                return;
-            }
-        }
+    if let Err(err) = result {
+        eprintln!("{}", err);
+        exit(1);
     }
 }
 
-async fn initate_download(zcon: &mut ZConnect, connection: &mut dyn Connection) {
-    println!("initiate transfer...");
-
-    let mut proto = icy_net::protocol::TransferProtocolType::ZModem.create();
-    let mut ts = proto.initiate_recv(connection).await.unwrap();
-
-    while !ts.is_finished {
-        if let Err(err) = proto.update_transfer(connection, &mut ts).await {
-            log::error!("ZModem error: {}", err);
-        }
-        println!("transferred: {}\r", ts.recieve_state.total_bytes_transfered);
-    }
-    println!("transfer finished");
-    for (file, path) in &ts.recieve_state.finished_files {
-        println!("Copy: {} to {}", path.display(), file);
-        let _ = fs::copy(path, file);
-    }
-    let execute = ZConnectCommandBlock::default().logoff();
-    zcon.send_block(connection, &execute).await.unwrap();
-    let header = zcon.recv_block(connection).await.unwrap();
-    println!("Received block: {}", header.display());
+fn set_up_logging(verbose: bool) {
+    let level = if verbose { log::LevelFilter::Debug } else { log::LevelFilter::Warn };
+    let _ = fern::Dispatch::new()
+        .format(|out, message, record| out.finish(format_args!("{}: {}", record.level(), message)))
+        .level(level)
+        .chain(std::io::stderr())
+        .apply();
 }
 
-async fn initate_upload(_zcon: &mut ZConnect, connection: &mut dyn Connection) {
-    println!("initiate transfer...");
-
-    let mut proto = icy_net::protocol::TransferProtocolType::ZModem.create();
-    let mut ts = proto.initiate_send(connection, &[]).await.unwrap();
-
-    while !ts.is_finished {
-        if let Err(err) = proto.update_transfer(connection, &mut ts).await {
-            log::error!("ZModem error: {}", err);
-        }
-        println!("transferred: {}\r", ts.recieve_state.total_bytes_transfered);
+fn load(config: &Path) -> Res<IcyBoard> {
+    let mut board = IcyBoard::load(&config)?;
+    board.resolve_paths();
+    if !board.ftn.is_configured() {
+        return Err(format!("{} lists no ftn address, so there is nothing to introduce this board as", config.display()).into());
     }
-    println!("transfer finished");
+    Ok(board)
+}
+
+fn list_links(config: &Path) -> Res<()> {
+    let board = load(config)?;
+    for link in &board.ftn.links {
+        let waiting = outbound_files(&board.ftn.outbound_for(link))?;
+        let bytes: u64 = waiting.iter().filter_map(|path| path.metadata().ok()).map(|data| data.len()).sum();
+        println!(
+            "{:<20} {}:{:<6} as {:<20} {} file(s), {} bytes waiting",
+            link.to_5d(),
+            link.host,
+            link.port,
+            board.ftn.aka_for(link).map(|aka| aka.to_5d()).unwrap_or_default(),
+            waiting.len(),
+            bytes
+        );
+    }
+    if board.ftn.links.is_empty() {
+        println!("No links configured.");
+    }
+    Ok(())
+}
+
+async fn poll_links(config: &Path, address: Option<&str>, keep: bool) -> Res<()> {
+    let board = load(config)?;
+    let selected: Vec<&FtnLink> = match address {
+        Some(wanted) => board.ftn.links.iter().filter(|link| answers_to(link, wanted)).collect(),
+        None => board.ftn.links.iter().collect(),
+    };
+    if selected.is_empty() {
+        return Err(match address {
+            Some(wanted) => format!("No link named {} is configured", wanted).into(),
+            None => "No links configured".into(),
+        });
+    }
+
+    let mut failed = 0;
+    for link in selected {
+        if let Err(err) = poll_link(&board.ftn, &identity_for(&board, link)?, link, keep).await {
+            eprintln!("{}: {}", link.to_5d(), err);
+            failed += 1;
+        }
+    }
+    if failed > 0 {
+        return Err(format!("{} of the calls did not get through", failed).into());
+    }
+    Ok(())
+}
+
+async fn poll_link(ftn: &FtnConfig, identity: &BinkpIdentity, link: &FtnLink, keep: bool) -> Res<()> {
+    let outbound = outbound_files(&ftn.outbound_for(link))?;
+    println!(
+        "Calling {} at {}:{} with {} file(s) to hand over",
+        link.to_5d(),
+        link.host,
+        link.port,
+        outbound.len()
+    );
+
+    let request = PollRequest {
+        host: link.host.clone(),
+        port: link.port,
+        identity: identity.clone(),
+        called: link.to_5d(),
+        password: link.password.clone(),
+        outbound,
+        inbound: ftn.inbound.clone(),
+        ..Default::default()
+    };
+    let result = icy_net::binkp::poll(&request).await?;
+
+    println!(
+        "  {} answered, running {}{}",
+        if result.remote.system_name.is_empty() {
+            link.to_5d()
+        } else {
+            result.remote.system_name.clone()
+        },
+        result.remote.mailer,
+        if result.remote.secure { "" } else { " (unsecure session)" }
+    );
+    for path in &result.batch.received {
+        println!("  received {}", path.display());
+    }
+    for path in &result.batch.sent {
+        println!("  delivered {}", path.display());
+        if !keep {
+            fs::remove_file(path)?;
+        }
+    }
+    for path in &result.batch.skipped {
+        println!("  held back for the next call: {}", path.display());
+    }
+    Ok(())
+}
+
+/// An address may be given with or without its network, so both spellings count.
+fn answers_to(link: &FtnLink, wanted: &str) -> bool {
+    link.address.to_string().eq_ignore_ascii_case(wanted) || link.to_5d().eq_ignore_ascii_case(wanted)
+}
+
+fn identity_for(board: &IcyBoard, link: &FtnLink) -> Res<BinkpIdentity> {
+    let Some(aka) = board.ftn.aka_for(link) else {
+        return Err(format!("No address of this board belongs to the network of {}", link.to_5d()).into());
+    };
+    Ok(BinkpIdentity {
+        addresses: vec![aka.to_5d()],
+        system_name: board.config.board.name.clone(),
+        sysop: board.config.sysop.name.clone(),
+        location: board.config.board.location.clone(),
+        ..Default::default()
+    })
+}
+
+fn outbound_files(directory: &Path) -> Res<Vec<PathBuf>> {
+    let mut files = Vec::new();
+    if !directory.is_dir() {
+        return Ok(files);
+    }
+    for entry in fs::read_dir(directory)? {
+        let entry = entry?;
+        if entry.file_type()?.is_file() {
+            files.push(entry.path());
+        }
+    }
+    // Bundles are named so that the oldest sorts first, and that is the order they should travel in.
+    files.sort();
+    Ok(files)
 }

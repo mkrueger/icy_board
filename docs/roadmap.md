@@ -24,7 +24,7 @@
 - [x] Implement SELECT command
 - [x] Implement group chat (CHAT command)
 - [x] Finish SSH/Websocket support
-- [ ] Mailer Support (BINKP?) - the spec is under crates/doc/binkp, nothing implements it yet
+- [ ] Mailer Support (BINKP?) - icbmailer polls a link and exchanges files, but nothing packs or unpacks mail yet
 - [ ] Go throught the PCBoard options and ensure they're working - atm some do - some don't
   - compat/COMMAND_AUDIT.md tracks where a command still answers differently than PCBoard did
 

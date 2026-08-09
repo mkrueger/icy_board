@@ -7,6 +7,9 @@ authors.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+icy_board_engine = { workspace = true }
 icy_net = { workspace = true }
 tokio = { workspace = true }
 log = { workspace = true }
+argh = { workspace = true }
+fern = { workspace = true }

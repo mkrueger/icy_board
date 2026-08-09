@@ -7,7 +7,7 @@ use serde_with::{DisplayFromStr, serde_as};
 use super::IcyBoardSerializer;
 
 /// The port fidonet technology networks reserved for binkp.
-pub const DEFAULT_BINKP_PORT: u16 = 24554;
+pub const DEFAULT_BINKP_PORT: u16 = icy_net::binkp::DEFAULT_PORT;
 
 /// One of the addresses this board answers to. A board that joined more than
 /// one network has one of these per network.
@@ -64,6 +64,13 @@ impl FtnLink {
     fn default_port() -> u16 {
         DEFAULT_BINKP_PORT
     }
+
+    pub fn to_5d(&self) -> String {
+        if self.domain.is_empty() {
+            return self.address.to_string();
+        }
+        format!("{}@{}", self.address, self.domain)
+    }
 }
 
 impl Default for FtnLink {
@@ -118,6 +125,12 @@ impl FtnConfig {
     pub fn is_configured(&self) -> bool {
         !self.akas.is_empty()
     }
+
+    /// Mail waits in a directory of its own per link, because a flat outbound
+    /// would offer every bundle to every system that calls.
+    pub fn outbound_for(&self, link: &FtnLink) -> PathBuf {
+        self.outbound.join(link.address.to_string().replace([':', '/'], "."))
+    }
 }
 
 impl Default for FtnConfig {
@@ -153,6 +166,17 @@ mod tests {
             domain: domain.to_string(),
             ..Default::default()
         }
+    }
+
+    #[test]
+    fn test_every_link_has_an_outbound_directory_of_its_own() {
+        let config = FtnConfig::default();
+
+        assert_eq!(config.outbound_for(&link("21:1/100", "fsxnet")), PathBuf::from("ftn/outbound/21.1.100"));
+        assert_ne!(
+            config.outbound_for(&link("21:1/100", "fsxnet")),
+            config.outbound_for(&link("21:1/101", "fsxnet"))
+        );
     }
 
     #[test]
