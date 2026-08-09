@@ -9,6 +9,7 @@ use crate::{
     datetime::{IcbDate, IcbTime},
     executable::{PPEExpr, VariableType, VariableValue},
     icy_board::{
+        ftn::queue,
         icb_config::IcbColor,
         state::{
             GraphicsMode, KeySource, NodeState, NodeStatus,
@@ -2392,13 +2393,45 @@ pub async fn fdoaddorg(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
     unimplemented_stmt!("FDOADDOR");
 }
 pub async fn fdoqmod(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("FDOQMOD");
+    let record = vm.eval_expr(&args[0]).await?.as_int();
+    let address = vm.eval_expr(&args[1]).await?.as_string();
+    let file = vm.eval_expr(&args[2]).await?.as_string();
+    let _flags = vm.eval_expr(&args[3]).await?.as_int();
+    let file = vm.resolve_file(&file).await;
+    let ftn = vm.icy_board_state.get_board().await.ftn.clone();
+
+    if let Err(err) = queue::remove(&ftn, record.max(0) as usize) {
+        log::error!("FDOQMOD {}: {}", record, err);
+        return Ok(());
+    }
+    if let Err(err) = queue::add(&ftn, &address, &file) {
+        log::error!("FDOQMOD {}: {}", address, err);
+    }
+    Ok(())
 }
 pub async fn fdoqadd(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("FDOQADD");
+    let address = vm.eval_expr(&args[0]).await?.as_string();
+    let file = vm.eval_expr(&args[1]).await?.as_string();
+    // Pcboard knew a normal and a crash entry. Nothing here calls a link out of
+    // turn, so what is queued waits for the next call either way.
+    let _flags = vm.eval_expr(&args[2]).await?.as_int();
+    let file = vm.resolve_file(&file).await;
+    let ftn = vm.icy_board_state.get_board().await.ftn.clone();
+
+    if let Err(err) = queue::add(&ftn, &address, &file) {
+        log::error!("FDOQADD {}: {}", address, err);
+    }
+    Ok(())
 }
 pub async fn fdoqdel(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    unimplemented_stmt!("FDOQDEL");
+    let record = vm.eval_expr(&args[0]).await?.as_int();
+    let ftn = vm.icy_board_state.get_board().await.ftn.clone();
+    match queue::remove(&ftn, record.max(0) as usize) {
+        Ok(false) => log::error!("FDOQDEL: nothing is waiting under number {}", record),
+        Err(err) => log::error!("FDOQDEL {}: {}", record, err),
+        Ok(true) => {}
+    }
+    Ok(())
 }
 pub async fn sounddelay(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     log::warn!("SOUNDDELAY is not supported");

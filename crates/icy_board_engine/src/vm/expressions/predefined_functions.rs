@@ -9,6 +9,7 @@ use crate::ast::constant::STACK_LIMIT;
 use crate::datetime::{IcbDate, IcbTime};
 use crate::executable::{GenericVariableData, PPEExpr, VariableData, VariableType, VariableValue};
 use crate::icy_board::conferences::ConferenceType;
+use crate::icy_board::ftn::queue;
 use crate::icy_board::macro_parser::Macro;
 use crate::icy_board::read_with_encoding_detection;
 use crate::icy_board::security_expr::SecurityExpression;
@@ -2181,19 +2182,65 @@ pub async fn instrr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variab
     }
 }
 
+/// Pcboard numbered the records of its fido configuration from one, and an
+/// empty string is how it said that there is no such record.
 pub async fn fdordaka(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("FDORDAKA", VariableValue::new_int(0));
+    let record = vm.eval_expr(&args[0]).await?.as_int();
+    let board = vm.icy_board_state.get_board().await;
+    let Some(aka) = record
+        .checked_sub(1)
+        .and_then(|index| usize::try_from(index).ok())
+        .and_then(|index| board.ftn.akas.get(index))
+    else {
+        return Ok(VariableValue::new_string(String::new()));
+    };
+    Ok(VariableValue::new_string(aka.address.to_string()))
 }
+
 pub async fn fdordorg(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("FDORDORG", VariableValue::new_int(0));
+    let record = vm.eval_expr(&args[0]).await?.as_int();
+    let board = vm.icy_board_state.get_board().await;
+    // One origin line is configured here where pcboard kept a list of them.
+    if record != 1 {
+        return Ok(VariableValue::new_string(String::new()));
+    }
+    Ok(VariableValue::new_string(board.ftn.origin.clone()))
 }
 
 pub async fn fdordarea(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("FDORDAREA", VariableValue::new_int(0));
+    let record = vm.eval_expr(&args[0]).await?.as_int();
+    let board = vm.icy_board_state.get_board().await;
+    let mut found = 0;
+    for conference in board.conferences.iter() {
+        let Some(areas) = &conference.areas else {
+            continue;
+        };
+        for area in areas.iter() {
+            if area.ftn_area_tag.is_empty() {
+                continue;
+            }
+            found += 1;
+            if found == record {
+                return Ok(VariableValue::new_string(area.ftn_area_tag.clone()));
+            }
+        }
+    }
+    Ok(VariableValue::new_string(String::new()))
 }
 
+/// Pcboard left this one empty, so what it answers is ours to decide: the file
+/// the queue holds under that number, and nothing when it holds none.
 pub async fn fdoqrd(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    unimplemented_function!("FDOQRD", VariableValue::new_int(0));
+    let record = vm.eval_expr(&args[0]).await?.as_int();
+    let board = vm.icy_board_state.get_board().await;
+    match queue::get(&board.ftn, record.max(0) as usize) {
+        Ok(Some(file)) => Ok(VariableValue::new_string(file.to_string_lossy().to_string())),
+        Ok(None) => Ok(VariableValue::new_string(String::new())),
+        Err(err) => {
+            log::error!("FDOQRD: {}", err);
+            Ok(VariableValue::new_string(String::new()))
+        }
+    }
 }
 
 pub async fn getdrive(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {

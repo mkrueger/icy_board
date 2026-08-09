@@ -78,23 +78,32 @@ rewrite of that part.
    :PPL:`MKADDR` still works, since it only packs a segment and an offset into
    one number and does not touch memory.
 
-FrontDoor mailer configuration
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+FidoNet mailer configuration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 *Statements:* :PPL:`FDOWRAKA`, :PPL:`FDOADDAKA`, :PPL:`FDOWRORG`,
-:PPL:`FDOADDORG`, :PPL:`FDOQADD`, :PPL:`FDOQMOD`, :PPL:`FDOQDEL`
+:PPL:`FDOADDORG`
 
-*Functions:* :PPL:`FDORDAKA`, :PPL:`FDORDORG`, :PPL:`FDORDAREA`, :PPL:`FDOQRD`
+PCBoard 15.2 added these so a PPE could edit the mailer setup that ran
+alongside it: the AKA list and the origin lines. They were never finished —
+the original source carries the bodies commented out, and the argument count
+its compiler accepted does not match what the dead code read. There is nothing
+to be faithful to, so they log a warning and return.
 
-PCBoard 15.2 added these so a PPE could edit the setup of FrontDoor, a DOS
-FidoNet mailer that ran alongside it: its AKA list, its origin lines, its
-message areas and its outbound queue. They read and write FrontDoor's own
-binary configuration files at fixed offsets.
+The reading half of the family does work:
 
-IcyBoard has its own mailer with its own configuration, so those files do not
-exist to be edited. The opcodes could be reconnected to it, but the mapping is
-not one to one and nobody has asked yet. If you run a FidoNet node and want
-these, say so — this one is a question of demand, not of possibility.
+* :PPL:`FDORDAKA(n)` returns the *n*-th address this board answers to, counted
+  from one, as ``zone:net/node`` with the point appended when there is one, and
+  an empty string when there is no such record.
+* :PPL:`FDORDAREA(n)` returns the tag of the *n*-th message area that takes
+  part in the network.
+* :PPL:`FDORDORG(1)` returns the origin line. PCBoard kept a list of them and
+  IcyBoard has one, so every other record number answers empty.
+* :PPL:`FDOQADD`, :PPL:`FDOQMOD`, :PPL:`FDOQDEL` and :PPL:`FDOQRD` work on the
+  outbound queue: what is waiting for a link, numbered from one across all
+  links. PCBoard queued a file with a normal or a crash flavour; nothing here
+  calls a link out of turn, so the flag is read and ignored. :PPL:`FDOQRD` was
+  an empty case in the original and answers the file name of that record here.
 
 Substituted values
 ------------------

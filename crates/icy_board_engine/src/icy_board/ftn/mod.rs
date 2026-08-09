@@ -8,6 +8,7 @@ use super::IcyBoardSerializer;
 
 pub mod bundle;
 pub mod packet;
+pub mod queue;
 pub mod toss;
 
 /// The port fidonet technology networks reserved for binkp.

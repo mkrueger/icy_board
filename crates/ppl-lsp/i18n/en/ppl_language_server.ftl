@@ -557,9 +557,23 @@ hint-statement-fdowraka=todo
 hint-statement-fdoaddaka=todo
 hint-statement-fdowrorg=todo
 hint-statement-fdoaddorg=todo
-hint-statement-fdoqmod=This statement can be used to modify fido queue records.todo
-hint-statement-fdoqadd=This statement can be used to add entries to the FIDO queue.
-hint-statement-fdoqdel=This statement can be used to delete fido queue records.
+hint-statement-fdoqmod=
+    Replaces an entry of the outbound queue
+
+    @1 = record number, counted from one
+    @2 = address of the link the file is for
+    @3 = file to send
+    @4 = NORMAL or CRASH, read and ignored
+hint-statement-fdoqadd=
+    Puts a file into the outbound queue of a link
+
+    @1 = address of the link the file is for
+    @2 = file to send
+    @3 = NORMAL or CRASH, read and ignored
+hint-statement-fdoqdel=
+    Takes an entry out of the outbound queue
+
+    @1 = record number, counted from one
 hint-statement-sounddelay=
     @1 = frequency at which to sound the PC speaker
     @2 = length, in clock ticks (18 = 1 second), to leave the speaker on
@@ -1088,10 +1102,26 @@ hint-function-cwd=
     The current working directory
 hint-function-instrr=
     Returns the right most position of @2 in @1 `(1-LEN(@1))` or `0` if @2 not in @1
-hint-function-fdordaka=todo
-hint-function-fdordorg=todo
-hint-function-fdordarea=todo
-hint-function-fdoqrd=todo
+hint-function-fdordaka=
+    Returns the address this board answers to, as zone:net/node with the point
+    appended when there is one, or an empty string when there is no such record
+
+    @1 = record number, counted from one
+hint-function-fdordorg=
+    Returns the origin line appended to echomail written here
+
+    @1 = record number, counted from one. Only one origin line is configured,
+    so every other number answers empty
+hint-function-fdordarea=
+    Returns the tag of a message area that takes part in the network, or an
+    empty string when there is no such record
+
+    @1 = record number, counted from one
+hint-function-fdoqrd=
+    Returns the file waiting under that number in the outbound queue, or an
+    empty string when nothing waits there
+
+    @1 = record number, counted from one
 hint-function-getdrive=
     ### Returns
     The current drive letter

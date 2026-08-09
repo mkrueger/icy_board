@@ -44,47 +44,22 @@ pub const UNIMPLEMENTED_STATEMENTS: &[&str] = &[
     "FDOADDAKA",
     "FDOWRORG",
     "FDOADDORG",
-    "FDOQMOD",
-    "FDOQADD",
-    "FDOQDEL",
 ];
 
 /// Statements implemented but known to miss edge cases.
-pub const PARTIAL_STATEMENTS: &[&str] = &["DLOCK", "DLOCKR", "DLOCKG", "DUNLOCK"];
+pub const PARTIAL_STATEMENTS: &[&str] = &["DLOCK", "DLOCKR", "DLOCKG", "DUNLOCK", "FDOQMOD", "FDOQADD", "FDOQDEL"];
 
 /// Functions that exist but intentionally return a placeholder.
 pub const UNSUPPORTED_FUNCTIONS: &[&str] = &["GETDRIVE", "SETDRIVE", "MODEM", "PEEKDW"];
 
 /// Functions stubbed with `unimplemented_function!`.
 pub const UNIMPLEMENTED_FUNCTIONS: &[&str] = &[
-    "REGAL",
-    "REGAH",
-    "REGBL",
-    "REGBH",
-    "REGCL",
-    "REGCH",
-    "REGDL",
-    "REGDH",
-    "REGAX",
-    "REGBX",
-    "REGCX",
-    "REGDX",
-    "REGSI",
-    "REGDI",
-    "REGF",
-    "REGCF",
-    "REGDS",
-    "REGES",
-    "PEEKB",
-    "PEEKW",
-    "FDORDAKA",
-    "FDORDORG",
-    "FDORDAREA",
-    "FDOQRD",
+    "REGAL", "REGAH", "REGBL", "REGBH", "REGCL", "REGCH", "REGDL", "REGDH", "REGAX", "REGBX", "REGCX", "REGDX", "REGSI", "REGDI", "REGF", "REGCF", "REGDS",
+    "REGES", "PEEKB", "PEEKW",
 ];
 
 /// Functions implemented but known to miss edge cases.
-pub const PARTIAL_FUNCTIONS: &[&str] = &["DLOCKF", "DLOCK", "DLOCKR", "DUNLOCK"];
+pub const PARTIAL_FUNCTIONS: &[&str] = &["DLOCKF", "DLOCK", "DLOCKR", "DUNLOCK", "FDORDORG", "FDOQRD"];
 
 fn contains(list: &[&str], name: &str) -> bool {
     list.iter().any(|s| s.eq_ignore_ascii_case(name))
