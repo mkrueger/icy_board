@@ -40,4 +40,10 @@ pub enum NetError {
 
     #[error("Invalid CRC32 in EMSI")]
     EmsiCRC32Error,
+
+    #[error("Binkp frame carries {0} octets, the size field holds 32767")]
+    BinkpFrameTooLarge(usize),
+
+    #[error("Unknown binkp command id {0}")]
+    UnknownBinkpCommand(u8),
 }
