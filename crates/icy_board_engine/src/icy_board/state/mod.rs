@@ -902,6 +902,7 @@ impl IcyBoardState {
             "A" => convert_cmd(CommandType::AbandonConference),
             "B" => convert_cmd(CommandType::BulletinList),
             "C" => convert_cmd(CommandType::CommentToSysop),
+            "D" => convert_cmd(CommandType::Download),
             "E" => convert_cmd(CommandType::EnterMessage),
             "RM" => convert_cmd(CommandType::ReadMemorizedMessage(0)),
             "RM+" => convert_cmd(CommandType::ReadMemorizedMessage(1)),
@@ -910,8 +911,9 @@ impl IcyBoardState {
             "BD" => convert_cmd(CommandType::BatchDownload),
             "BU" => convert_cmd(CommandType::BatchUpload),
             "G" => convert_cmd(CommandType::Goodbye),
-            "?" => convert_cmd(CommandType::Help),
+            "?" | "H" => convert_cmd(CommandType::Help),
             "I" => convert_cmd(CommandType::InitialWelcome),
+            "J" => convert_cmd(CommandType::JoinConference),
             "K" => convert_cmd(CommandType::DeleteMessage),
             "L" => convert_cmd(CommandType::LocateFile),
             "M" => convert_cmd(CommandType::ToggleGraphics),
@@ -922,6 +924,7 @@ impl IcyBoardState {
             "R" => convert_cmd(CommandType::ReadMessages),
             "S" => convert_cmd(CommandType::Survey),
             "T" => convert_cmd(CommandType::SetTransferProtocol),
+            "U" => convert_cmd(CommandType::UploadFile),
             "V" => convert_cmd(CommandType::ViewSettings),
             "W" => convert_cmd(CommandType::WriteSettings),
             "X" => convert_cmd(CommandType::ExpertMode),
@@ -932,6 +935,11 @@ impl IcyBoardState {
             "@" => convert_cmd(CommandType::ReadEmail),
             "@W" => convert_cmd(CommandType::WriteEmail),
             _ => {
+                // Like PCBoard, only words are abbreviated - a single letter is either one of
+                // the commands above or nothing, so "D" can't be read as "DOOR".
+                if command.len() < 2 {
+                    return None;
+                }
                 if "ALIAS".starts_with(command.as_str()) {
                     return convert_cmd(CommandType::EnableAlias);
                 }
@@ -953,7 +961,7 @@ impl IcyBoardState {
                 if "DOOR".starts_with(command.as_str()) || "Open".starts_with(command.as_str()) {
                     return convert_cmd(CommandType::OpenDoor);
                 }
-                if "DOWN".starts_with(command.as_str()) {
+                if "DOWNLOAD".starts_with(command.as_str()) {
                     return convert_cmd(CommandType::Download);
                 }
                 if "FLAG".starts_with(command.as_str()) {
