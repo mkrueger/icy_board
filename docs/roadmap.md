@@ -24,9 +24,12 @@
 - [x] Implement SELECT command
 - [x] Implement group chat (CHAT command)
 - [x] Finish SSH/Websocket support
-- [ ] Mailer Support (BINKP?) - icbmailer polls, tosses and scans, but nothing calls it on a schedule and nothing answers an incoming call yet
+- [ ] Mailer Support (BINKP?) - icbmailer polls, tosses and scans, documented in docs/source/mailer.rst,
+      but nothing calls it on a schedule and nothing answers an incoming call yet
 - [ ] Go throught the PCBoard options and ensure they're working - atm some do - some don't
   - compat/COMMAND_AUDIT.md tracks where a command still answers differently than PCBoard did
+  - compat/OPTIONS_AUDIT.md tracks the configuration switches - 43 of 117 options and 21 of 29
+    sysop security levels are editable in ICBSetup but read by nobody
 
 -> 1st BETA
 
