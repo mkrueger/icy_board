@@ -170,6 +170,88 @@ privilege they name is either always granted or the feature does not exist.
 `user_sec` is otherwise complete: `security_for` maps every built-in command
 to its level.
 
+## The other direction: PCBoard options with no home here
+
+`PCBOARD.DAT` has 194 top level entries in our model of it. The importer reads
+71 into `icboard.toml`; the remaining 123 have nowhere to go. Most of that is
+right — half of `PCBOARD.DAT` describes a UART, a swap file or an OS/2 thread
+priority — but not all of it.
+
+### Obsolete by construction, do not port
+
+The machine underneath is gone, so the setting has no meaning: `eliminate_snow`,
+`disable_ctsdrop`, `no16550`, `force16550_a`, `os2_driver`, `monitor_modem`,
+`auto_reset`, `verify_cdloss`, `no_carrier_exit`, `parallel_port_num`,
+`upload_buf_size`, `env_size`, `swap`, `swap_during_bat`, `slow_drives`,
+`slow_drive_bat`, `exit_to_dos`, `allow_shell`, `disable_password`, `slaves`,
+`fast_text`, `fast_cnames`, `network`, `node_num`, `net_timeout`, `net_copy`,
+`float_node_number`, `low_baud_sec_override`, `max_scroll_back`,
+`view_batch`/`view_ext` (unarc-rs reads the archives directly),
+`auto_make_msgs` (a JAM base creates itself), `encrypt` (passwords are hashed),
+`user_sys_during_bat`, the seven `minimize_*` and the six `priority_*`.
+
+That is 47 of the 123, and the honest answer for all of them is no.
+
+### Worth porting
+
+| PCBoard option | What it does | Why |
+|---|---|---|
+| `event_active`, `event_time`, `event_slide` | when the nightly event runs, and whether it waits for a caller to hang up | icy_board has an `event` section with no time in it, so the feature cannot be configured even once a scheduler exists |
+| `auto_reg_conf` | register a new user in every conference | otherwise a new user sees one conference and has to find the rest |
+| `force_main` | comments to the sysop always land in the main board | cheap, and stops comments scattering across conferences |
+| `conf_pwrd_adjust` | re-read the conference password on every join | a password changed while a user is online takes effect |
+| `confirm_caller` | make the caller confirm the name they typed | catches the typo that creates a second account |
+| `disable_quick` | switch off quick logon | a board that wants every caller to see the welcome files |
+| `last_read_update` | whether reading a new message moves the pointer | affects what the next scan shows |
+| `log_caller_number`, `log_connect_str`, `log_sec_level` | what goes into the caller log | the log is thin without them |
+| `cap_file` | where a session capture is written | the `R` command's capture is unimplemented and will need this |
+| `stop_clock_on_cap` | do not charge time while a capture is downloaded | belongs with the above |
+| `chat_delay` | how often node chat polls | a hard-coded interval today |
+| `pub_conf` | which conferences count as public | used for the "public conferences" display |
+
+### The FidoNet block — 25 options, newly relevant
+
+PCBoard grew a whole FidoNet configuration; icy_board's `ftn.toml` has six
+keys. Now that the tosser exists, several of these describe decisions the
+tosser is currently making on its own with no way to change them:
+
+`fido_check_dupe_msg_id`, `fido_check_dupe_path`, `fido_num_msgs_to_track`
+(the duplicate window — currently every MSGID ever seen is kept),
+`fido_secure` (where mail for an unknown user goes), `fido_auto_add`
+(create an area for an unknown tag instead of counting it),
+`fido_sysop_change`, `fido_make_response`, `fido_crash_sec`,
+`fido_enable_area_fix`, `fido_enable_pass_thru`, `fido_route_echo_mail`,
+`fido_re_address`, `fido_enable_routing`, `fido_import_after_xfer`,
+`fido_pkt_freq`/`fido_export_freq`/`fido_mail_freq` (the scheduler that does
+not exist), `fido_default_zone`/`fido_default_net`, `fido_log_level`,
+`fido_process_in`/`_out`/`_orphan`, `fido_dial_out`, `fido_create_msg`.
+
+Not all of these are worth having, but the duplicate window, the unknown-area
+policy and the unknown-user policy are decisions the code makes today by
+accident rather than by configuration.
+
+### The UUCP block — 22 options, a whole missing feature
+
+`uucp_*`, `organization`, `comp_bat_file`, `de_comp_bat_file`. This is
+PCBoard's Usenet and internet mail gateway: newsgroups appear as conferences,
+mail is exchanged over UUCP. Porting the options makes no sense; porting the
+*feature* over NNTP and SMTP instead of UUCP might, and that is a roadmap
+question rather than a configuration one.
+
+### Options with a home the importer does not fill
+
+These are worse than missing, because a converted board silently loses a
+setting the sysop made:
+
+| PCBoard option | icy_board field | State |
+|---|---|---|
+| `max_total_msgs` | `qwk_settings.max_msgs` | the whole `qwk_settings` block is imported as default |
+| `max_conf_msgs` | `qwk_settings.max_msgs_per_conf` | as above |
+| `qwk_file` | `qwk_settings.bbs_id` | as above |
+| `event_active` | `event.enabled` | hardcoded to `false` on import |
+| `account_track` | `accounting.tracking_file` | left empty |
+| `num_areas` | — | conferences are counted, areas are not |
+
 ## What to do about it
 
 Three answers are defensible per option, and each needs a deliberate choice:
