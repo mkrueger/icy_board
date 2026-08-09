@@ -383,6 +383,7 @@ impl PCBoardImporter {
                 command_file,
                 statistics_file,
                 group_file,
+                ftn_file: PathBuf::new(),
 
                 trashcan_upload_files,
                 trashcan_user: PathBuf::new(),

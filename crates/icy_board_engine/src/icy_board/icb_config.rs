@@ -438,6 +438,10 @@ pub struct ConfigPaths {
     /// name and location of multi language definitions
     pub group_file: PathBuf,
 
+    /// name and location of the fidonet technology network config
+    #[serde(default)]
+    pub ftn_file: PathBuf,
+
     /// home directory for user files
     pub user_file: PathBuf,
 
@@ -911,6 +915,7 @@ impl IcbConfig {
                 command_file: PathBuf::new(),
                 statistics_file: PathBuf::new(),
                 group_file: PathBuf::new(),
+                ftn_file: PathBuf::new(),
 
                 logon_survey: PathBuf::new(),
                 logon_answer: PathBuf::new(),

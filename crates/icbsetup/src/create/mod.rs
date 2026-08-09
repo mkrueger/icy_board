@@ -12,6 +12,7 @@ use icy_board_engine::{
         conferences::{Conference, ConferenceBase},
         doors::DoorList,
         file_directory::{DirectoryList, FileDirectory},
+        ftn::FtnConfig,
         group_list::GroupList,
         icb_config::IcbConfig,
         icb_text::DEFAULT_DISPLAY_TEXT,
@@ -252,6 +253,13 @@ impl IcyBoardCreator {
         list.add_group("sysop", "System Operators");
         list.add_group("users", "Common Users");
         list.save(&self.destination.join(&config.paths.group_file))?;
+
+        self.logger.start_action("Write default fidonet config file".to_string());
+        config.paths.ftn_file = PathBuf::from("main/ftn.toml");
+        let ftn = FtnConfig::default();
+        fs::create_dir_all(&self.destination.join(&ftn.inbound))?;
+        fs::create_dir_all(&self.destination.join(&ftn.outbound))?;
+        ftn.save(&self.destination.join(&config.paths.ftn_file))?;
 
         self.logger.start_action("Create default user (SYSOP)".to_string());
 

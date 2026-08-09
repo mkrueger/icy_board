@@ -18,6 +18,7 @@ use self::{
     conferences::ConferenceBase,
     doors::DoorList,
     file_directory::DirectoryList,
+    ftn::FtnConfig,
     group_list::GroupList,
     icb_config::IcbConfig,
     icb_text::IcbTextFile,
@@ -37,6 +38,7 @@ pub mod commands;
 pub mod conferences;
 pub mod doors;
 pub mod file_directory;
+pub mod ftn;
 pub mod group_list;
 pub mod icb_config;
 pub mod icb_text;
@@ -114,6 +116,7 @@ pub struct IcyBoard {
     pub groups: GroupList,
     pub statistics: Statistics,
     pub commands: CommandList,
+    pub ftn: FtnConfig,
 }
 
 impl IcyBoard {
@@ -133,6 +136,7 @@ impl IcyBoard {
             commands: CommandList::default(),
             statistics: Statistics::default(),
             groups: GroupList::default(),
+            ftn: FtnConfig::default(),
         }
     }
 
@@ -171,6 +175,11 @@ impl IcyBoard {
         self.config.paths.protocol_data_file = get_path(&self.root_path, &self.config.paths.protocol_data_file);
         self.config.paths.pwrd_sec_level_file = get_path(&self.root_path, &self.config.paths.pwrd_sec_level_file);
         self.config.paths.statistics_file = get_path(&self.root_path, &self.config.paths.statistics_file);
+        self.config.paths.ftn_file = get_path(&self.root_path, &self.config.paths.ftn_file);
+
+        // Fidonet mail spool
+        self.ftn.inbound = get_path(&self.root_path, &self.ftn.inbound);
+        self.ftn.outbound = get_path(&self.root_path, &self.ftn.outbound);
 
         // Trashcan files
         self.config.paths.trashcan_upload_files = get_path(&self.root_path, &self.config.paths.trashcan_upload_files);
@@ -347,6 +356,19 @@ impl IcyBoard {
             }
         };
 
+        let ftn = if config.paths.ftn_file.as_os_str().is_empty() {
+            FtnConfig::default()
+        } else {
+            let load_path = get_path(parent_path, &config.paths.ftn_file);
+            match FtnConfig::load(&load_path) {
+                Ok(ftn) => ftn,
+                Err(e) => {
+                    log::error!("Error loading ftn config: {} from {}, generating default.", e, load_path.display());
+                    FtnConfig::default()
+                }
+            }
+        };
+
         let load_path = get_path(parent_path, &config.accounting.cfg_file);
         match AccountingConfig::load(&load_path) {
             Ok(acc) => {
@@ -372,6 +394,7 @@ impl IcyBoard {
             commands,
             statistics,
             groups,
+            ftn,
         };
 
         for conf in board.conferences.iter_mut() {

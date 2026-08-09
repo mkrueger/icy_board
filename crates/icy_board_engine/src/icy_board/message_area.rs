@@ -29,6 +29,12 @@ pub struct MessageArea {
     #[serde(skip_serializing_if = "is_null_16")]
     pub qwk_conference_number: u16,
 
+    /// The tag a fidonet technology network knows this area under, empty when
+    /// the area is local.
+    #[serde(default)]
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub ftn_area_tag: String,
+
     pub path: PathBuf,
     pub is_read_only: bool,
     pub allow_aliases: bool,

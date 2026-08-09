@@ -1,6 +1,6 @@
-use std::fmt;
+use std::{fmt, str::FromStr};
 
-#[derive(Default)]
+#[derive(Default, Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct EchomailAddress {
     pub zone: u16,
     pub net: u16,
@@ -120,6 +120,14 @@ impl fmt::Display for EchomailAddress {
             return write!(f, "{}:{}/{}", self.zone, self.net, self.node);
         }
         write!(f, "{}:{}/{}.{}", self.zone, self.net, self.node, self.point)
+    }
+}
+
+impl FromStr for EchomailAddress {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::parse(s).ok_or_else(|| format!("'{}' is not a zone:net/node[.point] address", s))
     }
 }
 
