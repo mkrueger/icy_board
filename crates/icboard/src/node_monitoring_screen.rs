@@ -189,14 +189,7 @@ impl NodeMonitoringScreen {
         }
     }
 
-    fn ui(
-        &mut self,
-        frame: &mut Frame,
-        infos: &Vec<Option<Info>>,
-        connections: &Vec<Connection>,
-        web_admin: Option<&WebAdminInfo>,
-        full_screen: bool,
-    ) {
+    fn ui(&mut self, frame: &mut Frame, infos: &Vec<Option<Info>>, connections: &Vec<Connection>, web_admin: Option<&WebAdminInfo>, full_screen: bool) {
         let now = Local::now();
         let mut footer = get_text("icbmoni_footer");
         if let Some(i) = self.table_state.selected() {
@@ -231,13 +224,7 @@ impl NodeMonitoringScreen {
         self.render_connections(frame, connections_area, connections, web_admin);
     }
 
-    fn render_connections(
-        &self,
-        frame: &mut Frame,
-        connections_area: Rect,
-        connections: &[Connection],
-        web_admin: Option<&WebAdminInfo>,
-    ) {
+    fn render_connections(&self, frame: &mut Frame, connections_area: Rect, connections: &[Connection], web_admin: Option<&WebAdminInfo>) {
         let mut area = connections_area.inner(Margin { vertical: 1, horizontal: 1 });
         Line::from("═".repeat(area.width as usize))
             .style(Style::new().fg(DOS_YELLOW))
@@ -262,9 +249,7 @@ impl NodeMonitoringScreen {
             let mut args = HashMap::new();
             args.insert("token".to_string(), admin.token.clone());
             let token_line = get_text_args("icbmoni_web_admin_token", args);
-            Text::from(token_line)
-                .style(Style::new().fg(DOS_LIGHT_CYAN))
-                .render(area, frame.buffer_mut());
+            Text::from(token_line).style(Style::new().fg(DOS_LIGHT_CYAN)).render(area, frame.buffer_mut());
         }
     }
     fn render_table(&mut self, frame: &mut Frame, area: Rect, infos: &Vec<Option<Info>>) {

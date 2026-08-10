@@ -295,11 +295,7 @@ async fn start_web_admin(board: &Arc<Mutex<IcyBoard>>, config_file: &std::path::
     let addr: SocketAddr = match format!("{}:{}", web_admin.address.trim(), web_admin.port).parse() {
         Ok(addr) => addr,
         Err(_) => {
-            log::error!(
-                "web admin: invalid listen address '{}:{}'",
-                web_admin.address,
-                web_admin.port
-            );
+            log::error!("web admin: invalid listen address '{}:{}'", web_admin.address, web_admin.port);
             return None;
         }
     };
@@ -338,7 +334,10 @@ async fn start_web_admin(board: &Arc<Mutex<IcyBoard>>, config_file: &std::path::
         log::warn!("web admin is listening on a non-loopback address; put a TLS reverse proxy in front of it");
     }
 
-    let info = WebAdminInfo { url: url.clone(), token: token.clone() };
+    let info = WebAdminInfo {
+        url: url.clone(),
+        token: token.clone(),
+    };
     tokio::spawn(async move {
         tokio::select! {
             result = icbadmin::serve(addr, state) => {

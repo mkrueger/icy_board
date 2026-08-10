@@ -201,7 +201,6 @@ async fn config_without_web_admin_table_uses_secure_defaults() {
     assert!(!config.board.web_admin.allow_remote);
 }
 
-
 #[tokio::test]
 async fn general_settings_include_web_admin_and_editor_fields() {
     let f = fixture();
@@ -219,7 +218,11 @@ async fn general_settings_include_web_admin_and_editor_fields() {
     patch.web_admin_address = "127.0.0.1".to_string();
 
     let result = f.backend.update_general_settings(&patch, &current.fingerprint, "test").await.unwrap();
-    assert!(result.changed_fields.contains(&"sysop_external_editor".to_string()), "{:?}", result.changed_fields);
+    assert!(
+        result.changed_fields.contains(&"sysop_external_editor".to_string()),
+        "{:?}",
+        result.changed_fields
+    );
     assert!(result.changed_fields.contains(&"web_admin_enabled".to_string()), "{:?}", result.changed_fields);
     assert!(result.changed_fields.contains(&"web_admin_port".to_string()), "{:?}", result.changed_fields);
 
@@ -238,8 +241,7 @@ async fn message_settings_round_trip() {
     patch.allow_esc_codes = !current.settings.allow_esc_codes;
     patch.prompt_to_read_mail = !current.settings.prompt_to_read_mail;
 
-    let result = f.backend.update_message_settings(&patch, &current.fingerprint, "test").await
-        .unwrap();
+    let result = f.backend.update_message_settings(&patch, &current.fingerprint, "test").await.unwrap();
     assert!(result.changed_fields.contains(&"max_msg_lines".to_string()));
     assert!(result.changed_fields.contains(&"allow_esc_codes".to_string()));
 
@@ -256,10 +258,7 @@ async fn paths_settings_can_update_help_path() {
     let mut patch = current.settings.clone();
     patch.help_path = "help".to_string();
 
-    f.backend
-        .update_paths_settings(&patch, &current.fingerprint, "test")
-        .await
-        .unwrap();
+    f.backend.update_paths_settings(&patch, &current.fingerprint, "test").await.unwrap();
 
     let reloaded = f.backend.get_paths_settings().await.unwrap();
     assert_eq!(reloaded.settings.help_path, "help");

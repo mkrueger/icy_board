@@ -105,11 +105,7 @@ impl LiveAdminBackend {
             return Err(AdminError::NotFound(board_file));
         }
         let root_path = board_file.parent().unwrap_or_else(|| Path::new(".")).to_path_buf();
-        Ok(Self {
-            board,
-            board_file,
-            root_path,
-        })
+        Ok(Self { board, board_file, root_path })
     }
 
     async fn mutate_live_fn<F>(&self, fingerprint: &str, actor: &str, action: &str, mutator: F) -> Result<ApplyResultDto>
@@ -137,9 +133,7 @@ impl LiveAdminBackend {
         let _ = mutator(&mut disk_config)?;
 
         let backup_path = backup::create_backup(&self.root_path, &self.board_file)?;
-        disk_config
-            .save_atomic(&self.board_file)
-            .map_err(|e| AdminError::Save(e.to_string()))?;
+        disk_config.save_atomic(&self.board_file).map_err(|e| AdminError::Save(e.to_string()))?;
         if let Err(e) = IcbConfig::load(&self.board_file) {
             let _ = std::fs::copy(&backup_path, &self.board_file);
             return Err(AdminError::Save(format!(
@@ -699,11 +693,7 @@ fn path_checks(config: &IcbConfig, root_path: &Path) -> Vec<PathCheckDto> {
                     expected: PathKind::Unset,
                 };
             }
-            let resolved = if path.is_absolute() {
-                path.clone()
-            } else {
-                root_path.join(path)
-            };
+            let resolved = if path.is_absolute() { path.clone() } else { root_path.join(path) };
             let exists = match kind {
                 PathKind::File => resolved.is_file(),
                 PathKind::Directory => resolved.is_dir(),
@@ -863,11 +853,7 @@ fn set_path(target: &mut PathBuf, value: &str) {
 }
 
 fn time_string(time: &IcbTime) -> String {
-    if time.is_empty() {
-        String::new()
-    } else {
-        time.to_string()
-    }
+    if time.is_empty() { String::new() } else { time.to_string() }
 }
 
 fn parse_time_field(label: &str, value: &str, errors: &mut Vec<String>) -> IcbTime {
@@ -1026,11 +1012,7 @@ fn validate_general(dto: &GeneralSettingsDto) -> Result<()> {
     if dto.web_admin_port == 0 {
         errors.push("Web admin port must be between 1 and 65535.".to_string());
     }
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(AdminError::Validation(errors))
-    }
+    if errors.is_empty() { Ok(()) } else { Err(AdminError::Validation(errors)) }
 }
 
 fn diff_general(old: &GeneralSettingsDto, new: &GeneralSettingsDto) -> Vec<FieldChangeDto> {
@@ -1039,12 +1021,7 @@ fn diff_general(old: &GeneralSettingsDto, new: &GeneralSettingsDto) -> Vec<Field
     push_change(&mut changes, "location", old.location.clone(), new.location.trim().to_string());
     push_change(&mut changes, "operator", old.operator.clone(), new.operator.trim().to_string());
     push_change(&mut changes, "notice", old.notice.clone(), new.notice.trim().to_string());
-    push_change(
-        &mut changes,
-        "capabilities",
-        old.capabilities.clone(),
-        new.capabilities.trim().to_string(),
-    );
+    push_change(&mut changes, "capabilities", old.capabilities.clone(), new.capabilities.trim().to_string());
     push_change(&mut changes, "date_format", old.date_format.clone(), new.date_format.clone());
     push_change(&mut changes, "num_nodes", old.num_nodes.to_string(), new.num_nodes.to_string());
     push_change(&mut changes, "allow_iemsi", old.allow_iemsi.to_string(), new.allow_iemsi.to_string());
@@ -1054,12 +1031,7 @@ fn diff_general(old: &GeneralSettingsDto, new: &GeneralSettingsDto) -> Vec<Field
         old.who_include_city.to_string(),
         new.who_include_city.to_string(),
     );
-    push_change(
-        &mut changes,
-        "who_show_alias",
-        old.who_show_alias.to_string(),
-        new.who_show_alias.to_string(),
-    );
+    push_change(&mut changes, "who_show_alias", old.who_show_alias.to_string(), new.who_show_alias.to_string());
     push_change(&mut changes, "sysop_name", old.sysop_name.clone(), new.sysop_name.trim().to_string());
     push_change(
         &mut changes,
@@ -1097,12 +1069,7 @@ fn diff_general(old: &GeneralSettingsDto, new: &GeneralSettingsDto) -> Vec<Field
         old.web_admin_address.clone(),
         new.web_admin_address.trim().to_string(),
     );
-    push_change(
-        &mut changes,
-        "web_admin_port",
-        old.web_admin_port.to_string(),
-        new.web_admin_port.to_string(),
-    );
+    push_change(&mut changes, "web_admin_port", old.web_admin_port.to_string(), new.web_admin_port.to_string());
     push_change(
         &mut changes,
         "web_admin_allow_remote",
@@ -1150,11 +1117,7 @@ fn validate_message(dto: &MessageSettingsDto) -> Result<()> {
     if !(1..=500).contains(&dto.max_msg_lines) {
         errors.push("Max message lines must be between 1 and 500.".to_string());
     }
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(AdminError::Validation(errors))
-    }
+    if errors.is_empty() { Ok(()) } else { Err(AdminError::Validation(errors)) }
 }
 
 fn diff_message(old: &MessageSettingsDto, new: &MessageSettingsDto) -> Vec<FieldChangeDto> {
@@ -1179,12 +1142,7 @@ fn diff_message(old: &MessageSettingsDto, new: &MessageSettingsDto) -> Vec<Field
         old.allow_carbon_copy.to_string(),
         new.allow_carbon_copy.to_string(),
     );
-    push_change(
-        &mut c,
-        "validate_to_name",
-        old.validate_to_name.to_string(),
-        new.validate_to_name.to_string(),
-    );
+    push_change(&mut c, "validate_to_name", old.validate_to_name.to_string(), new.validate_to_name.to_string());
     push_change(
         &mut c,
         "default_quick_personal_scan",
@@ -1252,11 +1210,7 @@ fn validate_file_transfer(dto: &FileTransferSettingsDto) -> Result<()> {
     if dto.upload_descr_lines == 0 || dto.upload_descr_lines > 99 {
         errors.push("Upload description lines must be between 1 and 99.".to_string());
     }
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(AdminError::Validation(errors))
-    }
+    if errors.is_empty() { Ok(()) } else { Err(AdminError::Validation(errors)) }
 }
 
 fn diff_file_transfer(old: &FileTransferSettingsDto, new: &FileTransferSettingsDto) -> Vec<FieldChangeDto> {
@@ -1297,12 +1251,7 @@ fn diff_file_transfer(old: &FileTransferSettingsDto, new: &FileTransferSettingsD
         old.upload_descr_lines.to_string(),
         new.upload_descr_lines.to_string(),
     );
-    push_change(
-        &mut c,
-        "display_uploader",
-        old.display_uploader.to_string(),
-        new.display_uploader.to_string(),
-    );
+    push_change(&mut c, "display_uploader", old.display_uploader.to_string(), new.display_uploader.to_string());
     push_change(
         &mut c,
         "disable_drive_size_check",
@@ -1357,21 +1306,12 @@ fn validate_system_control(dto: &SystemControlSettingsDto) -> Result<()> {
     if password_storage_from_str(&dto.password_storage_method).is_none() {
         errors.push("Password storage method must be bcrypt, argon2 or plain.".to_string());
     }
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(AdminError::Validation(errors))
-    }
+    if errors.is_empty() { Ok(()) } else { Err(AdminError::Validation(errors)) }
 }
 
 fn diff_system_control(old: &SystemControlSettingsDto, new: &SystemControlSettingsDto) -> Vec<FieldChangeDto> {
     let mut c = Vec::new();
-    push_change(
-        &mut c,
-        "disable_ns_logon",
-        old.disable_ns_logon.to_string(),
-        new.disable_ns_logon.to_string(),
-    );
+    push_change(&mut c, "disable_ns_logon", old.disable_ns_logon.to_string(), new.disable_ns_logon.to_string());
     push_change(
         &mut c,
         "disable_full_record_updating",
@@ -1384,18 +1324,8 @@ fn diff_system_control(old: &SystemControlSettingsDto, new: &SystemControlSettin
         old.allow_alias_change.to_string(),
         new.allow_alias_change.to_string(),
     );
-    push_change(
-        &mut c,
-        "is_multi_lingual",
-        old.is_multi_lingual.to_string(),
-        new.is_multi_lingual.to_string(),
-    );
-    push_change(
-        &mut c,
-        "is_closed_board",
-        old.is_closed_board.to_string(),
-        new.is_closed_board.to_string(),
-    );
+    push_change(&mut c, "is_multi_lingual", old.is_multi_lingual.to_string(), new.is_multi_lingual.to_string());
+    push_change(&mut c, "is_closed_board", old.is_closed_board.to_string(), new.is_closed_board.to_string());
     push_change(
         &mut c,
         "enforce_daily_time_limit",
@@ -1483,11 +1413,7 @@ fn validate_switches(dto: &SwitchesSettingsDto) -> Result<()> {
     if news_from_str(&dto.display_news_behavior).is_none() {
         errors.push("Display news behavior must be Y, N, A or X.".to_string());
     }
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(AdminError::Validation(errors))
-    }
+    if errors.is_empty() { Ok(()) } else { Err(AdminError::Validation(errors)) }
 }
 
 fn diff_switches(old: &SwitchesSettingsDto, new: &SwitchesSettingsDto) -> Vec<FieldChangeDto> {
@@ -1619,21 +1545,12 @@ fn validate_limits(dto: &LimitsSettingsDto) -> Result<()> {
     }
     let _ = parse_time_field("Sysop page start", &dto.sysop_start, &mut errors);
     let _ = parse_time_field("Sysop page stop", &dto.sysop_stop, &mut errors);
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(AdminError::Validation(errors))
-    }
+    if errors.is_empty() { Ok(()) } else { Err(AdminError::Validation(errors)) }
 }
 
 fn diff_limits(old: &LimitsSettingsDto, new: &LimitsSettingsDto) -> Vec<FieldChangeDto> {
     let mut c = Vec::new();
-    push_change(
-        &mut c,
-        "keyboard_timeout",
-        old.keyboard_timeout.to_string(),
-        new.keyboard_timeout.to_string(),
-    );
+    push_change(&mut c, "keyboard_timeout", old.keyboard_timeout.to_string(), new.keyboard_timeout.to_string());
     push_change(
         &mut c,
         "max_number_upload_descr_lines",
@@ -1716,22 +1633,13 @@ fn apply_new_user_dto(config: &mut IcbConfig, dto: &NewUserSettingsDto) -> Resul
 fn validate_new_user(dto: &NewUserSettingsDto) -> Result<()> {
     let mut errors = Vec::new();
     check_text("New user groups", &dto.new_user_groups, 128, false, &mut errors);
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(AdminError::Validation(errors))
-    }
+    if errors.is_empty() { Ok(()) } else { Err(AdminError::Validation(errors)) }
 }
 
 fn diff_new_user(old: &NewUserSettingsDto, new: &NewUserSettingsDto) -> Vec<FieldChangeDto> {
     let mut c = Vec::new();
     push_change(&mut c, "sec_level", old.sec_level.to_string(), new.sec_level.to_string());
-    push_change(
-        &mut c,
-        "new_user_groups",
-        old.new_user_groups.clone(),
-        new.new_user_groups.trim().to_string(),
-    );
+    push_change(&mut c, "new_user_groups", old.new_user_groups.clone(), new.new_user_groups.trim().to_string());
     push_change(
         &mut c,
         "allow_one_name_users",
@@ -1751,24 +1659,14 @@ fn diff_new_user(old: &NewUserSettingsDto, new: &NewUserSettingsDto) -> Vec<Fiel
         new.ask_city_or_state.to_string(),
     );
     push_change(&mut c, "ask_address", old.ask_address.to_string(), new.ask_address.to_string());
-    push_change(
-        &mut c,
-        "ask_verification",
-        old.ask_verification.to_string(),
-        new.ask_verification.to_string(),
-    );
+    push_change(&mut c, "ask_verification", old.ask_verification.to_string(), new.ask_verification.to_string());
     push_change(
         &mut c,
         "ask_business_phone",
         old.ask_business_phone.to_string(),
         new.ask_business_phone.to_string(),
     );
-    push_change(
-        &mut c,
-        "ask_home_phone",
-        old.ask_home_phone.to_string(),
-        new.ask_home_phone.to_string(),
-    );
+    push_change(&mut c, "ask_home_phone", old.ask_home_phone.to_string(), new.ask_home_phone.to_string());
     push_change(&mut c, "ask_comment", old.ask_comment.to_string(), new.ask_comment.to_string());
     push_change(&mut c, "ask_clr_msg", old.ask_clr_msg.to_string(), new.ask_clr_msg.to_string());
     push_change(
@@ -1777,23 +1675,13 @@ fn diff_new_user(old: &NewUserSettingsDto, new: &NewUserSettingsDto) -> Vec<Fiel
         old.ask_xfer_protocol.to_string(),
         new.ask_xfer_protocol.to_string(),
     );
-    push_change(
-        &mut c,
-        "ask_date_format",
-        old.ask_date_format.to_string(),
-        new.ask_date_format.to_string(),
-    );
+    push_change(&mut c, "ask_date_format", old.ask_date_format.to_string(), new.ask_date_format.to_string());
     push_change(&mut c, "ask_fse", old.ask_fse.to_string(), new.ask_fse.to_string());
     push_change(&mut c, "ask_alias", old.ask_alias.to_string(), new.ask_alias.to_string());
     push_change(&mut c, "ask_gender", old.ask_gender.to_string(), new.ask_gender.to_string());
     push_change(&mut c, "ask_birthdate", old.ask_birthdate.to_string(), new.ask_birthdate.to_string());
     push_change(&mut c, "ask_email", old.ask_email.to_string(), new.ask_email.to_string());
-    push_change(
-        &mut c,
-        "ask_web_address",
-        old.ask_web_address.to_string(),
-        new.ask_web_address.to_string(),
-    );
+    push_change(&mut c, "ask_web_address", old.ask_web_address.to_string(), new.ask_web_address.to_string());
     push_change(
         &mut c,
         "ask_use_short_descr",
@@ -1833,29 +1721,15 @@ fn apply_event_dto(config: &mut IcbConfig, dto: &EventSettingsDto) -> Result<()>
 fn validate_event(dto: &EventSettingsDto) -> Result<()> {
     let mut errors = Vec::new();
     check_path_text("Event file", &dto.event_file, &mut errors);
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(AdminError::Validation(errors))
-    }
+    if errors.is_empty() { Ok(()) } else { Err(AdminError::Validation(errors)) }
 }
 
 fn diff_event(old: &EventSettingsDto, new: &EventSettingsDto) -> Vec<FieldChangeDto> {
     let mut c = Vec::new();
     push_change(&mut c, "enabled", old.enabled.to_string(), new.enabled.to_string());
     push_change(&mut c, "event_file", old.event_file.clone(), new.event_file.trim().to_string());
-    push_change(
-        &mut c,
-        "suspend_minutes",
-        old.suspend_minutes.to_string(),
-        new.suspend_minutes.to_string(),
-    );
-    push_change(
-        &mut c,
-        "disallow_uploads",
-        old.disallow_uploads.to_string(),
-        new.disallow_uploads.to_string(),
-    );
+    push_change(&mut c, "suspend_minutes", old.suspend_minutes.to_string(), new.suspend_minutes.to_string());
+    push_change(&mut c, "disallow_uploads", old.disallow_uploads.to_string(), new.disallow_uploads.to_string());
     push_change(
         &mut c,
         "minutes_uploads_disallowed",
@@ -1948,10 +1822,7 @@ fn apply_connection_dto(config: &mut IcbConfig, dto: &ConnectionSettingsDto) -> 
     config.login_server.secure_websocket.is_enabled = dto.secure_websocket.is_enabled;
     config.login_server.secure_websocket.port = dto.secure_websocket.port;
     config.login_server.secure_websocket.address = dto.secure_websocket.address.trim().to_string();
-    set_path(
-        &mut config.login_server.secure_websocket.display_file,
-        &dto.secure_websocket.display_file,
-    );
+    set_path(&mut config.login_server.secure_websocket.display_file, &dto.secure_websocket.display_file);
     set_path(&mut config.login_server.secure_websocket.cert_pem, &dto.secure_websocket.cert_pem);
     set_path(&mut config.login_server.secure_websocket.key_pem, &dto.secure_websocket.key_pem);
     Ok(())
@@ -1973,11 +1844,7 @@ fn validate_connection(dto: &ConnectionSettingsDto) -> Result<()> {
     check_path_text("Secure WebSocket display file", &dto.secure_websocket.display_file, &mut errors);
     check_path_text("Certificate PEM", &dto.secure_websocket.cert_pem, &mut errors);
     check_path_text("Key PEM", &dto.secure_websocket.key_pem, &mut errors);
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(AdminError::Validation(errors))
-    }
+    if errors.is_empty() { Ok(()) } else { Err(AdminError::Validation(errors)) }
 }
 
 fn diff_connection(old: &ConnectionSettingsDto, new: &ConnectionSettingsDto) -> Vec<FieldChangeDto> {
@@ -1989,12 +1856,7 @@ fn diff_connection(old: &ConnectionSettingsDto, new: &ConnectionSettingsDto) -> 
         new.telnet.is_enabled.to_string(),
     );
     push_change(&mut c, "telnet.port", old.telnet.port.to_string(), new.telnet.port.to_string());
-    push_change(
-        &mut c,
-        "telnet.address",
-        old.telnet.address.clone(),
-        new.telnet.address.trim().to_string(),
-    );
+    push_change(&mut c, "telnet.address", old.telnet.address.clone(), new.telnet.address.trim().to_string());
     push_change(
         &mut c,
         "telnet.display_file",
@@ -2180,11 +2042,7 @@ fn validate_paths(dto: &PathsSettingsDto) -> Result<()> {
     for (label, value) in fields {
         check_path_text(label, value, &mut errors);
     }
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(AdminError::Validation(errors))
-    }
+    if errors.is_empty() { Ok(()) } else { Err(AdminError::Validation(errors)) }
 }
 
 fn diff_paths(old: &PathsSettingsDto, new: &PathsSettingsDto) -> Vec<FieldChangeDto> {
@@ -2306,11 +2164,7 @@ fn validate_accounting(dto: &AccountingSettingsDto) -> Result<()> {
     ] {
         check_path_text(label, value, &mut errors);
     }
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(AdminError::Validation(errors))
-    }
+    if errors.is_empty() { Ok(()) } else { Err(AdminError::Validation(errors)) }
 }
 
 fn diff_accounting(old: &AccountingSettingsDto, new: &AccountingSettingsDto) -> Vec<FieldChangeDto> {
@@ -2335,12 +2189,7 @@ fn diff_accounting(old: &AccountingSettingsDto, new: &AccountingSettingsDto) -> 
         old.peak_usage_start.clone(),
         new.peak_usage_start.trim().to_string(),
     );
-    push_change(
-        &mut c,
-        "peak_usage_end",
-        old.peak_usage_end.clone(),
-        new.peak_usage_end.trim().to_string(),
-    );
+    push_change(&mut c, "peak_usage_end", old.peak_usage_end.clone(), new.peak_usage_end.trim().to_string());
     push_change(
         &mut c,
         "peak_days_of_week",
@@ -2354,19 +2203,9 @@ fn diff_accounting(old: &AccountingSettingsDto, new: &AccountingSettingsDto) -> 
         new.peak_holiday_list_file.trim().to_string(),
     );
     push_change(&mut c, "cfg_file", old.cfg_file.clone(), new.cfg_file.trim().to_string());
-    push_change(
-        &mut c,
-        "tracking_file",
-        old.tracking_file.clone(),
-        new.tracking_file.trim().to_string(),
-    );
+    push_change(&mut c, "tracking_file", old.tracking_file.clone(), new.tracking_file.trim().to_string());
     push_change(&mut c, "info_file", old.info_file.clone(), new.info_file.trim().to_string());
-    push_change(
-        &mut c,
-        "warning_file",
-        old.warning_file.clone(),
-        new.warning_file.trim().to_string(),
-    );
+    push_change(&mut c, "warning_file", old.warning_file.clone(), new.warning_file.trim().to_string());
     push_change(&mut c, "logoff_file", old.logoff_file.clone(), new.logoff_file.trim().to_string());
     c
 }
@@ -2396,11 +2235,7 @@ fn validate_function_keys(dto: &FunctionKeysSettingsDto) -> Result<()> {
             errors.push(format!("F{} must not be longer than 256 characters.", i + 1));
         }
     }
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(AdminError::Validation(errors))
-    }
+    if errors.is_empty() { Ok(()) } else { Err(AdminError::Validation(errors)) }
 }
 
 fn diff_function_keys(old: &FunctionKeysSettingsDto, new: &FunctionKeysSettingsDto) -> Vec<FieldChangeDto> {
@@ -2732,19 +2567,11 @@ fn conference_summaries(base: &ConferenceBase) -> Vec<ConferenceSummaryDto> {
 }
 
 fn conference_at(base: &ConferenceBase, index: usize) -> Result<&Conference> {
-    base.get(index)
-        .ok_or_else(|| AdminError::Missing(format!("conference {index} does not exist")))
+    base.get(index).ok_or_else(|| AdminError::Missing(format!("conference {index} does not exist")))
 }
 
 /// Shared write path for the conference file: backup, atomic save, read back check, audit.
-fn write_conferences(
-    root_path: &Path,
-    path: &Path,
-    base: &ConferenceBase,
-    actor: &str,
-    action: &str,
-    changes: &[FieldChangeDto],
-) -> Result<ApplyResultDto> {
+fn write_conferences(root_path: &Path, path: &Path, base: &ConferenceBase, actor: &str, action: &str, changes: &[FieldChangeDto]) -> Result<ApplyResultDto> {
     let backup_path = backup::create_backup(root_path, path)?;
     base.save_atomic(&path).map_err(|e| AdminError::Save(e.to_string()))?;
 

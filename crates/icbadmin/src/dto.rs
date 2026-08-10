@@ -85,18 +85,9 @@ pub const DATE_FORMATS: &[(&str, &str)] = &[
     ("%y-%m-%d", "YY-MM-DD"),
 ];
 
-pub const PASSWORD_STORAGE_METHODS: &[(&str, &str)] = &[
-    ("bcrypt", "bcrypt (recommended)"),
-    ("argon2", "Argon2"),
-    ("plain", "Plain text (legacy only)"),
-];
+pub const PASSWORD_STORAGE_METHODS: &[(&str, &str)] = &[("bcrypt", "bcrypt (recommended)"), ("argon2", "Argon2"), ("plain", "Plain text (legacy only)")];
 
-pub const DISPLAY_NEWS_BEHAVIORS: &[(&str, &str)] = &[
-    ("Y", "Only newer news"),
-    ("N", "Once per day"),
-    ("A", "Always"),
-    ("X", "Never"),
-];
+pub const DISPLAY_NEWS_BEHAVIORS: &[(&str, &str)] = &[("Y", "Only newer news"), ("N", "Once per day"), ("A", "Always"), ("X", "Never")];
 
 /// Board identity + sysop display options. The sysop password is never part of this DTO.
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]

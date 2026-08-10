@@ -159,12 +159,7 @@ async fn api_get_section(State(state): State<AppState>, headers: HeaderMap, Axum
     }
 }
 
-async fn api_preview_section(
-    State(state): State<AppState>,
-    headers: HeaderMap,
-    AxumPath(section): AxumPath<String>,
-    Json(body): Json<Value>,
-) -> Response {
+async fn api_preview_section(State(state): State<AppState>, headers: HeaderMap, AxumPath(section): AxumPath<String>, Json(body): Json<Value>) -> Response {
     let Some(principal) = authenticate(&state, &headers) else {
         return unauthorized();
     };
@@ -251,9 +246,19 @@ async fn preview_section_json(state: &AppState, section: SectionId, body: Value)
                 .preview_system_control_settings(&serde_json::from_value(body).map_err(json_val)?)
                 .await?
         }
-        SectionId::Switches => state.backend.preview_switches_settings(&serde_json::from_value(body).map_err(json_val)?).await?,
+        SectionId::Switches => {
+            state
+                .backend
+                .preview_switches_settings(&serde_json::from_value(body).map_err(json_val)?)
+                .await?
+        }
         SectionId::Limits => state.backend.preview_limits_settings(&serde_json::from_value(body).map_err(json_val)?).await?,
-        SectionId::NewUser => state.backend.preview_new_user_settings(&serde_json::from_value(body).map_err(json_val)?).await?,
+        SectionId::NewUser => {
+            state
+                .backend
+                .preview_new_user_settings(&serde_json::from_value(body).map_err(json_val)?)
+                .await?
+        }
         SectionId::Events => state.backend.preview_event_settings(&serde_json::from_value(body).map_err(json_val)?).await?,
         SectionId::Subscription => {
             state
@@ -454,9 +459,7 @@ async fn page_section_submit(
 
     let fingerprint = form.get("fingerprint").cloned().unwrap_or_default();
     match form_to_update(&state, section, &form, &fingerprint, &actor(&principal, addr)).await {
-        Ok(result) if result.changed_fields.is_empty() => {
-            render_section(&state, section, csrf, Some(Notice::Success("No changes to save.".to_string()))).await
-        }
+        Ok(result) if result.changed_fields.is_empty() => render_section(&state, section, csrf, Some(Notice::Success("No changes to save.".to_string()))).await,
         Ok(result) => {
             render_section(
                 &state,
@@ -989,11 +992,7 @@ async fn page_conference_submit(
     };
     let fingerprint = text(&form, "fingerprint");
     let patch = conference_from_form(&form);
-    let notice = match state
-        .backend
-        .update_conference(index, &patch, &fingerprint, &actor(&principal, addr))
-        .await
-    {
+    let notice = match state.backend.update_conference(index, &patch, &fingerprint, &actor(&principal, addr)).await {
         Ok(result) if result.changed_fields.is_empty() => Notice::Success("No changes to save.".to_string()),
         Ok(result) => Notice::Success(format!(
             "Saved {} field(s). Backup: {}",
@@ -1091,11 +1090,7 @@ async fn api_update_conference(
         Ok(patch) => patch,
         Err(e) => return json_error(&json_val(e)),
     };
-    match state
-        .backend
-        .update_conference(index, &patch, &fingerprint, &actor(&principal, addr))
-        .await
-    {
+    match state.backend.update_conference(index, &patch, &fingerprint, &actor(&principal, addr)).await {
         Ok(result) => Json(result).into_response(),
         Err(e) => json_error(&e),
     }

@@ -83,10 +83,7 @@ impl SectionId {
     /// Grouped in the order icbsetup presents them, so both tools read the same way.
     pub fn groups() -> &'static [(&'static str, &'static [SectionId])] {
         &[
-            (
-                "Board",
-                &[Self::General, Self::Paths, Self::Connections, Self::Events, Self::Subscription],
-            ),
+            ("Board", &[Self::General, Self::Paths, Self::Connections, Self::Events, Self::Subscription]),
             (
                 "Configuration options",
                 &[
@@ -125,12 +122,7 @@ fn nav_links(active: Option<SectionId>, conferences_active: bool) -> String {
         links.push_str(&format!(r#"<span class="nav-group">{}</span>"#, escape(group)));
         for section in *sections {
             let class = if active == Some(*section) { " class=\"active\"" } else { "" };
-            links.push_str(&format!(
-                r#"<a href="/settings/{}"{}>{}</a>"#,
-                section.slug(),
-                class,
-                escape(section.title())
-            ));
+            links.push_str(&format!(r#"<a href="/settings/{}"{}>{}</a>"#, section.slug(), class, escape(section.title())));
         }
     }
     links.push_str(r#"<span class="nav-group">Conferences</span>"#);
@@ -199,10 +191,7 @@ pub fn overview_page(overview: &OverviewDto) -> String {
     body.push_str(r#"<section class="hero-grid">"#);
     body.push_str(&stat_card("Board", overview.board_name.as_deref().unwrap_or("—")));
     body.push_str(&stat_card("Sysop", overview.sysop_name.as_deref().unwrap_or("—")));
-    body.push_str(&stat_card(
-        "Nodes",
-        &overview.num_nodes.map(|n| n.to_string()).unwrap_or_else(|| "—".into()),
-    ));
+    body.push_str(&stat_card("Nodes", &overview.num_nodes.map(|n| n.to_string()).unwrap_or_else(|| "—".into())));
     body.push_str(&stat_card("Version", &overview.tool_version));
     body.push_str("</section>");
 
@@ -290,12 +279,7 @@ pub fn general_page(settings: &GeneralSettingsResponse, csrf: &str, notice: Opti
     let mut date_options = String::new();
     for (value, label) in DATE_FORMATS {
         let selected = if *value == s.date_format { " selected" } else { "" };
-        date_options.push_str(&format!(
-            r#"<option value="{}"{}>{}</option>"#,
-            escape(value),
-            selected,
-            escape(label)
-        ));
+        date_options.push_str(&format!(r#"<option value="{}"{}>{}</option>"#, escape(value), selected, escape(label)));
     }
     let fields = format!(
         r#"<fieldset><legend>Board identity</legend>
@@ -375,7 +359,14 @@ pub fn message_page(settings: &MessageSettingsResponse, csrf: &str, notice: Opti
         force_comments = checkbox("Force comments to main board", "force_comments_to_main", s.force_comments_to_main),
         update_ptr = checkbox("Update last-read pointer while reading", "update_last_read_pointer", s.update_last_read_pointer),
     );
-    settings_shell(SectionId::Messages, &settings.fingerprint, csrf, notice, "Message scanning and composition behaviour.", &fields)
+    settings_shell(
+        SectionId::Messages,
+        &settings.fingerprint,
+        csrf,
+        notice,
+        "Message scanning and composition behaviour.",
+        &fields,
+    )
 }
 
 pub fn file_transfer_page(settings: &FileTransferSettingsResponse, csrf: &str, notice: Option<Notice>) -> String {
@@ -391,14 +382,27 @@ pub fn file_transfer_page(settings: &FileTransferSettingsResponse, csrf: &str, n
         credit_time = number_field("Upload credit time", "upload_credit_time", s.upload_credit_time as u64, None, None),
         credit_bytes = number_field("Upload credit bytes", "upload_credit_bytes", s.upload_credit_bytes as u64, None, None),
         descr_lines = number_field("Upload description lines", "upload_descr_lines", s.upload_descr_lines as u64, Some(1), Some(99)),
-        free_space = number_field("Stop uploads free space", "stop_uploads_free_space", s.stop_uploads_free_space as u64, None, None),
+        free_space = number_field(
+            "Stop uploads free space",
+            "stop_uploads_free_space",
+            s.stop_uploads_free_space as u64,
+            None,
+            None
+        ),
         disallow_batch = checkbox("Disallow batch uploads", "disallow_batch_uploads", s.disallow_batch_uploads),
         promote = checkbox("Promote to batch transfers", "promote_to_batch_transfers", s.promote_to_batch_transfers),
         verify = checkbox("Verify uploaded files", "verify_files_uploaded", s.verify_files_uploaded),
         display_uploader = checkbox("Display uploader", "display_uploader", s.display_uploader),
         disable_drive = checkbox("Disable drive size check", "disable_drive_size_check", s.disable_drive_size_check),
     );
-    settings_shell(SectionId::FileTransfer, &settings.fingerprint, csrf, notice, "Upload credits, batch behaviour and free-space guards.", &fields)
+    settings_shell(
+        SectionId::FileTransfer,
+        &settings.fingerprint,
+        csrf,
+        notice,
+        "Upload credits, batch behaviour and free-space guards.",
+        &fields,
+    )
 }
 
 pub fn system_control_page(settings: &SystemControlSettingsResponse, csrf: &str, notice: Option<Notice>) -> String {
@@ -421,12 +425,23 @@ pub fn system_control_page(settings: &SystemControlSettingsResponse, csrf: &str,
         multi = checkbox("Multi-lingual board", "is_multi_lingual", s.is_multi_lingual),
         closed = checkbox("Closed board / NewAsk mode", "is_closed_board", s.is_closed_board),
         daily = checkbox("Enforce daily time limit", "enforce_daily_time_limit", s.enforce_daily_time_limit),
-        pw_fail = checkbox("Allow password failure comment", "allow_password_failure_comment", s.allow_password_failure_comment),
+        pw_fail = checkbox(
+            "Allow password failure comment",
+            "allow_password_failure_comment",
+            s.allow_password_failure_comment
+        ),
         guard = checkbox("Guard logoff (G asks)", "guard_logoff", s.guard_logoff),
         confirm = checkbox("Confirm caller name", "confirm_caller_name", s.confirm_caller_name),
         reread = checkbox("Re-read security level on join", "reread_sec_level_on_join", s.reread_sec_level_on_join),
     );
-    settings_shell(SectionId::SystemControl, &settings.fingerprint, csrf, notice, "Logon policy, closed-board mode and password storage.", &fields)
+    settings_shell(
+        SectionId::SystemControl,
+        &settings.fingerprint,
+        csrf,
+        notice,
+        "Logon policy, closed-board mode and password storage.",
+        &fields,
+    )
 }
 
 pub fn switches_page(settings: &SwitchesSettingsResponse, csrf: &str, notice: Option<Notice>) -> String {
@@ -465,7 +480,14 @@ pub fn switches_page(settings: &SwitchesSettingsResponse, csrf: &str, notice: Op
         log_connect = checkbox("Log connect string", "log_connect_string", s.log_connect_string),
         log_sec = checkbox("Log security level", "log_security_level", s.log_security_level),
     );
-    settings_shell(SectionId::Switches, &settings.fingerprint, csrf, notice, "Config switches and board logging options.", &fields)
+    settings_shell(
+        SectionId::Switches,
+        &settings.fingerprint,
+        csrf,
+        notice,
+        "Config switches and board logging options.",
+        &fields,
+    )
 }
 
 pub fn limits_page(settings: &LimitsSettingsResponse, csrf: &str, notice: Option<Notice>) -> String {
@@ -497,7 +519,14 @@ pub fn limits_page(settings: &LimitsSettingsResponse, csrf: &str, notice: Option
         start = text_field("Sysop page start", "sysop_start", &s.sysop_start, 8, false),
         stop = text_field("Sysop page stop", "sysop_stop", &s.sysop_stop, 8, false),
     );
-    settings_shell(SectionId::Limits, &settings.fingerprint, csrf, notice, "Timeouts, password ageing and sysop page window.", &fields)
+    settings_shell(
+        SectionId::Limits,
+        &settings.fingerprint,
+        csrf,
+        notice,
+        "Timeouts, password ageing and sysop page window.",
+        &fields,
+    )
 }
 
 pub fn new_user_page(settings: &NewUserSettingsResponse, csrf: &str, notice: Option<Notice>) -> String {
@@ -531,7 +560,14 @@ pub fn new_user_page(settings: &NewUserSettingsResponse, csrf: &str, notice: Opt
         web = checkbox("Ask web address", "ask_web_address", s.ask_web_address),
         short = checkbox("Ask short description preference", "ask_use_short_descr", s.ask_use_short_descr),
     );
-    settings_shell(SectionId::NewUser, &settings.fingerprint, csrf, notice, "Default security, groups and registration questions.", &fields)
+    settings_shell(
+        SectionId::NewUser,
+        &settings.fingerprint,
+        csrf,
+        notice,
+        "Default security, groups and registration questions.",
+        &fields,
+    )
 }
 
 pub fn event_page(settings: &EventSettingsResponse, csrf: &str, notice: Option<Notice>) -> String {
@@ -553,7 +589,14 @@ pub fn event_page(settings: &EventSettingsResponse, csrf: &str, notice: Option<N
             None
         ),
     );
-    settings_shell(SectionId::Events, &settings.fingerprint, csrf, notice, "EVENT.DAT style timed event controls.", &fields)
+    settings_shell(
+        SectionId::Events,
+        &settings.fingerprint,
+        csrf,
+        notice,
+        "EVENT.DAT style timed event controls.",
+        &fields,
+    )
 }
 
 pub fn subscription_page(settings: &SubscriptionSettingsResponse, csrf: &str, notice: Option<Notice>) -> String {
@@ -565,10 +608,23 @@ pub fn subscription_page(settings: &SubscriptionSettingsResponse, csrf: &str, no
 </fieldset>"#,
         enabled = checkbox("Subscription mode enabled", "is_enabled", s.is_enabled),
         length = number_field("Subscription length (days)", "subscription_length", s.subscription_length as u64, None, None),
-        level = number_field("Default expired level", "default_expired_level", s.default_expired_level as u64, None, Some(255)),
+        level = number_field(
+            "Default expired level",
+            "default_expired_level",
+            s.default_expired_level as u64,
+            None,
+            Some(255)
+        ),
         warn = number_field("Warning days", "warning_days", s.warning_days as u64, None, None),
     );
-    settings_shell(SectionId::Subscription, &settings.fingerprint, csrf, notice, "Subscription period and expiry defaults.", &fields)
+    settings_shell(
+        SectionId::Subscription,
+        &settings.fingerprint,
+        csrf,
+        notice,
+        "Subscription period and expiry defaults.",
+        &fields,
+    )
 }
 
 pub fn connection_page(settings: &ConnectionSettingsResponse, csrf: &str, notice: Option<Notice>) -> String {
@@ -601,7 +657,14 @@ pub fn connection_page(settings: &ConnectionSettingsResponse, csrf: &str, notice
         w_cert = text_field("Certificate PEM", "wss_cert_pem", &s.secure_websocket.cert_pem, 512, false),
         w_key = text_field("Key PEM", "wss_key_pem", &s.secure_websocket.key_pem, 512, false),
     );
-    settings_shell(SectionId::Connections, &settings.fingerprint, csrf, notice, "Login listeners for Telnet, SSH and secure websockets.", &fields)
+    settings_shell(
+        SectionId::Connections,
+        &settings.fingerprint,
+        csrf,
+        notice,
+        "Login listeners for Telnet, SSH and secure websockets.",
+        &fields,
+    )
 }
 
 pub fn paths_page(settings: &PathsSettingsResponse, csrf: &str, notice: Option<Notice>) -> String {
@@ -690,13 +753,26 @@ pub fn accounting_page(settings: &AccountingSettingsResponse, csrf: &str, notice
         warn = text_field("Warning file", "warning_file", &s.warning_file, 512, false),
         logoff = text_field("Logoff file", "logoff_file", &s.logoff_file, 512, false),
     );
-    settings_shell(SectionId::Accounting, &settings.fingerprint, csrf, notice, "Accounting mode, peak windows and related files.", &fields)
+    settings_shell(
+        SectionId::Accounting,
+        &settings.fingerprint,
+        csrf,
+        notice,
+        "Accounting mode, peak windows and related files.",
+        &fields,
+    )
 }
 
 pub fn function_keys_page(settings: &FunctionKeysSettingsResponse, csrf: &str, notice: Option<Notice>) -> String {
     let mut fields = String::from(r#"<fieldset><legend>Function keys F1–F10</legend><div class="grid-2">"#);
     for i in 0..10 {
-        fields.push_str(&text_field(&format!("F{}", i + 1), &format!("f{}", i + 1), &settings.settings.keys[i], 256, false));
+        fields.push_str(&text_field(
+            &format!("F{}", i + 1),
+            &format!("f{}", i + 1),
+            &settings.settings.keys[i],
+            256,
+            false,
+        ));
     }
     fields.push_str("</div></fieldset>");
     settings_shell(
@@ -738,11 +814,7 @@ fn stat_card(label: &str, value: &str) -> String {
 }
 
 fn metric(label: &str, value: usize) -> String {
-    format!(
-        r#"<div class="metric"><span>{}</span><strong>{}</strong></div>"#,
-        escape(label),
-        value
-    )
+    format!(r#"<div class="metric"><span>{}</span><strong>{}</strong></div>"#, escape(label), value)
 }
 
 fn text_field(label: &str, name: &str, value: &str, max_len: usize, required: bool) -> String {
@@ -1032,12 +1104,7 @@ fn select_field(label: &str, name: &str, value: &str, options: &[(&str, &str)]) 
             escape(option_label)
         ));
     }
-    format!(
-        r#"<label>{}<select name="{}">{}</select></label>"#,
-        escape(label),
-        escape(name),
-        rendered
-    )
+    format!(r#"<label>{}<select name="{}">{}</select></label>"#, escape(label), escape(name), rendered)
 }
 
 fn decimal_field(label: &str, name: &str, value: f64) -> String {
