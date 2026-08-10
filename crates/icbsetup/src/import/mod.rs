@@ -868,8 +868,14 @@ impl PCBoardImporter {
             conf.users_menu = self.convert_conference_display_file(&output, &conf.users_menu)?;
             conf.sysop_menu = self.convert_conference_display_file(&output, &conf.sysop_menu)?;
             conf.news_file = self.convert_conference_display_file(&output, &conf.news_file)?;
+            // The metadata path anchors the file base index, so it has to follow the new
+            // upload directory instead of staying on the sysop's old DOS drive.
             conf.pub_upload_location = PathBuf::from(output.to_string() + "/pub_up");
             conf.private_upload_location = PathBuf::from(output.to_string() + "/priv_up");
+            let _ = fs::create_dir_all(self.output_directory.join(&conf.pub_upload_location));
+            let _ = fs::create_dir_all(self.output_directory.join(&conf.private_upload_location));
+            conf.pub_upload_metadata = conf.pub_upload_location.join("dir");
+            conf.private_upload_metadata = conf.private_upload_location.join("dir");
             conf.doors_menu = self.convert_conference_display_file(&output, &conf.doors_menu)?;
             conf.doors_file = self.convert_doors_file(&destination, &output, &conf.doors_file)?;
 

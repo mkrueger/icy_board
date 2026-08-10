@@ -108,7 +108,7 @@ fn fileinf_date_time_and_attrs_are_real_for_existing_files() {
         PRINTLN "attr0=", FILEINF("missing.pcb", 5)
         PRINTLN "date_ok=", FILEINF("found.pcb", 2) > 0
         PRINTLN "time_ok=", FILEINF("found.pcb", 3) >= 0
-        PRINTLN "attr_ok=", FILEINF("found.pcb", 5) > 0
+        PRINTLN "attr=", FILEINF("found.pcb", 5)
         PRINTLN "miss_date_zero=", FILEINF("missing.pcb", 2) = 0
         PRINTLN "miss_time_zero=", FILEINF("missing.pcb", 3) = 0
     "#,
@@ -116,8 +116,23 @@ fn fileinf_date_time_and_attrs_are_real_for_existing_files() {
     );
     assert_eq!(
         output,
-        "size=20\nattr0=0\ndate_ok=1\ntime_ok=1\nattr_ok=1\nmiss_date_zero=1\nmiss_time_zero=1\n"
+        "size=20\nattr0=0\ndate_ok=1\ntime_ok=1\nattr=32\nmiss_date_zero=1\nmiss_time_zero=1\n"
     );
+}
+
+/// PCBoard looked for files with dosfindfirst and never passed FA_DIREC, so a directory
+/// answers like a name that is not there. Verified against PCBoard 15.4/M.
+#[test]
+fn fileinf_reads_a_directory_as_nothing() {
+    let output = run_ppl_with_files(
+        r#"
+        PRINTLN "exist=", FILEINF("sub", 1)
+        PRINTLN "attr=", FILEINF("sub", 5)
+        PRINTLN "size=", FILEINF("sub", 4)
+    "#,
+        &[("sub/inner.txt", CONTENT)],
+    );
+    assert_eq!(output, "exist=0\nattr=0\nsize=0\n");
 }
 
 /// PCBoard printed such a line as it stood when the file behind it was not there -

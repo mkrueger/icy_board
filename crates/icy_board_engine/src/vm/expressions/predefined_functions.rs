@@ -1161,10 +1161,11 @@ pub async fn fileinf(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
     let item = vm.eval_expr(&args[1]).await?.as_int();
 
     let path = vm.resolve_file(&file).await;
-    // PCBoard (EVALP.CPP TOK_OP_FILEINF): dosfindfirst, and if not found memset the
-    // find block to 0 — missing files yield zeros, never a hard error.
-    let meta = path.metadata().ok();
-    let exists = path.exists();
+    // PCBoard (EVALP.CPP TOK_OP_FILEINF): dosfindfirst without FA_DIREC, and if nothing
+    // is found memset the find block to 0 - directories and missing files both read as
+    // zeroes, never as an error.
+    let meta = path.metadata().ok().filter(|m| m.is_file());
+    let exists = meta.is_some();
 
     match item {
         1 => Ok(VariableValue::new_bool(exists)),
@@ -1196,22 +1197,15 @@ pub async fn fileinf(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
         }
         4 => Ok(VariableValue::new_int(meta.as_ref().map_or(0, |data| data.len()) as i32)),
         5 => {
-            // DOS attribute bits. Unix has no direct match; report archive (0x20) for
-            // normal files and directory (0x10) for dirs, readonly (0x01) when not writable.
-            // Missing file → 0 (zeroed find block).
+            // Verified against PCBoard 15.4/M: a plain file reads 0x20, a read-only one 0x21.
             let attrs = meta
                 .map(|m| {
-                    let mut a = 0i32;
-                    if m.is_dir() {
-                        a |= 0x10; // FA_DIREC
-                    } else {
-                        a |= 0x20; // FA_ARCH — normal files looked "archived" after write
-                    }
+                    let mut a = 0x20i32;
                     #[cfg(unix)]
                     {
                         use std::os::unix::fs::PermissionsExt;
                         if m.permissions().mode() & 0o200 == 0 {
-                            a |= 0x01; // FA_RDONLY
+                            a |= 0x01;
                         }
                     }
                     #[cfg(not(unix))]
