@@ -170,3 +170,21 @@ fn test_cmd_r_long_message_stops_at_the_more_prompt() {
     let output = test_output("R\n1\n\n\n\n\n".to_string(), crate::tests::setup_conference_with_a_long_message);
     assert!(output.contains("More"), "a message longer than a page must pause:\n{output}");
 }
+
+/// A PPE stuffs its commands in whatever case it likes, and PCBoard uppercased a
+/// stuffed line before tokenizing it. So `r a wait` is ALL plus the WAIT option and
+/// not a text to search for, which would ask where to begin the search.
+#[test]
+fn test_cmd_r_lower_case_options_stay_options() {
+    let output = test_output("r a wait\n\n\n\n".to_string(), crate::tests::setup_conference_with_messages);
+    assert!(!output.contains("Begin Search"), "the options were taken as search text:\n{output}");
+}
+
+/// PCBoard asked whether to resume an (A)ll scan only when an earlier one had stopped
+/// part way - getallresumestatus() looks at Status.StartConf. Without one there is
+/// nothing to resume, so the question does not come up.
+#[test]
+fn test_cmd_r_all_does_not_ask_to_resume_a_scan_that_never_stopped() {
+    let output = test_output("R A\n\n\n\n".to_string(), crate::tests::setup_conference_with_messages);
+    assert!(!output.contains("Continue with scan"), "there is no scan to resume:\n{output}");
+}

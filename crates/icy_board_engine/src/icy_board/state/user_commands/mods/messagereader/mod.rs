@@ -394,21 +394,27 @@ impl IcyBoardState {
                 .await?;
         }
 
-        if cmd.ask_resume_all {
-            self.input_field(
-                IceText::ResumeAll,
-                1,
-                "",
-                "",
-                Some(self.session.yes_char.to_uppercase().to_string()),
-                display_flags::NEWLINE
-                    | display_flags::LFBEFORE
-                    | display_flags::FIELDLEN
-                    | display_flags::GUIDE
-                    | display_flags::UPCASE
-                    | display_flags::YESNO,
-            )
-            .await?;
+        // PCBoard only asked where an (A)ll scan had stopped before; without one there is
+        // nothing to resume. See getallresumestatus() in MSGREAD.C.
+        if cmd.ask_resume_all && self.session.start_conf != 0 {
+            let answer = self
+                .input_field(
+                    IceText::ResumeAll,
+                    1,
+                    "",
+                    "",
+                    Some(self.session.yes_char.to_uppercase().to_string()),
+                    display_flags::NEWLINE
+                        | display_flags::LFBEFORE
+                        | display_flags::FIELDLEN
+                        | display_flags::GUIDE
+                        | display_flags::UPCASE
+                        | display_flags::YESNO,
+                )
+                .await?;
+            if !answer.is_empty() && !answer.eq_ignore_ascii_case(&self.session.yes_char.to_string()) {
+                self.session.start_conf = 0;
+            }
         }
 
         if cmd.do_text_search && cmd.search_text.is_empty() {

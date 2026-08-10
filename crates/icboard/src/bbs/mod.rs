@@ -298,7 +298,7 @@ pub async fn internal_handle_client(mut state: IcyBoardState, login_options: Opt
                 MASK_COMMAND,
                 "",
                 None,
-                display_flags::NEWLINE | display_flags::STACKED,
+                display_flags::NEWLINE | display_flags::STACKED | display_flags::UPCASE | display_flags::HIGHASCII,
             )
             .await?;
 

@@ -182,6 +182,9 @@ pub struct Session {
     pub is_local: bool,
     pub paged_sysop: bool,
 
+    /// Where an (A)ll conference scan stopped, zero when none was left unfinished.
+    pub start_conf: u16,
+
     pub user_command_level: UserCommandLevels,
     pub sysop_command_level: SysopCommandLevels,
 
@@ -275,6 +278,7 @@ impl Session {
             disp_options: DisplayOptions::default(),
             current_conference_number: 0,
             current_conference: Conference::default(),
+            start_conf: 0,
             login_date: Utc::now(),
             current_user: None,
             cur_user_id: -1,

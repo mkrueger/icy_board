@@ -17,7 +17,7 @@ fn test_extended_mode_on() {
     let output = test_output("x on\n".to_string(), |_| {});
     assert_eq!(
         output,
-        "\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0mx on\n\n\u{1b}[1;37mExpert mode is now on, Sysop ...\n\n\u{1b}[33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0m"
+        "\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0mX ON\n\n\u{1b}[1;37mExpert mode is now on, Sysop ...\n\n\u{1b}[33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0m"
     );
 }
 
@@ -26,7 +26,7 @@ fn test_extended_mode_invalid() {
     let output = test_output("x invalid\n".to_string(), |_| {});
     assert_eq!(
         output,
-        "\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0mx invalid\n\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0m"
+        "\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0mX INVALID\n\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0m"
     );
 }
 
@@ -46,6 +46,6 @@ fn test_extended_mode_cmd_file() {
     });
     assert_eq!(
         output,
-        "\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0mx on\nXCMDFILE\n\u{1b}[1;37mExpert mode is now on, Sysop ...\n\n\u{1b}[33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0m"
+        "\u{1b}[1;33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0mX ON\nXCMDFILE\n\u{1b}[1;37mExpert mode is now on, Sysop ...\n\n\u{1b}[33m(\u{1b}[31m1000\u{1b}[33m min. left) Main Board Command? \u{1b}[0m"
     );
 }
