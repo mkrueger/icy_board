@@ -1,0 +1,25 @@
+' Captured from real PCBoard 15.4/M via the compat/ oracle.
+' Expected output in the matching .out file is PCBoard's actual behaviour,
+' not ours - do not "fix" it to match icy_board.
+DATE d
+TIME t
+MONEY m
+INTEGER i
+PRINTLN "---BEGIN---"
+LET d = "03-15-96"
+PRINTLN "d=", d, " i=", TOINTEGER(d)
+LET t = "14:22:36"
+PRINTLN "t=", t, " i=", TOINTEGER(t)
+LET m = "1.50"
+PRINTLN "m=", m, " i=", TOINTEGER(m)
+LET m = "$2.25"
+PRINTLN "m2=", m, " i=", TOINTEGER(m)
+LET i = ""
+PRINTLN "empty_i=", i
+LET d = ""
+PRINTLN "empty_d=", d, " i=", TOINTEGER(d)
+PRINTLN "todate=", TODATE("03-15-96"), " i=", TOINTEGER(TODATE("03-15-96"))
+PRINTLN "totime=", TOTIME("14:22:36"), " i=", TOINTEGER(TOTIME("14:22:36"))
+PRINTLN "tomoney=", TOMONEY("1.50"), " i=", TOINTEGER(TOMONEY("1.50"))
+PRINTLN "---END---"
+END

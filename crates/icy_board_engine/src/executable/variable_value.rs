@@ -1522,12 +1522,10 @@ impl VariableValue {
                         }
                     }
                     VariableType::Unsigned => self.data.unsigned_value.to_string(),
-                    VariableType::Date | VariableType::EDate => {
-                        format!("{}", IcbDate::from_pcboard(self.data.date_value))
-                    }
+                    VariableType::Date | VariableType::EDate => pcb_date_string(self.data.date_value),
                     VariableType::DDate => self.data.ddate_value.to_string(),
                     VariableType::Integer => self.data.int_value.to_string(),
-                    VariableType::Money => self.data.money_value.to_string(),
+                    VariableType::Money => pcb_money_string(self.data.money_value),
                     VariableType::Float => self.data.float_value.to_string(),
                     VariableType::Double => self.data.double_value.to_string(),
                     VariableType::Time => {
@@ -1729,24 +1727,27 @@ impl VariableValue {
                 data.unsigned_value = self.as_int() as u64;
             }
             VariableType::Date => {
-                data.date_value = if self.vtype == VariableType::DDate {
-                    ddate_to_date(unsafe { self.data.ddate_value }).to_pcboard_date() as u32
-                } else {
-                    self.as_int() as u32
+                data.date_value = match self.vtype {
+                    VariableType::DDate => ddate_to_date(unsafe { self.data.ddate_value }).to_pcboard_date() as u32,
+                    VariableType::String | VariableType::BigStr => date_from_string(&self.as_string()),
+                    _ => self.as_int() as u32,
                 };
             }
             VariableType::EDate => {
-                data.edate_value = if self.vtype == VariableType::DDate {
-                    ddate_to_date(unsafe { self.data.ddate_value }).to_pcboard_date() as u32
-                } else {
-                    self.as_int() as u32
+                data.edate_value = match self.vtype {
+                    VariableType::DDate => ddate_to_date(unsafe { self.data.ddate_value }).to_pcboard_date() as u32,
+                    VariableType::String | VariableType::BigStr => date_from_string(&self.as_string()),
+                    _ => self.as_int() as u32,
                 };
             }
             VariableType::Integer => {
                 data.int_value = self.as_int();
             }
             VariableType::Money => {
-                data.money_value = self.as_int();
+                data.money_value = match self.vtype {
+                    VariableType::String | VariableType::BigStr => money_from_string(&self.as_string()),
+                    _ => self.as_int(),
+                };
             }
             VariableType::String => return VariableValue::new_string(self.as_string()),
             VariableType::BigStr => {
@@ -1757,7 +1758,10 @@ impl VariableValue {
                 };
             }
             VariableType::Time => {
-                data.time_value = self.as_int();
+                data.time_value = match self.vtype {
+                    VariableType::String | VariableType::BigStr => IcbTime::parse(&self.as_string()).to_pcboard_time(),
+                    _ => self.as_int(),
+                };
             }
             VariableType::Byte => {
                 data.byte_value = self.as_byte();
@@ -1816,6 +1820,55 @@ impl VariableValue {
             generic_data: GenericVariableData::Password(password),
         }
     }
+}
+
+/// PCBoard prints a date as MM/DD/YY and an empty one as 00/00/00.
+fn pcb_date_string(date: u32) -> String {
+    if date == 0 {
+        return "00/00/00".to_string();
+    }
+    let date = IcbDate::from_pcboard(date);
+    format!("{:02}/{:02}/{:02}", date.month(), date.day(), date.year() % 100)
+}
+
+/// Money is held in cents and printed as $D.CC.
+fn pcb_money_string(cents: i32) -> String {
+    format!("${}.{:02}", cents / 100, (cents % 100).abs())
+}
+
+/// A date a PPE hands over as text, or 0 when it is not one.
+fn date_from_string(str: &str) -> u32 {
+    IcbDate::try_parse(str).map_or(0, |date| date.to_pcboard_date().max(0) as u32)
+}
+
+/// PCBoard reads money as dollars and keeps cents, cutting off anything finer.
+/// It drops the sign on the way in: "-1.50" is worth as much as "1.50".
+fn money_from_string(str: &str) -> i32 {
+    let mut dollars: i64 = 0;
+    let mut cents: i64 = 0;
+    let mut digits_after_dot = 0;
+    let mut seen_dot = false;
+    for ch in str.chars() {
+        match ch {
+            '.' if !seen_dot => seen_dot = true,
+            '0'..='9' => {
+                let digit = ch as i64 - '0' as i64;
+                if seen_dot {
+                    if digits_after_dot < 2 {
+                        cents = cents * 10 + digit;
+                        digits_after_dot += 1;
+                    }
+                } else {
+                    dollars = dollars.saturating_mul(10).saturating_add(digit);
+                }
+            }
+            _ => {}
+        }
+    }
+    if digits_after_dot == 1 {
+        cents *= 10;
+    }
+    dollars.saturating_mul(100).saturating_add(cents).clamp(i32::MIN as i64, i32::MAX as i64) as i32
 }
 
 /// A DDATE is a signed long holding the date as the decimal number CCYYMMDD.

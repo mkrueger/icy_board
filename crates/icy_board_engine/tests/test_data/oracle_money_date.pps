@@ -1,0 +1,25 @@
+' Captured from real PCBoard 15.4/M via the compat/ oracle.
+' Expected output in the matching .out file is PCBoard's actual behaviour,
+' not ours - do not "fix" it to match icy_board.
+MONEY m
+DATE d
+PRINTLN "---BEGIN---"
+LET m = "2"
+PRINTLN "m_int=", m, " i=", TOINTEGER(m)
+LET m = "-1.50"
+PRINTLN "m_neg=", m, " i=", TOINTEGER(m)
+LET m = "1.5"
+PRINTLN "m_1dp=", m, " i=", TOINTEGER(m)
+LET m = "1.555"
+PRINTLN "m_3dp=", m, " i=", TOINTEGER(m)
+LET m = "abc"
+PRINTLN "m_junk=", m, " i=", TOINTEGER(m)
+LET m = 150
+PRINTLN "m_from_int=", m, " i=", TOINTEGER(m)
+LET d = "12-30-76"
+PRINTLN "d76=", d, " i=", TOINTEGER(d)
+LET d = 35138
+PRINTLN "d_from_int=", d
+PRINTLN "str_of_d=", STRING(d)
+PRINTLN "---END---"
+END

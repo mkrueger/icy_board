@@ -443,7 +443,7 @@ pub async fn inputmoney(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()
             display_flags::NEWLINE | display_flags::UPCASE | display_flags::GUIDE,
         )
         .await?;
-    // TODO: Money conversion.
+    // PCBoard assigns the text and lets the variable's type convert it (SCREXEC.CPP).
     vm.set_variable(&args[1], VariableValue::new_string(output)).await?;
     Ok(())
 }
@@ -466,7 +466,7 @@ pub async fn inputint(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
             display_flags::NEWLINE | display_flags::UPCASE | display_flags::GUIDE,
         )
         .await?;
-    vm.set_variable(&args[1], VariableValue::new_int(output.parse::<i32>()?)).await?;
+    vm.set_variable(&args[1], VariableValue::new_string(output)).await?;
     Ok(())
 }
 pub async fn inputcc(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
@@ -510,7 +510,6 @@ pub async fn inputdate(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
             display_flags::NEWLINE | display_flags::UPCASE | display_flags::GUIDE,
         )
         .await?;
-    // TODO: Date conversion
     vm.set_variable(&args[1], VariableValue::new_string(output)).await?;
     Ok(())
 }
@@ -533,7 +532,6 @@ pub async fn inputtime(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
             display_flags::NEWLINE | display_flags::UPCASE | display_flags::GUIDE,
         )
         .await?;
-    // TODO: Time conversion
     vm.set_variable(&args[1], VariableValue::new_string(output)).await?;
     Ok(())
 }

@@ -20,7 +20,7 @@ fn test_toddate_converts_a_date() {
 
 #[test]
 fn test_a_date_survives_the_trip_through_ddate_and_back() {
-    assert_eq!(run_ppl("PRINT TODATE(TODDATE(MKDATE(1994, 5, 27)))"), "05-27-94");
+    assert_eq!(run_ppl("PRINT TODATE(TODDATE(MKDATE(1994, 5, 27)))"), "05/27/94");
 }
 
 #[test]
