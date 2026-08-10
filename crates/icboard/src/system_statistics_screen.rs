@@ -42,7 +42,7 @@ impl SystemStatisticsScreen {
     where
         B::Error: Send + Sync + 'static,
     {
-        let last_tick = Instant::now();
+        let mut last_tick = Instant::now();
         let tick_rate = Duration::from_millis(1000);
         loop {
             let timeout = tick_rate.saturating_sub(last_tick.elapsed());
@@ -98,6 +98,10 @@ impl SystemStatisticsScreen {
                         }
                     }
                 }
+            }
+
+            if last_tick.elapsed() >= tick_rate {
+                last_tick = Instant::now();
             }
         }
     }
