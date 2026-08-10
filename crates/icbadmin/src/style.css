@@ -429,6 +429,9 @@ footer {
 		display: grid;
 		grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
 	}
+	.side-nav .nav-group {
+		grid-column: 1 / -1;
+	}
 	.content { padding: 18px; }
 	.grid-2 { grid-template-columns: 1fr; }
 }
@@ -506,4 +509,20 @@ table a {
 
 table a:hover {
 	text-decoration: underline;
+}
+
+.side-nav .nav-group {
+	display: block;
+	margin: 14px 0 4px;
+	padding: 0 12px;
+	color: var(--muted);
+	font-size: 10px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.12em;
+	opacity: 0.75;
+}
+
+.side-nav .nav-group:first-of-type {
+	margin-top: 10px;
 }

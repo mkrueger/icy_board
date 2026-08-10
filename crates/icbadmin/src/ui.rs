@@ -68,33 +68,37 @@ impl SectionId {
             Self::Messages => "Messages",
             Self::FileTransfer => "File Transfer",
             Self::SystemControl => "System Control",
-            Self::Switches => "Switches & Options",
+            Self::Switches => "Configuration Switches",
             Self::Limits => "Limits",
-            Self::NewUser => "New Users",
-            Self::Events => "Events",
+            Self::NewUser => "New User Options",
+            Self::Events => "Event Setup",
             Self::Subscription => "Subscription",
-            Self::Connections => "Connections",
+            Self::Connections => "Connection Information",
             Self::Paths => "File Locations",
-            Self::Accounting => "Accounting",
+            Self::Accounting => "Accounting Configuration",
             Self::FunctionKeys => "Function Keys",
         }
     }
 
-    pub fn all() -> &'static [Self] {
+    /// Grouped in the order icbsetup presents them, so both tools read the same way.
+    pub fn groups() -> &'static [(&'static str, &'static [SectionId])] {
         &[
-            Self::General,
-            Self::Connections,
-            Self::Messages,
-            Self::FileTransfer,
-            Self::SystemControl,
-            Self::Switches,
-            Self::Limits,
-            Self::NewUser,
-            Self::Events,
-            Self::Subscription,
-            Self::Paths,
-            Self::Accounting,
-            Self::FunctionKeys,
+            (
+                "Board",
+                &[Self::General, Self::Paths, Self::Connections, Self::Events, Self::Subscription],
+            ),
+            (
+                "Configuration options",
+                &[
+                    Self::Messages,
+                    Self::FileTransfer,
+                    Self::SystemControl,
+                    Self::Switches,
+                    Self::Limits,
+                    Self::FunctionKeys,
+                ],
+            ),
+            ("Accounts", &[Self::Accounting, Self::NewUser]),
         ]
     }
 }
@@ -114,10 +118,12 @@ pub fn escape(text: &str) -> String {
     out
 }
 
-fn shell(title: &str, active: Option<SectionId>, body: &str) -> String {
-    let nav = if active.is_some() || title == "Overview" {
-        let mut links = String::from(r#"<a href="/" class="nav-home">Overview</a><a href="/conferences">Conferences</a>"#);
-        for section in SectionId::all() {
+/// Sidebar shared by the settings pages and the conference pages.
+fn nav_links(active: Option<SectionId>, conferences_active: bool) -> String {
+    let mut links = String::from(r#"<a href="/" class="nav-home">Overview</a>"#);
+    for (group, sections) in SectionId::groups() {
+        links.push_str(&format!(r#"<span class="nav-group">{}</span>"#, escape(group)));
+        for section in *sections {
             let class = if active == Some(*section) { " class=\"active\"" } else { "" };
             links.push_str(&format!(
                 r#"<a href="/settings/{}"{}>{}</a>"#,
@@ -126,6 +132,16 @@ fn shell(title: &str, active: Option<SectionId>, body: &str) -> String {
                 escape(section.title())
             ));
         }
+    }
+    links.push_str(r#"<span class="nav-group">Conferences</span>"#);
+    let class = if conferences_active { " class=\"active\"" } else { "" };
+    links.push_str(&format!(r#"<a href="/conferences"{class}>Conferences</a>"#));
+    links
+}
+
+fn shell(title: &str, active: Option<SectionId>, body: &str) -> String {
+    let nav = if active.is_some() || title == "Overview" {
+        let links = nav_links(active, false);
         format!(
             r#"<div class="layout"><aside class="sidebar"><div class="brand"><span class="brand-mark">IB</span><div><strong>IcyBoard</strong><small>Web Admin</small></div></div><nav class="side-nav">{links}</nav><form class="logout" method="post" action="/logout"><button type="submit">Log out</button></form></aside><div class="content"><header class="topbar"><div><p class="eyebrow">Configuration</p><h1>{title}</h1></div><span class="badge">local</span></header><main>{body}</main><footer>icbadmin {version} · icbsetup and icbsysmgr remain fully supported.</footer></div></div>"#,
             title = escape(title),
@@ -783,15 +799,7 @@ fn conference_shell(title: &str, body: &str) -> String {
 }
 
 fn conference_nav_links() -> String {
-    let mut links = String::from(r#"<a href="/" class="nav-home">Overview</a><a href="/conferences" class="active">Conferences</a>"#);
-    for section in SectionId::all() {
-        links.push_str(&format!(
-            r#"<a href="/settings/{}">{}</a>"#,
-            section.slug(),
-            escape(section.title())
-        ));
-    }
-    links
+    nav_links(None, true)
 }
 
 pub fn conference_list_page(list: &ConferenceListResponse, csrf: &str, notice: Option<Notice>) -> String {
