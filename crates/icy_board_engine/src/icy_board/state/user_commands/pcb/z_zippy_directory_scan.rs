@@ -25,6 +25,15 @@ pub struct DirNumbers {
     pub numbers: Vec<(usize, String, std::path::PathBuf, std::path::PathBuf)>,
 }
 
+/// What a lone `N` or `S` on the command line asked for.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum NewScanKind {
+    /// `N` - ask which date to scan from.
+    AskDate,
+    /// `S` - take the stored date without asking.
+    SinceLastScan,
+}
+
 impl IcyBoardState {
     pub async fn zippy_directory_scan(&mut self) -> Res<()> {
         if self.session.current_conference.directories.is_none() || self.session.current_conference.directories.as_ref().unwrap().is_empty() {
@@ -32,7 +41,11 @@ impl IcyBoardState {
                 .await?;
             return Ok(());
         }
-        let scan_date = if self.tokens_request_new_scan() { self.ask_scan_date().await? } else { None };
+        let scan_date = if let Some(kind) = self.tokens_request_new_scan() {
+            self.ask_scan_date(kind).await?
+        } else {
+            None
+        };
         let search_pattern = if let Some(token) = self.session.tokens.pop_front() {
             token
         } else {
@@ -140,24 +153,34 @@ impl IcyBoardState {
     /// PCBoard treats a lone N or S on the command line as a new file scan and
     /// then asks for a date before it asks for the search text. The tokens are
     /// taken out of the queue so the later directory parse does not see them twice.
-    pub fn tokens_request_new_scan(&mut self) -> bool {
-        let mut found = false;
+    /// S wins over N, the way PCBoard's date buffer keeps the last thing written to it.
+    pub fn tokens_request_new_scan(&mut self) -> Option<NewScanKind> {
+        let mut kind = None;
         self.session.tokens.retain(|token| {
-            if token.eq_ignore_ascii_case("N") || token.eq_ignore_ascii_case("S") {
-                found = true;
+            if token.eq_ignore_ascii_case("S") {
+                kind = Some(NewScanKind::SinceLastScan);
+                false
+            } else if token.eq_ignore_ascii_case("N") {
+                kind.get_or_insert(NewScanKind::AskDate);
                 false
             } else {
                 true
             }
         });
-        found
+        kind
     }
 
     /// An empty answer keeps the default, a
     /// date of all zeroes turns the filter off and anything that is not six
     /// digits is asked again.
-    pub async fn ask_scan_date(&mut self) -> Res<Option<chrono::prelude::DateTime<chrono::prelude::Local>>> {
+    pub async fn ask_scan_date(&mut self, kind: NewScanKind) -> Res<Option<chrono::prelude::DateTime<chrono::prelude::Local>>> {
         let default = self.session.current_user.as_ref().map(|user| user.stats.last_on.format("%m%d%y").to_string());
+        if kind == NewScanKind::SinceLastScan {
+            let Some(default) = &default else {
+                return Ok(None);
+            };
+            return Ok(Self::parse_scan_date(default));
+        }
         loop {
             let mut answer = self
                 .input_field(
@@ -181,11 +204,18 @@ impl IcyBoardState {
             if answer.len() != 6 || !answer.chars().all(|c| c.is_ascii_digit()) {
                 continue;
             }
-            let month = answer[0..2].parse::<u8>().unwrap_or(0);
-            let day = answer[2..4].parse::<u8>().unwrap_or(0);
-            let year = answer[4..6].parse::<u16>().unwrap_or(0);
-            return Ok(Some(IcbDate::new(month, day, year).to_local_date_time()));
+            return Ok(Self::parse_scan_date(&answer));
         }
+    }
+
+    fn parse_scan_date(answer: &str) -> Option<chrono::prelude::DateTime<chrono::prelude::Local>> {
+        if answer.len() != 6 || !answer.chars().all(|c| c.is_ascii_digit()) {
+            return None;
+        }
+        let month = answer[0..2].parse::<u8>().unwrap_or(0);
+        let day = answer[2..4].parse::<u8>().unwrap_or(0);
+        let year = answer[4..6].parse::<u16>().unwrap_or(0);
+        Some(IcbDate::new(month, day, year).to_local_date_time())
     }
 
     pub async fn get_dir_numbers(&mut self) -> Res<DirNumbers> {
@@ -238,7 +268,11 @@ impl IcyBoardState {
                     read_date = true;
                 }
                 "S" => {
-                    // TODO
+                    // Scan from the stored date without asking for one.
+                    if let Some(user) = self.session.current_user.as_ref() {
+                        let stored = user.stats.last_on.format("%m%d%y").to_string();
+                        res.date_time = Self::parse_scan_date(&stored);
+                    }
                 }
                 t => {
                     self.add_numbers(&mut numbers, t).await?;

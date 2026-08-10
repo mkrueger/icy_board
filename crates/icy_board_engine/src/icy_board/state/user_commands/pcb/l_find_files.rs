@@ -23,7 +23,11 @@ impl IcyBoardState {
                 .await?;
             return Ok(());
         }
-        let scan_date = if self.tokens_request_new_scan() { self.ask_scan_date().await? } else { None };
+        let scan_date = if let Some(kind) = self.tokens_request_new_scan() {
+            self.ask_scan_date(kind).await?
+        } else {
+            None
+        };
         let search_pattern = if let Some(token) = self.session.tokens.pop_front() {
             token
         } else {

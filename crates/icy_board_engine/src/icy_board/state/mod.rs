@@ -940,8 +940,8 @@ impl IcyBoardState {
             "RM+" => convert_cmd(CommandType::ReadMemorizedMessage(1)),
             "RM-" => convert_cmd(CommandType::ReadMemorizedMessage(2)),
             "F" => convert_cmd(CommandType::FileDirectory),
-            "BD" => convert_cmd(CommandType::BatchDownload),
-            "BU" => convert_cmd(CommandType::BatchUpload),
+            "BD" | "DB" => convert_cmd(CommandType::BatchDownload),
+            "BU" | "UB" => convert_cmd(CommandType::BatchUpload),
             "G" => convert_cmd(CommandType::Goodbye),
             "?" | "H" => convert_cmd(CommandType::Help),
             "I" => convert_cmd(CommandType::InitialWelcome),
@@ -963,7 +963,15 @@ impl IcyBoardState {
             "Y" => convert_cmd(CommandType::YourMailScan),
             "Z" => convert_cmd(CommandType::ZippyDirectoryScan),
             "TS" => convert_cmd(CommandType::TextSearch),
+            "1" => convert_cmd(CommandType::ViewCallerLog),
+            "2" => convert_cmd(CommandType::ViewUserFile),
             "4" => convert_cmd(CommandType::RestoreMessage),
+            "5" => convert_cmd(CommandType::HeaderScan),
+            "6" => convert_cmd(CommandType::ViewTextFile),
+            "11" => convert_cmd(CommandType::NodeList),
+            "12" => convert_cmd(CommandType::LogoffNode),
+            "13" => convert_cmd(CommandType::NodeCallerLog),
+            "16" => convert_cmd(CommandType::DirCommand),
             "@" => convert_cmd(CommandType::ReadEmail),
             "@W" => convert_cmd(CommandType::WriteEmail),
             _ => {
@@ -978,7 +986,7 @@ impl IcyBoardState {
                 if "BYE".starts_with(command.as_str()) {
                     return convert_cmd(CommandType::Bye);
                 }
-                if "CHAT".starts_with(command.as_str()) {
+                if "CHAT".starts_with(command.as_str()) || "NODE".starts_with(command.as_str()) {
                     return convert_cmd(CommandType::GroupChat);
                 }
                 if "WHO".starts_with(command.as_str()) {
@@ -990,7 +998,7 @@ impl IcyBoardState {
                 if "HELP".starts_with(command.as_str()) {
                     return convert_cmd(CommandType::Help);
                 }
-                if "DOOR".starts_with(command.as_str()) || "Open".starts_with(command.as_str()) {
+                if "DOOR".starts_with(command.as_str()) || "OPEN".starts_with(command.as_str()) {
                     return convert_cmd(CommandType::OpenDoor);
                 }
                 if "DOWNLOAD".starts_with(command.as_str()) {
@@ -1020,9 +1028,6 @@ impl IcyBoardState {
 
                 if "QWK".starts_with(command.as_str()) {
                     return convert_cmd(CommandType::QWK);
-                }
-                if "MENU".starts_with(command.as_str()) {
-                    return convert_cmd(CommandType::ShowMenu);
                 }
                 if "SELECT".starts_with(command.as_str()) {
                     return convert_cmd(CommandType::SelectConferences);
@@ -1063,6 +1068,8 @@ impl IcyBoardState {
     }
 
     /// Appends one time stamped line to the caller log, PCBoard's CALLER file.
+    /// PCBoard kept one log per node; icy_board shares a single file, so the node
+    /// is stamped on every line and sysop command 13 filters on it.
     pub async fn write_caller_log(&self, text: &str) {
         let path = {
             let board = self.get_board().await;
@@ -1074,7 +1081,7 @@ impl IcyBoardState {
         if path.as_os_str().is_empty() {
             return;
         }
-        let line = format!("{} {}\r\n", chrono::Local::now().format("%H:%M"), text);
+        let line = format!("{} [{}] {}\r\n", chrono::Local::now().format("%H:%M"), self.node + 1, text);
         let result = std::fs::OpenOptions::new()
             .create(true)
             .append(true)

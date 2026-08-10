@@ -41,18 +41,31 @@ impl IcyBoardState {
         }
 
         let mut protocol_str: String = self.session.current_user.as_ref().unwrap().protocol.clone();
-        let mut protocol = None;
-        let mut p_descr = "None".to_string();
+        let mut protocol;
+        let mut p_descr;
 
         let mut goodbye_after_dl = false;
         let mut do_dl = true;
         loop {
+            protocol = None;
+            p_descr = "None".to_string();
             for p in self.get_board().await.protocols.iter() {
                 if p.is_enabled && p.char_code == protocol_str {
                     p_descr = p.description.clone();
                     protocol = Some(p.send_command.clone());
                     break;
                 }
+            }
+
+            // PCBoard asks which protocol to use instead of starting a transfer
+            // the caller has no protocol for.
+            if protocol.is_none() {
+                let answer = self.ask_transfer_protocol(&protocol_str).await?;
+                if answer.is_empty() || answer.eq_ignore_ascii_case("N") {
+                    return Ok(());
+                }
+                protocol_str = answer;
+                continue;
             }
 
             let mut total_size = 0;

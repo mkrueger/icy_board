@@ -91,8 +91,12 @@ impl IcyBoardState {
             self.autorun_commands(mnu, AutoRun::After, 0).await?;
 
             let typed_ahead = self.ppl_typeahead();
-            let command = self.input_menu_prompt(mnu, &mut current_item, &menu_start_time).await?;
-            if command.len() > 5 {
+            let mut command = self.input_menu_prompt(mnu, &mut current_item, &menu_start_time).await?;
+            // PCBoard repeats the last command worth remembering when the caller types '!'.
+            if command == "!" && !self.saved_cmd.is_empty() {
+                command = self.saved_cmd.clone();
+            }
+            if command.len() >= 5 {
                 self.saved_cmd = command.clone();
             }
             if command.is_empty() {
@@ -459,6 +463,70 @@ impl IcyBoardState {
                 }
                 // 4
                 self.restore_message().await?;
+            }
+            CommandType::ViewCallerLog => {
+                let sec = self.session.sysop_command_level.sec_1_view_caller_log.clone();
+                if check_security && !self.check_sec("1", &sec).await? {
+                    return Ok(());
+                }
+                // 1
+                self.view_caller_log().await?;
+            }
+            CommandType::ViewUserFile => {
+                let sec = self.session.sysop_command_level.sec_2_view_usr_list.clone();
+                if check_security && !self.check_sec("2", &sec).await? {
+                    return Ok(());
+                }
+                // 2
+                self.view_user_file().await?;
+            }
+            CommandType::ViewTextFile => {
+                let sec = self.session.sysop_command_level.sec_6_view_any_file.clone();
+                if check_security && !self.check_sec("6", &sec).await? {
+                    return Ok(());
+                }
+                // 6
+                self.view_text_file().await?;
+            }
+            CommandType::NodeList => {
+                let sec = self.session.sysop_command_level.sec_11_view_other_nodes.clone();
+                if check_security && !self.check_sec("11", &sec).await? {
+                    return Ok(());
+                }
+                // 11
+                self.node_list().await?;
+            }
+            CommandType::NodeCallerLog => {
+                let sec = self.session.sysop_command_level.sec_13_view_alt_node_callers.clone();
+                if check_security && !self.check_sec("13", &sec).await? {
+                    return Ok(());
+                }
+                // 13
+                self.view_node_caller_log().await?;
+            }
+            CommandType::HeaderScan => {
+                let sec = self.session.sysop_command_level.sec_5_list_message_hdr.clone();
+                if check_security && !self.check_sec("5", &sec).await? {
+                    return Ok(());
+                }
+                // 5
+                self.header_message_scan().await?;
+            }
+            CommandType::LogoffNode => {
+                let sec = self.session.sysop_command_level.sec_12_logoff_alt_node.clone();
+                if check_security && !self.check_sec("12", &sec).await? {
+                    return Ok(());
+                }
+                // 12
+                self.logoff_node().await?;
+            }
+            CommandType::DirCommand => {
+                let sec = self.session.sysop_command_level.sec_6_view_any_file.clone();
+                if check_security && !self.check_sec("16", &sec).await? {
+                    return Ok(());
+                }
+                // 16
+                self.dir_command().await?;
             }
             CommandType::ReadEmail => {
                 let sec = self.session.user_command_level.cmd_r.clone();

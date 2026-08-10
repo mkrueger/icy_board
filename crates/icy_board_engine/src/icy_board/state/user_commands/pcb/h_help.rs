@@ -25,7 +25,11 @@ impl IcyBoardState {
             let mut found = false;
             let help_cmd = help_cmd.to_ascii_uppercase();
 
-            if let Some(action) = self.try_find_command(&help_cmd, true).await {
+            if help_cmd == "!" {
+                // '!' repeats the last command and has no entry in the command list.
+                help_loc = help_loc.join("hlp!");
+                found = true;
+            } else if let Some(action) = self.try_find_command(&help_cmd, true).await {
                 if !action.help.is_empty() {
                     help_loc = help_loc.join(&action.help);
                     found = true;

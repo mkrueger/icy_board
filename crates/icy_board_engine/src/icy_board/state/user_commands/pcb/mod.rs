@@ -1,4 +1,10 @@
+pub mod _11_node_list;
+pub mod _12_logoff_node;
+pub mod _16_dir_command;
+pub mod _1_view_caller_log;
+pub mod _2_view_user_file;
 pub mod _4_recover_message;
+pub mod _6_view_text_file;
 pub mod a_abandon_conference;
 pub mod alias_toggle_alias;
 pub mod b_show_bulletins;

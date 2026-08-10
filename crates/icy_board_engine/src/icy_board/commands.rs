@@ -224,6 +224,30 @@ pub enum CommandType {
     // SYSOP '4' command
     RestoreMessage,
 
+    /// SYSOP '1' command
+    ViewCallerLog,
+
+    /// SYSOP '2' command
+    ViewUserFile,
+
+    /// SYSOP '6' command
+    ViewTextFile,
+
+    /// SYSOP '11' command
+    NodeList,
+
+    /// SYSOP '13' command
+    NodeCallerLog,
+
+    /// SYSOP '5' command
+    HeaderScan,
+
+    /// SYSOP '12' command
+    LogoffNode,
+
+    /// SYSOP '16' command
+    DirCommand,
+
     // '@'
     ReadEmail,
 
@@ -319,6 +343,14 @@ impl Display for CommandType {
             CommandType::EnableAlias => write!(f, "EnableAlias"),
             CommandType::Broadcast => write!(f, "Broadcast"),
             CommandType::RestoreMessage => write!(f, "RestoreMessage"),
+            CommandType::ViewCallerLog => write!(f, "ViewCallerLog"),
+            CommandType::ViewUserFile => write!(f, "ViewUserFile"),
+            CommandType::ViewTextFile => write!(f, "ViewTextFile"),
+            CommandType::NodeList => write!(f, "NodeList"),
+            CommandType::NodeCallerLog => write!(f, "NodeCallerLog"),
+            CommandType::HeaderScan => write!(f, "HeaderScan"),
+            CommandType::LogoffNode => write!(f, "LogoffNode"),
+            CommandType::DirCommand => write!(f, "DirCommand"),
             CommandType::ReadEmail => write!(f, "ReadEmail"),
             CommandType::WriteEmail => write!(f, "WriteEmail"),
             CommandType::RunPPE => write!(f, "RunPPE"),
@@ -397,6 +429,14 @@ impl Display for CommandType {
             CommandType::EnableAlias => write!(f, "(ALIAS)\tEnableAlias"),
             CommandType::Broadcast => write!(f, "(BROADCAST)\tBroadcast"),
             CommandType::RestoreMessage => write!(f, "(RESTORE)\tRestoreMessage"),
+            CommandType::ViewCallerLog => write!(f, "(1)\tViewCallerLog"),
+            CommandType::ViewUserFile => write!(f, "(2)\tViewUserFile"),
+            CommandType::ViewTextFile => write!(f, "(6)\tViewTextFile"),
+            CommandType::NodeList => write!(f, "(11)\tNodeList"),
+            CommandType::NodeCallerLog => write!(f, "(13)\tNodeCallerLog"),
+            CommandType::HeaderScan => write!(f, "(5)\tHeaderScan"),
+            CommandType::LogoffNode => write!(f, "(12)\tLogoffNode"),
+            CommandType::DirCommand => write!(f, "(16)\tDirCommand"),
             CommandType::ReadEmail => write!(f, "(@)\tReadEmail"),
             CommandType::WriteEmail => write!(f, "(@W)\tWriteEmail"),
             CommandType::RunPPE => write!(f, "(PPE)\tRunPPE"),
@@ -476,6 +516,14 @@ impl FromStr for CommandType {
             "enablealias" => Ok(CommandType::EnableAlias),
             "broadcast" => Ok(CommandType::Broadcast),
             "restoremessage" => Ok(CommandType::RestoreMessage),
+            "viewcallerlog" => Ok(CommandType::ViewCallerLog),
+            "viewuserfile" => Ok(CommandType::ViewUserFile),
+            "viewtextfile" => Ok(CommandType::ViewTextFile),
+            "nodelist" => Ok(CommandType::NodeList),
+            "nodecallerlog" => Ok(CommandType::NodeCallerLog),
+            "headerscan" => Ok(CommandType::HeaderScan),
+            "logoffnode" => Ok(CommandType::LogoffNode),
+            "dircommand" => Ok(CommandType::DirCommand),
             "reademail" => Ok(CommandType::ReadEmail),
             "writeemail" => Ok(CommandType::WriteEmail),
             "runppe" => Ok(CommandType::RunPPE),
@@ -558,6 +606,14 @@ impl CommandType {
             CommandType::EnableAlias,
             CommandType::Broadcast,
             CommandType::RestoreMessage,
+            CommandType::ViewCallerLog,
+            CommandType::ViewUserFile,
+            CommandType::ViewTextFile,
+            CommandType::NodeList,
+            CommandType::NodeCallerLog,
+            CommandType::HeaderScan,
+            CommandType::LogoffNode,
+            CommandType::DirCommand,
             CommandType::ReadEmail,
             CommandType::WriteEmail,
             CommandType::RunPPE,
@@ -612,19 +668,31 @@ impl CommandType {
             CommandType::TestFile => "hlptest",
             CommandType::UserList => "hlpusers",
             CommandType::WhoIsOnline => "hlpwho",
-            CommandType::ShowMenu => "hlpmenu",
             CommandType::DisplayNews => "hlpnews",
             CommandType::SetLanguage => "hlplang",
             CommandType::ReplyMessage => "hlprep",
             CommandType::EnableAlias => "hlpalias",
             CommandType::Broadcast => "hlpbrd",
             CommandType::RestoreMessage => "hlp4",
+            CommandType::ViewCallerLog => "hlp1",
+            CommandType::ViewUserFile => "hlp2",
+            CommandType::ViewTextFile => "hlp6",
+            CommandType::NodeList => "hlp11",
+            CommandType::NodeCallerLog => "hlp13",
+            CommandType::HeaderScan => "hlp5",
+            CommandType::LogoffNode => "hlp12",
+            CommandType::DirCommand => "hlp16",
             CommandType::ReadEmail => "hlp@",
             CommandType::WriteEmail => "hlp@w",
             CommandType::RunPPE => "hlpppe",
             CommandType::TextSearch => "hlpts",
             CommandType::ChangeMessageArea => "hlparea",
             CommandType::QWK => "hlpqwk",
+            CommandType::SelectConferences => "hlpsel",
+            CommandType::ReadMemorizedMessage(_) => "hlprm",
+            // PCBoard sends the batch commands to the plain transfer help.
+            CommandType::BatchDownload => "hlpd",
+            CommandType::BatchUpload => "hlpu",
             _ => "",
         }
     }

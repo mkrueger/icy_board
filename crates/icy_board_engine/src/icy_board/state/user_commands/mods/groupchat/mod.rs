@@ -283,7 +283,7 @@ impl IcyBoardState {
             prompt,
             60,
             &MASK_ASCII,
-            "hlpchat",
+            "hlpcmenu",
             None,
             display_flags::UPCASE | display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE,
         )

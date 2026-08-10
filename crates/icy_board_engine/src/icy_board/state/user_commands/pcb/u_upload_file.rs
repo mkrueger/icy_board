@@ -82,6 +82,21 @@ impl IcyBoardState {
         if file_name.is_empty() {
             return Ok(());
         }
+
+        // PCBoard settles the protocol before it offers the goodbye question, and
+        // asks for one rather than starting a transfer the caller has none for.
+        let mut protocol_str: String = self.session.current_user.as_ref().unwrap().protocol.clone();
+        loop {
+            if self.get_protocol(protocol_str.clone()).await.is_some() {
+                break;
+            }
+            let answer = self.ask_transfer_protocol(&protocol_str).await?;
+            if answer.is_empty() || answer.eq_ignore_ascii_case("N") {
+                return Ok(());
+            }
+            protocol_str = answer;
+        }
+
         let mut goodbye_after_upload = false;
 
         loop {
@@ -106,6 +121,7 @@ impl IcyBoardState {
                 }
                 "P" => {
                     self.set_transfer_protocol().await?;
+                    protocol_str = self.session.current_user.as_ref().unwrap().protocol.clone();
                     continue;
                 }
                 "" => {
@@ -115,7 +131,6 @@ impl IcyBoardState {
             }
         }
 
-        let protocol_str: String = self.session.current_user.as_ref().unwrap().protocol.clone();
         let protocol = self.get_protocol(protocol_str).await;
 
         if let Some(protocol) = protocol {

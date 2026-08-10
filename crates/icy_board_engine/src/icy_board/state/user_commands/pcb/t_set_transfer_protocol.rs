@@ -49,6 +49,16 @@ impl IcyBoardState {
     }
 
     pub async fn ask_protocols(&mut self, cur_protocol: &str) -> Res<String> {
+        self.ask_protocol_with(cur_protocol, IceText::DesiredProtocol).await
+    }
+
+    /// PCBoard asks this one when a transfer is about to start and the caller has
+    /// no usable protocol set, and it uses its own prompt rather than the T command's.
+    pub async fn ask_transfer_protocol(&mut self, cur_protocol: &str) -> Res<String> {
+        self.ask_protocol_with(cur_protocol, IceText::ProtocolForTransfer).await
+    }
+
+    async fn ask_protocol_with(&mut self, cur_protocol: &str, prompt: IceText) -> Res<String> {
         let mut protocols = Vec::new();
         self.new_line().await?;
         for protocol in self.get_board().await.protocols.iter() {
@@ -69,7 +79,7 @@ impl IcyBoardState {
         }
         let protocol = self
             .input_field(
-                IceText::DesiredProtocol,
+                prompt,
                 1,
                 &MASK_ASCII,
                 "",

@@ -25,6 +25,18 @@ use jamjam::jam::JamMessageBase;
 impl IcyBoardState {
     #[async_recursion(?Send)]
     pub async fn quick_message_scan(&mut self) -> Res<()> {
+        self.message_scan(false).await
+    }
+
+    /// Sysop command 5. PCBoard runs the quick scan with its header scan flag on,
+    /// which adds the active/inactive column and lists killed messages too.
+    #[async_recursion(?Send)]
+    pub async fn header_message_scan(&mut self) -> Res<()> {
+        self.message_scan(true).await
+    }
+
+    #[async_recursion(?Send)]
+    async fn message_scan(&mut self, header_scan: bool) -> Res<()> {
         self.set_activity(NodeStatus::HandlingMail).await;
 
         let Some(message_base_file) = self.message_area_path(self.session.current_message_area) else {
@@ -34,7 +46,7 @@ impl IcyBoardState {
         };
         match JamMessageBase::open(&message_base_file) {
             Ok(message_base) => {
-                self.show_quick_scans(self.session.current_message_area, message_base).await?;
+                self.show_quick_scans(self.session.current_message_area, message_base, header_scan).await?;
                 Ok(())
             }
             Err(err) => {
@@ -44,7 +56,7 @@ impl IcyBoardState {
                     .await?;
                 if JamMessageBase::create(message_base_file).is_ok() {
                     log::error!("successfully created new message index.");
-                    return self.quick_message_scan().await;
+                    return self.message_scan(header_scan).await;
                 }
                 log::error!("failed to create message index.");
 
@@ -55,7 +67,7 @@ impl IcyBoardState {
         }
     }
 
-    async fn show_quick_scans(&mut self, area: usize, message_base: JamMessageBase) -> Res<()> {
+    async fn show_quick_scans(&mut self, area: usize, message_base: JamMessageBase, header_scan: bool) -> Res<()> {
         let prompt = if self.session.expert_mode() {
             IceText::MessageScanCommandExpertmode
         } else {
@@ -105,12 +117,20 @@ impl IcyBoardState {
         );
         self.println(TerminalTarget::Both, &conf).await?;
 
-        self.display_text(IceText::QuickScanHeader, display_flags::NEWLINE).await?;
+        self.display_text(
+            if header_scan { IceText::FiveScanHeader } else { IceText::QuickScanHeader },
+            display_flags::NEWLINE,
+        )
+        .await?;
 
         self.set_color(TerminalTarget::Both, IcbColor::dos_light_cyan()).await?;
         for i in number..message_base.active_messages() {
             match message_base.read_header(i) {
                 Ok(header) => {
+                    // Only the header scan lists what has been killed.
+                    if header.is_deleted() && !header_scan {
+                        continue;
+                    }
                     let status = if header.needs_password() {
                         if header.is_read() { '^' } else { '%' }
                     } else if header.is_private() {
@@ -124,11 +144,19 @@ impl IcyBoardState {
                     } else {
                         '-'
                     };
+                    let active = if !header_scan {
+                        String::new()
+                    } else if header.is_deleted() {
+                        "I".to_string()
+                    } else {
+                        "A".to_string()
+                    };
 
                     self.println(
                         TerminalTarget::Both,
                         &format!(
-                            "{}{:<7} {:<7} {:<15} {:<15} {:<25}",
+                            "{}{}{:<7} {:<7} {:<15} {:<15} {:<25}",
+                            active,
                             status,
                             header.message_number,
                             if header.reply_to > 0 { header.reply_to.to_string() } else { "-".to_string() },
@@ -143,6 +171,10 @@ impl IcyBoardState {
             }
         }
 
+        if header_scan {
+            // A header scan lists and stops; it does not walk into the messages.
+            return Ok(());
+        }
         self.read_msgs_from_base(message_base, false).await
     }
 }
