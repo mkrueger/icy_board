@@ -53,13 +53,21 @@ enum Commands {
 /// Import PCBDAT.DAT file to IcyBoard
 #[argh(subcommand, name = "import")]
 struct Import {
-    /// PCBOARD.DAT file to import
+    /// PCBOARD.DAT file or the directory of the PCBoard installation to import
     #[argh(positional)]
     name: PathBuf,
 
     /// output directory
     #[argh(positional)]
     out: PathBuf,
+
+    /// map a dos path to a local one, may be repeated: --map 'D:\FILES=/mnt/files'
+    #[argh(option)]
+    map: Vec<String>,
+
+    /// only report what would be imported and which paths can't be resolved
+    #[argh(switch)]
+    dry_run: bool,
 }
 
 #[derive(FromArgs, PartialEq, Debug)]
@@ -84,17 +92,50 @@ fn main() -> Result<()> {
     let arguments: Cli = argh::from_env();
 
     match &arguments.command {
-        Some(Commands::Import(Import { name, out })) => {
+        Some(Commands::Import(Import { name, out, map, dry_run })) => {
+            let mut mappings = Vec::new();
+            for mapping in map {
+                let Some((dos_path, local_path)) = mapping.split_once('=') else {
+                    print_error(format!("Invalid mapping '{}', expected 'C:\\PCB=/path/to/pcb'", mapping));
+                    process::exit(1);
+                };
+                mappings.push((dos_path.to_string(), local_path.to_string()));
+            }
+
+            let output_directory = if *dry_run {
+                std::env::temp_dir().join(format!("icbsetup-dry-run-{}", process::id()))
+            } else {
+                PathBuf::from(out)
+            };
+
             let output = Box::<ConsoleLogger>::default();
-            match PCBoardImporter::new(name, output, PathBuf::from(out)) {
+            match PCBoardImporter::new(name, output, output_directory.clone(), &mappings) {
                 Ok(mut importer) => match importer.start_import() {
                     Ok(_) => {
-                        println!("Imported successfully");
+                        if *dry_run {
+                            let unresolved = importer.unresolved_paths();
+                            println!("\nUnresolved paths ({}):", unresolved.len());
+                            for path in unresolved {
+                                println!("  {}", path);
+                            }
+                            let _ = fs::remove_dir_all(&output_directory);
+                            println!("\nDry run - nothing was written.");
+                            return Ok(());
+                        }
+                        // A board that doesn't load again is an import failure, no matter what got written.
+                        let config = output_directory.join(icy_board_engine::DEFAULT_ICYBOARD_FILE);
+                        match IcyBoard::load(&config) {
+                            Ok(_) => println!("Imported successfully"),
+                            Err(e) => print_error(format!("Imported board doesn't load: {}", e)),
+                        }
                     }
                     Err(e) => {
                         print_error(e.to_string());
                         let destination = importer.output_directory.join("importlog.txt");
                         fs::write(destination, &importer.logger.output)?;
+                        if *dry_run {
+                            let _ = fs::remove_dir_all(&output_directory);
+                        }
                     }
                 },
                 Err(e) => {

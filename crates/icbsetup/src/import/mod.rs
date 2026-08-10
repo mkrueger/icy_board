@@ -1,5 +1,6 @@
 use std::{
-    collections::HashMap,
+    cell::RefCell,
+    collections::{BTreeSet, HashMap},
     fs,
     path::{Path, PathBuf},
     str::FromStr,
@@ -69,11 +70,74 @@ pub trait OutputLogger {
     fn warning(&self, message: String);
 }
 
+/// Art and RIP lines start with the same character as a PPE call, so only a plausible name is followed.
+fn is_dos_path(file: &str) -> bool {
+    !file.is_empty() && file.len() <= 128 && !file.chars().any(|ch| ch.is_control() || matches!(ch, '|' | '<' | '>' | '"' | '*' | '?' | '@'))
+}
+
+/// A `X:\…` path starting at `start`, ending where a delimiter or the line does.
+fn dos_path_at(data: &[u8], start: usize) -> Option<usize> {
+    if start + 3 > data.len() || !data[start].is_ascii_alphabetic() || data[start + 1] != b':' || data[start + 2] != b'\\' {
+        return None;
+    }
+    if start > 0 && data[start - 1].is_ascii_alphanumeric() {
+        return None;
+    }
+    let mut end = start + 3;
+    while end < data.len() {
+        let ch = data[end];
+        if !(0x21..=0x7e).contains(&ch) || matches!(ch, b'"' | b'\'' | b',' | b';' | b'|' | b'*' | b'?' | b'<' | b'>') {
+            break;
+        }
+        end += 1;
+    }
+    Some(end)
+}
+
+/// A whole PCBoard installation may be given instead of its PCBOARD.DAT.
+fn locate_pcboard_dat(path: &Path) -> Res<PathBuf> {
+    if !path.is_dir() {
+        return Ok(path.to_path_buf());
+    }
+    let in_root = lookup_case_insensitive(&path.join("PCBOARD.DAT"));
+    if in_root.is_file() {
+        return Ok(in_root);
+    }
+    let found = WalkDir::new(path)
+        .max_depth(2)
+        .sort_by_file_name()
+        .into_iter()
+        .filter_map(|entry| entry.ok())
+        .filter(|entry| entry.file_type().is_file() && entry.file_name().to_string_lossy().eq_ignore_ascii_case("pcboard.dat"))
+        .map(|entry| entry.into_path())
+        .next();
+    match found {
+        Some(found) => Ok(found),
+        None => Err(Box::new(IcyBoardError::Error(format!(
+            "No PCBOARD.DAT found in {} - point the import at the file itself.",
+            path.display()
+        )))),
+    }
+}
+
+#[derive(Default)]
+pub struct ImportStats {
+    pub conferences: usize,
+    pub users: usize,
+    pub users_without_inf: usize,
+    pub message_bases: usize,
+    pub ppes: usize,
+    pub converted_files: usize,
+}
+
 pub struct PCBoardImporter {
     pub output: Box<dyn OutputLogger>,
     pub data: PcbBoardData,
     pub output_directory: PathBuf,
     pub logger: ImportLog,
+
+    /// Directory PCBOARD.DAT was read from.
+    pub source_directory: PathBuf,
 
     /// Contains paths to map dos paths to unix paths
     /// For example:
@@ -82,15 +146,28 @@ pub struct PCBoardImporter {
     pub resolve_paths: HashMap<String, String>,
 
     pub converted_files: HashMap<String, String>,
+
+    pub stats: ImportStats,
+
+    /// DOS paths nothing was found for - resolving happens behind &self.
+    unresolved: RefCell<BTreeSet<String>>,
 }
 
 impl PCBoardImporter {
-    pub fn new(file_name: &Path, output: Box<dyn OutputLogger>, output_directory: PathBuf) -> Res<Self> {
-        match PcbBoardData::import_pcboard(file_name) {
+    pub fn new(file_name: &Path, output: Box<dyn OutputLogger>, output_directory: PathBuf, mappings: &[(String, String)]) -> Res<Self> {
+        let file_name = locate_pcboard_dat(file_name)?;
+        match PcbBoardData::import_pcboard(&file_name) {
             Ok(data) => {
                 let mut paths = HashMap::new();
+                for (dos_path, local_path) in mappings {
+                    let mut dos_path = dos_path.replace('\\', "/");
+                    while dos_path.ends_with('/') {
+                        dos_path.pop();
+                    }
+                    paths.insert(dos_path, local_path.trim_end_matches('/').to_string());
+                }
 
-                let file_path = PathBuf::from(file_name);
+                let file_path = file_name.clone();
                 let mut help = data.path.help_loc.clone();
                 if help.ends_with('\\') {
                     help.pop();
@@ -99,16 +176,23 @@ impl PCBoardImporter {
                 help = help.replace('\\', "/");
 
                 let help_loc = PathBuf::from(&help);
-                let mut path = file_path.parent().unwrap().to_path_buf();
+                let path = file_path.parent().unwrap().to_path_buf();
 
                 let upper = path.to_string_lossy().to_ascii_uppercase();
 
                 let source_directory = path.clone();
-                output.start_action(format!("Importing PCBoard from base path {}\n", source_directory.display()));
+                output.start_action(format!(
+                    "Importing PCBoard {} from base path {}\n",
+                    file_path.file_name().unwrap_or_default().to_string_lossy(),
+                    source_directory.display()
+                ));
 
-                path.push(help_loc.file_name().unwrap_or_default());
-                if !path.exists() {
-                    return Err(Box::new(IcyBoardError::Error("Can't resolve C: file".to_string())));
+                if !lookup_case_insensitive(&path.join(help_loc.file_name().unwrap_or_default())).is_dir() {
+                    output.warning(format!(
+                        "'{}' not found below {} - assuming the installation was copied into one directory.",
+                        data.path.help_loc,
+                        source_directory.display()
+                    ));
                 }
 
                 //let len = to_str().unwrap().len();
@@ -116,7 +200,14 @@ impl PCBoardImporter {
                     if let Some(v) = file_path.parent() {
                         let k = k.to_str().unwrap_or_default().to_string();
                         let v = v.to_path_buf().to_str().unwrap_or_default().to_string();
-                        paths.insert(k, v);
+                        paths.entry(k).or_insert(v);
+                    }
+                }
+
+                // A board below C:\PCB has the rest of the drive next to it, so C: is worth a guess.
+                if let Some((drive, _)) = help.split_once(':') {
+                    if let Some(drive_root) = source_directory.parent() {
+                        paths.entry(format!("{}:", drive)).or_insert(drive_root.to_string_lossy().to_string());
                     }
                 }
 
@@ -128,9 +219,12 @@ impl PCBoardImporter {
                     output,
                     data,
                     output_directory,
+                    source_directory,
                     resolve_paths: paths,
                     logger: ImportLog::default(),
                     converted_files: HashMap::new(),
+                    stats: ImportStats::default(),
+                    unresolved: RefCell::new(BTreeSet::new()),
                 })
             }
             Err(err) => Err(Box::new(IcyBoardError::Error(format!("Error reading PCBoard data: {}", err.to_string())))),
@@ -138,6 +232,36 @@ impl PCBoardImporter {
     }
 
     pub fn resolve_file(&self, file: &str) -> PathBuf {
+        let resolved = self.try_resolve_file(file);
+        if !resolved.exists() && !file.trim().is_empty() {
+            self.unresolved.borrow_mut().insert(file.to_string());
+        }
+        resolved
+    }
+
+    /// Conference lists name their files with the DOS path they had - if that leads nowhere the name alone still may.
+    pub fn resolve_listed_file(&self, file: &Path) -> PathBuf {
+        let full = self.try_resolve_file(&file.to_string_lossy());
+        if full.exists() {
+            return full;
+        }
+        if let Some(name) = file.file_name() {
+            let by_name = self.try_resolve_file(&name.to_string_lossy());
+            if by_name.exists() {
+                return by_name;
+            }
+        }
+        if !file.as_os_str().is_empty() {
+            self.unresolved.borrow_mut().insert(file.to_string_lossy().to_string());
+        }
+        full
+    }
+
+    pub fn unresolved_paths(&self) -> Vec<String> {
+        self.unresolved.borrow().iter().cloned().collect()
+    }
+
+    fn try_resolve_file(&self, file: &str) -> PathBuf {
         let path = PathBuf::from(file);
         if path.exists() {
             return path;
@@ -152,35 +276,91 @@ impl PCBoardImporter {
             .collect();
         // hack for "/path" - assume that PCB is on the same drive & top level dir (like C:\PCB)
         if s.starts_with("/") {
-            if let Some(path) = self.resolve_paths.values().next() {
+            if let Some(drive) = self.resolve_paths.keys().find(|key| key.len() == 2 && key.ends_with(':')) {
+                s = format!("{}{}", drive, s);
+            } else if let Some(path) = self.resolve_paths.values().next() {
                 s = format!("{}/..{}", path, s);
             }
         }
 
-        for (k, v) in &self.resolve_paths {
-            if s.to_ascii_uppercase().starts_with(&k.to_ascii_uppercase()) {
-                if v.ends_with('/') || s.chars().skip(k.len()).next().unwrap() == '/' {
-                    s = v.clone() + &s[k.len()..];
-                } else {
-                    s = v.clone() + "/" + &s[k.len()..];
-                }
+        // C:\PCB and C: both map somewhere, the longer one is the one that was meant.
+        let mapping = self
+            .resolve_paths
+            .iter()
+            .filter(|(k, _)| s.to_ascii_uppercase().starts_with(&k.to_ascii_uppercase()))
+            .max_by_key(|(k, _)| k.len());
+        if let Some((k, v)) = mapping {
+            let rest = &s[k.len()..];
+            s = if rest.is_empty() || rest.starts_with('/') || v.ends_with('/') {
+                v.clone() + rest
+            } else {
+                v.clone() + "/" + rest
+            };
+        }
+
+        let mapped = PathBuf::from(&s);
+        let resolved = lookup_case_insensitive(&mapped);
+        if resolved.exists() {
+            return resolved;
+        }
+        for candidate in self.name_variants(&mapped) {
+            let candidate = lookup_case_insensitive(&candidate);
+            if candidate.exists() {
+                return candidate;
+            }
+        }
+        resolved
+    }
+
+    /// Where PCBoard names a file it may mean the same name with a display extension, a prompt
+    /// suffix like `_` or `~`, or - on installations copied into one directory - the board directory.
+    fn name_variants(&self, mapped: &Path) -> Vec<PathBuf> {
+        let Some(name) = mapped.file_name().map(|n| n.to_string_lossy().to_string()) else {
+            return Vec::new();
+        };
+        let parent = mapped.parent().map(|p| p.to_path_buf()).unwrap_or_default();
+        let trimmed = name.trim_end_matches(['_', '~', '.', ' ']).to_string();
+
+        let mut names = vec![name.clone()];
+        if trimmed != name && !trimmed.is_empty() {
+            names.push(trimmed.clone());
+        }
+        if !trimmed.contains('.') {
+            for ext in ["pcb", "ans", "asc", "rip"] {
+                names.push(format!("{}.{}", trimmed, ext));
             }
         }
 
-        lookup_case_insensitive(Path::new(&s))
+        let mut variants = Vec::new();
+        // Relative names are relative to the board directory, not to where icbsetup was started.
+        if mapped.is_relative() {
+            variants.push(self.source_directory.join(mapped));
+            if let Some(dir) = mapped.parent() {
+                variants.push(self.source_directory.join(dir).join(&trimmed));
+            }
+        }
+        for name in names {
+            if parent != self.source_directory {
+                variants.push(parent.join(&name));
+            }
+            variants.push(self.source_directory.join(&name));
+        }
+        variants.retain(|variant| variant != mapped);
+        variants
     }
 
     pub fn start_import(&mut self) -> Res<()> {
         self.create_directories()?;
 
-        self.copy_display_directory("help files", &self.data.path.help_loc.clone(), "art/help", |_| true)?;
+        self.copy_display_directory("help files", &self.data.path.help_loc.clone(), "art/help", Some("HLP"), |_| true)?;
         self.copy_display_directory(
             "commmand display files",
             &self.data.path.cmd_display_files_loc.clone(),
             "art/cmd_display",
+            None,
             |_| true,
         )?;
-        self.copy_display_directory("security files", &self.data.path.sec_loc.clone(), "art/secmsgs", |p| {
+        self.copy_display_directory("security files", &self.data.path.sec_loc.clone(), "art/secmsgs", None, |p| {
             let file_name = p.file_name().unwrap().to_str().unwrap();
             file_name.chars().next().unwrap_or_default().is_ascii_digit()
         })?;
@@ -598,6 +778,52 @@ impl PCBoardImporter {
         let destination = self.output_directory.join("importlog.txt");
         fs::write(destination, &self.logger.output)?;
 
+        self.write_report()?;
+
+        Ok(())
+    }
+
+    fn write_report(&mut self) -> Res<()> {
+        let unresolved = self.unresolved_paths();
+        let mut report = String::new();
+        report.push_str(&format!(
+            "Imported {} to {}\n\n",
+            self.source_directory.display(),
+            self.output_directory.display()
+        ));
+        report.push_str(&format!("Conferences   {}\n", self.stats.conferences));
+        report.push_str(&format!("Users         {}\n", self.stats.users));
+        report.push_str(&format!("Message bases {}\n", self.stats.message_bases));
+        report.push_str(&format!("PPEs          {}\n", self.stats.ppes));
+        report.push_str(&format!("Files         {}\n", self.stats.converted_files));
+        if self.stats.users_without_inf > 0 {
+            report.push_str(&format!("Users without USERS.INF record {}\n", self.stats.users_without_inf));
+        }
+        report.push_str(&format!("\nUnresolved paths ({}):\n", unresolved.len()));
+        for path in &unresolved {
+            report.push_str(&format!("  {}\n", path));
+        }
+        report.push_str("\nPaths are looked up through:\n");
+        let mut mappings: Vec<_> = self.resolve_paths.iter().collect();
+        mappings.sort();
+        for (dos, local) in mappings {
+            report.push_str(&format!("  {} -> {}\n", dos, local));
+        }
+        report.push_str("\nAdd --map 'D:\\FILES=/path/to/files' for paths that point to another drive.\n");
+
+        let destination = self.output_directory.join("import_report.txt");
+        fs::write(&destination, &report)?;
+
+        self.output.start_action(format!(
+            "\nConferences {}, users {}, message bases {}, PPEs {}, files {}, unresolved paths {}.\nReport written to {}",
+            self.stats.conferences,
+            self.stats.users,
+            self.stats.message_bases,
+            self.stats.ppes,
+            self.stats.converted_files,
+            unresolved.len(),
+            destination.display()
+        ));
         Ok(())
     }
 
@@ -629,6 +855,7 @@ impl PCBoardImporter {
             vec![PcbAdditionalConferenceHeader::default(); conferences.len()]
         };
         self.logger.log("imported conference headers, converting...");
+        self.stats.conferences = conferences.len();
 
         let mut conf_base = ConferenceBase::import_pcboard(&self.output_directory, &conferences, &add_conferences);
         for (i, conf) in conf_base.iter_mut().enumerate() {
@@ -665,6 +892,8 @@ impl PCBoardImporter {
                     for area in list.iter_mut() {
                         area.path = self.convert_message_base(&destination, &output, &area.path)?;
                     }
+                    // An area without a message base is one the board can only stumble over.
+                    list.retain(|area| !area.path.as_os_str().is_empty());
                     list.save(&destination.join("area.toml"))?;
                 }
                 Err(err) => {
@@ -681,15 +910,18 @@ impl PCBoardImporter {
         Ok(PathBuf::from(new_rel_name))
     }
 
-    fn convert_conference_display_file(&mut self, output: &str, file_name: &Path) -> Res<PathBuf> {
-        let Some(file_name) = file_name.file_name() else {
+    fn convert_conference_display_file(&mut self, output: &str, file_path: &Path) -> Res<PathBuf> {
+        let Some(file_name) = file_path.file_name() else {
             return Ok(PathBuf::new());
         };
 
-        let resolved_file = self.resolve_file(file_name.to_str().unwrap());
+        let resolved_file = self.resolve_listed_file(file_path);
 
         let name = resolved_file.file_name().unwrap().to_str().unwrap().to_string().to_ascii_lowercase();
         let new_name = format!("{}/{}", output, &name);
+        if resolved_file.exists() {
+            return self.convert_display_file(&resolved_file.to_string_lossy(), &new_name);
+        }
         self.convert_display_file(file_name.to_str().unwrap(), &new_name)
     }
 
@@ -770,11 +1002,14 @@ impl PCBoardImporter {
 
     pub fn scan_pcb_text_line_for_commands(&mut self, line: &str, i: usize) -> Res<String> {
         if let Some(call) = PPECall::try_parse_line(line) {
-            self.logger.log(&format!(
-                "Found {:?} in entry {} : {} arguments :{:?}",
-                call.call_type, i, call.file, call.arguments
-            ));
-            let resolved_file = self.resolve_file(&call.file);
+            if !is_dos_path(&call.file) {
+                return Ok(line.to_string());
+            }
+            // '_' ends the record and '~' is a space - both belong to the entry, not to the file name.
+            let file = call.file.trim_end_matches(['_', '~']).to_string();
+            self.logger
+                .log(&format!("Found {:?} in entry {} : {} arguments :{:?}", call.call_type, i, file, call.arguments));
+            let resolved_file = self.resolve_file(&file);
             if !resolved_file.exists() {
                 self.output.warning(format!("Can't find file {}", resolved_file.display()));
                 self.logger.log(&format!("Can't find file {}", resolved_file.display()));
@@ -787,7 +1022,7 @@ impl PCBoardImporter {
                 if i == 1 {
                     new_line.push_str(&new_name);
                 }
-                if i >= 1 && i <= call.file.len() {
+                if i >= 1 && i <= file.len() {
                     continue;
                 }
                 new_line.push(ch);
@@ -800,11 +1035,13 @@ impl PCBoardImporter {
 
     pub fn scan_line_for_commands(&mut self, line: &str, i: usize) -> Res<String> {
         if let Some(call) = PPECall::try_parse_line(line) {
-            self.logger.log(&format!(
-                "Found {:?} in line {} : {} arguments :{:?}",
-                call.call_type, i, call.file, call.arguments
-            ));
-            let resolved_file = self.resolve_file(&call.file);
+            if !is_dos_path(&call.file) {
+                return Ok(line.to_string());
+            }
+            let file = call.file.trim_end_matches(['_', '~']).to_string();
+            self.logger
+                .log(&format!("Found {:?} in line {} : {} arguments :{:?}", call.call_type, i, file, call.arguments));
+            let resolved_file = self.resolve_file(&file);
             if !resolved_file.exists() {
                 self.output.warning(format!("Can't find file {}", resolved_file.display()));
                 self.logger.log(&format!("Can't find file {}", resolved_file.display()));
@@ -821,7 +1058,7 @@ impl PCBoardImporter {
                 if i == 1 {
                     new_line.push_str(&new_name);
                 }
-                if i >= 1 && i <= call.file.len() {
+                if i >= 1 && i <= file.len() {
                     continue;
                 }
                 new_line.push(ch);
@@ -841,9 +1078,9 @@ impl PCBoardImporter {
         if let Some(ext) = resolved_file.extension() {
             match ext.to_ascii_uppercase().to_string_lossy().to_string().as_str() {
                 "PPE" => {
-                    self.converted_files
-                        .insert(upper_file_name.clone(), resolved_file.to_str().unwrap().to_string());
-                    return Ok(resolved_file.to_str().unwrap().to_string());
+                    let new_name = self.copy_ppe(&resolved_file)?;
+                    self.converted_files.insert(upper_file_name.clone(), new_name.clone());
+                    return Ok(new_name);
                 }
                 "MNU" => {
                     let imported_menu = Menu::import_pcboard(&resolved_file)?;
@@ -882,6 +1119,145 @@ impl PCBoardImporter {
         Ok(out_path)*/
     }
 
+    /// A PPE is useless without the files next to it, so its own directory comes over as a whole.
+    fn copy_ppe(&mut self, ppe: &Path) -> Res<String> {
+        let stem = ppe.file_stem().unwrap_or_default().to_string_lossy().to_string();
+        let file_name = ppe.file_name().unwrap().to_string_lossy().to_ascii_lowercase();
+        let parent = ppe.parent().unwrap_or(&self.source_directory).to_path_buf();
+        let own_directory = self.is_ppe_directory(&parent);
+
+        let dir_name = if own_directory {
+            parent.file_name().unwrap_or_default().to_string_lossy().to_ascii_lowercase()
+        } else {
+            stem.to_ascii_lowercase()
+        };
+        let dest_dir = self.output_directory.join("ppe").join(&dir_name);
+
+        self.output
+            .start_action(format!("\t copy PPE '{}' to '{}'…", ppe.display(), dest_dir.display()));
+        fs::create_dir_all(&dest_dir)?;
+
+        for entry in WalkDir::new(&parent).max_depth(if own_directory { usize::MAX } else { 1 }) {
+            let entry = entry?;
+            if !entry.file_type().is_file() {
+                continue;
+            }
+            if !own_directory && !entry.path().file_stem().is_some_and(|name| name.to_string_lossy().eq_ignore_ascii_case(&stem)) {
+                continue;
+            }
+            let rel_path: RelativePathBuf = entry.path().relative_to(&parent).unwrap();
+            let to = RelativePathBuf::from_path(rel_path.as_str().to_lowercase()).unwrap().to_logical_path(&dest_dir);
+            if let Some(parent_dir) = to.parent() {
+                fs::create_dir_all(parent_dir)?;
+            }
+            self.copy_ppe_file(entry.path(), &to)?;
+            self.logger.copy_file(entry.path(), &to);
+        }
+        self.stats.ppes += 1;
+        Ok(format!("ppe/{}/{}", dir_name, file_name))
+    }
+
+    /// A directory holding a handful of PPEs is one PPE's own; a bucket like PPE\ is not.
+    fn is_ppe_directory(&self, dir: &Path) -> bool {
+        if dir == self.source_directory || !dir.is_dir() {
+            return false;
+        }
+        let ppes = fs::read_dir(dir)
+            .map(|entries| {
+                entries
+                    .flatten()
+                    .filter(|entry| entry.path().extension().is_some_and(|ext| ext.eq_ignore_ascii_case("ppe")))
+                    .count()
+            })
+            .unwrap_or(0);
+        (1..=3).contains(&ppes)
+    }
+
+    /// Config files of a PPE carry the DOS paths of the installation they were written for.
+    /// The bytes are kept as they are - only the paths themselves are replaced.
+    fn copy_ppe_file(&mut self, from: &Path, to: &Path) -> Res<()> {
+        let is_documentation = from.extension().is_some_and(|ext| {
+            ["doc", "nfo", "diz", "ans", "pcb", "asc", "rip"]
+                .iter()
+                .any(|kind| ext.eq_ignore_ascii_case(kind))
+        });
+        let Ok(data) = fs::read(from) else {
+            self.output.check_error(fs::copy(from, to).err())?;
+            return Ok(());
+        };
+        if is_documentation || data.contains(&0) || !data.windows(2).any(|w| w[1] == b':' && w[0].is_ascii_alphabetic()) {
+            self.output.check_error(fs::copy(from, to).err())?;
+            return Ok(());
+        }
+
+        let mut out = Vec::with_capacity(data.len());
+        let mut i = 0;
+        let mut rewrote = 0;
+        while i < data.len() {
+            let Some(end) = dos_path_at(&data, i) else {
+                out.push(data[i]);
+                i += 1;
+                continue;
+            };
+            let dos_path = String::from_utf8_lossy(&data[i..end]).to_string();
+            match self.map_ppe_path(&dos_path) {
+                Some(new_path) => {
+                    out.extend(new_path.as_bytes());
+                    rewrote += 1;
+                    self.logger.log(&format!("{}: {} -> {}", from.display(), dos_path, new_path));
+                }
+                None => out.extend(&data[i..end]),
+            }
+            i = end;
+        }
+
+        if rewrote > 0 {
+            self.output.start_action(format!("\t adjust {} path(s) in '{}'…", rewrote, to.display()));
+        }
+        fs::write(to, &out)?;
+        Ok(())
+    }
+
+    /// A DOS path that leads into a PPE directory gets the place that directory has now.
+    fn map_ppe_path(&self, dos_path: &str) -> Option<String> {
+        let resolved = self.try_resolve_file(dos_path);
+        if resolved.exists() {
+            if let Some(mapped) = self.ppe_target_path(&resolved) {
+                return Some(mapped);
+            }
+            // Anything the import already brought over is named by the place it went to.
+            return self.converted_files.get(&resolved.to_string_lossy().to_ascii_uppercase()).cloned();
+        }
+        // Log files and the like are only created while the board runs, so the directory decides.
+        let path = PathBuf::from(dos_path.replace('\\', "/"));
+        let dir = self.try_resolve_file(&path.parent()?.to_string_lossy());
+        if !dir.is_dir() {
+            return None;
+        }
+        let name = path.file_name()?.to_string_lossy().to_ascii_lowercase();
+        self.ppe_target_path(&dir.join(name))
+    }
+
+    /// Where a file below a PPE directory ends up - the place copy_ppe() gives it.
+    fn ppe_target_path(&self, resolved: &Path) -> Option<String> {
+        let mut rel = PathBuf::new();
+        let mut dir = resolved.to_path_buf();
+        loop {
+            if self.is_ppe_directory(&dir) {
+                let name = dir.file_name()?.to_string_lossy().to_ascii_lowercase();
+                let rel = rel.to_string_lossy().to_ascii_lowercase();
+                return Some(if rel.is_empty() {
+                    format!("ppe/{}", name)
+                } else {
+                    format!("ppe/{}/{}", name, rel)
+                });
+            }
+            let name = dir.file_name()?.to_os_string();
+            dir = dir.parent()?.to_path_buf();
+            rel = PathBuf::from(name).join(rel);
+        }
+    }
+
     pub fn import_and_scan_file<P: AsRef<Path>, Q: AsRef<Path>>(&mut self, from: &P, to: &Q) -> Res<()> {
         let from = from.as_ref();
         if from.is_dir() {
@@ -898,8 +1274,13 @@ impl PCBoardImporter {
             import.push_str(&line_txt);
             import.push('\n');
         }
+        // A prompt file ends where the cursor has to stay, so a newline is not added to one that had none.
+        if !in_string.ends_with('\n') && !in_string.ends_with('\r') {
+            import.pop();
+        }
 
         write_utf8_with_bom(to, &import)?;
+        self.stats.converted_files += 1;
         self.logger.converted_file(from.as_ref(), to.as_ref(), true);
         Ok(())
     }
@@ -1032,15 +1413,26 @@ impl PCBoardImporter {
             let users = PcbUserRecord::read_users(&PathBuf::from(&usr_file))?;
             let user_inf = PcbUserInf::read_users(&PathBuf::from(&inf_file))?;
 
-            UserBase::import_pcboard(
-                &users
-                    .iter()
-                    .map(|u| PcbUser {
-                        user: u.clone(),
-                        inf: user_inf[u.rec_num as usize].clone(),
-                    })
-                    .collect::<Vec<PcbUser>>(),
-            )
+            let mut missing_inf = 0;
+            let pcb_users = users
+                .iter()
+                .map(|u| PcbUser {
+                    user: u.clone(),
+                    // A packed or crashed board can leave USERS.INF shorter than USERS.
+                    inf: user_inf.get(u.rec_num as usize).cloned().unwrap_or_else(|| {
+                        missing_inf += 1;
+                        PcbUserInf::default()
+                    }),
+                })
+                .collect::<Vec<PcbUser>>();
+            if missing_inf > 0 {
+                self.output
+                    .warning(format!("{} users have no USERS.INF record - imported with defaults.", missing_inf));
+                self.logger.log(&format!("{} users without USERS.INF record", missing_inf));
+                self.stats.users_without_inf = missing_inf;
+            }
+
+            UserBase::import_pcboard(&pcb_users)
         };
         let destination: PathBuf = self.output_directory.join(new_rel_name);
         if user_base.is_empty() {
@@ -1059,31 +1451,57 @@ impl PCBoardImporter {
             user.stats.first_date_on = chrono::Utc::now();
             user_base.new_user(user);
         }
+        self.stats.users = user_base.len();
         user_base.save(&destination)?;
         Ok(PathBuf::from(new_rel_name))
     }
 
-    fn copy_display_directory<F: Fn(&Path) -> bool>(&mut self, category: &str, dir_loc: &str, rel_output: &str, filter: F) -> Res<()> {
+    fn copy_display_directory<F: Fn(&Path) -> bool>(
+        &mut self,
+        category: &str,
+        dir_loc: &str,
+        rel_output: &str,
+        flat_prefix: Option<&str>,
+        filter: F,
+    ) -> Res<()> {
         self.logger.log(&format!("\n=== Converting {} ===", category));
         if dir_loc.is_empty() {
             self.logger.log(&format!("\ndir wasn't set."));
             return Ok(());
         }
         let help_loc = self.resolve_file(dir_loc);
-        let help_loc = PathBuf::from(&help_loc);
+        let mut help_loc = PathBuf::from(&help_loc);
+        let mut flat_prefix = flat_prefix.map(|p| p.to_ascii_uppercase());
         if !help_loc.is_dir() {
-            self.logger.log(&format!("\ndir {} doesn't exist", help_loc.display()));
-            return Ok(());
+            // On a flat installation the files sit next to PCBOARD.DAT and only the name tells them apart.
+            match &flat_prefix {
+                Some(_) if self.source_directory.is_dir() => {
+                    self.logger
+                        .log(&format!("\ndir {} doesn't exist - taking them from the board directory", help_loc.display()));
+                    help_loc = self.source_directory.clone();
+                }
+                _ => {
+                    self.logger.log(&format!("\ndir {} doesn't exist", help_loc.display()));
+                    return Ok(());
+                }
+            }
+        } else {
+            flat_prefix = None;
         }
 
         let o = self.output_directory.join(rel_output);
         if help_loc.exists() {
             self.output
                 .start_action(format!("Copy {} from {} to {}…", category, help_loc.display(), o.display()));
-            for entry in WalkDir::new(&help_loc) {
+            for entry in WalkDir::new(&help_loc).max_depth(if flat_prefix.is_some() { 1 } else { usize::MAX }) {
                 let entry = entry?;
                 if entry.path().is_dir() {
                     continue;
+                }
+                if let Some(prefix) = &flat_prefix {
+                    if !entry.file_name().to_string_lossy().to_ascii_uppercase().starts_with(prefix) {
+                        continue;
+                    }
                 }
                 if !filter(entry.path()) {
                     continue;
@@ -1212,7 +1630,7 @@ impl PCBoardImporter {
         if src_file.to_str().unwrap().is_empty() {
             return Ok(PathBuf::new());
         }
-        let resolved_file = self.resolve_file(src_file.file_name().unwrap().to_str().unwrap());
+        let resolved_file = self.resolve_listed_file(src_file);
         let upper_file_name = resolved_file.to_str().unwrap().to_ascii_uppercase();
         if let Some(file) = self.converted_files.get(&upper_file_name) {
             return Ok(PathBuf::from(file));
@@ -1229,6 +1647,7 @@ impl PCBoardImporter {
         let destination = dest_path.join(resolved_file.file_name().unwrap().to_ascii_lowercase());
 
         jamjam::conversion::convert_pcboard_to_jam(&resolved_file, &destination, &EchomailAddress::default())?;
+        self.stats.message_bases += 1;
 
         self.logger
             .log(&format!("Converted message base {} -> {}", resolved_file.display(), destination.display()));
@@ -1237,13 +1656,21 @@ impl PCBoardImporter {
         Ok(new_rel_name)
     }
 
+    /// A conference without a usable list still gets an empty one, so the board has something to load.
+    fn write_empty_list<T: Default + IcyBoardSerializer>(&mut self, dest_path: &Path, output: &str, name: &str) -> Res<PathBuf> {
+        let destination = dest_path.join(name);
+        T::default().save(&destination)?;
+        self.logger.log(&format!("Wrote empty list {}", destination.display()));
+        Ok(PathBuf::from(format!("{}/{}", output, name)))
+    }
+
     fn convert_bullettin_file(&mut self, dest_path: &Path, output: &str, src_file: &Path) -> Res<PathBuf> {
         self.logger.log(&format!("\n=== Converting BLT.LST {} ===", src_file.display()));
 
         if src_file.to_str().unwrap().is_empty() {
-            return Ok(PathBuf::new());
+            return self.write_empty_list::<BullettinList>(dest_path, output, "blt.toml");
         }
-        let resolved_file = self.resolve_file(src_file.file_name().unwrap().to_str().unwrap());
+        let resolved_file = self.resolve_listed_file(src_file);
         let upper_file_name = resolved_file.to_str().unwrap().to_ascii_uppercase();
         if let Some(file) = self.converted_files.get(&upper_file_name) {
             return Ok(PathBuf::from(file));
@@ -1252,7 +1679,7 @@ impl PCBoardImporter {
         let Ok(mut list) = BullettinList::import_pcboard(&resolved_file) else {
             self.logger.log(&format!("Warning, can't import bulletin  {}", resolved_file.display()));
             self.output.warning(format!("Warning, can't import bulletin {}", resolved_file.display()));
-            return Ok(resolved_file);
+            return self.write_empty_list::<BullettinList>(dest_path, output, "blt.toml");
         };
         let resolved_file = resolved_file.with_extension("toml");
 
@@ -1303,9 +1730,9 @@ impl PCBoardImporter {
         self.logger.log(&format!("\n=== Converting Script Questionnaires {} ===", src_file.display()));
 
         if src_file.to_str().unwrap().is_empty() {
-            return Ok(PathBuf::new());
+            return self.write_empty_list::<SurveyList>(dest_path, output, "survey.toml");
         }
-        let resolved_file = self.resolve_file(src_file.file_name().unwrap().to_str().unwrap());
+        let resolved_file = self.resolve_listed_file(src_file);
         let upper_file_name = resolved_file.to_str().unwrap().to_ascii_uppercase();
         if let Some(file) = self.converted_files.get(&upper_file_name) {
             return Ok(PathBuf::from(file));
@@ -1316,7 +1743,7 @@ impl PCBoardImporter {
                 .log(&format!("Warning, can't import script questionnaires {}", resolved_file.display()));
             self.output
                 .warning(format!("Warning, can't import script questionnaires {}", resolved_file.display()));
-            return Ok(resolved_file);
+            return self.write_empty_list::<SurveyList>(dest_path, output, "survey.toml");
         };
         let resolved_file = resolved_file.with_extension("toml");
 
@@ -1405,9 +1832,9 @@ impl PCBoardImporter {
 
         if src_file.to_str().unwrap().is_empty() {
             self.logger.log(&format!("Original file not defined: {}", src_file.display()));
-            return Ok(PathBuf::new());
+            return self.write_empty_list::<DirectoryList>(dest_path, output, "dir.toml");
         }
-        let resolved_file = self.resolve_file(src_file.file_name().unwrap().to_str().unwrap());
+        let resolved_file = self.resolve_listed_file(src_file);
         let upper_file_name = resolved_file.to_str().unwrap().to_ascii_uppercase();
         if let Some(file) = self.converted_files.get(&upper_file_name) {
             return Ok(PathBuf::from(file));
@@ -1416,7 +1843,7 @@ impl PCBoardImporter {
         let Ok(mut list) = DirectoryList::import_pcboard(&resolved_file) else {
             self.logger.log(&format!("Warning, can't import dir.lst file {}", resolved_file.display()));
             self.output.warning(format!("Warning, can't import dir.lst file {}", resolved_file.display()));
-            return Ok(resolved_file);
+            return self.write_empty_list::<DirectoryList>(dest_path, output, "dir.toml");
         };
         let resolved_file = resolved_file.with_extension("toml");
 
@@ -1445,9 +1872,9 @@ impl PCBoardImporter {
         self.logger.log(&format!("\n=== Converting DOORS.LST {} ===", src_file.display()));
 
         if src_file.to_str().unwrap().is_empty() {
-            return Ok(PathBuf::new());
+            return self.write_empty_list::<DoorList>(dest_path, output, "doors.toml");
         }
-        let resolved_file = self.resolve_file(src_file.file_name().unwrap().to_str().unwrap());
+        let resolved_file = self.resolve_listed_file(src_file);
         let upper_file_name = resolved_file.to_str().unwrap().to_ascii_uppercase();
         if let Some(file) = self.converted_files.get(&upper_file_name) {
             return Ok(PathBuf::from(file));
@@ -1456,7 +1883,7 @@ impl PCBoardImporter {
         let Ok(list) = DoorList::import_pcboard(&resolved_file) else {
             self.logger.log(&format!("Warning, can't import bulletin  {}", resolved_file.display()));
             self.output.warning(format!("Warning, can't import bulletin {}", resolved_file.display()));
-            return Ok(resolved_file);
+            return self.write_empty_list::<DoorList>(dest_path, output, "doors.toml");
         };
         let resolved_file = resolved_file.with_extension("toml");
 
@@ -1514,7 +1941,7 @@ impl PCBoardImporter {
         }
 
         let src_file = PathBuf::from(source);
-        let resolved_file = self.resolve_file(src_file.file_name().unwrap().to_str().unwrap());
+        let resolved_file = self.resolve_listed_file(&src_file);
         let upper_file_name = resolved_file.to_str().unwrap().to_ascii_uppercase();
         if let Some(file) = self.converted_files.get(&upper_file_name) {
             return Ok(PathBuf::from(file));

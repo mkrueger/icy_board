@@ -228,7 +228,13 @@ impl IcyBoardState {
         // lookup language/security/graphics mode
         let resolved_name = self.find_more_specific_file(resolved_name.to_string_lossy().to_string());
 
-        let Ok(content) = fs::read(resolved_name) else {
+        // PCBoard left a file alone that it was already displaying, so a file including itself
+        // or a PPE started from it displaying it again ends here. See displayfile() in FILES.C.
+        if self.displayed_files.iter().any(|open| open == &resolved_name) {
+            return Ok(true);
+        }
+
+        let Ok(content) = fs::read(&resolved_name) else {
             if display_error {
                 self.bell().await?;
                 self.set_color(TerminalTarget::Both, IcbColor::dos_light_red()).await?;
@@ -249,6 +255,15 @@ impl IcyBoardState {
             }
             s
         };
+
+        self.displayed_files.push(resolved_name);
+        let result = self.display_file_content(&converted_content).await;
+        self.displayed_files.pop();
+        result?;
+        Ok(true)
+    }
+
+    async fn display_file_content(&mut self, converted_content: &str) -> Res<()> {
         for (i, line) in converted_content.lines().enumerate() {
             if i > 0 {
                 self.new_line().await?;
@@ -263,7 +278,7 @@ impl IcyBoardState {
         if converted_content.ends_with('\n') {
             self.new_line().await?;
         }
-        Ok(true)
+        Ok(())
     }
 
     pub async fn input_field(

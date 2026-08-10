@@ -85,7 +85,13 @@ Note: UTF-8 is recommended for everything.
 
 # Importing old installations
 
-Importing old installatins is generally difficult mostly because of complex setup situations, PPEs and so on. However `icbsetup import PCBDAT.OLD <OUT_PATH>` will try to import old installations. 
+Importing old installatins is generally difficult mostly because of complex setup situations, PPEs and so on. However `icbsetup import PCBDAT.OLD <OUT_PATH>` will try to import old installations. Instead of the file the directory of the PCBoard installation can be given - `icbsetup import ~/CSB <OUT_PATH>` looks the PCBOARD.DAT up itself.
+
+`--dry-run` imports into a temporary directory and only reports which paths could not be resolved. Paths that pointed to another drive can be given with `--map`, the option may be repeated:
+
+`icbsetup import ~/CSB out --dry-run --map 'D:\FILES=/mnt/files'`
+
+Beside the importlog.txt the import writes an import_report.txt with the counts and the list of unresolved paths.
 
 the importlog.txt contains all operations done and it should usually be enough to turn on an existing pcboard installation in icyboard.
 
