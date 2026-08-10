@@ -41,6 +41,47 @@ fn test_setmsghdr_changes_a_field_that_getmsghdr_reads_back() {
     );
 }
 
+/// PCBoard 15.4/M numbers the writable fields 1..5, so 3 is the subject rather
+/// than the reference message HDR_MSGREF names.
+#[test]
+fn test_setmsghdr_takes_the_documented_field_numbers() {
+    assert_eq!(
+        run_ppl_with_messages("INTEGER n\nn = SETMSGHDR(0, 2, 3, \"By number\")\nPRINT GETMSGHDR(0, 2, HDR_SUBJ)", MESSAGES),
+        "By number"
+    );
+    assert_eq!(
+        run_ppl_with_messages("INTEGER n\nn = SETMSGHDR(0, 2, 1, \"NOBODY\")\nPRINT GETMSGHDR(0, 2, HDR_TO)", MESSAGES),
+        "NOBODY"
+    );
+}
+
+/// The status is the character PCBoard kept in the header: a public message
+/// nobody has read yet is a blank.
+#[test]
+fn test_getmsghdr_reads_the_status_character() {
+    assert_eq!(run_ppl_with_messages(r#"PRINT "[", GETMSGHDR(0, 1, HDR_STATUS), "]""#, MESSAGES), "[ ]");
+}
+
+/// The header held its date and time as text, so a PPE reads MM-DD-YY and HH:MM.
+#[test]
+fn test_getmsghdr_reads_the_date_and_time_as_text() {
+    let output = run_ppl_with_messages(
+        r#"PRINT LEN(GETMSGHDR(0, 1, HDR_DATE)), " ", LEN(GETMSGHDR(0, 1, HDR_TIME))"#,
+        MESSAGES,
+    );
+    assert_eq!(output, "8 5");
+}
+
+/// Nothing has replied to these messages, and nothing is echoed.
+#[test]
+fn test_getmsghdr_leaves_the_reply_and_echo_fields_empty() {
+    let output = run_ppl_with_messages(
+        r#"PRINT "[", GETMSGHDR(0, 1, HDR_REPLY), "][", GETMSGHDR(0, 1, HDR_ECHO), "][", GETMSGHDR(0, 1, HDR_RPLYTIME), "]", GETMSGHDR(0, 1, HDR_RPLYDATE)"#,
+        MESSAGES,
+    );
+    assert_eq!(output, "[][][]0");
+}
+
 #[test]
 fn test_setmsghdr_leaves_the_other_messages_alone() {
     assert_eq!(

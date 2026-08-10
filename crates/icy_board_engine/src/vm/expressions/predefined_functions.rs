@@ -24,6 +24,7 @@ use chrono::{DateTime, Datelike, Timelike, Utc};
 use icy_engine::{Position, TextPane};
 use icy_net::crc::update_crc32;
 use jamjam::jam::JamMessageBase;
+use jamjam::jam::attributes as jam_attributes;
 use jamjam::jam::msg_header::JamMessageHeader;
 use jamjam::util::basic_real::{BasicDouble, BasicReal};
 use radix_fmt::radix;
@@ -2477,6 +2478,21 @@ pub async fn getmsghdr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Var
     }
 }
 
+/// The one character PCBoard kept in the header to say what kind of message this
+/// is and whether it has been read (MESSAGES.H).
+fn message_status(header: &JamMessageHeader) -> char {
+    let read = header.is_read();
+    if header.needs_password() {
+        if read { '^' } else { '%' }
+    } else if header.is_private() {
+        if read { '+' } else { '*' }
+    } else if read {
+        '-'
+    } else {
+        ' '
+    }
+}
+
 fn get_field(field_num: i32, header: &JamMessageHeader) -> Res<VariableValue> {
     match field_num {
         HDR_ACTIVE => Ok(VariableValue::new_int(if header.is_deleted() { 226 } else { 225 })),
@@ -2484,12 +2500,21 @@ fn get_field(field_num: i32, header: &JamMessageHeader) -> Res<VariableValue> {
         HDR_DATE => {
             let date_time = DateTime::from_timestamp(header.date_written as i64, 0).unwrap_or(Utc::now());
             let date = IcbDate::from_utc(&date_time);
-            Ok(VariableValue::new_date(date.to_pcboard_date()))
+            // PCBoard kept the header date as text, so a PPE reads back MM-DD-YY.
+            Ok(VariableValue::new_string(format!(
+                "{:02}-{:02}-{:02}",
+                date.month(),
+                date.day(),
+                date.year() % 100
+            )))
         }
-        HDR_ECHO => {
-            // TODO
-            Ok(VariableValue::new_bool(false))
-        }
+        HDR_ECHO => Ok(VariableValue::new_string(
+            if header.attributes & jam_attributes::MSG_TYPEECHO != 0 {
+                "E".to_string()
+            } else {
+                String::new()
+            },
+        )),
         HDR_FROM => {
             if let Some(from) = header.get_from() {
                 Ok(VariableValue::new_string(from.to_string()))
@@ -2500,19 +2525,11 @@ fn get_field(field_num: i32, header: &JamMessageHeader) -> Res<VariableValue> {
         HDR_MSGNUM => Ok(VariableValue::new_int(header.message_number as i32)),
         HDR_MSGREF => Ok(VariableValue::new_int(header.reply_to as i32)),
         HDR_PWD => Ok(VariableValue::new_int(header.password_crc as i32)),
-        HDR_REPLY => Ok(VariableValue::new_int(header.reply_to as i32)),
-        HDR_RPLYDATE => {
-            // TODO
-            Ok(VariableValue::new_int(0))
-        }
-        HDR_RPLYTIME => {
-            // TODO
-            Ok(VariableValue::new_int(0))
-        }
-        HDR_STATUS => {
-            // TODO
-            Ok(VariableValue::new_int(0))
-        }
+        // PCBoard keeps a one character flag here, blank when nobody replied.
+        HDR_REPLY => Ok(VariableValue::new_string(if header.reply1st != 0 { "R".to_string() } else { String::new() })),
+        HDR_RPLYDATE => Ok(VariableValue::new_int(0)),
+        HDR_RPLYTIME => Ok(VariableValue::new_string(String::new())),
+        HDR_STATUS => Ok(VariableValue::new_string(message_status(header).to_string())),
         HDR_SUBJ => {
             if let Some(subj) = header.get_subject() {
                 Ok(VariableValue::new_string(subj.to_string()))
@@ -2523,7 +2540,7 @@ fn get_field(field_num: i32, header: &JamMessageHeader) -> Res<VariableValue> {
         HDR_TIME => {
             let date_time = DateTime::from_timestamp(header.date_written as i64, 0).unwrap_or(Utc::now());
             let time = IcbTime::from_naive(date_time.naive_local());
-            Ok(VariableValue::new_time(time.to_pcboard_time()))
+            Ok(VariableValue::new_string(format!("{:02}:{:02}", time.get_hour(), time.get_minute())))
         }
         HDR_TO => {
             if let Some(to) = header.get_to() {
@@ -2572,30 +2589,42 @@ pub async fn setmsghdr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Var
 /// Writes one header field. Only the fields a message actually carries can be
 /// changed; the rest are derived and are reported back as a failure.
 fn set_field(field_num: i32, header: &mut JamMessageHeader, value: &str) -> bool {
+    // PCBoard 15.4 numbers the writable fields 1..5 - To, From, Subject, Password and
+    // Echo - and does not take the HDR_ constants GETMSGHDR reads with. The HDR_ names
+    // that do not collide with those five keep working.
     match field_num {
+        1 | HDR_TO => {
+            header.set_to(BString::from(value));
+            true
+        }
+        2 | HDR_FROM => {
+            header.set_from(BString::from(value));
+            true
+        }
+        3 | HDR_SUBJ => {
+            header.set_subject(BString::from(value));
+            true
+        }
+        4 | HDR_PWD => {
+            header.password_crc = JamMessageBase::get_crc(&BString::from(value.to_lowercase()));
+            true
+        }
+        5 | HDR_ECHO => {
+            let echoed = matches!(value.trim().to_ascii_uppercase().as_str(), "E" | "1" | "TRUE" | "YES");
+            if echoed {
+                header.attributes |= jam_attributes::MSG_TYPEECHO;
+            } else {
+                header.attributes &= !jam_attributes::MSG_TYPEECHO;
+            }
+            true
+        }
         HDR_ACTIVE => {
             // The same 225/226 pair `HDR_ACTIVE` reads back.
             let deleted = value.trim() == "226";
             header.set_deleted(deleted);
             true
         }
-        HDR_FROM => {
-            header.set_from(BString::from(value));
-            true
-        }
-        HDR_TO => {
-            header.set_to(BString::from(value));
-            true
-        }
-        HDR_SUBJ => {
-            header.set_subject(BString::from(value));
-            true
-        }
-        HDR_PWD => {
-            header.password_crc = JamMessageBase::get_crc(&BString::from(value.to_lowercase()));
-            true
-        }
-        HDR_REPLY | HDR_MSGREF => {
+        HDR_REPLY => {
             header.reply_to = value.trim().parse::<u32>().unwrap_or(0);
             true
         }
