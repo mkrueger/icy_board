@@ -248,15 +248,11 @@ impl PcbLegacyConferenceHeader {
 }
 
 fn append_cp437(res: &mut Vec<u8>, name: &str, arg: i32) {
-    for i in 0..arg {
-        if (i as usize) < name.len() {
-            if let Some(ch) = UNICODE_TO_CP437.get(&name.chars().nth(i as usize).unwrap()) {
-                res.push(*ch);
-            } else {
-                res.push(b'*');
-            }
-        } else {
-            res.push(0);
+    let mut chars = name.chars();
+    for _ in 0..arg {
+        match chars.next() {
+            Some(ch) => res.push(*UNICODE_TO_CP437.get(&ch).unwrap_or(&b'*')),
+            None => res.push(0),
         }
     }
 }
@@ -513,17 +509,13 @@ impl PcbAdditionalConferenceHeader {
         res.push(if self.allow_aliases { 1 } else { 0 });
         res.push(if self.show_intro_on_ra { 1 } else { 0 });
         res.push(self.req_level_to_enter);
-        res.extend(self.password.as_bytes());
-        res.extend(&vec![0; 13 - self.password.len()]);
-        res.extend(self.intro.as_bytes());
-        res.extend(&vec![0; 32 - self.intro.len()]);
-        res.extend(self.attach_loc.as_bytes());
-        res.extend(&vec![0; 32 - self.attach_loc.len()]);
+        append_cp437(&mut res, &self.password, 13);
+        append_cp437(&mut res, &self.intro, 32);
+        append_cp437(&mut res, &self.attach_loc, 32);
         res.extend(&self.reg_flags.to_le_bytes());
         res.push(self.attach_level);
         res.push(self.carbon_limit);
-        res.extend(self.cmd_lst.as_bytes());
-        res.extend(&vec![0; 32 - self.cmd_lst.len()]);
+        append_cp437(&mut res, &self.cmd_lst, 32);
         res.push(if self.old_index { 1 } else { 0 });
         res.push(if self.long_to_names { 1 } else { 0 });
         res.push(self.carbon_level);

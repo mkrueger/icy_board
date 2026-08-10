@@ -443,7 +443,7 @@ impl IcyBoard {
             } else {
                 board.root_path.join(&conf.area_file)
             };
-            if area_file.exists() {
+            if area_file.is_file() {
                 match AreaList::load(&area_file) {
                     Ok(mut areas) => {
                         for area in areas.iter_mut() {
@@ -464,7 +464,7 @@ impl IcyBoard {
             } else {
                 board.root_path.join(&conf.dir_file)
             };
-            if dir_file.exists() {
+            if dir_file.is_file() {
                 match DirectoryList::load(&dir_file) {
                     Ok(directories) => {
                         conf.directories = Some(directories);
@@ -480,7 +480,7 @@ impl IcyBoard {
             } else {
                 board.root_path.join(&conf.doors_file)
             };
-            if doors_file.exists() {
+            if doors_file.is_file() {
                 match DoorList::load(&doors_file) {
                     Ok(doors) => {
                         conf.doors = Some(doors);
@@ -496,7 +496,7 @@ impl IcyBoard {
             } else {
                 board.root_path.join(&conf.blt_file)
             };
-            if blt_file.exists() {
+            if blt_file.is_file() {
                 match BullettinList::load(&blt_file) {
                     Ok(blts) => {
                         conf.bulletins = Some(blts);
@@ -512,7 +512,7 @@ impl IcyBoard {
             } else {
                 board.root_path.join(&conf.survey_file)
             };
-            if survey_file.exists() {
+            if survey_file.is_file() {
                 match SurveyList::load(&survey_file) {
                     Ok(surveys) => {
                         conf.surveys = Some(surveys);
@@ -712,6 +712,11 @@ impl IcyBoard {
         Ok(())
     }
 
+    /// PCBoard's records hold 32 byte paths, so what is exported stays relative to the board.
+    fn export_path(&self, path: &Path) -> String {
+        path.strip_prefix(&self.root_path).unwrap_or(path).to_string_lossy().to_string()
+    }
+
     fn export_conference_files(&self, base_loc: &Path, cnames: &PathBuf) -> Res<()> {
         let mut headers = Vec::new();
         let mut legacy_headers = Vec::new();
@@ -726,10 +731,7 @@ impl IcyBoard {
             let dir_file = base_loc.join(&format!("dir{}", dirs));
             let dir_file = if let Ok(area_list) = DirectoryList::load(&conf.dir_file) {
                 area_list.export_pcboard(&dir_file)?;
-
-                let dir_file = dir_file.to_string_lossy().to_string();
-                let len = self.root_path.to_string_lossy().len() + 1;
-                dir_file[len..].to_string()
+                self.export_path(&dir_file)
             } else {
                 String::new()
             };
@@ -745,21 +747,21 @@ impl IcyBoard {
                 add_conference_time: conf.add_conference_time,
                 message_blocks: 0,
                 message_file: String::new(),
-                users_menu: conf.users_menu.to_string_lossy().to_string(),
-                sysop_menu: conf.sysop_menu.to_string_lossy().to_string(),
-                news_file: conf.news_file.to_string_lossy().to_string(),
+                users_menu: self.export_path(&conf.users_menu),
+                sysop_menu: self.export_path(&conf.sysop_menu),
+                news_file: self.export_path(&conf.news_file),
                 pub_upload_sort: conf.pub_upload_sort,
                 pub_upload_dirfile: String::new(),
-                pub_upload_location: conf.pub_upload_location.to_string_lossy().to_string(),
+                pub_upload_location: self.export_path(&conf.pub_upload_location),
                 private_upload_sort: conf.private_upload_sort,
                 private_upload_dirfile: String::new(),
-                private_upload_location: conf.private_upload_location.to_string_lossy().to_string(),
+                private_upload_location: self.export_path(&conf.private_upload_location),
                 public_conference: conf.is_public,
-                doors_menu: conf.doors_menu.to_string_lossy().to_string(),
-                doors_file: conf.doors_file.to_string_lossy().to_string(),
+                doors_menu: self.export_path(&conf.doors_menu),
+                doors_file: self.export_path(&conf.doors_file),
                 required_security: conf.required_security.level(),
-                blt_menu: conf.blt_menu.to_string_lossy().to_string(),
-                blt_file: conf.blt_file.to_string_lossy().to_string(),
+                blt_menu: self.export_path(&conf.blt_menu),
+                blt_file: self.export_path(&conf.blt_file),
                 script_menu: String::new(), // todo
                 script_file: String::new(),
                 dir_menu: String::new(), // todo
@@ -781,19 +783,19 @@ impl IcyBoard {
                 add_time: conf.add_conference_time as u16,
                 msg_blocks: 0,
                 msg_file: String::new(),
-                user_menu: conf.users_menu.to_string_lossy().to_string(),
-                sysop_menu: conf.sysop_menu.to_string_lossy().to_string(),
-                news_file: conf.news_file.to_string_lossy().to_string(),
+                user_menu: self.export_path(&conf.users_menu),
+                sysop_menu: self.export_path(&conf.sysop_menu),
+                news_file: self.export_path(&conf.news_file),
                 pub_upld_sort: conf.pub_upload_sort,
                 upld_dir: String::new(),
-                pub_upld_loc: conf.pub_upload_location.to_string_lossy().to_string(),
+                pub_upld_loc: self.export_path(&conf.pub_upload_location),
                 prv_upld_sort: conf.private_upload_sort,
                 priv_dir: String::new(),
-                prv_upld_loc: conf.private_upload_location.to_string_lossy().to_string(),
-                drs_menu: conf.doors_menu.to_string_lossy().to_string(),
-                drs_file: conf.doors_file.to_string_lossy().to_string(),
-                blt_menu: conf.blt_menu.to_string_lossy().to_string(),
-                blt_name_loc: conf.blt_file.to_string_lossy().to_string(),
+                prv_upld_loc: self.export_path(&conf.private_upload_location),
+                drs_menu: self.export_path(&conf.doors_menu),
+                drs_file: self.export_path(&conf.doors_file),
+                blt_menu: self.export_path(&conf.blt_menu),
+                blt_name_loc: self.export_path(&conf.blt_file),
                 scr_menu: String::new(), // todo
                 scr_name_loc: String::new(),
                 dir_menu: String::new(), // todo
@@ -807,9 +809,9 @@ impl IcyBoard {
                 attach_level: conf.sec_attachments.level(),
                 req_level_to_enter: conf.sec_write_message.level(),
                 allow_aliases: conf.allow_aliases,
-                attach_loc: conf.attachment_location.to_string_lossy().to_string(),
-                cmd_lst: conf.command_file.to_string_lossy().to_string(),
-                intro: conf.intro_file.to_string_lossy().to_string(),
+                attach_loc: self.export_path(&conf.attachment_location),
+                cmd_lst: self.export_path(&conf.command_file),
+                intro: self.export_path(&conf.intro_file),
                 force_echo: false,
                 read_only: false,
                 no_private_msgs: false,

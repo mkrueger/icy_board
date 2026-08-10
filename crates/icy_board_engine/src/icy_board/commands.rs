@@ -884,10 +884,19 @@ pub fn find_exact<'a>(commands: &'a [Command], keyword: &str) -> Option<&'a Comm
 }
 
 /// The same, for a keyword the caller has only typed the beginning of.
+///
+/// PCBoard took an abbreviation from two characters on - one character is never enough,
+/// no matter what a command list holds, so `G` stays Goodbye next to a `GREED` entry.
+/// See runcmds() in PCBoard's CMDS.C.
 pub fn find_prefix<'a>(commands: &'a [Command], keyword: &str) -> Option<&'a Command> {
-    commands
-        .iter()
-        .find(|cmd| cmd.keyword.len() >= keyword.len() && cmd.keyword.as_bytes()[..keyword.len()].eq_ignore_ascii_case(keyword.as_bytes()))
+    if keyword.len() < 2 {
+        return None;
+    }
+    commands.iter().find(|cmd| {
+        let name = cmd.keyword.as_bytes();
+        let typed = keyword.as_bytes();
+        name.len() >= typed.len() && name[..typed.len()].eq_ignore_ascii_case(typed) && (typed.len() + 1 >= name.len() || name.len() >= 3)
+    })
 }
 
 impl PCBoardRecordImporter<Command> for CommandList {
@@ -985,5 +994,20 @@ mod tests {
     #[test]
     fn test_a_prefix_search_does_not_split_a_multi_byte_keyword() {
         assert!(find_prefix(&list(&["ä"]), "A").is_none());
+    }
+
+    #[test]
+    fn test_a_single_character_is_no_abbreviation() {
+        assert!(find_prefix(&list(&["GREED"]), "G").is_none());
+    }
+
+    #[test]
+    fn test_two_characters_are_an_abbreviation() {
+        assert_eq!(find_prefix(&list(&["GREED"]), "GR").unwrap().keyword, "GREED");
+    }
+
+    #[test]
+    fn test_a_two_letter_keyword_needs_all_of_it() {
+        assert!(find_prefix(&list(&["VW"]), "V").is_none());
     }
 }
