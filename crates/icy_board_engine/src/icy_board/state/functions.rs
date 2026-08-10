@@ -72,6 +72,15 @@ lazy_static::lazy_static! {
 
 pub const MASK_COMMAND: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;':,.<>?/\\\" ";
 
+/// A name a display file carries still looks the way it did on the sysop's DOS drive.
+fn dos_path(file: &str) -> PathBuf {
+    let mut file = file.replace('\\', "/");
+    if file.len() > 2 && file.as_bytes()[1] == b':' && file.as_bytes()[0].is_ascii_alphabetic() {
+        file = file[2..].trim_start_matches('/').to_string();
+    }
+    PathBuf::from(file)
+}
+
 #[derive(Debug, PartialEq)]
 pub enum PPECallType {
     PPE,
@@ -183,19 +192,28 @@ impl IcyBoardState {
     pub async fn display_line(&mut self, txt: &str) -> Res<()> {
         if !txt.is_empty() {
             if let Some(call) = PPECall::try_parse_line(txt) {
+                let file = self.get_board().await.resolve_file(&dos_path(&call.file));
+                let found = match call.call_type {
+                    PPECallType::Menu => file.exists() || self.get_board().await.resolve_file(&file.with_extension("ppe")).exists(),
+                    _ => file.exists(),
+                };
+                // A line naming something that is not there is a line, the way PCBoard
+                // printed it when runscriptwithparams() came back empty. See FILES.C.
+                if !found {
+                    self.print(TerminalTarget::Both, txt).await?;
+                    return Ok(());
+                }
                 for sc in call.arguments {
                     self.session.tokens.push_back(sc.to_string());
                 }
                 match call.call_type {
                     PPECallType::PPE => {
-                        let file = self.get_board().await.resolve_file(&call.file);
                         self.run_ppe(&file, None).await?;
                     }
                     PPECallType::Menu => {
-                        let _ = self.display_menu(&call.file).await?;
+                        let _ = self.display_menu(&file).await?;
                     }
                     PPECallType::File => {
-                        let file = self.get_board().await.resolve_file(&call.file);
                         let _ = self.display_file(&file).await?;
                     }
                 }
@@ -331,6 +349,11 @@ impl IcyBoardState {
                 // (the same way typed input is handled). Returning only the
                 // first token here corrupted the token order when the caller
                 // re-pushed the returned value.
+                let result = if display_flags & display_flags::UPCASE != 0 {
+                    result.to_uppercase()
+                } else {
+                    result
+                };
                 self.session.last_answer = Some(result.clone());
                 return Ok(result);
             }
@@ -374,6 +397,11 @@ impl IcyBoardState {
                     result.push(key.ch);
                 }
                 log::info!("PPE stuffed input: {}", result);
+                let result = if display_flags & display_flags::UPCASE != 0 {
+                    result.to_uppercase()
+                } else {
+                    result
+                };
                 self.session.last_answer = Some(result.clone());
                 return Ok(result);
             }

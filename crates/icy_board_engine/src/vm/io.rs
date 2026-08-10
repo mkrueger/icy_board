@@ -171,6 +171,21 @@ impl DiskIO {
             channels,
         }
     }
+
+    /// The channel a PPE names, or `None` when nothing is open on it - PCBoard remembered
+    /// an error flag for every channel and returned instead of ending the PPE.
+    fn open_channel(&mut self, channel: i32) -> Option<&mut FileChannel> {
+        let chan = self.channels.entry(channel).or_insert_with(FileChannel::new);
+        if chan.file.is_none() && chan.reader.is_none() {
+            chan.err = true;
+            return None;
+        }
+        Some(chan)
+    }
+
+    fn set_channel_error(&mut self, channel: i32) {
+        self.channels.entry(channel).or_insert_with(FileChannel::new).err = true;
+    }
 }
 
 impl PCBoardIO for DiskIO {
@@ -199,10 +214,17 @@ impl PCBoardIO for DiskIO {
     }
 
     fn is_open(&self, channel: i32) -> bool {
-        self.channels.contains_key(&channel)
+        self.channels.get(&channel).is_some_and(|chan| chan.file.is_some() || chan.reader.is_some())
     }
 
     fn fopen(&mut self, channel: i32, file_name: &str, mode: i32, _sm: i32) -> Res<()> {
+        // PCBoard's openChan set an error flag and carried on - a channel already in use or a
+        // file that would not open never stopped a PPE. See SCREXEC.CPP.
+        if self.is_open(channel) {
+            self.set_channel_error(channel);
+            return Ok(());
+        }
+
         // PCBoard masks the access mode to two bits, and dosfopen creates a missing file for any write mode.
         let file = if mode == O_APPEND {
             OpenOptions::new().append(true).create(true).open(file_name)
@@ -226,8 +248,8 @@ impl PCBoardIO for DiskIO {
                 );
             }
             Err(err) => {
-                log::error!("error opening file: {}", err);
-                return Err(Box::new(VMError::FileNotFound(file_name.to_string())));
+                log::error!("error opening file {}: {}", file_name, err);
+                self.set_channel_error(channel);
             }
         }
 
@@ -239,8 +261,8 @@ impl PCBoardIO for DiskIO {
     }
 
     fn fput(&mut self, channel: i32, text: String) -> Res<()> {
-        let Some(chan) = self.channels.get_mut(&channel) else {
-            return Err(Box::new(VMError::FileChannelNotOpen(channel)));
+        let Some(chan) = self.open_channel(channel) else {
+            return Ok(());
         };
 
         if let Some(f) = &mut chan.file {
@@ -260,8 +282,8 @@ impl PCBoardIO for DiskIO {
     }
 
     fn fget(&mut self, channel: i32) -> Res<String> {
-        let Some(chan) = self.channels.get_mut(&channel) else {
-            return Err(Box::new(VMError::FileChannelNotOpen(channel)));
+        let Some(chan) = self.open_channel(channel) else {
+            return Ok(String::new());
         };
 
         if let Some(mut f) = chan.file.take() {
@@ -292,26 +314,27 @@ impl PCBoardIO for DiskIO {
     }
 
     fn fread(&mut self, channel: i32, size: usize) -> Res<Vec<u8>> {
-        let Some(chan) = self.channels.get_mut(&channel) else {
-            return Err(Box::new(VMError::FileChannelNotOpen(channel)));
+        let Some(chan) = self.open_channel(channel) else {
+            return Ok(Vec::new());
         };
-        if let Some(f) = &mut chan.file {
-            let mut buf = vec![0; size];
-            f.read_exact(&mut buf)?;
-            return Ok(buf);
-        }
-        if let Some(reader) = &mut chan.reader {
-            let mut buf = vec![0; size];
-            reader.read_exact(&mut buf)?;
-            Ok(buf)
+        let mut buf = vec![0; size];
+        let read = if let Some(f) = &mut chan.file {
+            f.read_exact(&mut buf)
+        } else if let Some(reader) = &mut chan.reader {
+            reader.read_exact(&mut buf)
         } else {
             chan.err = true;
-            Ok(Vec::new())
+            return Ok(Vec::new());
+        };
+        if read.is_err() {
+            chan.err = true;
+            return Ok(Vec::new());
         }
+        Ok(buf)
     }
     fn fwrite(&mut self, channel: i32, data: &[u8]) -> Res<()> {
-        let Some(chan) = self.channels.get_mut(&channel) else {
-            return Err(Box::new(VMError::FileChannelNotOpen(channel)));
+        let Some(chan) = self.open_channel(channel) else {
+            return Ok(());
         };
 
         if let Some(f) = &mut chan.file {
@@ -325,8 +348,8 @@ impl PCBoardIO for DiskIO {
     }
 
     fn ftell(&mut self, channel: i32) -> Res<u64> {
-        let Some(chan) = self.channels.get_mut(&channel) else {
-            return Err(Box::new(VMError::FileChannelNotOpen(channel)));
+        let Some(chan) = self.open_channel(channel) else {
+            return Ok(0);
         };
 
         match &mut chan.file {
@@ -335,62 +358,49 @@ impl PCBoardIO for DiskIO {
                 if let Some(reader) = &mut chan.reader {
                     Ok(reader.position())
                 } else {
-                    Err(Box::new(VMError::FileChannelNotOpen(channel)))
+                    chan.err = true;
+                    Ok(0)
                 }
             }
         }
     }
 
     fn fseek(&mut self, channel: i32, pos: i32, seek_pos: i32) -> Res<()> {
-        let Some(chan) = self.channels.get_mut(&channel) else {
-            return Err(Box::new(VMError::FileChannelNotOpen(channel)));
+        let Some(chan) = self.open_channel(channel) else {
+            return Ok(());
         };
 
-        match &mut chan.file {
-            Some(f) => match seek_pos {
-                0 => {
-                    f.seek(SeekFrom::Start(pos as u64))?;
+        let seek_to = match seek_pos {
+            0 => SeekFrom::Start(pos as u64),
+            1 => SeekFrom::Current(pos as i64),
+            2 => SeekFrom::End(-pos as i64),
+            _ => return Err(Box::new(VMError::InvalidSeekPosition(seek_pos))),
+        };
+        let sought = match &mut chan.file {
+            Some(f) => f.seek(seek_to).map(|_| ()),
+            _ => match &mut chan.reader {
+                Some(reader) => reader.seek(seek_to).map(|_| ()),
+                None => {
+                    chan.err = true;
+                    return Ok(());
                 }
-                1 => {
-                    f.seek(SeekFrom::Current(pos as i64))?;
-                }
-                2 => {
-                    f.seek(SeekFrom::End(-pos as i64))?;
-                }
-                _ => return Err(Box::new(VMError::InvalidSeekPosition(seek_pos))),
             },
-            _ => {
-                if let Some(reader) = &mut chan.reader {
-                    match seek_pos {
-                        0 => {
-                            reader.seek(SeekFrom::Start(pos as u64))?;
-                        }
-                        1 => {
-                            reader.seek(SeekFrom::Current(pos as i64))?;
-                        }
-                        2 => {
-                            reader.seek(SeekFrom::End(-pos as i64))?;
-                        }
-                        _ => return Err(Box::new(VMError::InvalidSeekPosition(seek_pos))),
-                    }
-                } else {
-                    return Err(Box::new(VMError::FileChannelNotOpen(channel)));
-                }
-            }
+        };
+        if sought.is_err() {
+            chan.err = true;
         }
 
         Ok(())
     }
 
     fn frewind(&mut self, channel: i32) -> Res<()> {
-        let Some(chan) = self.channels.get_mut(&channel) else {
-            return Err(Box::new(VMError::FileChannelNotOpen(channel)));
+        let Some(chan) = self.open_channel(channel) else {
+            return Ok(());
         };
 
         match &mut chan.file {
             Some(f) => {
-                f.seek(SeekFrom::Start(0)).expect("seek error");
-                chan.err = false;
+                chan.err = f.seek(SeekFrom::Start(0)).is_err();
             }
             _ => {
                 chan.err = true;
@@ -400,13 +410,13 @@ impl PCBoardIO for DiskIO {
     }
 
     fn fflush(&mut self, channel: i32) -> Res<()> {
-        let Some(chan) = self.channels.get_mut(&channel) else {
-            return Err(Box::new(VMError::FileChannelNotOpen(channel)));
+        let Some(chan) = self.open_channel(channel) else {
+            return Ok(());
         };
 
         match &mut chan.file {
             Some(f) => {
-                f.flush()?;
+                chan.err = f.flush().is_err();
             }
             _ => {
                 chan.err = true;
@@ -416,7 +426,15 @@ impl PCBoardIO for DiskIO {
     }
 
     fn fclose(&mut self, channel: i32) -> Res<()> {
-        self.channels.remove(&channel);
+        // A channel keeps its place after it was closed, so FERR still answers for it.
+        match self.channels.get_mut(&channel) {
+            Some(chan) if chan.file.is_some() || chan.reader.is_some() => {
+                chan.file = None;
+                chan.reader = None;
+                chan.err = false;
+            }
+            _ => self.set_channel_error(channel),
+        }
 
         Ok(())
     }
@@ -438,13 +456,50 @@ mod tests {
     use super::{DiskIO, PCBoardIO};
     use tempfile::TempDir;
 
+    /// PCBoard's openChan set the error flag when the file would not open, and the PPE
+    /// carried on to look at FERR itself.
     #[test]
-    fn test_fopen_o_rd_missing_file_fails() {
+    fn test_fopen_o_rd_missing_file_reports_through_ferr() {
         let tmp = TempDir::new().unwrap();
         let path = tmp.path().join("missing.dat");
         let mut io = DiskIO::new(tmp.path().to_str().unwrap(), None);
-        let result = io.fopen(1, path.to_str().unwrap(), 0, 0);
-        assert!(result.is_err());
+        io.fopen(1, path.to_str().unwrap(), 0, 0).unwrap();
+        assert!(io.ferr(1));
+        assert!(!io.is_open(1));
+    }
+
+    /// Every operation on a channel that is not open answers the same way - PCBoard
+    /// never let one end a PPE.
+    #[test]
+    fn test_a_closed_channel_only_sets_the_error_flag() {
+        let tmp = TempDir::new().unwrap();
+        let mut io = DiskIO::new(tmp.path().to_str().unwrap(), None);
+
+        io.frewind(6).unwrap();
+        assert!(io.ferr(6));
+        assert_eq!(io.fget(6).unwrap(), "");
+        assert_eq!(io.fread(6, 4).unwrap(), Vec::<u8>::new());
+        io.fput(6, "x".to_string()).unwrap();
+        io.fwrite(6, b"x").unwrap();
+        io.fseek(6, 0, 0).unwrap();
+        io.fflush(6).unwrap();
+        assert_eq!(io.ftell(6).unwrap(), 0);
+    }
+
+    /// A file that was read to the end and closed can be reopened on the same channel.
+    #[test]
+    fn test_a_channel_is_free_again_after_it_was_closed() {
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().join("data.dat");
+        std::fs::write(&path, b"hello").unwrap();
+        let mut io = DiskIO::new(tmp.path().to_str().unwrap(), None);
+
+        io.fopen(6, path.to_str().unwrap(), 0, 0).unwrap();
+        assert!(io.is_open(6));
+        io.fclose(6).unwrap();
+        assert!(!io.is_open(6));
+        io.fopen(6, path.to_str().unwrap(), 0, 0).unwrap();
+        assert!(!io.ferr(6));
     }
 
     #[test]
@@ -501,7 +556,8 @@ mod tests {
         io.fopen(1, read_write.to_str().unwrap(), 3, 0).unwrap();
         assert!(read_write.exists());
 
-        assert!(io.fopen(2, tmp.path().join("mode8.dat").to_str().unwrap(), 8, 0).is_err());
+        io.fopen(2, tmp.path().join("mode8.dat").to_str().unwrap(), 8, 0).unwrap();
+        assert!(io.ferr(2));
     }
 }
 

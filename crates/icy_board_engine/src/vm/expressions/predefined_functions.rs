@@ -1161,34 +1161,32 @@ pub async fn fileinf(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
     let item = vm.eval_expr(&args[1]).await?.as_int();
 
     let path = vm.resolve_file(&file).await;
+    // PCBoard zeroed its find record when the file was not there, so nothing here fails.
     match item {
         1 => Ok(VariableValue::new_bool(path.exists())),
         2 => Ok(VariableValue::new(VariableType::Date, VariableData::default())), // TODO: File date
         3 => Ok(VariableValue::new(VariableType::Time, VariableData::default())), // TODO: File time
-        4 => Ok(VariableValue::new_int(path.metadata()?.len() as i32)),
-        5 => Ok(VariableValue::new_int(0)),                   // TODO: File attributes
-        6 => Ok(VariableValue::new_string("C:".to_string())), // Drive
+        4 => Ok(VariableValue::new_int(path.metadata().map_or(0, |data| data.len()) as i32)),
+        5 => Ok(VariableValue::new_int(0)), // TODO: File attributes
+        // PCBoard hands out the drive letter alone, the path with its trailing separator,
+        // the name without its extension and the extension without its dot.
+        6 => Ok(VariableValue::new_string("C".to_string())),
         7 => {
-            if let Some(dir) = path.parent() {
-                Ok(VariableValue::new_string(dir.to_string_lossy().to_string()))
-            } else {
-                Ok(VariableValue::new_string(String::new()))
+            let Some(dir) = path.parent() else {
+                return Ok(VariableValue::new_string(String::new()));
+            };
+            let mut dir = dir.to_string_lossy().to_string();
+            if !dir.is_empty() && !dir.ends_with(std::path::MAIN_SEPARATOR) {
+                dir.push(std::path::MAIN_SEPARATOR);
             }
+            Ok(VariableValue::new_string(dir))
         }
-        8 => {
-            if let Some(dir) = path.file_name() {
-                Ok(VariableValue::new_string(dir.to_string_lossy().to_string()))
-            } else {
-                Ok(VariableValue::new_string(String::new()))
-            }
-        }
-        9 => {
-            if let Some(dir) = path.file_stem() {
-                Ok(VariableValue::new_string(dir.to_string_lossy().to_string()))
-            } else {
-                Ok(VariableValue::new_string(String::new()))
-            }
-        }
+        8 => Ok(VariableValue::new_string(
+            path.file_stem().map_or(String::new(), |name| name.to_string_lossy().to_string()),
+        )),
+        9 => Ok(VariableValue::new_string(
+            path.extension().map_or(String::new(), |ext| ext.to_string_lossy().to_string()),
+        )),
         _ => {
             log::error!("Unknown fileinf item: {}", item);
             Ok(VariableValue::new_int(0))

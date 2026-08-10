@@ -68,3 +68,50 @@ fn dispstr_hands_the_words_after_the_name_over_as_tokens() {
     );
     assert_eq!(output, "the file was found\ntokens=2\n");
 }
+
+/// PCBoard zeroed its find record for a file that is not there, so asking for the size
+/// of one answers 0. Boards are full of PPEs that write `EXIST(f) & FILEINF(f,4)`.
+#[test]
+fn fileinf_of_a_file_that_is_not_there_answers_zero() {
+    let output = run_ppl_with_files(
+        r#"
+        PRINTLN "size=", FILEINF("missing.pcb", 4)
+        PRINTLN "still running"
+    "#,
+        &[],
+    );
+    assert_eq!(output, "size=0\nstill running\n");
+}
+
+/// FILEINF hands out the name without its extension and the extension without its dot.
+#[test]
+fn fileinf_splits_a_name_the_way_pcboard_did() {
+    let output = run_ppl_with_files(
+        r#"
+        PRINTLN "name=", FILEINF("found.pcb", 8), " ext=", FILEINF("found.pcb", 9)
+    "#,
+        &[("found.pcb", CONTENT)],
+    );
+    assert_eq!(output, "name=found ext=pcb\n");
+}
+
+/// PCBoard printed such a line as it stood when the file behind it was not there -
+/// displayfile() falls through to printxlated() when runscriptwithparams() finds nothing.
+#[test]
+fn a_line_naming_a_file_that_is_not_there_is_printed() {
+    let output = run_ppl_with_files(r#"DISPSTR "%missing.pcb""#, &[]);
+    assert_eq!(output, "%missing.pcb");
+}
+
+#[test]
+fn a_line_naming_a_ppe_that_is_not_there_is_printed() {
+    let output = run_ppl_with_files(r#"DISPSTR "!C:\TEMP\TOP.PPE""#, &[]);
+    assert_eq!(output, "!C:\\TEMP\\TOP.PPE");
+}
+
+/// The names in such a line are the ones the sysop's DOS drive had.
+#[test]
+fn a_dos_path_in_a_display_line_finds_the_file() {
+    let output = run_ppl_with_files(r#"DISPSTR "%C:\FOUND.PCB""#, &[("found.pcb", CONTENT)]);
+    assert_eq!(output, "the file was found\n");
+}

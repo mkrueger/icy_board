@@ -10,6 +10,7 @@
 mod control_flow;
 mod dbase;
 mod display_pause;
+mod file_channels;
 mod file_names;
 mod masks;
 mod message_base;
