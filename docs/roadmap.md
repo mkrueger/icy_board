@@ -14,7 +14,6 @@
 - [x] icbfile - convert an existing PCBoard file base, and bring one into a single shape
   - Repacks every archive to ZIP under a lower case name and drops the BBStros on the way,
     keeping the description and download counter of the entry it replaces.
-- [ ] Finsh/sync commands & help files
 - [x] ICBSETUP needs a "cmd editor"
 - [x] Rework the mkicbmnu - due to changes in the icbsetup menu system that got broken
 - [x] Look at the NEWS/INTRO feature of PCBOARD how that really works
@@ -25,10 +24,18 @@
 - [x] Implement group chat (CHAT command)
 - [x] Finish SSH/Websocket support
 - [x] Timed events - the board clears itself before an event runs, documented in docs/source/events.rst
-- [ ] Mailer Support (BINKP?) - icbmailer polls, tosses and scans, documented in docs/source/mailer.rst,
-      but nothing calls it on a schedule and nothing answers an incoming call yet
-      (a timed event can now do the calling)
-- [ ] Go throught the PCBoard options and ensure they're working - atm some do - some don't
+- [x] FTN mailer usable as a leaf/point - icbmailer scan/poll/toss over BinkP client,
+      config in ftn.toml, docs in docs/source/mailer.rst; schedule via timed event or cron.
+      No BinkP server/answering side planned. Netmail still lands in one dump base;
+      AKA/link setup is hand-edited TOML for now.
+- [x] Finish/sync commands & help files - every PCBoard user command (A-Z, the word commands and
+      the DB/UB/NODE/OPEN aliases) resolves, "!" repeats the last command again, and every help
+      file in the help directory is reachable. Help ids follow PCBoard's HELP.C table, so BD/DB
+      share the D help and BU/UB the U one, and the MORE? help is built from PCBTEXT like PCBoard.
+      Only the sysop help (hlp1-hlp15) is unwritten - PCBoard never shipped those either.
+      German help set is still 20 of 52 files.
+- [x] PPL dBase3 statements/functions
+- [x] Go through the PCBoard options and ensure they're working - atm some do - some don't
   - compat/COMMAND_AUDIT.md tracks where a command still answers differently than PCBoard did
   - compat/OPTIONS_AUDIT.md tracks the configuration switches - 38 of 125 options and 21 of 29
     sysop security levels are editable in ICBSetup but read by nobody
@@ -37,10 +44,9 @@
 
 After BETA
 
-- [ ] PPL tree sitter grammar - crates/tree-sitter-ppl has the grammar, ppl-lsp still parses on its own
+- [ ] PPL tree-sitter grammar - crates/tree-sitter-ppl has the grammar, ppl-lsp still parses on its own
 - [ ] PPL web statements/functions
-- [x] PPL dabase3 statements/functions
+- [ ] FTN polish (optional): netmail to users, ICBSetup AKA/link editor, AreaFix if needed
 - [ ] Self-service password reset using email
 - [ ] Web Frontend (IcyTerm can run as Webassembly but needs the data from somewhere)
-- [ ] Support for IcyAnim - no need to use icy_play in icy_board anymore 
-- [ ]
+- [ ] Support for IcyAnim - no need to use icy_play in icy_board anymore

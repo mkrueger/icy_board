@@ -44,7 +44,7 @@ Status is from behaviour analysis. Nothing here is oracle-verified yet — see
 | I | none | none | ✅ |
 | J | JOINCONFNUM (64), TEXTTOSCANFOR (70), PWRDTOJOIN (640), then VIEWCONFMEMBERS (88), SCANMSGBASE (296) | all five, and only on the first join of a conference | ✅ |
 | K | MSGNUMBERTOKILL (330), YOURPASSWORD (148) | uses PasswordToReadMessage | ⚠️ wrong prompt id |
-| L | DATETOSEARCH (72) when OptionalNewScan, SEARCHFILENAME (71), FILENUMEXPERT (352)/NOVICE (353) | all three; 72 appears only when the line carried an `N` or `S` | ✅ |
+| L | DATETOSEARCH (72) when OptionalNewScan, SEARCHFILENAME (71), FILENUMEXPERT (352)/NOVICE (353) | all three; 72 appears only for `N`, while `S` takes the stored date without asking | ✅ |
 | M | no prompt; CT/AN/GR/RI token | same + AvatarOn | ✅ extension is fine |
 | N | DATETOSEARCH (72), FILENUMEXPERT/NOVICE | same | ✅ |
 | O | forced `NumTokens=1` so tokens are ignored; SYSOPUNAVAILABLE then COMMENTINSTEAD (571) **only if user has SEC_C** | gated on SEC_C, asked once, and also asked after a page that rang out | ✅ |
@@ -53,12 +53,12 @@ Status is from behaviour analysis. Nothing here is oracle-verified yet — see
 | R | MSGREADCMDEXPRT (584)/MSGREADCOMMAND (425); per-message loop ENDOFMSGEXPERT (612)/ENDOFMESSAGE (197); MOVE (465)/COPY (569) | prompts and parser match; the capture and QWK commands parse but do nothing yet | ⚠️ |
 | S | QNUMTOANSWER (67), **always prompts, ignores tokens** | same | ✅ |
 | T | DESIREDPROTOCOL (198); token skips | same | ✅ |
-| U | CONTINUEUPLOAD (449), FILENAMETOUPLOAD (68)/(729), PROTOCOLFORXFER (280), GOODBYEAFTERUP (474) | 449, 68 (token aware), 474 | ⚠️ 474 is unconditional; PCBoard only asks it in batch mode |
+| U | CONTINUEUPLOAD (449), FILENAMETOUPLOAD (68)/(729), PROTOCOLFORXFER (280), GOODBYEAFTERUP (474) | 449, 68 (token aware), 280 when no protocol is set, then 474 | ⚠️ 474 is unconditional; PCBoard only asks it in batch mode |
 | V | no prompts; returns if STAT display file missing | built-in settings display as fallback | ⚠️ improvement, divergent |
 | W | NEWPASSWORD (152), REENTERPASSWORD (111), CITYSTATE (265), BUSDATAPHONE (113), HOMEVOICEPHONE (114), COMMENTFIELDPROMPT (2), CLSBETWEENMSGS (556), SCROLLMSGBODY (627), USEBIGHEADERS (628), SETFSEDEFAULT (583), DEFAULTWIDEMSGS (637), GETALIASNAME (690), USESHORTDESC (746), SELECTCONFS (325), address block, QWK limits (732-735) | same, then the icy_board extras | ✅ |
 | X | no prompt; ON/OFF token | same | ✅ |
 | Y | MSGSCANPROMPT (155); tokens skip | same | ✅ |
-| Z | DATETOSEARCH (72) conditional, TEXTTOSCANFOR (70), FILENUMEXPERT/NOVICE | all three, `N`/`S` both trigger the date prompt | ✅ |
+| Z | DATETOSEARCH (72) conditional, TEXTTOSCANFOR (70), FILENUMEXPERT/NOVICE | all three; `N` prompts, `S` takes the stored date without asking | ✅ |
 
 ## Word commands
 
@@ -75,8 +75,9 @@ icy_board resolves these in `try_find_command` (`state/mod.rs:833-960`).
 | SELECT | PCBoard can ask SELECTCONFFLAGS (564) | ⚠️ 1 missing |
 | TS | area token `S` handling is a TODO | 🚧 partial |
 | BD, BU | recognised, but the handlers are stubs | 🚧 stubs |
-| DB, UB, NODE | PCBoard aliases for download / upload / chat | ❌ not recognised |
-| OPEN | matcher tests `"Open".starts_with(command)` with mixed case, but the command is upper-cased first, so `OPEN` never matches | ❌ dead branch |
+| DB, UB, NODE | PCBoard aliases for download / upload / chat | ✅ recognised |
+| OPEN | the matcher compared against mixed case `"Open"` while the command is upper-cased first | ✅ fixed |
+| ! | repeats the last command of five characters or more, help in HLP! | ✅ |
 | AREA | icy_board extension, not in PCBoard's table | ⚠️ extension |
 
 Unrecognised words fall through to the door list when the user has OPEN access,
@@ -90,26 +91,41 @@ wins in both, so an abbreviation can resolve to a different command.
 
 ## Numeric commands (sysop functions)
 
-PCBoard maps 1-16. icy_board implements only `4`.
+PCBoard maps 1-16. icy_board implements `1`, `2`, `4`, `5`, `6`, `11`, `12`, `13` and `16`.
 
 | # | Function | PCBoard prompts | Status |
 |---|---|---|---|
-| 1 | view callers log | VIEWCALLERS (212), TEXTTOSCANFOR (70), DELETECALLERSLOG (80) | ❌ missing |
-| 2 | view/print users | VIEWPRINTUSERS (213) | ❌ missing |
+| 1 | view callers log | VIEWCALLERS (212), TEXTTOSCANFOR (70), DELETECALLERSLOG (80) | ✅ |
+| 2 | view/print users | VIEWPRINTUSERS (213) | ✅ |
 | 3 | pack message base | PACKTHEMSGBASE (79), GENERATENEWINDEX (461), PURGEOLDERTHAN (106), PURGEPRIVRECEIVED (89), RENUMBERDURINGPACK (82), NEWLOWMSGNUM (83) | ❌ missing |
 | 4 | recover message | MSGNUMTOACTIVATE (77) | ✅ |
-| 5 | quick/header scan | 613/424 via message reader | ❌ missing |
-| 6 | view a text file | TEXTVIEWFILENAME (62) | ❌ missing |
+| 5 | quick/header scan | 613/424 via message reader | ✅ |
+| 6 | view a text file | TEXTVIEWFILENAME (62) | ✅ |
 | 7 | user maintenance | USERMODEXPERT (167)/USERMODNONEXPERT (168), DELETERECORD (561) | ❌ missing |
 | 8 | pack users file | PACKTHEUSERSFILE (86), KEEPLOCKEDOUT (105), PURGEOLDERTHAN (106), KEEPSECURITY (107) | ❌ missing |
 | 9 | remote DOS | EXITTODOS (90) | ❌ intentionally out of scope? |
 | 10 | DOS command | DOSFUNCTION (142) | ❌ intentionally out of scope? |
-| 11 | node list (forces `X`) | none | ❌ missing |
-| 12 | log off a node | NODENUMTOLOGOFF (65) | ❌ missing |
-| 13 | view node callers log | NODETOVIEW (66), TEXTTOSCANFOR (70) | ❌ missing |
+| 11 | node list (forces `X`) | none | ✅ |
+| 12 | log off a node | NODENUMTOLOGOFF (65) | ✅ |
+| 13 | view node callers log | NODETOVIEW (66), TEXTTOSCANFOR (70) | ✅ filters the shared log by node |
 | 14 | drop node to DOS | NODENUMTODROP (274), DROPNOW (345) | ❌ missing |
 | 15 | recycle a node | RECYCLETHRUDOS (348) | ❌ missing |
-| 16 | directory listing | ENTERDIRCMD (740) | ❌ missing |
+| 16 | directory listing | ENTERDIRCMD (740) | ⚠️ name, size and date, not a DOS DIR |
+
+PCBoard kept one caller log per node. icy_board keeps a single shared log, so
+`write_caller_log` stamps the node on every line and 13 filters on that; `A`
+scans every node. The `P` option of 1 and 2 has no printer to go to, so it runs
+the listing without stopping instead.
+
+5 is the quick scan with PCBoard's header scan flag: it uses FIVESCANHEADER (158)
+instead of QUICKSCANHEADER (725), puts an `A`/`I` column in front of every line
+and is the only scan that lists killed messages. It lists and stops rather than
+walking into the messages.
+
+12 sends the `Shutdown` message the event scheduler already uses, so the node
+shows the text and drops its caller. It refuses to log off the node it runs on.
+16 lists name, size and date instead of shelling out to `DIR`, and like 6 it
+stays inside the board directory because a PPE can stuff the path.
 
 ## Structural issues (fix before the per-command work)
 
@@ -158,18 +174,39 @@ Priority is "how badly does this break a PPE that stuffs input".
 
 ### P1 — missing prompts, wrong answer consumed
 
-- [ ] **J** and **A**: post-join VIEWCONFMEMBERS (88) and SCANMSGBASE (296).
-- [ ] **U**: CONTINUEUPLOAD (449) and PROTOCOLFORXFER (280); accept a filename token.
-- [ ] **D**: BYEAFTERDOWNLOAD (490), DFLTFILENAMETODNLD (300), FILENAMETODOWNLOAD (61).
-- [ ] **O**: only offer COMMENTINSTEAD (571) when the user has C access; ignore tokens.
-- [ ] **L**, **Z**: conditional DATETOSEARCH (72); finish the `S` token TODO.
-- [ ] **DOOR/OPEN**: PWRDFORDOOR (415), CONTINUEDOOR (604).
+Most of this list turned out to be already done when it was re-checked against
+the code; only the last three rows were real.
+
+- [x] **J** and **A**: post-join VIEWCONFMEMBERS (88) and SCANMSGBASE (296) were
+      already asked, and A already delegates to J with a forced `0` token.
+- [x] **O**: COMMENTINSTEAD (571) was already gated on C access, and the
+      dispatcher already clears the tokens.
+- [x] **DOOR/OPEN**: PWRDFORDOOR (415) and CONTINUEDOOR (604) were already asked.
+- [x] **L**, **Z**: `S` no longer asks DATETOSEARCH (72). PCBoard's
+      `getdatefromuser` takes the stored date as soon as the date buffer holds
+      `S`, so only `N` prompts; `S` beats `N` when both are on the line.
+- [x] **U**: PROTOCOLFORXFER (280) is asked when the caller has no usable
+      protocol, and the protocol is settled *before* GOODBYEAFTERUP (474), the
+      order PCBoard uses. CONTINUEUPLOAD (449) and the filename token were there.
+- [x] **D**: PROTOCOLFORXFER (280) is asked instead of quietly transferring
+      nothing when the caller's protocol is `N` or unknown.
+
+Blocked on features that do not exist yet rather than on the prompt code:
+
+- [ ] **D**: BYEAFTERDOWNLOAD (490) only fires when the caller captured messages
+      to a file. Capture parses but does not run, so the prompt is unreachable —
+      do it with the capture work.
+- [ ] **D**: DFLTFILENAMETODNLD (300) pre-fills from the last file the caller
+      viewed with `F`/`V`. Nothing tracks a last-viewed file yet.
+- [ ] **D**: FILENAMETODOWNLOAD (61) is the non-batch wording of (728). There is
+      no session batch flag, so the split belongs with the BD/BU work. Both
+      consume one token, so this is wording, not contract.
 
 ### P2 — smaller divergences
 
 - [ ] **K**: use YOURPASSWORD (148).
 - [ ] **SELECT**: SELECTCONFFLAGS (564).
-- [ ] Fix the `"Open"` case bug and add aliases `NODE`, `DB`, `UB`.
+- [x] Fix the `"Open"` case bug and add aliases `NODE`, `DB`, `UB`.
 - [ ] Fall back to the door list for unknown words when the user has OPEN access.
 - [ ] Match PCBoard's minimum-abbreviation rule instead of accepting any prefix.
 - [ ] Implement **BD**/**BU** batch transfer.
@@ -177,7 +214,17 @@ Priority is "how badly does this break a PPE that stuffs input".
 
 ### P3 — sysop numeric commands
 
-- [ ] 1, 2, 3, 5, 6, 7, 8, 11, 12, 13, 14, 15, 16.
+- [x] 1, 2, 6, 11, 13 — the ones that only needed the caller log, the user file,
+      `display_file` and the node table. They also make `sec_1_view_caller_log`,
+      `sec_2_view_usr_list`, `sec_6_view_any_file`, `sec_11_view_other_nodes` and
+      `sec_13_view_alt_node_callers` live instead of dead config.
+- [x] 5, 12, 16 — header scan, forced node logoff and the directory listing.
+      `sec_5_list_message_hdr` and `sec_12_logoff_alt_node` are live too now.
+- [ ] 14, 15 — drop a node to DOS and recycle it. The signalling 12 uses is
+      there; what is missing is a decision on what they should mean here.
+- [ ] 3, 8 — packing message bases and the user file. Data destructive, wants
+      tests before anything else.
+- [ ] 7 — user maintenance, the one that needs a real editor.
 - [ ] Decide explicitly whether 9 (remote DOS) and 10 (DOS shell) are out of
       scope; if so, document it rather than leaving them unimplemented.
 
