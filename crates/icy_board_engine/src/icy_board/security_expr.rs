@@ -170,7 +170,7 @@ enum Token {
     #[regex("[_a-zA-Z]+", |lex| lex.slice().to_string())]
     Text(String),
 
-    #[regex("[0-9]+", |lex| lex.slice().parse::<i64>().unwrap())]
+    #[regex("[0-9]+", |lex| lex.slice().parse::<i64>().ok())]
     Integer(i64),
 
     #[regex("\\d\\d:\\d\\d", |lex| lex.slice().to_string())]
@@ -464,7 +464,10 @@ fn factor(lexer: &mut Peekable<Lexer<Token>>) -> Result<SecurityExpression, Stri
             SecurityExpression::Constant(Value::String(s))
         }
         Token::Integer(i) => SecurityExpression::Constant(Value::Integer(i)),
-        Token::Time(t) => SecurityExpression::Constant(Value::Time(NaiveTime::parse_from_str(&t, "%H:%M").unwrap())),
+        Token::Time(t) => match NaiveTime::parse_from_str(&t, "%H:%M") {
+            Ok(time) => SecurityExpression::Constant(Value::Time(time)),
+            Err(_) => return Err(format!("Invalid time '{t}'")),
+        },
         Token::Text(name) => {
             let lpar = lexer.next();
             if lpar != Some(Ok(Token::LPar)) {
@@ -487,7 +490,7 @@ fn factor(lexer: &mut Peekable<Lexer<Token>>) -> Result<SecurityExpression, Stri
             }
             SecurityExpression::Call(name, args)
         }
-        _ => panic!("Unexpected token {:?}", token),
+        _ => return Err(format!("Unexpected token {token:?}")),
     };
     Ok(r)
 }

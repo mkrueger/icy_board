@@ -167,6 +167,40 @@ pub struct SubscriptionMode {
     pub warning_days: u32,
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct WebAdminServer {
+    #[serde(default)]
+    pub enabled: bool,
+
+    #[serde(default = "default_web_admin_address")]
+    pub address: String,
+
+    #[serde(default = "default_web_admin_port")]
+    pub port: u16,
+
+    #[serde(default)]
+    pub allow_remote: bool,
+}
+
+impl Default for WebAdminServer {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            address: default_web_admin_address(),
+            port: default_web_admin_port(),
+            allow_remote: false,
+        }
+    }
+}
+
+fn default_web_admin_address() -> String {
+    "127.0.0.1".to_string()
+}
+
+fn default_web_admin_port() -> u16 {
+    8787
+}
+
 #[derive(Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct BoardInformation {
     ///  name of board
@@ -199,6 +233,9 @@ pub struct BoardInformation {
 
     #[serde(default)]
     pub who_show_alias: bool,
+
+    #[serde(default)]
+    pub web_admin: WebAdminServer,
 }
 
 #[derive(Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -832,6 +869,7 @@ impl IcbConfig {
                 allow_iemsi: true,
                 who_include_city: true,
                 who_show_alias: true,
+                web_admin: WebAdminServer::default(),
             },
 
             sysop: SysopInformation {
