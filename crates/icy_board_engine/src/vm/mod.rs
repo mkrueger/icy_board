@@ -13,6 +13,7 @@ use crate::executable::PPEScript;
 use crate::executable::VariableTable;
 use crate::executable::VariableType;
 use crate::executable::VariableValue;
+use crate::icy_board::lookup_case_insensitive;
 use crate::icy_board::state::NodeState;
 use crate::icy_board::user_base::FSEMode;
 use crate::parser::UserTypeRegistry;
@@ -783,11 +784,54 @@ impl<'a> VirtualMachine<'a> {
             file = file.replace('/', "\\");
         }
 
-        if file.starts_with("C:/") {
+        let board_root = self.icy_board_state.get_board().await.root_path.clone();
+        let resolved = if file.starts_with("C:/") {
             log::warn!("Absolute path detected: {}, change the src file.", file);
             self.icy_board_state.get_board().await.resolve_file(&PathBuf::from(&file[3..]))
         } else {
             self.icy_board_state.get_board().await.resolve_file(&file)
+        };
+        if resolved.exists() {
+            return resolved;
+        }
+        // A bare name is the board's, the way PCBoard read it from its own directory - only a
+        // path that leads somewhere else is worth looking for below the PPE.
+        if !file.contains(std::path::MAIN_SEPARATOR) {
+            return resolved;
+        }
+        self.resolve_below_ppe(&file, &board_root).unwrap_or(resolved)
+    }
+
+    /// An imported PPE still names its files the way they lay on the sysop's DOS drive.
+    /// Whatever is left of such a path below the PPE's own directory - or below the board,
+    /// which is where the PPE directories went - is where the file lives now.
+    fn resolve_below_ppe(&self, file: &str, board_root: &Path) -> Option<PathBuf> {
+        let dir = self.file_name.parent()?;
+        let from_dos_drive = file.starts_with('/') || file.chars().nth(1) == Some(':');
+        let mut rel = PathBuf::from(file);
+        loop {
+            if rel.is_relative() && !rel.as_os_str().is_empty() {
+                for base in [dir, board_root] {
+                    let candidate = lookup_case_insensitive(&base.join(&rel));
+                    if candidate.exists() {
+                        return Some(candidate);
+                    }
+                }
+            }
+            // Only a path off a drive holds directories that are gone; a relative one
+            // says where the file is and is taken as it stands.
+            if !from_dos_drive {
+                return None;
+            }
+            let mut components = rel.components();
+            components.next()?;
+            let rest = components.as_path().to_path_buf();
+            if rest.as_os_str().is_empty() {
+                // Nothing of the path is left, so a file still to be written goes next to the PPE.
+                let name = PathBuf::from(file).file_name()?.to_os_string();
+                return Some(dir.join(name));
+            }
+            rel = rest;
         }
     }
 

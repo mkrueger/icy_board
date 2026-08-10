@@ -561,6 +561,11 @@ pub struct IcyBoardState {
     pub saved_cmd: String,
     pub file_bases: HashMap<PathBuf, Arc<Mutex<FileBase>>>,
 
+    /// The files being displayed right now, innermost last.
+    displayed_files: Vec<PathBuf>,
+    /// How many PPEs are running on top of each other.
+    ppe_nesting: usize,
+
     /// Where `OPENCAP` is teeing everything the caller sees, until `CLOSECAP`.
     capture_file: Option<std::fs::File>,
 }
@@ -614,6 +619,8 @@ impl IcyBoardState {
             saved_cmd: String::new(),
             autorun_times: HashMap::new(),
             file_bases: HashMap::new(),
+            displayed_files: Vec::new(),
+            ppe_nesting: 0,
             capture_file: None,
         }
     }
@@ -836,13 +843,23 @@ impl IcyBoardState {
     }
 
     pub async fn run_executable<P: AsRef<Path>>(&mut self, file_name: &P, answer_file: Option<&Path>, executable: Executable) -> Res<()> {
+        // PCBoard stacked no more than 16 PPEs, doScript() refused the next one.
+        // See MAX_SCR_STK in SCRMISC.CPP.
+        const MAX_PPE_NESTING: usize = 16;
+        if self.ppe_nesting >= MAX_PPE_NESTING {
+            log::warn!("PPE nesting limit reached, not running {}", file_name.as_ref().display());
+            return Ok(());
+        }
         self.session.disp_options.no_change();
         let canonicalized_path: PathBuf = file_name.as_ref().canonicalize()?;
 
         let canonicalized_path = PathBuf::from(adjust_canonicalization(canonicalized_path));
         let parent = canonicalized_path.parent().unwrap().to_str().unwrap().to_string();
         let mut io: DiskIO = DiskIO::new(&parent, answer_file);
-        Ok(if let Err(err) = run(&canonicalized_path, &executable, &mut io, self).await {
+        self.ppe_nesting += 1;
+        let result = run(&canonicalized_path, &executable, &mut io, self).await;
+        self.ppe_nesting -= 1;
+        Ok(if let Err(err) = result {
             log::error!("Error executing PPE {}: {}", canonicalized_path.display(), err);
             self.session.op_text = format!("{}", err);
             self.display_text(IceText::ErrorExecPPE, display_flags::LFBEFORE | display_flags::LFAFTER)

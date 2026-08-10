@@ -634,17 +634,25 @@ pub async fn shell(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let use_shell = vm.eval_expr(&args[0]).await?.as_bool();
 
     let mut cmd = vm.eval_expr(&args[2]).await?.as_string();
-    let mut arguments = vm.eval_expr(&args[3]).await?.as_string();
+    let arguments = vm.eval_expr(&args[3]).await?.as_string();
     let mut exit_code = 1;
 
+    let mut command_args = Vec::new();
     if use_shell {
-        if let Ok(shell) = env::var("SHELL") {
-            arguments = format!("/C {} '{}'", cmd, arguments);
-            cmd = shell;
-        }
+        // Only COMMAND.COM ever took /C, every shell here takes -c.
+        let (shell, flag) = if cfg!(windows) {
+            (env::var("COMSPEC").unwrap_or_else(|_| "cmd.exe".to_string()), "/C")
+        } else {
+            (env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string()), "-c")
+        };
+        command_args.push(flag.to_string());
+        command_args.push(format!("{} '{}'", cmd.trim(), arguments));
+        cmd = shell;
+    } else {
+        command_args.push(arguments);
     }
 
-    match std::process::Command::new(cmd).arg(arguments).spawn() {
+    match std::process::Command::new(cmd).args(command_args).spawn() {
         Ok(mut child) => match child.wait() {
             Ok(code) => {
                 if let Some(ec) = code.code() {

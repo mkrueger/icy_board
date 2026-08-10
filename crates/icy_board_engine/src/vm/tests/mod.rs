@@ -12,6 +12,7 @@ mod dbase;
 mod file_names;
 mod masks;
 mod message_base;
+mod ppe_paths;
 mod scalars;
 mod tpa;
 
@@ -75,12 +76,31 @@ pub fn run_ppl_with_files(source: &str, files: &[(&str, &[u8])]) -> String {
     run_ppl_seeded(source, |_| {}, files)
 }
 
+/// The same, with the snippet running as a PPE that lives in `ppe_dir` below the board.
+/// File names may name subdirectories, which are created on the way.
+pub fn run_ppl_in_ppe_dir(source: &str, ppe_dir: &str, files: &[(&str, &[u8])]) -> String {
+    run_ppl_seeded_in(source, |_| {}, files, Some(ppe_dir))
+}
+
 fn run_ppl_seeded<P: Fn(&mut IcyBoard)>(source: &str, init_fn: P, files: &[(&str, &[u8])]) -> String {
+    run_ppl_seeded_in(source, init_fn, files, None)
+}
+
+fn run_ppl_seeded_in<P: Fn(&mut IcyBoard)>(source: &str, init_fn: P, files: &[(&str, &[u8])], ppe_dir: Option<&str>) -> String {
     let executable = compile(source);
     let work_dir = scratch_dir("run");
     for (name, bytes) in files {
-        std::fs::write(work_dir.join(name), bytes).unwrap();
+        let path = work_dir.join(name);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, bytes).unwrap();
     }
+    let ppe_file = match ppe_dir {
+        Some(dir) => {
+            std::fs::create_dir_all(work_dir.join(dir)).unwrap();
+            work_dir.join(dir).join("test.ppe")
+        }
+        None => PathBuf::from("test.ppe"),
+    };
 
     let output = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
         let bbs = Arc::new(tokio::sync::Mutex::new(BBS::new(1)));
@@ -127,7 +147,7 @@ fn run_ppl_seeded<P: Fn(&mut IcyBoard)>(source: &str, init_fn: P, files: &[(&str
         });
 
         let mut io = DiskIO::new(work_dir.to_str().unwrap(), None);
-        let result = run(&PathBuf::from("test.ppe"), &executable, &mut io, &mut state).await;
+        let result = run(&ppe_file, &executable, &mut io, &mut state).await;
 
         // Dropping the board end closes the channel, which is what lets the
         // reader finish instead of blocking on a connection nobody will write to.
