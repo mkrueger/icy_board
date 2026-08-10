@@ -3,15 +3,13 @@ name = "icbadmin"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
-description = "Local web based administration UI for IcyBoard"
+description = "Web based administration UI hosted by IcyBoard"
 
 [dependencies]
 icy_board_engine = { workspace = true }
 
-argh = { workspace = true }
 async-trait = { workspace = true }
 chrono = { workspace = true }
-fern = { workspace = true }
 log = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }

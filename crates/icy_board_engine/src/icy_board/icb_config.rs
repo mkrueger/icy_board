@@ -402,7 +402,7 @@ impl serde::Serialize for IcbColor {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct ConfigPaths {
     pub help_path: PathBuf,
 
@@ -814,7 +814,7 @@ impl DisplayNewsBehavior {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct IcbConfig {
     pub board: BoardInformation,
     pub sysop: SysopInformation,

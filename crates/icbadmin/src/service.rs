@@ -23,13 +23,6 @@ use crate::{
     error::{AdminError, Result},
 };
 
-/// Everything the web layer is allowed to do with a board. All configuration access
-/// goes through the engine types; this layer only adds locking, backups and auditing.
-pub struct AdminService {
-    board_file: PathBuf,
-    root_path: PathBuf,
-}
-
 #[async_trait]
 pub trait AdminBackend: Send + Sync {
     fn board_file(&self) -> &Path;
@@ -95,477 +88,10 @@ pub trait AdminBackend: Send + Sync {
     async fn delete_conference(&self, index: usize, fingerprint: &str, actor: &str) -> Result<ApplyResultDto>;
 }
 
-impl AdminService {
-    pub fn open<P: AsRef<Path>>(board_file: P) -> Result<Self> {
-        let board_file = absolute(board_file.as_ref());
-        if !board_file.is_file() {
-            return Err(AdminError::NotFound(board_file));
-        }
-        let root_path = board_file.parent().unwrap_or_else(|| Path::new(".")).to_path_buf();
-        Ok(Self { board_file, root_path })
-    }
-
-    pub fn board_file(&self) -> &Path {
-        &self.board_file
-    }
-
-    pub fn root_path(&self) -> &Path {
-        &self.root_path
-    }
-
-    pub fn overview(&self) -> OverviewDto {
-        let board = match IcyBoard::load(&self.board_file) {
-            Ok(board) => board,
-            Err(e) => {
-                let mut dto = empty_overview(&self.board_file, &self.root_path);
-                dto.load_error = Some(e.to_string());
-                return dto;
-            }
-        };
-        overview_from_board(&board, &self.board_file, &self.root_path)
-    }
-
-    fn load_config(&self) -> Result<IcbConfig> {
-        IcbConfig::load(&self.board_file).map_err(|e| AdminError::Load(e.to_string()))
-    }
-
-    fn fingerprint(&self) -> Result<String> {
-        backup::fingerprint(&self.board_file)
-    }
-
-    fn mutate_config<F>(&self, fingerprint: &str, actor: &str, action: &str, mutator: F) -> Result<ApplyResultDto>
-    where
-        F: FnOnce(&mut IcbConfig) -> Result<Vec<FieldChangeDto>>,
-    {
-        let _lock = BoardLock::acquire(&self.root_path)?;
-        backup::check_fingerprint(&self.board_file, fingerprint)?;
-
-        let mut config = self.load_config()?;
-        let changes = mutator(&mut config)?;
-        if changes.is_empty() {
-            return Ok(ApplyResultDto {
-                changed_fields: Vec::new(),
-                backup: None,
-                fingerprint: self.fingerprint()?,
-            });
-        }
-
-        let backup_path = backup::create_backup(&self.root_path, &self.board_file)?;
-        config.save_atomic(&self.board_file).map_err(|e| AdminError::Save(e.to_string()))?;
-
-        if let Err(e) = IcbConfig::load(&self.board_file) {
-            let _ = std::fs::copy(&backup_path, &self.board_file);
-            return Err(AdminError::Save(format!(
-                "written configuration could not be read back ({e}), the backup was restored"
-            )));
-        }
-
-        let changed_fields: Vec<String> = changes.iter().map(|c| c.field.clone()).collect();
-        backup::append_audit(
-            &self.root_path,
-            &serde_json::json!({
-                "time": chrono::Utc::now().to_rfc3339(),
-                "actor": actor,
-                "action": action,
-                "file": self.board_file.display().to_string(),
-                "backup": backup_path.display().to_string(),
-                "changes": changes.iter().map(|c| serde_json::json!({ "field": c.field, "old": c.old, "new": c.new })).collect::<Vec<_>>(),
-            }),
-        );
-
-        Ok(ApplyResultDto {
-            changed_fields,
-            backup: Some(backup_path.display().to_string()),
-            fingerprint: self.fingerprint()?,
-        })
-    }
-}
-
-// ---------------------------------------------------------------- section helpers (offline)
-
-macro_rules! impl_offline_section {
-    ($get:ident, $preview:ident, $update:ident, $dto:ident, $resp:ident, $to:ident, $apply:ident, $validate:ident, $diff:ident, $action:literal $(, $extra_field:ident = $extra_expr:expr )* ) => {
-        impl AdminService {
-            pub fn $get(&self) -> Result<$resp> {
-                let config = self.load_config()?;
-                Ok($resp {
-                    settings: $to(&config),
-                    $( $extra_field: $extra_expr, )*
-                    fingerprint: self.fingerprint()?,
-                })
-            }
-
-            pub fn $preview(&self, patch: &$dto) -> Result<DiffDto> {
-                $validate(patch)?;
-                let current = $to(&self.load_config()?);
-                Ok(DiffDto {
-                    changes: $diff(&current, patch),
-                })
-            }
-
-            pub fn $update(&self, patch: &$dto, fingerprint: &str, actor: &str) -> Result<ApplyResultDto> {
-                $validate(patch)?;
-                self.mutate_config(fingerprint, actor, $action, |config| {
-                    let current = $to(config);
-                    let changes = $diff(&current, patch);
-                    if !changes.is_empty() {
-                        $apply(config, patch)?;
-                    }
-                    Ok(changes)
-                })
-            }
-        }
-    };
-}
-
-impl AdminService {
-    pub fn get_general_settings(&self) -> Result<GeneralSettingsResponse> {
-        let config = self.load_config()?;
-        Ok(GeneralSettingsResponse {
-            settings: to_general_dto(&config),
-            sysop_password_set: !config.sysop.password.is_empty(),
-            fingerprint: self.fingerprint()?,
-        })
-    }
-
-    pub fn preview_general_settings(&self, patch: &GeneralSettingsDto) -> Result<DiffDto> {
-        validate_general(patch)?;
-        let current = to_general_dto(&self.load_config()?);
-        Ok(DiffDto {
-            changes: diff_general(&current, patch),
-        })
-    }
-
-    pub fn update_general_settings(&self, patch: &GeneralSettingsDto, fingerprint: &str, actor: &str) -> Result<ApplyResultDto> {
-        validate_general(patch)?;
-        self.mutate_config(fingerprint, actor, "update_general_settings", |config| {
-            let current = to_general_dto(config);
-            let changes = diff_general(&current, patch);
-            if !changes.is_empty() {
-                apply_general_dto(config, patch)?;
-            }
-            Ok(changes)
-        })
-    }
-}
-
-impl_offline_section!(
-    get_message_settings,
-    preview_message_settings,
-    update_message_settings,
-    MessageSettingsDto,
-    MessageSettingsResponse,
-    to_message_dto,
-    apply_message_dto,
-    validate_message,
-    diff_message,
-    "update_message_settings"
-);
-
-impl_offline_section!(
-    get_file_transfer_settings,
-    preview_file_transfer_settings,
-    update_file_transfer_settings,
-    FileTransferSettingsDto,
-    FileTransferSettingsResponse,
-    to_file_transfer_dto,
-    apply_file_transfer_dto,
-    validate_file_transfer,
-    diff_file_transfer,
-    "update_file_transfer_settings"
-);
-
-impl_offline_section!(
-    get_system_control_settings,
-    preview_system_control_settings,
-    update_system_control_settings,
-    SystemControlSettingsDto,
-    SystemControlSettingsResponse,
-    to_system_control_dto,
-    apply_system_control_dto,
-    validate_system_control,
-    diff_system_control,
-    "update_system_control_settings"
-);
-
-impl_offline_section!(
-    get_switches_settings,
-    preview_switches_settings,
-    update_switches_settings,
-    SwitchesSettingsDto,
-    SwitchesSettingsResponse,
-    to_switches_dto,
-    apply_switches_dto,
-    validate_switches,
-    diff_switches,
-    "update_switches_settings"
-);
-
-impl_offline_section!(
-    get_limits_settings,
-    preview_limits_settings,
-    update_limits_settings,
-    LimitsSettingsDto,
-    LimitsSettingsResponse,
-    to_limits_dto,
-    apply_limits_dto,
-    validate_limits,
-    diff_limits,
-    "update_limits_settings"
-);
-
-impl_offline_section!(
-    get_new_user_settings,
-    preview_new_user_settings,
-    update_new_user_settings,
-    NewUserSettingsDto,
-    NewUserSettingsResponse,
-    to_new_user_dto,
-    apply_new_user_dto,
-    validate_new_user,
-    diff_new_user,
-    "update_new_user_settings"
-);
-
-impl_offline_section!(
-    get_event_settings,
-    preview_event_settings,
-    update_event_settings,
-    EventSettingsDto,
-    EventSettingsResponse,
-    to_event_dto,
-    apply_event_dto,
-    validate_event,
-    diff_event,
-    "update_event_settings"
-);
-
-impl_offline_section!(
-    get_subscription_settings,
-    preview_subscription_settings,
-    update_subscription_settings,
-    SubscriptionSettingsDto,
-    SubscriptionSettingsResponse,
-    to_subscription_dto,
-    apply_subscription_dto,
-    validate_subscription,
-    diff_subscription,
-    "update_subscription_settings"
-);
-
-impl_offline_section!(
-    get_connection_settings,
-    preview_connection_settings,
-    update_connection_settings,
-    ConnectionSettingsDto,
-    ConnectionSettingsResponse,
-    to_connection_dto,
-    apply_connection_dto,
-    validate_connection,
-    diff_connection,
-    "update_connection_settings"
-);
-
-impl_offline_section!(
-    get_paths_settings,
-    preview_paths_settings,
-    update_paths_settings,
-    PathsSettingsDto,
-    PathsSettingsResponse,
-    to_paths_dto,
-    apply_paths_dto,
-    validate_paths,
-    diff_paths,
-    "update_paths_settings"
-);
-
-impl_offline_section!(
-    get_accounting_settings,
-    preview_accounting_settings,
-    update_accounting_settings,
-    AccountingSettingsDto,
-    AccountingSettingsResponse,
-    to_accounting_dto,
-    apply_accounting_dto,
-    validate_accounting,
-    diff_accounting,
-    "update_accounting_settings"
-);
-
-impl_offline_section!(
-    get_function_keys_settings,
-    preview_function_keys_settings,
-    update_function_keys_settings,
-    FunctionKeysSettingsDto,
-    FunctionKeysSettingsResponse,
-    to_function_keys_dto,
-    apply_function_keys_dto,
-    validate_function_keys,
-    diff_function_keys,
-    "update_function_keys_settings"
-);
-
-#[async_trait]
-impl AdminBackend for AdminService {
-    fn board_file(&self) -> &Path {
-        AdminService::board_file(self)
-    }
-    fn root_path(&self) -> &Path {
-        AdminService::root_path(self)
-    }
-    async fn overview(&self) -> OverviewDto {
-        AdminService::overview(self)
-    }
-
-    async fn get_general_settings(&self) -> Result<GeneralSettingsResponse> {
-        AdminService::get_general_settings(self)
-    }
-    async fn preview_general_settings(&self, patch: &GeneralSettingsDto) -> Result<DiffDto> {
-        AdminService::preview_general_settings(self, patch)
-    }
-    async fn update_general_settings(&self, patch: &GeneralSettingsDto, fingerprint: &str, actor: &str) -> Result<ApplyResultDto> {
-        AdminService::update_general_settings(self, patch, fingerprint, actor)
-    }
-
-    async fn get_message_settings(&self) -> Result<MessageSettingsResponse> {
-        AdminService::get_message_settings(self)
-    }
-    async fn preview_message_settings(&self, patch: &MessageSettingsDto) -> Result<DiffDto> {
-        AdminService::preview_message_settings(self, patch)
-    }
-    async fn update_message_settings(&self, patch: &MessageSettingsDto, fingerprint: &str, actor: &str) -> Result<ApplyResultDto> {
-        AdminService::update_message_settings(self, patch, fingerprint, actor)
-    }
-
-    async fn get_file_transfer_settings(&self) -> Result<FileTransferSettingsResponse> {
-        AdminService::get_file_transfer_settings(self)
-    }
-    async fn preview_file_transfer_settings(&self, patch: &FileTransferSettingsDto) -> Result<DiffDto> {
-        AdminService::preview_file_transfer_settings(self, patch)
-    }
-    async fn update_file_transfer_settings(&self, patch: &FileTransferSettingsDto, fingerprint: &str, actor: &str) -> Result<ApplyResultDto> {
-        AdminService::update_file_transfer_settings(self, patch, fingerprint, actor)
-    }
-
-    async fn get_system_control_settings(&self) -> Result<SystemControlSettingsResponse> {
-        AdminService::get_system_control_settings(self)
-    }
-    async fn preview_system_control_settings(&self, patch: &SystemControlSettingsDto) -> Result<DiffDto> {
-        AdminService::preview_system_control_settings(self, patch)
-    }
-    async fn update_system_control_settings(&self, patch: &SystemControlSettingsDto, fingerprint: &str, actor: &str) -> Result<ApplyResultDto> {
-        AdminService::update_system_control_settings(self, patch, fingerprint, actor)
-    }
-
-    async fn get_switches_settings(&self) -> Result<SwitchesSettingsResponse> {
-        AdminService::get_switches_settings(self)
-    }
-    async fn preview_switches_settings(&self, patch: &SwitchesSettingsDto) -> Result<DiffDto> {
-        AdminService::preview_switches_settings(self, patch)
-    }
-    async fn update_switches_settings(&self, patch: &SwitchesSettingsDto, fingerprint: &str, actor: &str) -> Result<ApplyResultDto> {
-        AdminService::update_switches_settings(self, patch, fingerprint, actor)
-    }
-
-    async fn get_limits_settings(&self) -> Result<LimitsSettingsResponse> {
-        AdminService::get_limits_settings(self)
-    }
-    async fn preview_limits_settings(&self, patch: &LimitsSettingsDto) -> Result<DiffDto> {
-        AdminService::preview_limits_settings(self, patch)
-    }
-    async fn update_limits_settings(&self, patch: &LimitsSettingsDto, fingerprint: &str, actor: &str) -> Result<ApplyResultDto> {
-        AdminService::update_limits_settings(self, patch, fingerprint, actor)
-    }
-
-    async fn get_new_user_settings(&self) -> Result<NewUserSettingsResponse> {
-        AdminService::get_new_user_settings(self)
-    }
-    async fn preview_new_user_settings(&self, patch: &NewUserSettingsDto) -> Result<DiffDto> {
-        AdminService::preview_new_user_settings(self, patch)
-    }
-    async fn update_new_user_settings(&self, patch: &NewUserSettingsDto, fingerprint: &str, actor: &str) -> Result<ApplyResultDto> {
-        AdminService::update_new_user_settings(self, patch, fingerprint, actor)
-    }
-
-    async fn get_event_settings(&self) -> Result<EventSettingsResponse> {
-        AdminService::get_event_settings(self)
-    }
-    async fn preview_event_settings(&self, patch: &EventSettingsDto) -> Result<DiffDto> {
-        AdminService::preview_event_settings(self, patch)
-    }
-    async fn update_event_settings(&self, patch: &EventSettingsDto, fingerprint: &str, actor: &str) -> Result<ApplyResultDto> {
-        AdminService::update_event_settings(self, patch, fingerprint, actor)
-    }
-
-    async fn get_subscription_settings(&self) -> Result<SubscriptionSettingsResponse> {
-        AdminService::get_subscription_settings(self)
-    }
-    async fn preview_subscription_settings(&self, patch: &SubscriptionSettingsDto) -> Result<DiffDto> {
-        AdminService::preview_subscription_settings(self, patch)
-    }
-    async fn update_subscription_settings(&self, patch: &SubscriptionSettingsDto, fingerprint: &str, actor: &str) -> Result<ApplyResultDto> {
-        AdminService::update_subscription_settings(self, patch, fingerprint, actor)
-    }
-
-    async fn get_connection_settings(&self) -> Result<ConnectionSettingsResponse> {
-        AdminService::get_connection_settings(self)
-    }
-    async fn preview_connection_settings(&self, patch: &ConnectionSettingsDto) -> Result<DiffDto> {
-        AdminService::preview_connection_settings(self, patch)
-    }
-    async fn update_connection_settings(&self, patch: &ConnectionSettingsDto, fingerprint: &str, actor: &str) -> Result<ApplyResultDto> {
-        AdminService::update_connection_settings(self, patch, fingerprint, actor)
-    }
-
-    async fn get_paths_settings(&self) -> Result<PathsSettingsResponse> {
-        AdminService::get_paths_settings(self)
-    }
-    async fn preview_paths_settings(&self, patch: &PathsSettingsDto) -> Result<DiffDto> {
-        AdminService::preview_paths_settings(self, patch)
-    }
-    async fn update_paths_settings(&self, patch: &PathsSettingsDto, fingerprint: &str, actor: &str) -> Result<ApplyResultDto> {
-        AdminService::update_paths_settings(self, patch, fingerprint, actor)
-    }
-
-    async fn get_accounting_settings(&self) -> Result<AccountingSettingsResponse> {
-        AdminService::get_accounting_settings(self)
-    }
-    async fn preview_accounting_settings(&self, patch: &AccountingSettingsDto) -> Result<DiffDto> {
-        AdminService::preview_accounting_settings(self, patch)
-    }
-    async fn update_accounting_settings(&self, patch: &AccountingSettingsDto, fingerprint: &str, actor: &str) -> Result<ApplyResultDto> {
-        AdminService::update_accounting_settings(self, patch, fingerprint, actor)
-    }
-
-    async fn get_function_keys_settings(&self) -> Result<FunctionKeysSettingsResponse> {
-        AdminService::get_function_keys_settings(self)
-    }
-    async fn preview_function_keys_settings(&self, patch: &FunctionKeysSettingsDto) -> Result<DiffDto> {
-        AdminService::preview_function_keys_settings(self, patch)
-    }
-    async fn update_function_keys_settings(&self, patch: &FunctionKeysSettingsDto, fingerprint: &str, actor: &str) -> Result<ApplyResultDto> {
-        AdminService::update_function_keys_settings(self, patch, fingerprint, actor)
-    }
-
-    async fn list_conferences(&self) -> Result<ConferenceListResponse> {
-        AdminService::list_conferences(self)
-    }
-    async fn get_conference(&self, index: usize) -> Result<ConferenceResponse> {
-        AdminService::get_conference(self, index)
-    }
-    async fn create_conference(&self, patch: &ConferenceDto, fingerprint: &str, actor: &str) -> Result<ApplyResultDto> {
-        AdminService::create_conference(self, patch, fingerprint, actor)
-    }
-    async fn update_conference(&self, index: usize, patch: &ConferenceDto, fingerprint: &str, actor: &str) -> Result<ApplyResultDto> {
-        AdminService::update_conference(self, index, patch, fingerprint, actor)
-    }
-    async fn delete_conference(&self, index: usize, fingerprint: &str, actor: &str) -> Result<ApplyResultDto> {
-        AdminService::delete_conference(self, index, fingerprint, actor)
-    }
-}
-
 // ---------------------------------------------------------------- live backend
 
+/// Administers the board the running IcyBoard process has in memory. Every change is
+/// applied to that board and to the configuration file, with locking, backups and auditing.
 pub struct LiveAdminBackend {
     board: Arc<Mutex<IcyBoard>>,
     board_file: PathBuf,
@@ -594,7 +120,8 @@ impl LiveAdminBackend {
         backup::check_fingerprint(&self.board_file, fingerprint)?;
         let mut board = self.board.lock().await;
 
-        let changes = mutator(&mut board.config)?;
+        let mut edited = relative_config(&self.root_path, &board.config);
+        let changes = mutator(&mut edited)?;
         if changes.is_empty() {
             return Ok(ApplyResultDto {
                 changed_fields: Vec::new(),
@@ -602,6 +129,8 @@ impl LiveAdminBackend {
                 fingerprint: backup::fingerprint(&self.board_file)?,
             });
         }
+        board.config = edited;
+        board.resolve_paths();
 
         let mut disk_config = IcbConfig::load(&self.board_file).map_err(|e| AdminError::Load(e.to_string()))?;
         // Apply the same section mutation onto the disk image.
@@ -656,7 +185,7 @@ impl AdminBackend for LiveAdminBackend {
     async fn get_general_settings(&self) -> Result<GeneralSettingsResponse> {
         let board = self.board.lock().await;
         Ok(GeneralSettingsResponse {
-            settings: to_general_dto(&board.config),
+            settings: to_general_dto(&relative_config(&self.root_path, &board.config)),
             sysop_password_set: !board.config.sysop.password.is_empty(),
             fingerprint: backup::fingerprint(&self.board_file)?,
         })
@@ -665,7 +194,7 @@ impl AdminBackend for LiveAdminBackend {
         validate_general(patch)?;
         let board = self.board.lock().await;
         Ok(DiffDto {
-            changes: diff_general(&to_general_dto(&board.config), patch),
+            changes: diff_general(&to_general_dto(&relative_config(&self.root_path, &board.config)), patch),
         })
     }
     async fn update_general_settings(&self, patch: &GeneralSettingsDto, fingerprint: &str, actor: &str) -> Result<ApplyResultDto> {
@@ -684,7 +213,7 @@ impl AdminBackend for LiveAdminBackend {
     async fn get_message_settings(&self) -> Result<MessageSettingsResponse> {
         let board = self.board.lock().await;
         Ok(MessageSettingsResponse {
-            settings: to_message_dto(&board.config),
+            settings: to_message_dto(&relative_config(&self.root_path, &board.config)),
             fingerprint: backup::fingerprint(&self.board_file)?,
         })
     }
@@ -692,7 +221,7 @@ impl AdminBackend for LiveAdminBackend {
         validate_message(patch)?;
         let board = self.board.lock().await;
         Ok(DiffDto {
-            changes: diff_message(&to_message_dto(&board.config), patch),
+            changes: diff_message(&to_message_dto(&relative_config(&self.root_path, &board.config)), patch),
         })
     }
     async fn update_message_settings(&self, patch: &MessageSettingsDto, fingerprint: &str, actor: &str) -> Result<ApplyResultDto> {
@@ -711,7 +240,7 @@ impl AdminBackend for LiveAdminBackend {
     async fn get_file_transfer_settings(&self) -> Result<FileTransferSettingsResponse> {
         let board = self.board.lock().await;
         Ok(FileTransferSettingsResponse {
-            settings: to_file_transfer_dto(&board.config),
+            settings: to_file_transfer_dto(&relative_config(&self.root_path, &board.config)),
             fingerprint: backup::fingerprint(&self.board_file)?,
         })
     }
@@ -719,7 +248,7 @@ impl AdminBackend for LiveAdminBackend {
         validate_file_transfer(patch)?;
         let board = self.board.lock().await;
         Ok(DiffDto {
-            changes: diff_file_transfer(&to_file_transfer_dto(&board.config), patch),
+            changes: diff_file_transfer(&to_file_transfer_dto(&relative_config(&self.root_path, &board.config)), patch),
         })
     }
     async fn update_file_transfer_settings(&self, patch: &FileTransferSettingsDto, fingerprint: &str, actor: &str) -> Result<ApplyResultDto> {
@@ -738,7 +267,7 @@ impl AdminBackend for LiveAdminBackend {
     async fn get_system_control_settings(&self) -> Result<SystemControlSettingsResponse> {
         let board = self.board.lock().await;
         Ok(SystemControlSettingsResponse {
-            settings: to_system_control_dto(&board.config),
+            settings: to_system_control_dto(&relative_config(&self.root_path, &board.config)),
             fingerprint: backup::fingerprint(&self.board_file)?,
         })
     }
@@ -746,7 +275,7 @@ impl AdminBackend for LiveAdminBackend {
         validate_system_control(patch)?;
         let board = self.board.lock().await;
         Ok(DiffDto {
-            changes: diff_system_control(&to_system_control_dto(&board.config), patch),
+            changes: diff_system_control(&to_system_control_dto(&relative_config(&self.root_path, &board.config)), patch),
         })
     }
     async fn update_system_control_settings(&self, patch: &SystemControlSettingsDto, fingerprint: &str, actor: &str) -> Result<ApplyResultDto> {
@@ -765,7 +294,7 @@ impl AdminBackend for LiveAdminBackend {
     async fn get_switches_settings(&self) -> Result<SwitchesSettingsResponse> {
         let board = self.board.lock().await;
         Ok(SwitchesSettingsResponse {
-            settings: to_switches_dto(&board.config),
+            settings: to_switches_dto(&relative_config(&self.root_path, &board.config)),
             fingerprint: backup::fingerprint(&self.board_file)?,
         })
     }
@@ -773,7 +302,7 @@ impl AdminBackend for LiveAdminBackend {
         validate_switches(patch)?;
         let board = self.board.lock().await;
         Ok(DiffDto {
-            changes: diff_switches(&to_switches_dto(&board.config), patch),
+            changes: diff_switches(&to_switches_dto(&relative_config(&self.root_path, &board.config)), patch),
         })
     }
     async fn update_switches_settings(&self, patch: &SwitchesSettingsDto, fingerprint: &str, actor: &str) -> Result<ApplyResultDto> {
@@ -792,7 +321,7 @@ impl AdminBackend for LiveAdminBackend {
     async fn get_limits_settings(&self) -> Result<LimitsSettingsResponse> {
         let board = self.board.lock().await;
         Ok(LimitsSettingsResponse {
-            settings: to_limits_dto(&board.config),
+            settings: to_limits_dto(&relative_config(&self.root_path, &board.config)),
             fingerprint: backup::fingerprint(&self.board_file)?,
         })
     }
@@ -800,7 +329,7 @@ impl AdminBackend for LiveAdminBackend {
         validate_limits(patch)?;
         let board = self.board.lock().await;
         Ok(DiffDto {
-            changes: diff_limits(&to_limits_dto(&board.config), patch),
+            changes: diff_limits(&to_limits_dto(&relative_config(&self.root_path, &board.config)), patch),
         })
     }
     async fn update_limits_settings(&self, patch: &LimitsSettingsDto, fingerprint: &str, actor: &str) -> Result<ApplyResultDto> {
@@ -819,7 +348,7 @@ impl AdminBackend for LiveAdminBackend {
     async fn get_new_user_settings(&self) -> Result<NewUserSettingsResponse> {
         let board = self.board.lock().await;
         Ok(NewUserSettingsResponse {
-            settings: to_new_user_dto(&board.config),
+            settings: to_new_user_dto(&relative_config(&self.root_path, &board.config)),
             fingerprint: backup::fingerprint(&self.board_file)?,
         })
     }
@@ -827,7 +356,7 @@ impl AdminBackend for LiveAdminBackend {
         validate_new_user(patch)?;
         let board = self.board.lock().await;
         Ok(DiffDto {
-            changes: diff_new_user(&to_new_user_dto(&board.config), patch),
+            changes: diff_new_user(&to_new_user_dto(&relative_config(&self.root_path, &board.config)), patch),
         })
     }
     async fn update_new_user_settings(&self, patch: &NewUserSettingsDto, fingerprint: &str, actor: &str) -> Result<ApplyResultDto> {
@@ -846,7 +375,7 @@ impl AdminBackend for LiveAdminBackend {
     async fn get_event_settings(&self) -> Result<EventSettingsResponse> {
         let board = self.board.lock().await;
         Ok(EventSettingsResponse {
-            settings: to_event_dto(&board.config),
+            settings: to_event_dto(&relative_config(&self.root_path, &board.config)),
             fingerprint: backup::fingerprint(&self.board_file)?,
         })
     }
@@ -854,7 +383,7 @@ impl AdminBackend for LiveAdminBackend {
         validate_event(patch)?;
         let board = self.board.lock().await;
         Ok(DiffDto {
-            changes: diff_event(&to_event_dto(&board.config), patch),
+            changes: diff_event(&to_event_dto(&relative_config(&self.root_path, &board.config)), patch),
         })
     }
     async fn update_event_settings(&self, patch: &EventSettingsDto, fingerprint: &str, actor: &str) -> Result<ApplyResultDto> {
@@ -873,7 +402,7 @@ impl AdminBackend for LiveAdminBackend {
     async fn get_subscription_settings(&self) -> Result<SubscriptionSettingsResponse> {
         let board = self.board.lock().await;
         Ok(SubscriptionSettingsResponse {
-            settings: to_subscription_dto(&board.config),
+            settings: to_subscription_dto(&relative_config(&self.root_path, &board.config)),
             fingerprint: backup::fingerprint(&self.board_file)?,
         })
     }
@@ -881,7 +410,7 @@ impl AdminBackend for LiveAdminBackend {
         validate_subscription(patch)?;
         let board = self.board.lock().await;
         Ok(DiffDto {
-            changes: diff_subscription(&to_subscription_dto(&board.config), patch),
+            changes: diff_subscription(&to_subscription_dto(&relative_config(&self.root_path, &board.config)), patch),
         })
     }
     async fn update_subscription_settings(&self, patch: &SubscriptionSettingsDto, fingerprint: &str, actor: &str) -> Result<ApplyResultDto> {
@@ -900,7 +429,7 @@ impl AdminBackend for LiveAdminBackend {
     async fn get_connection_settings(&self) -> Result<ConnectionSettingsResponse> {
         let board = self.board.lock().await;
         Ok(ConnectionSettingsResponse {
-            settings: to_connection_dto(&board.config),
+            settings: to_connection_dto(&relative_config(&self.root_path, &board.config)),
             fingerprint: backup::fingerprint(&self.board_file)?,
         })
     }
@@ -908,7 +437,7 @@ impl AdminBackend for LiveAdminBackend {
         validate_connection(patch)?;
         let board = self.board.lock().await;
         Ok(DiffDto {
-            changes: diff_connection(&to_connection_dto(&board.config), patch),
+            changes: diff_connection(&to_connection_dto(&relative_config(&self.root_path, &board.config)), patch),
         })
     }
     async fn update_connection_settings(&self, patch: &ConnectionSettingsDto, fingerprint: &str, actor: &str) -> Result<ApplyResultDto> {
@@ -927,7 +456,7 @@ impl AdminBackend for LiveAdminBackend {
     async fn get_paths_settings(&self) -> Result<PathsSettingsResponse> {
         let board = self.board.lock().await;
         Ok(PathsSettingsResponse {
-            settings: to_paths_dto(&board.config),
+            settings: to_paths_dto(&relative_config(&self.root_path, &board.config)),
             fingerprint: backup::fingerprint(&self.board_file)?,
         })
     }
@@ -935,7 +464,7 @@ impl AdminBackend for LiveAdminBackend {
         validate_paths(patch)?;
         let board = self.board.lock().await;
         Ok(DiffDto {
-            changes: diff_paths(&to_paths_dto(&board.config), patch),
+            changes: diff_paths(&to_paths_dto(&relative_config(&self.root_path, &board.config)), patch),
         })
     }
     async fn update_paths_settings(&self, patch: &PathsSettingsDto, fingerprint: &str, actor: &str) -> Result<ApplyResultDto> {
@@ -954,7 +483,7 @@ impl AdminBackend for LiveAdminBackend {
     async fn get_accounting_settings(&self) -> Result<AccountingSettingsResponse> {
         let board = self.board.lock().await;
         Ok(AccountingSettingsResponse {
-            settings: to_accounting_dto(&board.config),
+            settings: to_accounting_dto(&relative_config(&self.root_path, &board.config)),
             fingerprint: backup::fingerprint(&self.board_file)?,
         })
     }
@@ -962,7 +491,7 @@ impl AdminBackend for LiveAdminBackend {
         validate_accounting(patch)?;
         let board = self.board.lock().await;
         Ok(DiffDto {
-            changes: diff_accounting(&to_accounting_dto(&board.config), patch),
+            changes: diff_accounting(&to_accounting_dto(&relative_config(&self.root_path, &board.config)), patch),
         })
     }
     async fn update_accounting_settings(&self, patch: &AccountingSettingsDto, fingerprint: &str, actor: &str) -> Result<ApplyResultDto> {
@@ -981,7 +510,7 @@ impl AdminBackend for LiveAdminBackend {
     async fn get_function_keys_settings(&self) -> Result<FunctionKeysSettingsResponse> {
         let board = self.board.lock().await;
         Ok(FunctionKeysSettingsResponse {
-            settings: to_function_keys_dto(&board.config),
+            settings: to_function_keys_dto(&relative_config(&self.root_path, &board.config)),
             fingerprint: backup::fingerprint(&self.board_file)?,
         })
     }
@@ -989,7 +518,7 @@ impl AdminBackend for LiveAdminBackend {
         validate_function_keys(patch)?;
         let board = self.board.lock().await;
         Ok(DiffDto {
-            changes: diff_function_keys(&to_function_keys_dto(&board.config), patch),
+            changes: diff_function_keys(&to_function_keys_dto(&relative_config(&self.root_path, &board.config)), patch),
         })
     }
     async fn update_function_keys_settings(&self, patch: &FunctionKeysSettingsDto, fingerprint: &str, actor: &str) -> Result<ApplyResultDto> {
@@ -1007,7 +536,7 @@ impl AdminBackend for LiveAdminBackend {
 
     async fn list_conferences(&self) -> Result<ConferenceListResponse> {
         let board = self.board.lock().await;
-        let path = self.live_conferences_path(&board.config)?;
+        let path = self.live_conferences_path(&relative_config(&self.root_path, &board.config))?;
         Ok(ConferenceListResponse {
             conferences: conference_summaries(&board.conferences),
             file: path.display().to_string(),
@@ -1017,11 +546,11 @@ impl AdminBackend for LiveAdminBackend {
 
     async fn get_conference(&self, index: usize) -> Result<ConferenceResponse> {
         let board = self.board.lock().await;
-        let path = self.live_conferences_path(&board.config)?;
+        let path = self.live_conferences_path(&relative_config(&self.root_path, &board.config))?;
         let conf = conference_at(&board.conferences, index)?;
         Ok(ConferenceResponse {
             index,
-            settings: to_conference_dto(conf),
+            settings: to_conference_dto(&relative_conference(&self.root_path, conf)),
             password_set: !conf.password.is_empty(),
             file: path.display().to_string(),
             fingerprint: backup::fingerprint(&path)?,
@@ -1180,9 +709,11 @@ fn path_checks(config: &IcbConfig, root_path: &Path) -> Vec<PathCheckDto> {
                 PathKind::Directory => resolved.is_dir(),
                 PathKind::Unset => true,
             };
+            let mut display = path.clone();
+            make_relative(root_path, &mut display);
             PathCheckDto {
                 label: label.to_string(),
-                path: resolved.display().to_string(),
+                path: display.display().to_string(),
                 exists,
                 expected: kind,
             }
@@ -1201,6 +732,127 @@ fn absolute(path: &Path) -> PathBuf {
 }
 
 // ---------------------------------------------------------------- conversion helpers
+
+/// A running board resolves every configured path against the board directory, while the
+/// configuration file stores them relative to it. The admin layer always works on the
+/// relative form so editing a live board does not rewrite the file with absolute paths.
+fn make_relative(root: &Path, path: &mut PathBuf) {
+    if let Ok(relative) = path.strip_prefix(root) {
+        *path = relative.to_path_buf();
+    }
+}
+
+fn relative_config(root: &Path, config: &IcbConfig) -> IcbConfig {
+    let mut config = config.clone();
+    {
+        let p = &mut config.paths;
+        for path in [
+            &mut p.help_path,
+            &mut p.security_file_path,
+            &mut p.email_msgbase,
+            &mut p.command_display_path,
+            &mut p.tmp_work_path,
+            &mut p.icbtext,
+            &mut p.conferences,
+            &mut p.welcome,
+            &mut p.newuser,
+            &mut p.closed,
+            &mut p.expire_warning,
+            &mut p.expired,
+            &mut p.conf_join_menu,
+            &mut p.chat_intro_file,
+            &mut p.chat_menu,
+            &mut p.chat_actions_menu,
+            &mut p.no_ansi,
+            &mut p.trashcan_upload_files,
+            &mut p.trashcan_user,
+            &mut p.trashcan_email,
+            &mut p.trashcan_passwords,
+            &mut p.vip_users,
+            &mut p.protocol_data_file,
+            &mut p.pwrd_sec_level_file,
+            &mut p.command_file,
+            &mut p.statistics_file,
+            &mut p.language_file,
+            &mut p.group_file,
+            &mut p.ftn_file,
+            &mut p.user_file,
+            &mut p.caller_log,
+            &mut p.logon_survey,
+            &mut p.logon_answer,
+            &mut p.logoff_survey,
+            &mut p.logoff_answer,
+            &mut p.newask_survey,
+            &mut p.newask_answer,
+        ] {
+            make_relative(root, path);
+        }
+    }
+
+    make_relative(root, &mut config.event.event_file);
+
+    {
+        let a = &mut config.accounting;
+        for path in [
+            &mut a.peak_holiday_list_file,
+            &mut a.cfg_file,
+            &mut a.tracking_file,
+            &mut a.info_file,
+            &mut a.warning_file,
+            &mut a.logoff_file,
+        ] {
+            make_relative(root, path);
+        }
+    }
+
+    {
+        let s = &mut config.login_server;
+        for path in [
+            &mut s.telnet.display_file,
+            &mut s.ssh.display_file,
+            &mut s.secure_websocket.display_file,
+            &mut s.secure_websocket.cert_pem,
+            &mut s.secure_websocket.key_pem,
+        ] {
+            make_relative(root, path);
+        }
+    }
+
+    config
+}
+
+fn relative_conference(root: &Path, conf: &Conference) -> Conference {
+    let mut conf = conf.clone();
+    make_conference_relative(root, &mut conf);
+    conf
+}
+
+fn make_conference_relative(root: &Path, conf: &mut Conference) {
+    for path in [
+        &mut conf.users_menu,
+        &mut conf.sysop_menu,
+        &mut conf.news_file,
+        &mut conf.intro_file,
+        &mut conf.attachment_location,
+        &mut conf.command_file,
+        &mut conf.pub_upload_location,
+        &mut conf.pub_upload_metadata,
+        &mut conf.private_upload_location,
+        &mut conf.private_upload_metadata,
+        &mut conf.doors_menu,
+        &mut conf.doors_file,
+        &mut conf.blt_menu,
+        &mut conf.blt_file,
+        &mut conf.survey_menu,
+        &mut conf.survey_file,
+        &mut conf.dir_menu,
+        &mut conf.dir_file,
+        &mut conf.area_menu,
+        &mut conf.area_file,
+    ] {
+        make_relative(root, path);
+    }
+}
 
 fn path_string(path: &Path) -> String {
     path.display().to_string()
@@ -3084,110 +2736,6 @@ fn conference_at(base: &ConferenceBase, index: usize) -> Result<&Conference> {
         .ok_or_else(|| AdminError::Missing(format!("conference {index} does not exist")))
 }
 
-impl AdminService {
-    fn conferences_file(&self) -> Result<PathBuf> {
-        let config = self.load_config()?;
-        let path = conferences_path(&self.root_path, &config);
-        if path.as_os_str().is_empty() {
-            return Err(AdminError::Missing("no conference file is configured for this board".to_string()));
-        }
-        Ok(path)
-    }
-
-    fn load_conferences(&self) -> Result<(PathBuf, ConferenceBase)> {
-        let path = self.conferences_file()?;
-        let base = ConferenceBase::load(&path).map_err(|e| AdminError::Load(e.to_string()))?;
-        Ok((path, base))
-    }
-
-    fn mutate_conferences<F>(&self, fingerprint: &str, actor: &str, action: &str, mutator: F) -> Result<ApplyResultDto>
-    where
-        F: FnOnce(&mut ConferenceBase) -> Result<Vec<FieldChangeDto>>,
-    {
-        let _lock = BoardLock::acquire(&self.root_path)?;
-        let (path, mut base) = self.load_conferences()?;
-        backup::check_fingerprint(&path, fingerprint)?;
-
-        let changes = mutator(&mut base)?;
-        if changes.is_empty() {
-            return Ok(ApplyResultDto {
-                changed_fields: Vec::new(),
-                backup: None,
-                fingerprint: backup::fingerprint(&path)?,
-            });
-        }
-
-        write_conferences(&self.root_path, &path, &base, actor, action, &changes)
-    }
-
-    pub fn list_conferences(&self) -> Result<ConferenceListResponse> {
-        let (path, base) = self.load_conferences()?;
-        Ok(ConferenceListResponse {
-            conferences: conference_summaries(&base),
-            file: path.display().to_string(),
-            fingerprint: backup::fingerprint(&path)?,
-        })
-    }
-
-    pub fn get_conference(&self, index: usize) -> Result<ConferenceResponse> {
-        let (path, base) = self.load_conferences()?;
-        let conf = conference_at(&base, index)?;
-        Ok(ConferenceResponse {
-            index,
-            settings: to_conference_dto(conf),
-            password_set: !conf.password.is_empty(),
-            file: path.display().to_string(),
-            fingerprint: backup::fingerprint(&path)?,
-        })
-    }
-
-    pub fn create_conference(&self, patch: &ConferenceDto, fingerprint: &str, actor: &str) -> Result<ApplyResultDto> {
-        let patch = normalize_conference(patch)?;
-        self.mutate_conferences(fingerprint, actor, "create_conference", |base| {
-            let mut conf = Conference::default();
-            apply_conference_dto(&mut conf, &patch)?;
-            let index = base.len();
-            base.push(conf);
-            Ok(vec![FieldChangeDto {
-                field: format!("conference[{index}]"),
-                old: String::new(),
-                new: patch.name.clone(),
-            }])
-        })
-    }
-
-    pub fn update_conference(&self, index: usize, patch: &ConferenceDto, fingerprint: &str, actor: &str) -> Result<ApplyResultDto> {
-        let patch = normalize_conference(patch)?;
-        self.mutate_conferences(fingerprint, actor, "update_conference", |base| {
-            let conf = base
-                .get_mut(index)
-                .ok_or_else(|| AdminError::Missing(format!("conference {index} does not exist")))?;
-            let changes = diff_conference(&to_conference_dto(conf), &patch);
-            if !changes.is_empty() {
-                apply_conference_dto(conf, &patch)?;
-            }
-            Ok(changes)
-        })
-    }
-
-    pub fn delete_conference(&self, index: usize, fingerprint: &str, actor: &str) -> Result<ApplyResultDto> {
-        self.mutate_conferences(fingerprint, actor, "delete_conference", |base| {
-            if index >= base.len() {
-                return Err(AdminError::Missing(format!("conference {index} does not exist")));
-            }
-            if base.len() == 1 {
-                return Err(AdminError::Validation(vec!["The last conference cannot be deleted".to_string()]));
-            }
-            let removed = base.remove(index);
-            Ok(vec![FieldChangeDto {
-                field: format!("conference[{index}]"),
-                old: removed.name.clone(),
-                new: String::new(),
-            }])
-        })
-    }
-}
-
 /// Shared write path for the conference file: backup, atomic save, read back check, audit.
 fn write_conferences(
     root_path: &Path,
@@ -3241,10 +2789,14 @@ impl LiveAdminBackend {
     {
         let _lock = BoardLock::acquire(&self.root_path)?;
         let mut board = self.board.lock().await;
-        let path = self.live_conferences_path(&board.config)?;
+        let path = self.live_conferences_path(&relative_config(&self.root_path, &board.config))?;
         backup::check_fingerprint(&path, fingerprint)?;
 
-        let changes = mutator(&mut board.conferences)?;
+        let mut edited = board.conferences.clone();
+        for conf in edited.iter_mut() {
+            make_conference_relative(&self.root_path, conf);
+        }
+        let changes = mutator(&mut edited)?;
         if changes.is_empty() {
             return Ok(ApplyResultDto {
                 changed_fields: Vec::new(),
@@ -3252,6 +2804,8 @@ impl LiveAdminBackend {
                 fingerprint: backup::fingerprint(&path)?,
             });
         }
+        board.conferences = edited;
+        board.resolve_paths();
 
         // The running board keeps runtime state the file does not have, so the disk image
         // is mutated separately instead of being serialized from memory.
