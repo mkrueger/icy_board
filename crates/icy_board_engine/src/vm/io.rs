@@ -39,11 +39,12 @@ pub trait PCBoardIO: Send {
     /// # Errors
     fn fopen(&mut self, channel: i32, file: &str, am: i32, sm: i32) -> Res<()>;
 
-    /// Dermine if a file error has occured on a channel since last check
+    /// Determine if a file error has occured on a channel since last check.
     /// channel - integer expression with the channel to use for the file
-    /// Returns
-    /// True, if an error occured on the specified channel, False otherwise
-    fn ferr(&self, channel: i32) -> bool;
+    ///
+    /// PCBoard cleared `errStat` when FERR was read (EVALP.CPP TOK_OP_FERR).
+    /// Returns true if an error occured on the specified channel since the last check.
+    fn ferr(&mut self, channel: i32) -> bool;
 
     fn fput(&mut self, channel: i32, text: String) -> Res<()>;
 
@@ -256,8 +257,18 @@ impl PCBoardIO for DiskIO {
         Ok(())
     }
 
-    fn ferr(&self, channel: i32) -> bool {
-        if let Some(channel) = self.channels.get(&channel) { channel.err } else { true }
+    fn ferr(&mut self, channel: i32) -> bool {
+        // PCBoard (EVALP.CPP): result = fileArr[c].errStat; fileArr[c].errStat = FALSE;
+        // Reading FERR clears the sticky error. A channel that was never opened has no
+        // sticky error yet — PCBoard's array starts false — but any prior failed op set it.
+        if let Some(chan) = self.channels.get_mut(&channel) {
+            let err = chan.err;
+            chan.err = false;
+            err
+        } else {
+            // No slot yet: nothing has set an error on this channel.
+            false
+        }
     }
 
     fn fput(&mut self, channel: i32, text: String) -> Res<()> {
@@ -465,7 +476,18 @@ mod tests {
         let mut io = DiskIO::new(tmp.path().to_str().unwrap(), None);
         io.fopen(1, path.to_str().unwrap(), 0, 0).unwrap();
         assert!(io.ferr(1));
+        // FERR clears the sticky flag on read (EVALP.CPP).
+        assert!(!io.ferr(1));
         assert!(!io.is_open(1));
+    }
+
+    #[test]
+    fn test_ferr_clears_sticky_error() {
+        let tmp = TempDir::new().unwrap();
+        let mut io = DiskIO::new(tmp.path().to_str().unwrap(), None);
+        io.frewind(3).unwrap();
+        assert!(io.ferr(3));
+        assert!(!io.ferr(3));
     }
 
     /// Every operation on a channel that is not open answers the same way - PCBoard

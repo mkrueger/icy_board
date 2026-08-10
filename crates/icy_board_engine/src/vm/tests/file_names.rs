@@ -84,15 +84,40 @@ fn fileinf_of_a_file_that_is_not_there_answers_zero() {
 }
 
 /// FILEINF hands out the name without its extension and the extension without its dot.
+/// PCBoard uppercased the path string before splitting (EVALP.CPP TOK_OP_FILEINF).
 #[test]
 fn fileinf_splits_a_name_the_way_pcboard_did() {
     let output = run_ppl_with_files(
         r#"
         PRINTLN "name=", FILEINF("found.pcb", 8), " ext=", FILEINF("found.pcb", 9)
+        PRINTLN "drive=", FILEINF("D:\FOO\BAR.DAT", 6)
+        PRINTLN "path=", FILEINF("D:\FOO\BAR.DAT", 7)
     "#,
         &[("found.pcb", CONTENT)],
     );
-    assert_eq!(output, "name=found ext=pcb\n");
+    assert_eq!(output, "name=FOUND ext=PCB\ndrive=D\npath=\\FOO\\\n");
+}
+
+/// FILEINF date/time/size/attrs come from the file; a missing file zeroes them
+/// (PCBoard zeroed the find block). Printed DATE/TIME of 0 show as the type defaults.
+#[test]
+fn fileinf_date_time_and_attrs_are_real_for_existing_files() {
+    let output = run_ppl_with_files(
+        r#"
+        PRINTLN "size=", FILEINF("found.pcb", 4)
+        PRINTLN "attr0=", FILEINF("missing.pcb", 5)
+        PRINTLN "date_ok=", FILEINF("found.pcb", 2) > 0
+        PRINTLN "time_ok=", FILEINF("found.pcb", 3) >= 0
+        PRINTLN "attr_ok=", FILEINF("found.pcb", 5) > 0
+        PRINTLN "miss_date_zero=", FILEINF("missing.pcb", 2) = 0
+        PRINTLN "miss_time_zero=", FILEINF("missing.pcb", 3) = 0
+    "#,
+        &[("found.pcb", CONTENT)],
+    );
+    assert_eq!(
+        output,
+        "size=20\nattr0=0\ndate_ok=1\ntime_ok=1\nattr_ok=1\nmiss_date_zero=1\nmiss_time_zero=1\n"
+    );
 }
 
 /// PCBoard printed such a line as it stood when the file behind it was not there -

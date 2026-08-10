@@ -310,9 +310,9 @@ pub async fn dlock(_vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<bool>
     Ok(false)
 }
 
-/// The lowest unused FOPEN channel. Like DNEXT it does not reserve anything.
+/// The lowest unused FOPEN channel, or -1 when all are busy. Like DNEXT it does not reserve anything.
 pub async fn fnext(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<i32> {
-    Ok((0..MAX_FILE_CHANNELS).find(|c| !vm.io.is_open(*c)).unwrap_or(MAX_FILE_CHANNELS))
+    Ok((0..MAX_FILE_CHANNELS).find(|c| !vm.io.is_open(*c)).unwrap_or(-1))
 }
 
 /// PCBoard has no message for any of its dBase error codes, and neither do we.

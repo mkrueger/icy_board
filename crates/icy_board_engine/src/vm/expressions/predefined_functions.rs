@@ -20,7 +20,7 @@ use crate::icy_board::user_inf::{BankUserInf, QwkConfigUserInf};
 use crate::parser::CONFERENCE_ID;
 use crate::vm::{TerminalTarget, VirtualMachine, dbase, get_file_channel};
 use bstr::BString;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Datelike, Timelike, Utc};
 use icy_engine::{Position, TextPane};
 use icy_net::crc::update_crc32;
 use jamjam::jam::JamMessageBase;
@@ -1161,32 +1161,124 @@ pub async fn fileinf(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
     let item = vm.eval_expr(&args[1]).await?.as_int();
 
     let path = vm.resolve_file(&file).await;
-    // PCBoard zeroed its find record when the file was not there, so nothing here fails.
+    // PCBoard (EVALP.CPP TOK_OP_FILEINF): dosfindfirst, and if not found memset the
+    // find block to 0 — missing files yield zeros, never a hard error.
+    let meta = path.metadata().ok();
+    let exists = path.exists();
+
     match item {
-        1 => Ok(VariableValue::new_bool(path.exists())),
-        2 => Ok(VariableValue::new(VariableType::Date, VariableData::default())), // TODO: File date
-        3 => Ok(VariableValue::new(VariableType::Time, VariableData::default())), // TODO: File time
-        4 => Ok(VariableValue::new_int(path.metadata().map_or(0, |data| data.len()) as i32)),
-        5 => Ok(VariableValue::new_int(0)), // TODO: File attributes
-        // PCBoard hands out the drive letter alone, the path with its trailing separator,
-        // the name without its extension and the extension without its dot.
-        6 => Ok(VariableValue::new_string("C".to_string())),
-        7 => {
-            let Some(dir) = path.parent() else {
-                return Ok(VariableValue::new_string(String::new()));
-            };
-            let mut dir = dir.to_string_lossy().to_string();
-            if !dir.is_empty() && !dir.ends_with(std::path::MAIN_SEPARATOR) {
-                dir.push(std::path::MAIN_SEPARATOR);
-            }
-            Ok(VariableValue::new_string(dir))
+        1 => Ok(VariableValue::new_bool(exists)),
+        2 => {
+            // DOS packed date → MM-DD-YY → julian DATE. Missing file → 0.
+            let date = meta
+                .and_then(|m| m.modified().ok())
+                .map(|t| {
+                    let dt: DateTime<Utc> = t.into();
+                    let local = dt.with_timezone(&chrono::Local);
+                    IcbDate::new(local.month() as u8, local.day() as u8, local.year() as u16).to_pcboard_date()
+                })
+                .unwrap_or(0);
+            Ok(VariableValue::new_date(date))
         }
-        8 => Ok(VariableValue::new_string(
-            path.file_stem().map_or(String::new(), |name| name.to_string_lossy().to_string()),
-        )),
-        9 => Ok(VariableValue::new_string(
-            path.extension().map_or(String::new(), |ext| ext.to_string_lossy().to_string()),
-        )),
+        3 => {
+            // Seconds from midnight (DOS 2-second granularity). Missing → 0.
+            let time = meta
+                .and_then(|m| m.modified().ok())
+                .map(|t| {
+                    let dt: DateTime<Utc> = t.into();
+                    let local = dt.with_timezone(&chrono::Local);
+                    // Drop odd seconds to match DOS time packing (* 2L).
+                    let sec = (local.second() / 2) * 2;
+                    IcbTime::new(local.hour() as u8, local.minute() as u8, sec as u8).to_pcboard_time()
+                })
+                .unwrap_or(0);
+            Ok(VariableValue::new_time(time))
+        }
+        4 => Ok(VariableValue::new_int(meta.as_ref().map_or(0, |data| data.len()) as i32)),
+        5 => {
+            // DOS attribute bits. Unix has no direct match; report archive (0x20) for
+            // normal files and directory (0x10) for dirs, readonly (0x01) when not writable.
+            // Missing file → 0 (zeroed find block).
+            let attrs = meta
+                .map(|m| {
+                    let mut a = 0i32;
+                    if m.is_dir() {
+                        a |= 0x10; // FA_DIREC
+                    } else {
+                        a |= 0x20; // FA_ARCH — normal files looked "archived" after write
+                    }
+                    #[cfg(unix)]
+                    {
+                        use std::os::unix::fs::PermissionsExt;
+                        if m.permissions().mode() & 0o200 == 0 {
+                            a |= 0x01; // FA_RDONLY
+                        }
+                    }
+                    #[cfg(not(unix))]
+                    {
+                        if m.permissions().readonly() {
+                            a |= 0x01;
+                        }
+                    }
+                    a
+                })
+                .unwrap_or(0);
+            Ok(VariableValue::new_int(attrs))
+        }
+        // PCBoard hands out the drive letter alone (no colon). Without a drive in the
+        // path it used the current DOS drive — default "C" on a single-volume host.
+        6 => {
+            let upper = file.to_ascii_uppercase();
+            let letter = if upper.len() >= 2 && upper.as_bytes()[1] == b':' {
+                upper.chars().next().unwrap_or('C').to_string()
+            } else {
+                "C".to_string()
+            };
+            Ok(VariableValue::new_string(letter))
+        }
+        7 => {
+            // Path without drive, through last separator (trailing sep kept).
+            // Prefer the PPE-supplied string (PCBoard uppercased the path arg).
+            let upper = file.to_ascii_uppercase();
+            let without_drive = if upper.len() >= 2 && upper.as_bytes()[1] == b':' {
+                &upper[2..]
+            } else {
+                upper.as_str()
+            };
+            if let Some(pos) = without_drive.rfind(['\\', '/']) {
+                Ok(VariableValue::new_string(without_drive[..=pos].to_string()))
+            } else {
+                Ok(VariableValue::new_string(String::new()))
+            }
+        }
+        8 => {
+            // Basename without extension — from the path string PCBoard parsed, not the
+            // resolved host path (keeps DOS 8.3 casing/style when given).
+            let upper = file.to_ascii_uppercase();
+            let without_drive = if upper.len() >= 2 && upper.as_bytes()[1] == b':' {
+                &upper[2..]
+            } else {
+                upper.as_str()
+            };
+            let base = without_drive.rsplit(['\\', '/']).next().unwrap_or(without_drive);
+            let name = base.split('.').next().unwrap_or(base);
+            Ok(VariableValue::new_string(name.to_string()))
+        }
+        9 => {
+            let upper = file.to_ascii_uppercase();
+            let without_drive = if upper.len() >= 2 && upper.as_bytes()[1] == b':' {
+                &upper[2..]
+            } else {
+                upper.as_str()
+            };
+            let base = without_drive.rsplit(['\\', '/']).next().unwrap_or(without_drive);
+            let ext = if let Some((_, e)) = base.split_once('.') {
+                e.to_string()
+            } else {
+                String::new()
+            };
+            Ok(VariableValue::new_string(ext))
+        }
         _ => {
             log::error!("Unknown fileinf item: {}", item);
             Ok(VariableValue::new_int(0))
@@ -2036,16 +2128,18 @@ pub async fn get_confinfo(vm: &mut VirtualMachine<'_>, conf_num: usize, conf_fie
             8 => Ok(VariableValue::new_int(conference.required_security.level() as i32)),
             9 => Ok(VariableValue::new_int(conference.add_conference_security)),
             10 => Ok(VariableValue::new_int(conference.add_conference_time as i32)),
-            11 => Ok(VariableValue::new_int(0)),                // message blocks
-            12 => Ok(VariableValue::new_string(String::new())), // message file
+            // Fields 11/12 (msg blocks / msg file) live on the area list in icy_board;
+            // keep empty defaults until conference-level msg base metadata is restored.
+            11 => Ok(VariableValue::new_int(0)),
+            12 => Ok(VariableValue::new_string(String::new())),
             13 => Ok(VariableValue::new_string(conference.users_menu.to_string_lossy().to_string())),
             14 => Ok(VariableValue::new_string(conference.sysop_menu.to_string_lossy().to_string())),
             15 => Ok(VariableValue::new_string(conference.news_file.to_string_lossy().to_string())),
             16 => Ok(VariableValue::new_int(conference.pub_upload_sort as i32)),
-            17 => Ok(VariableValue::new_string(String::new())), // public upload dir file
+            17 => Ok(VariableValue::new_string(conference.pub_upload_metadata.to_string_lossy().to_string())),
             18 => Ok(VariableValue::new_string(conference.pub_upload_location.to_string_lossy().to_string())),
             19 => Ok(VariableValue::new_int(conference.private_upload_sort as i32)),
-            20 => Ok(VariableValue::new_string(String::new())), // private upload dir file
+            20 => Ok(VariableValue::new_string(conference.private_upload_metadata.to_string_lossy().to_string())),
             21 => Ok(VariableValue::new_string(conference.private_upload_location.to_string_lossy().to_string())),
             22 => Ok(VariableValue::new_string(conference.doors_menu.to_string_lossy().to_string())),
             23 => Ok(VariableValue::new_string(conference.doors_file.to_string_lossy().to_string())),
@@ -2055,31 +2149,32 @@ pub async fn get_confinfo(vm: &mut VirtualMachine<'_>, conf_num: usize, conf_fie
             27 => Ok(VariableValue::new_string(conference.survey_file.to_string_lossy().to_string())),
             28 => Ok(VariableValue::new_string(conference.dir_menu.to_string_lossy().to_string())),
             29 => Ok(VariableValue::new_string(conference.dir_file.to_string_lossy().to_string())),
-            30 => Ok(VariableValue::new_string(conference.attachment_location.to_string_lossy().to_string())), // PthNameLoc ???
-            31 => Ok(VariableValue::new_bool(conference.force_echomail)),                                      // force echo
-            32 => Ok(VariableValue::new_bool(conference.is_read_only)),                                        // read only
-            33 => Ok(VariableValue::new_bool(conference.private_msgs)),
-            34 => Ok(VariableValue::new_int(0)),                              // ret receipt level
-            35 => Ok(VariableValue::new_bool(conference.record_origin)),      // record origin
-            36 => Ok(VariableValue::new_bool(conference.prompt_for_routing)), // prompt for routing
+            30 => Ok(VariableValue::new_string(conference.attachment_location.to_string_lossy().to_string())), // PthNameLoc
+            31 => Ok(VariableValue::new_bool(conference.force_echomail)),
+            32 => Ok(VariableValue::new_bool(conference.is_read_only)),
+            // PCBoard field 33 is NoPrivateMsgs (SCRMISC.CPP), not PrivMsgs (field 6).
+            33 => Ok(VariableValue::new_bool(conference.disallow_private_msgs)),
+            34 => Ok(VariableValue::new_int(conference.sec_request_rr.level() as i32)),
+            35 => Ok(VariableValue::new_bool(conference.record_origin)),
+            36 => Ok(VariableValue::new_bool(conference.prompt_for_routing)),
             37 => Ok(VariableValue::new_bool(conference.allow_aliases)),
-            38 => Ok(VariableValue::new_bool(conference.show_intro_in_scan)), //  show intro  on ra
-            39 => Ok(VariableValue::new_int(conference.required_security.level() as i32)), // req level to enter mail
+            38 => Ok(VariableValue::new_bool(conference.show_intro_in_scan)),
+            39 => Ok(VariableValue::new_int(conference.sec_write_message.level() as i32)),
             40 => Ok(VariableValue::new_string(conference.password.to_string())),
             41 => Ok(VariableValue::new_string(conference.intro_file.to_string_lossy().to_string())),
             42 => Ok(VariableValue::new_string(conference.attachment_location.to_string_lossy().to_string())),
-            43 => Ok(VariableValue::new_string(String::new())),                      // reg flags
-            44 => Ok(VariableValue::new_byte(conference.required_security.level())), // attach level
-            45 => Ok(VariableValue::new_byte(conference.carbon_list_limit)),         // carbon limit
+            43 => Ok(VariableValue::new_string(String::new())), // reg flags
+            44 => Ok(VariableValue::new_byte(conference.sec_attachments.level())),
+            45 => Ok(VariableValue::new_byte(conference.carbon_list_limit)),
             46 => Ok(VariableValue::new_string(conference.command_file.to_string_lossy().to_string())),
-            47 => Ok(VariableValue::new_bool(false)),                              // old index
-            48 => Ok(VariableValue::new_bool(conference.long_to_names)),           // long to names
-            49 => Ok(VariableValue::new_byte(0)),                                  // carbon level
-            50 => Ok(VariableValue::new_byte(conference.conference_type.to_u8())), // conf type
-            51 => Ok(VariableValue::new_int(0)),                                   // export ptr
-            52 => Ok(VariableValue::new_double(conference.charge_time)),           // charge time
-            53 => Ok(VariableValue::new_double(conference.charge_msg_read)),       // charge msg read
-            54 => Ok(VariableValue::new_double(conference.charge_msg_write)),      // charge msg write
+            47 => Ok(VariableValue::new_bool(false)), // old index
+            48 => Ok(VariableValue::new_bool(conference.long_to_names)),
+            49 => Ok(VariableValue::new_byte(conference.sec_carbon_copy.level())),
+            50 => Ok(VariableValue::new_byte(conference.conference_type.to_u8())),
+            51 => Ok(VariableValue::new_int(0)), // export ptr
+            52 => Ok(VariableValue::new_double(conference.charge_time)),
+            53 => Ok(VariableValue::new_double(conference.charge_msg_read)),
+            54 => Ok(VariableValue::new_double(conference.charge_msg_write)),
             _ => Ok(VariableValue::new_int(-1)),
         }
     } else {
@@ -2122,25 +2217,38 @@ pub async fn set_confinfo(vm: &mut VirtualMachine<'_>, conf_num: usize, conf_fie
             30 => conference.attachment_location = PathBuf::from_str(&value.as_string())?,
             31 => conference.force_echomail = value.as_bool(),
             32 => conference.is_read_only = value.as_bool(),
-            33 => conference.private_msgs = value.as_bool(),
-            34 => (), // ret receipt level
+            // Field 33 is NoPrivateMsgs on PCBoard (not PrivMsgs / field 6).
+            33 => conference.disallow_private_msgs = value.as_bool(),
+            34 => {
+                conference.sec_request_rr =
+                    SecurityExpression::Constant(crate::icy_board::security_expr::Value::Integer(value.as_int() as i64))
+            }
             35 => conference.record_origin = value.as_bool(),
             36 => conference.prompt_for_routing = value.as_bool(),
             37 => conference.allow_aliases = value.as_bool(),
             38 => conference.show_intro_in_scan = value.as_bool(),
-            39 => conference.required_security = SecurityExpression::Constant(crate::icy_board::security_expr::Value::Integer(value.as_int() as i64)),
+            39 => {
+                conference.sec_write_message =
+                    SecurityExpression::Constant(crate::icy_board::security_expr::Value::Integer(value.as_int() as i64))
+            }
             40 => conference.password = Password::PlainText(value.as_string()),
             41 => conference.intro_file = PathBuf::from_str(&value.as_string())?,
             42 => conference.attachment_location = PathBuf::from_str(&value.as_string())?,
             43 => (), // reg flags
-            44 => conference.sec_attachments = SecurityExpression::Constant(crate::icy_board::security_expr::Value::Integer(value.as_int() as i64)),
-            45 => (), // conference.carbon_limit = value.as_byte(),
+            44 => {
+                conference.sec_attachments =
+                    SecurityExpression::Constant(crate::icy_board::security_expr::Value::Integer(value.as_int() as i64))
+            }
+            45 => conference.carbon_list_limit = value.as_byte(),
             46 => conference.command_file = PathBuf::from_str(&value.as_string())?,
             47 => (), // old index
             48 => conference.long_to_names = value.as_bool(),
-            49 => (), // conference.carbon_level = value.as_byte(),
+            49 => {
+                conference.sec_carbon_copy =
+                    SecurityExpression::Constant(crate::icy_board::security_expr::Value::Integer(value.as_int() as i64))
+            }
             50 => conference.conference_type = ConferenceType::from_u8(value.as_byte()),
-            51 => (), // conference.export_ptr = value.as_int(),
+            51 => (), // export ptr
             52 => conference.charge_time = value.as_double(),
             53 => conference.charge_msg_read = value.as_double(),
             54 => conference.charge_msg_write = value.as_double(),
