@@ -162,3 +162,11 @@ fn test_cmd_r_edit_header_asks_for_the_field_and_the_value() {
         "the header still carries the old subject:\n{output}"
     );
 }
+
+/// A message longer than a page stops at the MORE prompt. The reader prints the
+/// body a line at a time, which is what PCBoard counted towards that prompt.
+#[test]
+fn test_cmd_r_long_message_stops_at_the_more_prompt() {
+    let output = test_output("R\n1\n\n\n\n\n".to_string(), crate::tests::setup_conference_with_a_long_message);
+    assert!(output.contains("More"), "a message longer than a page must pause:\n{output}");
+}

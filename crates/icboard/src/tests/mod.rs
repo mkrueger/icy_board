@@ -107,6 +107,30 @@ pub fn setup_conference_with_messages(board: &mut IcyBoard) {
     base.write_jhr_header().unwrap();
 }
 
+/// The same board, with one message long enough to fill more than a page.
+pub fn setup_conference_with_a_long_message(board: &mut IcyBoard) {
+    setup_conference(board);
+
+    // A page length of zero is what turns the pause off, so the caller gets one.
+    for user in board.users.iter_mut() {
+        user.page_len = 24;
+    }
+
+    let path = board.conferences[0].areas.as_ref().unwrap()[0].path.clone();
+    let mut base = jamjam::jam::JamMessageBase::create(path).unwrap();
+    let body = (1..=60).map(|i| format!("Line {i}")).collect::<Vec<_>>().join("\r\n");
+    base.write_message(
+        &jamjam::jam::JamMessage::default()
+            .with_from(bstr::BString::from("SYSOP"))
+            .with_to(bstr::BString::from("ALL"))
+            .with_subject(bstr::BString::from("A long one"))
+            .with_date_time(chrono::Utc::now())
+            .with_text(bstr::BString::from(body)),
+    )
+    .unwrap();
+    base.write_jhr_header().unwrap();
+}
+
 /// The same board, but the second conference carries two message areas so a
 /// move into it has to ask which one.
 pub fn setup_conference_with_two_areas(board: &mut IcyBoard) {

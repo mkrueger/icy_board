@@ -222,11 +222,22 @@ impl MessageViewer {
     }
 
     async fn display_body(&self, state: &mut IcyBoardState, text: &str) -> Res<()> {
-        if state.session.search_pattern.is_some() {
-            state.print_found_text(TerminalTarget::Both, text).await
-        } else {
-            state.print(TerminalTarget::Both, text).await
+        // PCBoard printed a message a line at a time, and a line is what a MORE prompt counts.
+        for (i, line) in text.split('\n').enumerate() {
+            if i > 0 {
+                state.new_line().await?;
+                if state.session.disp_options.abort_printout {
+                    break;
+                }
+            }
+            let line = line.strip_suffix('\r').unwrap_or(line);
+            if state.session.search_pattern.is_some() {
+                state.print_found_text(TerminalTarget::Both, line).await?;
+            } else {
+                state.print(TerminalTarget::Both, line).await?;
+            }
         }
+        Ok(())
     }
 }
 

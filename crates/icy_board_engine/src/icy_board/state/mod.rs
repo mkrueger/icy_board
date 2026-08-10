@@ -672,7 +672,9 @@ impl IcyBoardState {
     }
 
     pub async fn clear_screen(&mut self, target: TerminalTarget) -> Res<()> {
-        self.session.disp_options.no_change();
+        // Clearing the screen starts the page over, it does not turn a pause back on that
+        // an @POFF@ before it turned off. See printcls() in DISPLAY.C.
+        self.session.disp_options.num_lines_printed = 0;
         match self.session.disp_options.grapics_mode {
             GraphicsMode::Ctty | GraphicsMode::Avatar => {
                 // form feed character
@@ -1839,7 +1841,6 @@ impl IcyBoardState {
                 self.write_chars_internal(target, &user_bytes, &sysop_bytes).await?;
                 user_bytes.clear();
                 sysop_bytes.clear();
-                self.next_line().await?;
             }
         }
         self.write_chars_internal(target, &user_bytes, &sysop_bytes).await?;
@@ -2830,8 +2831,11 @@ impl IcyBoardState {
         Ok(())
     }
 
+    /// PCBoard counted a line here and nowhere else, so a PPE drawing its own screen with
+    /// PRINT and cursor positioning never ran into a MORE prompt. See newline() in DISPLAY.C.
     pub async fn new_line(&mut self) -> Res<()> {
-        self.write_chars(TerminalTarget::Both, &['\r', '\n']).await
+        self.write_chars(TerminalTarget::Both, &['\r', '\n']).await?;
+        self.next_line().await
     }
 
     pub async fn fresh_line(&mut self) -> Res<()> {
