@@ -103,6 +103,8 @@ icbmoni_user_header = User
 icbmoni_protocol_header = Protocol
 
 icbmoni_log_in=User logging in…
+icbmoni_web_admin_url = Web Admin: { $url }
+icbmoni_web_admin_token = Token: { $token }
 
 yes=Yes
 no=No
@@ -327,6 +329,39 @@ who_include_city-help=
     When a user types WHO at the command prompt in IcyBoard, this 
     setting will determine if the city field of each user online is
     included in the list.
+
+web_admin_enabled=Enable Web Administration
+web_admin_enabled-status=Start the web administration server with IcyBoard
+web_admin_enabled-help=
+    # Enable Web Administration
+
+    Starts the web administration interface when IcyBoard is running.
+    It is disabled by default and does not replace icbsetup or icbsysmgr.
+
+web_admin_address=Web Admin Address
+web_admin_address-status=Address used by the web administration server
+web_admin_address-help=
+    # Web Admin Address
+
+    Network address on which the web administration server listens.
+    Keep this at 127.0.0.1 unless remote access is explicitly required.
+
+web_admin_port=Web Admin Port
+web_admin_port-status=TCP port used by the web administration server
+web_admin_port-help=
+    # Web Admin Port
+
+    TCP port on which the web administration server listens.
+    The default port is 8787.
+
+web_admin_allow_remote=Allow Remote Web Admin
+web_admin_allow_remote-status=Permit the web administration server to listen outside localhost
+web_admin_allow_remote-help=
+    # Allow Remote Web Administration
+
+    Allows the administration server to bind to a non-loopback address.
+    This exposes board administration to the network. Only enable it behind
+    an authenticated TLS reverse proxy and with a strong access token.
 
 who_show_alias=Show ALIAS Name in WHO Display
 who_show_alias-status=Show ALIAS Name in WHO Display

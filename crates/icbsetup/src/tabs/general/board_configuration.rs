@@ -4,7 +4,7 @@ use crossterm::event::KeyEvent;
 use icy_board_engine::icy_board::IcyBoard;
 use icy_board_tui::{
     cfg_entry_bool, cfg_entry_text, cfg_entry_u16,
-    config_menu::{ConfigEntry, ConfigMenu, ListItem, ListValue, ResultState, Value},
+    config_menu::{ConfigEntry, ConfigMenu, ListItem, ListValue, ResultState, TextFlags, Value},
     get_text,
     icbconfigmenu::ICBConfigMenuUI,
     tab_page::{Page, PageMessage},
@@ -61,6 +61,49 @@ impl BoardConfiguration {
                 ConfigEntry::Separator,
                 cfg_entry_bool!("who_include_city", 33, board, who_include_city, lock),
                 cfg_entry_bool!("who_show_alias", 33, board, who_show_alias, lock),
+                ConfigEntry::Separator,
+                ConfigEntry::Item(
+                    ListItem::new(get_text("web_admin_enabled"), ListValue::Bool(lock.config.board.web_admin.enabled))
+                        .with_status(get_text("web_admin_enabled-status"))
+                        .with_help(get_text("web_admin_enabled-help"))
+                        .with_label_width(33)
+                        .with_update_bool_value(&|board: &Arc<Mutex<IcyBoard>>, value| {
+                            board.lock().unwrap().config.board.web_admin.enabled = value;
+                        }),
+                ),
+                ConfigEntry::Item(
+                    ListItem::new(
+                        get_text("web_admin_address"),
+                        ListValue::Text(45, TextFlags::None, lock.config.board.web_admin.address.clone()),
+                    )
+                    .with_status(get_text("web_admin_address-status"))
+                    .with_help(get_text("web_admin_address-help"))
+                    .with_label_width(33)
+                    .with_update_text_value(&|board: &Arc<Mutex<IcyBoard>>, value| {
+                        board.lock().unwrap().config.board.web_admin.address = value;
+                    }),
+                ),
+                ConfigEntry::Item(
+                    ListItem::new(
+                        get_text("web_admin_port"),
+                        ListValue::U32(lock.config.board.web_admin.port as u32, 1, u16::MAX as u32),
+                    )
+                    .with_status(get_text("web_admin_port-status"))
+                    .with_help(get_text("web_admin_port-help"))
+                    .with_label_width(33)
+                    .with_update_u32_value(&|board: &Arc<Mutex<IcyBoard>>, value| {
+                        board.lock().unwrap().config.board.web_admin.port = value as u16;
+                    }),
+                ),
+                ConfigEntry::Item(
+                    ListItem::new(get_text("web_admin_allow_remote"), ListValue::Bool(lock.config.board.web_admin.allow_remote))
+                        .with_status(get_text("web_admin_allow_remote-status"))
+                        .with_help(get_text("web_admin_allow_remote-help"))
+                        .with_label_width(33)
+                        .with_update_bool_value(&|board: &Arc<Mutex<IcyBoard>>, value| {
+                            board.lock().unwrap().config.board.web_admin.allow_remote = value;
+                        }),
+                ),
             ];
             ConfigMenu {
                 obj: icy_board2,

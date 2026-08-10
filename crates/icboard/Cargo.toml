@@ -8,6 +8,7 @@ edition = "2024"
 [dependencies]
 icy_board_engine = { workspace = true }
 icy_board_tui = { workspace = true }
+icbadmin = { path = "../icbadmin" }
 icy_parser_core = { workspace = true }
 jamjam = { workspace = true }
 codepages = { workspace = true }

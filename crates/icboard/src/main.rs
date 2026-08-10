@@ -1,6 +1,7 @@
 use std::{
     fmt::Display,
     io::stdout,
+    net::SocketAddr,
     path::PathBuf,
     process::{self, Command, exit},
     sync::Arc,
@@ -20,7 +21,7 @@ use icy_board_engine::{
     icy_board::{IcyBoard, bbs::BBS, state::PPEExecute},
 };
 
-use node_monitoring_screen::NodeMonitoringScreenMessage;
+use node_monitoring_screen::{NodeMonitoringScreenMessage, WebAdminInfo};
 use ratatui::{Terminal, backend::Backend};
 use semver::Version;
 use system_statistics_screen::{SystemStatisticsScreen, SystemStatisticsScreenMessage};
@@ -29,6 +30,8 @@ use tokio_util::sync::CancellationToken;
 use tui::{Tui, print_exit_screen};
 
 use crate::bbs::await_securewebsocket_connections;
+
+const WEB_ADMIN_TOKEN_ENV: &str = "ICBADMIN_TOKEN";
 
 pub mod bbs;
 mod call_wait_screen;
@@ -125,7 +128,7 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
                 } else {
                     CallWaitMessage::User(false)
                 };
-                run_message(cmd, &mut terminal, &board, &mut bbs, arguments.full_screen, stuffed).await?;
+                run_message(cmd, &mut terminal, &board, &mut bbs, arguments.full_screen, stuffed, None).await?;
                 restore_terminal()?;
                 return Ok(());
             }
@@ -135,7 +138,7 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
                 match handle_runppe(runppe_params).await {
                     Ok(cmd) => {
                         let mut terminal = init_terminal()?;
-                        run_message(cmd, &mut terminal, &board, &mut bbs, arguments.full_screen, stuffed).await?;
+                        run_message(cmd, &mut terminal, &board, &mut bbs, arguments.full_screen, stuffed, None).await?;
                         restore_terminal()?;
                     }
                     Err(err) => {
@@ -147,14 +150,24 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
             }
 
             let mut connection_token = CancellationToken::new();
-            start_connections(&bbs, &board, connection_token.clone()).await;
+            let mut web_admin = start_connections(&bbs, &board, &config_file, connection_token.clone()).await;
             let mut app = CallWaitScreen::new(&board).await?;
             let mut terminal = init_terminal()?;
             loop {
                 terminal.clear()?;
                 app.reset(&board).await;
                 match app.run(&mut terminal, &board, arguments.full_screen).await {
-                    Ok(msg) => match run_message(msg, &mut terminal, &mut board, &mut bbs, arguments.full_screen, String::new()).await {
+                    Ok(msg) => match run_message(
+                        msg,
+                        &mut terminal,
+                        &mut board,
+                        &mut bbs,
+                        arguments.full_screen,
+                        String::new(),
+                        web_admin.clone(),
+                    )
+                    .await
+                    {
                         Ok(reload) => {
                             if reload {
                                 icy_board = IcyBoard::load(&config_file)?;
@@ -165,7 +178,7 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
                                 app = CallWaitScreen::new(&board).await?;
                                 connection_token.cancel();
                                 connection_token = CancellationToken::new();
-                                start_connections(&bbs, &board, connection_token.clone()).await;
+                                web_admin = start_connections(&bbs, &board, &config_file, connection_token.clone()).await;
                                 continue;
                             }
                         }
@@ -193,7 +206,12 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
     }
 }
 
-async fn start_connections(bbs: &Arc<Mutex<BBS>>, board: &Arc<Mutex<IcyBoard>>, token: CancellationToken) {
+async fn start_connections(
+    bbs: &Arc<Mutex<BBS>>,
+    board: &Arc<Mutex<IcyBoard>>,
+    config_file: &std::path::Path,
+    token: CancellationToken,
+) -> Option<WebAdminInfo> {
     {
         let bbs = bbs.clone();
         let board = board.clone();
@@ -264,6 +282,77 @@ async fn start_connections(bbs: &Arc<Mutex<BBS>>, board: &Arc<Mutex<IcyBoard>>, 
             }
         });
     }
+
+    start_web_admin(board, config_file, token).await
+}
+
+async fn start_web_admin(board: &Arc<Mutex<IcyBoard>>, config_file: &std::path::Path, cancel: CancellationToken) -> Option<WebAdminInfo> {
+    let web_admin = board.lock().await.config.board.web_admin.clone();
+    if !web_admin.enabled {
+        return None;
+    }
+
+    let addr: SocketAddr = match format!("{}:{}", web_admin.address.trim(), web_admin.port).parse() {
+        Ok(addr) => addr,
+        Err(_) => {
+            log::error!(
+                "web admin: invalid listen address '{}:{}'",
+                web_admin.address,
+                web_admin.port
+            );
+            return None;
+        }
+    };
+
+    if let Err(err) = icbadmin::check_bind_address(&addr, web_admin.allow_remote) {
+        log::error!("web admin: {err}");
+        return None;
+    }
+
+    let backend = match icbadmin::service::LiveAdminBackend::new(config_file, board.clone()) {
+        Ok(backend) => Arc::new(backend),
+        Err(err) => {
+            log::error!("web admin: could not open live backend: {err}");
+            return None;
+        }
+    };
+
+    let (token, from_env) = match std::env::var(WEB_ADMIN_TOKEN_ENV) {
+        Ok(token) if !token.trim().is_empty() => (token, true),
+        _ => (icbadmin::auth::random_hex(24), false),
+    };
+
+    let state = icbadmin::api::AppState {
+        backend,
+        auth: Arc::new(icbadmin::auth::AuthState::new(token.clone())),
+    };
+
+    let url = format!("http://{addr}/");
+    log::info!("web admin listening on {url}");
+    if from_env {
+        log::info!("web admin token taken from {WEB_ADMIN_TOKEN_ENV}");
+    } else {
+        log::info!("web admin token: {token}");
+    }
+    if !addr.ip().is_loopback() {
+        log::warn!("web admin is listening on a non-loopback address; put a TLS reverse proxy in front of it");
+    }
+
+    let info = WebAdminInfo { url: url.clone(), token: token.clone() };
+    tokio::spawn(async move {
+        tokio::select! {
+            result = icbadmin::serve(addr, state) => {
+                if let Err(err) = result {
+                    log::error!("web admin server stopped: {err}");
+                }
+            }
+            _ = cancel.cancelled() => {
+                log::info!("web admin server cancelled");
+            }
+        }
+    });
+
+    Some(info)
 }
 
 async fn run_message<B: Backend>(
@@ -273,6 +362,7 @@ async fn run_message<B: Backend>(
     bbs: &mut Arc<Mutex<BBS>>,
     full_screen: bool,
     stuffed_chars: String,
+    web_admin: Option<WebAdminInfo>,
 ) -> Res<bool>
 where
     B::Error: Send + Sync + 'static,
@@ -355,7 +445,7 @@ where
         }
         CallWaitMessage::Monitor => {
             let mut app = node_monitoring_screen::NodeMonitoringScreen::new(&board).await;
-            match app.run(terminal, &board, bbs, full_screen).await {
+            match app.run(terminal, &board, bbs, full_screen, web_admin.as_ref()).await {
                 Ok(msg) => {
                     if let NodeMonitoringScreenMessage::EnterNode(node) = msg {
                         let mut tui = Tui::sysop_mode(bbs, node).await?;

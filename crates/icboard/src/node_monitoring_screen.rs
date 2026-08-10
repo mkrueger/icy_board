@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -9,7 +10,7 @@ use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use icy_board_engine::icy_board::{IcyBoard, bbs::BBS, state::NodeState};
 use icy_board_tui::{
     app::get_screen_size,
-    get_text,
+    get_text, get_text_args,
     theme::{DOS_BLUE, DOS_LIGHT_CYAN, DOS_LIGHT_GRAY, DOS_RED, DOS_YELLOW},
 };
 use icy_net::ConnectionType;
@@ -19,6 +20,12 @@ use tokio::sync::Mutex;
 pub enum NodeMonitoringScreenMessage {
     Exit,
     EnterNode(usize),
+}
+
+#[derive(Clone)]
+pub struct WebAdminInfo {
+    pub url: String,
+    pub token: String,
 }
 
 pub struct NodeMonitoringScreen {
@@ -70,6 +77,7 @@ impl NodeMonitoringScreen {
         board: &Arc<Mutex<IcyBoard>>,
         bbs: &mut Arc<Mutex<BBS>>,
         full_screen: bool,
+        web_admin: Option<&WebAdminInfo>,
     ) -> Res<NodeMonitoringScreenMessage>
     where
         B::Error: Send + Sync + 'static,
@@ -123,7 +131,7 @@ impl NodeMonitoringScreen {
 
             terminal.draw(|frame| {
                 page_len = (frame.area().height as usize).saturating_sub(3);
-                self.ui(frame, &node_info, &connections, full_screen);
+                self.ui(frame, &node_info, &connections, web_admin, full_screen);
             })?;
             if event::poll(timeout)? {
                 if let Event::Key(key) = event::read()? {
@@ -181,7 +189,14 @@ impl NodeMonitoringScreen {
         }
     }
 
-    fn ui(&mut self, frame: &mut Frame, infos: &Vec<Option<Info>>, connections: &Vec<Connection>, full_screen: bool) {
+    fn ui(
+        &mut self,
+        frame: &mut Frame,
+        infos: &Vec<Option<Info>>,
+        connections: &Vec<Connection>,
+        web_admin: Option<&WebAdminInfo>,
+        full_screen: bool,
+    ) {
         let now = Local::now();
         let mut footer = get_text("icbmoni_footer");
         if let Some(i) = self.table_state.selected() {
@@ -207,14 +222,22 @@ impl NodeMonitoringScreen {
             .border_style(Style::new().fg(DOS_YELLOW))
             .borders(Borders::ALL);
         b.render(area, frame.buffer_mut());
-        let vertical = Layout::vertical([Constraint::Fill(1), Constraint::Length(connections.len().max(5) as u16 + 1)]);
+        let extra_lines = if web_admin.is_some() { 2usize } else { 0 };
+        let bottom_len = (connections.len() + extra_lines).max(5) as u16 + 1;
+        let vertical = Layout::vertical([Constraint::Fill(1), Constraint::Length(bottom_len)]);
         let [node_area, connections_area] = vertical.areas(area);
         self.render_table(frame, node_area, infos);
         self.render_scrollbar(frame, node_area);
-        self.render_connections(frame, connections_area, connections);
+        self.render_connections(frame, connections_area, connections, web_admin);
     }
 
-    fn render_connections(&self, frame: &mut Frame, connections_area: Rect, connections: &[Connection]) {
+    fn render_connections(
+        &self,
+        frame: &mut Frame,
+        connections_area: Rect,
+        connections: &[Connection],
+        web_admin: Option<&WebAdminInfo>,
+    ) {
         let mut area = connections_area.inner(Margin { vertical: 1, horizontal: 1 });
         Line::from("═".repeat(area.width as usize))
             .style(Style::new().fg(DOS_YELLOW))
@@ -223,11 +246,25 @@ impl NodeMonitoringScreen {
         area.y += 1;
 
         for con in connections {
-            let n = if con.name.is_empty() { &con.name } else { "0.0.0.0" };
-            let text = format!("{} on {}:{}", con.name, n, con.endpoint);
+            let text = format!("{} on {}", con.name, con.endpoint);
             let text = Text::from(text);
             text.render(area, frame.buffer_mut());
             area.y += 1;
+        }
+
+        if let Some(admin) = web_admin {
+            let mut args = HashMap::new();
+            args.insert("url".to_string(), admin.url.clone());
+            let url_line = get_text_args("icbmoni_web_admin_url", args);
+            Text::from(url_line).style(Style::new().fg(DOS_LIGHT_CYAN)).render(area, frame.buffer_mut());
+            area.y += 1;
+
+            let mut args = HashMap::new();
+            args.insert("token".to_string(), admin.token.clone());
+            let token_line = get_text_args("icbmoni_web_admin_token", args);
+            Text::from(token_line)
+                .style(Style::new().fg(DOS_LIGHT_CYAN))
+                .render(area, frame.buffer_mut());
         }
     }
     fn render_table(&mut self, frame: &mut Frame, area: Rect, infos: &Vec<Option<Info>>) {

@@ -350,6 +350,7 @@ impl PCBoardImporter {
                 allow_iemsi: true,
                 who_include_city: self.data.who_include_city,
                 who_show_alias: self.data.who_show_alias,
+                web_admin: Default::default(),
             },
             login_server: LoginServer::default(),
             func_keys: self.data.func_keys.clone(),
