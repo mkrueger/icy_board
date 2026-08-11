@@ -79,6 +79,20 @@ fn test_message_marks_an_echoed_message() {
     assert!(output.ends_with("[E]"), "unexpected output: {output:?}");
 }
 
+/// PCBoard's entermessagefromfile() returns quietly when the body file is not
+/// there, so the program carries on rather than being stopped.
+#[test]
+fn test_message_with_a_missing_file_does_not_stop_the_program() {
+    let output = run_ppl_with_messages(
+        r#"
+        MESSAGE 0, "SOMEONE", "ME", "No body", "N", 0, FALSE, FALSE, "does_not_exist.txt"
+        PRINT "still here"
+    "#,
+        MESSAGES,
+    );
+    assert!(output.ends_with("still here"), "unexpected output: {output:?}");
+}
+
 #[test]
 fn test_setmsghdr_changes_a_field_that_getmsghdr_reads_back() {
     assert_eq!(

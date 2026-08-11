@@ -924,10 +924,13 @@ pub async fn wrunet(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     // polling loop later finds Status == NODEMESSAGE in its record (USERNET.C); we
     // do not run that poll, so the message text has nowhere to go.
     if let Some(Some(node)) = vm.icy_board_state.node_state.lock().await.get_mut(node as usize) {
-        if !stat.is_empty() {
-            if let Some(stat) = NodeStatus::from_char(stat.chars().next().unwrap()) {
+        // PCBoard writes the status byte unconditionally; an empty string clears it.
+        if let Some(ch) = stat.chars().next() {
+            if let Some(stat) = NodeStatus::from_char(ch) {
                 node.status = stat;
             }
+        } else {
+            node.status = NodeStatus::NoCaller;
         }
         node.operation = operation;
         node.user_name = name;
@@ -1061,9 +1064,10 @@ pub async fn message(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let echo = vm.eval_expr(&args[7]).await?.as_bool();
     let file = vm.eval_expr(&args[8]).await?.as_string();
     let file = vm.resolve_file(&file).await;
+    // PCBoard's entermessagefromfile() returns quietly when the body file is missing.
     if !file.exists() {
-        log::error!("PPE function 'message': Message text file not found {}", file.display());
-        return Err(Box::new(IcyError::FileNotFound("MESSAGE".to_string(), file.display().to_string())));
+        log::error!("PPE function 'message': message text file not found {}", file.display());
+        return Ok(());
     }
 
     // An empty name stands for the caller, and "R" asks for a message only its
