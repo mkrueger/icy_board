@@ -1962,9 +1962,11 @@ pub async fn pcbaccstat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Va
     let field = vm.eval_expr(&args[0]).await?.as_int();
     match field {
         0 => {
-            // ActStatus
-            // TODO
-            Ok(VariableValue::new_int(b'T' as i32))
+            // ACC_STAT: 0=disabled, 1=tracking, 2=enabled. icy_board models the
+            // system as on or off, not a separate tracking mode, so an enabled
+            // system reports fully enabled.
+            let status = if vm.icy_board_state.get_board().await.config.accounting.enabled { 2 } else { 0 };
+            Ok(VariableValue::new_int(status))
         }
         1 => Ok(VariableValue::new_double(vm.icy_board_state.session.current_conference.charge_time)),
         2 => Ok(VariableValue::new_double(vm.icy_board_state.session.current_conference.charge_msg_read)),
@@ -1998,7 +2000,7 @@ pub async fn account(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 
     let value = match field {
         0 => accounting.starting_balance,        // START_BAL - User's starting balance
-        1 => accounting.starting_balance,        // TODO: START_SESSION - Starting balance for this session
+        1 => accounting.start_this_session,      // START_SESSION - Balance at the start of this session
         2 => accounting.debit_call,              // DEB_CALL - Debit for this call
         3 => accounting.debit_time,              // DEB_TIME - Debit for time online
         4 => accounting.debit_msg_read,          // DEB_MSGREAD - Debit for reading messages

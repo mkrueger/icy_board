@@ -1,11 +1,22 @@
 //! The loose scalar functions: DDATE conversion, the event flag, the keyboard
 //! script flag and free disk space.
 
-use super::run_ppl;
+use super::{run_ppl, run_ppl_on};
 
 #[test]
 fn test_toddate_reads_a_ccyymmdd_string() {
     assert_eq!(run_ppl("PRINT TODDATE(\"19940527\")"), "19940527");
+}
+
+/// PCBACCSTAT field 0 answers 0 when accounting is off and 2 when it is on;
+/// icy_board has no separate tracking mode, so an enabled system is fully on.
+#[test]
+fn test_pcbaccstat_reports_the_accounting_status() {
+    assert_eq!(run_ppl("PRINT PCBACCSTAT(0)"), "0");
+    let enabled = run_ppl_on("PRINT PCBACCSTAT(0)", |board| {
+        board.config.accounting.enabled = true;
+    });
+    assert_eq!(enabled, "2");
 }
 
 /// PCBoard kept a name and a city per node in USERNET, so what WRUNET writes is
