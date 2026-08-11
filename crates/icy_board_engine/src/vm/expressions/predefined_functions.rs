@@ -2486,7 +2486,7 @@ pub async fn getmsghdr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Var
 
 /// The one character PCBoard kept in the header to say what kind of message this
 /// is and whether it has been read (MESSAGES.H).
-fn message_status(header: &JamMessageHeader) -> char {
+pub(crate) fn message_status(header: &JamMessageHeader) -> char {
     let read = header.is_read();
     if header.needs_password() {
         if read { '^' } else { '%' }

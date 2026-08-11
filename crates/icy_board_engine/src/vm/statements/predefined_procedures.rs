@@ -33,6 +33,7 @@ use crate::{
 };
 
 use super::super::errors::IcyError;
+use super::super::expressions::predefined_functions::message_status;
 
 /// A statement that is not implemented yet. PCBoard never aborted a PPE over one,
 /// so the call is logged and skipped rather than killing the session.
@@ -2117,72 +2118,100 @@ pub async fn msgtofile(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
     let msg_number: i32 = vm.eval_expr(&args[1]).await?.as_int();
     let file_name = vm.eval_expr(&args[2]).await?.as_string();
 
-    let msg_base = vm.icy_board_state.session.current_conference.areas.as_ref().unwrap()[area as usize]
-        .path
-        .clone();
-    match JamMessageBase::open(&msg_base) {
-        Ok(base) => {
-            match base.read_header(msg_number as u32) {
-                Ok(header) => {
-                    match base.read_msg_text(&header) {
-                        Ok(msg_text) => {
-                            let mut msg = String::new();
-                            msg.push_str(&format!("          Status: {}\n", '+'));
-                            msg.push_str(&format!("  Message Number: {}\n", header.message_number));
-                            msg.push_str(&format!("Reference Number: {}\n", 0));
-                            msg.push_str(&format!("Number of blocks: {}\n", msg.len() / 128));
-
-                            let date_time = DateTime::from_timestamp(header.date_written as i64, 0).unwrap_or(Utc::now());
-                            let date = IcbDate::from_utc(&date_time);
-                            let time = IcbTime::from_naive(date_time.naive_local());
-                            msg.push_str(&format!("            Date: {}\n", date));
-                            msg.push_str(&format!("            Time: {}\n", time));
-                            msg.push_str(&format!(
-                                "              To: {}\n",
-                                if let Some(s) = header.get_to() { s.to_string() } else { String::new() }
-                            ));
-                            msg.push_str(&format!("           Reply: {}\n", ""));
-                            msg.push_str(&format!("   Time of reply: {}\n", ""));
-                            msg.push_str(&format!("           Reply: {}\n", ""));
-                            msg.push_str(&format!(
-                                "            From: {}\n",
-                                if let Some(s) = header.get_from() { s.to_string() } else { String::new() }
-                            ));
-                            msg.push_str(&format!(
-                                "         Subject: {}\n",
-                                if let Some(s) = header.get_subject() { s.to_string() } else { String::new() }
-                            ));
-                            msg.push_str(&format!("        Password: {}\n", header.password_crc));
-                            msg.push_str(&format!("          Active: {}\n", if header.is_deleted() { 225 } else { 226 }));
-                            msg.push_str(&format!("            Echo:{}\n", ""));
-                            msg.push_str(&format!("  Extended headers: {}\n", 0));
-                            //  Todo: Extended headers
-                            msg.push_str("Message Body:\n");
-                            msg.push_str(&msg_text.to_string());
-                            if let Err(err) = write_utf8_with_bom(&file_name, &msg) {
-                                log::error!("MSGTOFILE can't write message text {msg_number} in area {area}: {err}");
-                                return Ok(());
-                            }
-                            return Ok(());
-                        }
-                        Err(err) => {
-                            log::error!("MSGTOFILE can't read message text {msg_number} in area {area}: {err}");
-                            return Ok(());
-                        }
-                    }
-                }
-                Err(err) => {
-                    log::error!("MSGTOFILE can't read message header {msg_number} in area {area}: {err}");
-                    return Ok(());
-                }
-            }
-        }
+    let Some(msg_base) = vm.message_base_path(conference, area).await else {
+        log::error!("MSGTOFILE: no message base {conference}:{area}");
+        return Ok(());
+    };
+    let base = match JamMessageBase::open(&msg_base) {
+        Ok(base) => base,
         Err(err) => {
             log::error!("MSGTOFILE can't open message base in area {area}: {err}");
             return Ok(());
         }
+    };
+    let header = match base.read_header(msg_number as u32) {
+        Ok(header) => header,
+        Err(err) => {
+            log::error!("MSGTOFILE can't read message header {msg_number} in area {area}: {err}");
+            return Ok(());
+        }
+    };
+    let msg_text = match base.read_msg_text(&header) {
+        Ok(text) => text,
+        Err(err) => {
+            log::error!("MSGTOFILE can't read message text {msg_number} in area {area}: {err}");
+            return Ok(());
+        }
+    };
+
+    let date_time = DateTime::from_timestamp(header.date_written as i64, 0).unwrap_or_else(Utc::now);
+    let date = IcbDate::from_utc(&date_time);
+    let time = IcbTime::from_naive(date_time.naive_local());
+
+    // PCBoard keeps at most 25 characters in the fixed To/From/Subject fields and
+    // spills anything longer into extended headers (MSGENTER.C).
+    let mut ext_headers: Vec<(&str, String)> = Vec::new();
+    let to = split_fixed_field(header.get_to().map(ToString::to_string).unwrap_or_default(), "TO", "TO2", true, &mut ext_headers);
+    let from = split_fixed_field(header.get_from().map(ToString::to_string).unwrap_or_default(), "FROM", "FROM2", true, &mut ext_headers);
+    let subject = split_fixed_field(header.get_subject().map(ToString::to_string).unwrap_or_default(), "SUBJECT", "SUBJ2", false, &mut ext_headers);
+
+    let echo = if header.attributes & jam_attributes::MSG_TYPEECHO != 0 { 'E' } else { ' ' };
+    let active = if header.is_deleted() { 226 } else { 225 };
+
+    let mut msg = String::new();
+    msg.push_str(&format!("          Status: {}\n", message_status(&header)));
+    msg.push_str(&format!("  Message Number: {}\n", header.message_number));
+    msg.push_str(&format!("Reference Number: {}\n", header.reply_to));
+    msg.push_str(&format!("Number of blocks: {}\n", header.txt_len / 128));
+    msg.push_str(&format!("            Date: {:02}-{:02}-{:02}\n", date.month(), date.day(), date.year() % 100));
+    msg.push_str(&format!("            Time: {:02}:{:02}\n", time.get_hour(), time.get_minute()));
+    msg.push_str(&format!("              To: {to}\n"));
+    // PCBoard builds a "Reply" line here but overwrites it before writing, so
+    // only "Time of reply" ever reaches the file (SCREXEC.CPP).
+    msg.push_str("   Time of reply: \n");
+    msg.push_str(&format!("            From: {from}\n"));
+    msg.push_str(&format!("         Subject: {subject}\n"));
+    // JAM keeps only a password CRC, so the plaintext PCBoard printed is gone.
+    msg.push_str("        Password: \n");
+    msg.push_str(&format!("          Active: {active}\n"));
+    msg.push_str(&format!("            Echo:{echo}\n"));
+    if !ext_headers.is_empty() {
+        msg.push_str(&format!("Extended headers: {}\n", ext_headers.len()));
+        for (func, value) in &ext_headers {
+            msg.push_str(&format!("{func:<7}:{value}\n"));
+        }
+    }
+    msg.push_str("Message Body:\n");
+    msg.push_str(&msg_text.to_string());
+
+    let file_name = vm.resolve_file(&file_name).await;
+    if let Err(err) = write_utf8_with_bom(&file_name, &msg) {
+        log::error!("MSGTOFILE can't write message text {msg_number} in area {area}: {err}");
+    }
+    Ok(())
+}
+
+/// Splits a header field the way PCBoard does: up to 25 characters stay in the
+/// fixed field, the rest moves into an extended header (and a second one past 60
+/// characters). To and From blank their fixed field, Subject keeps its first 25.
+fn split_fixed_field(value: String, func: &'static str, func2: &'static str, blank_fixed: bool, ext: &mut Vec<(&'static str, String)>) -> String {
+    const FIXED: usize = 25;
+    const EXT: usize = 60;
+    if value.chars().count() <= FIXED {
+        return value;
+    }
+    let chars: Vec<char> = value.chars().collect();
+    ext.push((func, chars.iter().take(EXT).collect()));
+    if chars.len() > EXT {
+        ext.push((func2, chars.iter().skip(EXT).collect()));
+    }
+    if blank_fixed {
+        String::new()
+    } else {
+        chars.iter().take(FIXED).collect()
     }
 }
+
 
 pub async fn qwklimits(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let field = vm.eval_expr(&args[0]).await?.as_int();

@@ -179,6 +179,74 @@ fn test_setlmr_moves_the_last_message_read_pointer() {
     assert_eq!(run_ppl_with_messages("SETLMR 0, 2\nPRINT \"ok\"", MESSAGES), "ok");
 }
 
+/// Dumps a message to a file and reads it back, so the test can see what a PPE
+/// would parse out of it.
+const DUMP_AND_READ: &str = r#"
+    STRING s
+    MSGTOFILE 0, 3, "out.txt"
+    FOPEN 1, "out.txt", O_RD, S_DN
+    FGET 1, s
+    WHILE (!FERR(1)) DO
+        PRINTLN s
+        FGET 1, s
+    ENDWHILE
+    FCLOSE 1
+"#;
+
+/// The dump carries the header fields PCBoard wrote: the real status character,
+/// the number, the parties, an active flag of 225 and the body.
+#[test]
+fn test_msgtofile_writes_the_header_and_body() {
+    let output = run_ppl_with_messages(DUMP_AND_READ, MESSAGES);
+    assert!(output.contains("          Status:  \n"), "status: {output:?}");
+    assert!(output.contains("  Message Number: 3\n"), "number: {output:?}");
+    assert!(output.contains("Reference Number: 0\n"), "reference: {output:?}");
+    assert!(output.contains("              To: ALL\n"), "to: {output:?}");
+    assert!(output.contains("            From: SYSOP\n"), "from: {output:?}");
+    assert!(output.contains("         Subject: Board news\n"), "subject: {output:?}");
+    assert!(output.contains("          Active: 225\n"), "active: {output:?}");
+    assert!(output.contains("Message Body:\n"), "body label: {output:?}");
+}
+
+/// PCBoard overwrites its two "Reply" lines before writing them, so only the
+/// "Time of reply" line survives.
+#[test]
+fn test_msgtofile_writes_only_the_time_of_reply_line() {
+    let output = run_ppl_with_messages(DUMP_AND_READ, MESSAGES);
+    assert!(output.contains("   Time of reply: \n"), "time of reply: {output:?}");
+    assert!(!output.contains("           Reply:"), "stray reply line: {output:?}");
+}
+
+/// With every field short enough to fit, PCBoard writes no extended-header
+/// section at all rather than a "0" count.
+#[test]
+fn test_msgtofile_omits_the_extended_headers_when_there_are_none() {
+    let output = run_ppl_with_messages(DUMP_AND_READ, MESSAGES);
+    assert!(!output.contains("Extended headers"), "unexpected ext headers: {output:?}");
+}
+
+/// A recipient longer than the 25-character fixed field moves into an extended
+/// TO header and blanks the fixed line, the way PCBoard stores it.
+#[test]
+fn test_msgtofile_spills_a_long_recipient_into_an_extended_header() {
+    let messages: &[(&str, &str, &str)] = &[("SYSOP", "A VERY LONG RECIPIENT NAME INDEED", "Hi")];
+    let source = r#"
+        STRING s
+        MSGTOFILE 0, 1, "out.txt"
+        FOPEN 1, "out.txt", O_RD, S_DN
+        FGET 1, s
+        WHILE (!FERR(1)) DO
+            PRINTLN s
+            FGET 1, s
+        ENDWHILE
+        FCLOSE 1
+    "#;
+    let output = run_ppl_with_messages(source, messages);
+    assert!(output.contains("              To: \n"), "fixed to not blanked: {output:?}");
+    assert!(output.contains("Extended headers: 1\n"), "ext count: {output:?}");
+    assert!(output.contains("TO     :A VERY LONG RECIPIENT NAME INDEED\n"), "ext to: {output:?}");
+}
+
 #[test]
 fn test_move_msg_copies_the_message_into_the_other_conference() {
     assert_eq!(
