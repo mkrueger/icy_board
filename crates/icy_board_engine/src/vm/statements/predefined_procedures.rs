@@ -917,8 +917,12 @@ pub async fn wrunet(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let name: String = vm.eval_expr(&args[2]).await?.as_string();
     let city = vm.eval_expr(&args[3]).await?.as_string();
     let operation = vm.eval_expr(&args[4]).await?.as_string();
-    let broadcast = vm.eval_expr(&args[5]).await?.as_string();
+    let _broadcast = vm.eval_expr(&args[5]).await?.as_string();
 
+    // PCBoard's WRUNET (SCREXEC.CPP) only calls updateusernetrecord - it never sends
+    // anything itself. A node message is delivered when the *target* node's own
+    // polling loop later finds Status == NODEMESSAGE in its record (USERNET.C); we
+    // do not run that poll, so the message text has nowhere to go.
     if let Some(Some(node)) = vm.icy_board_state.node_state.lock().await.get_mut(node as usize) {
         if !stat.is_empty() {
             if let Some(stat) = NodeStatus::from_char(stat.chars().next().unwrap()) {
@@ -930,13 +934,6 @@ pub async fn wrunet(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
         node.city = city;
     } else {
         log::error!("PPE wrunet - node invalid: {}", node);
-        return Ok(());
-    }
-
-    // Writing the broadcast field of a node's record is how PCBoard sends it one.
-    if !broadcast.is_empty() {
-        let node = node.max(0) as u16;
-        vm.icy_board_state.broadcast(node, node, &broadcast).await?;
     }
 
     Ok(())
