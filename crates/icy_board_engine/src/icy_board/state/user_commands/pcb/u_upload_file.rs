@@ -134,7 +134,11 @@ impl IcyBoardState {
         let protocol = self.get_protocol(protocol_str).await;
 
         if let Some(protocol) = protocol {
-            let mut prot = create_protocol(&protocol);
+            let Some(mut prot) = create_protocol(&protocol) else {
+                self.display_text(IceText::TransferAborted, display_flags::NEWLINE | display_flags::LFBEFORE)
+                    .await?;
+                return Ok(());
+            };
 
             match prot.initiate_recv(&mut *self.connection).await {
                 Ok(mut state) => {
@@ -189,18 +193,18 @@ impl IcyBoardState {
     }
 }
 
-pub fn create_protocol(protocol: &TransferProtocolType) -> Box<dyn Protocol> {
-    match *protocol {
-        TransferProtocolType::None => todo!(),
-        TransferProtocolType::ASCII => todo!(),
-        TransferProtocolType::XModem => Box::new(XYmodem::new(XYModemVariant::XModem)),
-        TransferProtocolType::XModemCRC => Box::new(XYmodem::new(XYModemVariant::XModemCRC)),
-        TransferProtocolType::XModem1k => Box::new(XYmodem::new(XYModemVariant::XModem1k)),
-        TransferProtocolType::XModem1kG => Box::new(XYmodem::new(XYModemVariant::XModem1kG)),
-        TransferProtocolType::YModem => Box::new(XYmodem::new(XYModemVariant::YModem)),
-        TransferProtocolType::YModemG => Box::new(XYmodem::new(XYModemVariant::YModemG)),
-        TransferProtocolType::ZModem => Box::new(Zmodem::new(1024)),
-        TransferProtocolType::ZModem8k => Box::new(Zmodem::new(8 * 1024)),
-        TransferProtocolType::External(_) => todo!(),
+pub fn create_protocol(protocol: &TransferProtocolType) -> Option<Box<dyn Protocol>> {
+    match protocol {
+        // No native handler runs a DOS external protocol, and ASCII/None have no
+        // framing to drive, so the caller aborts rather than claim a transfer.
+        TransferProtocolType::None | TransferProtocolType::ASCII | TransferProtocolType::External(_) => None,
+        TransferProtocolType::XModem => Some(Box::new(XYmodem::new(XYModemVariant::XModem))),
+        TransferProtocolType::XModemCRC => Some(Box::new(XYmodem::new(XYModemVariant::XModemCRC))),
+        TransferProtocolType::XModem1k => Some(Box::new(XYmodem::new(XYModemVariant::XModem1k))),
+        TransferProtocolType::XModem1kG => Some(Box::new(XYmodem::new(XYModemVariant::XModem1kG))),
+        TransferProtocolType::YModem => Some(Box::new(XYmodem::new(XYModemVariant::YModem))),
+        TransferProtocolType::YModemG => Some(Box::new(XYmodem::new(XYModemVariant::YModem))),
+        TransferProtocolType::ZModem => Some(Box::new(Zmodem::new(1024))),
+        TransferProtocolType::ZModem8k => Some(Box::new(Zmodem::new(8 * 1024))),
     }
 }

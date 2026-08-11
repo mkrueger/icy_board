@@ -506,7 +506,10 @@ impl IcyBoardState {
             return Ok(());
         };
 
-        let mut prot = create_protocol(&protocol);
+        let Some(mut prot) = create_protocol(&protocol) else {
+            self.display_text(IceText::TransferAborted, display_flags::NEWLINE).await?;
+            return Ok(());
+        };
         let bbs_id = {
             let board = self.board.lock().await;
             if board.config.qwk_settings.bbs_id.is_empty() {

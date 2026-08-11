@@ -6,6 +6,8 @@ use humanize_bytes::humanize_bytes_decimal;
 use crate::icy_board::icb_config::IcbColor;
 use crate::icy_board::state::functions::MASK_NUM;
 use crate::{Res, icy_board::state::IcyBoardState};
+
+use super::u_upload_file::create_protocol;
 use crate::{
     icy_board::{icb_text::IceText, state::functions::display_flags},
     vm::TerminalTarget,
@@ -127,7 +129,10 @@ impl IcyBoardState {
             self.display_text(IceText::SendingFiles, display_flags::NEWLINE).await?;
 
             if let Some(protocol) = &protocol {
-                let mut prot = protocol.create();
+                let Some(mut prot) = create_protocol(protocol) else {
+                    self.display_text(IceText::TransferAborted, display_flags::NEWLINE).await?;
+                    return Ok(());
+                };
                 let files: Vec<PathBuf> = self.session.flagged_files.drain(..).collect();
                 for f in &files {
                     if !f.exists() {
