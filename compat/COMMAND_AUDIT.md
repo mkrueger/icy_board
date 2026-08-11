@@ -73,7 +73,7 @@ icy_board resolves these in `try_find_command` (`state/mod.rs:833-960`).
 | ALIAS, BYE, BROADCAST, CHAT, FLAG, HELP, JOIN, LANG, MENU, NEWS, PPE, QWK, REPLY, RM/RM+/RM-, SELECT, TEST, USERS, WHO | present, prompt sequences line up | ✅ |
 | DOOR / OPEN | PCBoard adds PWRDFORDOOR (415) and CONTINUEDOOR (604) when files are flagged | both present; the sysop skips them as in PCBoard | ✅ |
 | SELECT | PCBoard can ask SELECTCONFFLAGS (564) | ⚠️ 1 missing |
-| TS | area token `S` handling is a TODO | 🚧 partial |
+| TS | area token `S` scans from the stored date, like the file scan | ✅ |
 | BD, BU | delegate to D/U with the batch flag on, as PCBoard does | ✅ |
 | DB, UB, NODE | PCBoard aliases for download / upload / chat | ✅ recognised |
 | OPEN | the matcher compared against mixed case `"Open"` while the command is upper-cased first | ✅ fixed |
@@ -207,7 +207,7 @@ Blocked on features that do not exist yet rather than on the prompt code:
 - [ ] **K**: use YOURPASSWORD (148).
 - [ ] **SELECT**: SELECTCONFFLAGS (564).
 - [x] Fix the `"Open"` case bug and add aliases `NODE`, `DB`, `UB`.
-- [ ] Fall back to the door list for unknown words when the user has OPEN access.
+- [x] Fall back to the door list for unknown words when the user has OPEN access.
 - [ ] Match PCBoard's minimum-abbreviation rule instead of accepting any prefix.
 - [ ] Implement **BD**/**BU** batch transfer.
 - [ ] Decide whether **V** should keep its built-in display when STAT is missing.

@@ -23,6 +23,11 @@ impl IcyBoardState {
             if let Some(action) = self.try_find_command(&command, via_cmd_list).await {
                 return self.dispatch_command(&command, &action).await;
             }
+            // PCBoard tries the door list before giving up on an unknown word.
+            if self.try_open_matching_door(&command).await? {
+                self.session.tokens.clear();
+                return Ok(false);
+            }
             log::warn!("Command not found: '{}'", command);
             self.display_text(
                 IceText::InvalidEntry,

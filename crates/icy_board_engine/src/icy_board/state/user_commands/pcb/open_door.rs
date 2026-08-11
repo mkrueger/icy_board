@@ -21,6 +21,28 @@ use thiserror::Error;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 impl IcyBoardState {
+    /// PCBoard's command dispatcher falls through to the door list when a caller
+    /// with OPEN access types a word that is not a command; the door name is
+    /// matched as a prefix, the way `searchdoorlist` does (DOORS.C). Returns true
+    /// when a door was found and run.
+    pub async fn try_open_matching_door(&mut self, name: &str) -> Res<bool> {
+        let open_access = self.session.user_command_level.cmd_open_door.clone();
+        if !open_access.session_can_access(&self.session) {
+            return Ok(false);
+        }
+        let Some(doors) = self.session.current_conference.doors.clone() else {
+            return Ok(false);
+        };
+        let needle = name.to_uppercase();
+        for (i, door) in doors.doors.iter().enumerate() {
+            if door.name.to_uppercase().starts_with(&needle) {
+                self.run_door(&doors, door, i).await?;
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
     pub async fn open_door(&mut self) -> Res<()> {
         self.set_activity(NodeStatus::RunningDoor).await;
         let doors = self.session.current_conference.doors.as_ref().unwrap().clone();

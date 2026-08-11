@@ -134,7 +134,14 @@ impl IcyBoardState {
                     read_date = true;
                 }
                 "S" => {
-                    // TODO
+                    // Scan from the stored date without asking, like the file scan's S.
+                    if let Some(user) = self.session.current_user.as_ref() {
+                        let stored = user.stats.last_on.format("%m%d%y").to_string();
+                        let month = stored[0..2].parse::<u8>().unwrap_or(0);
+                        let day = stored[2..4].parse::<u8>().unwrap_or(0);
+                        let year = stored[4..6].parse::<u16>().unwrap_or(0);
+                        res.date_time = Some(IcbDate::new(month, day, year).to_local_date_time());
+                    }
                 }
                 t => {
                     self.add_area_numbers(&mut numbers, t).await?;
