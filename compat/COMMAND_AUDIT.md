@@ -74,7 +74,7 @@ icy_board resolves these in `try_find_command` (`state/mod.rs:833-960`).
 | DOOR / OPEN | PCBoard adds PWRDFORDOOR (415) and CONTINUEDOOR (604) when files are flagged | both present; the sysop skips them as in PCBoard | ✅ |
 | SELECT | PCBoard can ask SELECTCONFFLAGS (564) | ⚠️ 1 missing |
 | TS | area token `S` handling is a TODO | 🚧 partial |
-| BD, BU | recognised, but the handlers are stubs | 🚧 stubs |
+| BD, BU | delegate to D/U with the batch flag on, as PCBoard does | ✅ |
 | DB, UB, NODE | PCBoard aliases for download / upload / chat | ✅ recognised |
 | OPEN | the matcher compared against mixed case `"Open"` while the command is upper-cased first | ✅ fixed |
 | ! | repeats the last command of five characters or more, help in HLP! | ✅ |
