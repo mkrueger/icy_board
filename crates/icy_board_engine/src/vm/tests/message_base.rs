@@ -30,6 +30,55 @@ fn test_scanmsghdr_reports_zero_when_nothing_matches() {
     assert_eq!(run_ppl_with_messages(r#"PRINT SCANMSGHDR(0, 1, HDR_TO, "NOBODY")"#, MESSAGES), "0");
 }
 
+/// The security argument of MESSAGE asks for a message only its receiver may read,
+/// which is the private flag GETMSGHDR reports as '*'.
+#[test]
+fn test_message_marks_a_receiver_only_message_private() {
+    let output = run_ppl_with_messages(
+        r#"
+        FCREATE 1, "body.txt", O_WR, S_DN
+        FPUTLN 1, "the body"
+        FCLOSE 1
+        MESSAGE 0, "SOMEONE", "ME", "Private one", "R", 0, FALSE, FALSE, "body.txt"
+        PRINT "[", GETMSGHDR(0, 4, HDR_STATUS), "]"
+    "#,
+        MESSAGES,
+    );
+    assert!(output.ends_with("[*]"), "unexpected output: {output:?}");
+}
+
+/// Without it the message is public, which reads back as a blank.
+#[test]
+fn test_message_leaves_a_public_message_public() {
+    let output = run_ppl_with_messages(
+        r#"
+        FCREATE 1, "body.txt", O_WR, S_DN
+        FPUTLN 1, "the body"
+        FCLOSE 1
+        MESSAGE 0, "SOMEONE", "ME", "Public one", "N", 0, FALSE, FALSE, "body.txt"
+        PRINT "[", GETMSGHDR(0, 4, HDR_STATUS), "]"
+    "#,
+        MESSAGES,
+    );
+    assert!(output.ends_with("[ ]"), "unexpected output: {output:?}");
+}
+
+/// An echoed message carries the flag HDR_ECHO reports.
+#[test]
+fn test_message_marks_an_echoed_message() {
+    let output = run_ppl_with_messages(
+        r#"
+        FCREATE 1, "body.txt", O_WR, S_DN
+        FPUTLN 1, "the body"
+        FCLOSE 1
+        MESSAGE 0, "SOMEONE", "ME", "Echoed one", "N", 0, FALSE, TRUE, "body.txt"
+        PRINT "[", GETMSGHDR(0, 4, HDR_ECHO), "]"
+    "#,
+        MESSAGES,
+    );
+    assert!(output.ends_with("[E]"), "unexpected output: {output:?}");
+}
+
 #[test]
 fn test_setmsghdr_changes_a_field_that_getmsghdr_reads_back() {
     assert_eq!(

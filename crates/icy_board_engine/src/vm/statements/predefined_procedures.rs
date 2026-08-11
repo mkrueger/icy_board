@@ -25,7 +25,7 @@ use chrono::{DateTime, Utc};
 use codepages::tables::{CP437_TO_UNICODE, write_utf8_with_bom};
 use icy_engine::formats::{CharacterFormatOptions, FileFormat, FormatOptions, ScreenPreperation};
 use icy_engine::{BufferType, SaveOptions};
-use jamjam::jam::{JamMessage, JamMessageBase};
+use jamjam::jam::{JamMessage, JamMessageBase, attributes as jam_attributes};
 
 use crate::{
     icy_board::icb_text::IceText,
@@ -881,6 +881,8 @@ pub async fn rdunet(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
             cur_conference: node.cur_conference,
             graphics_mode: node.graphics_mode,
             operation: node.operation.clone(),
+            user_name: node.user_name.clone(),
+            city: node.city.clone(),
             status: node.status.clone(),
             enabled_chat: node.enabled_chat,
             node_number: node.node_number,
@@ -896,6 +898,8 @@ pub async fn rdunet(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
             cur_conference: 0,
             graphics_mode: GraphicsMode::Graphics,
             operation: String::new(),
+            user_name: String::new(),
+            city: String::new(),
             status: NodeStatus::NoCaller,
             enabled_chat: false,
             node_number: node as usize,
@@ -915,8 +919,6 @@ pub async fn wrunet(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let operation = vm.eval_expr(&args[4]).await?.as_string();
     let broadcast = vm.eval_expr(&args[5]).await?.as_string();
 
-    // Todo: Name/City/Broadcast
-
     if let Some(Some(node)) = vm.icy_board_state.node_state.lock().await.get_mut(node as usize) {
         if !stat.is_empty() {
             if let Some(stat) = NodeStatus::from_char(stat.chars().next().unwrap()) {
@@ -924,8 +926,17 @@ pub async fn wrunet(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
             }
         }
         node.operation = operation;
+        node.user_name = name;
+        node.city = city;
     } else {
         log::error!("PPE wrunet - node invalid: {}", node);
+        return Ok(());
+    }
+
+    // Writing the broadcast field of a node's record is how PCBoard sends it one.
+    if !broadcast.is_empty() {
+        let node = node.max(0) as u16;
+        vm.icy_board_state.broadcast(node, node, &broadcast).await?;
     }
 
     Ok(())
@@ -1047,7 +1058,7 @@ pub async fn message(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let to = vm.eval_expr(&args[1]).await?.as_string();
     let from = vm.eval_expr(&args[2]).await?.as_string();
     let subject = vm.eval_expr(&args[3]).await?.as_string();
-    let sec = vm.eval_expr(&args[4]).await?.as_string(); // Security
+    let sec = vm.eval_expr(&args[4]).await?.as_string();
     let pack_out_date = vm.eval_expr(&args[5]).await?.as_int() as u32;
     let retreceipt = vm.eval_expr(&args[6]).await?.as_bool();
     let echo = vm.eval_expr(&args[7]).await?.as_bool();
@@ -1057,13 +1068,31 @@ pub async fn message(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
         log::error!("PPE function 'message': Message text file not found {}", file.display());
         return Err(Box::new(IcyError::FileNotFound("MESSAGE".to_string(), file.display().to_string())));
     }
+
+    // An empty name stands for the caller, and "R" asks for a message only its
+    // receiver may read - anything else is the public "N".
+    let caller = vm.icy_board_state.session.get_username_or_alias();
+    let to = if to.is_empty() { caller.clone() } else { to };
+    let from = if from.is_empty() { caller } else { from };
+
+    let mut attributes = 0;
+    if sec.trim().to_ascii_uppercase().starts_with('R') {
+        attributes |= jam_attributes::MSG_PRIVATE;
+    }
+    if retreceipt {
+        attributes |= jam_attributes::MSG_RECEIPTREQ;
+    }
+    if echo {
+        attributes |= jam_attributes::MSG_TYPEECHO;
+    }
+
     let mut message = JamMessage::default()
         .with_from(BString::from(from))
         .with_to(BString::from(to))
         .with_subject(BString::from(subject))
         .with_date_time(Utc::now())
+        .with_attributes(attributes)
         .with_text(BString::from(fs::read_to_string(file)?));
-    // TODO: Message Security
     if pack_out_date > 0 {
         message = message.with_packout_date(IcbDate::from_pcboard(pack_out_date).to_utc_date_time());
     }

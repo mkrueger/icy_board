@@ -475,6 +475,9 @@ pub struct NodeState {
     pub graphics_mode: GraphicsMode,
     pub status: NodeStatus,
     pub operation: String,
+    /// What a PPE wrote into the node's USERNET record, empty until one does.
+    pub user_name: String,
+    pub city: String,
     pub enabled_chat: bool,
     pub node_number: usize,
     pub connection_type: ConnectionType,
@@ -492,6 +495,8 @@ impl NodeState {
             bbs_channel: Some(rx),
             status: NodeStatus::NoCaller,
             operation: String::new(),
+            user_name: String::new(),
+            city: String::new(),
             graphics_mode: GraphicsMode::Ansi,
             cur_user: -1,
             cur_conference: 0,

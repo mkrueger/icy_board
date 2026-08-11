@@ -743,6 +743,9 @@ pub async fn un_stat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 
 pub async fn un_name(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     if let Some(node) = &vm.pcb_node {
+        if !node.user_name.is_empty() {
+            return Ok(VariableValue::new_string(node.user_name.clone()));
+        }
         if let Some(user) = vm.icy_board_state.board.lock().await.users.get(node.cur_user as usize) {
             return Ok(VariableValue::new_string(user.get_name().clone()));
         }
@@ -751,6 +754,9 @@ pub async fn un_name(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 }
 pub async fn un_city(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     if let Some(node) = &vm.pcb_node {
+        if !node.city.is_empty() {
+            return Ok(VariableValue::new_string(node.city.clone()));
+        }
         if let Some(user) = vm.icy_board_state.board.lock().await.users.get(node.cur_user as usize) {
             let city = user.city_or_state.clone();
             return Ok(VariableValue::new_string(city));

@@ -8,6 +8,20 @@ fn test_toddate_reads_a_ccyymmdd_string() {
     assert_eq!(run_ppl("PRINT TODDATE(\"19940527\")"), "19940527");
 }
 
+/// PCBoard kept a name and a city per node in USERNET, so what WRUNET writes is
+/// what UN_NAME and UN_CITY read back.
+#[test]
+fn test_wrunet_keeps_the_name_and_city_a_ppe_wrote() {
+    let output = run_ppl(
+        r#"
+        WRUNET PCBNODE(), "", "FAKE CALLER", "FAKE CITY", "doing things", ""
+        RDUNET PCBNODE()
+        PRINTLN "name=", UN_NAME(), " city=", UN_CITY(), " oper=", UN_OPER()
+    "#,
+    );
+    assert_eq!(output, "name=FAKE CALLER city=FAKE CITY oper=doing things\n");
+}
+
 /// A DDATE holds the julian date a DATE holds; only its text form is CCYYMMDD.
 /// Verified against PCBoard 15.4/M.
 #[test]
