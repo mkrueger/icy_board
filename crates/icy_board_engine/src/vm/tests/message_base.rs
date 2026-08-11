@@ -201,6 +201,7 @@ fn test_msgtofile_writes_the_header_and_body() {
     assert!(output.contains("          Status:  \n"), "status: {output:?}");
     assert!(output.contains("  Message Number: 3\n"), "number: {output:?}");
     assert!(output.contains("Reference Number: 0\n"), "reference: {output:?}");
+    assert!(output.contains("Number of blocks: 2\n"), "blocks: {output:?}");
     assert!(output.contains("              To: ALL\n"), "to: {output:?}");
     assert!(output.contains("            From: SYSOP\n"), "from: {output:?}");
     assert!(output.contains("         Subject: Board news\n"), "subject: {output:?}");
@@ -244,7 +245,50 @@ fn test_msgtofile_spills_a_long_recipient_into_an_extended_header() {
     let output = run_ppl_with_messages(source, messages);
     assert!(output.contains("              To: \n"), "fixed to not blanked: {output:?}");
     assert!(output.contains("Extended headers: 1\n"), "ext count: {output:?}");
-    assert!(output.contains("TO     :A VERY LONG RECIPIENT NAME INDEED\n"), "ext to: {output:?}");
+    let ext_to = format!("TO     :{:<60}N\n", "A VERY LONG RECIPIENT NAME INDEED");
+    assert!(output.contains(&ext_to), "ext to: {output:?}");
+}
+
+#[test]
+fn test_msgtofile_appends_to_an_existing_file() {
+    let source = r#"
+        FCREATE 1, "out.txt", O_WR, S_DN
+        FPUTLN 1, "before"
+        FCLOSE 1
+        MSGTOFILE 0, 1, "out.txt"
+        STRING s
+        FOPEN 1, "out.txt", O_RD, S_DN
+        FGET 1, s
+        PRINT s
+        FCLOSE 1
+    "#;
+    assert_eq!(run_ppl_with_messages(source, MESSAGES), "before");
+}
+
+#[test]
+fn test_msgtofile_writes_receipt_and_packout_extended_headers() {
+    let source = r#"
+        FCREATE 1, "body.txt", O_WR, S_DN
+        FPUTLN 1, "body"
+        FCLOSE 1
+        MESSAGE 0, "STAN", "SYSOP", "Expiring", "R", MKDATE(2026, 8, 15), TRUE, FALSE, "body.txt"
+        MSGTOFILE 0, 4, "out.txt"
+        STRING s
+        FOPEN 1, "out.txt", O_RD, S_DN
+        FGET 1, s
+        WHILE (!FERR(1)) DO
+            PRINTLN s
+            FGET 1, s
+        ENDWHILE
+        FCLOSE 1
+    "#;
+    let output = run_ppl_with_messages(source, MESSAGES);
+    assert!(output.contains("Extended headers: 2\n"), "ext count: {output:?}");
+    assert!(output.contains(&format!("PACKOUT:{:<60}N\n", "08-15-26")), "packout: {output:?}");
+    assert!(
+        output.contains(&format!("REQRR  :{:<60}N\n", "Caller has requested a Return Receipt")),
+        "receipt: {output:?}"
+    );
 }
 
 #[test]

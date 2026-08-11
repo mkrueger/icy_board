@@ -22,10 +22,10 @@ use crate::{
 };
 use bstr::BString;
 use chrono::{DateTime, Utc};
-use codepages::tables::{CP437_TO_UNICODE, write_utf8_with_bom};
+use codepages::tables::CP437_TO_UNICODE;
 use icy_engine::formats::{CharacterFormatOptions, FileFormat, FormatOptions, ScreenPreperation};
 use icy_engine::{BufferType, SaveOptions};
-use jamjam::jam::{JamMessage, JamMessageBase, attributes as jam_attributes};
+use jamjam::jam::{JamMessage, JamMessageBase, attributes as jam_attributes, msg_header::SubfieldType};
 
 use crate::{
     icy_board::icb_text::IceText,
@@ -2151,18 +2151,63 @@ pub async fn msgtofile(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
     // PCBoard keeps at most 25 characters in the fixed To/From/Subject fields and
     // spills anything longer into extended headers (MSGENTER.C).
     let mut ext_headers: Vec<(&str, String)> = Vec::new();
-    let to = split_fixed_field(header.get_to().map(ToString::to_string).unwrap_or_default(), "TO", "TO2", true, &mut ext_headers);
-    let from = split_fixed_field(header.get_from().map(ToString::to_string).unwrap_or_default(), "FROM", "FROM2", true, &mut ext_headers);
-    let subject = split_fixed_field(header.get_subject().map(ToString::to_string).unwrap_or_default(), "SUBJECT", "SUBJ2", false, &mut ext_headers);
+    let to = split_fixed_field(
+        header.get_to().map(ToString::to_string).unwrap_or_default(),
+        "TO",
+        "TO2",
+        true,
+        &mut ext_headers,
+    );
+    let from = split_fixed_field(
+        header.get_from().map(ToString::to_string).unwrap_or_default(),
+        "FROM",
+        "FROM2",
+        true,
+        &mut ext_headers,
+    );
+    let subject = split_fixed_field(
+        header.get_subject().map(ToString::to_string).unwrap_or_default(),
+        "SUBJECT",
+        "SUBJ2",
+        false,
+        &mut ext_headers,
+    );
+    if header.attributes & jam_attributes::MSG_RECEIPTREQ != 0 {
+        push_ext_header(&mut ext_headers, "REQRR", "Caller has requested a Return Receipt");
+    }
+    for field in &header.sub_fields {
+        let value = field.get_string().to_string();
+        match field.get_type() {
+            SubfieldType::EnclFile => push_ext_header(&mut ext_headers, "ATTACH", &value),
+            SubfieldType::AddressD => push_ext_header(&mut ext_headers, "ROUTE", &value),
+            SubfieldType::PackoutDate => {
+                if let Ok(date) = DateTime::parse_from_rfc3339(&value) {
+                    push_ext_header(&mut ext_headers, "PACKOUT", &date.format("%m-%d-%y").to_string());
+                }
+            }
+            SubfieldType::FTSKludge => {
+                if let Some(value) = value.strip_prefix("NEWSGROUPS: ") {
+                    push_ext_header(&mut ext_headers, "UNEWSGR", value);
+                } else if let Some(value) = value.strip_prefix("FOLLOWUP-TO: ") {
+                    push_ext_header(&mut ext_headers, "UFOLLOW", value);
+                }
+            }
+            _ => {}
+        }
+    }
+    ext_headers.sort_unstable_by(|left, right| left.0.cmp(right.0).then_with(|| left.1.cmp(&right.1)));
 
     let echo = if header.attributes & jam_attributes::MSG_TYPEECHO != 0 { 'E' } else { ' ' };
     let active = if header.is_deleted() { 226 } else { 225 };
+    let body = pcboard_message_body(&msg_text.to_string());
+    let stored_len = body.len().saturating_add(ext_headers.len() * 72);
+    let blocks = (stored_len.saturating_add(127) / 128).saturating_add(1).min(255);
 
     let mut msg = String::new();
     msg.push_str(&format!("          Status: {}\n", message_status(&header)));
     msg.push_str(&format!("  Message Number: {}\n", header.message_number));
     msg.push_str(&format!("Reference Number: {}\n", header.reply_to));
-    msg.push_str(&format!("Number of blocks: {}\n", header.txt_len / 128));
+    msg.push_str(&format!("Number of blocks: {blocks}\n"));
     msg.push_str(&format!("            Date: {:02}-{:02}-{:02}\n", date.month(), date.day(), date.year() % 100));
     msg.push_str(&format!("            Time: {:02}:{:02}\n", time.get_hour(), time.get_minute()));
     msg.push_str(&format!("              To: {to}\n"));
@@ -2178,17 +2223,37 @@ pub async fn msgtofile(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
     if !ext_headers.is_empty() {
         msg.push_str(&format!("Extended headers: {}\n", ext_headers.len()));
         for (func, value) in &ext_headers {
-            msg.push_str(&format!("{func:<7}:{value}\n"));
+            msg.push_str(&format!("{func:<7}:{value:<60}N\n"));
         }
     }
     msg.push_str("Message Body:\n");
-    msg.push_str(&msg_text.to_string());
+    msg.push_str(&body);
 
     let file_name = vm.resolve_file(&file_name).await;
-    if let Err(err) = write_utf8_with_bom(&file_name, &msg) {
+    if let Err(err) = append_utf8_with_bom(&file_name, &msg) {
         log::error!("MSGTOFILE can't write message text {msg_number} in area {area}: {err}");
     }
     Ok(())
+}
+
+fn append_utf8_with_bom(path: &std::path::Path, text: &str) -> std::io::Result<()> {
+    let mut file = std::fs::OpenOptions::new().create(true).append(true).open(path)?;
+    if file.metadata()?.len() == 0 {
+        file.write_all(&[0xEF, 0xBB, 0xBF])?;
+    }
+    file.write_all(text.as_bytes())
+}
+
+fn pcboard_message_body(text: &str) -> String {
+    let mut body = String::new();
+    for line in text.lines() {
+        body.push_str(line.trim_end_matches('\r'));
+        body.push('\n');
+    }
+    if body.is_empty() {
+        body.push('\n');
+    }
+    body
 }
 
 /// Splits a header field the way PCBoard does: up to 25 characters stay in the
@@ -2203,15 +2268,14 @@ fn split_fixed_field(value: String, func: &'static str, func2: &'static str, bla
     let chars: Vec<char> = value.chars().collect();
     ext.push((func, chars.iter().take(EXT).collect()));
     if chars.len() > EXT {
-        ext.push((func2, chars.iter().skip(EXT).collect()));
+        ext.push((func2, chars.iter().skip(EXT).take(EXT).collect()));
     }
-    if blank_fixed {
-        String::new()
-    } else {
-        chars.iter().take(FIXED).collect()
-    }
+    if blank_fixed { String::new() } else { chars.iter().take(FIXED).collect() }
 }
 
+fn push_ext_header(ext: &mut Vec<(&'static str, String)>, function: &'static str, value: &str) {
+    ext.push((function, value.chars().take(60).collect()));
+}
 
 pub async fn qwklimits(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let field = vm.eval_expr(&args[0]).await?.as_int();
