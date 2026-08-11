@@ -24,6 +24,7 @@ const EXPECTED_CODE_SIZE: &[(&str, usize)] = &[
     ("get_user.pps", 52),
     ("if_then.pps", 266),
     ("local_variables.pps", 80),
+    ("oracle_edate_ddate.pps", 432),
     ("oracle_money_date.pps", 364),
     ("oracle_string_edge.pps", 316),
     ("oracle_type_coercion.pps", 364),

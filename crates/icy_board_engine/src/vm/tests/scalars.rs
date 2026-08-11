@@ -8,9 +8,25 @@ fn test_toddate_reads_a_ccyymmdd_string() {
     assert_eq!(run_ppl("PRINT TODDATE(\"19940527\")"), "19940527");
 }
 
+/// A DDATE holds the julian date a DATE holds; only its text form is CCYYMMDD.
+/// Verified against PCBoard 15.4/M.
 #[test]
-fn test_a_ddate_holds_the_date_as_the_number_ccyymmdd() {
-    assert_eq!(run_ppl("INTEGER i\ni = TODDATE(\"19940527\")\nPRINT i"), "19940527");
+fn test_a_ddate_holds_the_julian_date_behind_its_ccyymmdd_text() {
+    assert_eq!(run_ppl("INTEGER i\ni = TODDATE(\"19940527\")\nPRINT i"), "34480");
+    assert_eq!(run_ppl("DDATE d\nd = TODDATE(\"19940527\")\nPRINT d"), "19940527");
+}
+
+/// An EDATE holds that same julian and shows itself as YYMM.DD.
+#[test]
+fn test_an_edate_shows_the_date_as_yymm_dd() {
+    assert_eq!(run_ppl("EDATE e\ne = MKDATE(1996, 3, 15)\nPRINT e"), "9603.15");
+    assert_eq!(run_ppl("EDATE e\ne = MKDATE(1996, 3, 15)\nPRINT TOINTEGER(e)"), "35138");
+}
+
+/// PCBoard does not read a date out of a string for an EDATE, it answers 0.
+#[test]
+fn test_an_edate_does_not_read_a_date_out_of_a_string() {
+    assert_eq!(run_ppl("PRINT TOEDATE(\"03-15-96\")"), "0000.00");
 }
 
 #[test]

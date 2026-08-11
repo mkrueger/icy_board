@@ -1,0 +1,25 @@
+' Captured from real PCBoard 15.4/M via the compat/ oracle.
+' Expected output in the matching .out file is PCBoard's actual behaviour,
+' not ours - do not "fix" it to match icy_board.
+EDATE e
+DDATE d
+DATE dt
+PRINTLN "---BEGIN---"
+LET dt = MKDATE(1996, 3, 15)
+PRINTLN "date=", dt, " i=", TOINTEGER(dt)
+LET e = dt
+PRINTLN "e_from_date=[", e, "] i=", TOINTEGER(e)
+LET e = 35138
+PRINTLN "e_from_int=[", e, "] i=", TOINTEGER(e)
+PRINTLN "toedate_str=[", TOEDATE("03-15-96"), "] i=", TOINTEGER(TOEDATE("03-15-96"))
+PRINTLN "toedate_date=[", TOEDATE(dt), "] i=", TOINTEGER(TOEDATE(dt))
+LET d = dt
+PRINTLN "d_from_date=[", d, "] i=", TOINTEGER(d)
+LET d = 19960315
+PRINTLN "d_from_int=[", d, "] i=", TOINTEGER(d)
+PRINTLN "toddate_date=[", TODDATE(dt), "] i=", TOINTEGER(TODDATE(dt))
+PRINTLN "toddate_str=[", TODDATE("19960315"), "] i=", TOINTEGER(TODDATE("19960315"))
+PRINTLN "todate_of_ddate=[", TODATE(TODDATE(dt)), "]"
+PRINTLN "date_of_edate=[", TODATE(TOEDATE(dt)), "]"
+PRINTLN "---END---"
+END

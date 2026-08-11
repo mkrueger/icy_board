@@ -502,8 +502,9 @@ fn format_value(field: &FieldInfo, value: &VariableValue) -> Option<Vec<u8>> {
             format!("{rendered:>width$}", width = field.length)
         }
         TYPE_DATE => {
-            let ddate = value.clone().convert_to(VariableType::DDate).as_int();
-            if ddate == 0 { String::new() } else { format!("{ddate:08}") }
+            // dBase keeps a date as CCYYMMDD text, which is how a DDATE spells itself.
+            let ddate = value.clone().convert_to(VariableType::DDate);
+            if ddate.as_int() == 0 { String::new() } else { ddate.as_string() }
         }
         TYPE_LOGICAL => if value.as_bool() { "1" } else { "0" }.to_string(),
         _ => return None,
