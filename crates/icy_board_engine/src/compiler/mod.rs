@@ -56,6 +56,15 @@ pub enum CompilationErrorType {
     #[error("Can't assign value to.")]
     InvalidLetVariable,
 
+    #[error("Can't assign {1} to {0}")]
+    AssignmentTypeMismatch(VariableType, VariableType),
+
+    #[error("Argument {0} expects {1}, got {2}")]
+    ArgumentTypeMismatch(usize, VariableType, VariableType),
+
+    #[error("Operator {0} is not defined for custom types")]
+    CustomTypeOperatorNotSupported(crate::ast::BinOp),
+
     #[error("Unused variable ({0})")]
     UnusedVariable(String),
 

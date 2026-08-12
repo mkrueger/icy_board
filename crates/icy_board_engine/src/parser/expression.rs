@@ -240,12 +240,13 @@ impl<'a> Parser<'a> {
 
                     self.next_token();
 
-                    return Some(Expression::Indexer(IndexerExpression::new(
+                    let indexer = Expression::Indexer(IndexerExpression::new(
                         identifier_token,
                         leftpar_token,
                         arguments,
                         rightpar_token,
-                    )));
+                    ));
+                    return self.parse_member_chain(indexer);
                 }
                 Some(Expression::Identifier(IdentifierExpression::new(identifier_token)))
             }

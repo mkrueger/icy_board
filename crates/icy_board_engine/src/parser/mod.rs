@@ -167,6 +167,12 @@ pub enum ParserErrorType {
     #[error("A type can't hold a field of its own type ('{0}')")]
     TypeUsedInItself(unicase::Ascii<String>),
 
+    #[error("Record field '{0}' cannot be an array")]
+    TypeFieldArrayNotSupported(unicase::Ascii<String>),
+
+    #[error("Record field '{0}' cannot have an initializer")]
+    TypeFieldInitializerNotSupported(unicase::Ascii<String>),
+
     #[error("No room for another type, {0} is the most a program may declare")]
     TooManyTypes(usize),
 }
@@ -642,6 +648,18 @@ impl<'a> Parser<'a> {
                     break;
                 };
                 let field_name = specifier.get_identifier().clone();
+                if !specifier.get_dimensions().is_empty() {
+                    self.error_reporter
+                        .lock()
+                        .unwrap()
+                        .report_error(specifier.get_identifier_token().span.clone(), ParserErrorType::TypeFieldArrayNotSupported(field_name.clone()));
+                }
+                if specifier.get_initalizer().is_some() {
+                    self.error_reporter.lock().unwrap().report_error(
+                        specifier.get_identifier_token().span.clone(),
+                        ParserErrorType::TypeFieldInitializerNotSupported(field_name.clone()),
+                    );
+                }
                 if field_names.contains(&field_name) {
                     self.error_reporter
                         .lock()

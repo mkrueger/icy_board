@@ -405,6 +405,15 @@ impl fmt::Display for VariableValue {
 
 impl PartialEq for VariableValue {
     fn eq(&self, other: &Self) -> bool {
+        if let (VariableType::UserData(left_type), VariableType::UserData(right_type)) = (self.vtype, other.vtype) {
+            if left_type != right_type {
+                return false;
+            }
+            return match (&self.generic_data, &other.generic_data) {
+                (GenericVariableData::Record(left), GenericVariableData::Record(right)) => left == right,
+                _ => false,
+            };
+        }
         let dest_type: VariableType = if self.vtype == VariableType::Password || other.vtype == VariableType::Password {
             VariableType::Password
         } else {
@@ -906,6 +915,28 @@ impl VariableValue {
                 vtype: self.vtype,
                 data: VariableData::default(),
                 generic_data: GenericVariableData::Record(fields.iter().map(VariableValue::emptied).collect()),
+            },
+            GenericVariableData::Dim1(values) => VariableValue {
+                vtype: self.vtype,
+                data: VariableData::default(),
+                generic_data: GenericVariableData::Dim1(values.iter().map(VariableValue::emptied).collect()),
+            },
+            GenericVariableData::Dim2(values) => VariableValue {
+                vtype: self.vtype,
+                data: VariableData::default(),
+                generic_data: GenericVariableData::Dim2(
+                    values.iter().map(|row| row.iter().map(VariableValue::emptied).collect()).collect(),
+                ),
+            },
+            GenericVariableData::Dim3(values) => VariableValue {
+                vtype: self.vtype,
+                data: VariableData::default(),
+                generic_data: GenericVariableData::Dim3(
+                    values
+                        .iter()
+                        .map(|plane| plane.iter().map(|row| row.iter().map(VariableValue::emptied).collect()).collect())
+                        .collect(),
+                ),
             },
             _ => self.vtype.create_empty_value(),
         }
@@ -1674,6 +1705,15 @@ impl VariableValue {
             }
         } else {
             self.vtype.create_empty_value()
+        }
+    }
+
+    pub fn get_array_value_mut(&mut self, dim_1: usize, dim_2: usize, dim_3: usize) -> Option<&mut VariableValue> {
+        match &mut self.generic_data {
+            GenericVariableData::Dim1(data) => data.get_mut(dim_1),
+            GenericVariableData::Dim2(data) => data.get_mut(dim_1)?.get_mut(dim_2),
+            GenericVariableData::Dim3(data) => data.get_mut(dim_1)?.get_mut(dim_2)?.get_mut(dim_3),
+            _ => None,
         }
     }
 

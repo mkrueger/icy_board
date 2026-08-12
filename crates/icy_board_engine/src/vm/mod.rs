@@ -603,10 +603,30 @@ impl<'a> VirtualMachine<'a> {
                     path.push(*member_id);
                     base = inner.as_ref();
                 }
-                let PPEExpr::Value(id) = base else {
-                    return Err(VMError::InternalVMError.into());
+                let (id, indices) = match base {
+                    PPEExpr::Value(id) => (*id, None),
+                    PPEExpr::Dim(id, dimensions) => {
+                        let dim_1 = self.eval_expr(&dimensions[0]).await?.as_int() as usize;
+                        let dim_2 = if dimensions.len() >= 2 {
+                            self.eval_expr(&dimensions[1]).await?.as_int() as usize
+                        } else {
+                            0
+                        };
+                        let dim_3 = if dimensions.len() >= 3 {
+                            self.eval_expr(&dimensions[2]).await?.as_int() as usize
+                        } else {
+                            0
+                        };
+                        (*id, Some((dim_1, dim_2, dim_3)))
+                    }
+                    _ => return Err(VMError::InternalVMError.into()),
                 };
-                let mut target = &mut self.variable_table.get_var_entry_mut(*id).value;
+                let root = &mut self.variable_table.get_var_entry_mut(id).value;
+                let mut target = if let Some((dim_1, dim_2, dim_3)) = indices {
+                    root.get_array_value_mut(dim_1, dim_2, dim_3).ok_or(VMError::InternalVMError)?
+                } else {
+                    root
+                };
                 for member_id in path.iter().rev() {
                     let vtype = target.vtype;
                     let GenericVariableData::Record(fields) = &mut target.generic_data else {
@@ -790,7 +810,7 @@ impl<'a> VirtualMachine<'a> {
             if (flags & 0x1) == 0x0 {
                 let entry = self.variable_table.get_var_entry(id);
                 // A record keeps the fields its type declares, emptied out again.
-                let val = if matches!(entry.value.generic_data, GenericVariableData::Record(_)) {
+                let val = if matches!(vtype, VariableType::UserData(type_id) if crate::parser::is_user_declared_type(type_id)) {
                     entry.value.emptied()
                 } else {
                     let mut val = vtype.create_empty_value();

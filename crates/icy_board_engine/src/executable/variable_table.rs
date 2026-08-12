@@ -917,7 +917,21 @@ impl VariableTable {
             let Some(value) = create_record_value(type_id, user_types) else {
                 continue;
             };
-            entry.value = value;
+            if entry.header.dim == 0 {
+                entry.value = value;
+            } else if let Some(generic_data) = GenericVariableData::create_array(
+                value,
+                entry.header.dim,
+                entry.header.vector_size,
+                entry.header.matrix_size,
+                entry.header.cube_size,
+            ) {
+                entry.value = VariableValue {
+                    vtype: entry.header.variable_type,
+                    data: crate::executable::VariableData::default(),
+                    generic_data,
+                };
+            }
         }
     }
 

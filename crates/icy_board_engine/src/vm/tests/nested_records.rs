@@ -212,3 +212,99 @@ PRINT o.i.v
         )
     );
 }
+
+#[test]
+fn test_a_nested_var_parameter_writes_back() {
+    assert_eq!(
+        "11",
+        run_ppl(
+            r#"
+TYPE Inner
+  INTEGER v
+ENDTYPE
+TYPE Outer
+  Inner value
+ENDTYPE
+Outer wrapper
+wrapper.value.v = 3
+Change(wrapper)
+PRINT wrapper.value.v
+PROCEDURE Change(VAR Outer item)
+  item.value.v = 11
+ENDPROC
+"#
+        )
+    );
+}
+
+#[test]
+fn test_a_nested_value_parameter_does_not_write_back() {
+    assert_eq!(
+        "3",
+        run_ppl(
+            r#"
+TYPE Inner
+  INTEGER v
+ENDTYPE
+TYPE Outer
+  Inner value
+ENDTYPE
+Outer wrapper
+wrapper.value.v = 3
+Change(wrapper)
+PRINT wrapper.value.v
+PROCEDURE Change(Outer item)
+  item.value.v = 11
+ENDPROC
+"#
+        )
+    );
+}
+
+#[test]
+fn test_a_function_can_answer_a_nested_record() {
+    assert_eq!(
+        "13",
+        run_ppl(
+            r#"
+TYPE Inner
+  INTEGER v
+ENDTYPE
+TYPE Outer
+  Inner value
+ENDTYPE
+Outer wrapper
+wrapper = Make()
+PRINT wrapper.value.v
+FUNCTION Make() Outer
+  Outer made
+  made.value.v = 13
+  RETURN made
+ENDFUNC
+"#
+        )
+    );
+}
+
+#[test]
+fn test_assigning_an_inner_record_copies_it() {
+    assert_eq!(
+        "4/9",
+        run_ppl(
+            r#"
+TYPE Inner
+  INTEGER v
+ENDTYPE
+TYPE Outer
+  Inner value
+ENDTYPE
+Inner source
+Outer wrapper
+source.v = 4
+wrapper.value = source
+wrapper.value.v = 9
+PRINT source.v, "/", wrapper.value.v
+"#
+        )
+    );
+}

@@ -476,6 +476,19 @@ m.Home.Town = "Kiel"
 PRINTLN m.Home.Town
 ```
 
+An array may hold records, including more than one dimension. Every element has
+fields of its own:
+
+```PPL
+Member members(10)
+members[0].Home.Town = "Kiel"
+members[1].Home.Town = "Hamburg"
+```
+
+The reverse shape - an array as one field of a record - is not supported yet.
+`INTEGER Values(10)` inside a `TYPE` block is rejected explicitly because the
+current PPE type table stores each field's type but not its dimensions.
+
 Rules the compiler enforces:
 
 * A type needs at least one field.
@@ -487,6 +500,9 @@ Rules the compiler enforces:
   30–99 for board objects.
 * Naming a field the record does not have is an error, on both sides of an
   assignment.
+* Custom types are nominal: two separately declared records are different types
+  even when their fields happen to match. Assignments and routine arguments
+  require the exact custom type.
 
 Records are the one thing a PPE may assign a member of. The board objects are
 read-only snapshots, so `conf.Name = "x"` is rejected.

@@ -1176,13 +1176,41 @@ impl SemanticVisitor {
                         }
                     }
                 }
-                _ => {}
+                ParameterSpecifier::Variable(parameter) => {
+                    let expected = parameter.get_variable_type();
+                    let actual = arguments[i].visit(self);
+                    if expected != actual
+                        && (matches!(expected, VariableType::UserData(_)) || matches!(actual, VariableType::UserData(_)))
+                    {
+                        self.errors.lock().unwrap().report_error(
+                            arguments[i].get_span(),
+                            CompilationErrorType::ArgumentTypeMismatch(i + 1, expected, actual),
+                        );
+                    }
+                }
             }
         }
     }
 }
 
 impl AstVisitor<VariableType> for SemanticVisitor {
+    fn visit_binary_expression(&mut self, binary: &crate::ast::BinaryExpression) -> VariableType {
+        let left = binary.get_left_expression().visit(self);
+        let right = binary.get_right_expression().visit(self);
+        let has_custom_type = matches!(left, VariableType::UserData(_)) || matches!(right, VariableType::UserData(_));
+        if has_custom_type && !matches!(binary.get_op(), crate::ast::BinOp::Eq | crate::ast::BinOp::NotEq) {
+            self.errors.lock().unwrap().report_error(
+                binary.get_op_token().span.clone(),
+                CompilationErrorType::CustomTypeOperatorNotSupported(binary.get_op()),
+            );
+        }
+        if has_custom_type && matches!(binary.get_op(), crate::ast::BinOp::Eq | crate::ast::BinOp::NotEq) {
+            VariableType::Boolean
+        } else {
+            VariableType::None
+        }
+    }
+
     fn visit_identifier_expression(&mut self, identifier: &IdentifierExpression) -> VariableType {
         let predef = FunctionDefinition::get_function_definitions(identifier.get_identifier());
         if !predef.is_empty() {
@@ -1568,6 +1596,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
     }
 
     fn visit_let_statement(&mut self, let_stmt: &LetStatement) -> VariableType {
+        let mut target_type = VariableType::None;
         if let Some(idx) = self.lookup_variable(let_stmt.get_identifier()) {
             if self.references[idx].1.variable_type == VariableType::Procedure {
                 self.errors
@@ -1579,7 +1608,13 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                     self.errors.lock().unwrap().file_name().to_path_buf(),
                     Spanned::new(let_stmt.get_identifier().to_string(), let_stmt.get_identifier_token().span.clone()),
                 ));
+                if let Some(container) = self.function_containers.iter().find(|container| container.id == idx) {
+                    if let FunctionDeclaration::Function(function) = &container.functions {
+                        target_type = function.get_return_type();
+                    }
+                }
             } else {
+                target_type = self.references[idx].1.variable_type;
                 if let Some(header) = &self.references[idx].1.header {
                     self.check_arg_count(header.dim as usize, let_stmt.get_arguments().len(), let_stmt.get_identifier_token());
                 } else {
@@ -1591,7 +1626,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
 
                 self.add_reference_to(let_stmt.get_identifier_token(), idx);
 
-                let mut variable_type = self.references[idx].1.variable_type;
+                let mut variable_type = target_type;
                 for member_token in let_stmt.get_members() {
                     match variable_type {
                         VariableType::UserData(type_id) if crate::parser::is_user_declared_type(type_id) => {
@@ -1610,6 +1645,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                         }
                     }
                 }
+                target_type = variable_type;
             }
         } else {
             self.errors.lock().unwrap().report_error(
@@ -1620,7 +1656,15 @@ impl AstVisitor<VariableType> for SemanticVisitor {
         for arg in let_stmt.get_arguments() {
             arg.visit(self);
         }
-        let_stmt.get_value_expression().visit(self);
+        let value_type = let_stmt.get_value_expression().visit(self);
+        if target_type != value_type
+            && (matches!(target_type, VariableType::UserData(_)) || matches!(value_type, VariableType::UserData(_)))
+        {
+            self.errors.lock().unwrap().report_error(
+                let_stmt.get_eq_token().span.clone(),
+                CompilationErrorType::AssignmentTypeMismatch(target_type, value_type),
+            );
+        }
         VariableType::None
     }
 

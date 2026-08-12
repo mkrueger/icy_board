@@ -180,6 +180,76 @@ fn test_two_types_get_distinct_ids() {
 }
 
 #[test]
+fn test_end_type_with_a_space_closes_the_declaration() {
+    let (nodes, _, errors) = parse_types("TYPE Point\n  INTEGER X\nEND TYPE\nPoint value\n");
+    assert!(errors.lock().unwrap().errors.is_empty());
+    assert_eq!(2, nodes.len());
+}
+
+#[test]
+fn test_type_and_field_names_are_case_insensitive() {
+    for source in [
+        "TYPE Point\n  INTEGER X\nENDTYPE\nTYPE pOiNt\n  INTEGER Y\nENDTYPE\n",
+        "TYPE Point\n  INTEGER Value\n  STRING vAlUe\nENDTYPE\n",
+    ] {
+        let (_, _, errors) = parse_types(source);
+        assert!(!errors.lock().unwrap().errors.is_empty(), "expected a duplicate-name error for:\n{source}");
+    }
+}
+
+#[test]
+fn test_a_record_field_can_name_an_earlier_record() {
+    let (_, reg, errors) = parse_types("TYPE Inner\n  INTEGER X\nENDTYPE\nTYPE Outer\n  Inner Value\nENDTYPE\n");
+    assert!(errors.lock().unwrap().errors.is_empty());
+    let outer = reg.get_user_type(&unicase::Ascii::new("outer".to_string())).unwrap();
+    assert_eq!(Some(VariableType::UserData(super::FIRST_USER_TYPE_ID as u8)), outer.field_type(0));
+}
+
+#[test]
+fn test_a_record_field_cannot_name_a_later_record() {
+    let (_, _, errors) = parse_types("TYPE Outer\n  Inner Value\nENDTYPE\nTYPE Inner\n  INTEGER X\nENDTYPE\n");
+    assert!(!errors.lock().unwrap().errors.is_empty());
+}
+
+#[test]
+fn test_a_record_field_array_is_rejected_explicitly() {
+    let (_, _, errors) = parse_types("TYPE Rec\n  INTEGER Values(10)\nENDTYPE\n");
+    let errors: Vec<String> = errors.lock().unwrap().errors.iter().map(|error| error.error.to_string()).collect();
+    assert!(errors.iter().any(|error| error == "Record field 'Values' cannot be an array"), "{errors:?}");
+}
+
+#[test]
+fn test_a_record_field_initializer_is_rejected_explicitly() {
+    let (_, _, errors) = parse_types("TYPE Rec\n  INTEGER Value = 7\nENDTYPE\n");
+    let errors: Vec<String> = errors.lock().unwrap().errors.iter().map(|error| error.error.to_string()).collect();
+    assert!(errors.iter().any(|error| error == "Record field 'Value' cannot have an initializer"), "{errors:?}");
+}
+
+fn many_types(count: usize) -> String {
+    (0..count).map(|index| format!("TYPE Type{index:03}\n  INTEGER Value\nENDTYPE\n")).collect()
+}
+
+#[test]
+fn test_all_reserved_custom_type_ids_are_available() {
+    let source = many_types(super::MAX_USER_TYPES);
+    let (nodes, registry, errors) = parse_types(&source);
+    assert!(errors.lock().unwrap().errors.is_empty());
+    assert_eq!(super::MAX_USER_TYPES, nodes.len());
+    assert_eq!(
+        u8::MAX as usize,
+        registry.get_user_type(&unicase::Ascii::new("Type155".to_string())).unwrap().id,
+    );
+}
+
+#[test]
+fn test_one_more_than_the_reserved_custom_type_ids_is_rejected() {
+    let source = many_types(super::MAX_USER_TYPES + 1);
+    let (_, _, errors) = parse_types(&source);
+    let errors: Vec<String> = errors.lock().unwrap().errors.iter().map(|error| error.error.to_string()).collect();
+    assert!(errors.iter().any(|error| error.contains("No room for another type")), "{errors:?}");
+}
+
+#[test]
 fn test_type_errors() {
     for (source, expected) in [
         ("TYPE Point\n  INTEGER X\n  INTEGER X\nENDTYPE\n", "duplicate field"),

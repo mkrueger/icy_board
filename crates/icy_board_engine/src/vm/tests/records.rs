@@ -323,3 +323,218 @@ ENDFUNC
         )
     );
 }
+
+#[test]
+fn test_an_array_can_hold_records() {
+    assert_eq!(
+        "1/2",
+        run_ppl(
+            r#"
+TYPE Rec
+  INTEGER v
+ENDTYPE
+Rec items(2)
+items[0].v = 1
+items[1].v = 2
+PRINT items[0].v, "/", items[1].v
+"#
+        )
+    );
+}
+
+#[test]
+fn test_record_array_elements_do_not_share_fields() {
+    assert_eq!(
+        "9/0",
+        run_ppl(
+            r#"
+TYPE Rec
+  INTEGER v
+ENDTYPE
+Rec items(2)
+items[0].v = 9
+PRINT items[0].v, "/", items[1].v
+"#
+        )
+    );
+}
+
+#[test]
+fn test_a_two_dimensional_array_can_hold_records() {
+    assert_eq!(
+        "7/8",
+        run_ppl(
+            r#"
+TYPE Rec
+  INTEGER v
+ENDTYPE
+Rec items(1, 1)
+items[0, 1].v = 7
+items[1, 0].v = 8
+PRINT items[0, 1].v, "/", items[1, 0].v
+"#
+        )
+    );
+}
+
+#[test]
+fn test_parenthesis_indexing_can_reach_a_record_field() {
+    assert_eq!(
+        "5",
+        run_ppl(
+            r#"
+TYPE Rec
+  INTEGER v
+ENDTYPE
+Rec items(1)
+items(0).v = 5
+PRINT items(0).v
+"#
+        )
+    );
+}
+
+#[test]
+fn test_a_three_dimensional_array_can_hold_records() {
+    assert_eq!(
+        "9",
+        run_ppl(
+            r#"
+TYPE Rec
+  INTEGER v
+ENDTYPE
+Rec items(1, 1, 1)
+items[1, 0, 1].v = 9
+PRINT items[1, 0, 1].v
+"#
+        )
+    );
+}
+
+#[test]
+fn test_a_whole_record_can_be_assigned_to_an_array_element() {
+    assert_eq!(
+        "6",
+        run_ppl(
+            r#"
+TYPE Rec
+  INTEGER v
+ENDTYPE
+Rec source
+Rec items(1)
+source.v = 6
+items[0] = source
+PRINT items[0].v
+"#
+        )
+    );
+}
+
+#[test]
+fn test_a_local_record_array_starts_empty_on_every_call() {
+    assert_eq!(
+        "1 1 ",
+        run_ppl(
+            r#"
+TYPE Rec
+  INTEGER v
+ENDTYPE
+Go()
+Go()
+PROCEDURE Go()
+  Rec items(1)
+  items[0].v += 1
+  PRINT items[0].v, " "
+ENDPROC
+"#
+        )
+    );
+}
+
+#[test]
+fn test_a_record_variable_can_be_initialized_from_another_record() {
+        assert_eq!(
+                "4/9",
+                run_ppl(
+                        r#"
+TYPE Rec
+    INTEGER v
+ENDTYPE
+Rec source
+source.v = 4
+Rec copy = source
+copy.v = 9
+PRINT source.v, "/", copy.v
+"#
+                )
+        );
+}
+
+#[test]
+fn test_a_var_parameter_can_write_back_to_a_record_array_element() {
+        assert_eq!(
+                "8",
+                run_ppl(
+                        r#"
+TYPE Rec
+    INTEGER v
+ENDTYPE
+Rec items(1)
+items[0].v = 3
+Change(items[0])
+PRINT items[0].v
+PROCEDURE Change(VAR Rec value)
+    value.v = 8
+ENDPROC
+"#
+                )
+        );
+}
+
+#[test]
+fn test_records_compare_by_their_fields() {
+        assert_eq!(
+                "equal different",
+                run_ppl(
+                        r#"
+TYPE Rec
+    INTEGER v
+    STRING s
+ENDTYPE
+Rec first
+Rec second
+first.v = 1
+first.s = "x"
+second.v = 1
+second.s = "x"
+IF first = second PRINT "equal"
+second.v = 2
+IF first <> second PRINT " different"
+"#
+                )
+        );
+}
+
+#[test]
+fn test_nested_records_compare_by_their_fields() {
+        assert_eq!(
+                "equal different",
+                run_ppl(
+                        r#"
+TYPE Inner
+    INTEGER v
+ENDTYPE
+TYPE Outer
+    Inner value
+ENDTYPE
+Outer first
+Outer second
+first.value.v = 1
+second.value.v = 1
+IF first = second PRINT "equal"
+second.value.v = 2
+IF first <> second PRINT " different"
+"#
+                )
+        );
+}

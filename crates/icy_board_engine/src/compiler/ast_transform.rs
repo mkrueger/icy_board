@@ -332,8 +332,17 @@ impl AstVisitorMut for AstTransformationVisitor {
     fn visit_let_statement(&mut self, let_stmt: &LetStatement) -> Statement {
         let mut val_expr = let_stmt.get_value_expression().visit_mut(self);
 
-        // `record.field op= value` has to read back the field, not the record.
-        let mut target = Expression::Identifier(IdentifierExpression::new(let_stmt.get_identifier_token().clone()));
+        // A compound assignment reads the same place it writes, including indices and members.
+        let mut target = if let (Some(left), Some(right)) = (let_stmt.get_lpar_token(), let_stmt.get_rpar_token()) {
+            Expression::Indexer(crate::ast::IndexerExpression::new(
+                let_stmt.get_identifier_token().clone(),
+                left.clone(),
+                let_stmt.get_arguments().iter().map(|argument| argument.visit_mut(self)).collect(),
+                right.clone(),
+            ))
+        } else {
+            Expression::Identifier(IdentifierExpression::new(let_stmt.get_identifier_token().clone()))
+        };
         for member in let_stmt.get_members() {
             target = Expression::MemberReference(crate::ast::MemberReferenceExpression::new(
                 target,

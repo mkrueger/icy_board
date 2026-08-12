@@ -873,6 +873,16 @@ impl<'a> Parser<'a> {
             let rightpar_token = self.save_spanned_token();
 
             self.next_token();
+            let mut members = Vec::new();
+            while self.get_cur_token() == Some(Token::Dot) {
+                self.next_token();
+                let Some(Token::Identifier(_)) = self.get_cur_token() else {
+                    self.report_error(self.save_token_span(), ParserErrorType::IdentifierExpected(self.save_token()));
+                    return None;
+                };
+                members.push(self.save_spanned_token());
+                self.next_token();
+            }
             if is_assign_token(self.get_cur_token()) {
                 let eq_token = self.save_spanned_token();
                 self.next_token();
@@ -887,7 +897,7 @@ impl<'a> Parser<'a> {
                         Some(lpar_token),
                         params,
                         Some(rightpar_token),
-                        Vec::new(),
+                        members,
                         eq_token,
                         value_expression,
                     )));
