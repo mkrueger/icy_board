@@ -29,35 +29,38 @@ use super::{
     user_inf::{AccountUserInf, BankUserInf, QwkConfigUserInf},
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub enum Password {
     PlainText(String),
     BCrypt(String),
     Argon2(String),
+    /// A secret that may be compared but never shown, like a door password a PPE reads.
+    Protected(String),
+}
+
+impl std::fmt::Debug for Password {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Whatever is behind it, a secret has no business in a log line.
+        match self {
+            Password::PlainText(_) => write!(f, "PlainText(******)"),
+            Password::BCrypt(_) => write!(f, "BCrypt(******)"),
+            Password::Argon2(_) => write!(f, "Argon2(******)"),
+            Password::Protected(_) => write!(f, "Protected(******)"),
+        }
+    }
 }
 
 impl PartialEq for Password {
     fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::PlainText(l0), Self::PlainText(r0)) => l0 == r0,
-
-            (Self::PlainText(plain), Self::Argon2(hash)) | (Self::Argon2(hash), Self::PlainText(plain)) => {
-                if let Ok(parsed_hash) = PasswordHash::new(hash) {
-                    Argon2::default().verify_password(plain.as_bytes(), &parsed_hash).is_ok()
-                } else {
-                    false
-                }
-            }
-
-            (Self::BCrypt(l), Self::BCrypt(r)) => l == r,
-
-            (Self::PlainText(plain), Self::BCrypt(hash)) | (Self::BCrypt(hash), Self::PlainText(plain)) => match bcrypt::verify(plain, hash) {
-                Ok(v) => v,
-                Err(_) => false,
+        match (self.unhashed(), other.unhashed()) {
+            (Some(left), Some(right)) => left == right,
+            (Some(plain), None) => other.verify(plain),
+            (None, Some(plain)) => self.verify(plain),
+            // A hash carries its own salt, so only an identical bcrypt record matches.
+            (None, None) => match (self, other) {
+                (Self::BCrypt(l), Self::BCrypt(r)) => l == r,
+                _ => false,
             },
-
-            // Everything else is not equal
-            _ => false,
         }
     }
 }
@@ -71,6 +74,33 @@ impl Default for Password {
 impl Password {
     pub fn new_plaintext(str: impl Into<String>) -> Res<Self> {
         Ok(Password::PlainText(str.into().to_lowercase()))
+    }
+
+    /// A secret kept as it stands so it can be compared, and which never shows itself.
+    pub fn new_protected(str: impl Into<String>) -> Password {
+        Password::Protected(str.into().to_lowercase())
+    }
+
+    /// The secret behind the values that are not hashed.
+    fn unhashed(&self) -> Option<&str> {
+        match self {
+            Password::PlainText(s) | Password::Protected(s) => Some(s),
+            Password::Argon2(_) | Password::BCrypt(_) => None,
+        }
+    }
+
+    fn verify(&self, plain: &str) -> bool {
+        match self {
+            Password::Argon2(hash) => {
+                if let Ok(parsed_hash) = PasswordHash::new(hash) {
+                    Argon2::default().verify_password(plain.as_bytes(), &parsed_hash).is_ok()
+                } else {
+                    false
+                }
+            }
+            Password::BCrypt(hash) => bcrypt::verify(plain, hash).unwrap_or(false),
+            Password::PlainText(s) | Password::Protected(s) => s == plain,
+        }
     }
 
     pub fn new_argon2(str: impl Into<String>) -> Password {
@@ -91,7 +121,7 @@ impl std::fmt::Display for Password {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Password::PlainText(s) => write!(f, "{}", s),
-            Password::Argon2(_s) | Password::BCrypt(_s) => write!(f, "******"),
+            Password::Argon2(_) | Password::BCrypt(_) | Password::Protected(_) => write!(f, "******"),
         }
     }
 }
@@ -102,6 +132,7 @@ impl Password {
             Password::PlainText(s) => s.is_empty(),
             Password::Argon2(s) => s.is_empty(),
             Password::BCrypt(s) => s.is_empty(),
+            Password::Protected(s) => s.is_empty(),
         }
     }
 
@@ -139,7 +170,9 @@ impl serde::Serialize for Password {
         S: serde::Serializer,
     {
         match self {
-            Password::PlainText(key) => format!("\"{key}\"").serialize(serializer),
+            // A protected secret is only ever built for a PPE to compare against, it is
+            // stored the way a plain one is on the chance it reaches a record at all.
+            Password::PlainText(key) | Password::Protected(key) => format!("\"{key}\"").serialize(serializer),
             Password::Argon2(key) => key.serialize(serializer),
             Password::BCrypt(key) => format!("bcrypt:{key}").serialize(serializer),
         }

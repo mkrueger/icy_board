@@ -41,7 +41,7 @@ The current Decompiler is completely rewritten and uses a ppl machine language -
 * It tries to do some name guessing based on variable usage.
 
 ```text
-Usage: ppld <file> [-r] [-d] [-o] [--style <style>]
+Usage: ppld [-r] [-d] [-o] [--check] [--cp437] [--style <style>] [--] <file>
 
 PCBoard Programming Language Decompiler
 
@@ -52,6 +52,10 @@ Options:
   -r, --raw         raw ppe without reconstruction control structures
   -d, --disassemble output the disassembly instead of ppl
   -o, --output      output to console instead of writing to file
+  --check           checks a .ppe file for compatibility with the current
+                    runtime
+  --cp437           write the source as cp437 instead of utf8, for use with the
+                    original tooling
   --style           keyword casing style, valid values are u=upper (default),
                     l=lower, c=camel
   --help, help      display usage information
@@ -70,7 +74,7 @@ The compiler decides itself if uservars are generated or not (so --novars is no 
 pplc has following options:
 
 ```text
-Usage: pplc <file> [-d] [--nowarnings] [--version <version>] [--lang-version <lang-version>] [--cp437 <cp437>]
+Usage: pplc [-d] [--nowarnings] [--runtime <runtime>] [--lang-version <lang-version>] [--cp437] [--init] [--defines <defines>] [--format] [--check] [--] [<file>]
 
 PCBoard Programming Language Compiler
 
@@ -81,13 +85,35 @@ Positional Arguments:
 Options:
   -d, --disassemble output the disassembly instead of compiling
   --nowarnings      don't report any warnings
-  --version         version number for the compiler, valid: 100, 200, 300, 310,
-                    330, 340, 400 (Default)
-  --lang-version    version number for the language (defaults to `version`)
-  --cp437           specify the encoding of the file, defaults to autodetection
+  --runtime         version number for the compiled PPE, valid: 100, 200, 300,
+                    310, 320, 330, 340, 400 (default)
+  --lang-version    version number for the language (defaults to version)
+  --cp437           specify the encoding of the file (cp437 = true, utf8 =
+                    false), defaults to autodetection
+  --init            create & init new ppl package in target directory
+  --defines         semicolon separated list of pre processor variables
+  --format          formats source file instead of compile
+  --check           checks source/package for errors without compiling
   --help, help      display usage information
+```
 
 As default the compiler takes UTF8 input - DOS special chars are translated to CP437 in the output.
+
+Called without a file `pplc` builds the package described by `ppl.toml` in the
+current directory. `pplc --init <dir>` creates one:
+
+```text
+mypkg/ppl.toml
+mypkg/src/main.pps
+```
+
+```toml
+[package]
+name = "mypkg"
+version = "0.1.0"
+
+[compiler]
+language_version = 400
 ```
 
 Note:  All old DOS files are usually CP437 - so it's recommended to use --cp437 for compiling these.
@@ -105,90 +131,390 @@ I think it improves the language and it's open for discussion. Note that some al
 * Return type differences in function declaration/implementation is an error, original compiler didn't care.
 
 
-#### PPL 4.0
+## The PPL 4.0 language
 
-DECLARE FUNCTION/PROCEDURE is now no longer needed anymore.
+PPL 4.0 is what IcyBoard's compiler targets by default. It is a superset of
+PCBoard 15.4 PPL: everything the original compiler accepted still means the same
+thing, and every addition sits behind a version number, so an old source keeps
+compiling as an old source.
 
-New Constructs (Language Version 350):
+### Two version numbers
 
-New loops
-``` REPEAT ... UNTIL [CONDITION] ``` Statement
-``` LOOP ... ENDLOOP``` Statement
+A PPE has a *runtime* version and a source has a *language* version. They are set
+independently, because wanting new syntax and wanting a file an old board can load
+are two different wishes.
 
-Variable initializers:
+| | Command line | `ppl.toml` | What it controls |
+| :--- | :--- | :--- | :--- |
+| Runtime | `--runtime` | `[package] runtime` | The PPE format written to disk. Valid: 100, 200, 300, 310, 320, 330, 340, 400. |
+| Language | `--lang-version` | `[compiler] language_version` | Which syntax and which built-ins the compiler accepts. |
 
-``` TYPE VAR=[INITIALIZER]``` Statement
+The language version defaults to the runtime version, and the runtime version
+defaults to 400. The command line wins over `ppl.toml`.
 
-It's possible to initialize dim expressions as well:
+Anything below is grouped by the language version that introduced it. A feature
+listed under 350 is available at 350 *and* 400; a feature listed under 400 needs
+`--lang-version 400`.
 
-``` TYPE VAR={ expr1, expr2, ..., exprn }``` means:
+### Language version 350
+
+3.50 is the "quality of life" version. It adds no new PPE format, so a 3.50
+source can still be compiled down to an older runtime as long as it does not
+call newer built-ins.
+
+#### DECLARE is optional
+
+`DECLARE FUNCTION` / `DECLARE PROCEDURE` before the implementation is no longer
+required; the compiler collects the signatures itself. Existing forward
+declarations are still accepted, and a return type that disagrees between the
+declaration and the implementation is an error rather than being quietly ignored.
+
+#### Variable initializers
 
 ```PPL
-TYPE VAR(n)
-VAR(0) = expr1
-...
-VAR(n - 1) = exprn
+INTEGER count = 0
+STRING  greeting = "Hello"
 ```
 
-Operator Assignment for binary (non condition operators):
-
-Example:
-``` A += 1``` Statement
-
-Works for ```+-*/%``` and ```&|```
-
-Return can now return values inside functions:
-
-``` RETURN expr``` Statement
-
-1:1 same semantic as:
+An array is initialized with a brace list:
 
 ```PPL
-FUNC_NAME = expr
-RETURN 
+INTEGER values = { 1, 2, 3 }
 ```
 
-No more brackets needed for if or while statements!
+which is shorthand for
 
-Example:
+```PPL
+INTEGER values(3)
+values(0) = 1
+values(1) = 2
+values(2) = 3
+```
+
+The brace list also decides the size, so the dimension is not written out.
+
+#### Bracket indexing
+
+`[` and `]` index an array:
+
+```PPL
+INTEGER values(10)
+values[0] = 5
+PRINTLN values[0]
+```
+
+Parenthesis indexing still works and still means the same thing. Brackets exist
+because `values(0)` and a call to a function named `values` are written
+identically, which the old language simply lived with. Brackets say which one is
+meant, and they are the recommended form in new code.
+
+#### Compound assignment
+
+```PPL
+count += 1
+```
+
+Available for `+` `-` `*` `/` `%` `&` `|`. `count += 1` is exactly
+`count = count + 1`; there is no separate opcode.
+
+#### REPEAT ... UNTIL
+
+A loop with the test at the bottom, so the body always runs once:
+
+```PPL
+INTEGER n = 0
+REPEAT
+    n += 1
+UNTIL n >= 3
+```
+
+#### LOOP ... ENDLOOP
+
+A loop with no test at all, left with `BREAK`:
+
+```PPL
+LOOP
+    n *= 2
+    IF n > 10 BREAK
+ENDLOOP
+```
+
+#### RETURN with a value
+
+Inside a function, `RETURN expr` both sets the result and returns:
+
+```PPL
+FUNCTION Total(INTEGER v) INTEGER
+    RETURN v + 1
+ENDFUNC
+```
+
+which is the same as the old two-step form:
+
+```PPL
+FUNCTION Total(INTEGER v) INTEGER
+    Total = v + 1
+    RETURN
+ENDFUNC
+```
+
+`RETURN expr` in a procedure is an error.
+
+#### Parentheses are optional on IF and WHILE
+
 ```PPL
 IF A <> B THEN
-...
+    ...
 ENDIF
 
 WHILE IsValid() PRINTLN "Success."
 ```
 
-Note: With "lang" version >=350 'Quit' and 'Loop' are no longer synonyms for 'break' and 'continue'. Existing sources should be easily adapted.
-But never saw them in the wild.
+The old `IF (A <> B) THEN` still parses.
 
-##### Procedure parameters
+#### QUIT and LOOP are no longer aliases
 
-It's now possible to use procedures as parameters.
+At language version 350 and above, `QUIT` is no longer a synonym for `BREAK` and
+`LOOP` is no longer a synonym for `CONTINUE` — `LOOP` is now a loop keyword of its
+own. Sources that used the aliases need the modern spelling. They were rare in
+practice.
 
-Example:
-```
+#### Functions and procedures as parameters
+
+A procedure or function can be declared as a parameter:
+
+```PPL
 PROCEDURE PrintHello(PROCEDURE f())
     PRINT "Hello "
     f()
 ENDPROC
 ```
-##### Pre Processor
 
-You use four preprocessor directives to control conditional compilation:
+The parameter is callable inside the body and the compiler checks the arity of
+whatever is passed.
 
-`;$DEFINE` Defines a pre processor variable
-`;$IF` Opens a conditional compilation, where code is compiled only if the specified expression is true
-`;$ELIF` Closes the preceding conditional compilation and opens a new conditional compilation based on the specified expression
-`;$ELSE` Closes the preceding conditional compilation and opens a new conditional compilation if the previous specified expression was true or false
-`;$ENDIF` Closes the preceding conditional compilation.
+> **Not usable yet.** Passing a procedure by name at the call site —
+> `PrintHello(Hello)` — is rejected with *"Function used as variable"*. The
+> declaration side and the type checking are in place, but a bare
+> function/procedure name is not yet resolved as a value, so the feature cannot
+> be used end to end.
 
+### Language version 400
 
-Tokens:
+400 is where the language stops being bound by what PCBoard 15.4 could express.
+A PPE built at runtime 400 will not load on an original PCBoard.
 
-`;#NAME` Replaces the directive with the evaluated token
+> **400 is not finished.** The PPE format is still allowed to change, so expect
+> to recompile against the final release.
 
-Example with the predefined defines:
+#### Parentheses, brackets and braces
+
+400 gives each bracket kind one job:
+
+| | Used for |
+| :--- | :--- |
+| `( )` | Grouping, call arguments, and array declarations |
+| `[ ]` | Indexing |
+| `{ }` | Array initializers |
+
+Indexing with `( )` is still accepted for compatibility, but new code should
+index with `[ ]`.
+
+#### The dot operator and board objects
+
+400 introduces the `.` operator and, with it, objects that describe the board
+itself. The point is that a PPE no longer has to parse the board's config files
+to find out what is on it.
+
+```PPL
+CONFERENCE conf = CONFINFO(CURCONF())
+
+IF conf.HasAccess() PRINTLN conf.Name
+```
+
+`ConfInfo(conf)` returns a read-only `CONFERENCE` snapshot. An invalid conference
+number returns an empty conference rather than failing, so its properties can
+still be read.
+
+**`CONFERENCE`**
+
+| Member | Type | Description |
+| :--- | :--- | :--- |
+| `Name` | `STRING` | Conference name |
+| `IsPublic` | `BOOLEAN` | Whether the conference is configured as public |
+| `Directories` | `INTEGER` | Number of file directories |
+| `Areas` | `INTEGER` | Number of message areas |
+| `Doors` | `INTEGER` | Number of doors |
+| `HasAccess()` | `BOOLEAN` | Whether the current caller can access the conference |
+| `GetDir(index)` | `DIRECTORY` | File directory at the zero-based index |
+| `GetArea(index)` | `AREA` | Message area at the zero-based index |
+| `GetDoor(index)` | `DOOR` | Door at the zero-based index |
+
+**`DIRECTORY`** and **`AREA`**
+
+| Member | Type | Description |
+| :--- | :--- | :--- |
+| `Name` | `STRING` | Directory / area name |
+| `HasAccess()` | `BOOLEAN` | Whether the current caller can access it |
+
+**`DOOR`**
+
+| Member | Type | Description |
+| :--- | :--- | :--- |
+| `Name` | `STRING` | Door name |
+| `Description` | `STRING` | Door description |
+| `Password` | `PASSWORD` | The door's password |
+| `HasAccess()` | `BOOLEAN` | Whether the current caller can access the door |
+
+Walking a conference:
+
+```PPL
+CONFERENCE conf = CONFINFO(CURCONF())
+INTEGER i
+
+FOR i = 0 TO conf.Doors - 1
+    DOOR item = conf.GetDoor(i)
+    IF item.HasAccess() PRINTLN item.Name
+NEXT
+```
+
+Note that `CONFERENCE`, `DOOR`, `AREA` and `DIRECTORY` are resolved wherever a
+type name is expected, so a variable cannot be called `door` or `area`.
+
+These objects are read-only snapshots. Assigning to a member — `conf.Name = "x"` —
+is rejected, and one call per statement is the limit: `conf.GetDoor(0).Name` does
+not parse, the intermediate has to go into a variable first.
+
+#### Overloaded built-ins
+
+A built-in can now have more than one signature, chosen by argument count.
+`CONFINFO` is the example: the original two-argument form returns a single field
+whose type depends on which field was asked for, while the new one-argument form
+returns a `CONFERENCE`. Old code keeps working unchanged.
+
+`LEN` is overloaded the same way — `Len(array, dim)` returns the length of one
+dimension.
+
+#### New types
+
+| Type | Declarable | Description |
+| :--- | :--- | :--- |
+| `MSGAREAID` | yes | A combined conference/message-area identifier, produced by `AreaId()` |
+| `PASSWORD` | no | A password. Comparable against a string, but printing or converting one yields `******` instead of the secret. |
+
+`PASSWORD` exists only at runtime; it is the type of `DOOR.Password` and cannot
+be written in a declaration.
+
+#### New library surface
+
+| | Kind | Signature | Description |
+| :--- | :--- | :--- | :--- |
+| `ConfInfo` | Function | `ConfInfo(conf) : CONFERENCE` | Snapshot of a conference |
+| `AreaId` | Function | `AreaId(conf, area) : MSGAREAID` | Addresses a message area in any conference |
+| `Len` | Function | `Len(array, dim) : INTEGER` | Length of one array dimension |
+| `WebRequest` | Function | `WebRequest(url) : STRING` | Fetches a URL and returns the body |
+| `WEBREQUEST` | Statement | `WEBREQUEST url, file` | Fetches a URL and saves it to a file |
+
+`AreaId()` is how message functions reach a message area outside the current
+conference without breaking any of the old calls. `WebRequest` in both forms logs
+and gives up after 30 seconds rather than holding the caller's node, and a failed
+request answers an empty string / writes no file instead of stopping the PPE.
+
+See [new_ppl.md](new_ppl.md) for the per-function reference pages.
+
+#### TYPE ... ENDTYPE
+
+> **Under construction.** The syntax below parses and is checked, but no record
+> layout is written to the PPE yet, so a record variable does not work at
+> runtime.
+
+A program can declare its own record types:
+
+```PPL
+TYPE Employee
+    STRING  Name
+    INTEGER Age, Level
+ENDTYPE
+
+Employee e
+```
+
+`END TYPE` may be written with a space, the way `END SELECT` may. Fields are
+declared like variables, several to a line, and the type name is then usable
+anywhere a built-in type name is.
+
+Rules the compiler enforces:
+
+* A type needs at least one field.
+* Field names must be unique within the type.
+* A type cannot contain a field of its own type.
+* A type cannot reuse the name of a built-in or of a board object.
+* A program may declare 156 types; ids 100–255 are reserved for them, leaving
+  30–99 for board objects.
+
+`TYPE` and `ENDTYPE` are keywords only at language version 400, so a 3.50 source
+may still have a variable called `type`.
+
+#### What 400 breaks
+
+* Runtime 400 PPEs do not load on an original PCBoard.
+* `.` is a token, so it can no longer appear in an identifier.
+* `[` and `]` are index operators.
+* The decompiler does not handle 400 PPEs — it targets the old formats.
+
+### The preprocessor
+
+The preprocessor is not tied to a language version — it works whatever `--lang-version`
+is set to. Its directives are written as `;`-comments so that a source using them
+still reads as a comment to any older tool.
+
+#### Conditional compilation
+
+| Directive | Meaning |
+| :--- | :--- |
+| `;$DEFINE name[=value]` | Defines a preprocessor variable |
+| `;$IF expr` | Opens a block that is compiled only if `expr` is true |
+| `;$ELSEIF expr` | Closes the preceding block and opens a new one on `expr` |
+| `;$ELIF expr` | Same as `;$ELSEIF` |
+| `;$ELSE` | Closes the preceding block and opens one for the case where no branch was taken |
+| `;$ENDIF` | Closes the preceding conditional block |
+
+Directive names are case insensitive. Blocks nest, and text in a branch that is
+not taken is never lexed, so it does not have to be valid PPL. Only the first
+branch whose condition is true is compiled.
+
+An `;$IF` left open, or an `;$ELSE`, `;$ELSEIF` or `;$ENDIF` without a matching
+`;$IF`, is an error. A `;$` word that is not a directive is treated as an
+ordinary comment.
+
+#### Predefined variables
+
+| Name | Type | Value |
+| :--- | :--- | :--- |
+| `VERSION` | `STRING` | The `version` field from `ppl.toml` |
+| `RUNTIME` | `INTEGER` | The PPE runtime version being written |
+| `LANGVERSION` | `INTEGER` | The language version being compiled against |
+
+More can be added with `;$DEFINE` or with `pplc --defines "A=1;B=2"`.
+
+Because `VERSION` is a string, version comparisons want `RUNTIME` or
+`LANGVERSION`:
+
+```PPL
+;$IF RUNTIME <= 340
+    PrintLn "World"
+;$ELSEIF RUNTIME < 200
+    PrintLn "Old World"
+;$ELSE
+    PrintLn "New World"
+;$ENDIF
+```
+
+#### Substitution tokens
+
+`;#NAME` is replaced by the value of the preprocessor variable `NAME`, and a name
+that was never defined is an error:
+
 ```
 PrintLn "Version:", ;#Version
 PrintLn "Runtime:", ;#Runtime
@@ -197,51 +523,11 @@ PrintLn "Language:", ;#LangVersion
 
 Would print:
 
+```text
+Version:0.1.0
+Runtime:400
+Language:400
 ```
-Version:0.1.0                                                                   
-Runtime:400                                                                     
-Language:400     
-```
-
-Would be possible to define conditional compilation based on language or runtime version
-For example:
-```
-;$IF VERSION <= 340
-    PrintLn "World"
-;$ELIF VERSION < 200
-    PrintLn "Old World"
-;$ELSE
-    PrintLn "New World"
-;$ENDIF
-```
-
-##### Language Version 400
-
-Language Version breaks compatibility with older PCBoards.
-
-WARNING: 400 is not yet finished so expect to have to recompile in the final version.
-
-Changes:
-
-* (), {} and [] is different. [] is for indexer expressions it's encouraged to use that for arrays. And '{', '}' is exclusive for array initializers.
-
-Member references. 400 introduces new BBS types:
-* Conference, MessageArea, FileArea
-
-For example:
-```PPL
-CONFERENCE CUR = CONFINFO(i) 
-
-IF CUR.HasAccess() 
-  PRINTLN CUR.Name
-```
-
-It's basically pre defined objects. This change requires a slight change in PPE.
-
-* Pre defined functions can now have overloads. See "CONFINFO" from above. CONFINFO has two versions: One old one with 2 parameters and the new one with 1.
-The new version returns a CONFERENCE object where the old one basically an "Object" of varying types, depending on the requested conference field.
-
-API still TBD. CONFINFO(i) which returns the CONFERENCE is the only new function so far. However it contains some member functions for message & file areas. All BBS "objects" should be accessible through PPL. It should no longer be needed to gather information through manual reading of config files anymore.
 
 ## Building & Running
 

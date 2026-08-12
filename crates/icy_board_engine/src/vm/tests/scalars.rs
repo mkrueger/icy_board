@@ -36,6 +36,152 @@ fn test_a_failed_web_request_statement_does_not_stop_the_program() {
     );
 }
 
+#[test]
+fn test_a_door_password_can_be_compared_but_not_printed() {
+    let output = run_ppl_on(
+        r#"
+        CONFERENCE conf
+        DOOR item
+        conf = CONFINFO(0)
+        item = conf.GetDoor(0)
+        PRINT "[", item.Password, "] ", item.Password = "SeCrEt", " ", item.Password = "wrong"
+    "#,
+        |board| {
+            board.conferences.clear();
+            board.conferences.push(crate::icy_board::conferences::Conference {
+                doors: Some(crate::icy_board::doors::DoorList {
+                    doors: vec![crate::icy_board::doors::Door {
+                        password: "secret".to_string(),
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                }),
+                ..Default::default()
+            });
+        },
+    );
+    assert_eq!(output, "[******] 1 0");
+}
+
+/// Reading the password must not hash it: a key derivation costs milliseconds and
+/// megabytes a call, which a loop over the doors would spend for nothing.
+#[test]
+fn test_reading_a_door_password_stays_cheap() {
+    let start = std::time::Instant::now();
+    let output = run_ppl_on(
+        r#"
+        CONFERENCE conf
+        DOOR item
+        INTEGER i, hits
+        conf = CONFINFO(0)
+        item = conf.GetDoor(0)
+        FOR i = 1 TO 200
+            IF item.Password = "secret" hits = hits + 1
+        NEXT
+        PRINT hits
+    "#,
+        |board| {
+            board.conferences.clear();
+            board.conferences.push(crate::icy_board::conferences::Conference {
+                doors: Some(crate::icy_board::doors::DoorList {
+                    doors: vec![crate::icy_board::doors::Door {
+                        password: "secret".to_string(),
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                }),
+                ..Default::default()
+            });
+        },
+    );
+    assert_eq!(output, "200");
+    // Argon2 would need seconds for this, comparing the secret needs microseconds.
+    assert!(start.elapsed() < std::time::Duration::from_secs(2), "took {:?}", start.elapsed());
+}
+
+#[test]
+fn test_conference_properties_report_configuration_and_counts() {
+    let output = run_ppl_on(
+        r#"
+        CONFERENCE conf
+        conf = CONFINFO(0)
+        PRINT conf.IsPublic, " ", conf.HasAccess(), " ", conf.Directories, " ", conf.Areas, " ", conf.Doors
+    "#,
+        |board| {
+            board.conferences.clear();
+            board.conferences.push(crate::icy_board::conferences::Conference {
+                is_public: false,
+                areas: Some(crate::icy_board::message_area::AreaList::new(vec![
+                    crate::icy_board::message_area::MessageArea::default(),
+                    crate::icy_board::message_area::MessageArea::default(),
+                ])),
+                doors: Some(crate::icy_board::doors::DoorList {
+                    doors: vec![crate::icy_board::doors::Door::default(), crate::icy_board::doors::Door::default()],
+                    ..Default::default()
+                }),
+                ..Default::default()
+            });
+        },
+    );
+    assert_eq!(output, "0 1 0 2 2");
+}
+
+#[test]
+fn test_invalid_confinfo_still_returns_a_conference() {
+    let output = run_ppl(
+        r#"
+        CONFERENCE conf
+        conf = CONFINFO(999)
+        PRINT "[", conf.Name, "] ", conf.IsPublic, " ", conf.Directories, " ", conf.Areas, " ", conf.Doors
+    "#,
+    );
+    assert_eq!(output, "[] 0 0 0 0");
+}
+
+#[test]
+fn test_len_dimension_returns_each_declared_upper_bound() {
+    let output = run_ppl(
+        r#"
+        INTEGER one(10)
+        INTEGER two(2, 3)
+        INTEGER three(1, 2, 3)
+        PRINT LEN(one), " ", LEN(one, 0), " ", LEN(two, 0), " ", LEN(two, 1), " ", LEN(three, 0), " ", LEN(three, 1), " ", LEN(three, 2)
+    "#,
+    );
+    assert_eq!(output, "10 10 2 3 1 2 3");
+}
+
+/// An object is held by the values that name it rather than by a table that only
+/// ever grows, so a loop can keep asking for one and reading it back.
+#[test]
+fn test_a_loop_can_keep_asking_for_objects() {
+    let output = run_ppl_on(
+        r#"
+        CONFERENCE conf
+        AREA first
+        INTEGER i, seen
+        FOR i = 1 TO 500
+            conf = CONFINFO(0)
+            first = conf.GetArea(0)
+            IF first.Name = "General" seen = seen + 1
+        NEXT
+        PRINT seen, " ", conf.Name
+    "#,
+        |board| {
+            board.conferences.clear();
+            board.conferences.push(crate::icy_board::conferences::Conference {
+                name: "Main".to_string(),
+                areas: Some(crate::icy_board::message_area::AreaList::new(vec![crate::icy_board::message_area::MessageArea {
+                    name: "General".to_string(),
+                    ..Default::default()
+                }])),
+                ..Default::default()
+            });
+        },
+    );
+    assert_eq!(output, "500 Main");
+}
+
 /// PCBoard kept a name and a city per node in USERNET, so what WRUNET writes is
 /// what UN_NAME and UN_CITY read back.
 #[test]

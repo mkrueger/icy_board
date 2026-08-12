@@ -73,6 +73,12 @@ fn test_member_call_serialization() {
     test_serialize(&val, &[2, 0, 1, 0, FuncOpCode::MemberCall as i16, 1, 32]);
 }
 
+#[test]
+fn test_member_call_keeps_the_argument_order() {
+    let val = PPEExpr::MemberFunctionCall(Box::new(PPEExpr::Value(2)), vec![PPEExpr::Value(3), PPEExpr::Value(4)], 32);
+    test_serialize(&val, &[2, 0, 3, 0, 4, 0, FuncOpCode::MemberCall as i16, 2, 32]);
+}
+
 fn test_serialize(val: &PPEExpr, expected: &[i16]) {
     assert_eq!(val.get_size(), expected.len(), "Serialization size mismatch for {val:?}");
     let mut result = Vec::new();

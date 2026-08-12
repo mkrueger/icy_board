@@ -56,7 +56,6 @@ async fn test_fmtreal(value: f64, field_width: i32, decimal_places: i32) -> Stri
         call_local_value_stack: Vec::new(),
         write_back_stack: Vec::new(),
         push_pop_stack: Vec::new(),
-        user_data: Vec::new(),
         stored_screen: None,
         fd_default_in: 0,
         fd_default_out: 0,

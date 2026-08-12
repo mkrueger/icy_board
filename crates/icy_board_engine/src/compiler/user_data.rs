@@ -4,7 +4,7 @@ use async_trait::async_trait;
 
 use crate::{
     Res,
-    executable::{VariableType, VariableValue},
+    executable::{GenericVariableData, VariableData, VariableType, VariableValue},
 };
 
 pub trait UserDataMemberRegistry {
@@ -21,6 +21,16 @@ pub trait UserData: Sized + UserDataValue {
 
     /// Adds custom fields specific to this userdata.
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F);
+}
+
+/// The value a member answers with when it hands back another object. The object
+/// lives as long as the values that name it, so nothing has to free it.
+pub fn user_data_value<T: UserDataValue + 'static>(value: T, type_id: usize) -> VariableValue {
+    VariableValue {
+        data: VariableData::default(),
+        generic_data: GenericVariableData::UserData(std::sync::Arc::new(value)),
+        vtype: VariableType::UserData(type_id as u8),
+    }
 }
 
 #[async_trait]

@@ -2,13 +2,14 @@ use std::{
     collections::HashMap,
     fs,
     path::{Path, PathBuf},
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, RwLock},
 };
 
 use crate::{
     ast::{
         Ast, AstNode, BlockStatement, CommentAstNode, Constant, DimensionSpecifier, FunctionDeclarationAstNode, FunctionImplementation, ParameterSpecifier,
-        ProcedureDeclarationAstNode, ProcedureImplementation, ProcedureParameterSpecifier, Statement, VariableParameterSpecifier, VariableSpecifier,
+        ProcedureDeclarationAstNode, ProcedureImplementation, ProcedureParameterSpecifier, Statement, TypeDeclarationAstNode, TypeFieldSpecifier,
+        VariableParameterSpecifier, VariableSpecifier,
     },
     compiler::{
         user_data::{UserData, UserDataRegistry},
@@ -150,6 +151,24 @@ pub enum ParserErrorType {
 
     #[error("',' or '}}' expected")]
     CommaOrRBraceExpected,
+
+    #[error("Type '{0}' is already declared")]
+    TypeAlreadyDeclared(unicase::Ascii<String>),
+
+    #[error("Field '{0}' is already declared in this type")]
+    FieldAlreadyDeclared(unicase::Ascii<String>),
+
+    #[error("'ENDTYPE' expected before the end of the file")]
+    EndTypeExpected,
+
+    #[error("A type needs at least one field")]
+    TypeNeedsAField,
+
+    #[error("A type can't hold a field of its own type ('{0}')")]
+    TypeUsedInItself(unicase::Ascii<String>),
+
+    #[error("No room for another type, {0} is the most a program may declare")]
+    TooManyTypes(usize),
 }
 
 #[derive(Error, Debug, Clone, PartialEq)]
@@ -171,10 +190,31 @@ pub enum ParserWarningType {
     FunctionClosedWithEndProc,
 }
 
+/// A record a program declared with `TYPE ... ENDTYPE`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct UserTypeDefinition {
+    pub id: usize,
+    pub name: unicase::Ascii<String>,
+    pub fields: Vec<(unicase::Ascii<String>, VariableType)>,
+}
+
+impl UserTypeDefinition {
+    pub fn field_index(&self, name: &unicase::Ascii<String>) -> Option<usize> {
+        self.fields.iter().position(|(field, _)| field == name)
+    }
+
+    pub fn field_type(&self, index: usize) -> Option<VariableType> {
+        self.fields.get(index).map(|(_, t)| *t)
+    }
+}
+
 #[derive(Default)]
 pub struct UserTypeRegistry {
     pub registered_types: HashMap<unicase::Ascii<String>, VariableType>,
     pub types: Vec<UserDataRegistry>,
+    /// Records the compiled program declares. Shared across every file of a
+    /// compilation so a type declared in one is visible in the next.
+    user_types: RwLock<Vec<UserTypeDefinition>>,
 }
 
 pub const FIRST_ID: usize = 30;
@@ -182,6 +222,18 @@ pub const CONFERENCE_ID: usize = 30;
 pub const MESSAGE_AREA_ID: usize = 31;
 pub const FILE_DIRECTORY_ID: usize = 32;
 pub const DOOR_ID: usize = 33;
+
+/// Types a program declares itself start here, so the board can keep adding
+/// objects of its own below without ever running into them.
+pub const FIRST_USER_TYPE_ID: usize = 100;
+
+/// How many records one program may declare, ids 100..=255.
+pub const MAX_USER_TYPES: usize = u8::MAX as usize - FIRST_USER_TYPE_ID + 1;
+
+/// True for a type a program declared rather than one the board provides.
+pub fn is_user_declared_type(id: u8) -> bool {
+    id as usize >= FIRST_USER_TYPE_ID
+}
 
 impl UserTypeRegistry {
     pub fn icy_board_registry() -> Self {
@@ -198,7 +250,35 @@ impl UserTypeRegistry {
         if let Some(vt) = self.registered_types.get(identifier) {
             return Some(*vt);
         }
-        None
+        self.get_user_type(identifier).map(|def| VariableType::UserData(def.id as u8))
+    }
+
+    /// The record declared under `identifier`, if the program declared one.
+    pub fn get_user_type(&self, identifier: &unicase::Ascii<String>) -> Option<UserTypeDefinition> {
+        self.user_types.read().unwrap().iter().find(|def| def.name == *identifier).cloned()
+    }
+
+    pub fn get_user_type_from_id(&self, id: u8) -> Option<UserTypeDefinition> {
+        let id = id as usize;
+        if id < FIRST_USER_TYPE_ID {
+            return None;
+        }
+        self.user_types.read().unwrap().get(id - FIRST_USER_TYPE_ID).cloned()
+    }
+
+    pub fn user_types(&self) -> Vec<UserTypeDefinition> {
+        self.user_types.read().unwrap().clone()
+    }
+
+    /// Adds a record and hands back its type id, or `None` when the id space is full.
+    pub fn declare_user_type(&self, name: unicase::Ascii<String>, fields: Vec<(unicase::Ascii<String>, VariableType)>) -> Option<usize> {
+        let mut user_types = self.user_types.write().unwrap();
+        let id = FIRST_USER_TYPE_ID + user_types.len();
+        if id > u8::MAX as usize {
+            return None;
+        }
+        user_types.push(UserTypeDefinition { id, name, fields });
+        Some(id)
     }
 
     pub fn register<'a, T: UserData>(&mut self) {
@@ -336,6 +416,9 @@ impl<'a> Parser<'a> {
                         Token::Loop => {
                             self.cur_token = Some(Spanned::new(Token::EndLoop, start..self.lex.span().end));
                         }
+                        Token::Type => {
+                            self.cur_token = Some(Spanned::new(Token::EndType, start..self.lex.span().end));
+                        }
                         Token::For => {
                             self.cur_token = Some(Spanned::new(Token::Next, start..self.lex.span().end));
                         }
@@ -413,6 +496,11 @@ impl<'a> Parser<'a> {
                     return Some(decl);
                 }
             }
+            Token::Type => {
+                if let Some(decl) = self.parse_type_declaration() {
+                    return Some(AstNode::TypeDeclaration(decl));
+                }
+            }
             Token::UseFuncs(_, _) => {
                 if self.use_funcs {
                     self.error_reporter
@@ -479,6 +567,113 @@ impl<'a> Parser<'a> {
         }
         None
     }
+
+    /// Parses `TYPE <name> ... ENDTYPE` and registers the record so later
+    /// declarations can name it as a type.
+    fn parse_type_declaration(&mut self) -> Option<TypeDeclarationAstNode> {
+        let type_token = self.save_spanned_token();
+        self.next_token();
+
+        let Some(Token::Identifier(name)) = self.get_cur_token() else {
+            self.report_error(self.lex.span(), ParserErrorType::IdentifierExpected(self.save_token()));
+            return None;
+        };
+        let identifier_token = self.save_spanned_token();
+        self.next_token();
+
+        if self.type_registry.get_type(&name).is_some() {
+            self.error_reporter
+                .lock()
+                .unwrap()
+                .report_error(identifier_token.span.clone(), ParserErrorType::TypeAlreadyDeclared(name.clone()));
+        } else if self.type_hashes.contains_key(&name) {
+            self.error_reporter
+                .lock()
+                .unwrap()
+                .report_error(identifier_token.span.clone(), ParserErrorType::TypeAlreadyDeclared(name.clone()));
+        }
+
+        let mut fields: Vec<TypeFieldSpecifier> = Vec::new();
+        let mut field_names: Vec<Ascii<String>> = Vec::new();
+
+        let endtype_token = loop {
+            while matches!(self.get_cur_token(), Some(Token::Eol)) || matches!(self.get_cur_token(), Some(Token::Comment(_, _))) {
+                self.next_token();
+            }
+            match self.get_cur_token() {
+                Some(Token::EndType) => {
+                    let token = self.save_spanned_token();
+                    self.next_token();
+                    break token;
+                }
+                None => {
+                    self.report_error(self.lex.span(), ParserErrorType::EndTypeExpected);
+                    return None;
+                }
+                _ => {}
+            }
+
+            // A record can't contain itself, that has no finite layout.
+            if let Some(Token::Identifier(id)) = self.get_cur_token() {
+                if id == name {
+                    self.report_error(self.save_token_span(), ParserErrorType::TypeUsedInItself(name.clone()));
+                    continue;
+                }
+            }
+
+            let Some(field_type) = self.get_variable_type() else {
+                self.report_error(self.save_token_span(), ParserErrorType::InvalidToken(self.save_token()));
+                continue;
+            };
+            let field_type_token = self.save_spanned_token();
+            self.next_token();
+
+            loop {
+                let Some(specifier) = self.parse_var_info(false) else {
+                    break;
+                };
+                let field_name = specifier.get_identifier().clone();
+                if field_names.contains(&field_name) {
+                    self.error_reporter
+                        .lock()
+                        .unwrap()
+                        .report_error(specifier.get_identifier_token().span.clone(), ParserErrorType::FieldAlreadyDeclared(field_name));
+                } else {
+                    field_names.push(field_name);
+                }
+                fields.push(TypeFieldSpecifier::new(field_type_token.clone(), field_type, specifier));
+
+                if matches!(self.get_cur_token(), Some(Token::Comma)) {
+                    self.next_token();
+                    continue;
+                }
+                break;
+            }
+        };
+
+        if fields.is_empty() {
+            self.error_reporter
+                .lock()
+                .unwrap()
+                .report_error(identifier_token.span.clone(), ParserErrorType::TypeNeedsAField);
+            return None;
+        }
+
+        let field_layout = fields
+            .iter()
+            .map(|field| (field.get_identifier().clone(), field.get_variable_type()))
+            .collect();
+        if self.type_registry.declare_user_type(name, field_layout).is_none() {
+            self.error_reporter
+                .lock()
+                .unwrap()
+                .report_error(identifier_token.span.clone(), ParserErrorType::TooManyTypes(MAX_USER_TYPES));
+            return None;
+        }
+
+        Some(TypeDeclarationAstNode::new(type_token, identifier_token, fields, endtype_token))
+    }
+
     /*
         fn parse_function_parameter_specifier(&mut self) -> ParameterSpecifier {
             let func_token = self.save_spanned_token();

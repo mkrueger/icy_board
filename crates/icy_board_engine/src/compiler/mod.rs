@@ -172,6 +172,8 @@ impl PPECompiler {
                     AstNode::Procedure(_proc) => {}
                     AstNode::FunctionDeclaration(_func) => {}
                     AstNode::ProcedureDeclaration(_proc) => {}
+                    // The layout is settled while parsing, nothing is emitted for it.
+                    AstNode::TypeDeclaration(_type_decl) => {}
                     AstNode::TopLevelStatement(stmt) => {
                         // may get transformed by the ast transformer.
                         if let Statement::Block(block) = stmt {

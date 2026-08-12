@@ -49,11 +49,17 @@ pub enum LexingErrorType {
     #[error("$ELSE without $IF")]
     ElseWithoutIf,
 
-    #[error("$ELIF without $IF")]
+    #[error("$ELSEIF without $IF")]
     ElseIfWithoutIf,
 
     #[error("Missing $ENDIF")]
     MissingEndIf,
+
+    #[error("$ENDIF without $IF")]
+    EndIfWithoutIf,
+
+    #[error("Undefined pre processor token ({0})")]
+    UndefinedPreProcessorToken(String),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -191,6 +197,9 @@ pub enum Token {
     SubAssign,
     AndAssign,
     OrAssign,
+
+    Type,
+    EndType,
 }
 
 impl Token {
@@ -309,6 +318,8 @@ impl fmt::Display for Token {
             Token::SubAssign => write!(f, "-="),
             Token::AndAssign => write!(f, "&="),
             Token::OrAssign => write!(f, "|="),
+            Token::Type => write!(f, "TYPE"),
+            Token::EndType => write!(f, "ENDTYPE"),
         }
     }
 }
@@ -325,6 +336,15 @@ pub enum LexerState {
 struct IfFrame {
     taken: bool,  // has any prior branch executed?
     active: bool, // emit tokens for this branch?
+}
+
+fn directive_len(upper: &str, directive: &str) -> Option<usize> {
+    let rest = upper.strip_prefix(directive)?;
+    (rest.is_empty() || rest.starts_with(char::is_whitespace)).then_some(directive.len())
+}
+
+fn elseif_directive_len(upper: &str) -> Option<usize> {
+    directive_len(upper, "$ELSEIF").or_else(|| directive_len(upper, "$ELIF"))
 }
 
 pub struct Lexer {
@@ -474,6 +494,14 @@ lazy_static::lazy_static! {
         m
     };
 
+    /// 400 only, so a 3.50 source may still call something 'type'.
+    static ref TOKEN_LOOKUP_TABLE_400: HashMap<unicase::Ascii<String>, Token> = {
+        let mut m = TOKEN_LOOKUP_TABLE_350.clone();
+        m.insert(unicase::Ascii::new("type".to_string()), Token::Type);
+        m.insert(unicase::Ascii::new("endtype".to_string()), Token::EndType);
+        m
+    };
+
 }
 
 impl Lexer {
@@ -487,15 +515,17 @@ impl Lexer {
             Constant::Integer(workspace.runtime() as i32, NumberFormat::Default),
         );
 
-        Self {
+        let mut lexer = Self {
             lookup_table: if lang_version < 200 {
                 &*TOKEN_LOOKUP_TABLE_100
             } else if lang_version < 300 {
                 &*TOKEN_LOOKUP_TABLE_200
             } else if lang_version < 350 {
                 &*TOKEN_LOOKUP_TABLE_300
-            } else {
+            } else if lang_version < 400 {
                 &*TOKEN_LOOKUP_TABLE_350
+            } else {
+                &*TOKEN_LOOKUP_TABLE_400
             },
             lang_version,
             define_table,
@@ -506,7 +536,13 @@ impl Lexer {
             token_end: 0,
             include_lexer: None,
             if_stack: Vec::new(),
+        };
+        if let Some(defines) = workspace.compiler.as_ref().and_then(|compiler| compiler.defines.as_ref()) {
+            for define in defines {
+                lexer.handle_define(define);
+            }
         }
+        lexer
     }
 
     pub fn span(&self) -> std::ops::Range<usize> {
@@ -1115,16 +1151,21 @@ impl Lexer {
                 break;
             };
             if !char::is_alphanumeric(ch) {
+                self.put_back();
                 break;
             }
             define.push(ch);
         }
 
-        if let Some(value) = self.define_table.get(&Ascii::new(define)) {
-            Some(Token::Const(value.clone()))
-        } else {
-            None
+        if let Some(value) = self.define_table.get(&Ascii::new(define.clone())) {
+            return Some(Token::Const(value.clone()));
         }
+        // Returning None here would look like end of file and drop the rest of the source.
+        self.errors
+            .lock()
+            .unwrap()
+            .report_error(self.token_start..self.token_end, LexingErrorType::UndefinedPreProcessorToken(define));
+        self.next_token()
     }
 
     // Collect skipped inactive region starting at a false $IF or untaken $ELSEIF.
@@ -1173,14 +1214,14 @@ impl Lexer {
             let upper = after_marker.trim_start().to_ascii_uppercase();
 
             // Nested IF
-            if upper.starts_with("$IF ") || upper == "$IF" {
+            if directive_len(&upper, "$IF").is_some() {
                 nest += 1;
                 collected.push_str(&line_str);
                 continue;
             }
 
             // ENDIF
-            if upper.starts_with("$ENDIF") {
+            if directive_len(&upper, "$ENDIF").is_some() {
                 if nest == 0 {
                     // Stop BEFORE consuming this line: rewind so it becomes its own comment token.
                     self.token_end = line_start;
@@ -1193,23 +1234,22 @@ impl Lexer {
             }
 
             // At root level, sibling directives might activate or also be skipped
-            if nest == 0 && (upper.starts_with("$ELSEIF") || upper.starts_with("$ELSE")) {
-                let activating = if upper.starts_with("$ELSE") {
-                    // $ELSE activates only if no branch taken yet
-                    if let Some(frame) = self.if_stack.last() { !frame.taken } else { false }
-                } else {
-                    // $ELSEIF
+            let elseif_len = elseif_directive_len(&upper);
+            if nest == 0 && (elseif_len.is_some() || directive_len(&upper, "$ELSE").is_some()) {
+                let activating = if let Some(len) = elseif_len {
                     if let Some(frame) = self.if_stack.last() {
                         if frame.taken {
                             false
                         } else {
-                            // Evaluate expression (slice off "$ELSEIF")
-                            let expr_src = &after_marker[after_marker.to_ascii_uppercase().find("$ELSEIF").unwrap() + "$ELSEIF".len()..];
+                            let expr_src = &after_marker[after_marker.find('$').unwrap() + len..];
                             self.eval_preproc_bool(expr_src)
                         }
                     } else {
                         false
                     }
+                } else {
+                    // $ELSE activates only if no branch taken yet
+                    if let Some(frame) = self.if_stack.last() { !frame.taken } else { false }
                 };
 
                 if activating {
@@ -1265,8 +1305,8 @@ impl Lexer {
         }
 
         // $IF
-        if upper.starts_with("$IF ") || upper == "$IF" {
-            let expr_src = &raw[upper.find("$IF").unwrap() + 3..];
+        if let Some(len) = directive_len(&upper, "$IF") {
+            let expr_src = &raw[raw.find('$').unwrap() + len..];
             let cond = self.eval_preproc_bool(expr_src);
             self.if_stack.push(IfFrame { taken: cond, active: cond });
             if !cond {
@@ -1277,7 +1317,7 @@ impl Lexer {
         }
 
         // $ELSEIF
-        if upper.starts_with("$ELSEIF") {
+        if let Some(len) = elseif_directive_len(&upper) {
             if self.if_stack.is_empty() {
                 self.errors
                     .lock()
@@ -1293,7 +1333,7 @@ impl Lexer {
                 let first_line = format!("{cmt_type}{raw}");
                 return Some(self.collect_inactive_region(first_line, cmt_type));
             } else {
-                let expr_src = &raw[raw.to_ascii_uppercase().find("$ELSEIF").unwrap() + 7..];
+                let expr_src = &raw[raw.find('$').unwrap() + len..];
                 let cond = self.eval_preproc_bool(expr_src);
                 if let Some(f) = self.if_stack.last_mut() {
                     f.active = cond;
@@ -1310,7 +1350,7 @@ impl Lexer {
         }
 
         // $ELSE
-        if upper.starts_with("$ELSE") {
+        if directive_len(&upper, "$ELSE").is_some() {
             if self.if_stack.is_empty() {
                 self.errors
                     .lock()
@@ -1338,18 +1378,18 @@ impl Lexer {
         }
 
         // $ENDIF: return as normal single-line comment, do NOT absorb earlier
-        if upper.starts_with("$ENDIF") {
+        if directive_len(&upper, "$ENDIF").is_some() {
             if self.if_stack.pop().is_none() {
                 self.errors
                     .lock()
                     .unwrap()
-                    .report_error(self.token_start..self.token_end, LexingErrorType::MissingEndIf);
+                    .report_error(self.token_start..self.token_end, LexingErrorType::EndIfWithoutIf);
             }
             return Some(Token::Comment(cmt_type, raw));
         }
 
-        if upper.starts_with("$DEFINE") {
-            let define_src = raw[upper.find("$DEFINE").unwrap() + 7..].trim();
+        if let Some(len) = directive_len(&upper, "$DEFINE") {
+            let define_src = raw[raw.find('$').unwrap() + len..].trim();
             self.handle_define(define_src);
             return self.next_token();
         }
@@ -1377,13 +1417,18 @@ impl Lexer {
     }
 
     fn handle_define(&mut self, input: &str) {
-        // parse like before; reuse existing logic but moved out of read_comment
         let reg = UserTypeRegistry::default();
         if input.is_empty() {
             return;
         }
-        if input.chars().all(|c| c.is_ascii_alphabetic()) {
-            self.define_table.insert(Ascii::new(input.to_string()), Constant::Boolean(true));
+        let mut chars = input.chars();
+        if chars.next().is_some_and(|ch| ch.is_ascii_alphabetic() || ch == '_') && chars.all(|ch| ch.is_ascii_alphanumeric() || ch == '_') {
+            if self.define_table.insert(Ascii::new(input.to_string()), Constant::Boolean(true)).is_some() {
+                self.errors
+                    .lock()
+                    .unwrap()
+                    .report_warning(self.token_start..self.token_end, LexingErrorType::AlreadyDefined(input.to_string()));
+            }
             return;
         }
         let mut parser = Parser::new(PathBuf::from("."), self.errors.clone(), &reg, input, Encoding::Utf8, &Workspace::default());
@@ -1489,7 +1534,7 @@ impl Lexer {
                     let upper = raw.trim_start().to_ascii_uppercase();
 
                     // Check for directives that affect flow
-                    if upper.starts_with("$ELSEIF") {
+                    if let Some(len) = elseif_directive_len(&upper) {
                         if self.if_stack.is_empty() {
                             self.errors
                                 .lock()
@@ -1500,7 +1545,7 @@ impl Lexer {
 
                         let prior_taken = self.if_stack.last().unwrap().taken;
                         if !prior_taken {
-                            let expr_src = &raw[raw.to_ascii_uppercase().find("$ELSEIF").unwrap() + 7..];
+                            let expr_src = &raw[raw.find('$').unwrap() + len..];
                             let cond = self.eval_preproc_bool(expr_src);
                             if let Some(frame) = self.if_stack.last_mut() {
                                 frame.active = cond;
@@ -1514,7 +1559,7 @@ impl Lexer {
                                 }
                             }
                         }
-                    } else if upper.starts_with("$ELSE") {
+                    } else if directive_len(&upper, "$ELSE").is_some() {
                         if self.if_stack.is_empty() {
                             self.errors
                                 .lock()
@@ -1533,19 +1578,19 @@ impl Lexer {
                                 break; // Exit skip loop, we're now active
                             }
                         }
-                    } else if upper.starts_with("$ENDIF") {
+                    } else if directive_len(&upper, "$ENDIF").is_some() {
                         if self.if_stack.pop().is_none() {
                             self.errors
                                 .lock()
                                 .unwrap()
-                                .report_error(self.token_start..self.token_end, LexingErrorType::MissingEndIf);
+                                .report_error(self.token_start..self.token_end, LexingErrorType::EndIfWithoutIf);
                         }
                         // Return the skipped block as a comment
                         if !skipped_content.is_empty() {
                             return Some(get_comment(skipped_content));
                         }
                         break; // Exit skip loop, check next level
-                    } else if upper.starts_with("$IF") {
+                    } else if directive_len(&upper, "$IF").is_some() {
                         // Nested IF while skipping - push an inactive frame
                         self.if_stack.push(IfFrame { taken: false, active: false });
                     }

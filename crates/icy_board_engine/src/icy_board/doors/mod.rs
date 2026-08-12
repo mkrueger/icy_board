@@ -156,7 +156,7 @@ impl UserData for Door {
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         registry.add_property(NAME.clone(), VariableType::String, false);
         registry.add_property(DESCRIPTION.clone(), VariableType::String, false);
-        registry.add_property(PASSWORD.clone(), VariableType::String, false);
+        registry.add_property(PASSWORD.clone(), VariableType::Password, false);
         registry.add_function(HAS_ACCESS.clone(), Vec::new(), VariableType::Boolean);
     }
 }
@@ -171,7 +171,9 @@ impl UserDataValue for Door {
             return Ok(VariableValue::new_string(self.description.clone()));
         }
         if *name == *PASSWORD {
-            return Ok(VariableValue::new_string(self.password.clone()));
+            return Ok(VariableValue::new_password(crate::icy_board::user_base::Password::new_protected(
+                &self.password,
+            )));
         }
         log::error!("Invalid user data call on Door ({})", name);
         Ok(VariableValue::new_int(-1))

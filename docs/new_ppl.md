@@ -16,6 +16,38 @@ message area just works in icy board. But with icy board it's possible to specif
 ### Returns
 `MessageAreaID`   Combined Value of conference/message area
 
+## Board objects (4.00)
+
+`ConfInfo(conf)` returns a read-only `CONFERENCE` snapshot. An invalid conference
+number returns an empty conference object, so its properties can still be read.
+
+| Conference member | Type | Description |
+| :--- | :--- | :--- |
+| `Name` | `STRING` | Conference name |
+| `IsPublic` | `BOOLEAN` | Whether the conference is configured as public |
+| `Directories` | `INTEGER` | Number of file directories |
+| `Areas` | `INTEGER` | Number of message areas |
+| `Doors` | `INTEGER` | Number of doors |
+| `HasAccess()` | `BOOLEAN` | Whether the current caller can access the conference |
+| `GetDir(index)` | `DIRECTORY` | File directory at the zero-based index |
+| `GetArea(index)` | `AREA` | Message area at the zero-based index |
+| `GetDoor(index)` | `DOOR` | Door at the zero-based index |
+
+`DIRECTORY` and `AREA` provide `Name` and `HasAccess()`. `DOOR` provides
+`Name`, `Description`, `Password` and `HasAccess()`. A door password has the
+runtime-only `PASSWORD` type: it can be compared with a string, but converting
+or printing it produces `******` rather than the secret.
+
+```PPL
+CONFERENCE conf = CONFINFO(CURCONF())
+INTEGER i
+
+FOR i = 0 TO conf.Doors - 1
+	DOOR item = conf.GetDoor(i)
+	IF item.HasAccess() PRINTLN item.Name
+NEXT
+```
+
 ## `WebRequest()`  Function (4.00)
 
 ### Function
@@ -56,7 +88,9 @@ logged, writes no file and lets the PPE carry on; it gives up after 30 seconds.
 
 ### Function
 With this overload of the len function it's possible to get the length of an array dimension.
-Note: With 400 Len(arr, 0) behaves like Len(arr) - the len function works on arrays as well.
+Note: With 400 `Len(arr, 0)` behaves like `Len(arr)`. PPL array declarations
+use upper bounds, so `INTEGER values(10)` makes both calls return `10`.
+For multidimensional arrays, `dim` is zero-based.
 
 ### Syntax
 `Len(array, dim)`

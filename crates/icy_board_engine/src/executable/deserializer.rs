@@ -344,6 +344,8 @@ impl PPEDeserializer {
                             return self.deserialize_expression(executable);
                         }
                     }
+                    // They were written left to right and come off the stack the other way.
+                    arguments.reverse();
 
                     let expr = self.pop_expr().unwrap();
                     self.push_expr(PPEExpr::MemberFunctionCall(Box::new(expr), arguments, member_id as usize));

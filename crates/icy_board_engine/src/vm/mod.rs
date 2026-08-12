@@ -3,7 +3,6 @@ use crate::ast::BinOp;
 use crate::ast::Statement;
 use crate::ast::UnaryOp;
 use crate::ast::constant::STACK_LIMIT;
-use crate::compiler::user_data::UserDataValue;
 use crate::datetime::IcbDate;
 use crate::executable::Executable;
 use crate::executable::GenericVariableData;
@@ -23,7 +22,6 @@ use icy_engine::TextBuffer;
 use jamjam::jam::msg_header::JamMessageHeader;
 use std::collections::HashMap;
 use std::collections::VecDeque;
-use std::mem;
 use std::path::Path;
 use std::path::PathBuf;
 use thiserror::Error;
@@ -86,6 +84,15 @@ pub enum VMError {
 
     #[error("Object not found (internal VM error) ({0})")]
     NoObjectFound(u8),
+
+    #[error("Member {1} not found for user type {0}")]
+    InvalidMemberId(u8, usize),
+
+    #[error("Member {1} of user type {0} is not a function")]
+    InvalidMemberFunction(u8, usize),
+
+    #[error("Member {1} of user type {0} expected {2} arguments, got {3}")]
+    InvalidMemberArgumentCount(u8, usize, usize, usize),
 
     #[error("PPE call stack exhausted")]
     StackOverflow,
@@ -157,8 +164,6 @@ pub struct VirtualMachine<'a> {
     pub icy_board_state: &'a mut IcyBoardState,
 
     pub pcb_node: Option<NodeState>,
-
-    pub user_data: Vec<Box<dyn UserDataValue>>,
 
     pub return_addresses: Vec<ReturnAddress>,
     pub call_local_value_stack: Vec<VariableValue>,
@@ -350,7 +355,9 @@ impl<'a> VirtualMachine<'a> {
         let pwd_value = self.variable_table.get_value(U_PWD);
         cur_user.password.password = if let GenericVariableData::Password(ref pwd) = pwd_value.generic_data {
             match pwd {
-                Password::PlainText(s) => self.icy_board_state.create_password(s).await,
+                // A secret a PPE carried over from elsewhere is stored the way the board
+                // stores any password it is told, rather than as it stands.
+                Password::PlainText(s) | Password::Protected(s) => self.icy_board_state.create_password(s).await,
                 pwd => pwd.clone(),
             }
         } else {
@@ -413,21 +420,25 @@ impl<'a> VirtualMachine<'a> {
                     log::error!("No user data registry entry for value: {:?} type :{} on expr {:?}", val, type_id, base_expr);
                     return Err(VMError::TypeNotFoundInRegistry(type_id).into());
                 };
-                let GenericVariableData::UserData(object_id) = val.generic_data else {
+                let GenericVariableData::UserData(object) = val.generic_data else {
                     // should never happen.
                     return Err(VMError::NoObjectFound(type_id).into());
                 };
 
-                match &registry.id_table[*member_id] {
+                let Some(member) = registry.id_table.get(*member_id) else {
+                    return Err(VMError::InvalidMemberId(type_id, *member_id).into());
+                };
+
+                match member {
                     crate::compiler::user_data::UserDataEntry::Field(name) | crate::compiler::user_data::UserDataEntry::Getter(name) => {
-                        let val = self.user_data[object_id].get_property_value(self, name);
+                        let val = object.get_property_value(self, name);
                         return val;
                     }
                     crate::compiler::user_data::UserDataEntry::Procedure(_) | crate::compiler::user_data::UserDataEntry::Function(_) => {
                         return Ok(VariableValue {
                             vtype: val.vtype,
                             data: val.data,
-                            generic_data: GenericVariableData::UserData(object_id),
+                            generic_data: GenericVariableData::UserData(object),
                         });
                     }
                 }
@@ -443,41 +454,28 @@ impl<'a> VirtualMachine<'a> {
                     log::error!("No user data registry entry for value: {:?} type :{} on expr {:?}", val, type_id, base_expr);
                     return Err(VMError::TypeNotFoundInRegistry(type_id).into());
                 };
-                let GenericVariableData::UserData(object_id) = val.generic_data else {
+                let GenericVariableData::UserData(object) = val.generic_data else {
                     // should never happen.
                     return Err(VMError::NoObjectFound(type_id).into());
                 };
 
-                match &registry.id_table[*id] {
-                    crate::compiler::user_data::UserDataEntry::Field(_) | crate::compiler::user_data::UserDataEntry::Getter(_) => {
-                        todo!();
-                    }
-                    crate::compiler::user_data::UserDataEntry::Procedure(_) => todo!(),
-                    crate::compiler::user_data::UserDataEntry::Function(name) => {
-                        let mut moved_data: Vec<Box<dyn UserDataValue>> = Vec::new();
-                        mem::swap(&mut moved_data, &mut self.user_data);
-                        let mut args = Vec::new();
-                        for arg in arguments {
-                            args.push(self.eval_expr(arg).await?);
-                        }
-                        match moved_data[object_id].call_function(self, name, &args).await {
-                            Ok(mut result) => {
-                                mem::swap(&mut moved_data, &mut self.user_data);
-                                if !moved_data.is_empty() {
-                                    if let GenericVariableData::UserData(data) = result.generic_data {
-                                        result.generic_data = GenericVariableData::UserData(data + self.user_data.len());
-                                    }
-                                    self.user_data.extend(moved_data.drain(..));
-                                }
-                                return Ok(result);
-                            }
-                            Err(e) => {
-                                mem::swap(&mut moved_data, &mut self.user_data);
-                                return Err(e);
-                            }
-                        }
-                    }
+                let Some(member) = registry.id_table.get(*id) else {
+                    return Err(VMError::InvalidMemberId(type_id, *id).into());
+                };
+                let crate::compiler::user_data::UserDataEntry::Function(name) = member else {
+                    return Err(VMError::InvalidMemberFunction(type_id, *id).into());
+                };
+                let expected_arguments = registry.functions.get(name).map_or(0, |(parameters, _)| parameters.len());
+                if arguments.len() != expected_arguments {
+                    return Err(VMError::InvalidMemberArgumentCount(type_id, *id, expected_arguments, arguments.len()).into());
                 }
+
+                let mut args = Vec::new();
+                for arg in arguments {
+                    args.push(self.eval_expr(arg).await?);
+                }
+
+                return object.call_function(self, name, &args).await;
             }
 
             PPEExpr::UnaryExpression(op, expr) => {
@@ -932,7 +930,6 @@ pub async fn run<P: AsRef<Path>>(file_name: &P, prg: &Executable, io: &mut dyn P
                 call_local_value_stack: Vec::new(),
                 write_back_stack: Vec::new(),
                 push_pop_stack: Vec::new(),
-                user_data: Vec::new(),
                 stored_screen: None,
                 fd_default_in: 0,
                 fd_default_out: 0,

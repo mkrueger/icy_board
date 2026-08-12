@@ -8,8 +8,8 @@ use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 
 use crate::{
-    compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue},
-    executable::{GenericVariableData, VariableData, VariableType, VariableValue},
+    compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue, user_data_value},
+    executable::{VariableType, VariableValue},
     icy_board::{doors::Door, file_directory::FileDirectory},
     parser::{DOOR_ID, FILE_DIRECTORY_ID, MESSAGE_AREA_ID},
 };
@@ -380,9 +380,9 @@ impl<'a> UserData for Conference {
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         registry.add_property(NAME.clone(), VariableType::String, false);
         registry.add_property(ISPUBLIC.clone(), VariableType::Boolean, false);
-        registry.add_property(FILE_AREAS.clone(), VariableType::Boolean, false);
-        registry.add_property(MESSAGE_AREAS.clone(), VariableType::Boolean, false);
-        registry.add_property(DOORS.clone(), VariableType::Boolean, false);
+        registry.add_property(FILE_AREAS.clone(), VariableType::Integer, false);
+        registry.add_property(MESSAGE_AREAS.clone(), VariableType::Integer, false);
+        registry.add_property(DOORS.clone(), VariableType::Integer, false);
 
         registry.add_function(HAS_ACCESS.clone(), Vec::new(), VariableType::Boolean);
         registry.add_function(
@@ -410,12 +410,12 @@ lazy_static::lazy_static! {
 
 #[async_trait]
 impl UserDataValue for Conference {
-    fn get_property_value(&self, vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
+    fn get_property_value(&self, _vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
         if *name == *NAME {
             return Ok(VariableValue::new_string(self.name.clone()));
         }
         if *name == *ISPUBLIC {
-            return Ok(VariableValue::new_bool(self.required_security.session_can_access(&vm.icy_board_state.session)));
+            return Ok(VariableValue::new_bool(self.is_public));
         }
         if *name == *FILE_AREAS {
             if let Some(res) = &self.directories {
@@ -431,7 +431,7 @@ impl UserDataValue for Conference {
         }
         if *name == *DOORS {
             if let Some(res) = &self.doors {
-                return Ok(VariableValue::new_bool(!res.is_empty()));
+                return Ok(VariableValue::new_int(res.len() as i32));
             }
             return Ok(VariableValue::new_int(0));
         }
@@ -459,65 +459,35 @@ impl UserDataValue for Conference {
             if let Some(dir) = &self.directories {
                 let area = arguments[0].as_int();
                 if let Some(res) = dir.get(area as usize) {
-                    vm.user_data.push(Box::new((*res).clone()));
-                    return Ok(VariableValue {
-                        data: VariableData::from_int(0),
-                        generic_data: GenericVariableData::UserData(vm.user_data.len() - 1),
-                        vtype: VariableType::UserData(FILE_DIRECTORY_ID as u8),
-                    });
+                    return Ok(user_data_value((*res).clone(), FILE_DIRECTORY_ID));
                 }
                 log::error!("PPL: File area not found ({})", area);
             }
 
-            vm.user_data.push(Box::new(FileDirectory::default()));
-            return Ok(VariableValue {
-                data: VariableData::from_int(0),
-                generic_data: GenericVariableData::UserData(vm.user_data.len() - 1),
-                vtype: VariableType::UserData(FILE_DIRECTORY_ID as u8),
-            });
+            return Ok(user_data_value(FileDirectory::default(), FILE_DIRECTORY_ID));
         }
         if *name == *GET_MSG_AREA {
             let area = arguments[0].as_int();
             if let Some(areas) = &self.areas {
                 if let Some(res) = areas.get(area as usize) {
-                    vm.user_data.push(Box::new((*res).clone()));
-                    return Ok(VariableValue {
-                        data: VariableData::from_int(0),
-                        generic_data: GenericVariableData::UserData(vm.user_data.len() - 1),
-                        vtype: VariableType::UserData(MESSAGE_AREA_ID as u8),
-                    });
+                    return Ok(user_data_value((*res).clone(), MESSAGE_AREA_ID));
                 }
                 log::error!("PPL: Message area not found ({})", area);
             }
 
-            vm.user_data.push(Box::new(MessageArea::default()));
-            return Ok(VariableValue {
-                data: VariableData::from_int(0),
-                generic_data: GenericVariableData::UserData(vm.user_data.len() - 1),
-                vtype: VariableType::UserData(MESSAGE_AREA_ID as u8),
-            });
+            return Ok(user_data_value(MessageArea::default(), MESSAGE_AREA_ID));
         }
 
         if *name == *GET_DOOR {
             let door = arguments[0].as_int();
             if let Some(doors) = &self.doors {
                 if let Some(res) = doors.get(door as usize) {
-                    vm.user_data.push(Box::new((*res).clone()));
-                    return Ok(VariableValue {
-                        data: VariableData::from_int(0),
-                        generic_data: GenericVariableData::UserData(vm.user_data.len() - 1),
-                        vtype: VariableType::UserData(DOOR_ID as u8),
-                    });
+                    return Ok(user_data_value((*res).clone(), DOOR_ID));
                 }
                 log::error!("PPL: Door not found ({})", door);
             }
 
-            vm.user_data.push(Box::new(Door::default()));
-            return Ok(VariableValue {
-                data: VariableData::from_int(0),
-                generic_data: GenericVariableData::UserData(vm.user_data.len() - 1),
-                vtype: VariableType::UserData(DOOR_ID as u8),
-            });
+            return Ok(user_data_value(Door::default(), DOOR_ID));
         }
         log::error!("Invalid function call on Conference ({})", name);
         Err("Function not found".into())

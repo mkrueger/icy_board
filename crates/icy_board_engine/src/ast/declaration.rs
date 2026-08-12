@@ -581,6 +581,86 @@ impl FunctionDeclarationAstNode {
     }
 }
 
+/// One field of a `TYPE ... ENDTYPE` block.
+#[derive(Debug, PartialEq, Clone)]
+pub struct TypeFieldSpecifier {
+    type_token: Spanned<Token>,
+    variable_type: VariableType,
+    specifier: VariableSpecifier,
+}
+
+impl TypeFieldSpecifier {
+    pub fn new(type_token: Spanned<Token>, variable_type: VariableType, specifier: VariableSpecifier) -> Self {
+        Self {
+            type_token,
+            variable_type,
+            specifier,
+        }
+    }
+
+    pub fn get_type_token(&self) -> &Spanned<Token> {
+        &self.type_token
+    }
+
+    pub fn get_variable_type(&self) -> VariableType {
+        self.variable_type
+    }
+
+    pub fn get_specifier(&self) -> &VariableSpecifier {
+        &self.specifier
+    }
+
+    pub fn get_identifier(&self) -> &unicase::Ascii<String> {
+        self.specifier.get_identifier()
+    }
+}
+
+/// `TYPE name ... ENDTYPE` - the record a program declares for itself.
+#[derive(Debug, PartialEq, Clone)]
+pub struct TypeDeclarationAstNode {
+    type_token: Spanned<Token>,
+    identifier_token: Spanned<Token>,
+    fields: Vec<TypeFieldSpecifier>,
+    endtype_token: Spanned<Token>,
+}
+
+impl TypeDeclarationAstNode {
+    pub fn new(type_token: Spanned<Token>, identifier_token: Spanned<Token>, fields: Vec<TypeFieldSpecifier>, endtype_token: Spanned<Token>) -> Self {
+        Self {
+            type_token,
+            identifier_token,
+            fields,
+            endtype_token,
+        }
+    }
+
+    pub fn get_type_token(&self) -> &Spanned<Token> {
+        &self.type_token
+    }
+
+    pub fn get_identifier_token(&self) -> &Spanned<Token> {
+        &self.identifier_token
+    }
+
+    /// # Panics
+    ///
+    /// Panics if the node was built without an identifier token.
+    pub fn get_identifier(&self) -> &unicase::Ascii<String> {
+        if let Token::Identifier(id) = &self.identifier_token.token {
+            return id;
+        }
+        panic!("Expected identifier token")
+    }
+
+    pub fn get_fields(&self) -> &Vec<TypeFieldSpecifier> {
+        &self.fields
+    }
+
+    pub fn get_endtype_token(&self) -> &Spanned<Token> {
+        &self.endtype_token
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct FunctionParameterSpecifier {
     function_token: Spanned<Token>,

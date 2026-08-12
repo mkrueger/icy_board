@@ -5,8 +5,8 @@ use super::{
     ContinueStatement, ElseBlock, ElseIfBlock, Expression, ForStatement, FunctionCallExpression, FunctionDeclarationAstNode, FunctionImplementation,
     GosubStatement, GotoStatement, IdentifierExpression, IfStatement, IfThenStatement, IndexerExpression, LabelStatement, LetStatement, LoopStatement,
     MemberReferenceExpression, ParameterSpecifier, ParensExpression, PredefinedCallStatement, ProcedureCallStatement, ProcedureDeclarationAstNode,
-    ProcedureImplementation, RepeatUntilStatement, ReturnStatement, SelectStatement, Statement, UnaryExpression, VariableDeclarationStatement,
-    VariableSpecifier, WhileDoStatement, WhileStatement,
+    ProcedureImplementation, RepeatUntilStatement, ReturnStatement, SelectStatement, Statement, TypeDeclarationAstNode, UnaryExpression,
+    VariableDeclarationStatement, VariableSpecifier, WhileDoStatement, WhileStatement,
 };
 
 #[allow(unused_variables)]
@@ -146,6 +146,9 @@ pub trait AstVisitor<T: Default>: Sized {
     }
     fn visit_function_declaration(&mut self, func_decl: &FunctionDeclarationAstNode) -> T {
         walk_function_declaration(self, func_decl);
+        T::default()
+    }
+    fn visit_type_declaration(&mut self, type_decl: &TypeDeclarationAstNode) -> T {
         T::default()
     }
 

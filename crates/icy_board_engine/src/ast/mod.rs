@@ -43,6 +43,7 @@ pub enum AstNode {
     TopLevelStatement(Statement),
     ProcedureDeclaration(ProcedureDeclarationAstNode),
     FunctionDeclaration(FunctionDeclarationAstNode),
+    TypeDeclaration(TypeDeclarationAstNode),
     Main(BlockStatement),
 }
 
@@ -54,6 +55,7 @@ impl AstNode {
             AstNode::TopLevelStatement(s) => s.visit(visitor),
             AstNode::ProcedureDeclaration(p) => visitor.visit_procedure_declaration(p),
             AstNode::FunctionDeclaration(f) => visitor.visit_function_declaration(f),
+            AstNode::TypeDeclaration(t) => visitor.visit_type_declaration(t),
             AstNode::Main(m) => visitor.visit_main(m),
         }
     }
@@ -66,6 +68,7 @@ impl AstNode {
             AstNode::TopLevelStatement(s) => AstNode::TopLevelStatement(s.visit_mut(visitor)),
             AstNode::ProcedureDeclaration(p) => visitor.visit_procedure_declaration(p),
             AstNode::FunctionDeclaration(f) => visitor.visit_function_declaration(f),
+            AstNode::TypeDeclaration(t) => AstNode::TypeDeclaration(t.clone()),
             AstNode::Main(m) => AstNode::Main(visitor.visit_block(m)),
         }
     }

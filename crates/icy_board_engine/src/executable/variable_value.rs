@@ -275,7 +275,7 @@ impl fmt::Debug for VariableData {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Default, Clone)]
 pub enum GenericVariableData {
     #[default]
     None,
@@ -289,7 +289,24 @@ pub enum GenericVariableData {
 
     Password(crate::icy_board::user_base::Password),
 
-    UserData(usize),
+    /// The object a member expression reads, kept alive by the values that name it.
+    UserData(std::sync::Arc<dyn crate::compiler::user_data::UserDataValue>),
+}
+
+impl fmt::Debug for GenericVariableData {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            GenericVariableData::None => write!(f, "None"),
+            GenericVariableData::String(s) => write!(f, "String({s:?})"),
+            GenericVariableData::Dim1(data) => write!(f, "Dim1({data:?})"),
+            GenericVariableData::Dim2(data) => write!(f, "Dim2({data:?})"),
+            GenericVariableData::Dim3(data) => write!(f, "Dim3({data:?})"),
+            GenericVariableData::Table(table) => write!(f, "Table({table:?})"),
+            // A secret has no business in a log line.
+            GenericVariableData::Password(_) => write!(f, "Password(******)"),
+            GenericVariableData::UserData(_) => write!(f, "UserData"),
+        }
+    }
 }
 unsafe impl Send for GenericVariableData {}
 unsafe impl Sync for GenericVariableData {}
@@ -439,7 +456,6 @@ impl PartialEq for VariableValue {
                         Password::PlainText(other.as_string().to_lowercase())
                     };
 
-                    log::info!("Comparing passwords: '{:?}' == '{:?}' -> {}", left_pwd, right_pwd, left_pwd == right_pwd);
                     left_pwd == right_pwd
                 }
 

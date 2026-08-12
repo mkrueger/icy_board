@@ -6,9 +6,10 @@ use std::{env, fs};
 
 use crate::Res;
 use crate::ast::constant::STACK_LIMIT;
+use crate::compiler::user_data::user_data_value;
 use crate::datetime::{IcbDate, IcbTime};
 use crate::executable::{GenericVariableData, PPEExpr, VariableData, VariableType, VariableValue};
-use crate::icy_board::conferences::ConferenceType;
+use crate::icy_board::conferences::{Conference, ConferenceType};
 use crate::icy_board::ftn::queue;
 use crate::icy_board::macro_parser::Macro;
 use crate::icy_board::read_with_encoding_detection;
@@ -99,7 +100,7 @@ pub async fn len_dim(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
     let arr = vm.eval_expr(&args[0]).await?;
     let dim = vm.eval_expr(&args[1]).await?.as_int();
 
-    let val = match arr.generic_data {
+    let val = match &arr.generic_data {
         GenericVariableData::String(str) => {
             if dim == 0 {
                 str.chars().count()
@@ -107,22 +108,22 @@ pub async fn len_dim(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
                 0
             }
         }
-        GenericVariableData::Dim1(items) => {
-            if dim == 0 {
-                items.len()
-            } else {
-                0
-            }
-        }
+        GenericVariableData::Dim1(items) => match dim {
+            0 => items.len().saturating_sub(1),
+            _ => 0,
+        },
         GenericVariableData::Dim2(items) => match dim {
-            0 => items.len() - 1,
-            1 => items[0].len() - 1,
+            0 => items.len().saturating_sub(1),
+            1 => items.first().map_or(0, |row| row.len().saturating_sub(1)),
             _ => 0,
         },
         GenericVariableData::Dim3(items) => match dim {
-            0 => items.len() - 1,
-            1 => items[0].len() - 1,
-            2 => items[0][0].len() - 1,
+            0 => items.len().saturating_sub(1),
+            1 => items.first().map_or(0, |plane| plane.len().saturating_sub(1)),
+            2 => items
+                .first()
+                .and_then(|plane| plane.first())
+                .map_or(0, |row| row.len().saturating_sub(1)),
             _ => 0,
         },
         GenericVariableData::Password(_) => {
@@ -2099,17 +2100,13 @@ pub async fn uselmrs(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 
 pub async fn new_confinfo(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let conf_num = vm.eval_expr(&args[0]).await?.as_int() as usize;
-    if let Some(conference) = &vm.icy_board_state.get_board().await.conferences.get(conf_num) {
-        vm.user_data.push(Box::new((*conference).clone()));
-        Ok(VariableValue {
-            data: VariableData::from_int(0),
-            generic_data: GenericVariableData::UserData(vm.user_data.len() - 1),
-            vtype: VariableType::UserData(CONFERENCE_ID as u8),
-        })
+    let conference = if let Some(conference) = &vm.icy_board_state.get_board().await.conferences.get(conf_num) {
+        (*conference).clone()
     } else {
         log::error!("PPL: Can't get conference {} (CONFINFO)", conf_num);
-        Ok(VariableValue::new_string(String::new()))
-    }
+        Conference::default()
+    };
+    Ok(user_data_value(conference, CONFERENCE_ID))
 }
 
 pub async fn confinfo(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {

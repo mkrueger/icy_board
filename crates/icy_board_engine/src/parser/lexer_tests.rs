@@ -475,3 +475,211 @@ fn test_if_elseif_branch() {
     // 6) EOF
     assert_eq!(None, lex.next_token());
 }
+
+fn lex_all(src: &str) -> (Vec<Token>, Vec<String>) {
+    let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+    let mut lex = Lexer::new(PathBuf::from("."), &Workspace::default(), src, Encoding::Utf8, errors.clone());
+    let mut tokens = Vec::new();
+    while let Some(token) = lex.next_token() {
+        tokens.push(token);
+    }
+    let reported = errors.lock().unwrap().errors.iter().map(|e| e.error.to_string()).collect();
+    (tokens, reported)
+}
+
+/// The identifiers a source lexes to, i.e. the code that survived the preprocessor.
+fn active_code(src: &str) -> Vec<String> {
+    lex_all(src)
+        .0
+        .iter()
+        .filter_map(|token| match token {
+            Token::Identifier(id) => Some(id.to_string()),
+            _ => None,
+        })
+        .collect()
+}
+
+fn assert_active(src: &str, expected: &[&str]) {
+    let (tokens, errors) = lex_all(src);
+    assert!(errors.is_empty(), "unexpected errors {errors:?} for:\n{src}");
+    let got: Vec<String> = tokens
+        .iter()
+        .filter_map(|token| match token {
+            Token::Identifier(id) => Some(id.to_string()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(expected, got.as_slice(), "wrong branch taken for:\n{src}");
+}
+
+#[test]
+fn test_preproc_branch_selection() {
+    assert_active(";$IF 1 == 1\nA\n;$ENDIF", &["A"]);
+    assert_active(";$IF 1 == 2\nA\n;$ENDIF", &[]);
+
+    assert_active(";$IF 1 == 2\nA\n;$ELSE\nB\n;$ENDIF", &["B"]);
+    assert_active(";$IF 1 == 1\nA\n;$ELSE\nB\n;$ENDIF", &["A"]);
+
+    assert_active(";$IF 1 == 2\nA\n;$ELSEIF 1 == 1\nB\n;$ELSE\nC\n;$ENDIF", &["B"]);
+    // A false ELSEIF used to fall through and wrongly activate its branch.
+    assert_active(";$IF 1 == 2\nA\n;$ELSEIF 1 == 3\nB\n;$ELSE\nC\n;$ENDIF", &["C"]);
+    assert_active(";$IF 1 == 2\nA\n;$ELSEIF 1 == 3\nB\n;$ENDIF", &[]);
+
+    // Only the first true branch runs.
+    assert_active(";$IF 1 == 1\nA\n;$ELSEIF 1 == 1\nB\n;$ELSE\nC\n;$ENDIF", &["A"]);
+    assert_active(";$IF 1 == 2\nA\n;$ELSEIF 1 == 1\nB\n;$ELSEIF 1 == 1\nC\n;$ENDIF", &["B"]);
+}
+
+#[test]
+fn test_preproc_elif_is_a_synonym_for_elseif() {
+    assert_active(";$IF 1 == 2\nA\n;$ELIF 1 == 1\nB\n;$ENDIF", &["B"]);
+    assert_active(";$IF 1 == 2\nA\n;$ELIF 1 == 3\nB\n;$ELSE\nC\n;$ENDIF", &["C"]);
+    assert_active(";$IF 1 == 1\nA\n;$ELIF 1 == 1\nB\n;$ENDIF", &["A"]);
+}
+
+#[test]
+fn test_preproc_directives_are_case_insensitive() {
+    assert_active(";$if 1 == 2\nA\n;$elseif 1 == 1\nB\n;$endif", &["B"]);
+    assert_active(";$If 1 == 2\nA\n;$Else\nB\n;$EndIf", &["B"]);
+}
+
+#[test]
+fn test_preproc_directives_allow_whitespace_after_comment_marker() {
+    assert_active(";  $IF 1 == 1\nA\n;  $ENDIF", &["A"]);
+    assert_active(";\t$IF 1 == 2\nA\n;\t$ELSE\nB\n;\t$ENDIF", &["B"]);
+
+    let (tokens, errors) = lex_all(";  $DEFINE FOO=42\nX = ;#FOO");
+    assert!(errors.is_empty(), "{errors:?}");
+    assert!(tokens.contains(&Token::Const(Constant::Integer(42, NumberFormat::Default))), "{tokens:?}");
+}
+
+#[test]
+fn test_preproc_directive_names_require_a_boundary() {
+    assert_active(";$IF 1 == 1\nA\n;$ELSEWHERE\nB\n;$ENDIF", &["A", "B"]);
+    assert_active(";$IF 1 == 1\nA\n;$ENDIF_EXTRA\nB\n;$ENDIF", &["A", "B"]);
+    assert_active(";$IF 1 == 2\nA\n;$ELIFOO 1 == 1\nB\n;$ELSE\nC\n;$ENDIF", &["C"]);
+}
+
+#[test]
+fn test_preproc_nested_blocks() {
+    assert_active(";$IF 1 == 1\n;$IF 1 == 2\nA\n;$ENDIF\nB\n;$ENDIF", &["B"]);
+    assert_active(";$IF 1 == 1\n;$IF 1 == 1\nA\n;$ENDIF\nB\n;$ENDIF", &["A", "B"]);
+    // The whole nested block sits inside a branch that is not taken.
+    assert_active(";$IF 1 == 2\n;$IF 1 == 1\nA\n;$ENDIF\nB\n;$ENDIF\nC", &["C"]);
+    assert_active(";$IF 1 == 2\n;$IF 1 == 1\nA\n;$ELSE\nB\n;$ENDIF\n;$ELSE\nC\n;$ENDIF", &["C"]);
+}
+
+#[test]
+fn test_preproc_unbalanced_directives_are_reported() {
+    for (src, expected) in [
+        (";$ELSE\nA", "$ELSE without $IF"),
+        (";$ELSEIF 1 == 1\nA", "$ELSEIF without $IF"),
+        (";$ELIF 1 == 1\nA", "$ELSEIF without $IF"),
+        (";$ENDIF\nA", "$ENDIF without $IF"),
+        (";$IF 1 == 1\nA", "Missing $ENDIF"),
+        (";$IF 1 == 2\nA", "Missing $ENDIF"),
+    ] {
+        let (_, errors) = lex_all(src);
+        assert!(errors.iter().any(|e| e == expected), "expected {expected:?}, got {errors:?} for:\n{src}");
+    }
+}
+
+#[test]
+fn test_preproc_define_drives_conditionals() {
+    assert_active(";$DEFINE FOO\n;$IF FOO\nA\n;$ELSE\nB\n;$ENDIF", &["A"]);
+    assert_active(";$DEFINE FOO=2\n;$IF FOO == 2\nA\n;$ELSE\nB\n;$ENDIF", &["A"]);
+    assert_active(";$DEFINE FOO=2\n;$IF FOO == 3\nA\n;$ELSE\nB\n;$ENDIF", &["B"]);
+    assert_active(";$DEFINE DEBUG_BUILD\n;$IF DEBUG_BUILD\nA\n;$ENDIF", &["A"]);
+    // An undefined name is simply false rather than an error.
+    assert_active(";$IF NOPE\nA\n;$ELSE\nB\n;$ENDIF", &["B"]);
+}
+
+#[test]
+fn test_preproc_workspace_defines() {
+    let mut workspace = Workspace::default();
+    workspace.compiler = Some(CompilerData {
+        language_version: Some(400),
+        defines: Some(vec!["FEATURE=42".to_string(), "DEBUG_BUILD".to_string()]),
+    });
+    let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+    let mut lex = Lexer::new(
+        PathBuf::from("."),
+        &workspace,
+        ";$IF FEATURE == 42 & DEBUG_BUILD\nA\n;$ENDIF",
+        Encoding::Utf8,
+        errors.clone(),
+    );
+    let mut identifiers = Vec::new();
+    while let Some(token) = lex.next_token() {
+        if let Token::Identifier(identifier) = token {
+            identifiers.push(identifier.to_string());
+        }
+    }
+    assert!(errors.lock().unwrap().errors.is_empty());
+    assert_eq!(vec!["A".to_string()], identifiers);
+}
+
+#[test]
+fn test_preproc_predefined_variables() {
+    let (tokens, errors) = lex_all("X = ;#RUNTIME");
+    assert!(errors.is_empty(), "{errors:?}");
+    assert!(
+        tokens.contains(&Token::Const(Constant::Integer(400, NumberFormat::Default))),
+        "RUNTIME did not substitute: {tokens:?}"
+    );
+
+    let (tokens, errors) = lex_all("X = ;#LANGVERSION");
+    assert!(errors.is_empty(), "{errors:?}");
+    assert!(
+        tokens.contains(&Token::Const(Constant::Integer(400, NumberFormat::Default))),
+        "LANGVERSION did not substitute: {tokens:?}"
+    );
+}
+
+#[test]
+fn test_preproc_substitution_of_user_define() {
+    let (tokens, errors) = lex_all(";$DEFINE FOO=41+1\nX = ;#FOO");
+    assert!(errors.is_empty(), "{errors:?}");
+    assert!(
+        tokens.contains(&Token::Const(Constant::Integer(42, NumberFormat::Default))),
+        "FOO did not substitute: {tokens:?}"
+    );
+}
+
+#[test]
+fn test_preproc_substitution_keeps_the_rest_of_the_line() {
+    // The terminator after the name used to be swallowed, which ate the following token.
+    let (tokens, _) = lex_all(";$DEFINE FOO=1\nA ;#FOO B");
+    let idents: Vec<String> = tokens
+        .iter()
+        .filter_map(|token| match token {
+            Token::Identifier(id) => Some(id.to_string()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(vec!["A".to_string(), "B".to_string()], idents, "{tokens:?}");
+}
+
+#[test]
+fn test_preproc_undefined_substitution_does_not_truncate() {
+    // An unknown token used to report end of file, silently dropping everything after it.
+    let (tokens, errors) = lex_all("A\n;#NOPE\nB");
+    assert!(
+        errors.iter().any(|e| e == "Undefined pre processor token (NOPE)"),
+        "expected an undefined token error, got {errors:?}"
+    );
+    let idents: Vec<String> = tokens
+        .iter()
+        .filter_map(|token| match token {
+            Token::Identifier(id) => Some(id.to_string()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(vec!["A".to_string(), "B".to_string()], idents, "code after the bad token was dropped");
+}
+
+#[test]
+fn test_preproc_unknown_directive_is_a_comment() {
+    assert_active(";$SOMETHINGELSE\nA", &["A"]);
+    assert_eq!(vec!["A".to_string()], active_code(";$SOMETHINGELSE\nA"));
+}
