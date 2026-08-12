@@ -382,7 +382,7 @@ impl PcbBoardCommand {
                     .state
                     .input_field(
                         IceText::GetAliasName,
-                        30,
+                        25,
                         &MASK_ASCII,
                         "",
                         None,
@@ -440,7 +440,7 @@ impl PcbBoardCommand {
                         .state
                         .input_field(
                             IceText::State,
-                            15,
+                            10,
                             &MASK_ASCII,
                             "",
                             None,
