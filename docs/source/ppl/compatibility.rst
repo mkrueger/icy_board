@@ -9,15 +9,29 @@ the predefined statements and functions that do **not** behave like the
 original, and says why. Everything not named here is implemented and is meant
 to match PCBoard; if you find one that does not, please report it.
 
-Of the 499 predefined statements and functions PCBoard offers, 454 are
-implemented, 39 are not, and 6 answer with a substitute value on purpose.
+Of the 507 predefined statements and functions PCBoard offers, 456 are
+implemented, 13 more work with one corner of their behaviour missing, 6 answer
+with a substitute value on purpose, and 32 are not implemented at all.
 
-======================  ==========  ===============  =============
-Kind                    Implemented  Not implemented  Substituted
-======================  ==========  ===============  =============
-Statements (223)        206          15               2
-Functions (276)         248          24               4
-======================  ==========  ===============  =============
+.. list-table::
+   :header-rows: 1
+   :widths: 26 16 10 14 18
+
+   * - Kind
+     - Implemented
+     - Partial
+     - Substituted
+     - Not implemented
+   * - Statements (223)
+     - 202
+     - 7
+     - 2
+     - 12
+   * - Functions (284)
+     - 254
+     - 6
+     - 4
+     - 20
 
 Checking your own PPE
 ---------------------
@@ -161,6 +175,11 @@ for a conflict that cannot happen.
 
 Everything else about the dBase support is implemented, including the parts the
 original PCBoard documentation gets wrong. See :doc:`dbase`.
+
+The FidoNet outbound queue is the other partial family: :PPL:`FDOQADD`,
+:PPL:`FDOQMOD` and :PPL:`FDOQDEL` queue and remove files and :PPL:`FDORDORG` and
+:PPL:`FDOQRD` read them back, but the crash flavour is ignored and only a single
+origin line is kept, as the FidoNet section above describes.
 
 Differences worth knowing
 -------------------------
