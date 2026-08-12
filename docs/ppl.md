@@ -165,9 +165,12 @@ call newer built-ins.
 #### DECLARE is optional
 
 `DECLARE FUNCTION` / `DECLARE PROCEDURE` before the implementation is no longer
-required; the compiler collects the signatures itself. Existing forward
-declarations are still accepted, and a return type that disagrees between the
-declaration and the implementation is an error rather than being quietly ignored.
+required; the compiler reads every signature in the file before it compiles the
+code, so a routine may be called before the file gets to it. Existing forward
+declarations are still accepted and keep their own checks.
+
+> A return type that disagrees between a declaration and its implementation is
+> currently accepted without a word. The implementation wins.
 
 #### Variable initializers
 

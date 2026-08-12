@@ -1000,6 +1000,49 @@ impl SemanticVisitor {
         }
     }
 
+    /// Registers the signature of a function the file implements, so a call that comes
+    /// before it resolves. A name that is already declared keeps its declaration.
+    fn predeclare_function(&mut self, function: &crate::ast::FunctionImplementation) {
+        if self.has_variable_defined(function.get_identifier()) {
+            return;
+        }
+        let id = self.add_declaration(VariableType::Function, function.get_identifier_token());
+        self.global_lookup.variable_lookup.insert(function.get_identifier().clone(), id);
+        self.function_containers.push(FunctionContainer {
+            name: function.get_identifier().clone(),
+            parameter_index: None,
+            id,
+            functions: FunctionDeclaration::Function(FunctionDeclarationAstNode::empty(
+                function.get_identifier().clone(),
+                function.get_parameters().clone(),
+                function.get_return_type(),
+            )),
+            lookup: VariableLookups::default(),
+            parameters: 0..0,
+            local_variables: 0..0,
+        });
+    }
+
+    fn predeclare_procedure(&mut self, procedure: &crate::ast::ProcedureImplementation) {
+        if self.has_variable_defined(procedure.get_identifier()) {
+            return;
+        }
+        let id = self.add_declaration(VariableType::Procedure, procedure.get_identifier_token());
+        self.global_lookup.variable_lookup.insert(procedure.get_identifier().clone(), id);
+        self.function_containers.push(FunctionContainer {
+            name: procedure.get_identifier().clone(),
+            parameter_index: None,
+            id,
+            functions: FunctionDeclaration::Procedure(ProcedureDeclarationAstNode::empty(
+                procedure.get_identifier().clone(),
+                procedure.get_parameters().clone(),
+            )),
+            lookup: VariableLookups::default(),
+            parameters: 0..0,
+            local_variables: 0..0,
+        });
+    }
+
     pub fn finish(&mut self) {
         for (rt, r) in &mut self.references.iter() {
             if matches!(rt, ReferenceType::Label(_)) {
@@ -1984,6 +2027,25 @@ impl AstVisitor<VariableType> for SemanticVisitor {
     }
 
     fn visit_ast(&mut self, program: &crate::ast::Ast) -> VariableType {
+        // A routine may be called before the file gets to it, so every signature is
+        // registered first - the same thing an explicit DECLARE does. A routine that
+        // has one is left to it, so its own checks still run.
+        let declared: Vec<unicase::Ascii<String>> = program
+            .nodes
+            .iter()
+            .filter_map(|node| match node {
+                crate::ast::AstNode::FunctionDeclaration(declaration) => Some(declaration.get_identifier().clone()),
+                crate::ast::AstNode::ProcedureDeclaration(declaration) => Some(declaration.get_identifier().clone()),
+                _ => None,
+            })
+            .collect();
+        for node in &program.nodes {
+            match node {
+                crate::ast::AstNode::Function(function) if !declared.contains(function.get_identifier()) => self.predeclare_function(function),
+                crate::ast::AstNode::Procedure(procedure) if !declared.contains(procedure.get_identifier()) => self.predeclare_procedure(procedure),
+                _ => {}
+            }
+        }
         for node in &program.nodes {
             match node {
                 crate::ast::AstNode::Function(_) | crate::ast::AstNode::Procedure(_) => {}
