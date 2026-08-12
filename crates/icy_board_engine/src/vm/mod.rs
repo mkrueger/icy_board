@@ -594,29 +594,34 @@ impl<'a> VirtualMachine<'a> {
                 };
                 self.variable_table.get_var_entry_mut(*id).value.set_array_value(dim_1, dim_2, dim_3, value)?;
             }
-            PPEExpr::Member(base_expr, member_id) => {
+            PPEExpr::Member(_, _) => {
                 // The base has to be reached as a place, not as the copy eval_expr hands out,
                 // so the slot it lives in is resolved first and then walked into.
-                match base_expr.as_ref() {
-                    PPEExpr::Value(id) => {
-                        let entry = self.variable_table.get_var_entry_mut(*id);
-                        let vtype = entry.value.vtype;
-                        let GenericVariableData::Record(fields) = &mut entry.value.generic_data else {
+                let mut path = Vec::new();
+                let mut base = variable;
+                while let PPEExpr::Member(inner, member_id) = base {
+                    path.push(*member_id);
+                    base = inner.as_ref();
+                }
+                let PPEExpr::Value(id) = base else {
+                    return Err(VMError::InternalVMError.into());
+                };
+                let mut target = &mut self.variable_table.get_var_entry_mut(*id).value;
+                for member_id in path.iter().rev() {
+                    let vtype = target.vtype;
+                    let GenericVariableData::Record(fields) = &mut target.generic_data else {
+                        return Err(VMError::NoUserTypeBase.into());
+                    };
+                    let Some(field) = fields.get_mut(*member_id) else {
+                        let VariableType::UserData(type_id) = vtype else {
                             return Err(VMError::NoUserTypeBase.into());
                         };
-                        let Some(field) = fields.get_mut(*member_id) else {
-                            let VariableType::UserData(type_id) = vtype else {
-                                return Err(VMError::NoUserTypeBase.into());
-                            };
-                            return Err(VMError::InvalidMemberId(type_id, *member_id).into());
-                        };
-                        let field_type = field.vtype;
-                        *field = value.convert_to(field_type);
-                    }
-                    _ => {
-                        return Err(VMError::InternalVMError.into());
-                    }
+                        return Err(VMError::InvalidMemberId(type_id, *member_id).into());
+                    };
+                    target = field;
                 }
+                let field_type = target.vtype;
+                *target = value.convert_to(field_type);
             }
             _ => {
                 return Err(VMError::InternalVMError.into());
@@ -784,13 +789,14 @@ impl<'a> VirtualMachine<'a> {
             };
             if (flags & 0x1) == 0x0 {
                 let entry = self.variable_table.get_var_entry(id);
-                let mut val = vtype.create_empty_value();
                 // A record keeps the fields its type declares, emptied out again.
-                if let GenericVariableData::Record(fields) = &entry.value.generic_data {
-                    val.generic_data = GenericVariableData::Record(fields.iter().map(|field| field.vtype.create_empty_value()).collect());
+                let val = if matches!(entry.value.generic_data, GenericVariableData::Record(_)) {
+                    entry.value.emptied()
                 } else {
+                    let mut val = vtype.create_empty_value();
                     val.generic_data = entry.header.create_generic_data().unwrap_or(GenericVariableData::None);
-                }
+                    val
+                };
                 self.variable_table.set_value(id, val);
             }
         }

@@ -107,6 +107,27 @@ impl VarHeader {
     }
 }
 
+/// A record value with every field set up, so a field that is itself a record gets
+/// its own fields too. A type can only name types declared before it, so this ends.
+pub fn create_record_value(type_id: u8, user_types: &[Vec<VariableType>]) -> Option<VariableValue> {
+    let fields = user_types.get(type_id as usize - crate::parser::FIRST_USER_TYPE_ID)?;
+    let mut values = Vec::with_capacity(fields.len());
+    for field in fields {
+        let value = match field {
+            VariableType::UserData(id) if crate::parser::is_user_declared_type(*id) => {
+                create_record_value(*id, user_types).unwrap_or_else(|| field.create_empty_value())
+            }
+            _ => field.create_empty_value(),
+        };
+        values.push(value);
+    }
+    Some(VariableValue {
+        vtype: VariableType::UserData(type_id),
+        data: crate::executable::VariableData::default(),
+        generic_data: GenericVariableData::Record(values),
+    })
+}
+
 #[derive(Clone, Copy, Default)]
 pub struct FunctionValue {
     pub parameters: u8,
@@ -893,14 +914,10 @@ impl VariableTable {
             if !crate::parser::is_user_declared_type(type_id) {
                 continue;
             }
-            let Some(fields) = user_types.get(type_id as usize - crate::parser::FIRST_USER_TYPE_ID) else {
+            let Some(value) = create_record_value(type_id, user_types) else {
                 continue;
             };
-            entry.value = VariableValue {
-                vtype: entry.header.variable_type,
-                data: crate::executable::VariableData::default(),
-                generic_data: GenericVariableData::create_record(fields),
-            };
+            entry.value = value;
         }
     }
 

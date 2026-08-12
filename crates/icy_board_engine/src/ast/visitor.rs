@@ -572,7 +572,7 @@ pub trait AstVisitorMut: Sized {
             let_stmt.get_lpar_token().clone(),
             let_stmt.get_arguments().iter().map(|arg| arg.visit_mut(self)).collect(),
             let_stmt.get_rpar_token().clone(),
-            let_stmt.get_member_token().clone(),
+            let_stmt.get_members().clone(),
             let_stmt.get_eq_token().clone(),
             let_stmt.get_value_expression().visit_mut(self),
         ))

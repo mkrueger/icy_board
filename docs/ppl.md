@@ -380,11 +380,13 @@ NEXT
 ```
 
 Note that `CONFERENCE`, `DOOR`, `AREA` and `DIRECTORY` are resolved wherever a
-type name is expected, so a variable cannot be called `door` or `area`.
+type name is expected, so a variable cannot be called `door` or `area`. The names
+are compared without regard to case, so this holds for a record type a program
+declares too: `Point point` leaves `point` ambiguous.
 
-These objects are read-only snapshots. Assigning to a member — `conf.Name = "x"` —
-is rejected, and one call per statement is the limit: `conf.GetDoor(0).Name` does
-not parse, the intermediate has to go into a variable first.
+These objects are read-only snapshots, so assigning to a member — `conf.Name = "x"`
+— is rejected. What a member answers may be asked again, so
+`conf.GetDoor(0).Name` reads in one go.
 
 #### Overloaded built-ins
 
@@ -454,13 +456,32 @@ e.Age += 1
 
 A record starts out with the empty value of each of its fields, and each variable
 of a record type has fields of its own. A record is a value, not a reference:
-two variables of the same type do not share anything.
+two variables of the same type do not share anything. A record travels into a
+routine and back out of a function like any other value, and a `VAR` parameter
+writes back.
+
+A field may be a record itself, as long as its type was declared first, and the
+fields of that field are reached by carrying on with `.`:
+
+```PPL
+TYPE Address
+    STRING Town
+ENDTYPE
+TYPE Member
+    Address Home
+ENDTYPE
+
+Member m
+m.Home.Town = "Kiel"
+PRINTLN m.Home.Town
+```
 
 Rules the compiler enforces:
 
 * A type needs at least one field.
 * Field names must be unique within the type.
-* A type cannot contain a field of its own type.
+* A type cannot contain a field of its own type, and can only name types that
+  were declared before it, so a record cannot end up containing itself.
 * A type cannot reuse the name of a built-in or of a board object.
 * A program may declare 156 types; ids 100–255 are reserved for them, leaving
   30–99 for board objects.

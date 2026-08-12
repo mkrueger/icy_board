@@ -333,15 +333,14 @@ impl AstVisitorMut for AstTransformationVisitor {
         let mut val_expr = let_stmt.get_value_expression().visit_mut(self);
 
         // `record.field op= value` has to read back the field, not the record.
-        let target = if let Some(member_token) = let_stmt.get_member_token() {
-            Expression::MemberReference(crate::ast::MemberReferenceExpression::new(
-                Expression::Identifier(IdentifierExpression::new(let_stmt.get_identifier_token().clone())),
+        let mut target = Expression::Identifier(IdentifierExpression::new(let_stmt.get_identifier_token().clone()));
+        for member in let_stmt.get_members() {
+            target = Expression::MemberReference(crate::ast::MemberReferenceExpression::new(
+                target,
                 Spanned::create_empty(Token::Dot),
-                member_token.clone(),
-            ))
-        } else {
-            Expression::Identifier(IdentifierExpression::new(let_stmt.get_identifier_token().clone()))
-        };
+                member.clone(),
+            ));
+        }
 
         match let_stmt.get_let_variant() {
             Token::MulAssign => {
@@ -377,7 +376,7 @@ impl AstVisitorMut for AstTransformationVisitor {
             let_stmt.get_lpar_token().clone(),
             let_stmt.get_arguments().iter().map(|arg| arg.visit_mut(self)).collect(),
             let_stmt.get_rpar_token().clone(),
-            let_stmt.get_member_token().clone(),
+            let_stmt.get_members().clone(),
             Spanned::create_empty(Token::Eq),
             val_expr,
         ))
@@ -420,7 +419,7 @@ impl AstVisitorMut for AstTransformationVisitor {
                 None,
                 Vec::new(),
                 None,
-                None,
+                Vec::new(),
                 Spanned::create_empty(Token::Eq),
                 expr.visit_mut(self),
             )));
@@ -459,7 +458,7 @@ impl AstVisitorMut for AstTransformationVisitor {
                                     NumberFormat::Default,
                                 )))],
                                 None,
-                                None,
+                                Vec::new(),
                                 Spanned::create_empty(Token::Eq),
                                 expr.visit_mut(self),
                             )));
@@ -486,7 +485,7 @@ impl AstVisitorMut for AstTransformationVisitor {
                             None,
                             Vec::new(),
                             None,
-                            None,
+                            Vec::new(),
                             Spanned::create_empty(Token::Eq),
                             init.visit_mut(self),
                         )));

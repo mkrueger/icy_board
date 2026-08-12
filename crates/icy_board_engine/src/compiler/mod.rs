@@ -313,19 +313,27 @@ impl PPECompiler {
                     }
                     PPEExpr::Dim(decl_id, arguments)
                 };
-                let variable = if let Some(member) = let_smt.get_member() {
-                    let VariableType::UserData(type_id) = variable_type else {
+                let mut variable = variable;
+                let mut member_type = variable_type;
+                for member_token in let_smt.get_members() {
+                    let Token::Identifier(member) = &member_token.token else {
+                        return None;
+                    };
+                    let VariableType::UserData(type_id) = member_type else {
                         log::error!("Not a record: {}", var_name);
                         return None;
                     };
-                    let Some(field) = self.semantic_visitor.type_registry.record_field_index(type_id, member) else {
+                    let Some(definition) = self.semantic_visitor.type_registry.get_user_type_from_id(type_id) else {
+                        log::error!("Not a record: {}", var_name);
+                        return None;
+                    };
+                    let Some(field) = definition.field_index(member) else {
                         log::error!("Field not found: {}.{}", var_name, member);
                         return None;
                     };
-                    PPEExpr::Member(Box::new(variable), field)
-                } else {
-                    variable
-                };
+                    member_type = definition.field_type(field).unwrap_or(VariableType::None);
+                    variable = PPEExpr::Member(Box::new(variable), field);
+                }
                 let value = self.comp_expr(let_smt.get_value_expression());
 
                 Some(PPECommand::Let(Box::new(variable), Box::new(value)))

@@ -15,6 +15,7 @@ mod file_names;
 mod forward_calls;
 mod masks;
 mod message_base;
+mod nested_records;
 mod ppe_paths;
 mod records;
 mod scalars;
@@ -36,9 +37,23 @@ use crate::parser::{Encoding, ErrorReporter, UserTypeRegistry, parse_ast};
 use crate::vm::io::DiskIO;
 use crate::vm::run;
 
-/// Compiles a PPL snippet, or panics with the diagnostics if it does not build.
-fn compile(source: &str) -> crate::executable::Executable {
+/// The diagnostics a snippet produces, for the cases where not compiling is the point.
+pub fn compile_errors(source: &str) -> Vec<String> {
     let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+    let reg = UserTypeRegistry::icy_board_registry();
+    let mut workspace = Workspace::default();
+    workspace.hard_coded_files = Some(vec![PathBuf::from("test.pps")]);
+
+    let ast = parse_ast(PathBuf::from("test.pps"), errors.clone(), source, &reg, Encoding::Utf8, &workspace);
+    let mut compiler = PPECompiler::new(&workspace, reg, errors.clone());
+    compiler.compile(&[&ast]);
+
+    let reporter = errors.lock().unwrap();
+    reporter.errors.iter().map(|e| e.error.to_string()).collect()
+}
+
+/// Compiles a PPL snippet, or panics with the diagnostics if it does not build.
+fn compile(source: &str) -> crate::executable::Executable {    let errors = Arc::new(Mutex::new(ErrorReporter::default()));
     let reg = UserTypeRegistry::icy_board_registry();
     let mut workspace = Workspace::default();
     workspace.hard_coded_files = Some(vec![PathBuf::from("test.pps")]);

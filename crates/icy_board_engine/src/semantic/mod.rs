@@ -1591,12 +1591,14 @@ impl AstVisitor<VariableType> for SemanticVisitor {
 
                 self.add_reference_to(let_stmt.get_identifier_token(), idx);
 
-                if let Some(member_token) = let_stmt.get_member_token() {
-                    let variable_type = self.references[idx].1.variable_type;
+                let mut variable_type = self.references[idx].1.variable_type;
+                for member_token in let_stmt.get_members() {
                     match variable_type {
                         VariableType::UserData(type_id) if crate::parser::is_user_declared_type(type_id) => {
-                            let member = let_stmt.get_member().cloned().unwrap_or_default();
-                            self.resolve_record_field(type_id, &member, &member_token.span);
+                            let Token::Identifier(member) = &member_token.token else {
+                                break;
+                            };
+                            variable_type = self.resolve_record_field(type_id, member, &member_token.span);
                         }
                         // Board objects hand out copies, so writing to one would go nowhere.
                         _ => {
@@ -1604,6 +1606,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                                 .lock()
                                 .unwrap()
                                 .report_error(member_token.span.clone(), CompilationErrorType::InvalidLetVariable);
+                            break;
                         }
                     }
                 }

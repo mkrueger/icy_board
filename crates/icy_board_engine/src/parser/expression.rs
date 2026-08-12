@@ -162,17 +162,34 @@ impl<'a> Parser<'a> {
                 let rightpar_token = self.save_spanned_token();
                 self.next_token();
 
-                return Some(Expression::FunctionCall(FunctionCallExpression::new(
-                    expr,
-                    leftpar_token,
-                    arguments,
-                    rightpar_token,
-                )));
+                let call = Expression::FunctionCall(FunctionCallExpression::new(expr, leftpar_token, arguments, rightpar_token));
+                return self.parse_member_chain(call);
             }
             Some(expr)
         } else {
             None
         }
+    }
+
+    /// Follows `.member` as far as it goes, so what a member answers may have members
+    /// of its own.
+    fn parse_member_chain(&mut self, expr: Expression) -> Option<Expression> {
+        let mut expr = expr;
+        while self.get_cur_token() == Some(Token::Dot) {
+            let dot_token: super::lexer::Spanned<Token> = self.save_spanned_token();
+            self.next_token();
+            let identifier_token = self.save_spanned_token();
+            if !matches!(identifier_token.token, Token::Identifier(_)) {
+                self.error_reporter
+                    .lock()
+                    .unwrap()
+                    .report_error(self.save_token_span(), ParserErrorType::IdentifierExpected(self.save_token()));
+                return None;
+            }
+            self.next_token();
+            expr = Expression::MemberReference(MemberReferenceExpression::new(expr, dot_token, identifier_token));
+        }
+        Some(expr)
     }
 
     fn parse_primary(&mut self) -> Option<Expression> {
@@ -295,23 +312,9 @@ impl<'a> Parser<'a> {
             _ => None,
         };
 
-        if self.get_cur_token() == Some(Token::Dot) {
-            if let Some(expr) = expr {
-                let dot_token: super::lexer::Spanned<Token> = self.save_spanned_token();
-                self.next_token();
-                let identifier_token = self.save_spanned_token();
-                if !matches!(identifier_token.token, Token::Identifier(_)) {
-                    self.error_reporter
-                        .lock()
-                        .unwrap()
-                        .report_error(self.save_token_span(), ParserErrorType::IdentifierExpected(self.save_token()));
-                    return None;
-                }
-                self.next_token();
-                return Some(Expression::MemberReference(MemberReferenceExpression::new(expr, dot_token, identifier_token)));
-            }
+        match expr {
+            Some(expr) if self.get_cur_token() == Some(Token::Dot) => self.parse_member_chain(expr),
+            expr => expr,
         }
-
-        expr
     }
 }
