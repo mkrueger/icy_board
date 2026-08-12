@@ -29,6 +29,12 @@ Gets data from a web server and returns it as a string.
 ### Returns
 `STRING`   Returns the web request value as STRING.
 
+### Remarks
+A request that fails - a bad url, a host that is not there, an error from the
+server - is logged and answers an empty string rather than stopping the PPE.
+A request gives up after 30 seconds, so a host that never answers cannot hold
+the caller's node.
+
 ## `WEBREQUEST()` Statement (4.00)
 
 ### Function
@@ -40,6 +46,11 @@ Gets data from a web server and stores it as a file.
 `url`  An string expression stating the url to get data from.
 
 `file` An string expression stating the file to save the data to.
+
+### Remarks
+The file is resolved against the board like every other file a PPE writes, so a
+DOS style path works the way it does everywhere else. A request that fails is
+logged, writes no file and lets the PPE carry on; it gives up after 30 seconds.
 
 ## `Len()`  Function (4.00)
 

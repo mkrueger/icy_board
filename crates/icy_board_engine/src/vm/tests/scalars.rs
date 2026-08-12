@@ -19,6 +19,23 @@ fn test_pcbaccstat_reports_the_accounting_status() {
     assert_eq!(enabled, "2");
 }
 
+/// A request that cannot be made answers empty and lets the program carry on,
+/// the way the runtime treats every other call it cannot carry out. The url is
+/// malformed, so it fails before anything is sent.
+#[test]
+fn test_a_web_request_that_fails_does_not_stop_the_program() {
+    assert_eq!(run_ppl("PRINT \"[\", WEBREQUEST(\"not a url\"), \"]\""), "[]");
+}
+
+/// The same for the statement form, which writes no file and keeps going.
+#[test]
+fn test_a_failed_web_request_statement_does_not_stop_the_program() {
+    assert_eq!(
+        run_ppl("WEBREQUEST \"not a url\", \"out.txt\"\nPRINT \"still here\""),
+        "still here"
+    );
+}
+
 /// PCBoard kept a name and a city per node in USERNET, so what WRUNET writes is
 /// what UN_NAME and UN_CITY read back.
 #[test]
