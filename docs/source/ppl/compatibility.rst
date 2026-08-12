@@ -39,10 +39,10 @@ Checking your own PPE
 You do not have to read this list to find out whether a particular PPE is
 affected. The decompiler will tell you::
 
-    ppld --compat-check MYDOOR.PPE
+    ppld --check MYDOOR.PPE
 
 It scans the compiled code and reports every call that is not fully supported,
-grouped by severity, along with the line it appears on. A PPE that reports
+grouped by severity, with the code offset it appears at. A PPE that reports
 nothing uses only opcodes that behave like the original.
 
 What the categories mean

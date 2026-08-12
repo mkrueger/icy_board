@@ -1,6 +1,6 @@
 //! Guards the PCBoard compatibility tables in `executable::compat` against drift.
 //!
-//! The curated lists there are consumed at runtime (`ppld --compat-check`) where the
+//! The curated lists there are consumed at runtime (`ppld --check`) where the
 //! sources aren't available. This test rebuilds the same information from the VM
 //! dispatch tables plus the handler bodies, so implementing (or breaking) an opcode
 //! fails here until the tables are updated.
