@@ -122,11 +122,13 @@ impl PcbBoardCommand {
             }
 
             if found_user.is_none() && !first_name.contains(' ') {
+                // PCBoard caps the last name so "First Last" fits the 25 char record.
+                let last_name_len = (24 - first_name.chars().count() as i32).max(0);
                 let last_name = self
                     .state
                     .input_field(
                         IceText::YourLastName,
-                        39,
+                        last_name_len,
                         &MASK_ASCII,
                         "",
                         None,
