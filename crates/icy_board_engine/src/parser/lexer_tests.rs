@@ -580,6 +580,57 @@ fn test_preproc_unbalanced_directives_are_reported() {
     }
 }
 
+fn assert_preproc_error(src: &str, expected: &str) {
+    let (_, errors) = lex_all(src);
+    assert_eq!(vec![expected.to_string()], errors, "unexpected diagnostics for:\n{src}");
+}
+
+#[test]
+fn test_preproc_malformed_conditions_have_dedicated_errors() {
+    assert_preproc_error(";$IF\nA\n;$ENDIF", "Invalid pre processor expression: ''");
+    assert_preproc_error(";$IF 1 ==\nA\n;$ENDIF", "Invalid pre processor expression: '1 =='");
+    assert_preproc_error(";$IF 1 2\nA\n;$ENDIF", "Invalid pre processor expression: '1 2'");
+    assert_preproc_error(
+        ";$IF 1 == 2\nA\n;$ELSEIF\nB\n;$ENDIF",
+        "Invalid pre processor expression: ''",
+    );
+    assert_preproc_error(
+        ";$IF 1 == 2\nA\n;$ELIF 1 ==\nB\n;$ENDIF",
+        "Invalid pre processor expression: '1 =='",
+    );
+    assert_preproc_error(
+        ";$IF 1 == 1\nA\n;$ELSEIF 1 ==\nB\n;$ENDIF",
+        "Invalid pre processor expression: '1 =='",
+    );
+    assert_preproc_error(
+        ";$IF 1 == 1\nA\n;$ELSEIF 1 == 2\nB\n;$ELSEIF 1 ==\nC\n;$ENDIF",
+        "Invalid pre processor expression: '1 =='",
+    );
+    assert_preproc_error(";$IF 1/0\nA\n;$ENDIF", "Invalid pre processor expression: '1/0'");
+    assert_preproc_error(";$IF 1%0\nA\n;$ENDIF", "Invalid pre processor expression: '1%0'");
+}
+
+#[test]
+fn test_preproc_malformed_defines_have_dedicated_errors() {
+    assert_preproc_error(";$DEFINE", "Invalid $DEFINE directive: 'missing name'");
+    assert_preproc_error(";$DEFINE = 1", "Invalid $DEFINE directive: '= 1'");
+    assert_preproc_error(";$DEFINE 1FOO", "Invalid $DEFINE directive: '1FOO'");
+    assert_preproc_error(";$DEFINE FOO BAR", "Invalid $DEFINE directive: 'FOO BAR'");
+    assert_preproc_error(";$DEFINE FOO=", "Invalid $DEFINE directive: 'FOO='");
+    assert_preproc_error(";$DEFINE FOO=1 2", "Invalid $DEFINE directive: 'FOO=1 2'");
+    assert_preproc_error(";$DEFINE FOO==", "Invalid $DEFINE directive: 'FOO=='");
+    assert_preproc_error(";$DEFINE FOO=1/0", "Invalid $DEFINE directive: 'FOO=1/0'");
+    assert_preproc_error(";$DEFINE FOO=1%0", "Invalid $DEFINE directive: 'FOO=1%0'");
+    assert_preproc_error(";$DEFINE FOO=UNKNOWN", "Invalid define value: FOO=UNKNOWN");
+    assert_preproc_error(";$DEFINE FOO=\"text\"", "Invalid define value: FOO=\"text\"");
+}
+
+#[test]
+fn test_preproc_define_allows_whitespace_and_boolean_values() {
+    assert_active(";$DEFINE FEATURE = 1 == 1\n;$IF FEATURE\nA\n;$ENDIF", &["A"]);
+    assert_active(";$DEFINE FEATURE=1=1\n;$IF FEATURE\nA\n;$ENDIF", &["A"]);
+}
+
 #[test]
 fn test_preproc_define_drives_conditionals() {
     assert_active(";$DEFINE FOO\n;$IF FOO\nA\n;$ELSE\nB\n;$ENDIF", &["A"]);

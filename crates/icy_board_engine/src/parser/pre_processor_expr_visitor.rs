@@ -10,7 +10,7 @@ use crate::{
 
 use super::{
     ErrorReporter,
-    lexer::{Spanned, Token},
+    lexer::{LexingErrorType, Spanned, Token},
 };
 
 pub struct PreProcessorVisitor<'a> {
@@ -71,6 +71,13 @@ impl<'a> AstVisitor<Option<VariableValue>> for PreProcessorVisitor<'a> {
                 BinOp::Add => Some(left_value + right_value),
                 BinOp::Sub => Some(left_value - right_value),
                 BinOp::Mul => Some(left_value * right_value),
+                BinOp::Div | BinOp::Mod if right_value.as_int() == 0 => {
+                    self.errors
+                        .lock()
+                        .unwrap()
+                        .report_error(0..0, LexingErrorType::InvalidPreProcessorExpression("division by zero".to_string()));
+                    None
+                }
                 BinOp::Div => Some(left_value / right_value),
                 BinOp::Mod => Some(left_value % right_value),
                 BinOp::PoW => Some(left_value.pow(right_value)),

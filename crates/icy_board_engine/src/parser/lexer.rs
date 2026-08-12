@@ -1,9 +1,10 @@
 use crate::{
     ast::{
-        Constant, Statement,
+        Constant,
         constant::{BUILTIN_CONSTS, NumberFormat},
     },
     compiler::workspace::Workspace,
+    executable::VariableValue,
 };
 use core::fmt;
 use std::{
@@ -42,6 +43,12 @@ pub enum LexingErrorType {
 
     #[error("Invalid define value: {0}")]
     InvalidDefineValue(String),
+
+    #[error("Invalid $DEFINE directive: '{0}'")]
+    InvalidDefine(String),
+
+    #[error("Invalid pre processor expression: '{0}'")]
+    InvalidPreProcessorExpression(String),
 
     #[error("Already defined ({0})")]
     AlreadyDefined(String),
@@ -1235,16 +1242,10 @@ impl Lexer {
             let elseif_len = elseif_directive_len(&upper);
             if nest == 0 && (elseif_len.is_some() || directive_len(&upper, "$ELSE").is_some()) {
                 let activating = if let Some(len) = elseif_len {
-                    if let Some(frame) = self.if_stack.last() {
-                        if frame.taken {
-                            false
-                        } else {
-                            let expr_src = &after_marker[after_marker.find('$').unwrap() + len..];
-                            self.eval_preproc_bool(expr_src)
-                        }
-                    } else {
-                        false
-                    }
+                    let already_taken = self.if_stack.last().is_some_and(|frame| frame.taken);
+                    let expr_src = &after_marker[after_marker.find('$').unwrap() + len..];
+                    let condition = self.eval_preproc_bool(expr_src);
+                    !already_taken && condition
                 } else {
                     // $ELSE activates only if no branch taken yet
                     if let Some(frame) = self.if_stack.last() { !frame.taken } else { false }
@@ -1317,10 +1318,11 @@ impl Lexer {
                 return self.next_token();
             }
             let already = self.if_stack.last().unwrap().taken;
+            let expr_src = &raw[raw.find('$').unwrap() + len..];
             if already {
+                self.eval_preproc_bool(expr_src);
                 return Some(self.collect_inactive_region(raw, cmt_type));
             } else {
-                let expr_src = &raw[raw.find('$').unwrap() + len..];
                 let cond = self.eval_preproc_bool(expr_src);
                 if let Some(f) = self.if_stack.last_mut() {
                     if cond {
@@ -1377,73 +1379,112 @@ impl Lexer {
 
         Some(Token::Comment(cmt_type, raw))
     }
-    fn eval_preproc_bool(&mut self, src: &str) -> bool {
+    fn parse_preproc_value(&self, src: &str) -> Result<Option<VariableValue>, ()> {
         let expr = src.trim();
         if expr.is_empty() {
-            return false;
+            return Err(());
         }
         let reg = UserTypeRegistry::default();
-        let mut parser = Parser::new(PathBuf::from("."), self.errors.clone(), &reg, expr, Encoding::Utf8, &Workspace::default());
+        let parse_errors = Arc::new(Mutex::new(ErrorReporter::default()));
+        let mut parser = Parser::new(PathBuf::from("."), parse_errors.clone(), &reg, expr, Encoding::Utf8, &Workspace::default());
         parser.next_token();
-        if let Some(ast) = parser.parse_expression() {
-            let mut visitor = PreProcessorVisitor {
-                define_table: &self.define_table,
-                errors: self.errors.clone(),
-            };
-            if let Some(val) = ast.visit(&mut visitor) {
-                return val.as_bool();
-            }
+        let Some(expression) = parser.parse_expression() else {
+            return Err(());
+        };
+        if parser.get_cur_token().is_some() || !parse_errors.lock().unwrap().errors.is_empty() {
+            return Err(());
         }
-        false
+        let mut visitor = PreProcessorVisitor {
+            define_table: &self.define_table,
+            errors: parse_errors.clone(),
+        };
+        let value = expression.visit(&mut visitor);
+        if parse_errors.lock().unwrap().errors.is_empty() {
+            Ok(value)
+        } else {
+            Err(())
+        }
     }
 
-    fn handle_define(&mut self, input: &str) {
-        let reg = UserTypeRegistry::default();
-        if input.is_empty() {
-            return;
-        }
-        let mut chars = input.chars();
-        if chars.next().is_some_and(|ch| ch.is_ascii_alphabetic() || ch == '_') && chars.all(|ch| ch.is_ascii_alphanumeric() || ch == '_') {
-            if self.define_table.insert(Ascii::new(input.to_string()), Constant::Boolean(true)).is_some() {
+    fn eval_preproc_bool(&mut self, src: &str) -> bool {
+        match self.parse_preproc_value(src) {
+            Ok(Some(value)) => value.as_bool(),
+            Ok(None) => false,
+            Err(()) => {
                 self.errors
                     .lock()
                     .unwrap()
-                    .report_warning(self.token_start..self.token_end, LexingErrorType::AlreadyDefined(input.to_string()));
-            }
-            return;
-        }
-        let mut parser = Parser::new(PathBuf::from("."), self.errors.clone(), &reg, input, Encoding::Utf8, &Workspace::default());
-        parser.next_token();
-        if let Some(stmt) = parser.parse_statement() {
-            if let Statement::Let(expr) = stmt {
-                let mut visitor = PreProcessorVisitor {
-                    define_table: &self.define_table,
-                    errors: self.errors.clone(),
-                };
-                if let Some(val) = expr.get_value_expression().visit(&mut visitor) {
-                    let (k, v) = match val.get_type() {
-                        crate::executable::VariableType::Boolean => (expr.get_identifier().to_string(), Constant::Boolean(val.as_bool())),
-                        crate::executable::VariableType::Integer => (expr.get_identifier().to_string(), Constant::Integer(val.as_int(), NumberFormat::Default)),
-                        _ => {
-                            self.errors
-                                .lock()
-                                .unwrap()
-                                .report_error(self.token_start..self.token_end, LexingErrorType::InvalidDefineValue(input.to_string()));
-                            return;
-                        }
-                    };
-                    if self.define_table.insert(Ascii::new(k.clone()), v).is_some() {
-                        self.errors
-                            .lock()
-                            .unwrap()
-                            .report_warning(self.token_start..self.token_end, LexingErrorType::AlreadyDefined(k));
-                    }
-                }
+                    .report_error(self.token_start..self.token_end, LexingErrorType::InvalidPreProcessorExpression(src.trim().to_string()));
+                false
             }
         }
     }
 
-    // In check_eof():
+    fn handle_define(&mut self, input: &str) {
+        let input = input.trim();
+        if input.is_empty() {
+            self.errors
+                .lock()
+                .unwrap()
+                .report_error(self.token_start..self.token_end, LexingErrorType::InvalidDefine("missing name".to_string()));
+            return;
+        }
+
+        let (name, value) = if let Some((name, value)) = input.split_once('=') {
+            (name.trim(), Some(value.trim()))
+        } else {
+            (input, None)
+        };
+        let mut chars = name.chars();
+        let valid_name = chars.next().is_some_and(|ch| ch.is_ascii_alphabetic() || ch == '_') && chars.all(|ch| ch.is_ascii_alphanumeric() || ch == '_');
+        if !valid_name {
+            self.errors
+                .lock()
+                .unwrap()
+                .report_error(self.token_start..self.token_end, LexingErrorType::InvalidDefine(input.to_string()));
+            return;
+        }
+
+        let value = if let Some(value) = value {
+            match self.parse_preproc_value(value) {
+                Ok(Some(value)) => match value.get_type() {
+                    crate::executable::VariableType::Boolean => Constant::Boolean(value.as_bool()),
+                    crate::executable::VariableType::Integer => Constant::Integer(value.as_int(), NumberFormat::Default),
+                    _ => {
+                        self.errors
+                            .lock()
+                            .unwrap()
+                            .report_error(self.token_start..self.token_end, LexingErrorType::InvalidDefineValue(input.to_string()));
+                        return;
+                    }
+                },
+                Ok(None) => {
+                    self.errors
+                        .lock()
+                        .unwrap()
+                        .report_error(self.token_start..self.token_end, LexingErrorType::InvalidDefineValue(input.to_string()));
+                    return;
+                }
+                Err(()) => {
+                    self.errors
+                        .lock()
+                        .unwrap()
+                        .report_error(self.token_start..self.token_end, LexingErrorType::InvalidDefine(input.to_string()));
+                    return;
+                }
+            }
+        } else {
+            Constant::Boolean(true)
+        };
+
+        if self.define_table.insert(Ascii::new(name.to_string()), value).is_some() {
+            self.errors
+                .lock()
+                .unwrap()
+                .report_warning(self.token_start..self.token_end, LexingErrorType::AlreadyDefined(name.to_string()));
+        }
+    }
+
     fn check_eof(&mut self) {
         if !self.if_stack.is_empty() {
             self.errors
@@ -1452,8 +1493,6 @@ impl Lexer {
                 .report_error(self.token_start..self.token_end, LexingErrorType::MissingEndIf);
         }
     }
-    // ...existing code...
-
     pub fn next_token(&mut self) -> Option<Token> {
         // Handle include files first
         if let Some(lexer) = &mut self.include_lexer {
