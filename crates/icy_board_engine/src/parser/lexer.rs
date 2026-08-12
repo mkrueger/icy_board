@@ -334,8 +334,7 @@ pub enum LexerState {
 
 #[derive(Debug, Clone)]
 struct IfFrame {
-    taken: bool,  // has any prior branch executed?
-    active: bool, // emit tokens for this branch?
+    taken: bool,
 }
 
 fn directive_len(upper: &str, directive: &str) -> Option<usize> {
@@ -1168,11 +1167,13 @@ impl Lexer {
         self.next_token()
     }
 
-    // Collect skipped inactive region starting at a false $IF or untaken $ELSEIF.
-    // Includes lines until:
-    //  * an activating $ELSE or $ELSEIF true branch (includes that directive line, then stops)
-    //  * OR the matching $ENDIF (excludes that line so it becomes its own comment token)
-    // Nested inactive $IF blocks are fully absorbed.
+    // Collect a skipped region starting at a false $IF, an untaken $ELSEIF or $ELSE.
+    // Collecting stops after:
+    //  * an activating $ELSE or true $ELSEIF, so the code behind it is lexed again, or
+    //  * the matching $ENDIF, which also pops the frame, or
+    //  * end of file, which leaves the frame for check_eof to report.
+    // Nested blocks are absorbed whole. The text keeps the source verbatim apart from
+    // the leading comment marker, which the returned CommentType stands for.
     fn collect_inactive_region(&mut self, mut collected: String, marker: CommentType) -> Token {
         if !collected.ends_with('\n') {
             collected.push('\n');
@@ -1183,7 +1184,6 @@ impl Lexer {
             if self.token_end >= self.text.len() {
                 break;
             }
-            let line_start = self.token_end;
             let mut line_chars: Vec<char> = Vec::new();
             let mut first_non_ws: Option<char> = None;
 
@@ -1222,15 +1222,13 @@ impl Lexer {
 
             // ENDIF
             if directive_len(&upper, "$ENDIF").is_some() {
+                collected.push_str(&line_str);
                 if nest == 0 {
-                    // Stop BEFORE consuming this line: rewind so it becomes its own comment token.
-                    self.token_end = line_start;
+                    self.if_stack.pop();
                     break;
-                } else {
-                    nest -= 1;
-                    collected.push_str(&line_str);
-                    continue;
                 }
+                nest -= 1;
+                continue;
             }
 
             // At root level, sibling directives might activate or also be skipped
@@ -1252,19 +1250,14 @@ impl Lexer {
                     if let Some(frame) = self.if_stack.last() { !frame.taken } else { false }
                 };
 
+                collected.push_str(&line_str);
                 if activating {
-                    // Include this directive line then stop so following code is active.
-                    collected.push_str(&line_str);
                     if let Some(f) = self.if_stack.last_mut() {
-                        f.active = true;
                         f.taken = true;
                     }
                     break;
-                } else {
-                    // Still inactive, include and continue.
-                    collected.push_str(&line_str);
-                    continue;
                 }
+                continue;
             }
 
             // Any other comment line in skipped region
@@ -1275,7 +1268,6 @@ impl Lexer {
         Token::Comment(marker, collected)
     }
 
-    // Adjust read_comment to call collect_inactive_region with marker and NOT produce BlockComment
     fn read_comment(&mut self, ch: char) -> Option<Token> {
         let cmt_type = match ch {
             ';' => CommentType::SingleLineSemicolon,
@@ -1308,10 +1300,9 @@ impl Lexer {
         if let Some(len) = directive_len(&upper, "$IF") {
             let expr_src = &raw[raw.find('$').unwrap() + len..];
             let cond = self.eval_preproc_bool(expr_src);
-            self.if_stack.push(IfFrame { taken: cond, active: cond });
+            self.if_stack.push(IfFrame { taken: cond });
             if !cond {
-                let first_line = format!("{cmt_type}{raw}");
-                return Some(self.collect_inactive_region(first_line, cmt_type));
+                return Some(self.collect_inactive_region(raw, cmt_type));
             }
             return self.next_token();
         }
@@ -1327,23 +1318,17 @@ impl Lexer {
             }
             let already = self.if_stack.last().unwrap().taken;
             if already {
-                if let Some(f) = self.if_stack.last_mut() {
-                    f.active = false;
-                }
-                let first_line = format!("{cmt_type}{raw}");
-                return Some(self.collect_inactive_region(first_line, cmt_type));
+                return Some(self.collect_inactive_region(raw, cmt_type));
             } else {
                 let expr_src = &raw[raw.find('$').unwrap() + len..];
                 let cond = self.eval_preproc_bool(expr_src);
                 if let Some(f) = self.if_stack.last_mut() {
-                    f.active = cond;
                     if cond {
                         f.taken = true;
                     }
                 }
                 if !cond {
-                    let first_line = format!("{cmt_type}{raw}");
-                    return Some(self.collect_inactive_region(first_line, cmt_type));
+                    return Some(self.collect_inactive_region(raw, cmt_type));
                 }
                 return self.next_token();
             }
@@ -1364,15 +1349,11 @@ impl Lexer {
             };
             if let Some(f) = self.if_stack.last_mut() {
                 if activate {
-                    f.active = true;
                     f.taken = true;
-                } else {
-                    f.active = false;
                 }
             }
             if !activate {
-                let first_line = format!("{cmt_type}{raw}");
-                return Some(self.collect_inactive_region(first_line, cmt_type));
+                return Some(self.collect_inactive_region(raw, cmt_type));
             }
             return self.next_token();
         }
@@ -1484,135 +1465,6 @@ impl Lexer {
                 None => {
                     self.check_eof();
                     self.include_lexer = None;
-                }
-            }
-        }
-
-        // Check if we're in an inactive conditional branch
-        if !self.if_stack.is_empty() && !self.if_stack.last().unwrap().active {
-            // Collect entire skipped block as a comment
-            let mut skipped_content = String::new();
-
-            // Skip tokens while in inactive conditional branch
-            while !self.if_stack.is_empty() && !self.if_stack.last().unwrap().active {
-                // We need to consume tokens until we find a directive that changes our state
-                let ch;
-                loop {
-                    self.token_start = self.token_end;
-                    if let Some(next_ch) = self.next_ch() {
-                        if next_ch != ' ' && next_ch != '\t' {
-                            ch = next_ch;
-                            break;
-                        }
-                        skipped_content.push(next_ch);
-                    } else {
-                        self.check_eof();
-                        // Return collected content as comment if we had any
-                        if !skipped_content.is_empty() {
-                            return Some(get_comment(skipped_content));
-                        }
-                        return None;
-                    }
-                }
-
-                // Collect the character
-                skipped_content.push(ch);
-
-                // Only process comment lines that might contain directives
-                if ch == '\'' || ch == ';' || (ch == '*' && self.lexer_state == LexerState::AfterEol) {
-                    let mut comment = Vec::new();
-                    while let Some(ch) = self.next_ch() {
-                        skipped_content.push(ch);
-                        if ch == '\n' {
-                            self.lexer_state = LexerState::AfterEol;
-                            break;
-                        }
-                        comment.push(ch);
-                    }
-
-                    let raw = comment.iter().collect::<String>();
-                    let upper = raw.trim_start().to_ascii_uppercase();
-
-                    // Check for directives that affect flow
-                    if let Some(len) = elseif_directive_len(&upper) {
-                        if self.if_stack.is_empty() {
-                            self.errors
-                                .lock()
-                                .unwrap()
-                                .report_error(self.token_start..self.token_end, LexingErrorType::ElseIfWithoutIf);
-                            continue;
-                        }
-
-                        let prior_taken = self.if_stack.last().unwrap().taken;
-                        if !prior_taken {
-                            let expr_src = &raw[raw.find('$').unwrap() + len..];
-                            let cond = self.eval_preproc_bool(expr_src);
-                            if let Some(frame) = self.if_stack.last_mut() {
-                                frame.active = cond;
-                                if cond {
-                                    frame.taken = true;
-                                    // Return the skipped block as a comment
-                                    if !skipped_content.is_empty() {
-                                        return Some(get_comment(skipped_content));
-                                    }
-                                    break; // Exit skip loop, we're now active
-                                }
-                            }
-                        }
-                    } else if directive_len(&upper, "$ELSE").is_some() {
-                        if self.if_stack.is_empty() {
-                            self.errors
-                                .lock()
-                                .unwrap()
-                                .report_error(self.token_start..self.token_end, LexingErrorType::ElseWithoutIf);
-                            continue;
-                        }
-                        if let Some(frame) = self.if_stack.last_mut() {
-                            if !frame.taken {
-                                frame.active = true;
-                                frame.taken = true;
-                                // Return the skipped block as a comment
-                                if !skipped_content.is_empty() {
-                                    return Some(get_comment(skipped_content));
-                                }
-                                break; // Exit skip loop, we're now active
-                            }
-                        }
-                    } else if directive_len(&upper, "$ENDIF").is_some() {
-                        if self.if_stack.pop().is_none() {
-                            self.errors
-                                .lock()
-                                .unwrap()
-                                .report_error(self.token_start..self.token_end, LexingErrorType::EndIfWithoutIf);
-                        }
-                        // Return the skipped block as a comment
-                        if !skipped_content.is_empty() {
-                            return Some(get_comment(skipped_content));
-                        }
-                        break; // Exit skip loop, check next level
-                    } else if directive_len(&upper, "$IF").is_some() {
-                        // Nested IF while skipping - push an inactive frame
-                        self.if_stack.push(IfFrame { taken: false, active: false });
-                    }
-                } else {
-                    // Collect non-comment content in inactive regions
-                    if ch == '\n' {
-                        self.lexer_state = LexerState::AfterEol;
-                    } else if ch == '\r' {
-                        if let Some('\n') = self.next_ch() {
-                            skipped_content.push('\n');
-                            self.lexer_state = LexerState::AfterEol;
-                        }
-                    } else {
-                        // Read the rest of the line/token
-                        while let Some(ch) = self.next_ch() {
-                            if ch == '\n' || ch == '\r' {
-                                self.put_back();
-                                break;
-                            }
-                            skipped_content.push(ch);
-                        }
-                    }
                 }
             }
         }
@@ -2186,20 +2038,6 @@ impl Lexer {
     pub(crate) fn define(&mut self, variable: &str, value: Constant)  {
         self.define_table.insert(Ascii::new(variable.to_string()), value);
     }*/
-}
-
-fn get_comment(skipped_content: String) -> Token {
-    let comment_type = if skipped_content.starts_with(';') {
-        CommentType::SingleLineSemicolon
-    } else if skipped_content.starts_with('\'') {
-        CommentType::SingleLineQuote
-    } else if skipped_content.starts_with('*') {
-        CommentType::SingleLineStar
-    } else {
-        CommentType::SingleLineSemicolon
-    };
-
-    Token::Comment(comment_type, skipped_content)
 }
 
 fn conv_hex(first: char) -> i32 {

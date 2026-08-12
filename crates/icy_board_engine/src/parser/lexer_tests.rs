@@ -414,7 +414,7 @@ fn test_if_else_branch() {
     let c1 = lex.next_token().expect("expected aggregated comment");
     match c1 {
         Token::Comment(CommentType::SingleLineSemicolon, text) => {
-            assert_eq!(";$IF 1 == 2\nFOO\n;$ELSE\n", text, "unexpected collected skipped text");
+            assert_eq!("$IF 1 == 2\nFOO\n;$ELSE\n", text, "unexpected collected skipped text");
         }
         other => panic!("unexpected first token: {other:?}"),
     }
@@ -448,7 +448,7 @@ fn test_if_elseif_branch() {
     let t1 = lex.next_token().expect("expected first aggregated comment");
     match t1 {
         Token::Comment(CommentType::SingleLineSemicolon, text) => {
-            assert_eq!(";$IF 0 == 1\nFOO\n;$ELSEIF 2 == 2\n", text, "unexpected aggregated false IF + ELSEIF block");
+            assert_eq!("$IF 0 == 1\nFOO\n;$ELSEIF 2 == 2\n", text, "unexpected aggregated false IF + ELSEIF block");
         }
         other => panic!("unexpected first token: {other:?}"),
     }
@@ -459,20 +459,16 @@ fn test_if_elseif_branch() {
     // 3) EOL after BAR (depends on newline presence; BAR line ends with '\n')
     assert_eq!(Some(Token::Eol), lex.next_token(), "expected EOL after BAR");
 
-    // 4) Skipped ELSE block aggregated (since branch already taken)
+    // 4) Skipped ELSE block aggregated (since branch already taken), closed by its ENDIF
     let t4 = lex.next_token().expect("expected aggregated ELSE skip");
     match t4 {
         Token::Comment(CommentType::SingleLineSemicolon, text) => {
-            assert_eq!(";$ELSE\nBAZ\n", text, "unexpected aggregated ELSE block");
+            assert_eq!("$ELSE\nBAZ\n;$ENDIF", text, "unexpected aggregated ELSE block");
         }
         other => panic!("unexpected token for ELSE block: {other:?}"),
     }
 
-    // 5) Standalone $ENDIF comment
-    let t5 = lex.next_token().expect("expected $ENDIF comment");
-    assert_eq!(Token::Comment(CommentType::SingleLineSemicolon, ";$ENDIF".to_string()), t5);
-
-    // 6) EOF
+    // 5) EOF
     assert_eq!(None, lex.next_token());
 }
 
@@ -682,4 +678,112 @@ fn test_preproc_undefined_substitution_does_not_truncate() {
 fn test_preproc_unknown_directive_is_a_comment() {
     assert_active(";$SOMETHINGELSE\nA", &["A"]);
     assert_eq!(vec!["A".to_string()], active_code(";$SOMETHINGELSE\nA"));
+}
+
+/// Renders the whole token stream so a refactoring cannot quietly change which
+/// tokens a skipped region turns into.
+fn token_stream(src: &str) -> String {
+    lex_all(src)
+        .0
+        .iter()
+        .map(|token| match token {
+            Token::Comment(marker, text) => format!("comment({marker}{})", text.escape_debug()),
+            Token::Identifier(id) => format!("id({id})"),
+            Token::Eol => "eol".to_string(),
+            other => format!("{other:?}"),
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+#[test]
+fn test_preproc_skipped_region_token_stream() {
+    // An active branch lexes its code and leaves the ENDIF as its own comment.
+    assert_eq!("id(A) eol comment(;$ENDIF)", token_stream(";$IF 1 == 1\nA\n;$ENDIF"));
+
+    // A skipped region is one comment, closed by the ENDIF it consumed.
+    assert_eq!("comment(;$IF 1 == 2\\nA\\n;$ENDIF)", token_stream(";$IF 1 == 2\nA\n;$ENDIF"));
+
+    // An activating ELSE closes the comment so the code behind it is lexed.
+    assert_eq!(
+        "comment(;$IF 1 == 2\\nA\\n;$ELSE\\n) id(B) eol comment(;$ENDIF)",
+        token_stream(";$IF 1 == 2\nA\n;$ELSE\nB\n;$ENDIF")
+    );
+
+    // A trailing skipped branch runs to the end of the block.
+    assert_eq!("id(A) eol comment(;$ELSE\\nB\\n;$ENDIF)", token_stream(";$IF 1 == 1\nA\n;$ELSE\nB\n;$ENDIF"));
+
+    // A false ELSEIF keeps collecting until the branch that does activate.
+    assert_eq!(
+        "comment(;$IF 1 == 2\\nA\\n;$ELSEIF 1 == 3\\nB\\n;$ELSE\\n) id(C) eol comment(;$ENDIF)",
+        token_stream(";$IF 1 == 2\nA\n;$ELSEIF 1 == 3\nB\n;$ELSE\nC\n;$ENDIF")
+    );
+
+    // A nested block inside a skipped branch is absorbed whole.
+    assert_eq!(
+        "comment(;$IF 1 == 2\\nA\\n;$IF 1 == 1\\nB\\n;$ENDIF\\nC\\n;$ENDIF\\n) id(D)",
+        token_stream(";$IF 1 == 2\nA\n;$IF 1 == 1\nB\n;$ENDIF\nC\n;$ENDIF\nD")
+    );
+
+    // Code after the block keeps its own tokens.
+    assert_eq!("comment(;$IF 1 == 2\\nA\\n;$ENDIF\\n) id(B)", token_stream(";$IF 1 == 2\nA\n;$ENDIF\nB"));
+}
+
+#[test]
+fn test_preproc_comment_tokens_reproduce_the_source() {
+    // The marker belongs to the CommentType, so printing a comment back must not
+    // double it. Skipped regions used to render as ";;$IF ...". Only regions that
+    // are skipped keep their directive lines; an active directive emits no token.
+    for src in [
+        ";$IF 1 == 2\nA\n;$ENDIF",
+        ";$IF 1 == 2\nA\n;$ELSE\nB\n;$ENDIF",
+        ";$IF 1 == 2\nA\n;$IF 1 == 1\nB\n;$ENDIF\nC\n;$ENDIF",
+    ] {
+        let rendered: String = lex_all(src)
+            .0
+            .iter()
+            .map(|token| match token {
+                Token::Comment(marker, text) => format!("{marker}{text}"),
+                Token::Identifier(id) => id.to_string(),
+                Token::Eol => "\n".to_string(),
+                other => panic!("unexpected token {other:?} for {src:?}"),
+            })
+            .collect();
+        assert_eq!(src, rendered, "comment tokens did not reproduce the source");
+    }
+}
+
+#[test]
+fn test_preproc_skipped_region_preserves_crlf() {
+    let src = ";$IF 1 == 2\r\nA\r\n;$ENDIF";
+    let rendered: String = lex_all(src)
+        .0
+        .iter()
+        .map(|token| match token {
+            Token::Comment(marker, text) => format!("{marker}{text}"),
+            other => panic!("unexpected token {other:?}"),
+        })
+        .collect();
+    assert_eq!(src, rendered);
+}
+
+#[test]
+fn test_preproc_skipped_region_preserves_comment_marker() {
+    for src in ["'$IF 1 == 2\nA\n'$ENDIF", "*$IF 1 == 2\nA\n*$ENDIF"] {
+        let rendered: String = lex_all(src)
+            .0
+            .iter()
+            .map(|token| match token {
+                Token::Comment(marker, text) => format!("{marker}{text}"),
+                other => panic!("unexpected token {other:?}"),
+            })
+            .collect();
+        assert_eq!(src, rendered);
+    }
+}
+
+#[test]
+fn test_preproc_skipped_region_reports_only_one_missing_endif() {
+    let (_, errors) = lex_all(";$IF 1 == 2\nA");
+    assert_eq!(vec!["Missing $ENDIF".to_string()], errors);
 }
