@@ -167,10 +167,8 @@ call newer built-ins.
 `DECLARE FUNCTION` / `DECLARE PROCEDURE` before the implementation is no longer
 required; the compiler reads every signature in the file before it compiles the
 code, so a routine may be called before the file gets to it. Existing forward
-declarations are still accepted and keep their own checks.
-
-> A return type that disagrees between a declaration and its implementation is
-> currently accepted without a word. The implementation wins.
+declarations are still accepted, and a parameter count or return type that
+disagrees between a declaration and its implementation is an error.
 
 #### Variable initializers
 

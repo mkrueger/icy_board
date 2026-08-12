@@ -1812,6 +1812,12 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                                 function.get_identifier_token().span.clone(),
                                 CompilationErrorType::ParameterMismatch(function.get_identifier().to_string()),
                             );
+                        }
+                        if func.get_return_type() != function.get_return_type() {
+                            self.errors.lock().unwrap().report_error(
+                                function.get_return_type_token().span.clone(),
+                                CompilationErrorType::ReturnTypeMismatch(function.get_identifier().to_string()),
+                            );
                         } // may've been wrongly added as procedure before - get's corrected.
                     } else if let FunctionDeclaration::Procedure(func) = &cont.functions {
                         if func.get_parameters().len() != function.get_parameters().len() {
@@ -1868,21 +1874,6 @@ impl AstVisitor<VariableType> for SemanticVisitor {
 
         for f in &mut self.function_containers {
             if f.name == function.get_identifier() {
-                if let FunctionDeclaration::Function(decl) = &f.functions {
-                    if decl.get_return_type() != function.get_return_type() {
-                        self.errors.lock().unwrap().report_error(
-                            function.get_return_type_token().span.clone(),
-                            CompilationErrorType::ReturnTypeMismatch(function.get_identifier().to_string()),
-                        );
-                    }
-
-                    if decl.get_parameters().len() != function.get_parameters().len() {
-                        self.errors.lock().unwrap().report_error(
-                            function.get_identifier_token().span.clone(),
-                            CompilationErrorType::ParameterMismatch(function.get_identifier().to_string()),
-                        );
-                    }
-                }
                 f.lookup = lookup;
                 f.parameters = start_parameter..end_parameter;
                 f.local_variables = start_locals..end_locals;
