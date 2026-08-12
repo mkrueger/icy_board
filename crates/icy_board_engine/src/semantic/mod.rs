@@ -952,6 +952,24 @@ impl SemanticVisitor {
             .report_error(expr.get_span().clone(), CompilationErrorType::VariableExpected(arg_num + 1));
     }
 
+    /// Resolves a field of a record the program declared and remembers the type, so
+    /// code generation can look the field up again by the member's source position.
+    fn resolve_record_field(&mut self, type_id: u8, member: &unicase::Ascii<String>, span: &core::ops::Range<usize>) -> VariableType {
+        let Some(definition) = self.type_registry.get_user_type_from_id(type_id) else {
+            self.errors.lock().unwrap().report_error(span.clone(), CompilationErrorType::TypeNotFound);
+            return VariableType::None;
+        };
+        let Some(index) = definition.field_index(member) else {
+            self.errors
+                .lock()
+                .unwrap()
+                .report_error(span.clone(), CompilationErrorType::InvalidMemberReferenceExpression);
+            return VariableType::None;
+        };
+        self.user_type_lookup.insert(span.start, type_id);
+        definition.field_type(index).unwrap_or(VariableType::None)
+    }
+
     fn check_arg_count(&mut self, arg_count_expected: usize, arg_count: usize, identifier_token: &Spanned<Token>) {
         if arg_count < arg_count_expected {
             self.errors.lock().unwrap().report_error(
@@ -1175,6 +1193,9 @@ impl AstVisitor<VariableType> for SemanticVisitor {
     fn visit_member_reference_expression(&mut self, member_reference_expression: &crate::ast::MemberReferenceExpression) -> VariableType {
         let t = member_reference_expression.get_expression().visit(self);
         if let VariableType::UserData(d) = t {
+            if crate::parser::is_user_declared_type(d) {
+                return self.resolve_record_field(d, member_reference_expression.get_identifier(), &member_reference_expression.get_identifier_token().span);
+            }
             if let Some(t) = self.type_registry.get_type_from_id(d) {
                 for (name, t) in &t.fields {
                     if name == member_reference_expression.get_identifier() {
@@ -1526,6 +1547,23 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 }
 
                 self.add_reference_to(let_stmt.get_identifier_token(), idx);
+
+                if let Some(member_token) = let_stmt.get_member_token() {
+                    let variable_type = self.references[idx].1.variable_type;
+                    match variable_type {
+                        VariableType::UserData(type_id) if crate::parser::is_user_declared_type(type_id) => {
+                            let member = let_stmt.get_member().cloned().unwrap_or_default();
+                            self.resolve_record_field(type_id, &member, &member_token.span);
+                        }
+                        // Board objects hand out copies, so writing to one would go nowhere.
+                        _ => {
+                            self.errors
+                                .lock()
+                                .unwrap()
+                                .report_error(member_token.span.clone(), CompilationErrorType::InvalidLetVariable);
+                        }
+                    }
+                }
             }
         } else {
             self.errors.lock().unwrap().report_error(

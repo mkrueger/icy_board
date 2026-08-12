@@ -882,6 +882,28 @@ impl VariableTable {
         &self.entries
     }
 
+    /// Gives every variable of a program declared type the fields its record has.
+    /// The layout is not part of a variable's own entry, so it is filled in once the
+    /// type table has been read.
+    pub fn fill_in_records(&mut self, user_types: &[Vec<VariableType>]) {
+        for entry in &mut self.entries {
+            let VariableType::UserData(type_id) = entry.header.variable_type else {
+                continue;
+            };
+            if !crate::parser::is_user_declared_type(type_id) {
+                continue;
+            }
+            let Some(fields) = user_types.get(type_id as usize - crate::parser::FIRST_USER_TYPE_ID) else {
+                continue;
+            };
+            entry.value = VariableValue {
+                vtype: entry.header.variable_type,
+                data: crate::executable::VariableData::default(),
+                generic_data: GenericVariableData::create_record(fields),
+            };
+        }
+    }
+
     pub(crate) fn analyze_locals(&mut self) {
         for t in self.entries.clone().iter() {
             if t.header.variable_type == VariableType::Function {

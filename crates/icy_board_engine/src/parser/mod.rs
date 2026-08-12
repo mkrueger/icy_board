@@ -270,6 +270,15 @@ impl UserTypeRegistry {
         self.user_types.read().unwrap().clone()
     }
 
+    /// The position of a field inside a record the program declared, which doubles
+    /// as its member id in the generated code.
+    pub fn record_field_index(&self, id: u8, field: &unicase::Ascii<String>) -> Option<usize> {
+        if !is_user_declared_type(id) {
+            return None;
+        }
+        self.get_user_type_from_id(id)?.field_index(field)
+    }
+
     /// Adds a record and hands back its type id, or `None` when the id space is full.
     pub fn declare_user_type(&self, name: unicase::Ascii<String>, fields: Vec<(unicase::Ascii<String>, VariableType)>) -> Option<usize> {
         let mut user_types = self.user_types.write().unwrap();

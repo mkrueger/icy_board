@@ -332,55 +332,38 @@ impl AstVisitorMut for AstTransformationVisitor {
     fn visit_let_statement(&mut self, let_stmt: &LetStatement) -> Statement {
         let mut val_expr = let_stmt.get_value_expression().visit_mut(self);
 
+        // `record.field op= value` has to read back the field, not the record.
+        let target = if let Some(member_token) = let_stmt.get_member_token() {
+            Expression::MemberReference(crate::ast::MemberReferenceExpression::new(
+                Expression::Identifier(IdentifierExpression::new(let_stmt.get_identifier_token().clone())),
+                Spanned::create_empty(Token::Dot),
+                member_token.clone(),
+            ))
+        } else {
+            Expression::Identifier(IdentifierExpression::new(let_stmt.get_identifier_token().clone()))
+        };
+
         match let_stmt.get_let_variant() {
             Token::MulAssign => {
-                val_expr = BinaryExpression::create_empty_expression(
-                    crate::ast::BinOp::Mul,
-                    Expression::Identifier(IdentifierExpression::new(let_stmt.get_identifier_token().clone())),
-                    val_expr,
-                );
+                val_expr = BinaryExpression::create_empty_expression(crate::ast::BinOp::Mul, target, val_expr);
             }
             Token::DivAssign => {
-                val_expr = BinaryExpression::create_empty_expression(
-                    crate::ast::BinOp::Div,
-                    Expression::Identifier(IdentifierExpression::new(let_stmt.get_identifier_token().clone())),
-                    val_expr,
-                );
+                val_expr = BinaryExpression::create_empty_expression(crate::ast::BinOp::Div, target, val_expr);
             }
             Token::ModAssign => {
-                val_expr = BinaryExpression::create_empty_expression(
-                    crate::ast::BinOp::Mod,
-                    Expression::Identifier(IdentifierExpression::new(let_stmt.get_identifier_token().clone())),
-                    val_expr,
-                );
+                val_expr = BinaryExpression::create_empty_expression(crate::ast::BinOp::Mod, target, val_expr);
             }
             Token::AddAssign => {
-                val_expr = BinaryExpression::create_empty_expression(
-                    crate::ast::BinOp::Add,
-                    Expression::Identifier(IdentifierExpression::new(let_stmt.get_identifier_token().clone())),
-                    val_expr,
-                );
+                val_expr = BinaryExpression::create_empty_expression(crate::ast::BinOp::Add, target, val_expr);
             }
             Token::SubAssign => {
-                val_expr = BinaryExpression::create_empty_expression(
-                    crate::ast::BinOp::Sub,
-                    Expression::Identifier(IdentifierExpression::new(let_stmt.get_identifier_token().clone())),
-                    val_expr,
-                );
+                val_expr = BinaryExpression::create_empty_expression(crate::ast::BinOp::Sub, target, val_expr);
             }
             Token::AndAssign => {
-                val_expr = BinaryExpression::create_empty_expression(
-                    crate::ast::BinOp::And,
-                    Expression::Identifier(IdentifierExpression::new(let_stmt.get_identifier_token().clone())),
-                    val_expr,
-                );
+                val_expr = BinaryExpression::create_empty_expression(crate::ast::BinOp::And, target, val_expr);
             }
             Token::OrAssign => {
-                val_expr = BinaryExpression::create_empty_expression(
-                    crate::ast::BinOp::Or,
-                    Expression::Identifier(IdentifierExpression::new(let_stmt.get_identifier_token().clone())),
-                    val_expr,
-                );
+                val_expr = BinaryExpression::create_empty_expression(crate::ast::BinOp::Or, target, val_expr);
             }
             _ => {}
         }
@@ -394,6 +377,7 @@ impl AstVisitorMut for AstTransformationVisitor {
             let_stmt.get_lpar_token().clone(),
             let_stmt.get_arguments().iter().map(|arg| arg.visit_mut(self)).collect(),
             let_stmt.get_rpar_token().clone(),
+            let_stmt.get_member_token().clone(),
             Spanned::create_empty(Token::Eq),
             val_expr,
         ))
@@ -436,6 +420,7 @@ impl AstVisitorMut for AstTransformationVisitor {
                 None,
                 Vec::new(),
                 None,
+                None,
                 Spanned::create_empty(Token::Eq),
                 expr.visit_mut(self),
             )));
@@ -474,6 +459,7 @@ impl AstVisitorMut for AstTransformationVisitor {
                                     NumberFormat::Default,
                                 )))],
                                 None,
+                                None,
                                 Spanned::create_empty(Token::Eq),
                                 expr.visit_mut(self),
                             )));
@@ -499,6 +485,7 @@ impl AstVisitorMut for AstTransformationVisitor {
                             var.get_identifier_token().clone(),
                             None,
                             Vec::new(),
+                            None,
                             None,
                             Spanned::create_empty(Token::Eq),
                             init.visit_mut(self),

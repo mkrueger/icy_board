@@ -21,15 +21,30 @@ impl<'a> AstVisitor<PPEExpr> for ExpressionCompiler<'a> {
 
     fn visit_member_reference_expression(&mut self, member_reference_expression: &crate::ast::MemberReferenceExpression) -> PPEExpr {
         let base = member_reference_expression.get_expression().visit(self);
-        let type_id = self
+        // Semantic analysis has already reported why the member is unknown, so codegen
+        // only has to avoid running into it.
+        let Some(type_id) = self
             .compiler
             .semantic_visitor
             .user_type_lookup
             .get(&member_reference_expression.get_identifier_token().span.start)
-            .unwrap();
-        let typ = self.compiler.semantic_visitor.type_registry.get_type_from_id(*type_id).unwrap();
-
-        let member_id = typ.member_id_lookup.get(&member_reference_expression.get_identifier()).unwrap();
+        else {
+            return PPEExpr::Value(0);
+        };
+        if let Some(member_id) = self
+            .compiler
+            .semantic_visitor
+            .type_registry
+            .record_field_index(*type_id, member_reference_expression.get_identifier())
+        {
+            return PPEExpr::Member(Box::new(base), member_id);
+        }
+        let Some(typ) = self.compiler.semantic_visitor.type_registry.get_type_from_id(*type_id) else {
+            return PPEExpr::Value(0);
+        };
+        let Some(member_id) = typ.member_id_lookup.get(&member_reference_expression.get_identifier()) else {
+            return PPEExpr::Value(0);
+        };
 
         PPEExpr::Member(Box::new(base), *member_id)
     }

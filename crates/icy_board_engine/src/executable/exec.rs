@@ -50,6 +50,9 @@ pub enum ExecutableError {
 pub struct Executable {
     pub runtime: u16,
     pub variable_table: VariableTable,
+    /// Field types of the records the program declared, indexed by type id minus
+    /// `FIRST_USER_TYPE_ID`. Only written for runtime 400 and above.
+    pub user_types: Vec<Vec<VariableType>>,
     pub script_buffer: Vec<i16>,
 }
 
@@ -86,7 +89,23 @@ impl Executable {
         }
 
         let buffer = &mut buffer[HEADER_SIZE..];
-        let (mut i, variable_table) = VariableTable::deserialize(version, buffer)?;
+        let (mut i, mut variable_table) = VariableTable::deserialize(version, buffer)?;
+        let mut user_types = Vec::new();
+        if version >= 400 {
+            let type_count = u16::from_le_bytes(buffer[i..=(i + 1)].try_into()?) as usize;
+            i += 2;
+            for _ in 0..type_count {
+                let field_count = u16::from_le_bytes(buffer[i..=(i + 1)].try_into()?) as usize;
+                i += 2;
+                let mut fields = Vec::with_capacity(field_count);
+                for _ in 0..field_count {
+                    fields.push(VariableType::from(buffer[i]));
+                    i += 1;
+                }
+                user_types.push(fields);
+            }
+            variable_table.fill_in_records(&user_types);
+        }
         let code_size = u16::from_le_bytes(buffer[i..=(i + 1)].try_into()?) as usize;
         i += 2;
         let real_size = buffer.len() - i;
@@ -145,6 +164,7 @@ impl Executable {
         Ok(Executable {
             runtime: version,
             variable_table,
+            user_types,
             script_buffer,
         })
     }
@@ -170,6 +190,16 @@ impl Executable {
         buffer.extend_from_slice(b"\x0D\x0A\x1A");
 
         self.variable_table.serialize(&mut buffer)?;
+
+        if self.runtime >= 400 {
+            buffer.extend_from_slice(&u16::to_le_bytes(self.user_types.len() as u16));
+            for fields in &self.user_types {
+                buffer.extend_from_slice(&u16::to_le_bytes(fields.len() as u16));
+                for field in fields {
+                    buffer.push((*field).into());
+                }
+            }
+        }
 
         let mut script_buffer = Vec::new();
         for s in &self.script_buffer {
@@ -204,6 +234,7 @@ impl Default for Executable {
         Self {
             runtime: LAST_PPLC,
             variable_table: VariableTable::default(),
+            user_types: Vec::new(),
             script_buffer: Vec::new(),
         }
     }

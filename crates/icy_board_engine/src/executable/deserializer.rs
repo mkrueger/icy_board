@@ -440,19 +440,29 @@ impl PPEDeserializer {
             return None;
         }
         self.offset += 1;
-        if dim == 0 {
-            return Some(PPEExpr::Value(id as usize));
-        }
-        for _ in 0..dim {
-            if let Some(e) = self.deserialize_expression(executable).unwrap() {
-                self.push_expr(e);
+        let mut expr = if dim == 0 {
+            PPEExpr::Value(id as usize)
+        } else {
+            for _ in 0..dim {
+                if let Some(e) = self.deserialize_expression(executable).unwrap() {
+                    self.push_expr(e);
+                }
             }
+            if self.expr_stack.len() < dim as usize {
+                self.report_bug(DeserializationErrorType::InvalidExpressionStackState);
+                return None;
+            }
+            let dims = self.expr_stack.drain(self.expr_stack.len() - dim as usize..).collect();
+            PPEExpr::Dim(id as usize, dims)
+        };
+
+        // A record field target is the variable followed by its member reference.
+        while self.offset + 1 < executable.script_buffer.len() && executable.script_buffer[self.offset] == FuncOpCode::MemberReference as i16 {
+            self.offset += 1;
+            let member_id = executable.script_buffer[self.offset];
+            self.offset += 1;
+            expr = PPEExpr::Member(Box::new(expr), member_id as usize);
         }
-        if self.expr_stack.len() < dim as usize {
-            self.report_bug(DeserializationErrorType::InvalidExpressionStackState);
-            return None;
-        }
-        let dims = self.expr_stack.drain(self.expr_stack.len() - dim as usize..).collect();
-        Some(PPEExpr::Dim(id as usize, dims))
+        Some(expr)
     }
 }

@@ -301,7 +301,9 @@ impl PPECompiler {
                 } else {
                     decl.header.id
                 };
-                let variable = if decl.header.dim == 0 {
+                let variable_type = decl.header.variable_type;
+                let dim = decl.header.dim;
+                let variable = if dim == 0 {
                     PPEExpr::Value(decl_id)
                 } else {
                     let mut arguments = Vec::new();
@@ -310,6 +312,19 @@ impl PPECompiler {
                         arguments.push(expr_buffer);
                     }
                     PPEExpr::Dim(decl_id, arguments)
+                };
+                let variable = if let Some(member) = let_smt.get_member() {
+                    let VariableType::UserData(type_id) = variable_type else {
+                        log::error!("Not a record: {}", var_name);
+                        return None;
+                    };
+                    let Some(field) = self.semantic_visitor.type_registry.record_field_index(type_id, member) else {
+                        log::error!("Field not found: {}.{}", var_name, member);
+                        return None;
+                    };
+                    PPEExpr::Member(Box::new(variable), field)
+                } else {
+                    variable
                 };
                 let value = self.comp_expr(let_smt.get_value_expression());
 
@@ -395,9 +410,18 @@ impl PPECompiler {
     pub fn create_executable(&self) -> Result<Executable, CompilationErrorType> {
         let mut variable_table = self.lookup_table.variable_table.clone();
         variable_table.set_version(self.runtime);
+        let user_types: Vec<Vec<VariableType>> = self
+            .semantic_visitor
+            .type_registry
+            .user_types()
+            .iter()
+            .map(|definition| definition.fields.iter().map(|(_, field_type)| *field_type).collect())
+            .collect();
+        variable_table.fill_in_records(&user_types);
         Ok(Executable {
             runtime: self.runtime,
             variable_table,
+            user_types,
             script_buffer: self.commands.serialize(),
         })
     }

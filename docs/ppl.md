@@ -424,10 +424,6 @@ See [new_ppl.md](new_ppl.md) for the per-function reference pages.
 
 #### TYPE ... ENDTYPE
 
-> **Under construction.** The syntax below parses and is checked, but no record
-> layout is written to the PPE yet, so a record variable does not work at
-> runtime.
-
 A program can declare its own record types:
 
 ```PPL
@@ -437,11 +433,27 @@ TYPE Employee
 ENDTYPE
 
 Employee e
+
+e.Name = "Sysop"
+e.Age  = 42
+PRINTLN e.Name, " ", e.Age
 ```
 
 `END TYPE` may be written with a space, the way `END SELECT` may. Fields are
 declared like variables, several to a line, and the type name is then usable
 anywhere a built-in type name is.
+
+A field is read and written with `.`, and takes the type it was declared with, so
+a value assigned to it is converted the same way an assignment to a variable of
+that type would be. Compound assignment works too:
+
+```PPL
+e.Age += 1
+```
+
+A record starts out with the empty value of each of its fields, and each variable
+of a record type has fields of its own. A record is a value, not a reference:
+two variables of the same type do not share anything.
 
 Rules the compiler enforces:
 
@@ -451,9 +463,17 @@ Rules the compiler enforces:
 * A type cannot reuse the name of a built-in or of a board object.
 * A program may declare 156 types; ids 100–255 are reserved for them, leaving
   30–99 for board objects.
+* Naming a field the record does not have is an error, on both sides of an
+  assignment.
+
+Records are the one thing a PPE may assign a member of. The board objects are
+read-only snapshots, so `conf.Name = "x"` is rejected.
 
 `TYPE` and `ENDTYPE` are keywords only at language version 400, so a 3.50 source
 may still have a variable called `type`.
+
+The record layout is written into the PPE, which is why a program using `TYPE`
+needs runtime 400.
 
 #### What 400 breaks
 

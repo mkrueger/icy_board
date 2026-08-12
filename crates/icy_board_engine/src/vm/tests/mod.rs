@@ -15,6 +15,7 @@ mod file_names;
 mod masks;
 mod message_base;
 mod ppe_paths;
+mod records;
 mod scalars;
 mod tpa;
 

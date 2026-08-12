@@ -552,6 +552,16 @@ impl<'a> Parser<'a> {
                 let mut leftpar_token = None;
                 let mut rightpar_token = None;
                 let mut params = Vec::new();
+                let mut member_token = None;
+                if self.get_cur_token() == Some(Token::Dot) {
+                    self.next_token();
+                    let Some(Token::Identifier(_)) = self.get_cur_token() else {
+                        self.report_error(self.save_token_span(), ParserErrorType::IdentifierExpected(self.save_token()));
+                        return None;
+                    };
+                    member_token = Some(self.save_spanned_token());
+                    self.next_token();
+                }
                 let is_lpar = self.get_cur_token() == Some(Token::LPar);
                 if is_lpar || self.get_cur_token() == Some(Token::LBracket) {
                     leftpar_token = Some(self.save_spanned_token());
@@ -601,6 +611,7 @@ impl<'a> Parser<'a> {
                         leftpar_token,
                         params,
                         rightpar_token,
+                        member_token,
                         eq_token,
                         value_expression,
                     )));
@@ -729,6 +740,36 @@ impl<'a> Parser<'a> {
         let id_token = self.save_spanned_token();
         self.next_token();
 
+        if self.get_cur_token() == Some(Token::Dot) {
+            self.next_token();
+            let Some(Token::Identifier(_)) = self.get_cur_token() else {
+                self.report_error(self.save_token_span(), ParserErrorType::IdentifierExpected(self.save_token()));
+                return None;
+            };
+            let member_token = self.save_spanned_token();
+            self.next_token();
+            if !is_assign_token(self.get_cur_token()) {
+                self.report_error(self.save_token_span(), ParserErrorType::InvalidToken(self.save_token()));
+                return None;
+            }
+            let eq_token = self.save_spanned_token();
+            self.next_token();
+            let Some(value_expression) = self.parse_expression() else {
+                self.report_error(self.lex.span(), ParserErrorType::ExpressionExpected(self.save_token()));
+                return None;
+            };
+            return Some(Statement::Let(LetStatement::new(
+                None,
+                id_token,
+                None,
+                Vec::new(),
+                None,
+                Some(member_token),
+                eq_token,
+                value_expression,
+            )));
+        }
+
         if is_assign_token(self.get_cur_token()) {
             let eq_token = self.save_spanned_token();
             self.next_token();
@@ -742,6 +783,7 @@ impl<'a> Parser<'a> {
                 id_token,
                 None,
                 Vec::new(),
+                None,
                 None,
                 eq_token,
                 value_expression,
@@ -842,6 +884,7 @@ impl<'a> Parser<'a> {
                         Some(lpar_token),
                         params,
                         Some(rightpar_token),
+                        None,
                         eq_token,
                         value_expression,
                     )));

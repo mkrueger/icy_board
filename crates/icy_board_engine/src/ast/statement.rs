@@ -1620,6 +1620,7 @@ pub struct LetStatement {
     leftpar_token: Option<Spanned<Token>>,
     arguments: Vec<Expression>,
     rightpar_token: Option<Spanned<Token>>,
+    member_token: Option<Spanned<Token>>,
     eq_token: Spanned<Token>,
     value_expression: Box<Expression>,
 }
@@ -1631,6 +1632,7 @@ impl LetStatement {
         leftpar_token: Option<Spanned<Token>>,
         arguments: Vec<Expression>,
         rightpar_token: Option<Spanned<Token>>,
+        member_token: Option<Spanned<Token>>,
         eq_token: Spanned<Token>,
         value_expression: Expression,
     ) -> Self {
@@ -1640,6 +1642,7 @@ impl LetStatement {
             leftpar_token,
             arguments,
             rightpar_token,
+            member_token,
             eq_token,
             value_expression: Box::new(value_expression),
         }
@@ -1652,8 +1655,21 @@ impl LetStatement {
             leftpar_token: None,
             arguments,
             rightpar_token: None,
+            member_token: None,
             eq_token: Spanned::create_empty(variant),
             value_expression: Box::new(value_expression),
+        }
+    }
+
+    /// The field a `record.field = value` assignment names.
+    pub fn get_member_token(&self) -> &Option<Spanned<Token>> {
+        &self.member_token
+    }
+
+    pub fn get_member(&self) -> Option<&unicase::Ascii<String>> {
+        match &self.member_token {
+            Some(Spanned { token: Token::Identifier(id), .. }) => Some(id),
+            _ => None,
         }
     }
 

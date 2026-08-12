@@ -289,6 +289,9 @@ pub enum GenericVariableData {
 
     Password(crate::icy_board::user_base::Password),
 
+    /// The fields of a value whose type the program declared with TYPE/ENDTYPE.
+    Record(Vec<VariableValue>),
+
     /// The object a member expression reads, kept alive by the values that name it.
     UserData(std::sync::Arc<dyn crate::compiler::user_data::UserDataValue>),
 }
@@ -304,6 +307,7 @@ impl fmt::Debug for GenericVariableData {
             GenericVariableData::Table(table) => write!(f, "Table({table:?})"),
             // A secret has no business in a log line.
             GenericVariableData::Password(_) => write!(f, "Password(******)"),
+            GenericVariableData::Record(fields) => write!(f, "Record({fields:?})"),
             GenericVariableData::UserData(_) => write!(f, "UserData"),
         }
     }
@@ -313,6 +317,11 @@ unsafe impl Sync for GenericVariableData {}
 const MAX_ARRAY_SIZE: usize = 100_000_000;
 
 impl GenericVariableData {
+    /// A record with every field set to the empty value of its own type.
+    pub fn create_record(fields: &[VariableType]) -> GenericVariableData {
+        GenericVariableData::Record(fields.iter().map(VariableType::create_empty_value).collect())
+    }
+
     pub(crate) fn create_array(base_value: VariableValue, dim: u8, vector_size: usize, matrix_size: usize, cube_size: usize) -> Option<GenericVariableData> {
         match dim {
             1 => {
