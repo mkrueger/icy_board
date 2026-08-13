@@ -1,9 +1,12 @@
 pub mod completion;
+pub mod context;
 pub mod documentation;
 pub mod formatting;
 pub mod jump_definition;
 pub mod reference;
 pub mod semantic_token;
+pub mod signature_help;
+pub mod type_lookup;
 
 #[derive(Debug)]
 pub struct ImCompleteSemanticToken {
@@ -37,4 +40,11 @@ pub fn offset_to_position(offset: usize, rope: &Rope) -> Option<Position> {
     let first_char_of_line = rope.try_line_to_char(line).ok()?;
     let column = offset - first_char_of_line;
     Some(Position::new(line as u32, column as u32))
+}
+
+/// The text of the cursor's line up to the cursor.
+pub fn line_before_cursor(rope: &Rope, position: Position) -> Option<String> {
+    let line = rope.get_line(position.line as usize)?;
+    let end = (position.character as usize).min(line.len_chars());
+    Some(line.slice(..end).to_string())
 }

@@ -1,15 +1,15 @@
-use std::sync::{Arc, Mutex};
-
 use icy_board_engine::{
     ast::{Ast, AstVisitor, IdentifierExpression, PredefinedCallStatement, constant::BUILTIN_CONSTS, walk_predefined_call_statement},
-    compiler::workspace::Workspace,
     executable::{FUNCTION_DEFINITIONS, STATEMENT_DEFINITIONS, StatementSignature},
-    parser::{ErrorReporter, UserTypeRegistry},
     semantic::{ReferenceType, SemanticVisitor},
 };
-use tower_lsp::lsp_types::{CompletionItem, Documentation, HoverContents};
+use tower_lsp::lsp_types::{CompletionItem, CompletionItemKind, Documentation, HoverContents, InsertTextFormat};
 
-use crate::documentation::{get_const_hover, get_function_hover, get_statement_hover};
+use crate::{
+    context::{CursorContext, cursor_context},
+    documentation::{get_const_hover, get_function_hover, get_statement_hover},
+    type_lookup::{MemberKind, members_of, type_name, type_of_chain},
+};
 
 pub enum ImCompleteCompletionItem {
     Variable(String),
@@ -68,13 +68,17 @@ const TYPES: [&str; 27] = [
 ];
 
 /// return (need_to_continue_search, founded reference)
-pub fn get_completion(ast: &Ast, offset: usize) -> Vec<CompletionItem> {
-    let mut map = CompletionVisitor::new(offset);
-    let reg = UserTypeRegistry::default();
-    let mut semantic_visitor = SemanticVisitor::new(&Workspace::default(), Arc::new(Mutex::new(ErrorReporter::default())), reg);
-    ast.visit(&mut semantic_visitor);
-    semantic_visitor.finish();
+pub fn get_completion(ast: &Ast, semantic_visitor: &SemanticVisitor, line_before_cursor: &str, offset: usize) -> Vec<CompletionItem> {
+    match cursor_context(line_before_cursor) {
+        CursorContext::Nothing => return Vec::new(),
+        CursorContext::Member(path) => return member_completion(semantic_visitor, &path),
+        CursorContext::RecordLiteralField { type_name, named_fields } => {
+            return record_literal_completion(semantic_visitor, &type_name, &named_fields);
+        }
+        CursorContext::Other => {}
+    }
 
+    let mut map = CompletionVisitor::new(offset);
     ast.visit(&mut map);
 
     if map.items.is_empty() {
@@ -93,6 +97,16 @@ pub fn get_completion(ast: &Ast, offset: usize) -> Vec<CompletionItem> {
                 insert_text: Some(stmt.to_string()),
                 kind: Some(tower_lsp::lsp_types::CompletionItemKind::CLASS),
                 insert_text_format: Some(tower_lsp::lsp_types::InsertTextFormat::PLAIN_TEXT),
+                ..Default::default()
+            });
+        }
+
+        for name in declared_type_names(semantic_visitor) {
+            map.items.push(CompletionItem {
+                label: name.clone(),
+                insert_text: Some(name),
+                kind: Some(CompletionItemKind::STRUCT),
+                insert_text_format: Some(InsertTextFormat::PLAIN_TEXT),
                 ..Default::default()
             });
         }
@@ -121,7 +135,7 @@ pub fn get_completion(ast: &Ast, offset: usize) -> Vec<CompletionItem> {
             });
         }
 
-        for (rt, r) in semantic_visitor.references {
+        for (rt, r) in &semantic_visitor.references {
             if matches!(rt, ReferenceType::Procedure(_)) {
                 if let Some((_, decl)) = &r.declaration {
                     map.items.push(CompletionItem {
@@ -174,6 +188,54 @@ pub fn get_completion(ast: &Ast, offset: usize) -> Vec<CompletionItem> {
     }
 
     map.items
+}
+
+/// The names of the record types the program declares plus the board objects.
+fn declared_type_names(visitor: &SemanticVisitor) -> Vec<String> {
+    let mut names: Vec<String> = visitor.type_registry.user_types().iter().map(|def| def.name.to_string()).collect();
+    names.extend(visitor.type_registry.registered_types.keys().map(|name| name.to_string()));
+    names.sort();
+    names
+}
+
+/// What may follow the `.` of a member chain.
+fn member_completion(visitor: &SemanticVisitor, path: &[String]) -> Vec<CompletionItem> {
+    let Some(var_type) = type_of_chain(visitor, path) else {
+        return Vec::new();
+    };
+    members_of(&visitor.type_registry, var_type)
+        .into_iter()
+        .map(|member| CompletionItem {
+            label: member.name.clone(),
+            insert_text: Some(member.name),
+            kind: Some(match member.kind {
+                MemberKind::Field => CompletionItemKind::FIELD,
+                MemberKind::Method => CompletionItemKind::METHOD,
+            }),
+            detail: Some(member.detail),
+            insert_text_format: Some(InsertTextFormat::PLAIN_TEXT),
+            ..Default::default()
+        })
+        .collect()
+}
+
+/// The fields a record literal has not named yet.
+fn record_literal_completion(visitor: &SemanticVisitor, type_name_of_literal: &str, named_fields: &[String]) -> Vec<CompletionItem> {
+    let Some(def) = visitor.type_registry.get_user_type(&unicase::Ascii::new(type_name_of_literal.to_string())) else {
+        return Vec::new();
+    };
+    def.fields
+        .iter()
+        .filter(|(name, _)| !named_fields.iter().any(|named| named.eq_ignore_ascii_case(name.as_ref())))
+        .map(|(name, field_type)| CompletionItem {
+            label: name.to_string(),
+            insert_text: Some(format!("{name} = ")),
+            kind: Some(CompletionItemKind::FIELD),
+            detail: Some(type_name(&visitor.type_registry, *field_type)),
+            insert_text_format: Some(InsertTextFormat::PLAIN_TEXT),
+            ..Default::default()
+        })
+        .collect()
 }
 
 #[derive(Default)]

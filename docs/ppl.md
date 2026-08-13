@@ -24,7 +24,11 @@ Everything that doesn't work is a bug - please report issues.
   - ppe-convert can take a <FILENAME> to convert the single file to UTF8
   - WARNING: Handle ppe-convert with care - can potentially destroy things. Convert one PPE after another.
   - No need to convert PPE - CP437 works, just consider that - I do it because no modern editor supports CP437 anymore.
-* LSP should provide highlighting, help, find all refs/goto definition and a basic code completion 
+* LSP should provide highlighting, help, find all refs/goto definition and code completion
+  - Completion knows the record types a program declares: `.` offers the fields of a record
+    or the members of a board object, and `Point { ` offers the fields the literal has not named
+  - Signature help shows the parameters of a user routine, of a built-in function and of a
+    built-in statement, with the argument the cursor is in marked
 
 ### Decompiler
 
@@ -133,8 +137,11 @@ I think it improves the language and it's open for discussion. Note that some al
 
 ### Editors
 
-The language server covers editors that speak LSP. Editors that highlight with
-tree-sitter - Neovim, Helix, Zed, Emacs - read the grammar in
+The language server covers editors that speak LSP. It knows the 4.x types, so a
+`.` offers what a record or a board object holds, `Point { ` offers the fields a
+literal has not named yet, and writing arguments shows the signature of the
+routine being called. Editors that highlight with tree-sitter - Neovim, Helix,
+Zed, Emacs - read the grammar in
 [crates/tree-sitter-ppl](../crates/tree-sitter-ppl/README.md) instead. It parses
 the whole language up to 4.01, including `TYPE`, record literals and routine
 parameters, and ships highlight, locals, fold and indent queries. Its README has

@@ -22,7 +22,8 @@ use ppl_language_server::formatting::VSCodeFormattingBackend;
 use ppl_language_server::jump_definition::get_definition;
 use ppl_language_server::reference::get_reference;
 use ppl_language_server::semantic_token::{LEGEND_TYPE, semantic_token_from_ast};
-use ppl_language_server::{ImCompleteSemanticToken, offset_to_position};
+use ppl_language_server::signature_help::get_signature_help;
+use ppl_language_server::{ImCompleteSemanticToken, line_before_cursor, offset_to_position};
 use ropey::Rope;
 use serde_json::Value;
 use tower_lsp::jsonrpc::Result;
@@ -61,10 +62,16 @@ impl LanguageServer for Backend {
 
                 completion_provider: Some(CompletionOptions {
                     resolve_provider: Some(false),
-                    trigger_characters: None,
+                    trigger_characters: Some(vec![".".to_string(), "{".to_string()]),
                     work_done_progress_options: Default::default(),
                     all_commit_characters: None,
                     completion_item: None,
+                }),
+
+                signature_help_provider: Some(SignatureHelpOptions {
+                    trigger_characters: Some(vec!["(".to_string(), ",".to_string(), " ".to_string()]),
+                    retrigger_characters: Some(vec![",".to_string()]),
+                    work_done_progress_options: Default::default(),
                 }),
 
                 execute_command_provider: Some(ExecuteCommandOptions {
@@ -277,14 +284,27 @@ impl LanguageServer for Backend {
         let uri = params.text_document_position.text_document.uri;
         let position = params.text_document_position.position;
         let rope = self.document_map.get(&uri).unwrap();
-        let completions = self.get_ast(&uri, |ast, _| {
+        let completions = self.get_ast(&uri, |ast, visitor| {
             let char = rope.try_line_to_char(position.line as usize).ok()?;
             let offset = char + position.character as usize;
-            let completions = get_completion(&ast, offset);
+            let line = line_before_cursor(&rope, position)?;
+            let completions = get_completion(ast, visitor, &line, offset);
 
             Some(completions)
         })?;
         Ok(completions.map(CompletionResponse::Array))
+    }
+
+    async fn signature_help(&self, params: SignatureHelpParams) -> Result<Option<SignatureHelp>> {
+        let uri = params.text_document_position_params.text_document.uri;
+        let position = params.text_document_position_params.position;
+        let Some(rope) = self.document_map.get(&uri) else {
+            return Ok(None);
+        };
+        self.get_ast(&uri, |_ast, visitor| {
+            let line = line_before_cursor(&rope, position)?;
+            get_signature_help(&line, visitor)
+        })
     }
 
     async fn references(&self, params: ReferenceParams) -> Result<Option<Vec<Location>>> {
@@ -560,7 +580,7 @@ impl Backend {
                 let _ = mem::replace(&mut *state, semantic_visitor);
             }
         } else {
-            let reg: UserTypeRegistry = UserTypeRegistry::default();
+            let reg: UserTypeRegistry = UserTypeRegistry::icy_board_registry();
             let errors = Arc::new(Mutex::new(ErrorReporter::default()));
             let path = uri.to_file_path().unwrap();
             let ast = parse_ast(path, errors.clone(), &params.text, &reg, Encoding::Utf8, &Workspace::default());

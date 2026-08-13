@@ -363,6 +363,9 @@ pub struct Lexer {
     lexer_state: LexerState,
     token_start: usize,
     token_end: usize,
+    /// True while the last read ran into the end of the file, so that putting it
+    /// back does not step over a character that was never read.
+    read_past_end: bool,
     if_stack: Vec<IfFrame>,
 
     include_lexer: Option<Box<Lexer>>,
@@ -540,6 +543,7 @@ impl Lexer {
             errors,
             token_start: 0,
             token_end: 0,
+            read_past_end: false,
             include_lexer: None,
             if_stack: Vec::new(),
         };
@@ -562,20 +566,27 @@ impl Lexer {
     #[inline]
     fn next_ch(&mut self) -> Option<char> {
         if self.token_end >= self.text.len() {
+            self.read_past_end = true;
             None
         } else {
             let t = self.text[self.token_end];
             // Some files take that as end of file char.
             if t == '\x1A' {
+                self.read_past_end = true;
                 return None;
             }
             self.token_end += 1;
+            self.read_past_end = false;
             Some(t)
         }
     }
 
     #[inline]
     fn put_back(&mut self) {
+        if self.read_past_end {
+            self.read_past_end = false;
+            return;
+        }
         self.token_end -= 1;
     }
 
