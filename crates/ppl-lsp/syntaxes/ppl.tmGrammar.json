@@ -1,108 +1,148 @@
 {
-  "scopeName": "source.pps",
-  "patterns": [
-    {
-			"comment": "Line comments",
-			"begin": "^\\s*(;|'|\\*)",
-			"beginCaptures": {
-				"0": {
-					"name": "punctuation.definition.comment.ppl"
-				}
-			},
-			"end": "$",
-			"name": "comment.line.ppl"
-		},
-    {
-			"comment": "String literals",
-			"begin": "\"",
-			"beginCaptures": {
-				"0": {
-					"name": "punctuation.definition.string.begin.ppl"
-				}
-			},
-			"end": "\"",
-			"endCaptures": {
-				"0": {
-					"name": "punctuation.definition.string.end.ppl"
-				}
-			},
-			"name": "string.quoted.double.ppl",
+	"scopeName": "source.pps",
+	"patterns": [
+		{ "include": "#preprocessor" },
+		{ "include": "#strings" },
+		{ "include": "#comments" },
+		{ "include": "#numbers" },
+		{ "include": "#declarations" },
+		{ "include": "#labels" },
+		{ "include": "#keywords" },
+		{ "include": "#types" },
+		{ "include": "#constants" },
+		{ "include": "#builtin-functions" },
+		{ "include": "#builtin-statements" },
+		{ "include": "#record-literals" },
+		{ "include": "#operators" }
+	],
+	"repository": {
+		"preprocessor": {
 			"patterns": [
 				{
-					"include": "#string_escaped_char"
+					"match": "(?i)(;\\$(?:DEFINE|IF|ELSEIF|ELIF|ELSE|ENDIF|USEFUNCS))\\b",
+					"name": "keyword.control.directive.ppl"
+				},
+				{
+					"match": ";#[A-Za-z_][A-Za-z0-9_]*",
+					"name": "constant.other.placeholder.ppl"
 				}
 			]
 		},
-    {
-			"comment": "Floating-point literals",
-			"match": "(\\.\\d+([Ee][-+]\\d+)?i?)\\b|\\b\\d+\\.\\d*(([Ee][-+]\\d+)?i?\\b)?",
-			"name": "constant.numeric.floating-point.ppl"
-		},
-		{
-			"comment": "Integers",
-			"match": "\\b((0x[0-9a-fA-F]+)|(0[0-7]+i?)|(\\d+([Ee]\\d+)?i?)|(\\d+[Ee][-+]\\d+i?))|@[0-9a-fA-F][0-9a-fA-F]\\b",
-			"name": "constant.numeric.integer.ppl"
-		},
-    {
-			"comment": "Language constants",
-			"match": "(?i)\\b(TRUE|FALSE|STK_LIMIT|ATTACH_LIM_P|ATTACH_LIM_U|ACC_CUR_BAL|F_NET|CMAXMSGS|MAXMSGS|CUR_USER|NO_USER|ACC_STAT|ACC_TIME|ACC_MSGREAD|ACC_MSGWRITE|DEFS|BELL|LOGIT|LOGITLEFT|AUTO|ECHODOTS|ERASELINE|FIELDLEN|GUIDE|HIGHASCII|LFAFTER|LFBEFORE|NEWLINE|NOCLEAR|STACKED|UPCASE|WORDWRAP|YESNO|NEWBALANCE|CHRG_CALL|CHRG_TIME|CHRG_PEAKTIME|CHRG_CHAT|CHRG_MSGREAD|CHRG_MSGCAP|CHRG_MSGWRITE|CHRG_MSGECHOED|CHRG_MSGPRIVATE|CHRG_DOWNFILE|CHRG_DOWNBYTES|PAY_UPFILE|PAY_UPBYTES|WARNLEVEL|CRC_FILE|CRC_STR|START_BAL|START_SESSION|DEB_CALL|DEB_TIME|DEB_MSGREAD|DEB_MSGCAP|DEB_MSGWRITE|DEB_MSGECHOED|DEB_MSGPRIVATE|DEB_DOWNFILE|DEB_DOWNBYTES|DEB_CHAT|DEB_TPU|DEB_SPECIAL|CRED_UPFILE|CRED_UPBYTES|CRED_SPECIAL|SEC_DROP|F_EXP|F_MW|F_REG|F_SEL|F_SYS|FCL|FNS|NC|GRAPH|SEC|LANG|HDR_ACTIVE|HDR_BLOCKS|HDR_DATE|HDR_ECHO|HDR_FROM|HDR_MSGNUM|HDR_MSGREF|HDR_PWD|HDR_REPLY|HDR_RPLYDATE|HDR_RPLYTIME|HDR_STATUS|HDR_SUBJ|HDR_TIME|HDR_TO|O_RD|O_RW|O_WR|SEEK_CUR|SEEK_END|SEEK_SET|S_DB|S_DN|S_DR|S_DW)\\b",
-			"name": "constant.language.ppl"
-		}
-    ,
-    {
-			"comment": "Keywords",
-			"match": "(?i)\\b(LET|WHILE|ENDWHILE|IF|THEN|DO|ELSE|ELSEIF|ENDIF|FOR|NEXT|BREAK|CONTINUE|RETURN|GOSUB|GOTO|SELECT|CASE|DEFAULT|ENDSELECT|DECLARE|FUNCTION|PROCEDURE|ENDPROC|ENDFUNC|REPEAT|UNTIL|LOOP|ENDLOOP)\\b",
-			"name": "keyword.control.ppl"
-		},
-    {
-			"comment": "Keywords",
-			"match": "(?i)\\b(INTEGER|SDWORD|LONG|STRING|BIGSTR|BOOLEAN|DATE|DDATE|EDATE|TIME|MONEY|WORD|UWORD|SWORD|INT|BYTE|UBYTE|UNSIGNED|DWORD|UDWORD|SBYTE|SHORT|REAL|FLOAT|DOUBLE|DREAL|MSGAREAID)\\b",
-			"name": "keyword.type.ppl"
-		},
-
-    {
-      "comment": "Operator",
+		"comments": {
 			"patterns": [
 				{
-					"match": "\\-\\-",
-					"name": "keyword.operator.decrement.ppl"
+					"match": "(;(?![$#])|').*$",
+					"name": "comment.line.ppl"
 				},
 				{
-					"match": "\\+\\+",
-					"name": "keyword.operator.increment.ppl"
-				},
-				{
-					"match": "(==|!=|<=|>=)",
-					"name": "keyword.operator.comparison.ppl"
-				},
-				{
-					"match": "(&|\\||!)",
-					"name": "keyword.operator.logical.ppl"
-				},
-				{
-					"match": "(=|\\+=|\\-=|\\|=|%=|\\*=|/=|&=)",
-					"name": "keyword.operator.assignment.go"
-				},
-				{
-					"match": "(\\+|\\-|\\*|/|%|^)",
-					"name": "keyword.operator.arithmetic.go"
+					"match": "^\\s*\\*[ \\t].*$",
+					"name": "comment.line.ppl"
 				}
-      ]
-    }
-  ],
-  "repository": {
-      "string_escaped_char": {
-      "patterns": [
-        {
-          "match": "\\\\([0-7]{3}|[abfnrtv\\\\'\"]|x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8})",
-          "name": "constant.character.escape.go"
-        },
-        {
-          "match": "\\\\[^0-7xuUabfnrtv\\'\"]",
-          "name": "invalid.illegal.unknown-escape.go"
-        }
-      ]
-    }
-  }
-
+			]
+		},
+		"strings": {
+			"begin": "\"",
+			"end": "\"",
+			"name": "string.quoted.double.ppl",
+			"applyEndPatternLast": true,
+			"patterns": [
+				{
+					"match": "\"\"",
+					"name": "constant.character.escape.ppl"
+				},
+				{
+					"match": "@X[0-9A-Fa-f]{2}",
+					"name": "constant.character.escape.ppl"
+				}
+			]
+		},
+		"numbers": {
+			"patterns": [
+				{ "match": "\\$\\d+(\\.\\d+)?", "name": "constant.numeric.money.ppl" },
+				{ "match": "@[xX][0-9A-Fa-f]{2}", "name": "constant.character.escape.ppl" },
+				{ "match": "\\b\\d[0-9A-Fa-f]*[hH]\\b", "name": "constant.numeric.hex.ppl" },
+				{ "match": "\\b[01]+[bB]\\b", "name": "constant.numeric.binary.ppl" },
+				{ "match": "\\b[0-7]+[oO]\\b", "name": "constant.numeric.octal.ppl" },
+				{ "match": "\\b\\d+[dD]\\b", "name": "constant.numeric.decimal.ppl" },
+				{ "match": "\\b\\d+\\.\\d+\\b", "name": "constant.numeric.float.ppl" },
+				{ "match": "\\b\\d+\\b", "name": "constant.numeric.integer.ppl" }
+			]
+		},
+		"declarations": {
+			"patterns": [
+				{
+					"match": "(?i)\\b(FUNCTION|PROCEDURE)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+					"captures": {
+						"1": { "name": "keyword.other.ppl" },
+						"2": { "name": "entity.name.function.ppl" }
+					}
+				},
+				{
+					"match": "(?i)\\bTYPE\\s+([A-Za-z_][A-Za-z0-9_]*)",
+					"captures": {
+						"0": { "name": "keyword.other.ppl" },
+						"1": { "name": "entity.name.type.ppl" }
+					}
+				}
+			]
+		},
+		"labels": {
+			"patterns": [
+				{ "match": "^\\s*(:[A-Za-z_][A-Za-z0-9_]*)", "name": "entity.name.label.ppl" },
+				{
+					"match": "(?i)\\b(GOTO|GOSUB)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+					"captures": {
+						"1": { "name": "keyword.control.ppl" },
+						"2": { "name": "entity.name.label.ppl" }
+					}
+				}
+			]
+		},
+		"keywords": {
+			"patterns": [
+				{
+					"match": "(?i)\\bEND\\s+(IF|WHILE|SELECT|LOOP|TYPE|FOR|PROC|PROCEDURE|FUNC|FUNCTION)\\b",
+					"name": "keyword.control.ppl"
+				},
+				{
+					"match": "(?i)\\b(IF|THEN|ELSE|ELSEIF|ENDIF|SELECT|CASE|DEFAULT|ENDSELECT|WHILE|DO|ENDWHILE|REPEAT|UNTIL|LOOP|ENDLOOP|FOR|TO|STEP|NEXT|ENDFOR|BREAK|CONTINUE|GOTO|GOSUB|RETURN|END|STOP|BEGIN)\\b",
+					"name": "keyword.control.ppl"
+				},
+				{
+					"match": "(?i)\\b(DECLARE|FUNCTION|PROCEDURE|ENDPROC|ENDFUNC|TYPE|ENDTYPE|LET|VAR)\\b",
+					"name": "keyword.other.ppl"
+				}
+			]
+		},
+		"types": {
+			"match": "(?i)\\b(BIGSTR|BOOLEAN|BYTE|DATE|DDATE|DOUBLE|DREAL|DWORD|EDATE|FLOAT|INTEGER|INT|LONG|MONEY|MSGAREAID|REAL|SBYTE|SDWORD|SHORT|STRING|SWORD|TIME|UBYTE|UDWORD|UNSIGNED|UWORD|WORD|AREA|CONFERENCE|DIRECTORY|DOOR|PASSWORD)\\b",
+			"name": "storage.type.ppl"
+		},
+		"constants": {
+			"match": "(?i)\\b(ACC_CUR_BAL|ACC_MSGREAD|ACC_MSGWRITE|ACC_STAT|ACC_TIME|ATTACH_LIM_P|ATTACH_LIM_U|AUTO|BELL|CHRG_CALL|CHRG_CHAT|CHRG_DOWNBYTES|CHRG_DOWNFILE|CHRG_MSGCAP|CHRG_MSGECHOED|CHRG_MSGPRIVATE|CHRG_MSGREAD|CHRG_MSGWRITE|CHRG_PEAKTIME|CHRG_TIME|CMAXMSGS|CRC_FILE|CRC_STR|CRED_SPECIAL|CRED_UPBYTES|CRED_UPFILE|CUR_USER|DEB_CALL|DEB_CHAT|DEB_DOWNBYTES|DEB_DOWNFILE|DEB_MSGCAP|DEB_MSGECHOED|DEB_MSGPRIVATE|DEB_MSGREAD|DEB_MSGWRITE|DEB_SPECIAL|DEB_TIME|DEB_TPU|DEFS|ECHODOTS|ERASELINE|FALSE|FCL|FIELDLEN|FNS|F_EXP|F_MW|F_NET|F_REG|F_SEL|F_SYS|GRAPH|GUIDE|HDR_ACTIVE|HDR_BLOCKS|HDR_DATE|HDR_ECHO|HDR_FROM|HDR_MSGNUM|HDR_MSGREF|HDR_PWD|HDR_REPLY|HDR_RPLYDATE|HDR_RPLYTIME|HDR_STATUS|HDR_SUBJ|HDR_TIME|HDR_TO|HIGHASCII|LANG|LFAFTER|LFBEFORE|LOGIT|LOGITLEFT|MAXMSGS|NC|NEWBALANCE|NEWLINE|NOCLEAR|NO_USER|O_RD|O_RW|O_WR|PAY_UPBYTES|PAY_UPFILE|SEC|SEC_DROP|SEEK_CUR|SEEK_END|SEEK_SET|STACKED|START_BAL|START_SESSION|STK_LIMIT|S_DB|S_DN|S_DR|S_DW|TRUE|UPCASE|WARNLEVEL|WORDWRAP|YESNO)\\b",
+			"name": "constant.language.ppl"
+		},
+		"builtin-functions": {
+			"match": "(?i)\\b(ABORT|ABS|ACCOUNT|ACTMSGNUM|ALIAS|ANSION|AREAID|ASC|B2W|BD2I|BS2I|CALLID|CALLNUM|CARRIER|CCTYPE|CDON|CHATSTAT|CHECKRIP|CHR|CONFALIAS|CONFEXP|CONFINFO|CONFMW|CONFREG|CONFSEL|CONFSYS|CRC32|CURCOLOR|CURCONF|CURSEC|CURUSER|CWD|DADD|DAPPEND|DATE|DAY|DBGLEVEL|DBLANK|DBOF|DBOTTOM|DCHANGED|DCHKSTAT|DCLOSE|DCLOSEALL|DDECIMALS|DDELETE|DDELETED|DEFANS|DEFCOLOR|DEOF|DERR|DERRMSG|DFBLANK|DFCOPY|DFIELDS|DGET|DGETALIAS|DGO|DLENGTH|DLOCK|DLOCKF|DLOCKR|DNAME|DNCLOSE|DNCLOSEALL|DNEW|DNEXT|DNOPEN|DOPEN|DOW|DPACK|DPUT|DRECALL|DRECCOUNT|DRECNO|DRIVESPACE|DSEEK|DSELECT|DSETALIAS|DSKIP|DTAG|DTOP|DTYPE|DUNLOCK|ERRCORRECT|EVTTIMEADJ|EXIST|FDOQRD|FDORDAKA|FDORDAREA|FDORDORG|FERR|FILEINF|FINDFIRST|FINDNEXT|FLAGCNT|FMTCC|FMTREAL|FNEXT|FTELL|GETBANKBAL|GETDRIVE|GETENV|GETMSGHDR|GETTOKEN|GETX|GETY|GRAFMODE|HELPPATH|HICONFNUM|HIMSGNUM|HOUR|I2BD|I2BS|I2S|INBYTES|INKEY|INSTR|INSTRR|ISBITSET|ISNONSTOP|KBDBUFSIZE|KBDFILUSED|KINKEY|LANGEXT|LASTANS|LEFT|LEN|LOGGEDON|LOMSGNUM|LOWER|LPRINTED|LTRIM|MASK_ALNUM|MASK_ALPHA|MASK_ASCII|MASK_FILE|MASK_NUM|MASK_PATH|MASK_PWD|MAXNODE|MEGANUM|MGETBYTE|MID|MIN|MINKEY|MINLEFT|MINON|MIXED|MKADDR|MKDATE|MODEM|MONTH|NOCHAR|ONLOCAL|OS|OUTBYTES|PAGESTAT|PCBACCOUNT|PCBACCSTAT|PCBDAT|PCBMAC|PCBNODE|PEEKB|PEEKDW|PEEKW|PPENAME|PPEPATH|PPLBUFSIZE|PSA|QWKLIMITS|RANDOM|READLINE|REGAH|REGAL|REGAX|REGBH|REGBL|REGBX|REGCF|REGCH|REGCL|REGCX|REGDH|REGDI|REGDL|REGDS|REGDX|REGES|REGF|REGSI|REPLACE|REPLACESTR|RIGHT|RIPVER|RTRIM|S2I|SCANMSGHDR|SCRTEXT|SEC|SETDRIVE|SETMSGHDR|SHORTDESC|SHOWSTAT|SLPATH|SPACE|STACKERR|STACKLEFT|STRING|STRIP|STRIPATX|STRIPSTR|SYSOPSEC|TEMPPATH|TIME|TIMEAP|TINKEY|TOBIGSTR|TOBOOLEAN|TOBYTE|TODATE|TODDATE|TODOUBLE|TODREAL|TODWORD|TOEDATE|TOFLOAT|TOINT|TOINTEGER|TOKCOUNT|TOKENSTR|TOLONG|TOMONEY|TOREAL|TOSBYTE|TOSDWORD|TOSHORT|TOSTRING|TOSWORD|TOTIME|TOUBYTE|TOUDWORD|TOUNSIGNED|TOUWORD|TOWORD|TRIM|UN_CITY|UN_NAME|UN_OPER|UN_STAT|UPPER|USELMRS|USERALIAS|U_BDL|U_BDLDAY|U_BUL|U_FDL|U_FUL|U_INCONF|U_LDATE|U_LDIR|U_LMR|U_LOGONS|U_LTIME|U_MSGRD|U_MSGWR|U_NAME|U_PWDHIST|U_PWDLC|U_PWDTC|U_RECNUM|U_STAT|U_TIMEON|VALCC|VALDATE|VALTIME|VER|WEBREQUEST|XOR|YEAR|YESCHAR)\\b",
+			"name": "support.function.ppl"
+		},
+		"builtin-statements": {
+			"match": "(?i)\\b(ACCOUNT|ADDUSER|ADJBYTES|ADJDBYTES|ADJTBYTES|ADJTFILES|ADJTIME|ADJTUBYTES|ALIAS|ANSIPOS|APPEND|BACKUP|BEEP|BITCLEAR|BITSET|BLT|BRAG|BROADCAST|BYE|CALL|CDCHKOFF|CDCHKON|CHAT|CHDIR|CLOSECAP|CLREOL|CLS|COLOR|COMMAND|CONFFLAG|CONFINFO|CONFUNFLAG|COPY|DADD|DAPPEND|DBGLEVEL|DBLANK|DBOTTOM|DCLOSE|DCLOSEALL|DCREATE|DDELETE|DEC|DEFCOLOR|DELAY|DELETE|DELUSER|DFBLANK|DFCOPY|DGET|DGO|DIR|DISPFILE|DISPSTR|DISPTEXT|DLOCK|DLOCKF|DLOCKG|DLOCKR|DNCLOSE|DNCLOSEALL|DNCREATE|DNEW|DNOPEN|DOINTR|DOPEN|DOWNLOAD|DPACK|DPUT|DRECALL|DSEEK|DSETALIAS|DSKIP|DTAG|DTOP|DTROFF|DTRON|DUNLOCK|ERASE|EVAL|FAPPEND|FCLOSE|FCLOSEALL|FCREATE|FDEFIN|FDEFOUT|FDGET|FDOADDAKA|FDOADDORG|FDOQADD|FDOQDEL|FDOQMOD|FDOWRAKA|FDOWRORG|FDPUT|FDPUTLN|FDPUTPAD|FDREAD|FDWRITE|FEND|FFLUSH|FGET|FLAG|FOPEN|FORWARD|FPCLR|FPUT|FPUTLN|FPUTPAD|FREAD|FREALTUSER|FRESHLINE|FREWIND|FSEEK|FWRITE|GETALTUSER|GETTOKEN|GETUSER|GOODBYE|GRAFMODE|HANGUP|INC|INPUT|INPUTCC|INPUTDATE|INPUTINT|INPUTMONEY|INPUTSTR|INPUTTEXT|INPUTTIME|INPUTYN|JOIN|KBDCHKOFF|KBDCHKON|KBDFILE|KBDFLUSH|KBDSTRING|KBDSTUFF|KEYFLUSH|KILLMSG|LANG|LASTIN|LOG|MDMFLUSH|MESSAGE|MKDIR|MORE|MOUSEREG|MOVEMSG|MPRINT|MPRINTLN|MSGTOFILE|NEWLINE|NEWLINES|NEWPWD|OPENCAP|OPTEXT|PAGEOFF|PAGEON|POKE|POKEB|POKEDW|POKEW|POP|PRFOUND|PRFOUNDLN|PRINT|PRINTLN|PROMPTSTR|PUSH|PUTALTUSER|PUTUSER|QUEST|QWKLIMITS|RDUNET|RDUSYS|RECORDUSAGE|REDIM|REDIR|RENAME|RESETDISP|RESTSCRN|RMDIR|SAVESCRN|SCRFILE|SEARCHFIND|SEARCHINIT|SEARCHSTOP|SENDMODEM|SETBANKBAL|SETENV|SETLMR|SHELL|SHORTDESC|SHOWOFF|SHOWON|SORT|SOUND|SOUNDDELAY|SPRINT|SPRINTLN|STACKABORT|STARTDISP|TOKENIZE|TPACGET|TPACPUT|TPACREAD|TPACWRITE|TPAGET|TPAPUT|TPAREAD|TPAWRITE|USELMRS|VARADDR|VAROFF|VARSEG|WAIT|WAITFOR|WEBREQUEST|WRUNET|WRUSYS|WRUSYSDOOR)\\b",
+			"name": "support.function.builtin.ppl"
+		},
+		"record-literals": {
+			"match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*(?=\\{)",
+			"name": "entity.name.type.ppl"
+		},
+		"operators": {
+			"patterns": [
+				{ "match": "(\\+=|\\-=|\\*=|/=|%=|&=|\\|=)", "name": "keyword.operator.assignment.ppl" },
+				{ "match": "(==|!=|<>|><|<=|=<|>=|=>|<|>)", "name": "keyword.operator.comparison.ppl" },
+				{ "match": "(&&|\\|\\||&|\\||!)", "name": "keyword.operator.logical.ppl" },
+				{ "match": "(\\+|\\-|\\*|/|%|\\^)", "name": "keyword.operator.arithmetic.ppl" },
+				{ "match": "=", "name": "keyword.operator.assignment.ppl" },
+				{ "match": "\\.\\.", "name": "keyword.operator.range.ppl" }
+			]
+		}
+	}
 }

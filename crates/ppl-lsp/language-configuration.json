@@ -11,32 +11,30 @@
 		{ "open": "{", "close": "}" },
 		{ "open": "[", "close": "]" },
 		{ "open": "(", "close": ")" },
-		{ "open": "'", "close": "'", "notIn": ["string", "comment"] },
 		{ "open": "\"", "close": "\"", "notIn": ["string"] }
 	],
-	"autoCloseBefore": ";:.,=}])>` \n\t",
+	"autoCloseBefore": ";:.,=}])> \n\t",
 	"surroundingPairs": [
 		["{", "}"],
 		["[", "]"],
 		["(", ")"],
-		["'", "'"],
-		["\"", "\""],
+		["\"", "\""]
 	],
 	"folding": {
 		"markers": {
-			"start": "(?i)^\\s*(PROCEDURE|FUNCTION)",
-			"end": "(?i)^\\s*(ENDPROC|ENDFUNC)\\b"
+			"start": "(?i)^\\s*(PROCEDURE\\b|FUNCTION\\b|TYPE\\s+\\w|SELECT\\b|FOR\\b|LOOP\\s*$|REPEAT\\s*$|IF\\b.*\\bTHEN\\s*$|WHILE\\b.*\\bDO\\s*$)",
+			"end": "(?i)^\\s*(END\\s*(PROC|PROCEDURE|FUNC|FUNCTION|TYPE|SELECT|LOOP|IF|WHILE|FOR)\\b|NEXT\\b|UNTIL\\b)"
 		}
 	},
 	"wordPattern": "(-?\\d*\\.\\d\\w*)|([^\\`\\~\\!\\@\\#\\%\\^\\&\\*\\(\\)\\-\\=\\+\\[\\{\\]\\}\\\\\\|\\;\\:\\'\\\"\\,\\.\\<\\>\\/\\?\\s]+)",
 	"indentationRules": {
 		"increaseIndentPattern": {
-            "pattern": "^\\s*(IF.+THEN$|PROCEDURE\\s.*$|FUNCTION\\s.*$|WHILE.+DO$|FOR\\s.*$|LOOP\\s.*$|REPEAT\\s.*$|SELECT\\s+CASE|CASE|DEFAULT$|ELSE$)",
-            "flags" : "i"
-        },
+			"pattern": "^\\s*(PROCEDURE\\b|FUNCTION\\b|TYPE\\s+\\w|SELECT\\b|CASE\\b|DEFAULT\\s*$|ELSE\\s*$|ELSEIF\\b|FOR\\b|LOOP\\s*$|REPEAT\\s*$|IF\\b.*\\bTHEN\\s*$|WHILE\\b.*\\bDO\\s*$)",
+			"flags": "i"
+		},
 		"decreaseIndentPattern": {
-            "pattern": "^\\s*ENDIF|ENDPROC|ENDFUNC|ENDWHILE|ENDLOOP|ENDSELECT|DEFAULT|NEXT|UNTIL|ELSE|CASE",
-            "flags" : "i"
-        }
+			"pattern": "^\\s*(END\\s*(PROC|PROCEDURE|FUNC|FUNCTION|TYPE|SELECT|LOOP|IF|WHILE|FOR)\\b|NEXT\\b|UNTIL\\b|ELSE\\b|ELSEIF\\b|CASE\\b|DEFAULT\\b)",
+			"flags": "i"
+		}
 	}
 }
