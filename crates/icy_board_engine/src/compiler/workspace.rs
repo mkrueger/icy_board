@@ -6,7 +6,11 @@ use std::{
 use semver::Version;
 use serde::{Deserialize, Serialize};
 
-use crate::{Res, executable::LAST_PPLC, formatting::FormattingOptions};
+use crate::{
+    Res,
+    executable::{LAST_PPE_RUNTIME, LAST_PPL_LANGUAGE_VERSION},
+    formatting::FormattingOptions,
+};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Package {
@@ -142,7 +146,7 @@ impl Workspace {
     }
 
     pub fn runtime(&self) -> u16 {
-        self.package.runtime.unwrap_or(LAST_PPLC)
+        self.package.runtime.unwrap_or(LAST_PPE_RUNTIME)
     }
 
     pub fn language_version(&self) -> u16 {
@@ -151,6 +155,25 @@ impl Workspace {
                 return language_version;
             }
         }
-        self.runtime()
+        self.runtime().min(LAST_PPL_LANGUAGE_VERSION)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_runtime_and_language_are_independent() {
+        let workspace = Workspace::default();
+        assert_eq!(LAST_PPE_RUNTIME, workspace.runtime());
+        assert_eq!(LAST_PPL_LANGUAGE_VERSION, workspace.language_version());
+    }
+
+    #[test]
+    fn an_older_runtime_remains_the_default_language() {
+        let mut workspace = Workspace::default();
+        workspace.package.runtime = Some(340);
+        assert_eq!(340, workspace.language_version());
     }
 }

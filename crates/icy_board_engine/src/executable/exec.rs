@@ -11,14 +11,14 @@ use crate::{
 use crate::crypt::{decode_rle, decrypt_chunks, encode_rle};
 use crate::executable::disassembler::DisassembleVisitor;
 
-use super::{FIRST_TYPE_TABLE_RUNTIME, LAST_PPLC, VariableTable, VariableType};
+use super::{FIRST_TYPE_TABLE_RUNTIME, LAST_PPE_RUNTIME, VariableTable, VariableType};
 
 #[derive(Error, Debug, Clone, PartialEq)]
 pub enum ExecutableError {
     #[error("Invalid PPE file")]
     InvalidPPEFile,
 
-    #[error("Unsupported version: {0} (Only up to {LAST_PPLC})")]
+    #[error("Unsupported version: {0} (Only up to {LAST_PPE_RUNTIME})")]
     UnsupporrtedVersion(u16),
 
     #[error("Too many declarations: {0}")]
@@ -142,7 +142,7 @@ impl Executable {
         }
         let version = ((buffer[40] & 15) as u16 * 10 + (buffer[41] as u16 & 15)) * 100 + (buffer[43] as u16 & 15) * 10 + (buffer[44] as u16 & 15);
 
-        if version > LAST_PPLC {
+        if version > LAST_PPE_RUNTIME {
             return Err(Box::new(ExecutableError::UnsupporrtedVersion(version)));
         }
 
@@ -253,7 +253,7 @@ impl Executable {
     ///
     /// This function will return an error if .
     pub fn to_buffer(&self) -> Result<Vec<u8>, ExecutableError> {
-        if self.runtime > LAST_PPLC {
+        if self.runtime > LAST_PPE_RUNTIME {
             return Err(ExecutableError::UnsupporrtedVersion(self.runtime));
         }
         if !self.user_types.is_empty() && self.runtime < FIRST_TYPE_TABLE_RUNTIME {
@@ -316,7 +316,7 @@ impl Executable {
 impl Default for Executable {
     fn default() -> Self {
         Self {
-            runtime: LAST_PPLC,
+            runtime: LAST_PPE_RUNTIME,
             variable_table: VariableTable::default(),
             user_types: Vec::new(),
             script_buffer: Vec::new(),

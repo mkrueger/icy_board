@@ -8,7 +8,7 @@ use toml::Spanned;
 use crate::{
     ast::{Constant, constant::NumberFormat},
     compiler::workspace::{CompilerData, Workspace},
-    executable::LAST_PPLC,
+    executable::{LAST_PPE_RUNTIME, LAST_PPL_LANGUAGE_VERSION},
     parser::{
         Encoding, ErrorReporter,
         lexer::{CommentType, Lexer, Token},
@@ -669,19 +669,17 @@ fn test_preproc_workspace_defines() {
 
 #[test]
 fn test_preproc_predefined_variables() {
-    let default_version = LAST_PPLC as i32;
-
     let (tokens, errors) = lex_all("X = ;#RUNTIME");
     assert!(errors.is_empty(), "{errors:?}");
     assert!(
-        tokens.contains(&Token::Const(Constant::Integer(default_version, NumberFormat::Default))),
+        tokens.contains(&Token::Const(Constant::Integer(LAST_PPE_RUNTIME as i32, NumberFormat::Default))),
         "RUNTIME did not substitute: {tokens:?}"
     );
 
     let (tokens, errors) = lex_all("X = ;#LANGVERSION");
     assert!(errors.is_empty(), "{errors:?}");
     assert!(
-        tokens.contains(&Token::Const(Constant::Integer(default_version, NumberFormat::Default))),
+        tokens.contains(&Token::Const(Constant::Integer(LAST_PPL_LANGUAGE_VERSION as i32, NumberFormat::Default))),
         "LANGVERSION did not substitute: {tokens:?}"
     );
 }

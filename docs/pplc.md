@@ -17,7 +17,8 @@ Options:
   --nowarnings      don't report any warnings
   --version         version number for the compiled PPE, valid: 100, 200, 300,
                     310, 320, 330, 340, 400, 401 (default)
-  --lang-version    version number for the language (defaults to version)
+       --lang-version    language version, valid: 100, 200, 300, 310, 320, 330, 340,
+                                                                      350, 400 (default)
   --cp437           specify the encoding of the file, defaults to autodetection
   --init            create & init new ppl package in target directory
   --help, help      display usage information

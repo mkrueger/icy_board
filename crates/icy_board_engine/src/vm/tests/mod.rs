@@ -40,7 +40,7 @@ use crate::vm::run;
 
 /// The diagnostics a snippet produces, for the cases where not compiling is the point.
 pub fn compile_errors(source: &str) -> Vec<String> {
-    compile_errors_with_runtime(source, crate::executable::LAST_PPLC)
+    compile_errors_with_runtime(source, crate::executable::LAST_PPE_RUNTIME)
 }
 
 pub fn compile_errors_with_runtime(source: &str, runtime: u16) -> Vec<String> {

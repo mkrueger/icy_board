@@ -9,7 +9,7 @@ use icy_board_engine::{
         PPECompiler,
         workspace::{CompilerData, Package, Workspace},
     },
-    executable::{LAST_PPLC, SUPPORTED_PPE_VERSIONS},
+    executable::{LAST_PPL_LANGUAGE_VERSION, SUPPORTED_PPE_VERSIONS, SUPPORTED_PPL_LANGUAGE_VERSIONS},
     formatting::{FormattingVisitor, StringFormattingBackend},
     icy_board::read_with_encoding_detection,
     parser::{
@@ -47,7 +47,7 @@ struct Cli {
     #[argh(option)]
     runtime: Option<u16>,
 
-    /// version number for the language (defaults to version)
+    /// language version (defaults to runtime, capped at 400)
     #[argh(option)]
     lang_version: Option<u16>,
 
@@ -90,6 +90,12 @@ fn main() {
             return;
         }
     }
+    if let Some(version) = arguments.lang_version {
+        if !SUPPORTED_PPL_LANGUAGE_VERSIONS.contains(&version) {
+            println!("Invalid language version valid values {SUPPORTED_PPL_LANGUAGE_VERSIONS:?}");
+            return;
+        }
+    }
 
     if arguments.init {
         let Some(file) = arguments.file.clone() else {
@@ -114,7 +120,7 @@ fn main() {
             authors: None,
         };
         ws.compiler = Some(CompilerData {
-            language_version: Some(arguments.lang_version.unwrap_or(LAST_PPLC)),
+            language_version: Some(arguments.lang_version.unwrap_or(LAST_PPL_LANGUAGE_VERSION)),
             defines: if let Some(defines) = arguments.defines {
                 Some(defines.split(';').map(|s| s.to_string()).collect())
             } else {

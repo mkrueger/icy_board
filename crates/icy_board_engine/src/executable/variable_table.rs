@@ -14,7 +14,7 @@ use crate::{
     crypt::{decrypt_chunks, encrypt_chunks},
 };
 
-use super::{ExecutableError, GenericVariableData, LAST_PPLC, PPEExpr, PPEScript, VariableData, VariableNameGenerator, VariableType, VariableValue};
+use super::{ExecutableError, GenericVariableData, LAST_PPE_RUNTIME, PPEExpr, PPEScript, VariableData, VariableNameGenerator, VariableType, VariableValue};
 
 #[derive(Clone, Default, Debug, PartialEq)]
 pub struct VarHeader {
@@ -764,7 +764,7 @@ impl VariableTable {
                 return res;
             }
         }
-        LAST_PPLC
+        LAST_PPE_RUNTIME
     }
 
     pub fn print_variable_table(&self) {

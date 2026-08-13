@@ -32,9 +32,13 @@ pub mod expr_tests;
 #[cfg(test)]
 pub mod stmt_tests;
 
-pub const LAST_PPLC: u16 = 401;
+pub const LAST_PPE_RUNTIME: u16 = 401;
+
+pub const LAST_PPL_LANGUAGE_VERSION: u16 = 400;
 
 pub const SUPPORTED_PPE_VERSIONS: &[u16] = &[100, 200, 300, 310, 320, 330, 340, 400, 401];
+
+pub const SUPPORTED_PPL_LANGUAGE_VERSIONS: &[u16] = &[100, 200, 300, 310, 320, 330, 340, 350, 400];
 
 /// The first runtime that stores a type table. A 4.00 file has none at all.
 pub const FIRST_TYPE_TABLE_RUNTIME: u16 = 401;

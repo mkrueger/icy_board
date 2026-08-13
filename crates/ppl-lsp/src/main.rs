@@ -9,7 +9,7 @@ use icy_board_engine::ast::{
     walk_predefined_call_statement, walk_variable_declaration_statement,
 };
 use icy_board_engine::compiler::workspace::Workspace;
-use icy_board_engine::executable::{FUNCTION_DEFINITIONS, FunctionDefinition, LAST_PPLC};
+use icy_board_engine::executable::{FUNCTION_DEFINITIONS, FunctionDefinition, LAST_PPE_RUNTIME};
 use icy_board_engine::formatting::FormattingVisitor;
 use icy_board_engine::icy_board::read_data_with_encoding_detection;
 use icy_board_engine::parser::{
@@ -421,7 +421,7 @@ impl LanguageServer for Backend {
                         self.client.log_message(MessageType::INFO, format!("{}", output)).await;
                     }
                     let out_file: String = self.workspace.lock().unwrap().package.name().to_string();
-                    let target_file = self.workspace.lock().unwrap().target_path(LAST_PPLC).join(out_file).with_extension("ppe");
+                    let target_file = self.workspace.lock().unwrap().target_path(LAST_PPE_RUNTIME).join(out_file).with_extension("ppe");
                     self.client.log_message(MessageType::INFO, format!("Execute:{}", target_file.display())).await;
 
                     let shell = env::var("SHELL").unwrap_or("sh".to_string());

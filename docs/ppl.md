@@ -87,7 +87,8 @@ Options:
   --nowarnings      don't report any warnings
   --runtime         version number for the compiled PPE, valid: 100, 200, 300,
                     310, 320, 330, 340, 400, 401 (default)
-  --lang-version    version number for the language (defaults to version)
+  --lang-version    language version, valid: 100, 200, 300, 310, 320, 330, 340,
+                    350, 400 (default)
   --cp437           specify the encoding of the file (cp437 = true, utf8 =
                     false), defaults to autodetection
   --init            create & init new ppl package in target directory
@@ -147,10 +148,12 @@ are two different wishes.
 | | Command line | `ppl.toml` | What it controls |
 | :--- | :--- | :--- | :--- |
 | Runtime | `--runtime` | `[package] runtime` | The PPE format written to disk. Valid: 100, 200, 300, 310, 320, 330, 340, 400, 401. |
-| Language | `--lang-version` | `[compiler] language_version` | Which syntax and which built-ins the compiler accepts. |
+| Language | `--lang-version` | `[compiler] language_version` | Which syntax and which built-ins the compiler accepts. Valid: 100, 200, 300, 310, 320, 330, 340, 350, 400. |
 
-The language version defaults to the runtime version, and the runtime version
-defaults to 401. The command line wins over `ppl.toml`.
+The runtime defaults to 401. The language defaults to the runtime version up to
+400, so the default pair is runtime 401 and language 400. A format-only runtime
+bump therefore does not invent a new language version. The command line wins
+over `ppl.toml`.
 
 Anything below is grouped by the language version that introduced it. A feature
 listed under 350 is available at 350 *and* 400; a feature listed under 400 needs
@@ -599,7 +602,7 @@ Would print:
 ```text
 Version:0.1.0
 Runtime:401
-Language:401
+Language:400
 ```
 
 ## Building & Running
