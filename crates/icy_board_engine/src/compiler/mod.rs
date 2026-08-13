@@ -86,6 +86,9 @@ pub enum CompilationErrorType {
     #[error("FUNCTION/PROCEDURE parameters not match with declaration ({0})")]
     ParameterMismatch(String),
 
+    #[error("Passing a FUNCTION/PROCEDURE needs runtime {0}")]
+    RoutineReferenceNeedsRuntime(u16),
+
     #[error("Indexer called on function or procedure ({0})")]
     IndexerCalledOnFunction(String),
 

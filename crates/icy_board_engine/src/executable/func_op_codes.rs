@@ -308,9 +308,10 @@ pub enum FuncOpCode {
     AreaId = -294,
     WebRequest = -295,
     Len_Dim = -296,
+    RoutineReference = -297,
 }
 
-pub const LAST_FUNC: i16 = -296;
+pub const LAST_FUNC: i16 = -297;
 
 impl FuncOpCode {
     pub fn get_definition(self) -> &'static FunctionDefinition {
@@ -378,7 +379,7 @@ impl FunctionDefinition {
     }
 }
 lazy_static::lazy_static! {
-    pub static ref FUNCTION_DEFINITIONS: [FunctionDefinition; 308] = [
+    pub static ref FUNCTION_DEFINITIONS: [FunctionDefinition; 309] = [
         FunctionDefinition {
             name: "END",
             version: 100,
@@ -3120,6 +3121,15 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("dimension", VariableType::Integer),
             ]),
             signature: FunctionSignature::FixedParameters(2),
+        },
+
+        FunctionDefinition {
+            name: "<routine reference>",
+            version: 401,
+            opcode: FuncOpCode::RoutineReference,
+            return_type: VariableType::None,
+            args: None,
+            signature: FunctionSignature::Invalid,
         },
 
         // ALIASES (need to be last in the list)

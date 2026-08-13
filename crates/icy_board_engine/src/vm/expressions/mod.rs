@@ -311,5 +311,6 @@ pub async fn run_function(opcode: FuncOpCode, arg: &mut VirtualMachine<'_>, argu
         FuncOpCode::AreaId => predefined_functions::area_id(arg, arguments).await,
         FuncOpCode::WebRequest => predefined_functions::web_request(arg, arguments).await,
         FuncOpCode::Len_Dim => predefined_functions::len_dim(arg, arguments).await,
+        FuncOpCode::RoutineReference => predefined_functions::invalid(arg, arguments).await,
     }
 }

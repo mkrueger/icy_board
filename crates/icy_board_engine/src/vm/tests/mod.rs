@@ -18,6 +18,7 @@ mod message_base;
 mod nested_records;
 mod ppe_paths;
 mod records;
+mod routine_parameters;
 mod scalars;
 mod tpa;
 
@@ -39,10 +40,15 @@ use crate::vm::run;
 
 /// The diagnostics a snippet produces, for the cases where not compiling is the point.
 pub fn compile_errors(source: &str) -> Vec<String> {
+    compile_errors_with_runtime(source, crate::executable::LAST_PPLC)
+}
+
+pub fn compile_errors_with_runtime(source: &str, runtime: u16) -> Vec<String> {
     let errors = Arc::new(Mutex::new(ErrorReporter::default()));
     let reg = UserTypeRegistry::icy_board_registry();
     let mut workspace = Workspace::default();
     workspace.hard_coded_files = Some(vec![PathBuf::from("test.pps")]);
+    workspace.package.runtime = Some(runtime);
 
     let ast = parse_ast(PathBuf::from("test.pps"), errors.clone(), source, &reg, Encoding::Utf8, &workspace);
     let mut compiler = PPECompiler::new(&workspace, reg, errors.clone());

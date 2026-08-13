@@ -68,7 +68,7 @@ fn collect_expr_hits(expr: &PPEExpr, hits: &mut Vec<UsageHit>, span_start: usize
                 collect_expr_hits(a, hits, span_start);
             }
         }
-        PPEExpr::Value(_) | PPEExpr::Invalid => {}
+        PPEExpr::Value(_) | PPEExpr::RoutineReference(_) | PPEExpr::Invalid => {}
     }
 }
 

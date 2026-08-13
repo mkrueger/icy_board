@@ -318,6 +318,13 @@ impl PPEDeserializer {
                     self.offset += 1;
                     break;
                 }
+                if id == FuncOpCode::RoutineReference as i16 {
+                    self.offset += 1;
+                    let routine_id = executable.script_buffer[self.offset] as usize;
+                    self.offset += 1;
+                    self.push_expr(PPEExpr::RoutineReference(routine_id));
+                    continue;
+                }
                 if id == FuncOpCode::MemberReference as i16 {
                     let expr = self.pop_expr().unwrap();
                     self.offset += 1;

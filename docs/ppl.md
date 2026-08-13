@@ -291,14 +291,13 @@ PROCEDURE PrintHello(PROCEDURE f())
 ENDPROC
 ```
 
-The parameter is callable inside the body and the compiler checks the arity of
-whatever is passed.
+The parameter is callable inside the body. Passing `PrintHello(Hello)` checks the
+complete signature: routine kind, argument types and dimensions, `VAR` flags and
+the return type of a function. A routine parameter can be passed on to another
+routine. Outside such an argument position a bare routine name is still an error.
 
-> **Not usable yet.** Passing a procedure by name at the call site —
-> `PrintHello(Hello)` — is rejected with *"Function used as variable"*. The
-> declaration side and the type checking are in place, but a bare
-> function/procedure name is not yet resolved as a value, so the feature cannot
-> be used end to end.
+Routine references need runtime 401 because 4.01 adds the bytecode marker that
+distinguishes a routine value from a call to that routine.
 
 ### Language version 400
 

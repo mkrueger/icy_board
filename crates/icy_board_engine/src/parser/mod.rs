@@ -7,9 +7,9 @@ use std::{
 
 use crate::{
     ast::{
-        Ast, AstNode, BlockStatement, CommentAstNode, Constant, DimensionSpecifier, FunctionDeclarationAstNode, FunctionImplementation, ParameterSpecifier,
-        ProcedureDeclarationAstNode, ProcedureImplementation, ProcedureParameterSpecifier, Statement, TypeDeclarationAstNode, TypeFieldSpecifier,
-        VariableParameterSpecifier, VariableSpecifier,
+        Ast, AstNode, BlockStatement, CommentAstNode, Constant, DimensionSpecifier, FunctionDeclarationAstNode, FunctionImplementation,
+        FunctionParameterSpecifier, ParameterSpecifier, ProcedureDeclarationAstNode, ProcedureImplementation, ProcedureParameterSpecifier, Statement,
+        TypeDeclarationAstNode, TypeFieldSpecifier, VariableParameterSpecifier, VariableSpecifier,
     },
     compiler::{
         user_data::{UserData, UserDataRegistry},
@@ -734,8 +734,7 @@ impl<'a> Parser<'a> {
         Some(TypeDeclarationAstNode::new(type_token, identifier_token, fields, endtype_token))
     }
 
-    /*
-        fn parse_function_parameter_specifier(&mut self) -> ParameterSpecifier {
+    fn parse_function_parameter_specifier(&mut self) -> ParameterSpecifier {
             let func_token = self.save_spanned_token();
             self.next_token();
             let Some(Token::Identifier(_)) = self.get_cur_token() else {
@@ -820,7 +819,6 @@ impl<'a> Parser<'a> {
                 return_type,
             ))
         }
-    */
     fn parse_procedure_parameter_specifier(&mut self) -> ParameterSpecifier {
         let proc_token = self.save_spanned_token();
         self.next_token();
@@ -847,13 +845,13 @@ impl<'a> Parser<'a> {
             }
 
             if self.lang_version >= 350 {
-                /*if let Some(Token::Function) = self.get_cur_token() {
+                if let Some(Token::Function) = self.get_cur_token() {
                     parameters.push(self.parse_function_parameter_specifier());
                     if self.get_cur_token() == Some(Token::Comma) {
                         self.next_token();
                     }
                     continue;
-                }*/
+                }
 
                 if let Some(Token::Procedure) = self.get_cur_token() {
                     parameters.push(self.parse_procedure_parameter_specifier());
@@ -1140,13 +1138,13 @@ impl<'a> Parser<'a> {
             let mut var_token = None;
 
             if self.lang_version >= 350 {
-                /*if let Some(Token::Function) = self.get_cur_token() {
+                if let Some(Token::Function) = self.get_cur_token() {
                     parameters.push(self.parse_function_parameter_specifier());
                     if self.get_cur_token() == Some(Token::Comma) {
                         self.next_token();
                     }
                     continue;
-                }*/
+                }
                 if let Some(Token::Procedure) = self.get_cur_token() {
                     parameters.push(self.parse_procedure_parameter_specifier());
                     if self.get_cur_token() == Some(Token::Comma) {
@@ -1268,13 +1266,13 @@ impl<'a> Parser<'a> {
                     return None;
                 }
                 if self.lang_version >= 350 {
-                    /*if let Some(Token::Function) = self.get_cur_token() {
+                    if let Some(Token::Function) = self.get_cur_token() {
                         parameters.push(self.parse_function_parameter_specifier());
                         if self.get_cur_token() == Some(Token::Comma) {
                             self.next_token();
                         }
                         continue;
-                    }*/
+                    }
                     if let Some(Token::Procedure) = self.get_cur_token() {
                         parameters.push(self.parse_procedure_parameter_specifier());
                         if self.get_cur_token() == Some(Token::Comma) {

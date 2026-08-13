@@ -306,6 +306,7 @@ pub enum PPEExpr {
     #[default]
     Invalid,
     Value(usize),
+    RoutineReference(usize),
     Member(Box<PPEExpr>, usize),
     UnaryExpression(UnaryOp, Box<PPEExpr>),
     BinaryExpression(BinOp, Box<PPEExpr>, Box<PPEExpr>),
@@ -338,6 +339,10 @@ impl PPEExpr {
             PPEExpr::Value(id) => {
                 vec.push(*id as i16);
                 vec.push(0);
+            }
+            PPEExpr::RoutineReference(id) => {
+                vec.push(FuncOpCode::RoutineReference as i16);
+                vec.push(*id as i16);
             }
             PPEExpr::Member(expr, id) => {
                 expr.serialize(vec);
@@ -393,6 +398,7 @@ impl PPEExpr {
         match self {
             PPEExpr::Invalid => 0,
             PPEExpr::Value(_) => 2,
+            PPEExpr::RoutineReference(_) => 2,
             PPEExpr::Member(expr, _) => expr.get_size() + 2,
             PPEExpr::Dim(_, args) => 2 + Self::count_size(args) + args.len(),
             PPEExpr::PredefinedFunctionCall(_, args) => Self::count_size(args) + 1,
@@ -410,7 +416,7 @@ impl PPEExpr {
 
     pub fn get_id(&self) -> Option<usize> {
         match self {
-            PPEExpr::Value(id) | PPEExpr::Dim(id, _) => Some(*id),
+            PPEExpr::Value(id) | PPEExpr::RoutineReference(id) | PPEExpr::Dim(id, _) => Some(*id),
             _ => None,
         }
     }
@@ -433,6 +439,7 @@ impl PPEExpr {
         match self {
             PPEExpr::Invalid => panic!("Invalid expression"),
             PPEExpr::Value(id) => visitor.visit_value(*id),
+            PPEExpr::RoutineReference(id) => visitor.visit_routine_reference(*id),
             PPEExpr::Member(expr, id) => visitor.visit_member(expr, *id),
             PPEExpr::UnaryExpression(op, expr) => visitor.visit_unary_expression(*op, expr),
             PPEExpr::BinaryExpression(op, left, right) => visitor.visit_binary_expression(*op, left, right),
@@ -453,6 +460,7 @@ impl PPEExpr {
         match self {
             PPEExpr::Invalid => panic!("Invalid expression"),
             PPEExpr::Value(id) => visitor.visit_value(*id),
+            PPEExpr::RoutineReference(id) => visitor.visit_routine_reference(*id),
             PPEExpr::Member(expr, id) => visitor.visit_member(expr, *id),
             PPEExpr::UnaryExpression(op, expr) => visitor.visit_unary_expression(*op, expr),
             PPEExpr::BinaryExpression(op, left, right) => visitor.visit_binary_expression(*op, left, right),
@@ -471,6 +479,9 @@ pub trait PPEVisitor<T>: Sized {
         }
     }
     fn visit_value(&mut self, id: usize) -> T;
+    fn visit_routine_reference(&mut self, id: usize) -> T {
+        self.visit_value(id)
+    }
     fn visit_member(&mut self, expr: &PPEExpr, id: usize) -> T;
     fn visit_unary_expression(&mut self, op: UnaryOp, expr: &PPEExpr) -> T;
     fn visit_binary_expression(&mut self, op: BinOp, left: &PPEExpr, right: &PPEExpr) -> T;
@@ -496,6 +507,9 @@ pub trait PPEVisitor<T>: Sized {
 pub trait PPEVisitorMut: Sized {
     fn visit_value(&mut self, id: usize) -> PPEExpr {
         PPEExpr::Value(id)
+    }
+    fn visit_routine_reference(&mut self, id: usize) -> PPEExpr {
+        PPEExpr::RoutineReference(id)
     }
     fn visit_member(&mut self, expr: &PPEExpr, id: usize) -> PPEExpr {
         PPEExpr::Member(Box::new(expr.visit_mut(self)), id)

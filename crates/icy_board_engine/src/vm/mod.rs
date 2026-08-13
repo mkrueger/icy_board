@@ -408,7 +408,7 @@ impl<'a> VirtualMachine<'a> {
     pub async fn eval_expr(&mut self, expr: &PPEExpr) -> Res<VariableValue> {
         match expr {
             PPEExpr::Invalid => Err(VMError::InternalVMError.into()),
-            PPEExpr::Value(id) => Ok(self.variable_table.get_value(*id).clone()),
+            PPEExpr::Value(id) | PPEExpr::RoutineReference(id) => Ok(self.variable_table.get_value(*id).clone()),
 
             PPEExpr::Member(base_expr, member_id) => {
                 let val = self.eval_expr(base_expr).await?;

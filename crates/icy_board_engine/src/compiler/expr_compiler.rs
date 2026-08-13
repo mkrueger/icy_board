@@ -13,6 +13,9 @@ pub struct ExpressionCompiler<'a> {
 impl<'a> AstVisitor<PPEExpr> for ExpressionCompiler<'a> {
     fn visit_identifier_expression(&mut self, identifier: &crate::ast::IdentifierExpression) -> PPEExpr {
         if let Some(decl) = self.compiler.lookup_table.lookup_variable(identifier.get_identifier()) {
+            if self.compiler.semantic_visitor.is_routine_reference(identifier.get_identifier_token().span.start) {
+                return PPEExpr::RoutineReference(decl.header.id);
+            }
             return PPEExpr::Value(decl.header.id);
         }
         log::error!("Variable not found: {}", identifier.get_identifier());
