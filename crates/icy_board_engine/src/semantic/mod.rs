@@ -826,6 +826,21 @@ impl SemanticVisitor {
         None
     }
 
+    fn is_whole_custom_type_array(&mut self, expression: &Expression) -> bool {
+        match expression {
+            Expression::Identifier(identifier) => {
+                let Some(index) = self.lookup_variable(identifier.get_identifier()) else {
+                    return false;
+                };
+                let reference = &self.references[index].1;
+                matches!(reference.variable_type, VariableType::UserData(_))
+                    && reference.header.as_ref().is_some_and(|header| header.dim > 0)
+            }
+            Expression::Parens(parens) => self.is_whole_custom_type_array(parens.get_expression()),
+            _ => false,
+        }
+    }
+
     fn add_reference_to(&mut self, identifier: &Spanned<Token>, idx: usize) {
         self.references[idx].1.usages.push((
             self.errors.lock().unwrap().file_name().to_path_buf(),
@@ -1207,7 +1222,14 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             );
         }
         if has_custom_type && matches!(binary.get_op(), crate::ast::BinOp::Eq | crate::ast::BinOp::NotEq) {
-            if left != right {
+            if self.is_whole_custom_type_array(binary.get_left_expression())
+                || self.is_whole_custom_type_array(binary.get_right_expression())
+            {
+                self.errors.lock().unwrap().report_error(
+                    binary.get_op_token().span.clone(),
+                    CompilationErrorType::CustomTypeArrayComparisonNotSupported,
+                );
+            } else if left != right {
                 self.errors.lock().unwrap().report_error(
                     binary.get_op_token().span.clone(),
                     CompilationErrorType::ComparisonTypeMismatch(left, right),

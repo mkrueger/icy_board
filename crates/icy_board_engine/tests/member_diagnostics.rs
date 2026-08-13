@@ -145,6 +145,24 @@ fn records_of_different_types_cannot_be_compared() {
 }
 
 #[test]
+fn a_board_object_cannot_be_a_record_field() {
+    let errors = diagnostics("TYPE Holder\n  CONFERENCE Conf\nENDTYPE\nHolder item\n");
+    assert!(errors.iter().any(|e| e == "Board object UserData(30) cannot be a record field"), "{errors:?}");
+}
+
+#[test]
+fn whole_arrays_of_records_cannot_be_compared() {
+    let errors = diagnostics("TYPE Rec\n  INTEGER v\nENDTYPE\nRec first(2)\nRec second(2)\nIF first = second PRINT \"equal\"\n");
+    assert!(errors.iter().any(|e| e == "Whole arrays of custom types cannot be compared"), "{errors:?}");
+}
+
+#[test]
+fn indexed_records_can_still_be_compared() {
+    let errors = diagnostics("TYPE Rec\n  INTEGER v\nENDTYPE\nRec first(2)\nRec second(2)\nIF first(1) = second(1) PRINT \"equal\"\n");
+    assert!(errors.is_empty(), "{errors:?}");
+}
+
+#[test]
 fn a_member_on_something_that_is_not_an_object_is_reported() {
     let errors = diagnostics("INTEGER i\nPRINTLN i.Name\n");
     assert!(errors.iter().any(|e| e == "Member not found"), "{errors:?}");

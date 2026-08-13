@@ -12,7 +12,9 @@ use icy_board_engine::{
     executable::{LAST_PPLC, SUPPORTED_PPE_VERSIONS},
     formatting::{FormattingVisitor, StringFormattingBackend},
     icy_board::read_with_encoding_detection,
-    parser::{Encoding, ErrorReporter, UserTypeRegistry, load_with_encoding, parse_ast},
+    parser::{
+        Encoding, ErrorReporter, UserTypeRegistry, load_with_encoding, parse_ast_with_predeclared_types, preparse_type_declarations,
+    },
 };
 
 use crossterm::{
@@ -275,9 +277,15 @@ fn compile_files(arguments: &Cli, encoding: Encoding, workspace: &Workspace, out
     let mut exit_code = 0;
 
     for src_file in workspace.files() {
+        if let Ok(src) = load_with_encoding(&src_file, encoding) {
+            preparse_type_declarations(src_file, errors.clone(), &src, &reg, encoding, workspace);
+        }
+    }
+
+    for src_file in workspace.files() {
         match load_with_encoding(&src_file, encoding) {
             Ok(src) => {
-                let ast = parse_ast(src_file.to_path_buf(), errors.clone(), &src, &reg, encoding, workspace);
+                let ast = parse_ast_with_predeclared_types(src_file.to_path_buf(), errors.clone(), &src, &reg, encoding, workspace);
                 if arguments.format || arguments.check {
                     let mut backend = StringFormattingBackend {
                         text: src.chars().collect(),

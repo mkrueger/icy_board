@@ -495,6 +495,8 @@ Rules the compiler enforces:
 * Field names must be unique within the type.
 * A type cannot contain a field of its own type, and can only name types that
   were declared before it, so a record cannot end up containing itself.
+* Board objects such as `CONFERENCE` cannot be fields. They are runtime snapshots,
+  not values with record copy and equality semantics.
 * A type cannot reuse the name of a built-in or of a board object.
 * A program may declare 156 types; ids 100–255 are reserved for them, leaving
   30–99 for board objects.
@@ -504,6 +506,13 @@ Rules the compiler enforces:
 * Custom types are nominal: two separately declared records are different types
   even when their fields happen to match. Assignments and routine arguments
   require the exact custom type.
+* Equality compares two individual records of the same type by their fields.
+  Whole arrays of records cannot be compared; index them first.
+
+All `TYPE` declarations in a package are collected before its source files are
+parsed, so `main.pps` may use a type declared in another file. Record fields still
+follow declaration order: a record may only contain another record declared
+earlier in the package.
 
 Records are the one thing a PPE may assign a member of. The board objects are
 read-only snapshots, so `conf.Name = "x"` is rejected.

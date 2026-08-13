@@ -13,7 +13,7 @@ use crate::{
     executable::VariableType,
 };
 
-use super::{Encoding, ErrorReporter, Parser, UserTypeRegistry};
+use super::{Encoding, ErrorReporter, Parser, UserTypeRegistry, parse_ast_with_predeclared_types, preparse_type_declarations};
 
 fn parse_ast_node(input: &str, assert_eof: bool) -> AstNode {
     let reg = UserTypeRegistry::default();
@@ -34,6 +34,30 @@ fn check_ast_node(input: &str, check: &AstNode) {
         println!("was:\n{node}\nShould be:\n{check}");
         panic!();
     }
+}
+
+#[test]
+fn a_file_can_use_a_type_declared_in_a_later_file() {
+    let registry = UserTypeRegistry::default();
+    let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+    let workspace = Workspace::default();
+    let main = "Point value\nvalue.X = 1\n";
+    let types = "TYPE Point\n  INTEGER X\nENDTYPE\n";
+
+    preparse_type_declarations(PathBuf::from("main.pps"), errors.clone(), main, &registry, Encoding::Utf8, &workspace);
+    preparse_type_declarations(PathBuf::from("types.pps"), errors.clone(), types, &registry, Encoding::Utf8, &workspace);
+    let ast = parse_ast_with_predeclared_types(
+        PathBuf::from("main.pps"),
+        errors.clone(),
+        main,
+        &registry,
+        Encoding::Utf8,
+        &workspace,
+    );
+
+    assert!(!ast.nodes.is_empty());
+    let messages: Vec<String> = errors.lock().unwrap().errors.iter().map(|error| error.error.to_string()).collect();
+    assert!(messages.is_empty(), "{messages:?}");
 }
 
 #[test]

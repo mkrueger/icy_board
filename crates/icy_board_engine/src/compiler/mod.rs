@@ -68,6 +68,9 @@ pub enum CompilationErrorType {
     #[error("Can't compare {0} with {1}")]
     ComparisonTypeMismatch(VariableType, VariableType),
 
+    #[error("Whole arrays of custom types cannot be compared")]
+    CustomTypeArrayComparisonNotSupported,
+
     #[error("Unused variable ({0})")]
     UnusedVariable(String),
 

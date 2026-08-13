@@ -173,6 +173,9 @@ pub enum ParserErrorType {
     #[error("Record field '{0}' cannot have an initializer")]
     TypeFieldInitializerNotSupported(unicase::Ascii<String>),
 
+    #[error("Board object {0} cannot be a record field")]
+    TypeFieldBoardObjectNotSupported(VariableType),
+
     #[error("No room for another type, {0} is the most a program may declare")]
     TooManyTypes(usize),
 
@@ -342,6 +345,7 @@ pub struct Parser<'a> {
     got_statement: bool,
     got_funcs: bool,
     in_function: bool,
+    types_predeclared: bool,
 }
 lazy_static::lazy_static! {
     static ref PROC_TOKEN: unicase::Ascii<String> = unicase::Ascii::new("PROC".to_string());
@@ -379,6 +383,7 @@ impl<'a> Parser<'a> {
             got_statement: false,
             got_funcs: false,
             in_function: false,
+            types_predeclared: false,
         }
     }
 
@@ -521,7 +526,16 @@ impl<'a> Parser<'a> {
                 }
             }
             Token::Type => {
-                if let Some(decl) = self.parse_type_declaration() {
+                let original_reporter = if self.types_predeclared {
+                    Some(std::mem::replace(&mut self.error_reporter, Arc::new(Mutex::new(ErrorReporter::default()))))
+                } else {
+                    None
+                };
+                let declaration = self.parse_type_declaration();
+                if let Some(original_reporter) = original_reporter {
+                    self.error_reporter = original_reporter;
+                }
+                if let Some(decl) = declaration {
                     return Some(AstNode::TypeDeclaration(decl));
                 }
             }
@@ -605,12 +619,8 @@ impl<'a> Parser<'a> {
         let identifier_token = self.save_spanned_token();
         self.next_token();
 
-        if self.type_registry.get_type(&name).is_some() {
-            self.error_reporter
-                .lock()
-                .unwrap()
-                .report_error(identifier_token.span.clone(), ParserErrorType::TypeAlreadyDeclared(name.clone()));
-        } else if self.type_hashes.contains_key(&name) {
+        let type_already_declared = self.type_registry.get_type(&name).is_some() || self.type_hashes.contains_key(&name);
+        if !self.types_predeclared && type_already_declared {
             self.error_reporter
                 .lock()
                 .unwrap()
@@ -650,6 +660,12 @@ impl<'a> Parser<'a> {
                 continue;
             };
             let field_type_token = self.save_spanned_token();
+            if !self.types_predeclared && matches!(field_type, VariableType::UserData(id) if !is_user_declared_type(id)) {
+                self.error_reporter.lock().unwrap().report_error(
+                    field_type_token.span.clone(),
+                    ParserErrorType::TypeFieldBoardObjectNotSupported(field_type),
+                );
+            }
             self.next_token();
 
             loop {
@@ -707,7 +723,7 @@ impl<'a> Parser<'a> {
             .iter()
             .map(|field| (field.get_identifier().clone(), field.get_variable_type()))
             .collect();
-        if self.type_registry.declare_user_type(name, field_layout).is_none() {
+        if !self.types_predeclared && !type_already_declared && self.type_registry.declare_user_type(name, field_layout).is_none() {
             self.error_reporter
                 .lock()
                 .unwrap()
@@ -1448,9 +1464,33 @@ pub fn parse_ast(
     encoding: Encoding,
     workspace: &Workspace,
 ) -> Ast {
+    parse_ast_internal(file_name, error_reporter, input, user_types, encoding, workspace, false)
+}
+
+pub fn parse_ast_with_predeclared_types(
+    file_name: PathBuf,
+    error_reporter: Arc<Mutex<ErrorReporter>>,
+    input: &str,
+    user_types: &UserTypeRegistry,
+    encoding: Encoding,
+    workspace: &Workspace,
+) -> Ast {
+    parse_ast_internal(file_name, error_reporter, input, user_types, encoding, workspace, true)
+}
+
+fn parse_ast_internal(
+    file_name: PathBuf,
+    error_reporter: Arc<Mutex<ErrorReporter>>,
+    input: &str,
+    user_types: &UserTypeRegistry,
+    encoding: Encoding,
+    workspace: &Workspace,
+    types_predeclared: bool,
+) -> Ast {
     error_reporter.lock().unwrap().set_file_name(&file_name);
     let mut nodes = Vec::new();
     let mut parser = Parser::new(file_name.clone(), error_reporter, user_types, input, encoding, workspace);
+    parser.types_predeclared = types_predeclared;
     parser.next_token();
     parser.skip_eol();
 
@@ -1464,6 +1504,26 @@ pub fn parse_ast(
         nodes,
         file_name,
         require_user_variables: parser.require_user_variables,
+    }
+}
+
+pub fn preparse_type_declarations(
+    file_name: PathBuf,
+    error_reporter: Arc<Mutex<ErrorReporter>>,
+    input: &str,
+    user_types: &UserTypeRegistry,
+    encoding: Encoding,
+    workspace: &Workspace,
+) {
+    error_reporter.lock().unwrap().set_file_name(&file_name);
+    let mut parser = Parser::new(file_name, error_reporter, user_types, input, encoding, workspace);
+    parser.next_token();
+    while parser.cur_token.is_some() {
+        if parser.get_cur_token() == Some(Token::Type) {
+            parser.parse_type_declaration();
+        } else {
+            parser.next_token();
+        }
     }
 }
 

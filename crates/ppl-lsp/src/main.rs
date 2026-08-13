@@ -12,7 +12,9 @@ use icy_board_engine::compiler::workspace::Workspace;
 use icy_board_engine::executable::{FUNCTION_DEFINITIONS, FunctionDefinition, LAST_PPLC};
 use icy_board_engine::formatting::FormattingVisitor;
 use icy_board_engine::icy_board::read_data_with_encoding_detection;
-use icy_board_engine::parser::{Encoding, ErrorReporter, UserTypeRegistry, parse_ast};
+use icy_board_engine::parser::{
+    Encoding, ErrorReporter, UserTypeRegistry, parse_ast, parse_ast_with_predeclared_types, preparse_type_declarations,
+};
 use icy_board_engine::semantic::SemanticVisitor;
 use ppl_language_server::completion::get_completion;
 use ppl_language_server::documentation::{get_const_hover, get_function_hover, get_statement_hover, get_type_hover};
@@ -456,19 +458,32 @@ impl Backend {
         let ws_file = roo_path.join("ppl.toml");
         if ws_file.exists() {
             if let Ok(ws) = Workspace::load(ws_file) {
-                let mut semantic_visitor = SemanticVisitor::new(&ws, Arc::new(Mutex::new(ErrorReporter::default())), UserTypeRegistry::default());
+                let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+                let registry = UserTypeRegistry::icy_board_registry();
+                let mut sources = Vec::new();
                 for file in ws.files() {
                     let content = read_data_with_encoding_detection(&std::fs::read(&file).unwrap()).unwrap();
-                    let ast = parse_ast(
+                    preparse_type_declarations(file.clone(), errors.clone(), &content, &registry, Encoding::Utf8, &ws);
+                    sources.push((file, content));
+                }
+
+                let mut asts = Vec::new();
+                for (file, content) in sources {
+                    let ast = parse_ast_with_predeclared_types(
                         file.clone(),
-                        semantic_visitor.errors.clone(),
+                        errors.clone(),
                         &content,
-                        &UserTypeRegistry::default(),
+                        &registry,
                         Encoding::Utf8,
                         &ws,
                     );
+                    asts.push(ast);
+                }
+
+                let mut semantic_visitor = SemanticVisitor::new(&ws, errors, registry);
+                for ast in asts {
                     ast.visit(&mut semantic_visitor);
-                    self.workspace_map.insert(Url::from_file_path(file).unwrap(), ast);
+                    self.workspace_map.insert(Url::from_file_path(&ast.file_name).unwrap(), ast);
                 }
                 semantic_visitor.finish();
 
@@ -497,50 +512,48 @@ impl Backend {
         self.client.publish_diagnostics(uri.clone(), Vec::new(), None).await;
 
         if self.workspace_map.get(&uri).is_some() {
-            let mut semantic_visitor = SemanticVisitor::new(
-                &self.workspace.lock().unwrap(),
-                Arc::new(Mutex::new(ErrorReporter::default())),
-                UserTypeRegistry::default(),
-            );
-            let files = self.workspace.lock().unwrap().files();
-            for file in files {
-                let name = file.to_string_lossy().to_string();
-                let cur_uri = Url::from_file_path(name).unwrap();
+            let semantic_visitor = {
+                let workspace = self.workspace.lock().unwrap();
+                let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+                let registry = UserTypeRegistry::icy_board_registry();
+                let mut sources = Vec::new();
 
-                if uri == cur_uri {
-                    let ast = parse_ast(
-                        file.clone(),
-                        semantic_visitor.errors.clone(),
-                        &params.text,
-                        &UserTypeRegistry::default(),
-                        Encoding::Utf8,
-                        &self.workspace.lock().unwrap(),
-                    );
-                    let semantic_tokens: Vec<ImCompleteSemanticToken> = semantic_token_from_ast(&ast);
-                    self.semantic_token_map.insert(cur_uri.clone(), semantic_tokens);
-                    self.workspace_map.insert(cur_uri.clone(), ast);
-                } else if self.workspace_map.get(&cur_uri).is_none() {
-                    self.client.publish_diagnostics(cur_uri.clone(), Vec::new(), None).await;
-                    let content = read_data_with_encoding_detection(&std::fs::read(&file).unwrap()).unwrap();
-                    let ast = parse_ast(
-                        file.clone(),
-                        semantic_visitor.errors.clone(),
-                        &content,
-                        &UserTypeRegistry::default(),
-                        Encoding::Utf8,
-                        &self.workspace.lock().unwrap(),
-                    );
-                    let semantic_tokens = semantic_token_from_ast(&ast);
-                    self.semantic_token_map.insert(cur_uri.clone(), semantic_tokens);
-                    self.workspace_map.insert(cur_uri.clone(), ast);
+                for file in workspace.files() {
+                    let cur_uri = Url::from_file_path(&file).unwrap();
+                    let content = if uri == cur_uri {
+                        params.text.clone()
+                    } else if let Some(document) = self.document_map.get(&cur_uri) {
+                        document.to_string()
+                    } else {
+                        read_data_with_encoding_detection(&std::fs::read(&file).unwrap()).unwrap()
+                    };
+                    preparse_type_declarations(file.clone(), errors.clone(), &content, &registry, Encoding::Utf8, &workspace);
+                    sources.push((file, cur_uri, content));
                 }
 
-                if let Some(ast) = self.workspace_map.get(&cur_uri) {
+                let mut asts = Vec::new();
+                for (file, cur_uri, content) in sources {
+                    let ast = parse_ast_with_predeclared_types(
+                        file,
+                        errors.clone(),
+                        &content,
+                        &registry,
+                        Encoding::Utf8,
+                        &workspace,
+                    );
+                    self.semantic_token_map.insert(cur_uri.clone(), semantic_token_from_ast(&ast));
+                    asts.push((cur_uri, ast));
+                }
+
+                let mut semantic_visitor = SemanticVisitor::new(&workspace, errors, registry);
+                for (cur_uri, ast) in asts {
                     semantic_visitor.errors.lock().unwrap().set_file_name(&ast.file_name);
                     ast.visit(&mut semantic_visitor);
+                    self.workspace_map.insert(cur_uri, ast);
                 }
-            }
-            semantic_visitor.finish();
+                semantic_visitor.finish();
+                semantic_visitor
+            };
             self.add_diagnostics(&semantic_visitor).await;
             {
                 let mut state: std::sync::MutexGuard<'_, SemanticVisitor> = self.workspace_visitor.lock().unwrap();

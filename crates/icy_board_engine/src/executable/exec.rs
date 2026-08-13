@@ -60,6 +60,9 @@ pub enum ExecutableError {
     #[error("Type {0} refers to type {1}, which has not been declared yet")]
     InvalidTypeReference(usize, u8),
 
+    #[error("Type {0} contains board object {1}, which cannot be a record field")]
+    BoardObjectTypeField(usize, u8),
+
     #[error("Variable refers to type {0}, which is not in the type table")]
     MissingTypeDefinition(u8),
 }
@@ -90,7 +93,10 @@ impl Executable {
             }
             for field in fields {
                 if let VariableType::UserData(field_type_id) = field {
-                    if is_user_declared_type(*field_type_id) && *field_type_id as usize >= type_id {
+                    if !is_user_declared_type(*field_type_id) {
+                        return Err(ExecutableError::BoardObjectTypeField(type_id, *field_type_id));
+                    }
+                    if *field_type_id as usize >= type_id {
                         return Err(ExecutableError::InvalidTypeReference(type_id, *field_type_id));
                     }
                 }

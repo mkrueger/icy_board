@@ -206,6 +206,15 @@ fn the_serializer_rejects_recursive_or_forward_type_references() {
 }
 
 #[test]
+fn the_serializer_rejects_a_board_object_field() {
+    let executable = Executable {
+        user_types: vec![vec![VariableType::UserData(30)]],
+        ..Executable::default()
+    };
+    assert_eq!(ExecutableError::BoardObjectTypeField(100, 30), executable.to_buffer().unwrap_err());
+}
+
+#[test]
 fn the_serializer_rejects_a_variable_whose_type_is_missing() {
     let mut executable = Executable::default();
     let mut entry = TableEntry::default();
