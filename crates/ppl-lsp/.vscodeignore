@@ -2,14 +2,24 @@
 node_modules
 out/
 src/
+tests/
+data/
+i18n/
+i18n.toml
+extensions.toml
 tsconfig.json
+esbuild.js
 webpack.config.js
 client/**
 target
+Cargo.toml
 Cargo.lock
+pnpm-lock.yaml
 .github
 .cargo
+.gitignore
 examples/
 justfile
 rust-toolchains.toml
+*.vsix
 

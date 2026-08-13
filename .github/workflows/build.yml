@@ -10,6 +10,7 @@ env:
 jobs:
   build_linux:
    runs-on: ubuntu-latest
+   if: github.event.workflow_run.conclusion == 'success'
    steps:
    - uses: actions/checkout@v4
    - name: Get version
@@ -20,7 +21,6 @@ jobs:
    - name: Build
      id: build
      run: |
-       rustup  update
        cargo build --release
        echo "Copy $DEB to icboard.deb"
        mkdir bin
@@ -51,6 +51,7 @@ jobs:
          INSTALL.txt
   build_windows:
    runs-on: windows-latest
+   if: github.event.workflow_run.conclusion == 'success'
    steps:
    - uses: actions/checkout@v4
    - name: Get version
@@ -61,7 +62,6 @@ jobs:
    - name: Build
      id: build
      run: |
-       rustup update
        set RUSTFLAGS=-C target-feature=+crt-static
        cargo build --release
        echo "Copy $DEB to icy_board.deb"
@@ -93,6 +93,7 @@ jobs:
          INSTALL.txt
   build_mac:
    runs-on: macos-13
+   if: github.event.workflow_run.conclusion == 'success'
    steps:
    - uses: actions/checkout@v4
    - name: Get version
@@ -102,7 +103,6 @@ jobs:
        echo "Version: $version"
    - name: Install rust compilation targets
      run: |
-       rustup update
        rustup target add aarch64-apple-darwin
        rustup target add x86_64-apple-darwin
    - name: Build
@@ -168,6 +168,7 @@ jobs:
          INSTALL.txt
   build_vs_extension:
    runs-on: ubuntu-latest
+   if: github.event.workflow_run.conclusion == 'success'
    steps:
    - uses: actions/checkout@v4
    - uses: pnpm/action-setup@v2
@@ -200,6 +201,7 @@ jobs:
 
   build_docs_pdf:
     runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success'
     steps:
     - uses: actions/checkout@v4
     

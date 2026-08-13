@@ -13,10 +13,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4   
     - name: Check formatting
-      run: |
-        rustup  update
-        cargo fmt --all -- --check
-    - run: rustup component add clippy
+      run: cargo fmt --all -- --check
     - name: Run tests
       run: |
         cargo test --all-features

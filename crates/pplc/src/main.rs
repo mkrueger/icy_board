@@ -383,7 +383,9 @@ fn compile_files(arguments: &Cli, encoding: Encoding, workspace: &Workspace, out
                     } else if arguments.stdout {
                         print!("{src}");
                     }
-                    continue;
+                    if arguments.format {
+                        continue;
+                    }
                 }
                 asts.push((ast, src));
                 if check_errors(errors.clone(), &arguments, &asts) {
@@ -408,15 +410,21 @@ fn compile_files(arguments: &Cli, encoding: Encoding, workspace: &Workspace, out
             }
         }
     }
-    if arguments.format || arguments.check {
+    if arguments.format {
         std::process::exit(exit_code);
     }
 
-    println!("Compiling...");
+    // --check runs the compiler for its diagnostics, it just keeps the result.
+    if !arguments.check {
+        println!("Compiling...");
+    }
     let mut compiler = PPECompiler::new(&workspace, reg, errors.clone());
     compiler.compile(&asts.iter().map(|(ast, _)| ast).collect::<Vec<&Ast>>());
     if check_errors(errors.clone(), &arguments, &asts) {
         std::process::exit(1);
+    }
+    if arguments.check {
+        std::process::exit(exit_code);
     }
 
     match compiler.create_executable() {

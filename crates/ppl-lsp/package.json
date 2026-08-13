@@ -1,9 +1,12 @@
 {
 	"name": "ppl-language-server",
+	"displayName": "PPL - PCBoard Programming Language",
 	"description": "PCBoard Programming Language server",
 	"license": "MIT",
-	"version": "0.1.7",
-	"categories": [],
+	"version": "0.2.0",
+	"categories": [
+		"Programming Languages"
+	],
 	"keywords": [
 		"language-server",
 		"tower-lsp"
