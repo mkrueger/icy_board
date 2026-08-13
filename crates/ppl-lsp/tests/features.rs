@@ -9,7 +9,7 @@ use icy_board_engine::{
     parser::{Encoding, ErrorReporter, UserTypeRegistry, parse_ast},
     semantic::SemanticVisitor,
 };
-use ppl_language_server::{document_symbol::get_document_symbols, hover::get_user_hover};
+use icyboard_ppl::{document_symbol::get_document_symbols, hover::get_user_hover};
 use ropey::Rope;
 use tower_lsp::lsp_types::{HoverContents, SymbolKind};
 

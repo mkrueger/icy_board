@@ -22,7 +22,7 @@ From a checkout of the repository:
 
    tools/setup-editor.sh
 
-That builds and installs ``ppl-language-server``, and sets up every editor it
+That builds and installs ``icyboard-ppl``, and sets up every editor it
 finds: the parser and the queries land where Helix and Neovim look for them, and
 the configuration is written unless there already is one. Run it again after
 pulling; it leaves anything you changed alone.
@@ -64,15 +64,16 @@ file is known in the next.
 Visual Studio Code
 ~~~~~~~~~~~~~~~~~~
 
-Download ``ppl-language-server-X.X.X.vsix`` from
+Download the ``icyboard-ppl-X.X.X.vsix`` for your platform from
 `the release page <https://github.com/mkrueger/icy_board/releases/latest>`_ and
 drag it onto the VS Code window, or open it from ``Extensions: Install from
 VSIX``.
 
-The extension needs the ``ppl-language-server`` binary. Either put it on your
-PATH - ``tools/setup-editor.sh server`` does - or point the setting
-``ppl.serverPath`` at it. If it cannot be found, the extension says so and offers
-to open the setting.
+The platform packages already contain the ``icyboard-ppl`` binary. The package
+without a platform in its name needs it on the PATH -
+``tools/setup-editor.sh server`` does that - or in the
+``icyboardPpl.serverPath`` setting. If it cannot be found, the extension says so
+and offers to open the setting.
 
 Helix
 ~~~~~
@@ -97,8 +98,8 @@ Add to ``~/.config/helix/languages.toml``:
 
 .. code-block:: toml
 
-   [language-server.ppl-lsp]
-   command = "ppl-language-server"
+   [language-server.icyboard-ppl]
+   command = "icyboard-ppl"
 
    [[language]]
    name = "ppl"
@@ -107,7 +108,7 @@ Add to ``~/.config/helix/languages.toml``:
    file-types = ["pps"]
    comment-token = ";"
    indent = { tab-width = 4, unit = "    " }
-   language-servers = ["ppl-lsp"]
+   language-servers = ["icyboard-ppl"]
    roots = ["ppl.toml"]
 
 **Step 3: check**
@@ -121,7 +122,7 @@ which should answer:
 .. code-block:: text
 
    Configured language servers:
-     ✓ ppl-lsp: /home/you/.cargo/bin/ppl-language-server
+   ✓ icyboard-ppl: /home/you/.cargo/bin/icyboard-ppl
    Tree-sitter parser: ✓
    Highlight queries: ✓
    Textobject queries: ✓
@@ -147,8 +148,8 @@ writes two small files, unless you already have them:
    vim.treesitter.start()
    vim.bo.commentstring = "; %s"
    vim.lsp.start({
-       name = "ppl-language-server",
-       cmd = { "ppl-language-server" },
+      name = "icyboard-ppl",
+      cmd = { "icyboard-ppl" },
        root_dir = vim.fs.root(0, { "ppl.toml", ".git" }),
    })
 

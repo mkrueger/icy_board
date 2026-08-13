@@ -8,7 +8,7 @@ use icy_board_engine::{
     parser::{Encoding, ErrorReporter, UserTypeRegistry, parse_ast},
     semantic::SemanticVisitor,
 };
-use ppl_language_server::{completion::get_completion, signature_help::get_signature_help};
+use icyboard_ppl::{completion::get_completion, signature_help::get_signature_help};
 use tower_lsp::lsp_types::ParameterLabel;
 
 /// Parses a source the way the server does and hands back its semantic model.

@@ -12,7 +12,7 @@ use icy_board_engine::{
     formatting::{FormattingOptions, FormattingVisitor, StringFormattingBackend},
     parser::{Encoding, ErrorReporter, UserTypeRegistry, parse_ast},
 };
-use ppl_language_server::formatting::VSCodeFormattingBackend;
+use icyboard_ppl::formatting::VSCodeFormattingBackend;
 use ropey::Rope;
 
 fn parse(path: &Path, source: &str) -> icy_board_engine::ast::Ast {

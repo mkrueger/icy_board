@@ -20,14 +20,14 @@ let client: LanguageClient;
 /// The server is looked for where the user said, then in the environment, then
 /// in the extension itself, then on the PATH.
 function serverCommand(context: vscode.ExtensionContext): string {
-  const configured = vscode.workspace.getConfiguration("ppl").get<string>("serverPath")?.trim();
+  const configured = vscode.workspace.getConfiguration("icyboardPpl").get<string>("serverPath")?.trim();
   if (configured) {
     return configured;
   }
   if (process.env.SERVER_PATH) {
     return process.env.SERVER_PATH;
   }
-  const name = process.platform === "win32" ? "ppl-language-server.exe" : "ppl-language-server";
+  const name = process.platform === "win32" ? "icyboard-ppl.exe" : "icyboard-ppl";
   const bundled = vscode.Uri.joinPath(context.extensionUri, "server", name).fsPath;
   if (fs.existsSync(bundled)) {
     // A vsix is a zip, and not every unpacker keeps the executable bit.
@@ -40,7 +40,7 @@ function serverCommand(context: vscode.ExtensionContext): string {
     }
     return bundled;
   }
-  return "ppl-language-server";
+  return "icyboard-ppl";
 }
 
 export async function activate(context: vscode.ExtensionContext) {
@@ -74,25 +74,25 @@ export async function activate(context: vscode.ExtensionContext) {
     traceOutputChannel,
   };
   // Create the language client and start the client.
-  client = new LanguageClient("ppl-language-server", "IcyBoard PPL language server", serverOptions, clientOptions);
+  client = new LanguageClient("icyboard-ppl", "IcyBoard PPL language server", serverOptions, clientOptions);
   // activateInlayHints(context);
   try {
     await client.start();
   } catch (error) {
     const openSettings = "Open settings";
     const answer = await vscode.window.showErrorMessage(
-      `PPL: could not start '${command}'. Install a build for your platform, or set ppl.serverPath to a server you built yourself.`,
+      `IcyBoard PPL: could not start '${command}'. Install a build for your platform, or set icyboardPpl.serverPath to a server you built yourself.`,
       openSettings,
     );
     if (answer === openSettings) {
-      await vscode.commands.executeCommand("workbench.action.openSettings", "ppl.serverPath");
+      await vscode.commands.executeCommand("workbench.action.openSettings", "icyboardPpl.serverPath");
     }
     return;
   }
 
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration(async (event) => {
-      if (!event.affectsConfiguration("ppl.serverPath")) {
+      if (!event.affectsConfiguration("icyboardPpl.serverPath")) {
         return;
       }
       const reload = "Reload window";

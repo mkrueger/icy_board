@@ -32,7 +32,7 @@ jobs:
        mv target/release/mkicbtxt bin
        mv target/release/pplc bin
        mv target/release/ppld bin
-       mv target/release/ppl-language-server bin
+       mv target/release/icyboard-ppl bin
    - name: 'Upload zip'
      uses: actions/upload-artifact@v4
      with:
@@ -46,7 +46,7 @@ jobs:
          bin/mkicbtxt
          bin/pplc
          bin/ppld
-         bin/ppl-language-server
+         bin/icyboard-ppl
          file_id.diz
          INSTALL.txt
   build_windows:
@@ -74,7 +74,7 @@ jobs:
        move target/release/mkicbtxt.exe bin
        move target/release/pplc.exe bin
        move target/release/ppld.exe bin
-       move target/release/ppl-language-server.exe bin
+       move target/release/icyboard-ppl.exe bin
    - name: 'Upload zip'
      uses: actions/upload-artifact@v4
      with:
@@ -88,7 +88,7 @@ jobs:
          bin/mkicbtxt.exe
          bin/pplc.exe
          bin/ppld.exe
-         bin/ppl-language-server.exe
+         bin/icyboard-ppl.exe
          file_id.diz
          INSTALL.txt
   build_mac:
@@ -113,26 +113,26 @@ jobs:
 
        echo "Copy $DEB to icy_board.deb"
        mkdir -p aarch64-apple-darwin/bin
-       mv target/aarch64-apple-darwin/release/icboard aarch64-apple-darwin/bin
-       mv target/aarch64-apple-darwin/release/icbsetup aarch64-apple-darwin/bin
-       mv target/aarch64-apple-darwin/release/icbmailer aarch64-apple-darwin/bin
-       mv target/aarch64-apple-darwin/release/icbsysmgr aarch64-apple-darwin/bin
-       mv target/aarch64-apple-darwin/release/mkicbmnu aarch64-apple-darwin/bin
-       mv target/aarch64-apple-darwin/release/mkicbtxt aarch64-apple-darwin/bin
-       mv target/aarch64-apple-darwin/release/pplc aarch64-apple-darwin/bin
-       mv target/aarch64-apple-darwin/release/ppld aarch64-apple-darwin/bin
-       mv target/aarch64-apple-darwin/release/ppl-language-server aarch64-apple-darwin/bin
+        mv target/aarch64-apple-darwin/release/icboard aarch64-apple-darwin/bin
+        mv target/aarch64-apple-darwin/release/icbsetup aarch64-apple-darwin/bin
+        mv target/aarch64-apple-darwin/release/icbmailer aarch64-apple-darwin/bin
+        mv target/aarch64-apple-darwin/release/icbsysmgr aarch64-apple-darwin/bin
+        mv target/aarch64-apple-darwin/release/mkicbmnu aarch64-apple-darwin/bin
+        mv target/aarch64-apple-darwin/release/mkicbtxt aarch64-apple-darwin/bin
+        mv target/aarch64-apple-darwin/release/pplc aarch64-apple-darwin/bin
+        mv target/aarch64-apple-darwin/release/ppld aarch64-apple-darwin/bin
+        mv target/aarch64-apple-darwin/release/icyboard-ppl aarch64-apple-darwin/bin
 
        mkdir -p x86_64-apple-darwin/bin
-       mv target/x86_64-apple-darwin/release/icboard x86_64-apple-darwin/bin
-       mv target/x86_64-apple-darwin/release/icbsetup x86_64-apple-darwin/bin
-       mv target/x86_64-apple-darwin/release/icbmailer x86_64-apple-darwin/bin
-       mv target/x86_64-apple-darwin/release/icbsysmgr x86_64-apple-darwin/bin
-       mv target/x86_64-apple-darwin/release/mkicbmnu x86_64-apple-darwin/bin
-       mv target/x86_64-apple-darwin/release/mkicbtxt x86_64-apple-darwin/bin
-       mv target/x86_64-apple-darwin/release/pplc x86_64-apple-darwin/bin
-       mv target/x86_64-apple-darwin/release/ppld x86_64-apple-darwin/bin
-       mv target/x86_64-apple-darwin/release/ppl-language-server x86_64-apple-darwin/bin
+        mv target/x86_64-apple-darwin/release/icboard x86_64-apple-darwin/bin
+        mv target/x86_64-apple-darwin/release/icbsetup x86_64-apple-darwin/bin
+        mv target/x86_64-apple-darwin/release/icbmailer x86_64-apple-darwin/bin
+        mv target/x86_64-apple-darwin/release/icbsysmgr x86_64-apple-darwin/bin
+        mv target/x86_64-apple-darwin/release/mkicbmnu x86_64-apple-darwin/bin
+        mv target/x86_64-apple-darwin/release/mkicbtxt x86_64-apple-darwin/bin
+        mv target/x86_64-apple-darwin/release/pplc x86_64-apple-darwin/bin
+        mv target/x86_64-apple-darwin/release/ppld x86_64-apple-darwin/bin
+        mv target/x86_64-apple-darwin/release/icyboard-ppl x86_64-apple-darwin/bin
 
    - name: 'Upload zip'
      uses: actions/upload-artifact@v4
@@ -147,7 +147,7 @@ jobs:
          aarch64-apple-darwin/bin/mkicbtxt
          aarch64-apple-darwin/bin/pplc
          aarch64-apple-darwin/bin/ppld
-         aarch64-apple-darwin/bin/ppl-language-server
+         aarch64-apple-darwin/bin/icyboard-ppl
          file_id.diz
          INSTALL.txt
    - name: 'Upload zip'
@@ -163,7 +163,7 @@ jobs:
          x86_64-apple-darwin/bin/mkicbtxt
          x86_64-apple-darwin/bin/pplc
          x86_64-apple-darwin/bin/ppld
-         x86_64-apple-darwin/bin/ppl-language-server
+         x86_64-apple-darwin/bin/icyboard-ppl
          file_id.diz
          INSTALL.txt
   build_vs_extension:
@@ -210,10 +210,10 @@ jobs:
          chmod +x server/*
          pnpm exec vsce package --no-dependencies --target "$1"
        }
-       package linux-x64    '*icy_board_linux_*/bin/ppl-language-server'
-       package win32-x64    '*icy_board_windows_*/bin/ppl-language-server.exe'
-       package darwin-arm64 '*aarch64-apple-darwin/bin/ppl-language-server'
-       package darwin-x64   '*x86_64-apple-darwin/bin/ppl-language-server'
+       package linux-x64    '*icy_board_linux_*/bin/icyboard-ppl'
+       package win32-x64    '*icy_board_windows_*/bin/icyboard-ppl.exe'
+       package darwin-arm64 '*aarch64-apple-darwin/bin/icyboard-ppl'
+       package darwin-x64   '*x86_64-apple-darwin/bin/icyboard-ppl'
 
        # And one for everyone else, which asks for a server on the PATH.
        rm -rf server

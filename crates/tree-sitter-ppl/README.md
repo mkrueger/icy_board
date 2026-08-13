@@ -112,12 +112,12 @@ after a change to `grammar.js`. `hx --health ppl` says what Helix found.
 The language server is a separate binary; add it to the same `[[language]]`:
 
 ```toml
-[language-server.ppl-lsp]
-command = "/path/to/icy_board/target/release/ppl-language-server"
+[language-server.icyboard-ppl]
+command = "/path/to/icy_board/target/release/icyboard-ppl"
 
 [[language]]
 name = "ppl"
-language-servers = ["ppl-lsp"]
+language-servers = ["icyboard-ppl"]
 ```
 
 ## Rust

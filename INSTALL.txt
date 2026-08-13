@@ -27,6 +27,6 @@ icbsysmgr - user/groups edutor.
 mkicbtxt - create & alter PCBTEXT files (compatible with old PCBoard format)
 mkicbmnu - create & change icy_board .mnu files 
 pplc - ppl compiler 
-ppl-language-server - a lsp implementation that can be used in editors that support it to get some syntax coloring, help and code completion for ppl 
+icyboard-ppl - editor support for PPL, including diagnostics, help and code completion
 
 The other tools are work in progress and will be split up into other commands. 

@@ -7,9 +7,9 @@ completion, signature help, hover, document symbols and formatting for `.pps`,
 
 ## Requirements
 
-None, if you took the package for your platform: the `ppl-language-server`
+None, if you took the package for your platform: the `icyboard-ppl`
 binary comes with it. The package without a platform in its name does not carry
-a server, so it needs one on your `PATH`. Either way, `ppl.serverPath` points
+a server, so it needs one on your `PATH`. Either way, `icyboardPpl.serverPath` points
 the extension at a server you built yourself.
 
 ## Building this extension

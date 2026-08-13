@@ -14,15 +14,15 @@ use icy_board_engine::formatting::FormattingVisitor;
 use icy_board_engine::icy_board::read_data_with_encoding_detection;
 use icy_board_engine::parser::{Encoding, ErrorReporter, UserTypeRegistry, parse_ast, parse_ast_with_predeclared_types, preparse_type_declarations};
 use icy_board_engine::semantic::SemanticVisitor;
-use ppl_language_server::completion::get_completion;
-use ppl_language_server::document_symbol::get_document_symbols;
-use ppl_language_server::documentation::{get_const_hover, get_function_hover, get_statement_hover, get_type_hover};
-use ppl_language_server::formatting::VSCodeFormattingBackend;
-use ppl_language_server::hover::get_user_hover;
-use ppl_language_server::jump_definition::get_definition;
-use ppl_language_server::reference::get_reference;
-use ppl_language_server::signature_help::get_signature_help;
-use ppl_language_server::{line_before_cursor, offset_to_position};
+use icyboard_ppl::completion::get_completion;
+use icyboard_ppl::document_symbol::get_document_symbols;
+use icyboard_ppl::documentation::{get_const_hover, get_function_hover, get_statement_hover, get_type_hover};
+use icyboard_ppl::formatting::VSCodeFormattingBackend;
+use icyboard_ppl::hover::get_user_hover;
+use icyboard_ppl::jump_definition::get_definition;
+use icyboard_ppl::reference::get_reference;
+use icyboard_ppl::signature_help::get_signature_help;
+use icyboard_ppl::{line_before_cursor, offset_to_position};
 use ropey::Rope;
 use serde_json::Value;
 use tower_lsp::jsonrpc::Result;
@@ -72,7 +72,7 @@ impl LanguageServer for Backend {
                 }),
 
                 execute_command_provider: Some(ExecuteCommandOptions {
-                    commands: vec!["ppl-lsp-vscode.run".to_string()],
+                    commands: vec!["icyboard-ppl.run".to_string()],
                     work_done_progress_options: Default::default(),
                 }),
 
@@ -358,7 +358,7 @@ impl LanguageServer for Backend {
 
     async fn execute_command(&self, params: ExecuteCommandParams) -> Result<Option<Value>> {
         match params.command.as_str() {
-            "ppl-lsp-vscode.run" => {
+            "icyboard-ppl.run" => {
                 let ws_file: PathBuf = self.workspace.lock().unwrap().file_name.clone();
                 if ws_file.exists() {
                     self.client.log_message(MessageType::INFO, "compile workspace!").await;

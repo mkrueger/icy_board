@@ -41,13 +41,13 @@
 			"type": "object",
 			"title": "IcyBoard PPL",
 			"properties": {
-				"ppl.serverPath": {
+				"icyboardPpl.serverPath": {
 					"type": "string",
 					"scope": "machine-overridable",
 					"default": "",
-					"markdownDescription": "Path to the `ppl-language-server` binary. Leave empty to use the one that ships with the extension, or the one on your PATH."
+					"markdownDescription": "Path to the `icyboard-ppl` binary. Leave empty to use the one that ships with the extension, or the one on your PATH."
 				},
-				"ppl-language-server.trace.server": {
+				"icyboard-ppl.trace.server": {
 					"type": "string",
 					"scope": "window",
 					"enum": [
@@ -184,7 +184,7 @@
 		],
 		"commands": [
 			{
-				"command": "ppl-lsp-vscode.run",
+				"command": "icyboard-ppl.run",
 				"title": "IcyBoard PPL: Run PPE"
 			}
 		]

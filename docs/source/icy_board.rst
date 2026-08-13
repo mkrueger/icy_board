@@ -72,7 +72,7 @@ Icy Board includes a comprehensive suite of tools for BBS management and develop
 * ``ppld`` - PPL decompiler (PPE → source)
 * ``mkicbtxt`` - Create/Edit ICBTXT files containing all strings used.
 * ``icbsysmgr`` - System manager utility (user/group editor)
-* ``ppl-language-server`` - Language server for PPL (for IDE integration)
+* ``icyboard-ppl`` - Language and editor support for PPL
 
 Directory Layout
 ~~~~~~~~~~~~~~~~
