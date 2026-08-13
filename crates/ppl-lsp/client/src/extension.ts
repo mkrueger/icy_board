@@ -16,10 +16,16 @@ import {
 let client: LanguageClient;
 // type a = Parameters<>;
 
+/// The server is looked for where the user said, then in the environment, then on the PATH.
+function serverCommand(): string {
+  const configured = vscode.workspace.getConfiguration("ppl").get<string>("serverPath")?.trim();
+  return configured || process.env.SERVER_PATH || "ppl-language-server";
+}
+
 export async function activate(context: vscode.ExtensionContext) {
 
   const traceOutputChannel = vscode.window.createOutputChannel("PPL Language Server trace");
-  const command = process.env.SERVER_PATH || "ppl-language-server";
+  const command = serverCommand();
   const run: Executable = {
     command,
     options: {
@@ -49,7 +55,32 @@ export async function activate(context: vscode.ExtensionContext) {
   // Create the language client and start the client.
   client = new LanguageClient("ppl-language-server", "ppl language server", serverOptions, clientOptions);
   // activateInlayHints(context);
-  client.start();
+  try {
+    await client.start();
+  } catch (error) {
+    const openSettings = "Open settings";
+    const answer = await vscode.window.showErrorMessage(
+      `PPL: could not start '${command}'. Install it with "cargo install --path crates/ppl-lsp" or set ppl.serverPath.`,
+      openSettings,
+    );
+    if (answer === openSettings) {
+      await vscode.commands.executeCommand("workbench.action.openSettings", "ppl.serverPath");
+    }
+    return;
+  }
+
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration(async (event) => {
+      if (!event.affectsConfiguration("ppl.serverPath")) {
+        return;
+      }
+      const reload = "Reload window";
+      const answer = await vscode.window.showInformationMessage("PPL: the server path changed.", reload);
+      if (answer === reload) {
+        await vscode.commands.executeCommand("workbench.action.reloadWindow");
+      }
+    }),
+  );
 }
 
 export function deactivate(): Thenable<void> | undefined {

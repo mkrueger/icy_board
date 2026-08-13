@@ -34,6 +34,21 @@ tree-sitter test
 `tree-sitter generate` runs `grammar.js`, so it needs Node.js. The generated
 parser in `src/` is checked in, so an editor does not.
 
+## Installing
+
+`tools/setup-editor.sh` in the repository root does the whole job - it builds the
+parser, puts the queries where an editor looks for them, installs the language
+server and writes the configuration:
+
+```bash
+tools/setup-editor.sh          # every editor found
+tools/setup-editor.sh helix
+tools/setup-editor.sh neovim
+```
+
+The sections below say what that amounts to, for anyone who would rather do it
+by hand.
+
 ## Neovim
 
 With [nvim-treesitter](https://github.com/nvim-treesitter/nvim-treesitter):

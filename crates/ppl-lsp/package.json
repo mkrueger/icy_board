@@ -35,6 +35,12 @@
 			"type": "object",
 			"title": "ppl-language-server",
 			"properties": {
+				"ppl.serverPath": {
+					"type": "string",
+					"scope": "machine-overridable",
+					"default": "",
+					"markdownDescription": "Path to the `ppl-language-server` binary. Leave empty to use the one on your PATH."
+				},
 				"ppl-language-server.trace.server": {
 					"type": "string",
 					"scope": "window",

@@ -137,6 +137,9 @@ I think it improves the language and it's open for discussion. Note that some al
 
 ### Editors
 
+`tools/setup-editor.sh` installs the language server and sets up every editor it
+finds, so the usual case is one command.
+
 The language server covers editors that speak LSP. It knows the 4.x types, so a
 `.` offers what a record or a board object holds, `Point { ` offers the fields a
 literal has not named yet, and writing arguments shows the signature of the
