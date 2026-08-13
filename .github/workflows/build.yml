@@ -188,14 +188,15 @@ jobs:
      id: build
      run: |
        cd crates/ppl-lsp
-       tsc -b
        npm run compile
        pnpm run package
    - name: 'Upload zip'
      uses: actions/upload-artifact@v4
      with:
        name: ppl-language-server-${{ env.VERSION }}.vsix
-       path: crates/ppl-lsp/ppl-language-server-${{ env.VERSION }}.vsix
+       # vsce names the file after the extension version, which is not the workspace version.
+       path: crates/ppl-lsp/*.vsix
+       if-no-files-found: error
 
   build_docs_pdf:
     runs-on: ubuntu-latest

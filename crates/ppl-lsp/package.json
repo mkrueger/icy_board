@@ -186,10 +186,10 @@
 	"scripts": {
 		"postinstall": "cd client && pnpm install --no-frozen-lockfile",
 		"compile": "npm run check-types && node esbuild.js --production",
-		"check-types": "tsc --noEmit",
+		"check-types": "tsc --noEmit -p client/tsconfig.json",
 		"watch": "npm-run-all -p watch:*",
 		"watch:esbuild": "node esbuild.js --watch",
-		"watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+		"watch:tsc": "tsc --noEmit --watch --project client/tsconfig.json",
 		"package": "vsce package --no-dependencies"
 	},
 	"devDependencies": {
