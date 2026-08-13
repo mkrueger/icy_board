@@ -8,7 +8,7 @@ use crate::Res;
 use crate::crypt::{decode_rle, decrypt_chunks, encode_rle};
 use crate::executable::disassembler::DisassembleVisitor;
 
-use super::{LAST_PPLC, VariableTable, VariableType};
+use super::{FIRST_TYPE_TABLE_RUNTIME, LAST_PPLC, VariableTable, VariableType};
 
 #[derive(Error, Debug, Clone, PartialEq)]
 pub enum ExecutableError {
@@ -51,7 +51,7 @@ pub struct Executable {
     pub runtime: u16,
     pub variable_table: VariableTable,
     /// Field types of the records the program declared, indexed by type id minus
-    /// `FIRST_USER_TYPE_ID`. Only written for runtime 400 and above.
+    /// `FIRST_USER_TYPE_ID`. Only written for runtime 401 and above.
     pub user_types: Vec<Vec<VariableType>>,
     pub script_buffer: Vec<i16>,
 }
@@ -91,12 +91,12 @@ impl Executable {
         let buffer = &mut buffer[HEADER_SIZE..];
         let (mut i, mut variable_table) = VariableTable::deserialize(version, buffer)?;
         let mut user_types = Vec::new();
-        if version >= 400 {
-            let type_count = u16::from_le_bytes(buffer[i..=(i + 1)].try_into()?) as usize;
-            i += 2;
+        if version >= FIRST_TYPE_TABLE_RUNTIME {
+            let type_count = buffer[i] as usize;
+            i += 1;
             for _ in 0..type_count {
-                let field_count = u16::from_le_bytes(buffer[i..=(i + 1)].try_into()?) as usize;
-                i += 2;
+                let field_count = buffer[i] as usize;
+                i += 1;
                 let mut fields = Vec::with_capacity(field_count);
                 for _ in 0..field_count {
                     fields.push(VariableType::from(buffer[i]));
@@ -191,10 +191,11 @@ impl Executable {
 
         self.variable_table.serialize(&mut buffer)?;
 
-        if self.runtime >= 400 {
-            buffer.extend_from_slice(&u16::to_le_bytes(self.user_types.len() as u16));
+        if self.runtime >= FIRST_TYPE_TABLE_RUNTIME {
+            // Ids run 100..=255, and a record is capped at 255 fields, so a byte holds both counts.
+            buffer.push(self.user_types.len() as u8);
             for fields in &self.user_types {
-                buffer.extend_from_slice(&u16::to_le_bytes(fields.len() as u16));
+                buffer.push(fields.len() as u8);
                 for field in fields {
                     buffer.push((*field).into());
                 }

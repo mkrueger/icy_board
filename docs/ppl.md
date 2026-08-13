@@ -86,7 +86,7 @@ Options:
   -d, --disassemble output the disassembly instead of compiling
   --nowarnings      don't report any warnings
   --runtime         version number for the compiled PPE, valid: 100, 200, 300,
-                    310, 320, 330, 340, 400 (default)
+                    310, 320, 330, 340, 400, 401 (default)
   --lang-version    version number for the language (defaults to version)
   --cp437           specify the encoding of the file (cp437 = true, utf8 =
                     false), defaults to autodetection
@@ -146,11 +146,11 @@ are two different wishes.
 
 | | Command line | `ppl.toml` | What it controls |
 | :--- | :--- | :--- | :--- |
-| Runtime | `--runtime` | `[package] runtime` | The PPE format written to disk. Valid: 100, 200, 300, 310, 320, 330, 340, 400. |
+| Runtime | `--runtime` | `[package] runtime` | The PPE format written to disk. Valid: 100, 200, 300, 310, 320, 330, 340, 400, 401. |
 | Language | `--lang-version` | `[compiler] language_version` | Which syntax and which built-ins the compiler accepts. |
 
 The language version defaults to the runtime version, and the runtime version
-defaults to 400. The command line wins over `ppl.toml`.
+defaults to 401. The command line wins over `ppl.toml`.
 
 Anything below is grouped by the language version that introduced it. A feature
 listed under 350 is available at 350 *and* 400; a feature listed under 400 needs
@@ -498,6 +498,7 @@ Rules the compiler enforces:
 * A type cannot reuse the name of a built-in or of a board object.
 * A program may declare 156 types; ids 100–255 are reserved for them, leaving
   30–99 for board objects.
+* A type may hold 255 fields; the PPE stores the count in a single byte.
 * Naming a field the record does not have is an error, on both sides of an
   assignment.
 * Custom types are nominal: two separately declared records are different types
@@ -511,14 +512,20 @@ read-only snapshots, so `conf.Name = "x"` is rejected.
 may still have a variable called `type`.
 
 The record layout is written into the PPE, which is why a program using `TYPE`
-needs runtime 400.
+needs runtime 401. 4.00 has no type table - it was fixed before records existed.
+
+Only the field types are written, not their names — the same as for variables,
+routines and labels, none of which keep a name either. A shipped PPE therefore
+carries no identifier from the source, and a decompiler has to invent them. See
+[the PPE format](ppe_format.md) for the layout.
 
 #### What 400 breaks
 
-* Runtime 400 PPEs do not load on an original PCBoard.
+* Runtime 400 and 401 PPEs do not load on an original PCBoard.
 * `.` is a token, so it can no longer appear in an identifier.
 * `[` and `]` are index operators.
-* The decompiler does not handle 400 PPEs — it targets the old formats.
+* A decompiled PPE names its records `TYPE001` and their fields `FIELD001`,
+  because the file carries no names to recover.
 
 ### The preprocessor
 
@@ -583,8 +590,8 @@ Would print:
 
 ```text
 Version:0.1.0
-Runtime:400
-Language:400
+Runtime:401
+Language:401
 ```
 
 ## Building & Running

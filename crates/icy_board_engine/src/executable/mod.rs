@@ -32,7 +32,10 @@ pub mod expr_tests;
 #[cfg(test)]
 pub mod stmt_tests;
 
-pub const LAST_PPLC: u16 = 400;
+pub const LAST_PPLC: u16 = 401;
+
+/// The first runtime that stores a type table. A 4.00 file has none at all.
+pub const FIRST_TYPE_TABLE_RUNTIME: u16 = 401;
 
 #[derive(Clone, Debug, Default)]
 pub struct VariableNameGenerator {

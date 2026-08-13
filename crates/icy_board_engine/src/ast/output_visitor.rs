@@ -1,4 +1,8 @@
-use crate::formatting::FormattingOptions;
+use crate::{
+    executable::VariableType,
+    formatting::FormattingOptions,
+    parser::lexer::{Spanned, Token},
+};
 
 use super::{AstVisitor, BlockStatement, ParameterSpecifier, Statement};
 
@@ -44,6 +48,16 @@ impl OutputVisitor {
         };
     }
 
+    /// A user type has no keyword to print - its name only lives in the token.
+    fn output_type(&mut self, variable_type: VariableType, type_token: &Spanned<Token>) {
+        if let (VariableType::UserData(_), Token::Identifier(name)) = (variable_type, &type_token.token) {
+            let name = name.to_string();
+            self.output(&name);
+            return;
+        }
+        self.output_keyword(variable_type.to_string().as_str());
+    }
+
     fn indent(&mut self) {
         let one_indent = if self.options.use_tabs {
             "\t".to_string()
@@ -79,7 +93,7 @@ impl OutputVisitor {
                     self.output_keyword("Var");
                     self.output.push(' ');
                 }
-                self.output_keyword(arg.get_variable_type().to_string().as_str());
+                self.output_type(arg.get_variable_type(), arg.get_type_token());
                 if let Some(variable) = arg.get_variable() {
                     self.output.push(' ');
                     self.output(variable.get_identifier());
@@ -109,7 +123,7 @@ impl OutputVisitor {
                     }
                 }
                 self.output.push(')');
-                self.output_keyword(call.get_return_type().to_string().as_str());
+                self.output_type(call.get_return_type(), call.get_return_type_token());
             }
 
             ParameterSpecifier::Procedure(call) => {
@@ -487,6 +501,13 @@ impl AstVisitor<()> for OutputVisitor {
             }
             self.output.push(')');
         }
+        for member in let_stmt.get_members() {
+            if let Token::Identifier(id) = &member.token {
+                let id = id.to_string();
+                self.output.push('.');
+                self.output(&id);
+            }
+        }
         self.output.push_str(" = ");
         let_stmt.get_value_expression().visit(self);
     }
@@ -525,7 +546,7 @@ impl AstVisitor<()> for OutputVisitor {
     }
 
     fn visit_variable_declaration_statement(&mut self, var_decl: &super::VariableDeclarationStatement) {
-        self.output_keyword(var_decl.get_variable_type().to_string().as_str());
+        self.output_type(var_decl.get_variable_type(), var_decl.get_type_token());
         self.output.push(' ');
         for (i, var) in var_decl.get_variables().iter().enumerate() {
             self.output(var.get_identifier());
@@ -548,6 +569,26 @@ impl AstVisitor<()> for OutputVisitor {
                 self.output.push_str(", ");
             }
         }
+    }
+
+    fn visit_type_declaration(&mut self, type_decl: &super::TypeDeclarationAstNode) {
+        self.output_keyword("Type ");
+        let identifier = type_decl.get_identifier().to_string();
+        self.output(&identifier);
+        self.eol();
+
+        self.indent += 1;
+        for field in type_decl.get_fields() {
+            self.indent();
+            self.output_type(field.get_variable_type(), field.get_type_token());
+            self.output.push(' ');
+            self.output(field.get_identifier());
+            self.eol();
+        }
+        self.indent -= 1;
+
+        self.indent();
+        self.output_keyword("EndType");
     }
 
     fn visit_procedure_declaration(&mut self, proc_decl: &super::ProcedureDeclarationAstNode) {
@@ -574,7 +615,7 @@ impl AstVisitor<()> for OutputVisitor {
             }
         }
         self.output.push_str(") ");
-        self.output_keyword(func_decl.get_return_type().to_string().as_str());
+        self.output_type(func_decl.get_return_type(), func_decl.get_return_type_token());
     }
 
     fn visit_function_implementation(&mut self, function: &super::FunctionImplementation) {
@@ -589,7 +630,7 @@ impl AstVisitor<()> for OutputVisitor {
             }
         }
         self.output.push_str(") ");
-        self.output_keyword(function.get_return_type().to_string().as_str());
+        self.output_type(function.get_return_type(), function.get_return_type_token());
         self.eol();
 
         self.indent += 1;

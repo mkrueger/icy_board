@@ -175,6 +175,12 @@ pub enum ParserErrorType {
 
     #[error("No room for another type, {0} is the most a program may declare")]
     TooManyTypes(usize),
+
+    #[error("No room for another field, {0} is the most a type may hold")]
+    TooManyFields(usize),
+
+    #[error("'TYPE' needs runtime {0}, an older PPE has nowhere to store the layout")]
+    TypeNeedsNewerRuntime(u16),
 }
 
 #[derive(Error, Debug, Clone, PartialEq)]
@@ -235,6 +241,9 @@ pub const FIRST_USER_TYPE_ID: usize = 100;
 
 /// How many records one program may declare, ids 100..=255.
 pub const MAX_USER_TYPES: usize = u8::MAX as usize - FIRST_USER_TYPE_ID + 1;
+
+/// How many fields one record may hold - the PPE stores the count in a byte.
+pub const MAX_TYPE_FIELDS: usize = u8::MAX as usize;
 
 /// True for a type a program declared rather than one the board provides.
 pub fn is_user_declared_type(id: u8) -> bool {
@@ -683,6 +692,14 @@ impl<'a> Parser<'a> {
                 .lock()
                 .unwrap()
                 .report_error(identifier_token.span.clone(), ParserErrorType::TypeNeedsAField);
+            return None;
+        }
+
+        if fields.len() > MAX_TYPE_FIELDS {
+            self.error_reporter
+                .lock()
+                .unwrap()
+                .report_error(identifier_token.span.clone(), ParserErrorType::TooManyFields(MAX_TYPE_FIELDS));
             return None;
         }
 

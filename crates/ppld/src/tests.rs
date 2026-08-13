@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 use icy_board_engine::{
     ast::{Ast, OutputFunc, output_visitor},
     compiler::{PPECompiler, workspace::Workspace},
-    executable::Executable,
+    executable::{Executable, LAST_PPLC},
     parser::{Encoding, ErrorReporter, UserTypeRegistry, parse_ast},
 };
 
@@ -184,4 +184,72 @@ fn decompiled_source_settles_after_one_pass() {
         failures.len(),
         failures.join("\n")
     );
+}
+
+/// A record keeps no name in the PPE, so the decompiler invents one. What matters
+/// is that the result still describes the same layout and compiles again.
+#[test]
+fn records_survive_decompilation() {
+    let source = "TYPE Point\n\
+                  INTEGER X\n\
+                  STRING Label\n\
+                  ENDTYPE\n\
+                  \n\
+                  Point Pt\n\
+                  Pt.X = 42\n\
+                  Pt.Label = \"here\"\n\
+                  PRINTLN Pt.X, Pt.Label\n";
+
+    let executable = compile_source(source, LAST_PPLC).unwrap();
+    let text = decompile_to_text(executable);
+
+    assert!(text.contains("TYPE TYPE001"), "no type declaration in:\n{text}");
+    assert!(text.contains("INTEGER FIELD001"), "no first field in:\n{text}");
+    assert!(text.contains("STRING FIELD002"), "no second field in:\n{text}");
+    assert!(text.contains("ENDTYPE"), "type block not closed in:\n{text}");
+    assert!(text.contains(".FIELD001 = 42"), "no member assignment in:\n{text}");
+
+    let rebuilt = compile_source(&text, LAST_PPLC).unwrap_or_else(|e| panic!("does not compile again:\n{text}\n{e}"));
+    assert_eq!(text, decompile_to_text(rebuilt));
+}
+
+/// A record inside a record has to come back out as two declarations, with the
+/// outer one naming the inner.
+#[test]
+fn nested_records_survive_decompilation() {
+    let source = "TYPE Inner\n\
+                  INTEGER Value\n\
+                  ENDTYPE\n\
+                  TYPE Outer\n\
+                  Inner Part\n\
+                  ENDTYPE\n\
+                  \n\
+                  Outer Rec\n\
+                  Rec.Part.Value = 7\n\
+                  PRINTLN Rec.Part.Value\n";
+
+    let executable = compile_source(source, LAST_PPLC).unwrap();
+    let text = decompile_to_text(executable);
+
+    let rebuilt = compile_source(&text, LAST_PPLC).unwrap_or_else(|e| panic!("does not compile again:\n{text}\n{e}"));
+    assert_eq!(text, decompile_to_text(rebuilt));
+}
+
+/// Board objects do carry their member names, in the registry rather than in the
+/// file, so those come back as they were written.
+#[test]
+fn board_object_members_keep_their_names() {
+    let source = "CONFERENCE Conf = CONFINFO(0)\n\
+                  PRINTLN Conf.Name\n\
+                  PRINTLN Conf.GetDoor(0).Name\n";
+
+    let executable = compile_source(source, LAST_PPLC).unwrap();
+    let text = decompile_to_text(executable);
+
+    assert!(text.contains("Conference VAR001"), "type name lost in:\n{text}");
+    assert!(text.contains("VAR001.Name"), "member name lost in:\n{text}");
+    assert!(text.contains("VAR001.GetDoor(0).Name"), "chained call lost in:\n{text}");
+
+    let rebuilt = compile_source(&text, LAST_PPLC).unwrap_or_else(|e| panic!("does not compile again:\n{text}\n{e}"));
+    assert_eq!(text, decompile_to_text(rebuilt));
 }

@@ -671,6 +671,11 @@ impl VariableTable {
     }
 
     fn report_usage(&mut self, variable: &PPEExpr) {
+        // A member assignment names the record only at the base of the expression.
+        let mut variable = variable;
+        while let PPEExpr::Member(base, _) = variable {
+            variable = base;
+        }
         if let Some(id) = variable.get_id() {
             if id < self.entries.len() + 1 && id > 0 {
                 self.get_var_entry_mut(id).report_variable_usage();

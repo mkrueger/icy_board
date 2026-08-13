@@ -9,13 +9,13 @@ use crate::{
     ast::{
         AstVisitor, CommentAstNode, Constant, ConstantExpression, Expression, FunctionCallExpression, FunctionDeclarationAstNode, FunctionImplementation,
         GosubStatement, GotoStatement, IdentifierExpression, LabelStatement, LetStatement, ParameterSpecifier, PredefinedCallStatement, ProcedureCallStatement,
-        ProcedureDeclarationAstNode, ProcedureImplementation, VariableDeclarationStatement, VariableParameterSpecifier, walk_function_implementation,
-        walk_indexer_expression, walk_predefined_call_statement, walk_procedure_call_statement, walk_procedure_implementation,
+        ProcedureDeclarationAstNode, ProcedureImplementation, TypeDeclarationAstNode, VariableDeclarationStatement, VariableParameterSpecifier,
+        walk_function_implementation, walk_indexer_expression, walk_predefined_call_statement, walk_procedure_call_statement, walk_procedure_implementation,
     },
     compiler::{CompilationErrorType, CompilationWarningType, user_data::UserDataMemberRegistry, workspace::Workspace},
     executable::{
-        EntryType, FUNCTION_DEFINITIONS, FuncOpCode, FunctionDefinition, FunctionValue, GenericVariableData, OpCode, ProcedureValue, TableEntry,
-        USER_VARIABLES, VarHeader, VariableData, VariableTable, VariableType, VariableValue,
+        EntryType, FIRST_TYPE_TABLE_RUNTIME, FUNCTION_DEFINITIONS, FuncOpCode, FunctionDefinition, FunctionValue, GenericVariableData, OpCode,
+        ProcedureValue, TableEntry, USER_VARIABLES, VarHeader, VariableData, VariableTable, VariableType, VariableValue,
     },
     parser::{
         self, ErrorReporter, ParserErrorType, UserTypeRegistry,
@@ -180,6 +180,7 @@ impl VariableLookups {
 
 pub struct SemanticVisitor {
     lang_version: u16,
+    runtime: u16,
     pub type_registry: UserTypeRegistry,
 
     pub errors: Arc<Mutex<ErrorReporter>>,
@@ -345,6 +346,7 @@ impl SemanticVisitor {
     pub fn new(workspace: &Workspace, errors: Arc<Mutex<ErrorReporter>>, type_registry: UserTypeRegistry) -> Self {
         let mut result = Self {
             lang_version: workspace.language_version(),
+            runtime: workspace.runtime(),
             errors,
             references: Vec::new(),
             type_registry,
@@ -2060,6 +2062,18 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 f.local_variables = start_locals..end_locals;
                 break;
             }
+        }
+        VariableType::None
+    }
+
+    /// The layout only reaches the PPE from `FIRST_TYPE_TABLE_RUNTIME` on, so an older
+    /// target would drop it and leave every field access reading nothing.
+    fn visit_type_declaration(&mut self, type_decl: &TypeDeclarationAstNode) -> VariableType {
+        if self.runtime < FIRST_TYPE_TABLE_RUNTIME {
+            self.errors.lock().unwrap().report_error(
+                type_decl.get_identifier_token().span.clone(),
+                ParserErrorType::TypeNeedsNewerRuntime(FIRST_TYPE_TABLE_RUNTIME),
+            );
         }
         VariableType::None
     }

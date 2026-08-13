@@ -10,16 +10,19 @@ use crate::{
     ast::{
         Ast, AstNode, BinOp, BinaryExpression, BlockStatement, CommentAstNode, Constant, ConstantExpression, Expression, FunctionCallExpression,
         FunctionDeclarationAstNode, FunctionImplementation, GosubStatement, GotoStatement, IdentifierExpression, IfStatement, IndexerExpression,
-        LabelStatement, LetStatement, ParameterSpecifier, ParensExpression, PredefinedCallStatement, ProcedureCallStatement, ProcedureDeclarationAstNode,
-        ProcedureImplementation, Statement, UnaryExpression, UnaryOp, VariableDeclarationStatement, VariableParameterSpecifier, VariableSpecifier,
-        constant::NumberFormat,
+        LabelStatement, LetStatement, MemberReferenceExpression, ParameterSpecifier, ParensExpression, PredefinedCallStatement, ProcedureCallStatement,
+        ProcedureDeclarationAstNode, ProcedureImplementation, Statement, TypeDeclarationAstNode, TypeFieldSpecifier, UnaryExpression, UnaryOp,
+        VariableDeclarationStatement, VariableParameterSpecifier, VariableSpecifier, constant::NumberFormat,
     },
-    compiler::workspace::Workspace,
+    compiler::{user_data::UserDataEntry, workspace::Workspace},
     executable::{
         DeserializationError, DeserializationErrorType, EntryType, Executable, OpCode, PPECommand, PPEExpr, PPEScript, PPEVisitor, StatementDefinition,
         TableEntry, VariableType,
     },
-    parser::{ErrorReporter, UserTypeRegistry, lexer::Token},
+    parser::{
+        ErrorReporter, UserTypeRegistry, is_user_declared_type,
+        lexer::{Spanned, Token},
+    },
     semantic::SemanticVisitor,
 };
 
@@ -38,6 +41,26 @@ pub struct DecompilerIssue {
     pub bug: DeserializationErrorType,
 }
 
+/// The name a record gets in the output. The PPE stores field types only, so
+/// every name here is made up.
+fn user_type_name(index: usize) -> unicase::Ascii<String> {
+    unicase::Ascii::new(format!("TYPE{:03}", index + 1))
+}
+
+fn user_field_name(index: usize) -> unicase::Ascii<String> {
+    unicase::Ascii::new(format!("FIELD{:03}", index + 1))
+}
+
+/// The board objects, plus a stand-in declaration for every record the PPE carries.
+fn build_type_registry(executable: &Executable) -> UserTypeRegistry {
+    let registry = UserTypeRegistry::icy_board_registry();
+    for (i, fields) in executable.user_types.iter().enumerate() {
+        let fields = fields.iter().enumerate().map(|(j, t)| (user_field_name(j), *t)).collect();
+        registry.declare_user_type(user_type_name(i), fields);
+    }
+    registry
+}
+
 #[derive(Default)]
 pub struct Decompiler {
     executable: Executable,
@@ -52,6 +75,7 @@ pub struct Decompiler {
     cur_ptr: usize,
     issues: Vec<DecompilerIssue>,
     optimize_output: bool,
+    type_registry: UserTypeRegistry,
 }
 
 impl Decompiler {
@@ -62,6 +86,7 @@ impl Decompiler {
     /// This function will return an error if .
     pub fn new(executable: Executable, optimize_output: bool) -> Result<Self, DeserializationError> {
         let script = PPEScript::from_ppe_file(&executable)?;
+        let type_registry = build_type_registry(&executable);
         Ok(Self {
             executable,
             script,
@@ -72,6 +97,7 @@ impl Decompiler {
             cur_ptr: 0,
             issues: Vec::new(),
             optimize_output,
+            type_registry,
         })
     }
 
@@ -116,6 +142,7 @@ impl Decompiler {
 
         let mut ast = Ast::default();
 
+        self.generate_type_declarations(&mut ast);
         self.generate_function_declarations(&mut ast);
         self.generate_global_variable_declarations(&mut ast);
 
@@ -189,9 +216,99 @@ impl Decompiler {
     fn generate_global_variable_declarations(&mut self, ast: &mut Ast) {
         for var in self.executable.variable_table.get_entries() {
             if let EntryType::Variable = var.entry_type {
-                let var_decl = generate_variable_declaration(var);
+                let var_decl = generate_variable_declaration(var, self.type_token(var.header.variable_type));
                 ast.nodes.push(AstNode::TopLevelStatement(var_decl));
             }
+        }
+    }
+
+    /// The records the PPE declares, under invented names.
+    fn generate_type_declarations(&self, ast: &mut Ast) {
+        for (i, fields) in self.executable.user_types.iter().enumerate() {
+            let fields = fields
+                .iter()
+                .enumerate()
+                .map(|(j, field_type)| {
+                    TypeFieldSpecifier::new(
+                        self.type_token(*field_type),
+                        *field_type,
+                        VariableSpecifier::empty(user_field_name(j), Vec::new()),
+                    )
+                })
+                .collect();
+            ast.nodes.push(AstNode::TypeDeclaration(TypeDeclarationAstNode::new(
+                Spanned::create_empty(Token::Type),
+                Spanned::create_empty(Token::Identifier(user_type_name(i))),
+                fields,
+                Spanned::create_empty(Token::EndType),
+            )));
+        }
+    }
+
+    /// The name a type is written under. Only user types need one - everything
+    /// else has a keyword.
+    fn type_token(&self, variable_type: VariableType) -> Spanned<Token> {
+        let name = match variable_type {
+            VariableType::UserData(id) => self.type_name(id),
+            _ => None,
+        };
+        let name = name.unwrap_or_else(|| unicase::Ascii::new(variable_type.to_string()));
+        Spanned::create_empty(Token::Identifier(name))
+    }
+
+    fn type_name(&self, type_id: u8) -> Option<unicase::Ascii<String>> {
+        if is_user_declared_type(type_id) {
+            return self.type_registry.get_user_type_from_id(type_id).map(|def| def.name);
+        }
+        self.type_registry
+            .registered_types
+            .iter()
+            .find(|(_, vt)| **vt == VariableType::UserData(type_id))
+            .map(|(name, _)| name.clone())
+    }
+
+    /// The name and type of member `id` of whatever `base` evaluates to.
+    fn resolve_member(&self, base: &PPEExpr, id: usize) -> Option<(unicase::Ascii<String>, VariableType)> {
+        let VariableType::UserData(type_id) = self.expression_type(base)? else {
+            return None;
+        };
+        if is_user_declared_type(type_id) {
+            return self.type_registry.get_user_type_from_id(type_id)?.fields.get(id).cloned();
+        }
+        let registry = self.type_registry.get_type_from_id(type_id)?;
+        match registry.id_table.get(id)? {
+            UserDataEntry::Field(name) | UserDataEntry::Getter(name) => Some((name.clone(), *registry.fields.get(name)?)),
+            UserDataEntry::Function(name) => Some((name.clone(), registry.functions.get(name)?.1)),
+            UserDataEntry::Procedure(name) => Some((name.clone(), VariableType::None)),
+        }
+    }
+
+    fn member_name(&self, base: &PPEExpr, id: usize) -> unicase::Ascii<String> {
+        self.resolve_member(base, id)
+            .map_or_else(|| unicase::Ascii::new(format!("MEMBER{:03}", id + 1)), |(name, _)| name)
+    }
+
+    /// What an expression evaluates to, as far as the variable table and the type
+    /// table can say. Only member access needs this.
+    fn expression_type(&self, expr: &PPEExpr) -> Option<VariableType> {
+        match expr {
+            PPEExpr::Value(id) | PPEExpr::Dim(id, _) => Some(self.executable.variable_table.try_get_entry(*id)?.header.variable_type),
+            PPEExpr::Member(base, id) => self.resolve_member(base, *id).map(|(_, t)| t),
+            PPEExpr::MemberFunctionCall(base, _, id) => {
+                // Codegen leaves the member reference in the base, so reach past it.
+                let base = if let PPEExpr::Member(inner, _) = base.as_ref() { inner } else { base };
+                self.resolve_member(base, *id).map(|(_, t)| t)
+            }
+            PPEExpr::FunctionCall(id, _) => {
+                let entry = self.executable.variable_table.try_get_entry(*id)?;
+                if entry.header.variable_type != VariableType::Function {
+                    return None;
+                }
+                let return_var = unsafe { entry.value.data.function_value.return_var } as usize;
+                Some(self.executable.variable_table.try_get_entry(return_var)?.header.variable_type)
+            }
+            PPEExpr::PredefinedFunctionCall(def, _) => Some(def.return_type),
+            _ => None,
         }
     }
 
@@ -220,8 +337,16 @@ impl Decompiler {
                             .executable
                             .variable_table
                             .get_var_entry(unsafe { entry.value.data.function_value.return_var as usize });
-                        let func_decl =
-                            FunctionDeclarationAstNode::empty(unicase::Ascii::new(entry.name.clone()), parameters, return_value.header.variable_type);
+                        let func_decl = FunctionDeclarationAstNode::new(
+                            Spanned::create_empty(Token::Declare),
+                            Spanned::create_empty(Token::Function),
+                            Spanned::create_empty(Token::Identifier(unicase::Ascii::new(entry.name.clone()))),
+                            Spanned::create_empty(Token::LPar),
+                            parameters,
+                            Spanned::create_empty(Token::RPar),
+                            self.type_token(return_value.header.variable_type),
+                            return_value.header.variable_type,
+                        );
                         ast.nodes.push(AstNode::FunctionDeclaration(func_decl));
                     } else {
                         let parameters = self.generate_parameter_list(entry);
@@ -256,11 +381,17 @@ impl Decompiler {
                     IdentifierExpression::create_empty_expression(unicase::Ascii::new(entry.name.clone()))
                 }
             },
-            PPEExpr::Member(_expr, _id) => {
-                todo!()
-            }
-            PPEExpr::MemberFunctionCall(_, _, _) => {
-                todo!()
+            PPEExpr::Member(expr, id) => MemberReferenceExpression::create_empty_expression(self.decompile_expression(expr), self.member_name(expr, *id)),
+            PPEExpr::MemberFunctionCall(expr, args, id) => {
+                let base = self.decompile_expression(expr);
+                // Codegen writes the member reference into the base as well, so only
+                // build one when it is missing.
+                let callee = if matches!(base, Expression::MemberReference(_)) {
+                    base
+                } else {
+                    MemberReferenceExpression::create_empty_expression(base, self.member_name(expr, *id))
+                };
+                FunctionCallExpression::create_empty_expression(callee, args.iter().map(|e| self.decompile_expression(e)).collect())
             }
             PPEExpr::UnaryExpression(op, expr) => {
                 let mut expr = self.decompile_expression(expr);
@@ -346,21 +477,41 @@ impl Decompiler {
                     .collect(),
             ),
             PPECommand::Let(left, expr) => {
-                let (identifier, arguments) = match self.decompile_expression(left) {
+                // A member assignment keeps the fields it walks through beside the base.
+                let mut members = Vec::new();
+                let mut base: &PPEExpr = left;
+                while let PPEExpr::Member(inner, id) = base {
+                    members.push(Spanned::create_empty(Token::Identifier(self.member_name(inner, *id))));
+                    base = inner.as_ref();
+                }
+                members.reverse();
+
+                let (identifier, arguments) = match self.decompile_expression(base) {
                     Expression::FunctionCall(f) => (unicase::Ascii::new(f.get_expression().to_string()), f.get_arguments().clone()),
                     Expression::Identifier(id) => (id.get_identifier().clone(), Vec::new()),
                     Expression::Indexer(f) => (unicase::Ascii::new(f.get_identifier().to_string()), f.get_arguments().clone()),
 
                     x => panic!("Invalid expression {x:?}"),
                 };
-                let id = left.get_id().unwrap();
                 let mut value_expr = self.decompile_expression(expr);
 
-                if self.executable.variable_table.get_var_entry(id).header.variable_type == VariableType::Boolean {
+                if self.expression_type(left) == Some(VariableType::Boolean) {
                     value_expr = Statement::try_boolean_conversion(&value_expr);
                 }
 
-                LetStatement::create_empty_statement(identifier, Token::Eq, arguments, value_expr)
+                if members.is_empty() {
+                    return LetStatement::create_empty_statement(identifier, Token::Eq, arguments, value_expr);
+                }
+                Statement::Let(LetStatement::new(
+                    None,
+                    Spanned::create_empty(Token::Identifier(identifier)),
+                    None,
+                    arguments,
+                    None,
+                    members,
+                    Spanned::create_empty(Token::Eq),
+                    value_expr,
+                ))
             }
         }
     }
@@ -395,12 +546,17 @@ impl Decompiler {
                         .executable
                         .variable_table
                         .get_var_entry(unsafe { entry.value.data.function_value.return_var as usize });
-                    let func_impl = FunctionImplementation::empty(
+                    let func_impl = FunctionImplementation::new(
                         func,
-                        unicase::Ascii::new(entry.name.clone()),
+                        Spanned::create_empty(Token::Function),
+                        Spanned::create_empty(Token::Identifier(unicase::Ascii::new(entry.name.clone()))),
+                        Spanned::create_empty(Token::LPar),
                         parameters,
+                        Spanned::create_empty(Token::RPar),
+                        self.type_token(return_value.header.variable_type),
                         return_value.header.variable_type,
                         func_body,
+                        Spanned::create_empty(Token::EndFunc),
                     );
                     self.functions.push(AstNode::Function(func_impl));
                 } else {
@@ -432,7 +588,7 @@ impl Decompiler {
             for i in start..end {
                 let local_var = self.executable.variable_table.get_var_entry(i);
                 if local_var.entry_type == EntryType::LocalVariable {
-                    decl.push(generate_variable_declaration(local_var));
+                    decl.push(generate_variable_declaration(local_var, self.type_token(local_var.header.variable_type)));
                 }
             }
 
@@ -477,8 +633,13 @@ impl Decompiler {
                     _ => {}
                 }
                 let is_var = pass_flags & (1 << i) != 0;
-                parameters.push(ParameterSpecifier::Variable(VariableParameterSpecifier::empty(
-                    is_var,
+                parameters.push(ParameterSpecifier::Variable(VariableParameterSpecifier::new(
+                    if is_var {
+                        Some(Spanned::create_empty(Token::Identifier(unicase::Ascii::new("VAR".to_string()))))
+                    } else {
+                        None
+                    },
+                    self.type_token(param.header.variable_type),
                     param.header.variable_type,
                     Some(VariableSpecifier::empty(unicase::Ascii::new(param.name.clone()), dimensions)),
                 )));
@@ -513,7 +674,7 @@ fn add_parens_if_required(op: BinOp, expr: Expression) -> Expression {
     if add_parens { ParensExpression::create_empty_expression(expr) } else { expr }
 }
 
-fn generate_variable_declaration(var: &TableEntry) -> Statement {
+fn generate_variable_declaration(var: &TableEntry, type_token: Spanned<Token>) -> Statement {
     let dims = match var.header.dim {
         1 => {
             vec![var.header.vector_size]
@@ -526,10 +687,11 @@ fn generate_variable_declaration(var: &TableEntry) -> Statement {
         }
         _ => Vec::new(),
     };
-    VariableDeclarationStatement::create_empty_statement(
+    Statement::VariableDeclaration(VariableDeclarationStatement::new(
+        type_token,
         var.header.variable_type,
         vec![VariableSpecifier::empty(unicase::Ascii::new(var.name.clone()), dims)],
-    )
+    ))
 }
 
 /// .
@@ -542,7 +704,7 @@ pub fn decompile(executable: Executable, raw: bool) -> Res<(Ast, Vec<DecompilerI
         Ok(mut d) => {
             let mut ast = d.decompile()?;
 
-            let reg = UserTypeRegistry::default();
+            let reg = std::mem::take(&mut d.type_registry);
             let errors: Arc<std::sync::Mutex<crate::parser::ErrorReporter>> = Arc::new(Mutex::new(ErrorReporter::default()));
             let mut visitor = SemanticVisitor::new(&Workspace::default(), errors.clone(), reg);
             ast.visit(&mut visitor);

@@ -41,7 +41,7 @@ struct Cli {
     #[argh(switch)]
     nowarnings: bool,
 
-    /// version number for the compiled PPE, valid: 100, 200, 300, 310, 320, 330, 340, 400 (default)
+    /// version number for the compiled PPE, valid: 100, 200, 300, 310, 320, 330, 340, 400, 401 (default)
     #[argh(option)]
     runtime: Option<u16>,
 
@@ -83,7 +83,7 @@ fn main() {
     println!("PPLC v{} - PCBoard Programming Language Compiler", *VERSION);
 
     if let Some(version) = arguments.runtime {
-        let valid_versions: Vec<u16> = vec![100, 200, 300, 310, 320, 330, 340, 400];
+        let valid_versions: Vec<u16> = vec![100, 200, 300, 310, 320, 330, 340, 400, 401];
         if !valid_versions.contains(&version) {
             println!("Invalid version number valid values {valid_versions:?}");
             return;
