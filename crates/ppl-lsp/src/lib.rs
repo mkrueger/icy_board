@@ -1,7 +1,9 @@
 pub mod completion;
 pub mod context;
+pub mod document_symbol;
 pub mod documentation;
 pub mod formatting;
+pub mod hover;
 pub mod jump_definition;
 pub mod reference;
 pub mod signature_help;

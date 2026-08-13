@@ -17,8 +17,10 @@ use icy_board_engine::parser::{
 };
 use icy_board_engine::semantic::SemanticVisitor;
 use ppl_language_server::completion::get_completion;
+use ppl_language_server::document_symbol::get_document_symbols;
 use ppl_language_server::documentation::{get_const_hover, get_function_hover, get_statement_hover, get_type_hover};
 use ppl_language_server::formatting::VSCodeFormattingBackend;
+use ppl_language_server::hover::get_user_hover;
 use ppl_language_server::jump_definition::get_definition;
 use ppl_language_server::reference::get_reference;
 use ppl_language_server::signature_help::get_signature_help;
@@ -88,6 +90,9 @@ impl LanguageServer for Backend {
                 definition_provider: Some(OneOf::Left(true)),
                 references_provider: Some(OneOf::Left(true)),
                 rename_provider: Some(OneOf::Left(true)),
+                document_symbol_provider: Some(OneOf::Left(true)),
+                document_highlight_provider: Some(OneOf::Left(true)),
+                document_formatting_provider: Some(OneOf::Left(true)),
                 document_range_formatting_provider: Some(OneOf::Left(true)),
                 ..ServerCapabilities::default()
             },
@@ -131,16 +136,15 @@ impl LanguageServer for Backend {
     }
 
     async fn hover(&self, params: HoverParams) -> Result<Option<Hover>> {
-        let _ = params;
         let uri = params.text_document_position_params.text_document.uri;
-        self.get_ast(&uri, |ast, _semantic_visitor| {
+        self.get_ast(&uri, |ast, visitor| {
             let rope = self.document_map.get(&uri)?;
 
             let position = params.text_document_position_params.position;
             let char = rope.try_line_to_char(position.line as usize).ok()?;
             let offset = char + position.character as usize;
 
-            get_tooltip(&ast, offset)
+            get_tooltip(ast, offset).or_else(|| get_user_hover(ast, visitor, offset))
         })
     }
 
@@ -170,11 +174,43 @@ impl LanguageServer for Backend {
         res
     }
 
-    async fn inlay_hint(&self, params: tower_lsp::lsp_types::InlayHintParams) -> Result<Option<Vec<InlayHint>>> {
-        let uri = &params.text_document.uri;
-        if self.get_ast(uri, |_, _| {}).is_err() {}
-        let inlay_hint_list = Vec::new();
-        Ok(Some(inlay_hint_list))
+    async fn document_symbol(&self, params: DocumentSymbolParams) -> Result<Option<DocumentSymbolResponse>> {
+        let uri = params.text_document.uri;
+        let Some(rope) = self.document_map.get(&uri) else {
+            return Ok(None);
+        };
+        let symbols = self.get_ast(&uri, |ast, _| get_document_symbols(ast, &rope))?;
+        Ok(Some(DocumentSymbolResponse::Nested(symbols)))
+    }
+
+    async fn document_highlight(&self, params: DocumentHighlightParams) -> Result<Option<Vec<DocumentHighlight>>> {
+        let uri = params.text_document_position_params.text_document.uri;
+        let Some(rope) = self.document_map.get(&uri) else {
+            return Ok(None);
+        };
+        let position = params.text_document_position_params.position;
+        let Ok(line_start) = rope.try_line_to_char(position.line as usize) else {
+            return Ok(None);
+        };
+        let offset = line_start + position.character as usize;
+
+        let path = uri.to_file_path().unwrap_or_default();
+        let highlights = self.get_ast(&uri, |ast, visitor| {
+            get_reference(ast, offset, visitor, true)
+                .into_iter()
+                .filter(|(reference_path, _)| *reference_path == path)
+                .filter_map(|(_, r)| {
+                    Some(DocumentHighlight {
+                        range: Range::new(offset_to_position(r.span.start, &rope)?, offset_to_position(r.span.end, &rope)?),
+                        kind: None,
+                    })
+                })
+                .collect::<Vec<_>>()
+        })?;
+        if highlights.is_empty() {
+            return Ok(None);
+        }
+        Ok(Some(highlights))
     }
 
     async fn completion(&self, params: CompletionParams) -> Result<Option<CompletionResponse>> {
@@ -305,25 +341,13 @@ impl LanguageServer for Backend {
         self.client.log_message(MessageType::INFO, "watched files have changed!").await;
     }
 
-    async fn range_formatting(&self, params: DocumentRangeFormattingParams) -> Result<Option<Vec<TextEdit>>> {
-        let uri = params.text_document.uri;
-        let Some(rope) = self.document_map.get(&uri) else {
-            return Ok(None);
-        };
-        self.client.log_message(MessageType::INFO, "format !").await;
-        let mut result = self.get_ast(&uri, |ast, _| {
-            let mut backend = VSCodeFormattingBackend {
-                edits: Vec::new(),
-                rope: &rope,
-            };
+    async fn formatting(&self, params: DocumentFormattingParams) -> Result<Option<Vec<TextEdit>>> {
+        self.format(&params.text_document.uri)
+    }
 
-            let options = self.workspace.lock().unwrap().formatting().clone();
-            let mut visitor: FormattingVisitor<'_> = FormattingVisitor::new(&mut backend, &options);
-            ast.visit(&mut visitor);
-            backend.edits
-        })?;
-        result.sort_by(|a, b| b.range.start.cmp(&a.range.start));
-        Ok(Some(result))
+    async fn range_formatting(&self, params: DocumentRangeFormattingParams) -> Result<Option<Vec<TextEdit>>> {
+        // The formatter works on the whole tree, so a range is formatted with it.
+        self.format(&params.text_document.uri)
     }
 
     async fn execute_command(&self, params: ExecuteCommandParams) -> Result<Option<Value>> {
@@ -371,6 +395,24 @@ struct TextDocumentItem {
 }
 
 impl Backend {
+    fn format(&self, uri: &Url) -> Result<Option<Vec<TextEdit>>> {
+        let Some(rope) = self.document_map.get(uri) else {
+            return Ok(None);
+        };
+        let mut result = self.get_ast(uri, |ast, _| {
+            let mut backend = VSCodeFormattingBackend {
+                edits: Vec::new(),
+                rope: &rope,
+            };
+            let options = self.workspace.lock().unwrap().formatting().clone();
+            let mut visitor: FormattingVisitor<'_> = FormattingVisitor::new(&mut backend, &options);
+            ast.visit(&mut visitor);
+            backend.edits
+        })?;
+        result.sort_by(|a, b| b.range.start.cmp(&a.range.start));
+        Ok(Some(result))
+    }
+
     fn load_workspace(&self, roo_path: PathBuf) {
         let ws_file = roo_path.join("ppl.toml");
         if ws_file.exists() {
@@ -492,45 +534,47 @@ impl Backend {
     }
 
     async fn add_diagnostics(&self, semantic_visitor: &SemanticVisitor) {
-        let mut diagnostics = HashMap::new();
-        for err in &semantic_visitor.errors.lock().unwrap().errors {
-            let uri = Url::from_file_path(err.file_name.clone()).unwrap();
-            let Some(rope) = self.document_map.get(&uri) else {
-                continue;
-            };
-
-            let start_position = offset_to_position(err.span.start, &rope).unwrap_or(Position::new(0, 0));
-            let end_position = offset_to_position(err.span.end, &rope).unwrap_or(Position::new(0, 0));
-            let mut diag = Diagnostic::new_simple(Range::new(start_position, end_position), format!("{}", err.error));
-            //diag.source = Some(uri.clone());
-            diag.severity = Some(DiagnosticSeverity::ERROR);
-            if !diagnostics.contains_key(&uri) {
-                diagnostics.insert(uri.clone(), Vec::new());
-            }
-            diagnostics.get_mut(&uri).unwrap().push(diag);
+        let mut diagnostics: HashMap<Url, Vec<Diagnostic>> = HashMap::new();
+        // Every file that was looked at gets an answer, so that a report which no
+        // longer applies is taken back rather than left standing.
+        for uri in self.workspace_map.iter().map(|entry| entry.key().clone()) {
+            diagnostics.insert(uri, Vec::new());
         }
-        for err in &semantic_visitor.errors.lock().unwrap().warnings {
-            let uri = Url::from_file_path(err.file_name.clone()).unwrap();
-            let Some(rope) = self.document_map.get(&uri) else {
-                continue;
-            };
-            let start_position = offset_to_position(err.span.start, &rope).unwrap_or(Position::new(0, 0));
-            let end_position = offset_to_position(err.span.end, &rope).unwrap_or(Position::new(0, 0));
-            let mut diag = Diagnostic::new_simple(Range::new(start_position, end_position), format!("{}", err.error));
-            //diag.source = Some(uri.clone());
-            diag.severity = Some(DiagnosticSeverity::WARNING);
-            if !diagnostics.contains_key(&uri) {
-                diagnostics.insert(uri.clone(), Vec::new());
+        for uri in self.ast_map.lock().unwrap().keys() {
+            diagnostics.insert(uri.clone(), Vec::new());
+        }
+
+        let mut ropes: HashMap<Url, Rope> = HashMap::new();
+        {
+            let reporter = semantic_visitor.errors.lock().unwrap();
+            for (report, severity) in [(&reporter.errors, DiagnosticSeverity::ERROR), (&reporter.warnings, DiagnosticSeverity::WARNING)] {
+                for err in report {
+                    let Ok(uri) = Url::from_file_path(err.file_name.clone()) else {
+                        continue;
+                    };
+                    if !ropes.contains_key(&uri) {
+                        let rope = if let Some(document) = self.document_map.get(&uri) {
+                            document.clone()
+                        } else if let Ok(Ok(text)) = std::fs::read(&err.file_name).map(|data| read_data_with_encoding_detection(&data)) {
+                            Rope::from_str(&text)
+                        } else {
+                            continue;
+                        };
+                        ropes.insert(uri.clone(), rope);
+                    }
+                    let rope = &ropes[&uri];
+
+                    let start_position = offset_to_position(err.span.start, rope).unwrap_or(Position::new(0, 0));
+                    let end_position = offset_to_position(err.span.end, rope).unwrap_or(Position::new(0, 0));
+                    let mut diag = Diagnostic::new_simple(Range::new(start_position, end_position), format!("{}", err.error));
+                    diag.severity = Some(severity);
+                    diag.source = Some("ppl".to_string());
+                    diagnostics.entry(uri).or_default().push(diag);
+                }
             }
-            diagnostics.get_mut(&uri).unwrap().push(diag);
         }
 
         for (uri, diagnostics) in diagnostics {
-            self.client.log_message(MessageType::INFO, format!("Add Diagnostics for {} !", uri)).await;
-            for d in &diagnostics {
-                self.client.log_message(MessageType::INFO, format!("{} !", d.message)).await;
-            }
-
             self.client.publish_diagnostics(uri, diagnostics, None).await;
         }
     }

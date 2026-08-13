@@ -46,8 +46,13 @@ What the language server offers
   board object such as ``CONFERENCE``, and the fields a record literal has not
   named yet
 * Signature help for user routines, built-in functions and built-in statements
-* Hover documentation, goto definition, find all references and rename
-* Formatting
+* Hover: what a built-in does, and the type of a variable, the signature of a
+  routine, the fields of a record or the type of one of them
+* Goto definition, find all references, rename, and the occurrences of the name
+  under the cursor
+* An outline of the file - its types with their fields, its routines and its
+  variables
+* Formatting, of the document or of a selection
 
 Highlighting is left to the editor's own grammar - the tree-sitter grammar in
 Helix and Neovim, the TextMate grammar the VS Code extension carries - so a file

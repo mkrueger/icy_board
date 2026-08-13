@@ -150,6 +150,11 @@ fn builtin_statement(name: &str) -> Option<SignatureInformation> {
     Some(builder.finish(""))
 }
 
+/// How a routine the program declares is written out.
+pub fn routine_signature(visitor: &SemanticVisitor, name: &str) -> Option<String> {
+    user_routine(visitor, name).map(|signature| signature.label)
+}
+
 /// The signature help for the call the cursor is writing arguments for.
 pub fn get_signature_help(line_before_cursor: &str, visitor: &SemanticVisitor) -> Option<SignatureHelp> {
     let call = call_context(line_before_cursor)?;
