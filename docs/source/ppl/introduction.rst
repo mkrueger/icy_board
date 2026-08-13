@@ -102,9 +102,33 @@ Examples
 
     pplc --runtime 340 myscript.pps 
 
+Formatting
+~~~~~~~~~~
+
+``pplc`` is the formatter as well. It rewrites a source the way the whole tool
+chain reads it: the blocks indented, one space around an operator and after a
+comma, the members of a record tight to their dot::
+
+    pplc --format myscript.pps
+
+Without a file it formats every source of the package in the current directory.
+
+``--check`` writes nothing and prints what would change instead, and answers 1
+when a file is not formatted, which is what a build or a hook wants::
+
+    pplc --check myscript.pps
+
+The `[formatting]` section of ``ppl.toml`` says how:
+
+.. code-block:: toml
+
+    [formatting]
+    indent_size = 4              # spaces per level, 4 by default
+    use_tabs = false             # a tab per level instead
+    space_around_binop = true    # a + b rather than a+b
+
 Compatibility Notes
 ~~~~~~~~~~~~~~~~~~~
-
 While maintaining high compatibility with the original PCBoard compiler, there are some 
 minor differences:
 

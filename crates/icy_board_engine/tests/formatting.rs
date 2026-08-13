@@ -27,7 +27,7 @@ pub fn test_formatting() {
         };
         let options = FormattingOptions::default();
         let mut visitor = FormattingVisitor::new(&mut backend, &options);
-        ast.visit(&mut visitor);
+        visitor.format(&ast);
 
         backend.edits.sort_by_key(|(range, _)| range.start);
 

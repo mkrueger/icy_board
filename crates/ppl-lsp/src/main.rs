@@ -406,7 +406,7 @@ impl Backend {
             };
             let options = self.workspace.lock().unwrap().formatting().clone();
             let mut visitor: FormattingVisitor<'_> = FormattingVisitor::new(&mut backend, &options);
-            ast.visit(&mut visitor);
+            visitor.format(ast);
             backend.edits
         })?;
         result.sort_by(|a, b| b.range.start.cmp(&a.range.start));

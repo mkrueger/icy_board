@@ -1,0 +1,12 @@
+TYPE Point
+    INTEGER X
+    INTEGER Y
+ENDTYPE
+
+Point p
+Point q
+INTEGER values = { 1, 2, 3 }
+p = Point { X = 1, Y = 2 }
+q = Point { X = p.X + 1 }
+p.X = values[0]
+p.Y = q.Y

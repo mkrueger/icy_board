@@ -1,4 +1,4 @@
-use icy_board_engine::formatting::FormattingBackend;
+use icy_board_engine::formatting::{FormattingBackend, space_around};
 use ropey::Rope;
 use tower_lsp::lsp_types::{Position, Range, TextEdit};
 
@@ -56,6 +56,9 @@ impl<'a> FormattingBackend for VSCodeFormattingBackend<'a> {
         let line: usize = self.rope.try_char_to_line(start).unwrap();
         let start_line_offset = self.rope.line_to_char(line);
         let char_in_line = start - start_line_offset;
+        if char_in_line == 0 {
+            return;
+        }
 
         if let Some(line_span) = self.rope.get_line(line) {
             if let Some(slice) = line_span.as_str() {
@@ -99,5 +102,50 @@ impl<'a> FormattingBackend for VSCodeFormattingBackend<'a> {
                 });
             }
         }
+    }
+
+    fn ensure_no_space_before(&mut self, start: usize) {
+        let Some(from) = offset_to_position(start, self.rope) else {
+            return;
+        };
+        let line_start = self.rope.line_to_char(from.line as usize);
+        let mut i = start;
+        while i > line_start {
+            let c = self.rope.char(i - 1);
+            if c != ' ' && c != '\t' {
+                break;
+            }
+            i -= 1;
+        }
+        if i == start {
+            return;
+        }
+        let Some(to_start) = offset_to_position(i, self.rope) else {
+            return;
+        };
+        self.edits.push(TextEdit {
+            range: Range::new(to_start, from),
+            new_text: String::new(),
+        });
+    }
+
+    fn ensure_space_around(&mut self, range: std::ops::Range<usize>) {
+        let Some(slice) = self.rope.get_slice(range.clone()) else {
+            return;
+        };
+        let text = slice.to_string();
+        let Some(replacement) = space_around(&text) else {
+            return;
+        };
+        if text == replacement {
+            return;
+        }
+        let (Some(from), Some(to)) = (offset_to_position(range.start, self.rope), offset_to_position(range.end, self.rope)) else {
+            return;
+        };
+        self.edits.push(TextEdit {
+            range: Range::new(from, to),
+            new_text: replacement,
+        });
     }
 }

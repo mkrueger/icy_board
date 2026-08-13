@@ -298,7 +298,7 @@ fn compile_files(arguments: &Cli, encoding: Encoding, workspace: &Workspace, out
                         edits: Vec::new(),
                     };
                     let mut visitor = FormattingVisitor::new(&mut backend, workspace.formatting());
-                    ast.visit(&mut visitor);
+                    visitor.format(&ast);
                     if !backend.edits.is_empty() {
                         backend.edits.sort_by_key(|(range, _)| range.start);
                         for (range, edit) in backend.edits.iter().rev() {
@@ -309,6 +309,7 @@ fn compile_files(arguments: &Cli, encoding: Encoding, workspace: &Workspace, out
                         if arguments.check {
                             let lines = diff::lines(&src, &formatted_text);
                             if lines.iter().any(|l| matches!(l, diff::Result::Left(_) | diff::Result::Right(_))) {
+                                exit_code = 1;
                                 println!("Diff in {}", src_file.display());
                                 for (i, diff) in lines.iter().enumerate() {
                                     let mut block_start = false;
@@ -336,7 +337,6 @@ fn compile_files(arguments: &Cli, encoding: Encoding, workspace: &Workspace, out
                                             .unwrap()
                                         }
                                         diff::Result::Both(l, _) => {
-                                            exit_code = 1;
                                             if block_start || block_end {
                                                 if last_line + 1 < i {
                                                     println!();

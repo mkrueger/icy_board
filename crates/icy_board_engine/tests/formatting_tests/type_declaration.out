@@ -1,0 +1,9 @@
+TYPE Point
+    INTEGER X
+    INTEGER Y, Z
+ENDTYPE
+
+TYPE Line
+    Point From
+    Point To
+ENDTYPE
