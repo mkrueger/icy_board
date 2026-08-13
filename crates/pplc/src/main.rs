@@ -12,9 +12,7 @@ use icy_board_engine::{
     executable::{LAST_PPL_LANGUAGE_VERSION, SUPPORTED_PPE_VERSIONS, SUPPORTED_PPL_LANGUAGE_VERSIONS},
     formatting::{FormattingVisitor, StringFormattingBackend},
     icy_board::read_with_encoding_detection,
-    parser::{
-        Encoding, ErrorReporter, UserTypeRegistry, load_with_encoding, parse_ast_with_predeclared_types, preparse_type_declarations,
-    },
+    parser::{Encoding, ErrorReporter, UserTypeRegistry, load_with_encoding, parse_ast_with_predeclared_types, preparse_type_declarations},
 };
 
 use crossterm::{
@@ -67,6 +65,10 @@ struct Cli {
     #[argh(switch)]
     format: bool,
 
+    /// with --format, write the result to stdout and leave the file alone
+    #[argh(switch)]
+    stdout: bool,
+
     /// checks source/package for errors without compiling
     #[argh(switch)]
     check: bool,
@@ -82,7 +84,12 @@ lazy_static::lazy_static! {
 
 fn main() {
     let arguments: Cli = argh::from_env();
-    println!("PPLC v{} - PCBoard Programming Language Compiler", *VERSION);
+    // With --stdout the formatted source is the output, so nothing else may go there.
+    if arguments.stdout {
+        eprintln!("PPLC v{} - PCBoard Programming Language Compiler", *VERSION);
+    } else {
+        println!("PPLC v{} - PCBoard Programming Language Compiler", *VERSION);
+    }
 
     if let Some(version) = arguments.runtime {
         if !SUPPORTED_PPE_VERSIONS.contains(&version) {
@@ -180,8 +187,10 @@ fn main() {
         return;
     }
 
-    println!();
-    println!("Parsing...");
+    if !(arguments.format || arguments.check) {
+        println!();
+        println!("Parsing...");
+    }
 
     let encoding = if let Some(cp437) = arguments.cp437 {
         if cp437 { Encoding::CP437 } else { Encoding::Utf8 }
@@ -271,6 +280,19 @@ fn compile_toml(file_name: &PathBuf, arguments: &Cli) -> Res<()> {
     Ok(())
 }
 
+/// Writes beside the source and renames, so a failure cannot leave a half file.
+fn write_formatted(file: &Path, text: &str) {
+    let temporary = file.with_extension("pps.tmp");
+    if fs::write(&temporary, text).is_err() {
+        eprintln!("ERROR: cannot write {}", temporary.display());
+        return;
+    }
+    if let Err(err) = fs::rename(&temporary, file) {
+        eprintln!("ERROR: cannot replace {}: {err}", file.display());
+        let _ = fs::remove_file(&temporary);
+    }
+}
+
 fn compile_files(arguments: &Cli, encoding: Encoding, workspace: &Workspace, out_file_name: &Path) {
     let errors = Arc::new(Mutex::new(ErrorReporter::default()));
 
@@ -293,18 +315,11 @@ fn compile_files(arguments: &Cli, encoding: Encoding, workspace: &Workspace, out
             Ok(src) => {
                 let ast = parse_ast_with_predeclared_types(src_file.to_path_buf(), errors.clone(), &src, &reg, encoding, workspace);
                 if arguments.format || arguments.check {
-                    let mut backend = StringFormattingBackend {
-                        text: src.chars().collect(),
-                        edits: Vec::new(),
-                    };
+                    let mut backend = StringFormattingBackend::new(&src);
                     let mut visitor = FormattingVisitor::new(&mut backend, workspace.formatting());
                     visitor.format(&ast);
                     if !backend.edits.is_empty() {
-                        backend.edits.sort_by_key(|(range, _)| range.start);
-                        for (range, edit) in backend.edits.iter().rev() {
-                            backend.text.splice(range.clone(), edit.chars());
-                        }
-                        let formatted_text = backend.text.iter().collect::<String>();
+                        let formatted_text = backend.apply();
                         let mut last_line = 0;
                         if arguments.check {
                             let lines = diff::lines(&src, &formatted_text);
@@ -360,9 +375,13 @@ fn compile_files(arguments: &Cli, encoding: Encoding, workspace: &Workspace, out
                                     }
                                 }
                             }
+                        } else if arguments.stdout {
+                            print!("{formatted_text}");
                         } else {
-                            fs::write(&src_file, formatted_text).unwrap();
+                            write_formatted(&src_file, &formatted_text);
                         }
+                    } else if arguments.stdout {
+                        print!("{src}");
                     }
                     continue;
                 }

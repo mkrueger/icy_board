@@ -17,8 +17,8 @@ mod masks;
 mod message_base;
 mod nested_records;
 mod ppe_paths;
-mod records;
 mod record_literals;
+mod records;
 mod routine_parameters;
 mod scalars;
 mod tpa;
@@ -60,7 +60,8 @@ pub fn compile_errors_with_runtime(source: &str, runtime: u16) -> Vec<String> {
 }
 
 /// Compiles a PPL snippet, or panics with the diagnostics if it does not build.
-fn compile(source: &str) -> crate::executable::Executable {    let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+fn compile(source: &str) -> crate::executable::Executable {
+    let errors = Arc::new(Mutex::new(ErrorReporter::default()));
     let reg = UserTypeRegistry::icy_board_registry();
     let mut workspace = Workspace::default();
     workspace.hard_coded_files = Some(vec![PathBuf::from("test.pps")]);

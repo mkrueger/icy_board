@@ -30,10 +30,7 @@ fn test_a_web_request_that_fails_does_not_stop_the_program() {
 /// The same for the statement form, which writes no file and keeps going.
 #[test]
 fn test_a_failed_web_request_statement_does_not_stop_the_program() {
-    assert_eq!(
-        run_ppl("WEBREQUEST \"not a url\", \"out.txt\"\nPRINT \"still here\""),
-        "still here"
-    );
+    assert_eq!(run_ppl("WEBREQUEST \"not a url\", \"out.txt\"\nPRINT \"still here\""), "still here");
 }
 
 #[test]
@@ -171,10 +168,12 @@ fn test_a_loop_can_keep_asking_for_objects() {
             board.conferences.clear();
             board.conferences.push(crate::icy_board::conferences::Conference {
                 name: "Main".to_string(),
-                areas: Some(crate::icy_board::message_area::AreaList::new(vec![crate::icy_board::message_area::MessageArea {
-                    name: "General".to_string(),
-                    ..Default::default()
-                }])),
+                areas: Some(crate::icy_board::message_area::AreaList::new(vec![
+                    crate::icy_board::message_area::MessageArea {
+                        name: "General".to_string(),
+                        ..Default::default()
+                    },
+                ])),
                 ..Default::default()
             });
         },

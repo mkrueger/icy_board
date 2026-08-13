@@ -12,17 +12,31 @@ pub struct ExpressionCompiler<'a> {
 
 impl<'a> AstVisitor<PPEExpr> for ExpressionCompiler<'a> {
     fn visit_record_literal_expression(&mut self, record: &crate::ast::RecordLiteralExpression) -> PPEExpr {
-        let VariableType::UserData(type_id) = record.get_variable_type() else { return PPEExpr::Value(0); };
-        let fields = record.get_fields().iter().filter_map(|field| {
-            let field_id = self.compiler.semantic_visitor.type_registry.record_field_index(type_id, field.get_identifier())?;
-            Some((field_id, field.get_value().visit(self)))
-        }).collect();
+        let VariableType::UserData(type_id) = record.get_variable_type() else {
+            return PPEExpr::Value(0);
+        };
+        let fields = record
+            .get_fields()
+            .iter()
+            .filter_map(|field| {
+                let field_id = self
+                    .compiler
+                    .semantic_visitor
+                    .type_registry
+                    .record_field_index(type_id, field.get_identifier())?;
+                Some((field_id, field.get_value().visit(self)))
+            })
+            .collect();
         PPEExpr::RecordLiteral(type_id, fields)
     }
 
     fn visit_identifier_expression(&mut self, identifier: &crate::ast::IdentifierExpression) -> PPEExpr {
         if let Some(decl) = self.compiler.lookup_table.lookup_variable(identifier.get_identifier()) {
-            if self.compiler.semantic_visitor.is_routine_reference(identifier.get_identifier_token().span.start) {
+            if self
+                .compiler
+                .semantic_visitor
+                .is_routine_reference(identifier.get_identifier_token().span.start)
+            {
                 return PPEExpr::RoutineReference(decl.header.id);
             }
             return PPEExpr::Value(decl.header.id);

@@ -591,18 +591,9 @@ fn test_preproc_malformed_conditions_have_dedicated_errors() {
     assert_preproc_error(";$IF\nA\n;$ENDIF", "Invalid pre processor expression: ''");
     assert_preproc_error(";$IF 1 ==\nA\n;$ENDIF", "Invalid pre processor expression: '1 =='");
     assert_preproc_error(";$IF 1 2\nA\n;$ENDIF", "Invalid pre processor expression: '1 2'");
-    assert_preproc_error(
-        ";$IF 1 == 2\nA\n;$ELSEIF\nB\n;$ENDIF",
-        "Invalid pre processor expression: ''",
-    );
-    assert_preproc_error(
-        ";$IF 1 == 2\nA\n;$ELIF 1 ==\nB\n;$ENDIF",
-        "Invalid pre processor expression: '1 =='",
-    );
-    assert_preproc_error(
-        ";$IF 1 == 1\nA\n;$ELSEIF 1 ==\nB\n;$ENDIF",
-        "Invalid pre processor expression: '1 =='",
-    );
+    assert_preproc_error(";$IF 1 == 2\nA\n;$ELSEIF\nB\n;$ENDIF", "Invalid pre processor expression: ''");
+    assert_preproc_error(";$IF 1 == 2\nA\n;$ELIF 1 ==\nB\n;$ENDIF", "Invalid pre processor expression: '1 =='");
+    assert_preproc_error(";$IF 1 == 1\nA\n;$ELSEIF 1 ==\nB\n;$ENDIF", "Invalid pre processor expression: '1 =='");
     assert_preproc_error(
         ";$IF 1 == 1\nA\n;$ELSEIF 1 == 2\nB\n;$ELSEIF 1 ==\nC\n;$ENDIF",
         "Invalid pre processor expression: '1 =='",

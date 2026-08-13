@@ -54,5 +54,11 @@ fn every_source_in_the_repository_parses() {
         }
     }
 
-    assert!(failures.is_empty(), "{} of {} sources failed to parse:\n{}", failures.len(), sources.len(), failures.join("\n"));
+    assert!(
+        failures.is_empty(),
+        "{} of {} sources failed to parse:\n{}",
+        failures.len(),
+        sources.len(),
+        failures.join("\n")
+    );
 }

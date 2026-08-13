@@ -924,9 +924,7 @@ impl VariableValue {
             GenericVariableData::Dim2(values) => VariableValue {
                 vtype: self.vtype,
                 data: VariableData::default(),
-                generic_data: GenericVariableData::Dim2(
-                    values.iter().map(|row| row.iter().map(VariableValue::emptied).collect()).collect(),
-                ),
+                generic_data: GenericVariableData::Dim2(values.iter().map(|row| row.iter().map(VariableValue::emptied).collect()).collect()),
             },
             GenericVariableData::Dim3(values) => VariableValue {
                 vtype: self.vtype,

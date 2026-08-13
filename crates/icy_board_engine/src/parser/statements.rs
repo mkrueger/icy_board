@@ -282,7 +282,11 @@ impl<'a> Parser<'a> {
 
         self.next_token();
         let mut statements = Vec::new();
-        self.skip_eol_and_comments();
+        // A comment on the same line belongs to the header, a later one to the block.
+        if matches!(self.get_cur_token(), Some(Token::Comment(_, _))) {
+            self.next_token();
+        }
+        self.skip_eol();
 
         while self.get_cur_token() != Some(Token::EndIf) && self.get_cur_token() != Some(Token::Else) && self.get_cur_token() != Some(Token::ElseIf) {
             if self.get_cur_token().is_none() {

@@ -4,12 +4,12 @@ use crossterm::execute;
 use crossterm::style::{Attribute, Print, SetAttribute};
 use thiserror::Error;
 
+use crate::crypt::{decode_rle, decrypt_chunks, encode_rle};
+use crate::executable::disassembler::DisassembleVisitor;
 use crate::{
     Res,
     parser::{FIRST_USER_TYPE_ID, MAX_TYPE_FIELDS, MAX_USER_TYPES, is_user_declared_type},
 };
-use crate::crypt::{decode_rle, decrypt_chunks, encode_rle};
-use crate::executable::disassembler::DisassembleVisitor;
 
 use super::{FIRST_TYPE_TABLE_RUNTIME, LAST_PPE_RUNTIME, VariableTable, VariableType};
 

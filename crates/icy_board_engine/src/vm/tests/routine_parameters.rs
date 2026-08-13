@@ -109,5 +109,8 @@ ENDPROC
 "#,
         400,
     );
-    assert!(errors.iter().any(|error| error == "Passing a FUNCTION/PROCEDURE needs runtime 401"), "{errors:?}");
+    assert!(
+        errors.iter().any(|error| error == "Passing a FUNCTION/PROCEDURE needs runtime 401"),
+        "{errors:?}"
+    );
 }

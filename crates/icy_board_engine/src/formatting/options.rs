@@ -18,6 +18,11 @@ pub struct FormattingOptions {
 
     #[serde_inline_default(4)]
     pub indent_size: usize,
+
+    /// How many blank lines may stand between two statements. At least one, so
+    /// that a paragraph is never glued together.
+    #[serde_inline_default(2)]
+    pub max_blank_lines: usize,
 }
 
 impl Default for FormattingOptions {
@@ -31,6 +36,7 @@ impl FormattingOptions {
         space_around_binop: true,
         use_tabs: false,
         indent_size: 4,
+        max_blank_lines: 2,
     };
 
     pub fn new() -> Self {

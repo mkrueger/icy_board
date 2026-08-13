@@ -661,10 +661,10 @@ impl<'a> Parser<'a> {
             };
             let field_type_token = self.save_spanned_token();
             if !self.types_predeclared && matches!(field_type, VariableType::UserData(id) if !is_user_declared_type(id)) {
-                self.error_reporter.lock().unwrap().report_error(
-                    field_type_token.span.clone(),
-                    ParserErrorType::TypeFieldBoardObjectNotSupported(field_type),
-                );
+                self.error_reporter
+                    .lock()
+                    .unwrap()
+                    .report_error(field_type_token.span.clone(), ParserErrorType::TypeFieldBoardObjectNotSupported(field_type));
             }
             self.next_token();
 
@@ -674,10 +674,10 @@ impl<'a> Parser<'a> {
                 };
                 let field_name = specifier.get_identifier().clone();
                 if !specifier.get_dimensions().is_empty() {
-                    self.error_reporter
-                        .lock()
-                        .unwrap()
-                        .report_error(specifier.get_identifier_token().span.clone(), ParserErrorType::TypeFieldArrayNotSupported(field_name.clone()));
+                    self.error_reporter.lock().unwrap().report_error(
+                        specifier.get_identifier_token().span.clone(),
+                        ParserErrorType::TypeFieldArrayNotSupported(field_name.clone()),
+                    );
                 }
                 if specifier.get_initalizer().is_some() {
                     self.error_reporter.lock().unwrap().report_error(
@@ -719,10 +719,7 @@ impl<'a> Parser<'a> {
             return None;
         }
 
-        let field_layout = fields
-            .iter()
-            .map(|field| (field.get_identifier().clone(), field.get_variable_type()))
-            .collect();
+        let field_layout = fields.iter().map(|field| (field.get_identifier().clone(), field.get_variable_type())).collect();
         if !self.types_predeclared && !type_already_declared && self.type_registry.declare_user_type(name, field_layout).is_none() {
             self.error_reporter
                 .lock()
@@ -735,90 +732,90 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_function_parameter_specifier(&mut self) -> ParameterSpecifier {
-            let func_token = self.save_spanned_token();
-            self.next_token();
-            let Some(Token::Identifier(_)) = self.get_cur_token() else {
-                self.report_error(self.lex.span(), ParserErrorType::IdentifierExpected(self.save_token()));
-                return ParameterSpecifier::Variable(VariableParameterSpecifier::new(None, func_token, VariableType::Integer, None));
-            };
-            let identifier_token = self.save_spanned_token();
-            self.next_token();
-            if self.get_cur_token() != Some(Token::LPar) {
-                self.report_error(self.lex.span(), ParserErrorType::MissingOpenParens(self.save_token()));
+        let func_token = self.save_spanned_token();
+        self.next_token();
+        let Some(Token::Identifier(_)) = self.get_cur_token() else {
+            self.report_error(self.lex.span(), ParserErrorType::IdentifierExpected(self.save_token()));
+            return ParameterSpecifier::Variable(VariableParameterSpecifier::new(None, func_token, VariableType::Integer, None));
+        };
+        let identifier_token = self.save_spanned_token();
+        self.next_token();
+        if self.get_cur_token() != Some(Token::LPar) {
+            self.report_error(self.lex.span(), ParserErrorType::MissingOpenParens(self.save_token()));
+            return ParameterSpecifier::Variable(VariableParameterSpecifier::new(None, func_token, VariableType::Integer, None));
+        }
+
+        let leftpar_token = self.save_spanned_token();
+        self.next_token();
+
+        let mut parameters: Vec<ParameterSpecifier> = Vec::new();
+
+        while self.get_cur_token() != Some(Token::RPar) {
+            if self.get_cur_token().is_none() {
+                self.report_error(self.lex.span(), ParserErrorType::MissingCloseParens(self.save_token()));
                 return ParameterSpecifier::Variable(VariableParameterSpecifier::new(None, func_token, VariableType::Integer, None));
             }
 
-            let leftpar_token = self.save_spanned_token();
-            self.next_token();
-
-            let mut parameters: Vec<ParameterSpecifier> = Vec::new();
-
-            while self.get_cur_token() != Some(Token::RPar) {
-                if self.get_cur_token().is_none() {
-                    self.report_error(self.lex.span(), ParserErrorType::MissingCloseParens(self.save_token()));
-                    return ParameterSpecifier::Variable(VariableParameterSpecifier::new(None, func_token, VariableType::Integer, None));
-                }
-
-                if self.lang_version >= 350 {
-                    if let Some(Token::Function) = self.get_cur_token() {
-                        parameters.push(self.parse_function_parameter_specifier());
-                        if self.get_cur_token() == Some(Token::Comma) {
-                            self.next_token();
-                        }
-                        continue;
-                    }
-
-                    if let Some(Token::Procedure) = self.get_cur_token() {
-                        parameters.push(self.parse_procedure_parameter_specifier());
-                        if self.get_cur_token() == Some(Token::Comma) {
-                            self.next_token();
-                        }
-                        continue;
-                    }
-                }
-
-                let mut var_token = None;
-                if let Some(Token::Identifier(id)) = self.get_cur_token() {
-                    if id == Ascii::new("VAR".to_string()) {
-                        var_token = Some(self.save_spanned_token());
+            if self.lang_version >= 350 {
+                if let Some(Token::Function) = self.get_cur_token() {
+                    parameters.push(self.parse_function_parameter_specifier());
+                    if self.get_cur_token() == Some(Token::Comma) {
                         self.next_token();
                     }
-                }
-                if let Some(var_type) = self.get_variable_type() {
-                    let type_token = self.save_spanned_token();
-                    self.next_token();
-                    let info = self.parse_var_info(false);
-                    parameters.push(ParameterSpecifier::Variable(VariableParameterSpecifier::new(
-                        var_token, type_token, var_type, info,
-                    )));
-                } else {
-                    self.report_error(self.lex.span(), ParserErrorType::TypeExpected(self.save_token()));
-                    return ParameterSpecifier::Variable(VariableParameterSpecifier::new(None, func_token, VariableType::Integer, None));
+                    continue;
                 }
 
-                if self.get_cur_token() == Some(Token::Comma) {
+                if let Some(Token::Procedure) = self.get_cur_token() {
+                    parameters.push(self.parse_procedure_parameter_specifier());
+                    if self.get_cur_token() == Some(Token::Comma) {
+                        self.next_token();
+                    }
+                    continue;
+                }
+            }
+
+            let mut var_token = None;
+            if let Some(Token::Identifier(id)) = self.get_cur_token() {
+                if id == Ascii::new("VAR".to_string()) {
+                    var_token = Some(self.save_spanned_token());
                     self.next_token();
                 }
             }
-            let rightpar_token = self.save_spanned_token();
-            let return_type_token = self.next_token();
-
-            let Some(return_type) = self.get_variable_type() else {
+            if let Some(var_type) = self.get_variable_type() {
+                let type_token = self.save_spanned_token();
+                self.next_token();
+                let info = self.parse_var_info(false);
+                parameters.push(ParameterSpecifier::Variable(VariableParameterSpecifier::new(
+                    var_token, type_token, var_type, info,
+                )));
+            } else {
                 self.report_error(self.lex.span(), ParserErrorType::TypeExpected(self.save_token()));
                 return ParameterSpecifier::Variable(VariableParameterSpecifier::new(None, func_token, VariableType::Integer, None));
-            };
-            self.next_token();
+            }
 
-            ParameterSpecifier::Function(FunctionParameterSpecifier::new(
-                func_token,
-                identifier_token,
-                leftpar_token,
-                parameters,
-                rightpar_token,
-                return_type_token.unwrap(),
-                return_type,
-            ))
+            if self.get_cur_token() == Some(Token::Comma) {
+                self.next_token();
+            }
         }
+        let rightpar_token = self.save_spanned_token();
+        let return_type_token = self.next_token();
+
+        let Some(return_type) = self.get_variable_type() else {
+            self.report_error(self.lex.span(), ParserErrorType::TypeExpected(self.save_token()));
+            return ParameterSpecifier::Variable(VariableParameterSpecifier::new(None, func_token, VariableType::Integer, None));
+        };
+        self.next_token();
+
+        ParameterSpecifier::Function(FunctionParameterSpecifier::new(
+            func_token,
+            identifier_token,
+            leftpar_token,
+            parameters,
+            rightpar_token,
+            return_type_token.unwrap(),
+            return_type,
+        ))
+    }
     fn parse_procedure_parameter_specifier(&mut self) -> ParameterSpecifier {
         let proc_token = self.save_spanned_token();
         self.next_token();
@@ -1081,9 +1078,10 @@ impl<'a> Parser<'a> {
             self.next_token();
         } else if self.lang_version >= 350 {
             if let Some(Token::Eq) = self.get_cur_token() {
-                let eq_token = self.next_token();
+                let eq_token = self.save_spanned_token();
+                self.next_token();
                 let initializer = self.parse_expression();
-                return Some(VariableSpecifier::new(identifier_token, None, dimensions, None, eq_token, initializer));
+                return Some(VariableSpecifier::new(identifier_token, None, dimensions, None, Some(eq_token), initializer));
             }
         }
 

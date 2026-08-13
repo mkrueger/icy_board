@@ -1,0 +1,15 @@
+INTEGER a
+
+
+a = 1
+
+
+PROCEDURE Gap()
+
+
+    a = 2
+
+
+    a = 3
+
+ENDPROC

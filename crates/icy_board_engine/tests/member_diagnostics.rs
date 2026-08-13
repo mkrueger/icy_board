@@ -60,9 +60,7 @@ fn assigning_to_a_board_object_member_is_reported() {
 
 #[test]
 fn records_of_different_declared_types_cannot_be_assigned() {
-    let errors = diagnostics(
-        "TYPE Alpha\n  INTEGER v\nENDTYPE\nTYPE Beta\n  INTEGER v\nENDTYPE\nAlpha first\nBeta second\nfirst = second\n",
-    );
+    let errors = diagnostics("TYPE Alpha\n  INTEGER v\nENDTYPE\nTYPE Beta\n  INTEGER v\nENDTYPE\nAlpha first\nBeta second\nfirst = second\n");
     assert!(errors.iter().any(|e| e == "Can't assign UserData(101) to UserData(100)"), "{errors:?}");
 }
 
@@ -94,9 +92,8 @@ fn type_and_field_names_ignore_case() {
 
 #[test]
 fn a_routine_rejects_a_different_record_type() {
-    let errors = diagnostics(
-        "TYPE Alpha\n  INTEGER v\nENDTYPE\nTYPE Beta\n  INTEGER v\nENDTYPE\nBeta value\nTake(value)\nPROCEDURE Take(Alpha argument)\nENDPROC\n",
-    );
+    let errors =
+        diagnostics("TYPE Alpha\n  INTEGER v\nENDTYPE\nTYPE Beta\n  INTEGER v\nENDTYPE\nBeta value\nTake(value)\nPROCEDURE Take(Alpha argument)\nENDPROC\n");
     assert!(errors.iter().any(|e| e == "Argument 1 expects UserData(100), got UserData(101)"), "{errors:?}");
 }
 
@@ -126,7 +123,8 @@ fn ordering_records_is_rejected() {
 
 #[test]
 fn equality_and_inequality_are_defined_for_records() {
-    let errors = diagnostics("TYPE Rec\n  INTEGER v\nENDTYPE\nRec first\nRec second\nIF first = second PRINT \"equal\"\nIF first <> second PRINT \"different\"\n");
+    let errors =
+        diagnostics("TYPE Rec\n  INTEGER v\nENDTYPE\nRec first\nRec second\nIF first = second PRINT \"equal\"\nIF first <> second PRINT \"different\"\n");
     assert!(errors.is_empty(), "{errors:?}");
 }
 

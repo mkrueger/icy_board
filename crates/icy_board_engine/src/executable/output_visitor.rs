@@ -54,7 +54,9 @@ impl PPEVisitor<()> for PPEOutputVisitor {
         for (index, (field_id, value)) in fields.iter().enumerate() {
             self.output.push_str(&format!("FIELD{field_id} = "));
             value.visit(self);
-            if index + 1 < fields.len() { self.output.push_str(", "); }
+            if index + 1 < fields.len() {
+                self.output.push_str(", ");
+            }
         }
         self.output.push_str(" }");
     }

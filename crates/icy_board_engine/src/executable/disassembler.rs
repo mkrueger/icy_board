@@ -158,7 +158,9 @@ impl<'a> PPEVisitor<()> for DisassembleVisitor<'a> {
         for (index, (field_id, value)) in fields.iter().enumerate() {
             let _ = execute!(stdout(), Print(format!("FIELD{field_id} = ")));
             value.visit(self);
-            if index + 1 < fields.len() { let _ = execute!(stdout(), Print(", ")); }
+            if index + 1 < fields.len() {
+                let _ = execute!(stdout(), Print(", "));
+            }
         }
         let _ = execute!(stdout(), Print(" }"));
     }

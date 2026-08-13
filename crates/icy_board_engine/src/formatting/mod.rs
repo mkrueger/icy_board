@@ -65,6 +65,17 @@ impl<'a> FormattingVisitor<'a> {
         }
     }
 
+    /// Indents every statement of a block and leaves at most the configured
+    /// number of blank lines between two of them.
+    fn format_block(&mut self, statements: &[Statement]) {
+        for stmt in statements {
+            let span = stmt.get_span();
+            self.backend.limit_blank_lines(span.start, self.options.max_blank_lines);
+            self.indent(span.clone());
+            stmt.visit(self);
+        }
+    }
+
     fn format_parameters(&mut self, parameters: &[ParameterSpecifier]) {
         let starts: Vec<usize> = parameters.iter().map(parameter_start).collect();
         self.separate(&starts);
@@ -110,17 +121,18 @@ impl<'a> FormattingVisitor<'a> {
     /// Formats a whole file, which is where the top level starts at column zero.
     pub fn format(&mut self, ast: &Ast) {
         for node in &ast.nodes {
-            let start = match node {
-                AstNode::TopLevelStatement(statement) => Some(statement.get_span().start),
-                AstNode::Function(function) => Some(function.get_function_token().span.start),
-                AstNode::Procedure(procedure) => Some(procedure.get_procedure_token().span.start),
-                AstNode::FunctionDeclaration(function) => Some(function.get_declare_token().span.start),
-                AstNode::ProcedureDeclaration(procedure) => Some(procedure.get_declare_token().span.start),
-                AstNode::TypeDeclaration(declaration) => Some(declaration.get_type_token().span.start),
+            let span = match node {
+                AstNode::TopLevelStatement(statement) => Some(statement.get_span()),
+                AstNode::Function(function) => Some(function.get_function_token().span.start..function.get_endfunc_token().span.end),
+                AstNode::Procedure(procedure) => Some(procedure.get_procedure_token().span.start..procedure.get_endproc_token().span.end),
+                AstNode::FunctionDeclaration(function) => Some(function.get_declare_token().span.clone()),
+                AstNode::ProcedureDeclaration(procedure) => Some(procedure.get_declare_token().span.clone()),
+                AstNode::TypeDeclaration(declaration) => Some(declaration.get_type_token().span.start..declaration.get_endtype_token().span.end),
                 AstNode::Main(_) => None,
             };
-            if let Some(start) = start {
-                self.indent(start..start);
+            if let Some(span) = &span {
+                self.backend.limit_blank_lines(span.start, self.options.max_blank_lines);
+                self.indent(span.start..span.start);
             }
             node.visit(self);
         }
@@ -129,9 +141,30 @@ impl<'a> FormattingVisitor<'a> {
 
 impl<'a> AstVisitor<()> for FormattingVisitor<'a> {
     fn visit_main(&mut self, block: &BlockStatement) {
-        for stmt in block.get_statements() {
-            self.indent(stmt.get_span());
-            stmt.visit(self);
+        self.format_block(block.get_statements());
+    }
+
+    fn visit_variable_declaration_statement(&mut self, declaration: &VariableDeclarationStatement) {
+        for specifier in declaration.get_variables() {
+            self.ensure_space_before(specifier.get_identifier_token().span.start);
+
+            if let (Some(lpar), Some(rpar)) = (specifier.get_leftpar_token(), specifier.get_rightpar_token()) {
+                self.ensure_text_or_newline(specifier.get_identifier_token().span.end..lpar.span.start, "");
+                self.ensure_no_space_after(lpar.span.end);
+                for dimension in specifier.get_dimensions().windows(2) {
+                    self.ensure_no_space_after(dimension[0].get_dimension_token().span.end);
+                    self.ensure_space_before(dimension[1].get_dimension_token().span.start);
+                }
+                if let Some(last) = specifier.get_dimensions().last() {
+                    self.ensure_text_or_newline(last.get_dimension_token().span.end..rpar.span.start, "");
+                }
+            }
+
+            if let (Some(eq), Some(initializer)) = (specifier.get_eq_token(), specifier.get_initalizer()) {
+                self.ensure_space_before(eq.span.start);
+                self.ensure_text_or_newline(eq.span.end..initializer.get_span().start, " ");
+                initializer.visit(self);
+            }
         }
     }
 
@@ -201,10 +234,7 @@ impl<'a> AstVisitor<()> for FormattingVisitor<'a> {
     }
 
     fn visit_indexer_expression(&mut self, indexer: &IndexerExpression) {
-        self.ensure_text_or_newline(
-            indexer.get_identifier_token().span.end..indexer.get_lbracket_token().span.start,
-            "",
-        );
+        self.ensure_text_or_newline(indexer.get_identifier_token().span.end..indexer.get_lbracket_token().span.start, "");
         self.ensure_no_space_after(indexer.get_lbracket_token().span.end);
         for argument in indexer.get_arguments() {
             argument.visit(self);
@@ -262,30 +292,21 @@ impl<'a> AstVisitor<()> for FormattingVisitor<'a> {
     fn visit_if_then_statement(&mut self, if_then: &IfThenStatement) {
         if_then.get_condition().visit(self);
         self.inc_indent();
-        for stmt in if_then.get_statements() {
-            self.indent(stmt.get_span());
-            stmt.visit(self);
-        }
+        self.format_block(if_then.get_statements());
         self.dec_indent();
 
         for stmt in if_then.get_else_if_blocks() {
             self.indent(stmt.get_elseif_token().span.clone());
             stmt.get_condition().visit(self);
             self.inc_indent();
-            for stmt in stmt.get_statements() {
-                self.indent(stmt.get_span());
-                stmt.visit(self);
-            }
+            self.format_block(stmt.get_statements());
             self.dec_indent();
         }
 
         if let Some(else_block) = if_then.get_else_block() {
             self.indent(else_block.get_else_token().span.clone());
             self.inc_indent();
-            for stmt in else_block.get_statements() {
-                self.indent(stmt.get_span());
-                stmt.visit(self);
-            }
+            self.format_block(else_block.get_statements());
             self.dec_indent();
         }
         self.indent(if_then.get_endif_token().span.clone());
@@ -300,10 +321,7 @@ impl<'a> AstVisitor<()> for FormattingVisitor<'a> {
                 specifier.visit(self);
             }
             self.inc_indent();
-            for stmt in case_block.get_statements() {
-                self.indent(stmt.get_span());
-                stmt.visit(self);
-            }
+            self.format_block(case_block.get_statements());
             self.dec_indent();
         }
         if let Some(dt) = select_stmt.get_default_token() {
@@ -311,10 +329,7 @@ impl<'a> AstVisitor<()> for FormattingVisitor<'a> {
         }
 
         self.inc_indent();
-        for stmt in select_stmt.get_default_statements() {
-            self.indent(stmt.get_span());
-            stmt.visit(self);
-        }
+        self.format_block(select_stmt.get_default_statements());
         self.dec_indent();
         self.indent(select_stmt.get_endselect_token().span.clone());
     }
@@ -326,10 +341,7 @@ impl<'a> AstVisitor<()> for FormattingVisitor<'a> {
             step.visit(self);
         }
         self.inc_indent();
-        for stmt in for_stmt.get_statements() {
-            self.indent(stmt.get_span());
-            stmt.visit(self);
-        }
+        self.format_block(for_stmt.get_statements());
         self.dec_indent();
         self.indent(for_stmt.get_next_token().span.clone());
     }
@@ -337,20 +349,14 @@ impl<'a> AstVisitor<()> for FormattingVisitor<'a> {
     fn visit_while_do_statement(&mut self, while_do_stmt: &WhileDoStatement) {
         while_do_stmt.get_condition().visit(self);
         self.inc_indent();
-        for stmt in while_do_stmt.get_statements() {
-            self.indent(stmt.get_span());
-            stmt.visit(self);
-        }
+        self.format_block(while_do_stmt.get_statements());
         self.dec_indent();
         self.indent(while_do_stmt.get_endwhile_token().span.clone());
     }
 
     fn visit_repeat_until_statement(&mut self, repeat_until_stmt: &RepeatUntilStatement) {
         self.inc_indent();
-        for stmt in repeat_until_stmt.get_statements() {
-            self.indent(stmt.get_span());
-            stmt.visit(self);
-        }
+        self.format_block(repeat_until_stmt.get_statements());
         self.dec_indent();
         self.indent(repeat_until_stmt.get_until_token().span.clone());
         repeat_until_stmt.get_condition().visit(self);
@@ -358,10 +364,7 @@ impl<'a> AstVisitor<()> for FormattingVisitor<'a> {
 
     fn visit_loop_statement(&mut self, loop_stmt: &LoopStatement) {
         self.inc_indent();
-        for stmt in loop_stmt.get_statements() {
-            self.indent(stmt.get_span());
-            stmt.visit(self);
-        }
+        self.format_block(loop_stmt.get_statements());
         self.dec_indent();
         self.indent(loop_stmt.get_endloop_token().span.clone());
     }
@@ -369,10 +372,7 @@ impl<'a> AstVisitor<()> for FormattingVisitor<'a> {
     fn visit_function_implementation(&mut self, function: &FunctionImplementation) {
         self.format_parameters(function.get_parameters());
         self.inc_indent();
-        for stmt in function.get_statements() {
-            self.indent(stmt.get_span());
-            stmt.visit(self);
-        }
+        self.format_block(function.get_statements());
         self.dec_indent();
         self.indent(function.get_endfunc_token().span.clone());
     }
@@ -380,10 +380,7 @@ impl<'a> AstVisitor<()> for FormattingVisitor<'a> {
     fn visit_procedure_implementation(&mut self, procedure: &ProcedureImplementation) {
         self.format_parameters(procedure.get_parameters());
         self.inc_indent();
-        for stmt in procedure.get_statements() {
-            self.indent(stmt.get_span());
-            stmt.visit(self);
-        }
+        self.format_block(procedure.get_statements());
         self.dec_indent();
         self.indent(procedure.get_endproc_token().span.clone());
     }

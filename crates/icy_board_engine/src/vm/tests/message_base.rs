@@ -128,10 +128,7 @@ fn test_getmsghdr_reads_the_status_character() {
 /// The header held its date and time as text, so a PPE reads MM-DD-YY and HH:MM.
 #[test]
 fn test_getmsghdr_reads_the_date_and_time_as_text() {
-    let output = run_ppl_with_messages(
-        r#"PRINT LEN(GETMSGHDR(0, 1, HDR_DATE)), " ", LEN(GETMSGHDR(0, 1, HDR_TIME))"#,
-        MESSAGES,
-    );
+    let output = run_ppl_with_messages(r#"PRINT LEN(GETMSGHDR(0, 1, HDR_DATE)), " ", LEN(GETMSGHDR(0, 1, HDR_TIME))"#, MESSAGES);
     assert_eq!(output, "8 5");
 }
 

@@ -1410,11 +1410,7 @@ impl Lexer {
             errors: parse_errors.clone(),
         };
         let value = expression.visit(&mut visitor);
-        if parse_errors.lock().unwrap().errors.is_empty() {
-            Ok(value)
-        } else {
-            Err(())
-        }
+        if parse_errors.lock().unwrap().errors.is_empty() { Ok(value) } else { Err(()) }
     }
 
     fn eval_preproc_bool(&mut self, src: &str) -> bool {
@@ -1422,10 +1418,10 @@ impl Lexer {
             Ok(Some(value)) => value.as_bool(),
             Ok(None) => false,
             Err(()) => {
-                self.errors
-                    .lock()
-                    .unwrap()
-                    .report_error(self.token_start..self.token_end, LexingErrorType::InvalidPreProcessorExpression(src.trim().to_string()));
+                self.errors.lock().unwrap().report_error(
+                    self.token_start..self.token_end,
+                    LexingErrorType::InvalidPreProcessorExpression(src.trim().to_string()),
+                );
                 false
             }
         }

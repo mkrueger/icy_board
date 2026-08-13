@@ -114,10 +114,7 @@ fn fileinf_date_time_and_attrs_are_real_for_existing_files() {
     "#,
         &[("found.pcb", CONTENT)],
     );
-    assert_eq!(
-        output,
-        "size=20\nattr0=0\ndate_ok=1\ntime_ok=1\nattr=32\nmiss_date_zero=1\nmiss_time_zero=1\n"
-    );
+    assert_eq!(output, "size=20\nattr0=0\ndate_ok=1\ntime_ok=1\nattr=32\nmiss_date_zero=1\nmiss_time_zero=1\n");
 }
 
 /// PCBoard looked for files with dosfindfirst and never passed FA_DIREC, so a directory

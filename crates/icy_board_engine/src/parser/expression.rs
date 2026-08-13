@@ -241,7 +241,11 @@ impl<'a> Parser<'a> {
                             let rbrace_token = self.save_spanned_token();
                             self.next_token();
                             return Some(Expression::RecordLiteral(RecordLiteralExpression::new(
-                                identifier_token, VariableType::UserData(type_id), lbrace_token, fields, rbrace_token,
+                                identifier_token,
+                                VariableType::UserData(type_id),
+                                lbrace_token,
+                                fields,
+                                rbrace_token,
                             )));
                         }
                     }
@@ -283,12 +287,7 @@ impl<'a> Parser<'a> {
 
                     self.next_token();
 
-                    let indexer = Expression::Indexer(IndexerExpression::new(
-                        identifier_token,
-                        leftpar_token,
-                        arguments,
-                        rightpar_token,
-                    ));
+                    let indexer = Expression::Indexer(IndexerExpression::new(identifier_token, leftpar_token, arguments, rightpar_token));
                     return self.parse_member_chain(indexer);
                 }
                 Some(Expression::Identifier(IdentifierExpression::new(identifier_token)))

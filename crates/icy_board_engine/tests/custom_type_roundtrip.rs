@@ -17,7 +17,11 @@ fn compile(source: &str) -> Executable {
     let mut compiler = PPECompiler::new(&workspace, registry, errors.clone());
     compiler.compile(&[&ast]);
     let reporter = errors.lock().unwrap();
-    assert!(reporter.errors.is_empty(), "{:?}", reporter.errors.iter().map(|e| e.error.to_string()).collect::<Vec<_>>());
+    assert!(
+        reporter.errors.is_empty(),
+        "{:?}",
+        reporter.errors.iter().map(|e| e.error.to_string()).collect::<Vec<_>>()
+    );
     drop(reporter);
     compiler.create_executable().unwrap()
 }
@@ -45,11 +49,12 @@ fn compile_diagnostics(source: &str, runtime: u16) -> Vec<String> {
 
 #[test]
 fn custom_type_layouts_survive_the_ppe_round_trip() {
-    let executable = compile(
-        "TYPE Inner\n  INTEGER Number\n  STRING Text\nENDTYPE\nTYPE Outer\n  Inner Value\n  BOOLEAN Flag\nENDTYPE\nOuter item\n",
-    );
+    let executable = compile("TYPE Inner\n  INTEGER Number\n  STRING Text\nENDTYPE\nTYPE Outer\n  Inner Value\n  BOOLEAN Flag\nENDTYPE\nOuter item\n");
     assert_eq!(
-        vec![vec![VariableType::Integer, VariableType::String], vec![VariableType::UserData(100), VariableType::Boolean]],
+        vec![
+            vec![VariableType::Integer, VariableType::String],
+            vec![VariableType::UserData(100), VariableType::Boolean]
+        ],
         executable.user_types
     );
 
@@ -60,9 +65,7 @@ fn custom_type_layouts_survive_the_ppe_round_trip() {
 
 #[test]
 fn loading_a_ppe_rebuilds_nested_record_defaults() {
-    let executable = compile(
-        "TYPE Inner\n  INTEGER Number\n  STRING Text\nENDTYPE\nTYPE Outer\n  Inner Value\nENDTYPE\nOuter item\nPRINT item.Value.Number\n",
-    );
+    let executable = compile("TYPE Inner\n  INTEGER Number\n  STRING Text\nENDTYPE\nTYPE Outer\n  Inner Value\nENDTYPE\nOuter item\nPRINT item.Value.Number\n");
     let mut bytes = executable.to_buffer().unwrap();
     let loaded = Executable::from_buffer(&mut bytes, false).unwrap();
     let value = loaded
@@ -103,7 +106,9 @@ fn a_runtime_before_401_does_not_gain_a_custom_type_section() {
 fn a_type_is_rejected_on_a_runtime_that_cannot_store_it() {
     let errors = compile_diagnostics("TYPE Point\n  INTEGER X\nENDTYPE\nPoint Pt\n", 400);
     assert_eq!(
-        vec![format!("'TYPE' needs runtime {FIRST_TYPE_TABLE_RUNTIME}, an older PPE has nowhere to store the layout")],
+        vec![format!(
+            "'TYPE' needs runtime {FIRST_TYPE_TABLE_RUNTIME}, an older PPE has nowhere to store the layout"
+        )],
         errors
     );
 }
@@ -156,7 +161,10 @@ fn a_record_past_the_byte_limit_is_rejected() {
     source.push_str("ENDTYPE\n");
 
     let errors = diagnostics(&source);
-    assert_eq!(vec![format!("No room for another field, {MAX_TYPE_FIELDS} is the most a type may hold")], errors);
+    assert_eq!(
+        vec![format!("No room for another field, {MAX_TYPE_FIELDS} is the most a type may hold")],
+        errors
+    );
 }
 
 #[test]
@@ -166,7 +174,10 @@ fn the_serializer_rejects_custom_types_before_runtime_401() {
         user_types: vec![vec![VariableType::Integer]],
         ..Executable::default()
     };
-    assert_eq!(ExecutableError::CustomTypesNotSupported(FIRST_TYPE_TABLE_RUNTIME), executable.to_buffer().unwrap_err());
+    assert_eq!(
+        ExecutableError::CustomTypesNotSupported(FIRST_TYPE_TABLE_RUNTIME),
+        executable.to_buffer().unwrap_err()
+    );
 }
 
 #[test]

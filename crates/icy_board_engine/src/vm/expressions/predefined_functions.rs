@@ -120,10 +120,7 @@ pub async fn len_dim(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
         GenericVariableData::Dim3(items) => match dim {
             0 => items.len().saturating_sub(1),
             1 => items.first().map_or(0, |plane| plane.len().saturating_sub(1)),
-            2 => items
-                .first()
-                .and_then(|plane| plane.first())
-                .map_or(0, |row| row.len().saturating_sub(1)),
+            2 => items.first().and_then(|plane| plane.first()).map_or(0, |row| row.len().saturating_sub(1)),
             _ => 0,
         },
         GenericVariableData::Password(_) => {
@@ -1966,7 +1963,11 @@ pub async fn pcbaccstat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Va
             // ACC_STAT: 0=disabled, 1=tracking, 2=enabled. icy_board models the
             // system as on or off, not a separate tracking mode, so an enabled
             // system reports fully enabled.
-            let status = if vm.icy_board_state.get_board().await.config.accounting.enabled { 2 } else { 0 };
+            let status = if vm.icy_board_state.get_board().await.config.accounting.enabled {
+                2
+            } else {
+                0
+            };
             Ok(VariableValue::new_int(status))
         }
         1 => Ok(VariableValue::new_double(vm.icy_board_state.session.current_conference.charge_time)),
@@ -2219,34 +2220,22 @@ pub async fn set_confinfo(vm: &mut VirtualMachine<'_>, conf_num: usize, conf_fie
             32 => conference.is_read_only = value.as_bool(),
             // Field 33 is NoPrivateMsgs on PCBoard (not PrivMsgs / field 6).
             33 => conference.disallow_private_msgs = value.as_bool(),
-            34 => {
-                conference.sec_request_rr =
-                    SecurityExpression::Constant(crate::icy_board::security_expr::Value::Integer(value.as_int() as i64))
-            }
+            34 => conference.sec_request_rr = SecurityExpression::Constant(crate::icy_board::security_expr::Value::Integer(value.as_int() as i64)),
             35 => conference.record_origin = value.as_bool(),
             36 => conference.prompt_for_routing = value.as_bool(),
             37 => conference.allow_aliases = value.as_bool(),
             38 => conference.show_intro_in_scan = value.as_bool(),
-            39 => {
-                conference.sec_write_message =
-                    SecurityExpression::Constant(crate::icy_board::security_expr::Value::Integer(value.as_int() as i64))
-            }
+            39 => conference.sec_write_message = SecurityExpression::Constant(crate::icy_board::security_expr::Value::Integer(value.as_int() as i64)),
             40 => conference.password = Password::PlainText(value.as_string()),
             41 => conference.intro_file = PathBuf::from_str(&value.as_string())?,
             42 => conference.attachment_location = PathBuf::from_str(&value.as_string())?,
             43 => (), // reg flags
-            44 => {
-                conference.sec_attachments =
-                    SecurityExpression::Constant(crate::icy_board::security_expr::Value::Integer(value.as_int() as i64))
-            }
+            44 => conference.sec_attachments = SecurityExpression::Constant(crate::icy_board::security_expr::Value::Integer(value.as_int() as i64)),
             45 => conference.carbon_list_limit = value.as_byte(),
             46 => conference.command_file = PathBuf::from_str(&value.as_string())?,
             47 => (), // old index
             48 => conference.long_to_names = value.as_bool(),
-            49 => {
-                conference.sec_carbon_copy =
-                    SecurityExpression::Constant(crate::icy_board::security_expr::Value::Integer(value.as_int() as i64))
-            }
+            49 => conference.sec_carbon_copy = SecurityExpression::Constant(crate::icy_board::security_expr::Value::Integer(value.as_int() as i64)),
             50 => conference.conference_type = ConferenceType::from_u8(value.as_byte()),
             51 => (), // export ptr
             52 => conference.charge_time = value.as_double(),
@@ -2513,13 +2502,11 @@ fn get_field(field_num: i32, header: &JamMessageHeader) -> Res<VariableValue> {
                 date.year() % 100
             )))
         }
-        HDR_ECHO => Ok(VariableValue::new_string(
-            if header.attributes & jam_attributes::MSG_TYPEECHO != 0 {
-                "E".to_string()
-            } else {
-                String::new()
-            },
-        )),
+        HDR_ECHO => Ok(VariableValue::new_string(if header.attributes & jam_attributes::MSG_TYPEECHO != 0 {
+            "E".to_string()
+        } else {
+            String::new()
+        })),
         HDR_FROM => {
             if let Some(from) = header.get_from() {
                 Ok(VariableValue::new_string(from.to_string()))

@@ -46,14 +46,7 @@ fn a_file_can_use_a_type_declared_in_a_later_file() {
 
     preparse_type_declarations(PathBuf::from("main.pps"), errors.clone(), main, &registry, Encoding::Utf8, &workspace);
     preparse_type_declarations(PathBuf::from("types.pps"), errors.clone(), types, &registry, Encoding::Utf8, &workspace);
-    let ast = parse_ast_with_predeclared_types(
-        PathBuf::from("main.pps"),
-        errors.clone(),
-        main,
-        &registry,
-        Encoding::Utf8,
-        &workspace,
-    );
+    let ast = parse_ast_with_predeclared_types(PathBuf::from("main.pps"), errors.clone(), main, &registry, Encoding::Utf8, &workspace);
 
     assert!(!ast.nodes.is_empty());
     let messages: Vec<String> = errors.lock().unwrap().errors.iter().map(|error| error.error.to_string()).collect();
@@ -200,7 +193,10 @@ fn test_two_types_get_distinct_ids() {
     assert!(errors.lock().unwrap().errors.is_empty());
     assert_eq!(2, nodes.len());
     assert_eq!(super::FIRST_USER_TYPE_ID, reg.get_user_type(&unicase::Ascii::new("a".to_string())).unwrap().id);
-    assert_eq!(super::FIRST_USER_TYPE_ID + 1, reg.get_user_type(&unicase::Ascii::new("b".to_string())).unwrap().id);
+    assert_eq!(
+        super::FIRST_USER_TYPE_ID + 1,
+        reg.get_user_type(&unicase::Ascii::new("b".to_string())).unwrap().id
+    );
 }
 
 #[test]
@@ -246,7 +242,10 @@ fn test_a_record_field_array_is_rejected_explicitly() {
 fn test_a_record_field_initializer_is_rejected_explicitly() {
     let (_, _, errors) = parse_types("TYPE Rec\n  INTEGER Value = 7\nENDTYPE\n");
     let errors: Vec<String> = errors.lock().unwrap().errors.iter().map(|error| error.error.to_string()).collect();
-    assert!(errors.iter().any(|error| error == "Record field 'Value' cannot have an initializer"), "{errors:?}");
+    assert!(
+        errors.iter().any(|error| error == "Record field 'Value' cannot have an initializer"),
+        "{errors:?}"
+    );
 }
 
 fn many_types(count: usize) -> String {

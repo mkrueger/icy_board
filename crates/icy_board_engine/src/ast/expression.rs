@@ -145,7 +145,7 @@ impl Expression {
             Expression::Indexer(fc) => fc.get_identifier_token().span.start..fc.get_rbracket_token().span.end,
             Expression::Unary(u) => u.get_op_token().span.start..u.get_expression().get_span().end,
             Expression::Binary(b) => b.get_left_expression().get_span().start..b.get_right_expression().get_span().end,
-            Expression::ArrayInitializer(b) => b.get_expressions().first().unwrap().get_span().start..b.get_expressions().last().unwrap().get_span().end,
+            Expression::ArrayInitializer(b) => b.get_lbrace_token().span.start..b.get_rbrace_token().span.end,
         }
     }
 
@@ -268,14 +268,30 @@ impl RecordLiteralExpression {
         fields: Vec<RecordLiteralField>,
         rbrace_token: Spanned<Token>,
     ) -> Self {
-        Self { type_token, variable_type, lbrace_token, fields, rbrace_token }
+        Self {
+            type_token,
+            variable_type,
+            lbrace_token,
+            fields,
+            rbrace_token,
+        }
     }
 
-    pub fn get_type_token(&self) -> &Spanned<Token> { &self.type_token }
-    pub fn get_variable_type(&self) -> VariableType { self.variable_type }
-    pub fn get_lbrace_token(&self) -> &Spanned<Token> { &self.lbrace_token }
-    pub fn get_fields(&self) -> &[RecordLiteralField] { &self.fields }
-    pub fn get_rbrace_token(&self) -> &Spanned<Token> { &self.rbrace_token }
+    pub fn get_type_token(&self) -> &Spanned<Token> {
+        &self.type_token
+    }
+    pub fn get_variable_type(&self) -> VariableType {
+        self.variable_type
+    }
+    pub fn get_lbrace_token(&self) -> &Spanned<Token> {
+        &self.lbrace_token
+    }
+    pub fn get_fields(&self) -> &[RecordLiteralField] {
+        &self.fields
+    }
+    pub fn get_rbrace_token(&self) -> &Spanned<Token> {
+        &self.rbrace_token
+    }
 }
 
 impl fmt::Display for Expression {

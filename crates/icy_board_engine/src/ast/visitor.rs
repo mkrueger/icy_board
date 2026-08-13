@@ -34,7 +34,9 @@ pub trait AstVisitor<T: Default>: Sized {
         T::default()
     }
     fn visit_record_literal_expression(&mut self, record: &RecordLiteralExpression) -> T {
-        for field in record.get_fields() { field.get_value().visit(self); }
+        for field in record.get_fields() {
+            field.get_value().visit(self);
+        }
         T::default()
     }
     fn visit_unary_expression(&mut self, unary: &UnaryExpression) -> T {

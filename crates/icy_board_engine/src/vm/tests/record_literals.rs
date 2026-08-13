@@ -61,14 +61,13 @@ ENDFUNC
 
 #[test]
 fn record_literal_fields_are_checked() {
-    let duplicate = compile_errors(
-        "TYPE Point\n INTEGER X\nENDTYPE\nPoint value = Point { X = 1, X = 2 }\n",
+    let duplicate = compile_errors("TYPE Point\n INTEGER X\nENDTYPE\nPoint value = Point { X = 1, X = 2 }\n");
+    assert!(
+        duplicate.iter().any(|error| error == "Record literal field 'X' is listed more than once"),
+        "{duplicate:?}"
     );
-    assert!(duplicate.iter().any(|error| error == "Record literal field 'X' is listed more than once"), "{duplicate:?}");
 
-    let unknown = compile_errors(
-        "TYPE Point\n INTEGER X\nENDTYPE\nPoint value = Point { Y = 1 }\n",
-    );
+    let unknown = compile_errors("TYPE Point\n INTEGER X\nENDTYPE\nPoint value = Point { Y = 1 }\n");
     assert!(unknown.iter().any(|error| error == "Record type UserData(100) has no field 'Y'"), "{unknown:?}");
 }
 
@@ -89,16 +88,15 @@ Holder holder = Holder { Value = Second { Value = 1 } }
 "#,
     );
     assert!(
-        errors.iter().any(|error| error == "Record field 'Value' expects UserData(100), got UserData(101)"),
+        errors
+            .iter()
+            .any(|error| error == "Record field 'Value' expects UserData(100), got UserData(101)"),
         "{errors:?}"
     );
 }
 
 #[test]
 fn a_record_literal_needs_runtime_401() {
-    let errors = compile_errors_with_runtime(
-        "TYPE Point\n INTEGER X\nENDTYPE\nPoint value = Point { X = 1 }\n",
-        400,
-    );
+    let errors = compile_errors_with_runtime("TYPE Point\n INTEGER X\nENDTYPE\nPoint value = Point { X = 1 }\n", 400);
     assert!(errors.iter().any(|error| error == "Record literals need runtime 401"), "{errors:?}");
 }

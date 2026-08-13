@@ -11,7 +11,10 @@ pub enum CursorContext {
     Member(Vec<String>),
 
     /// A field name inside `Type { ... }`, with the fields already named.
-    RecordLiteralField { type_name: String, named_fields: Vec<String> },
+    RecordLiteralField {
+        type_name: String,
+        named_fields: Vec<String>,
+    },
 
     /// Inside a string or a comment, where nothing should be offered.
     Nothing,
@@ -295,7 +298,10 @@ mod tests {
     #[test]
     fn member_after_a_dot() {
         assert_eq!(cursor_context("    e."), CursorContext::Member(vec!["e".to_string()]));
-        assert_eq!(cursor_context("PRINTLN m.Home."), CursorContext::Member(vec!["m".to_string(), "Home".to_string()]));
+        assert_eq!(
+            cursor_context("PRINTLN m.Home."),
+            CursorContext::Member(vec!["m".to_string(), "Home".to_string()])
+        );
         assert_eq!(cursor_context("x = e.Na"), CursorContext::Member(vec!["e".to_string()]));
     }
 
@@ -305,10 +311,7 @@ mod tests {
             cursor_context("members[0].Home."),
             CursorContext::Member(vec!["members".to_string(), "Home".to_string()])
         );
-        assert_eq!(
-            cursor_context("ConfInfo(CurConf())."),
-            CursorContext::Member(vec!["ConfInfo".to_string()])
-        );
+        assert_eq!(cursor_context("ConfInfo(CurConf())."), CursorContext::Member(vec!["ConfInfo".to_string()]));
     }
 
     #[test]

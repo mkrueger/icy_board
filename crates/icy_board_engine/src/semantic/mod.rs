@@ -39,7 +39,11 @@ pub enum ReferenceType {
 }
 
 fn parameter_lists_match(expected: &[ParameterSpecifier], actual: &[ParameterSpecifier]) -> bool {
-    expected.len() == actual.len() && expected.iter().zip(actual).all(|(expected, actual)| parameter_signature_matches(expected, actual))
+    expected.len() == actual.len()
+        && expected
+            .iter()
+            .zip(actual)
+            .all(|(expected, actual)| parameter_signature_matches(expected, actual))
 }
 
 fn parameter_signature_matches(expected: &ParameterSpecifier, actual: &ParameterSpecifier) -> bool {
@@ -62,8 +66,7 @@ fn parameter_signature_matches(expected: &ParameterSpecifier, actual: &Parameter
             }
         }
         (ParameterSpecifier::Function(expected), ParameterSpecifier::Function(actual)) => {
-            expected.get_return_type() == actual.get_return_type()
-                && parameter_lists_match(expected.get_parameters(), actual.get_parameters())
+            expected.get_return_type() == actual.get_return_type() && parameter_lists_match(expected.get_parameters(), actual.get_parameters())
         }
         (ParameterSpecifier::Procedure(expected), ParameterSpecifier::Procedure(actual)) => {
             parameter_lists_match(expected.get_parameters(), actual.get_parameters())
@@ -893,8 +896,7 @@ impl SemanticVisitor {
                     return false;
                 };
                 let reference = &self.references[index].1;
-                matches!(reference.variable_type, VariableType::UserData(_))
-                    && reference.header.as_ref().is_some_and(|header| header.dim > 0)
+                matches!(reference.variable_type, VariableType::UserData(_)) && reference.header.as_ref().is_some_and(|header| header.dim > 0)
             }
             Expression::Parens(parens) => self.is_whole_custom_type_array(parens.get_expression()),
             _ => false,
@@ -1202,8 +1204,7 @@ impl SemanticVisitor {
                         let container = self.function_containers.iter().find(|container| container.id == self.last_lookup_index);
                         let matches = container.is_some_and(|container| match &container.functions {
                             FunctionDeclaration::Function(declaration) => {
-                                f.get_return_type() == declaration.get_return_type()
-                                    && parameter_lists_match(f.get_parameters(), declaration.get_parameters())
+                                f.get_return_type() == declaration.get_return_type() && parameter_lists_match(f.get_parameters(), declaration.get_parameters())
                             }
                             _ => false,
                         });
@@ -1243,13 +1244,11 @@ impl SemanticVisitor {
                 ParameterSpecifier::Variable(parameter) => {
                     let expected = parameter.get_variable_type();
                     let actual = arguments[i].visit(self);
-                    if expected != actual
-                        && (matches!(expected, VariableType::UserData(_)) || matches!(actual, VariableType::UserData(_)))
-                    {
-                        self.errors.lock().unwrap().report_error(
-                            arguments[i].get_span(),
-                            CompilationErrorType::ArgumentTypeMismatch(i + 1, expected, actual),
-                        );
+                    if expected != actual && (matches!(expected, VariableType::UserData(_)) || matches!(actual, VariableType::UserData(_))) {
+                        self.errors
+                            .lock()
+                            .unwrap()
+                            .report_error(arguments[i].get_span(), CompilationErrorType::ArgumentTypeMismatch(i + 1, expected, actual));
                     }
                 }
             }
@@ -1312,18 +1311,16 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             );
         }
         if has_custom_type && matches!(binary.get_op(), crate::ast::BinOp::Eq | crate::ast::BinOp::NotEq) {
-            if self.is_whole_custom_type_array(binary.get_left_expression())
-                || self.is_whole_custom_type_array(binary.get_right_expression())
-            {
-                self.errors.lock().unwrap().report_error(
-                    binary.get_op_token().span.clone(),
-                    CompilationErrorType::CustomTypeArrayComparisonNotSupported,
-                );
+            if self.is_whole_custom_type_array(binary.get_left_expression()) || self.is_whole_custom_type_array(binary.get_right_expression()) {
+                self.errors
+                    .lock()
+                    .unwrap()
+                    .report_error(binary.get_op_token().span.clone(), CompilationErrorType::CustomTypeArrayComparisonNotSupported);
             } else if left != right {
-                self.errors.lock().unwrap().report_error(
-                    binary.get_op_token().span.clone(),
-                    CompilationErrorType::ComparisonTypeMismatch(left, right),
-                );
+                self.errors
+                    .lock()
+                    .unwrap()
+                    .report_error(binary.get_op_token().span.clone(), CompilationErrorType::ComparisonTypeMismatch(left, right));
             }
             VariableType::Boolean
         } else {
@@ -1396,7 +1393,11 @@ impl AstVisitor<VariableType> for SemanticVisitor {
         let t = member_reference_expression.get_expression().visit(self);
         if let VariableType::UserData(d) = t {
             if crate::parser::is_user_declared_type(d) {
-                return self.resolve_record_field(d, member_reference_expression.get_identifier(), &member_reference_expression.get_identifier_token().span);
+                return self.resolve_record_field(
+                    d,
+                    member_reference_expression.get_identifier(),
+                    &member_reference_expression.get_identifier_token().span,
+                );
             }
             if let Some(t) = self.type_registry.get_type_from_id(d) {
                 for (name, t) in &t.fields {
@@ -1795,9 +1796,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             arg.visit(self);
         }
         let value_type = let_stmt.get_value_expression().visit(self);
-        if target_type != value_type
-            && (matches!(target_type, VariableType::UserData(_)) || matches!(value_type, VariableType::UserData(_)))
-        {
+        if target_type != value_type && (matches!(target_type, VariableType::UserData(_)) || matches!(value_type, VariableType::UserData(_))) {
             self.errors.lock().unwrap().report_error(
                 let_stmt.get_eq_token().span.clone(),
                 CompilationErrorType::AssignmentTypeMismatch(target_type, value_type),

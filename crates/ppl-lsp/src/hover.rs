@@ -58,11 +58,7 @@ pub fn get_user_hover(ast: &Ast, visitor: &SemanticVisitor, offset: usize) -> Op
         };
     }
 
-    let mut member_visitor = MemberHoverVisitor {
-        visitor,
-        offset,
-        hover: None,
-    };
+    let mut member_visitor = MemberHoverVisitor { visitor, offset, hover: None };
     ast.visit(&mut member_visitor);
     member_visitor.hover
 }

@@ -1,0 +1,17 @@
+; leading comment
+TYPE Point ; after type
+INTEGER X ; field comment
+INTEGER Y
+ENDTYPE ; after endtype
+
+INTEGER a
+PROCEDURE P(INTEGER v) ; after signature
+; standalone in body
+PRINTLN v ; trailing
+IF (v>1) THEN ; after then
+; inside if
+PRINTLN "x"
+ELSE ; after else
+PRINTLN "y"
+ENDIF ; after endif
+ENDPROC

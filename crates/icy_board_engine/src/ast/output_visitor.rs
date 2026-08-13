@@ -159,7 +159,9 @@ impl AstVisitor<()> for OutputVisitor {
             self.output(field.get_identifier());
             self.output.push_str(" = ");
             field.get_value().visit(self);
-            if index + 1 < record.get_fields().len() { self.output.push_str(", "); }
+            if index + 1 < record.get_fields().len() {
+                self.output.push_str(", ");
+            }
         }
         self.output.push_str(" }");
     }

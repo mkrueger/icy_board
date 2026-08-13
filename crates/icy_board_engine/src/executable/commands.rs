@@ -346,11 +346,15 @@ impl PPEExpr {
                 vec.push(*id as i16);
             }
             PPEExpr::RecordLiteral(type_id, fields) => {
-                for (_, value) in fields { value.serialize(vec); }
+                for (_, value) in fields {
+                    value.serialize(vec);
+                }
                 vec.push(FuncOpCode::RecordLiteral as i16);
                 vec.push(*type_id as i16);
                 vec.push(fields.len() as i16);
-                for (field_id, _) in fields { vec.push(*field_id as i16); }
+                for (field_id, _) in fields {
+                    vec.push(*field_id as i16);
+                }
             }
             PPEExpr::Member(expr, id) => {
                 expr.serialize(vec);

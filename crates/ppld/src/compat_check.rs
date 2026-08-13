@@ -69,7 +69,9 @@ fn collect_expr_hits(expr: &PPEExpr, hits: &mut Vec<UsageHit>, span_start: usize
             }
         }
         PPEExpr::RecordLiteral(_, fields) => {
-            for (_, value) in fields { collect_expr_hits(value, hits, span_start); }
+            for (_, value) in fields {
+                collect_expr_hits(value, hits, span_start);
+            }
         }
         PPEExpr::Value(_) | PPEExpr::RoutineReference(_) | PPEExpr::Invalid => {}
     }

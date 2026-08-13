@@ -12,9 +12,7 @@ use icy_board_engine::compiler::workspace::Workspace;
 use icy_board_engine::executable::{FUNCTION_DEFINITIONS, FunctionDefinition, LAST_PPE_RUNTIME};
 use icy_board_engine::formatting::FormattingVisitor;
 use icy_board_engine::icy_board::read_data_with_encoding_detection;
-use icy_board_engine::parser::{
-    Encoding, ErrorReporter, UserTypeRegistry, parse_ast, parse_ast_with_predeclared_types, preparse_type_declarations,
-};
+use icy_board_engine::parser::{Encoding, ErrorReporter, UserTypeRegistry, parse_ast, parse_ast_with_predeclared_types, preparse_type_declarations};
 use icy_board_engine::semantic::SemanticVisitor;
 use ppl_language_server::completion::get_completion;
 use ppl_language_server::document_symbol::get_document_symbols;
@@ -346,8 +344,17 @@ impl LanguageServer for Backend {
     }
 
     async fn range_formatting(&self, params: DocumentRangeFormattingParams) -> Result<Option<Vec<TextEdit>>> {
-        // The formatter works on the whole tree, so a range is formatted with it.
-        self.format(&params.text_document.uri)
+        // The formatter reads the whole tree; only what falls into the selection is handed back.
+        let selection = params.range;
+        let Some(edits) = self.format(&params.text_document.uri)? else {
+            return Ok(None);
+        };
+        Ok(Some(
+            edits
+                .into_iter()
+                .filter(|edit| edit.range.start >= selection.start && edit.range.end <= selection.end)
+                .collect(),
+        ))
     }
 
     async fn execute_command(&self, params: ExecuteCommandParams) -> Result<Option<Value>> {
@@ -362,7 +369,13 @@ impl LanguageServer for Backend {
                         self.client.log_message(MessageType::INFO, format!("{}", output)).await;
                     }
                     let out_file: String = self.workspace.lock().unwrap().package.name().to_string();
-                    let target_file = self.workspace.lock().unwrap().target_path(LAST_PPE_RUNTIME).join(out_file).with_extension("ppe");
+                    let target_file = self
+                        .workspace
+                        .lock()
+                        .unwrap()
+                        .target_path(LAST_PPE_RUNTIME)
+                        .join(out_file)
+                        .with_extension("ppe");
                     self.client.log_message(MessageType::INFO, format!("Execute:{}", target_file.display())).await;
 
                     let shell = env::var("SHELL").unwrap_or("sh".to_string());
@@ -428,14 +441,7 @@ impl Backend {
 
                 let mut asts = Vec::new();
                 for (file, content) in sources {
-                    let ast = parse_ast_with_predeclared_types(
-                        file.clone(),
-                        errors.clone(),
-                        &content,
-                        &registry,
-                        Encoding::Utf8,
-                        &ws,
-                    );
+                    let ast = parse_ast_with_predeclared_types(file.clone(), errors.clone(), &content, &registry, Encoding::Utf8, &ws);
                     asts.push(ast);
                 }
 
@@ -492,14 +498,7 @@ impl Backend {
 
                 let mut asts = Vec::new();
                 for (file, cur_uri, content) in sources {
-                    let ast = parse_ast_with_predeclared_types(
-                        file,
-                        errors.clone(),
-                        &content,
-                        &registry,
-                        Encoding::Utf8,
-                        &workspace,
-                    );
+                    let ast = parse_ast_with_predeclared_types(file, errors.clone(), &content, &registry, Encoding::Utf8, &workspace);
                     asts.push((cur_uri, ast));
                 }
 

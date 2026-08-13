@@ -1,0 +1,6 @@
+INTEGER a, b(10), c = 3
+STRING x, y
+INTEGER grid(5, 5)
+INTEGER list = { 1, 2 }
+INTEGER d = 4
+INTEGER empty = {}

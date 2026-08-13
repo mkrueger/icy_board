@@ -453,10 +453,10 @@ ENDPROC
 
 #[test]
 fn test_a_record_variable_can_be_initialized_from_another_record() {
-        assert_eq!(
-                "4/9",
-                run_ppl(
-                        r#"
+    assert_eq!(
+        "4/9",
+        run_ppl(
+            r#"
 TYPE Rec
     INTEGER v
 ENDTYPE
@@ -466,16 +466,16 @@ Rec copy = source
 copy.v = 9
 PRINT source.v, "/", copy.v
 "#
-                )
-        );
+        )
+    );
 }
 
 #[test]
 fn test_a_var_parameter_can_write_back_to_a_record_array_element() {
-        assert_eq!(
-                "8",
-                run_ppl(
-                        r#"
+    assert_eq!(
+        "8",
+        run_ppl(
+            r#"
 TYPE Rec
     INTEGER v
 ENDTYPE
@@ -487,16 +487,16 @@ PROCEDURE Change(VAR Rec value)
     value.v = 8
 ENDPROC
 "#
-                )
-        );
+        )
+    );
 }
 
 #[test]
 fn test_records_compare_by_their_fields() {
-        assert_eq!(
-                "equal different",
-                run_ppl(
-                        r#"
+    assert_eq!(
+        "equal different",
+        run_ppl(
+            r#"
 TYPE Rec
     INTEGER v
     STRING s
@@ -511,16 +511,16 @@ IF first = second PRINT "equal"
 second.v = 2
 IF first <> second PRINT " different"
 "#
-                )
-        );
+        )
+    );
 }
 
 #[test]
 fn test_nested_records_compare_by_their_fields() {
-        assert_eq!(
-                "equal different",
-                run_ppl(
-                        r#"
+    assert_eq!(
+        "equal different",
+        run_ppl(
+            r#"
 TYPE Inner
     INTEGER v
 ENDTYPE
@@ -535,6 +535,6 @@ IF first = second PRINT "equal"
 second.value.v = 2
 IF first <> second PRINT " different"
 "#
-                )
-        );
+        )
+    );
 }

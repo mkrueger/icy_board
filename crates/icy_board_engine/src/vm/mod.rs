@@ -412,7 +412,9 @@ impl<'a> VirtualMachine<'a> {
             PPEExpr::Value(id) | PPEExpr::RoutineReference(id) => Ok(self.variable_table.get_value(*id).clone()),
             PPEExpr::RecordLiteral(type_id, fields) => {
                 let mut value = crate::executable::create_record_value(*type_id, &self.user_types).ok_or(VMError::InternalVMError)?;
-                let GenericVariableData::Record(values) = &mut value.generic_data else { return Err(VMError::InternalVMError.into()); };
+                let GenericVariableData::Record(values) = &mut value.generic_data else {
+                    return Err(VMError::InternalVMError.into());
+                };
                 for (field_id, expression) in fields {
                     let field_type = values.get(*field_id).ok_or(VMError::InvalidMemberId(*type_id, *field_id))?.vtype;
                     values[*field_id] = self.eval_expr(expression).await?.convert_to(field_type);

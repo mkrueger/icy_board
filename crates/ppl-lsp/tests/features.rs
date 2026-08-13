@@ -104,7 +104,10 @@ fn hover_over_an_array_shows_its_bounds() {
 #[test]
 fn hover_over_a_routine_shows_its_signature() {
     assert_eq!(hover(SOURCE, "Show(\"done\")"), Some("```PPL\nPROCEDURE Show(STRING text)\n```".to_string()));
-    assert_eq!(hover(SOURCE, "Total(INTEGER v)"), Some("```PPL\nFUNCTION Total(INTEGER v) INTEGER\n```".to_string()));
+    assert_eq!(
+        hover(SOURCE, "Total(INTEGER v)"),
+        Some("```PPL\nFUNCTION Total(INTEGER v) INTEGER\n```".to_string())
+    );
 }
 
 #[test]

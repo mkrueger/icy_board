@@ -332,11 +332,15 @@ impl PPEDeserializer {
                     let field_count = executable.script_buffer[self.offset] as usize;
                     self.offset += 1;
                     let field_ids: Vec<usize> = executable.script_buffer[self.offset..self.offset + field_count]
-                        .iter().map(|id| *id as usize).collect();
+                        .iter()
+                        .map(|id| *id as usize)
+                        .collect();
                     self.offset += field_count;
                     let mut values = Vec::with_capacity(field_count);
                     for field_id in field_ids.into_iter().rev() {
-                        let Some(value) = self.pop_expr() else { return Err(DeserializationErrorType::ExpressionStackEmpty); };
+                        let Some(value) = self.pop_expr() else {
+                            return Err(DeserializationErrorType::ExpressionStackEmpty);
+                        };
                         values.push((field_id, value));
                     }
                     values.reverse();
