@@ -65,6 +65,9 @@ pub enum CompilationErrorType {
     #[error("Operator {0} is not defined for custom types")]
     CustomTypeOperatorNotSupported(crate::ast::BinOp),
 
+    #[error("Can't compare {0} with {1}")]
+    ComparisonTypeMismatch(VariableType, VariableType),
+
     #[error("Unused variable ({0})")]
     UnusedVariable(String),
 

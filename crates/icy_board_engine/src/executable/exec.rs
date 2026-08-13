@@ -4,7 +4,10 @@ use crossterm::execute;
 use crossterm::style::{Attribute, Print, SetAttribute};
 use thiserror::Error;
 
-use crate::Res;
+use crate::{
+    Res,
+    parser::{FIRST_USER_TYPE_ID, MAX_TYPE_FIELDS, MAX_USER_TYPES, is_user_declared_type},
+};
 use crate::crypt::{decode_rle, decrypt_chunks, encode_rle};
 use crate::executable::disassembler::DisassembleVisitor;
 
@@ -44,6 +47,21 @@ pub enum ExecutableError {
 
     #[error("Variable id mismatch: {0} != {1}")]
     VariableIdMismatch(usize, i32),
+
+    #[error("Custom types need runtime {0}")]
+    CustomTypesNotSupported(u16),
+
+    #[error("Type count exceeds maximum: {0} ({1})")]
+    TypeCountExceedsMaximum(usize, usize),
+
+    #[error("Type {0} has an invalid field count: {1}")]
+    InvalidTypeFieldCount(usize, usize),
+
+    #[error("Type {0} refers to type {1}, which has not been declared yet")]
+    InvalidTypeReference(usize, u8),
+
+    #[error("Variable refers to type {0}, which is not in the type table")]
+    MissingTypeDefinition(u8),
 }
 
 #[derive(Clone)]
@@ -61,6 +79,37 @@ static PREAMBLE: &[u8] = b"PCBoard Programming Language Executable";
 const HEADER_SIZE: usize = 48;
 
 impl Executable {
+    fn validate_user_types(user_types: &[Vec<VariableType>]) -> Result<(), ExecutableError> {
+        if user_types.len() > MAX_USER_TYPES {
+            return Err(ExecutableError::TypeCountExceedsMaximum(user_types.len(), MAX_USER_TYPES));
+        }
+        for (index, fields) in user_types.iter().enumerate() {
+            let type_id = FIRST_USER_TYPE_ID + index;
+            if fields.is_empty() || fields.len() > MAX_TYPE_FIELDS {
+                return Err(ExecutableError::InvalidTypeFieldCount(type_id, fields.len()));
+            }
+            for field in fields {
+                if let VariableType::UserData(field_type_id) = field {
+                    if is_user_declared_type(*field_type_id) && *field_type_id as usize >= type_id {
+                        return Err(ExecutableError::InvalidTypeReference(type_id, *field_type_id));
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_variable_types(variable_table: &VariableTable, user_types: &[Vec<VariableType>]) -> Result<(), ExecutableError> {
+        for entry in variable_table.get_entries() {
+            if let VariableType::UserData(type_id) = entry.header.variable_type {
+                if is_user_declared_type(type_id) && type_id as usize - FIRST_USER_TYPE_ID >= user_types.len() {
+                    return Err(ExecutableError::MissingTypeDefinition(type_id));
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// .
     ///
     /// # Examples
@@ -79,6 +128,9 @@ impl Executable {
     ///
     /// This function will return an error if .
     pub fn from_buffer(buffer: &mut [u8], print_header_information: bool) -> Res<Executable> {
+        if buffer.len() < HEADER_SIZE {
+            return Err(Box::new(ExecutableError::BufferTooShort(buffer.len())));
+        }
         if !buffer.starts_with(PREAMBLE) {
             return Err(Box::new(ExecutableError::InvalidPPEFile));
         }
@@ -92,21 +144,41 @@ impl Executable {
         let (mut i, mut variable_table) = VariableTable::deserialize(version, buffer)?;
         let mut user_types = Vec::new();
         if version >= FIRST_TYPE_TABLE_RUNTIME {
-            let type_count = buffer[i] as usize;
+            let Some(&type_count) = buffer.get(i) else {
+                return Err(Box::new(ExecutableError::BufferTooShort(buffer.len())));
+            };
+            let type_count = type_count as usize;
             i += 1;
+            if type_count > MAX_USER_TYPES {
+                return Err(Box::new(ExecutableError::TypeCountExceedsMaximum(type_count, MAX_USER_TYPES)));
+            }
             for _ in 0..type_count {
-                let field_count = buffer[i] as usize;
+                let Some(&field_count) = buffer.get(i) else {
+                    return Err(Box::new(ExecutableError::BufferTooShort(buffer.len())));
+                };
+                let field_count = field_count as usize;
                 i += 1;
-                let mut fields = Vec::with_capacity(field_count);
-                for _ in 0..field_count {
-                    fields.push(VariableType::from(buffer[i]));
-                    i += 1;
+                if field_count == 0 {
+                    return Err(Box::new(ExecutableError::InvalidTypeFieldCount(FIRST_USER_TYPE_ID + user_types.len(), 0)));
                 }
+                let Some(field_bytes) = buffer.get(i..i + field_count) else {
+                    return Err(Box::new(ExecutableError::BufferTooShort(buffer.len())));
+                };
+                let mut fields = Vec::with_capacity(field_count);
+                for field in field_bytes {
+                    fields.push(VariableType::from(*field));
+                }
+                i += field_count;
                 user_types.push(fields);
             }
+            Self::validate_user_types(&user_types)?;
+            Self::validate_variable_types(&variable_table, &user_types)?;
             variable_table.fill_in_records(&user_types);
         }
-        let code_size = u16::from_le_bytes(buffer[i..=(i + 1)].try_into()?) as usize;
+        let Some(code_size_bytes) = buffer.get(i..i + 2) else {
+            return Err(Box::new(ExecutableError::BufferTooShort(buffer.len())));
+        };
+        let code_size = u16::from_le_bytes(code_size_bytes.try_into()?) as usize;
         i += 2;
         let real_size = buffer.len() - i;
         if print_header_information {
@@ -178,6 +250,11 @@ impl Executable {
         if self.runtime > LAST_PPLC {
             return Err(ExecutableError::UnsupporrtedVersion(self.runtime));
         }
+        if !self.user_types.is_empty() && self.runtime < FIRST_TYPE_TABLE_RUNTIME {
+            return Err(ExecutableError::CustomTypesNotSupported(FIRST_TYPE_TABLE_RUNTIME));
+        }
+        Self::validate_user_types(&self.user_types)?;
+        Self::validate_variable_types(&self.variable_table, &self.user_types)?;
         let mut buffer = Vec::new();
         buffer.extend_from_slice(PREAMBLE);
         buffer.push(b' ');

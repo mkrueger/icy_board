@@ -9,7 +9,7 @@ use icy_board_engine::{
         PPECompiler,
         workspace::{CompilerData, Package, Workspace},
     },
-    executable::LAST_PPLC,
+    executable::{LAST_PPLC, SUPPORTED_PPE_VERSIONS},
     formatting::{FormattingVisitor, StringFormattingBackend},
     icy_board::read_with_encoding_detection,
     parser::{Encoding, ErrorReporter, UserTypeRegistry, load_with_encoding, parse_ast},
@@ -83,9 +83,8 @@ fn main() {
     println!("PPLC v{} - PCBoard Programming Language Compiler", *VERSION);
 
     if let Some(version) = arguments.runtime {
-        let valid_versions: Vec<u16> = vec![100, 200, 300, 310, 320, 330, 340, 400, 401];
-        if !valid_versions.contains(&version) {
-            println!("Invalid version number valid values {valid_versions:?}");
+        if !SUPPORTED_PPE_VERSIONS.contains(&version) {
+            println!("Invalid version number valid values {SUPPORTED_PPE_VERSIONS:?}");
             return;
         }
     }

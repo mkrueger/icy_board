@@ -1207,6 +1207,12 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             );
         }
         if has_custom_type && matches!(binary.get_op(), crate::ast::BinOp::Eq | crate::ast::BinOp::NotEq) {
+            if left != right {
+                self.errors.lock().unwrap().report_error(
+                    binary.get_op_token().span.clone(),
+                    CompilationErrorType::ComparisonTypeMismatch(left, right),
+                );
+            }
             VariableType::Boolean
         } else {
             VariableType::None

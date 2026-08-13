@@ -5,8 +5,8 @@ use std::{
 
 use icy_board_engine::{
     compiler::{PPECompiler, workspace::Workspace},
-    executable::{Executable, FIRST_TYPE_TABLE_RUNTIME, GenericVariableData, VariableType},
-    parser::{Encoding, ErrorReporter, MAX_TYPE_FIELDS, UserTypeRegistry, parse_ast},
+    executable::{Executable, ExecutableError, FIRST_TYPE_TABLE_RUNTIME, GenericVariableData, TableEntry, VariableType},
+    parser::{Encoding, ErrorReporter, MAX_TYPE_FIELDS, MAX_USER_TYPES, UserTypeRegistry, parse_ast},
 };
 
 fn compile(source: &str) -> Executable {
@@ -87,7 +87,7 @@ fn loading_a_ppe_rebuilds_nested_record_defaults() {
 }
 
 #[test]
-fn a_runtime_before_400_does_not_gain_a_custom_type_section() {
+fn a_runtime_before_401_does_not_gain_a_custom_type_section() {
     let executable = Executable {
         runtime: 340,
         ..Executable::default()
@@ -157,4 +157,88 @@ fn a_record_past_the_byte_limit_is_rejected() {
 
     let errors = diagnostics(&source);
     assert_eq!(vec![format!("No room for another field, {MAX_TYPE_FIELDS} is the most a type may hold")], errors);
+}
+
+#[test]
+fn the_serializer_rejects_custom_types_before_runtime_401() {
+    let executable = Executable {
+        runtime: 400,
+        user_types: vec![vec![VariableType::Integer]],
+        ..Executable::default()
+    };
+    assert_eq!(ExecutableError::CustomTypesNotSupported(FIRST_TYPE_TABLE_RUNTIME), executable.to_buffer().unwrap_err());
+}
+
+#[test]
+fn the_serializer_rejects_counts_that_do_not_fit_the_format() {
+    let too_many_types = Executable {
+        user_types: vec![vec![VariableType::Integer]; MAX_USER_TYPES + 1],
+        ..Executable::default()
+    };
+    assert_eq!(
+        ExecutableError::TypeCountExceedsMaximum(MAX_USER_TYPES + 1, MAX_USER_TYPES),
+        too_many_types.to_buffer().unwrap_err()
+    );
+
+    let too_many_fields = Executable {
+        user_types: vec![vec![VariableType::Integer; MAX_TYPE_FIELDS + 1]],
+        ..Executable::default()
+    };
+    assert_eq!(
+        ExecutableError::InvalidTypeFieldCount(100, MAX_TYPE_FIELDS + 1),
+        too_many_fields.to_buffer().unwrap_err()
+    );
+}
+
+#[test]
+fn the_serializer_rejects_recursive_or_forward_type_references() {
+    let self_reference = Executable {
+        user_types: vec![vec![VariableType::UserData(100)]],
+        ..Executable::default()
+    };
+    assert_eq!(ExecutableError::InvalidTypeReference(100, 100), self_reference.to_buffer().unwrap_err());
+
+    let forward_reference = Executable {
+        user_types: vec![vec![VariableType::UserData(101)], vec![VariableType::Integer]],
+        ..Executable::default()
+    };
+    assert_eq!(ExecutableError::InvalidTypeReference(100, 101), forward_reference.to_buffer().unwrap_err());
+}
+
+#[test]
+fn the_serializer_rejects_a_variable_whose_type_is_missing() {
+    let mut executable = Executable::default();
+    let mut entry = TableEntry::default();
+    entry.header.id = 1;
+    entry.header.variable_type = VariableType::UserData(100);
+    executable.variable_table.push(entry);
+
+    assert_eq!(ExecutableError::MissingTypeDefinition(100), executable.to_buffer().unwrap_err());
+}
+
+#[test]
+fn the_loader_rejects_a_recursive_type_table() {
+    let executable = Executable {
+        user_types: vec![vec![VariableType::Integer]],
+        ..Executable::default()
+    };
+    let mut bytes = executable.to_buffer().unwrap();
+    // Header (48), empty variable table count (2), type count, field count, field type.
+    bytes[52] = 100;
+    assert!(matches!(
+        Executable::from_buffer(&mut bytes, false),
+        Err(error) if error.to_string() == "Type 100 refers to type 100, which has not been declared yet"
+    ));
+}
+
+#[test]
+fn the_loader_rejects_a_truncated_type_table() {
+    let executable = Executable::default();
+    let mut bytes = executable.to_buffer().unwrap();
+    bytes[50] = 1;
+    bytes.truncate(51);
+    assert!(matches!(
+        Executable::from_buffer(&mut bytes, false),
+        Err(error) if error.to_string().starts_with("Buffer too short")
+    ));
 }

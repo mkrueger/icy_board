@@ -15,7 +15,7 @@ Features:
 
 * Both compiler & decompiler is DONE. I would say it's better than everything we had back in the 90'.
 Everything that doesn't work is a bug - please report issues.
-* The decompiler should be able to decompile any existing PPE file and trick out the anti decompiliation tricks that were common these days :). Note that it's not designed to decompile the new 400 PPEs.
+* The decompiler should be able to decompile existing PPE files, including 4.x files with custom types, and handle the anti-decompilation tricks that were common in the 90s.
 * Compiler should be able to parse a PPS and generate running PPE files
   - There are slight differences to PPLC - the new one is more strict. Issues should be easy fixable
   - Be prepared for tons of warnings of non trivial .PPS files. The old PPLC hasn't had much error checks. In doubt I added a warning instead.
@@ -303,10 +303,10 @@ whatever is passed.
 ### Language version 400
 
 400 is where the language stops being bound by what PCBoard 15.4 could express.
-A PPE built at runtime 400 will not load on an original PCBoard.
+A PPE built at runtime 400 or 401 will not load on an original PCBoard.
 
-> **400 is not finished.** The PPE format is still allowed to change, so expect
-> to recompile against the final release.
+Runtime 400 introduced the IcyBoard-only format. Runtime 401 adds the type table
+needed by custom types while keeping 4.00 files readable.
 
 #### Parentheses, brackets and braces
 

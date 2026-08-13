@@ -131,6 +131,20 @@ fn equality_and_inequality_are_defined_for_records() {
 }
 
 #[test]
+fn a_record_cannot_be_compared_with_a_scalar() {
+    let errors = diagnostics("TYPE Rec\n  INTEGER v\nENDTYPE\nRec item\nIF item = 1 PRINT \"equal\"\n");
+    assert!(errors.iter().any(|e| e == "Can't compare UserData(100) with Integer"), "{errors:?}");
+}
+
+#[test]
+fn records_of_different_types_cannot_be_compared() {
+    let errors = diagnostics(
+        "TYPE First\n  INTEGER v\nENDTYPE\nTYPE Second\n  INTEGER v\nENDTYPE\nFirst firstRecord\nSecond secondRecord\nIF firstRecord = secondRecord PRINT \"equal\"\n",
+    );
+    assert!(errors.iter().any(|e| e == "Can't compare UserData(100) with UserData(101)"), "{errors:?}");
+}
+
+#[test]
 fn a_member_on_something_that_is_not_an_object_is_reported() {
     let errors = diagnostics("INTEGER i\nPRINTLN i.Name\n");
     assert!(errors.iter().any(|e| e == "Member not found"), "{errors:?}");
