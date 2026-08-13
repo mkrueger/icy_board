@@ -1,4 +1,4 @@
-# PPL for VS Code
+# IcyBoard PPL
 
 Editor support for the PCBoard Programming Language: syntax highlighting,
 completion, signature help, hover, document symbols and formatting for `.pps`,

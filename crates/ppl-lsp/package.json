@@ -1,13 +1,16 @@
 {
-	"name": "ppl-language-server",
-	"displayName": "PPL - PCBoard Programming Language",
-	"description": "PCBoard Programming Language server",
+	"name": "icyboard-ppl",
+	"displayName": "IcyBoard PPL",
+	"description": "Language support for the PCBoard Programming Language",
 	"license": "MIT",
 	"version": "0.2.0",
 	"categories": [
 		"Programming Languages"
 	],
 	"keywords": [
+		"icyboard",
+		"pcboard",
+		"ppl",
 		"language-server",
 		"tower-lsp"
 	],
@@ -36,7 +39,7 @@
 		],
 		"configuration": {
 			"type": "object",
-			"title": "ppl-language-server",
+			"title": "IcyBoard PPL",
 			"properties": {
 				"ppl.serverPath": {
 					"type": "string",
@@ -182,7 +185,7 @@
 		"commands": [
 			{
 				"command": "ppl-lsp-vscode.run",
-				"title": "PPL: Run PPE in IcyBoard"
+				"title": "IcyBoard PPL: Run PPE"
 			}
 		]
 	},

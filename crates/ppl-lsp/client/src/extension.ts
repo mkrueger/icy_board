@@ -74,7 +74,7 @@ export async function activate(context: vscode.ExtensionContext) {
     traceOutputChannel,
   };
   // Create the language client and start the client.
-  client = new LanguageClient("ppl-language-server", "ppl language server", serverOptions, clientOptions);
+  client = new LanguageClient("ppl-language-server", "IcyBoard PPL language server", serverOptions, clientOptions);
   // activateInlayHints(context);
   try {
     await client.start();

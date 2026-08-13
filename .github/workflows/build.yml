@@ -221,8 +221,7 @@ jobs:
    - name: 'Upload zip'
      uses: actions/upload-artifact@v4
      with:
-       name: ppl-language-server-${{ env.VERSION }}.vsix
-       # vsce names the file after the extension version, which is not the workspace version.
+       name: icyboard-ppl-${{ env.VERSION }}-vsix
        path: crates/ppl-lsp/*.vsix
        if-no-files-found: error
 
