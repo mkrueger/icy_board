@@ -20,6 +20,7 @@ Every PPL source in the IcyBoard repository parses without an error; the
 | `queries/locals.scm` | Scopes, definitions and references |
 | `queries/folds.scm` | Foldable regions |
 | `queries/indents.scm` | Indentation |
+| `queries/textobjects.scm` | Text objects |
 | `test/corpus/` | Parser tests |
 
 ## Building
@@ -65,6 +66,7 @@ scope = "source.ppl"
 file-types = ["pps"]
 comment-token = ";"
 indent = { tab-width = 4, unit = "    " }
+roots = ["ppl.toml"]
 
 [[grammar]]
 name = "ppl"
@@ -74,6 +76,35 @@ source = { git = "https://github.com/mkrueger/icy_board", subpath = "crates/tree
 Then `hx --grammar fetch && hx --grammar build` and copy `queries/` to
 `~/.config/helix/runtime/queries/ppl/`.
 
+To work on the grammar itself, point Helix at this directory instead and build
+the parser by hand, which saves fetching every other grammar:
+
+```toml
+[[grammar]]
+name = "ppl"
+source = { path = "/path/to/icy_board/crates/tree-sitter-ppl" }
+```
+
+```bash
+mkdir -p ~/.config/helix/runtime/grammars
+cc -shared -fPIC -O1 -I src src/parser.c -o ~/.config/helix/runtime/grammars/ppl.so
+ln -sfn "$PWD/queries" ~/.config/helix/runtime/queries/ppl
+```
+
+The symbolic link keeps the queries live, so only the parser has to be rebuilt
+after a change to `grammar.js`. `hx --health ppl` says what Helix found.
+
+The language server is a separate binary; add it to the same `[[language]]`:
+
+```toml
+[language-server.ppl-lsp]
+command = "/path/to/icy_board/target/release/ppl-language-server"
+
+[[language]]
+name = "ppl"
+language-servers = ["ppl-lsp"]
+```
+
 ## Rust
 
 ```rust
@@ -82,8 +113,8 @@ parser.set_language(&tree_sitter_ppl::LANGUAGE.into())?;
 let tree = parser.parse(source, None).unwrap();
 ```
 
-`HIGHLIGHTS_QUERY`, `LOCALS_QUERY`, `FOLDS_QUERY` and `INDENTS_QUERY` carry the
-query files.
+`HIGHLIGHTS_QUERY`, `LOCALS_QUERY`, `FOLDS_QUERY`, `INDENTS_QUERY` and
+`TEXTOBJECTS_QUERY` carry the query files.
 
 ## What the grammar cannot know
 

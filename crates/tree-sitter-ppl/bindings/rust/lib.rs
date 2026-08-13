@@ -38,6 +38,7 @@ pub const HIGHLIGHTS_QUERY: &str = include_str!("../../queries/highlights.scm");
 pub const LOCALS_QUERY: &str = include_str!("../../queries/locals.scm");
 pub const FOLDS_QUERY: &str = include_str!("../../queries/folds.scm");
 pub const INDENTS_QUERY: &str = include_str!("../../queries/indents.scm");
+pub const TEXTOBJECTS_QUERY: &str = include_str!("../../queries/textobjects.scm");
 
 #[cfg(test)]
 mod tests {
@@ -57,6 +58,7 @@ mod tests {
             ("locals", super::LOCALS_QUERY),
             ("folds", super::FOLDS_QUERY),
             ("indents", super::INDENTS_QUERY),
+            ("textobjects", super::TEXTOBJECTS_QUERY),
         ] {
             tree_sitter::Query::new(&language, source).unwrap_or_else(|e| panic!("{name}.scm: {e}"));
         }
