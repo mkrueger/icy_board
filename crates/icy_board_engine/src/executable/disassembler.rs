@@ -153,6 +153,15 @@ impl<'a> PPEVisitor<()> for DisassembleVisitor<'a> {
             Print("]"),
         );
     }
+    fn visit_record_literal(&mut self, type_id: u8, fields: &[(usize, PPEExpr)]) {
+        let _ = execute!(stdout(), Print(format!("TYPE{type_id} {{ ")));
+        for (index, (field_id, value)) in fields.iter().enumerate() {
+            let _ = execute!(stdout(), Print(format!("FIELD{field_id} = ")));
+            value.visit(self);
+            if index + 1 < fields.len() { let _ = execute!(stdout(), Print(", ")); }
+        }
+        let _ = execute!(stdout(), Print(" }"));
+    }
 
     fn visit_member(&mut self, expr: &PPEExpr, id: usize) -> () {
         expr.visit(self);

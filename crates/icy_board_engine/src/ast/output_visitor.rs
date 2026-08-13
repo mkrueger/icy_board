@@ -152,6 +152,18 @@ impl AstVisitor<()> for OutputVisitor {
         self.output(&format!(".{}", member_ref.get_identifier()));
     }
 
+    fn visit_record_literal_expression(&mut self, record: &super::RecordLiteralExpression) {
+        self.output(&record.get_type_token().token.to_string());
+        self.output.push_str(" { ");
+        for (index, field) in record.get_fields().iter().enumerate() {
+            self.output(field.get_identifier());
+            self.output.push_str(" = ");
+            field.get_value().visit(self);
+            if index + 1 < record.get_fields().len() { self.output.push_str(", "); }
+        }
+        self.output.push_str(" }");
+    }
+
     fn visit_constant_expression(&mut self, constant: &super::ConstantExpression) {
         match constant.get_constant_value() {
             super::Constant::Builtin(b) => {

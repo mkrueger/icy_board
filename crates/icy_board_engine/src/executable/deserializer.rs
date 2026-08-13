@@ -325,6 +325,24 @@ impl PPEDeserializer {
                     self.push_expr(PPEExpr::RoutineReference(routine_id));
                     continue;
                 }
+                if id == FuncOpCode::RecordLiteral as i16 {
+                    self.offset += 1;
+                    let type_id = executable.script_buffer[self.offset] as u8;
+                    self.offset += 1;
+                    let field_count = executable.script_buffer[self.offset] as usize;
+                    self.offset += 1;
+                    let field_ids: Vec<usize> = executable.script_buffer[self.offset..self.offset + field_count]
+                        .iter().map(|id| *id as usize).collect();
+                    self.offset += field_count;
+                    let mut values = Vec::with_capacity(field_count);
+                    for field_id in field_ids.into_iter().rev() {
+                        let Some(value) = self.pop_expr() else { return Err(DeserializationErrorType::ExpressionStackEmpty); };
+                        values.push((field_id, value));
+                    }
+                    values.reverse();
+                    self.push_expr(PPEExpr::RecordLiteral(type_id, values));
+                    continue;
+                }
                 if id == FuncOpCode::MemberReference as i16 {
                     let expr = self.pop_expr().unwrap();
                     self.offset += 1;

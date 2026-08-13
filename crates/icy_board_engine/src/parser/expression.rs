@@ -2,8 +2,9 @@ use super::{Parser, lexer::Token};
 use crate::{
     ast::{
         ArrayInitializerExpression, BinaryExpression, ConstantExpression, Expression, FunctionCallExpression, IdentifierExpression, IndexerExpression,
-        MemberReferenceExpression, ParensExpression, UnaryExpression,
+        MemberReferenceExpression, ParensExpression, RecordLiteralExpression, RecordLiteralField, UnaryExpression,
     },
+    executable::VariableType,
     parser::ParserErrorType,
 };
 
@@ -202,7 +203,49 @@ impl<'a> Parser<'a> {
             }
             Token::Identifier(_id) => {
                 let identifier_token = self.save_spanned_token();
+                let variable_type = self.get_variable_type();
                 self.next_token();
+                if self.lang_version >= 400 && self.get_cur_token() == Some(Token::LBrace) {
+                    if let Some(VariableType::UserData(type_id)) = variable_type {
+                        if crate::parser::is_user_declared_type(type_id) {
+                            let lbrace_token = self.save_spanned_token();
+                            self.next_token();
+                            let mut fields = Vec::new();
+                            self.skip_eol_and_comments();
+                            while self.get_cur_token() != Some(Token::RBrace) {
+                                let Some(Token::Identifier(_)) = self.get_cur_token() else {
+                                    self.report_error(self.save_token_span(), ParserErrorType::IdentifierExpected(self.save_token()));
+                                    return None;
+                                };
+                                let field_token = self.save_spanned_token();
+                                self.next_token();
+                                if self.get_cur_token() != Some(Token::Eq) {
+                                    self.report_error(self.save_token_span(), ParserErrorType::InvalidToken(self.save_token()));
+                                    return None;
+                                }
+                                self.next_token();
+                                let Some(value) = self.parse_expression() else {
+                                    self.report_error(self.save_token_span(), ParserErrorType::ExpressionExpected(self.save_token()));
+                                    return None;
+                                };
+                                fields.push(RecordLiteralField::new(field_token, value));
+                                self.skip_eol_and_comments();
+                                if self.get_cur_token() == Some(Token::Comma) {
+                                    self.next_token();
+                                    self.skip_eol_and_comments();
+                                } else if self.get_cur_token() != Some(Token::RBrace) {
+                                    self.report_error(self.save_token_span(), ParserErrorType::CommaOrRBraceExpected);
+                                    return None;
+                                }
+                            }
+                            let rbrace_token = self.save_spanned_token();
+                            self.next_token();
+                            return Some(Expression::RecordLiteral(RecordLiteralExpression::new(
+                                identifier_token, VariableType::UserData(type_id), lbrace_token, fields, rbrace_token,
+                            )));
+                        }
+                    }
+                }
                 if self.lang_version >= 350 && self.get_cur_token() == Some(Token::LBracket) {
                     let leftpar_token = self.save_spanned_token();
 

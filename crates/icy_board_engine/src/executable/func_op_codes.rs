@@ -309,9 +309,10 @@ pub enum FuncOpCode {
     WebRequest = -295,
     Len_Dim = -296,
     RoutineReference = -297,
+    RecordLiteral = -298,
 }
 
-pub const LAST_FUNC: i16 = -297;
+pub const LAST_FUNC: i16 = -298;
 
 impl FuncOpCode {
     pub fn get_definition(self) -> &'static FunctionDefinition {
@@ -379,7 +380,7 @@ impl FunctionDefinition {
     }
 }
 lazy_static::lazy_static! {
-    pub static ref FUNCTION_DEFINITIONS: [FunctionDefinition; 309] = [
+    pub static ref FUNCTION_DEFINITIONS: [FunctionDefinition; 310] = [
         FunctionDefinition {
             name: "END",
             version: 100,
@@ -3127,6 +3128,15 @@ lazy_static::lazy_static! {
             name: "<routine reference>",
             version: 401,
             opcode: FuncOpCode::RoutineReference,
+            return_type: VariableType::None,
+            args: None,
+            signature: FunctionSignature::Invalid,
+        },
+
+        FunctionDefinition {
+            name: "<record literal>",
+            version: 401,
+            opcode: FuncOpCode::RecordLiteral,
             return_type: VariableType::None,
             args: None,
             signature: FunctionSignature::Invalid,

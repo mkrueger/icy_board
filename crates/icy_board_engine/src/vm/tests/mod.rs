@@ -18,6 +18,7 @@ mod message_base;
 mod nested_records;
 mod ppe_paths;
 mod records;
+mod record_literals;
 mod routine_parameters;
 mod scalars;
 mod tpa;

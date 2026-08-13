@@ -253,3 +253,14 @@ fn board_object_members_keep_their_names() {
     let rebuilt = compile_source(&text, LAST_PPE_RUNTIME).unwrap_or_else(|e| panic!("does not compile again:\n{text}\n{e}"));
     assert_eq!(text, decompile_to_text(rebuilt));
 }
+
+#[test]
+fn record_literals_survive_decompilation() {
+    let source = "TYPE Point\n  INTEGER X\n  INTEGER Y\nENDTYPE\nPoint value = Point { Y = 2, X = 1 }\nPRINTLN value.X, value.Y\n";
+    let executable = compile_source(source, LAST_PPE_RUNTIME).unwrap();
+    let text = decompile_to_text(executable);
+
+    assert!(text.contains("TYPE001 { FIELD002 = 2, FIELD001 = 1 }"), "record literal lost in:\n{text}");
+    let rebuilt = compile_source(&text, LAST_PPE_RUNTIME).unwrap_or_else(|error| panic!("does not compile again:\n{text}\n{error}"));
+    assert_eq!(text, decompile_to_text(rebuilt));
+}

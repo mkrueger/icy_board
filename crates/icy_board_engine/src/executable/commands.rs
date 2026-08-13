@@ -307,6 +307,7 @@ pub enum PPEExpr {
     Invalid,
     Value(usize),
     RoutineReference(usize),
+    RecordLiteral(u8, Vec<(usize, PPEExpr)>),
     Member(Box<PPEExpr>, usize),
     UnaryExpression(UnaryOp, Box<PPEExpr>),
     BinaryExpression(BinOp, Box<PPEExpr>, Box<PPEExpr>),
@@ -343,6 +344,13 @@ impl PPEExpr {
             PPEExpr::RoutineReference(id) => {
                 vec.push(FuncOpCode::RoutineReference as i16);
                 vec.push(*id as i16);
+            }
+            PPEExpr::RecordLiteral(type_id, fields) => {
+                for (_, value) in fields { value.serialize(vec); }
+                vec.push(FuncOpCode::RecordLiteral as i16);
+                vec.push(*type_id as i16);
+                vec.push(fields.len() as i16);
+                for (field_id, _) in fields { vec.push(*field_id as i16); }
             }
             PPEExpr::Member(expr, id) => {
                 expr.serialize(vec);
@@ -399,6 +407,7 @@ impl PPEExpr {
             PPEExpr::Invalid => 0,
             PPEExpr::Value(_) => 2,
             PPEExpr::RoutineReference(_) => 2,
+            PPEExpr::RecordLiteral(_, fields) => fields.iter().map(|(_, value)| value.get_size()).sum::<usize>() + 3 + fields.len(),
             PPEExpr::Member(expr, _) => expr.get_size() + 2,
             PPEExpr::Dim(_, args) => 2 + Self::count_size(args) + args.len(),
             PPEExpr::PredefinedFunctionCall(_, args) => Self::count_size(args) + 1,
@@ -440,6 +449,7 @@ impl PPEExpr {
             PPEExpr::Invalid => panic!("Invalid expression"),
             PPEExpr::Value(id) => visitor.visit_value(*id),
             PPEExpr::RoutineReference(id) => visitor.visit_routine_reference(*id),
+            PPEExpr::RecordLiteral(type_id, fields) => visitor.visit_record_literal(*type_id, fields),
             PPEExpr::Member(expr, id) => visitor.visit_member(expr, *id),
             PPEExpr::UnaryExpression(op, expr) => visitor.visit_unary_expression(*op, expr),
             PPEExpr::BinaryExpression(op, left, right) => visitor.visit_binary_expression(*op, left, right),
@@ -461,6 +471,7 @@ impl PPEExpr {
             PPEExpr::Invalid => panic!("Invalid expression"),
             PPEExpr::Value(id) => visitor.visit_value(*id),
             PPEExpr::RoutineReference(id) => visitor.visit_routine_reference(*id),
+            PPEExpr::RecordLiteral(type_id, fields) => visitor.visit_record_literal(*type_id, fields),
             PPEExpr::Member(expr, id) => visitor.visit_member(expr, *id),
             PPEExpr::UnaryExpression(op, expr) => visitor.visit_unary_expression(*op, expr),
             PPEExpr::BinaryExpression(op, left, right) => visitor.visit_binary_expression(*op, left, right),
@@ -482,6 +493,7 @@ pub trait PPEVisitor<T>: Sized {
     fn visit_routine_reference(&mut self, id: usize) -> T {
         self.visit_value(id)
     }
+    fn visit_record_literal(&mut self, type_id: u8, fields: &[(usize, PPEExpr)]) -> T;
     fn visit_member(&mut self, expr: &PPEExpr, id: usize) -> T;
     fn visit_unary_expression(&mut self, op: UnaryOp, expr: &PPEExpr) -> T;
     fn visit_binary_expression(&mut self, op: BinOp, left: &PPEExpr, right: &PPEExpr) -> T;
@@ -510,6 +522,9 @@ pub trait PPEVisitorMut: Sized {
     }
     fn visit_routine_reference(&mut self, id: usize) -> PPEExpr {
         PPEExpr::RoutineReference(id)
+    }
+    fn visit_record_literal(&mut self, type_id: u8, fields: &[(usize, PPEExpr)]) -> PPEExpr {
+        PPEExpr::RecordLiteral(type_id, fields.iter().map(|(id, value)| (*id, value.visit_mut(self))).collect())
     }
     fn visit_member(&mut self, expr: &PPEExpr, id: usize) -> PPEExpr {
         PPEExpr::Member(Box::new(expr.visit_mut(self)), id)
@@ -551,11 +566,17 @@ pub enum PPEError {
 
     #[error("Only constant expressions are allowed")]
     OnlyConstantsAllowed,
+
+    #[error("A record literal is not a constant expression")]
+    RecordLiteralIsNotConstant,
 }
 
 impl<'a> PPEVisitor<Result<VariableValue, PPEError>> for PPEConstantValueVisitor<'a> {
     fn visit_value(&mut self, id: usize) -> Result<VariableValue, PPEError> {
         Ok(self.executable.variable_table.get_value(id).clone())
+    }
+    fn visit_record_literal(&mut self, _type_id: u8, _fields: &[(usize, PPEExpr)]) -> Result<VariableValue, PPEError> {
+        Err(PPEError::RecordLiteralIsNotConstant)
     }
 
     fn visit_member(&mut self, expr: &PPEExpr, id: usize) -> Result<VariableValue, PPEError> {

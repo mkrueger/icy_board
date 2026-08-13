@@ -168,6 +168,7 @@ pub struct VirtualMachine<'a> {
     pub return_addresses: Vec<ReturnAddress>,
     pub call_local_value_stack: Vec<VariableValue>,
     pub write_back_stack: Vec<PPEExpr>,
+    pub user_types: Vec<Vec<VariableType>>,
 
     pub label_table: HashMap<usize, usize>,
     pub push_pop_stack: Vec<VariableValue>,
@@ -409,6 +410,15 @@ impl<'a> VirtualMachine<'a> {
         match expr {
             PPEExpr::Invalid => Err(VMError::InternalVMError.into()),
             PPEExpr::Value(id) | PPEExpr::RoutineReference(id) => Ok(self.variable_table.get_value(*id).clone()),
+            PPEExpr::RecordLiteral(type_id, fields) => {
+                let mut value = crate::executable::create_record_value(*type_id, &self.user_types).ok_or(VMError::InternalVMError)?;
+                let GenericVariableData::Record(values) = &mut value.generic_data else { return Err(VMError::InternalVMError.into()); };
+                for (field_id, expression) in fields {
+                    let field_type = values.get(*field_id).ok_or(VMError::InvalidMemberId(*type_id, *field_id))?.vtype;
+                    values[*field_id] = self.eval_expr(expression).await?.convert_to(field_type);
+                }
+                Ok(value)
+            }
 
             PPEExpr::Member(base_expr, member_id) => {
                 let val = self.eval_expr(base_expr).await?;
@@ -990,6 +1000,7 @@ pub async fn run<P: AsRef<Path>>(file_name: &P, prg: &Executable, io: &mut dyn P
                 label_table,
                 call_local_value_stack: Vec::new(),
                 write_back_stack: Vec::new(),
+                user_types: prg.user_types.clone(),
                 push_pop_stack: Vec::new(),
                 stored_screen: None,
                 fd_default_in: 0,

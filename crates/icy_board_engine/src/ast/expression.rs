@@ -2,7 +2,7 @@ use std::fmt;
 
 use super::{AstVisitor, AstVisitorMut, Constant, ExpressionDepthVisitor, NegateExpressionVisitor};
 use crate::{
-    executable::FuncOpCode,
+    executable::{FuncOpCode, VariableType},
     parser::lexer::{Spanned, Token},
 };
 
@@ -128,6 +128,7 @@ pub enum Expression {
     Unary(UnaryExpression),
     Binary(BinaryExpression),
     MemberReference(MemberReferenceExpression),
+    RecordLiteral(RecordLiteralExpression),
 
     ArrayInitializer(ArrayInitializerExpression),
 }
@@ -137,6 +138,7 @@ impl Expression {
         match self {
             Expression::Identifier(i) => i.get_identifier_token().span.clone(),
             Expression::MemberReference(i) => i.get_expression().get_span().start..i.get_identifier_token().span.end,
+            Expression::RecordLiteral(i) => i.get_type_token().span.start..i.get_rbrace_token().span.end,
             Expression::Const(c) => c.get_constant_token().span.clone(),
             Expression::Parens(p) => p.get_lpar_token().span.start..p.get_rpar_token().span.end,
             Expression::FunctionCall(fc) => fc.get_expression().get_span().start..fc.get_rpar_token().span.end,
@@ -151,6 +153,7 @@ impl Expression {
         match self {
             Expression::Identifier(expr) => visitor.visit_identifier_expression(expr),
             Expression::MemberReference(expr) => visitor.visit_member_reference_expression(expr),
+            Expression::RecordLiteral(expr) => visitor.visit_record_literal_expression(expr),
             Expression::Const(expr) => visitor.visit_constant_expression(expr),
             Expression::Parens(expr) => visitor.visit_parens_expression(expr),
             Expression::FunctionCall(expr) => visitor.visit_function_call_expression(expr),
@@ -166,6 +169,7 @@ impl Expression {
         match self {
             Expression::Identifier(expr) => visitor.visit_identifier_expression(expr),
             Expression::MemberReference(expr) => visitor.visit_member_reference_expression(expr),
+            Expression::RecordLiteral(expr) => visitor.visit_record_literal_expression(expr),
             Expression::Const(expr) => visitor.visit_constant_expression(expr),
             Expression::Parens(expr) => visitor.visit_parens_expression(expr),
             Expression::FunctionCall(expr) => visitor.visit_function_call_expression(expr),
@@ -218,6 +222,60 @@ impl Expression {
         let v2_len = variant2.visit(&mut ExpressionDepthVisitor::default());
         if v1_len <= v2_len { variant1 } else { variant2 }
     }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct RecordLiteralField {
+    identifier_token: Spanned<Token>,
+    value: Expression,
+}
+
+impl RecordLiteralField {
+    pub fn new(identifier_token: Spanned<Token>, value: Expression) -> Self {
+        Self { identifier_token, value }
+    }
+
+    pub fn get_identifier_token(&self) -> &Spanned<Token> {
+        &self.identifier_token
+    }
+
+    pub fn get_identifier(&self) -> &unicase::Ascii<String> {
+        let Token::Identifier(identifier) = &self.identifier_token.token else {
+            panic!("Expected identifier token");
+        };
+        identifier
+    }
+
+    pub fn get_value(&self) -> &Expression {
+        &self.value
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct RecordLiteralExpression {
+    type_token: Spanned<Token>,
+    variable_type: VariableType,
+    lbrace_token: Spanned<Token>,
+    fields: Vec<RecordLiteralField>,
+    rbrace_token: Spanned<Token>,
+}
+
+impl RecordLiteralExpression {
+    pub fn new(
+        type_token: Spanned<Token>,
+        variable_type: VariableType,
+        lbrace_token: Spanned<Token>,
+        fields: Vec<RecordLiteralField>,
+        rbrace_token: Spanned<Token>,
+    ) -> Self {
+        Self { type_token, variable_type, lbrace_token, fields, rbrace_token }
+    }
+
+    pub fn get_type_token(&self) -> &Spanned<Token> { &self.type_token }
+    pub fn get_variable_type(&self) -> VariableType { self.variable_type }
+    pub fn get_lbrace_token(&self) -> &Spanned<Token> { &self.lbrace_token }
+    pub fn get_fields(&self) -> &[RecordLiteralField] { &self.fields }
+    pub fn get_rbrace_token(&self) -> &Spanned<Token> { &self.rbrace_token }
 }
 
 impl fmt::Display for Expression {

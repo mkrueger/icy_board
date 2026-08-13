@@ -71,6 +71,18 @@ pub enum CompilationErrorType {
     #[error("Whole arrays of custom types cannot be compared")]
     CustomTypeArrayComparisonNotSupported,
 
+    #[error("Record literal field '{0}' is listed more than once")]
+    DuplicateRecordLiteralField(String),
+
+    #[error("Record type {0} has no field '{1}'")]
+    UnknownRecordLiteralField(VariableType, String),
+
+    #[error("Record field '{0}' expects {1}, got {2}")]
+    RecordLiteralFieldTypeMismatch(String, VariableType, VariableType),
+
+    #[error("Record literals need runtime {0}")]
+    RecordLiteralNeedsRuntime(u16),
+
     #[error("Unused variable ({0})")]
     UnusedVariable(String),
 

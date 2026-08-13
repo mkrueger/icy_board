@@ -382,6 +382,22 @@ impl Decompiler {
                 }
             },
             PPEExpr::RoutineReference(id) => IdentifierExpression::create_empty_expression(self.get_variable_name(*id)),
+            PPEExpr::RecordLiteral(type_id, fields) => {
+                let type_name = self.type_name(*type_id).unwrap_or_else(|| unicase::Ascii::new(format!("TYPE{:03}", *type_id as usize - 99)));
+                let literal_fields = fields.iter().map(|(field_id, value)| {
+                    crate::ast::RecordLiteralField::new(
+                        Spanned::create_empty(Token::Identifier(user_field_name(*field_id))),
+                        self.decompile_expression(value),
+                    )
+                }).collect();
+                Expression::RecordLiteral(crate::ast::RecordLiteralExpression::new(
+                    Spanned::create_empty(Token::Identifier(type_name)),
+                    VariableType::UserData(*type_id),
+                    Spanned::create_empty(Token::LBrace),
+                    literal_fields,
+                    Spanned::create_empty(Token::RBrace),
+                ))
+            }
             PPEExpr::Member(expr, id) => MemberReferenceExpression::create_empty_expression(self.decompile_expression(expr), self.member_name(expr, *id)),
             PPEExpr::MemberFunctionCall(expr, args, id) => {
                 let base = self.decompile_expression(expr);
@@ -754,6 +770,9 @@ impl<'a> PPEVisitor<()> for VariableConstantVisitor<'a> {
     }
 
     fn visit_value(&mut self, _id: usize) -> () {}
+    fn visit_record_literal(&mut self, _type_id: u8, fields: &[(usize, PPEExpr)]) -> () {
+        for (_, value) in fields { value.visit(self); }
+    }
     fn visit_member(&mut self, expr: &PPEExpr, _id: usize) -> () {
         expr.visit(self)
     }

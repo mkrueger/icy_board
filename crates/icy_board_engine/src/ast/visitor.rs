@@ -5,8 +5,8 @@ use super::{
     ContinueStatement, ElseBlock, ElseIfBlock, Expression, ForStatement, FunctionCallExpression, FunctionDeclarationAstNode, FunctionImplementation,
     GosubStatement, GotoStatement, IdentifierExpression, IfStatement, IfThenStatement, IndexerExpression, LabelStatement, LetStatement, LoopStatement,
     MemberReferenceExpression, ParameterSpecifier, ParensExpression, PredefinedCallStatement, ProcedureCallStatement, ProcedureDeclarationAstNode,
-    ProcedureImplementation, RepeatUntilStatement, ReturnStatement, SelectStatement, Statement, TypeDeclarationAstNode, UnaryExpression,
-    VariableDeclarationStatement, VariableSpecifier, WhileDoStatement, WhileStatement,
+    ProcedureImplementation, RecordLiteralExpression, RepeatUntilStatement, ReturnStatement, SelectStatement, Statement, TypeDeclarationAstNode,
+    UnaryExpression, VariableDeclarationStatement, VariableSpecifier, WhileDoStatement, WhileStatement,
 };
 
 #[allow(unused_variables)]
@@ -31,6 +31,10 @@ pub trait AstVisitor<T: Default>: Sized {
     }
     fn visit_array_expression(&mut self, array_expr: &ArrayInitializerExpression) -> T {
         walk_array_expression(self, array_expr);
+        T::default()
+    }
+    fn visit_record_literal_expression(&mut self, record: &RecordLiteralExpression) -> T {
+        for field in record.get_fields() { field.get_value().visit(self); }
         T::default()
     }
     fn visit_unary_expression(&mut self, unary: &UnaryExpression) -> T {
@@ -407,6 +411,9 @@ pub trait AstVisitorMut: Sized {
         Expression::ArrayInitializer(ArrayInitializerExpression::empty(
             array_expr.get_expressions().iter().map(|arg| arg.visit_mut(self)).collect(),
         ))
+    }
+    fn visit_record_literal_expression(&mut self, record: &RecordLiteralExpression) -> Expression {
+        Expression::RecordLiteral(record.clone())
     }
 
     fn visit_unary_expression(&mut self, unary: &UnaryExpression) -> Expression {

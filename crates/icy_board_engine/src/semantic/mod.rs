@@ -14,8 +14,9 @@ use crate::{
     },
     compiler::{CompilationErrorType, CompilationWarningType, user_data::UserDataMemberRegistry, workspace::Workspace},
     executable::{
-        EntryType, FIRST_ROUTINE_REFERENCE_RUNTIME, FIRST_TYPE_TABLE_RUNTIME, FUNCTION_DEFINITIONS, FuncOpCode, FunctionDefinition, FunctionValue,
-        GenericVariableData, OpCode, ProcedureValue, TableEntry, USER_VARIABLES, VarHeader, VariableData, VariableTable, VariableType, VariableValue,
+        EntryType, FIRST_RECORD_LITERAL_RUNTIME, FIRST_ROUTINE_REFERENCE_RUNTIME, FIRST_TYPE_TABLE_RUNTIME, FUNCTION_DEFINITIONS, FuncOpCode,
+        FunctionDefinition, FunctionValue, GenericVariableData, OpCode, ProcedureValue, TableEntry, USER_VARIABLES, VarHeader, VariableData, VariableTable,
+        VariableType, VariableValue,
     },
     parser::{
         self, ErrorReporter, ParserErrorType, UserTypeRegistry,
@@ -1257,6 +1258,49 @@ impl SemanticVisitor {
 }
 
 impl AstVisitor<VariableType> for SemanticVisitor {
+    fn visit_record_literal_expression(&mut self, record: &crate::ast::RecordLiteralExpression) -> VariableType {
+        if self.runtime < FIRST_RECORD_LITERAL_RUNTIME {
+            self.errors.lock().unwrap().report_error(
+                record.get_type_token().span.clone(),
+                CompilationErrorType::RecordLiteralNeedsRuntime(FIRST_RECORD_LITERAL_RUNTIME),
+            );
+        }
+        let VariableType::UserData(type_id) = record.get_variable_type() else {
+            return VariableType::None;
+        };
+        let Some(definition) = self.type_registry.get_user_type_from_id(type_id) else {
+            return VariableType::None;
+        };
+        let mut seen = HashSet::new();
+        for field in record.get_fields() {
+            let name = field.get_identifier();
+            if !seen.insert(name.clone()) {
+                self.errors.lock().unwrap().report_error(
+                    field.get_identifier_token().span.clone(),
+                    CompilationErrorType::DuplicateRecordLiteralField(name.to_string()),
+                );
+                continue;
+            }
+            let Some(index) = definition.field_index(name) else {
+                self.errors.lock().unwrap().report_error(
+                    field.get_identifier_token().span.clone(),
+                    CompilationErrorType::UnknownRecordLiteralField(record.get_variable_type(), name.to_string()),
+                );
+                field.get_value().visit(self);
+                continue;
+            };
+            let expected = definition.field_type(index).unwrap_or(VariableType::None);
+            let actual = field.get_value().visit(self);
+            if expected != actual && (matches!(expected, VariableType::UserData(_)) || matches!(actual, VariableType::UserData(_))) {
+                self.errors.lock().unwrap().report_error(
+                    field.get_value().get_span(),
+                    CompilationErrorType::RecordLiteralFieldTypeMismatch(name.to_string(), expected, actual),
+                );
+            }
+        }
+        record.get_variable_type()
+    }
+
     fn visit_binary_expression(&mut self, binary: &crate::ast::BinaryExpression) -> VariableType {
         let left = binary.get_left_expression().visit(self);
         let right = binary.get_right_expression().visit(self);

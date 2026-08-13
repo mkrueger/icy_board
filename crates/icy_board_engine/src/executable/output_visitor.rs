@@ -49,6 +49,15 @@ impl PPEVisitor<()> for PPEOutputVisitor {
             self.output.push_str(format!("[{:04X}]", id).as_str());
         };
     }
+    fn visit_record_literal(&mut self, type_id: u8, fields: &[(usize, PPEExpr)]) {
+        self.output.push_str(&format!("TYPE{type_id} {{ "));
+        for (index, (field_id, value)) in fields.iter().enumerate() {
+            self.output.push_str(&format!("FIELD{field_id} = "));
+            value.visit(self);
+            if index + 1 < fields.len() { self.output.push_str(", "); }
+        }
+        self.output.push_str(" }");
+    }
 
     fn visit_member(&mut self, expr: &PPEExpr, id: usize) -> () {
         expr.visit(self);

@@ -45,6 +45,8 @@ pub const FIRST_TYPE_TABLE_RUNTIME: u16 = 401;
 
 pub const FIRST_ROUTINE_REFERENCE_RUNTIME: u16 = 401;
 
+pub const FIRST_RECORD_LITERAL_RUNTIME: u16 = 401;
+
 #[derive(Clone, Debug, Default)]
 pub struct VariableNameGenerator {
     _version: u16,

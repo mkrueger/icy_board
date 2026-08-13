@@ -487,6 +487,19 @@ members[0].Home.Town = "Kiel"
 members[1].Home.Town = "Hamburg"
 ```
 
+A named record literal creates a value without temporary field assignments.
+Fields may appear in any order; omitted fields keep their empty value:
+
+```PPL
+Point origin = Point { X = 0, Y = 0 }
+Point vertical = Point { Y = 10 }
+RETURN Point { X = source.X + 1, Y = source.Y }
+```
+
+Unknown and duplicate fields are errors. A field holding another record requires
+the exact nominal type. Record literals need runtime 401; the PPE stores type and
+field ids rather than their source names.
+
 The reverse shape - an array as one field of a record - is not supported yet.
 `INTEGER Values(10)` inside a `TYPE` block is rejected explicitly because the
 current PPE type table stores each field's type but not its dimensions.
