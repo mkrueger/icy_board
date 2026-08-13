@@ -1,25 +1,17 @@
-; filepath: crates/tree-sitter-ppl/queries/folds.scm
-(function_implementation
-  (_) @fold
-  (#set! role region))
-(procedure_implementation
-  (_) @fold
-  (#set! role region))
-(block_statement
-  (_) @fold
-  (#set! role region))
-(if_block_statement
-  (_) @fold
-  (#set! role region))
-(select_statement
-  (_) @fold
-  (#set! role region))
-(loop_block_statement
-  (_) @fold
-  (#set! role region))
-(while_block_statement
-  (_) @fold
-  (#set! role region))
-(for_block_statement
-  (_) @fold
-  (#set! role region))
+; Foldable regions.
+
+[
+  (function_definition)
+  (procedure_definition)
+  (type_declaration)
+  (if_block)
+  (elseif_clause)
+  (else_clause)
+  (while_block)
+  (repeat_statement)
+  (loop_statement)
+  (for_statement)
+  (select_statement)
+  (case_clause)
+  (default_clause)
+] @fold

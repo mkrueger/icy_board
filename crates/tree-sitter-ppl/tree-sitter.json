@@ -7,9 +7,7 @@
       "title": "PCBoard Programming Language",
       "scope": "source.ppl",
       "file-types": [
-        "pps",
-        "ppd",
-        "ppx"
+        "pps"
       ],
       "injection-regex": "^ppl$",
       "class-name": "TreeSitterPcboard"

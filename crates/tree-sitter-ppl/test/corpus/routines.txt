@@ -1,0 +1,131 @@
+================================================================================
+Declarations
+================================================================================
+
+DECLARE PROCEDURE Show(INTEGER value)
+DECLARE FUNCTION Total(VAR INTEGER value, STRING name) INTEGER
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (procedure_declaration
+    name: (identifier)
+    (parameter_list
+      (parameter
+        type: (builtin_type)
+        name: (identifier))))
+  (function_declaration
+    name: (identifier)
+    (parameter_list
+      (parameter
+        type: (builtin_type)
+        name: (identifier))
+      (parameter
+        type: (builtin_type)
+        name: (identifier)))
+    return_type: (builtin_type)))
+
+================================================================================
+Implementations
+================================================================================
+
+PROCEDURE Show(STRING text)
+    PRINTLN text
+ENDPROC
+
+FUNCTION Total(INTEGER v) INTEGER
+    RETURN v + 1
+ENDFUNC
+
+FUNCTION Empty() INTEGER
+    Empty = 0
+    RETURN
+END FUNC
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (procedure_definition
+    name: (identifier)
+    (parameter_list
+      (parameter
+        type: (builtin_type)
+        name: (identifier)))
+    body: (predefined_call
+      name: (builtin_statement)
+      argument: (identifier)))
+  (function_definition
+    name: (identifier)
+    (parameter_list
+      (parameter
+        type: (builtin_type)
+        name: (identifier)))
+    return_type: (builtin_type)
+    body: (return_statement
+      value: (binary_expression
+        left: (identifier)
+        right: (constant
+          (number_literal)))))
+  (function_definition
+    name: (identifier)
+    (parameter_list)
+    return_type: (builtin_type)
+    body: (assignment_statement
+      left: (identifier)
+      right: (constant
+        (number_literal)))
+    body: (return_statement)))
+
+================================================================================
+Array parameters
+================================================================================
+
+PROCEDURE Fill(VAR INTEGER values(10))
+ENDPROC
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (procedure_definition
+    name: (identifier)
+    (parameter_list
+      (parameter
+        type: (builtin_type)
+        name: (identifier)
+        (dimensions
+          (constant
+            (number_literal)))))))
+
+================================================================================
+Routines as parameters
+================================================================================
+
+PROCEDURE PrintHello(PROCEDURE f())
+    f()
+ENDPROC
+
+PROCEDURE Apply(FUNCTION f(INTEGER a) INTEGER)
+ENDPROC
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (procedure_definition
+    name: (identifier)
+    (parameter_list
+      (procedure_parameter
+        name: (identifier)
+        (parameter_list)))
+    body: (procedure_call
+      name: (identifier)
+      (argument_list)))
+  (procedure_definition
+    name: (identifier)
+    (parameter_list
+      (function_parameter
+        name: (identifier)
+        (parameter_list
+          (parameter
+            type: (builtin_type)
+            name: (identifier)))
+        return_type: (builtin_type)))))

@@ -1,0 +1,159 @@
+================================================================================
+TYPE declaration
+================================================================================
+
+TYPE Employee
+    STRING  Name
+    INTEGER Age, Level
+ENDTYPE
+
+TYPE Member
+    Address Home
+END TYPE
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (type_declaration
+    name: (identifier)
+    (field_declaration
+      type: (builtin_type)
+      name: (identifier))
+    (field_declaration
+      type: (builtin_type)
+      name: (identifier)
+      name: (identifier)))
+  (type_declaration
+    name: (identifier)
+    (field_declaration
+      type: (type_identifier)
+      name: (identifier))))
+
+================================================================================
+Record variables and fields
+================================================================================
+
+Employee e
+Member members(10)
+e.Age += 1
+members[0].Home.Town = "Kiel"
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (variable_declaration
+    type: (type_identifier)
+    (variable_declarator
+      name: (identifier)))
+  (variable_declaration
+    type: (type_identifier)
+    (variable_declarator
+      name: (identifier)
+      (dimensions
+        (constant
+          (number_literal)))))
+  (assignment_statement
+    left: (member_access
+      object: (identifier)
+      member: (identifier))
+    right: (constant
+      (number_literal)))
+  (assignment_statement
+    left: (member_access
+      object: (member_access
+        object: (index_expression
+          array: (identifier)
+          index: (constant
+            (number_literal)))
+        member: (identifier))
+      member: (identifier))
+    right: (constant
+      (string_literal))))
+
+================================================================================
+Record literals
+================================================================================
+
+Point origin = Point { X = 0, Y = 0 }
+Point vertical = Point { Y = 10 }
+p = Point { X = source.X + 1 }
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (variable_declaration
+    type: (type_identifier)
+    (variable_declarator
+      name: (identifier)
+      value: (record_literal
+        type: (type_identifier)
+        (record_literal_field
+          name: (identifier)
+          value: (constant
+            (number_literal)))
+        (record_literal_field
+          name: (identifier)
+          value: (constant
+            (number_literal))))))
+  (variable_declaration
+    type: (type_identifier)
+    (variable_declarator
+      name: (identifier)
+      value: (record_literal
+        type: (type_identifier)
+        (record_literal_field
+          name: (identifier)
+          value: (constant
+            (number_literal))))))
+  (assignment_statement
+    left: (identifier)
+    right: (record_literal
+      type: (type_identifier)
+      (record_literal_field
+        name: (identifier)
+        value: (binary_expression
+          left: (member_access
+            object: (identifier)
+            member: (identifier))
+          right: (constant
+            (number_literal)))))))
+
+================================================================================
+Board objects
+================================================================================
+
+CONFERENCE conf = CONFINFO(CURCONF())
+DOOR item = conf.GetDoor(0)
+IF item.HasAccess() PRINTLN item.Name
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (variable_declaration
+    type: (builtin_type)
+    (variable_declarator
+      name: (identifier)
+      value: (call_expression
+        function: (identifier)
+        argument: (call_expression
+          function: (identifier)))))
+  (variable_declaration
+    type: (builtin_type)
+    (variable_declarator
+      name: (identifier)
+      value: (call_expression
+        function: (member_access
+          object: (identifier)
+          member: (identifier))
+        argument: (constant
+          (number_literal)))))
+  (if_statement
+    condition: (call_expression
+      function: (member_access
+        object: (identifier)
+        member: (identifier)))
+    consequence: (predefined_call
+      name: (builtin_statement)
+      argument: (member_access
+        object: (identifier)
+        member: (identifier)))))

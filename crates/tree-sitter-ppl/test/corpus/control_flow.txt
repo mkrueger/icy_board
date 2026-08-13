@@ -1,0 +1,247 @@
+================================================================================
+IF on one line
+================================================================================
+
+IF (A <> B) PRINTLN "differs"
+IF A <> B PRINTLN "differs"
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (if_statement
+    condition: (parenthesized_expression
+      (binary_expression
+        left: (identifier)
+        right: (identifier)))
+    consequence: (predefined_call
+      name: (builtin_statement)
+      argument: (constant
+        (string_literal))))
+  (if_statement
+    condition: (binary_expression
+      left: (identifier)
+      right: (identifier))
+    consequence: (predefined_call
+      name: (builtin_statement)
+      argument: (constant
+        (string_literal)))))
+
+================================================================================
+IF block with ELSEIF and ELSE
+================================================================================
+
+IF A THEN
+    PRINTLN "a"
+ELSEIF B THEN
+    PRINTLN "b"
+ELSE IF C THEN
+    PRINTLN "c"
+ELSE
+    PRINTLN "d"
+ENDIF
+
+IF A THEN
+    PRINTLN "a"
+END IF
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (if_block
+    condition: (identifier)
+    consequence: (predefined_call
+      name: (builtin_statement)
+      argument: (constant
+        (string_literal)))
+    (elseif_clause
+      condition: (identifier)
+      consequence: (predefined_call
+        name: (builtin_statement)
+        argument: (constant
+          (string_literal))))
+    (elseif_clause
+      condition: (identifier)
+      consequence: (predefined_call
+        name: (builtin_statement)
+        argument: (constant
+          (string_literal))))
+    (else_clause
+      body: (predefined_call
+        name: (builtin_statement)
+        argument: (constant
+          (string_literal)))))
+  (if_block
+    condition: (identifier)
+    consequence: (predefined_call
+      name: (builtin_statement)
+      argument: (constant
+        (string_literal)))))
+
+================================================================================
+WHILE
+================================================================================
+
+WHILE IsValid() PRINTLN "ok"
+
+WHILE (i < 10) DO
+    i += 1
+ENDWHILE
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (while_statement
+    condition: (call_expression
+      function: (identifier))
+    body: (predefined_call
+      name: (builtin_statement)
+      argument: (constant
+        (string_literal))))
+  (while_block
+    condition: (parenthesized_expression
+      (binary_expression
+        left: (identifier)
+        right: (constant
+          (number_literal))))
+    body: (assignment_statement
+      left: (identifier)
+      right: (constant
+        (number_literal)))))
+
+================================================================================
+REPEAT and LOOP
+================================================================================
+
+REPEAT
+    n += 1
+UNTIL n >= 3
+
+LOOP
+    n *= 2
+    IF n > 10 BREAK
+ENDLOOP
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (repeat_statement
+    body: (assignment_statement
+      left: (identifier)
+      right: (constant
+        (number_literal)))
+    condition: (binary_expression
+      left: (identifier)
+      right: (constant
+        (number_literal))))
+  (loop_statement
+    body: (assignment_statement
+      left: (identifier)
+      right: (constant
+        (number_literal)))
+    body: (if_statement
+      condition: (binary_expression
+        left: (identifier)
+        right: (constant
+          (number_literal)))
+      consequence: (break_statement))))
+
+================================================================================
+FOR
+================================================================================
+
+FOR i = 0 TO 10
+    PRINTLN i
+NEXT
+
+FOR i = 10 TO 0 STEP -1
+    PRINTLN i
+NEXT i
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (for_statement
+    variable: (identifier)
+    start: (constant
+      (number_literal))
+    end: (constant
+      (number_literal))
+    body: (predefined_call
+      name: (builtin_statement)
+      argument: (identifier)))
+  (for_statement
+    variable: (identifier)
+    start: (constant
+      (number_literal))
+    end: (constant
+      (number_literal))
+    step: (unary_expression
+      operand: (constant
+        (number_literal)))
+    body: (predefined_call
+      name: (builtin_statement)
+      argument: (identifier))
+    variable_end: (identifier)))
+
+================================================================================
+SELECT CASE
+================================================================================
+
+SELECT CASE key
+    CASE "A", "B"
+        PRINTLN "letter"
+    CASE 1 .. 9
+        PRINTLN "digit"
+    CASE ELSE
+        PRINTLN "other"
+ENDSELECT
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (select_statement
+    value: (identifier)
+    (case_clause
+      (case_label
+        (constant
+          (string_literal)))
+      (case_label
+        (constant
+          (string_literal)))
+      body: (predefined_call
+        name: (builtin_statement)
+        argument: (constant
+          (string_literal))))
+    (case_clause
+      (case_label
+        (constant
+          (number_literal))
+        (constant
+          (number_literal)))
+      body: (predefined_call
+        name: (builtin_statement)
+        argument: (constant
+          (string_literal))))
+    (default_clause
+      body: (predefined_call
+        name: (builtin_statement)
+        argument: (constant
+          (string_literal))))))
+
+================================================================================
+BEGIN and END frame the main body
+================================================================================
+
+BEGIN
+    PRINTLN "hello"
+END
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (begin_statement)
+  (predefined_call
+    name: (builtin_statement)
+    argument: (constant
+      (string_literal)))
+  (end_statement))

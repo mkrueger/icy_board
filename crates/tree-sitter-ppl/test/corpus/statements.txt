@@ -1,0 +1,196 @@
+================================================================================
+Variable declarations
+================================================================================
+
+INTEGER count
+STRING name, greeting
+INTEGER values(10)
+INTEGER list = { 1, 2, 3 }
+STRING greeting2 = "Hello"
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (variable_declaration
+    type: (builtin_type)
+    (variable_declarator
+      name: (identifier)))
+  (variable_declaration
+    type: (builtin_type)
+    (variable_declarator
+      name: (identifier))
+    (variable_declarator
+      name: (identifier)))
+  (variable_declaration
+    type: (builtin_type)
+    (variable_declarator
+      name: (identifier)
+      (dimensions
+        (constant
+          (number_literal)))))
+  (variable_declaration
+    type: (builtin_type)
+    (variable_declarator
+      name: (identifier)
+      value: (array_initializer
+        (constant
+          (number_literal))
+        (constant
+          (number_literal))
+        (constant
+          (number_literal)))))
+  (variable_declaration
+    type: (builtin_type)
+    (variable_declarator
+      name: (identifier)
+      value: (constant
+        (string_literal)))))
+
+================================================================================
+Assignments
+================================================================================
+
+count = 1
+LET count = 2
+count += 1
+values[0] = 5
+values(0) = 5
+e.Age = 42
+e.Home.Town = "Kiel"
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (constant
+      (number_literal)))
+  (assignment_statement
+    left: (identifier)
+    right: (constant
+      (number_literal)))
+  (assignment_statement
+    left: (identifier)
+    right: (constant
+      (number_literal)))
+  (assignment_statement
+    left: (index_expression
+      array: (identifier)
+      index: (constant
+        (number_literal)))
+    right: (constant
+      (number_literal)))
+  (assignment_statement
+    left: (call_expression
+      function: (identifier)
+      argument: (constant
+        (number_literal)))
+    right: (constant
+      (number_literal)))
+  (assignment_statement
+    left: (member_access
+      object: (identifier)
+      member: (identifier))
+    right: (constant
+      (number_literal)))
+  (assignment_statement
+    left: (member_access
+      object: (member_access
+        object: (identifier)
+        member: (identifier))
+      member: (identifier))
+    right: (constant
+      (string_literal))))
+
+================================================================================
+A variable may carry the name of a built-in statement
+================================================================================
+
+INTEGER color
+color = 5
+PRINTLN color, ""
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (variable_declaration
+    type: (builtin_type)
+    (variable_declarator
+      name: (identifier)))
+  (assignment_statement
+    left: (identifier)
+    right: (constant
+      (number_literal)))
+  (predefined_call
+    name: (builtin_statement)
+    argument: (identifier)
+    argument: (constant
+      (string_literal))))
+
+================================================================================
+Built-in statements
+================================================================================
+
+CLS
+PRINTLN "Hello ", name
+ANSIPOS 1, 1
+PRINTLN
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (predefined_call
+    name: (builtin_statement))
+  (predefined_call
+    name: (builtin_statement)
+    argument: (constant
+      (string_literal))
+    argument: (identifier))
+  (predefined_call
+    name: (builtin_statement)
+    argument: (constant
+      (number_literal))
+    argument: (constant
+      (number_literal)))
+  (predefined_call
+    name: (builtin_statement)))
+
+================================================================================
+Procedure calls
+================================================================================
+
+PrintHello()
+Show(1, "a")
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (procedure_call
+    name: (identifier)
+    (argument_list))
+  (procedure_call
+    name: (identifier)
+    (argument_list
+      argument: (constant
+        (number_literal))
+      argument: (constant
+        (string_literal)))))
+
+================================================================================
+Labels and jumps
+================================================================================
+
+:START
+GOTO START
+GOSUB HELPER
+END
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (label)
+  (goto_statement
+    label: (identifier))
+  (gosub_statement
+    label: (identifier))
+  (end_statement))

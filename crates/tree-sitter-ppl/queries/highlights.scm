@@ -1,132 +1,178 @@
-; filepath: /home/mkrueger/work/icy_board/crates/tree-sitter-ppl/queries/highlights.scm
-; -------- Literals --------
-(string_literal)            @string
-(number_literal)            @number
-(int_number)                @number
-(float_number)              @number
-(hex_number)                @number
-(boolean_literal)           @constant.builtin
-(at_color_code)             @constant.character
+; Highlighting for PPL.
+;
+; Capture names follow the nvim-treesitter set; where Helix spells one
+; differently the node carries both names and each editor picks the one it
+; knows.
 
-; -------- Comments --------
-(comment)                   @comment
+; ---------- Comments ----------
+(comment) @comment @comment.line
 
-; -------- Types --------
-; Since types are now aliased tokens, we need to match them explicitly
+; ---------- Literals ----------
+(string_literal) @string
+(number_literal) @number @constant.numeric
+(money_literal) @number @constant.numeric
+(color_code) @character.special @constant.character.escape
+(boolean_literal) @boolean @constant.builtin.boolean
+(builtin_constant) @constant.builtin
+
+; ---------- Types ----------
+(builtin_type) @type.builtin
+(type_identifier) @type
+
+; ---------- Declarations ----------
+(type_declaration name: (identifier) @type)
+(field_declaration name: (identifier) @variable.member @variable.other.member)
+
+(function_declaration name: (identifier) @function)
+(function_definition name: (identifier) @function)
+(procedure_declaration name: (identifier) @function)
+(procedure_definition name: (identifier) @function)
+(function_parameter name: (identifier) @variable.parameter)
+(procedure_parameter name: (identifier) @variable.parameter)
+(parameter name: (identifier) @variable.parameter)
+
+(variable_declaration
+  (variable_declarator name: (identifier) @variable))
+
+; ---------- Calls ----------
+(builtin_statement) @function.builtin
+(procedure_call name: (identifier) @function.call)
+(call_expression function: (identifier) @function.call)
+(call_expression
+  function: (member_access member: (identifier) @function.method.call))
+
+; ---------- Members ----------
+(member_access member: (identifier) @variable.member @variable.other.member)
+(record_literal_field name: (identifier) @variable.member @variable.other.member)
+
+; ---------- Loop variables and labels ----------
+(for_statement variable: (identifier) @variable)
+(for_statement variable_end: (identifier) @variable)
+(label) @label
+(goto_statement label: (identifier) @label)
+(gosub_statement label: (identifier) @label)
+
+; ---------- Preprocessor ----------
 [
-  "BOOLEAN" "DATE" "DDATE" "INTEGER" "SDWORD"
-  "LONG" "MONEY" "STRING" "TIME"
-  "BIGSTR" "EDATE" "REAL" "FLOAT" "DREAL"
-  "DOUBLE" "UNSIGNED" "DWORD" "UDWORD"
-  "BYTE" "UBYTE" "WORD" "UWORD" "SBYTE"
-  "SHORT" "SWORD" "INT" "MSGAREAID" "PASSWORD"
-] @type.builtin
-
-; Highlight types in variable declarations
-(variable_declaration type: (_) @type.builtin)
-
-; Highlight types in parameters
-(parameter type: (_) @type.builtin)
-
-; Highlight return types in function declarations
-(function_declaration return_type: (_) @type.builtin)
-(function_implementation return_type: (_) @type.builtin)
-
-; -------- Structural / block keywords (literal tokens) --------
-[
-  "IF" "ELSEIF" "ELSE" "ENDIF" "THEN"
-  "WHILE" "ENDWHILE" "DO"
-  "REPEAT" "UNTIL"
-  "LOOP" "ENDLOOP"
-  "FOR" "NEXT" "STEP" "TO"
-  "SELECT" "CASE" "DEFAULT" "ENDSELECT"
-  "FUNCTION" "ENDFUNC"
-  "PROCEDURE" "ENDPROC"
-  "DECLARE"
-  "BEGIN" "END"
-  "LET" "VAR"
-  "GOTO" "GOSUB"
-  "RETURN"  "STOP"
-] @keyword.control
-
-; -------- Preprocessor directives --------
-(define_directive)        @keyword.directive
-(undef_directive)         @keyword.directive
-(include_directive)       @keyword.directive
-(if_directive)            @keyword.directive
-(elif_directive)          @keyword.directive
-(else_directive)          @keyword.directive
-(endif_directive)         @keyword.directive
-(version_directive)       @keyword.directive
+  ";$DEFINE"
+  ";$IF"
+  ";$ELSEIF"
+  ";$ELSE"
+  ";$ENDIF"
+  ";$USEFUNCS"
+] @keyword.directive @preproc
 
 (define_directive name: (identifier) @constant.macro)
-(undef_directive  name: (identifier) @constant.macro)
-(version_directive key: (identifier) @property)
-(include_directive path: (string_literal) @string.special)
+(substitution) @constant.macro
 
-; -------- Function / procedure declarations --------
-(function_declaration        name: (identifier) @function)
-(function_implementation     name: (identifier) @function)
-(procedure_declaration       name: (identifier) @function.method)
-(procedure_implementation    name: (identifier) @function.method)
-
-; -------- Builtin functions / statements --------
-; Since builtins are now aliased tokens, match them by their token names
-(builtin_function)           @function.builtin
-(builtin_statement)          @function.builtin
-
-(predefined_call
-  name: (builtin_statement)  @function.builtin)
-
-(call_expression
-  function: (builtin_function) @function.builtin)
-
-(call_expression
-  function: (identifier)     @function.call)
-
-; -------- Variables / parameters / labels --------
-(variable_declaration name: (identifier) @variable)
-(parameter           name: (identifier) @variable.parameter)
-
-(for_block_statement var: (identifier) @variable)
-(label name: (identifier) @label)
-
-; -------- Member / property access --------
-(member_reference member: (identifier) @property)
-
-; -------- Control-flow statements (node-based) --------
-(return_statement)    @keyword.return
-(break_statement)     @keyword
-(continue_statement)  @keyword
-(end_statement)       @keyword
-(stop_statement)      @keyword
-(goto_statement)      @keyword
-(gosub_statement)     @keyword
-
-; -------- Operators --------
+; ---------- Keywords ----------
 [
-  "=" "+=" "-=" "*=" "/=" "%=" "&=" "|="
-  "==" "!=" "<>" "<" ">" "<=" ">="
-  "+" "-" "*" "/" "%" "^" "**"
-  "&&" "||" "&" "|" "!" "NOT"
+  "IF"
+  "THEN"
+  "ELSE"
+  "ELSEIF"
+  "ENDIF"
+  "SELECT"
+  "CASE"
+  "DEFAULT"
+  "ENDSELECT"
+] @keyword.conditional @keyword.control.conditional
+
+[
+  "WHILE"
+  "DO"
+  "ENDWHILE"
+  "REPEAT"
+  "UNTIL"
+  "LOOP"
+  "ENDLOOP"
+  "FOR"
+  "TO"
+  "STEP"
+  "NEXT"
+  "ENDFOR"
+  "BREAK"
+  "CONTINUE"
+] @keyword.repeat @keyword.control.repeat
+
+[
+  "GOTO"
+  "GOSUB"
+] @keyword.control @keyword.control.jump
+
+"RETURN" @keyword.return @keyword.control.return
+
+[
+  "DECLARE"
+  "FUNCTION"
+  "PROCEDURE"
+  "ENDFUNC"
+  "ENDFUNCTION"
+  "ENDPROC"
+  "ENDPROCEDURE"
+] @keyword.function
+
+[
+  "TYPE"
+  "ENDTYPE"
+] @keyword.type @keyword.storage.type
+
+[
+  "LET"
+  "VAR"
+  "BEGIN"
+  "END"
+] @keyword
+
+; ---------- Operators ----------
+[
+  "="
+  "+="
+  "-="
+  "*="
+  "/="
+  "%="
+  "&="
+  "|="
+  "=="
+  "!="
+  "<>"
+  "><"
+  "<"
+  "<="
+  "=<"
+  ">"
+  ">="
+  "=>"
+  "+"
+  "-"
+  "*"
+  "/"
+  "%"
+  "^"
+  "&"
+  "&&"
+  "|"
+  "||"
+  "!"
+  ".."
 ] @operator
 
-; -------- Punctuation --------
-; Parentheses
-"(" @punctuation.bracket
-")" @punctuation.bracket
+; ---------- Punctuation ----------
+[
+  "("
+  ")"
+  "["
+  "]"
+  "{"
+  "}"
+] @punctuation.bracket
 
-; Delimiters
-"," @punctuation.delimiter
-":" @punctuation.delimiter
-"." @punctuation.delimiter
-".." @punctuation.delimiter
+[
+  ","
+  "."
+  ":"
+] @punctuation.delimiter
 
-; -------- Builtin boolean / null-ish constants --------
-; These are now proper tokens from boolean_literal
-"TRUE"  @constant.builtin
-"FALSE" @constant.builtin
-
-; -------- Fallback: all other identifiers as variables --------
-; This must come last to have lowest priority
+; ---------- Everything else ----------
 (identifier) @variable

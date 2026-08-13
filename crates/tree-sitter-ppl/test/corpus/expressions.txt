@@ -1,0 +1,252 @@
+================================================================================
+Literals
+================================================================================
+
+INTEGER a = 123
+INTEGER b = 0FFh
+INTEGER c = 130o
+INTEGER d = 1000b
+INTEGER e = 123d
+REAL f = 3.15
+MONEY g = $1.42
+INTEGER h = @X64
+BOOLEAN i = TRUE
+STRING j = "say ""hi"""
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (variable_declaration
+    type: (builtin_type)
+    (variable_declarator
+      name: (identifier)
+      value: (constant
+        (number_literal))))
+  (variable_declaration
+    type: (builtin_type)
+    (variable_declarator
+      name: (identifier)
+      value: (constant
+        (number_literal))))
+  (variable_declaration
+    type: (builtin_type)
+    (variable_declarator
+      name: (identifier)
+      value: (constant
+        (number_literal))))
+  (variable_declaration
+    type: (builtin_type)
+    (variable_declarator
+      name: (identifier)
+      value: (constant
+        (number_literal))))
+  (variable_declaration
+    type: (builtin_type)
+    (variable_declarator
+      name: (identifier)
+      value: (constant
+        (number_literal))))
+  (variable_declaration
+    type: (builtin_type)
+    (variable_declarator
+      name: (identifier)
+      value: (constant
+        (number_literal))))
+  (variable_declaration
+    type: (builtin_type)
+    (variable_declarator
+      name: (identifier)
+      value: (constant
+        (money_literal))))
+  (variable_declaration
+    type: (builtin_type)
+    (variable_declarator
+      name: (identifier)
+      value: (constant
+        (color_code))))
+  (variable_declaration
+    type: (builtin_type)
+    (variable_declarator
+      name: (identifier)
+      value: (constant
+        (boolean_literal))))
+  (variable_declaration
+    type: (builtin_type)
+    (variable_declarator
+      name: (identifier)
+      value: (constant
+        (string_literal)))))
+
+================================================================================
+Operator precedence
+================================================================================
+
+x = 1 + 2 * 3 ^ 4
+y = a < b && c >= d
+z = !a | b
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (constant
+        (number_literal))
+      right: (binary_expression
+        left: (constant
+          (number_literal))
+        right: (binary_expression
+          left: (constant
+            (number_literal))
+          right: (constant
+            (number_literal))))))
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (binary_expression
+        left: (identifier)
+        right: (identifier))
+      right: (binary_expression
+        left: (identifier)
+        right: (identifier))))
+  (assignment_statement
+    left: (identifier)
+    right: (binary_expression
+      left: (unary_expression
+        operand: (identifier))
+      right: (identifier))))
+
+================================================================================
+Calls, indexing and members
+================================================================================
+
+x = Len(values, 0)
+y = values[1]
+z = values(1)
+w = conf.GetDoor(0).Name
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (call_expression
+      function: (identifier)
+      argument: (identifier)
+      argument: (constant
+        (number_literal))))
+  (assignment_statement
+    left: (identifier)
+    right: (index_expression
+      array: (identifier)
+      index: (constant
+        (number_literal))))
+  (assignment_statement
+    left: (identifier)
+    right: (call_expression
+      function: (identifier)
+      argument: (constant
+        (number_literal))))
+  (assignment_statement
+    left: (identifier)
+    right: (member_access
+      object: (call_expression
+        function: (member_access
+          object: (identifier)
+          member: (identifier))
+        argument: (constant
+          (number_literal)))
+      member: (identifier))))
+
+================================================================================
+A function may carry the name of a type or statement
+================================================================================
+
+x = String(a)
+PRINTLN GetToken(), GetToken()
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (assignment_statement
+    left: (identifier)
+    right: (call_expression
+      function: (identifier)
+      argument: (identifier)))
+  (predefined_call
+    name: (builtin_statement)
+    argument: (call_expression
+      function: (identifier))
+    argument: (call_expression
+      function: (identifier))))
+
+================================================================================
+Comments
+================================================================================
+
+; a semicolon comment
+' an apostrophe comment
+PRINTLN "x" ; trailing
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (comment)
+  (comment)
+  (predefined_call
+    name: (builtin_statement)
+    argument: (constant
+      (string_literal)))
+  (comment))
+
+================================================================================
+Preprocessor
+================================================================================
+
+;$DEFINE DEBUG 1
+;$IF RUNTIME <= 340
+    PRINTLN "old"
+;$ELSEIF RUNTIME < 200
+    PRINTLN "older"
+;$ELSE
+    PRINTLN "new"
+;$ENDIF
+PRINTLN "Version:", ;#Version
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (define_directive
+    name: (identifier)
+    value: (constant
+      (number_literal)))
+  (if_directive
+    condition: (binary_expression
+      left: (identifier)
+      right: (constant
+        (number_literal))))
+  (predefined_call
+    name: (builtin_statement)
+    argument: (constant
+      (string_literal)))
+  (elseif_directive
+    condition: (binary_expression
+      left: (identifier)
+      right: (constant
+        (number_literal))))
+  (predefined_call
+    name: (builtin_statement)
+    argument: (constant
+      (string_literal)))
+  (else_directive)
+  (predefined_call
+    name: (builtin_statement)
+    argument: (constant
+      (string_literal)))
+  (endif_directive)
+  (predefined_call
+    name: (builtin_statement)
+    argument: (constant
+      (string_literal))
+    argument: (substitution)))

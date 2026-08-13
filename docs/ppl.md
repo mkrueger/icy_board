@@ -131,6 +131,16 @@ I think it improves the language and it's open for discussion. Note that some al
 * Added ```€``` as valid identifier character. (for UTF8 files)
 * Return type differences in function declaration/implementation is an error, original compiler didn't care.
 
+### Editors
+
+The language server covers editors that speak LSP. Editors that highlight with
+tree-sitter - Neovim, Helix, Zed, Emacs - read the grammar in
+[crates/tree-sitter-ppl](../crates/tree-sitter-ppl/README.md) instead. It parses
+the whole language up to 4.01, including `TYPE`, record literals and routine
+parameters, and ships highlight, locals, fold and indent queries. Its README has
+the setup for Neovim and Helix; the grammar is checked against every `.pps` in
+this repository, so what the compiler reads is what an editor colours.
+
 
 ## The PPL 4.0 language
 

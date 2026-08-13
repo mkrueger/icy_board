@@ -1,18 +1,21 @@
-; filepath: /home/mkrueger/work/icy_board/crates/tree-sitter-ppl/queries/locals.scm
-; Scopes
-(function_implementation) @scope
-(procedure_implementation) @scope
-(block_statement) @scope
-(if_block_statement) @scope
-(for_block_statement) @scope
-(while_block_statement) @scope
+; Scopes, definitions and references for PPL.
 
-; Definitions
-(variable_declaration name: (identifier) @definition.var)
-(parameter name: (identifier) @definition.parameter)
-(function_implementation name: (identifier) @definition.function)
-(procedure_implementation name: (identifier) @definition.function)
-(label name: (identifier) @definition.label)
+(function_definition) @local.scope
+(procedure_definition) @local.scope
 
-; References
-(identifier) @reference
+(parameter name: (identifier) @local.definition.parameter)
+(function_parameter name: (identifier) @local.definition.parameter)
+(procedure_parameter name: (identifier) @local.definition.parameter)
+
+(variable_declarator name: (identifier) @local.definition.var)
+(field_declaration name: (identifier) @local.definition.field)
+
+(type_declaration name: (identifier) @local.definition.type)
+(function_definition name: (identifier) @local.definition.function)
+(procedure_definition name: (identifier) @local.definition.function)
+(function_declaration name: (identifier) @local.definition.function)
+(procedure_declaration name: (identifier) @local.definition.function)
+
+(label) @local.definition.label
+
+(identifier) @local.reference

@@ -34,10 +34,10 @@ pub const NODE_TYPES: &str = include_str!("../../src/node-types.json");
 
 // NOTE: uncomment these to include any queries that this grammar contains:
 
-// pub const HIGHLIGHTS_QUERY: &str = include_str!("../../queries/highlights.scm");
-// pub const INJECTIONS_QUERY: &str = include_str!("../../queries/injections.scm");
-// pub const LOCALS_QUERY: &str = include_str!("../../queries/locals.scm");
-// pub const TAGS_QUERY: &str = include_str!("../../queries/tags.scm");
+pub const HIGHLIGHTS_QUERY: &str = include_str!("../../queries/highlights.scm");
+pub const LOCALS_QUERY: &str = include_str!("../../queries/locals.scm");
+pub const FOLDS_QUERY: &str = include_str!("../../queries/folds.scm");
+pub const INDENTS_QUERY: &str = include_str!("../../queries/indents.scm");
 
 #[cfg(test)]
 mod tests {
@@ -47,5 +47,18 @@ mod tests {
         parser
             .set_language(&super::LANGUAGE.into())
             .expect("Error loading PCBoard Programming Language parser");
+    }
+
+    #[test]
+    fn queries_compile() {
+        let language: tree_sitter::Language = super::LANGUAGE.into();
+        for (name, source) in [
+            ("highlights", super::HIGHLIGHTS_QUERY),
+            ("locals", super::LOCALS_QUERY),
+            ("folds", super::FOLDS_QUERY),
+            ("indents", super::INDENTS_QUERY),
+        ] {
+            tree_sitter::Query::new(&language, source).unwrap_or_else(|e| panic!("{name}.scm: {e}"));
+        }
     }
 }

@@ -44,7 +44,9 @@
 
 After BETA
 
-- [ ] PPL tree-sitter grammar - crates/tree-sitter-ppl has the grammar, ppl-lsp still parses on its own
+- [x] PPL tree-sitter grammar - crates/tree-sitter-ppl parses the whole language up to 4.01 and
+      ships highlight/locals/fold/indent queries, so Neovim, Helix and friends read PPL. ppl-lsp
+      still parses on its own.
 - [ ] PPL web statements/functions
 - [ ] FTN polish (optional): netmail to users, ICBSetup AKA/link editor, AreaFix if needed
 - [ ] Self-service password reset using email

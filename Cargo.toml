@@ -18,6 +18,7 @@ members = [
 	"crates/icbsysmgr",
 	"crates/icbfile",
 	"crates/icbadmin",
+	"crates/tree-sitter-ppl",
 ]
 [workspace.package]
 version = "0.2.0"

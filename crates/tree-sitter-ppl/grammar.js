@@ -1,551 +1,577 @@
 /**
- * PPL (PCBoard Programming Language) Tree-Sitter Grammar
- * Case-insensitive version
+ * PPL (PCBoard Programming Language) grammar for tree-sitter.
  *
- * Notes:
- * - Keywords, types, and builtins are now case-insensitive
- * - Identifiers accept mixed case
- * - Builtin lists aggregated from versions 1.00–4.00 (IcyBoard extensions included where known)
+ * Covers PPL 1.00 - 4.01 as implemented by IcyBoard: the classic PCBoard
+ * statements plus the 3.50 and 4.00 additions (REPEAT/LOOP, brackets, braces,
+ * the dot operator, TYPE ... ENDTYPE, record literals and routine parameters).
+ *
+ * The language is case insensitive, so every keyword is a case insensitive
+ * token. Built-in statements share a single token so that a statement head can
+ * be told apart from a declaration; built-in functions stay plain identifiers
+ * and are recognized in queries/highlights.scm instead.
  */
 
 /// <reference types="tree-sitter-cli/dsl" />
 // @ts-check
 
-// Helper to create case-insensitive regex for keywords
-function ci(keyword) {
+/** Case insensitive pattern for a word. */
+function ci(word) {
   return new RegExp(
-    keyword
+    word
       .split('')
-      .map(char => {
-        if (/[a-zA-Z]/.test(char)) {
-          const lower = char.toLowerCase();
-          const upper = char.toUpperCase();
-          return `[${lower}${upper}]`;
-        }
-        // Handle special regex characters
-        if (/[.*+?^${}()|[\]\\]/.test(char)) {
-          return `\\${char}`;
-        }
-        return char;
+      .map(c => {
+        if (/[a-zA-Z]/.test(c)) return `[${c.toLowerCase()}${c.toUpperCase()}]`;
+        return /[.*+?^${}()|[\]\\]/.test(c) ? `\\${c}` : c;
       })
-      .join('')
+      .join(''),
   );
 }
 
-// Helper for keyword tokens - uses alias to create a consistent token name
-// Types get higher precedence (3) than other keywords (2)
-function kw(keyword, precedence = 2) {
-  return alias(token(prec(precedence, ci(keyword))), keyword.toUpperCase());
+/** A keyword token, named after its upper case spelling. */
+function kw(word) {
+  return alias(token(ci(word)), word.toUpperCase());
 }
 
-// Helper for preprocessor directives (starts with ; or ;$)
-function dir(directive) {
-  return token(ci(directive));
+/** `ENDIF` and `END IF` mean the same thing, and both lex as one token. */
+function endKw(word) {
+  return alias(token(seq(ci('END'), /[ \t]*/, ci(word))), 'END' + word.toUpperCase());
 }
+
+/** `ELSEIF` may also be written `ELSE IF`, `DEFAULT` also `CASE ELSE`. */
+function pairKw(first, second, name) {
+  return alias(token(seq(ci(first), /[ \t]*/, ci(second))), name);
+}
+
+function commaSep1(rule) {
+  return seq(rule, repeat(seq(',', rule)));
+}
+
+function commaSep(rule) {
+  return optional(commaSep1(rule));
+}
+
+// Built-in statements, taken from STATEMENT_DEFINITIONS. Names the grammar
+// handles as keywords (END, IF, LET, GOTO, GOSUB, RETURN, DECLARE, FUNCTION,
+// PROCEDURE) and the internal opcodes (BEGIN, FEND, PCALL, PLACEHOLDER, STATIC)
+// are left out.
+const BUILTIN_STATEMENTS = [
+  'ACCOUNT', 'ADDUSER', 'ADJBYTES', 'ADJDBYTES', 'ADJTBYTES', 'ADJTFILES', 'ADJTUBYTES', 'ADJTIME',
+  'ALIAS', 'ANSIPOS', 'APPEND', 'BACKUP', 'BEEP', 'BITCLEAR', 'BITSET', 'BLT', 'BRAG', 'BROADCAST',
+  'BYE', 'CALL', 'CDCHKOFF', 'CDCHKON', 'CHDIR', 'CHAT', 'CLOSECAP', 'CLREOL', 'CLS', 'COLOR',
+  'COMMAND', 'CONFFLAG', 'CONFINFO', 'CONFUNFLAG', 'COPY',
+  'DADD', 'DAPPEND', 'DBLANK', 'DBOTTOM', 'DCLOSE', 'DCLOSEALL', 'DCREATE', 'DDELETE', 'DFBLANK',
+  'DFCOPY', 'DGET', 'DGO', 'DLOCK', 'DLOCKF', 'DLOCKG', 'DLOCKR', 'DNCLOSE', 'DNCLOSEALL',
+  'DNCREATE', 'DNOPEN', 'DNEW', 'DOPEN', 'DPACK', 'DPUT', 'DRECALL', 'DSEEK', 'DSETALIAS', 'DSKIP',
+  'DTAG', 'DTOP', 'DUNLOCK', 'DBGLEVEL', 'DEC', 'DEFCOLOR', 'DELUSER', 'DELAY', 'DELETE', 'DIR',
+  'DISPFILE', 'DISPSTR', 'DISPTEXT', 'DOINTR', 'DOWNLOAD', 'DTROFF', 'DTRON', 'ERASE', 'EVAL',
+  'FAPPEND', 'FCLOSE', 'FCLOSEALL', 'FCREATE', 'FDGET', 'FDOADDAKA', 'FDOADDORG', 'FDOQADD',
+  'FDOQDEL', 'FDOQMOD', 'FDOWRAKA', 'FDOWRORG', 'FDPUT', 'FDPUTLN', 'FDPUTPAD', 'FDREAD',
+  'FDWRITE', 'FDEFIN', 'FDEFOUT', 'FFLUSH', 'FGET', 'FOPEN', 'FPCLR', 'FPUT', 'FPUTLN', 'FPUTPAD',
+  'FREAD', 'FREALTUSER', 'FREWIND', 'FSEEK', 'FWRITE', 'FLAG', 'FORWARD', 'FRESHLINE',
+  'GETALTUSER', 'GETTOKEN', 'GETUSER', 'GOODBYE', 'GRAFMODE', 'HANGUP', 'INC', 'INPUT', 'INPUTCC',
+  'INPUTDATE', 'INPUTINT', 'INPUTMONEY', 'INPUTSTR', 'INPUTTEXT', 'INPUTTIME', 'INPUTYN', 'JOIN',
+  'KBDFILE', 'KBDFLUSH', 'KBDSTRING', 'KBDSTUFF', 'KBDCHKOFF', 'KBDCHKON', 'KEYFLUSH', 'KILLMSG',
+  'LANG', 'LASTIN', 'LOG', 'MPRINT', 'MPRINTLN', 'MDMFLUSH', 'MESSAGE', 'MKDIR', 'MORE',
+  'MOUSEREG', 'MOVEMSG', 'MSGTOFILE', 'NEWLINE', 'NEWLINES', 'NEWPWD', 'OPTEXT', 'OPENCAP',
+  'PAGEOFF', 'PAGEON', 'POKE', 'POKEB', 'POKEDW', 'POKEW', 'POP', 'PRFOUND', 'PRFOUNDLN', 'PRINT',
+  'PRINTLN', 'PROMPTSTR', 'PUSH', 'PUTALTUSER', 'PUTUSER', 'QUEST', 'QWKLIMITS', 'RDUSYS',
+  'RDUNET', 'REDIM', 'REDIR', 'RECORDUSAGE', 'RENAME', 'RESETDISP', 'RESTSCRN', 'RMDIR', 'SPRINT',
+  'SPRINTLN', 'STOP', 'SAVESCRN', 'SCRFILE', 'SEARCHFIND', 'SEARCHINIT', 'SEARCHSTOP', 'SENDMODEM',
+  'SETBANKBAL', 'SETENV', 'SETLMR', 'SHELL', 'SHORTDESC', 'SHOWOFF', 'SHOWON', 'SORT', 'SOUND',
+  'SOUNDDELAY', 'STACKABORT', 'STARTDISP', 'TPACGET', 'TPACPUT', 'TPACREAD', 'TPACWRITE', 'TPAGET',
+  'TPAPUT', 'TPAREAD', 'TPAWRITE', 'TOKENIZE', 'USELMRS', 'VARADDR', 'VAROFF', 'VARSEG', 'WRUSYS',
+  'WRUNET', 'WRUSYSDOOR', 'WAIT', 'WAITFOR', 'WEBREQUEST',
+];
+
+// Types that may be written in a declaration, plus the read-only board objects.
+const BUILTIN_TYPES = [
+  'BIGSTR', 'BOOLEAN', 'BYTE', 'DATE', 'DDATE', 'DOUBLE', 'DREAL', 'DWORD', 'EDATE', 'FLOAT',
+  'INTEGER', 'INT', 'LONG', 'MONEY', 'MSGAREAID', 'REAL', 'SBYTE', 'SDWORD', 'SHORT', 'STRING',
+  'SWORD', 'TIME', 'UBYTE', 'UDWORD', 'UNSIGNED', 'UWORD', 'WORD',
+  'AREA', 'CONFERENCE', 'DIRECTORY', 'DOOR', 'PASSWORD',
+];
+
+// Built-in constants, taken from BUILTIN_CONSTS. TRUE and FALSE are literals of
+// their own, the names a statement or function already carries are left out.
+const BUILTIN_CONSTANTS = [
+  'ACC_CUR_BAL', 'ACC_MSGREAD', 'ACC_MSGWRITE', 'ACC_STAT', 'ACC_TIME', 'ATTACH_LIM_P',
+  'ATTACH_LIM_U', 'AUTO', 'BELL', 'CHRG_CALL', 'CHRG_CHAT', 'CHRG_DOWNBYTES', 'CHRG_DOWNFILE',
+  'CHRG_MSGCAP', 'CHRG_MSGECHOED', 'CHRG_MSGPRIVATE', 'CHRG_MSGREAD', 'CHRG_MSGWRITE',
+  'CHRG_PEAKTIME', 'CHRG_TIME', 'CMAXMSGS', 'CRC_FILE', 'CRC_STR', 'CRED_SPECIAL', 'CRED_UPBYTES',
+  'CRED_UPFILE', 'CUR_USER', 'DEB_CALL', 'DEB_CHAT', 'DEB_DOWNBYTES', 'DEB_DOWNFILE',
+  'DEB_MSGCAP', 'DEB_MSGECHOED', 'DEB_MSGPRIVATE', 'DEB_MSGREAD', 'DEB_MSGWRITE', 'DEB_SPECIAL',
+  'DEB_TIME', 'DEB_TPU', 'DEFS', 'ECHODOTS', 'ERASELINE', 'FCL', 'FIELDLEN', 'FNS', 'F_EXP',
+  'F_MW', 'F_NET', 'F_REG', 'F_SEL', 'F_SYS', 'GRAPH', 'GUIDE', 'HDR_ACTIVE', 'HDR_BLOCKS',
+  'HDR_DATE', 'HDR_ECHO', 'HDR_FROM', 'HDR_MSGNUM', 'HDR_MSGREF', 'HDR_PWD', 'HDR_REPLY',
+  'HDR_RPLYDATE', 'HDR_RPLYTIME', 'HDR_STATUS', 'HDR_SUBJ', 'HDR_TIME', 'HDR_TO', 'HIGHASCII',
+  'LFAFTER', 'LFBEFORE', 'LOGIT', 'LOGITLEFT', 'MAXMSGS', 'NC', 'NEWBALANCE', 'NOCLEAR',
+  'NO_USER', 'O_RD', 'O_RW', 'O_WR', 'PAY_UPBYTES', 'PAY_UPFILE', 'SEC_DROP', 'SEEK_CUR',
+  'SEEK_END', 'SEEK_SET', 'STACKED', 'START_BAL', 'START_SESSION', 'STK_LIMIT', 'S_DB', 'S_DN',
+  'S_DR', 'S_DW', 'UPCASE', 'WARNLEVEL', 'WORDWRAP', 'YESNO',
+];
+
+const PREC = {
+  OR: 1,
+  COMPARE: 2,
+  ADD: 3,
+  MUL: 4,
+  POW: 5,
+  UNARY: 6,
+  CALL: 7,
+  MEMBER: 8,
+};
 
 module.exports = grammar({
-  name: "ppl",
+  name: 'ppl',
 
-  // Whitespace + comments
-  extras: $ => [
-    /\s+/,
-    $.comment,
-  ],
-
-  // Conflicts - only the essential ones
-  conflicts: $ => [
-    [$.if_single_line_statement, $.if_block_statement],
-    [$.top_level_item, $.statement],
-    [$.array_dimensions, $.argument_sequence],
-  ],
+  extras: $ => [/\s/, $.comment],
 
   word: $ => $.identifier,
 
+  conflicts: $ => [
+    [$._assignment_target, $._expression],
+    [$._assignment_target, $._name_from_keyword],
+    [$.predefined_call, $._name_from_keyword],
+    [$.predefined_call],
+    [$.return_statement],
+    [$.procedure_call, $._expression],
+  ],
+
+  supertypes: $ => [$._statement, $._expression],
+
   rules: {
-    source_file: $ => seq(
-      optional($.preprocessor_section),
-      repeat($.top_level_item),
+    source_file: $ => repeat($._top_level_item),
+
+    _top_level_item: $ => choice(
+      $.type_declaration,
+      $.function_declaration,
+      $.procedure_declaration,
+      $.function_definition,
+      $.procedure_definition,
+      $._statement,
     ),
 
     // ---------- Preprocessor ----------
-    preprocessor_section: $ => repeat1($.preprocessor_directive),
-
-    preprocessor_directive: $ => choice(
+    // Directives are written as comments so that a source using them still
+    // reads as a comment to any older tool.
+    _preprocessor_directive: $ => choice(
       $.define_directive,
-      $.undef_directive,
-      $.include_directive,
       $.if_directive,
-      $.elif_directive,
+      $.elseif_directive,
       $.else_directive,
       $.endif_directive,
-      $.version_directive,
+      $.usefuncs_directive,
     ),
 
     define_directive: $ => prec.right(seq(
-      dir(';$DEFINE'), 
-      field('name', $.identifier), 
-      optional(field('value', $.expression))
+      alias(token(seq(';', ci('$DEFINE'))), ';$DEFINE'),
+      field('name', $.identifier),
+      optional(seq(optional('='), field('value', $._expression))),
     )),
-    undef_directive:   $ => seq(dir(';$UNDEF'), field('name', $.identifier)),
-    include_directive: $ => seq(dir(';$INCLUDE'), field('path', $.string_literal)),
-    if_directive: $ => prec.right(seq(dir(';$IF'), field('cond', $.expression))),
-    elif_directive: $ => prec.right(seq(dir(';$ELIF'), field('cond', $.expression))),
-    else_directive:    $ => dir(';$ELSE'),
-    endif_directive:   $ => dir(';$ENDIF'),
-    version_directive: $ => seq(dir(';#'), field('key', $.identifier), '=', field('value', $.expression)),
 
-    // ---------- Top level ----------
-    top_level_item: $ => choice(
-      $.function_declaration,
-      $.function_implementation,
-      $.procedure_declaration,
-      $.procedure_implementation,
-      $.variable_declaration,
-      $.statement,
-      $.label,
+    if_directive: $ => seq(
+      alias(token(seq(';', ci('$IF'))), ';$IF'),
+      field('condition', $._expression),
     ),
+
+    elseif_directive: $ => seq(
+      alias(token(seq(';', choice(ci('$ELSEIF'), ci('$ELIF')))), ';$ELSEIF'),
+      field('condition', $._expression),
+    ),
+
+    else_directive: $ => alias(token(seq(';', ci('$ELSE'))), ';$ELSE'),
+    endif_directive: $ => alias(token(seq(';', ci('$ENDIF'))), ';$ENDIF'),
+    usefuncs_directive: $ => alias(token(seq(';', ci('$USEFUNCS'), /[^\n]*/)), ';$USEFUNCS'),
+
+    // `;#NAME` is replaced by the value of a preprocessor variable.
+    substitution: $ => token(seq(';#', /[A-Za-z_][A-Za-z0-9_]*/)),
 
     // ---------- Declarations ----------
-    function_declaration: $ => seq(
-      kw('DECLARE'), kw('FUNCTION'),
+    type_declaration: $ => seq(
+      kw('TYPE'),
       field('name', $.identifier),
-      '(', optional($.parameter_list), ')',
-      field('return_type', $.type),
+      repeat($.field_declaration),
+      endKw('TYPE'),
     ),
 
-    function_implementation: $ => seq(
+    field_declaration: $ => seq(
+      field('type', $._type),
+      commaSep1(field('name', $.identifier)),
+    ),
+
+    function_declaration: $ => seq(
+      kw('DECLARE'),
       kw('FUNCTION'),
       field('name', $.identifier),
-      '(', optional($.parameter_list), ')',
-      optional(field('return_type', $.type)),
-      repeat($.statement),
-      kw('ENDFUNC'),
+      $.parameter_list,
+      field('return_type', $._type),
     ),
 
     procedure_declaration: $ => seq(
-      kw('DECLARE'), kw('PROCEDURE'),
-      field('name', $.identifier),
-      '(', optional($.parameter_list), ')'
-    ),
-
-    procedure_implementation: $ => seq(
+      kw('DECLARE'),
       kw('PROCEDURE'),
       field('name', $.identifier),
-      '(', optional($.parameter_list), ')',
-      repeat($.statement),
-      kw('ENDPROC'),
+      $.parameter_list,
     ),
 
-    parameter_list: $ => seq(
-      $.parameter,
-      repeat(seq(',', $.parameter)),
+    function_definition: $ => seq(
+      kw('FUNCTION'),
+      field('name', $.identifier),
+      $.parameter_list,
+      field('return_type', $._type),
+      field('body', repeat($._statement)),
+      choice(endKw('FUNC'), endKw('FUNCTION')),
     ),
+
+    procedure_definition: $ => seq(
+      kw('PROCEDURE'),
+      field('name', $.identifier),
+      $.parameter_list,
+      field('body', repeat($._statement)),
+      choice(endKw('PROC'), endKw('PROCEDURE')),
+    ),
+
+    parameter_list: $ => seq('(', commaSep($._parameter), ')'),
+
+    _parameter: $ => choice($.parameter, $.function_parameter, $.procedure_parameter),
 
     parameter: $ => seq(
       optional(kw('VAR')),
-      field('type', $.type),
+      field('type', $._type),
       field('name', $.identifier),
-      optional($.array_dimensions),
+      optional($.dimensions),
     ),
 
-    // ---------- Variables ----------
-    // Give variable_declaration highest precedence to resolve ambiguity
-    variable_declaration: $ => prec(11, prec.right(seq(
-      field('type', $.type),
+    // A routine may be passed to a routine since 3.50.
+    function_parameter: $ => seq(
+      kw('FUNCTION'),
       field('name', $.identifier),
-      optional($.array_dimensions),
-      optional(seq('=', field('initializer', $.expression))),
-    ))),
-
-    array_dimensions: $ => seq(
-      '(',
-      $.expression,
-      repeat(seq(',', $.expression)),
-      ')'
+      $.parameter_list,
+      field('return_type', $._type),
     ),
+
+    procedure_parameter: $ => seq(
+      kw('PROCEDURE'),
+      field('name', $.identifier),
+      $.parameter_list,
+    ),
+
+    _type: $ => choice($.builtin_type, alias($.identifier, $.type_identifier)),
+
+    builtin_type: $ => choice(...BUILTIN_TYPES.map(t => kw(t))),
 
     // ---------- Statements ----------
-    statement: $ => choice(
+    _statement: $ => choice(
       $.variable_declaration,
-      $.let_statement,
-      $.if_single_line_statement,
-      $.if_block_statement,
+      $.assignment_statement,
+      $.if_statement,
+      $.if_block,
+      $.while_statement,
+      $.while_block,
+      $.repeat_statement,
+      $.loop_statement,
+      $.for_statement,
       $.select_statement,
-      $.while_single_line_statement,
-      $.while_block_statement,
-      $.repeat_until_statement,
-      $.loop_block_statement,
-      $.for_block_statement,
       $.goto_statement,
       $.gosub_statement,
       $.return_statement,
       $.break_statement,
       $.continue_statement,
-      $.block_statement,
+      $.end_statement,
+      $.begin_statement,
+      $.label,
       $.predefined_call,
       $.procedure_call,
-      $.end_statement,
-      $.stop_statement,
-      $.expression_statement,
+      $._preprocessor_directive,
     ),
-    
-    expression_statement: $ => $.expression,
 
-    let_statement: $ => prec.left(1, seq(
-      optional(kw('LET')),
-      field('target', $.expression),
-      choice('=', '+=', '-=', '*=', '/=', '%=', '&=', '|='),
-      field('value', $.expression)
+    variable_declaration: $ => seq(
+      field('type', $._type),
+      commaSep1($.variable_declarator),
+    ),
+
+    variable_declarator: $ => prec.right(seq(
+      field('name', $.identifier),
+      optional($.dimensions),
+      optional(seq('=', field('value', choice($._expression, $.array_initializer)))),
     )),
 
-    if_single_line_statement: $ => seq(
+    dimensions: $ => seq('(', commaSep1($._expression), ')'),
+
+    array_initializer: $ => seq('{', commaSep($._expression), '}'),
+
+    assignment_statement: $ => seq(
+      optional(kw('LET')),
+      field('left', $._assignment_target),
+      field('operator', choice('=', '+=', '-=', '*=', '/=', '%=', '&=', '|=')),
+      field('right', $._expression),
+    ),
+
+    // A variable may carry the name of a built-in statement, so that spelling
+    // has to be accepted on the left of an assignment as well.
+    _assignment_target: $ => choice(
+      $.identifier,
+      alias($.builtin_statement, $.identifier),
+      alias($.builtin_constant, $.identifier),
+      $.member_access,
+      $.index_expression,
+      $.call_expression,
+    ),
+    if_statement: $ => seq(
       kw('IF'),
-      optional('('), field('condition', $.expression), optional(')'),
-      field('then', $.statement)
+      field('condition', $._expression),
+      field('consequence', $._statement),
     ),
 
-    if_block_statement: $ => seq(
+    if_block: $ => seq(
       kw('IF'),
-      optional('('), field('condition', $.expression), optional(')'),
-      optional(kw('THEN')),
-      repeat($.statement),
-      repeat($.elseif_block),
-      optional($.else_block),
-      kw('ENDIF')
+      field('condition', $._expression),
+      kw('THEN'),
+      field('consequence', repeat($._statement)),
+      repeat($.elseif_clause),
+      optional($.else_clause),
+      endKw('IF'),
     ),
 
-    elseif_block: $ => seq(
-      kw('ELSEIF'),
-      optional('('), field('condition', $.expression), optional(')'),
+    elseif_clause: $ => seq(
+      choice(kw('ELSEIF'), pairKw('ELSE', 'IF', 'ELSEIF')),
+      field('condition', $._expression),
       optional(kw('THEN')),
-      repeat($.statement)
+      field('consequence', repeat($._statement)),
     ),
 
-    else_block: $ => seq(
-      kw('ELSE'),
-      repeat($.statement)
+    else_clause: $ => seq(kw('ELSE'), field('body', repeat($._statement))),
+
+    while_statement: $ => seq(
+      kw('WHILE'),
+      field('condition', $._expression),
+      field('body', $._statement),
     ),
+
+    while_block: $ => seq(
+      kw('WHILE'),
+      field('condition', $._expression),
+      kw('DO'),
+      field('body', repeat($._statement)),
+      endKw('WHILE'),
+    ),
+
+    repeat_statement: $ => seq(
+      kw('REPEAT'),
+      field('body', repeat($._statement)),
+      kw('UNTIL'),
+      field('condition', $._expression),
+    ),
+
+    loop_statement: $ => seq(
+      kw('LOOP'),
+      field('body', repeat($._statement)),
+      endKw('LOOP'),
+    ),
+
+    for_statement: $ => prec.right(seq(
+      kw('FOR'),
+      field('variable', $.identifier),
+      '=',
+      field('start', $._expression),
+      kw('TO'),
+      field('end', $._expression),
+      optional(seq(kw('STEP'), field('step', $._expression))),
+      field('body', repeat($._statement)),
+      choice(kw('NEXT'), endKw('FOR')),
+      optional(field('variable_end', $.identifier)),
+    )),
 
     select_statement: $ => seq(
       kw('SELECT'),
       optional(kw('CASE')),
-      optional('('), field('selector', $.expression), optional(')'),
-      repeat($.case_block),
-      optional($.default_block),
-      kw('ENDSELECT')
+      field('value', $._expression),
+      repeat($.case_clause),
+      optional($.default_clause),
+      endKw('SELECT'),
     ),
 
-    case_block: $ => seq(
+    case_clause: $ => seq(
       kw('CASE'),
-      $.case_specifier_list,
+      commaSep1($.case_label),
       optional(':'),
-      repeat($.statement)
+      field('body', repeat($._statement)),
     ),
 
-    case_specifier_list: $ => seq(
-      $.case_specifier,
-      repeat(seq(',', $.case_specifier))
-    ),
-
-    case_specifier: $ => choice(
-      $.expression,
-      seq($.expression, '..', $.expression)
-    ),
-
-    default_block: $ => seq(
-      kw('DEFAULT'),
-      optional(':'),
-      repeat($.statement)
-    ),
-
-    while_single_line_statement: $ => seq(
-      kw('WHILE'),
-      optional('('), field('condition', $.expression), optional(')'),
-      field('body', $.statement)
-    ),
-
-    while_block_statement: $ => seq(
-      kw('WHILE'),
-      optional('('), field('condition', $.expression), optional(')'),
-      kw('DO'),
-      repeat($.statement),
-      kw('ENDWHILE')
-    ),
-
-    repeat_until_statement: $ => seq(
-      kw('REPEAT'),
-      repeat($.statement),
-      kw('UNTIL'),
-      optional('('), field('condition', $.expression), optional(')')
-    ),
-
-    loop_block_statement: $ => seq(
-      kw('LOOP'),
-      repeat($.statement),
-      kw('ENDLOOP')
-    ),
-
-    for_block_statement: $ => prec.right(seq(
-      kw('FOR'),
-      field('var', $.identifier),
-      '=',
-      field('start', $.expression),
-      kw('TO'),
-      field('end', $.expression),
-      optional(seq(kw('STEP'), field('step', $.expression))),
-      repeat($.statement),
-      kw('NEXT'),
-      optional(field('var_repeat', $.identifier))
+    case_label: $ => prec.right(choice(
+      seq($._expression, '..', $._expression),
+      $._expression,
     )),
+
+    default_clause: $ => seq(
+      choice(kw('DEFAULT'), pairKw('CASE', 'ELSE', 'DEFAULT')),
+      optional(':'),
+      field('body', repeat($._statement)),
+    ),
 
     goto_statement: $ => seq(kw('GOTO'), field('label', $.identifier)),
     gosub_statement: $ => seq(kw('GOSUB'), field('label', $.identifier)),
 
+    // A value after RETURN needs 3.50. Without one the next line stands on its
+    // own, which is what old sources mean.
     return_statement: $ => choice(
-      prec(1, seq(kw('RETURN'), field('value', $.expression))),
-      kw('RETURN')
+      kw('RETURN'),
+      prec.dynamic(-1, seq(kw('RETURN'), field('value', $._expression))),
     ),
 
     break_statement: $ => kw('BREAK'),
     continue_statement: $ => kw('CONTINUE'),
-    end_statement: $ => kw('END'),
-    stop_statement: $ => kw('STOP'),
+    end_statement: $ => prec(-1, kw('END')),
 
-    block_statement: $ => prec(1, seq(
-      kw('BEGIN'),
-      repeat($.statement),
-      kw('END')
-    )),
+    // BEGIN marks where the main body starts; the compiler reads it as a label.
+    begin_statement: $ => kw('BEGIN'),
 
-    predefined_call: $ => prec.right(2, seq(
+    // A label is one token, the way the compiler lexes it: no space after ':'.
+    label: $ => token(seq(':', /[A-Za-z_][A-Za-z0-9_]*/)),
+
+    predefined_call: $ => seq(
       field('name', $.builtin_statement),
-      optional(choice($.parenthesized_args, $.bare_args))
-    )),
+      optional(commaSep1(field('argument', $._expression))),
+    ),
 
-    procedure_call: $ => prec.right(1, seq(
+    procedure_call: $ => seq(
       field('name', $.identifier),
-      optional(choice($.parenthesized_args, $.bare_args))
-    )),
+      $.argument_list,
+    ),
 
-    parenthesized_args: $ => seq('(', optional($.argument_sequence), ')'),
-    bare_args: $ => $.argument_sequence,
-
-    argument_sequence: $ => seq(
-      $.expression,
-      repeat(seq(',', $.expression))
+    argument_list: $ => choice(
+      seq('(', commaSep(field('argument', $._expression)), ')'),
+      seq('[', commaSep(field('argument', $._expression)), ']'),
     ),
 
     // ---------- Expressions ----------
-    expression: $ => choice(
-      $.binary_expression,
-      $.unary_expression,
-      $.parens_expression,
-      $.call_expression,
-      $.member_reference,
-      $.index_expression,
+    _expression: $ => choice(
       $.identifier,
-      $.constant
+      $.builtin_constant,
+      $._name_from_keyword,
+      $.constant,
+      $.substitution,
+      $.parenthesized_expression,
+      $.unary_expression,
+      $.binary_expression,
+      $.call_expression,
+      $.index_expression,
+      $.member_access,
+      $.record_literal,
     ),
-  
-    call_expression: $ => prec(10, seq(
-      field('function', choice($.identifier, $.builtin_function)),
-      '(',
-      optional($.argument_sequence),
-      ')'
+
+    // `LANG`, `STRING` and friends name a statement or a type and a function or
+    // constant at the same time. Reading one as a value is the last resort, so
+    // that a statement of its own is preferred where both would parse.
+    _name_from_keyword: $ => prec.dynamic(-1, choice(
+      alias($.builtin_statement, $.identifier),
+      alias($.builtin_type, $.identifier),
     )),
 
-    parens_expression: $ => prec(1, seq('(', $.expression, ')')),
+    parenthesized_expression: $ => seq('(', $._expression, ')'),
 
-    member_reference: $ => prec(4, seq(
-      field('object', $.expression),
-      '.',
-      field('member', $.identifier)
-    )),
-
-    index_expression: $ => prec(3, seq(
-      field('array', $.expression),
-      '(',
-      field('index', $.expression),
-      repeat(seq(',', field('index', $.expression))),
-      ')'
+    unary_expression: $ => prec.right(PREC.UNARY, seq(
+      field('operator', choice('-', '+', '!')),
+      field('operand', $._expression),
     )),
 
     binary_expression: $ => {
-      const ops = [
-        ['||', 1],
-        ['&&', 2],
-        ['|',  3],
-        ['&',  4],
-        ['==', 5], ['!=', 5], ['<>', 5],
-        ['<',  6], ['>',  6], ['<=', 6], ['>=', 6],
-        ['+',  7], ['-',  7],
-        ['*',  8], ['/',  8], ['%',  8],
-        ['^',  9], ['**', 9],
+      const table = [
+        [PREC.OR, choice('&&', '&', '||', '|')],
+        [PREC.COMPARE, choice('==', '=', '!=', '<>', '><', '<=', '=<', '>=', '=>', '<', '>')],
+        [PREC.ADD, choice('+', '-')],
+        [PREC.MUL, choice('*', '/', '%')],
       ];
       return choice(
-        ...ops.map(([op, precedence]) =>
-          prec.left(precedence,
-            seq(
-              field('left', $.expression),
-              op,
-              field('right', $.expression)
-            )
-          )
-        )
+        ...table.map(([precedence, operator]) => prec.left(precedence, seq(
+          field('left', $._expression),
+          field('operator', operator),
+          field('right', $._expression),
+        ))),
+        prec.right(PREC.POW, seq(
+          field('left', $._expression),
+          field('operator', '^'),
+          field('right', $._expression),
+        )),
       );
     },
 
-    unary_expression: $ => prec.right(10, choice(
-      seq('!', field('operand', $.expression)),
-      seq(kw('NOT'), field('operand', $.expression)),
-      seq('-', field('operand', $.expression)),
-      seq('+', field('operand', $.expression))
+    call_expression: $ => prec(PREC.CALL, seq(
+      field('function', $._expression),
+      '(',
+      commaSep(field('argument', $._expression)),
+      ')',
     )),
+
+    index_expression: $ => prec(PREC.CALL, seq(
+      field('array', $._expression),
+      '[',
+      commaSep1(field('index', $._expression)),
+      ']',
+    )),
+
+    member_access: $ => prec(PREC.MEMBER, seq(
+      field('object', $._expression),
+      '.',
+      field('member', $.identifier),
+    )),
+
+    // `Point { X = 1, Y = 2 }` builds a record without temporary assignments.
+    record_literal: $ => prec(PREC.MEMBER, seq(
+      field('type', alias($.identifier, $.type_identifier)),
+      '{',
+      commaSep($.record_literal_field),
+      '}',
+    )),
+
+    record_literal_field: $ => seq(
+      field('name', $.identifier),
+      '=',
+      field('value', $._expression),
+    ),
+
+    // ---------- Terminals ----------
+    // One token for every built-in statement name. A lexical precedence would
+    // beat a longer keyword such as DECLARE, so the names carry none.
+    builtin_statement: $ => token(choice(...BUILTIN_STATEMENTS.map(s => ci(s)))),
+
+    // The built-in constants are their own token so that highlighting does not
+    // need a case insensitive query predicate. Built-in functions do not need
+    // one: a call is recognized by its parentheses.
+    builtin_constant: $ => token(choice(...BUILTIN_CONSTANTS.map(s => ci(s)))),
 
     constant: $ => choice(
       $.string_literal,
       $.number_literal,
+      $.money_literal,
+      $.color_code,
       $.boolean_literal,
-      $.at_color_code
     ),
 
-    // ---------- Labels ----------
-    label: $ => seq(':', field('name', $.identifier)),
+    // A doubled quote is a quote, there is no backslash escape.
+    string_literal: $ => token(seq('"', repeat(choice(/[^"]/, '""')), '"')),
 
-    // ---------- Comments ----------
-    comment: $ => token(choice(
-      /;[ \t]*[^$#\n][^\n]*/,   // generic line comment
-      /'[^\n]*/,                // apostrophe comment
-      /\*[ \t][^\n]*/           // star + space comment (legacy style)
+    number_literal: $ => token(choice(
+      /\d+\.\d+/,
+      /\d[0-9A-Fa-f]*[hH]/,
+      /[01]+[bB]/,
+      /[0-7]+[oO]/,
+      /\d+[dD]/,
+      /\d+/,
     )),
 
-    // ---------- Types ----------
-    // Types get higher precedence (3) to avoid being interpreted as identifiers
-    type: $ => choice(
-      kw('BOOLEAN', 3), kw('DATE', 3), kw('DDATE', 3), kw('INTEGER', 3), kw('SDWORD', 3), 
-      kw('LONG', 3), kw('MONEY', 3), kw('STRING', 3), kw('TIME', 3),
-      kw('BIGSTR', 3), kw('EDATE', 3), kw('REAL', 3), kw('FLOAT', 3), kw('DREAL', 3), 
-      kw('DOUBLE', 3), kw('UNSIGNED', 3), kw('DWORD', 3), kw('UDWORD', 3),
-      kw('BYTE', 3), kw('UBYTE', 3), kw('WORD', 3), kw('UWORD', 3), kw('SBYTE', 3), 
-      kw('SHORT', 3), kw('SWORD', 3), kw('INT', 3), kw('MSGAREAID', 3), kw('PASSWORD', 3)
-    ),
+    money_literal: $ => token(seq('$', /\d+(\.\d+)?/)),
 
-    // ---------- Builtin Statements ----------
-    builtin_statement: $ => choice(
-      kw('ADJBYTES'), kw('ADJDBYTES'), kw('ADJTBYTES'), kw('ADJTFILES'), kw('APPEND'), 
-      kw('BACKUP'), kw('BITSET'), kw('BITCLEAR'), kw('BYE'), kw('CALL'), 
-      kw('CDCHKOFF'), kw('CDCHKON'), kw('CHDIR'), kw('CLS'), kw('CLREOL'), 
-      kw('COLOR'), kw('CONFFLAG'), kw('CONFUNFLAG'), kw('COPY'), kw('CURSOR'), 
-      kw('DBGLEVEL'), kw('DEC'), kw('DELAY'), kw('DELETE'), kw('DELUSER'),
-      kw('DIR'), kw('DISPFILE'), kw('DISPSTR'), kw('DISPTEXT'), kw('DOWNLOAD'), 
-      kw('DTROFF'), kw('DTRON'), kw('EVT'), kw('FAPPEND'), kw('FCLOSE'), 
-      kw('FCLOSEALL'), kw('FCREATE'), kw('FDEFIN'), kw('FDEFOUT'), kw('FDGET'), 
-      kw('FDPUT'), kw('FDPUTLN'), kw('FDPUTPAD'), kw('FDREAD'), kw('FDWRITE'), 
-      kw('FGET'), kw('FLAG'), kw('FOPEN'), kw('FORWARD'), kw('FPUT'), 
-      kw('FPUTLN'), kw('FPUTPAD'), kw('FREAD'), kw('FREALTUSER'), kw('FRESHLINE'), 
-      kw('FSEEK'), kw('FWRITE'), kw('GETALTUSER'), kw('GETTOKEN'), kw('GETUSER'),
-      kw('GOODBYE'), kw('HANGUP'), kw('INC'), kw('INPUT'), kw('INPUTCC'), 
-      kw('INPUTDATE'), kw('INPUTINT'), kw('INPUTMONEY'), kw('INPUTSTR'), 
-      kw('INPUTTEXT'), kw('INPUTTIME'), kw('INPUTYN'), kw('JOIN'), kw('KBDFILE'), 
-      kw('KBDSTUFF'), kw('KBDSTRING'), kw('KBDFLUSH'), kw('KEYFLUSH'), kw('LANG'), 
-      kw('LASTIN'), kw('LOG'), kw('MDMFLUSH'), kw('MKDIR'), kw('MOUSEREG'), 
-      kw('MORE'), kw('MPRINT'), kw('MPRINTLN'), kw('NEWLINE'), kw('NEWLINES'), 
-      kw('OPTEXT'), kw('PAGEOFF'), kw('PAGEON'), kw('POP'), kw('PRINT'),
-      kw('PRINTLN'), kw('PRFOUND'), kw('PRFOUNDLN'), kw('PROMPTSTR'), kw('PUSH'), 
-      kw('PUTUSER'), kw('PUTALTUSER'), kw('QUEST'), kw('RDUNET'), kw('RDUSYS'), 
-      kw('REDIM'), kw('RENAME'), kw('RESETDISP'), kw('RESTSCRN'), kw('RMDIR'), 
-      kw('SAVESCRN'), kw('SCRFILE'), kw('SEARCHINIT'), kw('SEARCHFIND'), 
-      kw('SEARCHSTOP'), kw('SHELL'), kw('SORT'), kw('SOUND'), kw('SOUNDDELAY'), 
-      kw('SPRINT'), kw('SPRINTLN'), kw('STACKABORT'), kw('STARTDISP'), kw('TOKENIZE'), 
-      kw('TPAGET'), kw('TPAPUT'), kw('TPAREAD'), kw('TPAWRITE'), kw('TPACGET'), 
-      kw('TPACPUT'), kw('TPACREAD'), kw('TPACWRITE'), kw('WAIT'), kw('WAITFOR'), 
-      kw('WRUNET'), kw('WRUSYS'), kw('WRUSYSDOOR')
-    ),
-
-    // ---------- Builtin Functions ----------
-    builtin_function: $ => choice(
-      // Arithmetic / bitwise / numeric
-      kw('ABS'), kw('BAND'), kw('BOR'), kw('BNOT'), kw('BXOR'), kw('RANDOM'), 
-      kw('MAX'), kw('MIN'), kw('S2I'), kw('I2S'),
-      // Conversion / formatting
-      kw('FMTREAL'), kw('REPLACE'), kw('REPLACESTR'), kw('STRIP'), kw('STRIPATX'), 
-      kw('STRIPSTR'), kw('LEFT'), kw('RIGHT'), kw('MID'), kw('LEN'), kw('LTRIM'), 
-      kw('RTRIM'), kw('TRIM'), kw('LOWER'), kw('UPPER'), kw('MIXED'), kw('SPACE'),
-      kw('TOBIGSTR'), kw('TOBOOLEAN'), kw('TOBYTE'), kw('TODATE'), kw('TODDATE'), 
-      kw('TODREAL'), kw('TOEDATE'), kw('TOINTEGER'), kw('TOMONEY'), kw('TOREAL'), 
-      kw('TOSBYTE'), kw('TOSWORD'), kw('TOTIME'), kw('TOUNSIGNED'), kw('TOWORD'), 
-      kw('MKDATE'), kw('MKADDR'), kw('MEGANUM'),
-      // Date/time functions
-      kw('TIMEAP'), kw('DAY'), kw('MONTH'), kw('YEAR'), kw('HOUR'), kw('SEC'), kw('DOW'),
-      // Input / keyboard / buffers
-      kw('INKEY'), kw('TINKEY'), kw('KINKEY'), kw('NOCHAR'), kw('KBDBUFSIZE'), 
-      kw('PPLBUFSIZE'), kw('KBDFILUSED'),
-      // User / system / environment
-      kw('CURCONF'), kw('CURSEC'), kw('CURCOLOR'), kw('CURUSER'), kw('U_LMR'), 
-      kw('CONFREG'), kw('CONFEXP'), kw('CONFSEL'), kw('CONFSYS'), kw('CONFMW'), 
-      kw('CONFALIAS'), kw('USERALIAS'), kw('CHATSTAT'), kw('ONLOCAL'),
-      kw('PCBACCOUNT'), kw('PCBACCSTAT'), kw('PCBNODE'), kw('UN_NAME'), 
-      kw('UN_CITY'), kw('UN_OPER'), kw('UN_STAT'),
-      // Messaging / conference boundaries
-      kw('LOMSGNUM'), kw('HIMSGNUM'),
-      // Files / directories
-      kw('EXIST'), kw('FILEINF'), kw('FERR'), kw('READLINE'),
-      // Modem / carrier / call
-      kw('CALLID'), kw('CALLNUM'), kw('CDON'), kw('CARRIER'),
-      // Crypto / checksum
-      kw('CRC32'),
-      // Card / billing
-      kw('CCTYPE'), kw('VALCC'), kw('FMTCC'),
-      // Searching / pointer
-      kw('INSTR'), kw('INSTRR'),
-      // Flag related
-      kw('FLAGCNT'),
-      // Account/time event
-      kw('EVTTIMEADJ'), kw('ADJTIME'),
-      // Answer memory
-      kw('DEFANS'), kw('LASTANS'),
-      // Bit ops on values
-      kw('ISBITSET'),
-      // Math not listed earlier (NOTE: NOT is already handled in unary_expression)
-      kw('AND'), kw('OR'), kw('XOR'),
-      // Register (legacy placeholders)
-      kw('REGAL'), kw('REGAH'), kw('REGBL'), kw('REGBH'), kw('REGCL'), kw('REGCH'), 
-      kw('REGDL'), kw('REGDH'), kw('REGAX'), kw('REGBX'), kw('REGCX'), kw('REGDX'), 
-      kw('REGSI'), kw('REGDI'), kw('REGF'), kw('REGCF'), kw('REGDS'), kw('REGES'),
-      // Misc door / PPE
-      kw('PPE_RNAME'), kw('PSA'), kw('GRAFMODE'), kw('GETX'), kw('GETY'), 
-      kw('LANGEXT'), kw('PAGESTAT'),
-      // Strip / mask validations
-      kw('MASK_ALNUM'), kw('MASK_ALPHA'), kw('MASK_ASCII'), kw('MASK_FILE'), 
-      kw('MASK_NUM'), kw('MASK_PATH'), kw('MASK_PWD'),
-      // Validation
-      kw('VALDATE'), kw('VALTIME'),
-      // Misc
-      kw('UNIXTIME')
-    ),
-
-    // ---------- Literals ----------
-    string_literal: $ => seq(
-      '"',
-      repeat(choice(/[^"\\]/, /\\./)),
-      '"'
-    ),
-
-    number_literal: $ => choice(
-      $.hex_number,
-      $.float_number,
-      $.int_number
-    ),
-
-    int_number:   $ => /\d+/,
-    float_number: $ => /\d+\.\d+/,
-    hex_number:   $ => /0[xX][0-9A-Fa-f]+|[0-9A-Fa-f]+[hH]/,
+    color_code: $ => token(seq('@', /[xX]/, /[0-9A-Fa-f]{2}/)),
 
     boolean_literal: $ => choice(kw('TRUE'), kw('FALSE')),
 
-    at_color_code: $ => /@[xX][0-9A-Fa-f]{2}/,
+    comment: $ => token(choice(
+      seq(';', /[^$#\n][^\n]*/),
+      seq(';', /\r?\n/),
+      seq("'", /[^\n]*/),
+    )),
 
-    // ---------- Identifiers (now case-insensitive) ----------
-    identifier: $ => /[A-Za-z_][A-Za-z0-9_]*/
-  }
+    identifier: $ => /[A-Za-z_][A-Za-z0-9_]*/,
+  },
 });
