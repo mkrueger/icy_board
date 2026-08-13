@@ -24,7 +24,9 @@ Everything that doesn't work is a bug - please report issues.
   - ppe-convert can take a <FILENAME> to convert the single file to UTF8
   - WARNING: Handle ppe-convert with care - can potentially destroy things. Convert one PPE after another.
   - No need to convert PPE - CP437 works, just consider that - I do it because no modern editor supports CP437 anymore.
-* LSP should provide highlighting, help, find all refs/goto definition and code completion
+* LSP should provide help, find all refs/goto definition and code completion
+  - Highlighting is the editor's own grammar - tree-sitter for Helix and Neovim, TextMate
+    for the VS Code extension
   - Completion knows the record types a program declares: `.` offers the fields of a record
     or the members of a board object, and `Point { ` offers the fields the literal has not named
   - Signature help shows the parameters of a user routine, of a built-in function and of a

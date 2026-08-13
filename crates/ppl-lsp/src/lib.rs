@@ -4,16 +4,8 @@ pub mod documentation;
 pub mod formatting;
 pub mod jump_definition;
 pub mod reference;
-pub mod semantic_token;
 pub mod signature_help;
 pub mod type_lookup;
-
-#[derive(Debug)]
-pub struct ImCompleteSemanticToken {
-    pub start: usize,
-    pub length: usize,
-    pub token_type: usize,
-}
 
 use ropey::Rope;
 use rust_embed::RustEmbed;

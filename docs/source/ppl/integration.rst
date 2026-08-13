@@ -47,7 +47,11 @@ What the language server offers
   named yet
 * Signature help for user routines, built-in functions and built-in statements
 * Hover documentation, goto definition, find all references and rename
-* Semantic highlighting and formatting
+* Formatting
+
+Highlighting is left to the editor's own grammar - the tree-sitter grammar in
+Helix and Neovim, the TextMate grammar the VS Code extension carries - so a file
+stays coloured while it is half written and while the server is busy.
 
 A directory with a ``ppl.toml`` is read as one package, so a type declared in one
 file is known in the next.

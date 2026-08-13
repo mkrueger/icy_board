@@ -21,9 +21,8 @@ use ppl_language_server::documentation::{get_const_hover, get_function_hover, ge
 use ppl_language_server::formatting::VSCodeFormattingBackend;
 use ppl_language_server::jump_definition::get_definition;
 use ppl_language_server::reference::get_reference;
-use ppl_language_server::semantic_token::{LEGEND_TYPE, semantic_token_from_ast};
 use ppl_language_server::signature_help::get_signature_help;
-use ppl_language_server::{ImCompleteSemanticToken, line_before_cursor, offset_to_position};
+use ppl_language_server::{line_before_cursor, offset_to_position};
 use ropey::Rope;
 use serde_json::Value;
 use tower_lsp::jsonrpc::Result;
@@ -41,7 +40,6 @@ struct Backend {
 
     ast_map: Arc<Mutex<HashMap<Url, (Ast, SemanticVisitor)>>>,
     document_map: DashMap<Url, Rope>,
-    semantic_token_map: DashMap<Url, Vec<ImCompleteSemanticToken>>,
 }
 
 #[tower_lsp::async_trait]
@@ -87,29 +85,6 @@ impl LanguageServer for Backend {
                     file_operations: None,
                 }),
 
-                semantic_tokens_provider: Some(SemanticTokensServerCapabilities::SemanticTokensRegistrationOptions(
-                    SemanticTokensRegistrationOptions {
-                        text_document_registration_options: {
-                            TextDocumentRegistrationOptions {
-                                document_selector: Some(vec![DocumentFilter {
-                                    language: Some("ppl".to_string()),
-                                    scheme: Some("file".to_string()),
-                                    pattern: None,
-                                }]),
-                            }
-                        },
-                        semantic_tokens_options: SemanticTokensOptions {
-                            work_done_progress_options: WorkDoneProgressOptions::default(),
-                            legend: SemanticTokensLegend {
-                                token_types: LEGEND_TYPE.into(),
-                                token_modifiers: vec![],
-                            },
-                            range: Some(true),
-                            full: Some(SemanticTokensFullOptions::Bool(true)),
-                        },
-                        static_registration_options: StaticRegistrationOptions::default(),
-                    },
-                )),
                 definition_provider: Some(OneOf::Left(true)),
                 references_provider: Some(OneOf::Left(true)),
                 rename_provider: Some(OneOf::Left(true)),
@@ -153,7 +128,6 @@ impl LanguageServer for Backend {
 
         self.client.publish_diagnostics(uri.clone(), Vec::new(), None).await;
         self.ast_map.lock().unwrap().remove(&uri);
-        self.semantic_token_map.remove(&uri);
     }
 
     async fn hover(&self, params: HoverParams) -> Result<Option<Hover>> {
@@ -194,83 +168,6 @@ impl LanguageServer for Backend {
         }
 
         res
-    }
-
-    async fn semantic_tokens_full(&self, params: SemanticTokensParams) -> Result<Option<SemanticTokensResult>> {
-        let uri = params.text_document.uri;
-        let mut im_complete_tokens = self.semantic_token_map.get_mut(&uri).unwrap();
-        let rope = self.document_map.get(&uri).unwrap();
-        let tokens = self.get_ast(&uri, |ast, _| {
-            let extends_tokens = semantic_token_from_ast(ast);
-            im_complete_tokens.extend(extends_tokens);
-            im_complete_tokens.sort_by(|a: &ImCompleteSemanticToken, b| a.start.cmp(&b.start));
-            let mut pre_line = 0;
-            let mut pre_start: u32 = 0;
-            let semantic_tokens = im_complete_tokens
-                .iter()
-                .filter_map(|token| {
-                    let line = rope.try_char_to_line(token.start).ok()? as u32;
-                    let first = rope.try_line_to_char(line as usize).ok()? as u32;
-                    let start = token.start as u32 - first;
-                    let delta_line = line - pre_line;
-                    let delta_start = if delta_line == 0 { start - pre_start } else { start };
-                    let ret = Some(SemanticToken {
-                        delta_line,
-                        delta_start,
-                        length: token.length as u32,
-                        token_type: token.token_type as u32,
-                        token_modifiers_bitset: 0,
-                    });
-                    pre_line = line;
-                    pre_start = start;
-                    ret
-                })
-                .collect::<Vec<_>>();
-            Some(semantic_tokens)
-        })?;
-        if let Some(semantic_token) = tokens {
-            return Ok(Some(SemanticTokensResult::Tokens(SemanticTokens {
-                result_id: None,
-                data: semantic_token,
-            })));
-        }
-        Ok(None)
-    }
-
-    async fn semantic_tokens_range(&self, params: SemanticTokensRangeParams) -> Result<Option<SemanticTokensRangeResult>> {
-        let uri = params.text_document.uri;
-        let semantic_tokens = || -> Option<Vec<SemanticToken>> {
-            let im_complete_tokens = self.semantic_token_map.get(&uri)?;
-            let rope = self.document_map.get(&uri)?;
-            let mut pre_line = 0;
-            let mut pre_start = 0;
-            let semantic_tokens = im_complete_tokens
-                .iter()
-                .filter_map(|token| {
-                    let line = rope.try_char_to_line(token.start).ok()? as u32;
-                    let first = rope.try_line_to_char(line as usize).ok()? as u32;
-                    let start = token.start as u32 - first;
-                    let ret = Some(SemanticToken {
-                        delta_line: line.saturating_sub(pre_line),
-                        delta_start: if start >= pre_start { start - pre_start } else { start },
-                        length: token.length as u32,
-                        token_type: token.token_type as u32,
-                        token_modifiers_bitset: 0,
-                    });
-                    pre_line = line;
-                    pre_start = start;
-                    ret
-                })
-                .collect::<Vec<_>>();
-            Some(semantic_tokens)
-        }();
-        if let Some(semantic_token) = semantic_tokens {
-            return Ok(Some(SemanticTokensRangeResult::Tokens(SemanticTokens {
-                result_id: None,
-                data: semantic_token,
-            })));
-        }
-        Ok(None)
     }
 
     async fn inlay_hint(&self, params: tower_lsp::lsp_types::InlayHintParams) -> Result<Option<Vec<InlayHint>>> {
@@ -561,7 +458,6 @@ impl Backend {
                         Encoding::Utf8,
                         &workspace,
                     );
-                    self.semantic_token_map.insert(cur_uri.clone(), semantic_token_from_ast(&ast));
                     asts.push((cur_uri, ast));
                 }
 
@@ -589,15 +485,9 @@ impl Backend {
             ast.visit(&mut semantic_visitor);
             semantic_visitor.finish();
 
-            let semantic_tokens: Vec<ImCompleteSemanticToken> = semantic_token_from_ast(&ast);
-            self.semantic_token_map.insert(uri.clone(), semantic_tokens);
-
             self.add_diagnostics(&semantic_visitor).await;
 
             self.ast_map.lock().unwrap().insert(uri, (ast, semantic_visitor));
-            // self.client
-            //     .log_message(MessageType::INFO, &format!("{:?}", semantic_tokens))
-            //     .await;
         }
     }
 
@@ -657,7 +547,6 @@ async fn main() {
         client,
         ast_map: Arc::new(Mutex::new(HashMap::new())),
         document_map: DashMap::new(),
-        semantic_token_map: DashMap::new(),
         workspace: Mutex::new(Workspace::default()),
         workspace_visitor: Mutex::new(SemanticVisitor::new(
             &Workspace::default(),
