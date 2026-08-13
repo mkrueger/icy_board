@@ -92,7 +92,7 @@ jobs:
          file_id.diz
          INSTALL.txt
   build_mac:
-   runs-on: macos-13
+   runs-on: macos-latest
    if: github.event.workflow_run.conclusion == 'success'
    steps:
    - uses: actions/checkout@v4
