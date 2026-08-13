@@ -7,9 +7,10 @@ completion, signature help, hover, document symbols and formatting for `.pps`,
 
 ## Requirements
 
-The extension talks to the `ppl-language-server` binary, which ships with the
-Icy Board tools. Put it on your `PATH`, or point the setting `ppl.serverPath`
-at it.
+None, if you took the package for your platform: the `ppl-language-server`
+binary comes with it. The package without a platform in its name does not carry
+a server, so it needs one on your `PATH`. Either way, `ppl.serverPath` points
+the extension at a server you built yourself.
 
 ## Building this extension
 

@@ -4,6 +4,7 @@
  * ------------------------------------------------------------------------------------------ */
 
 import * as vscode from "vscode";
+import * as fs from "fs";
 
 import {
   Disposable,
@@ -16,16 +17,36 @@ import {
 let client: LanguageClient;
 // type a = Parameters<>;
 
-/// The server is looked for where the user said, then in the environment, then on the PATH.
-function serverCommand(): string {
+/// The server is looked for where the user said, then in the environment, then
+/// in the extension itself, then on the PATH.
+function serverCommand(context: vscode.ExtensionContext): string {
   const configured = vscode.workspace.getConfiguration("ppl").get<string>("serverPath")?.trim();
-  return configured || process.env.SERVER_PATH || "ppl-language-server";
+  if (configured) {
+    return configured;
+  }
+  if (process.env.SERVER_PATH) {
+    return process.env.SERVER_PATH;
+  }
+  const name = process.platform === "win32" ? "ppl-language-server.exe" : "ppl-language-server";
+  const bundled = vscode.Uri.joinPath(context.extensionUri, "server", name).fsPath;
+  if (fs.existsSync(bundled)) {
+    // A vsix is a zip, and not every unpacker keeps the executable bit.
+    if (process.platform !== "win32") {
+      try {
+        fs.chmodSync(bundled, 0o755);
+      } catch {
+        // Read-only install, the bit is either already there or nothing helps.
+      }
+    }
+    return bundled;
+  }
+  return "ppl-language-server";
 }
 
 export async function activate(context: vscode.ExtensionContext) {
 
   const traceOutputChannel = vscode.window.createOutputChannel("PPL Language Server trace");
-  const command = serverCommand();
+  const command = serverCommand(context);
   const run: Executable = {
     command,
     options: {
@@ -60,7 +81,7 @@ export async function activate(context: vscode.ExtensionContext) {
   } catch (error) {
     const openSettings = "Open settings";
     const answer = await vscode.window.showErrorMessage(
-      `PPL: could not start '${command}'. Install it with "cargo install --path crates/ppl-lsp" or set ppl.serverPath.`,
+      `PPL: could not start '${command}'. Install a build for your platform, or set ppl.serverPath to a server you built yourself.`,
       openSettings,
     );
     if (answer === openSettings) {

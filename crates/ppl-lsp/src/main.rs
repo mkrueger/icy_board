@@ -54,7 +54,6 @@ impl LanguageServer for Backend {
             server_info: None,
             offset_encoding: None,
             capabilities: ServerCapabilities {
-                inlay_hint_provider: Some(OneOf::Left(true)),
                 text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)),
                 hover_provider: Some(HoverProviderCapability::Simple(true)),
 

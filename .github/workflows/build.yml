@@ -169,6 +169,8 @@ jobs:
   build_vs_extension:
    runs-on: ubuntu-latest
    if: github.event.workflow_run.conclusion == 'success'
+   # The platform builds hold the servers that go into the packages.
+   needs: [build_linux, build_windows, build_mac]
    steps:
    - uses: actions/checkout@v4
    - uses: pnpm/action-setup@v2
@@ -181,6 +183,10 @@ jobs:
        export version=$(python3 ./tools/get_version.py)
        echo "Version: $VERSION"
        echo "VERSION=$version" >> $GITHUB_ENV
+   - name: Download the servers
+     uses: actions/download-artifact@v4
+     with:
+       path: servers
    - name: Install required libraries
      run: |
        cd crates/ppl-lsp
@@ -190,6 +196,27 @@ jobs:
      run: |
        cd crates/ppl-lsp
        npm run compile
+
+       # One package per platform, each with the server that belongs to it.
+       package() {
+         found=$(find "$GITHUB_WORKSPACE/servers" -path "$2" | head -1)
+         if [ -z "$found" ]; then
+           echo "no server for $1 below servers/ (looked for $2)"
+           exit 1
+         fi
+         rm -rf server
+         mkdir server
+         cp "$found" "server/$(basename "$found")"
+         chmod +x server/*
+         pnpm exec vsce package --no-dependencies --target "$1"
+       }
+       package linux-x64    '*icy_board_linux_*/bin/ppl-language-server'
+       package win32-x64    '*icy_board_windows_*/bin/ppl-language-server.exe'
+       package darwin-arm64 '*aarch64-apple-darwin/bin/ppl-language-server'
+       package darwin-x64   '*x86_64-apple-darwin/bin/ppl-language-server'
+
+       # And one for everyone else, which asks for a server on the PATH.
+       rm -rf server
        pnpm run package
    - name: 'Upload zip'
      uses: actions/upload-artifact@v4
