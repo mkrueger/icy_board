@@ -27,15 +27,21 @@ PPL versions from 1.00 through 4.00, maintaining backward compatibility while ad
 Version Support
 ~~~~~~~~~~~~~~~
 
-The compiler supports multiple PPE format versions:
+A PPE has a *runtime* version, which is the format written to disk:
 
-* **PPL 1.00** - Original PCBoard 15.0 format
-* **PPL 2.00** - PCBoard 15.2 enhancements
-* **PPL 3.00** - PCBoard 15.3 with database support
-* **PPL 3.10** - Minor updates and fixes
-* **PPL 3.30** - Additional string handling
-* **PPL 3.40** - PCBoard 15.4 final version
-* **PPL 4.00** - IcyBoard extensions (default)
+* **100** - PCBoard 15.0
+* **200** - PCBoard 15.2
+* **300** - PCBoard 15.3
+* **310**, **320**, **330** - PCBoard point releases
+* **340** - PCBoard 15.4, the last one an original board can load
+* **400** - IcyBoard's own format
+* **401** - IcyBoard, with the type table records need (default)
+
+The *language* version says which syntax and which built-ins the compiler
+accepts, and is set on its own: 100 through 340 as PCBoard had them, 350 for the
+quality of life additions and 400 for records and the board objects. It defaults
+to the runtime version up to 400, so the default pair is runtime 401 and language
+400. See :doc:`language` for what each version added.
 
 Command Line Usage
 ~~~~~~~~~~~~~~~~~~
@@ -44,7 +50,9 @@ Basic syntax::
 
     pplc [options] <file> 
 
-The compiler automatically adds the `.pps` extension if not specified.
+The compiler automatically adds the `.pps` extension if not specified. Called
+without a file it builds the package described by the ``ppl.toml`` in the current
+directory.
 
 **Positional Arguments**
   * ``file`` - Source file to compile (e.g., ``myscript`` or ``myscript.pps``)
@@ -52,9 +60,13 @@ The compiler automatically adds the `.pps` extension if not specified.
 **Options**
   * ``-d, --disassemble`` - Output disassembly instead of compiling to PPE
   * ``--nowarnings`` - Suppress warning messages (errors still shown)
-  * ``--version <ver>`` - Target PPE version (100, 200, 300, 310, 330, 340, 400)
-  * ``--lang-version <ver>`` - Language version (defaults to ``--version`` value)
+  * ``--runtime <ver>`` - PPE format to write (100, 200, 300, 310, 320, 330, 340, 400, 401)
+  * ``--lang-version <ver>`` - Language version (100 - 400, defaults to the runtime up to 400)
   * ``--cp437`` - Force CP437 encoding for DOS source files
+  * ``--init <dir>`` - Create a new PPL package
+  * ``--defines <list>`` - Semicolon separated preprocessor variables, e.g. ``"A=1;B=2"``
+  * ``--format`` - Format the source instead of compiling it
+  * ``--check`` - Check the source or package for errors without writing a PPE
   * ``--help`` - Display usage information
 
 **User Variables**
@@ -88,7 +100,7 @@ Examples
 
 **Target specific PPE version**::
 
-    pplc --version 340 myscript.pps 
+    pplc --runtime 340 myscript.pps 
 
 Compatibility Notes
 ~~~~~~~~~~~~~~~~~~~
@@ -182,7 +194,8 @@ The configuration file consists of three main sections: ``[package]``, ``[compil
     * ``320`` - PCBoard 15.22
     * ``330`` - PCBoard 15.3
     * ``340`` - PCBoard 15.4
-    * ``400`` - IcyBoard (default)
+    * ``400`` - IcyBoard
+    * ``401`` - IcyBoard with a type table (default)
 
   * ``authors`` (array of strings, optional) - List of project authors
 
@@ -216,7 +229,7 @@ Compiled files are placed in version-specific directories under ``target/``:
 * ``target/pcboard_15.22/`` - For runtime version 320
 * ``target/pcboard_15.30/`` - For runtime version 330
 * ``target/pcboard_15.40/`` - For runtime version 340
-* ``target/icboard/`` - For runtime version 400 (IcyBoard)
+* ``target/icboard/`` - For runtime version 400 and 401 (IcyBoard)
 
 PPL Decompiler
 --------------

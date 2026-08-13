@@ -6,6 +6,8 @@ PPL Reference
    :caption: PPL Reference
 
    introduction
+   language
+   preprocessor
    data_types
    constants
    functions

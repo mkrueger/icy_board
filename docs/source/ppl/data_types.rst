@@ -183,8 +183,8 @@ These data types are only valid in Icy Board and not in PCBoard.
 They are used for specific purposes to support new features without 
 breaking compatibility with existing PCBoard PPL scripts.
 
-MESSAGEAREAID
-~~~~~~~~~~~~~
+MSGAREAID
+~~~~~~~~~
 
 A datatype that contains a reference to a message conference/area number.
 This is used in Icy Board to support area numbers. It's used verywhere where CONFNUMBER 
@@ -196,64 +196,103 @@ So all PPEs are usually backwards compatible but may not be message area aware.
 
 PASSWORD
 ~~~~~~~~
-Only U_PWD and U_PWDHIST are of this type. Can't be declared by the user.
-Can be compared to STRING, U_PWD can be assigned from STRING.
+The type of ``U_PWD``, ``U_PWDHIST`` and of a door's ``Password``. It cannot be
+declared. It compares against a ``STRING``, and ``U_PWD`` can be assigned one.
 
-Will be converted as string in PlainText when password hashing is disabled in the system settings.
-Otherwise it will be "******"
+Converting or printing one yields the password in plain text while password
+hashing is off in the system settings, and ``******`` otherwise.
 
-- **Size**: Variable (typically hashed/encrypted)
-- **Default value**: Empty/null
 - **Purpose**: Secure password storage and handling
 
+Board objects
+~~~~~~~~~~~~~
+
+``CONFERENCE``, ``AREA``, ``DIRECTORY`` and ``DOOR`` are read-only snapshots of
+what the board is configured with. They are declared like any other type and read
+with the ``.`` operator::
+
+    CONFERENCE conf = ConfInfo(CurConf())
+    IF conf.HasAccess() PRINTLN conf.Name
+
+See :doc:`language` for what each of them answers.
+
+Records
+~~~~~~~
+
+A program declares record types of its own with ``TYPE ... ENDTYPE`` and then
+uses the name wherever a built-in type name goes::
+
+    TYPE Member
+        STRING  Name
+        INTEGER Age
+    ENDTYPE
+
+    Member m
+    m.Name = "Sysop"
+
+Records are values: two variables of the same type share nothing. See
+:doc:`language` for the whole story, including record literals.
 
 Composite Data Types
 --------------------
 
 Arrays
 ~~~~~~
-PPL supports single-dimensional arrays of any basic data type.
+An array is declared by writing its bounds after the name. Up to three
+dimensions are supported.
 
-- **Declaration**: ``TYPE ARRAY(size) varname``
-- **Indexing**: 1-based (arrays start at index 1, not 0)
-- **Maximum size**: Typically 1000 elements
+- **Declaration**: ``INTEGER scores(10)``, ``INTEGER grid(10, 10)``
+- **Indexing**: zero based, with ``[ ]`` or ``( )``
+- **Bounds**: the declared number is the *highest* index, so ``scores(10)`` holds
+  the elements 0 to 10
+- **Length**: ``Len(array)`` answers the upper bound, ``Len(array, dim)`` the one
+  of a single dimension
 
 Example::
 
-    INTEGER ARRAY(10) scores
-    STRING ARRAY(50) userNames
-    BOOLEAN ARRAY(7) weekDays
-    
-    ; Accessing array elements
-    scores(1) = 100
-    userNames(5) = "John Doe"
-    weekDays(1) = TRUE  ; Monday
+    INTEGER scores(10)
+    STRING  userNames(50)
+    BOOLEAN weekDays(6)
+
+    scores[0] = 100
+    userNames[5] = "John Doe"
+    weekDays[0] = TRUE  ; Monday
+
+Since language version 350 an array may be written out instead::
+
+    INTEGER values = { 1, 2, 3 }
+
+which declares ``values(3)`` and fills the first three elements. An array of a
+record type works the same way, and every element has fields of its own::
+
+    Member members(10)
+    members[0].Name = "Sysop"
 
 Type Conversion
 ---------------
 
-PPL provides automatic type conversion in many cases, but explicit conversion functions are available:
+PPL converts between types on assignment where that makes sense. Where it should
+be spelled out, the ``To...`` functions do it:
 
-- **STRING()**: Convert to string
-- **INTEGER()**: Convert to integer
-- **REAL()**: Convert to real
-- **MONEY()**: Convert to money
-- **DATE()**: Convert to date
-- **TIME()**: Convert to time
-- **BYTE()**: Convert to byte
-- **WORD()**: Convert to word
-- **DWORD()**: Convert to dword
+- **ToString()** / **String()**: Convert to string
+- **ToInteger()**: Convert to integer
+- **ToReal()**, **ToDouble()**: Convert to a floating point number
+- **ToMoney()**: Convert to money
+- **ToDate()**, **ToTime()**: Convert to date or time
+- **ToByte()**, **ToWord()**, **ToDWord()**, **ToUnsigned()**: Convert to the
+  smaller number types
+- **ToBoolean()**: Convert to boolean
 
 Example::
 
     STRING strNum = "123"
-    INTEGER intNum = INTEGER(strNum)  ; Convert string to integer
-    
+    INTEGER intNum = ToInteger(strNum)   ; Convert string to integer
+
     REAL realVal = 3.14
-    STRING strVal = STRING(realVal)   ; Convert real to string
-    
+    STRING strVal = ToString(realVal)    ; Convert real to string
+
     INTEGER days = 30
-    DATE future = DATE() + days       ; Automatic conversion
+    DATE future = Date() + days          ; Automatic conversion
 
 Special Constants
 -----------------
@@ -289,8 +328,10 @@ Best Practices
 1. **Initialize variables**: Always initialize variables when declaring them
 2. **Use appropriate types**: Choose the most appropriate data type for your needs
 3. **Check ranges**: Be aware of type limits to avoid overflow
-4. **String length**: Remember STRING has a 256-character limit
-5. **Array bounds**: Always check array bounds (1-based indexing)
+4. **Index with brackets**: ``values[0]`` says it is an array, ``values(0)`` reads
+   like a call
+5. **Array bounds**: The declared number is the highest index, and indices start
+   at 0
 6. **Type conversion**: Use explicit conversion when mixing types
 
 Example of good practices::
@@ -300,10 +341,10 @@ Example of good practices::
     INTEGER userAge = 0
     MONEY accountBalance = 0.00
     BOOLEAN isVerified = FALSE
-    
+
     ; Check before array access
-    INTEGER ARRAY(10) data
+    INTEGER data(10)
     INTEGER index = 5
-    IF (index >= 1 AND index <= 10) THEN
-        data(index) = 100
+    IF (index >= 0 && index <= 10) THEN
+        data[index] = 100
     ENDIF
