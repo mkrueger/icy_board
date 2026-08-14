@@ -366,8 +366,8 @@ impl PCBoardImporter {
         })?;
 
         let icbtext = self.convert_pcbtext(&(self.data.path.text_loc.clone() + "/PCBTEXT"), "main/icbtext")?;
-        // let bad_users = self.convert_trashcan(&self.data.path.tcan_file.clone(), "main/tcan_user.txt")?;
-        let trashcan_upload_files = self.convert_trashcan(&self.data.path.tcan_file.clone(), "main/tcan_user.txt")?;
+        let trashcan_user = self.convert_trashcan(&self.data.path.tcan_file.clone(), "main/tcan_user.txt")?;
+        let trashcan_upload_files = self.convert_trashcan(&self.data.path.file_tcan.clone(), "main/tcan_uploads.txt")?;
         let tcan_email = self.create_file(include_str!("../../data/tcan_email.txt"), "main/tcan_email.txt")?;
         let tcan_passwords = self.create_file(include_str!("../../data/tcan_passwords.txt"), "main/tcan_passwords.txt")?;
         let vip_users = self.create_file(include_str!("../../data/vip_users.txt"), "main/vip_users.txt")?;
@@ -390,7 +390,7 @@ impl PCBoardImporter {
         let conf_join_menu = self.convert_display_file(&self.data.path.conf_menu.clone(), "art/cnfn")?;
         let group_chat = self.convert_display_file(&self.data.path.group_chat.clone(), "art/group")?;
         let chat_menu = self.convert_display_file(&self.data.path.chat_menu.clone(), "art/chtm")?;
-        let chat_actions_menu = self.convert_display_file(&self.data.path.chat_menu.clone(), "art/chatactm")?;
+        let chat_actions_menu = self.convert_display_file(&self.data.path.chat_actions.clone(), "art/chatactm")?;
 
         let no_ansi = self.convert_display_file(&self.data.path.no_ansi.clone(), "art/noansi")?;
 
@@ -573,7 +573,7 @@ impl PCBoardImporter {
                 },
 
                 trashcan_upload_files,
-                trashcan_user: PathBuf::new(),
+                trashcan_user,
                 trashcan_email: tcan_email,
                 trashcan_passwords: tcan_passwords,
                 vip_users,
@@ -1314,7 +1314,7 @@ impl PCBoardImporter {
         self.output.start_action(format!("Convert trashcan -> tcan_users.txt {}…", dest.display()));
 
         if !resolved_file.exists() {
-            fs::write(new_rel_name, trashcan_header)?;
+            fs::write(&dest, trashcan_header)?;
             self.logger.create_new_file(dest.clone().to_string_lossy());
             return Ok(dest);
         }
