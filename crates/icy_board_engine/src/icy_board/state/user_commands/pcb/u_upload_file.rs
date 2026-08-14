@@ -65,7 +65,9 @@ impl IcyBoardState {
         }
 
         // A name stacked on the command line skips the prompt.
-        let file_name = if let Some(token) = self.session.tokens.pop_front() {
+        let stacked_name = self.session.tokens.pop_front();
+        let had_token = stacked_name.is_some();
+        let file_name = if let Some(token) = stacked_name {
             token
         } else {
             self.input_field(
@@ -97,9 +99,16 @@ impl IcyBoardState {
             protocol_str = answer;
         }
 
+        // TRANSFER.C only offers the goodbye question in a batch upload, and only
+        // promotes to one when nothing was stacked on the command line.
+        let batch_upload = !had_token
+            && self.get_board().await.config.file_transfer.promote_to_batch_transfers
+            && self.session.user_command_level.batch_file_transfer.session_can_access(&self.session)
+            && self.is_batch_protocol(&protocol_str).await;
+
         let mut goodbye_after_upload = false;
 
-        loop {
+        while batch_upload {
             let input = self
                 .input_field(
                     IceText::GoodbyeAfterUpload,
@@ -190,6 +199,14 @@ impl IcyBoardState {
             }
         }
         protocol
+    }
+
+    pub async fn is_batch_protocol(&mut self, protocol_str: &str) -> bool {
+        self.get_board()
+            .await
+            .protocols
+            .iter()
+            .any(|p| p.is_enabled && p.is_batch && p.char_code == protocol_str)
     }
 }
 

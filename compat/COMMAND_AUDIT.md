@@ -27,6 +27,7 @@ is still analysis.
 | Q | One prompt, `(H)elp, (1-4), Message Scan Command?`. | |
 | Y | One prompt, `Msg Scan: (A)ll, (C)urrent, (S)ince, (Q)uick, (L)ong, (Enter)=abort?`. | |
 | U | `Enter the Filename to Upload (Enter)=none?`, then the description block (`Before beginning, enter a description of: NAME`, `Begin description with (/) to make upload 'Private'`, one `?` per line, empty line ends it), then `Protocol Type for Transfer, (Enter) or (N)=abort?`. An empty description returns to the filename prompt, which repeats like D's does. | |
+| R | `(H)elp, (1-N), Message Read Command?`, a number prints the header (`Date/Number/To/From/Subj`) and the body, then `(N min left), (H)elp, End of Message Command?`, and an empty answer returns to the read prompt rather than to the menu. | `crates/icboard/src/tests/cmd_r.rs` |
 
 icy_board's D asked once and gave up, which is the failure mode this audit warns
 about: a PPE that stuffs two names with `KBDSTUFF` had its second name answer
@@ -79,7 +80,7 @@ Zmodem transfer.
 | O | forced `NumTokens=1` so tokens are ignored; SYSOPUNAVAILABLE then COMMENTINSTEAD (571) **only if user has SEC_C** | gated on SEC_C, asked once, and also asked after a page that rang out | ✅ |
 | P | CURPAGELEN (284) then ENTERPAGELENGTH (146); token skips both | same | ✅ |
 | Q | MSGSCANCMDEXPERT (613)/MSGSCANCOMMAND (424); tokens skip it; shares R's command parser | same parser, quick-scan number semantics | ✅ verified against the original |
-| R | MSGREADCMDEXPRT (584)/MSGREADCOMMAND (425); per-message loop ENDOFMSGEXPERT (612)/ENDOFMESSAGE (197); MOVE (465)/COPY (569) | prompts and parser match; the capture and QWK commands parse but do nothing yet | ⚠️ |
+| R | MSGREADCMDEXPRT (584)/MSGREADCOMMAND (425); per-message loop ENDOFMSGEXPERT (612)/ENDOFMESSAGE (197); MOVE (465)/COPY (569) | prompts and parser match; the capture and QWK commands parse but do nothing yet | ⚠️ prompt sequence verified against the original, the capture commands are still empty |
 | S | QNUMTOANSWER (67), **always prompts, ignores tokens** | same | ✅ |
 | T | DESIREDPROTOCOL (198); token skips | same | ✅ |
 | U | CONTINUEUPLOAD (449), FILENAMETOUPLOAD (68)/(729), PROTOCOLFORXFER (280), GOODBYEAFTERUP (474) | 449, 68 (token aware), 280 when no protocol is set, then 474 | ⚠️ verified: the original asks for a description between 68 and 280 and repeats 68 like D; icy_board asks no description at all and asks 474 before the transfer |

@@ -88,12 +88,6 @@ pub const UNREAD_OPTIONS: &[UnreadOption] = &[
     },
     UnreadOption {
         section: "file_transfer",
-        option: "promote_to_batch_transfers",
-        kind: Unread::NotReadYet,
-        note: "",
-    },
-    UnreadOption {
-        section: "file_transfer",
         option: "upload_credit_time",
         kind: Unread::NotReadYet,
         note: "uploading earns neither time nor bytes",

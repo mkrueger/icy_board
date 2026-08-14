@@ -73,6 +73,29 @@ To run a PPE, append a 64-byte record to `~/dos/PCB/GEN/CMD.LST` (16 bytes
 command name, 32 bytes PPE path, 16 zero bytes) and type that command at the
 `command:` prompt.
 
+## Writing to the board
+
+Expect rules split on the first `=`, and most PCBoard prompts contain one, so a
+rule has to stop before it: `To \(Enter\)=ALL` works, `To \(Enter\)=.ALL.\?=ALL`
+sends nonsense. Rules only run before `--until` matches, so a command that has
+to be typed at the menu belongs in the rules (`command:=E`) rather than in a
+`--send`, otherwise the session stops at the menu with the command unsent.
+
+This writes a message and saves it:
+
+```sh
+python3 compat/bbs_session.py --wait 40 --idle 4 --total 20 --max-steps 45 \
+  --script compat/logon.expect \
+  --expect "Text Entry Command\?=S" --expect "alone to end=oracle body line" \
+  --expect "  2: =" --expect "To \(Enter\)=ALL" \
+  --expect "Subject \(Enter\)=ORACLE TEST MSG" \
+  --expect "Message Security \(H\)=" --expect "command:=E" \
+  --until "NOTHINGMATCHES"
+```
+
+`Message Security` is asked between the subject and the text, which is easy to
+miss when answers are sent by position instead of by pattern.
+
 ## Golden test format
 
 Test programs print `name=value` lines between `---BEGIN---` and `---END---`:

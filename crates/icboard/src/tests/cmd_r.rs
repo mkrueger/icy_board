@@ -188,3 +188,15 @@ fn test_cmd_r_all_does_not_ask_to_resume_a_scan_that_never_stopped() {
     let output = test_output("R A\n\n\n\n".to_string(), crate::tests::setup_conference_with_messages);
     assert!(!output.contains("Continue with scan"), "there is no scan to resume:\n{output}");
 }
+
+/// The original walks read prompt, message, end of message prompt, read prompt
+/// again - verified against PCBoard 15.4.
+#[test]
+fn test_cmd_r_walks_like_the_original() {
+    let output = test_output("R\n1\n\n\n".to_string(), crate::tests::setup_conference_with_messages);
+    assert_eq!(output.matches("Message Read Command?").count(), 2, "{output}");
+    assert_eq!(output.matches("End of Message Command?").count(), 1, "{output}");
+    for field in ["To: ", "From: ", "Subj: "] {
+        assert!(output.contains(field), "the header is missing {field}:\n{output}");
+    }
+}

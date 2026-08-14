@@ -17,7 +17,7 @@ Legend:
 - ❌ stored and editable, but nothing reads it
 - 📥 filled in by the `PCBOARD.DAT` importer, but nothing reads it afterwards
 
-**38 of 125 options and 21 of 29 sysop security levels do nothing today.**
+**37 of 125 options and 21 of 29 sysop security levels do nothing today.**
 
 ## board — general information
 
@@ -61,14 +61,14 @@ matching questions of the `W` command.
 
 ## file_transfer
 
-Eight of nine do nothing. This is the worst section, and the one a sysop is
+Seven of nine do nothing. This is the worst section, and the one a sysop is
 most likely to touch.
 
 | Option | Status | Note |
 |---|---|---|
 | `display_uploader` | ✅ | file listing |
 | `disallow_batch_uploads` | ❌ | `BU` is a stub anyway |
-| `promote_to_batch_transfers` | ❌ | |
+| `promote_to_batch_transfers` | ✅ | upload, decides whether a batch upload is offered and with it the goodbye question |
 | `upload_credit_time` | ❌ | uploading earns neither time nor bytes |
 | `upload_credit_bytes` | ❌ | |
 | `verify_files_uploaded` | ❌ | uploads are never test-extracted |
