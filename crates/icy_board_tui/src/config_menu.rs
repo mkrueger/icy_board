@@ -1296,16 +1296,18 @@ impl<T> ConfigMenu<T> {
                             item.render_label(left_area, frame, *i == state.selected, true);
                         }
 
-                        // Render separator
-                        Text::from(":").style(get_tui_theme().item_separator).render(
-                            Rect {
-                                x: left_area.x + item.label_width + 1,
-                                y: left_area.y,
-                                width: 1,
-                                height: 1,
-                            },
-                            frame.buffer_mut(),
-                        );
+                        // An item without a label is a bare column, so it carries no separator.
+                        if !item.title.is_empty() {
+                            Text::from(":").style(get_tui_theme().item_separator).render(
+                                Rect {
+                                    x: left_area.x + item.label_width + 1,
+                                    y: left_area.y,
+                                    width: 1,
+                                    height: 1,
+                                },
+                                frame.buffer_mut(),
+                            );
+                        }
 
                         // Calculate value area
                         let value_x = left_area.x + item.label_width + 3;
@@ -1376,15 +1378,17 @@ impl<T> ConfigMenu<T> {
                         };
                         item.render_label(left_area, frame, *i == state.selected, true);
 
-                        Text::from(":").style(get_tui_theme().item_separator).render(
-                            Rect {
-                                x: left_area.left() + item.label_width + 1,
-                                y: area.y + *y - state.first_row,
-                                width: 1,
-                                height: 1,
-                            },
-                            frame.buffer_mut(),
-                        );
+                        if !item.title.is_empty() {
+                            Text::from(":").style(get_tui_theme().item_separator).render(
+                                Rect {
+                                    x: left_area.left() + item.label_width + 1,
+                                    y: area.y + *y - state.first_row,
+                                    width: 1,
+                                    height: 1,
+                                },
+                                frame.buffer_mut(),
+                            );
+                        }
 
                         let right_area = Rect {
                             x: left_area.left() + item.label_width + 3,

@@ -5,7 +5,7 @@ use crossterm::event::{KeyCode, KeyEvent};
 use icy_board_engine::icy_board::{
     IcyBoard,
     user_base::ConferenceFlags,
-    user_maintenance::{self, CounterInit, ExpirationChange, MaintenanceReport, SecurityField, UserSelection},
+    user_maintenance::{self, ExpirationChange, MaintenanceReport, SecurityField, UserSelection},
 };
 use icy_board_tui::{
     BORDER_SET,
@@ -22,7 +22,7 @@ use ratatui::{
 };
 use std::collections::HashMap;
 
-use super::{counter_init_combo, counter_init_from, counter_scope};
+use super::{counter_init_from_option, counter_scope};
 
 /// The bulk operations offered below "Users File Maintenance", named the way
 /// the utility this replaces named them.
@@ -47,7 +47,7 @@ impl MaintenanceOp {
             MaintenanceOp::AdjustSecurity => get_text("icbsm_sec_by_ranges_title"),
             MaintenanceOp::AdjustSecurityExpired => get_text("icbsm_sec_by_ranges_expired_title"),
             MaintenanceOp::CopyExpiredSecurity => get_text("icbsm_sec_copy_expired"),
-            MaintenanceOp::InitializeCounters => get_text("icbsm_sec_init_counters"),
+            MaintenanceOp::InitializeCounters => get_text("icbsm_counters_title"),
             MaintenanceOp::AdjustExpiration => get_text("icbsm_adjust_expiration_title"),
             MaintenanceOp::ConferenceInsert => get_text("icbsm_conf_insert_title"),
             MaintenanceOp::ConferenceRemove => get_text("icbsm_conf_remove_title"),
@@ -76,7 +76,7 @@ struct Params {
     keep_locked_out: bool,
 
     new_level: u32,
-    counter_init: CounterInit,
+    counter_option: u32,
     counter_files: bool,
     counter_bytes: bool,
 
@@ -122,9 +122,9 @@ impl Default for Params {
             keep_security: 100,
             keep_locked_out: true,
             new_level: 0,
-            counter_init: CounterInit::Zero,
-            counter_files: true,
-            counter_bytes: true,
+            counter_option: 1,
+            counter_files: false,
+            counter_bytes: false,
             set_expiration_date: false,
             expiration_date: Utc::now(),
             add_days: 0,
@@ -168,6 +168,7 @@ const PACK_LABEL_WIDTH: u16 = 50;
 const SECURITY_LABEL_WIDTH: u16 = 55;
 const EXPIRATION_LABEL_WIDTH: u16 = 61;
 const CONFERENCE_LABEL_WIDTH: u16 = 60;
+const COUNTER_LABEL_WIDTH: u16 = 44;
 
 fn screen_label_width(op: MaintenanceOp) -> u16 {
     match op {
@@ -297,6 +298,9 @@ impl MaintenancePage {
                     ],
                 ),
             ]
+        } else if op == MaintenanceOp::InitializeCounters {
+            // The counters screen picks no range; it lists its options instead.
+            Vec::new()
         } else {
             let width = screen_label_width(op);
             let mut range = vec![
@@ -337,21 +341,34 @@ impl MaintenancePage {
                 ));
             }
             MaintenanceOp::InitializeCounters => {
+                for key in [
+                    "icbsm_counters_option1",
+                    "icbsm_counters_option2",
+                    "icbsm_counters_option3",
+                    "icbsm_counters_option4",
+                ] {
+                    entry.push(ConfigEntry::Label(get_text(key)));
+                }
                 entry.push(ConfigEntry::Separator);
-                entry.push(ConfigEntry::Item(
-                    ListItem::new(get_text("icbsm_counters_mode"), ListValue::ComboBox(counter_init_combo(CounterInit::Zero)))
-                        .with_status(get_text("icbsm_counters_mode"))
-                        .with_label_width(LABEL_WIDTH)
-                        .with_update_combobox_value(&|o: &Obj, value: &icy_board_tui::config_menu::ComboBox| {
-                            o.lock().unwrap().counter_init = counter_init_from(&value.cur_value.value)
-                        }),
+                entry.push(sized(
+                    u32_item("icbsm_counters_choose", params.counter_option, 1, 4, &|o: &Obj, v: u32| {
+                        o.lock().unwrap().counter_option = v
+                    }),
+                    COUNTER_LABEL_WIDTH,
                 ));
-                entry.push(bool_item("icbsm_counters_files", params.counter_files, &|o: &Obj, v: bool| {
-                    o.lock().unwrap().counter_files = v
-                }));
-                entry.push(bool_item("icbsm_counters_bytes", params.counter_bytes, &|o: &Obj, v: bool| {
-                    o.lock().unwrap().counter_bytes = v
-                }));
+                entry.push(ConfigEntry::Separator);
+                entry.push(sized(
+                    bool_item("icbsm_counters_files", params.counter_files, &|o: &Obj, v: bool| {
+                        o.lock().unwrap().counter_files = v
+                    }),
+                    COUNTER_LABEL_WIDTH,
+                ));
+                entry.push(sized(
+                    bool_item("icbsm_counters_bytes", params.counter_bytes, &|o: &Obj, v: bool| {
+                        o.lock().unwrap().counter_bytes = v
+                    }),
+                    COUNTER_LABEL_WIDTH,
+                ));
             }
             MaintenanceOp::AdjustExpiration => {
                 entry.push(ConfigEntry::Separator);
@@ -421,7 +438,7 @@ impl MaintenancePage {
                 entry,
             },
             state: ConfigMenuState::default(),
-            stage: if op == MaintenanceOp::StandardizePhones {
+            stage: if matches!(op, MaintenanceOp::StandardizePhones | MaintenanceOp::CopyExpiredSecurity) {
                 Stage::Confirm
             } else {
                 Stage::Criteria
@@ -510,7 +527,7 @@ impl MaintenancePage {
                 p.reset_lastread,
                 p.move_last_conference,
                 p.new_level.min(255) as u8,
-                (p.counter_init, counter_scope(p.counter_files, p.counter_bytes)),
+                (counter_init_from_option(p.counter_option), counter_scope(p.counter_files, p.counter_bytes)),
                 if p.set_expiration_date {
                     ExpirationChange::SetDate(p.expiration_date)
                 } else {
@@ -576,13 +593,7 @@ impl Page for MaintenancePage {
 
         match &self.stage {
             Stage::Confirm => {
-                self.render_lines(
-                    frame,
-                    area,
-                    self.op.title(),
-                    get_text("icbsm_criteria_keys"),
-                    vec![Line::from(get_text("icbsm_are_you_sure"))],
-                );
+                super::render_question(frame, disp_area, &get_text("icbsm_are_you_sure"), &get_text("icbsm_question_keys"));
             }
             Stage::Criteria => {
                 let block = Block::new()

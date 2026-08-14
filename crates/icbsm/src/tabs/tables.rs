@@ -8,7 +8,7 @@ use icy_board_engine::icy_board::{
 };
 use icy_board_tui::{
     BORDER_SET,
-    config_menu::{ComboBox, ComboBoxValue, ConfigEntry, ConfigMenu, ConfigMenuState, EditMessage, ListItem, ListValue, ResultState},
+    config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, EditMessage, ListItem, ListValue, ResultState},
     get_text, get_text_args,
     select_menu::MenuItem,
     tab_page::{Page, PageMessage},
@@ -16,7 +16,7 @@ use icy_board_tui::{
 };
 use ratatui::{
     Frame,
-    layout::{Alignment, Margin, Rect},
+    layout::{Alignment, Constraint, Layout, Margin, Rect},
     text::{Line, Span, Text},
     widgets::{Block, Borders, Clear, Padding, Paragraph, Widget, Wrap},
 };
@@ -67,22 +67,36 @@ pub fn security_menu_page(icy_board: Arc<Mutex<IcyBoard>>) -> MenuPage {
     )
 }
 
-fn table_title(kind: TableKind) -> String {
-    get_text(match kind {
-        TableKind::FileRatio => "icbsm_sec_table_file_ratio",
-        TableKind::ByteRatio => "icbsm_sec_table_byte_ratio",
-        TableKind::Uploads => "icbsm_sec_table_uploads",
-        TableKind::Downloads => "icbsm_sec_table_downloads",
-    })
+fn kind_text(kind: TableKind, prefix: &str) -> String {
+    get_text(&format!(
+        "{prefix}_{}",
+        match kind {
+            TableKind::FileRatio => "file_ratio",
+            TableKind::ByteRatio => "byte_ratio",
+            TableKind::Uploads => "uploads",
+            TableKind::Downloads => "downloads",
+        }
+    ))
 }
 
-fn apply_title(kind: TableKind) -> String {
-    get_text(match kind {
-        TableKind::FileRatio => "icbsm_sec_by_file_ratio",
-        TableKind::ByteRatio => "icbsm_sec_by_byte_ratio",
-        TableKind::Uploads => "icbsm_sec_by_uploads",
-        TableKind::Downloads => "icbsm_sec_by_downloads",
-    })
+fn edit_title(kind: TableKind) -> String {
+    kind_text(kind, "icbsm_table_title")
+}
+
+fn value_header(kind: TableKind) -> String {
+    kind_text(kind, "icbsm_table_column")
+}
+
+/// The panel of prose the original printed beside the table.
+fn table_help(kind: TableKind) -> Vec<Line<'static>> {
+    let mut lines = vec![
+        Line::from(Span::styled(kind_text(kind, "icbsm_table_help_title"), get_tui_theme().group_title)),
+        Line::from(""),
+    ];
+    for line in kind_text(kind, "icbsm_table_help").lines() {
+        lines.push(Line::from(line.to_string()));
+    }
+    lines
 }
 
 /// A step is only part of the table once it names a security level.
@@ -107,13 +121,13 @@ macro_rules! row_items {
     ($rows:expr, $($index:literal),+) => {
         vec![$(
             ConfigEntry::Item(
-                ListItem::new(get_text("icbsm_table_value"), ListValue::Float($rows[$index].0, $rows[$index].0.to_string()))
-                    .with_label_width(10)
+                ListItem::new(String::new(), ListValue::Float($rows[$index].0, $rows[$index].0.to_string()))
+                    .with_label_width(0)
                     .with_update_float_value(&|o: &Obj, v: f64| o.lock().unwrap().rows[$index].0 = v),
             ),
             ConfigEntry::Item(
-                ListItem::new(get_text("icbsm_table_security"), ListValue::U32($rows[$index].1, 0, 255))
-                    .with_label_width(10)
+                ListItem::new(String::new(), ListValue::U32($rows[$index].1, 0, 255))
+                    .with_label_width(0)
                     .with_update_u32_value(&|o: &Obj, v: u32| o.lock().unwrap().rows[$index].1 = v),
             ),
         )+]
@@ -141,7 +155,7 @@ impl TableEditPage {
             }
         }
 
-        let entry = vec![ConfigEntry::Separator, ConfigEntry::Table(2, row_items!(rows, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9))];
+        let entry = vec![ConfigEntry::Table(2, row_items!(rows, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9))];
 
         Self {
             icy_board,
@@ -181,7 +195,7 @@ impl Page for TableEditPage {
             render_box(
                 frame,
                 area,
-                table_title(self.kind),
+                edit_title(self.kind),
                 get_text("icbsm_done_keys"),
                 vec![Line::from(message.clone())],
             );
@@ -195,12 +209,30 @@ impl Page for TableEditPage {
             .border_style(get_tui_theme().dialog_box)
             .padding(Padding::new(2, 2, 1, 0))
             .title_alignment(Alignment::Center)
-            .title(Span::styled(table_title(self.kind), get_tui_theme().dialog_box_title))
+            .title(Span::styled(edit_title(self.kind), get_tui_theme().dialog_box_title))
             .title_bottom(Span::styled(get_text("icbsm_table_keys"), get_tui_theme().key_binding));
         block.render(area, frame.buffer_mut());
 
         let inner = area.inner(Margin { vertical: 1, horizontal: 2 });
-        self.menu.render(inner, frame, &mut self.state);
+        let [table_area, help_area] = Layout::horizontal([Constraint::Length(24), Constraint::Min(20)]).areas(inner);
+
+        // The two columns carry their heading once, over the whole table.
+        let headers = Line::from(format!("{:<11}{}", value_header(self.kind), get_text("icbsm_table_security")));
+        Paragraph::new(Text::from(headers))
+            .style(get_tui_theme().group_title)
+            .render(Rect { height: 1, ..table_area }, frame.buffer_mut());
+
+        let rows_area = Rect {
+            y: table_area.y + 2,
+            height: table_area.height.saturating_sub(2),
+            ..table_area
+        };
+        self.menu.render(rows_area, frame, &mut self.state);
+
+        Paragraph::new(Text::from(table_help(self.kind)))
+            .style(get_tui_theme().item)
+            .wrap(Wrap { trim: false })
+            .render(help_area, frame.buffer_mut());
     }
 
     fn request_status(&self) -> ResultState {
@@ -226,7 +258,8 @@ impl Page for TableEditPage {
     }
 }
 
-/// Reads a table back and moves the security levels it names.
+/// Reads a table back and moves the security levels it names. There is nothing
+/// to fill in here, so the screen is the one question the original asked.
 pub struct TableApplyPage {
     icy_board: Arc<Mutex<IcyBoard>>,
     kind: TableKind,
@@ -275,23 +308,25 @@ impl TableApplyPage {
 }
 
 impl Page for TableApplyPage {
+    fn is_modal(&self) -> bool {
+        true
+    }
+
     fn render(&mut self, frame: &mut Frame, disp_area: Rect) {
-        let area = disp_area.inner(Margin { vertical: 1, horizontal: 2 });
-        Clear.render(area, frame.buffer_mut());
-
-        let (lines, bottom) = if let Some(result) = &self.result {
-            (vec![Line::from(result.clone())], get_text("icbsm_done_keys"))
+        let (line, bottom) = if let Some(result) = &self.result {
+            (result.clone(), get_text("icbsm_done_keys"))
         } else if self.entries.is_empty() {
-            (vec![Line::from(get_text("icbsm_table_empty"))], get_text("icbsm_done_keys"))
+            (get_text("icbsm_table_empty"), get_text("icbsm_done_keys"))
         } else {
-            let mut lines = vec![Line::from(get_text("icbsm_table_header")), Line::from("")];
-            for entry in &self.entries {
-                lines.push(Line::from(format!("  {:>12}  {:>3}", entry.value, entry.security)));
-            }
-            (lines, get_text("icbsm_criteria_keys"))
+            (
+                get_text_args(
+                    "icbsm_apply_table_question",
+                    HashMap::from([("count".to_string(), self.entries.len().to_string())]),
+                ),
+                get_text("icbsm_question_keys"),
+            )
         };
-
-        render_box(frame, area, apply_title(self.kind), bottom, lines);
+        render_question(frame, disp_area, &line, &bottom);
     }
 
     fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
@@ -307,6 +342,33 @@ impl Page for TableApplyPage {
             _ => PageMessage::None,
         }
     }
+}
+
+/// One question in a box of its own, the way the original asked when a screen
+/// had nothing to fill in.
+pub fn render_question(frame: &mut Frame, disp_area: Rect, question: &str, bottom: &str) {
+    let width = (question.chars().count() as u16 + 8).min(disp_area.width.saturating_sub(4));
+    let area = Rect {
+        x: disp_area.x + (disp_area.width.saturating_sub(width)) / 2,
+        y: disp_area.y + disp_area.height / 3,
+        width,
+        height: 5,
+    };
+    Clear.render(area, frame.buffer_mut());
+
+    let block = Block::new()
+        .style(get_tui_theme().background)
+        .borders(Borders::ALL)
+        .border_set(BORDER_SET)
+        .border_style(get_tui_theme().menu_box)
+        .padding(Padding::new(2, 2, 1, 0))
+        .title_bottom(Span::styled(bottom.to_string(), get_tui_theme().key_binding));
+
+    Paragraph::new(Text::from(question.to_string()))
+        .style(get_tui_theme().item)
+        .alignment(Alignment::Center)
+        .block(block)
+        .render(area, frame.buffer_mut());
 }
 
 fn render_box(frame: &mut Frame, area: Rect, title: String, bottom: String, lines: Vec<Line<'static>>) {
@@ -327,31 +389,12 @@ fn render_box(frame: &mut Frame, area: Rect, title: String, bottom: String, line
         .render(area, frame.buffer_mut());
 }
 
-/// The three ways the original offered to reset the transfer counters.
-pub fn counter_init_combo(current: CounterInit) -> ComboBox {
-    let values = vec![
-        ComboBoxValue::new(get_text("icbsm_counters_zero"), "Zero"),
-        ComboBoxValue::new(get_text("icbsm_counters_up_from_down"), "UploadsFromDownloads"),
-        ComboBoxValue::new(get_text("icbsm_counters_down_from_up"), "DownloadsFromUploads"),
-    ];
-    let selected = match current {
-        CounterInit::Zero => 0,
-        CounterInit::UploadsFromDownloads => 1,
-        CounterInit::DownloadsFromUploads => 2,
-    };
-    ComboBox {
-        is_edit_open: false,
-        cur_value: values[selected].clone(),
-        values,
-        selected_item: selected,
-        first_item: 0,
-    }
-}
-
-pub fn counter_init_from(value: &str) -> CounterInit {
-    match value {
-        "UploadsFromDownloads" => CounterInit::UploadsFromDownloads,
-        "DownloadsFromUploads" => CounterInit::DownloadsFromUploads,
+/// The four ways the original offered to reset the transfer counters, in its order.
+pub fn counter_init_from_option(option: u32) -> CounterInit {
+    match option {
+        1 => CounterInit::UploadsFromDownloads,
+        2 => CounterInit::DownloadsFromUploads,
+        4 => CounterInit::BytesFromFileRatio,
         _ => CounterInit::Zero,
     }
 }

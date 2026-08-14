@@ -485,6 +485,8 @@ pub enum CounterInit {
     Zero,
     UploadsFromDownloads,
     DownloadsFromUploads,
+    /// Splits the bytes a caller moved the way their file counts are split.
+    BytesFromFileRatio,
 }
 
 /// Which pair of counters it does it to.
@@ -507,6 +509,7 @@ pub fn initialize_counters(base: &mut UserBase, selection: &UserSelection, init:
                 }
                 CounterInit::UploadsFromDownloads => stats.num_uploads = stats.num_downloads,
                 CounterInit::DownloadsFromUploads => stats.num_downloads = stats.num_uploads,
+                CounterInit::BytesFromFileRatio => {}
             }
         }
         if scope.bytes {
@@ -517,6 +520,14 @@ pub fn initialize_counters(base: &mut UserBase, selection: &UserSelection, init:
                 }
                 CounterInit::UploadsFromDownloads => stats.total_upld_bytes = stats.total_dnld_bytes,
                 CounterInit::DownloadsFromUploads => stats.total_dnld_bytes = stats.total_upld_bytes,
+                CounterInit::BytesFromFileRatio => {
+                    let files = stats.num_uploads + stats.num_downloads;
+                    let bytes = stats.total_upld_bytes + stats.total_dnld_bytes;
+                    if files > 0 {
+                        stats.total_upld_bytes = bytes * stats.num_uploads / files;
+                        stats.total_dnld_bytes = bytes - stats.total_upld_bytes;
+                    }
+                }
             }
         }
 
@@ -1099,6 +1110,22 @@ mod tests {
         assert_eq!(1, loaded.get(TableKind::FileRatio).len());
         assert_eq!(50, loaded.get(TableKind::FileRatio)[0].security);
         assert!(loaded.get(TableKind::Uploads).is_empty());
+    }
+
+    #[test]
+    fn byte_counters_can_follow_the_file_ratio() {
+        let mut base = base(vec![user("Sysop", 110), user("A", 20)]);
+        base[1].stats.num_uploads = 1;
+        base[1].stats.num_downloads = 3;
+        base[1].stats.total_upld_bytes = 800;
+        base[1].stats.total_dnld_bytes = 0;
+
+        let scope = CounterScope { files: false, bytes: true };
+        initialize_counters(&mut base, &UserSelection::default(), CounterInit::BytesFromFileRatio, scope, now());
+
+        assert_eq!(200, base[1].stats.total_upld_bytes);
+        assert_eq!(600, base[1].stats.total_dnld_bytes);
+        assert_eq!(1, base[1].stats.num_uploads, "the file counters were out of scope");
     }
 
     #[test]

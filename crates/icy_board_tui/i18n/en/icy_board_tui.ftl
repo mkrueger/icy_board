@@ -1592,21 +1592,81 @@ icbsm_sec_table_downloads=Create Download Table
 icbsm_sec_copy_expired=Change Security to Expired Level
 icbsm_sec_init_counters=Initialize Upld/Dnld Counters
 
-icbsm_table_value=Reaches
+icbsm_table_title_file_ratio=Edit Upload/Download FILE Ratio Table
+icbsm_table_title_byte_ratio=Edit Upload/Download BYTE Ratio Table
+icbsm_table_title_uploads=Edit Upload Table
+icbsm_table_title_downloads=Edit Download Table
+
+icbsm_table_column_file_ratio=Ratio
+icbsm_table_column_byte_ratio=Ratio
+icbsm_table_column_uploads=Uploads
+icbsm_table_column_downloads=Downloads
 icbsm_table_security=Security
-icbsm_table_header=Reaches       Security
+
+icbsm_table_help_title_file_ratio=Adjust Securities by Upload/Download Ratio
+icbsm_table_help_title_byte_ratio=Adjust Securities by Upload/Download Ratio
+icbsm_table_help_title_uploads=Adjust Securities by Number of Uploads
+icbsm_table_help_title_downloads=Adjust Securities by Number of Downloads
+
+icbsm_table_help_file_ratio =
+    Define each of the upload/download ratios desired and attach a security level to each. A ratio is uploads divided by downloads.
+    .
+    Examples:
+    .
+      0.1  means   1 up for every 10 down
+      1.0  means   uploads equal downloads
+      5.0  means   5 up for every 1 down
+    .
+    NOTE: A caller below the lowest step in the table keeps the security level they have.
+icbsm_table_help_byte_ratio =
+    Define each of the upload/download byte ratios desired and attach a security level to each. A ratio is bytes uploaded divided by bytes downloaded.
+    .
+    Examples:
+    .
+      0.1  means   1 byte up for every 10 down
+      1.0  means   bytes up equal bytes down
+      5.0  means   5 bytes up for every 1 down
+    .
+    NOTE: A caller below the lowest step in the table keeps the security level they have.
+icbsm_table_help_uploads =
+    Define each of the upload counts desired and attach a security level to each. A caller who reaches a count gets that level, whether it raises or lowers the one they have.
+    .
+    Example:      Uploads   Security
+    .
+      assuming        0        10
+      this table     10        25
+      is used        20        30
+                     30        35
+    .
+    A caller with 10 to 19 uploads and a level of 20 would be raised to 25. Below the lowest step the level stays as it is.
+icbsm_table_help_downloads =
+    Define each of the download counts desired and attach a security level to each. A caller who reaches a count gets that level, whether it raises or lowers the one they have.
+    .
+    Example:    Downloads   Security
+    .
+      assuming        0        35
+      this table     10        25
+      is used        20        20
+                     30        15
+    .
+    A caller with 20 to 29 downloads and a level of 15 would be raised to 20. Below the lowest step the level stays as it is.
+
 icbsm_table_empty=This table has no steps yet. Build it first.
 icbsm_table_hint=A step with security 0 is left out of the table
-icbsm_table_keys=Press PGDN to save the table, or press ESC to abort
+icbsm_table_keys=ESC=Exit   PGDN=Save the table   Arrows=Move
 icbsm_table_saved=The table was saved.
 
-icbsm_counters_mode=Initialize the counters by
-icbsm_counters_zero=Setting them to zero
-icbsm_counters_up_from_down=Making uploads equal downloads
-icbsm_counters_down_from_up=Making downloads equal uploads
-icbsm_counters_files=Adjust the file counters
-icbsm_counters_bytes=Adjust the byte counters
+icbsm_counters_title=Initialize Upload/Download Counters
+icbsm_counters_option1=1) Make fields EQUAL (based on download field)
+icbsm_counters_option2=2) Make fields EQUAL (based on upload field)
+icbsm_counters_option3=3) Initialize both upload & download fields to ZERO
+icbsm_counters_option4=4) Initialize both BYTE counters (based on Up:Down FILE ratio)
+icbsm_counters_choose=Choose Option (1, 2, 3 or 4 from above)
+icbsm_counters_files=Adjust Upload / Download FILE Counters
+icbsm_counters_bytes=Adjust Upload / Download BYTE Counters
 
+icbsm_apply_table_question=Adjust securities from the { $count } step(s) in the table?
+icbsm_question_keys=PGDN=Yes   ESC=Abort
 icbsm_are_you_sure=Are you sure?
 
 icbsm_sort_options_title=Sort Options
