@@ -31,22 +31,27 @@ is still analysis.
 
 icy_board's D asked once and gave up, which is the failure mode this audit warns
 about: a PPE that stuffs two names with `KBDSTUFF` had its second name answer
-the main menu instead. It loops now.
+the main menu instead. It asks again now, and stops once the batch limit is
+reached - outside a batch that is a single file, so a name that resolves ends
+the questioning and only a name that finds nothing is asked for again.
 
 Our D prompt carries a `(1)` batch counter the original does not print. The
 count and the order are the contract, the wording is not, so this stays.
 
 **U asked no description at all** - `EnterDescription` (160) sat in the text
-table and no command used it, so an upload landed without one. It now follows
-`getdescription` in TRANSFER.C: the name, then the description block, then the
+table and no command used it, so an upload landed without one. The order is now
+the one the original uses: the name, then the description block, then the
 protocol. An empty first line abandons an upload that has not started and a
-first line shorter than five characters is refused, both as in the original.
-`GoodbyeAfterUpload` (474) is asked in batch mode only, which is what the source
-says and what the oracle could not reach.
+first line shorter than five characters is refused. A leading `/` on the first
+line marks the upload for screening, which decides whether it lands in the
+conference's private or public upload directory, and the board says which of the
+two it will be before the transfer starts.
 
-Two things are left for U. The original asks for another name after each one the
-way D does, and it reads a leading `/` on the first description line as "store
-this upload privately"; icy_board asks once and ignores the slash.
+`GoodbyeAfterUpload` (474) is asked in batch mode only. A transfer becomes a
+batch when the sysop allows promoting, nothing was stacked on the command line,
+the caller's protocol is a batch protocol and their security reaches the batch
+level. The oracle cannot reach that point, because the harness carries no
+Zmodem transfer.
 
 ## Ground rules PCBoard applies to every command
 

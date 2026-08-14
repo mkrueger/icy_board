@@ -42,10 +42,12 @@ impl IcyBoardState {
         Ok(true)
     }
 
-    /// TRANSFER.C `getdescription`: the caller describes the file before anything is
-    /// transferred, and an empty first line abandons an upload that has not started.
-    pub async fn ask_upload_description(&mut self, file_name: &str) -> Res<Option<Vec<String>>> {
+    /// PCBoard has the caller describe the file before anything is transferred, and an
+    /// empty first line abandons an upload that has not started. A leading `/` on the
+    /// first line asks for the upload to be screened.
+    pub async fn ask_upload_description(&mut self, file_name: &str) -> Res<Option<(Vec<String>, bool)>> {
         let max_lines = self.get_board().await.config.file_transfer.upload_descr_lines.max(1) as usize;
+        let mut private = self.session.current_conference.private_uploads;
 
         self.session.op_text = file_name.to_string();
         self.display_text(IceText::EnterDescription, display_flags::NEWLINE | display_flags::LFBEFORE)
@@ -77,12 +79,15 @@ impl IcyBoardState {
                     self.display_text(IceText::LongerDescription, display_flags::NEWLINE).await?;
                     continue;
                 }
+                if line.starts_with('/') {
+                    private = true;
+                }
             } else if line.is_empty() {
                 break;
             }
             lines.push(line);
         }
-        Ok(Some(lines))
+        Ok(Some((lines, private)))
     }
 
     pub async fn upload_file(&mut self) -> Res<()> {
@@ -129,9 +134,35 @@ impl IcyBoardState {
             return Ok(());
         }
 
-        let Some(description) = self.ask_upload_description(&file_name).await? else {
+        let Some((description, private_upload)) = self.ask_upload_description(&file_name).await? else {
             return Ok(());
         };
+
+        // PCBoard receives into the private location and moves the file to the public
+        // one afterwards unless it is to be screened.
+        let (upload_location, upload_metadata) = if private_upload {
+            (
+                self.session.current_conference.private_upload_location.clone(),
+                self.session.current_conference.private_upload_metadata.clone(),
+            )
+        } else {
+            (upload_location, upload_metadata)
+        };
+        if !upload_location.exists() {
+            self.display_text(
+                IceText::NoDirectoriesAvailable,
+                display_flags::NEWLINE | display_flags::BELL | display_flags::LFBEFORE,
+            )
+            .await?;
+            return Ok(());
+        }
+
+        self.display_text(IceText::UploadStatus, display_flags::DEFAULT).await?;
+        self.display_text(
+            if private_upload { IceText::ScreenEditor } else { IceText::PostedImmediately },
+            display_flags::NEWLINE,
+        )
+        .await?;
 
         // PCBoard settles the protocol before it offers the goodbye question, and
         // asks for one rather than starting a transfer the caller has none for.
@@ -147,8 +178,7 @@ impl IcyBoardState {
             protocol_str = answer;
         }
 
-        // TRANSFER.C only offers the goodbye question in a batch upload, and only
-        // promotes to one when nothing was stacked on the command line.
+        // PCBoard only offers the goodbye question in a batch upload.
         let batch_upload = !had_token
             && self.get_board().await.config.file_transfer.promote_to_batch_transfers
             && self.session.user_command_level.batch_file_transfer.session_can_access(&self.session)
@@ -262,6 +292,19 @@ impl IcyBoardState {
             .protocols
             .iter()
             .any(|p| p.is_enabled && p.is_batch && p.char_code == protocol_str)
+    }
+
+    /// PCBoard promotes a transfer to a batch only when nothing was stacked on the
+    /// command line, the caller's protocol is a batch one and the sysop allows it.
+    pub async fn promotes_to_batch(&mut self, had_token: bool) -> bool {
+        if had_token || !self.get_board().await.config.file_transfer.promote_to_batch_transfers {
+            return false;
+        }
+        if !self.session.user_command_level.batch_file_transfer.session_can_access(&self.session) {
+            return false;
+        }
+        let protocol = self.session.current_user.as_ref().map(|user| user.protocol.clone()).unwrap_or_default();
+        self.is_batch_protocol(&protocol).await
     }
 }
 

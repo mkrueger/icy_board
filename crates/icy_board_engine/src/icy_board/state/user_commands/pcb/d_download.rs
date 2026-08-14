@@ -33,9 +33,19 @@ impl IcyBoardState {
                 }
             }
 
-            // PCBoard keeps asking for another name until the caller answers nothing,
-            // and a PPE stuffing names with KBDSTUFF counts on it.
-            while self.flag_files_cmd(true).await? {}
+            // PCBoard asks for another name until the caller answers nothing or the
+            // batch limit is reached, and outside a batch that limit is a single file.
+            let had_token = !self.session.tokens.is_empty();
+            let limit = if self.promotes_to_batch(had_token).await {
+                self.session.batch_limit.max(1)
+            } else {
+                1
+            };
+            while self.session.flagged_files.len() < limit {
+                if !self.flag_files_cmd(true).await? {
+                    break;
+                }
+            }
 
             if self.session.flagged_files.is_empty() {
                 return Ok(());
