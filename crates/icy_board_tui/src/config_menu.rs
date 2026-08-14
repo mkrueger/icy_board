@@ -287,6 +287,14 @@ impl<T> ListItem<T> {
         self
     }
 
+    /// Greys the entry out when the audit says the board does not read this option.
+    pub fn maybe_inactive(self, property: &str, field: &str) -> Self {
+        match crate::inactive_options::inactive_reason(property, field) {
+            Some(reason) => self.with_inactive(reason),
+            None => self,
+        }
+    }
+
     pub fn with_status(mut self, status: impl Into<String>) -> Self {
         self.status = status.into();
         self

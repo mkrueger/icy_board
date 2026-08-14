@@ -3,6 +3,7 @@ error_file_or_path_not_found = File or path not found
 
 # Shown for an option the board does not read yet
 option_not_read_yet = the board does not act on this yet
+option_imported_only = kept from the PCBoard import, the board does not act on it
 
 exit_icy_board_msg = Thank you for using { $name } Professional BBS Software!
 

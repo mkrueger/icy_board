@@ -9,6 +9,7 @@ macro_rules! cfg_entry_text {
             .with_status(&icy_board_tui::get_text(&format!("{}-status", $i)))
             .with_help(&icy_board_tui::get_text(&format!("{}-help", $i)))
             .with_label_width($width)
+            .maybe_inactive(stringify!($property), stringify!($conf))
             .with_update_text_value(&|board: &Arc<Mutex<IcyBoard>>, value: String| {
                 board.lock().unwrap().config.$property.$conf = value;
             }),
@@ -24,6 +25,7 @@ macro_rules! cfg_entry_text {
             .with_status(&icy_board_tui::get_text(&format!("{}-status", $i)))
             .with_help(&icy_board_tui::get_text(&format!("{}-help", $i)))
             .with_label_width($width)
+            .maybe_inactive(stringify!($property), stringify!($conf))
             .with_edit_width($edit_with)
             .with_update_text_value(&|board: &Arc<Mutex<IcyBoard>>, value: String| {
                 board.lock().unwrap().config.$property.$conf = value;
@@ -43,6 +45,7 @@ macro_rules! cfg_entry_bool {
             .with_status(&icy_board_tui::get_text(&format!("{}-status", $i)))
             .with_help(&icy_board_tui::get_text(&format!("{}-help", $i)))
             .with_label_width($width)
+            .maybe_inactive(stringify!($property), stringify!($conf))
             .with_update_bool_value(&|board: &Arc<Mutex<IcyBoard>>, value: bool| {
                 board.lock().unwrap().config.$property.$conf = value;
             }),
@@ -57,6 +60,7 @@ macro_rules! cfg_entry_bool {
             .with_status(&icy_board_tui::get_text(&format!("{}-status", $i)))
             .with_help(&icy_board_tui::get_text(&format!("{}-help", $i)))
             .with_label_width($width)
+            .maybe_inactive(stringify!($property), stringify!($conf))
             .with_edit_width($edit_width)
             .with_update_bool_value(&|board: &Arc<Mutex<IcyBoard>>, value: bool| {
                 board.lock().unwrap().config.$property.$conf = value;
@@ -76,6 +80,7 @@ macro_rules! cfg_entry_u32 {
             .with_status(&icy_board_tui::get_text(&format!("{}-status", $i)))
             .with_help(&icy_board_tui::get_text(&format!("{}-help", $i)))
             .with_label_width($width)
+            .maybe_inactive(stringify!($property), stringify!($conf))
             .with_update_value(Box::new(|board: &Arc<Mutex<IcyBoard>>, value: &icy_board_tui::config_menu::ListValue| {
                 let icy_board_tui::config_menu::ListValue::U32(val, _, _) = value else {
                     return;
@@ -97,6 +102,7 @@ macro_rules! cfg_entry_u16 {
             .with_status(&icy_board_tui::get_text(&format!("{}-status", $i)))
             .with_help(&icy_board_tui::get_text(&format!("{}-help", $i)))
             .with_label_width($width)
+            .maybe_inactive(stringify!($property), stringify!($conf))
             .with_update_value(Box::new(|board: &Arc<Mutex<IcyBoard>>, value: &icy_board_tui::config_menu::ListValue| {
                 let icy_board_tui::config_menu::ListValue::U32(val, _, _) = value else {
                     return;
@@ -118,6 +124,7 @@ macro_rules! cfg_entry_u8 {
             .with_status(&icy_board_tui::get_text(&format!("{}-status", $i)))
             .with_help(&icy_board_tui::get_text(&format!("{}-help", $i)))
             .with_label_width($width)
+            .maybe_inactive(stringify!($property), stringify!($conf))
             .with_update_value(Box::new(|board: &Arc<Mutex<IcyBoard>>, value: &icy_board_tui::config_menu::ListValue| {
                 let icy_board_tui::config_menu::ListValue::U32(val, _, _) = value else {
                     return;
@@ -139,6 +146,7 @@ macro_rules! cfg_entry_sec_level {
             .with_status(&icy_board_tui::get_text(&format!("{}-status", $i)))
             .with_help(&icy_board_tui::get_text(&format!("{}-help", $i)))
             .with_label_width($width)
+            .maybe_inactive(stringify!($property), stringify!($conf))
             .with_update_value(Box::new(|board: &Arc<Mutex<IcyBoard>>, value: &icy_board_tui::config_menu::ListValue| {
                 let icy_board_tui::config_menu::ListValue::Security(val, _) = value else {
                     return;
@@ -156,6 +164,7 @@ macro_rules! cfg_entry_sec_level {
             .with_status(&icy_board_tui::get_text(&format!("{}-status", $i)))
             .with_help(&icy_board_tui::get_text(&format!("{}-help", $i)))
             .with_label_width($width)
+            .maybe_inactive(stringify!($property), stringify!($conf))
             .with_edit_width($edit_width)
             .with_update_value(Box::new(|board: &Arc<Mutex<IcyBoard>>, value: &icy_board_tui::config_menu::ListValue| {
                 let icy_board_tui::config_menu::ListValue::Security(val, _) = value else {
@@ -177,10 +186,11 @@ macro_rules! cfg_entry_color {
             )
             .with_status(&icy_board_tui::get_text(&format!("{}-status", $i)))
             .with_help(&icy_board_tui::get_text(&format!("{}-help", $i)))
-            .with_label_width($width), /*
-                                       .with_update_color_value(&|board: &Arc<Mutex<IcyBoard>>, value: Color| {
-                                           board.lock().unwrap().config.$property.$conf = value;
-                                       })*/
+            .with_label_width($width)
+            .maybe_inactive(stringify!($property), stringify!($conf)), /*
+                                                                       .with_update_color_value(&|board: &Arc<Mutex<IcyBoard>>, value: Color| {
+                                                                           board.lock().unwrap().config.$property.$conf = value;
+                                                                       })*/
         )
     };
 }
@@ -196,6 +206,7 @@ macro_rules! cfg_entry_path {
             .with_status(&icy_board_tui::get_text(&format!("{}-status", $i)))
             .with_help(&icy_board_tui::get_text(&format!("{}-help", $i)))
             .with_label_width($width)
+            .maybe_inactive(stringify!($property), stringify!($conf))
             .with_update_value(Box::new(|board: &Arc<Mutex<IcyBoard>>, value: &icy_board_tui::config_menu::ListValue| {
                 let icy_board_tui::config_menu::ListValue::Path(val) = value else {
                     return;
@@ -213,6 +224,7 @@ macro_rules! cfg_entry_path {
             .with_status(&icy_board_tui::get_text(&format!("{}-status", $i)))
             .with_help(&icy_board_tui::get_text(&format!("{}-help", $i)))
             .with_label_width($width)
+            .maybe_inactive(stringify!($property), stringify!($conf))
             .with_path_editor($editor)
             .with_update_value(Box::new(|board: &Arc<Mutex<IcyBoard>>, value: &icy_board_tui::config_menu::ListValue| {
                 let icy_board_tui::config_menu::ListValue::Path(val) = value else {
@@ -235,6 +247,7 @@ macro_rules! cfg_entry_time {
             .with_status(&icy_board_tui::get_text(&format!("{}-status", $i)))
             .with_help(&icy_board_tui::get_text(&format!("{}-help", $i)))
             .with_label_width($width)
+            .maybe_inactive(stringify!($property), stringify!($conf))
             .with_update_value(Box::new(|board: &Arc<Mutex<IcyBoard>>, value: &icy_board_tui::config_menu::ListValue| {
                 let icy_board_tui::config_menu::ListValue::Time(val, _) = value else {
                     return;
@@ -256,6 +269,7 @@ macro_rules! cfg_entry_dow {
             .with_status(&icy_board_tui::get_text(&format!("{}-status", $i)))
             .with_help(&icy_board_tui::get_text(&format!("{}-help", $i)))
             .with_label_width($width)
+            .maybe_inactive(stringify!($property), stringify!($conf))
             .with_update_value(Box::new(|board: &Arc<Mutex<IcyBoard>>, value: &icy_board_tui::config_menu::ListValue| {
                 let icy_board_tui::config_menu::ListValue::DoW(val, _) = value else {
                     return;

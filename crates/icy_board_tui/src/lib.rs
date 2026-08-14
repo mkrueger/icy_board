@@ -12,6 +12,7 @@ pub mod config_menu;
 pub mod help_view;
 pub mod icbconfigmenu;
 pub mod icbsetupmenu;
+pub mod inactive_options;
 pub mod insert_table;
 pub mod message_box;
 pub mod pcb_line;
