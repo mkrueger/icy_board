@@ -17,7 +17,7 @@ Legend:
 - ❌ stored and editable, but nothing reads it
 - 📥 filled in by the `PCBOARD.DAT` importer, but nothing reads it afterwards
 
-**25 of 125 options and 14 of 29 sysop security levels do nothing today.**
+**22 of 125 options and 14 of 29 sysop security levels do nothing today.**
 
 ## board — general information
 
@@ -61,7 +61,7 @@ matching questions of the `W` command.
 
 ## file_transfer
 
-Six of nine do nothing. This is the worst section, and the one a sysop is
+Four of nine do nothing. This is the worst section, and the one a sysop is
 most likely to touch.
 
 | Option | Status | Note |
@@ -73,8 +73,8 @@ most likely to touch.
 | `upload_credit_bytes` | ❌ | |
 | `verify_files_uploaded` | ❌ | uploads are never test-extracted |
 | `upload_descr_lines` | ✅ | upload, how many description lines the caller may type; `limits.max_number_upload_descr_lines` is still dead |
-| `disable_drive_size_check` | ❌ | |
-| `stop_uploads_free_space` | ❌ | the board uploads until the disk is full |
+| `disable_drive_size_check` | ✅ | disables the free-space preflight check |
+| `stop_uploads_free_space` | ✅ | rejects an upload when the destination has less than this many KiB free; zero disables the threshold |
 
 ## system_control
 
@@ -106,11 +106,8 @@ most likely to touch.
 | Option | Status | Note |
 |---|---|---|
 | `min_pwd_length`, `password_expire_days`, `password_expire_warn_days`, `sysop_start`, `sysop_stop` | ✅ | |
-| `keyboard_timeout` | ❌ | an idle user is never disconnected |
+| `keyboard_timeout` | ✅ | disconnects an idle remote caller after this many minutes; zero disables it and `KBDCHKOFF` suspends it for a PPE |
 | `max_number_upload_descr_lines` | ❌ | |
-
-`keyboard_timeout` is the one with a real consequence: without it a dropped
-connection holds its node until the process is restarted.
 
 ## options
 
@@ -308,12 +305,10 @@ setting the sysop made:
 Three answers are defensible per option, and each needs a deliberate choice:
 
 1. **Implement it.** The ones worth it first, in the order a sysop notices
-   them: `limits.keyboard_timeout`, `file_transfer.stop_uploads_free_space`,
-   `file_transfer.upload_credit_time`/`upload_credit_bytes`,
+   them: `file_transfer.upload_credit_time`/`upload_credit_bytes`,
    `system_control.enforce_daily_time_limit`.
 2. **Remove it.** An option that describes a DOS-era problem the port does not
    have should not be offered. Candidates:
-   `file_transfer.disable_drive_size_check`,
    `switches.default_graphics_at_login`.
 3. **Mark it.** Where the feature is planned but distant — the peak-rate half
    of `accounting` — ICBSetup should say so rather than presenting a

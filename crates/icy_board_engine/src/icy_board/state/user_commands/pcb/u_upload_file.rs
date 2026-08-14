@@ -13,8 +13,17 @@ use crate::{
 };
 use dizbase::file_base::metadata::{MetadataHeader, MetadataType};
 use dizbase::file_base_scanner::scan_file;
+use fs4::available_space;
 use icy_net::protocol::{Protocol, TransferProtocolType, XYModemVariant, XYmodem, Zmodem};
 use std::time::Instant;
+
+fn has_upload_space(path: &std::path::Path, minimum_kib: u32) -> std::io::Result<bool> {
+    Ok(enough_upload_space(available_space(path)?, minimum_kib))
+}
+
+fn enough_upload_space(available_bytes: u64, minimum_kib: u32) -> bool {
+    minimum_kib == 0 || available_bytes / 1024 >= u64::from(minimum_kib)
+}
 
 impl IcyBoardState {
     /// An upload throws the flag list
@@ -155,6 +164,13 @@ impl IcyBoardState {
                 display_flags::NEWLINE | display_flags::BELL | display_flags::LFBEFORE,
             )
             .await?;
+            return Ok(());
+        }
+
+        let file_transfer = self.get_board().await.config.file_transfer.clone();
+        if !file_transfer.disable_drive_size_check && !has_upload_space(&upload_location, file_transfer.stop_uploads_free_space)? {
+            self.display_text(IceText::InsufficientUploadSpace, display_flags::NEWLINE | display_flags::LFBEFORE)
+                .await?;
             return Ok(());
         }
 
@@ -327,5 +343,17 @@ pub fn create_protocol(protocol: &TransferProtocolType) -> Option<Box<dyn Protoc
         TransferProtocolType::YModemG => Some(Box::new(XYmodem::new(XYModemVariant::YModem))),
         TransferProtocolType::ZModem => Some(Box::new(Zmodem::new(1024))),
         TransferProtocolType::ZModem8k => Some(Box::new(Zmodem::new(8 * 1024))),
+    }
+}
+
+#[cfg(test)]
+mod option_tests {
+    use super::enough_upload_space;
+
+    #[test]
+    fn upload_space_limit_is_in_kib_and_zero_disables_it() {
+        assert!(!enough_upload_space(1023, 1));
+        assert!(enough_upload_space(1024, 1));
+        assert!(enough_upload_space(0, 0));
     }
 }

@@ -38,6 +38,24 @@ pub mod user_commands;
 pub mod virtual_screen;
 use self::functions::display_flags;
 
+fn keyboard_timeout_elapsed(is_local: bool, enabled: bool, minutes: u16, elapsed: Duration) -> bool {
+    !is_local && enabled && minutes > 0 && elapsed >= Duration::from_secs(u64::from(minutes) * 60)
+}
+
+#[cfg(test)]
+mod option_tests {
+    use super::{Duration, keyboard_timeout_elapsed};
+
+    #[test]
+    fn keyboard_timeout_uses_minutes_and_zero_disables_it() {
+        assert!(!keyboard_timeout_elapsed(false, true, 5, Duration::from_secs(299)));
+        assert!(keyboard_timeout_elapsed(false, true, 5, Duration::from_secs(300)));
+        assert!(!keyboard_timeout_elapsed(false, true, 0, Duration::from_secs(3600)));
+        assert!(!keyboard_timeout_elapsed(true, true, 1, Duration::from_secs(60)));
+        assert!(!keyboard_timeout_elapsed(false, false, 1, Duration::from_secs(60)));
+    }
+}
+
 use super::{
     IcyBoard,
     bbs::{BBS, BBSMessage},
@@ -215,6 +233,7 @@ pub struct Session {
     /// If true, the keyboard timer is checked.
     /// After it's elapsed logoff the user for inactivity.
     pub keyboard_timer_check: bool,
+    pub keyboard_timer_started: Instant,
 
     pub tokens: VecDeque<String>,
 
@@ -296,7 +315,8 @@ impl Session {
             use_alias: false,
             time_limit: 1000,
             time_adjusted_for_event: false,
-            keyboard_timer_check: false,
+            keyboard_timer_check: true,
+            keyboard_timer_started: Instant::now(),
             request_logoff: false,
             tokens: VecDeque::new(),
             last_password: String::new(),
@@ -653,6 +673,24 @@ impl IcyBoardState {
     /// Turns on keyboard check & resets the keyboard check timer.
     pub fn reset_keyboard_check_timer(&mut self) {
         self.session.keyboard_timer_check = true;
+        self.session.keyboard_timer_started = Instant::now();
+    }
+
+    async fn keyboard_timed_out(&mut self) -> Res<bool> {
+        let timeout = self.get_board().await.config.limits.keyboard_timeout;
+        if !keyboard_timeout_elapsed(
+            self.session.is_local,
+            self.session.keyboard_timer_check,
+            timeout,
+            self.session.keyboard_timer_started.elapsed(),
+        ) {
+            return Ok(false);
+        }
+
+        self.display_text(IceText::KeyboardTimeExpired, display_flags::NEWLINE | display_flags::LFBEFORE)
+            .await?;
+        self.hangup().await?;
+        Ok(true)
     }
 
     pub fn get_env(&self, key: &str) -> Option<&String> {
@@ -2410,10 +2448,16 @@ impl IcyBoardState {
         if let Some(ch) = self.char_buffer.pop_front() {
             match target {
                 TerminalTarget::Both => {
+                    if ch.source == KeySource::User {
+                        self.session.keyboard_timer_started = Instant::now();
+                    }
                     return Ok(Some(ch));
                 }
                 TerminalTarget::User => {
                     if ch.source == KeySource::User || ch.source.is_stuffed() {
+                        if ch.source == KeySource::User {
+                            self.session.keyboard_timer_started = Instant::now();
+                        }
                         return Ok(Some(ch));
                     } else {
                         self.char_buffer.push_back(ch);
@@ -2427,6 +2471,10 @@ impl IcyBoardState {
                     }
                 }
             }
+        }
+
+        if self.keyboard_timed_out().await? {
+            return Ok(None);
         }
 
         let mut sysop_connection;
@@ -2497,6 +2545,7 @@ impl IcyBoardState {
                 }
                 size2 = self.connection.read(&mut user_key_data) => {
                     if let Ok(1) = size2 {
+                        self.session.keyboard_timer_started = Instant::now();
                         if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
                             state.sysop_connection = Some(sysop_connection);
                             state.bbs_channel = Some(bbs_channel);
@@ -2545,6 +2594,7 @@ impl IcyBoardState {
                 }
                 size2 = self.connection.read(&mut user_key_data) => {
                     if let Ok(1) = size2 {
+                        self.session.keyboard_timer_started = Instant::now();
                         if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
                             state.bbs_channel = Some(bbs_channel);
                         }

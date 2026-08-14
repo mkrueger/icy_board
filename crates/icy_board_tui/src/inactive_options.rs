@@ -63,18 +63,6 @@ pub const UNREAD_OPTIONS: &[UnreadOption] = &[
         note: "uploads are never test-extracted",
     },
     UnreadOption {
-        section: "file_transfer",
-        option: "disable_drive_size_check",
-        kind: Unread::NotReadYet,
-        note: "",
-    },
-    UnreadOption {
-        section: "file_transfer",
-        option: "stop_uploads_free_space",
-        kind: Unread::NotReadYet,
-        note: "the board uploads until the disk is full",
-    },
-    UnreadOption {
         section: "system_control",
         option: "disable_full_record_updating",
         kind: Unread::NotReadYet,
@@ -109,12 +97,6 @@ pub const UNREAD_OPTIONS: &[UnreadOption] = &[
         option: "allow_handle_in_grpchat",
         kind: Unread::NotReadYet,
         note: "group chat always uses the handle",
-    },
-    UnreadOption {
-        section: "limits",
-        option: "keyboard_timeout",
-        kind: Unread::NotReadYet,
-        note: "an idle user is never disconnected",
     },
     UnreadOption {
         section: "limits",
@@ -328,6 +310,6 @@ mod tests {
 
     #[test]
     fn the_note_of_the_audit_is_kept() {
-        assert_eq!(lookup("limits", "keyboard_timeout").unwrap().note, "an idle user is never disconnected");
+        assert_eq!(lookup("sysop", "config_color_theme").unwrap().note, "the TUI theme is not chosen from it");
     }
 }

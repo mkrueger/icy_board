@@ -43,7 +43,7 @@ If something is missing just let me know.
 | Statistics | 30%  | Works a bit but not checked - modelling is done | 
 | Help Files | 80%  | Every command reaches a help file, the German set is 20 of 52 | 
 | Modem Support | Not started yet | Telnet, SSH and websockets work |
-| Limits | 40% | Session limits apply, `keyboard_timeout` does not - an idle line holds its node | 
+| Limits | 60% | Session limits and the keyboard timeout apply; the daily-time-limit switch is not enforced |
 | Events | 80% | The nightly event runs, clears the board and can suspend callers; PCBoard's per node and expedited modes are missing | 
 | Subscriptions | 20% | Expiry is warned about, a new period is never set and an expired user keeps their level | 
 | Accounting | 20% | Charges and the warning file work, peak rates and the money display do not | 

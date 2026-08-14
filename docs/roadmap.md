@@ -37,7 +37,7 @@
 - [x] PPL dBase3 statements/functions
 - [x] Go through the PCBoard options and ensure they're working - atm some do - some don't
   - compat/COMMAND_AUDIT.md tracks where a command still answers differently than PCBoard did
-  - compat/OPTIONS_AUDIT.md tracks the configuration switches - 25 of 125 options and 14 of 29
+  - compat/OPTIONS_AUDIT.md tracks the configuration switches - 22 of 125 options and 14 of 29
     sysop security levels are editable in ICBSetup but read by nobody
 
 -> 1st BETA
