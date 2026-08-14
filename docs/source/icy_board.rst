@@ -41,8 +41,8 @@ Alarm - On/Off
 ~~~~~~~~~~~~~~~~~~~~~~~
 Toggle the alarm bell. If on, the terminal bell will ring when a user logs in.
 
-ICBSysMgr
-~~~~~~~~~
+ICBSM
+~~~~~
 Start the system manager utility. This is a TUI utility to manage users and groups.
 
 ICBText
@@ -71,7 +71,7 @@ Icy Board includes a comprehensive suite of tools for BBS management and develop
 * ``pplc`` - PPL compiler (source → PPE)
 * ``ppld`` - PPL decompiler (PPE → source)
 * ``mkicbtxt`` - Create/Edit ICBTXT files containing all strings used.
-* ``icbsysmgr`` - System manager utility (user/group editor)
+* ``icbsm`` - System manager utility (user/group editor)
 * ``icyboard-ppl`` - Language and editor support for PPL
 
 Directory Layout

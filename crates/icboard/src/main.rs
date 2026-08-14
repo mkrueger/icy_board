@@ -477,12 +477,12 @@ where
             config.options.alarm = !config.options.alarm;
         }
         CallWaitMessage::SystemManager => {
-            let path = std::env::current_exe().unwrap().with_file_name("icbsysmgr");
+            let path = std::env::current_exe().unwrap().with_file_name("icbsm");
             let mut cmd = Command::new(path)
                 .arg(format!("{}", board.lock().await.file_name.display()))
                 .spawn()
-                .expect("icbsysmgr command failed to start");
-            cmd.wait().expect("icbsysmgr command failed to run");
+                .expect("icbsm command failed to start");
+            cmd.wait().expect("icbsm command failed to run");
             return Ok(true);
         }
         CallWaitMessage::Setup => {
@@ -490,8 +490,8 @@ where
             let mut cmd = Command::new(path)
                 .arg(format!("{}", board.lock().await.file_name.display()))
                 .spawn()
-                .expect("icbsysmgr command failed to start");
-            cmd.wait().expect("icbsysmgr command failed to run");
+                .expect("icbsetup command failed to start");
+            cmd.wait().expect("icbsetup command failed to run");
             return Ok(true);
         }
         CallWaitMessage::IcbText => {
@@ -502,8 +502,8 @@ where
             let mut cmd = Command::new(path)
                 .arg(format!("{}", icbtxt_path.display()))
                 .spawn()
-                .expect("icbsysmgr command failed to start");
-            cmd.wait().expect("icbsysmgr command failed to run");
+                .expect("mkicbtxt command failed to start");
+            cmd.wait().expect("mkicbtxt command failed to run");
             return Ok(true);
         }
         CallWaitMessage::ToggleStatistics => unsafe {

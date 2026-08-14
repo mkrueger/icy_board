@@ -135,7 +135,7 @@ fn shell(title: &str, active: Option<SectionId>, body: &str) -> String {
     let nav = if active.is_some() || title == "Overview" {
         let links = nav_links(active, false);
         format!(
-            r#"<div class="layout"><aside class="sidebar"><div class="brand"><span class="brand-mark">IB</span><div><strong>IcyBoard</strong><small>Web Admin</small></div></div><nav class="side-nav">{links}</nav><form class="logout" method="post" action="/logout"><button type="submit">Log out</button></form></aside><div class="content"><header class="topbar"><div><p class="eyebrow">Configuration</p><h1>{title}</h1></div><span class="badge">local</span></header><main>{body}</main><footer>icbadmin {version} · icbsetup and icbsysmgr remain fully supported.</footer></div></div>"#,
+            r#"<div class="layout"><aside class="sidebar"><div class="brand"><span class="brand-mark">IB</span><div><strong>IcyBoard</strong><small>Web Admin</small></div></div><nav class="side-nav">{links}</nav><form class="logout" method="post" action="/logout"><button type="submit">Log out</button></form></aside><div class="content"><header class="topbar"><div><p class="eyebrow">Configuration</p><h1>{title}</h1></div><span class="badge">local</span></header><main>{body}</main><footer>icbadmin {version} · icbsetup and icbsm remain fully supported.</footer></div></div>"#,
             title = escape(title),
             version = env!("CARGO_PKG_VERSION"),
             links = links,
@@ -248,7 +248,7 @@ pub fn overview_page(overview: &OverviewDto) -> String {
 
     body.push_str(
         r#"<section class="panel soft"><h2>Still use icbsetup for</h2>
-<ul class="plain"><li>Conference create/edit and menus</li><li>Security expressions and command levels</li><li>User maintenance (icbsysmgr)</li><li>Sysop password changes</li><li>QWK / FTN message networking details</li></ul></section>"#,
+<ul class="plain"><li>Conference create/edit and menus</li><li>Security expressions and command levels</li><li>User maintenance (icbsm)</li><li>Sysop password changes</li><li>QWK / FTN message networking details</li></ul></section>"#,
     );
 
     shell("Overview", None, &body)
@@ -855,7 +855,7 @@ fn checkbox(label: &str, name: &str, checked: bool) -> String {
 
 fn conference_shell(title: &str, body: &str) -> String {
     let nav = format!(
-        r#"<div class="layout"><aside class="sidebar"><div class="brand"><span class="brand-mark">IB</span><div><strong>IcyBoard</strong><small>Web Admin</small></div></div><nav class="side-nav">{links}</nav><form class="logout" method="post" action="/logout"><button type="submit">Log out</button></form></aside><div class="content"><header class="topbar"><div><p class="eyebrow">Conferences</p><h1>{title}</h1></div><span class="badge">local</span></header><main>{body}</main><footer>icbadmin {version} · icbsetup and icbsysmgr remain fully supported.</footer></div></div>"#,
+        r#"<div class="layout"><aside class="sidebar"><div class="brand"><span class="brand-mark">IB</span><div><strong>IcyBoard</strong><small>Web Admin</small></div></div><nav class="side-nav">{links}</nav><form class="logout" method="post" action="/logout"><button type="submit">Log out</button></form></aside><div class="content"><header class="topbar"><div><p class="eyebrow">Conferences</p><h1>{title}</h1></div><span class="badge">local</span></header><main>{body}</main><footer>icbadmin {version} · icbsetup and icbsm remain fully supported.</footer></div></div>"#,
         links = conference_nav_links(),
         title = escape(title),
         version = env!("CARGO_PKG_VERSION"),

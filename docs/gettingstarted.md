@@ -41,7 +41,7 @@ I develop this software on linux - next time I set up I'll add a more detailed d
 | :--- | :--- |
 | `icboard` | The board itself. Started in the directory that holds `icboard.toml`. |
 | `icbsetup` | Creates a board, imports a PCBoard one, and edits every setting. Start here. |
-| `icbsysmgr` | User and group editor. |
+| `icbsm` | User and group editor. |
 | `mkicbtxt` | Edits the system messages, which is how most of the board is reworded. |
 | `mkicbmnu` | Edits menus. |
 | `icbfile` | Brings a file base into shape - see [icbfile](icbfile.md). |
@@ -56,7 +56,7 @@ I recommend putting the bin/ directory in the path but you can just `cd bin` for
 1. `icbsetup create mybbs`, then `cd mybbs`.
 2. `icbsetup` - board name, sysop name and password, and the number of nodes.
    Options the board does not read yet are greyed out and say so.
-3. `mkicbtxt` if you want to reword prompts, `icbsysmgr` for users.
+3. `mkicbtxt` if you want to reword prompts, `icbsm` for users.
 4. `icboard` and log in locally, then walk the menu once: `J` join a
    conference, `E` enter a message, `R` read it back, `F` the file
    directories, `G` goodbye.

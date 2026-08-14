@@ -14,7 +14,7 @@ The web administration interface hosted by a running IcyBoard.
 
 ## What it is not
 
-- **Not** a full replacement for `icbsetup` or `icbsysmgr`. Those remain fully supported
+- **Not** a full replacement for `icbsetup` or `icbsm`. Those remain fully supported
   and are the only way to administer a board that is not running.
 - Not a remote multi-user management platform. There are no user roles, no file browser,
   no shell access and no way to run doors or PPEs.
@@ -130,7 +130,7 @@ board keeps the resolved absolute form it needs.
 
 ## Concurrency
 
-`icbsetup` and `icbsysmgr` do not take the board lock. **Do not run them against a board
+`icbsetup` and `icbsm` do not take the board lock. **Do not run them against a board
 whose web admin is in use.** Concurrent edits are detected on save via the fingerprint
 check, but the safest workflow is to use one tool at a time.
 
@@ -142,7 +142,7 @@ board & sysop identity, web admin listener, login connections, messages, file
 transfer, system control, switches/options, limits, new-user defaults, events,
 subscription, file locations, accounting and function keys.
 
-Still use `icbsetup` / `icbsysmgr` for:
+Still use `icbsetup` / `icbsm` for:
 
 conference create/edit and menus, security expressions and command levels, user
 maintenance, sysop password changes, QWK/FTN networking depth, and colour themes

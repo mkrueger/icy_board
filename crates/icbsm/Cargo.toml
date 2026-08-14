@@ -1,5 +1,5 @@
 [package]
-name = "icbsysmgr"
+name = "icbsm"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true

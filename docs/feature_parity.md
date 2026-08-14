@@ -22,7 +22,7 @@ If something is missing just let me know.
 | PPLC  | 💯 | Better than the original |
 | PPLD  | 💯 | Better than the original. Was 3rd party software but it's important for icy board. |
 | MKPCBTXT  | 💯 | Much better |
-| ICBSysMgr  | 40% | Edit user files work but nothing else |
+| ICBSM      | 40% | Edit user files work but nothing else |
 | MKPCBMNU  | 💯 | MKICBMNU can do much more |
 | PCBSETUP  | 90% | Most is implemented, but 38 of the switches are read by nobody - see the options audit |
 | Call Waiting Screen  | 💯 | Almost the same, some improvements |

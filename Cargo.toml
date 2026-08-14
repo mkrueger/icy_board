@@ -15,7 +15,7 @@ members = [
 	"crates/icboard",
 	"crates/icbsetup",
 	"crates/icbmailer",
-	"crates/icbsysmgr",
+	"crates/icbsm",
 	"crates/icbfile",
 	"crates/icbadmin",
 	"crates/tree-sitter-ppl",

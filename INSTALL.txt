@@ -27,7 +27,7 @@ It's recommended to put bin/ in path.
 Following tools are currently shipped
 
 icbsetup - setting up with a tui client - in theory the .toml files can be edited with any text editor but it's easier with a tui
-icbsysmgr - user/groups edutor.
+icbsm - user/groups edutor.
 mkicbtxt - create & alter PCBTEXT files (compatible with old PCBoard format)
 mkicbmnu - create & change icy_board .mnu files 
 pplc - ppl compiler 

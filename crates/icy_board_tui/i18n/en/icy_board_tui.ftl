@@ -37,7 +37,7 @@ call_wait_screen_alarm_descr=System BEEPs as caller logs on, etc.
 call_wait_screen_monitor_button_not_busy=ICBMoni
 call_wait_screen_monitor_button_not_busy_descr=Run ICBMoni to monitor NODE activity
 
-call_wait_screen_system_manager=ICBSysMgr
+call_wait_screen_system_manager=ICBSM
 call_wait_screen_system_manager_descr=Run IcyBoard System Manager for User File maintenance.
 
 call_wait_screen_setup=ICBSetup
@@ -340,7 +340,7 @@ web_admin_enabled-help=
     # Enable Web Administration
 
     Starts the web administration interface when IcyBoard is running.
-    It is disabled by default and does not replace icbsetup or icbsysmgr.
+    It is disabled by default and does not replace icbsetup or icbsm.
 
 web_admin_address=Web Admin Address
 web_admin_address-status=Address used by the web administration server
@@ -494,7 +494,7 @@ sysop_name-help=
     
     NOTE: Do NOT use your full name.
     This is just the sysop's first name.
-    Your FULL NAME should be entered in record #1 of the USERS file via `icbsysmgr`.
+    Your FULL NAME should be entered in record #1 of the USERS file via `icbsm`.
 
 local_password=Local Password
 local_password-status=Call waiting screen password.
