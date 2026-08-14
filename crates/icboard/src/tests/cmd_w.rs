@@ -1,4 +1,4 @@
-use crate::tests::test_output;
+use crate::tests::{setup_conference, test_output};
 
 /// The order of the W questions is a compatibility contract: PPEs pre-answer it
 /// with KBDSTUFF, so an extra or missing question shifts every following stuffed
@@ -36,6 +36,29 @@ fn test_cmd_w_prompt_order() {
 fn test_cmd_w_empty_password_skips_confirmation() {
     let output = test_output(format!("W\n{}", "\n".repeat(30)), |_| {});
     assert!(!output.contains("Re-Enter"), "an empty password must not ask for a confirmation:\n{output}");
+}
+
+fn setup_existing_alias(board: &mut icy_board_engine::icy_board::IcyBoard, allow_change: bool) {
+    setup_conference(board);
+    board.conferences[0].allow_aliases = true;
+    board.users[0].alias = "OLDALIAS".to_string();
+    board.config.new_user_settings.ask_alias = true;
+    board.config.system_control.allow_alias_change = allow_change;
+}
+
+#[test]
+fn test_cmd_w_keeps_an_existing_alias_when_changes_are_disabled() {
+    let output = test_output(format!("W\n{}", "\n".repeat(30)), |board| setup_existing_alias(board, false));
+    assert!(
+        !output.contains("Alias Name"),
+        "the alias question should be locked after choosing one:\n{output}"
+    );
+}
+
+#[test]
+fn test_cmd_w_asks_for_an_existing_alias_when_changes_are_allowed() {
+    let output = test_output(format!("W\n{}", "\n".repeat(30)), |board| setup_existing_alias(board, true));
+    assert!(output.contains("Alias Name"), "the alias question is missing:\n{output}");
 }
 
 fn assert_prompt_order(output: &str, prompts: &[&str]) {

@@ -65,7 +65,7 @@ fn from_audit() -> Vec<(String, String, Unread, String)> {
 #[test]
 fn the_table_says_what_the_audit_says() {
     let audit = from_audit();
-    assert!(audit.len() > 50, "the audit was not read properly, found {}", audit.len());
+    assert!(!audit.is_empty(), "the audit did not yield any inactive options");
 
     let mut table: Vec<(String, String, Unread, String)> = UNREAD_OPTIONS
         .iter()

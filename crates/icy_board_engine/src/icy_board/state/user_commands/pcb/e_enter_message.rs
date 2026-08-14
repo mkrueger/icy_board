@@ -8,6 +8,7 @@ use crate::icy_board::{
         NodeStatus,
         functions::{MASK_ALPHA, MASK_ASCII, MASK_PWD, display_flags},
     },
+    user_base::ConferenceFlags,
 };
 use bstr::BString;
 use chrono::{DateTime, Utc};
@@ -61,19 +62,8 @@ impl IcyBoardState {
         to.truncate(25);
         let default_to = if to.trim().is_empty() { "ALL".to_string() } else { to.trim().to_string() };
 
-        let mut to = self
-            .input_field(
-                IceText::MessageTo,
-                54,
-                &MASK_ASCII,
-                "",
-                Some(default_to.clone()),
-                display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::FIELDLEN,
-            )
-            .await?;
-
-        if to.is_empty() {
-            to = default_to;
+        let Some(to) = self.get_message_recipient(IceText::MessageTo, default_to, false).await? else {
+            return Ok(());
         };
 
         let subject = self
@@ -107,6 +97,74 @@ impl IcyBoardState {
         )
         .await?;
         Ok(())
+    }
+
+    pub(crate) async fn get_message_recipient(&mut self, prompt: IceText, mut default_to: String, empty_ends: bool) -> Res<Option<String>> {
+        loop {
+            let answer = self
+                .input_field(
+                    prompt,
+                    54,
+                    &MASK_ASCII,
+                    "",
+                    Some(default_to.clone()),
+                    display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::FIELDLEN,
+                )
+                .await?;
+            if empty_ends && answer.is_empty() {
+                return Ok(None);
+            }
+            let to = if answer.is_empty() { default_to.clone() } else { answer };
+
+            let validate = self.get_board().await.config.message.validate_to_name && !self.session.current_conference.echo_mail_in_conference;
+            if !validate || to.eq_ignore_ascii_case("ALL") || to.eq_ignore_ascii_case("SYSOP") {
+                return Ok(Some(to));
+            }
+
+            let conference = self.session.current_conference_number as usize;
+            let (found, registered) = {
+                let board = self.get_board().await;
+                match board.users.find_by_name(&to) {
+                    Some(index) => {
+                        let registered = conference == 0
+                            || board.users[index]
+                                .conference_flags
+                                .get(&conference)
+                                .is_some_and(|flags| flags.contains(ConferenceFlags::Registered));
+                        (true, registered)
+                    }
+                    None => (false, false),
+                }
+            };
+            if found && registered {
+                return Ok(Some(to));
+            }
+
+            self.session.op_text = to.clone();
+            self.display_text(
+                if found {
+                    IceText::UserNotRegisteredInConference
+                } else {
+                    IceText::CouldntFindInUsers
+                },
+                display_flags::NEWLINE | display_flags::LFBEFORE,
+            )
+            .await?;
+            let retry = self
+                .input_field(
+                    IceText::ReEnterUsersName,
+                    1,
+                    "CR",
+                    "",
+                    Some("R".to_string()),
+                    display_flags::NEWLINE | display_flags::UPCASE | display_flags::FIELDLEN,
+                )
+                .await?;
+            if retry.eq_ignore_ascii_case("C") {
+                return Ok(Some(to));
+            }
+            default_to = to;
+        }
     }
 
     /// Prompts for message security, return receipt and echo flag, mirroring the

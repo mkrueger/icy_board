@@ -14,7 +14,74 @@ use chrono::{DateTime, Utc};
 use icy_engine::Position;
 use jamjam::jam::{JamMessage, attributes, msg_header::MessageSubfield};
 
+fn message_text(lines: &[String], allow_esc_codes: bool) -> String {
+    let mut text = lines.join("\n");
+    if !allow_esc_codes {
+        text.retain(|ch| ch != '\u{1b}' && ch != '\u{1d}');
+    }
+    text
+}
+
+fn make_message(
+    editor: &EditState,
+    recipient: &str,
+    text: &str,
+    attributes: u32,
+    password: &Option<String>,
+    packout_date: Option<DateTime<Utc>>,
+    sub_fields: &[MessageSubfield],
+) -> JamMessage {
+    let mut msg = JamMessage::default()
+        .with_from(BString::from(editor.from.clone()))
+        .with_to(BString::from(recipient))
+        .with_subject(BString::from(editor.subj.clone()))
+        .with_date_time(Utc::now())
+        .with_attributes(attributes)
+        .with_text(BString::from(text));
+    if let Some(password) = password {
+        msg = msg.with_password(&BString::from(password.clone()));
+    }
+    if let Some(packout_date) = packout_date {
+        msg = msg.with_packout_date(packout_date);
+    }
+    for sub_field in sub_fields {
+        msg = msg.with_sub_field(sub_field.clone());
+    }
+    msg
+}
+
 impl IcyBoardState {
+    pub async fn password_failure_comment(&mut self) -> Res<()> {
+        let answer = self
+            .input_field(
+                IceText::WrongPasswordComment,
+                1,
+                "",
+                "",
+                Some(self.session.no_char.to_string()),
+                display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFBEFORE | display_flags::FIELDLEN | display_flags::YESNO,
+            )
+            .await?;
+        if answer != self.session.yes_char.to_uppercase().to_string() {
+            return Ok(());
+        }
+
+        let to = self.get_board().await.config.sysop.name.clone();
+        let subject = self.get_display_text(IceText::WrongPasswordSubject)?;
+        self.write_message(
+            0,
+            0,
+            &to,
+            subject.trim(),
+            attributes::MSG_PRIVATE,
+            None,
+            None,
+            Vec::new(),
+            IceText::SavingComment,
+        )
+        .await
+    }
+
     pub async fn comment_to_sysop(&mut self) -> Res<()> {
         let leave_comment = self
             .input_field(
@@ -40,11 +107,9 @@ impl IcyBoardState {
         let to = self.get_board().await.config.sysop.name.clone();
         // PCBoard's ForceMain keeps every comment in the main board instead of
         // scattering them over the conferences.
-        let conf = if self.get_board().await.config.message.force_comments_to_main {
-            0
-        } else {
-            -1
-        };
+        let force_main = self.get_board().await.config.message.force_comments_to_main;
+        let conf = if force_main { 0 } else { self.session.current_conference_number as i32 };
+        let area = if force_main { 0 } else { self.session.current_message_area as i32 };
         let subj = format!("COMMENT {}", IcbTime::now().to_string());
         let receipt = self
             .input_field(
@@ -61,7 +126,7 @@ impl IcyBoardState {
         if receipt == self.session.yes_char.to_uppercase().to_string() {
             msg_attributes |= attributes::MSG_RECEIPTREQ;
         }
-        self.write_message(conf, -1, &to, &subj, msg_attributes, None, None, Vec::new(), IceText::SavingComment)
+        self.write_message(conf, area, &to, &subj, msg_attributes, None, None, Vec::new(), IceText::SavingComment)
             .await?;
 
         Ok(())
@@ -100,31 +165,25 @@ impl IcyBoardState {
             insert_mode: use_fse,
             top_line: 0,
             max_line_length: 79,
+            max_lines: self.get_board().await.config.message.max_msg_lines.max(1) as usize,
         };
 
         match editor.edit_message(self).await? {
             EditResult::Abort => {}
-            EditResult::SendMessage => {
-                let msg = editor.msg.join("\n");
-                let mut msg = JamMessage::default()
-                    .with_from(BString::from(editor.from.clone()))
-                    .with_to(BString::from(editor.to.clone()))
-                    .with_subject(BString::from(editor.subj))
-                    .with_date_time(Utc::now())
-                    .with_attributes(attributes)
-                    .with_text(BString::from(msg));
+            result @ (EditResult::SendMessage | EditResult::CarbonCopy) => {
+                let msg = message_text(&editor.msg, self.get_board().await.config.message.allow_esc_codes);
+                let original = make_message(&editor, &editor.to, &msg, attributes, &password, packout_date, &sub_fields);
+                self.send_message(conf, area, original, text).await?;
 
-                if let Some(password) = &password {
-                    msg = msg.with_password(&BString::from(password.clone()));
+                if matches!(result, EditResult::CarbonCopy)
+                    && !matches!(text, IceText::SavingComment)
+                    && self.get_board().await.config.message.allow_carbon_copy
+                {
+                    while let Some(recipient) = self.get_message_recipient(IceText::CarbonCopyTo, String::new(), true).await? {
+                        let copy = make_message(&editor, &recipient, &msg, attributes, &password, packout_date, &sub_fields);
+                        self.send_message(conf, area, copy, text).await?;
+                    }
                 }
-                if let Some(packout_date) = packout_date {
-                    msg = msg.with_packout_date(packout_date);
-                }
-                for sub_field in sub_fields {
-                    msg = msg.with_sub_field(sub_field);
-                }
-
-                self.send_message(conf, area, msg, text).await?;
             }
         }
         Ok(())
@@ -168,5 +227,20 @@ impl IcyBoardState {
                 .await?;
         }
         Ok(answer == yes)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::message_text;
+
+    #[test]
+    fn escape_codes_are_removed_when_disabled() {
+        assert_eq!(message_text(&["A\u{1b}[31mB\u{1d}C".to_string()], false), "A[31mBC");
+    }
+
+    #[test]
+    fn escape_codes_are_kept_when_enabled() {
+        assert_eq!(message_text(&["A\u{1b}[31mB\u{1d}C".to_string()], true), "A\u{1b}[31mB\u{1d}C");
     }
 }

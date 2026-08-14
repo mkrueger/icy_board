@@ -253,6 +253,7 @@ impl IcyBoardCreator {
         let mut list = GroupList::default();
         list.add_group("sysop", "System Operators");
         list.add_group("users", "Common Users");
+        list.add_group("new_users", "New users");
         list.save(&self.destination.join(&config.paths.group_file))?;
 
         self.logger.start_action("Write default fidonet config file".to_string());

@@ -18,6 +18,12 @@ use icy_board_engine::{
     },
     vm::TerminalTarget,
 };
+
+fn assign_new_user_groups(groups: &mut icy_board_engine::icy_board::group_list::GroupList, configured: &str, user_name: &str) {
+    for group in configured.split([',', ';']).map(str::trim).filter(|name| !name.is_empty()) {
+        groups.add_member(group, user_name);
+    }
+}
 use icy_net::iemsi::try_iemsi;
 use tokio::fs;
 impl PcbBoardCommand {
@@ -559,8 +565,15 @@ impl PcbBoardCommand {
             self.register_public_conferences(&mut new_user).await;
         }
 
+        let user_name = new_user.get_name().clone();
         let id = self.state.get_board().await.users.new_user(new_user);
-        self.state.get_board().await.save_userbase()?;
+        {
+            let mut board = self.state.get_board().await;
+            let configured = board.config.new_user_settings.new_user_groups.clone();
+            assign_new_user_groups(&mut board.groups, &configured, &user_name);
+            board.groups.save(&board.config.paths.group_file)?;
+            board.save_userbase()?;
+        }
         self.state.set_current_user(id, true).await?;
 
         log::info!("NEW USER: '{}'", self.state.session.user_name);
@@ -687,6 +700,9 @@ impl PcbBoardCommand {
 
         if !check_password {
             log::warn!("Login from {} at {} password failed", self.state.session.user_name, Local::now().to_rfc2822());
+            if self.state.get_board().await.config.system_control.allow_password_failure_comment {
+                self.state.password_failure_comment().await?;
+            }
             self.state.display_text(IceText::DeniedPasswordFailed, display_flags::NEWLINE).await?;
             self.state.hangup().await?;
             return Ok(false);
@@ -801,5 +817,20 @@ impl PcbBoardCommand {
             }
             self.state.display_text(IceText::PasswordsDontMatch, display_flags::NEWLINE).await?;
         }
+    }
+}
+
+#[cfg(test)]
+mod option_tests {
+    use super::assign_new_user_groups;
+    use icy_board_engine::icy_board::group_list::GroupList;
+
+    #[test]
+    fn configured_groups_receive_the_new_user() {
+        let mut groups = GroupList::new();
+        groups.add_group("new_users", "New users");
+        groups.add_group("trial", "Trial users");
+        assign_new_user_groups(&mut groups, "new_users, trial; missing", "NEW USER");
+        assert_eq!(groups.get_groups("NEW USER"), vec!["new_users", "trial"]);
     }
 }

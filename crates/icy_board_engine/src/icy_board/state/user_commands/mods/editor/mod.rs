@@ -33,11 +33,13 @@ pub struct EditState {
     pub top_line: usize,
 
     pub max_line_length: usize,
+    pub max_lines: usize,
 }
 
 pub enum EditResult {
     Abort,
     SendMessage,
+    CarbonCopy,
 }
 
 impl EditState {
@@ -48,7 +50,7 @@ impl EditState {
             state.new_line().await?;
             state.display_text(IceText::MessageEnterText, 0).await?;
             // display line editor header.
-            state.session.op_text = 99.to_string(); // display max lines.
+            state.session.op_text = self.max_lines.to_string();
             state.display_text(IceText::Columns79, display_flags::NEWLINE).await?;
             self.print_divider(state).await?;
         }
@@ -174,6 +176,10 @@ impl EditState {
                         // send message
                         state.session.disp_options.force_count_lines();
                         return Ok(EditResult::SendMessage);
+                    }
+                    "SC" => {
+                        state.session.disp_options.force_count_lines();
+                        return Ok(EditResult::CarbonCopy);
                     }
                     "Q" => { // quote message
                         // TODO: quote
@@ -352,7 +358,7 @@ impl EditState {
                 }
 
                 control_codes::DOWN => {
-                    if (self.cursor.y + self.top_line as i32) < 999 {
+                    if (self.cursor.y + self.top_line as i32) < self.max_lines.saturating_sub(1) as i32 {
                         if (self.cursor.y - self.top_line as i32) < state.session.page_len as i32 - Self::HEADER_SIZE - 1 {
                             self.cursor.y += 1;
                             state.down(1).await?;
@@ -395,7 +401,7 @@ impl EditState {
                 }
 
                 '\r' => {
-                    if (self.cursor.y + self.top_line as i32) < 999 {
+                    if (self.cursor.y + self.top_line as i32) < self.max_lines.saturating_sub(1) as i32 {
                         let update = self.press_enter();
                         if (self.cursor.y - self.top_line as i32) >= state.session.page_len as i32 - Self::HEADER_SIZE - 1 {
                             self.top_line += (state.session.page_len as i32 - Self::HEADER_SIZE - 1).max(1) as usize;
@@ -495,6 +501,10 @@ impl EditState {
     async fn insline(&mut self, state: &mut IcyBoardState) -> Res<()> {
         let mut edit_line = String::new();
         loop {
+            if self.msg.len() >= self.max_lines {
+                state.display_text(IceText::TextEntryFull, display_flags::NEWLINE).await?;
+                return Ok(());
+            }
             let (new_line, next_line) = self.get_line(state, edit_line).await?;
             if new_line.is_empty() && next_line.is_empty() {
                 return Ok(());
@@ -721,6 +731,9 @@ impl EditState {
     }
 
     fn press_enter(&mut self) -> EditUpdate {
+        if self.msg.len() >= self.max_lines {
+            return EditUpdate::None;
+        }
         let mut y = self.cursor.y as usize;
         if y < self.msg.len() {
             let x = self.cursor.x as usize;

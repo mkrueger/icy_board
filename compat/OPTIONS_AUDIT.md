@@ -17,7 +17,7 @@ Legend:
 - ❌ stored and editable, but nothing reads it
 - 📥 filled in by the `PCBOARD.DAT` importer, but nothing reads it afterwards
 
-**36 of 125 options and 14 of 29 sysop security levels do nothing today.**
+**25 of 125 options and 14 of 29 sysop security levels do nothing today.**
 
 ## board — general information
 
@@ -35,13 +35,13 @@ All ten are used: `name`, `allow_iemsi`, `location`, `operator`, `notice`,
 
 ## new_user_settings
 
-Twenty of twenty-one are used, both in the new user questionnaire and in the
+All twenty-one are used, both in the new user questionnaire and in the
 matching questions of the `W` command.
 
 | Option | Status | Note |
 |---|---|---|
 | `auto_register_conferences` | ✅ | new user, registers in every public conference without a security requirement |
-| `new_user_groups` | ❌ | a new user is never put into the group named here |
+| `new_user_groups` | ✅ | comma- or semicolon-separated existing groups receive the new user; new boards provide `new_users` |
 
 ## message
 
@@ -52,12 +52,12 @@ matching questions of the `W` command.
 | `prompt_to_read_mail` | ✅ | logon mail scan |
 | `force_comments_to_main` | ✅ | `C` |
 | `update_last_read_pointer` | ✅ | message reader |
-| `max_msg_lines` | 📥 | the editor has its own limit |
-| `allow_esc_codes` | 📥 | ESC is filtered or not without asking this |
-| `scan_all_mail_at_login` | ❌ | |
-| `allow_carbon_copy` | ❌ | `E` never offers a carbon copy |
-| `validate_to_name` | ❌ | a message to a name nobody carries is accepted |
-| `default_quick_personal_scan` | ❌ | |
+| `max_msg_lines` | ✅ | line and full-screen editors stop at this many message lines |
+| `allow_esc_codes` | ✅ | message text keeps ESC/GS control bytes when enabled and strips them when disabled |
+| `scan_all_mail_at_login` | ✅ | adds the all-conferences flag to the first personal mail scan |
+| `allow_carbon_copy` | ✅ | editor command `SC` saves the original and then asks repeatedly for carbon-copy recipients |
+| `validate_to_name` | ✅ | message entry checks the user file and conference registration, except in echo-mail conferences |
+| `default_quick_personal_scan` | ✅ | sets the initial Q/L mode of `Y`; an explicit Q or L still wins |
 
 ## file_transfer
 
@@ -86,11 +86,11 @@ most likely to touch.
 | `confirm_caller_name` | ✅ | login |
 | `reread_sec_level_on_join` | ✅ | join, when the conference changes the level |
 | `disable_ns_logon` | ✅ | login |
-| `allow_alias_change` | 📥 | `W` lets the alias be changed regardless |
+| `allow_alias_change` | ✅ | `W` asks for an alias again only when this is enabled; an empty alias is always asked |
 | `disable_full_record_updating` | ❌ | `W` always asks everything |
 | `is_multi_lingual` | ❌ | `LANG` works whether or not this is set |
 | `enforce_daily_time_limit` | ❌ | only session limits exist |
-| `allow_password_failure_comment` | ❌ | |
+| `allow_password_failure_comment` | ✅ | after four failed password attempts, offers a private comment to the sysop before logoff |
 
 ## switches
 
@@ -158,7 +158,7 @@ no equivalent.
 | Option | Status | Note |
 |---|---|---|
 | the five `bbs_*` fields, `welcome_screen`, `max_msgs`, `max_msgs_per_conf` | ✅ | |
-| `goodbye_screen`, `news_sceen` | ❌ | not packed into the QWK archive |
+| `goodbye_screen`, `news_sceen` | ✅ | named in `CONTROL.DAT` and included in the QWK archive when the configured file exists |
 
 `news_sceen` is also a typo in the key name; fixing it needs a migration.
 
@@ -305,7 +305,6 @@ Three answers are defensible per option, and each needs a deliberate choice:
 1. **Implement it.** The ones worth it first, in the order a sysop notices
    them: `limits.keyboard_timeout`, `file_transfer.stop_uploads_free_space`,
    `file_transfer.upload_credit_time`/`upload_credit_bytes`,
-   `message.validate_to_name`, `new_user_settings.new_user_groups`,
    `system_control.enforce_daily_time_limit`.
 2. **Remove it.** An option that describes a DOS-era problem the port does not
    have should not be offered. Candidates:

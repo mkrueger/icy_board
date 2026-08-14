@@ -5,6 +5,7 @@ use super::EditState;
 fn create_state(text: &str) -> EditState {
     let mut state = EditState::default();
     state.max_line_length = 79;
+    state.max_lines = 100;
     for (i, line) in text.lines().enumerate() {
         let mut line = line.to_string();
         if line.contains('|') {
@@ -25,6 +26,15 @@ fn test_fse_enter_eol() {
     assert_eq!(2, state.msg.len());
     assert_eq!(0, state.msg[1].len());
     assert_eq!(1, state.cursor.y);
+}
+
+#[test]
+fn enter_does_not_grow_past_the_message_line_limit() {
+    let mut state = create_state("One|\nTwo");
+    state.max_lines = 2;
+    let update = state.press_enter();
+    assert_eq!(EditUpdate::None, update);
+    assert_eq!(2, state.msg.len());
 }
 
 #[test]

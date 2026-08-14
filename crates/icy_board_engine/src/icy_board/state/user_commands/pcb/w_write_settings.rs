@@ -187,7 +187,7 @@ impl IcyBoardState {
 
         new_user.flags.wide_editor = self.ask_yes_no(IceText::DefaultWideMessages, new_user.flags.wide_editor).await?;
 
-        if settings.ask_alias {
+        if settings.ask_alias && (new_user.alias.is_empty() || self.get_board().await.config.system_control.allow_alias_change) {
             let answer = self
                 .input_field(
                     IceText::GetAliasName,

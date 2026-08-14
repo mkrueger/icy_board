@@ -253,7 +253,8 @@ impl IcyBoardState {
             command.clear();
         }
         command.push_str(" S");
-        if self.get_board().await.config.message.default_scan_all_selected_confs_at_login {
+        let message_options = self.get_board().await.config.message.clone();
+        if message_options.scan_all_mail_at_login || message_options.default_scan_all_selected_confs_at_login {
             command.push_str(" A");
         }
         self.session.push_tokens(&command);

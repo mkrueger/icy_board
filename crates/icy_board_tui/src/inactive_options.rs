@@ -39,48 +39,6 @@ pub const UNREAD_OPTIONS: &[UnreadOption] = &[
         note: "the TUI theme is not chosen from it",
     },
     UnreadOption {
-        section: "new_user_settings",
-        option: "new_user_groups",
-        kind: Unread::NotReadYet,
-        note: "a new user is never put into the group named here",
-    },
-    UnreadOption {
-        section: "message",
-        option: "max_msg_lines",
-        kind: Unread::ImportedOnly,
-        note: "the editor has its own limit",
-    },
-    UnreadOption {
-        section: "message",
-        option: "allow_esc_codes",
-        kind: Unread::ImportedOnly,
-        note: "ESC is filtered or not without asking this",
-    },
-    UnreadOption {
-        section: "message",
-        option: "scan_all_mail_at_login",
-        kind: Unread::NotReadYet,
-        note: "",
-    },
-    UnreadOption {
-        section: "message",
-        option: "allow_carbon_copy",
-        kind: Unread::NotReadYet,
-        note: "E never offers a carbon copy",
-    },
-    UnreadOption {
-        section: "message",
-        option: "validate_to_name",
-        kind: Unread::NotReadYet,
-        note: "a message to a name nobody carries is accepted",
-    },
-    UnreadOption {
-        section: "message",
-        option: "default_quick_personal_scan",
-        kind: Unread::NotReadYet,
-        note: "",
-    },
-    UnreadOption {
         section: "file_transfer",
         option: "disallow_batch_uploads",
         kind: Unread::NotReadYet,
@@ -118,12 +76,6 @@ pub const UNREAD_OPTIONS: &[UnreadOption] = &[
     },
     UnreadOption {
         section: "system_control",
-        option: "allow_alias_change",
-        kind: Unread::ImportedOnly,
-        note: "W lets the alias be changed regardless",
-    },
-    UnreadOption {
-        section: "system_control",
         option: "disable_full_record_updating",
         kind: Unread::NotReadYet,
         note: "W always asks everything",
@@ -139,12 +91,6 @@ pub const UNREAD_OPTIONS: &[UnreadOption] = &[
         option: "enforce_daily_time_limit",
         kind: Unread::NotReadYet,
         note: "only session limits exist",
-    },
-    UnreadOption {
-        section: "system_control",
-        option: "allow_password_failure_comment",
-        kind: Unread::NotReadYet,
-        note: "",
     },
     UnreadOption {
         section: "switches",
@@ -241,18 +187,6 @@ pub const UNREAD_OPTIONS: &[UnreadOption] = &[
         option: "default_expired_level",
         kind: Unread::ImportedOnly,
         note: "an expired user keeps their level",
-    },
-    UnreadOption {
-        section: "qwk_settings",
-        option: "goodbye_screen",
-        kind: Unread::NotReadYet,
-        note: "not packed into the QWK archive",
-    },
-    UnreadOption {
-        section: "qwk_settings",
-        option: "news_sceen",
-        kind: Unread::NotReadYet,
-        note: "not packed into the QWK archive",
     },
     UnreadOption {
         section: "sysop_sec",

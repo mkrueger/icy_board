@@ -34,8 +34,10 @@ mod cmd_u;
 
 mod cmd_w;
 mod cmd_x;
+mod cmd_y;
 
 mod display_file;
+mod login_options;
 mod sysop_security;
 
 // !
@@ -164,6 +166,14 @@ fn test_message_areas() -> AreaList {
 }
 
 pub fn test_output<P: Fn(&mut IcyBoard)>(cmd: String, init_fn: P) -> String {
+    test_session_output(cmd, init_fn, true)
+}
+
+pub fn test_login_output<P: Fn(&mut IcyBoard)>(cmd: String, init_fn: P) -> String {
+    test_session_output(cmd, init_fn, false)
+}
+
+fn test_session_output<P: Fn(&mut IcyBoard)>(cmd: String, init_fn: P, login_sysop: bool) -> String {
     let result = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
         let bbs: Arc<tokio::sync::Mutex<BBS>> = Arc::new(tokio::sync::Mutex::new(BBS::new(1)));
         let mut icy_board = icy_board_engine::icy_board::IcyBoard::new();
@@ -222,7 +232,7 @@ pub fn test_output<P: Fn(&mut IcyBoard)>(cmd: String, init_fn: P) -> String {
             .spawn(move || {
                 tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
                     let options = LoginOptions {
-                        login_sysop: true,
+                        login_sysop,
                         ppe: None,
                         local: true,
                     };

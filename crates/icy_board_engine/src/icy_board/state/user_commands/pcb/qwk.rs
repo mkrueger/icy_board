@@ -1,6 +1,7 @@
 use std::{
     collections::HashMap,
     io::{Cursor, Read, Seek, Write},
+    path::Path,
 };
 
 use bstr::BString;
@@ -16,6 +17,7 @@ use zip::write::SimpleFileOptions;
 use crate::{
     Res,
     icy_board::{
+        IcyBoard,
         commands::CommandType,
         icb_config::IcbColor,
         icb_text::IceText,
@@ -29,6 +31,15 @@ use crate::{
 use super::u_upload_file::create_protocol;
 
 const MASK_CONFNUMBERS: &str = "0123456789-SDL?";
+
+fn qwk_screen(board: &IcyBoard, path: &Path) -> Option<(String, Vec<u8>)> {
+    if path.as_os_str().is_empty() {
+        return None;
+    }
+    let path = board.resolve_file(&path);
+    let name = path.file_name()?.to_string_lossy().to_string();
+    std::fs::read(path).ok().map(|data| (name, data))
+}
 
 impl IcyBoardState {
     async fn set_last_read(&mut self, table: &HashMap<u16, (usize, usize)>) -> Res<()> {
@@ -346,6 +357,9 @@ impl IcyBoardState {
 
         {
             let board = self.board.lock().await;
+            let welcome = qwk_screen(&board, &board.config.qwk_settings.welcome_screen);
+            let news = qwk_screen(&board, &board.config.qwk_settings.news_sceen);
+            let goodbye = qwk_screen(&board, &board.config.qwk_settings.goodbye_screen);
             let bbs_name: BString = if board.config.qwk_settings.bbs_name.is_empty() {
                 board.config.board.name.clone().into()
             } else {
@@ -380,9 +394,9 @@ impl IcyBoardState {
                 zero_line: "0".into(),
                 message_count: 0,
                 conferences: Vec::new(),
-                welcome_screen: BString::from(""),
-                news_screen: BString::from(""),
-                logoff_screen: BString::from(""),
+                welcome_screen: welcome.as_ref().map(|(name, _)| name.as_str()).unwrap_or_default().into(),
+                news_screen: news.as_ref().map(|(name, _)| name.as_str()).unwrap_or_default().into(),
+                logoff_screen: goodbye.as_ref().map(|(name, _)| name.as_str()).unwrap_or_default().into(),
             };
             let Some(user) = &mut self.session.current_user else {
                 return Ok(());
@@ -474,6 +488,11 @@ impl IcyBoardState {
 
             zip.start_file("messages.dat", SimpleFileOptions::default())?;
             zip.write_all(&msg_writer)?;
+
+            for (name, data) in [welcome, news, goodbye].into_iter().flatten() {
+                zip.start_file(name, SimpleFileOptions::default())?;
+                zip.write_all(&data)?;
+            }
 
             for (cnf, ndx) in ndx_data.iter() {
                 zip.start_file(&format!("{:03}.ndx", cnf), SimpleFileOptions::default())?;
@@ -577,5 +596,27 @@ impl IcyBoardState {
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod option_tests {
+    use super::qwk_screen;
+    use crate::icy_board::IcyBoard;
+
+    #[test]
+    fn screen_name_and_contents_are_ready_for_the_packet() {
+        let dir = std::env::temp_dir().join(format!("qwk-screen-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("goodbye.pcb"), b"BYE").unwrap();
+        let mut board = IcyBoard::new();
+        board.root_path = dir.clone();
+        assert_eq!(
+            qwk_screen(&board, std::path::Path::new("goodbye.pcb")),
+            Some(("goodbye.pcb".to_string(), b"BYE".to_vec()))
+        );
+        assert_eq!(qwk_screen(&board, std::path::Path::new("missing.pcb")), None);
+        assert_eq!(qwk_screen(&board, std::path::Path::new("")), None);
+        std::fs::remove_dir_all(dir).unwrap();
     }
 }

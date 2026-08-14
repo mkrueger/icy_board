@@ -46,7 +46,7 @@ impl IcyBoardState {
         };
         self.session.push_tokens(&text);
         let mut scan = YourMailScan::default();
-        scan.quick = true;
+        scan.quick = self.get_board().await.config.message.default_quick_personal_scan;
         loop {
             let Some(cmd) = self.session.tokens.pop_front() else {
                 break;
