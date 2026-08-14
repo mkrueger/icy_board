@@ -1,6 +1,8 @@
 error_cmd_line_label = Fehler:
 error_file_or_path_not_found = Datei oder Verzeichnis nicht gefunden
 
+option_not_read_yet = wird vom Board noch nicht ausgewertet
+
 
 yes=Ja
 no=Nein

@@ -9,6 +9,7 @@ use icy_board_engine::{
 use ratatui::{
     Frame,
     layout::{Alignment, Rect},
+    style::Modifier,
     text::Text,
     widgets::{Block, BorderType, Borders, Clear, Scrollbar, ScrollbarOrientation, ScrollbarState, StatefulWidget, Widget},
 };
@@ -272,6 +273,20 @@ impl<T> ListItem<T> {
         self
     }
 
+    /// For an option the board does not read yet: it stays visible and selectable,
+    /// but greyed out, and says why.
+    pub fn with_inactive(mut self, reason: impl Into<String>) -> Self {
+        let reason = reason.into();
+        self.editable = false;
+        self.status = format!("{} - {}", self.status, reason);
+        self.help = if self.help.is_empty() {
+            reason
+        } else {
+            format!("{}\n\n{}", self.help, reason)
+        };
+        self
+    }
+
     pub fn with_status(mut self, status: impl Into<String>) -> Self {
         self.status = status.into();
         self
@@ -407,13 +422,21 @@ impl<T> ListItem<T> {
     }
 
     fn render_label(&self, left_area: Rect, frame: &mut Frame, selected: bool, in_edit: bool) {
+        let style = if !self.editable {
+            // Greyed out, but the cursor has to stay visible on it.
+            if selected && !in_edit {
+                get_tui_theme().table_inactive.add_modifier(Modifier::REVERSED)
+            } else {
+                get_tui_theme().table_inactive
+            }
+        } else if selected && !in_edit {
+            get_tui_theme().selected_item
+        } else {
+            get_tui_theme().item
+        };
         Text::from(self.title.clone())
             .alignment(self.label_alignment)
-            .style(if selected && !in_edit {
-                get_tui_theme().selected_item
-            } else {
-                get_tui_theme().item
-            })
+            .style(style)
             .render(left_area, frame.buffer_mut());
     }
 
@@ -807,6 +830,15 @@ impl<T> ListItem<T> {
             }
         }
 
+        if !self.editable {
+            match key.code {
+                KeyCode::Up => return ResultState::up(),
+                KeyCode::Down | KeyCode::Enter => return ResultState::down(),
+                KeyCode::Esc => return ResultState::close(),
+                _ => return ResultState::status_line(self.status.clone()),
+            }
+        }
+
         match &mut self.value {
             ListValue::Text(_edit_len, _, text) => {
                 self.need_update |= self.text_field_state.handle_input(key, text);
@@ -1025,6 +1057,13 @@ impl<T> ConfigEntry<T> {
             _ => {}
         }
         self
+    }
+
+    pub fn with_inactive(self, reason: impl Into<String>) -> Self {
+        match self {
+            ConfigEntry::Item(item) => ConfigEntry::Item(item.with_inactive(reason)),
+            other => other,
+        }
     }
 
     fn measure_value(&self, area: Rect) -> u16 {
@@ -1273,12 +1312,15 @@ impl<T> ConfigMenu<T> {
                             height: 1,
                         };
 
-                        if *i == state.selected && display_editor {
+                        if *i == state.selected && display_editor && item.editable {
                             if !item.render_editor(val, right_area, frame) {
                                 return false;
                             }
                         } else if !display_editor {
                             item.render_value(right_area, frame);
+                            if !item.editable {
+                                frame.buffer_mut().set_style(right_area, get_tui_theme().table_inactive);
+                            }
                         }
                     }
 
@@ -1338,7 +1380,7 @@ impl<T> ConfigMenu<T> {
                             width: area.right().saturating_sub(left_area.right() + 5),
                             height: 1,
                         };
-                        if *i == state.selected {
+                        if *i == state.selected && item.editable {
                             if display_editor {
                                 if !item.render_editor(val, right_area, frame) {
                                     return false;
@@ -1346,6 +1388,9 @@ impl<T> ConfigMenu<T> {
                             }
                         } else if !display_editor {
                             item.render_value(right_area, frame);
+                            if !item.editable {
+                                frame.buffer_mut().set_style(right_area, get_tui_theme().table_inactive);
+                            }
                         }
                     }
 
@@ -1524,5 +1569,48 @@ impl<'a, T> Iterator for ConfigMenuIter<'a, T> {
             },
             None => self.next(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn press(item: &mut ListItem<()>, code: KeyCode) -> ResultState {
+        item.handle_key_press(KeyEvent::from(code), &mut ConfigMenuState::default())
+    }
+
+    fn bool_item(value: bool) -> ListItem<()> {
+        ListItem::new("Option".to_string(), ListValue::Bool(value))
+    }
+
+    #[test]
+    fn an_option_the_board_reads_can_be_changed() {
+        let mut item = bool_item(false);
+        press(&mut item, KeyCode::Char(' '));
+        assert!(matches!(item.value, ListValue::Bool(true)));
+    }
+
+    #[test]
+    fn an_inactive_option_keeps_its_value() {
+        let mut item = bool_item(false).with_inactive("nothing reads this");
+        press(&mut item, KeyCode::Char(' '));
+        assert!(matches!(item.value, ListValue::Bool(false)));
+        assert!(!item.editable());
+    }
+
+    #[test]
+    fn an_inactive_option_says_why_and_stays_reachable() {
+        let mut item = bool_item(false)
+            .with_status("Option")
+            .with_help("What it would do")
+            .with_inactive("nothing reads this");
+
+        assert!(item.status.contains("nothing reads this"));
+        assert!(item.help.contains("What it would do") && item.help.contains("nothing reads this"));
+
+        assert!(matches!(press(&mut item, KeyCode::Down).edit_msg, EditMessage::NextItem));
+        assert!(matches!(press(&mut item, KeyCode::Up).edit_msg, EditMessage::PrevItem));
+        assert!(matches!(press(&mut item, KeyCode::F(1)).edit_msg, EditMessage::DisplayHelp(_)));
     }
 }
