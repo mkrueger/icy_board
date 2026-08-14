@@ -44,8 +44,8 @@ impl MaintenanceOp {
     fn title(&self) -> String {
         match self {
             MaintenanceOp::Pack => get_text("icbsm_pack_title"),
-            MaintenanceOp::AdjustSecurity => get_text("icbsm_sec_by_ranges"),
-            MaintenanceOp::AdjustSecurityExpired => get_text("icbsm_sec_by_ranges_expired"),
+            MaintenanceOp::AdjustSecurity => get_text("icbsm_sec_by_ranges_title"),
+            MaintenanceOp::AdjustSecurityExpired => get_text("icbsm_sec_by_ranges_expired_title"),
             MaintenanceOp::CopyExpiredSecurity => get_text("icbsm_sec_copy_expired"),
             MaintenanceOp::InitializeCounters => get_text("icbsm_sec_init_counters"),
             MaintenanceOp::AdjustExpiration => get_text("icbsm_adjust_expiration_title"),
@@ -113,7 +113,7 @@ impl Default for Params {
     fn default() -> Self {
         Self {
             min_security: 0,
-            max_security: 255,
+            max_security: 0,
             use_expired_level: false,
             remove_deleted_or_locked: true,
             inactive_days: DAYS_OFF,
@@ -121,7 +121,7 @@ impl Default for Params {
             expired_before: no_date(),
             keep_security: 100,
             keep_locked_out: true,
-            new_level: 10,
+            new_level: 0,
             counter_init: CounterInit::Zero,
             counter_files: true,
             counter_bytes: true,
@@ -162,8 +162,38 @@ pub struct MaintenancePage {
 type Obj = Arc<Mutex<Params>>;
 
 const LABEL_WIDTH: u16 = 30;
-/// The pack criteria are whole sentences, like the screen they come from.
+/// The criteria are whole sentences, like the screens they come from, and each
+/// screen lines its answers up in one column.
 const PACK_LABEL_WIDTH: u16 = 50;
+const SECURITY_LABEL_WIDTH: u16 = 55;
+const EXPIRATION_LABEL_WIDTH: u16 = 61;
+const CONFERENCE_LABEL_WIDTH: u16 = 60;
+
+fn screen_label_width(op: MaintenanceOp) -> u16 {
+    match op {
+        MaintenanceOp::Pack => PACK_LABEL_WIDTH,
+        MaintenanceOp::AdjustSecurity | MaintenanceOp::AdjustSecurityExpired | MaintenanceOp::CopyExpiredSecurity => SECURITY_LABEL_WIDTH,
+        MaintenanceOp::AdjustExpiration => EXPIRATION_LABEL_WIDTH,
+        MaintenanceOp::ConferenceInsert | MaintenanceOp::ConferenceRemove | MaintenanceOp::ConferenceMove => CONFERENCE_LABEL_WIDTH,
+        _ => LABEL_WIDTH,
+    }
+}
+
+fn sized(entry: ConfigEntry<Obj>, width: u16) -> ConfigEntry<Obj> {
+    match entry {
+        ConfigEntry::Item(item) => ConfigEntry::Item(item.with_label_width(width)),
+        other => other,
+    }
+}
+
+/// The second half of a sentence that started on the line above, pulled over to
+/// the colon the way the original set it.
+fn continued(entry: ConfigEntry<Obj>, width: u16) -> ConfigEntry<Obj> {
+    match entry {
+        ConfigEntry::Item(item) => ConfigEntry::Item(item.with_label_width(width).with_label_alignment(Alignment::Right)),
+        other => other,
+    }
+}
 
 fn u32_item(label: &str, value: u32, min: u32, max: u32, update: &'static dyn Fn(&Obj, u32)) -> ConfigEntry<Obj> {
     ConfigEntry::Item(
@@ -184,10 +214,7 @@ fn bool_item(label: &str, value: bool, update: &'static dyn Fn(&Obj, bool)) -> C
 }
 
 fn wide(entry: ConfigEntry<Obj>) -> ConfigEntry<Obj> {
-    match entry {
-        ConfigEntry::Item(item) => ConfigEntry::Item(item.with_label_width(PACK_LABEL_WIDTH)),
-        other => other,
-    }
+    sized(entry, PACK_LABEL_WIDTH)
 }
 
 /// Replaces the status line of an item, for the fields that carry an off value.
@@ -218,6 +245,10 @@ impl MaintenancePage {
             MaintenanceOp::ConferenceInsert | MaintenanceOp::ConferenceRemove | MaintenanceOp::ConferenceMove
         ) {
             params.max_security = 110;
+        }
+        // Packing has no range of its own; it keeps by level instead.
+        if op == MaintenanceOp::Pack || op == MaintenanceOp::StandardizePhones {
+            params.max_security = 255;
         }
         let mut entry = if op == MaintenanceOp::Pack {
             vec![
@@ -267,27 +298,43 @@ impl MaintenancePage {
                 ),
             ]
         } else {
-            vec![
+            let width = screen_label_width(op);
+            let mut range = vec![
                 ConfigEntry::Separator,
-                u32_item("icbsm_min_security", params.min_security, 0, 255, &|o: &Obj, v: u32| {
-                    o.lock().unwrap().min_security = v
-                }),
-                u32_item("icbsm_max_security", params.max_security, 0, 255, &|o: &Obj, v: u32| {
-                    o.lock().unwrap().max_security = v
-                }),
-                bool_item("icbsm_use_expired_level", params.use_expired_level, &|o: &Obj, v: bool| {
-                    o.lock().unwrap().use_expired_level = v
-                }),
-            ]
+                sized(
+                    u32_item("icbsm_min_security", params.min_security, 0, 255, &|o: &Obj, v: u32| {
+                        o.lock().unwrap().min_security = v
+                    }),
+                    width,
+                ),
+                continued(
+                    u32_item("icbsm_max_security", params.max_security, 0, 255, &|o: &Obj, v: u32| {
+                        o.lock().unwrap().max_security = v
+                    }),
+                    width,
+                ),
+            ];
+            // The expired variant is a menu entry of its own, so those two
+            // screens carry no toggle for it.
+            if !matches!(op, MaintenanceOp::AdjustSecurity | MaintenanceOp::AdjustSecurityExpired) {
+                range.push(sized(
+                    bool_item("icbsm_use_expired_level", params.use_expired_level, &|o: &Obj, v: bool| {
+                        o.lock().unwrap().use_expired_level = v
+                    }),
+                    width,
+                ));
+            }
+            range
         };
 
         match op {
             MaintenanceOp::Pack => {}
             MaintenanceOp::AdjustSecurity | MaintenanceOp::AdjustSecurityExpired => {
                 entry.push(ConfigEntry::Separator);
-                entry.push(u32_item("icbsm_new_level", params.new_level, 0, 255, &|o: &Obj, v: u32| {
-                    o.lock().unwrap().new_level = v
-                }));
+                entry.push(sized(
+                    u32_item("icbsm_new_level", params.new_level, 0, 255, &|o: &Obj, v: u32| o.lock().unwrap().new_level = v),
+                    27,
+                ));
             }
             MaintenanceOp::InitializeCounters => {
                 entry.push(ConfigEntry::Separator);

@@ -1578,6 +1578,8 @@ icbsm_phones_title=Standardize Phone Formats
 icbsm_undo_title=Undo (restore backup file)
 
 icbsm_sec_by_ranges=Adjust by Ranges
+icbsm_sec_by_ranges_title=Adjust Security by Range
+icbsm_sec_by_ranges_expired_title=Adjust Expired Security by Range
 icbsm_sec_by_ranges_expired=Adjust by Ranges (Expired)
 icbsm_sec_by_file_ratio=Adjust by Up/Dn File Ratio
 icbsm_sec_by_byte_ratio=Adjust by Up/Dn Byte Ratio
