@@ -17,7 +17,7 @@ Legend:
 - ❌ stored and editable, but nothing reads it
 - 📥 filled in by the `PCBOARD.DAT` importer, but nothing reads it afterwards
 
-**37 of 125 options and 21 of 29 sysop security levels do nothing today.**
+**36 of 125 options and 21 of 29 sysop security levels do nothing today.**
 
 ## board — general information
 
@@ -61,7 +61,7 @@ matching questions of the `W` command.
 
 ## file_transfer
 
-Seven of nine do nothing. This is the worst section, and the one a sysop is
+Six of nine do nothing. This is the worst section, and the one a sysop is
 most likely to touch.
 
 | Option | Status | Note |
@@ -72,7 +72,7 @@ most likely to touch.
 | `upload_credit_time` | ❌ | uploading earns neither time nor bytes |
 | `upload_credit_bytes` | ❌ | |
 | `verify_files_uploaded` | ❌ | uploads are never test-extracted |
-| `upload_descr_lines` | ❌ | duplicated by `limits.max_number_upload_descr_lines`, both dead |
+| `upload_descr_lines` | ✅ | upload, how many description lines the caller may type; `limits.max_number_upload_descr_lines` is still dead |
 | `disable_drive_size_check` | ❌ | |
 | `stop_uploads_free_space` | ❌ | the board uploads until the disk is full |
 

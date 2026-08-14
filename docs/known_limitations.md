@@ -18,7 +18,6 @@ for where a command answers differently than PCBoard did, and
 | Subscriptions | An expiring subscription is warned about. A new period is never set and an expired user keeps their security level. |
 | Idle timeout | `limits.keyboard_timeout` is not enforced. A dropped line holds its node until the process is restarted. |
 | Upload credits | Uploading earns neither time nor bytes, uploads are not test-extracted, and the free space check does not stop an upload. |
-| Upload descriptions | PCBoard asks for a description before it accepts an upload. icy_board does not ask, so an uploaded file arrives without one. |
 | FTN | icy_board is a leaf or point over BinkP: scan, poll and toss. There is no BinkP answering side, netmail arrives in a single dump base, AreaFix is missing and the AKA and link setup is hand-edited TOML. |
 | Web | There is no web frontend, and the PPL web statements and functions are not implemented. |
 | Sysop numeric commands | The sysop commands `1`, `2`, `3`, `5` to `9` and `11` to `14` do not exist, so the security levels that name them are read by nobody. |

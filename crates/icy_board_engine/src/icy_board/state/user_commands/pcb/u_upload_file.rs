@@ -1,4 +1,5 @@
 use crate::icy_board::commands::CommandType;
+use crate::icy_board::icb_config::IcbColor;
 use crate::{Res, icy_board::state::IcyBoardState};
 use crate::{
     icy_board::{
@@ -39,6 +40,49 @@ impl IcyBoardState {
         }
         self.session.flagged_files.clear();
         Ok(true)
+    }
+
+    /// TRANSFER.C `getdescription`: the caller describes the file before anything is
+    /// transferred, and an empty first line abandons an upload that has not started.
+    pub async fn ask_upload_description(&mut self, file_name: &str) -> Res<Option<Vec<String>>> {
+        let max_lines = self.get_board().await.config.file_transfer.upload_descr_lines.max(1) as usize;
+
+        self.session.op_text = file_name.to_string();
+        self.display_text(IceText::EnterDescription, display_flags::NEWLINE | display_flags::LFBEFORE)
+            .await?;
+        self.display_text(IceText::SlashForPrivate, display_flags::NEWLINE).await?;
+        self.session.op_text = max_lines.to_string();
+        self.display_text(IceText::MessageEnterText, display_flags::DEFAULT).await?;
+        self.display_text(IceText::Columns45, display_flags::NEWLINE).await?;
+
+        let mut lines: Vec<String> = Vec::new();
+        while lines.len() < max_lines {
+            let line = self
+                .input_string(
+                    IcbColor::None,
+                    String::new(),
+                    45,
+                    &MASK_ASCII,
+                    "",
+                    None,
+                    display_flags::NEWLINE | display_flags::FIELDLEN | display_flags::HIGHASCII,
+                )
+                .await?;
+
+            if lines.is_empty() {
+                if line.is_empty() {
+                    return Ok(None);
+                }
+                if line.chars().count() < 5 {
+                    self.display_text(IceText::LongerDescription, display_flags::NEWLINE).await?;
+                    continue;
+                }
+            } else if line.is_empty() {
+                break;
+            }
+            lines.push(line);
+        }
+        Ok(Some(lines))
     }
 
     pub async fn upload_file(&mut self) -> Res<()> {
@@ -84,6 +128,10 @@ impl IcyBoardState {
         if file_name.is_empty() {
             return Ok(());
         }
+
+        let Some(description) = self.ask_upload_description(&file_name).await? else {
+            return Ok(());
+        };
 
         // PCBoard settles the protocol before it offers the goodbye question, and
         // asks for one rather than starting a transfer the caller has none for.
@@ -173,6 +221,13 @@ impl IcyBoardState {
                             data: self.session.get_username_or_alias().as_bytes().to_vec(),
                             metadata_type: MetadataType::Uploader,
                         });
+                        // An archive that carries its own FILE_ID.DIZ keeps it.
+                        if !description.is_empty() && !metadata.iter().any(|m| m.metadata_type == MetadataType::FileID) {
+                            metadata.push(MetadataHeader {
+                                data: description.join("\n").as_bytes().to_vec(),
+                                metadata_type: MetadataType::FileID,
+                            });
+                        }
                         file_base.lock().await.add_file(&dest, metadata.clone())?;
 
                         std::fs::remove_file(&path)?;

@@ -36,14 +36,17 @@ the main menu instead. It loops now.
 Our D prompt carries a `(1)` batch counter the original does not print. The
 count and the order are the contract, the wording is not, so this stays.
 
-**U still differs and it is not only wording.** The original asks for the
-description before it settles the protocol, and it asks for it *every* time.
-icy_board never asks: `EnterDescription` (160) is in the text table and no
-command uses it, so an upload lands without one. icy_board also asks
-`GoodbyeAfterUpload` (474) between the filename and the transfer, where the
-original asks nothing. Where the original puts 474 is still unverified - the
-oracle run ends at the protocol prompt because the harness cannot carry out a
-Zmodem transfer.
+**U asked no description at all** - `EnterDescription` (160) sat in the text
+table and no command used it, so an upload landed without one. It now follows
+`getdescription` in TRANSFER.C: the name, then the description block, then the
+protocol. An empty first line abandons an upload that has not started and a
+first line shorter than five characters is refused, both as in the original.
+`GoodbyeAfterUpload` (474) is asked in batch mode only, which is what the source
+says and what the oracle could not reach.
+
+Two things are left for U. The original asks for another name after each one the
+way D does, and it reads a leading `/` on the first description line as "store
+this upload privately"; icy_board asks once and ignores the slash.
 
 ## Ground rules PCBoard applies to every command
 
@@ -83,7 +86,7 @@ Zmodem transfer.
 | R | MSGREADCMDEXPRT (584)/MSGREADCOMMAND (425); per-message loop ENDOFMSGEXPERT (612)/ENDOFMESSAGE (197); MOVE (465)/COPY (569) | prompts and parser match; the capture and QWK commands parse but do nothing yet | ⚠️ prompt sequence verified against the original, the capture commands are still empty |
 | S | QNUMTOANSWER (67), **always prompts, ignores tokens** | same | ✅ |
 | T | DESIREDPROTOCOL (198); token skips | same | ✅ |
-| U | CONTINUEUPLOAD (449), FILENAMETOUPLOAD (68)/(729), PROTOCOLFORXFER (280), GOODBYEAFTERUP (474) | 449, 68 (token aware), 280 when no protocol is set, then 474 | ⚠️ verified: the original asks for a description between 68 and 280 and repeats 68 like D; icy_board asks no description at all and asks 474 before the transfer |
+| U | CONTINUEUPLOAD (449), FILENAMETOUPLOAD (68)/(729), ENTERDESCRIPTION (160) block, PROTOCOLFORXFER (280), GOODBYEAFTERUP (474) in batch mode only | same, in that order | ⚠️ the original repeats 68 after each file, icy_board still asks once |
 | V | no prompts; returns if STAT display file missing | built-in settings display as fallback | ⚠️ improvement, divergent |
 | W | NEWPASSWORD (152), REENTERPASSWORD (111), CITYSTATE (265), BUSDATAPHONE (113), HOMEVOICEPHONE (114), COMMENTFIELDPROMPT (2), CLSBETWEENMSGS (556), SCROLLMSGBODY (627), USEBIGHEADERS (628), SETFSEDEFAULT (583), DEFAULTWIDEMSGS (637), GETALIASNAME (690), USESHORTDESC (746), SELECTCONFS (325), address block, QWK limits (732-735) | same, then the icy_board extras | ✅ |
 | X | no prompt; ON/OFF token | same | ✅ |

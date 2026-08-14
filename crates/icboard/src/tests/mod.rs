@@ -30,6 +30,7 @@ mod cmd_o;
 mod cmd_p;
 mod cmd_r;
 mod cmd_t;
+mod cmd_u;
 
 mod cmd_w;
 mod cmd_x;

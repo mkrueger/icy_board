@@ -106,12 +106,6 @@ pub const UNREAD_OPTIONS: &[UnreadOption] = &[
     },
     UnreadOption {
         section: "file_transfer",
-        option: "upload_descr_lines",
-        kind: Unread::NotReadYet,
-        note: "duplicated by limits.max_number_upload_descr_lines, both dead",
-    },
-    UnreadOption {
-        section: "file_transfer",
         option: "disable_drive_size_check",
         kind: Unread::NotReadYet,
         note: "",
