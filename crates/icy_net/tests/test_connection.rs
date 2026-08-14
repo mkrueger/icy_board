@@ -136,14 +136,11 @@ impl Connection for TestConnection {
 
     async fn read_u8(&mut self) -> icy_net::Result<u8> {
         let mut buf = [0u8; 1];
-        loop {
-            let n = self.read(&mut buf).await?;
-            if n == 0 {
-                // EOF - you might want to return an error here instead
-                return Err("Connection closed".into());
-            }
-            return Ok(buf[0]);
+        let n = self.read(&mut buf).await?;
+        if n == 0 {
+            return Err("Connection closed".into());
         }
+        Ok(buf[0])
     }
 }
 

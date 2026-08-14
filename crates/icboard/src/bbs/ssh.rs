@@ -227,7 +227,7 @@ impl Connection for SSHConnection {
     }
 
     async fn send(&mut self, buf: &[u8]) -> icy_net::Result<()> {
-        self.channel.write(buf).await?;
+        self.channel.write_all(buf).await?;
         Ok(())
     }
 

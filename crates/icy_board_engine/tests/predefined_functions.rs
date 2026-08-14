@@ -137,12 +137,12 @@ async fn test_fmtreal_field_width() {
 #[tokio::test]
 async fn test_fmtreal_decimal_places() {
     // Test different decimal places
-    assert_eq!(test_fmtreal(3.14159, 10, 0).await, "         3");
-    assert_eq!(test_fmtreal(3.14159, 10, 1).await, "       3.1");
-    assert_eq!(test_fmtreal(3.14159, 10, 2).await, "      3.14");
-    assert_eq!(test_fmtreal(3.14159, 10, 3).await, "     3.142");
-    assert_eq!(test_fmtreal(3.14159, 10, 4).await, "    3.1416");
-    assert_eq!(test_fmtreal(3.14159, 10, 5).await, "   3.14159");
+    assert_eq!(test_fmtreal(1.23456, 10, 0).await, "         1");
+    assert_eq!(test_fmtreal(1.23456, 10, 1).await, "       1.2");
+    assert_eq!(test_fmtreal(1.23456, 10, 2).await, "      1.23");
+    assert_eq!(test_fmtreal(1.23456, 10, 3).await, "     1.235");
+    assert_eq!(test_fmtreal(1.23456, 10, 4).await, "    1.2346");
+    assert_eq!(test_fmtreal(1.23456, 10, 5).await, "   1.23456");
 }
 
 #[tokio::test]
