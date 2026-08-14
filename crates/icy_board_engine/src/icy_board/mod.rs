@@ -1009,9 +1009,33 @@ pub(crate) fn load_internal<T: IcyBoardSerializer, P: AsRef<Path>>(path: &P) -> 
     }
 }
 
+/// Writes through a temporary file in the target directory and renames it into
+/// place, so a crash or a full disk can never leave a half-written file behind.
+pub fn write_atomic<P: AsRef<Path>>(path: P, contents: &[u8]) -> std::io::Result<()> {
+    use std::io::Write as _;
+
+    let path = path.as_ref();
+    let dir = path.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or_else(|| Path::new("."));
+
+    let mut tmp = tempfile::NamedTempFile::new_in(dir)?;
+    tmp.write_all(contents)?;
+    tmp.as_file().sync_all()?;
+
+    if let Ok(meta) = fs::metadata(path) {
+        let _ = tmp.as_file().set_permissions(meta.permissions());
+    }
+    tmp.persist(path).map_err(|e| e.error)?;
+
+    // The rename becomes durable only once the directory entry itself is flushed.
+    if let Ok(handle) = fs::File::open(dir) {
+        let _ = handle.sync_all();
+    }
+    Ok(())
+}
+
 pub(crate) fn save_internal<T: IcyBoardSerializer, P: AsRef<Path>>(s: &T, path: &P) -> Res<()> {
     match toml::to_string(s) {
-        Ok(txt) => match fs::write(path, txt) {
+        Ok(txt) => match write_atomic(path, txt.as_bytes()) {
             Ok(_) => Ok(()),
             Err(e) => {
                 log::error!("Error writing {} file '{}': {}", T::FILE_TYPE, path.as_ref().display(), e);
@@ -1025,38 +1049,6 @@ pub(crate) fn save_internal<T: IcyBoardSerializer, P: AsRef<Path>>(s: &T, path: 
     }
 }
 
-/// Writes to a temporary file in the target directory and renames it into place,
-/// so a crashing or failing write can never leave a half-written config behind.
-pub(crate) fn save_atomic_internal<T: IcyBoardSerializer, P: AsRef<Path>>(s: &T, path: &P) -> Res<()> {
-    use std::io::Write as _;
-
-    let path = path.as_ref();
-    let txt = match toml::to_string(s) {
-        Ok(txt) => txt,
-        Err(e) => {
-            log::error!("Error generating {} toml file '{}': {}", T::FILE_TYPE, path.display(), e);
-            return Err(IcyError::ErrorGeneratingToml(path.to_string_lossy().to_string(), e.to_string()).into());
-        }
-    };
-
-    let dir = path.parent().unwrap_or_else(|| Path::new("."));
-    let map_io = |e: std::io::Error| -> Box<dyn std::error::Error + Send + Sync> {
-        log::error!("Error writing {} file '{}': {}", T::FILE_TYPE, path.display(), e);
-        IcyError::ErrorGeneratingToml(path.to_string_lossy().to_string(), e.to_string()).into()
-    };
-
-    let mut tmp = tempfile::NamedTempFile::new_in(dir).map_err(map_io)?;
-    tmp.write_all(txt.as_bytes()).map_err(map_io)?;
-    tmp.as_file().sync_all().map_err(map_io)?;
-
-    if let Ok(meta) = fs::metadata(path) {
-        let _ = tmp.as_file().set_permissions(meta.permissions());
-    }
-
-    tmp.persist(path).map_err(|e| map_io(e.error))?;
-    Ok(())
-}
-
 pub trait IcyBoardSerializer: serde::de::DeserializeOwned + serde::ser::Serialize {
     const FILE_TYPE: &'static str;
 
@@ -1066,11 +1058,6 @@ pub trait IcyBoardSerializer: serde::de::DeserializeOwned + serde::ser::Serializ
 
     fn save<P: AsRef<Path>>(&self, path: &P) -> Res<()> {
         save_internal::<Self, P>(self, path)
-    }
-
-    /// Crash-safe variant of [`IcyBoardSerializer::save`].
-    fn save_atomic<P: AsRef<Path>>(&self, path: &P) -> Res<()> {
-        save_atomic_internal::<Self, P>(self, path)
     }
 }
 
@@ -1171,6 +1158,34 @@ mod tests {
         let root = board(&["gen/BRDM.PPE"]);
         let path = root.path().join("gen/BRDM.PPE");
         assert_eq!(lookup_case_insensitive(&path), path);
+    }
+
+    #[test]
+    fn an_atomic_write_replaces_the_file_and_leaves_nothing_behind() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("users.toml");
+        fs::write(&path, "old").unwrap();
+
+        write_atomic(&path, b"new").unwrap();
+
+        assert_eq!(fs::read_to_string(&path).unwrap(), "new");
+        let left: Vec<_> = fs::read_dir(root.path()).unwrap().map(|e| e.unwrap().file_name()).collect();
+        assert_eq!(left, vec![std::ffi::OsString::from("users.toml")]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn an_atomic_write_keeps_the_permissions_of_the_file_it_replaces() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("users.toml");
+        fs::write(&path, "old").unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o640)).unwrap();
+
+        write_atomic(&path, b"new").unwrap();
+
+        assert_eq!(fs::metadata(&path).unwrap().permissions().mode() & 0o777, 0o640);
     }
 
     #[test]

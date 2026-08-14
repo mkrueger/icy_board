@@ -1797,7 +1797,7 @@ impl IcbTextFile {
             }
             txt.push('\n');
         }
-        fs::write(path, &txt)?;
+        super::write_atomic(path, txt.as_bytes())?;
         Ok(())
     }
 

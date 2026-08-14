@@ -158,7 +158,7 @@ impl GroupList {
     }
 
     pub fn save<P: AsRef<Path>>(&self, path: &P) -> Res<()> {
-        fs::write(path, self.to_string())?;
+        super::write_atomic(path, self.to_string().as_bytes())?;
         Ok(())
     }
 }

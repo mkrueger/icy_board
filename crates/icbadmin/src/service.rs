@@ -133,7 +133,7 @@ impl LiveAdminBackend {
         let _ = mutator(&mut disk_config)?;
 
         let backup_path = backup::create_backup(&self.root_path, &self.board_file)?;
-        disk_config.save_atomic(&self.board_file).map_err(|e| AdminError::Save(e.to_string()))?;
+        disk_config.save(&self.board_file).map_err(|e| AdminError::Save(e.to_string()))?;
         if let Err(e) = IcbConfig::load(&self.board_file) {
             let _ = std::fs::copy(&backup_path, &self.board_file);
             return Err(AdminError::Save(format!(
@@ -2578,7 +2578,7 @@ fn conference_at(base: &ConferenceBase, index: usize) -> Result<&Conference> {
 /// Shared write path for the conference file: backup, atomic save, read back check, audit.
 fn write_conferences(root_path: &Path, path: &Path, base: &ConferenceBase, actor: &str, action: &str, changes: &[FieldChangeDto]) -> Result<ApplyResultDto> {
     let backup_path = backup::create_backup(root_path, path)?;
-    base.save_atomic(&path).map_err(|e| AdminError::Save(e.to_string()))?;
+    base.save(&path).map_err(|e| AdminError::Save(e.to_string()))?;
 
     if let Err(e) = ConferenceBase::load(&path) {
         let _ = std::fs::copy(&backup_path, path);

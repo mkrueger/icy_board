@@ -1,6 +1,5 @@
 use std::{
     collections::HashMap,
-    fs,
     ops::{Deref, DerefMut, Index, IndexMut},
     path::{Path, PathBuf},
     str::FromStr,
@@ -1034,12 +1033,8 @@ impl User {
     pub fn save(&self, _home_dir: &Path) -> Res<()> {
         let user_txt = toml::to_string(self)?;
         if let Some(path) = self.path.as_ref() {
-            fs::write(path, user_txt)?;
-        } /* else {
-        let home_dir = UserBase::get_user_home_dir(home_dir, self.get_name());
-        std::fs::create_dir_all(&home_dir)?;
-        fs::write(home_dir.join("user.toml"), user_txt)?;
-        }*/
+            super::write_atomic(path, user_txt.as_bytes())?;
+        }
         Ok(())
     }
 
