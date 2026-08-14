@@ -1,10 +1,14 @@
 use std::{
     fs,
+    fs::OpenOptions,
+    io::Write,
     path::{Path, PathBuf},
+    time::Instant,
 };
 
 use crate::Res;
 use async_recursion::async_recursion;
+use chrono::{DateTime, Local};
 use codepages::tables::CP437_TO_UNICODE;
 use icy_engine::IceMode;
 use jamjam::jam::{JamMessage, JamMessageBase};
@@ -615,6 +619,46 @@ impl IcyBoardState {
             JamMessageBase::create(msg_base)?
         })
     }
+
+    /// Appends one line per transferred file to the transfer log.
+    pub async fn log_transfer(&mut self, upload: bool, file_names: &[String], protocol: &str, errors: usize, cps: usize) -> Res<()> {
+        let (log_file, exclude_locals) = {
+            let board = self.get_board().await;
+            (board.config.paths.transfer_log.clone(), board.config.switches.exclude_local_calls_stats)
+        };
+        if log_file.as_os_str().is_empty() || file_names.is_empty() || (self.session.is_local && exclude_locals) {
+            return Ok(());
+        }
+        let log_file = self.resolve_path(&log_file);
+        let user_name = self.session.user_name.clone();
+        let now = Local::now();
+        let mut text = String::new();
+        for file_name in file_names {
+            text.push_str(&transfer_log_line(upload, &user_name, now, file_name, protocol, errors, cps));
+        }
+        let mut file = OpenOptions::new().create(true).append(true).open(&log_file)?;
+        file.write_all(text.as_bytes())?;
+        Ok(())
+    }
+}
+
+fn transfer_log_line(upload: bool, user_name: &str, time: DateTime<Local>, file_name: &str, protocol: &str, errors: usize, cps: usize) -> String {
+    format!(
+        "({}),{},{},{},{},{},{},{}\r\n",
+        if upload { 'U' } else { 'D' },
+        user_name,
+        time.format("%m-%d-%Y"),
+        time.format("%H:%M"),
+        file_name,
+        protocol,
+        errors,
+        cps
+    )
+}
+
+pub fn transfer_cps(bytes: u64, started: Instant) -> usize {
+    let elapsed = started.elapsed().as_secs_f64();
+    if elapsed <= 0.0 { 0 } else { (bytes as f64 / elapsed) as usize }
 }
 
 const MASK_PASSWORD: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()-_=+[]{};:'\",.<>/?\\|~`";
@@ -627,7 +671,18 @@ pub mod pwd_flags {
 
 #[cfg(test)]
 mod tests {
-    use super::{PPECall, PPECallType};
+    use super::{PPECall, PPECallType, transfer_log_line};
+    use chrono::TimeZone;
+
+    #[test]
+    fn a_transfer_log_line_names_direction_user_file_and_speed() {
+        let time = chrono::Local.with_ymd_and_hms(2026, 8, 14, 21, 5, 0).unwrap();
+        assert_eq!(
+            transfer_log_line(false, "JOHN DOE", time, "GAME.ZIP", "Z", 2, 1150),
+            "(D),JOHN DOE,08-14-2026,21:05,GAME.ZIP,Z,2,1150\r\n"
+        );
+        assert!(transfer_log_line(true, "JOHN DOE", time, "GAME.ZIP", "Z", 0, 0).starts_with("(U),"));
+    }
 
     #[test]
     fn test_parse_simple_ppe_call() {

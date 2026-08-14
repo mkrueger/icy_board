@@ -54,6 +54,7 @@ impl SystemFiles {
                 cfg_entry_path!("paths_users_file", label_width, paths, user_file, lock),
                 cfg_entry_path!("paths_group_file", label_width, paths, group_file, lock),
                 cfg_entry_path!("paths_caller_log", label_width, paths, caller_log, lock),
+                cfg_entry_path!("paths_transfer_log", label_width, paths, transfer_log, lock),
                 cfg_entry_path!("paths_statistic_file", label_width, paths, statistics_file, lock),
                 ConfigEntry::Separator,
                 cfg_entry_path!("paths_icbtext", label_width, paths, icbtext, Box::new(edit_icbtext), lock),

@@ -222,6 +222,11 @@ the `NS` token stacked onto the logon prompt, so it landed on the existing
 longer names a capture file in PCBoard 15, `getqwkroot()` only falls back to it
 when `qwk_file` is empty, so both feed `qwk_settings.bbs_id`.
 
+`download_file` — the log every completed transfer is appended to, one line per
+file with direction, caller, date, time, name, protocol, error count and CPS.
+It became `paths.transfer_log`, is written by `D` and `U`, respects
+`switches.exclude_local_calls_stats` and is exported again.
+
 ### No counterpart here
 
 | PCBoard option | Why not |

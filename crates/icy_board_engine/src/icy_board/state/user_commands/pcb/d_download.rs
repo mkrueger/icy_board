@@ -1,10 +1,11 @@
 use std::path::PathBuf;
+use std::time::Instant;
 
 use async_recursion::async_recursion;
 use humanize_bytes::humanize_bytes_decimal;
 
 use crate::icy_board::icb_config::IcbColor;
-use crate::icy_board::state::functions::MASK_NUM;
+use crate::icy_board::state::functions::{MASK_NUM, transfer_cps};
 use crate::{Res, icy_board::state::IcyBoardState};
 
 use super::u_upload_file::create_protocol;
@@ -156,6 +157,7 @@ impl IcyBoardState {
                 }
                 match prot.initiate_send(&mut *self.connection, &files).await {
                     Ok(mut state) => {
+                        let started = Instant::now();
                         while !state.is_finished {
                             if let Err(e) = prot.update_transfer(&mut *self.connection, &mut state).await {
                                 log::error!("Error while updating file transfer with {:?} : {}", protocol, e);
@@ -167,6 +169,10 @@ impl IcyBoardState {
                         self.transfer_statistics.downloaded_bytes = state.send_state.total_bytes_transfered as usize;
                         self.transfer_statistics.downloaded_files = state.send_state.finished_files.len();
                         self.display_text(IceText::BatchSend, display_flags::LFBEFORE).await?;
+
+                        let sent: Vec<String> = state.send_state.finished_files.iter().map(|(name, _)| name.clone()).collect();
+                        let cps = transfer_cps(state.send_state.total_bytes_transfered, started);
+                        self.log_transfer(false, &sent, &protocol_str, state.send_state.errors, cps).await?;
 
                         self.board.lock().await.statistics.add_download(&state);
                         self.board.lock().await.save_statistics()?;

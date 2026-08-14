@@ -672,7 +672,7 @@ pub fn paths_page(settings: &PathsSettingsResponse, csrf: &str, notice: Option<N
     let path = |label: &str, name: &str, value: &str| text_field(label, name, value, 512, false);
     let fields = format!(
         r#"<fieldset><legend>System files</legend><div class="grid-2">
-{help}{sec}{email}{cmd_disp}{tmp}{icbtext}{conf}{user}{caller}{stats}{cmd}{lang}{group}{proto}{pwrd}{ftn}
+{help}{sec}{email}{cmd_disp}{tmp}{icbtext}{conf}{user}{caller}{transfer}{stats}{cmd}{lang}{group}{proto}{pwrd}{ftn}
 </div></fieldset>
 <fieldset><legend>Display files</legend><div class="grid-2">
 {welcome}{newuser}{closed}{expire_warning}{expired}{join}{chat_intro}{chat_menu}{chat_actions}{no_ansi}
@@ -690,6 +690,7 @@ pub fn paths_page(settings: &PathsSettingsResponse, csrf: &str, notice: Option<N
         conf = path("Conferences", "conferences", &s.conferences),
         user = path("User file", "user_file", &s.user_file),
         caller = path("Caller log", "caller_log", &s.caller_log),
+        transfer = path("Transfer log", "transfer_log", &s.transfer_log),
         stats = path("Statistics file", "statistics_file", &s.statistics_file),
         cmd = path("Command file", "command_file", &s.command_file),
         lang = path("Language file", "language_file", &s.language_file),

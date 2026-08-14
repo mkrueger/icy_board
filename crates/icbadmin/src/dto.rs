@@ -517,6 +517,7 @@ pub struct PathsSettingsDto {
     pub ftn_file: String,
     pub user_file: String,
     pub caller_log: String,
+    pub transfer_log: String,
     pub logon_survey: String,
     pub logon_answer: String,
     pub logoff_survey: String,

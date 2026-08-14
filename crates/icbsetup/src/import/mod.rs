@@ -380,6 +380,7 @@ impl PCBoardImporter {
         let warning = self.convert_display_file(&self.data.path.warning_file.clone(), "art/warning")?;
         let expired = self.convert_display_file(&self.data.path.expired_file.clone(), "art/expired")?;
         let caller_log = self.convert_display_file(&self.data.path.clr_file.clone(), "caller.log")?;
+        let transfer_log = self.convert_display_file(&self.data.path.download_file.clone(), "transfer.log")?;
 
         let accounting_config_file = self.convert_accounting_cfg(&self.data.account_config.clone(), "main/accounting_cfg.toml")?;
         let accounting_holiday_list_file = self.convert_display_file(&self.data.holidays_file.clone(), "art/acc_holidays")?;
@@ -548,6 +549,7 @@ impl PCBoardImporter {
                 user_file: PathBuf::from("main/users.toml"),
                 email_msgbase: PathBuf::from("main/email"),
                 caller_log,
+                transfer_log,
                 icbtext,
                 conferences,
                 welcome,

@@ -801,6 +801,7 @@ fn paths_from_form(form: &HashMap<String, String>) -> PathsSettingsDto {
         ftn_file: text(form, "ftn_file"),
         user_file: text(form, "user_file"),
         caller_log: text(form, "caller_log"),
+        transfer_log: text(form, "transfer_log"),
         logon_survey: text(form, "logon_survey"),
         logon_answer: text(form, "logon_answer"),
         logoff_survey: text(form, "logoff_survey"),

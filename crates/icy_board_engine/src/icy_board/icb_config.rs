@@ -501,6 +501,10 @@ pub struct ConfigPaths {
 
     pub caller_log: PathBuf,
 
+    /// name and location of the file every completed transfer is recorded in
+    #[serde(default)]
+    pub transfer_log: PathBuf,
+
     pub logon_survey: PathBuf,
     pub logon_answer: PathBuf,
 
@@ -982,6 +986,7 @@ impl IcbConfig {
                 user_file: PathBuf::from("main/users.toml"),
                 email_msgbase: PathBuf::from("main/email"),
                 caller_log: PathBuf::from("caller.log"),
+                transfer_log: PathBuf::from("transfer.log"),
 
                 welcome: PathBuf::new(),
                 newuser: PathBuf::new(),

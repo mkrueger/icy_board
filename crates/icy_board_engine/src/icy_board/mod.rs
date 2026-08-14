@@ -607,6 +607,8 @@ impl IcyBoard {
         let protocol_data_file = base_loc.join("pcbprot.dat");
         self.protocols.export_data(&protocol_data_file)?;
         pcb_dat.path.protocol_data_file = protocol_data_file.to_string_lossy().to_string();
+        // Line 46
+        pcb_dat.path.download_file = self.resolve_file(&self.config.paths.transfer_log).to_string_lossy().to_string();
         // Line 47
         pcb_dat.path.logoff_script = self.resolve_file(&self.config.paths.logoff_survey).to_string_lossy().to_string();
         // Line 48
@@ -683,6 +685,8 @@ impl IcyBoard {
         pcb_dat.auto_reg_conf = self.config.new_user_settings.auto_register_conferences;
         // Line 251
         pcb_dat.qwk_file = self.config.qwk_settings.bbs_id.clone();
+        // Line 252
+        pcb_dat.path.file_tcan = self.resolve_file(&self.config.paths.trashcan_upload_files).to_string_lossy().to_string();
 
         // The fido block, lines 173-177, 232-236 and 336-347. PCBoard keeps the
         // addresses and the links in the files under FidoLoc, only the options

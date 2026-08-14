@@ -1093,6 +1093,10 @@ paths_caller_log=Name/Loc of Caller Log
 paths_caller_log-status=Name/Loc of Caller Log
 paths_caller_log-help=TODO
 
+paths_transfer_log=Name/Loc of Transfer Log
+paths_transfer_log-status=Name/Location of the log every completed transfer is written to
+paths_transfer_log-help=TODO
+
 paths_statistic_file=Name/Loc of Statistics File
 paths_statistic_file-status=Name/Loc of Statistics File
 paths_statistic_file-help=TODO

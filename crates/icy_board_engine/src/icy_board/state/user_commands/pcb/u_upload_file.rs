@@ -6,7 +6,7 @@ use crate::{
         icb_text::IceText,
         state::{
             NodeStatus,
-            functions::{MASK_ASCII, display_flags},
+            functions::{MASK_ASCII, display_flags, transfer_cps},
         },
     },
     vm::TerminalTarget,
@@ -14,6 +14,7 @@ use crate::{
 use dizbase::file_base::metadata::{MetadataHeader, MetadataType};
 use dizbase::file_base_scanner::scan_file;
 use icy_net::protocol::{Protocol, TransferProtocolType, XYModemVariant, XYmodem, Zmodem};
+use std::time::Instant;
 
 impl IcyBoardState {
     /// An upload throws the flag list
@@ -218,7 +219,7 @@ impl IcyBoardState {
             }
         }
 
-        let protocol = self.get_protocol(protocol_str).await;
+        let protocol = self.get_protocol(protocol_str.clone()).await;
 
         if let Some(protocol) = protocol {
             let Some(mut prot) = create_protocol(&protocol) else {
@@ -229,6 +230,7 @@ impl IcyBoardState {
 
             match prot.initiate_recv(&mut *self.connection).await {
                 Ok(mut state) => {
+                    let started = Instant::now();
                     while !state.is_finished {
                         if let Err(e) = prot.update_transfer(&mut *self.connection, &mut state).await {
                             log::error!("Error while updating file transfer with {:?} : {}", protocol, e);
@@ -240,6 +242,10 @@ impl IcyBoardState {
                         .await?;
                     self.display_text(IceText::ThanksForTheFiles, display_flags::NEWLINE | display_flags::LFBEFORE)
                         .await?;
+
+                    let received: Vec<String> = state.recieve_state.finished_files.iter().map(|(name, _)| name.clone()).collect();
+                    let cps = transfer_cps(state.recieve_state.total_bytes_transfered, started);
+                    self.log_transfer(true, &received, &protocol_str, state.recieve_state.errors, cps).await?;
 
                     for (x, path) in state.recieve_state.finished_files {
                         let dest = upload_location.join(x);

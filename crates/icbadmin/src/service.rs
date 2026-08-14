@@ -768,6 +768,7 @@ fn relative_config(root: &Path, config: &IcbConfig) -> IcbConfig {
             &mut p.ftn_file,
             &mut p.user_file,
             &mut p.caller_log,
+            &mut p.transfer_log,
             &mut p.logon_survey,
             &mut p.logon_answer,
             &mut p.logoff_survey,
@@ -1947,6 +1948,7 @@ fn to_paths_dto(config: &IcbConfig) -> PathsSettingsDto {
         ftn_file: path_string(&p.ftn_file),
         user_file: path_string(&p.user_file),
         caller_log: path_string(&p.caller_log),
+        transfer_log: path_string(&p.transfer_log),
         logon_survey: path_string(&p.logon_survey),
         logon_answer: path_string(&p.logon_answer),
         logoff_survey: path_string(&p.logoff_survey),
@@ -1989,6 +1991,7 @@ fn apply_paths_dto(config: &mut IcbConfig, dto: &PathsSettingsDto) -> Result<()>
     set_path(&mut p.ftn_file, &dto.ftn_file);
     set_path(&mut p.user_file, &dto.user_file);
     set_path(&mut p.caller_log, &dto.caller_log);
+    set_path(&mut p.transfer_log, &dto.transfer_log);
     set_path(&mut p.logon_survey, &dto.logon_survey);
     set_path(&mut p.logon_answer, &dto.logon_answer);
     set_path(&mut p.logoff_survey, &dto.logoff_survey);
@@ -2032,6 +2035,7 @@ fn validate_paths(dto: &PathsSettingsDto) -> Result<()> {
         ("ftn_file", &dto.ftn_file),
         ("user_file", &dto.user_file),
         ("caller_log", &dto.caller_log),
+        ("transfer_log", &dto.transfer_log),
         ("logon_survey", &dto.logon_survey),
         ("logon_answer", &dto.logon_answer),
         ("logoff_survey", &dto.logoff_survey),
@@ -2079,6 +2083,7 @@ fn diff_paths(old: &PathsSettingsDto, new: &PathsSettingsDto) -> Vec<FieldChange
         ("ftn_file", &old.ftn_file, new.ftn_file.trim()),
         ("user_file", &old.user_file, new.user_file.trim()),
         ("caller_log", &old.caller_log, new.caller_log.trim()),
+        ("transfer_log", &old.transfer_log, new.transfer_log.trim()),
         ("logon_survey", &old.logon_survey, new.logon_survey.trim()),
         ("logon_answer", &old.logon_answer, new.logon_answer.trim()),
         ("logoff_survey", &old.logoff_survey, new.logoff_survey.trim()),
