@@ -81,3 +81,32 @@ fn the_table_says_what_the_audit_says() {
         "compat/OPTIONS_AUDIT.md and inactive_options.rs disagree.\nonly in the audit: {missing:#?}\nonly in the table: {extra:#?}"
     );
 }
+
+/// Greying an entry out by hand bypasses the audit, and then nobody notices when the
+/// board starts reading the option after all - which is how the e-mail message base
+/// ended up greyed out while the mail commands were using it.
+#[test]
+fn nothing_is_greyed_out_by_hand() {
+    let mut marked = Vec::new();
+    let mut stack = vec![std::path::PathBuf::from("../icbsetup/src")];
+    while let Some(dir) = stack.pop() {
+        for entry in std::fs::read_dir(&dir).unwrap_or_else(|e| panic!("{}: {e}", dir.display())).flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+            } else if path.extension().is_some_and(|ext| ext == "rs") {
+                let source = std::fs::read_to_string(&path).unwrap_or_default();
+                for (number, line) in source.lines().enumerate() {
+                    if line.contains(".with_inactive(") || line.contains(".with_editable(false)") {
+                        marked.push(format!("{}:{}", path.display(), number + 1));
+                    }
+                }
+            }
+        }
+    }
+    assert!(
+        marked.is_empty(),
+        "an option is greyed out by hand instead of through compat/OPTIONS_AUDIT.md:\n{}",
+        marked.join("\n")
+    );
+}
