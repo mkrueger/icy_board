@@ -1557,6 +1557,7 @@ icb_sysmanager_main_edit_users=Edit Users File
 icb_sysmanager_main_edit_groups=Edit Groups
 
 icbsm_menu_edit_users=Edit Users File
+icbsm_menu_sort=Sort Users File
 icbsm_menu_pack=Pack Users File
 icbsm_menu_adjust_security=Adjust Security Levels
 icbsm_menu_insert_conf=Insert Group Conference
@@ -1576,9 +1577,40 @@ icbsm_conf_move_title=Move Users BETWEEN Conferences
 icbsm_phones_title=Standardize Phone Formats
 icbsm_undo_title=Undo (restore backup file)
 
-icbsm_min_security=Security Level GTE
-icbsm_max_security=Security Level LTE
-icbsm_use_expired_level=Base on Expired Security Level
+icbsm_sort_options_title=Sort Options
+icbsm_sort_single_title=Single Field Sorts
+icbsm_sort_multiple_title=Multiple Field Sorts
+icbsm_sort_run_title=Sort Users File
+
+icbsm_sort_name=Name
+icbsm_sort_password=Password
+icbsm_sort_bus_phone=Business / Data Phone
+icbsm_sort_home_phone=Home / Voice Phone
+icbsm_sort_registration=Registration Expiration
+icbsm_sort_comment1=Comment Number 1
+icbsm_sort_comment2=Comment Number 2
+icbsm_sort_city=User City
+
+icbsm_sort_security_name=Security Level then Name
+icbsm_sort_times_on_name=Num Times On then Name
+icbsm_sort_dnld_name=Num Files Downloaded then Name
+icbsm_sort_upld_name=Num Files Uploaded then Name
+icbsm_sort_file_ratio_name=Files Upld:Dnld Ratio then Name
+icbsm_sort_dnld_bytes_name=Num Bytes Downloaded then Name
+icbsm_sort_upld_bytes_name=Num Bytes Uploaded then Name
+icbsm_sort_byte_ratio_name=Bytes Upld:Dnld Ratio then Name
+
+icbsm_sort_field=Sort the user file by { $field }
+icbsm_sort_reverse=Sort in Reverse Order : { $value }
+icbsm_sort_done={ $count } record(s) moved.
+icbsm_yes=Yes
+icbsm_no=No
+icbsm_sort_keys=R reverse order, PGDN to begin, ESC to abort
+icbsm_menu_keys=Use arrow keys to move bar, press ENTER to select, ESC to exit
+
+icbsm_min_security=Change users whose security is greater than or equal to
+icbsm_max_security=and whose security level is less than or equal to
+icbsm_use_expired_level=Base Security Level Criteria on the Expired Level
 
 icbsm_pack_removal_group=Criteria for User Record Removal
 icbsm_pack_keep_group=Criteria for Keeping User Record
@@ -1593,28 +1625,29 @@ icbsm_keep_security=Keep Users with security greater than or equal to
 icbsm_keep_security-status=0 keeps nobody for their security level
 icbsm_keep_locked_out=Keep Users that are `LOCKED OUT'
 
-icbsm_new_level=Change Them To New Level
-icbsm_write_expired_level=Change the Expired Security Level
+icbsm_new_level=To a new security level of
+icbsm_write_expired_level=Change the Expired Security Level instead
 icbsm_copy_expired_level=Change Security to Expired Level
 icbsm_copy_expired_level-status=Takes the new level from each record instead
 
-icbsm_set_expiration=Set All Records To A New Date
-icbsm_expiration_date=New Reg. Exp. Date
-icbsm_add_days=Or Add This Many Days
+icbsm_set_expiration=Set a New Expiration Date
+icbsm_expiration_date=New Expiration Date
+icbsm_add_days=Current Date in record plus XXXX days
 
-icbsm_conf_first=First Conference
-icbsm_conf_last=Last Conference
-icbsm_conf_from=REMOVE From Conference
-icbsm_conf_to=ADD To Conference
-icbsm_flag_registered=R - Registered in Conference
-icbsm_flag_expired=X - Access After Expiration
-icbsm_flag_selected=S - Selected for Scanning
-icbsm_flag_sysop=C - Conference Sysop
-icbsm_reset_lastread=Reset Last Message Read Pointer
-icbsm_move_lastread=Move Last Message Read Pointer
-icbsm_move_last_conference=Move Last Conference In
+icbsm_conf_first=First number of conferences to be adjusted
+icbsm_conf_last=Last  number of conferences to be adjusted
+icbsm_conf_from=REMOVE user(s) from which conference
+icbsm_conf_to=ADD to which conference
+icbsm_flag_registered=Adjust conferences user is normally allowed to join
+icbsm_flag_expired=Adjust conferences user can join with expired subscription
+icbsm_flag_selected=Adjust the user selected conferences for scanning
+icbsm_flag_sysop=Adjust conferences where user becomes a sysop when joining
+icbsm_reset_lastread=Reset user's last message read to zero in these conferences
+icbsm_flag_net_status=Adjust conferences where user has Net Status
+icbsm_move_lastread=Move the 'Last Message Read' pointer to the new conference
+icbsm_move_last_conference=Set the 'Last Conference In' flag
 
-icbsm_criteria_keys=PGDN or F2 to preview, ESC to abort
+icbsm_criteria_keys=Press PGDN to begin, or press ESC to abort
 icbsm_preview_keys=ENTER Run, ESC Back
 icbsm_done_keys=Press A Key
 icbsm_undo_keys=ENTER Restore, ESC Cancel
@@ -1627,7 +1660,7 @@ icbsm_done_backup_hint=The previous user file was kept, undo it from the main me
 icbsm_backup_failed=Could not write the backup, nothing was changed: { $error }
 icbsm_save_failed=Could not save the user file: { $error }
 
-icbsm_undo_prompt=Restore the user file saved at { $date }?
+icbsm_undo_prompt=Restore Users File from backup taken { $date }?
 icbsm_undo_no_backup=There is no backup to restore.
 icbsm_undo_done=The user file was restored.
 icbsm_undo_failed=Could not restore the user file: { $error }

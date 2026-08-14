@@ -16,7 +16,7 @@ use ratatui::{Frame, layout::Rect};
 
 use crate::VERSION;
 
-use super::{GroupEditor, MaintenanceOp, MaintenancePage, UndoPage, UserList};
+use super::{GroupEditor, MaintenanceOp, MaintenancePage, UndoPage, UserList, sort_options_page};
 
 pub struct GeneralTab {
     pub page: IcbSetupMenuUI,
@@ -30,15 +30,16 @@ impl GeneralTab {
         Self {
             page: IcbSetupMenuUI::new(SelectMenu::new(vec![
                 MenuItem::new(0, 'A', get_text("icbsm_menu_edit_users")),
-                MenuItem::new(1, 'C', get_text("icbsm_menu_pack")),
-                MenuItem::new(2, 'G', get_text("icbsm_menu_adjust_security")),
-                MenuItem::new(3, 'H', get_text("icbsm_menu_insert_conf")),
-                MenuItem::new(4, 'I', get_text("icbsm_menu_remove_conf")),
-                MenuItem::new(5, 'J', get_text("icbsm_menu_move_conf")),
-                MenuItem::new(6, 'K', get_text("icbsm_menu_expiration")),
-                MenuItem::new(7, 'M', get_text("icbsm_menu_phones")),
-                MenuItem::new(8, 'N', get_text("icbsm_menu_undo")),
-                MenuItem::new(9, 'O', get_text("icbsm_menu_groups")),
+                MenuItem::new(1, 'B', get_text("icbsm_menu_sort")),
+                MenuItem::new(2, 'C', get_text("icbsm_menu_pack")),
+                MenuItem::new(3, 'D', get_text("icbsm_menu_adjust_security")),
+                MenuItem::new(4, 'E', get_text("icbsm_menu_insert_conf")),
+                MenuItem::new(5, 'F', get_text("icbsm_menu_remove_conf")),
+                MenuItem::new(6, 'G', get_text("icbsm_menu_move_conf")),
+                MenuItem::new(7, 'H', get_text("icbsm_menu_expiration")),
+                MenuItem::new(8, 'I', get_text("icbsm_menu_phones")),
+                MenuItem::new(9, 'J', get_text("icbsm_menu_undo")),
+                MenuItem::new(10, 'K', get_text("icbsm_menu_groups")),
             ]))
             .with_center_title(center_title)
             .with_right_title(right_title),
@@ -75,18 +76,22 @@ impl TabPage for GeneralTab {
                     let page = UserList::new(self.icy_board.clone());
                     return self.page.open_sup_page(Box::new(page));
                 }
-                1 => MaintenanceOp::Pack,
-                2 => MaintenanceOp::AdjustSecurity,
-                3 => MaintenanceOp::ConferenceInsert,
-                4 => MaintenanceOp::ConferenceRemove,
-                5 => MaintenanceOp::ConferenceMove,
-                6 => MaintenanceOp::AdjustExpiration,
-                7 => MaintenanceOp::StandardizePhones,
-                8 => {
+                1 => {
+                    let page = sort_options_page(self.icy_board.clone());
+                    return self.page.open_sup_page(Box::new(page));
+                }
+                2 => MaintenanceOp::Pack,
+                3 => MaintenanceOp::AdjustSecurity,
+                4 => MaintenanceOp::ConferenceInsert,
+                5 => MaintenanceOp::ConferenceRemove,
+                6 => MaintenanceOp::ConferenceMove,
+                7 => MaintenanceOp::AdjustExpiration,
+                8 => MaintenanceOp::StandardizePhones,
+                9 => {
                     let page = UndoPage::new(self.icy_board.clone());
                     return self.page.open_sup_page(Box::new(page));
                 }
-                9 => {
+                10 => {
                     let page = GroupEditor::new(self.icy_board.clone());
                     return self.page.open_sup_page(Box::new(page));
                 }

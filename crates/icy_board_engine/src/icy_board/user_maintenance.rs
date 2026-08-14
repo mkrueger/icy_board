@@ -374,6 +374,115 @@ pub fn standardize_phones(base: &mut UserBase, selection: &UserSelection, now: D
     })
 }
 
+/// The orders the user file can be put in. The single fields come first, then
+/// the ones that fall back on the name, as the original offered them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SortKey {
+    Name,
+    Password,
+    BusinessPhone,
+    HomePhone,
+    RegistrationExpiration,
+    Comment1,
+    Comment2,
+    City,
+
+    SecurityThenName,
+    TimesOnThenName,
+    FilesDownloadedThenName,
+    FilesUploadedThenName,
+    FileRatioThenName,
+    BytesDownloadedThenName,
+    BytesUploadedThenName,
+    BytesRatioThenName,
+}
+
+impl SortKey {
+    /// Everything below the single fields sorts on a number and then the name.
+    pub fn is_multi_field(&self) -> bool {
+        !matches!(
+            self,
+            SortKey::Name
+                | SortKey::Password
+                | SortKey::BusinessPhone
+                | SortKey::HomePhone
+                | SortKey::RegistrationExpiration
+                | SortKey::Comment1
+                | SortKey::Comment2
+                | SortKey::City
+        )
+    }
+}
+
+/// A ratio of zero downloads is worth its uploads, so a leech and a donor do not
+/// land next to each other.
+fn ratio(uploaded: u64, downloaded: u64) -> f64 {
+    uploaded as f64 / downloaded.max(1) as f64
+}
+
+fn text_key(user: &User, key: SortKey) -> String {
+    match key {
+        SortKey::Name => user.get_name().to_lowercase(),
+        SortKey::Password => user.password.password.to_string().to_lowercase(),
+        SortKey::BusinessPhone => user.bus_data_phone.to_lowercase(),
+        SortKey::HomePhone => user.home_voice_phone.to_lowercase(),
+        SortKey::RegistrationExpiration => user.expiration_date.to_rfc3339(),
+        SortKey::Comment1 => user.user_comment.to_lowercase(),
+        SortKey::Comment2 => user.sysop_comment.to_lowercase(),
+        SortKey::City => user.city_or_state.to_lowercase(),
+        _ => String::new(),
+    }
+}
+
+fn number_key(user: &User, key: SortKey) -> f64 {
+    match key {
+        SortKey::SecurityThenName => user.security_level as f64,
+        SortKey::TimesOnThenName => user.stats.num_times_on as f64,
+        SortKey::FilesDownloadedThenName => user.stats.num_downloads as f64,
+        SortKey::FilesUploadedThenName => user.stats.num_uploads as f64,
+        SortKey::FileRatioThenName => ratio(user.stats.num_uploads, user.stats.num_downloads),
+        SortKey::BytesDownloadedThenName => user.stats.total_dnld_bytes as f64,
+        SortKey::BytesUploadedThenName => user.stats.total_upld_bytes as f64,
+        SortKey::BytesRatioThenName => ratio(user.stats.total_upld_bytes, user.stats.total_dnld_bytes),
+        _ => 0.0,
+    }
+}
+
+/// Puts the records in order. The first record stays where it is - it is the
+/// sysop, and the board and its drop files count on finding it there.
+pub fn sort(base: &mut UserBase, key: SortKey, reverse: bool) -> MaintenanceReport {
+    let keep_first = !base.is_empty();
+    let before: Vec<String> = base.iter().map(|user| user.get_name().clone()).collect();
+
+    let start = usize::from(keep_first);
+    let mut rest: Vec<User> = base.drain(start..).collect();
+    rest.sort_by(|a, b| {
+        let ordering = if key.is_multi_field() {
+            number_key(a, key)
+                .partial_cmp(&number_key(b, key))
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.get_name().to_lowercase().cmp(&b.get_name().to_lowercase()))
+        } else {
+            text_key(a, key).cmp(&text_key(b, key))
+        };
+        if reverse { ordering.reverse() } else { ordering }
+    });
+    base.extend(rest);
+
+    let moved: Vec<String> = base
+        .iter()
+        .enumerate()
+        .filter(|(index, user)| before.get(*index) != Some(user.get_name()))
+        .map(|(_, user)| user.get_name().clone())
+        .collect();
+
+    MaintenanceReport {
+        matched: base.len(),
+        changed: moved.len(),
+        names: moved,
+    }
+}
+
 fn apply<F>(base: &mut UserBase, selection: &UserSelection, now: DateTime<Utc>, mut op: F) -> MaintenanceReport
 where
     F: FnMut(&mut User) -> bool,
@@ -751,6 +860,47 @@ mod tests {
         assert_eq!(42, base[1].lastread_ptr_flags[&(7, 0)].last_read);
         assert!(!base[1].lastread_ptr_flags.contains_key(&(3, 0)));
         assert_eq!(7, base[1].last_conference);
+    }
+
+    #[test]
+    fn sorting_by_name_leaves_the_sysop_in_front() {
+        let mut base = base(vec![user("Sysop", 110), user("Zulu", 20), user("alpha", 20), user("Mike", 20)]);
+        let report = sort(&mut base, SortKey::Name, false);
+
+        assert_eq!(
+            vec!["Sysop".to_string(), "alpha".to_string(), "Mike".to_string(), "Zulu".to_string()],
+            names(&base)
+        );
+        assert_eq!(3, report.changed);
+    }
+
+    #[test]
+    fn sorting_can_run_the_other_way() {
+        let mut base = base(vec![user("Sysop", 110), user("alpha", 20), user("Zulu", 20)]);
+        sort(&mut base, SortKey::Name, true);
+        assert_eq!(vec!["Sysop".to_string(), "Zulu".to_string(), "alpha".to_string()], names(&base));
+    }
+
+    #[test]
+    fn a_multi_field_sort_falls_back_on_the_name() {
+        let mut base = base(vec![user("Sysop", 110), user("Bravo", 20), user("Alpha", 20), user("Charlie", 10)]);
+        sort(&mut base, SortKey::SecurityThenName, false);
+        assert_eq!(
+            vec!["Sysop".to_string(), "Charlie".to_string(), "Alpha".to_string(), "Bravo".to_string()],
+            names(&base)
+        );
+    }
+
+    #[test]
+    fn the_upload_ratio_counts_a_user_without_downloads() {
+        let mut base = base(vec![user("Sysop", 110), user("Leech", 20), user("Donor", 20)]);
+        base[1].stats.num_uploads = 0;
+        base[1].stats.num_downloads = 40;
+        base[2].stats.num_uploads = 30;
+        base[2].stats.num_downloads = 0;
+
+        sort(&mut base, SortKey::FileRatioThenName, false);
+        assert_eq!(vec!["Sysop".to_string(), "Leech".to_string(), "Donor".to_string()], names(&base));
     }
 
     #[test]
