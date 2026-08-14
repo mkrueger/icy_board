@@ -16,7 +16,7 @@ use ratatui::{Frame, layout::Rect};
 
 use crate::VERSION;
 
-use super::{GroupEditor, UserList};
+use super::{GroupEditor, MaintenanceOp, MaintenancePage, UndoPage, UserList};
 
 pub struct GeneralTab {
     pub page: IcbSetupMenuUI,
@@ -30,7 +30,16 @@ impl GeneralTab {
         Self {
             page: IcbSetupMenuUI::new(SelectMenu::new(vec![
                 MenuItem::new(0, 'A', get_text("icb_sysmanager_main_edit_users")),
-                MenuItem::new(1, 'B', get_text("icb_sysmanager_main_edit_groups")),
+                MenuItem::new(1, 'B', get_text("icbsm_pack_title")),
+                MenuItem::new(2, 'C', get_text("icbsm_adjust_security_title")),
+                MenuItem::new(3, 'D', get_text("icbsm_copy_expired_title")),
+                MenuItem::new(4, 'E', get_text("icbsm_adjust_expiration_title")),
+                MenuItem::new(5, 'F', get_text("icbsm_conf_insert_title")),
+                MenuItem::new(6, 'G', get_text("icbsm_conf_remove_title")),
+                MenuItem::new(7, 'H', get_text("icbsm_conf_move_title")),
+                MenuItem::new(8, 'I', get_text("icbsm_phones_title")),
+                MenuItem::new(9, 'J', get_text("icbsm_undo_title")),
+                MenuItem::new(10, 'K', get_text("icb_sysmanager_main_edit_groups")),
             ]))
             .with_center_title(center_title)
             .with_right_title(right_title),
@@ -62,17 +71,31 @@ impl TabPage for GeneralTab {
             return state;
         }
         if let Some(selected) = opt {
-            match selected {
+            let op = match selected {
                 0 => {
                     let page = UserList::new(self.icy_board.clone());
                     return self.page.open_sup_page(Box::new(page));
                 }
-                1 => {
+                1 => MaintenanceOp::Pack,
+                2 => MaintenanceOp::AdjustSecurity,
+                3 => MaintenanceOp::CopyExpiredSecurity,
+                4 => MaintenanceOp::AdjustExpiration,
+                5 => MaintenanceOp::ConferenceInsert,
+                6 => MaintenanceOp::ConferenceRemove,
+                7 => MaintenanceOp::ConferenceMove,
+                8 => MaintenanceOp::StandardizePhones,
+                9 => {
+                    let page = UndoPage::new(self.icy_board.clone());
+                    return self.page.open_sup_page(Box::new(page));
+                }
+                10 => {
                     let page = GroupEditor::new(self.icy_board.clone());
                     return self.page.open_sup_page(Box::new(page));
                 }
-                _ => {}
-            }
+                _ => return state,
+            };
+            let page = MaintenancePage::new(self.icy_board.clone(), op);
+            return self.page.open_sup_page(Box::new(page));
         }
         state
     }

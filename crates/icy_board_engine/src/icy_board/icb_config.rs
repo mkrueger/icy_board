@@ -55,6 +55,8 @@ impl SysopCommandLevels {
             CommandType::RestoreMessage => Some(self.sec_4_recover_deleted_msg.clone()),
             CommandType::HeaderScan => Some(self.sec_5_list_message_hdr.clone()),
             CommandType::ViewTextFile | CommandType::DirCommand => Some(self.sec_6_view_any_file.clone()),
+            CommandType::UserMaintenance => Some(self.sec_7_user_maint.clone()),
+            CommandType::PackUserFile => Some(self.sec_8_pack_usr_file.clone()),
             CommandType::RunPPE => Some(self.sec_10_shelled_dos_func.clone()),
             CommandType::NodeList => Some(self.sec_11_view_other_nodes.clone()),
             CommandType::LogoffNode => Some(self.sec_12_logoff_alt_node.clone()),

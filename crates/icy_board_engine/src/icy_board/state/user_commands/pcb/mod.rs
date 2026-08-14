@@ -5,6 +5,8 @@ pub mod _1_view_caller_log;
 pub mod _2_view_user_file;
 pub mod _4_recover_message;
 pub mod _6_view_text_file;
+pub mod _7_user_maintenance;
+pub mod _8_pack_user_file;
 pub mod a_abandon_conference;
 pub mod alias_toggle_alias;
 pub mod b_show_bulletins;

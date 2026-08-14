@@ -22,7 +22,7 @@ pub enum AdminError {
     #[error("The configuration was modified by another tool since it was loaded. Reload and try again.")]
     Conflict,
 
-    #[error("Another icbadmin instance is currently writing to this board.")]
+    #[error("Another tool is currently writing to this board.")]
     Locked,
 
     #[error("I/O error: {0}")]

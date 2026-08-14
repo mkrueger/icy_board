@@ -1,32 +1,23 @@
 use std::{
-    fs::{self, File, OpenOptions, TryLockError},
+    fs::{self, OpenOptions},
     path::{Path, PathBuf},
 };
 
 use crate::error::{AdminError, Result};
 
-pub const LOCK_FILE_NAME: &str = ".icbadmin.lock";
+pub use icy_board_engine::icy_board::lock::LOCK_FILE_NAME;
+
 pub const BACKUP_DIR_NAME: &str = "backups";
 pub const AUDIT_LOG_NAME: &str = "icbadmin-audit.log";
 
-/// Advisory cross-process lock, released when dropped.
-pub struct BoardLock {
-    _file: File,
-}
+/// The board wide advisory lock, reported as a conflict the API can answer with.
+pub struct BoardLock(#[allow(dead_code)] icy_board_engine::icy_board::lock::BoardLock);
 
 impl BoardLock {
     pub fn acquire(root_path: &Path) -> Result<Self> {
-        let file = OpenOptions::new()
-            .create(true)
-            .read(true)
-            .write(true)
-            .truncate(false)
-            .open(root_path.join(LOCK_FILE_NAME))?;
-        match file.try_lock() {
-            Ok(()) => Ok(Self { _file: file }),
-            Err(TryLockError::WouldBlock) => Err(AdminError::Locked),
-            Err(TryLockError::Error(e)) => Err(AdminError::Io(e)),
-        }
+        icy_board_engine::icy_board::lock::BoardLock::acquire(root_path)
+            .map(Self)
+            .map_err(|_| AdminError::Locked)
     }
 }
 

@@ -44,6 +44,20 @@ Toggle the alarm bell. If on, the terminal bell will ring when a user logs in.
 ICBSM
 ~~~~~
 Start the system manager utility. This is a TUI utility to manage users and groups.
+Besides the record editor it packs the user file and runs the bulk edits over a
+selection of users: security levels, expiration dates, conference registration and
+phone number formatting. Every one of those writes a copy of the user file first,
+and ``Undo`` in the main menu puts that copy back.
+
+The same operations run without a screen for cron jobs and timed events::
+
+    icbsm --pack --inactive-days 365 --keep-security 100 --dry-run
+    icbsm --standardize-phones
+    icbsm --undo
+
+``--dry-run`` lists the users that would be affected and writes nothing.
+ICBSM takes the board lock while it runs, so it refuses to start when another
+tool is already writing to the same board.
 
 ICBText
 ~~~~~~~

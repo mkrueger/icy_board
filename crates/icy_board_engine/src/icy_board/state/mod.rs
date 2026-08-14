@@ -1038,6 +1038,8 @@ impl IcyBoardState {
             "4" => convert_cmd(CommandType::RestoreMessage),
             "5" => convert_cmd(CommandType::HeaderScan),
             "6" => convert_cmd(CommandType::ViewTextFile),
+            "7" => convert_cmd(CommandType::UserMaintenance),
+            "8" => convert_cmd(CommandType::PackUserFile),
             "11" => convert_cmd(CommandType::NodeList),
             "12" => convert_cmd(CommandType::LogoffNode),
             "13" => convert_cmd(CommandType::NodeCallerLog),

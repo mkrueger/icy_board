@@ -41,7 +41,7 @@ I develop this software on linux - next time I set up I'll add a more detailed d
 | :--- | :--- |
 | `icboard` | The board itself. Started in the directory that holds `icboard.toml`. |
 | `icbsetup` | Creates a board, imports a PCBoard one, and edits every setting. Start here. |
-| `icbsm` | User and group editor. |
+| `icbsm` | User and group editor, packs the user file and runs the bulk edits. |
 | `mkicbtxt` | Edits the system messages, which is how most of the board is reworded. |
 | `mkicbmnu` | Edits menus. |
 | `icbfile` | Brings a file base into shape - see [icbfile](icbfile.md). |

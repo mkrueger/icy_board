@@ -233,6 +233,12 @@ pub enum CommandType {
     /// SYSOP '6' command
     ViewTextFile,
 
+    /// SYSOP '7' command
+    UserMaintenance,
+
+    /// SYSOP '8' command
+    PackUserFile,
+
     /// SYSOP '11' command
     NodeList,
 
@@ -346,6 +352,8 @@ impl Display for CommandType {
             CommandType::ViewCallerLog => write!(f, "ViewCallerLog"),
             CommandType::ViewUserFile => write!(f, "ViewUserFile"),
             CommandType::ViewTextFile => write!(f, "ViewTextFile"),
+            CommandType::UserMaintenance => write!(f, "UserMaintenance"),
+            CommandType::PackUserFile => write!(f, "PackUserFile"),
             CommandType::NodeList => write!(f, "NodeList"),
             CommandType::NodeCallerLog => write!(f, "NodeCallerLog"),
             CommandType::HeaderScan => write!(f, "HeaderScan"),
@@ -432,6 +440,8 @@ impl Display for CommandType {
             CommandType::ViewCallerLog => write!(f, "(1)\tViewCallerLog"),
             CommandType::ViewUserFile => write!(f, "(2)\tViewUserFile"),
             CommandType::ViewTextFile => write!(f, "(6)\tViewTextFile"),
+            CommandType::UserMaintenance => write!(f, "(7)\tUserMaintenance"),
+            CommandType::PackUserFile => write!(f, "(8)\tPackUserFile"),
             CommandType::NodeList => write!(f, "(11)\tNodeList"),
             CommandType::NodeCallerLog => write!(f, "(13)\tNodeCallerLog"),
             CommandType::HeaderScan => write!(f, "(5)\tHeaderScan"),
@@ -519,6 +529,8 @@ impl FromStr for CommandType {
             "viewcallerlog" => Ok(CommandType::ViewCallerLog),
             "viewuserfile" => Ok(CommandType::ViewUserFile),
             "viewtextfile" => Ok(CommandType::ViewTextFile),
+            "usermaintenance" => Ok(CommandType::UserMaintenance),
+            "packuserfile" => Ok(CommandType::PackUserFile),
             "nodelist" => Ok(CommandType::NodeList),
             "nodecallerlog" => Ok(CommandType::NodeCallerLog),
             "headerscan" => Ok(CommandType::HeaderScan),
@@ -609,6 +621,8 @@ impl CommandType {
             CommandType::ViewCallerLog,
             CommandType::ViewUserFile,
             CommandType::ViewTextFile,
+            CommandType::UserMaintenance,
+            CommandType::PackUserFile,
             CommandType::NodeList,
             CommandType::NodeCallerLog,
             CommandType::HeaderScan,
@@ -677,6 +691,8 @@ impl CommandType {
             CommandType::ViewCallerLog => "hlp1",
             CommandType::ViewUserFile => "hlp2",
             CommandType::ViewTextFile => "hlp6",
+            CommandType::UserMaintenance => "hlp7",
+            CommandType::PackUserFile => "hlp8",
             CommandType::NodeList => "hlp11",
             CommandType::NodeCallerLog => "hlp13",
             CommandType::HeaderScan => "hlp5",

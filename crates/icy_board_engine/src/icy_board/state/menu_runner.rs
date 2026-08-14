@@ -493,6 +493,22 @@ impl IcyBoardState {
                 // 6
                 self.view_text_file().await?;
             }
+            CommandType::UserMaintenance => {
+                let sec = self.session.sysop_command_level.sec_7_user_maint.clone();
+                if check_security && !self.check_sec("7", &sec).await? {
+                    return Ok(());
+                }
+                // 7
+                self.user_maintenance().await?;
+            }
+            CommandType::PackUserFile => {
+                let sec = self.session.sysop_command_level.sec_8_pack_usr_file.clone();
+                if check_security && !self.check_sec("8", &sec).await? {
+                    return Ok(());
+                }
+                // 8
+                self.pack_user_file().await?;
+            }
             CommandType::NodeList => {
                 let sec = self.session.sysop_command_level.sec_11_view_other_nodes.clone();
                 if check_security && !self.check_sec("11", &sec).await? {

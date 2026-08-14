@@ -226,18 +226,6 @@ pub const UNREAD_OPTIONS: &[UnreadOption] = &[
     },
     UnreadOption {
         section: "sysop_sec",
-        option: "sec_7",
-        kind: Unread::NotReadYet,
-        note: "the numeric command itself is missing, see COMMAND_AUDIT.md",
-    },
-    UnreadOption {
-        section: "sysop_sec",
-        option: "sec_8",
-        kind: Unread::NotReadYet,
-        note: "the numeric command itself is missing, see COMMAND_AUDIT.md",
-    },
-    UnreadOption {
-        section: "sysop_sec",
         option: "sec_9",
         kind: Unread::NotReadYet,
         note: "the numeric command itself is missing, see COMMAND_AUDIT.md",

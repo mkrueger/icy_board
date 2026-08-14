@@ -45,6 +45,7 @@ pub mod group_list;
 pub mod icb_config;
 pub mod icb_text;
 pub mod language;
+pub mod lock;
 pub mod login_server;
 pub mod macro_parser;
 pub mod menu;
@@ -56,6 +57,7 @@ pub mod state;
 pub mod statistics;
 pub mod surveys;
 pub mod user_base;
+pub mod user_maintenance;
 pub mod xfer_protocols;
 
 pub use pcb::*;
@@ -96,6 +98,9 @@ pub enum IcyBoardError {
 
     #[error("Internal board lock error (report!).")]
     ErrorLockingBoard,
+
+    #[error("Another tool is working on this board.")]
+    BoardInUse,
 
     #[error("Error opening home directory ({0})")]
     HomeDirMissing(String),

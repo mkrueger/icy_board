@@ -102,7 +102,7 @@ Browser form posts use the same backend with a session cookie and CSRF token.
 
 Every write:
 
-1. takes an exclusive lock on `.icbadmin.lock` in the board directory,
+1. takes an exclusive lock on `.icboard.lock` in the board directory,
 2. verifies the fingerprint of the configuration file,
 3. validates the new values and rejects the whole request if anything is wrong,
 4. copies the current file to `backups/icboard.toml.<timestamp>.bak`,

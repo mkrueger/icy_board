@@ -129,7 +129,7 @@ wins in both, so an abbreviation can resolve to a different command.
 
 ## Numeric commands (sysop functions)
 
-PCBoard maps 1-16. icy_board implements `1`, `2`, `4`, `5`, `6`, `11`, `12`, `13` and `16`.
+PCBoard maps 1-16. icy_board implements `1`, `2`, `4`, `5`, `6`, `7`, `8`, `11`, `12`, `13` and `16`.
 
 | # | Function | PCBoard prompts | Status |
 |---|---|---|---|
@@ -139,8 +139,8 @@ PCBoard maps 1-16. icy_board implements `1`, `2`, `4`, `5`, `6`, `11`, `12`, `13
 | 4 | recover message | MSGNUMTOACTIVATE (77) | ✅ |
 | 5 | quick/header scan | 613/424 via message reader | ✅ |
 | 6 | view a text file | TEXTVIEWFILENAME (62) | ✅ |
-| 7 | user maintenance | USERMODEXPERT (167)/USERMODNONEXPERT (168), DELETERECORD (561) | ❌ missing |
-| 8 | pack users file | PACKTHEUSERSFILE (86), KEEPLOCKEDOUT (105), PURGEOLDERTHAN (106), KEEPSECURITY (107) | ❌ missing |
+| 7 | user maintenance | USERMODEXPERT (167)/USERMODNONEXPERT (168), DELETERECORD (561) | ⚠️ browse, find, delete and undelete a record; `A`dd and `C`hange run in ICBSM instead |
+| 8 | pack users file | PACKTHEUSERSFILE (86), KEEPLOCKEDOUT (105), PURGEOLDERTHAN (106), KEEPSECURITY (107) | ⚠️ only from record 1, keeps the callers that are online and writes a backup first |
 | 9 | remote DOS | EXITTODOS (90) | ❌ intentionally out of scope? |
 | 10 | DOS command | DOSFUNCTION (142) | ❌ numeric command out of scope; its configured security level protects the `PPE` command instead |
 | 11 | node list (forces `X`) | none | ✅ |

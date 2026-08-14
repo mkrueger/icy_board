@@ -1556,6 +1556,77 @@ icb_sysmanager_main_title=User File Maintenance
 icb_sysmanager_main_edit_users=Edit Users File
 icb_sysmanager_main_edit_groups=Edit Groups
 
+icbsm_pack_title=Pack Users File
+icbsm_adjust_security_title=Adjust Security Levels
+icbsm_copy_expired_title=Use Expired Security Level
+icbsm_adjust_expiration_title=Adjust Expiration Dates
+icbsm_conf_insert_title=Insert Group Conference
+icbsm_conf_remove_title=Remove Group Conference
+icbsm_conf_move_title=Move Between Conferences
+icbsm_phones_title=Standardize Phone Numbers
+icbsm_undo_title=Undo (Restore Backup)
+
+icbsm_min_security=Security Level GTE
+icbsm_max_security=Security Level LTE
+icbsm_use_expired_level=Use Expired Security Level
+
+icbsm_delete_flagged=Users Marked For Deletion
+icbsm_disabled=Disabled Accounts
+icbsm_never_logged_on=Users That Never Called
+icbsm_inactive_days=Not Called In Days (0=Off)
+icbsm_use_subscription=Use Subscription Date
+icbsm_subscription_date=Expired Before
+icbsm_keep_security=Keep Security GTE (0=Off)
+icbsm_keep_locked_out=Keep Locked Out Users
+
+icbsm_new_level=New Security Level
+icbsm_write_expired_level=Write Expired Level Instead
+
+icbsm_set_expiration=Set A New Date
+icbsm_expiration_date=New Expiration Date
+icbsm_add_days=Add Days
+
+icbsm_conf_first=First Conference
+icbsm_conf_last=Last Conference
+icbsm_conf_from=Remove From Conference
+icbsm_conf_to=Add To Conference
+icbsm_flag_registered=Registered Flag
+icbsm_flag_expired=Expired Access Flag
+icbsm_flag_selected=Selected Flag
+icbsm_flag_sysop=Conference Sysop Flag
+icbsm_reset_lastread=Reset Last Message Read
+icbsm_move_lastread=Move Last Message Read
+icbsm_move_last_conference=Move Last Conference In
+
+icbsm_criteria_keys=F2 Preview, ESC Cancel
+icbsm_preview_keys=ENTER Run, ESC Back
+icbsm_done_keys=Press A Key
+icbsm_undo_keys=ENTER Restore, ESC Cancel
+
+icbsm_preview_count={ $count } user(s) selected
+icbsm_preview_more=... and { $count } more
+icbsm_preview_pack_warning=These records will be removed. A backup is written first.
+icbsm_done_count={ $changed } of { $matched } user(s) changed
+icbsm_done_backup_hint=The previous user file was kept, undo it from the main menu.
+icbsm_backup_failed=Could not write the backup, nothing was changed: { $error }
+icbsm_save_failed=Could not save the user file: { $error }
+
+icbsm_undo_prompt=Restore the user file saved at { $date }?
+icbsm_undo_no_backup=There is no backup to restore.
+icbsm_undo_done=The user file was restored.
+icbsm_undo_failed=Could not restore the user file: { $error }
+
+icbsm_board_in_use=Another tool is working on this board. Close it and start again.
+
+icbsm_sort_record=Record
+icbsm_sort_name=Name
+icbsm_sort_security=Security
+icbsm_sort_last_on=Last On
+
+icbsm_user_list_keys=F2 Save, F3 Find, F4 Sort ({ $sort }), INS Add, DEL Remove
+icbsm_user_list_search=Find: { $search }_ (ENTER Keep, ESC Clear)
+icbsm_user_list_filtered=Find "{ $search }": { $count } shown, sorted by { $sort } - F3 Find, F4 Sort
+
 user_editor_name=Name
 user_editor_name-status=Name
 user_editor_name-help=TODO
