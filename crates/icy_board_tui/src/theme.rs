@@ -34,6 +34,7 @@ pub struct Theme {
     pub menu_box_title: Style,
 
     pub config_title: Style,
+    pub group_title: Style,
 
     pub filter_text: Style,
     pub description_text: Style,
@@ -91,6 +92,7 @@ pub static CLASSIC_THEME: Theme = Theme {
     menu_title: Style::new().bg(DOS_BLACK).fg(DOS_YELLOW),
     menu_label: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_GRAY),
     config_title: Style::new().bg(DOS_BLACK).fg(DOS_RED),
+    group_title: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_GRAY).add_modifier(Modifier::UNDERLINED),
     filter_text: Style::new().bg(DOS_BLACK).fg(DOS_YELLOW),
     description_text: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_GRAY),
 
@@ -138,6 +140,7 @@ pub static DEFAULT_THEME: Theme = Theme {
     selected_item: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_CYAN),
     item_separator: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_GRAY),
     config_title: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_CYAN),
+    group_title: Style::new().bg(DOS_BLACK).fg(LIGHT_GRAY).add_modifier(Modifier::UNDERLINED),
     value: Style::new().bg(DOS_BLACK).fg(LIGHT_GRAY),
     true_value: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_GREEN),
     false_value: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_RED),

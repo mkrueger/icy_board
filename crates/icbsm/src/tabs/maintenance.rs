@@ -511,7 +511,7 @@ impl MaintenancePage {
             .border_style(get_tui_theme().dialog_box)
             .padding(Padding::new(2, 2, 1, 0))
             .title_alignment(Alignment::Center)
-            .title(title)
+            .title(Span::styled(title, get_tui_theme().dialog_box_title))
             .title_bottom(Span::styled(bottom, get_tui_theme().key_binding));
 
         Paragraph::new(Text::from(lines))
@@ -545,7 +545,7 @@ impl Page for MaintenancePage {
                     .border_style(get_tui_theme().dialog_box)
                     .padding(Padding::new(2, 2, 1, 0))
                     .title_alignment(Alignment::Center)
-                    .title(self.op.title())
+                    .title(Span::styled(self.op.title(), get_tui_theme().dialog_box_title))
                     .title_bottom(Span::styled(get_text("icbsm_criteria_keys"), get_tui_theme().key_binding));
                 block.render(area, frame.buffer_mut());
 
@@ -721,7 +721,7 @@ impl Page for UndoPage {
             .border_style(get_tui_theme().dialog_box)
             .padding(Padding::new(2, 2, 1, 0))
             .title_alignment(Alignment::Center)
-            .title(get_text("icbsm_undo_title"))
+            .title(Span::styled(get_text("icbsm_undo_title"), get_tui_theme().dialog_box_title))
             .title_bottom(Span::styled(bottom, get_tui_theme().key_binding));
 
         Paragraph::new(Text::from(lines))

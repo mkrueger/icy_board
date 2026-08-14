@@ -1422,7 +1422,7 @@ impl<T> ConfigMenu<T> {
                                 };
                                 Text::from(format!(" {}", title.clone()))
                                     .alignment(ratatui::layout::Alignment::Left)
-                                    .style(get_tui_theme().config_title.italic())
+                                    .style(get_tui_theme().group_title)
                                     .render(left_area, frame.buffer_mut());
                             }
                         }

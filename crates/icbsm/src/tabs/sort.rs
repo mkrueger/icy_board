@@ -52,7 +52,7 @@ impl Page for MenuPage {
             .border_style(get_tui_theme().menu_box)
             .padding(Padding::new(2, 2, 1, 0))
             .title_alignment(Alignment::Center)
-            .title(self.title.clone())
+            .title(Span::styled(self.title.clone(), get_tui_theme().menu_box_title))
             .title_bottom(Span::styled(get_text("icbsm_menu_keys"), get_tui_theme().key_binding));
         block.render(area, frame.buffer_mut());
 
@@ -215,7 +215,7 @@ impl Page for SortPage {
             .border_style(get_tui_theme().dialog_box)
             .padding(Padding::new(2, 2, 1, 0))
             .title_alignment(Alignment::Center)
-            .title(get_text("icbsm_sort_run_title"))
+            .title(Span::styled(get_text("icbsm_sort_run_title"), get_tui_theme().dialog_box_title))
             .title_bottom(Span::styled(bottom, get_tui_theme().key_binding));
 
         Paragraph::new(Text::from(lines))

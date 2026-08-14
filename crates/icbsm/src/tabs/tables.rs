@@ -195,7 +195,7 @@ impl Page for TableEditPage {
             .border_style(get_tui_theme().dialog_box)
             .padding(Padding::new(2, 2, 1, 0))
             .title_alignment(Alignment::Center)
-            .title(table_title(self.kind))
+            .title(Span::styled(table_title(self.kind), get_tui_theme().dialog_box_title))
             .title_bottom(Span::styled(get_text("icbsm_table_keys"), get_tui_theme().key_binding));
         block.render(area, frame.buffer_mut());
 
@@ -317,7 +317,7 @@ fn render_box(frame: &mut Frame, area: Rect, title: String, bottom: String, line
         .border_style(get_tui_theme().dialog_box)
         .padding(Padding::new(2, 2, 1, 0))
         .title_alignment(Alignment::Center)
-        .title(title)
+        .title(Span::styled(title, get_tui_theme().dialog_box_title))
         .title_bottom(Span::styled(bottom, get_tui_theme().key_binding));
 
     Paragraph::new(Text::from(lines))
