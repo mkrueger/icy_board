@@ -479,8 +479,8 @@ impl PCBoardImporter {
                 sec_10_shelled_dos_func: SecurityExpression::from_req_security(self.data.sysop_security.sec_10_shelled_dos_func as u8),
                 sec_11_view_other_nodes: SecurityExpression::from_req_security(self.data.sysop_security.sec_11_view_other_nodes as u8),
                 sec_12_logoff_alt_node: SecurityExpression::from_req_security(self.data.sysop_security.sec_12_logoff_alt_node as u8),
-                sec_13_view_alt_node_callers: SecurityExpression::from_req_security(self.data.sysop_security.sec_13_drop_alt_node_to_dos as u8),
-                sec_14_drop_alt_node_to_dos: SecurityExpression::from_req_security(self.data.sysop_security.sec_14_drop_to_dos as u8),
+                sec_13_view_alt_node_callers: SecurityExpression::from_req_security(self.data.sysop_security.sec_13_view_alt_node_callers as u8),
+                sec_14_drop_alt_node_to_dos: SecurityExpression::from_req_security(self.data.sysop_security.sec_14_drop_alt_node_to_dos as u8),
             },
 
             user_command_level: UserCommandLevels {
@@ -614,7 +614,7 @@ impl PCBoardImporter {
                 prompt_to_read_mail: self.data.prompt_to_read_mail,
                 disable_message_scan_prompt: self.data.disable_scan,
                 allow_esc_codes: self.data.allow_esc_codes,
-                allow_carbon_copy: true, // TODO
+                allow_carbon_copy: self.data.allow_ccs,
                 validate_to_name: self.data.validate_to,
                 default_quick_personal_scan: self.data.quick_scan,
                 default_scan_all_selected_confs_at_login: self.data.scan_all,

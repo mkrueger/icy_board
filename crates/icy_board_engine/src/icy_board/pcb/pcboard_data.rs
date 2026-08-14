@@ -504,25 +504,20 @@ pub struct PCBSysopSecurityLevels {
     pub read_all_comments: i32,
     pub read_all_mail: i32,
     pub copy_move_messages: i32,
-    pub enter_at_vars_in_messages: i32,
-    pub edit_any_message: i32,
-    pub not_update_msg_read_status: i32,
     pub use_broadcast_command: i32,
     pub view_private_uploads: i32,
     pub enter_generic_message: i32,
     pub edit_message_headers: i32,
     pub protect_unprotect_messages: i32,
     pub overwrite_uploads: i32,
-    pub set_pack_out_date_on_messages: i32,
-    pub see_all_return_receipt_messages: i32,
 
-    pub subs: i32,
-    pub edit_all: i32,
-    pub read_only: i32,
+    pub enter_at_vars_in_messages: i32,
+    pub edit_any_message: i32,
+    pub not_update_msg_read_status: i32,
     pub sec_15: i32,
     pub unused0: i32,
-    pub keep_msg: i32,
-    pub seeretrcpt: i32,
+    pub set_pack_out_date_on_messages: i32,
+    pub see_all_return_receipt_messages: i32,
 
     pub sec_1_view_caller_log: i32,
     pub sec_2_view_usr_list: i32,
@@ -536,8 +531,8 @@ pub struct PCBSysopSecurityLevels {
     pub sec_10_shelled_dos_func: i32,
     pub sec_11_view_other_nodes: i32,
     pub sec_12_logoff_alt_node: i32,
-    pub sec_13_drop_alt_node_to_dos: i32,
-    pub sec_14_drop_to_dos: i32,
+    pub sec_13_view_alt_node_callers: i32,
+    pub sec_14_drop_alt_node_to_dos: i32,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -777,8 +772,8 @@ impl PcbBoardData {
         ret.sysop_security.sec_10_shelled_dos_func = read_int(&mut reader, encoding)?;
         ret.sysop_security.sec_11_view_other_nodes = read_int(&mut reader, encoding)?;
         ret.sysop_security.sec_12_logoff_alt_node = read_int(&mut reader, encoding)?;
-        ret.sysop_security.sec_13_drop_alt_node_to_dos = read_int(&mut reader, encoding)?;
-        ret.sysop_security.sec_14_drop_to_dos = read_int(&mut reader, encoding)?;
+        ret.sysop_security.sec_13_view_alt_node_callers = read_int(&mut reader, encoding)?;
+        ret.sysop_security.sec_14_drop_alt_node_to_dos = read_int(&mut reader, encoding)?;
 
         ret.path.help_loc = read_line(&mut reader, encoding)?;
         ret.path.sec_loc = read_line(&mut reader, encoding)?;
@@ -923,7 +918,7 @@ impl PcbBoardData {
         ret.max_scroll_back = read_int(&mut reader, encoding)?;
         ret.fast_text = read_bool(&mut reader, encoding)?;
         ret.fast_cnames = read_bool(&mut reader, encoding)?;
-        ret.sysop_security.subs = read_int(&mut reader, encoding)?;
+        ret.sysop_security.enter_at_vars_in_messages = read_int(&mut reader, encoding)?;
         ret.upload_by = read_bool(&mut reader, encoding)?;
         ret.display_userinfo_at_login = read_bool(&mut reader, encoding)?;
         ret.allow_shell = read_bool(&mut reader, encoding)?;
@@ -934,11 +929,11 @@ impl PcbBoardData {
         ret.max_conf_msgs = read_int(&mut reader, encoding)?;
         ret.min_prior_to_event = read_int(&mut reader, encoding)?;
 
-        ret.sysop_security.edit_all = read_int(&mut reader, encoding)?;
+        ret.sysop_security.edit_any_message = read_int(&mut reader, encoding)?;
         ret.user_levels.edit_own_messages = read_int(&mut reader, encoding)?;
         ret.modem.share_irqs = read_bool(&mut reader, encoding)?;
         ret.scan_all = read_bool(&mut reader, encoding)?;
-        ret.sysop_security.read_only = read_int(&mut reader, encoding)?;
+        ret.sysop_security.not_update_msg_read_status = read_int(&mut reader, encoding)?;
         ret.use_new_ask_file = read_bool(&mut reader, encoding)?;
 
         ret.path.tmp_loc = read_line(&mut reader, encoding)?;
@@ -1036,8 +1031,8 @@ impl PcbBoardData {
         ret.qwk_file = read_line(&mut reader, encoding)?;
         ret.path.file_tcan = read_line(&mut reader, encoding)?;
 
-        ret.sysop_security.keep_msg = read_int(&mut reader, encoding)?;
-        ret.sysop_security.seeretrcpt = read_int(&mut reader, encoding)?;
+        ret.sysop_security.set_pack_out_date_on_messages = read_int(&mut reader, encoding)?;
+        ret.sysop_security.see_all_return_receipt_messages = read_int(&mut reader, encoding)?;
 
         ret.swap_during_bat = read_bool(&mut reader, encoding)?;
         ret.user_sys_during_bat = read_bool(&mut reader, encoding)?;
@@ -1182,8 +1177,8 @@ impl PcbBoardData {
         append_int(&mut res, encoding, self.sysop_security.sec_10_shelled_dos_func);
         append_int(&mut res, encoding, self.sysop_security.sec_11_view_other_nodes);
         append_int(&mut res, encoding, self.sysop_security.sec_12_logoff_alt_node);
-        append_int(&mut res, encoding, self.sysop_security.sec_13_drop_alt_node_to_dos);
-        append_int(&mut res, encoding, self.sysop_security.sec_14_drop_to_dos);
+        append_int(&mut res, encoding, self.sysop_security.sec_13_view_alt_node_callers);
+        append_int(&mut res, encoding, self.sysop_security.sec_14_drop_alt_node_to_dos);
 
         append_line(&mut res, encoding, &self.path.help_loc);
         append_line(&mut res, encoding, &self.path.sec_loc);
@@ -1326,7 +1321,7 @@ impl PcbBoardData {
         append_int(&mut res, encoding, self.max_scroll_back);
         append_bool(&mut res, encoding, self.fast_text);
         append_bool(&mut res, encoding, self.fast_cnames);
-        append_int(&mut res, encoding, self.sysop_security.subs);
+        append_int(&mut res, encoding, self.sysop_security.enter_at_vars_in_messages);
         append_bool(&mut res, encoding, self.upload_by);
         append_bool(&mut res, encoding, self.display_userinfo_at_login);
         append_bool(&mut res, encoding, self.allow_shell);
@@ -1336,11 +1331,11 @@ impl PcbBoardData {
         append_int(&mut res, encoding, self.max_total_msgs);
         append_int(&mut res, encoding, self.max_conf_msgs);
         append_int(&mut res, encoding, self.min_prior_to_event);
-        append_int(&mut res, encoding, self.sysop_security.edit_all);
+        append_int(&mut res, encoding, self.sysop_security.edit_any_message);
         append_int(&mut res, encoding, self.user_levels.edit_own_messages);
         append_bool(&mut res, encoding, self.modem.share_irqs);
         append_bool(&mut res, encoding, self.scan_all);
-        append_int(&mut res, encoding, self.sysop_security.read_only);
+        append_int(&mut res, encoding, self.sysop_security.not_update_msg_read_status);
         append_bool(&mut res, encoding, self.use_new_ask_file);
 
         append_line(&mut res, encoding, &self.path.tmp_loc);
@@ -1426,8 +1421,8 @@ impl PcbBoardData {
         append_line(&mut res, encoding, &self.qwk_file);
         append_line(&mut res, encoding, &self.path.file_tcan);
 
-        append_int(&mut res, encoding, self.sysop_security.keep_msg);
-        append_int(&mut res, encoding, self.sysop_security.seeretrcpt);
+        append_int(&mut res, encoding, self.sysop_security.set_pack_out_date_on_messages);
+        append_int(&mut res, encoding, self.sysop_security.see_all_return_receipt_messages);
         append_bool(&mut res, encoding, self.swap_during_bat);
         append_bool(&mut res, encoding, self.user_sys_during_bat);
         append_bool(&mut res, encoding, self.default_graphics);
@@ -1573,4 +1568,51 @@ pub struct Node {
     pub message: String,
     pub channel: u8,
     pub last_update: String,
+}
+
+#[cfg(test)]
+mod layout_tests {
+    use super::PcbBoardData;
+
+    /// Parses a file in which every line holds its own line number, so each value
+    /// can be checked against the line it is supposed to come from.
+    fn numbered_dat() -> PcbBoardData {
+        let dir = std::env::temp_dir().join(format!("pcbdat-layout-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("pcboard.dat");
+        let text = (1..=400).map(|line| format!("{}\r\n", line)).collect::<String>();
+        std::fs::write(&path, text).unwrap();
+        let data = PcbBoardData::import_pcboard(&path).unwrap();
+        std::fs::remove_dir_all(dir).unwrap();
+        data
+    }
+
+    #[test]
+    fn every_value_comes_from_its_documented_line() {
+        let d = numbered_dat();
+        assert_eq!(d.sysop_info.sysop, "2");
+        assert_eq!(d.sysop_security.read_all_comments, 6);
+        assert_eq!(d.sysop_security.sec_1_view_caller_log, 10);
+        assert_eq!(d.sysop_security.sec_13_view_alt_node_callers, 22);
+        assert_eq!(d.sysop_security.sec_14_drop_alt_node_to_dos, 23);
+        assert_eq!(d.path.welcome_file, "36");
+        assert_eq!(d.modem.modem_init, "55");
+        assert_eq!(d.kbd_timeout, 89);
+        assert_eq!(d.board_name, "94");
+        assert_eq!(d.max_msg_lines, 109);
+        assert_eq!(d.stop_free_space, 120);
+        assert_eq!(d.user_levels.cmd_a, 121);
+        assert_eq!(d.sysop_security.enter_at_vars_in_messages, 164);
+        assert_eq!(d.sysop_security.edit_any_message, 173);
+        assert_eq!(d.user_levels.edit_own_messages, 174);
+        assert_eq!(d.sysop_security.not_update_msg_read_status, 177);
+        assert_eq!(d.num_ul_desc_lines, 198);
+        assert_eq!(d.upload_credit, 220);
+        assert_eq!(d.byte_credit, 221);
+        assert_eq!(d.sysop_security.sec_15, 234);
+        assert_eq!(d.sysop_security.set_pack_out_date_on_messages, 253);
+        assert_eq!(d.sysop_security.see_all_return_receipt_messages, 254);
+        assert_eq!(d.peak_days, "310");
+        assert_eq!(d.holidays_file, "311");
+    }
 }
