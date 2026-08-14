@@ -44,9 +44,11 @@ Toggle the alarm bell. If on, the terminal bell will ring when a user logs in.
 ICBSM
 ~~~~~
 Start the system manager utility. This is a TUI utility to manage users and groups.
-Besides the record editor it packs the user file and runs the bulk edits over a
-selection of users: security levels, expiration dates, conference registration and
-phone number formatting. Every one of those writes a copy of the user file first,
+Its menu follows the utility it replaces letter for letter: besides the record
+editor it packs the user file and runs the bulk edits over a selection of users -
+security levels, expiration dates, conference registration and phone formats.
+The entries the original spent on printer reports, index files and the user info
+file have no equivalent here. Every one of those writes a copy of the user file first,
 and ``Undo`` in the main menu puts that copy back.
 
 The same operations run without a screen for cron jobs and timed events::

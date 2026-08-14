@@ -115,10 +115,10 @@ impl IcbSetupMenuUI {
             get_tui_theme().menu_box,
         );
 
-        const MENU_WIDTH: u16 = 30;
+        let menu_width = self.menu.preferred_width();
         let mut menu_area = disp_area.inner(Margin {
             vertical: 0,
-            horizontal: (disp_area.width.saturating_sub(MENU_WIDTH)) / 2,
+            horizontal: (disp_area.width.saturating_sub(menu_width)) / 2,
         });
         menu_area.y += 4;
         menu_area.height = menu_area.height.saturating_sub(4);

@@ -40,6 +40,8 @@ pub struct UserSelection {
     pub never_logged_on: bool,
     pub delete_flagged: bool,
     pub disabled: bool,
+    /// Level zero, which is what locking a caller out leaves behind.
+    pub locked_out: bool,
     pub expired_before: Option<DateTime<Utc>>,
 
     /// Users at or above this level survive every condition above.
@@ -63,6 +65,7 @@ impl Default for UserSelection {
             never_logged_on: false,
             delete_flagged: false,
             disabled: false,
+            locked_out: false,
             expired_before: None,
             keep_security_at_least: None,
             keep_locked_out: false,
@@ -85,6 +88,7 @@ impl UserSelection {
             || self.never_logged_on
             || self.delete_flagged
             || self.disabled
+            || self.locked_out
             || self.expired_before.is_some()
     }
 
@@ -126,6 +130,9 @@ impl UserSelection {
             return true;
         }
         if self.disabled && user.flags.disabled_flag {
+            return true;
+        }
+        if self.locked_out && user.security_level == 0 {
             return true;
         }
         if self.never_logged_on && user.stats.num_times_on == 0 {
@@ -574,6 +581,23 @@ mod tests {
             ..UserSelection::default()
         };
         assert_eq!(vec![1], selection.select(&base, now()));
+    }
+
+    #[test]
+    fn locked_out_users_go_unless_the_keep_rule_says_otherwise() {
+        let base = base(vec![user("Sysop", 110), user("LockedOut", 0), user("Normal", 20)]);
+
+        let selection = UserSelection {
+            locked_out: true,
+            ..UserSelection::default()
+        };
+        assert_eq!(vec![1], selection.select(&base, now()));
+
+        let selection = UserSelection {
+            keep_locked_out: true,
+            ..selection
+        };
+        assert!(selection.select(&base, now()).is_empty());
     }
 
     #[test]

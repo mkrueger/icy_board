@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeZone, Utc};
 use crossterm::event::{KeyCode, KeyEvent};
 use icy_board_engine::icy_board::{
     IcyBoard,
@@ -22,12 +22,12 @@ use ratatui::{
 };
 use std::collections::HashMap;
 
-/// The bulk operations offered below "Users File Maintenance".
+/// The bulk operations offered below "Users File Maintenance", named the way
+/// the utility this replaces named them.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum MaintenanceOp {
     Pack,
     AdjustSecurity,
-    CopyExpiredSecurity,
     AdjustExpiration,
     ConferenceInsert,
     ConferenceRemove,
@@ -40,7 +40,6 @@ impl MaintenanceOp {
         match self {
             MaintenanceOp::Pack => get_text("icbsm_pack_title"),
             MaintenanceOp::AdjustSecurity => get_text("icbsm_adjust_security_title"),
-            MaintenanceOp::CopyExpiredSecurity => get_text("icbsm_copy_expired_title"),
             MaintenanceOp::AdjustExpiration => get_text("icbsm_adjust_expiration_title"),
             MaintenanceOp::ConferenceInsert => get_text("icbsm_conf_insert_title"),
             MaintenanceOp::ConferenceRemove => get_text("icbsm_conf_remove_title"),
@@ -61,17 +60,16 @@ struct Params {
     max_security: u32,
     use_expired_level: bool,
 
-    delete_flagged: bool,
-    disabled: bool,
-    never_logged_on: bool,
+    remove_deleted_or_locked: bool,
     inactive_days: u32,
-    use_subscription_date: bool,
-    subscription_date: DateTime<Utc>,
+    last_on_since: DateTime<Utc>,
+    expired_before: DateTime<Utc>,
     keep_security: u32,
     keep_locked_out: bool,
 
     new_level: u32,
     write_expired_level: bool,
+    copy_expired_level: bool,
 
     set_expiration_date: bool,
     expiration_date: DateTime<Utc>,
@@ -88,22 +86,34 @@ struct Params {
     move_last_conference: bool,
 }
 
+/// The date the original used for "no date given", still the way to switch the
+/// two date criteria off.
+fn no_date() -> DateTime<Utc> {
+    Utc.with_ymd_and_hms(1980, 1, 1, 0, 0, 0).unwrap()
+}
+
+fn date_is_set(date: DateTime<Utc>) -> bool {
+    date > no_date()
+}
+
+/// 9999 days means "do not look at the last call", as it did in the original.
+const DAYS_OFF: u32 = 9999;
+
 impl Default for Params {
     fn default() -> Self {
         Self {
             min_security: 0,
             max_security: 255,
             use_expired_level: false,
-            delete_flagged: true,
-            disabled: false,
-            never_logged_on: false,
-            inactive_days: 0,
-            use_subscription_date: false,
-            subscription_date: Utc::now(),
-            keep_security: 0,
+            remove_deleted_or_locked: true,
+            inactive_days: DAYS_OFF,
+            last_on_since: no_date(),
+            expired_before: no_date(),
+            keep_security: 100,
             keep_locked_out: true,
             new_level: 10,
             write_expired_level: false,
+            copy_expired_level: false,
             set_expiration_date: false,
             expiration_date: Utc::now(),
             add_days: 0,
@@ -139,6 +149,8 @@ pub struct MaintenancePage {
 type Obj = Arc<Mutex<Params>>;
 
 const LABEL_WIDTH: u16 = 30;
+/// The pack criteria are whole sentences, like the screen they come from.
+const PACK_LABEL_WIDTH: u16 = 50;
 
 fn u32_item(label: &str, value: u32, min: u32, max: u32, update: &'static dyn Fn(&Obj, u32)) -> ConfigEntry<Obj> {
     ConfigEntry::Item(
@@ -158,6 +170,21 @@ fn bool_item(label: &str, value: bool, update: &'static dyn Fn(&Obj, bool)) -> C
     )
 }
 
+fn wide(entry: ConfigEntry<Obj>) -> ConfigEntry<Obj> {
+    match entry {
+        ConfigEntry::Item(item) => ConfigEntry::Item(item.with_label_width(PACK_LABEL_WIDTH)),
+        other => other,
+    }
+}
+
+/// Replaces the status line of an item, for the fields that carry an off value.
+fn with_hint(entry: ConfigEntry<Obj>, hint: &str) -> ConfigEntry<Obj> {
+    match entry {
+        ConfigEntry::Item(item) => ConfigEntry::Item(item.with_status(get_text(hint))),
+        other => other,
+    }
+}
+
 fn date_item(label: &str, value: DateTime<Utc>, update: &'static dyn Fn(&Obj, DateTime<Utc>)) -> ConfigEntry<Obj> {
     ConfigEntry::Item(
         ListItem::new(
@@ -173,46 +200,70 @@ fn date_item(label: &str, value: DateTime<Utc>, update: &'static dyn Fn(&Obj, Da
 impl MaintenancePage {
     pub fn new(icy_board: Arc<Mutex<IcyBoard>>, op: MaintenanceOp) -> Self {
         let params = Params::default();
-        let mut entry = vec![
-            ConfigEntry::Separator,
-            u32_item("icbsm_min_security", params.min_security, 0, 255, &|o: &Obj, v: u32| {
-                o.lock().unwrap().min_security = v
-            }),
-            u32_item("icbsm_max_security", params.max_security, 0, 255, &|o: &Obj, v: u32| {
-                o.lock().unwrap().max_security = v
-            }),
-            bool_item("icbsm_use_expired_level", params.use_expired_level, &|o: &Obj, v: bool| {
-                o.lock().unwrap().use_expired_level = v
-            }),
-        ];
+        let mut entry = if op == MaintenanceOp::Pack {
+            vec![
+                ConfigEntry::Separator,
+                ConfigEntry::Group(
+                    get_text("icbsm_pack_removal_group"),
+                    vec![
+                        wide(bool_item(
+                            "icbsm_remove_deleted_or_locked",
+                            params.remove_deleted_or_locked,
+                            &|o: &Obj, v: bool| o.lock().unwrap().remove_deleted_or_locked = v,
+                        )),
+                        wide(with_hint(
+                            u32_item("icbsm_inactive_days", params.inactive_days, 0, DAYS_OFF, &|o: &Obj, v: u32| {
+                                o.lock().unwrap().inactive_days = v
+                            }),
+                            "icbsm_inactive_days-status",
+                        )),
+                        wide(with_hint(
+                            date_item("icbsm_last_on_since", params.last_on_since, &|o: &Obj, v: DateTime<Utc>| {
+                                o.lock().unwrap().last_on_since = v
+                            }),
+                            "icbsm_date_off-status",
+                        )),
+                        wide(with_hint(
+                            date_item("icbsm_expired_before", params.expired_before, &|o: &Obj, v: DateTime<Utc>| {
+                                o.lock().unwrap().expired_before = v
+                            }),
+                            "icbsm_date_off-status",
+                        )),
+                    ],
+                ),
+                ConfigEntry::Separator,
+                ConfigEntry::Group(
+                    get_text("icbsm_pack_keep_group"),
+                    vec![
+                        wide(with_hint(
+                            u32_item("icbsm_keep_security", params.keep_security, 0, 255, &|o: &Obj, v: u32| {
+                                o.lock().unwrap().keep_security = v
+                            }),
+                            "icbsm_keep_security-status",
+                        )),
+                        wide(bool_item("icbsm_keep_locked_out", params.keep_locked_out, &|o: &Obj, v: bool| {
+                            o.lock().unwrap().keep_locked_out = v
+                        })),
+                    ],
+                ),
+            ]
+        } else {
+            vec![
+                ConfigEntry::Separator,
+                u32_item("icbsm_min_security", params.min_security, 0, 255, &|o: &Obj, v: u32| {
+                    o.lock().unwrap().min_security = v
+                }),
+                u32_item("icbsm_max_security", params.max_security, 0, 255, &|o: &Obj, v: u32| {
+                    o.lock().unwrap().max_security = v
+                }),
+                bool_item("icbsm_use_expired_level", params.use_expired_level, &|o: &Obj, v: bool| {
+                    o.lock().unwrap().use_expired_level = v
+                }),
+            ]
+        };
 
         match op {
-            MaintenanceOp::Pack => {
-                entry.push(ConfigEntry::Separator);
-                entry.push(bool_item("icbsm_delete_flagged", params.delete_flagged, &|o: &Obj, v: bool| {
-                    o.lock().unwrap().delete_flagged = v
-                }));
-                entry.push(bool_item("icbsm_disabled", params.disabled, &|o: &Obj, v: bool| o.lock().unwrap().disabled = v));
-                entry.push(bool_item("icbsm_never_logged_on", params.never_logged_on, &|o: &Obj, v: bool| {
-                    o.lock().unwrap().never_logged_on = v
-                }));
-                entry.push(u32_item("icbsm_inactive_days", params.inactive_days, 0, 9999, &|o: &Obj, v: u32| {
-                    o.lock().unwrap().inactive_days = v
-                }));
-                entry.push(bool_item("icbsm_use_subscription", params.use_subscription_date, &|o: &Obj, v: bool| {
-                    o.lock().unwrap().use_subscription_date = v
-                }));
-                entry.push(date_item("icbsm_subscription_date", params.subscription_date, &|o: &Obj, v: DateTime<Utc>| {
-                    o.lock().unwrap().subscription_date = v
-                }));
-                entry.push(ConfigEntry::Separator);
-                entry.push(u32_item("icbsm_keep_security", params.keep_security, 0, 255, &|o: &Obj, v: u32| {
-                    o.lock().unwrap().keep_security = v
-                }));
-                entry.push(bool_item("icbsm_keep_locked_out", params.keep_locked_out, &|o: &Obj, v: bool| {
-                    o.lock().unwrap().keep_locked_out = v
-                }));
-            }
+            MaintenanceOp::Pack => {}
             MaintenanceOp::AdjustSecurity => {
                 entry.push(ConfigEntry::Separator);
                 entry.push(u32_item("icbsm_new_level", params.new_level, 0, 255, &|o: &Obj, v: u32| {
@@ -221,6 +272,12 @@ impl MaintenancePage {
                 entry.push(bool_item("icbsm_write_expired_level", params.write_expired_level, &|o: &Obj, v: bool| {
                     o.lock().unwrap().write_expired_level = v
                 }));
+                entry.push(with_hint(
+                    bool_item("icbsm_copy_expired_level", params.copy_expired_level, &|o: &Obj, v: bool| {
+                        o.lock().unwrap().copy_expired_level = v
+                    }),
+                    "icbsm_copy_expired_level-status",
+                ));
             }
             MaintenanceOp::AdjustExpiration => {
                 entry.push(ConfigEntry::Separator);
@@ -276,7 +333,7 @@ impl MaintenancePage {
                     }));
                 }
             }
-            MaintenanceOp::CopyExpiredSecurity | MaintenanceOp::StandardizePhones => {}
+            MaintenanceOp::StandardizePhones => {}
         }
 
         Self {
@@ -294,18 +351,20 @@ impl MaintenancePage {
 
     fn selection(&self) -> UserSelection {
         let p = self.menu.obj.lock().unwrap();
+        let packing = self.op == MaintenanceOp::Pack;
         UserSelection {
             min_security: p.min_security.min(255) as u8,
             max_security: p.max_security.min(255) as u8,
             security_field: if p.use_expired_level { SecurityField::Expired } else { SecurityField::Normal },
-            last_on_before: None,
-            inactive_days: (self.op == MaintenanceOp::Pack && p.inactive_days > 0).then_some(p.inactive_days),
-            never_logged_on: self.op == MaintenanceOp::Pack && p.never_logged_on,
-            delete_flagged: self.op == MaintenanceOp::Pack && p.delete_flagged,
-            disabled: self.op == MaintenanceOp::Pack && p.disabled,
-            expired_before: (self.op == MaintenanceOp::Pack && p.use_subscription_date).then_some(p.subscription_date),
-            keep_security_at_least: (p.keep_security > 0).then_some(p.keep_security.min(255) as u8),
-            keep_locked_out: self.op == MaintenanceOp::Pack && p.keep_locked_out,
+            last_on_before: (packing && date_is_set(p.last_on_since)).then_some(p.last_on_since),
+            inactive_days: (packing && p.inactive_days < DAYS_OFF).then_some(p.inactive_days),
+            never_logged_on: false,
+            delete_flagged: packing && p.remove_deleted_or_locked,
+            disabled: packing && p.remove_deleted_or_locked,
+            locked_out: packing && p.remove_deleted_or_locked,
+            expired_before: (packing && date_is_set(p.expired_before)).then_some(p.expired_before),
+            keep_security_at_least: (packing && p.keep_security > 0).then_some(p.keep_security.min(255) as u8),
+            keep_locked_out: packing && p.keep_locked_out,
             protect_first_record: true,
             protected_names: Vec::new(),
         }
@@ -350,7 +409,7 @@ impl MaintenancePage {
         let selection = self.selection();
         let flags = self.conference_flags();
         let conferences = self.conference_range();
-        let (target, from, to, reset_lastread, move_last_conference, new_level, write_expired, change) = {
+        let (target, from, to, reset_lastread, move_last_conference, new_level, copy_expired, change) = {
             let p = self.menu.obj.lock().unwrap();
             (
                 if p.write_expired_level {
@@ -363,7 +422,7 @@ impl MaintenancePage {
                 p.reset_lastread,
                 p.move_last_conference,
                 p.new_level.min(255) as u8,
-                p.write_expired_level,
+                p.copy_expired_level,
                 if p.set_expiration_date {
                     ExpirationChange::SetDate(p.expiration_date)
                 } else {
@@ -371,7 +430,6 @@ impl MaintenancePage {
                 },
             )
         };
-        let _ = write_expired;
 
         let mut board = self.icy_board.lock().unwrap();
         let users_file = board.resolve_file(&board.config.paths.user_file);
@@ -382,8 +440,13 @@ impl MaintenancePage {
 
         let report = match self.op {
             MaintenanceOp::Pack => user_maintenance::pack(&mut board.users, &selection, now),
-            MaintenanceOp::AdjustSecurity => user_maintenance::adjust_security(&mut board.users, &selection, new_level, target, now),
-            MaintenanceOp::CopyExpiredSecurity => user_maintenance::copy_expired_security(&mut board.users, &selection, now),
+            MaintenanceOp::AdjustSecurity => {
+                if copy_expired {
+                    user_maintenance::copy_expired_security(&mut board.users, &selection, now)
+                } else {
+                    user_maintenance::adjust_security(&mut board.users, &selection, new_level, target, now)
+                }
+            }
             MaintenanceOp::AdjustExpiration => user_maintenance::adjust_expiration(&mut board.users, &selection, change, now),
             MaintenanceOp::ConferenceInsert => user_maintenance::conference_register(&mut board.users, &selection, &conferences, flags, reset_lastread, now),
             MaintenanceOp::ConferenceRemove => user_maintenance::conference_unregister(&mut board.users, &selection, &conferences, flags, reset_lastread, now),
@@ -510,7 +573,7 @@ impl Page for MaintenancePage {
 
         match &self.stage {
             Stage::Criteria => {
-                if key.code == KeyCode::F(2) {
+                if key.code == KeyCode::F(2) || key.code == KeyCode::PageDown {
                     self.build_preview();
                     return PageMessage::None;
                 }
@@ -525,7 +588,7 @@ impl Page for MaintenancePage {
                     self.stage = Stage::Criteria;
                     PageMessage::None
                 }
-                KeyCode::Enter | KeyCode::F(2) => {
+                KeyCode::Enter | KeyCode::F(2) | KeyCode::PageDown => {
                     if *matched > 0 {
                         self.run();
                     } else {

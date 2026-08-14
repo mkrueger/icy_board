@@ -81,6 +81,13 @@ impl<T> SelectMenu<T> {
         Self { items }
     }
 
+    /// The column this menu wants, never narrower than the classic 30.
+    pub fn preferred_width(&self) -> u16 {
+        const MIN_WIDTH: u16 = 30;
+        let longest = self.items.iter().map(|item| item.title.chars().count() as u16 + 5).max().unwrap_or(0);
+        MIN_WIDTH.max(longest)
+    }
+
     pub fn render(&self, area: Rect, frame: &mut Frame, state: &mut SelectMenuState) {
         for (i, item) in self.items.iter().enumerate() {
             if i < state.first_row as usize {

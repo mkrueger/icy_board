@@ -1556,49 +1556,65 @@ icb_sysmanager_main_title=User File Maintenance
 icb_sysmanager_main_edit_users=Edit Users File
 icb_sysmanager_main_edit_groups=Edit Groups
 
+icbsm_menu_edit_users=Edit Users File
+icbsm_menu_pack=Pack Users File
+icbsm_menu_adjust_security=Adjust Security Levels
+icbsm_menu_insert_conf=Insert Group Conference
+icbsm_menu_remove_conf=Remove Group Conference
+icbsm_menu_move_conf=Move Users BETWEEN Conferences
+icbsm_menu_expiration=Adjust Expiration Dates
+icbsm_menu_phones=Standardize Phone Formats
+icbsm_menu_undo=Undo (restore backup file)
+icbsm_menu_groups=Edit Groups
+
 icbsm_pack_title=Pack Users File
 icbsm_adjust_security_title=Adjust Security Levels
-icbsm_copy_expired_title=Use Expired Security Level
 icbsm_adjust_expiration_title=Adjust Expiration Dates
 icbsm_conf_insert_title=Insert Group Conference
 icbsm_conf_remove_title=Remove Group Conference
-icbsm_conf_move_title=Move Between Conferences
-icbsm_phones_title=Standardize Phone Numbers
-icbsm_undo_title=Undo (Restore Backup)
+icbsm_conf_move_title=Move Users BETWEEN Conferences
+icbsm_phones_title=Standardize Phone Formats
+icbsm_undo_title=Undo (restore backup file)
 
 icbsm_min_security=Security Level GTE
 icbsm_max_security=Security Level LTE
-icbsm_use_expired_level=Use Expired Security Level
+icbsm_use_expired_level=Base on Expired Security Level
 
-icbsm_delete_flagged=Users Marked For Deletion
-icbsm_disabled=Disabled Accounts
-icbsm_never_logged_on=Users That Never Called
-icbsm_inactive_days=Not Called In Days (0=Off)
-icbsm_use_subscription=Use Subscription Date
-icbsm_subscription_date=Expired Before
-icbsm_keep_security=Keep Security GTE (0=Off)
-icbsm_keep_locked_out=Keep Locked Out Users
+icbsm_pack_removal_group=Criteria for User Record Removal
+icbsm_pack_keep_group=Criteria for Keeping User Record
 
-icbsm_new_level=New Security Level
-icbsm_write_expired_level=Write Expired Level Instead
+icbsm_remove_deleted_or_locked=Remove Users that are Deleted or `LOCKED OUT'
+icbsm_inactive_days=Remove Users who have not been on for XXXX days
+icbsm_inactive_days-status=9999 leaves the last call out of it
+icbsm_last_on_since=Remove Users who have not been on since
+icbsm_expired_before=Remove Users whose Reg. Exp. Date is older than
+icbsm_date_off-status=01-01-80 switches this criterion off
+icbsm_keep_security=Keep Users with security greater than or equal to
+icbsm_keep_security-status=0 keeps nobody for their security level
+icbsm_keep_locked_out=Keep Users that are `LOCKED OUT'
 
-icbsm_set_expiration=Set A New Date
-icbsm_expiration_date=New Expiration Date
-icbsm_add_days=Add Days
+icbsm_new_level=Change Them To New Level
+icbsm_write_expired_level=Change the Expired Security Level
+icbsm_copy_expired_level=Change Security to Expired Level
+icbsm_copy_expired_level-status=Takes the new level from each record instead
+
+icbsm_set_expiration=Set All Records To A New Date
+icbsm_expiration_date=New Reg. Exp. Date
+icbsm_add_days=Or Add This Many Days
 
 icbsm_conf_first=First Conference
 icbsm_conf_last=Last Conference
-icbsm_conf_from=Remove From Conference
-icbsm_conf_to=Add To Conference
-icbsm_flag_registered=Registered Flag
-icbsm_flag_expired=Expired Access Flag
-icbsm_flag_selected=Selected Flag
-icbsm_flag_sysop=Conference Sysop Flag
-icbsm_reset_lastread=Reset Last Message Read
-icbsm_move_lastread=Move Last Message Read
+icbsm_conf_from=REMOVE From Conference
+icbsm_conf_to=ADD To Conference
+icbsm_flag_registered=R - Registered in Conference
+icbsm_flag_expired=X - Access After Expiration
+icbsm_flag_selected=S - Selected for Scanning
+icbsm_flag_sysop=C - Conference Sysop
+icbsm_reset_lastread=Reset Last Message Read Pointer
+icbsm_move_lastread=Move Last Message Read Pointer
 icbsm_move_last_conference=Move Last Conference In
 
-icbsm_criteria_keys=F2 Preview, ESC Cancel
+icbsm_criteria_keys=PGDN or F2 to preview, ESC to abort
 icbsm_preview_keys=ENTER Run, ESC Back
 icbsm_done_keys=Press A Key
 icbsm_undo_keys=ENTER Restore, ESC Cancel
