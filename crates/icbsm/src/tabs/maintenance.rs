@@ -5,7 +5,7 @@ use crossterm::event::{KeyCode, KeyEvent};
 use icy_board_engine::icy_board::{
     IcyBoard,
     user_base::ConferenceFlags,
-    user_maintenance::{self, ExpirationChange, MaintenanceReport, SecurityField, UserSelection},
+    user_maintenance::{self, CounterInit, ExpirationChange, MaintenanceReport, SecurityField, UserSelection},
 };
 use icy_board_tui::{
     BORDER_SET,
@@ -22,12 +22,17 @@ use ratatui::{
 };
 use std::collections::HashMap;
 
+use super::{counter_init_combo, counter_init_from, counter_scope};
+
 /// The bulk operations offered below "Users File Maintenance", named the way
 /// the utility this replaces named them.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum MaintenanceOp {
     Pack,
     AdjustSecurity,
+    AdjustSecurityExpired,
+    CopyExpiredSecurity,
+    InitializeCounters,
     AdjustExpiration,
     ConferenceInsert,
     ConferenceRemove,
@@ -39,7 +44,10 @@ impl MaintenanceOp {
     fn title(&self) -> String {
         match self {
             MaintenanceOp::Pack => get_text("icbsm_pack_title"),
-            MaintenanceOp::AdjustSecurity => get_text("icbsm_adjust_security_title"),
+            MaintenanceOp::AdjustSecurity => get_text("icbsm_sec_by_ranges"),
+            MaintenanceOp::AdjustSecurityExpired => get_text("icbsm_sec_by_ranges_expired"),
+            MaintenanceOp::CopyExpiredSecurity => get_text("icbsm_sec_copy_expired"),
+            MaintenanceOp::InitializeCounters => get_text("icbsm_sec_init_counters"),
             MaintenanceOp::AdjustExpiration => get_text("icbsm_adjust_expiration_title"),
             MaintenanceOp::ConferenceInsert => get_text("icbsm_conf_insert_title"),
             MaintenanceOp::ConferenceRemove => get_text("icbsm_conf_remove_title"),
@@ -68,8 +76,9 @@ struct Params {
     keep_locked_out: bool,
 
     new_level: u32,
-    write_expired_level: bool,
-    copy_expired_level: bool,
+    counter_init: CounterInit,
+    counter_files: bool,
+    counter_bytes: bool,
 
     set_expiration_date: bool,
     expiration_date: DateTime<Utc>,
@@ -82,6 +91,7 @@ struct Params {
     flag_expired: bool,
     flag_selected: bool,
     flag_sysop: bool,
+    flag_net_status: bool,
     reset_lastread: bool,
     move_last_conference: bool,
 }
@@ -112,8 +122,9 @@ impl Default for Params {
             keep_security: 100,
             keep_locked_out: true,
             new_level: 10,
-            write_expired_level: false,
-            copy_expired_level: false,
+            counter_init: CounterInit::Zero,
+            counter_files: true,
+            counter_bytes: true,
             set_expiration_date: false,
             expiration_date: Utc::now(),
             add_days: 0,
@@ -124,6 +135,7 @@ impl Default for Params {
             flag_expired: false,
             flag_selected: false,
             flag_sysop: false,
+            flag_net_status: false,
             reset_lastread: false,
             move_last_conference: false,
         }
@@ -131,6 +143,7 @@ impl Default for Params {
 }
 
 enum Stage {
+    Confirm,
     Criteria,
     Preview { matched: usize, names: Vec<String> },
     Done { report: MaintenanceReport },
@@ -199,7 +212,13 @@ fn date_item(label: &str, value: DateTime<Utc>, update: &'static dyn Fn(&Obj, Da
 
 impl MaintenancePage {
     pub fn new(icy_board: Arc<Mutex<IcyBoard>>, op: MaintenanceOp) -> Self {
-        let params = Params::default();
+        let mut params = Params::default();
+        if matches!(
+            op,
+            MaintenanceOp::ConferenceInsert | MaintenanceOp::ConferenceRemove | MaintenanceOp::ConferenceMove
+        ) {
+            params.max_security = 110;
+        }
         let mut entry = if op == MaintenanceOp::Pack {
             vec![
                 ConfigEntry::Separator,
@@ -264,20 +283,28 @@ impl MaintenancePage {
 
         match op {
             MaintenanceOp::Pack => {}
-            MaintenanceOp::AdjustSecurity => {
+            MaintenanceOp::AdjustSecurity | MaintenanceOp::AdjustSecurityExpired => {
                 entry.push(ConfigEntry::Separator);
                 entry.push(u32_item("icbsm_new_level", params.new_level, 0, 255, &|o: &Obj, v: u32| {
                     o.lock().unwrap().new_level = v
                 }));
-                entry.push(bool_item("icbsm_write_expired_level", params.write_expired_level, &|o: &Obj, v: bool| {
-                    o.lock().unwrap().write_expired_level = v
-                }));
-                entry.push(with_hint(
-                    bool_item("icbsm_copy_expired_level", params.copy_expired_level, &|o: &Obj, v: bool| {
-                        o.lock().unwrap().copy_expired_level = v
-                    }),
-                    "icbsm_copy_expired_level-status",
+            }
+            MaintenanceOp::InitializeCounters => {
+                entry.push(ConfigEntry::Separator);
+                entry.push(ConfigEntry::Item(
+                    ListItem::new(get_text("icbsm_counters_mode"), ListValue::ComboBox(counter_init_combo(CounterInit::Zero)))
+                        .with_status(get_text("icbsm_counters_mode"))
+                        .with_label_width(LABEL_WIDTH)
+                        .with_update_combobox_value(&|o: &Obj, value: &icy_board_tui::config_menu::ComboBox| {
+                            o.lock().unwrap().counter_init = counter_init_from(&value.cur_value.value)
+                        }),
                 ));
+                entry.push(bool_item("icbsm_counters_files", params.counter_files, &|o: &Obj, v: bool| {
+                    o.lock().unwrap().counter_files = v
+                }));
+                entry.push(bool_item("icbsm_counters_bytes", params.counter_bytes, &|o: &Obj, v: bool| {
+                    o.lock().unwrap().counter_bytes = v
+                }));
             }
             MaintenanceOp::AdjustExpiration => {
                 entry.push(ConfigEntry::Separator);
@@ -320,6 +347,9 @@ impl MaintenancePage {
                 entry.push(bool_item("icbsm_flag_sysop", params.flag_sysop, &|o: &Obj, v: bool| {
                     o.lock().unwrap().flag_sysop = v
                 }));
+                entry.push(bool_item("icbsm_flag_net_status", params.flag_net_status, &|o: &Obj, v: bool| {
+                    o.lock().unwrap().flag_net_status = v
+                }));
                 if op == MaintenanceOp::ConferenceMove {
                     entry.push(bool_item("icbsm_move_lastread", params.reset_lastread, &|o: &Obj, v: bool| {
                         o.lock().unwrap().reset_lastread = v
@@ -333,7 +363,7 @@ impl MaintenancePage {
                     }));
                 }
             }
-            MaintenanceOp::StandardizePhones => {}
+            MaintenanceOp::CopyExpiredSecurity | MaintenanceOp::StandardizePhones => {}
         }
 
         Self {
@@ -344,7 +374,11 @@ impl MaintenancePage {
                 entry,
             },
             state: ConfigMenuState::default(),
-            stage: Stage::Criteria,
+            stage: if op == MaintenanceOp::StandardizePhones {
+                Stage::Confirm
+            } else {
+                Stage::Criteria
+            },
             error: None,
         }
     }
@@ -355,7 +389,11 @@ impl MaintenancePage {
         UserSelection {
             min_security: p.min_security.min(255) as u8,
             max_security: p.max_security.min(255) as u8,
-            security_field: if p.use_expired_level { SecurityField::Expired } else { SecurityField::Normal },
+            security_field: if p.use_expired_level || self.op == MaintenanceOp::AdjustSecurityExpired {
+                SecurityField::Expired
+            } else {
+                SecurityField::Normal
+            },
             last_on_before: (packing && date_is_set(p.last_on_since)).then_some(p.last_on_since),
             inactive_days: (packing && p.inactive_days < DAYS_OFF).then_some(p.inactive_days),
             never_logged_on: false,
@@ -385,6 +423,9 @@ impl MaintenancePage {
         if p.flag_sysop {
             flags |= ConferenceFlags::Sysop;
         }
+        if p.flag_net_status {
+            flags |= ConferenceFlags::NetStatus;
+        }
         flags
     }
 
@@ -409,10 +450,10 @@ impl MaintenancePage {
         let selection = self.selection();
         let flags = self.conference_flags();
         let conferences = self.conference_range();
-        let (target, from, to, reset_lastread, move_last_conference, new_level, copy_expired, change) = {
+        let (target, from, to, reset_lastread, move_last_conference, new_level, counters, change) = {
             let p = self.menu.obj.lock().unwrap();
             (
-                if p.write_expired_level {
+                if self.op == MaintenanceOp::AdjustSecurityExpired {
                     SecurityField::Expired
                 } else {
                     SecurityField::Normal
@@ -422,7 +463,7 @@ impl MaintenancePage {
                 p.reset_lastread,
                 p.move_last_conference,
                 p.new_level.min(255) as u8,
-                p.copy_expired_level,
+                (p.counter_init, counter_scope(p.counter_files, p.counter_bytes)),
                 if p.set_expiration_date {
                     ExpirationChange::SetDate(p.expiration_date)
                 } else {
@@ -440,13 +481,11 @@ impl MaintenancePage {
 
         let report = match self.op {
             MaintenanceOp::Pack => user_maintenance::pack(&mut board.users, &selection, now),
-            MaintenanceOp::AdjustSecurity => {
-                if copy_expired {
-                    user_maintenance::copy_expired_security(&mut board.users, &selection, now)
-                } else {
-                    user_maintenance::adjust_security(&mut board.users, &selection, new_level, target, now)
-                }
+            MaintenanceOp::AdjustSecurity | MaintenanceOp::AdjustSecurityExpired => {
+                user_maintenance::adjust_security(&mut board.users, &selection, new_level, target, now)
             }
+            MaintenanceOp::CopyExpiredSecurity => user_maintenance::copy_expired_security(&mut board.users, &selection, now),
+            MaintenanceOp::InitializeCounters => user_maintenance::initialize_counters(&mut board.users, &selection, counters.0, counters.1, now),
             MaintenanceOp::AdjustExpiration => user_maintenance::adjust_expiration(&mut board.users, &selection, change, now),
             MaintenanceOp::ConferenceInsert => user_maintenance::conference_register(&mut board.users, &selection, &conferences, flags, reset_lastread, now),
             MaintenanceOp::ConferenceRemove => user_maintenance::conference_unregister(&mut board.users, &selection, &conferences, flags, reset_lastread, now),
@@ -489,6 +528,15 @@ impl Page for MaintenancePage {
         Clear.render(area, frame.buffer_mut());
 
         match &self.stage {
+            Stage::Confirm => {
+                self.render_lines(
+                    frame,
+                    area,
+                    self.op.title(),
+                    get_text("icbsm_criteria_keys"),
+                    vec![Line::from(get_text("icbsm_are_you_sure"))],
+                );
+            }
             Stage::Criteria => {
                 let block = Block::new()
                     .style(get_tui_theme().background)
@@ -572,6 +620,14 @@ impl Page for MaintenancePage {
         }
 
         match &self.stage {
+            Stage::Confirm => match key.code {
+                KeyCode::Esc => PageMessage::Close,
+                KeyCode::Enter | KeyCode::PageDown | KeyCode::F(2) => {
+                    self.run();
+                    PageMessage::None
+                }
+                _ => PageMessage::None,
+            },
             Stage::Criteria => {
                 if key.code == KeyCode::F(2) || key.code == KeyCode::PageDown {
                     self.build_preview();

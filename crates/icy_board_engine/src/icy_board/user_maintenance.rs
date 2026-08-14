@@ -11,8 +11,10 @@ use chrono::{DateTime, Duration, Utc};
 
 use crate::Res;
 
+use serde::{Deserialize, Serialize};
+
 use super::user_base::{ConferenceFlags, User, UserBase};
-use super::write_atomic;
+use super::{IcyBoardSerializer, write_atomic};
 
 /// Which of the two security fields a criterion or an operation looks at.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -371,6 +373,154 @@ pub fn standardize_phones(base: &mut UserBase, selection: &UserSelection, now: D
         user.bus_data_phone = bus;
         user.home_voice_phone = home;
         true
+    })
+}
+
+/// Which number a security table is read against.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TableKind {
+    FileRatio,
+    ByteRatio,
+    Uploads,
+    Downloads,
+}
+
+/// One step of a security table: everyone who reaches `value` lands on `security`.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct TableEntry {
+    pub value: f64,
+    pub security: u8,
+}
+
+/// The tables the sysop builds once and applies whenever the numbers moved.
+///
+/// The original stored a ratio as a scaled integer where the sign said which
+/// side of one to one it was on; here a ratio is simply uploads divided by
+/// downloads, which is the same information without the decoder ring.
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct SecurityTables {
+    #[serde(default)]
+    pub file_ratio: Vec<TableEntry>,
+    #[serde(default)]
+    pub byte_ratio: Vec<TableEntry>,
+    #[serde(default)]
+    pub uploads: Vec<TableEntry>,
+    #[serde(default)]
+    pub downloads: Vec<TableEntry>,
+}
+
+impl IcyBoardSerializer for SecurityTables {
+    const FILE_TYPE: &'static str = "security tables";
+}
+
+impl SecurityTables {
+    pub fn get(&self, kind: TableKind) -> &Vec<TableEntry> {
+        match kind {
+            TableKind::FileRatio => &self.file_ratio,
+            TableKind::ByteRatio => &self.byte_ratio,
+            TableKind::Uploads => &self.uploads,
+            TableKind::Downloads => &self.downloads,
+        }
+    }
+
+    pub fn get_mut(&mut self, kind: TableKind) -> &mut Vec<TableEntry> {
+        match kind {
+            TableKind::FileRatio => &mut self.file_ratio,
+            TableKind::ByteRatio => &mut self.byte_ratio,
+            TableKind::Uploads => &mut self.uploads,
+            TableKind::Downloads => &mut self.downloads,
+        }
+    }
+
+    /// The tables live next to the user file they belong to.
+    pub fn path_for(users_file: &Path) -> PathBuf {
+        users_file.with_file_name("security_tables.toml")
+    }
+
+    pub fn load_for(users_file: &Path) -> Self {
+        let path = Self::path_for(users_file);
+        if path.is_file() {
+            Self::load(&path).unwrap_or_default()
+        } else {
+            Self::default()
+        }
+    }
+
+    pub fn save_for(&self, users_file: &Path) -> Res<()> {
+        self.save(&Self::path_for(users_file))
+    }
+}
+
+fn table_value(user: &User, kind: TableKind) -> f64 {
+    match kind {
+        TableKind::FileRatio => ratio(user.stats.num_uploads, user.stats.num_downloads),
+        TableKind::ByteRatio => ratio(user.stats.total_upld_bytes, user.stats.total_dnld_bytes),
+        TableKind::Uploads => user.stats.num_uploads as f64,
+        TableKind::Downloads => user.stats.num_downloads as f64,
+    }
+}
+
+/// Moves everyone the table has a step for. A user below the lowest step keeps
+/// the level they have - the table says who earns what, not who loses it.
+pub fn adjust_by_table(base: &mut UserBase, selection: &UserSelection, kind: TableKind, table: &[TableEntry], now: DateTime<Utc>) -> MaintenanceReport {
+    let mut steps: Vec<TableEntry> = table.to_vec();
+    steps.sort_by(|a, b| a.value.partial_cmp(&b.value).unwrap_or(std::cmp::Ordering::Equal));
+
+    apply(base, selection, now, |user| {
+        let value = table_value(user, kind);
+        let Some(step) = steps.iter().rev().find(|step| value >= step.value) else {
+            return false;
+        };
+        if user.security_level == step.security {
+            return false;
+        }
+        user.security_level = step.security;
+        true
+    })
+}
+
+/// What "Initialize Upld/Dnld Counters" does to a record.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CounterInit {
+    Zero,
+    UploadsFromDownloads,
+    DownloadsFromUploads,
+}
+
+/// Which pair of counters it does it to.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CounterScope {
+    pub files: bool,
+    pub bytes: bool,
+}
+
+pub fn initialize_counters(base: &mut UserBase, selection: &UserSelection, init: CounterInit, scope: CounterScope, now: DateTime<Utc>) -> MaintenanceReport {
+    apply(base, selection, now, |user| {
+        let stats = &mut user.stats;
+        let before = (stats.num_uploads, stats.num_downloads, stats.total_upld_bytes, stats.total_dnld_bytes);
+
+        if scope.files {
+            match init {
+                CounterInit::Zero => {
+                    stats.num_uploads = 0;
+                    stats.num_downloads = 0;
+                }
+                CounterInit::UploadsFromDownloads => stats.num_uploads = stats.num_downloads,
+                CounterInit::DownloadsFromUploads => stats.num_downloads = stats.num_uploads,
+            }
+        }
+        if scope.bytes {
+            match init {
+                CounterInit::Zero => {
+                    stats.total_upld_bytes = 0;
+                    stats.total_dnld_bytes = 0;
+                }
+                CounterInit::UploadsFromDownloads => stats.total_upld_bytes = stats.total_dnld_bytes,
+                CounterInit::DownloadsFromUploads => stats.total_dnld_bytes = stats.total_upld_bytes,
+            }
+        }
+
+        before != (stats.num_uploads, stats.num_downloads, stats.total_upld_bytes, stats.total_dnld_bytes)
     })
 }
 
@@ -901,6 +1051,54 @@ mod tests {
 
         sort(&mut base, SortKey::FileRatioThenName, false);
         assert_eq!(vec!["Sysop".to_string(), "Leech".to_string(), "Donor".to_string()], names(&base));
+    }
+
+    #[test]
+    fn a_security_table_moves_everyone_it_has_a_step_for() {
+        let mut base = base(vec![user("Sysop", 110), user("Fresh", 10), user("Regular", 10), user("Heavy", 10)]);
+        base[1].stats.num_uploads = 0;
+        base[2].stats.num_uploads = 12;
+        base[3].stats.num_uploads = 60;
+
+        let table = [TableEntry { value: 10.0, security: 30 }, TableEntry { value: 50.0, security: 40 }];
+        let report = adjust_by_table(&mut base, &UserSelection::default(), TableKind::Uploads, &table, now());
+
+        assert_eq!(10, base[1].security_level, "below the lowest step nobody is touched");
+        assert_eq!(30, base[2].security_level);
+        assert_eq!(40, base[3].security_level);
+        assert_eq!(2, report.changed);
+    }
+
+    #[test]
+    fn counters_can_be_matched_up_or_zeroed() {
+        let mut base = base(vec![user("Sysop", 110), user("A", 20)]);
+        base[1].stats.num_downloads = 7;
+        base[1].stats.total_dnld_bytes = 700;
+
+        let scope = CounterScope { files: true, bytes: false };
+        initialize_counters(&mut base, &UserSelection::default(), CounterInit::UploadsFromDownloads, scope, now());
+        assert_eq!(7, base[1].stats.num_uploads);
+        assert_eq!(0, base[1].stats.total_upld_bytes, "the byte counters were out of scope");
+
+        let scope = CounterScope { files: true, bytes: true };
+        initialize_counters(&mut base, &UserSelection::default(), CounterInit::Zero, scope, now());
+        assert_eq!(0, base[1].stats.num_downloads);
+        assert_eq!(0, base[1].stats.total_dnld_bytes);
+    }
+
+    #[test]
+    fn the_tables_live_next_to_the_user_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let users_file = dir.path().join("users.toml");
+
+        let mut tables = SecurityTables::default();
+        tables.get_mut(TableKind::FileRatio).push(TableEntry { value: 1.0, security: 50 });
+        tables.save_for(&users_file).unwrap();
+
+        let loaded = SecurityTables::load_for(&users_file);
+        assert_eq!(1, loaded.get(TableKind::FileRatio).len());
+        assert_eq!(50, loaded.get(TableKind::FileRatio)[0].security);
+        assert!(loaded.get(TableKind::Uploads).is_empty());
     }
 
     #[test]

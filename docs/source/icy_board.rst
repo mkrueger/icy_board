@@ -48,6 +48,9 @@ Its menu carries the entries of the utility it replaces: besides the record edit
 it sorts and packs the user file and runs the bulk edits over a selection of users -
 security levels, expiration dates, conference registration and phone formats. The
 screens ask the same questions in the same order, and PGDN starts the run as it did.
+Security levels can also be handed out from a table of upload, download or ratio
+steps; the tables are built from the same menu and kept in ``security_tables.toml``
+next to the user file.
 The entries the original spent on printer reports, index files and the user info
 file have no equivalent here. Every operation that rewrites the file copies it
 first, and ``Undo`` in the main menu puts that copy back.

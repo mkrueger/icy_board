@@ -16,7 +16,7 @@ use ratatui::{Frame, layout::Rect};
 
 use crate::VERSION;
 
-use super::{GroupEditor, MaintenanceOp, MaintenancePage, UndoPage, UserList, sort_options_page};
+use super::{GroupEditor, MaintenanceOp, MaintenancePage, UndoPage, UserList, security_menu_page, sort_options_page};
 
 pub struct GeneralTab {
     pub page: IcbSetupMenuUI,
@@ -81,7 +81,10 @@ impl TabPage for GeneralTab {
                     return self.page.open_sup_page(Box::new(page));
                 }
                 2 => MaintenanceOp::Pack,
-                3 => MaintenanceOp::AdjustSecurity,
+                3 => {
+                    let page = security_menu_page(self.icy_board.clone());
+                    return self.page.open_sup_page(Box::new(page));
+                }
                 4 => MaintenanceOp::ConferenceInsert,
                 5 => MaintenanceOp::ConferenceRemove,
                 6 => MaintenanceOp::ConferenceMove,

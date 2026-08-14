@@ -19,3 +19,6 @@ pub use maintenance::*;
 
 pub mod sort;
 pub use sort::*;
+
+pub mod tables;
+pub use tables::*;

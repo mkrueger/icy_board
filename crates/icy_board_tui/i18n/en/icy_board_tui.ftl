@@ -1577,6 +1577,36 @@ icbsm_conf_move_title=Move Users BETWEEN Conferences
 icbsm_phones_title=Standardize Phone Formats
 icbsm_undo_title=Undo (restore backup file)
 
+icbsm_sec_by_ranges=Adjust by Ranges
+icbsm_sec_by_ranges_expired=Adjust by Ranges (Expired)
+icbsm_sec_by_file_ratio=Adjust by Up/Dn File Ratio
+icbsm_sec_by_byte_ratio=Adjust by Up/Dn Byte Ratio
+icbsm_sec_by_uploads=Adjust by Number of Uploads
+icbsm_sec_by_downloads=Adjust by Number of Downloads
+icbsm_sec_table_file_ratio=Create Up/Dn File Ratio Table
+icbsm_sec_table_byte_ratio=Create Up/Dn Byte Ratio Table
+icbsm_sec_table_uploads=Create Upload Table
+icbsm_sec_table_downloads=Create Download Table
+icbsm_sec_copy_expired=Change Security to Expired Level
+icbsm_sec_init_counters=Initialize Upld/Dnld Counters
+
+icbsm_table_value=Reaches
+icbsm_table_security=Security
+icbsm_table_header=Reaches       Security
+icbsm_table_empty=This table has no steps yet. Build it first.
+icbsm_table_hint=A step with security 0 is left out of the table
+icbsm_table_keys=Press PGDN to save the table, or press ESC to abort
+icbsm_table_saved=The table was saved.
+
+icbsm_counters_mode=Initialize the counters by
+icbsm_counters_zero=Setting them to zero
+icbsm_counters_up_from_down=Making uploads equal downloads
+icbsm_counters_down_from_up=Making downloads equal uploads
+icbsm_counters_files=Adjust the file counters
+icbsm_counters_bytes=Adjust the byte counters
+
+icbsm_are_you_sure=Are you sure?
+
 icbsm_sort_options_title=Sort Options
 icbsm_sort_single_title=Single Field Sorts
 icbsm_sort_multiple_title=Multiple Field Sorts
