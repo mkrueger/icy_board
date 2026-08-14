@@ -1252,6 +1252,15 @@ pub async fn fread(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     internal_fread(vm, channel, size, &args[1]).await
 }
 
+/// A read that hit the end of the file comes back short, so the bytes that are
+/// missing count as zero instead of taking the node down.
+fn read_bytes<const N: usize>(data: &[u8]) -> [u8; N] {
+    let mut bytes = [0u8; N];
+    let len = data.len().min(N);
+    bytes[..len].copy_from_slice(&data[..len]);
+    bytes
+}
+
 async fn internal_fread(vm: &mut VirtualMachine<'_>, channel: i32, size: usize, arg: &PPEExpr) -> Res<()> {
     let val = vm.eval_expr(&arg).await?;
 
@@ -1269,23 +1278,16 @@ async fn internal_fread(vm: &mut VirtualMachine<'_>, channel: i32, size: usize, 
             vm.set_variable(arg, VariableValue::new_string(vs)).await?;
         }
         VariableType::Boolean => {
-            vm.set_variable(arg, VariableValue::new_bool(result[0] != 0)).await?;
+            vm.set_variable(arg, VariableValue::new_bool(read_bytes::<1>(&result)[0] != 0)).await?;
         }
         VariableType::Byte | VariableType::SByte => {
-            vm.set_variable(arg, VariableValue::new_byte(result[0])).await?;
+            vm.set_variable(arg, VariableValue::new_byte(read_bytes::<1>(&result)[0])).await?;
         }
         VariableType::Word | VariableType::SWord => {
-            vm.set_variable(arg, VariableValue::new_word(u16::from_le_bytes([result[0], result[1]])))
-                .await?;
+            vm.set_variable(arg, VariableValue::new_word(u16::from_le_bytes(read_bytes(&result)))).await?;
         }
         VariableType::Double => {
-            vm.set_variable(
-                arg,
-                VariableValue::new_double(f64::from_le_bytes([
-                    result[0], result[1], result[2], result[3], result[4], result[5], result[6], result[7],
-                ])),
-            )
-            .await?;
+            vm.set_variable(arg, VariableValue::new_double(f64::from_le_bytes(read_bytes(&result)))).await?;
         }
         _ => {
             match result.len() {

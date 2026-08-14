@@ -113,3 +113,39 @@ fn a_channel_can_be_opened_again_after_it_was_closed() {
     );
     assert_eq!(output, "line=first line err=0\n");
 }
+
+/// FREAD past the end of a file used to index into an empty buffer and take the
+/// whole board down with it. PCBoard set the error flag and carried on.
+#[test]
+fn reading_a_byte_past_the_end_sets_the_error_flag() {
+    let output = run_ppl_with_files(
+        r#"
+        BYTE b
+        FOPEN 6, "data.pag", 0, 0
+        FREAD 6, b, 1
+        PRINTLN "first=", b, " err=", FERR(6)
+        FREAD 6, b, 1
+        PRINTLN "second=", b, " err=", FERR(6)
+        FCLOSE 6
+    "#,
+        &[("data.pag", b"A")],
+    );
+    assert_eq!(output, "first=65 err=0\nsecond=0 err=1\n");
+}
+
+/// The same for a value that needs more bytes than the file has left.
+#[test]
+fn reading_a_word_from_a_file_with_one_byte_left_does_not_end_the_ppe() {
+    let output = run_ppl_with_files(
+        r#"
+        WORD w
+        FOPEN 6, "data.pag", 0, 0
+        FREAD 6, w, 2
+        PRINTLN "w=", w, " err=", FERR(6)
+        PRINTLN "still running"
+        FCLOSE 6
+    "#,
+        &[("data.pag", b"A")],
+    );
+    assert_eq!(output, "w=0 err=1\nstill running\n");
+}
