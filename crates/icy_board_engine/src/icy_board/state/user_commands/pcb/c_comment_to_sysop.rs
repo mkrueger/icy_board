@@ -51,6 +51,15 @@ fn make_message(
 }
 
 impl IcyBoardState {
+    /// A negative conference number selects the recipient's mailbox instead of a message area.
+    async fn comment_target(&mut self) -> (i32, i32) {
+        if self.get_board().await.config.message.force_comments_to_main {
+            (0, 0)
+        } else {
+            (-1, 0)
+        }
+    }
+
     pub async fn password_failure_comment(&mut self) -> Res<()> {
         let answer = self
             .input_field(
@@ -68,9 +77,10 @@ impl IcyBoardState {
 
         let to = self.get_board().await.config.sysop.name.clone();
         let subject = self.get_display_text(IceText::WrongPasswordSubject)?;
+        let (conf, area) = self.comment_target().await;
         self.write_message(
-            0,
-            0,
+            conf,
+            area,
             &to,
             subject.trim(),
             attributes::MSG_PRIVATE,
@@ -105,11 +115,7 @@ impl IcyBoardState {
 
     pub async fn enter_comment_to_sysop(&mut self) -> Res<()> {
         let to = self.get_board().await.config.sysop.name.clone();
-        // PCBoard's ForceMain keeps every comment in the main board instead of
-        // scattering them over the conferences.
-        let force_main = self.get_board().await.config.message.force_comments_to_main;
-        let conf = if force_main { 0 } else { self.session.current_conference_number as i32 };
-        let area = if force_main { 0 } else { self.session.current_message_area as i32 };
+        let (conf, area) = self.comment_target().await;
         let subj = format!("COMMENT {}", IcbTime::now().to_string());
         let receipt = self
             .input_field(
