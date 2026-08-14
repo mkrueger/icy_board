@@ -21,7 +21,7 @@ jobs:
    - name: Build
      id: build
      run: |
-       cargo build --release
+       cargo build --release --locked
        echo "Copy $DEB to icboard.deb"
        mkdir bin
        mv target/release/icboard bin
@@ -63,7 +63,7 @@ jobs:
      id: build
      run: |
        set RUSTFLAGS=-C target-feature=+crt-static
-       cargo build --release
+       cargo build --release --locked
        echo "Copy $DEB to icy_board.deb"
        mkdir bin
        move target/release/icboard.exe bin
@@ -108,8 +108,8 @@ jobs:
    - name: Build
      id: build
      run: |
-       cargo build --release --target aarch64-apple-darwin
-       cargo build --release --target x86_64-apple-darwin
+       cargo build --release --locked --target aarch64-apple-darwin
+       cargo build --release --locked --target x86_64-apple-darwin
 
        echo "Copy $DEB to icy_board.deb"
        mkdir -p aarch64-apple-darwin/bin
