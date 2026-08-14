@@ -21,14 +21,28 @@ is still analysis.
 
 | Command | What the original does | Where it is held |
 |---|---|---|
-| D | `Enter the filename to Download (Enter)=none?` repeats after every name, whether the name came from the prompt or from a stacked token, and only an empty answer ends it. A missing file prints `Checking file transfer request...` and `(NAME) not found on disk!` and then asks again. | `crates/icboard/src/tests/cmd_d.rs` |
+| D | `Enter the filename to Download (Enter)=none?` repeats after every name, whether the name was typed or stacked as a token, and only an empty answer ends it. A missing file prints `Checking file transfer request...` and `(NAME) not found on disk!` and then asks again. | `crates/icboard/src/tests/cmd_d.rs` |
+| E | A stacked name **pre-fills** the To field and the prompt is still shown - `(SYSOP)` above `To (Enter)='ALL'?` - then `Subject (Enter)=abort?`, where an empty answer abandons the message. | `crates/icboard/src/tests/cmd_e.rs` |
+| F | One prompt, `(H)elp, (1-8), File List Command?`, after the directory list. | |
+| Q | One prompt, `(H)elp, (1-4), Message Scan Command?`. | |
+| Y | One prompt, `Msg Scan: (A)ll, (C)urrent, (S)ince, (Q)uick, (L)ong, (Enter)=abort?`. | |
+| U | `Enter the Filename to Upload (Enter)=none?`, then the description block (`Before beginning, enter a description of: NAME`, `Begin description with (/) to make upload 'Private'`, one `?` per line, empty line ends it), then `Protocol Type for Transfer, (Enter) or (N)=abort?`. An empty description returns to the filename prompt, which repeats like D's does. | |
 
-icy_board asked once and gave up, which is the failure mode this audit warns
+icy_board's D asked once and gave up, which is the failure mode this audit warns
 about: a PPE that stuffs two names with `KBDSTUFF` had its second name answer
 the main menu instead. It loops now.
 
-Our prompt carries a `(1)` batch counter the original does not print. The count
-and the order are the contract, the wording is not, so this stays.
+Our D prompt carries a `(1)` batch counter the original does not print. The
+count and the order are the contract, the wording is not, so this stays.
+
+**U still differs and it is not only wording.** The original asks for the
+description before it settles the protocol, and it asks for it *every* time.
+icy_board never asks: `EnterDescription` (160) is in the text table and no
+command uses it, so an upload lands without one. icy_board also asks
+`GoodbyeAfterUpload` (474) between the filename and the transfer, where the
+original asks nothing. Where the original puts 474 is still unverified - the
+oracle run ends at the protocol prompt because the harness cannot carry out a
+Zmodem transfer.
 
 ## Ground rules PCBoard applies to every command
 
@@ -52,8 +66,8 @@ and the order are the contract, the wording is not, so this stays.
 | B | BLTLISTCMDEXPERT (611) / BLTLISTCOMMAND (224); TEXTTOSCANFOR (70) for `S` | same | ✅ |
 | C | LEAVECOMMENT (1), REQRETRECEIPT (630), USEFULLSCREEN (498) + REQUIRESANSI (499) retry, editor loop 163/222 | same | ✅ |
 | D | BYEAFTERDOWNLOAD (490), DFLTFILENAMETODNLD (300), DOWNLOADTAGGED (500), FILENAMETODOWNLOAD (61)/(728), PROTOCOLFORXFER (280), GOODBYEAFTERDOWN (550), EDITBATCH (551), REMOVEFILENUMBER (552) | asks for a name until the answer is empty, with or without a stacked token | ✅ verified against the original |
-| E | MSGTO (199) **always**, MSGSUBJ (200), MSGSECURITY (194) loop, REQRETRECEIPT (630), ECHOMESSAGE (221), ROUTETO (636), DESTNEWSGROUP (736), FOLLOWUPNEWSGROUP (737), editor | same; tokens pre-fill 199 instead of skipping it | ✅ |
-| F | FILELISTCMDEXPRT (585) / FILELISTCOMMAND (223) | same | ✅ |
+| E | MSGTO (199) **always**, MSGSUBJ (200), MSGSECURITY (194) loop, REQRETRECEIPT (630), ECHOMESSAGE (221), ROUTETO (636), DESTNEWSGROUP (736), FOLLOWUPNEWSGROUP (737), editor | same; tokens pre-fill 199 instead of skipping it | ✅ verified against the original |
+| F | FILELISTCMDEXPRT (585) / FILELISTCOMMAND (223) | same | ✅ verified against the original |
 | G | FILESAREFLAGGED (603) then CONTINUELOGOFF (605); first token as yes-shortcut | same | ✅ |
 | H | HELPPROMPT (63), token skips | same | ✅ |
 | I | none | none | ✅ |
@@ -64,15 +78,15 @@ and the order are the contract, the wording is not, so this stays.
 | N | DATETOSEARCH (72), FILENUMEXPERT/NOVICE | same | ✅ |
 | O | forced `NumTokens=1` so tokens are ignored; SYSOPUNAVAILABLE then COMMENTINSTEAD (571) **only if user has SEC_C** | gated on SEC_C, asked once, and also asked after a page that rang out | ✅ |
 | P | CURPAGELEN (284) then ENTERPAGELENGTH (146); token skips both | same | ✅ |
-| Q | MSGSCANCMDEXPERT (613)/MSGSCANCOMMAND (424); tokens skip it; shares R's command parser | same parser, quick-scan number semantics | ✅ |
+| Q | MSGSCANCMDEXPERT (613)/MSGSCANCOMMAND (424); tokens skip it; shares R's command parser | same parser, quick-scan number semantics | ✅ verified against the original |
 | R | MSGREADCMDEXPRT (584)/MSGREADCOMMAND (425); per-message loop ENDOFMSGEXPERT (612)/ENDOFMESSAGE (197); MOVE (465)/COPY (569) | prompts and parser match; the capture and QWK commands parse but do nothing yet | ⚠️ |
 | S | QNUMTOANSWER (67), **always prompts, ignores tokens** | same | ✅ |
 | T | DESIREDPROTOCOL (198); token skips | same | ✅ |
-| U | CONTINUEUPLOAD (449), FILENAMETOUPLOAD (68)/(729), PROTOCOLFORXFER (280), GOODBYEAFTERUP (474) | 449, 68 (token aware), 280 when no protocol is set, then 474 | ⚠️ 474 is unconditional; PCBoard only asks it in batch mode |
+| U | CONTINUEUPLOAD (449), FILENAMETOUPLOAD (68)/(729), PROTOCOLFORXFER (280), GOODBYEAFTERUP (474) | 449, 68 (token aware), 280 when no protocol is set, then 474 | ⚠️ verified: the original asks for a description between 68 and 280 and repeats 68 like D; icy_board asks no description at all and asks 474 before the transfer |
 | V | no prompts; returns if STAT display file missing | built-in settings display as fallback | ⚠️ improvement, divergent |
 | W | NEWPASSWORD (152), REENTERPASSWORD (111), CITYSTATE (265), BUSDATAPHONE (113), HOMEVOICEPHONE (114), COMMENTFIELDPROMPT (2), CLSBETWEENMSGS (556), SCROLLMSGBODY (627), USEBIGHEADERS (628), SETFSEDEFAULT (583), DEFAULTWIDEMSGS (637), GETALIASNAME (690), USESHORTDESC (746), SELECTCONFS (325), address block, QWK limits (732-735) | same, then the icy_board extras | ✅ |
 | X | no prompt; ON/OFF token | same | ✅ |
-| Y | MSGSCANPROMPT (155); tokens skip | same | ✅ |
+| Y | MSGSCANPROMPT (155); tokens skip | same | ✅ verified against the original |
 | Z | DATETOSEARCH (72) conditional, TEXTTOSCANFOR (70), FILENUMEXPERT/NOVICE | all three; `N` prompts, `S` takes the stored date without asking | ✅ |
 
 ## Word commands
