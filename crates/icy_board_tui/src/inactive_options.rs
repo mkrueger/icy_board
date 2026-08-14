@@ -11,68 +11,387 @@ pub enum Unread {
     ImportedOnly,
 }
 
-/// Keyed by the name the option carries in `icboard.toml`, not by the Rust field.
-pub const UNREAD_OPTIONS: &[(&str, &str, Unread)] = &[
-    ("sysop", "config_color_theme", Unread::NotReadYet),
-    ("new_user_settings", "new_user_groups", Unread::NotReadYet),
-    ("message", "max_msg_lines", Unread::ImportedOnly),
-    ("message", "allow_esc_codes", Unread::ImportedOnly),
-    ("message", "scan_all_mail_at_login", Unread::NotReadYet),
-    ("message", "allow_carbon_copy", Unread::NotReadYet),
-    ("message", "validate_to_name", Unread::NotReadYet),
-    ("message", "default_quick_personal_scan", Unread::NotReadYet),
-    ("file_transfer", "disallow_batch_uploads", Unread::NotReadYet),
-    ("file_transfer", "promote_to_batch_transfers", Unread::NotReadYet),
-    ("file_transfer", "upload_credit_time", Unread::NotReadYet),
-    ("file_transfer", "upload_credit_bytes", Unread::NotReadYet),
-    ("file_transfer", "verify_files_uploaded", Unread::NotReadYet),
-    ("file_transfer", "upload_descr_lines", Unread::NotReadYet),
-    ("file_transfer", "disable_drive_size_check", Unread::NotReadYet),
-    ("file_transfer", "stop_uploads_free_space", Unread::NotReadYet),
-    ("system_control", "allow_alias_change", Unread::ImportedOnly),
-    ("system_control", "disable_full_record_updating", Unread::NotReadYet),
-    ("system_control", "is_multi_lingual", Unread::NotReadYet),
-    ("system_control", "enforce_daily_time_limit", Unread::NotReadYet),
-    ("system_control", "allow_password_failure_comment", Unread::NotReadYet),
-    ("switches", "default_graphics_at_login", Unread::NotReadYet),
-    ("switches", "capture_grp_chat_session", Unread::NotReadYet),
-    ("switches", "allow_handle_in_grpchat", Unread::NotReadYet),
-    ("limits", "keyboard_timeout", Unread::NotReadYet),
-    ("limits", "max_number_upload_descr_lines", Unread::NotReadYet),
-    ("accounting", "use_money", Unread::NotReadYet),
-    ("accounting", "concurrent_tracking", Unread::NotReadYet),
-    ("accounting", "ignore_empty_sec_level", Unread::NotReadYet),
-    ("accounting", "peak_usage_start", Unread::NotReadYet),
-    ("accounting", "peak_usage_end", Unread::NotReadYet),
-    ("accounting", "peak_days_of_week", Unread::NotReadYet),
-    ("accounting", "peak_holiday_list_file", Unread::NotReadYet),
-    ("accounting", "info_file", Unread::NotReadYet),
-    ("accounting", "logoff_file", Unread::NotReadYet),
-    ("subs", "subscription_length", Unread::ImportedOnly),
-    ("subs", "default_expired_level", Unread::ImportedOnly),
-    ("qwk_settings", "goodbye_screen", Unread::NotReadYet),
-    ("qwk_settings", "news_sceen", Unread::NotReadYet),
-    ("sysop_sec", "read_all_comments", Unread::NotReadYet),
-    ("sysop_sec", "read_all_mail", Unread::NotReadYet),
-    ("sysop_sec", "enter_color_codes_in_messages", Unread::NotReadYet),
-    ("sysop_sec", "not_update_msg_read", Unread::NotReadYet),
-    ("sysop_sec", "enter_generic_messages", Unread::NotReadYet),
-    ("sysop_sec", "overwrite_files_on_uploads", Unread::NotReadYet),
-    ("sysop_sec", "set_pack_out_date_on_messages", Unread::NotReadYet),
-    ("sysop_sec", "see_all_return_receipts", Unread::NotReadYet),
-    ("sysop_sec", "sec_1", Unread::NotReadYet),
-    ("sysop_sec", "sec_2", Unread::NotReadYet),
-    ("sysop_sec", "sec_3", Unread::NotReadYet),
-    ("sysop_sec", "sec_5", Unread::NotReadYet),
-    ("sysop_sec", "sec_6", Unread::NotReadYet),
-    ("sysop_sec", "sec_7", Unread::NotReadYet),
-    ("sysop_sec", "sec_8", Unread::NotReadYet),
-    ("sysop_sec", "sec_9", Unread::NotReadYet),
-    ("sysop_sec", "sec_11", Unread::NotReadYet),
-    ("sysop_sec", "sec_12", Unread::NotReadYet),
-    ("sysop_sec", "sec_13", Unread::NotReadYet),
-    ("sysop_sec", "sec_14", Unread::NotReadYet),
-    ("user_sec", "edit_own_messages", Unread::NotReadYet),
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+pub struct UnreadOption {
+    /// The name the option carries in `icboard.toml`, not the Rust field.
+    pub section: &'static str,
+    pub option: &'static str,
+    pub kind: Unread,
+    /// What the audit says happens instead, empty when it says nothing.
+    pub note: &'static str,
+}
+
+impl UnreadOption {
+    /// One line for the status bar, in the language of the sysop.
+    pub fn reason(&self) -> String {
+        match self.kind {
+            Unread::NotReadYet => get_text("option_not_read_yet"),
+            Unread::ImportedOnly => get_text("option_imported_only"),
+        }
+    }
+}
+
+pub const UNREAD_OPTIONS: &[UnreadOption] = &[
+    UnreadOption {
+        section: "sysop",
+        option: "config_color_theme",
+        kind: Unread::NotReadYet,
+        note: "the TUI theme is not chosen from it",
+    },
+    UnreadOption {
+        section: "new_user_settings",
+        option: "new_user_groups",
+        kind: Unread::NotReadYet,
+        note: "a new user is never put into the group named here",
+    },
+    UnreadOption {
+        section: "message",
+        option: "max_msg_lines",
+        kind: Unread::ImportedOnly,
+        note: "the editor has its own limit",
+    },
+    UnreadOption {
+        section: "message",
+        option: "allow_esc_codes",
+        kind: Unread::ImportedOnly,
+        note: "ESC is filtered or not without asking this",
+    },
+    UnreadOption {
+        section: "message",
+        option: "scan_all_mail_at_login",
+        kind: Unread::NotReadYet,
+        note: "",
+    },
+    UnreadOption {
+        section: "message",
+        option: "allow_carbon_copy",
+        kind: Unread::NotReadYet,
+        note: "E never offers a carbon copy",
+    },
+    UnreadOption {
+        section: "message",
+        option: "validate_to_name",
+        kind: Unread::NotReadYet,
+        note: "a message to a name nobody carries is accepted",
+    },
+    UnreadOption {
+        section: "message",
+        option: "default_quick_personal_scan",
+        kind: Unread::NotReadYet,
+        note: "",
+    },
+    UnreadOption {
+        section: "file_transfer",
+        option: "disallow_batch_uploads",
+        kind: Unread::NotReadYet,
+        note: "BU is a stub anyway",
+    },
+    UnreadOption {
+        section: "file_transfer",
+        option: "promote_to_batch_transfers",
+        kind: Unread::NotReadYet,
+        note: "",
+    },
+    UnreadOption {
+        section: "file_transfer",
+        option: "upload_credit_time",
+        kind: Unread::NotReadYet,
+        note: "uploading earns neither time nor bytes",
+    },
+    UnreadOption {
+        section: "file_transfer",
+        option: "upload_credit_bytes",
+        kind: Unread::NotReadYet,
+        note: "",
+    },
+    UnreadOption {
+        section: "file_transfer",
+        option: "verify_files_uploaded",
+        kind: Unread::NotReadYet,
+        note: "uploads are never test-extracted",
+    },
+    UnreadOption {
+        section: "file_transfer",
+        option: "upload_descr_lines",
+        kind: Unread::NotReadYet,
+        note: "duplicated by limits.max_number_upload_descr_lines, both dead",
+    },
+    UnreadOption {
+        section: "file_transfer",
+        option: "disable_drive_size_check",
+        kind: Unread::NotReadYet,
+        note: "",
+    },
+    UnreadOption {
+        section: "file_transfer",
+        option: "stop_uploads_free_space",
+        kind: Unread::NotReadYet,
+        note: "the board uploads until the disk is full",
+    },
+    UnreadOption {
+        section: "system_control",
+        option: "allow_alias_change",
+        kind: Unread::ImportedOnly,
+        note: "W lets the alias be changed regardless",
+    },
+    UnreadOption {
+        section: "system_control",
+        option: "disable_full_record_updating",
+        kind: Unread::NotReadYet,
+        note: "W always asks everything",
+    },
+    UnreadOption {
+        section: "system_control",
+        option: "is_multi_lingual",
+        kind: Unread::NotReadYet,
+        note: "LANG works whether or not this is set",
+    },
+    UnreadOption {
+        section: "system_control",
+        option: "enforce_daily_time_limit",
+        kind: Unread::NotReadYet,
+        note: "only session limits exist",
+    },
+    UnreadOption {
+        section: "system_control",
+        option: "allow_password_failure_comment",
+        kind: Unread::NotReadYet,
+        note: "",
+    },
+    UnreadOption {
+        section: "switches",
+        option: "default_graphics_at_login",
+        kind: Unread::NotReadYet,
+        note: "graphics mode is decided by the terminal handshake",
+    },
+    UnreadOption {
+        section: "switches",
+        option: "capture_grp_chat_session",
+        kind: Unread::NotReadYet,
+        note: "group chat is never logged",
+    },
+    UnreadOption {
+        section: "switches",
+        option: "allow_handle_in_grpchat",
+        kind: Unread::NotReadYet,
+        note: "group chat always uses the handle",
+    },
+    UnreadOption {
+        section: "limits",
+        option: "keyboard_timeout",
+        kind: Unread::NotReadYet,
+        note: "an idle user is never disconnected",
+    },
+    UnreadOption {
+        section: "limits",
+        option: "max_number_upload_descr_lines",
+        kind: Unread::NotReadYet,
+        note: "",
+    },
+    UnreadOption {
+        section: "accounting",
+        option: "use_money",
+        kind: Unread::NotReadYet,
+        note: "amounts are always shown as units",
+    },
+    UnreadOption {
+        section: "accounting",
+        option: "concurrent_tracking",
+        kind: Unread::NotReadYet,
+        note: "",
+    },
+    UnreadOption {
+        section: "accounting",
+        option: "ignore_empty_sec_level",
+        kind: Unread::NotReadYet,
+        note: "",
+    },
+    UnreadOption {
+        section: "accounting",
+        option: "peak_usage_start",
+        kind: Unread::NotReadYet,
+        note: "peak rates are never applied",
+    },
+    UnreadOption {
+        section: "accounting",
+        option: "peak_usage_end",
+        kind: Unread::NotReadYet,
+        note: "peak rates are never applied",
+    },
+    UnreadOption {
+        section: "accounting",
+        option: "peak_days_of_week",
+        kind: Unread::NotReadYet,
+        note: "peak rates are never applied",
+    },
+    UnreadOption {
+        section: "accounting",
+        option: "peak_holiday_list_file",
+        kind: Unread::NotReadYet,
+        note: "peak rates are never applied",
+    },
+    UnreadOption {
+        section: "accounting",
+        option: "info_file",
+        kind: Unread::NotReadYet,
+        note: "only the warning file is displayed",
+    },
+    UnreadOption {
+        section: "accounting",
+        option: "logoff_file",
+        kind: Unread::NotReadYet,
+        note: "only the warning file is displayed",
+    },
+    UnreadOption {
+        section: "subs",
+        option: "subscription_length",
+        kind: Unread::ImportedOnly,
+        note: "a new subscription period is never set",
+    },
+    UnreadOption {
+        section: "subs",
+        option: "default_expired_level",
+        kind: Unread::ImportedOnly,
+        note: "an expired user keeps their level",
+    },
+    UnreadOption {
+        section: "qwk_settings",
+        option: "goodbye_screen",
+        kind: Unread::NotReadYet,
+        note: "not packed into the QWK archive",
+    },
+    UnreadOption {
+        section: "qwk_settings",
+        option: "news_sceen",
+        kind: Unread::NotReadYet,
+        note: "not packed into the QWK archive",
+    },
+    UnreadOption {
+        section: "sysop_sec",
+        option: "read_all_comments",
+        kind: Unread::NotReadYet,
+        note: "always granted to whoever passes the sysop level",
+    },
+    UnreadOption {
+        section: "sysop_sec",
+        option: "read_all_mail",
+        kind: Unread::NotReadYet,
+        note: "always granted to whoever passes the sysop level",
+    },
+    UnreadOption {
+        section: "sysop_sec",
+        option: "enter_color_codes_in_messages",
+        kind: Unread::NotReadYet,
+        note: "",
+    },
+    UnreadOption {
+        section: "sysop_sec",
+        option: "not_update_msg_read",
+        kind: Unread::NotReadYet,
+        note: "",
+    },
+    UnreadOption {
+        section: "sysop_sec",
+        option: "enter_generic_messages",
+        kind: Unread::NotReadYet,
+        note: "",
+    },
+    UnreadOption {
+        section: "sysop_sec",
+        option: "overwrite_files_on_uploads",
+        kind: Unread::NotReadYet,
+        note: "",
+    },
+    UnreadOption {
+        section: "sysop_sec",
+        option: "set_pack_out_date_on_messages",
+        kind: Unread::NotReadYet,
+        note: "",
+    },
+    UnreadOption {
+        section: "sysop_sec",
+        option: "see_all_return_receipts",
+        kind: Unread::NotReadYet,
+        note: "",
+    },
+    UnreadOption {
+        section: "sysop_sec",
+        option: "sec_1",
+        kind: Unread::NotReadYet,
+        note: "the numeric command itself is missing, see COMMAND_AUDIT.md",
+    },
+    UnreadOption {
+        section: "sysop_sec",
+        option: "sec_2",
+        kind: Unread::NotReadYet,
+        note: "the numeric command itself is missing, see COMMAND_AUDIT.md",
+    },
+    UnreadOption {
+        section: "sysop_sec",
+        option: "sec_3",
+        kind: Unread::NotReadYet,
+        note: "the numeric command itself is missing, see COMMAND_AUDIT.md",
+    },
+    UnreadOption {
+        section: "sysop_sec",
+        option: "sec_5",
+        kind: Unread::NotReadYet,
+        note: "the numeric command itself is missing, see COMMAND_AUDIT.md",
+    },
+    UnreadOption {
+        section: "sysop_sec",
+        option: "sec_6",
+        kind: Unread::NotReadYet,
+        note: "the numeric command itself is missing, see COMMAND_AUDIT.md",
+    },
+    UnreadOption {
+        section: "sysop_sec",
+        option: "sec_7",
+        kind: Unread::NotReadYet,
+        note: "the numeric command itself is missing, see COMMAND_AUDIT.md",
+    },
+    UnreadOption {
+        section: "sysop_sec",
+        option: "sec_8",
+        kind: Unread::NotReadYet,
+        note: "the numeric command itself is missing, see COMMAND_AUDIT.md",
+    },
+    UnreadOption {
+        section: "sysop_sec",
+        option: "sec_9",
+        kind: Unread::NotReadYet,
+        note: "the numeric command itself is missing, see COMMAND_AUDIT.md",
+    },
+    UnreadOption {
+        section: "sysop_sec",
+        option: "sec_11",
+        kind: Unread::NotReadYet,
+        note: "the numeric command itself is missing, see COMMAND_AUDIT.md",
+    },
+    UnreadOption {
+        section: "sysop_sec",
+        option: "sec_12",
+        kind: Unread::NotReadYet,
+        note: "the numeric command itself is missing, see COMMAND_AUDIT.md",
+    },
+    UnreadOption {
+        section: "sysop_sec",
+        option: "sec_13",
+        kind: Unread::NotReadYet,
+        note: "the numeric command itself is missing, see COMMAND_AUDIT.md",
+    },
+    UnreadOption {
+        section: "sysop_sec",
+        option: "sec_14",
+        kind: Unread::NotReadYet,
+        note: "the numeric command itself is missing, see COMMAND_AUDIT.md",
+    },
+    UnreadOption {
+        section: "user_sec",
+        option: "edit_own_messages",
+        kind: Unread::NotReadYet,
+        note: "",
+    },
 ];
 
 /// The struct behind a section is not always named like the section.
@@ -97,17 +416,9 @@ fn option_of(field: &str) -> &str {
     &field[..4 + digits.len()]
 }
 
-pub fn unread(property: &str, field: &str) -> Option<Unread> {
+pub fn lookup(property: &str, field: &str) -> Option<&'static UnreadOption> {
     let (section, option) = (section_of(property), option_of(field));
-    UNREAD_OPTIONS.iter().find(|(s, o, _)| *s == section && *o == option).map(|(_, _, kind)| *kind)
-}
-
-/// What to tell the sysop about an option the board ignores.
-pub fn inactive_reason(property: &str, field: &str) -> Option<String> {
-    unread(property, field).map(|kind| match kind {
-        Unread::NotReadYet => get_text("option_not_read_yet"),
-        Unread::ImportedOnly => get_text("option_imported_only"),
-    })
+    UNREAD_OPTIONS.iter().find(|o| o.section == section && o.option == option)
 }
 
 #[cfg(test)]
@@ -123,15 +434,20 @@ mod tests {
 
     #[test]
     fn the_renamed_sections_are_found() {
-        assert!(unread("subscription_info", "subscription_length").is_some());
-        assert!(unread("sysop_command_level", "sec_13_view_alt_node_callers").is_some());
-        assert!(unread("user_command_level", "edit_own_messages").is_some());
+        assert!(lookup("subscription_info", "subscription_length").is_some());
+        assert!(lookup("sysop_command_level", "sec_13_view_alt_node_callers").is_some());
+        assert!(lookup("user_command_level", "edit_own_messages").is_some());
     }
 
     #[test]
     fn an_option_the_board_reads_is_not_listed() {
-        assert!(unread("board", "name").is_none());
-        assert!(unread("sysop_command_level", "sec_4_recover_deleted_msg").is_none());
-        assert!(unread("event", "enabled").is_none());
+        assert!(lookup("board", "name").is_none());
+        assert!(lookup("sysop_command_level", "sec_4_recover_deleted_msg").is_none());
+        assert!(lookup("event", "enabled").is_none());
+    }
+
+    #[test]
+    fn the_note_of_the_audit_is_kept() {
+        assert_eq!(lookup("limits", "keyboard_timeout").unwrap().note, "an idle user is never disconnected");
     }
 }

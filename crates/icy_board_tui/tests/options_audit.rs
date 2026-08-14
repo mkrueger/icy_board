@@ -1,7 +1,7 @@
 //! The audit is the list; the table in the code has to match it, or ICBSetup starts
 //! greying out the wrong switches.
 
-use icy_board_tui::inactive_options::{UNREAD_OPTIONS, Unread};
+use icy_board_tui::inactive_options::{UNREAD_OPTIONS, Unread, UnreadOption};
 
 const AUDIT: &str = "../../compat/OPTIONS_AUDIT.md";
 
@@ -14,7 +14,7 @@ fn backticked(cell: &str) -> Vec<String> {
         .collect()
 }
 
-fn from_audit() -> Vec<(String, String, Unread)> {
+fn from_audit() -> Vec<(String, String, Unread, String)> {
     let text = std::fs::read_to_string(AUDIT).unwrap_or_else(|e| panic!("{AUDIT}: {e}"));
     let mut section: Option<&str> = None;
     let mut found = Vec::new();
@@ -44,12 +44,18 @@ fn from_audit() -> Vec<(String, String, Unread)> {
         } else {
             continue;
         };
+        // A two column table carries what the audit has to say in the status cell.
+        let mut note: String = cells[1].chars().skip(1).collect::<String>().trim().to_string();
+        if note.is_empty() {
+            note = cells.get(2).unwrap_or(&"").to_string();
+        }
+        let note = note.replace('`', "");
         let section = if cells[0].contains("in `user_sec`") { "user_sec" } else { section };
         for name in backticked(cells[0]) {
             if name == "user_sec" || name == "sysop_sec" {
                 continue;
             }
-            found.push((section.to_string(), name, kind));
+            found.push((section.to_string(), name, kind, note.clone()));
         }
     }
     found.sort();
@@ -61,9 +67,9 @@ fn the_table_says_what_the_audit_says() {
     let audit = from_audit();
     assert!(audit.len() > 50, "the audit was not read properly, found {}", audit.len());
 
-    let mut table: Vec<(String, String, Unread)> = UNREAD_OPTIONS
+    let mut table: Vec<(String, String, Unread, String)> = UNREAD_OPTIONS
         .iter()
-        .map(|(section, option, kind)| (section.to_string(), option.to_string(), *kind))
+        .map(|UnreadOption { section, option, kind, note }| (section.to_string(), option.to_string(), *kind, note.to_string()))
         .collect();
     table.sort();
 

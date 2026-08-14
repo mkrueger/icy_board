@@ -289,10 +289,14 @@ impl<T> ListItem<T> {
 
     /// Greys the entry out when the audit says the board does not read this option.
     pub fn maybe_inactive(self, property: &str, field: &str) -> Self {
-        match crate::inactive_options::inactive_reason(property, field) {
-            Some(reason) => self.with_inactive(reason),
-            None => self,
+        let Some(option) = crate::inactive_options::lookup(property, field) else {
+            return self;
+        };
+        let mut item = self.with_inactive(option.reason());
+        if !option.note.is_empty() {
+            item.help = format!("{}\n{}", item.help, option.note);
         }
+        item
     }
 
     pub fn with_status(mut self, status: impl Into<String>) -> Self {
