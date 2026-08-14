@@ -13,7 +13,8 @@ use crate::{
 };
 
 impl IcyBoardState {
-    pub async fn flag_files_cmd(&mut self, show_flagged: bool) -> Res<()> {
+    /// Answers `true` when a name was given, so the download command can ask again like PCBoard does.
+    pub async fn flag_files_cmd(&mut self, show_flagged: bool) -> Res<bool> {
         // flag
         let input = if let Some(token) = self.session.tokens.pop_front() {
             token
@@ -56,7 +57,7 @@ impl IcyBoardState {
                 self.display_text(IceText::NotFoundOnDisk, display_flags::NEWLINE | display_flags::LFBEFORE)
                     .await?;
                 self.session.disp_options.in_file_list = saved_list;
-                return Ok(());
+                return Ok(true);
             }
 
             for (file, _size) in flagged {
@@ -72,8 +73,9 @@ impl IcyBoardState {
                 self.add_flagged_file(file, false, true).await?;
             }
             self.session.disp_options.in_file_list = saved_list;
+            return Ok(true);
         }
-        Ok(())
+        Ok(false)
     }
 
     pub async fn add_flagged_file(&mut self, file: impl Into<PathBuf>, force: bool, show_duplicates: bool) -> Res<()> {

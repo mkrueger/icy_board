@@ -21,6 +21,7 @@ mod cmd_alias;
 mod cmd_b;
 mod cmd_bye;
 mod cmd_c;
+mod cmd_d;
 mod cmd_e;
 mod cmd_g;
 mod cmd_j;

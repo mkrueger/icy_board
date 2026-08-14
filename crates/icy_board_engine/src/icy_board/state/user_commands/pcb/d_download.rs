@@ -33,7 +33,9 @@ impl IcyBoardState {
                 }
             }
 
-            self.flag_files_cmd(true).await?;
+            // PCBoard keeps asking for another name until the caller answers nothing,
+            // and a PPE stuffing names with KBDSTUFF counts on it.
+            while self.flag_files_cmd(true).await? {}
 
             if self.session.flagged_files.is_empty() {
                 return Ok(());

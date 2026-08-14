@@ -305,7 +305,7 @@ impl IcyBoardCreator {
 
         self.logger.start_action("IcyBoard created successfully.".to_string());
         self.logger.start_action(format!(
-            "Start with icy_board run \"{}\"",
+            "Start with icboard \"{}\"",
             self.destination.join(icy_board_engine::DEFAULT_ICYBOARD_FILE).display()
         ));
         Ok(())

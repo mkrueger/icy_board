@@ -1,10 +1,29 @@
 # Getting Started
 
-First grab a release for your operating system:
+## A board in five minutes
+
+```sh
+icbsetup create mybbs     # writes a complete board into mybbs/
+cd mybbs
+icboard                   # call waiting screen, telnet on port 1337
+```
+
+Pick *Sysop* on the call waiting screen with the arrow keys and press Enter to
+log in locally, start the board with `icboard --localon` to go straight in, or
+reach it from another terminal with `telnet localhost 1337`. Your terminal
+needs at least 80x25.
+
+That is a running board. What follows is where everything lives and how to
+bring an old installation over. Before you move a real board, read
+[known limitations](known_limitations.md) - it says what is missing and what
+works differently than PCBoard did.
+
+## Getting the programs
+
+Grab a release for your operating system:
 https://github.com/mkrueger/icy_board/releases/latest
 
-Or build from source. Building from source is easy as well.
-It's installing a [rust development](https://www.rust-lang.org/tools/install) environment and just run
+Or build from source, which needs a [rust toolchain](https://www.rust-lang.org/tools/install):
 
 `cargo build --release`
 
@@ -16,22 +35,35 @@ Update: On my pi I needed to install openssl-dev:
 
 I develop this software on linux - next time I set up I'll add a more detailed description.
 
-# Startup Icy Board
+## The programs
+
+| Program | What it is for |
+| :--- | :--- |
+| `icboard` | The board itself. Started in the directory that holds `icboard.toml`. |
+| `icbsetup` | Creates a board, imports a PCBoard one, and edits every setting. Start here. |
+| `icbsysmgr` | User and group editor. |
+| `mkicbtxt` | Edits the system messages, which is how most of the board is reworded. |
+| `mkicbmnu` | Edits menus. |
+| `icbfile` | Brings a file base into shape - see [icbfile](icbfile.md). |
+| `icbmailer` | FTN mail, scan, poll and toss. |
+| `pplc`, `ppld` | PPL compiler and decompiler - see [PPL](ppl.md). |
+| `icyboard-ppl` | Editor support for PPL: diagnostics, completion, formatting. |
 
 I recommend putting the bin/ directory in the path but you can just `cd bin` for now.
 
-First create a new BBS: `./icbsetup create FOO`
-Then start it: `./icboard FOO`
+## The first half hour
 
-This will fire up a new call waiting screen where you can log in as sysop. By defaulut telnet is enabled on port 1337.
+1. `icbsetup create mybbs`, then `cd mybbs`.
+2. `icbsetup` - board name, sysop name and password, and the number of nodes.
+   Options the board does not read yet are greyed out and say so.
+3. `mkicbtxt` if you want to reword prompts, `icbsysmgr` for users.
+4. `icboard` and log in locally, then walk the menu once: `J` join a
+   conference, `E` enter a message, `R` read it back, `F` the file
+   directories, `G` goodbye.
+5. Read `icboard.log` afterwards. It is the first place to look when something
+   goes wrong.
 
 NOTE: Ensure that your terminal screen is big enough - 80x25 at least.
-
-# Tools
-
-* Most important is ICBSetup - that contains all options for IcyBoard. It's a mess!
-* ICBText - there you can edit all text messages. This is the main way of extending IcyBoard through PPEs
-* ICBSysMgr - that let's you edit the users.
 
 # Directory Layout
 

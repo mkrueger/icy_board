@@ -4,6 +4,13 @@ That is the current state of PCBoard features supported.
 Not the state of ICY BOARD features - that would make it too long and it's important to know what works
 from PCBoard.
 
+A percentage here is what the code does, not what it is meant to do. What a
+sysop can set but the board ignores is listed in
+[compat/OPTIONS_AUDIT.md](../compat/OPTIONS_AUDIT.md), where a command answers
+differently than the original in
+[compat/COMMAND_AUDIT.md](../compat/COMMAND_AUDIT.md), and what is missing
+altogether in [known limitations](known_limitations.md).
+
 If something is missing just let me know.
 
 # Supported Features
@@ -17,7 +24,7 @@ If something is missing just let me know.
 | MKPCBTXT  | 💯 | Much better |
 | ICBSysMgr  | 40% | Edit user files work but nothing else |
 | MKPCBMNU  | 💯 | MKICBMNU can do much more |
-| PCBSETUP  | 90% | Most is implemented  |
+| PCBSETUP  | 90% | Most is implemented, but 38 of the switches are read by nobody - see the options audit |
 | Call Waiting Screen  | 💯 | Almost the same, some improvements |
 | New User Creation  | 💯 | Much better & detailed |
 | Security Level check  | 💯 | |
@@ -27,19 +34,19 @@ If something is missing just let me know.
 | Bullettins | 💯 | | 
 | Questionnaires | 💯 | Renamed them so "Surveys" | 
 | Built in Message Editor | 80% | I consider line & fse done but needs 1-2 test passes to the real one to make it 100% | 
-| PPE Runtime  | 90% | Every existing PPE not running is considered as a bug. Due to the Nature the PPE runtime it won't reach 100% since it's not running on DOS anymore. DBASE3 support missing.| 
-| Conferences  | 90% | Basically works, No INTRO SCAN/NEWS yet |
+| PPE Runtime  | 90% | Every existing PPE not running is considered as a bug. Due to the Nature the PPE runtime it won't reach 100% since it's not running on DOS anymore. dBase III statements and functions are in. |
+| Conferences  | 90% | Basically works, INTRO and NEWS are displayed on join |
 | @ Macro support | 80% | Most should work, all @ features work  | 
-| File Bases  | 80% | No testing/checking, metadata missing and a solution for long file names needed |
-| Mail Bases | 50% | Qwk, Search, FTNs Missing  |
+| File Bases  | 90% | SQLite base with the metadata the archives do not carry, long file names, archives read through unarc-rs |
+| Mail Bases | 80% | JAM base, search, QWK and an FTN leaf; netmail still lands in one dump base |
 | Up/Download  | 90%  | Commands need to be checked for 100% parity, but protocols should work |
 | Statistics | 30%  | Works a bit but not checked - modelling is done | 
-| Help Files | 80%  | Mostly done | 
-| Modem Support | Not started yet | Telnet works |
-| Limits | 10% | In Setup but not checked | 
-| Events | 10% | Data Strucutures are there - rest not implemented | 
-| Subscriptions | 10% | Data Strucutures are there - rest not implemented | 
-| Accounting | 10% | Data Strucutures are there - rest not implemented | 
+| Help Files | 80%  | Every command reaches a help file, the German set is 20 of 52 | 
+| Modem Support | Not started yet | Telnet, SSH and websockets work |
+| Limits | 40% | Session limits apply, `keyboard_timeout` does not - an idle line holds its node | 
+| Events | 80% | The nightly event runs, clears the board and can suspend callers; PCBoard's per node and expedited modes are missing | 
+| Subscriptions | 20% | Expiry is warned about, a new period is never set and an expired user keeps their level | 
+| Accounting | 20% | Charges and the warning file work, peak rates and the money display do not | 
 
 ## PCBoard Commands
 
@@ -83,10 +90,10 @@ If something is missing just let me know.
 | REPLY  | Reply Message | 💯 | 
 | USER  | User List | 90% | 
 | WHO  |WHO is Online | 90% | 
-| QWK  | QWK command | 70% | Upload needs testing [^2]
-| CHAT  | Group Chat| 0% | Note: There are working PPEs for that
-| BD/DB  | Batch Download | 0% | 
-| BU/UB  | Batch Upload | 0% | 
+| QWK  | QWK command | 90% | Download, upload and the scanned bases work; upload needs more testing [^2]
+| CHAT  | Group Chat| 💯 | Built in, the PPEs are no longer needed
+| BD/DB  | Batch Download | 90% | Delegates to the download command with the batch flag
+| BU/UB  | Batch Upload | 90% | Delegates to the upload command, which drives a batch protocol
 | RM  | Read Message | 💯 | Read remembered message
 | SELECT | Select Conference | 99% | Changes were needed due to message areas [^1]
 | TEST | Test File | 💯 | Slight improvements - search for pattern

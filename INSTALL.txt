@@ -16,9 +16,13 @@ Howver it's not 100% so manual changes are likeley to be required but the output
 
 Then just start with:
 
-bin/icy_board --file bbs
+bin/icboard bbs
 
-It's recommended to put bin/ in path and just start icy_board etc. inside the bbs directory - it'll be picked up all automatically.
+Or run icboard inside the bbs directory - it picks up the icboard.toml there.
+ICB_PATH can name the directory instead. Add --localon to log in as the sysop
+right away.
+
+It's recommended to put bin/ in path.
 
 Following tools are currently shipped
 

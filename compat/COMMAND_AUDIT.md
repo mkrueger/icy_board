@@ -12,8 +12,23 @@ Derived from the observable behaviour of PCBoard 15.x against
 `crates/icy_board_engine/src/icy_board/state/user_commands/pcb/`.
 Numbers in parentheses are PCBTEXT ids.
 
-Status is from behaviour analysis. Nothing here is oracle-verified yet — see
-[README.md](README.md) for how to confirm a row against the real board.
+Status is from behaviour analysis unless a row says otherwise. A row marked
+"verified against the original" was driven through the DOSBox oracle described
+in [README.md](README.md) and its sequence compared prompt by prompt; the rest
+is still analysis.
+
+## Verified so far
+
+| Command | What the original does | Where it is held |
+|---|---|---|
+| D | `Enter the filename to Download (Enter)=none?` repeats after every name, whether the name came from the prompt or from a stacked token, and only an empty answer ends it. A missing file prints `Checking file transfer request...` and `(NAME) not found on disk!` and then asks again. | `crates/icboard/src/tests/cmd_d.rs` |
+
+icy_board asked once and gave up, which is the failure mode this audit warns
+about: a PPE that stuffs two names with `KBDSTUFF` had its second name answer
+the main menu instead. It loops now.
+
+Our prompt carries a `(1)` batch counter the original does not print. The count
+and the order are the contract, the wording is not, so this stays.
 
 ## Ground rules PCBoard applies to every command
 
@@ -36,7 +51,7 @@ Status is from behaviour analysis. Nothing here is oracle-verified yet — see
 | A | delegates to J with a forced `0` token; post-join VIEWCONFMEMBERS (88), SCANMSGBASE (296) | delegates correctly; both post-join prompts present | ✅ |
 | B | BLTLISTCMDEXPERT (611) / BLTLISTCOMMAND (224); TEXTTOSCANFOR (70) for `S` | same | ✅ |
 | C | LEAVECOMMENT (1), REQRETRECEIPT (630), USEFULLSCREEN (498) + REQUIRESANSI (499) retry, editor loop 163/222 | same | ✅ |
-| D | BYEAFTERDOWNLOAD (490), DFLTFILENAMETODNLD (300), DOWNLOADTAGGED (500), FILENAMETODOWNLOAD (61)/(728), PROTOCOLFORXFER (280), GOODBYEAFTERDOWN (550), EDITBATCH (551), REMOVEFILENUMBER (552) | 500/550/551/552 plus the flag prompts, which take a stacked token | ⚠️ PCBoard asks for names in a loop, icy_board asks once |
+| D | BYEAFTERDOWNLOAD (490), DFLTFILENAMETODNLD (300), DOWNLOADTAGGED (500), FILENAMETODOWNLOAD (61)/(728), PROTOCOLFORXFER (280), GOODBYEAFTERDOWN (550), EDITBATCH (551), REMOVEFILENUMBER (552) | asks for a name until the answer is empty, with or without a stacked token | ✅ verified against the original |
 | E | MSGTO (199) **always**, MSGSUBJ (200), MSGSECURITY (194) loop, REQRETRECEIPT (630), ECHOMESSAGE (221), ROUTETO (636), DESTNEWSGROUP (736), FOLLOWUPNEWSGROUP (737), editor | same; tokens pre-fill 199 instead of skipping it | ✅ |
 | F | FILELISTCMDEXPRT (585) / FILELISTCOMMAND (223) | same | ✅ |
 | G | FILESAREFLAGGED (603) then CONTINUELOGOFF (605); first token as yes-shortcut | same | ✅ |
