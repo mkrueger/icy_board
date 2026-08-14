@@ -142,7 +142,7 @@ PCBoard maps 1-16. icy_board implements `1`, `2`, `4`, `5`, `6`, `11`, `12`, `13
 | 7 | user maintenance | USERMODEXPERT (167)/USERMODNONEXPERT (168), DELETERECORD (561) | ❌ missing |
 | 8 | pack users file | PACKTHEUSERSFILE (86), KEEPLOCKEDOUT (105), PURGEOLDERTHAN (106), KEEPSECURITY (107) | ❌ missing |
 | 9 | remote DOS | EXITTODOS (90) | ❌ intentionally out of scope? |
-| 10 | DOS command | DOSFUNCTION (142) | ❌ intentionally out of scope? |
+| 10 | DOS command | DOSFUNCTION (142) | ❌ numeric command out of scope; its configured security level protects the `PPE` command instead |
 | 11 | node list (forces `X`) | none | ✅ |
 | 12 | log off a node | NODENUMTOLOGOFF (65) | ✅ |
 | 13 | view node callers log | NODETOVIEW (66), TEXTTOSCANFOR (70) | ✅ filters the shared log by node |

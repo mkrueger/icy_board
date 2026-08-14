@@ -304,31 +304,7 @@ pub const UNREAD_OPTIONS: &[UnreadOption] = &[
     },
     UnreadOption {
         section: "sysop_sec",
-        option: "sec_1",
-        kind: Unread::NotReadYet,
-        note: "the numeric command itself is missing, see COMMAND_AUDIT.md",
-    },
-    UnreadOption {
-        section: "sysop_sec",
-        option: "sec_2",
-        kind: Unread::NotReadYet,
-        note: "the numeric command itself is missing, see COMMAND_AUDIT.md",
-    },
-    UnreadOption {
-        section: "sysop_sec",
         option: "sec_3",
-        kind: Unread::NotReadYet,
-        note: "the numeric command itself is missing, see COMMAND_AUDIT.md",
-    },
-    UnreadOption {
-        section: "sysop_sec",
-        option: "sec_5",
-        kind: Unread::NotReadYet,
-        note: "the numeric command itself is missing, see COMMAND_AUDIT.md",
-    },
-    UnreadOption {
-        section: "sysop_sec",
-        option: "sec_6",
         kind: Unread::NotReadYet,
         note: "the numeric command itself is missing, see COMMAND_AUDIT.md",
     },
@@ -347,24 +323,6 @@ pub const UNREAD_OPTIONS: &[UnreadOption] = &[
     UnreadOption {
         section: "sysop_sec",
         option: "sec_9",
-        kind: Unread::NotReadYet,
-        note: "the numeric command itself is missing, see COMMAND_AUDIT.md",
-    },
-    UnreadOption {
-        section: "sysop_sec",
-        option: "sec_11",
-        kind: Unread::NotReadYet,
-        note: "the numeric command itself is missing, see COMMAND_AUDIT.md",
-    },
-    UnreadOption {
-        section: "sysop_sec",
-        option: "sec_12",
-        kind: Unread::NotReadYet,
-        note: "the numeric command itself is missing, see COMMAND_AUDIT.md",
-    },
-    UnreadOption {
-        section: "sysop_sec",
-        option: "sec_13",
         kind: Unread::NotReadYet,
         note: "the numeric command itself is missing, see COMMAND_AUDIT.md",
     },
@@ -423,7 +381,7 @@ mod tests {
     #[test]
     fn the_renamed_sections_are_found() {
         assert!(lookup("subscription_info", "subscription_length").is_some());
-        assert!(lookup("sysop_command_level", "sec_13_view_alt_node_callers").is_some());
+        assert!(lookup("sysop_command_level", "sec_14_drop_alt_node_to_dos").is_some());
         assert!(lookup("user_command_level", "edit_own_messages").is_some());
     }
 

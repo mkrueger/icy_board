@@ -644,9 +644,9 @@ sysop_sec_9_exit_to_dos=(9) Exit to Shell remote
 sysop_sec_9_exit_to_dos-status=Exit to Shell remote
 sysop_sec_9_exit_to_dos-help=TODO
 
-sysop_sec_10_shelled_dos_func=(10) Execute Shell functions
-sysop_sec_10_shelled_dos_func-status=Execute Shell functions
-sysop_sec_10_shelled_dos_func-help=TODO
+sysop_sec_10_shelled_dos_func=Run a PPE (PCBoard command 10)
+sysop_sec_10_shelled_dos_func-status=Security required to run a PPE from the command prompt
+sysop_sec_10_shelled_dos_func-help=PCBoard used this level for command 10 and its DOS shell. IcyBoard has no DOS shell; the level protects the PPE command instead.
 
 sysop_sec_11_view_other_nodes=(11) View Other Nodes
 sysop_sec_11_view_other_nodes-status=View Other Nodes

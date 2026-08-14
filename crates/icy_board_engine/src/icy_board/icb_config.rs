@@ -47,6 +47,23 @@ pub struct SysopCommandLevels {
     pub sec_14_drop_alt_node_to_dos: SecurityExpression,
 }
 
+impl SysopCommandLevels {
+    pub fn security_for(&self, command_type: &CommandType) -> Option<SecurityExpression> {
+        match command_type {
+            CommandType::ViewCallerLog => Some(self.sec_1_view_caller_log.clone()),
+            CommandType::ViewUserFile => Some(self.sec_2_view_usr_list.clone()),
+            CommandType::RestoreMessage => Some(self.sec_4_recover_deleted_msg.clone()),
+            CommandType::HeaderScan => Some(self.sec_5_list_message_hdr.clone()),
+            CommandType::ViewTextFile | CommandType::DirCommand => Some(self.sec_6_view_any_file.clone()),
+            CommandType::RunPPE => Some(self.sec_10_shelled_dos_func.clone()),
+            CommandType::NodeList => Some(self.sec_11_view_other_nodes.clone()),
+            CommandType::LogoffNode => Some(self.sec_12_logoff_alt_node.clone()),
+            CommandType::NodeCallerLog => Some(self.sec_13_view_alt_node_callers.clone()),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Default, Clone, Serialize, Deserialize)]
 pub struct UserCommandLevels {
     pub cmd_a: SecurityExpression,

@@ -17,7 +17,7 @@ Legend:
 - ❌ stored and editable, but nothing reads it
 - 📥 filled in by the `PCBOARD.DAT` importer, but nothing reads it afterwards
 
-**36 of 125 options and 21 of 29 sysop security levels do nothing today.**
+**36 of 125 options and 14 of 29 sysop security levels do nothing today.**
 
 ## board — general information
 
@@ -164,16 +164,16 @@ no equivalent.
 
 ## sysop_sec — sysop security levels
 
-Eight of twenty-nine are checked. The rest are read by nobody, which means the
-privilege they name is either always granted or the feature does not exist.
+Fifteen of twenty-nine are checked. The rest are read by nobody, which means
+the privilege they name is either always granted or the feature does not exist.
 
 | Level | Status |
 |---|---|
 | `copy_move_messages`, `edit_any_message`, `use_broadcast_command`, `view_private_uploads`, `edit_message_headers`, `protect_unprotect_messages` | ✅ |
-| `sec_4_recover_deleted_msg`, `sec_10_shelled_dos_func` | ✅ |
+| `sec_1_view_caller_log`, `sec_2_view_usr_list`, `sec_4_recover_deleted_msg`, `sec_5_list_message_hdr`, `sec_6_view_any_file`, `sec_10_shelled_dos_func`, `sec_11_view_other_nodes`, `sec_12_logoff_alt_node`, `sec_13_view_alt_node_callers` | ✅ |
 | `read_all_comments`, `read_all_mail` | ❌ always granted to whoever passes the sysop level |
 | `enter_color_codes_in_messages`, `not_update_msg_read`, `enter_generic_messages`, `overwrite_files_on_uploads`, `set_pack_out_date_on_messages`, `see_all_return_receipts` | ❌ |
-| `sec_1`, `sec_2`, `sec_3`, `sec_5`, `sec_6`, `sec_7`, `sec_8`, `sec_9`, `sec_11`, `sec_12`, `sec_13`, `sec_14` | ❌ the numeric command itself is missing, see COMMAND_AUDIT.md |
+| `sec_3`, `sec_7`, `sec_8`, `sec_9`, `sec_14` | ❌ the numeric command itself is missing, see COMMAND_AUDIT.md |
 | `edit_own_messages` (in `user_sec`) | ❌ |
 
 `user_sec` is otherwise complete: `security_for` maps every built-in command

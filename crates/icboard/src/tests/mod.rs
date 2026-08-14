@@ -36,6 +36,7 @@ mod cmd_w;
 mod cmd_x;
 
 mod display_file;
+mod sysop_security;
 
 // !
 #[test]

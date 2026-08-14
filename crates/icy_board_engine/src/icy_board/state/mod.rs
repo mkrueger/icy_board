@@ -948,10 +948,14 @@ impl IcyBoardState {
         }
 
         // A built-in carries no security of its own, so it answers to the level the
-        // conference set for it.
+        // board configured for that command.
         let mut cmd = Self::builtin_command(command)?;
         if let Some(action) = cmd.actions.first() {
-            cmd.security = self.session.user_command_level.security_for(&action.command_type);
+            cmd.security = self
+                .session
+                .sysop_command_level
+                .security_for(&action.command_type)
+                .unwrap_or_else(|| self.session.user_command_level.security_for(&action.command_type));
         }
         Some(cmd)
     }
