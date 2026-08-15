@@ -98,3 +98,43 @@ For multidimensional arrays, `dim` is zero-based.
 `array`    An array expresison to get the length of
 
 `dim`      The dimension to get the length of
+
+## `BEGIN ... END` Block (4.00)
+
+### Function
+Groups statements into a block. At top level the block is the main program.
+
+### Syntax
+```PPL
+BEGIN
+    <statements>
+END
+```
+
+### Remarks
+Before 400 `BEGIN` was a pseudo label for `;$USEFUNCS` and `END` was the
+statement that stops a program. From 400 on the pair is a real block: a `BEGIN`
+without a matching `END` is an error, and a program that has a block may not
+have statements outside it - only declarations and comments. The block says
+where the body is, so it may stand after the routines and `;$USEFUNCS` is no
+longer needed. Inside a routine a block only groups statements.
+
+`END` closes a block and nothing else. Use `EXIT` to end a program and `STOP` to
+abort one.
+
+## `EXIT` Statement (4.00)
+
+### Function
+Ends the program normally.
+
+### Syntax
+`EXIT`
+
+### Remarks
+`EXIT` is what `END` meant up to 3.50 and compiles to the same instruction, so
+the executable is unchanged. The compiler appends the terminating instruction by
+itself, which makes a trailing `EXIT` optional.
+
+`STOP` ends the program too, but as an abort: the channel 0 output a script
+questionnaire collects is dropped instead of being appended to the answer file.
+The decompiler prints the terminating instruction as `EXIT`.

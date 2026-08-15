@@ -14,13 +14,15 @@ use super::{Ast, Expression, Statement, rename_visitor::RenameScanVisitor};
 
 pub mod for_next;
 mod if_else;
+mod loop_endloop;
 mod remove_label_visitor;
+mod repeat_until;
 mod select_case;
 mod unused_label_visitor;
 mod while_do;
 
-pub fn reconstruct_block(visitor: &SemanticVisitor, statements: &mut Vec<Statement>) {
-    optimize_block(visitor, statements);
+pub fn reconstruct_block(visitor: &SemanticVisitor, statements: &mut Vec<Statement>, lang_version: u16) {
+    optimize_block(visitor, statements, lang_version);
 }
 
 fn _optimize_argument(arg: &mut Expression) {
@@ -29,21 +31,27 @@ fn _optimize_argument(arg: &mut Expression) {
     }
 }
 
-pub fn optimize_loops(visitor: &SemanticVisitor, statements: &mut Vec<Statement>) {
-    scan_for_next(visitor, statements);
-    scan_do_while(visitor, statements);
+pub fn optimize_loops(visitor: &SemanticVisitor, statements: &mut Vec<Statement>, lang_version: u16) {
+    scan_for_next(visitor, statements, lang_version);
+    scan_do_while(visitor, statements, lang_version);
+    if lang_version >= 350 {
+        repeat_until::scan_repeat_until(visitor, statements, lang_version);
+        loop_endloop::scan_loop(visitor, statements, lang_version);
+    }
 }
 
-fn optimize_block(visitor: &SemanticVisitor, statements: &mut Vec<Statement>) {
-    optimize_loops(visitor, statements);
-    optimize_ifs(visitor, statements);
-    scan_select_statements(statements);
+fn optimize_block(visitor: &SemanticVisitor, statements: &mut Vec<Statement>, lang_version: u16) {
+    optimize_loops(visitor, statements, lang_version);
+    optimize_ifs(visitor, statements, lang_version);
+    if lang_version >= 200 {
+        scan_select_statements(statements);
+    }
 }
 
-fn optimize_ifs(visitor: &SemanticVisitor, statements: &mut Vec<Statement>) {
+fn optimize_ifs(visitor: &SemanticVisitor, statements: &mut Vec<Statement>, lang_version: u16) {
     scan_negated_if(visitor, statements);
-    scan_if(visitor, statements);
-    if_else::scan_if_else(visitor, statements);
+    scan_if(visitor, statements, lang_version);
+    if_else::scan_if_else(visitor, statements, lang_version);
 }
 
 fn scan_label(statements: &[Statement], from: usize, label: &unicase::Ascii<String>) -> Option<usize> {
@@ -128,7 +136,7 @@ fn scan_negated_if(_visitor: &SemanticVisitor, statements: &mut Vec<Statement>) 
     }
 }
 
-fn scan_if(visitor: &SemanticVisitor, statements: &mut Vec<Statement>) {
+fn scan_if(visitor: &SemanticVisitor, statements: &mut Vec<Statement>, lang_version: u16) {
     // scan:
     // IF (COND) GOTO SKIP
     // STATEMENTS..
@@ -176,7 +184,7 @@ fn scan_if(visitor: &SemanticVisitor, statements: &mut Vec<Statement>) {
 
         // replace if with if…then
         let mut statements2: Vec<Statement> = statements.drain((i + 1)..endif_label_index).collect();
-        optimize_block(visitor, &mut statements2);
+        optimize_block(visitor, &mut statements2, lang_version);
         if statements2.len() == 1 && is_simple_statement(&statements[0]) {
             statements[i] = IfStatement::create_empty_statement(if_stmt.get_condition().negate_expression(), statements2.pop().unwrap());
         } else {

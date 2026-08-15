@@ -12,7 +12,9 @@ use icy_board_engine::ast::OutputFunc;
 use icy_board_engine::ast::output_visitor;
 use icy_board_engine::decompiler::decompile;
 use icy_board_engine::executable::Executable;
+use icy_board_engine::executable::LAST_PPL_LANGUAGE_VERSION;
 use icy_board_engine::executable::PPEScript;
+use icy_board_engine::executable::SUPPORTED_PPL_LANGUAGE_VERSIONS;
 use semver::Version;
 use std::ffi::OsStr;
 use std::fs::*;
@@ -53,6 +55,10 @@ struct Cli {
     /// keyword casing style, valid values are u=upper (default), l=lower, c=camel
     style: Option<char>,
 
+    /// language version the source is written for, defaults to the newest one
+    #[argh(option)]
+    lang_version: Option<u16>,
+
     /// file[.ppe] to decompile
     #[argh(positional)]
     file: String,
@@ -65,6 +71,12 @@ lazy_static::lazy_static! {
 fn main() {
     let arguments: Cli = argh::from_env();
     println!("PPLD v{} - PCBoard Programming Language v", *VERSION);
+    if let Some(version) = arguments.lang_version {
+        if !SUPPORTED_PPL_LANGUAGE_VERSIONS.contains(&version) {
+            eprintln!("Invalid language version valid values {SUPPORTED_PPL_LANGUAGE_VERSIONS:?}");
+            std::process::exit(2);
+        }
+    }
     let mut output_func = OutputFunc::Upper;
     match arguments.style {
         Some('u') => output_func = OutputFunc::Upper,
@@ -127,11 +139,12 @@ fn main() {
                 return;
             }
 
-            let runtime = executable.runtime;
-            match decompile(executable, arguments.raw) {
+            let lang_version = arguments.lang_version.unwrap_or(LAST_PPL_LANGUAGE_VERSION);
+            match decompile(executable, arguments.raw, lang_version) {
                 Ok((decompilation, issues)) => {
                     let mut output_visitor: output_visitor::OutputVisitor = output_visitor::OutputVisitor::default();
-                    output_visitor.version = runtime;
+                    // The source is written for our own pplc, whatever runtime the PPE was built for.
+                    output_visitor.version = lang_version;
                     output_visitor.output_func = output_func;
                     decompilation.visit(&mut output_visitor);
                     if arguments.output {

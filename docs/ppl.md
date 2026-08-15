@@ -46,8 +46,16 @@ The current Decompiler is completely rewritten and uses a ppl machine language -
 * Full reconstruction of IF/THEN, SWITH, WHEN etc.
 * It tries to do some name guessing based on variable usage.
 
+The source is written for the current language, whatever runtime the PPE was built
+for, so it goes straight back into `pplc`. It opens with a `;$LANGVERSION` line that
+names that language, and the instruction that ends a program is printed as `EXIT`
+rather than `END`, because from 400 on `END` closes a `BEGIN ... END` block.
+`--lang-version` writes for an older language instead, which is what the original
+tooling needs; it also limits the reconstruction to the loops that language has, so
+below 350 a `REPEAT`/`LOOP` comes back as labels and jumps.
+
 ```text
-Usage: ppld [-r] [-d] [-o] [--check] [--cp437] [--style <style>] [--] <file>
+Usage: ppld [-r] [-d] [-o] [--check] [--cp437] [--style <style>] [--lang-version <lang-version>] [--] <file>
 
 PCBoard Programming Language Decompiler
 
@@ -64,6 +72,8 @@ Options:
                     original tooling
   --style           keyword casing style, valid values are u=upper (default),
                     l=lower, c=camel
+  --lang-version    language version the source is written for, defaults to the
+                    newest one
   --help, help      display usage information
 ```
 
@@ -635,6 +645,31 @@ The preprocessor is not tied to a language version — it works whatever `--lang
 is set to. Its directives are written as `;`-comments so that a source using them
 still reads as a comment to any older tool.
 
+#### The language of a source
+
+| Directive | Meaning |
+| :--- | :--- |
+| `;$LANGVERSION number` | The language version the file is written in |
+
+A source states which language it is written in, so it wins over `language_version`
+in `ppl.toml` and over `pplc --lang-version`. That is not a preference but a fact:
+a file that uses `BEGIN` as a block cannot be read as 3.50, where `begin` may still
+be a variable name.
+
+```PPL
+;$LANGVERSION 400
+
+BEGIN
+    PrintLn "Hello"
+END
+```
+
+Nothing but comments and blank lines may come before it, because it decides which
+words are keywords for everything that follows. For the same reason it is read
+before the preprocessor runs, so it cannot stand in a `;$IF` branch, and a file may
+only carry one. An unknown version number is an error, and two files of one package
+may not disagree. `ppld` writes the directive into the source it produces.
+
 #### Conditional compilation
 
 | Directive | Meaning |
@@ -660,7 +695,7 @@ ordinary comment.
 | :--- | :--- | :--- |
 | `VERSION` | `STRING` | The `version` field from `ppl.toml` |
 | `RUNTIME` | `INTEGER` | The PPE runtime version being written |
-| `LANGVERSION` | `INTEGER` | The language version being compiled against |
+| `LANGVERSION` | `INTEGER` | The language version being compiled against, `;$LANGVERSION` included |
 
 More can be added with `;$DEFINE` or with `pplc --defines "A=1;B=2"`.
 

@@ -271,7 +271,9 @@ or a low-level disassembly. It’s useful for:
 * Security auditing of third-party PPEs
 
 The decompiler attempts to reconstruct higher-level control structures (IF / WHILE /
-SELECT / blocks) unless raw mode is requested.
+SELECT / blocks) unless raw mode is requested. Which ones it may use follows the
+target language version: a ``REPEAT ... UNTIL`` or ``LOOP ... ENDLOOP`` is only
+rebuilt for 350 and up, because that is where those loops exist.
 
 Features
 ~~~~~~~~
@@ -314,6 +316,13 @@ Options
 ``--style <u|l|c>``  
   Keyword casing: ``u`` = UPPER (default), ``l`` = lower, ``c`` = CamelCase.
 
+``--lang-version <version>``
+  Language version the source is written for. Defaults to the newest one; an
+  older version writes the syntax that generation used, down to ``END`` for the
+  end of a program and parentheses around a condition. It also decides which
+  constructs may be reconstructed: :PPL:`REPEAT`/:PPL:`UNTIL` and :PPL:`LOOP`
+  arrived in 350, so below that their loops come back as labels and jumps.
+
 ``file``  
   PPE file to decompile (with or without ``.ppe``).
 
@@ -324,6 +333,14 @@ Default (no ``-o`` / no disassembly) creates a sibling file with ``.ppd`` extens
     LOGIN.PPE  →  LOGIN.ppd
 
 With ``-o`` the reconstructed source is printed to the console.
+
+The source is written for the current language version, whatever runtime the PPE
+was built for, so it can be handed back to ``pplc`` without an option: it opens
+with a ``;$LANGVERSION`` line that names the language it is written in. The
+instruction that ends a program therefore appears as :PPL:`EXIT`: from 400 on
+``END`` closes a ``BEGIN ... END`` block and is no longer a statement. Compile
+with ``--runtime`` if the rebuilt PPE has to keep the format it came from, and
+decompile with ``--lang-version`` if the source has to read as an older language.
 
 Disassembly Mode
 ~~~~~~~~~~~~~~~~

@@ -721,7 +721,7 @@ fn generate_variable_declaration(var: &TableEntry, type_token: Spanned<Token>) -
 /// # Panics
 ///
 /// Panics if .
-pub fn decompile(executable: Executable, raw: bool) -> Res<(Ast, Vec<DecompilerIssue>)> {
+pub fn decompile(executable: Executable, raw: bool, lang_version: u16) -> Res<(Ast, Vec<DecompilerIssue>)> {
     match Decompiler::new(executable, !raw) {
         Ok(mut d) => {
             let mut ast = d.decompile()?;
@@ -736,13 +736,13 @@ pub fn decompile(executable: Executable, raw: bool) -> Res<(Ast, Vec<DecompilerI
                 for node in &mut ast.nodes {
                     match node {
                         AstNode::Function(f) => {
-                            reconstruct::reconstruct_block(&visitor, f.get_statements_mut());
+                            reconstruct::reconstruct_block(&visitor, f.get_statements_mut(), lang_version);
                         }
                         AstNode::Procedure(p) => {
-                            reconstruct::reconstruct_block(&visitor, p.get_statements_mut());
+                            reconstruct::reconstruct_block(&visitor, p.get_statements_mut(), lang_version);
                         }
                         AstNode::Main(block) => {
-                            reconstruct::reconstruct_block(&visitor, block.get_statements_mut());
+                            reconstruct::reconstruct_block(&visitor, block.get_statements_mut(), lang_version);
                         }
                         _ => {}
                     }

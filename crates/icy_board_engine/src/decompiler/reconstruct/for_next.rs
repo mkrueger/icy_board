@@ -3,7 +3,7 @@ use crate::{
     semantic::SemanticVisitor,
 };
 
-pub fn scan_for_next(visitor: &SemanticVisitor, statements: &mut Vec<Statement>) {
+pub fn scan_for_next(visitor: &SemanticVisitor, statements: &mut Vec<Statement>, lang_version: u16) {
     // FOR Header:
     // LET VAR001 = [START]
     // :LABEL002
@@ -92,7 +92,7 @@ pub fn scan_for_next(visitor: &SemanticVisitor, statements: &mut Vec<Statement>)
                 };
                 for_block.pop();
                 let continue_label = continue_label_stmt.get_label().clone();
-                super::optimize_block(visitor, &mut for_block);
+                super::optimize_block(visitor, &mut for_block, lang_version);
                 super::handle_break_continue(skip_label, continue_label, &mut for_block);
                 if step_expr.to_string() == "1" {
                     statements.insert(i, ForStatement::create_empty_statement(var_name, from_expr, to_expr, None, for_block));

@@ -19,8 +19,8 @@ WHILE (1) DO
   PRINT "Hello World!"
 ENDWHILE
 */
-pub fn scan_do_while(visitor: &SemanticVisitor, statements: &mut Vec<Statement>) {
-    scan_do_while_case2(visitor, statements);
+pub fn scan_do_while(visitor: &SemanticVisitor, statements: &mut Vec<Statement>, lang_version: u16) {
+    scan_do_while_case2(visitor, statements, lang_version);
 
     let mut i = 0;
     while i + 3 < statements.len() {
@@ -62,7 +62,7 @@ pub fn scan_do_while(visitor: &SemanticVisitor, statements: &mut Vec<Statement>)
 
         let continue_label = super::get_last_label(&statements[i..i + 1]);
         super::handle_break_continue(break_label, continue_label, &mut while_block);
-        optimize_block(visitor, &mut while_block);
+        optimize_block(visitor, &mut while_block, lang_version);
 
         if while_block.len() == 1 && is_simple_statement(&while_block[0]) {
             statements.insert(
@@ -96,7 +96,7 @@ WHILE (TRUE) DO
   PRINT "Hello World!"
 ENDWHILE
 */
-fn scan_do_while_case2(visitor: &SemanticVisitor, statements: &mut Vec<Statement>) {
+fn scan_do_while_case2(visitor: &SemanticVisitor, statements: &mut Vec<Statement>, lang_version: u16) {
     let mut i = 0;
     while i + 4 < statements.len() {
         let Statement::Label(while_continue_label) = statements[i].clone() else {
@@ -149,7 +149,7 @@ fn scan_do_while_case2(visitor: &SemanticVisitor, statements: &mut Vec<Statement
         statements.remove(i + 4);
         statements.drain(i + 1..i + 3);
 
-        optimize_block(visitor, &mut while_block);
+        optimize_block(visitor, &mut while_block, lang_version);
         super::handle_break_continue(break_label, continue_label, &mut while_block);
 
         if while_block.len() == 1 {

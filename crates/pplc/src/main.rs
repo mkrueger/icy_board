@@ -12,7 +12,10 @@ use icy_board_engine::{
     executable::{LAST_PPL_LANGUAGE_VERSION, SUPPORTED_PPE_VERSIONS, SUPPORTED_PPL_LANGUAGE_VERSIONS},
     formatting::{FormattingVisitor, StringFormattingBackend},
     icy_board::{read_with_encoding_detection, write_atomic},
-    parser::{Encoding, ErrorReporter, UserTypeRegistry, load_with_encoding, parse_ast_with_predeclared_types, preparse_type_declarations},
+    parser::{
+        Encoding, ErrorReporter, UserTypeRegistry, lexer::scan_language_version, load_with_encoding, parse_ast_with_predeclared_types,
+        preparse_type_declarations,
+    },
 };
 
 use crossterm::{
@@ -168,7 +171,7 @@ fn main() {
     ws.hard_coded_files = Some(vec![PathBuf::from(&file_name)]);
     apply_arguments(&mut ws, &arguments);
 
-    if let Err(err) = compile_files(&arguments, encoding, &ws, &out_file_name) {
+    if let Err(err) = compile_files(&arguments, encoding, &mut ws, &out_file_name) {
         eprintln!("ERROR: {err}");
         std::process::exit(1);
     }
@@ -211,6 +214,43 @@ fn apply_arguments(workspace: &mut Workspace, arguments: &Cli) {
     }
 }
 
+/// A source states which language it is written in, so it wins over the manifest and
+/// the command line. Two files may not disagree about it.
+fn apply_declared_language_version(workspace: &mut Workspace, encoding: Encoding) -> Res<()> {
+    let mut declared: Option<(PathBuf, u16)> = None;
+    for src_file in workspace.files() {
+        let Ok(src) = load_with_encoding(&src_file, encoding) else {
+            continue;
+        };
+        let Some(version) = scan_language_version(&src) else {
+            continue;
+        };
+        if let Some((other_file, other_version)) = &declared {
+            if *other_version != version {
+                return Err(format!(
+                    "{} declares language version {} while {} declares {}",
+                    src_file.display(),
+                    version,
+                    other_file.display(),
+                    other_version
+                )
+                .into());
+            }
+        } else {
+            declared = Some((src_file, version));
+        }
+    }
+
+    if let Some((file, version)) = declared {
+        let configured = workspace.compiler.as_ref().and_then(|c| c.language_version);
+        if configured.is_some_and(|configured| configured != version) {
+            println!("{} declares language version {}, using that one.", file.display(), version);
+        }
+        workspace.compiler.get_or_insert_with(CompilerData::default).language_version = Some(version);
+    }
+    Ok(())
+}
+
 fn compile_toml(file_name: &PathBuf, arguments: &Cli) -> Res<()> {
     let mut workspace = Workspace::load(file_name)?;
     apply_arguments(&mut workspace, arguments);
@@ -222,7 +262,7 @@ fn compile_toml(file_name: &PathBuf, arguments: &Cli) -> Res<()> {
     fs::create_dir_all(&target_path)?;
 
     let out_file_name = target_path.join(workspace.package.name()).with_extension("ppe");
-    compile_files(arguments, encoding, &workspace, &out_file_name)?;
+    compile_files(arguments, encoding, &mut workspace, &out_file_name)?;
     println!("Copying data files...");
     if let Some(data) = &workspace.data {
         if let Some(art_files) = &data.art_files {
@@ -278,7 +318,8 @@ fn write_formatted(file: &Path, text: &str) -> Res<()> {
     Ok(())
 }
 
-fn compile_files(arguments: &Cli, encoding: Encoding, workspace: &Workspace, out_file_name: &Path) -> Res<()> {
+fn compile_files(arguments: &Cli, encoding: Encoding, workspace: &mut Workspace, out_file_name: &Path) -> Res<()> {
+    apply_declared_language_version(workspace, encoding)?;
     let errors = Arc::new(Mutex::new(ErrorReporter::default()));
 
     let reg = UserTypeRegistry::icy_board_registry();

@@ -4,7 +4,7 @@ use crate::{
         constant::{BUILTIN_CONSTS, NumberFormat},
     },
     compiler::workspace::Workspace,
-    executable::VariableValue,
+    executable::{SUPPORTED_PPL_LANGUAGE_VERSIONS, VariableValue},
 };
 use core::fmt;
 use std::{
@@ -67,6 +67,12 @@ pub enum LexingErrorType {
 
     #[error("Undefined pre processor token ({0})")]
     UndefinedPreProcessorToken(String),
+
+    #[error("Invalid $LANGVERSION '{0}', valid values are {SUPPORTED_PPL_LANGUAGE_VERSIONS:?}")]
+    InvalidLanguageVersion(String),
+
+    #[error("$LANGVERSION has to come before everything else in a file")]
+    LanguageVersionMustComeFirst,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -351,6 +357,56 @@ fn directive_len(upper: &str, directive: &str) -> Option<usize> {
     (rest.is_empty() || rest.starts_with(char::is_whitespace)).then_some(directive.len())
 }
 
+/// A `;$LANGVERSION` line. It is read before the first token, so it can pick the
+/// keywords the rest of the file is lexed with.
+pub struct LanguageVersionDirective {
+    pub version: Option<u16>,
+    pub value: String,
+    pub span: core::ops::Range<usize>,
+    /// Nothing but comments and blank lines come before it.
+    pub in_header: bool,
+}
+
+/// Every `;$LANGVERSION` a source has, the misplaced ones included, so a caller can
+/// report them.
+pub fn scan_language_version_directives(text: &str) -> Vec<LanguageVersionDirective> {
+    let mut directives = Vec::new();
+    let mut in_header = true;
+    let mut offset = 0;
+
+    for line in text.split('\n') {
+        let line_len = line.chars().count();
+        let trimmed = line.trim_start();
+        let indent = line_len - trimmed.chars().count();
+
+        if let Some(body) = trimmed.strip_prefix([';', '\'', '*']) {
+            let body = body.trim_start();
+            let upper = body.to_ascii_uppercase();
+            if let Some(len) = directive_len(&upper, "$LANGVERSION") {
+                let value = body[len..].trim().to_string();
+                let version = value.parse::<u16>().ok().filter(|v| SUPPORTED_PPL_LANGUAGE_VERSIONS.contains(v));
+                directives.push(LanguageVersionDirective {
+                    version,
+                    value,
+                    span: offset + indent..offset + line_len,
+                    in_header,
+                });
+            }
+        } else if !trimmed.trim_end().is_empty() {
+            in_header = false;
+        }
+
+        offset += line_len + 1;
+    }
+
+    directives
+}
+
+/// The language version a source declares for itself.
+pub fn scan_language_version(text: &str) -> Option<u16> {
+    scan_language_version_directives(text).into_iter().find(|d| d.in_header).and_then(|d| d.version)
+}
+
 fn elseif_directive_len(upper: &str) -> Option<usize> {
     directive_len(upper, "$ELSEIF").or_else(|| directive_len(upper, "$ELIF"))
 }
@@ -518,9 +574,28 @@ lazy_static::lazy_static! {
 
 impl Lexer {
     pub fn new(_file: PathBuf, workspace: &Workspace, text: &str, _encoding: Encoding, errors: Arc<Mutex<ErrorReporter>>) -> Self {
+        let mut lang_version = workspace.language_version();
+        let mut declared = false;
+        for directive in scan_language_version_directives(text) {
+            if !directive.in_header || declared {
+                errors
+                    .lock()
+                    .unwrap()
+                    .report_error(directive.span, LexingErrorType::LanguageVersionMustComeFirst);
+                continue;
+            }
+            declared = true;
+            match directive.version {
+                Some(version) => lang_version = version,
+                None => errors
+                    .lock()
+                    .unwrap()
+                    .report_error(directive.span, LexingErrorType::InvalidLanguageVersion(directive.value)),
+            }
+        }
+
         let mut define_table = HashMap::new();
         define_table.insert(Ascii::new("VERSION".into()), Constant::String(workspace.package.version.to_string()));
-        let lang_version = workspace.language_version();
         define_table.insert(Ascii::new("LANGVERSION".into()), Constant::Integer(lang_version as i32, NumberFormat::Default));
         define_table.insert(
             Ascii::new("RUNTIME".into()),
@@ -560,6 +635,11 @@ impl Lexer {
 
     pub fn span(&self) -> std::ops::Range<usize> {
         self.token_start..self.token_end
+    }
+
+    /// The version the file declared for itself, or the one the workspace asked for.
+    pub fn lang_version(&self) -> u16 {
+        self.lang_version
     }
 
     pub fn get_define(&self, key: &str) -> Option<&Constant> {

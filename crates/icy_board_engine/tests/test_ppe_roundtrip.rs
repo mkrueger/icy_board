@@ -53,7 +53,7 @@ fn test_legacy_ppe_roundtrip() {
         assert_eq!(&output, EXPECTED_OUTPUT);
 
         println!("Recompile {:?}...", file_name);
-        let (dec_ast, _) = decompile(executable, false).unwrap();
+        let (dec_ast, _) = decompile(executable, false, workspace.language_version()).unwrap();
 
         let reg = UserTypeRegistry::default();
         let input = dec_ast.to_string();

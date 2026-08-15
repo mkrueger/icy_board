@@ -75,7 +75,7 @@ BOOLEAN BOOL002
 :LABEL002
 */
 
-pub fn scan_if_else(visitor: &SemanticVisitor, statements: &mut Vec<Statement>) {
+pub fn scan_if_else(visitor: &SemanticVisitor, statements: &mut Vec<Statement>, lang_version: u16) {
     let mut i = 0;
     while i + 1 < statements.len() {
         let start = i;
@@ -118,7 +118,7 @@ pub fn scan_if_else(visitor: &SemanticVisitor, statements: &mut Vec<Statement>) 
 
         if j < end_label_idx {
             let mut stmts = statements.drain(j..end_label_idx).collect();
-            optimize_block(visitor, &mut stmts);
+            optimize_block(visitor, &mut stmts, lang_version);
             let mut is_else_if = false;
             if stmts.len() == 1 {
                 if let Statement::IfThen(if_then_stmt) = &stmts[0] {

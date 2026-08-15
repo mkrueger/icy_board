@@ -372,7 +372,7 @@ impl<'a> Parser<'a> {
         workspace: &Workspace,
     ) -> Self {
         let lex: Lexer = Lexer::new(file, workspace, text, encoding, error_reporter.clone());
-        let lang_version = workspace.language_version();
+        let lang_version = lex.lang_version();
         Parser {
             error_reporter,
             lang_version,

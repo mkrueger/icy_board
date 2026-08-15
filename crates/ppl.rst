@@ -402,8 +402,12 @@ Miscellaneous
 SELECT fall-through
   There is no implicit fall-through between CASE blocks; each CASE’s block executes fully then control jumps to ENDSELECT (unless ``BREAK`` inside a nested loop is interpreted). Use multiple CASE value lists instead of stacked empty CASEs.
 
-END (synthetic)
-  The decompiler may show an internal ``End`` comment or label transformation; you do not author a standalone ``END`` statement in modern PPL (``ENDIF``, ``ENDWHILE``, ``ENDSELECT``, ``ENDLOOP``, ``NEXT`` serve as terminators).
+END, EXIT and STOP
+  Up to 3.50 ``END`` is the statement that ends a program. From 400 on it closes
+  a ``BEGIN ... END`` block instead: :PPL:`EXIT` ends a program normally,
+  :PPL:`STOP` aborts it and a script questionnaire keeps no answers. Block bodies
+  are still terminated by ``ENDIF``, ``ENDWHILE``, ``ENDSELECT``, ``ENDLOOP`` and
+  ``NEXT``. The decompiler writes ``EXIT`` for the terminating instruction.
 
 Deprecated / Discouraged Patterns
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

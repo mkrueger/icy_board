@@ -830,3 +830,53 @@ fn test_preproc_skipped_region_reports_only_one_missing_endif() {
     let (_, errors) = lex_all(";$IF 1 == 2\nA");
     assert_eq!(vec!["Missing $ENDIF".to_string()], errors);
 }
+
+#[test]
+fn a_declared_language_version_picks_the_keywords() {
+    // BEGIN is a keyword in 400 only, so the token says which table was used.
+    assert_eq!(Token::Identifier(unicase::Ascii::new("BEGIN".to_string())), first_code_token("BEGIN", 350));
+    assert_eq!(Token::Begin, first_code_token(";$LANGVERSION 400\nBEGIN", 350));
+    assert_eq!(
+        Token::Identifier(unicase::Ascii::new("BEGIN".to_string())),
+        first_code_token(";$LANGVERSION 350\nBEGIN", 400)
+    );
+}
+
+/// The directive stays in the stream as the comment it is, so the token after it is
+/// the one that shows which keywords are in use.
+fn first_code_token(src: &str, ver: u16) -> Token {
+    let mut ws = Workspace::default();
+    ws.compiler.get_or_insert_with(CompilerData::default).language_version = Some(ver);
+
+    let mut lex = Lexer::new(PathBuf::from("."), &ws, src, Encoding::Utf8, Arc::new(Mutex::new(ErrorReporter::default())));
+    while let Some(token) = lex.next_token() {
+        if !matches!(token, Token::Comment(_, _) | Token::Eol) {
+            return token;
+        }
+    }
+    panic!("no code in {src:?}");
+}
+
+#[test]
+fn a_language_version_may_stand_below_comments_only() {
+    let (_, errors) = lex_all("; a note\n\n;$LANGVERSION 400\nBEGIN\nEND");
+    assert!(errors.is_empty(), "{errors:?}");
+
+    let (_, errors) = lex_all("PRINTLN \"x\"\n;$LANGVERSION 400");
+    assert_eq!(vec!["$LANGVERSION has to come before everything else in a file".to_string()], errors);
+
+    let (_, errors) = lex_all(";$LANGVERSION 400\n;$LANGVERSION 350");
+    assert_eq!(vec!["$LANGVERSION has to come before everything else in a file".to_string()], errors);
+}
+
+#[test]
+fn an_unknown_language_version_is_reported() {
+    let (_, errors) = lex_all(";$LANGVERSION 999");
+    assert_eq!(
+        vec!["Invalid $LANGVERSION '999', valid values are [100, 200, 300, 310, 320, 330, 340, 350, 400]".to_string()],
+        errors
+    );
+
+    assert_eq!(Some(400), crate::parser::lexer::scan_language_version(";$LANGVERSION 400\nBEGIN"));
+    assert_eq!(None, crate::parser::lexer::scan_language_version("BEGIN"));
+}

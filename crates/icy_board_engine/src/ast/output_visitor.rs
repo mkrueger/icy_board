@@ -297,8 +297,9 @@ impl AstVisitor<()> for OutputVisitor {
 
     fn visit_if_then_statement(&mut self, if_then: &super::IfThenStatement) {
         self.output_keyword("If");
+        self.output.push(' ');
         if self.version < 350 {
-            self.output.push_str(" (");
+            self.output.push('(');
         }
         if_then.get_condition().visit(self);
         if self.version < 350 {
@@ -689,6 +690,11 @@ impl AstVisitor<()> for OutputVisitor {
     }
 
     fn visit_ast(&mut self, program: &super::Ast) {
+        // A source that names its language can be compiled without being told which one.
+        if self.version > 0 {
+            self.output(&format!(";$LANGVERSION {}", self.version));
+            self.eol();
+        }
         for stmt in &program.nodes {
             stmt.visit(self);
             self.eol();

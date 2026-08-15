@@ -5,6 +5,37 @@ The preprocessor is not tied to a language version - it works whatever
 ``--lang-version`` is set to. Its directives are written as ``;``-comments so
 that a source using them still reads as a comment to any older tool.
 
+The language of a source
+------------------------
+
+=========================  ====================================================
+Directive                  Meaning
+=========================  ====================================================
+``;$LANGVERSION number``   The language version the file is written in
+=========================  ====================================================
+
+A source states which language it is written in, so it wins over
+``language_version`` in ``ppl.toml`` and over ``pplc --lang-version``. That is
+not a preference but a fact: a file that uses ``BEGIN`` as a block cannot be
+read as 3.50, where ``begin`` may still be a variable name.
+
+.. code-block:: PPL
+
+    ;$LANGVERSION 400
+
+    BEGIN
+        PrintLn "Hello"
+    END
+
+Nothing but comments and blank lines may come before it, because it decides
+which words are keywords for everything that follows. For the same reason it is
+read before the preprocessor runs, so it cannot stand in a ``;$IF`` branch, and
+a file may only carry one. An unknown version number is an error.
+
+Two files of one package may not declare different versions. ``ppld`` writes the
+directive into the source it produces, which is what makes a decompiled PPE
+compile again without an option.
+
 Conditional compilation
 -----------------------
 
@@ -35,7 +66,8 @@ Name                 Type           Value
 ===================  =============  ============================================
 ``VERSION``          ``STRING``     The ``version`` field from ``ppl.toml``
 ``RUNTIME``          ``INTEGER``    The PPE runtime version being written
-``LANGVERSION``      ``INTEGER``    The language version being compiled against
+``LANGVERSION``      ``INTEGER``    The language version being compiled against,
+                                    ``;$LANGVERSION`` included
 ===================  =============  ============================================
 
 More can be added with ``;$DEFINE`` or with ``pplc --defines "A=1;B=2"``.
