@@ -466,23 +466,17 @@ impl MaintenancePage {
 
             MaintenanceOp::ConferenceMove => vec![
                 ConfigEntry::Separator,
-                // Both conferences sit on one line, as they did.
-                ConfigEntry::Table(
-                    2,
-                    vec![
-                        sized(
-                            u32_item("icbsm_conf_from", params.conf_first, 0, 65535, &|o: &Obj, v: u32| {
-                                o.lock().unwrap().conf_first = v
-                            }),
-                            36,
-                        ),
-                        sized(
-                            u32_item("icbsm_conf_to", params.conf_target, 0, 65535, &|o: &Obj, v: u32| {
-                                o.lock().unwrap().conf_target = v
-                            }),
-                            24,
-                        ),
-                    ],
+                sized(
+                    u32_item("icbsm_conf_from", params.conf_first, 0, 65535, &|o: &Obj, v: u32| {
+                        o.lock().unwrap().conf_first = v
+                    }),
+                    width,
+                ),
+                sized(
+                    u32_item("icbsm_conf_to", params.conf_target, 0, 65535, &|o: &Obj, v: u32| {
+                        o.lock().unwrap().conf_target = v
+                    }),
+                    width,
                 ),
                 ConfigEntry::Separator,
                 sized(
