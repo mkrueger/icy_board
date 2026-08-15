@@ -77,6 +77,15 @@ impl Cli {
 }
 
 fn main() -> Result<()> {
+    let arguments: Cli = argh::from_env();
+
+    let Some(file) = icy_board_engine::lookup_icyboard_file(&arguments.file) else {
+        print_error(icy_board_tui::get_text("error_file_or_path_not_found"));
+        exit(1);
+    };
+
+    // The log belongs to the board, not to wherever the tool was started from.
+    let log_file = file.with_file_name("icbsm.log");
     fern::Dispatch::new()
         // Perform allocation-free log formatting
         .format(|out, message, record| {
@@ -93,17 +102,10 @@ fn main() -> Result<()> {
         // - and per-module overrides
         .level_for("hyper", log::LevelFilter::Info)
         // Output to stdout, files, and other Dispatch configurations
-        .chain(fern::log_file("icbsm.log").unwrap())
+        .chain(fern::log_file(&log_file)?)
         // Apply globally
         .apply()
         .unwrap();
-
-    let arguments: Cli = argh::from_env();
-
-    let Some(file) = icy_board_engine::lookup_icyboard_file(&arguments.file) else {
-        print_error(icy_board_tui::get_text("error_file_or_path_not_found"));
-        exit(1);
-    };
 
     match IcyBoard::load(&file) {
         Ok(mut icy_board) => {

@@ -239,15 +239,12 @@ fn date_item(label: &str, value: DateTime<Utc>, update: &'static dyn Fn(&Obj, Da
 impl MaintenancePage {
     pub fn new(icy_board: Arc<Mutex<IcyBoard>>, op: MaintenanceOp) -> Self {
         let mut params = Params::default();
-        if matches!(
-            op,
-            MaintenanceOp::ConferenceInsert | MaintenanceOp::ConferenceRemove | MaintenanceOp::ConferenceMove
-        ) {
-            params.max_security = 110;
-        }
-        if matches!(op, MaintenanceOp::Pack | MaintenanceOp::StandardizePhones) {
-            params.max_security = 255;
-        }
+        // The screens that ask for a range start at the one the utility used;
+        // the screens without such a question must not filter at all.
+        params.max_security = match op {
+            MaintenanceOp::Pack | MaintenanceOp::StandardizePhones | MaintenanceOp::CopyExpiredSecurity | MaintenanceOp::InitializeCounters => 255,
+            _ => 110,
+        };
 
         let width = screen_label_width(op);
         let entry = match op {
@@ -609,10 +606,16 @@ impl MaintenancePage {
         flags
     }
 
+    /// Numbers above the last conference would only set flags nobody reads.
+    fn last_conference(&self) -> usize {
+        self.icy_board.lock().unwrap().conferences.len().saturating_sub(1)
+    }
+
     fn conference_range(&self) -> Vec<usize> {
+        let highest = self.last_conference();
         let p = self.menu.obj.lock().unwrap();
-        let first = p.conf_first as usize;
-        let last = p.conf_last.max(p.conf_first) as usize;
+        let first = (p.conf_first as usize).min(highest);
+        let last = (p.conf_last.max(p.conf_first) as usize).min(highest);
         (first..=last).collect()
     }
 
@@ -630,6 +633,7 @@ impl MaintenancePage {
         let selection = self.selection();
         let flags = self.conference_flags();
         let conferences = self.conference_range();
+        let highest_conference = self.last_conference();
         let (target, from, to, reset_lastread, move_last_conference, new_level, counters, change) = {
             let p = self.menu.obj.lock().unwrap();
             (
@@ -638,8 +642,8 @@ impl MaintenancePage {
                 } else {
                     SecurityField::Normal
                 },
-                p.conf_first as usize,
-                p.conf_target as usize,
+                (p.conf_first as usize).min(highest_conference),
+                (p.conf_target as usize).min(highest_conference),
                 p.reset_lastread,
                 p.move_last_conference,
                 p.new_level.min(255) as u8,
@@ -708,6 +712,12 @@ impl Page for MaintenancePage {
     fn render(&mut self, frame: &mut Frame, disp_area: Rect) {
         let area = disp_area.inner(Margin { vertical: 1, horizontal: 2 });
         Clear.render(area, frame.buffer_mut());
+
+        // A run that could not write says so whatever stage it stopped in.
+        if let Some(error) = self.error.clone() {
+            self.render_lines(frame, area, self.op.title(), get_text("icbsm_done_keys"), vec![Line::from(error)]);
+            return;
+        }
 
         match &self.stage {
             Stage::Confirm => {

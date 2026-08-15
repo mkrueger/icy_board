@@ -2791,6 +2791,7 @@ dependencies = [
  "color-eyre",
  "crossterm 0.29.0",
  "dizbase",
+ "fastrand",
  "fern",
  "icy_board_engine",
  "icy_board_tui",

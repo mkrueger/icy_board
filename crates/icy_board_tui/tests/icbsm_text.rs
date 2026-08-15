@@ -24,3 +24,16 @@ fn icbsm_main_menu_text_is_available() {
         assert!(!get_text(key).is_empty(), "{key} is missing");
     }
 }
+
+#[test]
+fn icbsm_table_help_text_parses() {
+    for (key, expected) in [
+        ("icbsm_table_help_file_ratio", "uploads divided by downloads"),
+        ("icbsm_table_help_byte_ratio", "bytes uploaded divided by bytes downloaded"),
+        ("icbsm_table_help_uploads", "Uploads   Security"),
+        ("icbsm_table_help_downloads", "Downloads   Security"),
+    ] {
+        let text = get_text(key);
+        assert!(text.contains(expected), "{key} did not parse: {text}");
+    }
+}

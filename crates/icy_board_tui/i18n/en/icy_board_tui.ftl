@@ -1606,45 +1606,45 @@ icbsm_table_help_title_downloads=Adjust Securities by Number of Downloads
 
 icbsm_table_help_file_ratio =
     Define each of the upload/download ratios desired and attach a security level to each. A ratio is uploads divided by downloads.
-    .
+    {" "}
     Examples:
-    .
+    {" "}
       0.1  means   1 up for every 10 down
       1.0  means   uploads equal downloads
       5.0  means   5 up for every 1 down
-    .
+    {" "}
     NOTE: A caller below the lowest step in the table keeps the security level they have.
 icbsm_table_help_byte_ratio =
     Define each of the upload/download byte ratios desired and attach a security level to each. A ratio is bytes uploaded divided by bytes downloaded.
-    .
+    {" "}
     Examples:
-    .
+    {" "}
       0.1  means   1 byte up for every 10 down
       1.0  means   bytes up equal bytes down
       5.0  means   5 bytes up for every 1 down
-    .
+    {" "}
     NOTE: A caller below the lowest step in the table keeps the security level they have.
 icbsm_table_help_uploads =
     Define each of the upload counts desired and attach a security level to each. A caller who reaches a count gets that level, whether it raises or lowers the one they have.
-    .
+    {" "}
     Example:      Uploads   Security
-    .
+    {" "}
       assuming        0        10
       this table     10        25
       is used        20        30
                      30        35
-    .
+    {" "}
     A caller with 10 to 19 uploads and a level of 20 would be raised to 25. Below the lowest step the level stays as it is.
 icbsm_table_help_downloads =
     Define each of the download counts desired and attach a security level to each. A caller who reaches a count gets that level, whether it raises or lowers the one they have.
-    .
+    {" "}
     Example:    Downloads   Security
-    .
+    {" "}
       assuming        0        35
       this table     10        25
       is used        20        20
                      30        15
-    .
+    {" "}
     A caller with 20 to 29 downloads and a level of 15 would be raised to 20. Below the lowest step the level stays as it is.
 
 icbsm_table_empty=This table has no steps yet. Build it first.

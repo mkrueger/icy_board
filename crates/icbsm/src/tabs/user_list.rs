@@ -60,7 +60,6 @@ pub struct UserList {
     save_dialog: Option<SaveChangesDialog>,
     backup: UserBase,
     has_changes: bool,
-    in_edit_mode: bool,
     /// Positions in the user base, in the order they are shown.
     view: Vec<usize>,
     search: String,
@@ -79,7 +78,6 @@ impl UserList {
             backup,
             save_dialog: None,
             has_changes: false,
-            in_edit_mode: false,
             view: Vec::new(),
             search: String::new(),
             searching: false,
@@ -229,7 +227,8 @@ impl UserList {
         let new_user = User {
             name: format!("NewUser{new_idx}"),
             password: PasswordInfo {
-                password: Password::PlainText("password".into()),
+                // A fresh record must not carry a password anyone could guess.
+                password: Password::PlainText(format!("{:08x}{:08x}", fastrand::u32(..), fastrand::u32(..))),
                 ..Default::default()
             },
             security_level: 10,
@@ -451,7 +450,6 @@ impl Page for UserList {
             KeyCode::F(2) if self.has_changes => self.try_save(),
             KeyCode::Enter => {
                 if let Some(index) = self.selected_user() {
-                    self.in_edit_mode = true;
                     PageMessage::OpenSubPage(Box::new(UserEditor::new(self.icy_board.clone(), index)))
                 } else {
                     PageMessage::None
@@ -460,9 +458,4 @@ impl Page for UserList {
             _ => PageMessage::None,
         }
     }
-
-    // (Optional) If your Page trait supports this:
-    // fn has_control(&self) -> bool {
-    //     self.save_dialog.is_some() || self.in_edit_mode
-    // }
 }

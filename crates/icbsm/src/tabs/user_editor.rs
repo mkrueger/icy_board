@@ -525,8 +525,8 @@ impl Page for UserEditor {
         let area = Rect {
             x: disp_area.x + 3,
             y: area.y + 1,
-            width: disp_area.width - 3,
-            height: area.height - 2,
+            width: disp_area.width.saturating_sub(3),
+            height: area.height.saturating_sub(2),
         };
         self.menu.render(area, frame, &mut self.state);
         if let Some(save_changes) = &self.save_dialog {

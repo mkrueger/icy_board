@@ -23,6 +23,7 @@ ratatui = { workspace = true }
 bstr = { workspace = true }
 jamjam = { workspace = true}
 regex = { workspace = true}
+fastrand = { workspace = true }
 walkdir = { workspace = true }
 relative-path = { workspace = true }
  
