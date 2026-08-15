@@ -14,4 +14,5 @@
   (select_statement)
   (case_clause)
   (default_clause)
+  (block)
 ] @fold

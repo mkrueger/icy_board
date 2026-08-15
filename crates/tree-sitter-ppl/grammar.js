@@ -278,7 +278,7 @@ module.exports = grammar({
       $.break_statement,
       $.continue_statement,
       $.end_statement,
-      $.begin_statement,
+      $.block,
       $.label,
       $.predefined_call,
       $.procedure_call,
@@ -423,8 +423,13 @@ module.exports = grammar({
     continue_statement: $ => kw('CONTINUE'),
     end_statement: $ => prec(-1, kw('END')),
 
-    // BEGIN marks where the main body starts; the compiler reads it as a label.
-    begin_statement: $ => kw('BEGIN'),
+    // Language version 400 made BEGIN ... END a block; before that BEGIN was a
+    // pseudo label and the END below it the statement that stops a program.
+    block: $ => seq(
+      kw('BEGIN'),
+      field('body', repeat($._statement)),
+      kw('END'),
+    ),
 
     // A label is one token, the way the compiler lexes it: no space after ':'.
     label: $ => token(seq(':', /[A-Za-z_][A-Za-z0-9_]*/)),

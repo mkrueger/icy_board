@@ -565,11 +565,44 @@ routines and labels, none of which keep a name either. A shipped PPE therefore
 carries no identifier from the source, and a decompiler has to invent them. See
 [the PPE format](ppe_format.md) for the layout.
 
+#### BEGIN ... END
+
+Before 400 the main program had no boundary of its own. `BEGIN` was a pseudo
+label that told `;$USEFUNCS` where the body started, and the `END` below it was
+the ordinary statement that stops a program.
+
+400 turns the pair into a real block:
+
+```PPL
+DECLARE PROCEDURE Greet()
+
+BEGIN
+    PRINTLN "Hello"
+    Greet()
+END
+
+PROCEDURE Greet()
+    PRINTLN "from a procedure"
+ENDPROC
+```
+
+A `BEGIN` without a matching `END` is an error, and once a program has a block,
+a statement outside it is one too - only declarations and comments may stand
+next to it. Because the block says where the body is, `;$USEFUNCS` is no longer
+needed to keep it in front of the routines; the block may just as well follow
+them. `BEGIN` may also group statements inside a routine, where it does nothing
+but read as one unit.
+
+The formatter indents the body of a block like any other block, and puts `END`
+back at the column its `BEGIN` starts on.
+
 #### What 400 breaks
 
 * Runtime 400 and 401 PPEs do not load on an original PCBoard.
 * `.` is a token, so it can no longer appear in an identifier.
 * `[` and `]` are index operators.
+* `BEGIN` is a keyword, so a 3.50 source may still have a variable called
+  `begin` while a 4.00 source may not.
 * A decompiled PPE names its records `TYPE001` and their fields `FIELD001`,
   because the file carries no names to recover.
 

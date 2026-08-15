@@ -76,6 +76,21 @@ impl<'a> FormattingVisitor<'a> {
         }
     }
 
+    /// The same for a block that spells out its own `BEGIN` and `END`.
+    fn format_delimited_block(&mut self, block: &BlockStatement) {
+        if block.get_begin_token().is_none() {
+            self.format_block(block.get_statements());
+            return;
+        }
+        self.inc_indent();
+        self.format_block(block.get_statements());
+        self.dec_indent();
+        if let Some(end_token) = block.get_end_token() {
+            self.backend.limit_blank_lines(end_token.span.start, self.options.max_blank_lines);
+            self.indent(end_token.span.clone());
+        }
+    }
+
     fn format_parameters(&mut self, parameters: &[ParameterSpecifier]) {
         let starts: Vec<usize> = parameters.iter().map(parameter_start).collect();
         self.separate(&starts);
@@ -128,7 +143,7 @@ impl<'a> FormattingVisitor<'a> {
                 AstNode::FunctionDeclaration(function) => Some(function.get_declare_token().span.clone()),
                 AstNode::ProcedureDeclaration(procedure) => Some(procedure.get_declare_token().span.clone()),
                 AstNode::TypeDeclaration(declaration) => Some(declaration.get_type_token().span.start..declaration.get_endtype_token().span.end),
-                AstNode::Main(_) => None,
+                AstNode::Main(main) => main.get_begin_token().map(|begin_token| begin_token.span.clone()),
             };
             if let Some(span) = &span {
                 self.backend.limit_blank_lines(span.start, self.options.max_blank_lines);
@@ -141,7 +156,11 @@ impl<'a> FormattingVisitor<'a> {
 
 impl<'a> AstVisitor<()> for FormattingVisitor<'a> {
     fn visit_main(&mut self, block: &BlockStatement) {
-        self.format_block(block.get_statements());
+        self.format_delimited_block(block);
+    }
+
+    fn visit_block_statement(&mut self, block: &BlockStatement) {
+        self.format_delimited_block(block);
     }
 
     fn visit_variable_declaration_statement(&mut self, declaration: &VariableDeclarationStatement) {

@@ -42,7 +42,7 @@ impl Statement {
         match self {
             Statement::Empty => 0..0,
             Statement::Comment(c) => c.get_comment_token().span.clone(),
-            Statement::Block(b) => b.get_begin_token().span.clone(),
+            Statement::Block(b) => b.get_span(),
             Statement::If(i) => i.get_if_token().span.clone(),
             Statement::IfThen(i) => i.get_if_token().span.clone(),
             Statement::Select(s) => s.get_select_token().span.clone(),
@@ -130,8 +130,9 @@ impl Statement {
                 true
             }
 
-            (Statement::Block(_), Statement::Block(_)) => {
-                panic!("Not implemented PPL has no blocks, it's just used as a container for statements during compiling.")
+            (Statement::Block(b1), Statement::Block(b2)) => {
+                b1.get_statements().len() == b2.get_statements().len()
+                    && b1.get_statements().iter().zip(b2.get_statements().iter()).all(|(s1, s2)| s1.is_similar(s2))
             }
 
             (Statement::If(i1), Statement::If(i2)) => i1.get_condition().is_similar(i2.get_condition()) && i1.get_statement().is_similar(i2.get_statement()),
@@ -460,30 +461,40 @@ impl fmt::Display for ReturnStatement {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct BlockStatement {
-    begin_token: Spanned<Token>,
+    begin_token: Option<Spanned<Token>>,
     statements: Vec<Statement>,
-    end_token: Spanned<Token>,
+    end_token: Option<Spanned<Token>>,
 }
 
 impl BlockStatement {
     pub fn new(begin_token: Spanned<Token>, statements: Vec<Statement>, end_token: Spanned<Token>) -> Self {
         Self {
-            begin_token,
+            begin_token: Some(begin_token),
             statements,
-            end_token,
+            end_token: Some(end_token),
         }
     }
 
+    /// A block without `BEGIN`/`END`, either a decompiled program or a container the compiler builds itself.
     pub fn empty(statements: Vec<Statement>) -> Self {
         Self {
-            begin_token: Spanned::create_empty(Token::Identifier(unicase::Ascii::new("BEGIN".to_string()))),
+            begin_token: None,
             statements,
-            end_token: Spanned::create_empty(Token::Identifier(unicase::Ascii::new("END".to_string()))),
+            end_token: None,
         }
     }
 
-    pub fn get_begin_token(&self) -> &Spanned<Token> {
-        &self.begin_token
+    #[must_use]
+    pub fn with_statements(&self, statements: Vec<Statement>) -> Self {
+        Self {
+            begin_token: self.begin_token.clone(),
+            statements,
+            end_token: self.end_token.clone(),
+        }
+    }
+
+    pub fn get_begin_token(&self) -> Option<&Spanned<Token>> {
+        self.begin_token.as_ref()
     }
 
     pub fn get_statements(&self) -> &Vec<Statement> {
@@ -494,8 +505,17 @@ impl BlockStatement {
         &mut self.statements
     }
 
-    pub fn get_end_token(&self) -> &Spanned<Token> {
-        &self.begin_token
+    pub fn get_end_token(&self) -> Option<&Spanned<Token>> {
+        self.end_token.as_ref()
+    }
+
+    pub fn get_span(&self) -> core::ops::Range<usize> {
+        if let (Some(begin_token), Some(end_token)) = (&self.begin_token, &self.end_token) {
+            return begin_token.span.start..end_token.span.end;
+        }
+        let start = self.statements.first().map_or(0, |stmt| stmt.get_span().start);
+        let end = self.statements.last().map_or(start, |stmt| stmt.get_span().end);
+        start..end
     }
 
     pub fn create_empty_statement(statements: Vec<Statement>) -> Statement {

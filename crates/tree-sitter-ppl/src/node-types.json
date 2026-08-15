@@ -58,7 +58,7 @@
         "named": true
       },
       {
-        "type": "begin_statement",
+        "type": "block",
         "named": true
       },
       {
@@ -267,11 +267,6 @@
     }
   },
   {
-    "type": "begin_statement",
-    "named": true,
-    "fields": {}
-  },
-  {
     "type": "binary_expression",
     "named": true,
     "fields": {
@@ -381,6 +376,22 @@
         "types": [
           {
             "type": "_expression",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "block",
+    "named": true,
+    "fields": {
+      "body": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "_statement",
             "named": true
           }
         ]

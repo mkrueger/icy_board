@@ -207,6 +207,7 @@ pub enum Token {
 
     Type,
     EndType,
+    Begin,
 }
 
 impl Token {
@@ -327,6 +328,7 @@ impl fmt::Display for Token {
             Token::OrAssign => write!(f, "|="),
             Token::Type => write!(f, "TYPE"),
             Token::EndType => write!(f, "ENDTYPE"),
+            Token::Begin => write!(f, "BEGIN"),
         }
     }
 }
@@ -503,11 +505,12 @@ lazy_static::lazy_static! {
         m
     };
 
-    /// 400 only, so a 3.50 source may still call something 'type'.
+    /// 400 only, so a 3.50 source may still call something 'type' or 'begin'.
     static ref TOKEN_LOOKUP_TABLE_400: HashMap<unicase::Ascii<String>, Token> = {
         let mut m = TOKEN_LOOKUP_TABLE_350.clone();
         m.insert(unicase::Ascii::new("type".to_string()), Token::Type);
         m.insert(unicase::Ascii::new("endtype".to_string()), Token::EndType);
+        m.insert(unicase::Ascii::new("begin".to_string()), Token::Begin);
         m
     };
 

@@ -1348,7 +1348,7 @@
         },
         {
           "type": "SYMBOL",
-          "name": "begin_statement"
+          "name": "block"
         },
         {
           "type": "SYMBOL",
@@ -2673,17 +2673,45 @@
         "value": "END"
       }
     },
-    "begin_statement": {
-      "type": "ALIAS",
-      "content": {
-        "type": "TOKEN",
-        "content": {
-          "type": "PATTERN",
-          "value": "[bB][eE][gG][iI][nN]"
+    "block": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
+              "value": "[bB][eE][gG][iI][nN]"
+            }
+          },
+          "named": false,
+          "value": "BEGIN"
+        },
+        {
+          "type": "FIELD",
+          "name": "body",
+          "content": {
+            "type": "REPEAT",
+            "content": {
+              "type": "SYMBOL",
+              "name": "_statement"
+            }
+          }
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
+              "value": "[eE][nN][dD]"
+            }
+          },
+          "named": false,
+          "value": "END"
         }
-      },
-      "named": false,
-      "value": "BEGIN"
+      ]
     },
     "label": {
       "type": "TOKEN",

@@ -239,9 +239,28 @@ END
 --------------------------------------------------------------------------------
 
 (source_file
-  (begin_statement)
-  (predefined_call
-    name: (builtin_statement)
-    argument: (constant
-      (string_literal)))
-  (end_statement))
+  (block
+    body: (predefined_call
+      name: (builtin_statement)
+      argument: (constant
+        (string_literal)))))
+
+================================================================================
+END on its own still stops a program
+================================================================================
+
+BEGIN
+    IF (1) THEN
+        END
+    END IF
+END
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    body: (if_block
+      condition: (parenthesized_expression
+        (constant
+          (number_literal)))
+      consequence: (end_statement))))

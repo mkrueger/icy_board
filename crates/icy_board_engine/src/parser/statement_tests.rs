@@ -5,18 +5,19 @@ use std::{
 
 use crate::{
     ast::{
-        BreakStatement, CaseBlock, CaseSpecifier, CommentAstNode, Constant, ConstantExpression, ContinueStatement, ElseBlock, ElseIfBlock, ForStatement,
-        GosubStatement, GotoStatement, IdentifierExpression, IfStatement, IfThenStatement, LabelStatement, LetStatement, LoopStatement, ParensExpression,
-        PredefinedCallStatement, RepeatUntilStatement, ReturnStatement, SelectStatement, Statement, UnaryExpression, UnaryOp, VariableDeclarationStatement,
-        VariableSpecifier, WhileDoStatement, WhileStatement, constant::NumberFormat,
+        Ast, AstNode, BlockStatement, BreakStatement, CaseBlock, CaseSpecifier, CommentAstNode, Constant, ConstantExpression, ContinueStatement, ElseBlock,
+        ElseIfBlock, ForStatement, GosubStatement, GotoStatement, IdentifierExpression, IfStatement, IfThenStatement, LabelStatement, LetStatement,
+        LoopStatement, ParensExpression, PredefinedCallStatement, RepeatUntilStatement, ReturnStatement, SelectStatement, Statement, UnaryExpression, UnaryOp,
+        VariableDeclarationStatement, VariableSpecifier, WhileDoStatement, WhileStatement, constant::NumberFormat,
     },
-    compiler::workspace::Workspace,
+    compiler::workspace::{CompilerData, Workspace},
     executable::{OpCode, VariableType},
 };
 
 use super::{
-    Encoding, ErrorReporter, Parser, UserTypeRegistry,
+    Encoding, ErrorReporter, Parser, ParserErrorType, UserTypeRegistry,
     lexer::{Spanned, Token},
+    parse_ast,
 };
 
 fn parse_statement(input: &str, assert_eof: bool) -> Statement {
@@ -641,7 +642,62 @@ NEXT I",
 
 #[test]
 fn test_check_begin() {
-    check_statement(r"BEGIN", &LabelStatement::create_empty_statement(unicase::Ascii::new("~BEGIN~".to_string())));
+    check_statement("BEGIN\nEND", &BlockStatement::create_empty_statement(Vec::new()));
+    check_statement(
+        "BEGIN\n  PRINT 1\nEND",
+        &BlockStatement::create_empty_statement(vec![PredefinedCallStatement::create_empty_statement(
+            OpCode::PRINT.get_definition(),
+            vec![ConstantExpression::create_empty_expression(Constant::Integer(1, NumberFormat::Default))],
+        )]),
+    );
+}
+
+fn parse_program(input: &str, language_version: u16) -> (Ast, Vec<String>) {
+    let registry = UserTypeRegistry::default();
+    let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+    let mut workspace = Workspace::default();
+    workspace.compiler = Some(CompilerData {
+        language_version: Some(language_version),
+        defines: None,
+    });
+    let ast = parse_ast(PathBuf::from("."), errors.clone(), input, &registry, Encoding::Utf8, &workspace);
+    let messages = errors.lock().unwrap().errors.iter().map(|error| error.error.to_string()).collect();
+    (ast, messages)
+}
+
+#[test]
+fn a_block_without_an_end_is_an_error() {
+    let (_, messages) = parse_program(";$USEFUNCS\nBEGIN\n  PRINT 1\n", 400);
+    assert_eq!(vec![ParserErrorType::BlockEndExpected.to_string()], messages);
+}
+
+#[test]
+fn statements_outside_of_a_block_are_an_error() {
+    let (_, messages) = parse_program("BEGIN\n  PRINT 1\nEND\nPRINT 2\n", 400);
+    assert_eq!(vec![ParserErrorType::NoStatementsAllowedOutsideBlock.to_string()], messages);
+}
+
+#[test]
+fn a_block_collects_the_main_program() {
+    let (ast, messages) = parse_program("BEGIN\n  PRINT 1\n  PRINT 2\nEND\n", 400);
+    assert!(messages.is_empty(), "{messages:?}");
+    let [AstNode::Main(main)] = ast.nodes.as_slice() else {
+        panic!("expected a single main block, got {:?}", ast.nodes);
+    };
+    assert_eq!(2, main.get_statements().len());
+    assert!(main.get_begin_token().is_some());
+    assert!(main.get_end_token().is_some());
+}
+
+#[test]
+fn an_older_language_keeps_begin_as_a_pseudo_label() {
+    let (ast, messages) = parse_program(";$USEFUNCS\nBEGIN\n  PRINT 1\n", 350);
+    assert!(messages.is_empty(), "{messages:?}");
+    assert!(
+        ast.nodes.iter().any(|node| matches!(node, AstNode::Main(_))),
+        "expected a main block, got {:?}",
+        ast.nodes
+    );
 }
 
 #[test]

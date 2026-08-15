@@ -110,6 +110,12 @@ pub enum ParserErrorType {
     #[error("No statements allowed outside of BEGIN...END block")]
     NoStatementsAllowedOutsideBlock,
 
+    #[error("'END' expected before the end of the file")]
+    BlockEndExpected,
+
+    #[error("A program can only have one BEGIN...END block")]
+    BlockAlreadyDefined,
+
     #[error("$USEFUNCS used after statements has no effect.")]
     UsefuncAfterStatement,
 
@@ -342,6 +348,7 @@ pub struct Parser<'a> {
     // parser state
     use_funcs: bool,
     parsed_begin: bool,
+    parsed_block: bool,
     got_statement: bool,
     got_funcs: bool,
     in_function: bool,
@@ -380,6 +387,7 @@ impl<'a> Parser<'a> {
             },
             use_funcs: false,
             parsed_begin: false,
+            parsed_block: false,
             got_statement: false,
             got_funcs: false,
             in_function: false,
@@ -539,6 +547,16 @@ impl<'a> Parser<'a> {
                     return Some(AstNode::TypeDeclaration(decl));
                 }
             }
+            Token::Begin => {
+                if self.parsed_block {
+                    self.report_error(cur_token.span.clone(), ParserErrorType::BlockAlreadyDefined);
+                    return None;
+                }
+                let (begin_token, statements, end_token) = self.parse_block_body()?;
+                self.parsed_block = true;
+                self.got_statement = true;
+                return Some(AstNode::Main(BlockStatement::new(begin_token, statements, end_token)));
+            }
             Token::UseFuncs(_, _) => {
                 if self.use_funcs {
                     self.error_reporter
@@ -568,7 +586,7 @@ impl<'a> Parser<'a> {
                         }
                     }
 
-                    if self.use_funcs && !self.parsed_begin {
+                    if self.parsed_block || (self.use_funcs && !self.parsed_begin) {
                         if matches!(stmt, Statement::Comment(_)) || matches!(stmt, Statement::VariableDeclaration(_)) {
                             return Some(AstNode::TopLevelStatement(stmt));
                         }

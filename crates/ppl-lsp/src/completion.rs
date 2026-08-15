@@ -16,7 +16,7 @@ pub enum ImCompleteCompletionItem {
     Function(String, Vec<String>),
 }
 
-const KEYWORDS: [&str; 18] = [
+const KEYWORDS: [&str; 20] = [
     "LET",
     "GOTO",
     "GOSUB",
@@ -35,6 +35,8 @@ const KEYWORDS: [&str; 18] = [
     "PROCEDURE",
     "ENDPROC",
     "ENDFUNC",
+    "BEGIN",
+    "END",
 ];
 
 const TYPES: [&str; 27] = [

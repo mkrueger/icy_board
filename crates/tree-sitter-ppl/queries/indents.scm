@@ -17,6 +17,7 @@
   (select_statement)
   (case_clause)
   (default_clause)
+  (block)
 ] @indent.begin @indent
 
 [

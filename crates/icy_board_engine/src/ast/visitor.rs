@@ -455,7 +455,7 @@ pub trait AstVisitorMut: Sized {
     }
 
     fn visit_block(&mut self, block: &BlockStatement) -> BlockStatement {
-        BlockStatement::empty(block.get_statements().iter().map(|stmt| stmt.visit_mut(self)).collect())
+        block.with_statements(block.get_statements().iter().map(|stmt| stmt.visit_mut(self)).collect())
     }
     fn visit_if_statement(&mut self, if_stmt: &IfStatement) -> Statement {
         Statement::If(IfStatement::empty(

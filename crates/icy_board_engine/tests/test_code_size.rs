@@ -40,7 +40,7 @@ const EXPECTED_CODE_SIZE: &[(&str, usize)] = &[
     ("test_functions.pps", 40),
     ("test_optext.pps", 20),
     ("test_rounding_bug.pps", 294),
-    ("use_funcs1.pps", 24),
+    ("use_funcs1.pps", 22),
 ];
 
 fn code_size(file_name: &PathBuf, source: &str) -> usize {

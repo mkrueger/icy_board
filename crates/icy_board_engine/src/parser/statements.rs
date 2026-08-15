@@ -1,9 +1,9 @@
 use crate::{
     ast::{
-        BreakStatement, CaseBlock, CaseSpecifier, CommentAstNode, Constant, ContinueStatement, ElseBlock, ElseIfBlock, ForStatement, GosubStatement,
-        GotoStatement, IdentifierExpression, IfStatement, IfThenStatement, LabelStatement, LetStatement, LoopStatement, PredefinedCallStatement,
-        ProcedureCallStatement, RepeatUntilStatement, ReturnStatement, SelectStatement, Statement, VariableDeclarationStatement, WhileDoStatement,
-        WhileStatement,
+        BlockStatement, BreakStatement, CaseBlock, CaseSpecifier, CommentAstNode, Constant, ContinueStatement, ElseBlock, ElseIfBlock, ForStatement,
+        GosubStatement, GotoStatement, IdentifierExpression, IfStatement, IfThenStatement, LabelStatement, LetStatement, LoopStatement,
+        PredefinedCallStatement, ProcedureCallStatement, RepeatUntilStatement, ReturnStatement, SelectStatement, Statement, VariableDeclarationStatement,
+        WhileDoStatement, WhileStatement,
     },
     executable::{OpCode, StatementDefinition},
     parser::ParserErrorType,
@@ -24,6 +24,39 @@ impl<'a> Parser<'a> {
         while self.get_cur_token() == Some(Token::Eol) || matches!(self.get_cur_token(), Some(Token::Comment(_, _))) {
             self.next_token();
         }
+    }
+
+    /// Parses the body of a `BEGIN...END` block, which language version 400 turned from a pair of
+    /// pseudo labels into a real block. The `BEGIN` token has to be the current one.
+    pub(crate) fn parse_block_body(&mut self) -> Option<(Spanned<Token>, Vec<Statement>, Spanned<Token>)> {
+        let begin_token = self.save_spanned_token();
+        self.next_token();
+
+        let mut statements = Vec::new();
+        loop {
+            let Some(cur_token) = &self.cur_token else {
+                self.report_error(begin_token.span.clone(), ParserErrorType::BlockEndExpected);
+                return None;
+            };
+            if is_block_end(&cur_token.token) {
+                let end_token = self.save_spanned_token();
+                self.next_token();
+                return Some((begin_token, statements, end_token));
+            }
+            // A declaration cannot be part of the body, so END is missing rather than misplaced.
+            if matches!(cur_token.token, Token::Function | Token::Procedure | Token::Declare) {
+                self.report_error(begin_token.span.clone(), ParserErrorType::BlockEndExpected);
+                return None;
+            }
+            if let Some(statement) = self.parse_statement() {
+                statements.push(statement);
+            }
+        }
+    }
+
+    fn parse_block(&mut self) -> Option<Statement> {
+        let (begin_token, statements, end_token) = self.parse_block_body()?;
+        Some(Statement::Block(BlockStatement::new(begin_token, statements, end_token)))
     }
 
     fn parse_while(&mut self) -> Option<Statement> {
@@ -531,11 +564,7 @@ impl<'a> Parser<'a> {
                 self.next_token();
                 None
             }
-            /*
-            Some(Token::Begin) => {
-                let begin_token = self.save_spanned_token();
-                self.parse_block(begin_token)
-            }*/
+            Some(Token::Begin) => self.parse_block(),
             Some(Token::While) => self.parse_while(),
             Some(Token::Repeat) => self.parse_repeat_until(),
             Some(Token::Loop) => self.parse_loop(),
@@ -808,6 +837,7 @@ impl<'a> Parser<'a> {
             }
 
             if *identifier == *BEGIN_TOKEN {
+                // Before 400 the main block was marked by a pseudo label instead of a real block.
                 return Some(Statement::Label(LabelStatement::new(Spanned {
                     token: Token::Label(BEGIN_LABEL.clone()),
                     span: id_token.span,
@@ -940,7 +970,13 @@ lazy_static::lazy_static! {
 
     static ref BEGIN_TOKEN: unicase::Ascii<String> = unicase::Ascii::new("BEGIN".to_string());
     pub static ref BEGIN_LABEL: unicase::Ascii<String> = unicase::Ascii::new("~BEGIN~".to_string());
+    static ref END_TOKEN: unicase::Ascii<String> = unicase::Ascii::new("END".to_string());
 
+}
+
+/// `END` stays the statement that stops a program, so it never became a keyword of its own.
+fn is_block_end(token: &Token) -> bool {
+    matches!(token, Token::Identifier(identifier) if *identifier == *END_TOKEN)
 }
 
 fn is_do_then(token: &Option<Spanned<Token>>) -> bool {
