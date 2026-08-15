@@ -21,3 +21,6 @@ toml = { workspace = true }
 serde = { workspace = true }
 walkdir = { workspace = true }
 diff = "0.1.13"
+
+[dev-dependencies]
+tempfile = { workspace = true }

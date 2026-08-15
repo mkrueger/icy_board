@@ -1,7 +1,7 @@
 use argh::FromArgs;
 use ariadne::{Label, Report, ReportKind};
 
-use codepages::tables::{write_cp437, write_utf8_with_bom};
+use codepages::tables::UNICODE_TO_CP437;
 use icy_board_engine::{
     Res,
     ast::Ast,
@@ -11,7 +11,7 @@ use icy_board_engine::{
     },
     executable::{LAST_PPL_LANGUAGE_VERSION, SUPPORTED_PPE_VERSIONS, SUPPORTED_PPL_LANGUAGE_VERSIONS},
     formatting::{FormattingVisitor, StringFormattingBackend},
-    icy_board::read_with_encoding_detection,
+    icy_board::{read_with_encoding_detection, write_atomic},
     parser::{Encoding, ErrorReporter, UserTypeRegistry, load_with_encoding, parse_ast_with_predeclared_types, preparse_type_declarations},
 };
 
@@ -93,48 +93,33 @@ fn main() {
 
     if let Some(version) = arguments.runtime {
         if !SUPPORTED_PPE_VERSIONS.contains(&version) {
-            println!("Invalid version number valid values {SUPPORTED_PPE_VERSIONS:?}");
-            return;
+            eprintln!("Invalid version number valid values {SUPPORTED_PPE_VERSIONS:?}");
+            std::process::exit(2);
         }
     }
     if let Some(version) = arguments.lang_version {
         if !SUPPORTED_PPL_LANGUAGE_VERSIONS.contains(&version) {
-            println!("Invalid language version valid values {SUPPORTED_PPL_LANGUAGE_VERSIONS:?}");
-            return;
+            eprintln!("Invalid language version valid values {SUPPORTED_PPL_LANGUAGE_VERSIONS:?}");
+            std::process::exit(2);
         }
     }
 
     if arguments.init {
         let Some(file) = arguments.file.clone() else {
-            println!("No target directory specified.");
-            return;
+            eprintln!("No target directory specified.");
+            std::process::exit(2);
         };
 
         if file.exists() {
-            println!("Target directory already exists.");
-            return;
+            eprintln!("Target directory already exists.");
+            std::process::exit(1);
         }
         let src_dir = file.join("src");
-        fs::create_dir_all(&src_dir).unwrap();
-        fs::write(&src_dir.join("main.pps"), "PRINTLN \"Hello, World!\"").unwrap();
-
-        let mut ws = Workspace::default();
-        ws.file_name = file.clone();
-        ws.package = Package {
-            name: file.file_name().unwrap().to_str().unwrap().to_string(),
-            runtime: None,
-            version: Version::new(0, 1, 0),
-            authors: None,
-        };
-        ws.compiler = Some(CompilerData {
-            language_version: Some(arguments.lang_version.unwrap_or(LAST_PPL_LANGUAGE_VERSION)),
-            defines: if let Some(defines) = arguments.defines {
-                Some(defines.split(';').map(|s| s.to_string()).collect())
-            } else {
-                None
-            },
-        });
-        ws.save(file.join("ppl.toml")).unwrap();
+        if let Err(err) = init_package(&file, &src_dir, &arguments) {
+            eprintln!("ERROR: {err}");
+            let _ = fs::remove_dir_all(&file);
+            std::process::exit(1);
+        }
         println!("Created new ppl package in {}", file.display());
         return;
     }
@@ -148,40 +133,20 @@ fn main() {
         file.clone()
     };
 
-    if !file.exists() {
+    if !file_name.exists() {
         if arguments.file.is_none() {
             if let Err(err) = Cli::from_args(&["pplc"], &["--help"]) {
                 eprintln!("{}", err.output);
             }
         } else {
-            execute!(
-                stdout(),
-                SetAttribute(Attribute::Bold),
-                SetForegroundColor(Color::Red),
-                Print(format!("ERROR: {} not found on disk, aborting...", file.display())),
-                SetAttribute(Attribute::Reset),
-                SetAttribute(Attribute::Reset),
-            )
-            .unwrap();
+            eprintln!("ERROR: {} not found on disk, aborting...", file_name.display());
         }
         std::process::exit(1);
     }
 
-    if file_name.extension().unwrap() == "toml" {
+    if file_name.extension().is_some_and(|extension| extension == "toml") {
         if let Err(err) = compile_toml(&file_name, &arguments) {
-            execute!(
-                stdout(),
-                SetAttribute(Attribute::Bold),
-                SetForegroundColor(Color::Red),
-                Print("ERROR: ".to_string()),
-                SetAttribute(Attribute::Reset),
-                SetAttribute(Attribute::Bold),
-                Print(format!("{}", err)),
-                SetAttribute(Attribute::Reset),
-            )
-            .unwrap();
-            println!();
-            println!();
+            eprintln!("ERROR: {err}");
             std::process::exit(1);
         }
         return;
@@ -203,7 +168,34 @@ fn main() {
     ws.hard_coded_files = Some(vec![PathBuf::from(&file_name)]);
     apply_arguments(&mut ws, &arguments);
 
-    compile_files(&arguments, encoding, &ws, &out_file_name);
+    if let Err(err) = compile_files(&arguments, encoding, &ws, &out_file_name) {
+        eprintln!("ERROR: {err}");
+        std::process::exit(1);
+    }
+}
+
+fn init_package(file: &Path, src_dir: &Path, arguments: &Cli) -> Res<()> {
+    fs::create_dir_all(src_dir)?;
+    write_atomic(src_dir.join("main.pps"), b"PRINTLN \"Hello, World!\"")?;
+
+    let mut ws = Workspace::default();
+    ws.file_name = file.to_path_buf();
+    ws.package = Package {
+        name: file.file_name().and_then(|name| name.to_str()).unwrap_or("package").to_string(),
+        runtime: None,
+        version: Version::new(0, 1, 0),
+        authors: None,
+    };
+    ws.compiler = Some(CompilerData {
+        language_version: Some(arguments.lang_version.unwrap_or(LAST_PPL_LANGUAGE_VERSION)),
+        defines: if let Some(defines) = &arguments.defines {
+            Some(defines.split(';').map(|s| s.to_string()).collect())
+        } else {
+            None
+        },
+    });
+    ws.save(file.join("ppl.toml"))?;
+    Ok(())
 }
 
 /// The command line wins over the manifest, and a package that has none still needs these.
@@ -223,14 +215,14 @@ fn compile_toml(file_name: &PathBuf, arguments: &Cli) -> Res<()> {
     let mut workspace = Workspace::load(file_name)?;
     apply_arguments(&mut workspace, arguments);
 
-    let base_path = file_name.parent().unwrap();
+    let base_path = file_name.parent().unwrap_or_else(|| Path::new("."));
     let encoding: Encoding = Encoding::Detect;
 
     let target_path = workspace.target_path(workspace.runtime());
-    fs::create_dir_all(&target_path).expect("Unable to create target directory");
+    fs::create_dir_all(&target_path)?;
 
     let out_file_name = target_path.join(workspace.package.name()).with_extension("ppe");
-    compile_files(arguments, encoding, &workspace, &out_file_name);
+    compile_files(arguments, encoding, &workspace, &out_file_name)?;
     println!("Copying data files...");
     if let Some(data) = &workspace.data {
         if let Some(art_files) = &data.art_files {
@@ -239,25 +231,25 @@ fn compile_toml(file_name: &PathBuf, arguments: &Cli) -> Res<()> {
                 let out_file = target_path.join(&file);
                 fs::create_dir_all(out_file.parent().unwrap())?;
 
-                if src_file.extension().unwrap() == "icy" {
+                if src_file.extension().is_some_and(|extension| extension == "icy") {
                     let data = fs::read(&src_file)?;
-                    let format = FileFormat::from_extension("icy").unwrap();
-                    let loaded = format.from_bytes(&data, None).unwrap();
+                    let format = FileFormat::from_extension("icy").ok_or("ICY format is unavailable")?;
+                    let loaded = format.from_bytes(&data, None)?;
                     let options = SaveOptions {
                         format: FormatOptions::Character(CharacterFormatOptions::default()),
                         ..Default::default()
                     };
-                    let bytes = FileFormat::PCBoard.to_bytes(&loaded.screen.buffer, &options).unwrap();
+                    let bytes = FileFormat::PCBoard.to_bytes(&loaded.screen.buffer, &options)?;
                     let out_file: PathBuf = out_file.with_extension("pcb");
-                    fs::write(out_file, bytes)?;
+                    write_atomic(out_file, &bytes)?;
                     continue;
                 }
 
                 let txt = read_with_encoding_detection(&src_file)?;
                 if workspace.runtime() <= 340 {
-                    write_cp437(&out_file, &txt)?;
+                    write_atomic(&out_file, &encode_cp437(&txt))?;
                 } else {
-                    write_utf8_with_bom(&out_file, &txt)?;
+                    write_atomic(&out_file, &encode_utf8(&txt))?;
                 }
             }
         }
@@ -269,9 +261,9 @@ fn compile_toml(file_name: &PathBuf, arguments: &Cli) -> Res<()> {
                 let txt = read_with_encoding_detection(&src_file)?;
 
                 if workspace.runtime() <= 340 {
-                    write_cp437(&out_file, &txt)?;
+                    write_atomic(&out_file, &encode_cp437(&txt))?;
                 } else {
-                    write_utf8_with_bom(&out_file, &txt)?;
+                    write_atomic(&out_file, &encode_utf8(&txt))?;
                 }
             }
         }
@@ -281,19 +273,12 @@ fn compile_toml(file_name: &PathBuf, arguments: &Cli) -> Res<()> {
 }
 
 /// Writes beside the source and renames, so a failure cannot leave a half file.
-fn write_formatted(file: &Path, text: &str) {
-    let temporary = file.with_extension("pps.tmp");
-    if fs::write(&temporary, text).is_err() {
-        eprintln!("ERROR: cannot write {}", temporary.display());
-        return;
-    }
-    if let Err(err) = fs::rename(&temporary, file) {
-        eprintln!("ERROR: cannot replace {}: {err}", file.display());
-        let _ = fs::remove_file(&temporary);
-    }
+fn write_formatted(file: &Path, text: &str) -> Res<()> {
+    write_atomic(file, text.as_bytes())?;
+    Ok(())
 }
 
-fn compile_files(arguments: &Cli, encoding: Encoding, workspace: &Workspace, out_file_name: &Path) {
+fn compile_files(arguments: &Cli, encoding: Encoding, workspace: &Workspace, out_file_name: &Path) -> Res<()> {
     let errors = Arc::new(Mutex::new(ErrorReporter::default()));
 
     let reg = UserTypeRegistry::icy_board_registry();
@@ -378,7 +363,7 @@ fn compile_files(arguments: &Cli, encoding: Encoding, workspace: &Workspace, out
                         } else if arguments.stdout {
                             print!("{formatted_text}");
                         } else {
-                            write_formatted(&src_file, &formatted_text);
+                            write_formatted(&src_file, &formatted_text)?;
                         }
                     } else if arguments.stdout {
                         print!("{src}");
@@ -411,7 +396,10 @@ fn compile_files(arguments: &Cli, encoding: Encoding, workspace: &Workspace, out
         }
     }
     if arguments.format {
-        std::process::exit(exit_code);
+        if exit_code != 0 {
+            std::process::exit(exit_code);
+        }
+        return Ok(());
     }
 
     // --check runs the compiler for its diagnostics, it just keeps the result.
@@ -424,7 +412,10 @@ fn compile_files(arguments: &Cli, encoding: Encoding, workspace: &Workspace, out
         std::process::exit(1);
     }
     if arguments.check {
-        std::process::exit(exit_code);
+        if exit_code != 0 {
+            std::process::exit(exit_code);
+        }
+        return Ok(());
     }
 
     match compiler.create_executable() {
@@ -440,12 +431,12 @@ fn compile_files(arguments: &Cli, encoding: Encoding, workspace: &Workspace, out
                 println!("Generated:");
                 executable.print_script_buffer_dump();
                 println!();
-                return;
+                return Ok(());
             }
 
-            let bin = executable.to_buffer().unwrap();
+            let bin = executable.to_buffer()?;
             //let len = bin.len();
-            fs::write(out_file_name, bin).expect("Unable to write file");
+            write_atomic(out_file_name, &bin)?;
             //let lines = src.lines().count();
             //println!("{} lines, {} chars compiled. {} bytes written to {:?}", lines, src.len(), len, &out_file_name);
         }
@@ -467,6 +458,27 @@ fn compile_files(arguments: &Cli, encoding: Encoding, workspace: &Workspace, out
             std::process::exit(1);
         }
     }
+    Ok(())
+}
+
+fn encode_utf8(text: &str) -> Vec<u8> {
+    let mut data = vec![0xEF, 0xBB, 0xBF];
+    data.extend_from_slice(text.as_bytes());
+    data
+}
+
+fn encode_cp437(text: &str) -> Vec<u8> {
+    let mut data = Vec::with_capacity(text.len());
+    for c in text.chars() {
+        if c == '\r' {
+            continue;
+        }
+        if c == '\n' {
+            data.push(b'\r');
+        }
+        data.push(UNICODE_TO_CP437.get(&c).copied().unwrap_or(b'.'));
+    }
+    data
 }
 
 fn check_errors(errors: std::sync::Arc<std::sync::Mutex<icy_board_engine::parser::ErrorReporter>>, arguments: &Cli, src: &[(Ast, String)]) -> bool {
