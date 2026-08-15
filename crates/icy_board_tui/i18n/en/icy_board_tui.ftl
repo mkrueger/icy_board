@@ -1570,10 +1570,6 @@ icbsm_menu_groups=Edit Groups
 
 icbsm_pack_title=Pack Users File
 icbsm_adjust_security_title=Adjust Security Levels
-icbsm_adjust_expiration_title=Adjust Expiration Dates
-icbsm_conf_insert_title=Insert Group Conference
-icbsm_conf_remove_title=Remove Group Conference
-icbsm_conf_move_title=Move Users BETWEEN Conferences
 icbsm_phones_title=Standardize Phone Formats
 icbsm_undo_title=Undo (restore backup file)
 
@@ -1702,7 +1698,7 @@ icbsm_menu_keys=Use arrow keys to move bar, press ENTER to select, ESC to exit
 
 icbsm_min_security=Change users whose security is greater than or equal to
 icbsm_max_security=and whose security level is less than or equal to
-icbsm_use_expired_level=Base Security Level Criteria on the Expired Level
+icbsm_use_expired_level=Base Security Level Criteria on the EXPIRED Level
 
 icbsm_pack_removal_group=Criteria for User Record Removal
 icbsm_pack_keep_group=Criteria for Keeping User Record
@@ -1722,20 +1718,41 @@ icbsm_write_expired_level=Change the Expired Security Level instead
 icbsm_copy_expired_level=Change Security to Expired Level
 icbsm_copy_expired_level-status=Takes the new level from each record instead
 
-icbsm_set_expiration=Set a New Expiration Date
-icbsm_expiration_date=New Expiration Date
+icbsm_expiration_title=Change Expiration Date
+icbsm_expiration_range_group=Security Level Range
+icbsm_expiration_change_group=Change Expiration Date To:
+icbsm_exp_min_security=Adjust Expiration Date if level is Greater than or equal to
+icbsm_exp_max_security=Adjust Expiration Date if level is Less than or equal to
+icbsm_expiration_date=New Expiration Date (01-01-80 is ignored)
 icbsm_add_days=Current Date in record plus XXXX days
 
-icbsm_conf_first=First number of conferences to be adjusted
-icbsm_conf_last=Last  number of conferences to be adjusted
+icbsm_conf_insert_title=Insert Group Conference Registrations
+icbsm_conf_remove_title=Remove Group Conference Registrations
+icbsm_conf_move_title=Move User(s) Between Conferences
+
+icbsm_conf_first_insert=First number of conferences to be inserted in registrations
+icbsm_conf_last_insert=Last  number of conferences to be inserted in registrations
+icbsm_conf_first_remove=First number of conferences to be removed from registrations
+icbsm_conf_last_remove=Last  number of conferences to be removed from registrations
+icbsm_conf_min_security=Adjust users with a security level greater than or equal to
+icbsm_conf_max_security=and less than or equal to
+
 icbsm_conf_from=REMOVE user(s) from which conference
 icbsm_conf_to=ADD to which conference
+icbsm_move_min_security=Include users with security levels GREATER THAN or EQUAL TO
+icbsm_move_max_security=Include users with security levels  LESS THAN   or EQUAL TO
+
 icbsm_flag_registered=Adjust conferences user is normally allowed to join
 icbsm_flag_expired=Adjust conferences user can join with expired subscription
 icbsm_flag_selected=Adjust the user selected conferences for scanning
 icbsm_flag_sysop=Adjust conferences where user becomes a sysop when joining
 icbsm_reset_lastread=Reset user's last message read to zero in these conferences
 icbsm_flag_net_status=Adjust conferences where user has Net Status
+
+icbsm_move_flag_registered=Adjust conferences user is allowed in (at all times)
+icbsm_move_flag_expired=Adjust conferences user is allowed in (expired subscription)
+icbsm_move_flag_selected=Adjust conferences user-scan preference list
+icbsm_move_flag_sysop=Adjust conferences where user becomes a sysop upon joining
 icbsm_move_lastread=Move the 'Last Message Read' pointer to the new conference
 icbsm_move_last_conference=Set the 'Last Conference In' flag
 
@@ -1759,10 +1776,10 @@ icbsm_undo_failed=Could not restore the user file: { $error }
 
 icbsm_board_in_use=Another tool is working on this board. Close it and start again.
 
-icbsm_sort_record=Record
-icbsm_sort_name=Name
-icbsm_sort_security=Security
-icbsm_sort_last_on=Last On
+icbsm_list_sort_record=Record
+icbsm_list_sort_name=Name
+icbsm_list_sort_security=Security
+icbsm_list_sort_last_on=Last On
 
 icbsm_user_list_keys=F2 Save, F3 Find, F4 Sort ({ $sort }), INS Add, DEL Remove
 icbsm_user_list_search=Find: { $search }_ (ENTER Keep, ESC Clear)

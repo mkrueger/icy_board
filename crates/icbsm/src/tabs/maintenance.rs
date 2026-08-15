@@ -48,7 +48,7 @@ impl MaintenanceOp {
             MaintenanceOp::AdjustSecurityExpired => get_text("icbsm_sec_by_ranges_expired_title"),
             MaintenanceOp::CopyExpiredSecurity => get_text("icbsm_sec_copy_expired"),
             MaintenanceOp::InitializeCounters => get_text("icbsm_counters_title"),
-            MaintenanceOp::AdjustExpiration => get_text("icbsm_adjust_expiration_title"),
+            MaintenanceOp::AdjustExpiration => get_text("icbsm_expiration_title"),
             MaintenanceOp::ConferenceInsert => get_text("icbsm_conf_insert_title"),
             MaintenanceOp::ConferenceRemove => get_text("icbsm_conf_remove_title"),
             MaintenanceOp::ConferenceMove => get_text("icbsm_conf_move_title"),
@@ -80,7 +80,6 @@ struct Params {
     counter_files: bool,
     counter_bytes: bool,
 
-    set_expiration_date: bool,
     expiration_date: DateTime<Utc>,
     add_days: u32,
 
@@ -125,15 +124,14 @@ impl Default for Params {
             counter_option: 1,
             counter_files: false,
             counter_bytes: false,
-            set_expiration_date: false,
-            expiration_date: Utc::now(),
+            expiration_date: no_date(),
             add_days: 0,
             conf_first: 0,
             conf_last: 0,
             conf_target: 0,
             flag_registered: true,
-            flag_expired: false,
-            flag_selected: false,
+            flag_expired: true,
+            flag_selected: true,
             flag_sysop: false,
             flag_net_status: false,
             reset_lastread: false,
@@ -247,12 +245,13 @@ impl MaintenancePage {
         ) {
             params.max_security = 110;
         }
-        // Packing has no range of its own; it keeps by level instead.
-        if op == MaintenanceOp::Pack || op == MaintenanceOp::StandardizePhones {
+        if matches!(op, MaintenanceOp::Pack | MaintenanceOp::StandardizePhones) {
             params.max_security = 255;
         }
-        let mut entry = if op == MaintenanceOp::Pack {
-            vec![
+
+        let width = screen_label_width(op);
+        let entry = match op {
+            MaintenanceOp::Pack => vec![
                 ConfigEntry::Separator,
                 ConfigEntry::Group(
                     get_text("icbsm_pack_removal_group"),
@@ -297,13 +296,9 @@ impl MaintenancePage {
                         })),
                     ],
                 ),
-            ]
-        } else if op == MaintenanceOp::InitializeCounters {
-            // The counters screen picks no range; it lists its options instead.
-            Vec::new()
-        } else {
-            let width = screen_label_width(op);
-            let mut range = vec![
+            ],
+
+            MaintenanceOp::AdjustSecurity | MaintenanceOp::AdjustSecurityExpired => vec![
                 ConfigEntry::Separator,
                 sized(
                     u32_item("icbsm_min_security", params.min_security, 0, 255, &|o: &Obj, v: u32| {
@@ -317,118 +312,239 @@ impl MaintenancePage {
                     }),
                     width,
                 ),
-            ];
-            // The expired variant is a menu entry of its own, so those two
-            // screens carry no toggle for it.
-            if !matches!(op, MaintenanceOp::AdjustSecurity | MaintenanceOp::AdjustSecurityExpired) {
-                range.push(sized(
-                    bool_item("icbsm_use_expired_level", params.use_expired_level, &|o: &Obj, v: bool| {
-                        o.lock().unwrap().use_expired_level = v
-                    }),
-                    width,
-                ));
-            }
-            range
-        };
-
-        match op {
-            MaintenanceOp::Pack => {}
-            MaintenanceOp::AdjustSecurity | MaintenanceOp::AdjustSecurityExpired => {
-                entry.push(ConfigEntry::Separator);
-                entry.push(sized(
+                ConfigEntry::Separator,
+                sized(
                     u32_item("icbsm_new_level", params.new_level, 0, 255, &|o: &Obj, v: u32| o.lock().unwrap().new_level = v),
                     27,
-                ));
-            }
-            MaintenanceOp::InitializeCounters => {
-                for key in [
-                    "icbsm_counters_option1",
-                    "icbsm_counters_option2",
-                    "icbsm_counters_option3",
-                    "icbsm_counters_option4",
-                ] {
-                    entry.push(ConfigEntry::Label(get_text(key)));
-                }
-                entry.push(ConfigEntry::Separator);
-                entry.push(sized(
+                ),
+            ],
+
+            MaintenanceOp::InitializeCounters => vec![
+                ConfigEntry::Label(get_text("icbsm_counters_option1")),
+                ConfigEntry::Label(get_text("icbsm_counters_option2")),
+                ConfigEntry::Label(get_text("icbsm_counters_option3")),
+                ConfigEntry::Label(get_text("icbsm_counters_option4")),
+                ConfigEntry::Separator,
+                sized(
                     u32_item("icbsm_counters_choose", params.counter_option, 1, 4, &|o: &Obj, v: u32| {
                         o.lock().unwrap().counter_option = v
                     }),
                     COUNTER_LABEL_WIDTH,
-                ));
-                entry.push(ConfigEntry::Separator);
-                entry.push(sized(
+                ),
+                ConfigEntry::Separator,
+                sized(
                     bool_item("icbsm_counters_files", params.counter_files, &|o: &Obj, v: bool| {
                         o.lock().unwrap().counter_files = v
                     }),
                     COUNTER_LABEL_WIDTH,
-                ));
-                entry.push(sized(
+                ),
+                sized(
                     bool_item("icbsm_counters_bytes", params.counter_bytes, &|o: &Obj, v: bool| {
                         o.lock().unwrap().counter_bytes = v
                     }),
                     COUNTER_LABEL_WIDTH,
-                ));
+                ),
+            ],
+
+            MaintenanceOp::AdjustExpiration => vec![
+                ConfigEntry::Separator,
+                ConfigEntry::Group(
+                    get_text("icbsm_expiration_range_group"),
+                    vec![
+                        sized(
+                            bool_item("icbsm_use_expired_level", params.use_expired_level, &|o: &Obj, v: bool| {
+                                o.lock().unwrap().use_expired_level = v
+                            }),
+                            width,
+                        ),
+                        sized(
+                            u32_item("icbsm_exp_min_security", params.min_security, 0, 255, &|o: &Obj, v: u32| {
+                                o.lock().unwrap().min_security = v
+                            }),
+                            width,
+                        ),
+                        sized(
+                            u32_item("icbsm_exp_max_security", params.max_security, 0, 255, &|o: &Obj, v: u32| {
+                                o.lock().unwrap().max_security = v
+                            }),
+                            width,
+                        ),
+                    ],
+                ),
+                ConfigEntry::Separator,
+                ConfigEntry::Group(
+                    get_text("icbsm_expiration_change_group"),
+                    vec![
+                        sized(
+                            with_hint(
+                                date_item("icbsm_expiration_date", params.expiration_date, &|o: &Obj, v: DateTime<Utc>| {
+                                    o.lock().unwrap().expiration_date = v
+                                }),
+                                "icbsm_date_off-status",
+                            ),
+                            41,
+                        ),
+                        sized(
+                            u32_item("icbsm_add_days", params.add_days, 0, 9999, &|o: &Obj, v: u32| o.lock().unwrap().add_days = v),
+                            41,
+                        ),
+                    ],
+                ),
+            ],
+
+            MaintenanceOp::ConferenceInsert | MaintenanceOp::ConferenceRemove => {
+                let removing = op == MaintenanceOp::ConferenceRemove;
+                vec![
+                    ConfigEntry::Separator,
+                    sized(
+                        u32_item(
+                            if removing { "icbsm_conf_first_remove" } else { "icbsm_conf_first_insert" },
+                            params.conf_first,
+                            0,
+                            65535,
+                            &|o: &Obj, v: u32| o.lock().unwrap().conf_first = v,
+                        ),
+                        width,
+                    ),
+                    sized(
+                        u32_item(
+                            if removing { "icbsm_conf_last_remove" } else { "icbsm_conf_last_insert" },
+                            params.conf_last,
+                            0,
+                            65535,
+                            &|o: &Obj, v: u32| o.lock().unwrap().conf_last = v,
+                        ),
+                        width,
+                    ),
+                    ConfigEntry::Separator,
+                    sized(
+                        bool_item("icbsm_flag_registered", params.flag_registered, &|o: &Obj, v: bool| {
+                            o.lock().unwrap().flag_registered = v
+                        }),
+                        width,
+                    ),
+                    sized(
+                        bool_item("icbsm_flag_expired", params.flag_expired, &|o: &Obj, v: bool| {
+                            o.lock().unwrap().flag_expired = v
+                        }),
+                        width,
+                    ),
+                    sized(
+                        bool_item("icbsm_flag_selected", params.flag_selected, &|o: &Obj, v: bool| {
+                            o.lock().unwrap().flag_selected = v
+                        }),
+                        width,
+                    ),
+                    sized(
+                        bool_item("icbsm_flag_sysop", params.flag_sysop, &|o: &Obj, v: bool| o.lock().unwrap().flag_sysop = v),
+                        width,
+                    ),
+                    sized(
+                        bool_item("icbsm_flag_net_status", params.flag_net_status, &|o: &Obj, v: bool| {
+                            o.lock().unwrap().flag_net_status = v
+                        }),
+                        width,
+                    ),
+                    sized(
+                        bool_item("icbsm_reset_lastread", params.reset_lastread, &|o: &Obj, v: bool| {
+                            o.lock().unwrap().reset_lastread = v
+                        }),
+                        width,
+                    ),
+                    ConfigEntry::Separator,
+                    sized(
+                        u32_item("icbsm_conf_min_security", params.min_security, 0, 255, &|o: &Obj, v: u32| {
+                            o.lock().unwrap().min_security = v
+                        }),
+                        width,
+                    ),
+                    continued(
+                        u32_item("icbsm_conf_max_security", params.max_security, 0, 255, &|o: &Obj, v: u32| {
+                            o.lock().unwrap().max_security = v
+                        }),
+                        width,
+                    ),
+                ]
             }
-            MaintenanceOp::AdjustExpiration => {
-                entry.push(ConfigEntry::Separator);
-                entry.push(bool_item("icbsm_set_expiration", params.set_expiration_date, &|o: &Obj, v: bool| {
-                    o.lock().unwrap().set_expiration_date = v
-                }));
-                entry.push(date_item("icbsm_expiration_date", params.expiration_date, &|o: &Obj, v: DateTime<Utc>| {
-                    o.lock().unwrap().expiration_date = v
-                }));
-                entry.push(u32_item("icbsm_add_days", params.add_days, 0, 9999, &|o: &Obj, v: u32| {
-                    o.lock().unwrap().add_days = v
-                }));
-            }
-            MaintenanceOp::ConferenceInsert | MaintenanceOp::ConferenceRemove | MaintenanceOp::ConferenceMove => {
-                entry.push(ConfigEntry::Separator);
-                if op == MaintenanceOp::ConferenceMove {
-                    entry.push(u32_item("icbsm_conf_from", params.conf_first, 0, 65535, &|o: &Obj, v: u32| {
-                        o.lock().unwrap().conf_first = v
-                    }));
-                    entry.push(u32_item("icbsm_conf_to", params.conf_target, 0, 65535, &|o: &Obj, v: u32| {
-                        o.lock().unwrap().conf_target = v
-                    }));
-                } else {
-                    entry.push(u32_item("icbsm_conf_first", params.conf_first, 0, 65535, &|o: &Obj, v: u32| {
-                        o.lock().unwrap().conf_first = v
-                    }));
-                    entry.push(u32_item("icbsm_conf_last", params.conf_last, 0, 65535, &|o: &Obj, v: u32| {
-                        o.lock().unwrap().conf_last = v
-                    }));
-                }
-                entry.push(bool_item("icbsm_flag_registered", params.flag_registered, &|o: &Obj, v: bool| {
-                    o.lock().unwrap().flag_registered = v
-                }));
-                entry.push(bool_item("icbsm_flag_expired", params.flag_expired, &|o: &Obj, v: bool| {
-                    o.lock().unwrap().flag_expired = v
-                }));
-                entry.push(bool_item("icbsm_flag_selected", params.flag_selected, &|o: &Obj, v: bool| {
-                    o.lock().unwrap().flag_selected = v
-                }));
-                entry.push(bool_item("icbsm_flag_sysop", params.flag_sysop, &|o: &Obj, v: bool| {
-                    o.lock().unwrap().flag_sysop = v
-                }));
-                entry.push(bool_item("icbsm_flag_net_status", params.flag_net_status, &|o: &Obj, v: bool| {
-                    o.lock().unwrap().flag_net_status = v
-                }));
-                if op == MaintenanceOp::ConferenceMove {
-                    entry.push(bool_item("icbsm_move_lastread", params.reset_lastread, &|o: &Obj, v: bool| {
-                        o.lock().unwrap().reset_lastread = v
-                    }));
-                    entry.push(bool_item("icbsm_move_last_conference", params.move_last_conference, &|o: &Obj, v: bool| {
+
+            MaintenanceOp::ConferenceMove => vec![
+                ConfigEntry::Separator,
+                // Both conferences sit on one line, as they did.
+                ConfigEntry::Table(
+                    2,
+                    vec![
+                        sized(
+                            u32_item("icbsm_conf_from", params.conf_first, 0, 65535, &|o: &Obj, v: u32| {
+                                o.lock().unwrap().conf_first = v
+                            }),
+                            36,
+                        ),
+                        sized(
+                            u32_item("icbsm_conf_to", params.conf_target, 0, 65535, &|o: &Obj, v: u32| {
+                                o.lock().unwrap().conf_target = v
+                            }),
+                            24,
+                        ),
+                    ],
+                ),
+                ConfigEntry::Separator,
+                sized(
+                    bool_item("icbsm_move_flag_registered", params.flag_registered, &|o: &Obj, v: bool| {
+                        o.lock().unwrap().flag_registered = v
+                    }),
+                    width,
+                ),
+                sized(
+                    bool_item("icbsm_move_flag_expired", params.flag_expired, &|o: &Obj, v: bool| {
+                        o.lock().unwrap().flag_expired = v
+                    }),
+                    width,
+                ),
+                sized(
+                    bool_item("icbsm_move_flag_selected", params.flag_selected, &|o: &Obj, v: bool| {
+                        o.lock().unwrap().flag_selected = v
+                    }),
+                    width,
+                ),
+                sized(
+                    bool_item("icbsm_move_flag_sysop", params.flag_sysop, &|o: &Obj, v: bool| o.lock().unwrap().flag_sysop = v),
+                    width,
+                ),
+                sized(
+                    bool_item("icbsm_flag_net_status", params.flag_net_status, &|o: &Obj, v: bool| {
+                        o.lock().unwrap().flag_net_status = v
+                    }),
+                    width,
+                ),
+                sized(
+                    bool_item("icbsm_move_last_conference", params.move_last_conference, &|o: &Obj, v: bool| {
                         o.lock().unwrap().move_last_conference = v
-                    }));
-                } else {
-                    entry.push(bool_item("icbsm_reset_lastread", params.reset_lastread, &|o: &Obj, v: bool| {
+                    }),
+                    width,
+                ),
+                sized(
+                    bool_item("icbsm_move_lastread", params.reset_lastread, &|o: &Obj, v: bool| {
                         o.lock().unwrap().reset_lastread = v
-                    }));
-                }
-            }
-            MaintenanceOp::CopyExpiredSecurity | MaintenanceOp::StandardizePhones => {}
-        }
+                    }),
+                    width,
+                ),
+                ConfigEntry::Separator,
+                sized(
+                    u32_item("icbsm_move_min_security", params.min_security, 0, 255, &|o: &Obj, v: u32| {
+                        o.lock().unwrap().min_security = v
+                    }),
+                    width,
+                ),
+                sized(
+                    u32_item("icbsm_move_max_security", params.max_security, 0, 255, &|o: &Obj, v: u32| {
+                        o.lock().unwrap().max_security = v
+                    }),
+                    width,
+                ),
+            ],
+
+            MaintenanceOp::CopyExpiredSecurity | MaintenanceOp::StandardizePhones => Vec::new(),
+        };
 
         Self {
             op,
@@ -528,7 +644,7 @@ impl MaintenancePage {
                 p.move_last_conference,
                 p.new_level.min(255) as u8,
                 (counter_init_from_option(p.counter_option), counter_scope(p.counter_files, p.counter_bytes)),
-                if p.set_expiration_date {
+                if date_is_set(p.expiration_date) {
                     ExpirationChange::SetDate(p.expiration_date)
                 } else {
                     ExpirationChange::AddDays(p.add_days as i64)

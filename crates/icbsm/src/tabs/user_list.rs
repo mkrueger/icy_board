@@ -46,10 +46,10 @@ impl SortOrder {
 
     fn label(self) -> &'static str {
         match self {
-            SortOrder::Record => "icbsm_sort_record",
-            SortOrder::Name => "icbsm_sort_name",
-            SortOrder::Security => "icbsm_sort_security",
-            SortOrder::LastOn => "icbsm_sort_last_on",
+            SortOrder::Record => "icbsm_list_sort_record",
+            SortOrder::Name => "icbsm_list_sort_name",
+            SortOrder::Security => "icbsm_list_sort_security",
+            SortOrder::LastOn => "icbsm_list_sort_last_on",
         }
     }
 }
