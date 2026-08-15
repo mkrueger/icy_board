@@ -20,6 +20,8 @@ members = [
 	"crates/icbadmin",
 	"crates/tree-sitter-ppl",
 ]
+# Zed builds the extension for wasm itself, so it stays out of this workspace.
+exclude = ["zed-ppl"]
 [workspace.package]
 version = "0.2.0"
 edition = "2024"
