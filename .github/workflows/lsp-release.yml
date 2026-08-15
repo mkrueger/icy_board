@@ -1,0 +1,68 @@
+name: PPL language server
+
+# The editor extensions download the server from the release of a tag, so every
+# tag carries one small archive per platform holding just that binary.
+on:
+  push:
+    tags: ["*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The tag whose release the archives are attached to
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  TAG: ${{ github.event.inputs.tag || github.ref_name }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create the release unless it is already there
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release view "$TAG" > /dev/null 2>&1 || gh release create "$TAG" --generate-notes
+
+  archive:
+    needs: release
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: macos-latest
+            target: aarch64-apple-darwin
+          - os: macos-latest
+            target: x86_64-apple-darwin
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the compilation target
+        run: rustup target add ${{ matrix.target }}
+
+      - name: Build the server
+        run: cargo build --release --locked --target ${{ matrix.target }} --package icyboard-ppl
+
+      - name: Pack it
+        if: matrix.os != 'windows-latest'
+        shell: bash
+        run: tar -czf "icyboard-ppl-${{ matrix.target }}.tar.gz" -C "target/${{ matrix.target }}/release" icyboard-ppl
+
+      - name: Pack it
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: Compress-Archive -Path "target\${{ matrix.target }}\release\icyboard-ppl.exe" -DestinationPath "icyboard-ppl-${{ matrix.target }}.zip"
+
+      - name: Attach it to the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG" icyboard-ppl-${{ matrix.target }}.* --clobber

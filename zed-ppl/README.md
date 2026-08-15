@@ -9,17 +9,19 @@ from this repository and the `icyboard-ppl` language server.
 - Diagnostics, completion, hover, signature help, go to definition and
   references through the language server
 
-## Requirements
+## The language server
 
-The extension does not ship a binary. Build the tools of this repository and put
-them on your `PATH`:
+Nothing to install. On the first PPL file the extension fetches `icyboard-ppl`
+from the newest IcyBoard release and keeps it until a release brings a newer one.
+
+An `icyboard-ppl` on your `PATH` is used instead, so a local build wins over the
+downloaded one:
 
 ```sh
-cargo build --release
+cargo build --release --package icyboard-ppl
 ```
 
-The server is `target/release/icyboard-ppl`. If you keep it somewhere else, name
-the path in your Zed settings:
+To point at one particular build, name it in your Zed settings:
 
 ```json
 {
