@@ -42,6 +42,9 @@
   "NEXT"
 ] @indent.end @outdent
 
+; Only the END that closes a block, never a plain END statement.
+(block "END" @indent.end @outdent)
+
 [
   ")"
   "]"
