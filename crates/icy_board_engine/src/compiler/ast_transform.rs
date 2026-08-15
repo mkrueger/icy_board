@@ -10,12 +10,11 @@ use crate::{
     parser::lexer::{Spanned, Token},
 };
 
-static mut LABELS: usize = 0;
-
 pub struct AstTransformationVisitor {
     continue_break_labels: Vec<(unicase::Ascii<String>, unicase::Ascii<String>)>,
     cur_function: Option<unicase::Ascii<String>>,
     optimize_output: bool,
+    labels: usize,
 }
 
 impl AstTransformationVisitor {
@@ -24,13 +23,12 @@ impl AstTransformationVisitor {
             continue_break_labels: Vec::new(),
             cur_function: None,
             optimize_output,
+            labels: 0,
         }
     }
     pub fn next_label(&mut self) -> unicase::Ascii<String> {
-        let label = unicase::Ascii::new(format!("*(label{}", unsafe { LABELS }));
-        unsafe {
-            LABELS += 1;
-        }
+        let label = unicase::Ascii::new(format!("*(label{}", self.labels));
+        self.labels += 1;
         label
     }
 }

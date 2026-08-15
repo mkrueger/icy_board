@@ -184,9 +184,11 @@ impl PPECompiler {
     /// Panics if .
     pub fn compile(&mut self, asts: &[&Ast]) {
         let mut visted = Vec::new();
+        // One transformer for the whole package, so its generated labels stay unique across files.
+        let mut transformer = AstTransformationVisitor::new(true);
         for prg in asts {
             self.semantic_visitor.errors.lock().unwrap().set_file_name(&prg.file_name);
-            let prg = prg.visit_mut(&mut AstTransformationVisitor::new(true));
+            let prg = prg.visit_mut(&mut transformer);
             // println!("{}", prg);
             prg.visit(&mut self.semantic_visitor);
             visted.push(prg);
