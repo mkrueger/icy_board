@@ -86,13 +86,16 @@ Icy Board includes a comprehensive suite of tools for BBS management and develop
 
 **Core Executables**
 
-* ``icboard`` - The main BBS server daemon
+* ``icboard`` - The BBS server and local call-waiting screen
 * ``icbsetup`` - Terminal-based configuration and setup utility
 * ``pplc`` - PPL compiler (source → PPE)
 * ``ppld`` - PPL decompiler (PPE → source)
-* ``mkicbtxt`` - Create/Edit ICBTXT files containing all strings used.
+* ``mkicbtxt`` - Edit the system messages and prompts
+* ``mkicbmnu`` - Edit menus
 * ``icbsm`` - System manager utility (user/group editor)
-* ``icyboard-ppl`` - Language and editor support for PPL
+* ``icbfile`` - File-base maintenance and import
+* ``icbmailer`` - FTN mail scanning, polling and tossing
+* ``icyboard-ppl`` - PPL language server for editors
 
 Directory Layout
 ~~~~~~~~~~~~~~~~
@@ -106,11 +109,10 @@ A typical Icy Board installation follows this structure:
    FOO/                    # Your BBS root (created by icbsetup)
    ├── icboard.toml        # Main configuration file
    ├── icboard.log         # Runtime log file
-   ├── users.toml          # User database
    ├── art/                # Graphics and art files
    │   └── help/           # Help Files
    ├── main/               # Main board files
-   ├── conferences/        # Conference data
+   ├── conferences/        # Conference menus, files and message bases
    └── tmp/                # Generated Files for backwards compatibility
 
 main/ files 
@@ -145,7 +147,7 @@ The ``main/`` directory contains core system configuration and data files:
 +------------------------+---------------------------------------------------------------+
 | File                   | Description                                                   |
 +========================+===============================================================+
-| ``tcan_user.txt``      | Forbidden usernames (one per line)                            |
+| ``tcan_users.txt``     | Forbidden usernames (one per line)                            |
 | ``tcan_passwords.txt`` | Forbidden passwords (weak/common passwords)                   |
 | ``tcan_email.txt``     | Blocked email domains or addresses                            |
 | ``tcan_uploads.txt``   | Prohibited upload filenames/patterns                          |
@@ -164,9 +166,9 @@ The ``main/`` directory contains core system configuration and data files:
 art/ files
 ~~~~~~~~~~
 
-It's recommended to use .pcb, .ans, .rip, .asc extensions instead of the old …G, …R sheme. 
+It is recommended to use ``.pcb``, ``.ans``, ``.rip`` and ``.asc`` extensions instead of the old ``@X`` naming scheme.
 This makes it easier to draw files with an ansi 
-drawing tool as well. And file name lengths ar no longer an issue.
+drawing tool as well, and file-name lengths are no longer an issue.
 Files can either be CP437 or UTF-8 - IcyBoard will do 
 all conversions automatically. Note that UTF-8 requires the UTF-8 BOM.
 This is by design it's the only way to make a 
@@ -177,10 +179,10 @@ Note: UTF-8 is recommended for everything.
 icbsetup
 ~~~~~~~~
 
-`icbsetup` is the interactive TUI (text user interface) utility 
+``icbsetup`` is the interactive TUI (text user interface) utility
 used to create, configure and maintain an Icy Board installation.  
 
-It's more than the classic PCBoard PCBSETUP untility.
+It covers more than the classic setup utility.
 
 * Create new BBS installations
 * Import legacy PCBoard systems

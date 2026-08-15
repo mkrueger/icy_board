@@ -7,7 +7,7 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = 'Icy Board'
-copyright = '2025, Mike Krüger'
+copyright = '2024-2026, Mike Krüger'
 author = 'Mike Krüger'
 
 # -- General configuration ---------------------------------------------------
@@ -16,7 +16,12 @@ author = 'Mike Krüger'
 extensions = []
 
 templates_path = ['_templates']
-exclude_patterns = []
+exclude_patterns = [
+    'customizing/adding_commands.rst',
+    'customizing/internationalization.rst',
+    'customizing/look_and_feel.rst',
+    'customizing/menus.rst',
+]
 
 
 
@@ -24,7 +29,6 @@ exclude_patterns = []
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
 html_theme = 'alabaster'
-html_static_path = ['_static']
 
 import re
 from pygments.lexer import RegexLexer, bygroups
@@ -44,13 +48,13 @@ class PPLLexer(RegexLexer):
         r'\b('
         r'IF|ELSEIF|ELSE|ENDIF|WHILE|ENDWHILE|FOR|NEXT|ENDFOR|REPEAT|UNTIL|'
         r'LOOP|ENDLOOP|BREAK|CONTINUE|RETURN|GOSUB|GOTO|SELECT|CASE|DEFAULT|ENDSELECT|'
-        r'DECLARE|FUNCTION|PROCEDURE|ENDPROC|ENDFUNC|THEN'
+        r'DECLARE|FUNCTION|PROCEDURE|ENDPROC|ENDFUNC|TYPE|ENDTYPE|BEGIN|END|THEN|VAR|LET'
         r')\b'
     )
 
     _types = (
         r'\b('
-        r'BOOLEAN|INTEGER|UNSIGNED|BYTE|WORD|SBYTE|SWORD|MONEY|FLOAT|DOUBLE|REAL|DATE|EDATE|DDATE|TIME|STRING|BIGSTR|TABLE|MESSAGEAREAID|PASSWORD'
+        r'BOOLEAN|INTEGER|UNSIGNED|BYTE|WORD|SBYTE|SWORD|MONEY|FLOAT|DOUBLE|REAL|DATE|EDATE|DDATE|TIME|STRING|BIGSTR|TABLE|MESSAGEAREAID|PASSWORD|CONFERENCE|DIRECTORY|AREA|DOOR|USER'
         r')\b'
     )
 

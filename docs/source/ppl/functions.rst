@@ -5193,8 +5193,10 @@ STRIPSTR (2.00)
        text = STRIPSTR(text, "  ")  ; Remove double spaces
 
   **See Also**
+
     * :PPL:`STRIP()` – Remove characters
     * :PPL:`REPLACESTR()` – Replace substring
+
 ISBITSET (2.00)
 ~~~~~~~~~~~~~~~
   :PPL:`FUNCTION BOOLEAN ISBITSET(ANY var, INTEGER bit)`

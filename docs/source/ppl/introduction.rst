@@ -30,8 +30,8 @@ Version Support
 A PPE has a *runtime* version, which is the format written to disk:
 
 * **100** - PCBoard 15.0
-* **200** - PCBoard 15.2
-* **300** - PCBoard 15.3
+* **200** - PCBoard 15.1
+* **300** - PCBoard 15.2
 * **310**, **320**, **330** - PCBoard point releases
 * **340** - PCBoard 15.4, the last one an original board can load
 * **400** - IcyBoard's own format
@@ -118,7 +118,7 @@ when a file is not formatted, which is what a build or a hook wants::
 
     pplc --check myscript.pps
 
-The `[formatting]` section of ``ppl.toml`` says how:
+The ``[formatting]`` section of ``ppl.toml`` says how:
 
 .. code-block:: toml
 
@@ -185,7 +185,7 @@ The configuration file consists of three main sections: ``[package]``, ``[compil
     [package]
     name = "my_ppe_project"
     version = "1.0.0"
-    runtime = 400                    # Target PPE runtime version (optional)
+    runtime = 401                    # Target PPE runtime version (optional)
     authors = ["Your Name"]          # List of authors (optional)
 
     [compiler]
@@ -233,7 +233,7 @@ The configuration file consists of three main sections: ``[package]``, ``[compil
   Specifies additional files to include with the compiled PPE:
 
   * ``text_files`` (array of strings, optional) - Text files to bundle
-  * ``art_files`` (array of strings, optional) - ANSI art files to include (icy_draw *.icy files are converted automatically)
+  * ``art_files`` (array of strings, optional) - ANSI art files to include (icy_draw ``*.icy`` files are converted automatically)
 
 **Source File Discovery**
 

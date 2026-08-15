@@ -14,7 +14,7 @@ enabling secure, scriptable expansion on today's platforms
 Unlike emulation layers that just “run the old EXE”, 
 Icy Board rebuilds core subsystems: 
 user base, conferences, message storage (JAM),
-time/byte bank, accounting scaffolding, PPL execution, and TUI
+time/byte bank, accounting, PPL execution, and TUI
 administration—providing a foundation that is both compatible *and*
 extensible.
 
@@ -25,7 +25,7 @@ modern features and improvements.
 Icy Board's Key features
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-* Full PCBoard 15.4 compatibility (users, conferences, messages, PPE)
+* Broad PCBoard 15.4 compatibility for users, conferences, messages, and PPEs
 * Modern, memory-safe codebase (Rust)
 * UTF-8 support (with legacy CP437 compatibility)
 * Internet protocols: Telnet, SSH, WebSockets (Web Terminal)
@@ -57,7 +57,7 @@ Non-Goals (by design)
 License
 ~~~~~~~
 
-Dual-licensed (Apache 2.0 / MIT) — see repository LICENSE files.
+Licensed under Apache License 2.0; see the repository ``LICENSE`` file.
 
 
 Why Icy Board?
@@ -84,11 +84,12 @@ diversity most boards are just out of the box installations from major software 
 These boards are great and have developed their own strengths but since they're so good 
 at what they do they don't emphasize creativity and individuality.
 
-Icy Board wants to bring back the individuality of BBSes. The issue is that not many people write
-new BBS software these days. So Icy Board wants to be a platform that makes it easy to create
-custom BBS experiences without requiring extensive programming knowledge.
+Icy Board wants to bring back the individuality of BBSes. Few people write new
+BBS software today, so Icy Board provides a platform for creating a distinct
+board without replacing its server or writing everything from scratch.
 
-PCBoards PPL language was a great way to customize the board. It's possible to run them on modern systems
-and Icy Board is the platform for that. Out of the box Icy Board is crap - it'll scare people away. 
-But with some PPL magic it can become a unique experience.
+PCBoard's PPL language was an effective way to customize a board. Icy Board runs
+existing PPEs on modern systems and extends PPL for new work. The initial board
+created by ``icbsetup`` is intentionally plain: menus, display files, and PPL
+are where a sysop turns it into a unique experience.
 

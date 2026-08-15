@@ -1,10 +1,11 @@
 The Language
 ============
 
-PPL 4.0 is what the IcyBoard compiler targets by default. It is a superset of
-PCBoard 15.4 PPL: everything the original compiler accepted still means the same
-thing, and every addition sits behind a version number, so an old source keeps
-compiling as an old source.
+PPL 4.0 is what the IcyBoard compiler targets by default. It is a source-level
+superset of PCBoard 15.4 PPL, and every language addition sits behind a version
+number so an old source keeps compiling as an old source. Calls tied directly
+to DOS hardware and a few operating-system details necessarily behave
+differently; :doc:`compatibility` lists them.
 
 This page describes what the language gained after PCBoard. The reference pages
 list what a program may call: :doc:`data_types`, :doc:`constants`,
@@ -17,12 +18,12 @@ A PPE has a *runtime* version and a source has a *language* version. They are
 set independently, because wanting new syntax and wanting a file an old board can
 load are two different wishes.
 
-===========  =====================  ==============================  ===========================================
-\            Command line           ``ppl.toml``                     What it controls
-===========  =====================  ==============================  ===========================================
-Runtime      ``--runtime``          ``[package] runtime``            The PPE format written to disk
-Language     ``--lang-version``     ``[compiler] language_version``  Which syntax and built-ins are accepted
-===========  =====================  ==============================  ===========================================
+.. csv-table:: Runtime and language versions
+   :header: "Version", "Command line", "ppl.toml", "What it controls"
+   :widths: 15, 25, 30, 30
+
+   "Runtime", "``--runtime``", "``[package] runtime``", "The PPE format written to disk"
+   "Language", "``--lang-version``", "``[compiler] language_version``", "Which syntax and built-ins are accepted"
 
 The runtime defaults to 401, the newest format. The language defaults to the
 runtime version up to 400, so the default pair is runtime 401 and language 400.

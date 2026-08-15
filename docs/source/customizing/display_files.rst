@@ -501,10 +501,3 @@ Best Practices
 4. **Balance information** - Don't overload screens with too many macros
 5. **Consider non-ANSI users** - Ensure content is readable without colors
 6. **Document your files** - Keep notes on which variants exist for each display file
-
-See Also
---------
-
-* :doc:`look_and_feel` - General BBS appearance customization
-* :doc:`menus` - Menu system configuration
-* :doc:`internationalization` - Multi-language support

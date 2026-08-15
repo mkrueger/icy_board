@@ -6,8 +6,9 @@ an uplink, writes it into the message bases, and packs what your users wrote
 back into bundles for the next call. The work is done by ``icbmailer``, a
 separate program that runs beside the board.
 
-Nothing calls ``icbmailer`` on a schedule yet, and it does not answer incoming
-calls. You run it yourself, or from cron.
+``icbmailer`` does not poll automatically and does not answer incoming calls.
+Run it yourself, from the board's timed events, or from the operating system's
+scheduler.
 
 .. note::
    This chapter assumes you already have a node number from the coordinator of

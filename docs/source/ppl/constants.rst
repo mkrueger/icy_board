@@ -293,7 +293,7 @@ User variables are typically accessed via GETUSER/PUTUSER statements.
 +--------------------+------------+---------------+-------------------------------------------------------+
 | U_PAGELEN          | INTEGER    | 1.00          | Page length (lines per screen)                        |
 +--------------------+------------+---------------+-------------------------------------------------------+
-| U_PWD              | STRING     | 1.00          | User's password [1]                                   |
+| U_PWD              | STRING     | 1.00          | User's password [#pwd]_                               |
 +--------------------+------------+---------------+-------------------------------------------------------+
 | U_PWDEXP           | DATE       | 1.00          | Password expiration date                              |
 +--------------------+------------+---------------+-------------------------------------------------------+
@@ -310,4 +310,5 @@ User variables are typically accessed via GETUSER/PUTUSER statements.
 | U_WEB              | STRING     | 3.40          | User's website URL                                    |
 +--------------------+------------+---------------+-------------------------------------------------------+
 
-.. [1] U_PWD value is usually '******' for crypted passwords. PlainText only supported if system configured for it.
+.. [#pwd] ``U_PWD`` is usually ``******`` for hashed passwords. Plain text is
+	only available when the board is explicitly configured to store it.
