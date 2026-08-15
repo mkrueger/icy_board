@@ -159,8 +159,8 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
                 app.reset(&board).await;
                 match app.run(&mut terminal, &board, arguments.full_screen).await {
                     Ok(msg) => {
-                        let launches_system_manager = matches!(&msg, CallWaitMessage::SystemManager);
-                        if launches_system_manager {
+                        let launches_board_tool = matches!(&msg, CallWaitMessage::SystemManager | CallWaitMessage::Setup);
+                        if launches_board_tool {
                             connection_token.cancel();
                             let states = {
                                 let mut bbs_guard = bbs.lock().await;
@@ -168,7 +168,7 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
                                 bbs_guard.open_connections.clone()
                             };
                             if states.lock().await.iter().any(Option::is_some) {
-                                print_error("ICBSM cannot start while callers are online.".to_string());
+                                print_error("Board tools cannot start while callers are online.".to_string());
                                 connection_token = CancellationToken::new();
                                 web_admin = start_connections(&bbs, &board, &config_file, connection_token.clone()).await;
                                 continue;
@@ -187,7 +187,7 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
                         )
                         .await;
 
-                        if launches_system_manager {
+                        if launches_board_tool {
                             board_lock = Some(BoardLock::acquire(&board.lock().await.root_path)?);
                         }
 

@@ -1,10 +1,9 @@
 use app::new_main_window;
 use argh::FromArgs;
 use chrono::Local;
-use codepages::tables::write_utf8_with_bom;
-use color_eyre::Result;
+use color_eyre::{Result, eyre::eyre};
 use create::IcyBoardCreator;
-use icy_board_engine::icy_board::{IcyBoard, read_with_encoding_detection};
+use icy_board_engine::icy_board::{IcyBoard, lock::BoardLock, read_with_encoding_detection, write_atomic};
 use icy_board_tui::{print_error, term};
 use import::{PCBoardImporter, console_logger::ConsoleLogger};
 use semver::Version;
@@ -105,6 +104,10 @@ fn main() -> Result<()> {
             let output_directory = if *dry_run {
                 std::env::temp_dir().join(format!("icbsetup-dry-run-{}", process::id()))
             } else {
+                if out.exists() {
+                    print_error(format!("Destination already exists: {}", out.display()));
+                    process::exit(1);
+                }
                 PathBuf::from(out)
             };
 
@@ -126,7 +129,10 @@ fn main() -> Result<()> {
                         let config = output_directory.join(icy_board_engine::DEFAULT_ICYBOARD_FILE);
                         match IcyBoard::load(&config) {
                             Ok(_) => println!("Imported successfully"),
-                            Err(e) => print_error(format!("Imported board doesn't load: {}", e)),
+                            Err(e) => {
+                                print_error(format!("Imported board doesn't load: {}", e));
+                                process::exit(1);
+                            }
                         }
                     }
                     Err(e) => {
@@ -136,10 +142,12 @@ fn main() -> Result<()> {
                         if *dry_run {
                             let _ = fs::remove_dir_all(&output_directory);
                         }
+                        process::exit(1);
                     }
                 },
                 Err(e) => {
                     print_error(e.to_string());
+                    process::exit(1);
                 }
             }
             return Ok(());
@@ -162,50 +170,21 @@ fn main() -> Result<()> {
             println!("Caution - this command is used for converting CP437 to UTF-8 in a directory.");
 
             if fs::metadata(path).is_err() {
-                println!("Path does not exist");
-                return Ok(());
+                print_error("Path does not exist".to_string());
+                process::exit(1);
             }
 
-            if fs::metadata(path).unwrap().is_file() {
+            if path.is_file() {
                 println!("Converting file to utf-8...");
-                convert_file(path.clone());
+                if let Err(err) = convert_file(path) {
+                    print_error(err.to_string());
+                    process::exit(1);
+                }
                 return Ok(());
             }
-
-            println!("Converting directories to lower case...");
-            for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
-                if !entry.path().is_dir() {
-                    continue;
-                }
-                let lower_case = entry.path().to_string_lossy().to_string().to_lowercase();
-                if lower_case == "." || lower_case == ".." {
-                    continue;
-                }
-                println!("Rename directory {} to {}", entry.path().display(), lower_case);
-                if fs::rename(entry.path(), lower_case).is_err() {
-                    println!("Error renaming directory {}", entry.path().display());
-                }
-            }
-            println!("Converting files...");
-            let convert_ext = ["ANS", "PCB", "CFG", "DOC", "NFO", "ASC", "TXT", "PPX", "PPS", "PPD", "LST", "XXX"];
-            for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
-                if !entry.path().is_file() {
-                    continue;
-                }
-                let lower_case = entry.path().to_string_lossy().to_string().to_lowercase();
-                if lower_case == entry.path().to_string_lossy().to_string() {
-                    continue;
-                }
-                if let Some(extension) = entry.path().extension() {
-                    if convert_ext.contains(&extension.to_str().unwrap()) {
-                        println!("Converting {} to utf8...", entry.path().display());
-                        convert_file(entry.path().to_path_buf());
-                    }
-                }
-                println!("Rename {} to {}", entry.path().display(), lower_case);
-                if fs::rename(entry.path(), lower_case).is_err() {
-                    println!("Error renaming {}", entry.path().display());
-                }
+            if let Err(err) = convert_tree(path) {
+                print_error(err.to_string());
+                process::exit(1);
             }
             return Ok(());
         }
@@ -216,14 +195,25 @@ fn main() -> Result<()> {
         exit(1);
     };
     init_log(&file.parent().unwrap().join("icbsetup.log"));
+    let _board_lock = match BoardLock::acquire(file.parent().unwrap_or_else(|| Path::new("."))) {
+        Ok(lock) => lock,
+        Err(err) => {
+            print_error(err);
+            process::exit(1);
+        }
+    };
     match IcyBoard::load(&file) {
         Ok(icy_board) => {
             let terminal = &mut term::init()?;
             let icy_board = Arc::new(Mutex::new(icy_board));
-            new_main_window(icy_board.clone(), arguments.full_screen).run(terminal)?;
+            let mut app = new_main_window(icy_board.clone(), arguments.full_screen);
+            app.run(terminal)?;
 
-            if let Err(err) = icy_board.lock().unwrap().save() {
-                eprintln!("Error saving config: {}", err);
+            if app.save
+                && let Err(err) = icy_board.lock().unwrap().save()
+            {
+                term::restore()?;
+                return Err(eyre!(err.to_string()));
             }
             term::restore()?;
             Ok(())
@@ -258,10 +248,52 @@ fn init_log(path: &Path) {
         .unwrap();
 }
 
-fn convert_file(entry: PathBuf) {
-    if let Ok(data) = read_with_encoding_detection(&entry) {
-        if write_utf8_with_bom(&entry, &data).is_err() {
-            println!("Error writing {}", entry.display());
+fn convert_file(entry: &Path) -> Result<()> {
+    let data = read_with_encoding_detection(&entry).map_err(|err| eyre!(err.to_string()))?;
+    let mut bytes = vec![0xEF, 0xBB, 0xBF];
+    bytes.extend_from_slice(data.as_bytes());
+    write_atomic(entry, &bytes)?;
+    Ok(())
+}
+
+fn convert_tree(root: &Path) -> Result<()> {
+    const CONVERT_EXT: &[&str] = &["ANS", "PCB", "CFG", "DOC", "NFO", "ASC", "TXT", "PPX", "PPS", "PPD", "LST", "XXX"];
+    let entries: Vec<_> = WalkDir::new(root).min_depth(1).into_iter().collect::<std::result::Result<_, _>>()?;
+
+    println!("Converting files...");
+    for entry in entries.iter().filter(|entry| entry.file_type().is_file()) {
+        let path = entry.path();
+        if path
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .is_some_and(|ext| CONVERT_EXT.contains(&ext.to_ascii_uppercase().as_str()))
+        {
+            println!("Converting {} to utf8...", path.display());
+            convert_file(path)?;
         }
+        rename_to_lowercase(path)?;
     }
+
+    println!("Converting directories to lower case...");
+    for entry in entries.iter().rev().filter(|entry| entry.file_type().is_dir()) {
+        rename_to_lowercase(entry.path())?;
+    }
+    Ok(())
+}
+
+fn rename_to_lowercase(path: &Path) -> Result<()> {
+    let Some(name) = path.file_name() else {
+        return Ok(());
+    };
+    let lower = name.to_string_lossy().to_lowercase();
+    if lower == name.to_string_lossy() {
+        return Ok(());
+    }
+    let target = path.with_file_name(lower);
+    if target.exists() {
+        return Err(eyre!("Can't rename {}: {} already exists", path.display(), target.display()));
+    }
+    println!("Rename {} to {}", path.display(), target.display());
+    fs::rename(path, target)?;
+    Ok(())
 }

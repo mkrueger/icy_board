@@ -38,6 +38,7 @@ icbtext_style_white = Weiß
 
 icbtext_tab_record=Einträge
 icbtext_tab_about=Über
+icb_setup_save_failed=Speichern fehlgeschlagen: { $error }
 
 key_desc_quit=Beenden
 key_desc_back=Zurück

@@ -270,8 +270,7 @@ impl Page for AccountingRatesEditor {
                 }
                 icy_board_tui::save_changes_dialog::SaveChangesMessage::Close => PageMessage::Close,
                 icy_board_tui::save_changes_dialog::SaveChangesMessage::Save => {
-                    self.menu.obj.lock().unwrap().save(&self.path).unwrap();
-                    PageMessage::Close
+                    crate::editors::save_file(&self.path, || self.menu.obj.lock().unwrap().save(&self.path))
                 }
                 icy_board_tui::save_changes_dialog::SaveChangesMessage::None => PageMessage::None,
             };

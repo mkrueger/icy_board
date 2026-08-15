@@ -205,13 +205,7 @@ impl<'a> Page for CommandsEditor<'a> {
                 }
                 icy_board_tui::save_changes_dialog::SaveChangesMessage::Close => PageMessage::Close,
                 icy_board_tui::save_changes_dialog::SaveChangesMessage::Save => {
-                    if let Some(parent) = self.path.parent() {
-                        if !parent.exists() {
-                            std::fs::create_dir_all(parent).unwrap();
-                        }
-                    }
-                    self.command_list.lock().unwrap().save(&self.path).unwrap();
-                    PageMessage::Close
+                    crate::editors::save_file(&self.path, || self.command_list.lock().unwrap().save(&self.path))
                 }
                 icy_board_tui::save_changes_dialog::SaveChangesMessage::None => PageMessage::None,
             };

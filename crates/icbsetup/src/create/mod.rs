@@ -269,10 +269,12 @@ impl IcyBoardCreator {
 
         self.logger.start_action("Create default user (SYSOP)".to_string());
 
+        let initial_password = format!("{:08x}{:08x}", fastrand::u32(..), fastrand::u32(..));
+
         let mut user = User {
             name: "SYSOP".to_string(),
             password: PasswordInfo {
-                password: Password::PlainText("".to_string()),
+                password: Password::new_argon2(&initial_password),
                 ..Default::default()
             },
             page_len: 23,
@@ -283,6 +285,7 @@ impl IcyBoardCreator {
         let mut user_base = UserBase::default();
         user_base.new_user(user);
         user_base.save(&self.destination.join(&config.paths.user_file))?;
+        self.logger.start_action(format!("Initial SYSOP password: {initial_password}"));
 
         // Accounting
         config.accounting.cfg_file = PathBuf::from("main/accounting.toml");
