@@ -14,4 +14,3 @@ PRINTLN "left_over=["+LEFT("AB",5)+"]"
 PRINTLN "right_over=["+RIGHT("AB",5)+"]"
 PRINTLN "left_neg=["+LEFT("AB",-1)+"]"
 PRINTLN "---END---"
-END

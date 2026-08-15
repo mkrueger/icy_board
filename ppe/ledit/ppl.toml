@@ -1,8 +1,10 @@
 [package]
 name = "ledit"
 version = "1.1.0"
-language_version = 350
 authors = ["Mike Krüger <mkrueger@posteo.de>"]
+
+[compiler]
+language_version = 350
 
 [data]
 text_files = [

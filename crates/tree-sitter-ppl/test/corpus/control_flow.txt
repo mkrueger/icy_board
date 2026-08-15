@@ -264,3 +264,23 @@ END
         (constant
           (number_literal)))
       consequence: (end_statement))))
+
+================================================================================
+EXIT ends a program from language version 400
+================================================================================
+
+BEGIN
+    IF (1) THEN
+        EXIT
+    END IF
+END
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (block
+    body: (if_block
+      condition: (parenthesized_expression
+        (constant
+          (number_literal)))
+      consequence: (exit_statement))))

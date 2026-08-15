@@ -844,6 +844,21 @@ impl<'a> Parser<'a> {
                 })));
             }
         }
+        if self.lang_version >= 400 {
+            if *identifier == *END_TOKEN {
+                self.report_error(id_token.span, ParserErrorType::EndIsNotAStatement);
+                // Carry on as if it were not there, so the enclosing block still finds its own END.
+                return Some(Statement::Empty);
+            }
+            // The statement END used to be, now that END delimits a block.
+            if *identifier == *EXIT_TOKEN {
+                return Some(Statement::PredifinedCall(PredefinedCallStatement::new(
+                    id_token,
+                    OpCode::END.get_definition(),
+                    Vec::new(),
+                )));
+            }
+        }
         if let Some(def) = StatementDefinition::get_statement_definition(identifier) {
             let mut params = Vec::new();
             while self.get_cur_token() != Some(Token::Eol) && !matches!(self.get_cur_token(), Some(Token::Comment(_, _))) && self.cur_token.is_some() {
@@ -971,6 +986,7 @@ lazy_static::lazy_static! {
     static ref BEGIN_TOKEN: unicase::Ascii<String> = unicase::Ascii::new("BEGIN".to_string());
     pub static ref BEGIN_LABEL: unicase::Ascii<String> = unicase::Ascii::new("~BEGIN~".to_string());
     static ref END_TOKEN: unicase::Ascii<String> = unicase::Ascii::new("END".to_string());
+    static ref EXIT_TOKEN: unicase::Ascii<String> = unicase::Ascii::new("EXIT".to_string());
 
 }
 

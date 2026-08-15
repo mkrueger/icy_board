@@ -1043,6 +1043,11 @@ END (1.00)
     present. For script questionnaires, saves any responses written to channel 0 to the 
     script answer file.
 
+    From language version 400 on, ``END`` is no longer a statement: it only closes a
+    ``BEGIN ... END`` block. Use :PPL:`EXIT` to end a program normally and :PPL:`STOP` to
+    abort one. Since the compiler appends the terminating instruction by itself, a
+    trailing ``END`` was redundant anyway.
+
   **Example**
 
     .. code-block:: PPL
@@ -4126,6 +4131,15 @@ STOP (1.00)
     Abnormally terminates PPE execution. Unlike END, does not save channel 0 output to 
     script answer file. Use when you need to abort without saving partial results.
 
+    From language version 400 on this is the abort half of a pair: :PPL:`EXIT` ends a
+    program normally, ``STOP`` gives up on it. ``END`` closes a ``BEGIN ... END`` block
+    there and is not a statement.
+
+    .. note::
+       Icy Board collects channel 0 in a temporary file and appends it to the answer file
+       when the PPE returns, the way PCBoard did. It does that whatever stopped the
+       program, so ``STOP`` does not discard the answers yet.
+
   **Example**
 
     .. code-block:: PPL
@@ -4148,7 +4162,41 @@ STOP (1.00)
 
   **See Also**
     * :PPL:`END` – Normal termination
+    * :PPL:`EXIT` – Normal termination from language version 400
     * :PPL:`RETURN` – Return from subroutine
+
+EXIT (4.00)
+~~~~~~~~~~~
+  :PPL:`STATEMENT EXIT`
+
+  End PPE execution.
+
+  **Remarks**
+    Ends the program the way :PPL:`END` did before language version 400 took ``END`` for
+    the terminator of a ``BEGIN ... END`` block, and saves script answers the same way.
+    It compiles to the very instruction ``END`` always produced, so an executable built
+    from it runs on any runtime.
+
+    Reaching the end of the program does the same, so ``EXIT`` is only needed to leave
+    early. Use :PPL:`STOP` instead to abort without saving script answers, and
+    :PPL:`RETURN` to leave a function or procedure rather than the program.
+
+  **Example**
+
+    .. code-block:: PPL
+
+       BEGIN
+           IF (!HasAccess()) THEN
+               PRINTLN "Sorry."
+               STOP
+           ENDIF
+           PRINTLN "Welcome."
+           EXIT
+       END
+
+  **See Also**
+    * :PPL:`STOP` – Abort without saving script answers
+    * :PPL:`RETURN` – Leave a routine
 
 TOKENIZE (1.00)
 ~~~~~~~~~~~~~~~

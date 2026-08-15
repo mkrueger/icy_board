@@ -113,6 +113,9 @@ pub enum ParserErrorType {
     #[error("'END' expected before the end of the file")]
     BlockEndExpected,
 
+    #[error("'END' only closes a BEGIN...END block, use 'EXIT' to end a program or 'STOP' to abort one")]
+    EndIsNotAStatement,
+
     #[error("A program can only have one BEGIN...END block")]
     BlockAlreadyDefined,
 

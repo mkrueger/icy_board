@@ -22,4 +22,3 @@ PRINTLN "toddate_str=[", TODDATE("19960315"), "] i=", TOINTEGER(TODDATE("1996031
 PRINTLN "todate_of_ddate=[", TODATE(TODDATE(dt)), "]"
 PRINTLN "date_of_edate=[", TODATE(TOEDATE(dt)), "]"
 PRINTLN "---END---"
-END

@@ -701,6 +701,55 @@ fn an_older_language_keeps_begin_as_a_pseudo_label() {
 }
 
 #[test]
+fn end_is_only_a_block_end_from_400() {
+    let (_, messages) = parse_program("PRINT 1\nEND\n", 400);
+    assert_eq!(vec![ParserErrorType::EndIsNotAStatement.to_string()], messages);
+
+    let (_, messages) = parse_program("BEGIN\n  IF (1) THEN\n    END\n  ENDIF\nEND\n", 400);
+    assert_eq!(vec![ParserErrorType::EndIsNotAStatement.to_string()], messages);
+
+    let (_, messages) = parse_program("BEGIN\n  IF (1) THEN\n    STOP\n  ENDIF\nEND\n", 400);
+    assert!(messages.is_empty(), "{messages:?}");
+}
+
+#[test]
+fn an_older_language_still_ends_a_program_with_end() {
+    let (_, messages) = parse_program("PRINT 1\nEND\n", 350);
+    assert!(messages.is_empty(), "{messages:?}");
+}
+
+#[test]
+fn exit_ends_a_program_from_400() {
+    let (ast, messages) = parse_program("BEGIN\n  IF (1) THEN\n    EXIT\n  ENDIF\n  PRINT 1\nEND\n", 400);
+    assert!(messages.is_empty(), "{messages:?}");
+
+    let mut visitor = OpCodeCollector::default();
+    ast.visit(&mut visitor);
+    assert!(
+        visitor.opcodes.contains(&OpCode::END),
+        "EXIT did not become the END statement: {:?}",
+        visitor.opcodes
+    );
+}
+
+#[test]
+fn exit_is_not_reserved_before_400() {
+    let (_, messages) = parse_program("INTEGER exit\nexit = 1\n", 350);
+    assert!(messages.is_empty(), "{messages:?}");
+}
+
+#[derive(Default)]
+struct OpCodeCollector {
+    opcodes: Vec<OpCode>,
+}
+
+impl crate::ast::AstVisitor<()> for OpCodeCollector {
+    fn visit_predefined_call_statement(&mut self, call: &PredefinedCallStatement) {
+        self.opcodes.push(call.get_func().opcode);
+    }
+}
+
+#[test]
 fn check_let_statement() {
     check_statement(
         "LET A = 5",

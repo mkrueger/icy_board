@@ -593,6 +593,25 @@ needed to keep it in front of the routines; the block may just as well follow
 them. `BEGIN` may also group statements inside a routine, where it does nothing
 but read as one unit.
 
+`END` closes a block and nothing else from 400 on - it is no longer a statement.
+Two words say what one used to: `EXIT` ends a program normally, `STOP` aborts it.
+
+```PPL
+BEGIN
+    IF (!HasAccess()) THEN
+        PRINTLN "Sorry."
+        STOP
+    ENDIF
+    PRINTLN "Welcome."
+    EXIT
+END
+```
+
+That removes the one place where PPL used a single word for two unrelated
+things. A trailing `EXIT` can simply go: the compiler has always appended the
+terminating instruction by itself. `EXIT` compiles to the instruction `END`
+always stood for, so the executable stays what it was.
+
 The formatter indents the body of a block like any other block, and puts `END`
 back at the column its `BEGIN` starts on.
 
@@ -603,6 +622,10 @@ back at the column its `BEGIN` starts on.
 * `[` and `]` are index operators.
 * `BEGIN` is a keyword, so a 3.50 source may still have a variable called
   `begin` while a 4.00 source may not.
+* `END` is a block terminator rather than a statement; `EXIT` ends a program and
+  `STOP` aborts one.
+* `EXIT` is a statement name from 4.00 on, so a 3.50 source may still have a
+  variable called `exit`.
 * A decompiled PPE names its records `TYPE001` and their fields `FIELD001`,
   because the file carries no names to recover.
 

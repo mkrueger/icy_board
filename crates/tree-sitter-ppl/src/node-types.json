@@ -90,6 +90,10 @@
         "named": true
       },
       {
+        "type": "exit_statement",
+        "named": true
+      },
+      {
         "type": "for_statement",
         "named": true
       },
@@ -643,6 +647,11 @@
   },
   {
     "type": "endif_directive",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "exit_statement",
     "named": true,
     "fields": {}
   },
@@ -1902,6 +1911,10 @@
   },
   {
     "type": "ENDWHILE",
+    "named": false
+  },
+  {
+    "type": "EXIT",
     "named": false
   },
   {

@@ -1348,6 +1348,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "exit_statement"
+        },
+        {
+          "type": "SYMBOL",
           "name": "block"
         },
         {
@@ -2672,6 +2676,18 @@
         "named": false,
         "value": "END"
       }
+    },
+    "exit_statement": {
+      "type": "ALIAS",
+      "content": {
+        "type": "TOKEN",
+        "content": {
+          "type": "PATTERN",
+          "value": "[eE][xX][iI][tT]"
+        }
+      },
+      "named": false,
+      "value": "EXIT"
     },
     "block": {
       "type": "SEQ",

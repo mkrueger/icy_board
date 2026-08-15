@@ -122,6 +122,7 @@
   "VAR"
   "BEGIN"
   "END"
+  "EXIT"
 ] @keyword
 
 ; ---------- Operators ----------

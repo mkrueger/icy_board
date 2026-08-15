@@ -278,6 +278,7 @@ module.exports = grammar({
       $.break_statement,
       $.continue_statement,
       $.end_statement,
+      $.exit_statement,
       $.block,
       $.label,
       $.predefined_call,
@@ -422,6 +423,9 @@ module.exports = grammar({
     break_statement: $ => kw('BREAK'),
     continue_statement: $ => kw('CONTINUE'),
     end_statement: $ => prec(-1, kw('END')),
+
+    // What END was before 400 took that word for the block terminator.
+    exit_statement: $ => kw('EXIT'),
 
     // Language version 400 made BEGIN ... END a block; before that BEGIN was a
     // pseudo label and the END below it the statement that stops a program.

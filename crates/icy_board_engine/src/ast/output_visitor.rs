@@ -553,6 +553,11 @@ impl AstVisitor<()> for OutputVisitor {
     }
 
     fn visit_predefined_call_statement(&mut self, call: &super::PredefinedCallStatement) {
+        // 400 turned END into the block terminator, so the statement is spelled EXIT there.
+        if self.version >= 400 && call.get_func().opcode == crate::executable::OpCode::END {
+            self.output_function("Exit");
+            return;
+        }
         self.output_function(call.get_func().name);
         self.output.push(' ');
         for (i, arg) in call.get_arguments().iter().enumerate() {
