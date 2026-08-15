@@ -48,7 +48,7 @@ jobs:
          bin/ppld
          bin/icyboard-ppl
          file_id.diz
-         INSTALL.txt
+         INSTALL.md
   build_windows:
    runs-on: windows-latest
    if: github.event.workflow_run.conclusion == 'success'
@@ -90,7 +90,7 @@ jobs:
          bin/ppld.exe
          bin/icyboard-ppl.exe
          file_id.diz
-         INSTALL.txt
+         INSTALL.md
   build_mac:
    runs-on: macos-latest
    if: github.event.workflow_run.conclusion == 'success'
@@ -149,7 +149,7 @@ jobs:
          aarch64-apple-darwin/bin/ppld
          aarch64-apple-darwin/bin/icyboard-ppl
          file_id.diz
-         INSTALL.txt
+         INSTALL.md
    - name: 'Upload zip'
      uses: actions/upload-artifact@v4
      with:
@@ -165,7 +165,7 @@ jobs:
          x86_64-apple-darwin/bin/ppld
          x86_64-apple-darwin/bin/icyboard-ppl
          file_id.diz
-         INSTALL.txt
+         INSTALL.md
   build_vs_extension:
    runs-on: ubuntu-latest
    if: github.event.workflow_run.conclusion == 'success'

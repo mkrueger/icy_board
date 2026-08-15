@@ -29,6 +29,7 @@ There are data structures for almost all PCBoard data structures so making a BBS
   Use it!
 
 # Topics
+* [Installation](INSTALL.md)
 * [GettingStarted](docs/gettingstarted.md)
 * [PCBoard Feature Status](docs/feature_parity.md)
 * [Known limitations](docs/known_limitations.md)
