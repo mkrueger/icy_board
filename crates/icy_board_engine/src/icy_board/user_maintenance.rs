@@ -460,15 +460,18 @@ fn table_value(user: &User, kind: TableKind) -> f64 {
     }
 }
 
-/// Moves everyone the table has a step for. A user below the lowest step keeps
-/// the level they have - the table says who earns what, not who loses it.
+/// Moves users whose current level appears in the table to the level selected
+/// by their counter. Values below the first threshold use the first step.
 pub fn adjust_by_table(base: &mut UserBase, selection: &UserSelection, kind: TableKind, table: &[TableEntry], now: DateTime<Utc>) -> MaintenanceReport {
     let mut steps: Vec<TableEntry> = table.to_vec();
     steps.sort_by(|a, b| a.value.partial_cmp(&b.value).unwrap_or(std::cmp::Ordering::Equal));
 
     apply(base, selection, now, |user| {
+        if !steps.iter().any(|step| step.security == user.security_level) {
+            return false;
+        }
         let value = table_value(user, kind);
-        let Some(step) = steps.iter().rev().find(|step| value >= step.value) else {
+        let Some(step) = steps.iter().rev().find(|step| value >= step.value).or_else(|| steps.first()) else {
             return false;
         };
         if user.security_level == step.security {
@@ -1066,17 +1069,25 @@ mod tests {
 
     #[test]
     fn a_security_table_moves_everyone_it_has_a_step_for() {
-        let mut base = base(vec![user("Sysop", 110), user("Fresh", 10), user("Regular", 10), user("Heavy", 10)]);
-        base[1].stats.num_uploads = 0;
-        base[2].stats.num_uploads = 12;
-        base[3].stats.num_uploads = 60;
+        let mut base = base(vec![
+            user("Sysop", 110),
+            user("NotListed", 10),
+            user("BelowFirst", 30),
+            user("Regular", 40),
+            user("Heavy", 30),
+        ]);
+        base[1].stats.num_uploads = 60;
+        base[2].stats.num_uploads = 0;
+        base[3].stats.num_uploads = 12;
+        base[4].stats.num_uploads = 60;
 
         let table = [TableEntry { value: 10.0, security: 30 }, TableEntry { value: 50.0, security: 40 }];
         let report = adjust_by_table(&mut base, &UserSelection::default(), TableKind::Uploads, &table, now());
 
-        assert_eq!(10, base[1].security_level, "below the lowest step nobody is touched");
+        assert_eq!(10, base[1].security_level, "levels absent from the table stay untouched");
         assert_eq!(30, base[2].security_level);
-        assert_eq!(40, base[3].security_level);
+        assert_eq!(30, base[3].security_level);
+        assert_eq!(40, base[4].security_level);
         assert_eq!(2, report.changed);
     }
 

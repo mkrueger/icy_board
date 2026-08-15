@@ -1775,6 +1775,7 @@ icbsm_undo_done=The user file was restored.
 icbsm_undo_failed=Could not restore the user file: { $error }
 
 icbsm_board_in_use=Another tool is working on this board. Close it and start again.
+icbsm_record_one_protected=Record #1 is the sysop record and cannot be removed.
 
 icbsm_list_sort_record=Record
 icbsm_list_sort_name=Name

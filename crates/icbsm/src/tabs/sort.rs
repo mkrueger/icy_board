@@ -176,8 +176,12 @@ impl SortPage {
             return;
         }
 
+        let original = board.users.clone();
         let report: MaintenanceReport = user_maintenance::sort(&mut board.users, self.key, self.reverse);
         let save = board.save_userbase();
+        if save.is_err() {
+            board.users = original;
+        }
         drop(board);
 
         self.result = Some(match save {

@@ -583,7 +583,7 @@ impl MaintenancePage {
             expired_before: (packing && date_is_set(p.expired_before)).then_some(p.expired_before),
             keep_security_at_least: (packing && p.keep_security > 0).then_some(p.keep_security.min(255) as u8),
             keep_locked_out: packing && p.keep_locked_out,
-            protect_first_record: true,
+            protect_first_record: packing,
             protected_names: Vec::new(),
         }
     }
@@ -659,6 +659,7 @@ impl MaintenancePage {
             return;
         }
 
+        let original = board.users.clone();
         let report = match self.op {
             MaintenanceOp::Pack => user_maintenance::pack(&mut board.users, &selection, now),
             MaintenanceOp::AdjustSecurity | MaintenanceOp::AdjustSecurityExpired => {
@@ -676,6 +677,7 @@ impl MaintenancePage {
         };
 
         if let Err(err) = board.save_userbase() {
+            board.users = original;
             self.error = Some(get_text_args("icbsm_save_failed", HashMap::from([("error".to_string(), err.to_string())])));
             return;
         }

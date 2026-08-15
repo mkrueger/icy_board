@@ -18,7 +18,7 @@ use crossterm::{
 };
 use icy_board_engine::{
     Res,
-    icy_board::{IcyBoard, bbs::BBS, state::PPEExecute},
+    icy_board::{IcyBoard, bbs::BBS, lock::BoardLock, state::PPEExecute},
 };
 
 use node_monitoring_screen::{NodeMonitoringScreenMessage, WebAdminInfo};
@@ -119,6 +119,7 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
     match IcyBoard::load(&config_file) {
         Ok(mut icy_board) => {
             icy_board.resolve_paths();
+            let mut board_lock = Some(BoardLock::acquire(&icy_board.root_path)?);
             let mut bbs = Arc::new(Mutex::new(BBS::new(icy_board.config.board.num_nodes as usize)));
             let mut board: Arc<Mutex<IcyBoard>> = Arc::new(tokio::sync::Mutex::new(icy_board));
             if arguments.localon || arguments.ppe.is_some() {
@@ -157,38 +158,62 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
                 terminal.clear()?;
                 app.reset(&board).await;
                 match app.run(&mut terminal, &board, arguments.full_screen).await {
-                    Ok(msg) => match run_message(
-                        msg,
-                        &mut terminal,
-                        &mut board,
-                        &mut bbs,
-                        arguments.full_screen,
-                        String::new(),
-                        web_admin.clone(),
-                    )
-                    .await
-                    {
-                        Ok(reload) => {
-                            if reload {
-                                icy_board = IcyBoard::load(&config_file)?;
-                                icy_board.resolve_paths();
-
-                                bbs = Arc::new(Mutex::new(BBS::new(icy_board.config.board.num_nodes as usize)));
-                                board = Arc::new(tokio::sync::Mutex::new(icy_board));
-                                app = CallWaitScreen::new(&board).await?;
-                                connection_token.cancel();
+                    Ok(msg) => {
+                        let launches_system_manager = matches!(&msg, CallWaitMessage::SystemManager);
+                        if launches_system_manager {
+                            connection_token.cancel();
+                            let states = {
+                                let mut bbs_guard = bbs.lock().await;
+                                bbs_guard.clear_closed_connections().await;
+                                bbs_guard.open_connections.clone()
+                            };
+                            if states.lock().await.iter().any(Option::is_some) {
+                                print_error("ICBSM cannot start while callers are online.".to_string());
                                 connection_token = CancellationToken::new();
                                 web_admin = start_connections(&bbs, &board, &config_file, connection_token.clone()).await;
                                 continue;
                             }
+                            drop(board_lock.take());
                         }
-                        Err(err) => {
-                            restore_terminal()?;
-                            log::error!("while processing call wait screen message: {}", err.to_string());
-                            print_error(err.to_string());
-                            return Err(err);
+
+                        let result = run_message(
+                            msg,
+                            &mut terminal,
+                            &mut board,
+                            &mut bbs,
+                            arguments.full_screen,
+                            String::new(),
+                            web_admin.clone(),
+                        )
+                        .await;
+
+                        if launches_system_manager {
+                            board_lock = Some(BoardLock::acquire(&board.lock().await.root_path)?);
                         }
-                    },
+
+                        match result {
+                            Ok(reload) => {
+                                if reload {
+                                    icy_board = IcyBoard::load(&config_file)?;
+                                    icy_board.resolve_paths();
+
+                                    bbs = Arc::new(Mutex::new(BBS::new(icy_board.config.board.num_nodes as usize)));
+                                    board = Arc::new(tokio::sync::Mutex::new(icy_board));
+                                    app = CallWaitScreen::new(&board).await?;
+                                    connection_token.cancel();
+                                    connection_token = CancellationToken::new();
+                                    web_admin = start_connections(&bbs, &board, &config_file, connection_token.clone()).await;
+                                    continue;
+                                }
+                            }
+                            Err(err) => {
+                                restore_terminal()?;
+                                log::error!("while processing call wait screen message: {}", err.to_string());
+                                print_error(err.to_string());
+                                return Err(err);
+                            }
+                        }
+                    }
                     Err(err) => {
                         restore_terminal()?;
                         log::error!("while running call wait screen: {}", err.to_string());

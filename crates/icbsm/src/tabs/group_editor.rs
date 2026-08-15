@@ -13,8 +13,8 @@ use icy_board_tui::config_menu::ConfigMenuState;
 use icy_board_tui::config_menu::ListItem;
 use icy_board_tui::config_menu::ListValue;
 use icy_board_tui::config_menu::TextFlags;
-use icy_board_tui::tab_page::Page;
-use icy_board_tui::tab_page::PageMessage;
+use icy_board_tui::get_text_args;
+use icy_board_tui::tab_page::{InfoState, Page, PageMessage};
 use icy_board_tui::theme::get_tui_theme;
 use ratatui::widgets::Block;
 use ratatui::widgets::BorderType;
@@ -31,7 +31,7 @@ pub struct GroupEditor {
     scroll_state: ScrollbarState,
     table_state: TableState,
     icy_board: Arc<Mutex<IcyBoard>>,
-    _old_groups: GroupList,
+    edit_backup: Option<GroupList>,
     in_edit_mode: bool,
 
     conference_config: ConfigMenu<(usize, Arc<Mutex<IcyBoard>>)>,
@@ -41,12 +41,12 @@ pub struct GroupEditor {
 
 impl GroupEditor {
     pub fn new(icy_board: Arc<Mutex<IcyBoard>>) -> Self {
-        let old_groups = icy_board.lock().unwrap().groups.clone();
+        let group_len = icy_board.lock().unwrap().groups.len();
         Self {
-            scroll_state: ScrollbarState::default().content_length(icy_board.lock().unwrap().conferences.len()),
-            table_state: TableState::default().with_selected(0),
+            scroll_state: ScrollbarState::default().content_length(group_len),
+            table_state: TableState::default().with_selected(if group_len > 0 { 0 } else { usize::MAX }),
             icy_board: icy_board.clone(),
-            _old_groups: old_groups,
+            edit_backup: None,
             in_edit_mode: false,
             conference_config: ConfigMenu {
                 obj: (0, icy_board.clone()),
@@ -109,7 +109,7 @@ impl GroupEditor {
     }
 
     fn prev(&mut self) {
-        if self.icy_board.lock().unwrap().conferences.is_empty() {
+        if self.icy_board.lock().unwrap().groups.is_empty() {
             return;
         }
         let i = match self.table_state.selected() {
@@ -127,7 +127,7 @@ impl GroupEditor {
     }
 
     fn next(&mut self) {
-        if self.icy_board.lock().unwrap().conferences.is_empty() {
+        if self.icy_board.lock().unwrap().groups.is_empty() {
             return;
         }
         let i = match self.table_state.selected() {
@@ -144,15 +144,23 @@ impl GroupEditor {
         self.scroll_state = self.scroll_state.position(i * 1);
     }
 
-    fn insert(&mut self) {
+    fn insert(&mut self) -> PageMessage {
+        let original = self.icy_board.lock().unwrap().groups.clone();
         let mut group = Group::default();
         group.name = format!("new_group{}", self.icy_board.lock().unwrap().groups.len() + 1);
         self.icy_board.lock().unwrap().groups.push(group);
         self.scroll_state = self.scroll_state.content_length(self.icy_board.lock().unwrap().groups.len());
-        self.save_groups();
+        match self.save_groups() {
+            Ok(()) => PageMessage::None,
+            Err(err) => {
+                self.icy_board.lock().unwrap().groups = original;
+                PageMessage::InfoBox(InfoState::Error, save_error(err))
+            }
+        }
     }
 
-    fn remove(&mut self) {
+    fn remove(&mut self) -> PageMessage {
+        let original = self.icy_board.lock().unwrap().groups.clone();
         if let Some(i) = self.table_state.selected() {
             if i > 0 {
                 self.icy_board.lock().unwrap().groups.remove(i);
@@ -166,7 +174,13 @@ impl GroupEditor {
                 }
             }
         }
-        self.save_groups();
+        match self.save_groups() {
+            Ok(()) => PageMessage::None,
+            Err(err) => {
+                self.icy_board.lock().unwrap().groups = original;
+                PageMessage::InfoBox(InfoState::Error, save_error(err))
+            }
+        }
     }
 
     fn render_editor(&mut self, frame: &mut Frame, area: Rect) {
@@ -178,6 +192,7 @@ impl GroupEditor {
         self.state = ConfigMenuState::default();
         self.edit_conference = index;
         let ib = self.icy_board.lock().unwrap();
+        self.edit_backup = Some(ib.groups.clone());
         let group = ib.groups.get(index).unwrap();
         let items = vec![
             ConfigEntry::Item(
@@ -200,11 +215,15 @@ impl GroupEditor {
         self.conference_config.entry = items;
     }
 
-    fn save_groups(&self) {
+    fn save_groups(&self) -> icy_board_engine::Res<()> {
         let path = self.icy_board.lock().unwrap().config.paths.group_file.clone();
         let path = self.icy_board.lock().unwrap().resolve_file(&path);
-        let _ = self.icy_board.lock().unwrap().groups.save(&path);
+        self.icy_board.lock().unwrap().groups.save(&path)
     }
+}
+
+fn save_error(err: impl std::fmt::Display) -> String {
+    get_text_args("icbsm_save_failed", std::collections::HashMap::from([("error".to_string(), err.to_string())]))
 }
 
 impl Page for GroupEditor {
@@ -242,9 +261,19 @@ impl Page for GroupEditor {
             let res = self.conference_config.handle_key_press(key, &mut self.state);
             if res.edit_msg == icy_board_tui::config_menu::EditMessage::Close {
                 self.in_edit_mode = false;
-                return PageMessage::None;
+                return match self.save_groups() {
+                    Ok(()) => {
+                        self.edit_backup = None;
+                        PageMessage::None
+                    }
+                    Err(err) => {
+                        if let Some(groups) = self.edit_backup.take() {
+                            self.icy_board.lock().unwrap().groups = groups;
+                        }
+                        PageMessage::InfoBox(InfoState::Error, save_error(err))
+                    }
+                };
             }
-            self.save_groups();
             return PageMessage::None;
         }
         match key.code {
@@ -253,8 +282,8 @@ impl Page for GroupEditor {
             }
             KeyCode::Up => self.prev(),
             KeyCode::Down => self.next(),
-            KeyCode::Insert => self.insert(),
-            KeyCode::Delete => self.remove(),
+            KeyCode::Insert => return self.insert(),
+            KeyCode::Delete => return self.remove(),
             KeyCode::Enter => {
                 if let Some(state) = self.table_state.selected() {
                     self.in_edit_mode = true;

@@ -21,6 +21,19 @@ impl IcyBoardState {
             return Ok(());
         }
 
+        if self
+            .node_state
+            .lock()
+            .await
+            .iter()
+            .enumerate()
+            .any(|(node, state)| node != self.node && state.is_some())
+        {
+            self.print(TerminalTarget::Both, "Pack unavailable while another caller is online.").await?;
+            self.new_line().await?;
+            return Ok(());
+        }
+
         if !self.ask_yes_no(IceText::PackTheUsersFile, false).await? {
             return Ok(());
         }
@@ -60,7 +73,6 @@ impl IcyBoardState {
             keep_security_at_least: keep_security,
             keep_locked_out,
             protect_first_record: true,
-            protected_names: self.online_user_names().await,
             ..Default::default()
         };
 
@@ -77,8 +89,12 @@ impl IcyBoardState {
             return Ok(());
         }
 
+        let original = board.users.clone();
         let report = user_maintenance::pack(&mut board.users, &selection, Utc::now());
         let save_result = board.save_userbase();
+        if save_result.is_err() {
+            board.users = original;
+        }
         drop(board);
 
         if let Err(err) = save_result {
@@ -102,22 +118,5 @@ impl IcyBoardState {
         self.display_text(IceText::UsersFilePacked, display_flags::NEWLINE | display_flags::LFBEFORE)
             .await?;
         Ok(())
-    }
-
-    /// Names of the callers on the nodes right now, which a pack has to leave alone.
-    async fn online_user_names(&self) -> Vec<String> {
-        let online: Vec<usize> = self
-            .node_state
-            .lock()
-            .await
-            .iter()
-            .filter_map(|state| state.as_ref().map(|state| state.cur_user as usize))
-            .collect();
-
-        let board = self.board.lock().await;
-        online
-            .into_iter()
-            .filter_map(|index| board.users.get(index).map(|user| user.get_name().clone()))
-            .collect()
     }
 }

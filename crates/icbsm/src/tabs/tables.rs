@@ -290,8 +290,16 @@ impl TableApplyPage {
             return;
         }
 
-        let report = user_maintenance::adjust_by_table(&mut board.users, &UserSelection::default(), self.kind, &self.entries, Utc::now());
+        let selection = UserSelection {
+            protect_first_record: false,
+            ..Default::default()
+        };
+        let original = board.users.clone();
+        let report = user_maintenance::adjust_by_table(&mut board.users, &selection, self.kind, &self.entries, Utc::now());
         let save = board.save_userbase();
+        if save.is_err() {
+            board.users = original;
+        }
         drop(board);
 
         self.result = Some(match save {
@@ -347,7 +355,8 @@ impl Page for TableApplyPage {
 /// One question in a box of its own, the way the original asked when a screen
 /// had nothing to fill in.
 pub fn render_question(frame: &mut Frame, disp_area: Rect, question: &str, bottom: &str) {
-    let width = (question.chars().count() as u16 + 8).min(disp_area.width.saturating_sub(4));
+    let content_width = question.chars().count().max(bottom.chars().count()) as u16;
+    let width = (content_width + 12).clamp(36, disp_area.width.saturating_sub(4));
     let area = Rect {
         x: disp_area.x + (disp_area.width.saturating_sub(width)) / 2,
         y: disp_area.y + disp_area.height / 3,

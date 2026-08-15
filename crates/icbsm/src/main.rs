@@ -165,8 +165,15 @@ fn run_batch(arguments: &Cli, icy_board: &mut IcyBoard) -> icy_board_engine::Res
         inactive_days: arguments.inactive_days,
         never_logged_on: arguments.never_logged_on,
         delete_flagged: arguments.pack && !arguments.no_delete_flagged,
-        keep_security_at_least: arguments.keep_security,
+        disabled: arguments.pack,
+        locked_out: arguments.pack && arguments.pack_locked_out,
+        keep_security_at_least: if arguments.pack {
+            arguments.keep_security.or(Some(100))
+        } else {
+            arguments.keep_security
+        },
         keep_locked_out: !arguments.pack_locked_out,
+        protect_first_record: arguments.pack,
         ..Default::default()
     };
 

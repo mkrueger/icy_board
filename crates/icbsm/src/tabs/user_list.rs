@@ -8,8 +8,7 @@ use icy_board_engine::icy_board::IcyBoard;
 use icy_board_engine::icy_board::user_base::UserBase;
 use icy_board_tui::save_changes_dialog::SaveChangesDialog;
 use icy_board_tui::save_changes_dialog::SaveChangesMessage;
-use icy_board_tui::tab_page::Page;
-use icy_board_tui::tab_page::PageMessage;
+use icy_board_tui::tab_page::{InfoState, Page, PageMessage};
 use icy_board_tui::theme::get_tui_theme;
 use icy_board_tui::{get_text, get_text_args};
 use ratatui::widgets::Block;
@@ -254,8 +253,11 @@ impl UserList {
         self.has_changes = true;
     }
 
-    fn remove(&mut self) {
+    fn remove(&mut self) -> PageMessage {
         if let Some(index) = self.selected_user() {
+            if index == 0 {
+                return PageMessage::InfoBox(InfoState::Warning, get_text("icbsm_record_one_protected"));
+            }
             let mut board = self.icy_board.lock().unwrap();
             if index < board.users.len() {
                 board.users.remove(index);
@@ -264,6 +266,7 @@ impl UserList {
                 self.has_changes = true;
             }
         }
+        PageMessage::None
     }
 
     fn open_save_dialog(&mut self) {
@@ -323,13 +326,16 @@ impl UserList {
         match self.icy_board.lock().unwrap().save_userbase() {
             Ok(_) => {
                 self.has_changes = false;
+                PageMessage::Close
             }
             Err(e) => {
                 log::error!("Failed to save user database: {e}");
+                PageMessage::InfoBox(
+                    InfoState::Error,
+                    get_text_args("icbsm_save_failed", std::collections::HashMap::from([("error".to_string(), e.to_string())])),
+                )
             }
         }
-
-        PageMessage::Close
     }
 
     fn handle_close_request(&mut self) -> PageMessage {
@@ -445,10 +451,7 @@ impl Page for UserList {
                 self.insert();
                 PageMessage::None
             }
-            KeyCode::Delete => {
-                self.remove();
-                PageMessage::None
-            }
+            KeyCode::Delete => self.remove(),
             KeyCode::F(2) if self.has_changes => self.try_save(),
             KeyCode::Enter => {
                 if let Some(index) = self.selected_user() {

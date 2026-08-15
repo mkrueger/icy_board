@@ -8,9 +8,9 @@ use icy_board_engine::icy_board::{
 use icy_board_tui::{
     BORDER_SET,
     config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, ResultState, TextFlags},
-    get_text,
+    get_text, get_text_args,
     save_changes_dialog::SaveChangesDialog,
-    tab_page::{Page, PageMessage},
+    tab_page::{InfoState, Page, PageMessage},
     theme::get_tui_theme,
 };
 use ratatui::{
@@ -462,7 +462,7 @@ impl UserEditor {
                         .with_help(get_text("user_editor_birthdate-help"))
                         .with_update_date_value(&|board: &Arc<Mutex<User>>, value: DateTime<Utc>| {
                             let mut user = board.lock().unwrap();
-                            user.expiration_date = value;
+                            user.birth_date = value;
                         }),
                 ),
                 ConfigEntry::Item(
@@ -551,9 +551,21 @@ impl Page for UserEditor {
                 }
                 icy_board_tui::save_changes_dialog::SaveChangesMessage::Close => PageMessage::Close,
                 icy_board_tui::save_changes_dialog::SaveChangesMessage::Save => {
-                    self.icy_board.lock().unwrap().users[self.num_user] = self.menu.obj.lock().unwrap().clone();
-                    self.icy_board.lock().unwrap().save_userbase().unwrap();
-                    PageMessage::Close
+                    self.save_dialog = None;
+                    let edited = self.menu.obj.lock().unwrap().clone();
+                    let mut board = self.icy_board.lock().unwrap();
+                    let original = board.users[self.num_user].clone();
+                    board.users[self.num_user] = edited;
+                    match board.save_userbase() {
+                        Ok(()) => PageMessage::Close,
+                        Err(err) => {
+                            board.users[self.num_user] = original;
+                            PageMessage::InfoBox(
+                                InfoState::Error,
+                                get_text_args("icbsm_save_failed", std::collections::HashMap::from([("error".to_string(), err.to_string())])),
+                            )
+                        }
+                    }
                 }
                 icy_board_tui::save_changes_dialog::SaveChangesMessage::None => PageMessage::None,
             };
