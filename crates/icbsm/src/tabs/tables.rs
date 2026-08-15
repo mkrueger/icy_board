@@ -356,7 +356,9 @@ impl Page for TableApplyPage {
 /// had nothing to fill in.
 pub fn render_question(frame: &mut Frame, disp_area: Rect, question: &str, bottom: &str) {
     let content_width = question.chars().count().max(bottom.chars().count()) as u16;
-    let width = (content_width + 12).clamp(36, disp_area.width.saturating_sub(4));
+    // A narrow terminal decides the width, so the box never asks for more than there is.
+    let available = disp_area.width.saturating_sub(4);
+    let width = (content_width + 12).min(available).max(36.min(available));
     let area = Rect {
         x: disp_area.x + (disp_area.width.saturating_sub(width)) / 2,
         y: disp_area.y + disp_area.height / 3,

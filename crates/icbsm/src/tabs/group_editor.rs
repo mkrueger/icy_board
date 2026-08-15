@@ -188,12 +188,15 @@ impl GroupEditor {
         self.conference_config.render(area, frame, &mut self.state);
     }
 
-    fn open_editor(&mut self, index: usize) {
+    fn open_editor(&mut self, index: usize) -> bool {
         self.state = ConfigMenuState::default();
         self.edit_conference = index;
         let ib = self.icy_board.lock().unwrap();
+        let Some(group) = ib.groups.get(index) else {
+            // An empty list has nothing to edit.
+            return false;
+        };
         self.edit_backup = Some(ib.groups.clone());
-        let group = ib.groups.get(index).unwrap();
         let items = vec![
             ConfigEntry::Item(
                 ListItem::new("Name".to_string(), ListValue::Text(60, TextFlags::None, group.name.to_string()))
@@ -213,6 +216,7 @@ impl GroupEditor {
         drop(ib);
         self.conference_config.obj = (index, self.icy_board.clone());
         self.conference_config.entry = items;
+        true
     }
 
     fn save_groups(&self) -> icy_board_engine::Res<()> {
@@ -286,8 +290,7 @@ impl Page for GroupEditor {
             KeyCode::Delete => return self.remove(),
             KeyCode::Enter => {
                 if let Some(state) = self.table_state.selected() {
-                    self.in_edit_mode = true;
-                    self.open_editor(state);
+                    self.in_edit_mode = self.open_editor(state);
                     return PageMessage::None;
                     //return ResultState::status_line(String::new());
                 } else {

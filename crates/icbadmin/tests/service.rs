@@ -3,7 +3,6 @@ use std::{fs, net::SocketAddr, path::PathBuf};
 use std::sync::Arc;
 
 use icbadmin::{
-    backup::BoardLock,
     check_bind_address,
     dto::GeneralSettingsDto,
     error::AdminError,
@@ -13,6 +12,7 @@ use icy_board_engine::icy_board::{
     IcyBoard, IcyBoardSerializer,
     conferences::{Conference, ConferenceBase},
     icb_config::IcbConfig,
+    lock::LOCK_FILE_NAME,
 };
 use tokio::sync::Mutex;
 
@@ -145,7 +145,16 @@ async fn invalid_settings_are_rejected_without_touching_the_file() {
 async fn a_held_lock_blocks_writes() {
     let f = fixture();
     let current = f.backend.get_general_settings().await.unwrap();
-    let _lock = BoardLock::acquire(f.backend.root_path()).unwrap();
+    // A tool in another process holds the board, so take the file lock directly
+    // instead of a handle this process would happily share.
+    let lock_file = std::fs::OpenOptions::new()
+        .create(true)
+        .read(true)
+        .write(true)
+        .truncate(false)
+        .open(f.backend.root_path().join(LOCK_FILE_NAME))
+        .unwrap();
+    lock_file.try_lock().unwrap();
 
     let mut patch = patch_from(&current.settings);
     patch.board_name = "Blocked".to_string();

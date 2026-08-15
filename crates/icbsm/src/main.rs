@@ -45,7 +45,7 @@ struct Cli {
     #[argh(switch)]
     no_delete_flagged: bool,
 
-    /// keep users at or above that security level
+    /// keep users at or above that security level (defaults to 100 when packing)
     #[argh(option)]
     keep_security: Option<u8>,
 

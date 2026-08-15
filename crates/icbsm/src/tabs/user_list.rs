@@ -397,14 +397,10 @@ impl Page for UserList {
 
     fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
         // If dialog is open, it owns the key events.
+        // The dialog owns the key, so its answer is passed on unchanged and the
+        // list never sees the same key a second time.
         if let Some(result) = self.handle_save_dialog_keys(key) {
-            // Stop further processing while dialog visible
-            if self.save_dialog.is_some() {
-                return PageMessage::None;
-            }
-            if matches!(result, PageMessage::Close) {
-                return result;
-            }
+            return result;
         }
 
         if self.handle_search_keys(key) {
