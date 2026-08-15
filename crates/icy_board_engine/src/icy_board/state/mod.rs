@@ -874,10 +874,13 @@ impl IcyBoardState {
         Ok(())
     }
 
-    pub async fn run_ppe<P: AsRef<Path>>(&mut self, file_name: &P, answer_file: Option<&Path>) -> Res<()> {
+    /// Answers `false` when the PPE gave up or failed, which is what keeps a script
+    /// questionnaire from saving the answers it collected.
+    pub async fn run_ppe<P: AsRef<Path>>(&mut self, file_name: &P, answer_file: Option<&Path>) -> Res<bool> {
+        let mut keep_answers = false;
         match Executable::read_file(&file_name, false) {
             Ok(executable) => {
-                self.run_executable(file_name, answer_file, executable).await?;
+                keep_answers = self.run_executable(file_name, answer_file, executable).await?;
             }
             Err(err) => {
                 log::error!("Error loading PPE {}: {}", file_name.as_ref().display(), err);
@@ -888,16 +891,16 @@ impl IcyBoardState {
         }
         // clear all ppe parameters
         self.session.tokens.clear();
-        Ok(())
+        Ok(keep_answers)
     }
 
-    pub async fn run_executable<P: AsRef<Path>>(&mut self, file_name: &P, answer_file: Option<&Path>, executable: Executable) -> Res<()> {
+    pub async fn run_executable<P: AsRef<Path>>(&mut self, file_name: &P, answer_file: Option<&Path>, executable: Executable) -> Res<bool> {
         // PCBoard stacked no more than 16 PPEs, doScript() refused the next one.
         // See MAX_SCR_STK in SCRMISC.CPP.
         const MAX_PPE_NESTING: usize = 16;
         if self.ppe_nesting >= MAX_PPE_NESTING {
             log::warn!("PPE nesting limit reached, not running {}", file_name.as_ref().display());
-            return Ok(());
+            return Ok(false);
         }
         self.session.disp_options.no_change();
         let canonicalized_path: PathBuf = file_name.as_ref().canonicalize()?;
@@ -908,12 +911,16 @@ impl IcyBoardState {
         self.ppe_nesting += 1;
         let result = run(&canonicalized_path, &executable, &mut io, self).await;
         self.ppe_nesting -= 1;
-        Ok(if let Err(err) = result {
-            log::error!("Error executing PPE {}: {}", canonicalized_path.display(), err);
-            self.session.op_text = format!("{}", err);
-            self.display_text(IceText::ErrorExecPPE, display_flags::LFBEFORE | display_flags::LFAFTER)
-                .await?;
-        })
+        match result {
+            Ok(keep_answers) => Ok(keep_answers),
+            Err(err) => {
+                log::error!("Error executing PPE {}: {}", canonicalized_path.display(), err);
+                self.session.op_text = format!("{}", err);
+                self.display_text(IceText::ErrorExecPPE, display_flags::LFBEFORE | display_flags::LFAFTER)
+                    .await?;
+                Ok(false)
+            }
+        }
     }
 
     pub fn stuff_keyboard_buffer(&mut self, value: &str, is_visible: bool) -> Res<()> {

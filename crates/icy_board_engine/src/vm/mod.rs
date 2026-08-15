@@ -156,6 +156,8 @@ pub struct VirtualMachine<'a> {
     pub script: PPEScript,
     pub cur_ptr: usize,
     pub is_running: bool,
+    /// Set by STOP, which gives up on a program rather than ending it.
+    pub aborted: bool,
     pub fpclear: bool,
 
     /// currently unused.
@@ -664,7 +666,12 @@ impl<'a> VirtualMachine<'a> {
 
     async fn execute_statement(&mut self, stmt: &PPECommand) -> Res<()> {
         match stmt {
-            PPECommand::End | PPECommand::Stop => {
+            PPECommand::End => {
+                self.is_running = false;
+            }
+
+            PPECommand::Stop => {
+                self.aborted = true;
                 self.is_running = false;
             }
 
@@ -971,6 +978,8 @@ impl<'a> VirtualMachine<'a> {
 }
 /// .
 /// # Errors
+/// Runs a PPE. Answers `false` when the program gave up with STOP, which is what tells a
+/// script questionnaire to drop the answers it collected.
 pub async fn run<P: AsRef<Path>>(file_name: &P, prg: &Executable, io: &mut dyn PCBoardIO, icy_board_state: &mut IcyBoardState) -> Res<bool> {
     match PPEScript::from_ppe_file(prg) {
         Ok(script) => {
@@ -994,6 +1003,7 @@ pub async fn run<P: AsRef<Path>>(file_name: &P, prg: &Executable, io: &mut dyn P
                 script,
                 io,
                 is_running: true,
+                aborted: false,
                 fpclear: false,
                 icy_board_state,
                 pcb_node: None,
@@ -1016,7 +1026,7 @@ pub async fn run<P: AsRef<Path>>(file_name: &P, prg: &Executable, io: &mut dyn P
             };
 
             vm.run().await?;
-            Ok(true)
+            Ok(!vm.aborted)
         }
         Err(e) => {
             log::error!("Error loading PPE file '{}': {}", file_name.as_ref().display(), e);

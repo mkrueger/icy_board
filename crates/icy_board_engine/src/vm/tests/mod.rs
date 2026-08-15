@@ -114,6 +114,16 @@ fn run_ppl_seeded<P: Fn(&mut IcyBoard)>(source: &str, init_fn: P, files: &[(&str
 }
 
 fn run_ppl_seeded_in<P: Fn(&mut IcyBoard)>(source: &str, init_fn: P, files: &[(&str, &[u8])], ppe_dir: Option<&str>) -> String {
+    run_ppl_collecting(source, init_fn, files, ppe_dir).1
+}
+
+/// True when the program ran to its end rather than giving up with STOP, which is what
+/// decides whether a script questionnaire keeps the answers it collected.
+pub fn ppl_keeps_script_answers(source: &str) -> bool {
+    run_ppl_collecting(source, |_| {}, &[], None).0
+}
+
+fn run_ppl_collecting<P: Fn(&mut IcyBoard)>(source: &str, init_fn: P, files: &[(&str, &[u8])], ppe_dir: Option<&str>) -> (bool, String) {
     let executable = compile(source);
     let work_dir = scratch_dir("run");
     for (name, bytes) in files {
@@ -181,13 +191,17 @@ fn run_ppl_seeded_in<P: Fn(&mut IcyBoard)>(source: &str, init_fn: P, files: &[(&
         drop(state);
         reader.join().unwrap();
 
-        result.expect("the snippet failed to run");
+        let kept_answers = result.expect("the snippet failed to run");
         let bytes = collected.lock().unwrap().clone();
-        bytes
+        (kept_answers, bytes)
     });
 
     let _ = std::fs::remove_dir_all(&work_dir);
-    String::from_utf8(output).expect("PPE output is not valid UTF-8").replace("\r\n", "\n")
+    let (kept_answers, bytes) = output;
+    (
+        kept_answers,
+        String::from_utf8(bytes).expect("PPE output is not valid UTF-8").replace("\r\n", "\n"),
+    )
 }
 
 /// A directory the snippet is free to write into, unique per test.
@@ -250,6 +264,14 @@ fn scratch_message_area() -> AreaList {
 #[test]
 fn test_the_harness_runs_a_program_and_captures_its_output() {
     assert_eq!(run_ppl(r#"PRINT "Hello, World!""#), "Hello, World!");
+}
+
+#[test]
+fn stop_gives_up_on_a_program_and_exit_does_not() {
+    assert!(ppl_keeps_script_answers("PRINT \"a\""), "reaching the end should keep the answers");
+    assert!(ppl_keeps_script_answers("PRINT \"a\"\nEXIT"), "EXIT should keep the answers");
+    assert!(!ppl_keeps_script_answers("PRINT \"a\"\nSTOP"), "STOP should drop the answers");
+    assert!(!ppl_keeps_script_answers("IF (1) THEN\n  STOP\nENDIF\nPRINT \"unreachable\""));
 }
 
 #[test]

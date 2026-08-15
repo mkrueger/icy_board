@@ -4137,8 +4137,8 @@ STOP (1.00)
 
     .. note::
        Icy Board collects channel 0 in a temporary file and appends it to the answer file
-       when the PPE returns, the way PCBoard did. It does that whatever stopped the
-       program, so ``STOP`` does not discard the answers yet.
+       once the PPE returns, the way PCBoard did. A PPE that failed to run drops its
+       answers as well.
 
   **Example**
 

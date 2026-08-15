@@ -129,7 +129,9 @@ impl IcyBoardState {
                     self.session.tokens.push_back(answer);
                 }
                 let t = temp_file::empty();
-                self.run_ppe(&question, Some(t.path())).await?;
+                if !self.run_ppe(&question, Some(t.path())).await? {
+                    return Ok(());
+                }
                 output.push(fs::read_to_string(t.path())?);
 
                 match OpenOptions::new().create(true).append(true).open(&answer_file) {

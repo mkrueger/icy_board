@@ -47,6 +47,7 @@ async fn test_fmtreal(value: f64, field_width: i32, decimal_places: i32) -> Stri
         script: PPEScript::default(),
         io: &mut io,
         is_running: true,
+        aborted: false,
         fpclear: false,
         icy_board_state: &mut state,
         pcb_node: None,
