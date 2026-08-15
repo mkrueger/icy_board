@@ -162,7 +162,16 @@ impl DiskIO {
         let mut first_chan = FileChannel::new();
 
         if let Some(answer_file) = answer_file {
-            let _ = first_chan.file.replace(Box::new(File::create(answer_file).unwrap()));
+            match File::create(answer_file) {
+                Ok(file) => {
+                    first_chan.file = Some(Box::new(file));
+                }
+                // A PPE that cannot record its answers still runs; channel 0 reports the error.
+                Err(err) => {
+                    log::error!("Can't create answer file {}: {err}", answer_file.display());
+                    first_chan.err = true;
+                }
+            }
         }
         let mut channels = HashMap::new();
         channels.insert(0, first_chan);
@@ -300,9 +309,17 @@ impl PCBoardIO for DiskIO {
         if let Some(mut f) = chan.file.take() {
             let mut buf = Vec::new();
             let _ = f.read_to_end(&mut buf);
-            let str = read_data_with_encoding_detection(&buf).unwrap();
-            let c = Cursor::new(str);
-            chan.reader = Some(c);
+            match read_data_with_encoding_detection(&buf) {
+                Ok(str) => {
+                    chan.reader = Some(Cursor::new(str));
+                }
+                // Whatever a PPE opened, failing to decode it is the channel's error, not the end of the PPE.
+                Err(err) => {
+                    log::error!("can't decode channel {channel}: {err}");
+                    chan.err = true;
+                    return Ok(String::new());
+                }
+            }
         }
         if let Some(reader) = &mut chan.reader {
             let mut line = String::new();
@@ -506,6 +523,20 @@ mod tests {
         io.fseek(6, 0, 0).unwrap();
         io.fflush(6).unwrap();
         assert_eq!(io.ftell(6).unwrap(), 0);
+    }
+
+    /// An answer file that cannot be created leaves channel 0 in error rather than
+    /// taking the whole PPE down with it.
+    #[test]
+    fn an_answer_file_that_cannot_be_created_only_fails_its_channel() {
+        let tmp = TempDir::new().unwrap();
+        let unusable = tmp.path().join("no-such-directory").join("answers.txt");
+
+        let mut io = DiskIO::new(tmp.path().to_str().unwrap(), Some(&unusable));
+
+        assert!(io.ferr(0));
+        assert!(!io.is_open(0));
+        io.fput(0, "answer".to_string()).unwrap();
     }
 
     /// A file that was read to the end and closed can be reopened on the same channel.
