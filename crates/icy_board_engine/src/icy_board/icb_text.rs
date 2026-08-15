@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 use std::{
-    fs::{self, File},
-    io::{BufWriter, Write},
+    fs,
+    io::Write,
     ops::{Deref, DerefMut},
     path::Path,
 };
@@ -17,7 +17,7 @@ use crate::vm::errors::IcyError;
 use super::icb_config::IcbColor;
 
 #[repr(usize)]
-#[derive(Clone, Copy, EnumString, Display, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, EnumString, Display, PartialEq, Eq)]
 pub enum IceText {
     UnusedStatusLine,
     /// `Leave a comment for the sysop (Enter)=no`
@@ -1607,8 +1607,14 @@ pub enum IceText {
 const LAST_ENTRY: usize = 778;
 
 impl IceText {
-    pub fn from(i: usize) -> Self {
-        unsafe { std::mem::transmute(i) }
+    /// A number a file or a PPE names. Anything past the last message has no
+    /// entry to name, and transmuting it would be undefined.
+    pub fn try_from_number(i: usize) -> Option<Self> {
+        if i <= LAST_ENTRY {
+            Some(unsafe { std::mem::transmute::<usize, Self>(i) })
+        } else {
+            None
+        }
     }
 }
 
@@ -1782,7 +1788,11 @@ impl IcbTextFile {
         txt.push('\n');
 
         for (i, entry) in self.entries.iter().enumerate().skip(1) {
-            let line = format!("[{}]\n", IceText::from(i));
+            let Some(name) = IceText::try_from_number(i) else {
+                log::warn!("Record {} of the text file has no name and is left out", i);
+                continue;
+            };
+            let line = format!("[{}]\n", name);
             txt.push_str(&line);
             let line = format!("text = \"{}\"\n", escape_toml(&entry.text));
             txt.push_str(&line);
@@ -1811,12 +1821,13 @@ impl IcbTextFile {
     }
 
     pub fn export_pcboard_format<P: AsRef<Path>>(&self, file_name: &P) -> Res<()> {
-        let mut fs = BufWriter::new(File::create(file_name)?);
+        let mut data = Vec::new();
         let header = TextEntry::new(IcbTextStyle::Red, PCBTEXT_HEADER, IcbTextJustification::Left);
-        header.serialize_pcb_format(&mut fs)?;
+        header.serialize_pcb_format(&mut data)?;
         for entry in self.entries.iter().skip(1) {
-            entry.serialize_pcb_format(&mut fs)?;
+            entry.serialize_pcb_format(&mut data)?;
         }
+        super::write_atomic(file_name, &data)?;
         Ok(())
     }
 
@@ -1860,7 +1871,7 @@ impl TextEntry {
         }
     }
 
-    fn serialize_pcb_format(&self, fs: &mut BufWriter<File>) -> Res<()> {
+    fn serialize_pcb_format(&self, fs: &mut impl Write) -> Res<()> {
         let pcb_char = match self.style {
             IcbTextStyle::Plain => b'0',
             IcbTextStyle::Red => b'1',
@@ -1879,6 +1890,33 @@ impl TextEntry {
         }
         fs.write_all(&output_buffer)?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn text_numbers_are_checked_before_they_become_an_enum() {
+        assert_eq!(IceText::try_from_number(0), Some(IceText::UnusedStatusLine));
+        assert_eq!(IceText::try_from_number(LAST_ENTRY), Some(IceText::SelectArea));
+        assert_eq!(IceText::try_from_number(LAST_ENTRY + 1), None);
+        assert_eq!(IceText::try_from_number(usize::MAX), None);
+    }
+
+    #[test]
+    fn pcboard_export_replaces_the_file_and_keeps_record_boundaries() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("PCBTEXT");
+        std::fs::write(&path, b"old contents").unwrap();
+
+        DEFAULT_DISPLAY_TEXT.export_pcboard_format(&path).unwrap();
+
+        let bytes = std::fs::read(&path).unwrap();
+        assert_eq!(bytes.len() % BIN_ENTRY_SIZE, 0);
+        assert!(bytes[1..].starts_with(PCBTEXT_HEADER.as_bytes()));
+        assert!(!dir.path().join(".PCBTEXT.tmp").exists());
     }
 }
 

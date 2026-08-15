@@ -23,6 +23,7 @@ icbtext_edit_style=Stil:
 
 icbtext_filter_title=Filter
 icbtext_filter_text=Zeige mit '{ $filter }' gefilterte Einträge
+icbtext_no_entries=Keine Einträge gefunden
 
 icbtext_jump_to_title=Zu Eintrag # springen
 

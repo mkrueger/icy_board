@@ -5,7 +5,9 @@ use color_eyre::{Result, eyre::Context};
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
 use icy_board_engine::icy_board::icb_text::{IcbTextFile, IcbTextStyle, TextEntry};
 use icy_board_tui::{
-    TerminalType, get_text, get_text_args,
+    TerminalType,
+    app::get_screen_size,
+    get_text, get_text_args,
     pcb_line::get_styled_pcb_line,
     term::next_event,
     text_field::{TextField, TextfieldState},
@@ -107,7 +109,7 @@ impl<'a> App<'a> {
     fn draw(&mut self, terminal: &mut TerminalType) -> Result<()> {
         terminal
             .draw(|frame| {
-                let screen = get_screen_size(&frame, self.full_screen);
+                let screen = get_screen_size(frame, self.full_screen);
                 self.ui(frame, screen);
                 match self.mode {
                     Mode::Jump | Mode::Edit => self.edit_state.set_cursor_position(frame),
@@ -247,9 +249,10 @@ impl<'a> App<'a> {
                         self.mode = Mode::Jump;
                     }
                     F(4) => {
-                        let orig_entry = self.record_tab.get_original_entry().unwrap().clone();
-                        if let Some(entry) = self.record_tab.get_selected_entry_mut() {
-                            *entry = orig_entry;
+                        if let Some(orig_entry) = self.record_tab.get_original_entry().cloned() {
+                            if let Some(entry) = self.record_tab.get_selected_entry_mut() {
+                                *entry = orig_entry;
+                            }
                         }
                     }
                     Char('d') | Enter => {
@@ -286,7 +289,7 @@ impl<'a> App<'a> {
         Block::new().style(get_tui_theme().title_bar).render(area, frame.buffer_mut());
         self.render_title_bar(title_bar, frame.buffer_mut());
 
-        if !self.filter.is_empty() {
+        if !self.filter.is_empty() && tab.height > 0 {
             let filter_area = Rect::new(tab.x, tab.y, tab.width, 1);
             self.render_filter_text(filter_area, frame.buffer_mut());
             tab.y += 1;
@@ -298,9 +301,11 @@ impl<'a> App<'a> {
         self.render_status_line(status_line, frame.buffer_mut());
 
         match self.mode {
+            // The dialog fills twelve lines and cannot be folded; below that the list stays.
+            Mode::Edit if area.height < 13 || area.width < 24 => {}
             Mode::Edit => {
                 let edit_height = 12;
-                let edit_area = Rect::new(area.x + 1, area.y + (area.height - edit_height - 1) / 2, area.width - 3, edit_height);
+                let edit_area = centered(area, area.width.saturating_sub(3), edit_height);
 
                 Clear.render(edit_area, frame.buffer_mut());
                 let edit_title = get_text_args(
@@ -344,8 +349,9 @@ impl<'a> App<'a> {
 
                 if let Some(entry) = self.record_tab.get_original_entry() {
                     let mut style_area = area;
-                    style_area.x += 30;
-                    style_area.width -= 30;
+                    let indent = 30.min(style_area.width);
+                    style_area.x += indent;
+                    style_area.width -= indent;
 
                     Line::from(vec![
                         Span::styled(get_text("icbtext_edit_style"), get_tui_theme().dialog_box_title),
@@ -376,8 +382,9 @@ impl<'a> App<'a> {
                     .render(area, frame.buffer_mut());
 
                 let mut style_area = area;
-                style_area.x += 30;
-                style_area.width -= 30;
+                let indent = 30.min(style_area.width);
+                style_area.x += indent;
+                style_area.width -= indent;
 
                 Line::from(vec![
                     Span::styled(get_text("icbtext_edit_style"), get_tui_theme().dialog_box_title),
@@ -401,7 +408,7 @@ impl<'a> App<'a> {
                     .render(area, frame.buffer_mut());
             }
             Mode::Filter => {
-                let filter_area = Rect::new(area.x + 2, area.y + (area.height - 3) / 2, area.width - 5, 3);
+                let filter_area = centered(area, area.width.saturating_sub(5), 3);
 
                 Clear.render(filter_area, frame.buffer_mut());
 
@@ -421,7 +428,7 @@ impl<'a> App<'a> {
             }
             Mode::Jump => {
                 let jump_size = 31;
-                let jump_area = Rect::new(area.x + 3 + (area.width - jump_size) / 2, area.y + (area.height - 3) / 2, jump_size, 3);
+                let jump_area = centered(area, jump_size, 3);
 
                 Clear.render(jump_area, frame.buffer_mut());
 
@@ -441,12 +448,7 @@ impl<'a> App<'a> {
             }
             Mode::RequestQuit => {
                 let save_text = format!("{} ", get_text("icbtext_save_changes"));
-                let mut save_area = Rect::new(
-                    area.x + (area.width - (save_text.len() as u16 + 10)) / 2,
-                    area.y + (area.height - 3) / 2,
-                    save_text.len() as u16 + 10,
-                    3,
-                );
+                let mut save_area = centered(area, save_text.len() as u16 + 10, 3);
 
                 Clear.render(save_area, frame.buffer_mut());
 
@@ -561,7 +563,7 @@ impl<'a> App<'a> {
         }
         let mut area = area;
         area.x += time_len + 1;
-        area.width -= time_len + 1;
+        area.width = area.width.saturating_sub(time_len + 1);
         Line::from(self.status_line.clone())
             .left_aligned()
             .style(get_tui_theme().status_line_text)
@@ -591,15 +593,9 @@ impl TabPageType {
     }
 }
 
-pub fn get_screen_size(frame: &Frame, is_full_screen: bool) -> Rect {
-    if is_full_screen {
-        frame.area()
-    } else {
-        let width = frame.area().width.min(80);
-        let height = frame.area().height.min(25);
-
-        let x = frame.area().x + (frame.area().width - width) / 2;
-        let y = frame.area().y + (frame.area().height - height) / 2;
-        Rect::new(frame.area().x + x, frame.area().y + y, width, height)
-    }
+/// A box of that size in the middle of the area, never bigger than the area itself.
+fn centered(area: Rect, width: u16, height: u16) -> Rect {
+    let width = width.min(area.width);
+    let height = height.min(area.height);
+    Rect::new(area.x + (area.width - width) / 2, area.y + (area.height - height) / 2, width, height)
 }

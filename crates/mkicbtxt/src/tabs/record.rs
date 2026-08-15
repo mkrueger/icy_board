@@ -1,6 +1,7 @@
 use crossterm::event::KeyCode;
 use icy_board_engine::icy_board::icb_text::{DEFAULT_DISPLAY_TEXT, IcbTextFile, IcbTextStyle, IceText, TextEntry};
 use icy_board_tui::{
+    get_text,
     pcb_line::get_styled_pcb_line,
     theme::{DOS_BLACK, DOS_BLUE, DOS_LIGHT_BLUE, DOS_LIGHT_CYAN, DOS_LIGHT_GRAY, DOS_LIGHT_GREEN, DOS_LIGHT_MAGENTA, DOS_LIGHT_RED, DOS_WHITE, DOS_YELLOW},
 };
@@ -67,7 +68,7 @@ impl<'a> RecordTab<'a> {
     }
 
     fn render_table(&mut self, frame: &mut Frame, mut area: Rect) {
-        area.width -= 1;
+        area.width = area.width.saturating_sub(1);
         let rows = self.filtered_entries.iter().map(|i| {
             let entry = self.icb_txt.get(*i).unwrap();
             Row::new(vec![Cell::from(get_styled_pcb_line(&entry.text))]).style(convert_style(entry.style))
@@ -111,16 +112,18 @@ impl<'a> RecordTab<'a> {
         self.filtered_entries = (1..self.icb_txt.len())
             .filter(|i| {
                 let entry = self.icb_txt.get(*i).unwrap();
-                entry.text.to_ascii_lowercase().contains(&filter)
-                    || DEFAULT_DISPLAY_TEXT
-                        .get_display_text(IceText::from(*i))
-                        .unwrap()
-                        .text
-                        .to_ascii_lowercase()
-                        .contains(&filter)
+                entry.text.to_ascii_lowercase().contains(&filter) || Self::record_name(*i).to_ascii_lowercase().contains(&filter)
             })
             .collect_vec();
         self.table_state.select(Some(0));
+    }
+
+    /// The name of a record, or its number for one the built-in list does not know.
+    fn record_name(number: usize) -> String {
+        IceText::try_from_number(number)
+            .and_then(|text| DEFAULT_DISPLAY_TEXT.get_display_text(text).ok())
+            .map(|entry| entry.text)
+            .unwrap_or_else(|| number.to_string())
     }
 
     pub fn jump(&mut self, number: usize) {
@@ -129,8 +132,9 @@ impl<'a> RecordTab<'a> {
         }
     }
 
+    /// The number the record carries in the file, which a filter detaches from the row.
     pub(crate) fn selected_record(&self) -> usize {
-        self.table_state.selected().unwrap()
+        self.table_state.selected().and_then(|row| self.filtered_entries.get(row).copied()).unwrap_or(0)
     }
 }
 
@@ -152,7 +156,7 @@ pub fn convert_style(text_style: icy_board_engine::icy_board::icb_text::IcbTextS
 impl<'a> TabPage for RecordTab<'a> {
     fn render(&mut self, frame: &mut Frame, area: Rect) {
         if self.filtered_entries.is_empty() {
-            Line::from(Span::styled("No entries found".to_string(), Style::default().fg(DOS_LIGHT_RED))).render(area, frame.buffer_mut());
+            Line::from(Span::styled(get_text("icbtext_no_entries"), Style::default().fg(DOS_LIGHT_RED))).render(area, frame.buffer_mut());
         }
 
         self.render_table(frame, area);
@@ -179,7 +183,9 @@ impl<'a> TabPage for RecordTab<'a> {
             }
             KeyCode::PageDown => {
                 if let Some(idx) = self.table_state.selected() {
-                    self.table_state.select(Some((idx + page_len).min(self.entries() - 1)));
+                    if self.entries() > 0 {
+                        self.table_state.select(Some((idx + page_len).min(self.entries() - 1)));
+                    }
                 }
             }
 
@@ -209,8 +215,8 @@ impl<'a> TabPage for RecordTab<'a> {
     fn request_status(&self) -> crate::app::ResultState {
         let status_line = if let Some(sel) = self.table_state.selected() {
             if sel < self.filtered_entries.len() {
-                let txt = DEFAULT_DISPLAY_TEXT.get_display_text(IceText::from(self.filtered_entries[sel])).unwrap().text;
-                format!("{}/{} {}", self.filtered_entries[sel], self.icb_txt.len() - 1, txt)
+                let number = self.filtered_entries[sel];
+                format!("{}/{} {}", number, self.icb_txt.len() - 1, Self::record_name(number))
             } else {
                 String::new()
             }

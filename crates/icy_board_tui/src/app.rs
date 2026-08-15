@@ -291,6 +291,6 @@ pub fn get_screen_size(frame: &Frame, is_full_screen: bool) -> Rect {
 
         let x = frame.area().x + (frame.area().width - width) / 2;
         let y = frame.area().y + (frame.area().height - height) / 2;
-        Rect::new(frame.area().x + x, frame.area().y + y, width, height)
+        Rect::new(x, y, width, height)
     }
 }

@@ -542,10 +542,10 @@ pub async fn promptstr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
     let len = vm.eval_expr(&args[2]).await?.as_int();
     let valid = vm.eval_expr(&args[3]).await?.as_string();
     let flags = vm.eval_expr(&args[4]).await?.as_int();
-    let output = vm
-        .icy_board_state
-        .input_field(IceText::from(prompt as usize), len, &valid, "", None, flags)
-        .await?;
+    let Some(prompt) = IceText::try_from_number(prompt.max(0) as usize) else {
+        return Err(format!("PROMPTSTR: there is no text record {prompt}").into());
+    };
+    let output = vm.icy_board_state.input_field(prompt, len, &valid, "", None, flags).await?;
     vm.set_variable(&args[1], VariableValue::new_string(output)).await?;
     Ok(())
 }
@@ -675,7 +675,10 @@ pub async fn disptext(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
     let rec = vm.eval_expr(&args[0]).await?.as_int();
     let flags = vm.eval_expr(&args[1]).await?.as_int();
 
-    vm.icy_board_state.display_text(IceText::from(rec as usize), flags).await
+    let Some(rec) = IceText::try_from_number(rec.max(0) as usize) else {
+        return Err(format!("DISPTEXT: there is no text record {rec}").into());
+    };
+    vm.icy_board_state.display_text(rec, flags).await
 }
 
 pub async fn stop(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {

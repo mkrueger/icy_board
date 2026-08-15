@@ -128,6 +128,7 @@ icbtext_edit_style=Style:
 
 icbtext_filter_title=Filter
 icbtext_filter_text=Show filtered entries: { $filter }
+icbtext_no_entries=No entries found
 
 icbtext_jump_to_title=Jump to Record #
 

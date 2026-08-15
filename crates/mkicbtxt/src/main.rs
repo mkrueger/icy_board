@@ -11,7 +11,10 @@ use std::{io::stdout, path::PathBuf, process::exit};
 mod app;
 mod tabs;
 
-use icy_board_engine::icy_board::icb_text::{DEFAULT_DISPLAY_TEXT, IcbTextFile, IcbTextFormat};
+use icy_board_engine::icy_board::{
+    icb_text::{DEFAULT_DISPLAY_TEXT, IcbTextFile, IcbTextFormat},
+    write_atomic,
+};
 
 lazy_static::lazy_static! {
     static ref VERSION: Version = Version::parse(env!("CARGO_PKG_VERSION")).unwrap();
@@ -36,6 +39,10 @@ struct Cli {
     #[argh(switch)]
     convert: bool,
 
+    /// overwrite a file that is already there
+    #[argh(switch)]
+    force: bool,
+
     /// file to edit/create
     #[argh(positional)]
     file: PathBuf,
@@ -55,7 +62,17 @@ fn main() -> Result<()> {
     }
 
     if arguments.create {
-        DEFAULT_DISPLAY_TEXT.save(&file).unwrap();
+        if file.exists() && !arguments.force {
+            print_error(format!("{} is already there. Pass --force to overwrite it.", file.display()));
+            exit(1);
+        }
+        if file.exists() {
+            create_backup(&file);
+        }
+        if let Err(err) = DEFAULT_DISPLAY_TEXT.save(&file) {
+            print_error(format!("Can't create: {}", err));
+            exit(1);
+        }
         println!("File created: {}", file.display());
         return Ok(());
     }
@@ -79,11 +96,18 @@ fn main() -> Result<()> {
                     Print(format!("Record #{} has been upgraded in {}.\n", rec_num, file.display())),
                     SetAttribute(Attribute::Reset),
                 )
-                .unwrap();
+                .ok();
                 return Ok(());
             }
             if arguments.convert {
                 let out_file = file.with_extension("toml");
+                if out_file.exists() && !arguments.force {
+                    print_error(format!("{} is already there. Pass --force to overwrite it.", out_file.display()));
+                    exit(1);
+                }
+                if out_file.exists() {
+                    create_backup(&out_file);
+                }
                 if let Err(err) = icb_txt.save(&out_file) {
                     print_error(format!("Can't save: {}", err));
                     exit(1);
@@ -109,6 +133,7 @@ fn main() -> Result<()> {
 }
 
 fn save_file(file: &PathBuf, icb_txt: &IcbTextFile) {
+    create_backup(file);
     let res = match icb_txt.get_format() {
         IcbTextFormat::IcyBoard => icb_txt.save(file),
         IcbTextFormat::PCBoard => icb_txt.export_pcboard_format(file),
@@ -116,5 +141,21 @@ fn save_file(file: &PathBuf, icb_txt: &IcbTextFile) {
     if let Err(err) = res {
         print_error(format!("Can't save: {}", err));
         exit(1);
+    }
+}
+
+fn create_backup(file: &PathBuf) {
+    if !file.is_file() {
+        return;
+    }
+    let mut name = file.file_name().unwrap_or_default().to_os_string();
+    name.push(".bak");
+    let backup = file.with_file_name(name);
+    match std::fs::read(file).and_then(|contents| write_atomic(&backup, &contents)) {
+        Ok(()) => {}
+        Err(err) => {
+            print_error(format!("Can't create backup {}: {}", backup.display(), err));
+            exit(1);
+        }
     }
 }
