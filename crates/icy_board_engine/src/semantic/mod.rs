@@ -2214,6 +2214,8 @@ impl AstVisitor<VariableType> for SemanticVisitor {
     }
 
     fn visit_ast(&mut self, program: &crate::ast::Ast) -> VariableType {
+        // Each file says which language it was read as, so the checks follow it.
+        self.lang_version = program.language_version;
         // A routine may be called before the file gets to it, so every signature is
         // registered first - the same thing an explicit DECLARE does. A routine that
         // has one is left to it, so its own checks still run.

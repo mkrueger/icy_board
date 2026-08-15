@@ -1520,6 +1520,7 @@ fn parse_ast_internal(
     Ast {
         nodes,
         file_name,
+        language_version: parser.lang_version,
         require_user_variables: parser.require_user_variables,
     }
 }

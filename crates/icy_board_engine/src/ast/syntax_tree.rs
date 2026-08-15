@@ -1,10 +1,14 @@
 use super::{AstNode, AstVisitor, AstVisitorMut};
+use crate::executable::LAST_PPL_LANGUAGE_VERSION;
 use std::{fmt, path::PathBuf};
 
 #[derive(Debug)]
 pub struct Ast {
     pub nodes: Vec<AstNode>,
     pub file_name: PathBuf,
+
+    /// The language the file was read as, `;$LANGVERSION` included.
+    pub language_version: u16,
 
     pub require_user_variables: bool,
 }
@@ -14,6 +18,7 @@ impl Ast {
         Ast {
             nodes: vec![],
             file_name: PathBuf::new(),
+            language_version: LAST_PPL_LANGUAGE_VERSION,
             require_user_variables: false,
         }
     }

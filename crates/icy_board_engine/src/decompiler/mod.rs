@@ -725,6 +725,7 @@ pub fn decompile(executable: Executable, raw: bool, lang_version: u16) -> Res<(A
     match Decompiler::new(executable, !raw) {
         Ok(mut d) => {
             let mut ast = d.decompile()?;
+            ast.language_version = lang_version;
 
             let reg = std::mem::take(&mut d.type_registry);
             let errors: Arc<std::sync::Mutex<crate::parser::ErrorReporter>> = Arc::new(Mutex::new(ErrorReporter::default()));

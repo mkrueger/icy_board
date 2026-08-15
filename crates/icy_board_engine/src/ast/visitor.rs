@@ -710,6 +710,7 @@ pub trait AstVisitorMut: Sized {
     fn visit_ast(&mut self, program: &Ast) -> Ast {
         let mut new_program = Ast::new();
         new_program.file_name.clone_from(&program.file_name);
+        new_program.language_version = program.language_version;
         for node in &program.nodes {
             new_program.nodes.push(node.visit_mut(self));
         }
