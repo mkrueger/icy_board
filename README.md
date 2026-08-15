@@ -38,3 +38,4 @@ There are data structures for almost all PCBoard data structures so making a BBS
 * [PPL](docs/ppl.md)
   * [PPLC](docs/pplc.md)
   * [New PPL functions](docs/new_ppl.md)
+* Editor support: [VS Code](crates/ppl-lsp), [Zed](https://github.com/mkrueger/zed-ppl)
