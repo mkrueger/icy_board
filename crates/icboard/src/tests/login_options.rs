@@ -43,15 +43,32 @@ fn a_direct_ppe_has_only_its_output_and_the_completion_prompt() {
     assert_eq!(output, format!("PPE ONLY\n{}\n", icy_board_tui::get_text("run_ppe_completed")));
 }
 
+/// The lines of an 80x25 screen after the board's own ANSI has been replayed into it.
+fn rendered_lines(output: &str) -> Vec<String> {
+    let mut screen = TextScreen::new((80, 25));
+    let mut parser = AnsiParser::default();
+    parser.parse(output.as_bytes(), &mut icy_engine::ScreenSink::new(&mut screen));
+    (0..25).map(|y| (0..80).map(|x| screen.char_at((x, y).into()).ch).collect::<String>()).collect()
+}
+
 #[test]
 fn a_long_input_field_keeps_the_cursor_on_its_prompt_line() {
     let output = test_ppe_output_with_input("STRING name\nINPUT \"What is your name? \", name", "test\r", |_| {});
 
-    let mut screen = TextScreen::new((80, 25));
-    let mut parser = AnsiParser::default();
-    parser.parse(output.as_bytes(), &mut icy_engine::ScreenSink::new(&mut screen));
-    let first_line: String = (0..80).map(|x| screen.char_at((x, 0).into()).ch).collect();
-    let second_line: String = (0..80).map(|x| screen.char_at((x, 1).into()).ch).collect();
-    assert!(first_line.contains("What is your name? ? (test"), "{first_line:?}");
-    assert!(!second_line.contains("test"), "{second_line:?}");
+    let lines = rendered_lines(&output);
+    assert!(lines[0].contains("What is your name? ? (test"), "{:?}", lines[0]);
+    assert!(!lines[1].contains("test"), "{:?}", lines[1]);
+}
+
+#[test]
+fn a_default_answer_stays_inside_a_clamped_field() {
+    // A prompt of this width keeps the field delimiters but leaves fewer than the
+    // sixty columns the field asks for, so the field itself is clamped.
+    let prompt = "x".repeat(30);
+    let default = "y".repeat(60);
+    let output = test_ppe_output_with_input(&format!("STRING name\nname = \"{default}\"\nINPUT \"{prompt}\", name"), "\r", |_| {});
+
+    let lines = rendered_lines(&output);
+    assert!(lines[0].contains(')'), "the field delimiters were dropped: {:?}", lines[0]);
+    assert!(!lines[1].contains('y'), "the default answer wrapped onto the next line: {:?}", lines[1]);
 }

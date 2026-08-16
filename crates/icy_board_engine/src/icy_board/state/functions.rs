@@ -427,6 +427,7 @@ impl IcyBoardState {
             }
         }
 
+        let mut default_answer = default_answer;
         if show_field_len {
             self.print(TerminalTarget::Both, " (").await?;
             let x = self.session.cursor_pos.x;
@@ -435,6 +436,13 @@ impl IcyBoardState {
                 if len < 1 {
                     return Ok(String::new());
                 }
+                // A default longer than the field it sits in would overwrite the
+                // closing delimiter, so it is cut to what the field can hold.
+                if let Some(default) = &mut default_answer {
+                    if default.chars().count() as i32 > len {
+                        *default = default.chars().take(len as usize).collect();
+                    }
+                }
             }
             self.forward(len).await?;
             self.print(TerminalTarget::Both, ")").await?;
@@ -442,7 +450,7 @@ impl IcyBoardState {
             self.reset_color(TerminalTarget::Both).await?;
             if let Some(default) = &default_answer {
                 self.print(TerminalTarget::Both, default).await?;
-                self.backward(default.len() as i32).await?;
+                self.backward(default.chars().count() as i32).await?;
             }
         } else if display_question {
             self.print(TerminalTarget::Both, " ").await?;
