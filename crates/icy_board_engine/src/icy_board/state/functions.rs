@@ -323,7 +323,7 @@ impl IcyBoardState {
         &mut self,
         color: IcbColor,
         prompt: String,
-        len: i32,
+        mut len: i32,
         valid_mask: &str,
         help: &str,
         default_answer: Option<String>,
@@ -411,12 +411,31 @@ impl IcyBoardState {
             }
         }
 
+        let mut show_field_len = display_flags & display_flags::FIELDLEN != 0 && self.use_ansi();
         if display_question {
-            self.print(TerminalTarget::Both, "? ").await?;
+            self.print(TerminalTarget::Both, "?").await?;
+            if show_field_len {
+                let x = self.session.cursor_pos.x;
+                let before_wrap_len = 79 - 3 - x;
+                if before_wrap_len < len && before_wrap_len <= len / 2 {
+                    if x < 70 {
+                        show_field_len = false;
+                    } else {
+                        self.new_line().await?;
+                    }
+                }
+            }
         }
 
-        if display_flags & display_flags::FIELDLEN != 0 {
-            self.print(TerminalTarget::Both, "(").await?;
+        if show_field_len {
+            self.print(TerminalTarget::Both, " (").await?;
+            let x = self.session.cursor_pos.x;
+            if x + 1 + len > 79 {
+                len = 79 - 1 - x;
+                if len < 1 {
+                    return Ok(String::new());
+                }
+            }
             self.forward(len).await?;
             self.print(TerminalTarget::Both, ")").await?;
             self.backward(len + 1).await?;
@@ -425,6 +444,8 @@ impl IcyBoardState {
                 self.print(TerminalTarget::Both, default).await?;
                 self.backward(default.len() as i32).await?;
             }
+        } else if display_question {
+            self.print(TerminalTarget::Both, " ").await?;
         }
         if self.use_graphics() {
             self.reset_color(TerminalTarget::Both).await?;

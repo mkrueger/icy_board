@@ -189,6 +189,10 @@ pub fn test_login_output<P: Fn(&mut IcyBoard)>(cmd: String, init_fn: P) -> Strin
 }
 
 pub fn test_ppe_output<P: Fn(&mut IcyBoard)>(source: &str, init_fn: P) -> String {
+    test_ppe_output_with_input(source, "", init_fn)
+}
+
+pub fn test_ppe_output_with_input<P: Fn(&mut IcyBoard)>(source: &str, input: &str, init_fn: P) -> String {
     let dir = test_dir();
     let source_file = dir.join("direct.pps");
     let ppe_file = source_file.with_extension("ppe");
@@ -205,7 +209,7 @@ pub fn test_ppe_output<P: Fn(&mut IcyBoard)>(source: &str, init_fn: P) -> String
     std::fs::write(&ppe_file, compiler.create_executable().unwrap().to_buffer().unwrap()).unwrap();
 
     test_session_output(
-        String::new(),
+        input.to_string(),
         init_fn,
         false,
         Some(PPEExecute {

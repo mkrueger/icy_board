@@ -1,5 +1,7 @@
-use crate::tests::{fixture, setup_conference, test_login_output, test_ppe_output};
+use crate::tests::{fixture, setup_conference, test_login_output, test_ppe_output, test_ppe_output_with_input};
 use icy_board_engine::icy_board::icb_config::DisplayNewsBehavior;
+use icy_engine::{TextPane, TextScreen};
+use icy_parser_core::{AnsiParser, CommandParser};
 
 fn setup_login(board: &mut icy_board_engine::icy_board::IcyBoard, allow_comment: bool) {
     board.config.paths.welcome = crate::tests::fixture("main/blt1");
@@ -39,4 +41,17 @@ fn a_direct_ppe_has_only_its_output_and_the_completion_prompt() {
     });
 
     assert_eq!(output, format!("PPE ONLY\n{}\n", icy_board_tui::get_text("run_ppe_completed")));
+}
+
+#[test]
+fn a_long_input_field_keeps_the_cursor_on_its_prompt_line() {
+    let output = test_ppe_output_with_input("STRING name\nINPUT \"What is your name? \", name", "test\r", |_| {});
+
+    let mut screen = TextScreen::new((80, 25));
+    let mut parser = AnsiParser::default();
+    parser.parse(output.as_bytes(), &mut icy_engine::ScreenSink::new(&mut screen));
+    let first_line: String = (0..80).map(|x| screen.char_at((x, 0).into()).ch).collect();
+    let second_line: String = (0..80).map(|x| screen.char_at((x, 1).into()).ch).collect();
+    assert!(first_line.contains("What is your name? ? (test"), "{first_line:?}");
+    assert!(!second_line.contains("test"), "{second_line:?}");
 }
