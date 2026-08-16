@@ -4,7 +4,7 @@ use std::{
 };
 
 use icy_board_engine::{
-    compiler::workspace::Workspace,
+    compiler::workspace::{CompilerData, Workspace},
     parser::{Encoding, ErrorReporter, UserTypeRegistry, parse_ast},
     semantic::SemanticVisitor,
 };
@@ -172,4 +172,33 @@ fn the_argument_the_cursor_is_in_is_marked() {
     let label: Vec<char> = signature.label.chars().collect();
     let marked: String = label[start as usize..end as usize].iter().collect();
     assert_eq!(marked, "INTEGER b");
+}
+
+/// The words offered in an empty file written for that language version.
+fn offered(version: u16) -> Vec<String> {
+    let mut workspace = Workspace::default();
+    workspace.compiler.get_or_insert_with(CompilerData::default).language_version = Some(version);
+
+    let registry = UserTypeRegistry::icy_board_registry();
+    let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+    let ast = parse_ast(PathBuf::from("test.pps"), errors.clone(), "", &registry, Encoding::Utf8, &workspace);
+    let mut visitor = SemanticVisitor::new(&workspace, errors, registry);
+    ast.visit(&mut visitor);
+    visitor.finish();
+
+    get_completion(&ast, &visitor, "", 0).into_iter().map(|item| item.label).collect()
+}
+
+#[test]
+fn a_word_is_offered_from_the_version_that_gave_it_meaning() {
+    let old = offered(340);
+    let new = offered(400);
+
+    for word in ["IF", "WHILE", "DECLARE"] {
+        assert!(old.contains(&word.to_string()), "{word} should be offered in 340: {old:?}");
+    }
+    for word in ["CONST", "ENUM", "REPEAT", "TYPE", "EXIT"] {
+        assert!(!old.contains(&word.to_string()), "{word} should not be offered in 340");
+        assert!(new.contains(&word.to_string()), "{word} should be offered in 400");
+    }
 }

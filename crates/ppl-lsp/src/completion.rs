@@ -1,6 +1,7 @@
 use icy_board_engine::{
     ast::{Ast, AstVisitor, IdentifierExpression, PredefinedCallStatement, constant::BUILTIN_CONSTS, walk_predefined_call_statement},
     executable::{FUNCTION_DEFINITIONS, STATEMENT_DEFINITIONS, StatementSignature},
+    parser::lexer::KEYWORDS,
     semantic::{ReferenceType, SemanticVisitor},
 };
 use tower_lsp::lsp_types::{CompletionItem, CompletionItemKind, Documentation, HoverContents, InsertTextFormat};
@@ -16,29 +17,9 @@ pub enum ImCompleteCompletionItem {
     Function(String, Vec<String>),
 }
 
-const KEYWORDS: [&str; 21] = [
-    "LET",
-    "GOTO",
-    "GOSUB",
-    "WHILE",
-    "ENDWHILE",
-    "IF",
-    "ENDIF",
-    "ELSE",
-    "RETURN",
-    "BREAK",
-    "CONTINUE",
-    "SELECT",
-    "ENDSELECT",
-    "DECLARE",
-    "FUNCTION",
-    "PROCEDURE",
-    "ENDPROC",
-    "ENDFUNC",
-    "BEGIN",
-    "END",
-    "EXIT",
-];
+/// Words the parser reads by name instead of as a token, with the version that gave
+/// them their meaning. EXIT is the statement END used to be.
+const CONTEXTUAL_WORDS: &[(&str, u16)] = &[("EXIT", 400)];
 
 const TYPES: [&str; 27] = [
     "BOOLEAN",
@@ -85,10 +66,19 @@ pub fn get_completion(ast: &Ast, semantic_visitor: &SemanticVisitor, line_before
     ast.visit(&mut map);
 
     if map.items.is_empty() {
-        for stmt in KEYWORDS {
+        for keyword in KEYWORDS.iter().filter(|keyword| keyword.since <= ast.language_version) {
             map.items.push(CompletionItem {
-                label: stmt.to_string(),
-                insert_text: Some(stmt.to_string()),
+                label: keyword.name.to_ascii_uppercase(),
+                insert_text: Some(keyword.name.to_ascii_uppercase()),
+                kind: Some(tower_lsp::lsp_types::CompletionItemKind::KEYWORD),
+                insert_text_format: Some(tower_lsp::lsp_types::InsertTextFormat::PLAIN_TEXT),
+                ..Default::default()
+            });
+        }
+        for (word, _) in CONTEXTUAL_WORDS.iter().filter(|(_, since)| *since <= ast.language_version) {
+            map.items.push(CompletionItem {
+                label: word.to_string(),
+                insert_text: Some(word.to_string()),
                 kind: Some(tower_lsp::lsp_types::CompletionItemKind::KEYWORD),
                 insert_text_format: Some(tower_lsp::lsp_types::InsertTextFormat::PLAIN_TEXT),
                 ..Default::default()
