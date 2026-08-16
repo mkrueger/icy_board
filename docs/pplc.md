@@ -4,7 +4,7 @@ PPLC works basically like the old one - specify file name and you're all set.
 But it has way more to offer now:
 
 ```
-Usage: pplc [<file>] [-d] [--nowarnings] [--version <version>] [--lang-version <lang-version>] [--cp437 <cp437>] [--init]
+Usage: pplc [-d] [--nowarnings] [--mono] [--runtime <runtime>] [--lang-version <lang-version>] [--cp437] [--init] [--defines <defines>] [--format] [--stdout] [--check] [--print-config] [--print-config-json] [--] [<file>]
 
 PCBoard Programming Language Compiler
 
@@ -17,15 +17,23 @@ Options:
   --nowarnings      don't report any warnings
   --mono            write plain text, without the ansi escapes that colour the
                     output
-  --version         version number for the compiled PPE, valid: 100, 200, 300,
+  --runtime         version number for the compiled PPE, valid: 100, 200, 300,
                     310, 320, 330, 340, 400, 401 (default)
-       --lang-version    language version, valid: 100, 200, 300, 310, 320, 330, 340,
-                                                                      350, 400 (default)
-  --cp437           specify the encoding of the file, defaults to autodetection
+  --lang-version    language version (defaults to the manifest,
+                    PPL_LANG_VERSION, then runtime capped at 400)
+  --cp437           specify the encoding of the file (cp437 = true, utf8 =
+                    false), defaults to autodetection
   --init            create & init new ppl package in target directory
-       --print-config    explain the effective configuration without compiling
-       --print-config-json
-                                                                      print the effective configuration as JSON
+  --defines         semicolon separated list of pre processor variables
+  --format          formats source file instead of compile
+  --stdout          with --format, write the result to stdout and leave the file
+                    alone
+  --check           checks source/package for errors without compiling
+  --print-config    prints the effective compiler configuration without
+                    compiling
+  --print-config-json
+                    prints the effective compiler configuration as json without
+                    compiling
   --help, help      display usage information
 ```
 
