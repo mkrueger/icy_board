@@ -1,14 +1,12 @@
-use std::path::PathBuf;
-
 use icy_board_engine::icy_board::{IcyBoard, conferences::Conference};
 
-use crate::tests::test_output;
+use crate::tests::{test_dir, test_output};
 
 fn setup_upload_directory(board: &mut IcyBoard) {
     board.conferences.push(Conference {
         name: "Main Board".to_string(),
-        pub_upload_location: PathBuf::from("src/tests/main"),
-        private_upload_location: PathBuf::from("src/tests/main"),
+        pub_upload_location: test_dir(),
+        private_upload_location: test_dir(),
         ..Default::default()
     });
 }

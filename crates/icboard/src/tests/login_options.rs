@@ -1,9 +1,7 @@
-use std::path::PathBuf;
-
 use crate::tests::test_login_output;
 
 fn setup_login(board: &mut icy_board_engine::icy_board::IcyBoard, allow_comment: bool) {
-    board.config.paths.welcome = PathBuf::from("src/tests/main/blt1");
+    board.config.paths.welcome = crate::tests::fixture("main/blt1");
     board.config.system_control.allow_password_failure_comment = allow_comment;
 }
 

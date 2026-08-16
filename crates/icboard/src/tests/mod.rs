@@ -62,11 +62,11 @@ fn test_last_cmd_empty() {
 pub fn setup_conference(board: &mut IcyBoard) {
     let mut bulletins = BullettinList::default();
     bulletins.push(Bullettin {
-        path: PathBuf::from("src/tests/main/blt1"),
+        path: fixture("main/blt1"),
         ..Default::default()
     });
     bulletins.push(Bullettin {
-        path: PathBuf::from("src/tests/main/blt2"),
+        path: fixture("main/blt2"),
         ..Default::default()
     });
 
@@ -74,7 +74,7 @@ pub fn setup_conference(board: &mut IcyBoard) {
     board.conferences.push(Conference {
         name: "Main Board".to_string(),
         bulletins: Some(bulletins.clone()),
-        blt_menu: PathBuf::from("src/tests/main/blt_menu"),
+        blt_menu: fixture("main/blt_menu"),
         areas: Some(test_message_areas()),
         ..Default::default()
     });
@@ -82,7 +82,7 @@ pub fn setup_conference(board: &mut IcyBoard) {
     board.conferences.push(Conference {
         name: "TESTCONF".to_string(),
         bulletins: Some(bulletins),
-        blt_menu: PathBuf::from("src/tests/main/blt_menu"),
+        blt_menu: fixture("main/blt_menu"),
         areas: Some(test_message_areas()),
         ..Default::default()
     });
@@ -151,16 +151,27 @@ pub fn setup_conference_with_two_areas(board: &mut IcyBoard) {
     board.conferences[1].areas = Some(areas);
 }
 
-/// A scratch message area, unique per test, that the reader is free to create
-/// and fill.
-fn test_message_areas() -> AreaList {
+/// A scratch directory, unique per call, for whatever a test writes.
+fn test_dir() -> PathBuf {
     static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
     let id = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let dir = std::env::temp_dir().join(format!("icboard-test-{}-{id}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
+    dir
+}
+
+/// A file that ships with the tests. The board resolves a relative path against its
+/// own directory, which is a scratch one here, so these have to name themselves.
+pub fn fixture(path: &str) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/tests").join(path)
+}
+
+/// A scratch message area, unique per test, that the reader is free to create
+/// and fill.
+fn test_message_areas() -> AreaList {
     AreaList::new(vec![MessageArea {
         name: "General".to_string(),
-        path: dir.join("general"),
+        path: test_dir().join("general"),
         ..Default::default()
     }])
 }
@@ -177,6 +188,15 @@ fn test_session_output<P: Fn(&mut IcyBoard)>(cmd: String, init_fn: P, login_syso
     let result = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
         let bbs: Arc<tokio::sync::Mutex<BBS>> = Arc::new(tokio::sync::Mutex::new(BBS::new(1)));
         let mut icy_board = icy_board_engine::icy_board::IcyBoard::new();
+
+        // A board writes where its paths point, and a fresh one points at plain names -
+        // which would be the crate directory the tests are run from.
+        let board_dir = test_dir();
+        icy_board.root_path = board_dir.clone();
+        icy_board.file_name = board_dir.join("icboard.toml");
+        icy_board.config.paths.statistics_file = PathBuf::from("statistics.toml");
+        icy_board.resolve_paths();
+
         icy_board.config.switches.display_news_behavior = DisplayNewsBehavior::Never;
         icy_board.config.switches.scan_new_blt = false;
         icy_board.commands = CommandList::new();

@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use crate::tests::test_output;
 
 // X
@@ -42,7 +40,7 @@ fn test_extended_mode_off() {
 #[test]
 fn test_extended_mode_cmd_file() {
     let output = test_output("x on\n".to_string(), |board| {
-        board.config.paths.command_display_path = PathBuf::from("src/tests/cmd_files".to_string());
+        board.config.paths.command_display_path = crate::tests::fixture("cmd_files");
     });
     assert_eq!(
         output,
