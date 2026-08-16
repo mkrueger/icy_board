@@ -4,6 +4,7 @@
 use icy_board_engine::{
     ast::constant::BUILTIN_CONSTS,
     executable::{FUNCTION_DEFINITIONS, STATEMENT_DEFINITIONS, StatementSignature},
+    parser::lexer::KEYWORDS,
 };
 
 /// Names the grammar spells as a keyword or that only exist as an opcode.
@@ -166,5 +167,112 @@ fn vscode_grammar_knows_every_built_in() {
         missing(&in_grammar, &expected),
         Vec::<String>::new(),
         "the TextMate grammar names a constant the engine does not have"
+    );
+}
+
+/// Words a grammar colours as a keyword that the lexer does not reserve: THEN, DO,
+/// TO, STEP and VAR are read as plain names, TRUE and FALSE are constants, END, EXIT
+/// and STOP are statements, and the engine reads END FUNCTION as two tokens rather
+/// than as one word.
+const COLOURED_BUT_NOT_RESERVED: &[&str] = &[
+    "DO",
+    "END",
+    "ENDFUNCTION",
+    "ENDPROCEDURE",
+    "EXIT",
+    "FALSE",
+    "STEP",
+    "STOP",
+    "THEN",
+    "TO",
+    "TRUE",
+    "VAR",
+];
+
+fn reserved_words() -> Vec<String> {
+    KEYWORDS.iter().map(|keyword| keyword.name.to_ascii_uppercase()).collect()
+}
+
+/// The words `kw('IF')` and `endKw('IF')` spell, the latter standing for `ENDIF`.
+fn keywords_from_grammar() -> Vec<String> {
+    let source = include_str!("../../tree-sitter-ppl/grammar.js");
+    let mut names = Vec::new();
+
+    for (call, prefix) in [("kw('", ""), ("endKw('", "END")] {
+        let mut rest = source;
+        while let Some(start) = rest.find(call) {
+            rest = &rest[start + call.len()..];
+            let end = rest.find('\'').expect("unterminated keyword in grammar.js");
+            names.push(format!("{prefix}{}", rest[..end].to_ascii_uppercase()));
+            rest = &rest[end..];
+        }
+    }
+    names
+}
+
+/// Every alternative of the keyword patterns, `END\s+(IF|...)` included.
+fn keywords_from_textmate() -> Vec<String> {
+    let source = include_str!("../../ppl-lsp/syntaxes/ppl.tmGrammar.json");
+    let start = source.find("\"keywords\": {").expect("no keyword rule in the TextMate grammar");
+    let section = &source[start..];
+    let section = &section[..section.find("\"types\":").expect("the keyword rule does not end")];
+
+    let mut names = Vec::new();
+    let mut idx = 0;
+    while let Some(open) = section[idx..].find('(') {
+        let open = idx + open + 1;
+        let Some(close) = section[open..].find(')') else {
+            break;
+        };
+        let close = open + close;
+        idx = close + 1;
+
+        let group = &section[open..close];
+        if group.is_empty() || !group.chars().all(|c| c.is_ascii_alphabetic() || c == '|') {
+            continue;
+        }
+        let prefix = if section[..open].ends_with("\\\\s+(") { "END" } else { "" };
+        names.extend(group.split('|').map(|name| format!("{prefix}{}", name.to_ascii_uppercase())));
+    }
+    names
+}
+
+#[test]
+fn grammar_reserves_every_keyword() {
+    let in_grammar = keywords_from_grammar();
+    assert_eq!(
+        missing(&reserved_words(), &in_grammar),
+        Vec::<String>::new(),
+        "keywords missing from grammar.js"
+    );
+
+    let allowed: Vec<String> = reserved_words()
+        .into_iter()
+        .chain(COLOURED_BUT_NOT_RESERVED.iter().map(|name| name.to_string()))
+        .collect();
+    assert_eq!(
+        missing(&in_grammar, &allowed),
+        Vec::<String>::new(),
+        "grammar.js reserves a word the lexer does not"
+    );
+}
+
+#[test]
+fn vscode_grammar_reserves_every_keyword() {
+    let in_grammar = keywords_from_textmate();
+    assert_eq!(
+        missing(&reserved_words(), &in_grammar),
+        Vec::<String>::new(),
+        "keywords missing from the TextMate grammar"
+    );
+
+    let allowed: Vec<String> = reserved_words()
+        .into_iter()
+        .chain(COLOURED_BUT_NOT_RESERVED.iter().map(|name| name.to_string()))
+        .collect();
+    assert_eq!(
+        missing(&in_grammar, &allowed),
+        Vec::<String>::new(),
+        "the TextMate grammar colours a word the lexer does not reserve"
     );
 }
