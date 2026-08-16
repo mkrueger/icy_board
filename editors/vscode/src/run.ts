@@ -35,7 +35,8 @@ function configOf(compiler: string, target: string): Promise<CompilerConfig> {
 
 function compile(compiler: string, target: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    execFile(compiler, [target], { cwd: path.dirname(target) }, (error, stdout, stderr) => {
+    // The output pane shows escapes rather than colour, so ask for plain text.
+    execFile(compiler, ["--mono", target], { cwd: path.dirname(target) }, (error, stdout, stderr) => {
       const output = `${stdout}${stderr}`.trim();
       if (error) {
         reject(new Error(output || error.message));

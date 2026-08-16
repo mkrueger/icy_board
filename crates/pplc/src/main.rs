@@ -29,9 +29,9 @@ use semver::Version;
 use serde::Serialize;
 use std::{
     fs::{self},
-    io::stdout,
+    io::{IsTerminal, stdout},
     path::{Path, PathBuf},
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, OnceLock},
 };
 
 #[derive(FromArgs)]
@@ -44,6 +44,10 @@ struct Cli {
     /// don't report any warnings
     #[argh(switch)]
     nowarnings: bool,
+
+    /// write plain text, without the ansi escapes that colour the output
+    #[argh(switch)]
+    mono: bool,
 
     /// version number for the compiled PPE, valid: 100, 200, 300, 310, 320, 330, 340, 400, 401 (default)
     #[argh(option)]
@@ -94,8 +98,65 @@ lazy_static::lazy_static! {
     static ref VERSION: Version = Version::parse(env!("CARGO_PKG_VERSION")).unwrap();
 }
 
+static COLOR: OnceLock<bool> = OnceLock::new();
+
+/// Colour helps someone looking at a terminal and is noise everywhere else - a
+/// pipe, a log or an editor's output pane shows the escapes themselves.
+fn decide_color(arguments: &Cli) -> bool {
+    if arguments.mono || std::env::var_os("NO_COLOR").is_some_and(|value| !value.is_empty()) {
+        return false;
+    }
+    if std::env::var_os("CLICOLOR_FORCE").is_some_and(|value| !value.is_empty() && value != "0") {
+        return true;
+    }
+    if std::env::var_os("TERM").is_some_and(|term| term == "dumb") {
+        return false;
+    }
+    stdout().is_terminal()
+}
+
+fn colored() -> bool {
+    *COLOR.get_or_init(|| stdout().is_terminal())
+}
+
+fn print_error(err: impl std::fmt::Display) {
+    if colored() {
+        execute!(
+            stdout(),
+            SetAttribute(Attribute::Bold),
+            SetForegroundColor(Color::Red),
+            Print("ERROR: ".to_string()),
+            SetAttribute(Attribute::Reset),
+            SetAttribute(Attribute::Bold),
+            Print(format!("{err}")),
+            SetAttribute(Attribute::Reset),
+        )
+        .unwrap();
+    } else {
+        print!("ERROR: {err}");
+    }
+    println!();
+    println!();
+}
+
+fn print_diff_line(line: usize, sign: char, text: impl std::fmt::Display, color: Color) {
+    if colored() {
+        execute!(
+            stdout(),
+            Print(format!("{line:>3}:")),
+            SetForegroundColor(color),
+            Print(format!("{sign}{text}\n")),
+            SetAttribute(Attribute::Reset),
+        )
+        .unwrap();
+    } else {
+        println!("{line:>3}:{sign}{text}");
+    }
+}
+
 fn main() {
     let arguments: Cli = argh::from_env();
+    let _ = COLOR.set(decide_color(&arguments));
     if arguments.print_config && arguments.print_config_json {
         eprintln!("--print-config and --print-config-json cannot be used together");
         std::process::exit(2);
@@ -174,11 +235,6 @@ fn main() {
             std::process::exit(1);
         }
         return;
-    }
-
-    if !(arguments.format || arguments.check || arguments.print_config || arguments.print_config_json) {
-        println!();
-        println!("Parsing...");
     }
 
     let encoding = if let Some(cp437) = arguments.cp437 {
@@ -616,15 +672,7 @@ fn compile_files(arguments: &Cli, encoding: Encoding, workspace: &mut Workspace,
                                     match diff {
                                         diff::Result::Left(l) => {
                                             last_line = i;
-
-                                            execute!(
-                                                stdout(),
-                                                Print(format!("{i:>3}:")),
-                                                SetForegroundColor(Color::Red),
-                                                Print(format!("-{}\n", l)),
-                                                SetAttribute(Attribute::Reset),
-                                            )
-                                            .unwrap()
+                                            print_diff_line(i, '-', l, Color::Red);
                                         }
                                         diff::Result::Both(l, _) => {
                                             if block_start || block_end {
@@ -637,15 +685,7 @@ fn compile_files(arguments: &Cli, encoding: Encoding, workspace: &mut Workspace,
                                         }
                                         diff::Result::Right(r) => {
                                             last_line = i;
-
-                                            execute!(
-                                                stdout(),
-                                                Print(format!("{i:>3}:")),
-                                                SetForegroundColor(Color::Green),
-                                                Print(format!("+{}\n", r)),
-                                                SetAttribute(Attribute::Reset),
-                                            )
-                                            .unwrap()
+                                            print_diff_line(i, '+', r, Color::Green);
                                         }
                                     }
                                 }
@@ -668,19 +708,7 @@ fn compile_files(arguments: &Cli, encoding: Encoding, workspace: &mut Workspace,
                 }
             }
             Err(err) => {
-                execute!(
-                    stdout(),
-                    SetAttribute(Attribute::Bold),
-                    SetForegroundColor(Color::Red),
-                    Print("ERROR: ".to_string()),
-                    SetAttribute(Attribute::Reset),
-                    SetAttribute(Attribute::Bold),
-                    Print(format!("{}", err)),
-                    SetAttribute(Attribute::Reset),
-                )
-                .unwrap();
-                println!();
-                println!();
+                print_error(err);
                 std::process::exit(1);
             }
         }
@@ -732,19 +760,7 @@ fn compile_files(arguments: &Cli, encoding: Encoding, workspace: &mut Workspace,
         }
 
         Err(err) => {
-            execute!(
-                stdout(),
-                SetAttribute(Attribute::Bold),
-                SetForegroundColor(Color::Red),
-                Print("ERROR: ".to_string()),
-                SetAttribute(Attribute::Reset),
-                SetAttribute(Attribute::Bold),
-                Print(format!("{}", err)),
-                SetAttribute(Attribute::Reset),
-            )
-            .unwrap();
-            println!();
-            println!();
+            print_error(err);
             std::process::exit(1);
         }
     }
@@ -781,10 +797,12 @@ fn check_errors(errors: std::sync::Arc<std::sync::Mutex<icy_board_engine::parser
         }
 
         // let file_name = file_name.to_string_lossy().to_string();
+        let config = ariadne::Config::default().with_color(colored());
         for err in &errors.lock().unwrap().errors {
             error_count += 1;
             let cache = ariadne::sources(cache.clone());
             Report::build(ReportKind::Error, (format!("{}", err.file_name.display()), err.span.clone()))
+                .with_config(config)
                 .with_message(format!("{}", err.error))
                 .with_label(Label::new((format!("{}", err.file_name.display()), err.span.clone())).with_color(ariadne::Color::Red))
                 .finish()
@@ -797,6 +815,7 @@ fn check_errors(errors: std::sync::Arc<std::sync::Mutex<icy_board_engine::parser
                 warning_count += 1;
                 let cache = ariadne::sources(cache.clone());
                 Report::build(ReportKind::Warning, (err.file_name.to_string_lossy().to_string(), err.span.clone()))
+                    .with_config(config)
                     .with_message(format!("{}", err.error))
                     .with_label(Label::new((err.file_name.to_string_lossy().to_string(), err.span.clone())).with_color(ariadne::Color::Yellow))
                     .finish()

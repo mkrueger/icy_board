@@ -15,6 +15,8 @@ Positional Arguments:
 Options:
   -d, --disassemble output the disassembly instead of compiling
   --nowarnings      don't report any warnings
+  --mono            write plain text, without the ansi escapes that colour the
+                    output
   --version         version number for the compiled PPE, valid: 100, 200, 300,
                     310, 320, 330, 340, 400, 401 (default)
        --lang-version    language version, valid: 100, 200, 300, 310, 320, 330, 340,
@@ -26,6 +28,14 @@ Options:
                                                                       print the effective configuration as JSON
   --help, help      display usage information
 ```
+
+### Coloured output
+
+Diagnostics are coloured only when someone is looking at a terminal. When the
+output is piped, redirected or read by an editor, `pplc` writes plain text, so
+escape sequences never end up in a log or an output pane. `--mono` forces plain
+text even on a terminal, `NO_COLOR` does the same through the environment, and
+`CLICOLOR_FORCE` keeps the colour when piping into a pager such as `less -R`.
 
 ### Effective configuration
 
