@@ -1534,11 +1534,16 @@ pub fn preparse_type_declarations(
     workspace: &Workspace,
 ) {
     error_reporter.lock().unwrap().set_file_name(&file_name);
-    let mut parser = Parser::new(file_name, error_reporter, user_types, input, encoding, workspace);
+    // The whole file is read again for the real parse, which reports everything it
+    // finds. Only what the declarations themselves say is new here.
+    let scratch = Arc::new(Mutex::new(ErrorReporter::default()));
+    let mut parser = Parser::new(file_name, scratch, user_types, input, encoding, workspace);
     parser.next_token();
     while parser.cur_token.is_some() {
         if parser.get_cur_token() == Some(Token::Type) {
+            let scratch = std::mem::replace(&mut parser.error_reporter, error_reporter.clone());
             parser.parse_type_declaration();
+            parser.error_reporter = scratch;
         } else {
             parser.next_token();
         }

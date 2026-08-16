@@ -54,6 +54,33 @@ fn a_file_can_use_a_type_declared_in_a_later_file() {
 }
 
 #[test]
+fn the_type_pass_does_not_report_what_the_real_parse_reports_again() {
+    let registry = UserTypeRegistry::default();
+    let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+    let workspace = Workspace::default();
+    let src = ";$ENDIF\nTYPE Point\n  INTEGER X\nENDTYPE\n";
+
+    preparse_type_declarations(PathBuf::from("main.pps"), errors.clone(), src, &registry, Encoding::Utf8, &workspace);
+    parse_ast_with_predeclared_types(PathBuf::from("main.pps"), errors.clone(), src, &registry, Encoding::Utf8, &workspace);
+
+    let messages: Vec<String> = errors.lock().unwrap().errors.iter().map(|error| error.error.to_string()).collect();
+    assert_eq!(vec!["$ENDIF without $IF".to_string()], messages);
+}
+
+#[test]
+fn a_type_declared_twice_is_reported_by_the_type_pass() {
+    let registry = UserTypeRegistry::default();
+    let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+    let workspace = Workspace::default();
+    let src = "TYPE Point\n  INTEGER X\nENDTYPE\nTYPE Point\n  INTEGER Y\nENDTYPE\n";
+
+    preparse_type_declarations(PathBuf::from("main.pps"), errors.clone(), src, &registry, Encoding::Utf8, &workspace);
+
+    let messages: Vec<String> = errors.lock().unwrap().errors.iter().map(|error| error.error.to_string()).collect();
+    assert_eq!(1, messages.len(), "{messages:?}");
+}
+
+#[test]
 fn test_proc_declarations() {
     check_ast_node(
         "DECLARE PROCEDURE PROC001()",
