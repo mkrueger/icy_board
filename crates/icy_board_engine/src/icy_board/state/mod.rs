@@ -793,11 +793,27 @@ impl IcyBoardState {
         }
     }
 
-    pub async fn join_conference(&mut self, conference: u16, quick_join: bool, show_intro: bool) -> Res<()> {
+    /// Selects a conference and applies its session state without displaying any
+    /// of the files or prompts a caller sees while joining it.
+    pub async fn set_current_conference(&mut self, conference: u16) -> Res<bool> {
         if (conference as usize) >= self.get_board().await.conferences.len() {
-            return Ok(());
+            return Ok(false);
         }
+        self.session.current_conference_number = conference;
+        let c = self.get_board().await.conferences[conference as usize].clone();
+        self.session.current_conference = c;
+        self.session.current_message_area = 0;
+        if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
+            state.cur_conference = self.session.current_conference_number;
+        }
+        if let Some(user) = &mut self.session.current_user {
+            user.last_conference = conference;
+        }
+        self.apply_conference_security().await;
+        Ok(true)
+    }
 
+    pub async fn join_conference(&mut self, conference: u16, quick_join: bool, show_intro: bool) -> Res<()> {
         let news_behavior = self.board.lock().await.config.switches.display_news_behavior;
         let scan_new_blt = self.board.lock().await.config.switches.scan_new_blt;
         let display_userinfo_at_login = self.board.lock().await.config.switches.display_userinfo_at_login;
@@ -812,17 +828,9 @@ impl IcyBoardState {
         // Everything below the intro only happens the first time round.
         let first_join = !self.session.joined_conferences.contains(&conference);
 
-        self.session.current_conference_number = conference;
-        let c = self.get_board().await.conferences[conference as usize].clone();
-        self.session.current_conference = c;
-        self.session.current_message_area = 0;
-        if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
-            state.cur_conference = self.session.current_conference_number;
+        if !self.set_current_conference(conference).await? {
+            return Ok(());
         }
-        if let Some(user) = &mut self.session.current_user {
-            user.last_conference = conference;
-        }
-        self.apply_conference_security().await;
 
         if show_news {
             self.display_news(only_new).await?;

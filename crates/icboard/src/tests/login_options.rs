@@ -1,4 +1,5 @@
-use crate::tests::test_login_output;
+use crate::tests::{fixture, setup_conference, test_login_output, test_ppe_output};
+use icy_board_engine::icy_board::icb_config::DisplayNewsBehavior;
 
 fn setup_login(board: &mut icy_board_engine::icy_board::IcyBoard, allow_comment: bool) {
     board.config.paths.welcome = crate::tests::fixture("main/blt1");
@@ -25,4 +26,17 @@ fn a_failed_password_does_not_offer_a_comment_when_disabled() {
         !output.contains("leave a comment to the sysop"),
         "the password failure comment was offered:\n{output}"
     );
+}
+
+#[test]
+fn a_direct_ppe_has_no_login_presentation_or_prompt() {
+    let output = test_ppe_output("PRINT \"PPE ONLY\"", |board| {
+        setup_conference(board);
+        board.conferences[0].news_file = fixture("main/blt1");
+        board.config.paths.welcome = fixture("main/blt2");
+        board.config.switches.display_news_behavior = DisplayNewsBehavior::Always;
+        board.config.switches.scan_new_blt = true;
+    });
+
+    assert_eq!(output, "PPE ONLY\n");
 }

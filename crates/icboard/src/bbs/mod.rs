@@ -189,6 +189,9 @@ pub async fn internal_handle_client(mut state: IcyBoardState, login_options: Opt
         if let Some(ppe) = &login_options.ppe {
             logged_in = true;
 
+            // PCBoard handled /PPE before normal login; load the caller context
+            // without welcome, NEWS, conference scans or other presentation.
+
             if let (Some(user_name), Some(password)) = (&ppe.user_name, &ppe.password) {
                 // Try to find and authenticate the user
                 let user_opt = state.board.lock().await.users.find_by_name(user_name);
@@ -196,7 +199,7 @@ pub async fn internal_handle_client(mut state: IcyBoardState, login_options: Opt
                     // Verify password
                     if state.board.lock().await.users[user_record].password.password.is_valid(password) {
                         // Set the authenticated user
-                        state.set_current_user(user_record, true).await?;
+                        state.set_current_user(user_record, false).await?;
                         logged_in = true;
                         state.session.is_sysop = false;
                     } else {
@@ -207,9 +210,11 @@ pub async fn internal_handle_client(mut state: IcyBoardState, login_options: Opt
                 }
             } else if !state.board.lock().await.users.is_empty() {
                 // No explicit login: run the PPE as the first user.
-                state.set_current_user(0, true).await?;
-            } else {
-                state.join_conference(0, false, false).await?;
+                state.set_current_user(0, false).await?;
+            }
+            let conference = state.session.current_user.as_ref().map_or(0, |user| user.last_conference);
+            if !state.set_current_conference(conference).await? {
+                state.set_current_conference(0).await?;
             }
             for arg in &ppe.args {
                 state.session.push_tokens(arg);
@@ -233,7 +238,7 @@ pub async fn internal_handle_client(mut state: IcyBoardState, login_options: Opt
             if let Err(err) = cmd.state.run_ppe(&ppe.ppe, None).await {
                 log::error!("error running PPE: {}", err);
             };
-            let _ = cmd.state.press_enter().await;
+            cmd.state.new_line().await?;
             return Ok(());
         }
     }

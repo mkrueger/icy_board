@@ -1,5 +1,6 @@
 error_cmd_line_label = error:
 error_file_or_path_not_found = File or path not found
+run_ppe_completed = Run completed - press any key to exit
 
 # Shown for an option the board does not read yet
 option_not_read_yet = the board does not act on this yet

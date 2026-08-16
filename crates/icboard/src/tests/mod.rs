@@ -8,9 +8,13 @@ use icy_board_engine::icy_board::{
     conferences::Conference,
     icb_config::DisplayNewsBehavior,
     message_area::{AreaList, MessageArea},
-    state::IcyBoardState,
+    state::{IcyBoardState, PPEExecute},
     user_base::User,
     xfer_protocols::SupportedProtocols,
+};
+use icy_board_engine::{
+    compiler::{PPECompiler, workspace::Workspace},
+    parser::{Encoding, ErrorReporter, UserTypeRegistry, parse_ast},
 };
 use icy_net::{Connection, ConnectionType, channel::ChannelConnection};
 
@@ -177,14 +181,43 @@ fn test_message_areas() -> AreaList {
 }
 
 pub fn test_output<P: Fn(&mut IcyBoard)>(cmd: String, init_fn: P) -> String {
-    test_session_output(cmd, init_fn, true)
+    test_session_output(cmd, init_fn, true, None)
 }
 
 pub fn test_login_output<P: Fn(&mut IcyBoard)>(cmd: String, init_fn: P) -> String {
-    test_session_output(cmd, init_fn, false)
+    test_session_output(cmd, init_fn, false, None)
 }
 
-fn test_session_output<P: Fn(&mut IcyBoard)>(cmd: String, init_fn: P, login_sysop: bool) -> String {
+pub fn test_ppe_output<P: Fn(&mut IcyBoard)>(source: &str, init_fn: P) -> String {
+    let dir = test_dir();
+    let source_file = dir.join("direct.pps");
+    let ppe_file = source_file.with_extension("ppe");
+    std::fs::write(&source_file, source).unwrap();
+
+    let mut workspace = Workspace::default();
+    workspace.hard_coded_files = Some(vec![source_file.clone()]);
+    let registry = UserTypeRegistry::icy_board_registry();
+    let errors = Arc::new(std::sync::Mutex::new(ErrorReporter::default()));
+    let ast = parse_ast(source_file, errors.clone(), source, &registry, Encoding::Utf8, &workspace);
+    let mut compiler = PPECompiler::new(&workspace, registry, errors.clone());
+    compiler.compile(&[&ast]);
+    assert!(!errors.lock().unwrap().has_errors());
+    std::fs::write(&ppe_file, compiler.create_executable().unwrap().to_buffer().unwrap()).unwrap();
+
+    test_session_output(
+        String::new(),
+        init_fn,
+        false,
+        Some(PPEExecute {
+            ppe: ppe_file,
+            user_name: None,
+            password: None,
+            args: Vec::new(),
+        }),
+    )
+}
+
+fn test_session_output<P: Fn(&mut IcyBoard)>(cmd: String, init_fn: P, login_sysop: bool, ppe: Option<PPEExecute>) -> String {
     let result = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
         let bbs: Arc<tokio::sync::Mutex<BBS>> = Arc::new(tokio::sync::Mutex::new(BBS::new(1)));
         let mut icy_board = icy_board_engine::icy_board::IcyBoard::new();
@@ -251,11 +284,7 @@ fn test_session_output<P: Fn(&mut IcyBoard)>(cmd: String, init_fn: P, login_syso
             .name("Local mode handle".to_string())
             .spawn(move || {
                 tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
-                    let options = LoginOptions {
-                        login_sysop,
-                        ppe: None,
-                        local: true,
-                    };
+                    let options = LoginOptions { login_sysop, ppe, local: true };
 
                     if let Err(err) = internal_handle_client(state, Some(options), &cmd).await {
                         log::error!("Error running background client: {}", err);
