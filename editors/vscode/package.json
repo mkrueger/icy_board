@@ -21,6 +21,19 @@
 		"vscode": "^1.85.0"
 	},
 	"enabledApiProposals": [],
+	"capabilities": {
+		"untrustedWorkspaces": {
+			"supported": "limited",
+			"description": "The extension starts the language server, and Run PPE starts a compiler and a board, so a workspace it does not trust may not say which programs those are.",
+			"restrictedConfigurations": [
+				"icyboardPpl.serverPath",
+				"icyboardPpl.compilerPath",
+				"icyboardPpl.boardPath",
+				"icyboardPpl.boardConfig",
+				"icyboardPpl.runArguments"
+			]
+		}
+	},
 	"main": "./dist/extension.js",
 	"contributes": {
 		"languages": [
@@ -104,7 +117,25 @@
 				"command": "icyboard-ppl.run",
 				"category": "IcyBoard PPL",
 				"title": "Run PPE",
+				"icon": "$(play)",
 				"enablement": "editorLangId == ppl"
+			}
+		],
+		"menus": {
+			"editor/title/run": [
+				{
+					"command": "icyboard-ppl.run",
+					"when": "resourceExtname == .pps",
+					"group": "navigation"
+				}
+			]
+		},
+		"keybindings": [
+			{
+				"command": "icyboard-ppl.run",
+				"key": "ctrl+f5",
+				"mac": "cmd+f5",
+				"when": "editorTextFocus && editorLangId == ppl"
 			}
 		]
 	},

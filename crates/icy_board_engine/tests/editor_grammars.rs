@@ -276,3 +276,37 @@ fn vscode_grammar_reserves_every_keyword() {
         "the TextMate grammar colours a word the lexer does not reserve"
     );
 }
+
+/// The words of the `END\s*(...)` group of the pattern that follows `marker`.
+fn block_ends_from_language_configuration(marker: &str) -> Vec<String> {
+    let source = include_str!("../../../editors/vscode/language-configuration.json");
+    let start = source
+        .find(marker)
+        .unwrap_or_else(|| panic!("{marker} not found in the language configuration"));
+    let rest = &source[start..];
+
+    let group = "END\\\\s*(";
+    let open = rest.find(group).expect("no END group") + group.len();
+    let close = rest[open..].find(')').expect("unterminated END group") + open;
+    rest[open..close].split('|').map(|name| name.to_ascii_uppercase()).collect()
+}
+
+/// Folding and indenting stop at the word that closes a block, so every ENDx the
+/// lexer knows has to be one the editor recognises.
+#[test]
+fn the_language_configuration_closes_every_block() {
+    let expected: Vec<String> = KEYWORDS
+        .iter()
+        .filter_map(|keyword| keyword.name.strip_prefix("end"))
+        .map(|word| word.to_ascii_uppercase())
+        .collect();
+    assert!(expected.len() > 5, "the keywords no longer spell their block ends");
+
+    for (rule, marker) in [("folding", "\"end\":"), ("indentation", "\"decreaseIndentPattern\"")] {
+        assert_eq!(
+            missing(&expected, &block_ends_from_language_configuration(marker)),
+            Vec::<String>::new(),
+            "block ends missing from the {rule} rule"
+        );
+    }
+}

@@ -16,7 +16,8 @@ the extension at a server you built yourself.
 
 **IcyBoard PPL: Run PPE** builds the open `.pps` with `pplc` and hands the
 executable beside it to `icboard --ppe`, in a terminal of its own - a PPE asks
-its caller questions, so it needs one.
+its caller questions, so it needs one. It sits on `Ctrl+F5` and behind the play
+button above a `.pps`.
 
 That takes two programs the extension does not ship. Both are looked for on the
 `PATH` unless a setting says otherwise:
@@ -40,6 +41,10 @@ and its own parameters takes the other door:
 ```
 
 Being a workspace setting, it can differ per project.
+
+A workspace that has not been trusted keeps its own answers to all of these: the
+extension starts programs, and which ones is not a question a folder you just
+opened gets to answer.
 
 ## Building this extension
 
