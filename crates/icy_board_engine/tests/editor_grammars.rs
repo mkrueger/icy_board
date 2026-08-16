@@ -104,7 +104,7 @@ const FUNCTIONS_NOT_IN_GRAMMAR: &[&str] = &[
 
 /// The alternatives of one pattern of the TextMate grammar VS Code reads.
 fn list_from_textmate(rule: &str) -> Vec<String> {
-    let source = include_str!("../../ppl-lsp/syntaxes/ppl.tmGrammar.json");
+    let source = include_str!("../../../editors/vscode/syntaxes/ppl.tmGrammar.json");
     let start = source
         .find(&format!("\"{rule}\": {{"))
         .unwrap_or_else(|| panic!("{rule} not found in the TextMate grammar"));
@@ -212,7 +212,7 @@ fn keywords_from_grammar() -> Vec<String> {
 
 /// Every alternative of the keyword patterns, `END\s+(IF|...)` included.
 fn keywords_from_textmate() -> Vec<String> {
-    let source = include_str!("../../ppl-lsp/syntaxes/ppl.tmGrammar.json");
+    let source = include_str!("../../../editors/vscode/syntaxes/ppl.tmGrammar.json");
     let start = source.find("\"keywords\": {").expect("no keyword rule in the TextMate grammar");
     let section = &source[start..];
     let section = &section[..section.find("\"types\":").expect("the keyword rule does not end")];

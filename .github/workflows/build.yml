@@ -189,12 +189,12 @@ jobs:
        path: servers
    - name: Install required libraries
      run: |
-       cd crates/ppl-lsp
+       cd editors/vscode
        pnpm i
    - name: Build
      id: build
      run: |
-       cd crates/ppl-lsp
+       cd editors/vscode
        npm run compile
 
        # One package per platform, each with the server that belongs to it.
@@ -222,7 +222,7 @@ jobs:
      uses: actions/upload-artifact@v4
      with:
        name: icyboard-ppl-${{ env.VERSION }}-vsix
-       path: crates/ppl-lsp/*.vsix
+       path: editors/vscode/*.vsix
        if-no-files-found: error
 
   build_docs_pdf:
