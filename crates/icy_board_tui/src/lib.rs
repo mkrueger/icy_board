@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Display, io::stdout};
+use std::{collections::HashMap, fmt::Display, io::stderr};
 
 use crossterm::{
     execute,
@@ -62,7 +62,7 @@ pub fn get_text_args(message_id: &str, args: HashMap<String, String>) -> String 
 
 pub fn print_error<A: Display>(error: A) {
     execute!(
-        stdout(),
+        stderr(),
         SetAttribute(Attribute::Bold),
         SetForegroundColor(Color::Red),
         Print(fl!(crate::LANGUAGE_LOADER, "error_cmd_line_label")),

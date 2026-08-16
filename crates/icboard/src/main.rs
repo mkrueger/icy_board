@@ -1,6 +1,6 @@
 use std::{
     fmt::Display,
-    io::stdout,
+    io::{stderr, stdout},
     net::SocketAddr,
     path::PathBuf,
     process::{self, Command, exit},
@@ -572,7 +572,7 @@ pub fn restore_terminal() -> Res<()> {
 
 pub fn print_error<A: Display>(error: A) {
     execute!(
-        stdout(),
+        stderr(),
         SetAttribute(Attribute::Bold),
         SetForegroundColor(crossterm::style::Color::Red),
         //Print(gettext("error_cmd_line_label")),

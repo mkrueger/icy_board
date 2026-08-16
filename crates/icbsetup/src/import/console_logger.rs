@@ -1,4 +1,4 @@
-use std::io::stdout;
+use std::io::{stderr, stdout};
 
 use crossterm::{
     execute,
@@ -42,7 +42,7 @@ impl OutputLogger for ConsoleLogger {
 
 pub fn print_error(e: impl Into<String>) {
     execute!(
-        stdout(),
+        stderr(),
         SetAttribute(Attribute::Bold),
         SetForegroundColor(Color::Red),
         Print("Error:".to_string()),

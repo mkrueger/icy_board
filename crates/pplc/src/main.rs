@@ -29,7 +29,7 @@ use semver::Version;
 use serde::Serialize;
 use std::{
     fs::{self},
-    io::{IsTerminal, stdout},
+    io::{IsTerminal, stderr, stdout},
     path::{Path, PathBuf},
     sync::{Arc, Mutex, OnceLock},
 };
@@ -126,7 +126,7 @@ fn colored() -> bool {
 fn print_error(err: impl std::fmt::Display) {
     if colored() {
         execute!(
-            stdout(),
+            stderr(),
             SetAttribute(Attribute::Bold),
             SetForegroundColor(Color::Red),
             Print("ERROR: ".to_string()),
@@ -137,10 +137,10 @@ fn print_error(err: impl std::fmt::Display) {
         )
         .unwrap();
     } else {
-        print!("ERROR: {err}");
+        eprint!("ERROR: {err}");
     }
-    println!();
-    println!();
+    eprintln!();
+    eprintln!();
 }
 
 fn print_diff_line(line: usize, sign: char, text: impl std::fmt::Display, color: Color) {
