@@ -152,3 +152,61 @@ fn init_refuses_an_existing_directory() {
     assert!(!status.success());
     assert_eq!(fs::read(dir.path().join("keep")).unwrap(), b"untouched");
 }
+
+#[test]
+fn print_config_explains_a_loose_source() {
+    let dir = tempfile::tempdir().unwrap();
+    let source = dir.path().join("source.pps");
+    fs::write(&source, ";$LANGVERSION 350\nPRINTLN 1\n").unwrap();
+
+    let output = pplc()
+        .env("PPL_LANG_VERSION", "340")
+        .args(["--print-config", "--lang-version", "400"])
+        .arg(&source)
+        .output()
+        .unwrap();
+    let text = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    assert!(text.contains("Language version       350"), "{text}");
+    assert!(text.contains("From                 sourceDirective"), "{text}");
+    assert!(text.contains("Command line         400"), "{text}");
+    assert!(text.contains("Environment          340"), "{text}");
+    assert!(!source.with_extension("ppe").exists(), "--print-config built the source");
+}
+
+#[test]
+fn print_config_json_is_machine_readable() {
+    let dir = tempfile::tempdir().unwrap();
+    let source = dir.path().join("source.pps");
+    fs::write(&source, "PRINTLN 1\n").unwrap();
+
+    let output = pplc().env("PPL_LANG_VERSION", "350").arg("--print-config-json").arg(&source).output().unwrap();
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    let config: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(config["languageVersion"]["effective"], 350);
+    assert_eq!(config["languageVersion"]["source"], "environment");
+    assert_eq!(config["runtimeVersion"]["effective"], 401);
+    assert_eq!(config["sources"].as_array().unwrap().len(), 1);
+}
+
+#[test]
+fn print_config_reads_a_package_without_building_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let package = dir.path().join("package");
+    let init = pplc().args(["--init", "--lang-version", "350"]).arg(&package).output().unwrap();
+    assert!(init.status.success(), "{}", String::from_utf8_lossy(&init.stderr));
+
+    let output = pplc().current_dir(&package).arg("--print-config-json").output().unwrap();
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    let config: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(config["package"]["name"], "package");
+    assert_eq!(config["languageVersion"]["source"], "manifest");
+    assert!(config["output"].as_str().unwrap().ends_with("target/icboard/package.ppe"));
+    assert!(!package.join("target").exists(), "printing config created the target directory");
+}
+
+#[test]
+fn print_config_formats_are_mutually_exclusive() {
+    let output = pplc().args(["--print-config", "--print-config-json", "ignored.pps"]).output().unwrap();
+    assert_eq!(output.status.code(), Some(2));
+}

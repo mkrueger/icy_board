@@ -26,6 +26,7 @@ use crossterm::{
 use icy_engine::SaveOptions;
 use icy_engine::formats::{CharacterFormatOptions, FileFormat, FormatOptions};
 use semver::Version;
+use serde::Serialize;
 use std::{
     fs::{self},
     io::stdout,
@@ -76,6 +77,14 @@ struct Cli {
     #[argh(switch)]
     check: bool,
 
+    /// prints the effective compiler configuration without compiling
+    #[argh(switch)]
+    print_config: bool,
+
+    /// prints the effective compiler configuration as json without compiling
+    #[argh(switch)]
+    print_config_json: bool,
+
     /// file[.pps] to compile (extension defaults to .pps if not specified)
     #[argh(positional)]
     file: Option<PathBuf>,
@@ -87,8 +96,14 @@ lazy_static::lazy_static! {
 
 fn main() {
     let arguments: Cli = argh::from_env();
+    if arguments.print_config && arguments.print_config_json {
+        eprintln!("--print-config and --print-config-json cannot be used together");
+        std::process::exit(2);
+    }
     // With --stdout the formatted source is the output, so nothing else may go there.
-    if arguments.stdout {
+    if arguments.print_config || arguments.print_config_json {
+        // Configuration output is data consumed by people or tools; it carries no banner.
+    } else if arguments.stdout {
         eprintln!("PPLC v{} - PCBoard Programming Language Compiler", *VERSION);
     } else {
         println!("PPLC v{} - PCBoard Programming Language Compiler", *VERSION);
@@ -147,6 +162,13 @@ fn main() {
     }
 
     if file_name.extension().is_some_and(|extension| extension == "toml") {
+        if arguments.print_config || arguments.print_config_json {
+            if let Err(err) = print_config(&file_name, &arguments, Encoding::Detect) {
+                eprintln!("ERROR: {err}");
+                std::process::exit(1);
+            }
+            return;
+        }
         if let Err(err) = compile_toml(&file_name, &arguments) {
             eprintln!("ERROR: {err}");
             std::process::exit(1);
@@ -154,7 +176,7 @@ fn main() {
         return;
     }
 
-    if !(arguments.format || arguments.check) {
+    if !(arguments.format || arguments.check || arguments.print_config || arguments.print_config_json) {
         println!();
         println!("Parsing...");
     }
@@ -168,6 +190,13 @@ fn main() {
 
     let mut ws = Workspace::default();
     ws.hard_coded_files = Some(vec![PathBuf::from(&file_name)]);
+    if arguments.print_config || arguments.print_config_json {
+        if let Err(err) = print_loose_config(&file_name, &arguments, encoding, ws) {
+            eprintln!("ERROR: {err}");
+            std::process::exit(1);
+        }
+        return;
+    }
     apply_arguments(&mut ws, &arguments);
 
     if let Err(err) = compile_files(&arguments, encoding, &mut ws, &out_file_name) {
@@ -233,7 +262,7 @@ fn apply_arguments(workspace: &mut Workspace, arguments: &Cli) {
 
 /// A source states which language it is written in, so it wins over the manifest and
 /// the command line. Two files may not disagree about it.
-fn apply_declared_language_version(workspace: &mut Workspace, encoding: Encoding) -> Res<()> {
+fn declared_language_version(workspace: &Workspace, encoding: Encoding) -> Res<Option<(PathBuf, u16)>> {
     let mut declared: Option<(PathBuf, u16)> = None;
     for src_file in workspace.files() {
         let Ok(src) = load_with_encoding(&src_file, encoding) else {
@@ -258,7 +287,11 @@ fn apply_declared_language_version(workspace: &mut Workspace, encoding: Encoding
         }
     }
 
-    if let Some((file, version)) = declared {
+    Ok(declared)
+}
+
+fn apply_declared_language_version(workspace: &mut Workspace, encoding: Encoding) -> Res<()> {
+    if let Some((file, version)) = declared_language_version(workspace, encoding)? {
         let configured = workspace.compiler.as_ref().and_then(|c| c.language_version);
         if configured.is_some_and(|configured| configured != version) {
             println!("{} declares language version {}, using that one.", file.display(), version);
@@ -266,6 +299,204 @@ fn apply_declared_language_version(workspace: &mut Workspace, encoding: Encoding
         workspace.compiler.get_or_insert_with(CompilerData::default).language_version = Some(version);
     }
     Ok(())
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct VersionReport {
+    effective: u16,
+    source: &'static str,
+    command_line: Option<u16>,
+    manifest: Option<u16>,
+    environment: Option<String>,
+    source_directive: Option<SourceDirectiveReport>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SourceDirectiveReport {
+    file: String,
+    version: u16,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PackageReport {
+    name: String,
+    version: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CompilerConfigReport {
+    project: Option<String>,
+    package: Option<PackageReport>,
+    sources: Vec<String>,
+    encoding: &'static str,
+    language_version: VersionReport,
+    runtime_version: VersionReport,
+    output: String,
+    defines: Vec<String>,
+    text_files: usize,
+    art_files: usize,
+}
+
+fn environment_candidate() -> Option<String> {
+    std::env::var(icy_board_engine::executable::PPL_LANG_VERSION_ENV).ok()
+}
+
+fn resolve_config(workspace: &Workspace, arguments: &Cli, encoding: Encoding, project: Option<&Path>, output: PathBuf) -> Res<CompilerConfigReport> {
+    let manifest_runtime = workspace.package.runtime;
+    let manifest_language = workspace.compiler.as_ref().and_then(|compiler| compiler.language_version);
+    let directive = declared_language_version(workspace, encoding)?;
+    let environment = environment_candidate();
+
+    let runtime = arguments.runtime.or(manifest_runtime).unwrap_or(icy_board_engine::executable::LAST_PPE_RUNTIME);
+    let runtime_source = if arguments.runtime.is_some() {
+        "commandLine"
+    } else if manifest_runtime.is_some() {
+        "manifest"
+    } else {
+        "default"
+    };
+
+    let (language, language_source) = if let Some((_, version)) = &directive {
+        (*version, "sourceDirective")
+    } else if let Some(version) = arguments.lang_version {
+        (version, "commandLine")
+    } else if let Some(version) = manifest_language {
+        (version, "manifest")
+    } else if let Some(version) = language_version_from_env()? {
+        (version, "environment")
+    } else {
+        (runtime.min(LAST_PPL_LANGUAGE_VERSION), "runtime")
+    };
+
+    let sources = workspace.files().into_iter().map(|file| absolute(&file)).collect();
+    let defines = arguments
+        .defines
+        .as_ref()
+        .map(|defines| defines.split(';').map(str::to_string).collect())
+        .or_else(|| workspace.compiler.as_ref().and_then(|compiler| compiler.defines.clone()))
+        .unwrap_or_default();
+
+    Ok(CompilerConfigReport {
+        project: project.map(absolute),
+        package: project.map(|_| PackageReport {
+            name: workspace.package.name.clone(),
+            version: workspace.package.version.to_string(),
+        }),
+        sources,
+        encoding: match encoding {
+            Encoding::CP437 => "cp437",
+            Encoding::Utf8 => "utf8",
+            Encoding::Detect => "detect",
+        },
+        language_version: VersionReport {
+            effective: language,
+            source: language_source,
+            command_line: arguments.lang_version,
+            manifest: manifest_language,
+            environment,
+            source_directive: directive.map(|(file, version)| SourceDirectiveReport {
+                file: absolute(&file),
+                version,
+            }),
+        },
+        runtime_version: VersionReport {
+            effective: runtime,
+            source: runtime_source,
+            command_line: arguments.runtime,
+            manifest: manifest_runtime,
+            environment: None,
+            source_directive: None,
+        },
+        output: absolute(&output),
+        defines,
+        text_files: workspace.data.as_ref().and_then(|data| data.text_files.as_ref()).map_or(0, Vec::len),
+        art_files: workspace.data.as_ref().and_then(|data| data.art_files.as_ref()).map_or(0, Vec::len),
+    })
+}
+
+fn absolute(path: &Path) -> String {
+    if path.is_absolute() {
+        path.to_string_lossy().into_owned()
+    } else {
+        std::env::current_dir().unwrap_or_default().join(path).to_string_lossy().into_owned()
+    }
+}
+
+fn print_report(report: &CompilerConfigReport, json: bool) -> Res<()> {
+    if json {
+        println!("{}", serde_json::to_string_pretty(report)?);
+        return Ok(());
+    }
+
+    println!("PPL compilation configuration\n");
+    if let Some(project) = &report.project {
+        println!("Project                {project}");
+    } else if let Some(source) = report.sources.first() {
+        println!("Source                 {source}");
+        println!("Project                none");
+    }
+    if let Some(package) = &report.package {
+        println!("Package                {} {}", package.name, package.version);
+    }
+    println!("Sources                {}", report.sources.len());
+    println!("Encoding               {}\n", report.encoding);
+    print_version("Language version", &report.language_version);
+    println!();
+    print_version("Runtime version", &report.runtime_version);
+    println!("\nOutput                 {}", report.output);
+    println!(
+        "Defines                {}",
+        if report.defines.is_empty() {
+            "none".to_string()
+        } else {
+            report.defines.join(", ")
+        }
+    );
+    if report.package.is_some() {
+        println!("Text files             {}", report.text_files);
+        println!("Art files              {}", report.art_files);
+    }
+    Ok(())
+}
+
+fn print_version(label: &str, report: &VersionReport) {
+    println!("{label:<23}{}", report.effective);
+    println!("  From                 {}", report.source);
+    println!(
+        "  Command line         {}",
+        report.command_line.map_or_else(|| "not set".to_string(), |value| value.to_string())
+    );
+    println!(
+        "  Manifest             {}",
+        report.manifest.map_or_else(|| "not set".to_string(), |value| value.to_string())
+    );
+    if report.environment.is_some() || label.starts_with("Language") {
+        println!("  Environment          {}", report.environment.as_deref().unwrap_or("not set"));
+    }
+    if let Some(directive) = &report.source_directive {
+        println!("  Source directive     {} ({})", directive.version, directive.file);
+    }
+}
+
+fn print_loose_config(file_name: &Path, arguments: &Cli, encoding: Encoding, mut workspace: Workspace) -> Res<()> {
+    workspace.hard_coded_files = Some(vec![file_name.to_path_buf()]);
+    let report = resolve_config(&workspace, arguments, encoding, None, file_name.with_extension("ppe"))?;
+    print_report(&report, arguments.print_config_json)
+}
+
+fn print_config(file_name: &Path, arguments: &Cli, encoding: Encoding) -> Res<()> {
+    let workspace = Workspace::load(file_name)?;
+    let runtime = arguments
+        .runtime
+        .or(workspace.package.runtime)
+        .unwrap_or(icy_board_engine::executable::LAST_PPE_RUNTIME);
+    let output = workspace.target_path(runtime).join(workspace.package.name()).with_extension("ppe");
+    let report = resolve_config(&workspace, arguments, encoding, Some(file_name), output)?;
+    print_report(&report, arguments.print_config_json)
 }
 
 fn compile_toml(file_name: &PathBuf, arguments: &Cli) -> Res<()> {

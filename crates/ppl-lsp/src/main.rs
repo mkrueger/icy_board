@@ -22,7 +22,7 @@ use icyboard_ppl::hover::get_user_hover;
 use icyboard_ppl::jump_definition::get_definition;
 use icyboard_ppl::reference::get_reference;
 use icyboard_ppl::signature_help::get_signature_help;
-use icyboard_ppl::{line_before_cursor, offset_to_position};
+use icyboard_ppl::{line_before_cursor, offset_to_position, position_to_offset};
 use ropey::Rope;
 use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::*;
@@ -106,9 +106,12 @@ impl LanguageServer for Backend {
     }
 
     async fn did_change(&self, mut params: DidChangeTextDocumentParams) {
+        let Some(change) = params.content_changes.get_mut(0) else {
+            return;
+        };
         self.on_change(TextDocumentItem {
             uri: params.text_document.uri,
-            text: std::mem::take(&mut params.content_changes[0].text),
+            text: std::mem::take(&mut change.text),
             // version: params.text_document.version,
         })
         .await;
@@ -122,16 +125,18 @@ impl LanguageServer for Backend {
 
         self.client.publish_diagnostics(uri.clone(), Vec::new(), None).await;
         self.ast_map.lock().unwrap().remove(&uri);
+        self.document_map.remove(&uri);
     }
 
     async fn hover(&self, params: HoverParams) -> Result<Option<Hover>> {
         let uri = params.text_document_position_params.text_document.uri;
+        if !self.document_map.contains_key(&uri) {
+            return Ok(None);
+        }
         self.get_ast(&uri, |ast, visitor| {
             let rope = self.document_map.get(&uri)?;
 
-            let position = params.text_document_position_params.position;
-            let char = rope.try_line_to_char(position.line as usize).ok()?;
-            let offset = char + position.character as usize;
+            let offset = position_to_offset(&rope, params.text_document_position_params.position)?;
 
             get_tooltip(ast, offset).or_else(|| get_user_hover(ast, visitor, offset))
         })
@@ -140,19 +145,15 @@ impl LanguageServer for Backend {
     async fn goto_definition(&self, params: GotoDefinitionParams) -> Result<Option<GotoDefinitionResponse>> {
         let uri2 = params.text_document_position_params.text_document.uri.clone();
         let uri = params.text_document_position_params.text_document.uri;
+        if !self.document_map.contains_key(&uri) {
+            return Ok(None);
+        }
         let res = self.get_ast(&uri, |ast, visitor| {
             let rope = self.document_map.get(&uri2)?;
 
-            let position = params.text_document_position_params.position;
-            let char = rope.try_line_to_char(position.line as usize).ok()?;
-            let offset = char + position.character as usize;
+            let offset = position_to_offset(&rope, params.text_document_position_params.position)?;
             if let Some((path, r)) = get_definition(&ast, visitor, offset) {
-                let start_position = offset_to_position(r.span.start, &rope)?;
-                let end_position = offset_to_position(r.span.end, &rope)?;
-                let range = Range::new(start_position, end_position);
-                if let Ok(path) = Url::from_file_path(&path) {
-                    return Some(GotoDefinitionResponse::Scalar(Location::new(path, range)));
-                }
+                return self.location(&path, r.span).map(GotoDefinitionResponse::Scalar);
             }
             None
         });
@@ -177,11 +178,9 @@ impl LanguageServer for Backend {
         let Some(rope) = self.document_map.get(&uri) else {
             return Ok(None);
         };
-        let position = params.text_document_position_params.position;
-        let Ok(line_start) = rope.try_line_to_char(position.line as usize) else {
+        let Some(offset) = position_to_offset(&rope, params.text_document_position_params.position) else {
             return Ok(None);
         };
-        let offset = line_start + position.character as usize;
 
         let path = uri.to_file_path().unwrap_or_default();
         let highlights = self.get_ast(&uri, |ast, visitor| {
@@ -205,10 +204,11 @@ impl LanguageServer for Backend {
     async fn completion(&self, params: CompletionParams) -> Result<Option<CompletionResponse>> {
         let uri = params.text_document_position.text_document.uri;
         let position = params.text_document_position.position;
-        let rope = self.document_map.get(&uri).unwrap();
+        let Some(rope) = self.document_map.get(&uri) else {
+            return Ok(None);
+        };
         let completions = self.get_ast(&uri, |ast, visitor| {
-            let char = rope.try_line_to_char(position.line as usize).ok()?;
-            let offset = char + position.character as usize;
+            let offset = position_to_offset(&rope, position)?;
             let line = line_before_cursor(&rope, position)?;
             let completions = get_completion(ast, visitor, &line, offset);
 
@@ -231,11 +231,12 @@ impl LanguageServer for Backend {
 
     async fn references(&self, params: ReferenceParams) -> Result<Option<Vec<Location>>> {
         let uri = params.text_document_position.text_document.uri;
-
-        let rope = self.document_map.get(&uri).unwrap();
-        let position = params.text_document_position.position;
-        let char = rope.try_line_to_char(position.line as usize).ok().unwrap();
-        let offset: usize = char + position.character as usize;
+        let Some(rope) = self.document_map.get(&uri) else {
+            return Ok(None);
+        };
+        let Some(offset) = position_to_offset(&rope, params.text_document_position.position) else {
+            return Ok(None);
+        };
 
         self.client.log_message(MessageType::INFO, format!("OFFSET {offset}!")).await;
 
@@ -243,40 +244,21 @@ impl LanguageServer for Backend {
 
         self.client.log_message(MessageType::INFO, format!("got {} refs!", reference_list.len())).await;
 
-        if !reference_list.is_empty() {
-            let mut list = Vec::new();
-            let mut rope_map = HashMap::new();
-            for (path, r) in reference_list {
-                let uri2 = Url::from_file_path(&path).ok().unwrap();
-                let start_position;
-                let end_position;
-                if let Some(rope) = self.document_map.get(&uri2) {
-                    start_position = offset_to_position(r.span.start, &rope).unwrap();
-                    end_position = offset_to_position(r.span.end, &rope).unwrap();
-                } else {
-                    if !rope_map.contains_key(&path) {
-                        let content = read_data_with_encoding_detection(&std::fs::read(&path).unwrap()).unwrap();
-                        rope_map.insert(path.clone(), Rope::from_str(&content));
-                    }
-                    let rope = rope_map.get(&path).unwrap();
-                    start_position = offset_to_position(r.span.start, &rope).unwrap();
-                    end_position = offset_to_position(r.span.end, &rope).unwrap();
-                };
-                list.push(Location::new(uri2, Range::new(start_position, end_position)));
-            }
-            Ok(Some(list))
-        } else {
-            Ok(None)
-        }
+        let list: Vec<Location> = reference_list
+            .into_iter()
+            .filter_map(|(path, reference)| self.location(&path, reference.span))
+            .collect();
+        if list.is_empty() { Ok(None) } else { Ok(Some(list)) }
     }
 
     async fn rename(&self, params: RenameParams) -> Result<Option<WorkspaceEdit>> {
         let uri = params.text_document_position.text_document.uri;
-
-        let rope = self.document_map.get(&uri).unwrap();
-        let position = params.text_document_position.position;
-        let char = rope.try_line_to_char(position.line as usize).ok().unwrap();
-        let offset: usize = char + position.character as usize;
+        let Some(rope) = self.document_map.get(&uri) else {
+            return Ok(None);
+        };
+        let Some(offset) = position_to_offset(&rope, params.text_document_position.position) else {
+            return Ok(None);
+        };
 
         self.client.log_message(MessageType::INFO, format!("OFFSET {offset}!")).await;
 
@@ -284,38 +266,16 @@ impl LanguageServer for Backend {
 
         self.client.log_message(MessageType::INFO, format!("got {} refs!", reference_list.len())).await;
 
-        let new_name = params.new_name;
-        if !reference_list.is_empty() {
-            let mut map = HashMap::new();
-            let mut rope_map = HashMap::new();
-            for (path, r) in reference_list {
-                let uri2 = Url::from_file_path(&path).ok().unwrap();
-                let start_position;
-                let end_position;
-                if let Some(rope) = self.document_map.get(&uri2) {
-                    start_position = offset_to_position(r.span.start, &rope).unwrap();
-                    end_position = offset_to_position(r.span.end, &rope).unwrap();
-                } else {
-                    if !rope_map.contains_key(&path) {
-                        let content = read_data_with_encoding_detection(&std::fs::read(&path).unwrap()).unwrap();
-                        rope_map.insert(path.clone(), Rope::from_str(&content));
-                    }
-                    let rope = rope_map.get(&path).unwrap();
-                    start_position = offset_to_position(r.span.start, &rope).unwrap();
-                    end_position = offset_to_position(r.span.end, &rope).unwrap();
-                };
-
-                if !map.contains_key(&uri2) {
-                    map.insert(uri2.clone(), Vec::new());
-                }
-                map.get_mut(&uri2)
-                    .unwrap()
-                    .push(TextEdit::new(Range::new(start_position, end_position), new_name.clone()));
-            }
-            Ok(Some(WorkspaceEdit::new(map)))
-        } else {
-            Ok(None)
+        let mut map: HashMap<Url, Vec<TextEdit>> = HashMap::new();
+        for (path, reference) in reference_list {
+            let Some(location) = self.location(&path, reference.span) else {
+                continue;
+            };
+            map.entry(location.uri)
+                .or_default()
+                .push(TextEdit::new(location.range, params.new_name.clone()));
         }
+        if map.is_empty() { Ok(None) } else { Ok(Some(WorkspaceEdit::new(map))) }
     }
 
     async fn did_change_configuration(&self, _: DidChangeConfigurationParams) {
@@ -355,6 +315,20 @@ struct TextDocumentItem {
 }
 
 impl Backend {
+    fn location(&self, path: &std::path::Path, span: std::ops::Range<usize>) -> Option<Location> {
+        let uri = Url::from_file_path(path).ok()?;
+        let rope = if let Some(document) = self.document_map.get(&uri) {
+            document.clone()
+        } else {
+            let data = std::fs::read(path).ok()?;
+            Rope::from_str(&read_data_with_encoding_detection(&data).ok()?)
+        };
+        Some(Location::new(
+            uri,
+            Range::new(offset_to_position(span.start, &rope)?, offset_to_position(span.end, &rope)?),
+        ))
+    }
+
     fn format(&self, uri: &Url) -> Result<Option<Vec<TextEdit>>> {
         let Some(rope) = self.document_map.get(uri) else {
             return Ok(None);
@@ -381,7 +355,12 @@ impl Backend {
                 let registry = UserTypeRegistry::icy_board_registry();
                 let mut sources = Vec::new();
                 for file in ws.files() {
-                    let content = read_data_with_encoding_detection(&std::fs::read(&file).unwrap()).unwrap();
+                    let Ok(data) = std::fs::read(&file) else {
+                        continue;
+                    };
+                    let Ok(content) = read_data_with_encoding_detection(&data) else {
+                        continue;
+                    };
                     preparse_type_declarations(file.clone(), errors.clone(), &content, &registry, Encoding::Utf8, &ws);
                     sources.push((file, content));
                 }
@@ -395,7 +374,9 @@ impl Backend {
                 let mut semantic_visitor = SemanticVisitor::new(&ws, errors, registry);
                 for ast in asts {
                     ast.visit(&mut semantic_visitor);
-                    self.workspace_map.insert(Url::from_file_path(&ast.file_name).unwrap(), ast);
+                    if let Ok(uri) = Url::from_file_path(&ast.file_name) {
+                        self.workspace_map.insert(uri, ast);
+                    }
                 }
                 semantic_visitor.finish();
 
@@ -431,13 +412,21 @@ impl Backend {
                 let mut sources = Vec::new();
 
                 for file in workspace.files() {
-                    let cur_uri = Url::from_file_path(&file).unwrap();
+                    let Ok(cur_uri) = Url::from_file_path(&file) else {
+                        continue;
+                    };
                     let content = if uri == cur_uri {
                         params.text.clone()
                     } else if let Some(document) = self.document_map.get(&cur_uri) {
                         document.to_string()
                     } else {
-                        read_data_with_encoding_detection(&std::fs::read(&file).unwrap()).unwrap()
+                        let Ok(data) = std::fs::read(&file) else {
+                            continue;
+                        };
+                        let Ok(content) = read_data_with_encoding_detection(&data) else {
+                            continue;
+                        };
+                        content
                     };
                     preparse_type_declarations(file.clone(), errors.clone(), &content, &registry, Encoding::Utf8, &workspace);
                     sources.push((file, cur_uri, content));
@@ -466,7 +455,9 @@ impl Backend {
         } else {
             let reg: UserTypeRegistry = UserTypeRegistry::icy_board_registry();
             let errors = Arc::new(Mutex::new(ErrorReporter::default()));
-            let path = uri.to_file_path().unwrap();
+            let Ok(path) = uri.to_file_path() else {
+                return;
+            };
             let ast = parse_ast(path, errors.clone(), &params.text, &reg, Encoding::Utf8, &Workspace::default());
 
             let mut semantic_visitor = SemanticVisitor::new(&Workspace::default(), errors, reg);

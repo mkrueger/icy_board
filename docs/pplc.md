@@ -21,8 +21,42 @@ Options:
                                                                       350, 400 (default)
   --cp437           specify the encoding of the file, defaults to autodetection
   --init            create & init new ppl package in target directory
+       --print-config    explain the effective configuration without compiling
+       --print-config-json
+                                                                      print the effective configuration as JSON
   --help, help      display usage information
 ```
+
+### Effective configuration
+
+`--print-config` reads a source or `ppl.toml`, including `;$LANGVERSION`, and
+shows the settings the compiler would use without creating an executable or a
+target directory:
+
+```text
+PPL compilation configuration
+
+Source                 /home/mike/doors/hello.pps
+Project                none
+Sources                1
+Encoding               detect
+
+Language version       350
+       From                 environment
+       Command line         not set
+       Manifest             not set
+       Environment          350
+
+Runtime version        401
+       From                 default
+
+Output                 /home/mike/doors/hello.ppe
+Defines                none
+```
+
+`--print-config-json` emits only JSON, with absolute source and output paths, so
+an editor can discover a package's actual output instead of reproducing the
+compiler's rules.
 
 ### Disassembling
 Instead of creating a .PPE executable it can print a disassembler. This is useful to find out what the compiler does with the input code.

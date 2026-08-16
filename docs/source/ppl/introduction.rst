@@ -67,6 +67,8 @@ directory.
   * ``--defines <list>`` - Semicolon separated preprocessor variables, e.g. ``"A=1;B=2"``
   * ``--format`` - Format the source instead of compiling it
   * ``--check`` - Check the source or package for errors without writing a PPE
+  * ``--print-config`` - Explain the effective compiler configuration and where each value came from
+  * ``--print-config-json`` - Print the same configuration as JSON for editor and CI integration
   * ``--help`` - Display usage information
 
 **User Variables**
