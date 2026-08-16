@@ -21,6 +21,8 @@
 
 ; ---------- Declarations ----------
 (type_declaration name: (identifier) @type)
+(enum_declaration name: (identifier) @type)
+(enum_variant name: (identifier) @constant)
 (field_declaration name: (identifier) @variable.member @variable.other.member)
 
 (function_declaration name: (identifier) @function)
@@ -116,6 +118,8 @@
 [
   "TYPE"
   "ENDTYPE"
+  "ENUM"
+  "ENDENUM"
 ] @keyword.type @keyword.storage.type
 
 "CONST" @keyword @keyword.storage.modifier

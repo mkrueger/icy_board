@@ -143,6 +143,7 @@ impl<'a> FormattingVisitor<'a> {
                 AstNode::FunctionDeclaration(function) => Some(function.get_declare_token().span.clone()),
                 AstNode::ProcedureDeclaration(procedure) => Some(procedure.get_declare_token().span.clone()),
                 AstNode::TypeDeclaration(declaration) => Some(declaration.get_type_token().span.start..declaration.get_endtype_token().span.end),
+                AstNode::EnumDeclaration(declaration) => Some(declaration.get_enum_token().span.start..declaration.get_endenum_token().span.end),
                 AstNode::Main(main) => main.get_begin_token().map(|begin_token| begin_token.span.clone()),
             };
             if let Some(span) = &span {
@@ -193,6 +194,17 @@ impl<'a> AstVisitor<()> for FormattingVisitor<'a> {
         self.ensure_space_before(declaration.get_eq_token().span.start);
         self.ensure_text_or_newline(declaration.get_eq_token().span.end..declaration.get_value().get_span().start, " ");
         declaration.get_value().visit(self);
+    }
+
+    fn visit_enum_declaration(&mut self, declaration: &EnumDeclarationAstNode) {
+        self.ensure_space_before(declaration.get_identifier_token().span.start);
+        for variant in declaration.get_variants() {
+            if let (Some(eq), Some(value)) = (variant.get_eq_token(), variant.get_explicit_value()) {
+                self.ensure_space_before(eq.span.start);
+                self.ensure_text_or_newline(eq.span.end..value.get_span().start, " ");
+                value.visit(self);
+            }
+        }
     }
 
     fn visit_let_statement(&mut self, let_stmt: &LetStatement) {

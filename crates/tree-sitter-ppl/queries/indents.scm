@@ -7,6 +7,7 @@
   (function_definition)
   (procedure_definition)
   (type_declaration)
+  (enum_declaration)
   (if_block)
   (elseif_clause)
   (else_clause)
@@ -34,6 +35,7 @@
   "ENDLOOP"
   "ENDSELECT"
   "ENDTYPE"
+  "ENDENUM"
   "ENDFOR"
   "ENDFUNC"
   "ENDFUNCTION"

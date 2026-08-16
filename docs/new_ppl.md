@@ -128,6 +128,33 @@ to write back to.
 language is read, carries no type and works at any version. `CONST` is typed and
 belongs to 4.00.
 
+## `ENUM ... ENDENUM` Declaration (4.00)
+
+### Function
+Defines a compile-time integer type and its named values.
+
+### Syntax
+```PPL
+ENUM Color
+	Red
+	Green = 5
+	Blue
+ENDENUM
+
+Color favorite = Color.Green
+```
+
+### Remarks
+The first implicit value is zero; every later implicit value follows the member
+before it. An explicit value must be an integer constant expression. Members
+live under the enum name, so `Color.Green` is valid and `Green` alone is not.
+
+Enums are nominal: different enums and plain integers cannot be assigned to or
+compared with each other. Equality and inequality are supported; arithmetic and
+bitflag behavior are not. Enum variables, arrays, routine parameters and return
+values, and record fields are stored as `INTEGER` in the PPE. The type and names
+therefore cost nothing at runtime and cannot be recovered by the decompiler.
+
 ## `BEGIN ... END` Block (4.00)
 
 ### Function

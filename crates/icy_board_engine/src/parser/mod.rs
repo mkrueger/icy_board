@@ -7,9 +7,9 @@ use std::{
 
 use crate::{
     ast::{
-        Ast, AstNode, BlockStatement, CommentAstNode, Constant, DimensionSpecifier, FunctionDeclarationAstNode, FunctionImplementation,
-        FunctionParameterSpecifier, ParameterSpecifier, ProcedureDeclarationAstNode, ProcedureImplementation, ProcedureParameterSpecifier, Statement,
-        TypeDeclarationAstNode, TypeFieldSpecifier, VariableParameterSpecifier, VariableSpecifier,
+        Ast, AstNode, BlockStatement, CommentAstNode, Constant, DimensionSpecifier, EnumDeclarationAstNode, EnumVariantSpecifier, FunctionDeclarationAstNode,
+        FunctionImplementation, FunctionParameterSpecifier, ParameterSpecifier, ProcedureDeclarationAstNode, ProcedureImplementation,
+        ProcedureParameterSpecifier, Statement, TypeDeclarationAstNode, TypeFieldSpecifier, VariableParameterSpecifier, VariableSpecifier, const_value,
     },
     compiler::{
         user_data::{UserData, UserDataRegistry},
@@ -170,6 +170,18 @@ pub enum ParserErrorType {
     #[error("'ENDTYPE' expected before the end of the file")]
     EndTypeExpected,
 
+    #[error("'ENDENUM' expected before the end of the file")]
+    EndEnumExpected,
+
+    #[error("An enum needs at least one member")]
+    EnumNeedsAMember,
+
+    #[error("Enum member '{0}' is already declared")]
+    EnumMemberAlreadyDeclared(unicase::Ascii<String>),
+
+    #[error("An enum member needs an integer value the compiler can work out")]
+    EnumValueExpected,
+
     #[error("A type needs at least one field")]
     TypeNeedsAField,
 
@@ -222,6 +234,20 @@ pub struct UserTypeDefinition {
     pub fields: Vec<(unicase::Ascii<String>, VariableType)>,
 }
 
+/// An integer-backed type that exists in source only.
+#[derive(Debug, Clone, PartialEq)]
+pub struct EnumDefinition {
+    pub id: u8,
+    pub name: unicase::Ascii<String>,
+    pub variants: Vec<(unicase::Ascii<String>, i32)>,
+}
+
+impl EnumDefinition {
+    pub fn value(&self, variant: &unicase::Ascii<String>) -> Option<i32> {
+        self.variants.iter().find_map(|(name, value)| (name == variant).then_some(*value))
+    }
+}
+
 impl UserTypeDefinition {
     pub fn field_index(&self, name: &unicase::Ascii<String>) -> Option<usize> {
         self.fields.iter().position(|(field, _)| field == name)
@@ -239,6 +265,7 @@ pub struct UserTypeRegistry {
     /// Records the compiled program declares. Shared across every file of a
     /// compilation so a type declared in one is visible in the next.
     user_types: RwLock<Vec<UserTypeDefinition>>,
+    enums: RwLock<Vec<EnumDefinition>>,
 }
 
 pub const FIRST_ID: usize = 30;
@@ -277,7 +304,9 @@ impl UserTypeRegistry {
         if let Some(vt) = self.registered_types.get(identifier) {
             return Some(*vt);
         }
-        self.get_user_type(identifier).map(|def| VariableType::UserData(def.id as u8))
+        self.get_user_type(identifier)
+            .map(|def| VariableType::UserData(def.id as u8))
+            .or_else(|| self.get_enum(identifier).map(|def| VariableType::UserData(def.id)))
     }
 
     /// The record declared under `identifier`, if the program declared one.
@@ -297,6 +326,31 @@ impl UserTypeRegistry {
         self.user_types.read().unwrap().clone()
     }
 
+    pub fn get_enum(&self, identifier: &unicase::Ascii<String>) -> Option<EnumDefinition> {
+        self.enums.read().unwrap().iter().find(|def| def.name == *identifier).cloned()
+    }
+
+    pub fn get_enum_from_id(&self, id: u8) -> Option<EnumDefinition> {
+        self.enums.read().unwrap().iter().find(|def| def.id == id).cloned()
+    }
+
+    pub fn is_enum_type(&self, variable_type: VariableType) -> bool {
+        matches!(variable_type, VariableType::UserData(id) if self.get_enum_from_id(id).is_some())
+    }
+
+    /// Records grow upward from 100, enums downward from 255; neither kind is
+    /// serialized under the other's representation.
+    pub fn declare_enum(&self, name: unicase::Ascii<String>, variants: Vec<(unicase::Ascii<String>, i32)>) -> Option<u8> {
+        let mut enums = self.enums.write().unwrap();
+        let id = u8::MAX as usize - enums.len();
+        let next_record = FIRST_USER_TYPE_ID + self.user_types.read().unwrap().len();
+        if id < next_record {
+            return None;
+        }
+        enums.push(EnumDefinition { id: id as u8, name, variants });
+        Some(id as u8)
+    }
+
     /// The position of a field inside a record the program declared, which doubles
     /// as its member id in the generated code.
     pub fn record_field_index(&self, id: u8, field: &unicase::Ascii<String>) -> Option<usize> {
@@ -310,7 +364,8 @@ impl UserTypeRegistry {
     pub fn declare_user_type(&self, name: unicase::Ascii<String>, fields: Vec<(unicase::Ascii<String>, VariableType)>) -> Option<usize> {
         let mut user_types = self.user_types.write().unwrap();
         let id = FIRST_USER_TYPE_ID + user_types.len();
-        if id > u8::MAX as usize {
+        let lowest_enum = self.enums.read().unwrap().last().map_or(u8::MAX as usize + 1, |def| def.id as usize);
+        if id >= lowest_enum {
             return None;
         }
         user_types.push(UserTypeDefinition { id, name, fields });
@@ -459,6 +514,9 @@ impl<'a> Parser<'a> {
                         Token::Type => {
                             self.cur_token = Some(Spanned::new(Token::EndType, start..self.lex.span().end));
                         }
+                        Token::Enum => {
+                            self.cur_token = Some(Spanned::new(Token::EndEnum, start..self.lex.span().end));
+                        }
                         Token::For => {
                             self.cur_token = Some(Spanned::new(Token::Next, start..self.lex.span().end));
                         }
@@ -548,6 +606,20 @@ impl<'a> Parser<'a> {
                 }
                 if let Some(decl) = declaration {
                     return Some(AstNode::TypeDeclaration(decl));
+                }
+            }
+            Token::Enum => {
+                let original_reporter = if self.types_predeclared {
+                    Some(std::mem::replace(&mut self.error_reporter, Arc::new(Mutex::new(ErrorReporter::default()))))
+                } else {
+                    None
+                };
+                let declaration = self.parse_enum_declaration();
+                if let Some(original_reporter) = original_reporter {
+                    self.error_reporter = original_reporter;
+                }
+                if let Some(decl) = declaration {
+                    return Some(AstNode::EnumDeclaration(decl));
                 }
             }
             Token::Begin => {
@@ -750,6 +822,103 @@ impl<'a> Parser<'a> {
         }
 
         Some(TypeDeclarationAstNode::new(type_token, identifier_token, fields, endtype_token))
+    }
+
+    fn parse_enum_declaration(&mut self) -> Option<EnumDeclarationAstNode> {
+        let enum_token = self.save_spanned_token();
+        self.next_token();
+
+        let Some(Token::Identifier(name)) = self.get_cur_token() else {
+            self.report_error(self.lex.span(), ParserErrorType::IdentifierExpected(self.save_token()));
+            return None;
+        };
+        let identifier_token = self.save_spanned_token();
+        self.next_token();
+
+        let type_already_declared = self.type_registry.get_type(&name).is_some() || self.type_hashes.contains_key(&name);
+        if !self.types_predeclared && type_already_declared {
+            self.error_reporter
+                .lock()
+                .unwrap()
+                .report_error(identifier_token.span.clone(), ParserErrorType::TypeAlreadyDeclared(name.clone()));
+        }
+
+        let mut variants = Vec::new();
+        let mut names = Vec::new();
+        let mut next_value = 0i32;
+        let endenum_token = loop {
+            while matches!(self.get_cur_token(), Some(Token::Eol | Token::Comma)) || matches!(self.get_cur_token(), Some(Token::Comment(_, _))) {
+                self.next_token();
+            }
+            match self.get_cur_token() {
+                Some(Token::EndEnum) => {
+                    let token = self.save_spanned_token();
+                    self.next_token();
+                    break token;
+                }
+                None => {
+                    self.report_error(self.lex.span(), ParserErrorType::EndEnumExpected);
+                    return None;
+                }
+                _ => {}
+            }
+
+            let Some(Token::Identifier(variant_name)) = self.get_cur_token() else {
+                self.report_error(self.save_token_span(), ParserErrorType::IdentifierExpected(self.save_token()));
+                continue;
+            };
+            let variant_token = self.save_spanned_token();
+            self.next_token();
+
+            if names.contains(&variant_name) {
+                self.error_reporter
+                    .lock()
+                    .unwrap()
+                    .report_error(variant_token.span.clone(), ParserErrorType::EnumMemberAlreadyDeclared(variant_name.clone()));
+            } else {
+                names.push(variant_name);
+            }
+
+            let (eq_token, explicit_value, value) = if self.get_cur_token() == Some(Token::Eq) {
+                let eq = self.save_spanned_token();
+                self.next_token();
+                let Some(expr) = self.parse_expression() else {
+                    self.report_error(self.save_token_span(), ParserErrorType::EnumValueExpected);
+                    continue;
+                };
+                let Some(value) = const_value(&expr, &|_| None).map(|value| value.as_int()) else {
+                    self.error_reporter
+                        .lock()
+                        .unwrap()
+                        .report_error(expr.get_span(), ParserErrorType::EnumValueExpected);
+                    continue;
+                };
+                (Some(eq), Some(expr), value)
+            } else {
+                (None, None, next_value)
+            };
+            next_value = value.saturating_add(1);
+            variants.push(EnumVariantSpecifier::new(variant_token, eq_token, value, explicit_value));
+        };
+
+        if variants.is_empty() {
+            self.error_reporter
+                .lock()
+                .unwrap()
+                .report_error(identifier_token.span.clone(), ParserErrorType::EnumNeedsAMember);
+            return None;
+        }
+
+        let layout = variants.iter().map(|variant| (variant.get_identifier().clone(), variant.get_value())).collect();
+        if !self.types_predeclared && !type_already_declared && self.type_registry.declare_enum(name, layout).is_none() {
+            self.error_reporter
+                .lock()
+                .unwrap()
+                .report_error(identifier_token.span.clone(), ParserErrorType::TooManyTypes(MAX_USER_TYPES));
+            return None;
+        }
+
+        Some(EnumDeclarationAstNode::new(enum_token, identifier_token, variants, endenum_token))
     }
 
     fn parse_function_parameter_specifier(&mut self) -> ParameterSpecifier {
@@ -1540,9 +1709,13 @@ pub fn preparse_type_declarations(
     let mut parser = Parser::new(file_name, scratch, user_types, input, encoding, workspace);
     parser.next_token();
     while parser.cur_token.is_some() {
-        if parser.get_cur_token() == Some(Token::Type) {
+        if matches!(parser.get_cur_token(), Some(Token::Type | Token::Enum)) {
             let scratch = std::mem::replace(&mut parser.error_reporter, error_reporter.clone());
-            parser.parse_type_declaration();
+            if parser.get_cur_token() == Some(Token::Type) {
+                parser.parse_type_declaration();
+            } else {
+                parser.parse_enum_declaration();
+            }
             parser.error_reporter = scratch;
         } else {
             parser.next_token();

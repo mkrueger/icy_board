@@ -213,6 +213,8 @@ pub enum Token {
 
     Type,
     EndType,
+    Enum,
+    EndEnum,
     /// The keyword, as opposed to `Const` which carries a value.
     ConstDecl,
     Begin,
@@ -336,6 +338,8 @@ impl fmt::Display for Token {
             Token::OrAssign => write!(f, "|="),
             Token::Type => write!(f, "TYPE"),
             Token::EndType => write!(f, "ENDTYPE"),
+            Token::Enum => write!(f, "ENUM"),
+            Token::EndEnum => write!(f, "ENDENUM"),
             Token::Begin => write!(f, "BEGIN"),
             Token::ConstDecl => write!(f, "CONST"),
         }
@@ -569,6 +573,8 @@ lazy_static::lazy_static! {
         let mut m = TOKEN_LOOKUP_TABLE_350.clone();
         m.insert(unicase::Ascii::new("type".to_string()), Token::Type);
         m.insert(unicase::Ascii::new("endtype".to_string()), Token::EndType);
+        m.insert(unicase::Ascii::new("enum".to_string()), Token::Enum);
+        m.insert(unicase::Ascii::new("endenum".to_string()), Token::EndEnum);
         m.insert(unicase::Ascii::new("begin".to_string()), Token::Begin);
         m.insert(unicase::Ascii::new("const".to_string()), Token::ConstDecl);
         m

@@ -9,7 +9,9 @@
 (procedure_declaration) @function.around @function.outer
 
 (type_declaration) @class.around @class.outer
+(enum_declaration) @class.around @class.outer
 (field_declaration) @entry.around
+(enum_variant) @entry.around
 
 (parameter) @parameter.inside @parameter.inner
 (function_parameter) @parameter.inside @parameter.inner

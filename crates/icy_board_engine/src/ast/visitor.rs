@@ -2,11 +2,12 @@ use crate::parser::lexer::{Spanned, Token};
 
 use super::{
     ArrayInitializerExpression, Ast, AstNode, BinaryExpression, BlockStatement, BreakStatement, CaseBlock, CaseSpecifier, CommentAstNode,
-    ConstDeclarationStatement, ConstantExpression, ContinueStatement, ElseBlock, ElseIfBlock, Expression, ForStatement, FunctionCallExpression,
-    FunctionDeclarationAstNode, FunctionImplementation, GosubStatement, GotoStatement, IdentifierExpression, IfStatement, IfThenStatement, IndexerExpression,
-    LabelStatement, LetStatement, LoopStatement, MemberReferenceExpression, ParameterSpecifier, ParensExpression, PredefinedCallStatement,
-    ProcedureCallStatement, ProcedureDeclarationAstNode, ProcedureImplementation, RecordLiteralExpression, RepeatUntilStatement, ReturnStatement,
-    SelectStatement, Statement, TypeDeclarationAstNode, UnaryExpression, VariableDeclarationStatement, VariableSpecifier, WhileDoStatement, WhileStatement,
+    ConstDeclarationStatement, ConstantExpression, ContinueStatement, ElseBlock, ElseIfBlock, EnumDeclarationAstNode, Expression, ForStatement,
+    FunctionCallExpression, FunctionDeclarationAstNode, FunctionImplementation, GosubStatement, GotoStatement, IdentifierExpression, IfStatement,
+    IfThenStatement, IndexerExpression, LabelStatement, LetStatement, LoopStatement, MemberReferenceExpression, ParameterSpecifier, ParensExpression,
+    PredefinedCallStatement, ProcedureCallStatement, ProcedureDeclarationAstNode, ProcedureImplementation, RecordLiteralExpression, RepeatUntilStatement,
+    ReturnStatement, SelectStatement, Statement, TypeDeclarationAstNode, UnaryExpression, VariableDeclarationStatement, VariableSpecifier, WhileDoStatement,
+    WhileStatement,
 };
 
 #[allow(unused_variables)]
@@ -159,6 +160,9 @@ pub trait AstVisitor<T: Default>: Sized {
         T::default()
     }
     fn visit_type_declaration(&mut self, type_decl: &TypeDeclarationAstNode) -> T {
+        T::default()
+    }
+    fn visit_enum_declaration(&mut self, enum_decl: &EnumDeclarationAstNode) -> T {
         T::default()
     }
 
@@ -661,6 +665,10 @@ pub trait AstVisitorMut: Sized {
             proc_decl.get_parameters().iter().map(|param| param.visit_mut(self)).collect(),
             proc_decl.get_rightpar_token().clone(),
         ))
+    }
+
+    fn visit_enum_declaration(&mut self, enum_decl: &EnumDeclarationAstNode) -> AstNode {
+        AstNode::EnumDeclaration(enum_decl.clone())
     }
     fn visit_function_declaration(&mut self, func_decl: &FunctionDeclarationAstNode) -> AstNode {
         AstNode::FunctionDeclaration(FunctionDeclarationAstNode::new(

@@ -545,6 +545,18 @@ impl FunctionCallExpression {
         }
     }
 
+    /// Rebuilds a call after semantic analysis without losing the id its semantic
+    /// information is keyed by.
+    pub(crate) fn preserving_id(&self, expression: Expression, arguments: Vec<Expression>) -> Self {
+        Self {
+            id: self.id,
+            expression: Box::new(expression),
+            lpar_token: self.lpar_token.clone(),
+            arguments,
+            rpar_token: self.rpar_token.clone(),
+        }
+    }
+
     pub fn get_expression(&self) -> &Expression {
         &self.expression
     }

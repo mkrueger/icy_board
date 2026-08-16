@@ -47,6 +47,7 @@ pub enum AstNode {
     ProcedureDeclaration(ProcedureDeclarationAstNode),
     FunctionDeclaration(FunctionDeclarationAstNode),
     TypeDeclaration(TypeDeclarationAstNode),
+    EnumDeclaration(EnumDeclarationAstNode),
     Main(BlockStatement),
 }
 
@@ -59,6 +60,7 @@ impl AstNode {
             AstNode::ProcedureDeclaration(p) => visitor.visit_procedure_declaration(p),
             AstNode::FunctionDeclaration(f) => visitor.visit_function_declaration(f),
             AstNode::TypeDeclaration(t) => visitor.visit_type_declaration(t),
+            AstNode::EnumDeclaration(e) => visitor.visit_enum_declaration(e),
             AstNode::Main(m) => visitor.visit_main(m),
         }
     }
@@ -72,6 +74,7 @@ impl AstNode {
             AstNode::ProcedureDeclaration(p) => visitor.visit_procedure_declaration(p),
             AstNode::FunctionDeclaration(f) => visitor.visit_function_declaration(f),
             AstNode::TypeDeclaration(t) => AstNode::TypeDeclaration(t.clone()),
+            AstNode::EnumDeclaration(e) => visitor.visit_enum_declaration(e),
             AstNode::Main(m) => AstNode::Main(visitor.visit_block(m)),
         }
     }

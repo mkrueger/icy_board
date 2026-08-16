@@ -699,6 +699,58 @@
     "fields": {}
   },
   {
+    "type": "enum_declaration",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "enum_variant",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "enum_variant",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "value": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "_expression",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "exit_statement",
     "named": true,
     "fields": {}
@@ -1488,6 +1540,10 @@
           "named": true
         },
         {
+          "type": "enum_declaration",
+          "named": true
+        },
+        {
           "type": "function_declaration",
           "named": true
         },
@@ -1946,6 +2002,10 @@
     "named": false
   },
   {
+    "type": "ENDENUM",
+    "named": false
+  },
+  {
     "type": "ENDFOR",
     "named": false
   },
@@ -1983,6 +2043,10 @@
   },
   {
     "type": "ENDWHILE",
+    "named": false
+  },
+  {
+    "type": "ENUM",
     "named": false
   },
   {

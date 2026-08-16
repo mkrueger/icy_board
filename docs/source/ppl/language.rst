@@ -216,6 +216,35 @@ variable called ``const``.
 the language is even read, it carries no type, and it works whatever version is
 set. Reach for ``CONST`` unless the value has to steer the preprocessor.
 
+ENUM ... ENDENUM
+~~~~~~~~~~~~~~~~
+
+An enum gives related integer values a type and a namespace::
+
+    ENUM Color
+        Red
+        Green = 5
+        Blue
+    ENDENUM
+
+    Color favorite = Color.Green
+
+Members without a value start at zero and continue from the preceding member, so
+``Red`` is 0 and ``Blue`` is 6 above. An explicit value must be an integer
+constant expression. Members are always qualified: ``Color.Green`` is a value,
+``Green`` on its own is not.
+
+Enums are nominal. A ``Color`` may be assigned and compared only with another
+``Color``; an integer or a member of a different enum is an error. Equality and
+inequality are supported, arithmetic is not. Enum variables, arrays, routine
+parameters and return values, and record fields all work with the same rule.
+
+The type exists while compiling only. Its storage in the PPE is ``INTEGER``, and
+``Color.Green`` becomes 5, so no new runtime or PPE format is needed. A
+decompiler therefore recovers an ``INTEGER`` and a number, not the enum name or
+member. Enums are not bitflags; use typed ``CONST`` values when named masks are
+needed.
+
 Parentheses, brackets and braces
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -462,5 +491,7 @@ What 4.00 breaks
   variable called ``exit``.
 * ``CONST`` is a keyword, so a 3.50 source may still have a variable called
   ``const``.
+* ``ENUM`` and ``ENDENUM`` are keywords, so a 3.50 source may still use those
+    names as identifiers.
 * A decompiled PPE names its records ``TYPE001`` and their fields ``FIELD001``,
   because the file carries no names to recover.

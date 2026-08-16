@@ -1,6 +1,7 @@
 pub use ast_transform::*;
 use workspace::Workspace;
 pub mod ast_transform;
+mod enum_lowering;
 pub mod optimizer;
 pub mod user_data;
 
@@ -61,6 +62,15 @@ pub enum CompilationErrorType {
 
     #[error("A constant needs a value the compiler can work out")]
     ConstantValueExpected,
+
+    #[error("Enum {0} has no member named {1}")]
+    EnumMemberNotFound(String, String),
+
+    #[error("Can't assign {1} to {0}")]
+    EnumAssignmentTypeMismatch(String, String),
+
+    #[error("Can't compare {0} with {1}")]
+    EnumComparisonTypeMismatch(String, String),
 
     #[error("Can't assign {1} to {0}")]
     AssignmentTypeMismatch(VariableType, VariableType),
@@ -201,6 +211,10 @@ impl PPECompiler {
         }
         self.semantic_visitor.finish();
 
+        for program in &mut visted {
+            *program = program.visit_mut(&mut enum_lowering::EnumLoweringVisitor::new(&self.semantic_visitor.type_registry));
+        }
+
         self.lookup_table = self.semantic_visitor.generate_variable_table();
         for prg in visted {
             self.semantic_visitor.errors.lock().unwrap().set_file_name(&prg.file_name);
@@ -212,6 +226,7 @@ impl PPECompiler {
                     AstNode::ProcedureDeclaration(_proc) => {}
                     // The layout is settled while parsing, nothing is emitted for it.
                     AstNode::TypeDeclaration(_type_decl) => {}
+                    AstNode::EnumDeclaration(_enum_decl) => {}
                     AstNode::TopLevelStatement(stmt) => {
                         // may get transformed by the ast transformer.
                         if let Statement::Block(block) = stmt {
@@ -463,7 +478,19 @@ impl PPECompiler {
             .type_registry
             .user_types()
             .iter()
-            .map(|definition| definition.fields.iter().map(|(_, field_type)| *field_type).collect())
+            .map(|definition| {
+                definition
+                    .fields
+                    .iter()
+                    .map(|(_, field_type)| {
+                        if self.semantic_visitor.type_registry.is_enum_type(*field_type) {
+                            VariableType::Integer
+                        } else {
+                            *field_type
+                        }
+                    })
+                    .collect()
+            })
             .collect();
         variable_table.fill_in_records(&user_types);
         Ok(Executable {

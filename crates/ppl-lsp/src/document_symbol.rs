@@ -110,6 +110,36 @@ pub fn get_document_symbols(ast: &Ast, rope: &Rope) -> Vec<DocumentSymbol> {
                 }
             }
 
+            AstNode::EnumDeclaration(declaration) => {
+                let full = range(rope, &(declaration.get_enum_token().span.start..declaration.get_endenum_token().span.end));
+                let selection = range(rope, &declaration.get_identifier_token().span);
+                if let (Some(full), Some(selection)) = (full, selection) {
+                    let children = declaration
+                        .get_variants()
+                        .iter()
+                        .filter_map(|variant| {
+                            let selection = range(rope, &variant.get_identifier_token().span)?;
+                            Some(symbol(
+                                variant.get_identifier().to_string(),
+                                Some(variant.get_value().to_string()),
+                                SymbolKind::ENUM_MEMBER,
+                                selection,
+                                selection,
+                                Vec::new(),
+                            ))
+                        })
+                        .collect();
+                    symbols.push(symbol(
+                        declaration.get_identifier().to_string(),
+                        Some("INTEGER".to_string()),
+                        SymbolKind::ENUM,
+                        full,
+                        selection,
+                        children,
+                    ));
+                }
+            }
+
             _ => {}
         }
     }

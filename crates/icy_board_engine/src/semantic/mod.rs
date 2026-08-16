@@ -7,11 +7,11 @@ use std::{
 
 use crate::{
     ast::{
-        AstVisitor, CommentAstNode, ConstDeclarationStatement, Constant, ConstantExpression, Expression, FunctionCallExpression, FunctionDeclarationAstNode,
-        FunctionImplementation, GosubStatement, GotoStatement, IdentifierExpression, LabelStatement, LetStatement, ParameterSpecifier, PredefinedCallStatement,
-        ProcedureCallStatement, ProcedureDeclarationAstNode, ProcedureImplementation, TypeDeclarationAstNode, VariableDeclarationStatement,
-        VariableParameterSpecifier, const_value, walk_function_implementation, walk_indexer_expression, walk_predefined_call_statement,
-        walk_procedure_call_statement, walk_procedure_implementation,
+        AstVisitor, CommentAstNode, ConstDeclarationStatement, Constant, ConstantExpression, EnumDeclarationAstNode, Expression, FunctionCallExpression,
+        FunctionDeclarationAstNode, FunctionImplementation, GosubStatement, GotoStatement, IdentifierExpression, LabelStatement, LetStatement,
+        ParameterSpecifier, PredefinedCallStatement, ProcedureCallStatement, ProcedureDeclarationAstNode, ProcedureImplementation, TypeDeclarationAstNode,
+        VariableDeclarationStatement, VariableParameterSpecifier, const_value, walk_function_implementation, walk_indexer_expression,
+        walk_predefined_call_statement, walk_procedure_call_statement, walk_procedure_implementation,
     },
     compiler::{CompilationErrorType, CompilationWarningType, user_data::UserDataMemberRegistry, workspace::Workspace},
     executable::{
@@ -146,19 +146,20 @@ impl References {
     }
 
     fn create_table_entry(&self) -> TableEntry {
+        self.create_table_entry_as(self.variable_type)
+    }
+
+    fn create_table_entry_as(&self, storage_type: VariableType) -> TableEntry {
         if let Some(header) = &self.header {
+            let mut header = header.clone();
+            header.variable_type = storage_type;
             if let Some((_, decl)) = self.declaration.as_ref() {
-                TableEntry::new(
-                    decl.token.to_string(),
-                    header.clone(),
-                    self.variable_type.create_empty_value(),
-                    EntryType::Variable,
-                )
+                TableEntry::new(decl.token.to_string(), header, storage_type.create_empty_value(), EntryType::Variable)
             } else if !self.usages.is_empty() {
                 TableEntry::new(
                     self.usages.first().unwrap().1.token.to_string(),
-                    header.clone(),
-                    self.variable_type.create_empty_value(),
+                    header,
+                    storage_type.create_empty_value(),
                     EntryType::Variable,
                 )
             } else {
@@ -390,6 +391,22 @@ impl LookupVariabeleTable {
 }
 
 impl SemanticVisitor {
+    fn storage_type(&self, source_type: VariableType) -> VariableType {
+        if self.type_registry.is_enum_type(source_type) {
+            VariableType::Integer
+        } else {
+            source_type
+        }
+    }
+
+    fn source_type_name(&self, variable_type: VariableType) -> String {
+        if let VariableType::UserData(id) = variable_type {
+            if let Some(definition) = self.type_registry.get_enum_from_id(id) {
+                return definition.name.to_string();
+            }
+        }
+        variable_type.to_string()
+    }
     pub fn is_routine_reference(&self, span_start: usize) -> bool {
         self.allowed_routine_reference_spans.contains(&span_start)
     }
@@ -460,6 +477,7 @@ impl SemanticVisitor {
         let mut variables: Vec<usize> = self.global_lookup.variable_lookup.values().map(|u| *u).collect();
         variables.sort();
         for i in variables {
+            let storage_type = self.storage_type(self.references[i].1.variable_type);
             let (rt, r) = &mut self.references[i];
             if !matches!(rt, ReferenceType::Variable(_)) {
                 continue;
@@ -483,7 +501,7 @@ impl SemanticVisitor {
             }
 
             r.variable_table_index = variable_table.len() + 1;
-            let entry = r.create_table_entry();
+            let entry = r.create_table_entry_as(storage_type);
             variable_table.push(entry);
         }
 
@@ -567,6 +585,7 @@ impl SemanticVisitor {
             };
 
             for idx in f.parameters.clone() {
+                let storage_type = self.storage_type(self.references[idx].1.variable_type);
                 let (rt, r) = &mut self.references[idx];
                 if let ReferenceType::Function(func) = rt {
                     for f in &mut self.function_containers {
@@ -612,7 +631,7 @@ impl SemanticVisitor {
                 if !matches!(rt, ReferenceType::Variable(_)) {
                     continue;
                 }
-                let mut new_entry = r.create_table_entry();
+                let mut new_entry = r.create_table_entry_as(storage_type);
                 new_entry.entry_type = EntryType::Parameter;
                 variable_table.push(new_entry);
             }
@@ -622,26 +641,27 @@ impl SemanticVisitor {
                 if !matches!(rt, ReferenceType::Variable(_)) {
                     continue;
                 }
-                let mut new_entry = r.create_table_entry();
+                let mut new_entry = r.create_table_entry_as(self.storage_type(r.variable_type));
                 new_entry.entry_type = EntryType::LocalVariable;
                 variable_table.push(new_entry);
             }
 
             if let FunctionDeclaration::Function(f) = &f.functions {
                 let return_type = f.get_return_type();
+                let storage_type = self.storage_type(return_type);
                 let header = VarHeader {
                     id,
                     dim: 0,
                     vector_size: 0,
                     matrix_size: 0,
                     cube_size: 0,
-                    variable_type: return_type,
+                    variable_type: storage_type,
                     flags: 0,
                 };
                 variable_table.push(TableEntry::new(
                     format!("{} result", f.get_identifier()),
                     header,
-                    return_type.create_empty_value(),
+                    storage_type.create_empty_value(),
                     EntryType::Variable,
                 ));
             }
@@ -1325,6 +1345,21 @@ impl AstVisitor<VariableType> for SemanticVisitor {
     fn visit_binary_expression(&mut self, binary: &crate::ast::BinaryExpression) -> VariableType {
         let left = binary.get_left_expression().visit(self);
         let right = binary.get_right_expression().visit(self);
+        let has_enum = self.type_registry.is_enum_type(left) || self.type_registry.is_enum_type(right);
+        if has_enum && !matches!(binary.get_op(), crate::ast::BinOp::Eq | crate::ast::BinOp::NotEq) {
+            self.errors.lock().unwrap().report_error(
+                binary.get_op_token().span.clone(),
+                CompilationErrorType::CustomTypeOperatorNotSupported(binary.get_op()),
+            );
+            return VariableType::None;
+        }
+        if has_enum && left != right {
+            self.errors.lock().unwrap().report_error(
+                binary.get_op_token().span.clone(),
+                CompilationErrorType::EnumComparisonTypeMismatch(self.source_type_name(left), self.source_type_name(right)),
+            );
+            return VariableType::Boolean;
+        }
         let has_custom_type = matches!(left, VariableType::UserData(_)) || matches!(right, VariableType::UserData(_));
         if has_custom_type && !matches!(binary.get_op(), crate::ast::BinOp::Eq | crate::ast::BinOp::NotEq) {
             self.errors.lock().unwrap().report_error(
@@ -1415,6 +1450,19 @@ impl AstVisitor<VariableType> for SemanticVisitor {
     }
 
     fn visit_member_reference_expression(&mut self, member_reference_expression: &crate::ast::MemberReferenceExpression) -> VariableType {
+        if let Expression::Identifier(base) = member_reference_expression.get_expression() {
+            if let Some(definition) = self.type_registry.get_enum(base.get_identifier()) {
+                if let Some(value) = definition.value(member_reference_expression.get_identifier()) {
+                    self.add_constant(&Constant::Integer(value, crate::ast::constant::NumberFormat::Default));
+                    return VariableType::UserData(definition.id);
+                }
+                self.errors.lock().unwrap().report_error(
+                    member_reference_expression.get_identifier_token().span.clone(),
+                    CompilationErrorType::EnumMemberNotFound(definition.name.to_string(), member_reference_expression.get_identifier().to_string()),
+                );
+                return VariableType::None;
+            }
+        }
         let t = member_reference_expression.get_expression().visit(self);
         if let VariableType::UserData(d) = t {
             if crate::parser::is_user_declared_type(d) {
@@ -1477,6 +1525,10 @@ impl AstVisitor<VariableType> for SemanticVisitor {
 
     fn visit_comment(&mut self, _comment: &CommentAstNode) -> VariableType {
         // nothing yet
+        VariableType::None
+    }
+
+    fn visit_enum_declaration(&mut self, _enum_decl: &EnumDeclarationAstNode) -> VariableType {
         VariableType::None
     }
 
@@ -1828,6 +1880,13 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             arg.visit(self);
         }
         let value_type = let_stmt.get_value_expression().visit(self);
+        if (self.type_registry.is_enum_type(target_type) || self.type_registry.is_enum_type(value_type)) && target_type != value_type {
+            self.errors.lock().unwrap().report_error(
+                let_stmt.get_eq_token().span.clone(),
+                CompilationErrorType::EnumAssignmentTypeMismatch(self.source_type_name(target_type), self.source_type_name(value_type)),
+            );
+            return VariableType::None;
+        }
         if target_type != value_type && (matches!(target_type, VariableType::UserData(_)) || matches!(value_type, VariableType::UserData(_))) {
             self.errors.lock().unwrap().report_error(
                 let_stmt.get_eq_token().span.clone(),

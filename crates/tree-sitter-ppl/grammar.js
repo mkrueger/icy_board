@@ -144,6 +144,7 @@ module.exports = grammar({
 
     _top_level_item: $ => choice(
       $.type_declaration,
+      $.enum_declaration,
       $.function_declaration,
       $.procedure_declaration,
       $.function_definition,
@@ -199,6 +200,19 @@ module.exports = grammar({
       field('name', $.identifier),
       repeat($.field_declaration),
       endKw('TYPE'),
+    ),
+
+    enum_declaration: $ => seq(
+      kw('ENUM'),
+      field('name', $.identifier),
+      repeat($.enum_variant),
+      endKw('ENUM'),
+    ),
+
+    enum_variant: $ => seq(
+      field('name', $.identifier),
+      optional(seq('=', field('value', $._expression))),
+      optional(','),
     ),
 
     field_declaration: $ => seq(

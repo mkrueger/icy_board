@@ -54,6 +54,23 @@ fn a_file_can_use_a_type_declared_in_a_later_file() {
 }
 
 #[test]
+fn a_file_can_use_an_enum_declared_in_a_later_file() {
+    let registry = UserTypeRegistry::default();
+    let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+    let workspace = Workspace::default();
+    let main = "Color favorite = Color.Green\n";
+    let types = "ENUM Color\n  Red\n  Green\nENDENUM\n";
+
+    preparse_type_declarations(PathBuf::from("main.pps"), errors.clone(), main, &registry, Encoding::Utf8, &workspace);
+    preparse_type_declarations(PathBuf::from("types.pps"), errors.clone(), types, &registry, Encoding::Utf8, &workspace);
+    let ast = parse_ast_with_predeclared_types(PathBuf::from("main.pps"), errors.clone(), main, &registry, Encoding::Utf8, &workspace);
+
+    assert!(!ast.nodes.is_empty());
+    let messages: Vec<String> = errors.lock().unwrap().errors.iter().map(|error| error.error.to_string()).collect();
+    assert!(messages.is_empty(), "{messages:?}");
+}
+
+#[test]
 fn the_type_pass_does_not_report_what_the_real_parse_reports_again() {
     let registry = UserTypeRegistry::default();
     let errors = Arc::new(Mutex::new(ErrorReporter::default()));

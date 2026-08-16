@@ -12,6 +12,8 @@
 (field_declaration name: (identifier) @local.definition.field)
 
 (type_declaration name: (identifier) @local.definition.type)
+(enum_declaration name: (identifier) @local.definition.type)
+(enum_variant name: (identifier) @local.definition.constant)
 (function_definition name: (identifier) @local.definition.function)
 (procedure_definition name: (identifier) @local.definition.function)
 (function_declaration name: (identifier) @local.definition.function)

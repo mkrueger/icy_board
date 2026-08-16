@@ -30,6 +30,30 @@ END TYPE
       name: (identifier))))
 
 ================================================================================
+ENUM declaration
+================================================================================
+
+ENUM Color
+    Red
+    Green = 5
+    Blue
+ENDENUM
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (enum_declaration
+    name: (identifier)
+    (enum_variant
+      name: (identifier))
+    (enum_variant
+      name: (identifier)
+      value: (constant
+        (number_literal)))
+    (enum_variant
+      name: (identifier))))
+
+================================================================================
 Record variables and fields
 ================================================================================
 

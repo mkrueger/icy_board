@@ -742,6 +742,82 @@ impl TypeDeclarationAstNode {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub struct EnumVariantSpecifier {
+    identifier_token: Spanned<Token>,
+    eq_token: Option<Spanned<Token>>,
+    value: i32,
+    explicit_value: Option<Expression>,
+}
+
+impl EnumVariantSpecifier {
+    pub fn new(identifier_token: Spanned<Token>, eq_token: Option<Spanned<Token>>, value: i32, explicit_value: Option<Expression>) -> Self {
+        Self {
+            identifier_token,
+            eq_token,
+            value,
+            explicit_value,
+        }
+    }
+
+    pub fn get_identifier_token(&self) -> &Spanned<Token> {
+        &self.identifier_token
+    }
+    pub fn get_identifier(&self) -> &unicase::Ascii<String> {
+        let Token::Identifier(id) = &self.identifier_token.token else {
+            panic!("Expected identifier token")
+        };
+        id
+    }
+    pub fn get_eq_token(&self) -> Option<&Spanned<Token>> {
+        self.eq_token.as_ref()
+    }
+    pub fn get_value(&self) -> i32 {
+        self.value
+    }
+    pub fn get_explicit_value(&self) -> Option<&Expression> {
+        self.explicit_value.as_ref()
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct EnumDeclarationAstNode {
+    enum_token: Spanned<Token>,
+    identifier_token: Spanned<Token>,
+    variants: Vec<EnumVariantSpecifier>,
+    endenum_token: Spanned<Token>,
+}
+
+impl EnumDeclarationAstNode {
+    pub fn new(enum_token: Spanned<Token>, identifier_token: Spanned<Token>, variants: Vec<EnumVariantSpecifier>, endenum_token: Spanned<Token>) -> Self {
+        Self {
+            enum_token,
+            identifier_token,
+            variants,
+            endenum_token,
+        }
+    }
+
+    pub fn get_enum_token(&self) -> &Spanned<Token> {
+        &self.enum_token
+    }
+    pub fn get_identifier_token(&self) -> &Spanned<Token> {
+        &self.identifier_token
+    }
+    pub fn get_identifier(&self) -> &unicase::Ascii<String> {
+        let Token::Identifier(id) = &self.identifier_token.token else {
+            panic!("Expected identifier token")
+        };
+        id
+    }
+    pub fn get_variants(&self) -> &[EnumVariantSpecifier] {
+        &self.variants
+    }
+    pub fn get_endenum_token(&self) -> &Spanned<Token> {
+        &self.endenum_token
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub struct FunctionParameterSpecifier {
     function_token: Spanned<Token>,
     identifier_token: Spanned<Token>,

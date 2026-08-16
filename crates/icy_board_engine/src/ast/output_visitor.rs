@@ -623,6 +623,26 @@ impl AstVisitor<()> for OutputVisitor {
         self.output_keyword("EndType");
     }
 
+    fn visit_enum_declaration(&mut self, enum_decl: &super::EnumDeclarationAstNode) {
+        self.output_keyword("Enum");
+        self.output.push(' ');
+        self.output(enum_decl.get_identifier());
+        self.eol();
+        self.indent += 1;
+        for variant in enum_decl.get_variants() {
+            self.indent();
+            self.output(variant.get_identifier());
+            if let Some(value) = variant.get_explicit_value() {
+                self.output.push_str(" = ");
+                value.visit(self);
+            }
+            self.eol();
+        }
+        self.indent -= 1;
+        self.indent();
+        self.output_keyword("EndEnum");
+    }
+
     fn visit_procedure_declaration(&mut self, proc_decl: &super::ProcedureDeclarationAstNode) {
         self.output_keyword("Declare Procedure ");
         self.output_function(proc_decl.get_identifier());
