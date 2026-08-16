@@ -45,6 +45,10 @@ struct Cli {
     #[argh(switch)]
     nowarnings: bool,
 
+    /// print the version and exit
+    #[argh(switch)]
+    version: bool,
+
     /// write plain text, without the ansi escapes that colour the output
     #[argh(switch)]
     mono: bool,
@@ -157,6 +161,10 @@ fn print_diff_line(line: usize, sign: char, text: impl std::fmt::Display, color:
 fn main() {
     let arguments: Cli = argh::from_env();
     let _ = COLOR.set(decide_color(&arguments));
+    if arguments.version {
+        println!("pplc {}", *VERSION);
+        return;
+    }
     if arguments.print_config && arguments.print_config_json {
         eprintln!("--print-config and --print-config-json cannot be used together");
         std::process::exit(2);

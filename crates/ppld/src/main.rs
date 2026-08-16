@@ -60,9 +60,13 @@ struct Cli {
     #[argh(option)]
     lang_version: Option<u16>,
 
+    /// print the version and exit
+    #[argh(switch)]
+    version: bool,
+
     /// file[.ppe] to decompile
     #[argh(positional)]
-    file: String,
+    file: Option<String>,
 }
 
 lazy_static::lazy_static! {
@@ -71,7 +75,11 @@ lazy_static::lazy_static! {
 
 fn main() {
     let arguments: Cli = argh::from_env();
-    println!("PPLD v{} - PCBoard Programming Language v", *VERSION);
+    if arguments.version {
+        println!("ppld {}", *VERSION);
+        return;
+    }
+    println!("PPLD v{} - PCBoard Programming Language Decompiler", *VERSION);
     if let Some(version) = arguments.lang_version {
         if !SUPPORTED_PPL_LANGUAGE_VERSIONS.contains(&version) {
             eprintln!("Invalid language version valid values {SUPPORTED_PPL_LANGUAGE_VERSIONS:?}");
@@ -98,7 +106,12 @@ fn main() {
         None => {}
     }
 
-    let mut file_name = arguments.file;
+    let Some(mut file_name) = arguments.file else {
+        if let Err(err) = Cli::from_args(&["ppld"], &["--help"]) {
+            eprintln!("{}", err.output);
+        }
+        std::process::exit(1);
+    };
 
     let extension = Path::new(&file_name).extension().and_then(OsStr::to_str);
     if extension.is_none() {

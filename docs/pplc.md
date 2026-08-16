@@ -4,7 +4,7 @@ PPLC works basically like the old one - specify file name and you're all set.
 But it has way more to offer now:
 
 ```
-Usage: pplc [-d] [--nowarnings] [--mono] [--runtime <runtime>] [--lang-version <lang-version>] [--cp437] [--init] [--defines <defines>] [--format] [--stdout] [--check] [--print-config] [--print-config-json] [--] [<file>]
+Usage: pplc [-d] [--nowarnings] [--version] [--mono] [--runtime <runtime>] [--lang-version <lang-version>] [--cp437] [--init] [--defines <defines>] [--format] [--stdout] [--check] [--print-config] [--print-config-json] [--] [<file>]
 
 PCBoard Programming Language Compiler
 
@@ -15,6 +15,7 @@ Positional Arguments:
 Options:
   -d, --disassemble output the disassembly instead of compiling
   --nowarnings      don't report any warnings
+  --version         print the version and exit
   --mono            write plain text, without the ansi escapes that colour the
                     output
   --runtime         version number for the compiled PPE, valid: 100, 200, 300,
