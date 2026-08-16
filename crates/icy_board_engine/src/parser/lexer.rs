@@ -562,6 +562,11 @@ lazy_static::lazy_static! {
         m.insert(unicase::Ascii::new("loop".to_string()), Token::Loop);
         m.insert(unicase::Ascii::new("endloop".to_string()), Token::EndLoop);
 
+        // Both are gone before anything is emitted, so they cost an old runtime nothing.
+        m.insert(unicase::Ascii::new("const".to_string()), Token::ConstDecl);
+        m.insert(unicase::Ascii::new("enum".to_string()), Token::Enum);
+        m.insert(unicase::Ascii::new("endenum".to_string()), Token::EndEnum);
+
         for c in &BUILTIN_CONSTS {
             m.insert(unicase::Ascii::new(c.name.to_string()), Token::Const(Constant::Builtin(c)));
         }
@@ -573,10 +578,7 @@ lazy_static::lazy_static! {
         let mut m = TOKEN_LOOKUP_TABLE_350.clone();
         m.insert(unicase::Ascii::new("type".to_string()), Token::Type);
         m.insert(unicase::Ascii::new("endtype".to_string()), Token::EndType);
-        m.insert(unicase::Ascii::new("enum".to_string()), Token::Enum);
-        m.insert(unicase::Ascii::new("endenum".to_string()), Token::EndEnum);
         m.insert(unicase::Ascii::new("begin".to_string()), Token::Begin);
-        m.insert(unicase::Ascii::new("const".to_string()), Token::ConstDecl);
         m
     };
 
@@ -1039,7 +1041,8 @@ impl Lexer {
                 } else {
                     self.put_back();
 
-                    if self.lang_version >= 400 {
+                    // An enum member is written with it, so it is needed from 350 on.
+                    if self.lang_version >= 350 {
                         return Some(Token::Dot);
                     }
 
@@ -1972,7 +1975,7 @@ impl Lexer {
                     Some(Token::DotDot)
                 } else {
                     self.put_back();
-                    if self.lang_version >= 400 {
+                    if self.lang_version >= 350 {
                         return Some(Token::Dot);
                     }
                     self.errors

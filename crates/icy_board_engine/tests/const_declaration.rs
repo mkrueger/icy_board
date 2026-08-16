@@ -118,14 +118,23 @@ fn variables_parameters_and_constants_still_share_a_local_scope() {
     assert_eq!(vec!["Variable name already used (Limit)".to_string()], errors);
 }
 
-/// CONST is a 4.00 word, so a 3.50 source may still have a variable called const.
+/// CONST is a 3.50 word, so a 3.40 source may still have a variable called const.
 #[test]
-fn const_is_a_keyword_from_400_on() {
-    let errors = diagnostics(";$LANGVERSION 350\nINTEGER Const\nConst = 2\nPRINTLN Const\n");
+fn const_is_a_keyword_from_350_on() {
+    let errors = diagnostics(";$LANGVERSION 340\nINTEGER Const\nConst = 2\nPRINTLN Const\n");
     assert!(errors.is_empty(), "{errors:?}");
 
-    let errors = diagnostics(";$LANGVERSION 400\nINTEGER Const\n");
-    assert!(!errors.is_empty(), "const should not be a variable name in 400");
+    let errors = diagnostics(";$LANGVERSION 350\nINTEGER Const\n");
+    assert!(!errors.is_empty(), "const should not be a variable name in 350");
+}
+
+/// Nothing of a constant reaches the runtime, so a 3.50 source may have one.
+#[test]
+fn a_constant_works_in_a_350_source() {
+    let with_constant = compile(";$LANGVERSION 350\nCONST INTEGER MaxTries = 3\nPRINTLN MaxTries\n").unwrap();
+    let with_literal = compile(";$LANGVERSION 350\nPRINTLN 3\n").unwrap();
+
+    assert_eq!(with_literal.to_buffer().unwrap(), with_constant.to_buffer().unwrap());
 }
 
 /// A constant may name an enum member and keeps the enum as its type.

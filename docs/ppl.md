@@ -334,6 +334,23 @@ routine. Outside such an argument position a bare routine name is still an error
 Routine references need runtime 401 because 4.01 adds the bytecode marker that
 distinguishes a routine value from a call to that routine.
 
+#### CONST and ENUM
+
+`CONST` names a value the compiler works out and `ENUM` groups related integer
+values under a type and a namespace. Both are gone before anything is emitted -
+the name is replaced by its value, an enum is stored as `INTEGER` - so the PPE is
+the one the value written out by hand would produce, whatever runtime it targets.
+See the language reference for the full rules.
+
+#### What 350 breaks
+
+* `QUIT` and `LOOP` are no longer aliases for `BREAK` and `CONTINUE`.
+* `.` is a token, so it can no longer appear in an identifier.
+* `CONST` is a keyword, so a 3.40 source may still have a variable called
+  `const` while a 3.50 source may not.
+* `ENUM` and `ENDENUM` are keywords, so a 3.40 source may still use those names
+  as identifiers.
+
 ### Language version 400
 
 400 is where the language stops being bound by what PCBoard 15.4 could express.
@@ -355,11 +372,11 @@ needed by custom types while keeping 4.00 files readable.
 Indexing with `( )` is still accepted for compatibility, but new code should
 index with `[ ]`.
 
-#### The dot operator and board objects
+#### Board objects
 
-400 introduces the `.` operator and, with it, objects that describe the board
-itself. The point is that a PPE no longer has to parse the board's config files
-to find out what is on it.
+400 puts the `.` operator, which 350 already uses for enum members, to a second
+use: objects that describe the board itself. The point is that a PPE no longer
+has to parse the board's config files to find out what is on it.
 
 ```PPL
 CONFERENCE conf = CONFINFO(CURCONF())
@@ -628,13 +645,9 @@ back at the column its `BEGIN` starts on.
 #### What 400 breaks
 
 * Runtime 400 and 401 PPEs do not load on an original PCBoard.
-* `.` is a token, so it can no longer appear in an identifier.
 * `[` and `]` are index operators.
 * `BEGIN` is a keyword, so a 3.50 source may still have a variable called
   `begin` while a 4.00 source may not.
-* `CONST` is a keyword, so a 3.50 source may still have a variable called `const`.
-* `ENUM` and `ENDENUM` are keywords, so a 3.50 source may still use those names
-  as identifiers.
 * `END` is a block terminator rather than a statement; `EXIT` ends a program and
   `STOP` aborts one.
 * `EXIT` is a statement name from 4.00 on, so a 3.50 source may still have a

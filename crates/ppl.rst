@@ -87,6 +87,7 @@ Evolution by Language Version
   - Inline :PPL:`RETURN expr` (instead of assigning to function name)
   - Optional braces disambiguation improvements
   - Variable initializers: :PPL:`TYPE VAR = expr` or array initializer :PPL:`TYPE VAR = { a, b, c }`
+  - Compile-time names: :PPL:`CONST` and :PPL:`ENUM ... ENDENUM`, both erased before the PPE is written
 
 * **400** (In progress – **experimental / subject to change**):
 

@@ -171,10 +171,22 @@ fn an_enum_is_named_in_argument_and_field_errors() {
 }
 
 #[test]
-fn enum_is_a_keyword_from_400_on() {
-    let errors = diagnostics(";$LANGVERSION 350\nINTEGER Enum\nEnum = 2\nPRINTLN Enum\n");
+fn enum_is_a_keyword_from_350_on() {
+    let errors = diagnostics(";$LANGVERSION 340\nINTEGER Enum\nEnum = 2\nPRINTLN Enum\n");
     assert!(errors.is_empty(), "{errors:?}");
 
-    let errors = diagnostics(";$LANGVERSION 400\nINTEGER Enum\n");
-    assert!(!errors.is_empty(), "ENUM should not be a variable name in 400");
+    let errors = diagnostics(";$LANGVERSION 350\nINTEGER Enum\n");
+    assert!(!errors.is_empty(), "ENUM should not be a variable name in 350");
+}
+
+/// The members are gone before anything is emitted, so a 3.50 source may have an enum.
+#[test]
+fn an_enum_works_in_a_350_source() {
+    let enum_source = format!(";$LANGVERSION 350\n{COLOR}Color favorite = Color.Green\nPRINTLN favorite\n");
+    let integer_source = ";$LANGVERSION 350\nINTEGER favorite = 5\nPRINTLN favorite\n";
+
+    assert_eq!(
+        compile(integer_source).unwrap().to_buffer().unwrap(),
+        compile(&enum_source).unwrap().to_buffer().unwrap()
+    );
 }

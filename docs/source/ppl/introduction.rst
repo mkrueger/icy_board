@@ -39,9 +39,9 @@ A PPE has a *runtime* version, which is the format written to disk:
 
 The *language* version says which syntax and which built-ins the compiler
 accepts, and is set on its own: 100 through 340 as PCBoard had them, 350 for the
-quality of life additions and 400 for records and the board objects. It defaults
-to the runtime version up to 400, so the default pair is runtime 401 and language
-400. See :doc:`language` for what each version added.
+quality of life additions, constants and enums, and 400 for records and the board
+objects. It defaults to the runtime version up to 400, so the default pair is
+runtime 401 and language 400. See :doc:`language` for what each version added.
 
 Command Line Usage
 ~~~~~~~~~~~~~~~~~~

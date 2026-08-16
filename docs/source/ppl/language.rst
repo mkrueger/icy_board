@@ -181,12 +181,6 @@ an error.
    Routine references need runtime 401, because 4.01 adds the bytecode marker
    that tells a routine value from a call to that routine.
 
-Language version 4.00
----------------------
-
-400 is where the language stops being bound by what PCBoard 15.4 could express.
-A PPE built at runtime 400 or 401 will not load on an original PCBoard.
-
 CONST
 ~~~~~
 
@@ -212,7 +206,7 @@ parameter - there is no variable to write back to.
 Writing to a constant is an error. A constant, parameter and variable may not
 share a name in the same scope. A local declaration may use the name of a global
 constant or variable; inside the routine the local declaration wins. ``CONST``
-is a keyword from 400 on, so a 3.50 source may still have a variable called
+is a keyword from 350 on, so a 3.40 source may still have a variable called
 ``const``.
 
 ``;$DEFINE`` looks similar but is a different thing: it substitutes text before
@@ -250,6 +244,22 @@ decompiler therefore recovers an ``INTEGER`` and a number, not the enum name or
 member. Enums are not bitflags; use typed ``CONST`` values when named masks are
 needed.
 
+What 3.50 breaks
+~~~~~~~~~~~~~~~~
+
+* ``QUIT`` and ``LOOP`` are no longer aliases for ``BREAK`` and ``CONTINUE``.
+* ``.`` is a token, so it can no longer appear in an identifier.
+* ``CONST`` is a keyword, so a 3.40 source may still have a variable called
+  ``const`` while a 3.50 source may not.
+* ``ENUM`` and ``ENDENUM`` are keywords, so a 3.40 source may still use those
+  names as identifiers.
+
+Language version 4.00
+---------------------
+
+400 is where the language stops being bound by what PCBoard 15.4 could express.
+A PPE built at runtime 400 or 401 will not load on an original PCBoard.
+
 Parentheses, brackets and braces
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -266,12 +276,12 @@ Written    Used for
 Indexing with ``( )`` is still accepted for compatibility, but new code should
 index with ``[ ]``.
 
-The dot operator and board objects
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Board objects
+~~~~~~~~~~~~~
 
-400 introduces the ``.`` operator and, with it, objects that describe the board
-itself. The point is that a PPE no longer has to parse the board's config files
-to find out what is on it.
+400 puts the ``.`` operator, which 350 already uses for enum members, to a second
+use: objects that describe the board itself. The point is that a PPE no longer
+has to parse the board's config files to find out what is on it.
 
 .. code-block:: PPL
 
@@ -486,7 +496,6 @@ What 4.00 breaks
 ~~~~~~~~~~~~~~~~
 
 * Runtime 400 and 401 PPEs do not load on an original PCBoard.
-* ``.`` is a token, so it can no longer appear in an identifier.
 * ``[`` and ``]`` are index operators.
 * ``BEGIN`` is a keyword, so a 3.50 source may still have a variable called
   ``begin`` while a 4.00 source may not.
@@ -494,9 +503,5 @@ What 4.00 breaks
   program and :PPL:`STOP` aborts one.
 * ``EXIT`` is a statement name from 4.00 on, so a 3.50 source may still have a
   variable called ``exit``.
-* ``CONST`` is a keyword, so a 3.50 source may still have a variable called
-  ``const``.
-* ``ENUM`` and ``ENDENUM`` are keywords, so a 3.50 source may still use those
-    names as identifiers.
 * A decompiled PPE names its records ``TYPE001`` and their fields ``FIELD001``,
   because the file carries no names to recover.

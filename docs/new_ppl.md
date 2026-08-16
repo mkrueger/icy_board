@@ -99,7 +99,7 @@ For multidimensional arrays, `dim` is zero-based.
 
 `dim`      The dimension to get the length of
 
-## `CONST` Declaration (4.00)
+## `CONST` Declaration (3.50)
 
 ### Function
 Gives a name to a value the compiler works out.
@@ -128,9 +128,9 @@ is no variable to write back to.
 
 `;$DEFINE` is the other way to name a value: it substitutes text before the
 language is read, carries no type and works at any version. `CONST` is typed and
-belongs to 4.00.
+belongs to 3.50.
 
-## `ENUM ... ENDENUM` Declaration (4.00)
+## `ENUM ... ENDENUM` Declaration (3.50)
 
 ### Function
 Defines a compile-time integer type and its named values.
