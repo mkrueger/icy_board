@@ -60,8 +60,16 @@ impl Server {
     /// Starts a server that has finished the handshake, and answers with what it
     /// said it can do.
     pub fn ready() -> (Self, Value) {
+        Self::ready_with_root(None)
+    }
+
+    pub fn ready_at(root_uri: &str) -> (Self, Value) {
+        Self::ready_with_root(Some(root_uri))
+    }
+
+    fn ready_with_root(root_uri: Option<&str>) -> (Self, Value) {
         let mut server = Self::start();
-        let capabilities = server.request("initialize", json!({"processId": null, "rootUri": null, "capabilities": {}}))["capabilities"].clone();
+        let capabilities = server.request("initialize", json!({"processId": null, "rootUri": root_uri, "capabilities": {}}))["capabilities"].clone();
         server.send(json!({"jsonrpc": "2.0", "method": "initialized", "params": {}}));
         (server, capabilities)
     }

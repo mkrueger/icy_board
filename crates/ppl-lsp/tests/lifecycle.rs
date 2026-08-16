@@ -18,6 +18,7 @@ fn the_server_offers_what_it_implements() {
         "renameProvider",
         "documentSymbolProvider",
         "documentHighlightProvider",
+        "codeActionProvider",
         "documentFormattingProvider",
         "documentRangeFormattingProvider",
         "semanticTokensProvider",
