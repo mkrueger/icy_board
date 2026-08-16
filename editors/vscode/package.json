@@ -26,9 +26,7 @@
 			"supported": "limited",
 			"description": "The extension starts the language server, and Run PPE starts a compiler and a board, so a workspace it does not trust may not say which programs those are.",
 			"restrictedConfigurations": [
-				"icyboardPpl.serverPath",
-				"icyboardPpl.compilerPath",
-				"icyboardPpl.boardPath",
+				"icyboardPpl.binPath",
 				"icyboardPpl.boardConfig",
 				"icyboardPpl.runArguments"
 			]
@@ -51,11 +49,11 @@
 			"type": "object",
 			"title": "IcyBoard PPL",
 			"properties": {
-				"icyboardPpl.serverPath": {
+				"icyboardPpl.binPath": {
 					"type": "string",
 					"scope": "machine-overridable",
 					"default": "",
-					"markdownDescription": "Path to the `icyboard-ppl` binary. Leave empty to use the one that ships with the extension, or the one on your PATH."
+					"markdownDescription": "The directory holding the IcyBoard programs - `icyboard-ppl`, `pplc` and `icboard`. Leave empty for the server that ships with the extension and the rest from your PATH."
 				},
 				"icyboard-ppl.trace.server": {
 					"type": "string",
@@ -72,18 +70,6 @@
 					],
 					"default": "off",
 					"description": "Traces the communication between VS Code and the language server."
-				},
-				"icyboardPpl.compilerPath": {
-					"type": "string",
-					"scope": "machine-overridable",
-					"default": "",
-					"markdownDescription": "Path to the `pplc` binary used by *Run PPE*. Leave empty to use the one on your PATH."
-				},
-				"icyboardPpl.boardPath": {
-					"type": "string",
-					"scope": "machine-overridable",
-					"default": "",
-					"markdownDescription": "Path to the `icboard` binary that runs a PPE. Leave empty to use the one on your PATH."
 				},
 				"icyboardPpl.boardConfig": {
 					"type": "string",

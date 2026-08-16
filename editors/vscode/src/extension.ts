@@ -4,14 +4,15 @@ import * as fs from "fs";
 import { Executable, LanguageClient, LanguageClientOptions, ServerOptions } from "vscode-languageclient/node";
 
 import { runPpe } from "./run";
+import { binary } from "./binaries";
 
 let client: LanguageClient | undefined;
 
 /// The server is looked for where the user said, then in the environment, then
 /// in the extension itself, then on the PATH.
 function serverCommand(context: vscode.ExtensionContext): string {
-  const configured = vscode.workspace.getConfiguration("icyboardPpl").get<string>("serverPath")?.trim();
-  if (configured) {
+  const configured = binary("icyboard-ppl");
+  if (configured !== "icyboard-ppl") {
     return configured;
   }
   if (process.env.SERVER_PATH) {
@@ -56,18 +57,18 @@ export async function activate(context: vscode.ExtensionContext) {
     output.appendLine(`${error}`);
     const openSettings = "Open settings";
     const answer = await vscode.window.showErrorMessage(
-      `IcyBoard PPL: could not start '${command}'. Install a build for your platform, or set icyboardPpl.serverPath to a server you built yourself.`,
+      `IcyBoard PPL: could not start '${command}'. Install a build for your platform, or point icyboardPpl.binPath at the directory holding the IcyBoard programs.`,
       openSettings,
     );
     if (answer === openSettings) {
-      await vscode.commands.executeCommand("workbench.action.openSettings", "icyboardPpl.serverPath");
+      await vscode.commands.executeCommand("workbench.action.openSettings", "icyboardPpl.binPath");
     }
     return;
   }
 
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration(async (event) => {
-      if (!event.affectsConfiguration("icyboardPpl.serverPath")) {
+      if (!event.affectsConfiguration("icyboardPpl.binPath")) {
         return;
       }
       const reload = "Reload window";

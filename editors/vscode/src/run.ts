@@ -2,10 +2,7 @@ import * as vscode from "vscode";
 import { execFile } from "child_process";
 import * as path from "path";
 
-function setting(name: string, fallback: string): string {
-  const value = vscode.workspace.getConfiguration("icyboardPpl").get<string>(name)?.trim();
-  return value ? value : fallback;
-}
+import { binary, locate, reportMissing } from "./binaries";
 
 /// What the board is called with, with the places a path goes filled in.
 function runArguments(replacements: Record<string, string>): string[] {
@@ -48,8 +45,20 @@ export async function runPpe(output: vscode.OutputChannel): Promise<void> {
     return;
   }
 
+  const compiler = binary("pplc");
+  const board = binary("icboard");
+  // Both are looked for before anything runs, so a missing one is a dialog
+  // rather than a shell error nobody reads.
+  if (!locate(compiler)) {
+    await reportMissing(compiler, "the IcyBoard programs");
+    return;
+  }
+  if (!locate(board)) {
+    await reportMissing(board, "the IcyBoard programs");
+    return;
+  }
+
   const source = document.fileName;
-  const compiler = setting("compilerPath", "pplc");
   try {
     const built = await compile(compiler, source);
     if (built) {
@@ -57,18 +66,23 @@ export async function runPpe(output: vscode.OutputChannel): Promise<void> {
     }
   } catch (error) {
     output.appendLine(`${error}`);
-    output.show(true);
-    vscode.window.showErrorMessage(`IcyBoard PPL: '${compiler}' did not build ${path.basename(source)}.`);
+    const showOutput = "Show output";
+    const answer = await vscode.window.showErrorMessage(
+      `IcyBoard PPL: ${path.basename(source)} did not build.`,
+      showOutput,
+    );
+    if (answer === showOutput) {
+      output.show(true);
+    }
     return;
   }
 
   const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri)?.uri;
-  const executable = source.replace(/\.pps$/i, ".ppe");
-  const config = setting("boardConfig", "");
+  const config = vscode.workspace.getConfiguration("icyboardPpl").get<string>("boardConfig")?.trim();
   const parts = [
-    setting("boardPath", "icboard"),
+    board,
     ...runArguments({
-      ppe: executable,
+      ppe: source.replace(/\.pps$/i, ".ppe"),
       source,
       workspaceFolder: workspaceFolder?.fsPath ?? path.dirname(source),
     }),
