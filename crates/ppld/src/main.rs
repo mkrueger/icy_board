@@ -102,7 +102,10 @@ fn main() {
         Some('u') => output_func = OutputFunc::Upper,
         Some('l') => output_func = OutputFunc::Lower,
         Some('c') => output_func = OutputFunc::CamelCase,
-        Some(x) => panic!("unsupported keyword style {}", x),
+        Some(x) => {
+            eprintln!("Invalid keyword style '{x}', valid values are u=upper, l=lower, c=camel");
+            std::process::exit(2);
+        }
         None => {}
     }
 
