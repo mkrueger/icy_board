@@ -205,7 +205,7 @@ pub fn test_ppe_output<P: Fn(&mut IcyBoard)>(source: &str, init_fn: P) -> String
     std::fs::write(&ppe_file, compiler.create_executable().unwrap().to_buffer().unwrap()).unwrap();
 
     test_session_output(
-        "\r".to_string(),
+        String::new(),
         init_fn,
         false,
         Some(PPEExecute {
@@ -256,6 +256,8 @@ fn test_session_output<P: Fn(&mut IcyBoard)>(cmd: String, init_fn: P, login_syso
             }
         }
 
+        let direct_ppe = ppe.is_some();
+        let completion = icy_board_tui::get_text("run_ppe_completed").into_bytes();
         let node: usize = bbs.lock().await.create_new_node(ConnectionType::Channel).await;
         let node_state: Arc<tokio::sync::Mutex<Vec<Option<icy_board_engine::icy_board::state::NodeState>>>> = bbs.lock().await.open_connections.clone();
         let (mut ui_connection, connection) = ChannelConnection::create_pair();
@@ -268,6 +270,7 @@ fn test_session_output<P: Fn(&mut IcyBoard)>(cmd: String, init_fn: P, login_syso
         let _ = std::thread::Builder::new().name("Terminal update".to_string()).spawn(move || {
             tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
                 let mut buffer = [0; 1024];
+                let mut exit_sent = false;
                 loop {
                     let Ok(size) = ui_connection.read(&mut buffer).await else {
                         break;
@@ -275,7 +278,15 @@ fn test_session_output<P: Fn(&mut IcyBoard)>(cmd: String, init_fn: P, login_syso
                     if size == 0 {
                         break;
                     }
-                    res.lock().await.extend(&buffer[0..size]);
+                    let should_exit = {
+                        let mut output = res.lock().await;
+                        output.extend(&buffer[0..size]);
+                        direct_ppe && !exit_sent && output.windows(completion.len()).any(|window| window == completion)
+                    };
+                    if should_exit {
+                        exit_sent = true;
+                        ui_connection.send(b"x").await.unwrap();
+                    }
                 }
             });
         });

@@ -241,7 +241,7 @@ pub async fn internal_handle_client(mut state: IcyBoardState, login_options: Opt
             cmd.state.new_line().await?;
             if local {
                 cmd.state.println(TerminalTarget::Both, &icy_board_tui::get_text("run_ppe_completed")).await?;
-                let _ = cmd.state.get_char(TerminalTarget::Both).await?;
+                while cmd.state.get_char(TerminalTarget::Both).await?.is_none() {}
             }
             return Ok(());
         }
