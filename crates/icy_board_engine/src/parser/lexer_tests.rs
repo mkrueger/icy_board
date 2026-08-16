@@ -8,10 +8,10 @@ use toml::Spanned;
 use crate::{
     ast::{Constant, constant::NumberFormat},
     compiler::workspace::{CompilerData, Workspace},
-    executable::{LAST_PPE_RUNTIME, LAST_PPL_LANGUAGE_VERSION},
+    executable::{LAST_PPE_RUNTIME, LAST_PPL_LANGUAGE_VERSION, SUPPORTED_PPL_LANGUAGE_VERSIONS},
     parser::{
         Encoding, ErrorReporter,
-        lexer::{CommentType, Lexer, Token},
+        lexer::{CommentType, KEYWORDS, Lexer, Token},
     },
 };
 
@@ -855,6 +855,31 @@ fn first_code_token(src: &str, ver: u16) -> Token {
         }
     }
     panic!("no code in {src:?}");
+}
+
+/// Every reserved word answers as its keyword from the version that reserved it on,
+/// and as a name in the version below.
+#[test]
+fn a_keyword_is_reserved_from_its_version_on() {
+    for keyword in KEYWORDS {
+        assert_eq!(
+            keyword.token,
+            first_code_token(keyword.name, keyword.since),
+            "'{}' should be a keyword in {}",
+            keyword.name,
+            keyword.since
+        );
+
+        let Some(before) = SUPPORTED_PPL_LANGUAGE_VERSIONS.iter().copied().filter(|version| *version < keyword.since).max() else {
+            continue;
+        };
+        assert_eq!(
+            Token::Identifier(unicase::Ascii::new(keyword.name.to_string())),
+            first_code_token(keyword.name, before),
+            "'{}' should still be a name in {before}",
+            keyword.name
+        );
+    }
 }
 
 #[test]

@@ -436,152 +436,90 @@ pub struct Lexer {
     include_lexer: Option<Box<Lexer>>,
 }
 
+/// A word the language reserves, and the version that reserved it.
+///
+/// A source below that version may still use the name for a variable, so this is
+/// what decides whether a word is a keyword or an identifier.
+pub struct Keyword {
+    pub name: &'static str,
+    pub token: Token,
+    pub since: u16,
+}
+
+/// Every reserved word of the language. The single place that says since when.
+#[rustfmt::skip]
+pub const KEYWORDS: &[Keyword] = &[
+    Keyword { name: "if",        token: Token::If,        since: 100 },
+    Keyword { name: "let",       token: Token::Let,       since: 100 },
+    Keyword { name: "while",     token: Token::While,     since: 100 },
+    Keyword { name: "endwhile",  token: Token::EndWhile,  since: 100 },
+    Keyword { name: "else",      token: Token::Else,      since: 100 },
+    Keyword { name: "elseif",    token: Token::ElseIf,    since: 100 },
+    Keyword { name: "endif",     token: Token::EndIf,     since: 100 },
+    Keyword { name: "for",       token: Token::For,       since: 100 },
+    Keyword { name: "next",      token: Token::Next,      since: 100 },
+    Keyword { name: "endfor",    token: Token::Next,      since: 100 },
+    Keyword { name: "break",     token: Token::Break,     since: 100 },
+    Keyword { name: "continue",  token: Token::Continue,  since: 100 },
+    Keyword { name: "return",    token: Token::Return,    since: 100 },
+    Keyword { name: "gosub",     token: Token::Gosub,     since: 100 },
+    Keyword { name: "goto",      token: Token::Goto,      since: 100 },
+
+    Keyword { name: "select",    token: Token::Select,    since: 200 },
+    Keyword { name: "case",      token: Token::Case,      since: 200 },
+    Keyword { name: "default",   token: Token::Default,   since: 200 },
+    Keyword { name: "endselect", token: Token::EndSelect, since: 200 },
+
+    Keyword { name: "declare",   token: Token::Declare,   since: 300 },
+    Keyword { name: "function",  token: Token::Function,  since: 300 },
+    Keyword { name: "procedure", token: Token::Procedure, since: 300 },
+    Keyword { name: "endproc",   token: Token::EndProc,   since: 300 },
+    Keyword { name: "endfunc",   token: Token::EndFunc,   since: 300 },
+
+    Keyword { name: "repeat",    token: Token::Repeat,    since: 350 },
+    Keyword { name: "until",     token: Token::Until,     since: 350 },
+    Keyword { name: "loop",      token: Token::Loop,      since: 350 },
+    Keyword { name: "endloop",   token: Token::EndLoop,   since: 350 },
+    // CONST and ENUM are gone before anything is emitted, so they cost an old runtime nothing.
+    Keyword { name: "const",     token: Token::ConstDecl, since: 350 },
+    Keyword { name: "enum",      token: Token::Enum,      since: 350 },
+    Keyword { name: "endenum",   token: Token::EndEnum,   since: 350 },
+
+    Keyword { name: "type",      token: Token::Type,      since: 400 },
+    Keyword { name: "endtype",   token: Token::EndType,   since: 400 },
+    Keyword { name: "begin",     token: Token::Begin,     since: 400 },
+];
+
 lazy_static::lazy_static! {
-    static ref TOKEN_LOOKUP_TABLE_100: HashMap<unicase::Ascii<String>, Token> = {
-        let mut m = HashMap::new();
-        m.insert(unicase::Ascii::new("if".to_string()), Token::If);
-        m.insert(unicase::Ascii::new("let".to_string()), Token::Let);
-        m.insert(unicase::Ascii::new("while".to_string()), Token::While);
-        m.insert(unicase::Ascii::new("endwhile".to_string()), Token::EndWhile);
-        m.insert(unicase::Ascii::new("else".to_string()), Token::Else);
-        m.insert(unicase::Ascii::new("elseif".to_string()), Token::ElseIf);
-        m.insert(unicase::Ascii::new("endif".to_string()), Token::EndIf);
-        m.insert(unicase::Ascii::new("for".to_string()), Token::For);
-        m.insert(unicase::Ascii::new("next".to_string()), Token::Next);
-        m.insert(unicase::Ascii::new("endfor".to_string()), Token::Next);
+    /// One table per version that reserves a word, in ascending order.
+    static ref TOKEN_LOOKUP_TABLES: Vec<(u16, HashMap<unicase::Ascii<String>, Token>)> = {
+        let mut versions: Vec<u16> = KEYWORDS.iter().map(|keyword| keyword.since).collect();
+        versions.sort_unstable();
+        versions.dedup();
 
-        m.insert(unicase::Ascii::new("break".to_string()), Token::Break);
-        m.insert(unicase::Ascii::new("continue".to_string()), Token::Continue);
-        m.insert(unicase::Ascii::new("return".to_string()), Token::Return);
+        versions
+            .into_iter()
+            .map(|version| {
+                let mut m: HashMap<unicase::Ascii<String>, Token> = KEYWORDS
+                    .iter()
+                    .filter(|keyword| keyword.since <= version)
+                    .map(|keyword| (unicase::Ascii::new(keyword.name.to_string()), keyword.token.clone()))
+                    .collect();
 
-        m.insert(unicase::Ascii::new("gosub".to_string()), Token::Gosub);
-        m.insert(unicase::Ascii::new("goto".to_string()), Token::Goto);
-
-        for c in &BUILTIN_CONSTS {
-            m.insert(unicase::Ascii::new(c.name.to_string()), Token::Const(Constant::Builtin(c)));
-        }
-        m
+                for c in &BUILTIN_CONSTS {
+                    m.insert(unicase::Ascii::new(c.name.to_string()), Token::Const(Constant::Builtin(c)));
+                }
+                (version, m)
+            })
+            .collect()
     };
+}
 
-    static ref TOKEN_LOOKUP_TABLE_200: HashMap<unicase::Ascii<String>, Token> = {
-        let mut m = HashMap::new();
-        m.insert(unicase::Ascii::new("if".to_string()), Token::If);
-        m.insert(unicase::Ascii::new("let".to_string()), Token::Let);
-        m.insert(unicase::Ascii::new("while".to_string()), Token::While);
-        m.insert(unicase::Ascii::new("endwhile".to_string()), Token::EndWhile);
-        m.insert(unicase::Ascii::new("else".to_string()), Token::Else);
-        m.insert(unicase::Ascii::new("elseif".to_string()), Token::ElseIf);
-        m.insert(unicase::Ascii::new("endif".to_string()), Token::EndIf);
-        m.insert(unicase::Ascii::new("for".to_string()), Token::For);
-        m.insert(unicase::Ascii::new("next".to_string()), Token::Next);
-        m.insert(unicase::Ascii::new("endfor".to_string()), Token::Next);
-
-        m.insert(unicase::Ascii::new("break".to_string()), Token::Break);
-        m.insert(unicase::Ascii::new("continue".to_string()), Token::Continue);
-        m.insert(unicase::Ascii::new("return".to_string()), Token::Return);
-
-        m.insert(unicase::Ascii::new("gosub".to_string()), Token::Gosub);
-        m.insert(unicase::Ascii::new("goto".to_string()), Token::Goto);
-        m.insert(unicase::Ascii::new("select".to_string()), Token::Select);
-        m.insert(unicase::Ascii::new("case".to_string()), Token::Case);
-        m.insert(unicase::Ascii::new("default".to_string()), Token::Default);
-        m.insert(unicase::Ascii::new("endselect".to_string()), Token::EndSelect);
-
-        for c in &BUILTIN_CONSTS {
-            m.insert(unicase::Ascii::new(c.name.to_string()), Token::Const(Constant::Builtin(c)));
-        }
-        m
-    };
-    static ref TOKEN_LOOKUP_TABLE_300: HashMap<unicase::Ascii<String>, Token> = {
-        let mut m = HashMap::new();
-        m.insert(unicase::Ascii::new("if".to_string()), Token::If);
-        m.insert(unicase::Ascii::new("let".to_string()), Token::Let);
-        m.insert(unicase::Ascii::new("while".to_string()), Token::While);
-        m.insert(unicase::Ascii::new("endwhile".to_string()), Token::EndWhile);
-        m.insert(unicase::Ascii::new("else".to_string()), Token::Else);
-        m.insert(unicase::Ascii::new("elseif".to_string()), Token::ElseIf);
-        m.insert(unicase::Ascii::new("endif".to_string()), Token::EndIf);
-        m.insert(unicase::Ascii::new("for".to_string()), Token::For);
-        m.insert(unicase::Ascii::new("next".to_string()), Token::Next);
-        m.insert(unicase::Ascii::new("endfor".to_string()), Token::Next);
-
-        m.insert(unicase::Ascii::new("break".to_string()), Token::Break);
-        m.insert(unicase::Ascii::new("continue".to_string()), Token::Continue);
-        m.insert(unicase::Ascii::new("return".to_string()), Token::Return);
-
-        m.insert(unicase::Ascii::new("gosub".to_string()), Token::Gosub);
-        m.insert(unicase::Ascii::new("goto".to_string()), Token::Goto);
-        m.insert(unicase::Ascii::new("select".to_string()), Token::Select);
-        m.insert(unicase::Ascii::new("case".to_string()), Token::Case);
-        m.insert(unicase::Ascii::new("default".to_string()), Token::Default);
-        m.insert(unicase::Ascii::new("endselect".to_string()), Token::EndSelect);
-        m.insert(unicase::Ascii::new("declare".to_string()), Token::Declare);
-        m.insert(unicase::Ascii::new("function".to_string()), Token::Function);
-        m.insert(unicase::Ascii::new("procedure".to_string()), Token::Procedure);
-        m.insert(unicase::Ascii::new("endproc".to_string()), Token::EndProc);
-        m.insert(unicase::Ascii::new("endfunc".to_string()), Token::EndFunc);
-
-        for c in &BUILTIN_CONSTS {
-            m.insert(unicase::Ascii::new(c.name.to_string()), Token::Const(Constant::Builtin(c)));
-        }
-        m
-    };
-
-    static ref TOKEN_LOOKUP_TABLE_350: HashMap<unicase::Ascii<String>, Token> = {
-        let mut m = HashMap::new();
-        m.insert(unicase::Ascii::new("if".to_string()), Token::If);
-        m.insert(unicase::Ascii::new("let".to_string()), Token::Let);
-        m.insert(unicase::Ascii::new("while".to_string()), Token::While);
-        m.insert(unicase::Ascii::new("endwhile".to_string()), Token::EndWhile);
-        m.insert(unicase::Ascii::new("else".to_string()), Token::Else);
-        m.insert(unicase::Ascii::new("elseif".to_string()), Token::ElseIf);
-        m.insert(unicase::Ascii::new("endif".to_string()), Token::EndIf);
-        m.insert(unicase::Ascii::new("for".to_string()), Token::For);
-        m.insert(unicase::Ascii::new("next".to_string()), Token::Next);
-        m.insert(unicase::Ascii::new("endfor".to_string()), Token::Next);
-
-        m.insert(unicase::Ascii::new("break".to_string()), Token::Break);
-        m.insert(unicase::Ascii::new("continue".to_string()), Token::Continue);
-        m.insert(unicase::Ascii::new("return".to_string()), Token::Return);
-
-        m.insert(unicase::Ascii::new("gosub".to_string()), Token::Gosub);
-        m.insert(unicase::Ascii::new("goto".to_string()), Token::Goto);
-        m.insert(unicase::Ascii::new("select".to_string()), Token::Select);
-        m.insert(unicase::Ascii::new("case".to_string()), Token::Case);
-        m.insert(unicase::Ascii::new("default".to_string()), Token::Default);
-        m.insert(unicase::Ascii::new("endselect".to_string()), Token::EndSelect);
-        m.insert(unicase::Ascii::new("declare".to_string()), Token::Declare);
-        m.insert(unicase::Ascii::new("function".to_string()), Token::Function);
-        m.insert(unicase::Ascii::new("procedure".to_string()), Token::Procedure);
-        m.insert(unicase::Ascii::new("endproc".to_string()), Token::EndProc);
-        m.insert(unicase::Ascii::new("endfunc".to_string()), Token::EndFunc);
-
-        // new ones
-        m.insert(unicase::Ascii::new("repeat".to_string()), Token::Repeat);
-        m.insert(unicase::Ascii::new("until".to_string()), Token::Until);
-        m.insert(unicase::Ascii::new("loop".to_string()), Token::Loop);
-        m.insert(unicase::Ascii::new("endloop".to_string()), Token::EndLoop);
-
-        // Both are gone before anything is emitted, so they cost an old runtime nothing.
-        m.insert(unicase::Ascii::new("const".to_string()), Token::ConstDecl);
-        m.insert(unicase::Ascii::new("enum".to_string()), Token::Enum);
-        m.insert(unicase::Ascii::new("endenum".to_string()), Token::EndEnum);
-
-        for c in &BUILTIN_CONSTS {
-            m.insert(unicase::Ascii::new(c.name.to_string()), Token::Const(Constant::Builtin(c)));
-        }
-        m
-    };
-
-    /// 400 only, so a 3.50 source may still call something 'type' or 'begin'.
-    static ref TOKEN_LOOKUP_TABLE_400: HashMap<unicase::Ascii<String>, Token> = {
-        let mut m = TOKEN_LOOKUP_TABLE_350.clone();
-        m.insert(unicase::Ascii::new("type".to_string()), Token::Type);
-        m.insert(unicase::Ascii::new("endtype".to_string()), Token::EndType);
-        m.insert(unicase::Ascii::new("begin".to_string()), Token::Begin);
-        m
-    };
-
+/// The words a source of this language version may not use as a name.
+fn token_lookup_table(lang_version: u16) -> &'static HashMap<unicase::Ascii<String>, Token> {
+    let tables = &*TOKEN_LOOKUP_TABLES;
+    let index = tables.partition_point(|(version, _)| *version <= lang_version).saturating_sub(1);
+    &tables[index].1
 }
 
 impl Lexer {
@@ -615,17 +553,7 @@ impl Lexer {
         );
 
         let mut lexer = Self {
-            lookup_table: if lang_version < 200 {
-                &*TOKEN_LOOKUP_TABLE_100
-            } else if lang_version < 300 {
-                &*TOKEN_LOOKUP_TABLE_200
-            } else if lang_version < 350 {
-                &*TOKEN_LOOKUP_TABLE_300
-            } else if lang_version < 400 {
-                &*TOKEN_LOOKUP_TABLE_350
-            } else {
-                &*TOKEN_LOOKUP_TABLE_400
-            },
+            lookup_table: token_lookup_table(lang_version),
             lang_version,
             define_table,
             text: text.chars().collect(),
