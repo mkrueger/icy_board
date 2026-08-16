@@ -39,6 +39,15 @@ impl Server {
         }
     }
 
+    fn notification(&mut self, method: &str) -> Value {
+        loop {
+            let message = self.message();
+            if message.get("method").and_then(Value::as_str) == Some(method) {
+                return message;
+            }
+        }
+    }
+
     fn message(&mut self) -> Value {
         let mut content_length = None;
         loop {
@@ -69,7 +78,8 @@ impl Drop for Server {
 fn invalid_positions_and_closed_documents_do_not_stop_the_server() {
     let mut server = Server::start();
     server.send(json!({"jsonrpc":"2.0", "id":1, "method":"initialize", "params":{"processId":null,"rootUri":null,"capabilities":{}}}));
-    assert!(server.response(1).get("result").is_some());
+    let initialized = server.response(1);
+    assert!(initialized["result"]["capabilities"]["semanticTokensProvider"].is_object(), "{initialized}");
     server.send(json!({"jsonrpc":"2.0", "method":"initialized", "params":{}}));
 
     let uri = "file:///tmp/lifecycle.pps";
@@ -77,20 +87,28 @@ fn invalid_positions_and_closed_documents_do_not_stop_the_server() {
         "jsonrpc":"2.0", "method":"textDocument/didOpen",
         "params":{"textDocument":{"uri":uri,"languageId":"ppl","version":1,"text":"PRINTLN \"😀\"\n"}}
     }));
+    server.notification("textDocument/publishDiagnostics");
     server.send(json!({
-        "jsonrpc":"2.0", "id":2, "method":"textDocument/hover",
-        "params":{"textDocument":{"uri":uri},"position":{"line":99,"character":99}}
+        "jsonrpc":"2.0", "id":2, "method":"textDocument/semanticTokens/full",
+        "params":{"textDocument":{"uri":uri}}
     }));
-    assert_eq!(server.response(2).get("result"), Some(&Value::Null));
+    let tokens = server.response(2);
+    assert!(tokens["result"]["data"].as_array().is_some_and(|data| !data.is_empty()), "{tokens}");
 
-    server.send(json!({"jsonrpc":"2.0", "method":"textDocument/didClose", "params":{"textDocument":{"uri":uri}}}));
     server.send(json!({
-        "jsonrpc":"2.0", "id":3, "method":"textDocument/completion",
-        "params":{"textDocument":{"uri":uri},"position":{"line":0,"character":0}}
+        "jsonrpc":"2.0", "id":3, "method":"textDocument/hover",
+        "params":{"textDocument":{"uri":uri},"position":{"line":99,"character":99}}
     }));
     assert_eq!(server.response(3).get("result"), Some(&Value::Null));
 
-    server.send(json!({"jsonrpc":"2.0", "id":4, "method":"shutdown"}));
-    let shutdown = server.response(4);
+    server.send(json!({"jsonrpc":"2.0", "method":"textDocument/didClose", "params":{"textDocument":{"uri":uri}}}));
+    server.send(json!({
+        "jsonrpc":"2.0", "id":4, "method":"textDocument/completion",
+        "params":{"textDocument":{"uri":uri},"position":{"line":0,"character":0}}
+    }));
+    assert_eq!(server.response(4).get("result"), Some(&Value::Null));
+
+    server.send(json!({"jsonrpc":"2.0", "id":5, "method":"shutdown"}));
+    let shutdown = server.response(5);
     assert!(shutdown.get("error").is_none(), "{shutdown}");
 }

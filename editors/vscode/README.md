@@ -3,7 +3,9 @@
 Editor support for the PCBoard Programming Language: syntax highlighting,
 completion, signature help, hover, document symbols and formatting for `.pps`,
 `.ppd` and `.ppx` files. Errors and warnings come from the same compiler that
-`pplc` uses.
+`pplc` uses. Semantic highlighting does too: it distinguishes constants,
+parameters, routines, types, enum members, record fields and labels, and follows
+the language version of the file.
 
 ## Requirements
 

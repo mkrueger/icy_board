@@ -98,6 +98,23 @@
 				"path": "./syntaxes/ppl.tmGrammar.json"
 			}
 		],
+		"semanticTokenTypes": [
+			{
+				"id": "label",
+				"superType": "variable",
+				"description": "A PPL jump label"
+			}
+		],
+		"semanticTokenScopes": [
+			{
+				"language": "ppl",
+				"scopes": {
+					"label": [
+						"entity.name.label.ppl"
+					]
+				}
+			}
+		],
 		"commands": [
 			{
 				"command": "icyboard-ppl.run",

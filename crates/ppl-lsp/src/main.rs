@@ -21,6 +21,7 @@ use icyboard_ppl::formatting::VSCodeFormattingBackend;
 use icyboard_ppl::hover::get_user_hover;
 use icyboard_ppl::jump_definition::get_definition;
 use icyboard_ppl::reference::get_reference;
+use icyboard_ppl::semantic_tokens::{get_semantic_tokens, legend_modifiers, legend_types};
 use icyboard_ppl::signature_help::get_signature_help;
 use icyboard_ppl::{line_before_cursor, offset_to_position, position_to_offset};
 use ropey::Rope;
@@ -83,6 +84,15 @@ impl LanguageServer for Backend {
                 document_highlight_provider: Some(OneOf::Left(true)),
                 document_formatting_provider: Some(OneOf::Left(true)),
                 document_range_formatting_provider: Some(OneOf::Left(true)),
+                semantic_tokens_provider: Some(SemanticTokensServerCapabilities::SemanticTokensOptions(SemanticTokensOptions {
+                    work_done_progress_options: Default::default(),
+                    legend: SemanticTokensLegend {
+                        token_types: legend_types(),
+                        token_modifiers: legend_modifiers(),
+                    },
+                    range: Some(false),
+                    full: Some(SemanticTokensFullOptions::Bool(true)),
+                })),
                 ..ServerCapabilities::default()
             },
         })
@@ -226,6 +236,39 @@ impl LanguageServer for Backend {
         self.get_ast(&uri, |_ast, visitor| {
             let line = line_before_cursor(&rope, position)?;
             get_signature_help(&line, visitor)
+        })
+    }
+
+    async fn semantic_tokens_full(&self, params: SemanticTokensParams) -> Result<Option<SemanticTokensResult>> {
+        let uri = params.text_document.uri;
+        let Some(rope) = self.document_map.get(&uri) else {
+            return Ok(None);
+        };
+        if !self.workspace_map.contains_key(&uri) && !self.ast_map.lock().unwrap().contains_key(&uri) {
+            return Ok(None);
+        }
+        let source = rope.to_string();
+
+        if self.workspace_map.contains_key(&uri) {
+            let workspace = self.workspace.lock().map_err(|_| tower_lsp::jsonrpc::Error::internal_error())?;
+            return self.get_ast(&uri, |ast, visitor| {
+                Some(SemanticTokensResult::Tokens(SemanticTokens {
+                    result_id: None,
+                    data: get_semantic_tokens(ast, visitor, &rope, &source, &workspace),
+                }))
+            });
+        }
+
+        self.get_ast(&uri, |ast, visitor| {
+            let mut workspace = Workspace::default();
+            workspace.compiler = Some(icy_board_engine::compiler::workspace::CompilerData {
+                language_version: Some(ast.language_version),
+                defines: None,
+            });
+            Some(SemanticTokensResult::Tokens(SemanticTokens {
+                result_id: None,
+                data: get_semantic_tokens(ast, visitor, &rope, &source, &workspace),
+            }))
         })
     }
 

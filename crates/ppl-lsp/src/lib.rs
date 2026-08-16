@@ -6,6 +6,7 @@ pub mod formatting;
 pub mod hover;
 pub mod jump_definition;
 pub mod reference;
+pub mod semantic_tokens;
 pub mod signature_help;
 pub mod type_lookup;
 
