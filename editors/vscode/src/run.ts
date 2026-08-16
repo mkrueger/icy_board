@@ -7,6 +7,13 @@ function setting(name: string, fallback: string): string {
   return value ? value : fallback;
 }
 
+/// What the board is called with, with the places a path goes filled in.
+function runArguments(replacements: Record<string, string>): string[] {
+  const configured = vscode.workspace.getConfiguration("icyboardPpl").get<string[]>("runArguments");
+  const template = configured?.length ? configured : ["--ppe", "${ppe}"];
+  return template.map((argument) => argument.replace(/\$\{(\w+)\}/g, (whole, name) => replacements[name] ?? whole));
+}
+
 function compile(compiler: string, source: string): Promise<string> {
   return new Promise((resolve, reject) => {
     execFile(compiler, [source], { cwd: path.dirname(source) }, (error, stdout, stderr) => {
@@ -55,15 +62,25 @@ export async function runPpe(output: vscode.OutputChannel): Promise<void> {
     return;
   }
 
+  const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri)?.uri;
+  const executable = source.replace(/\.pps$/i, ".ppe");
   const config = setting("boardConfig", "");
-  const parts = [setting("boardPath", "icboard"), "--ppe", source.replace(/\.pps$/i, ".ppe"), ...(config ? [config] : [])];
+  const parts = [
+    setting("boardPath", "icboard"),
+    ...runArguments({
+      ppe: executable,
+      source,
+      workspaceFolder: workspaceFolder?.fsPath ?? path.dirname(source),
+    }),
+    ...(config ? [config] : []),
+  ];
 
   const name = "IcyBoard PPL";
   const terminal =
     vscode.window.terminals.find((candidate) => candidate.name === name) ??
     vscode.window.createTerminal({
       name,
-      cwd: vscode.workspace.getWorkspaceFolder(document.uri)?.uri ?? vscode.Uri.file(path.dirname(source)),
+      cwd: workspaceFolder ?? vscode.Uri.file(path.dirname(source)),
     });
 
   terminal.show();

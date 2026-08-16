@@ -30,6 +30,17 @@ That takes two programs the extension does not ship. Both are looked for on the
 A PPE runs on a board, so `icboard` needs a configuration. Left empty, it looks
 in the workspace folder and then in `ICB_PATH`.
 
+`icyboardPpl.runArguments` decides how the board is called. It defaults to
+`["--ppe", "${ppe}"]`, where `${ppe}` is the executable that was just built;
+`${source}` and `${workspaceFolder}` are there too. A PPE that wants a caller
+and its own parameters takes the other door:
+
+```json
+"icyboardPpl.runArguments": ["--runppe", "Sysop;;PWRD:secret;PPE:${ppe};first;second"]
+```
+
+Being a workspace setting, it can differ per project.
+
 ## Building this extension
 
 ```

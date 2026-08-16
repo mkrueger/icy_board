@@ -77,6 +77,18 @@
 					"scope": "machine-overridable",
 					"default": "",
 					"markdownDescription": "The `icyboard.toml` a PPE is run against, or the directory holding it. Leave empty to let `icboard` look in the workspace folder and in `ICB_PATH`."
+				},
+				"icyboardPpl.runArguments": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"scope": "resource",
+					"default": [
+						"--ppe",
+						"${ppe}"
+					],
+					"markdownDescription": "What `icboard` is called with. `${ppe}` is the built executable, `${source}` the file it came from and `${workspaceFolder}` the folder it lives in.\n\nTo run as a logged-in user, and to pass a PPE its parameters:\n\n`[\"--runppe\", \"Sysop;;PWRD:secret;PPE:${ppe};first;second\"]`"
 				}
 			}
 		},
