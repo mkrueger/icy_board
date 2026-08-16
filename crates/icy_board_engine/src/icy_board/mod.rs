@@ -99,8 +99,8 @@ pub enum IcyBoardError {
     #[error("Internal board lock error (report!).")]
     ErrorLockingBoard,
 
-    #[error("Another tool is working on this board.")]
-    BoardInUse,
+    #[error("Another program is already working on the board in {0}.")]
+    BoardInUse(String),
 
     #[error("Error opening home directory ({0})")]
     HomeDirMissing(String),

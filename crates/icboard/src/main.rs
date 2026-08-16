@@ -88,7 +88,10 @@ async fn main() -> Res<()> {
         exit(1);
     };
 
-    start_icy_board(&arguments, file).await?;
+    if let Err(err) = start_icy_board(&arguments, file).await {
+        print_error(err);
+        exit(1);
+    }
     Ok(())
 }
 

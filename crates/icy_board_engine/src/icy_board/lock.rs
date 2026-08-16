@@ -45,7 +45,7 @@ impl BoardLock {
                 held.insert(key.clone(), (file, 1));
                 Ok(Self { key })
             }
-            Err(TryLockError::WouldBlock) => Err(IcyBoardError::BoardInUse.into()),
+            Err(TryLockError::WouldBlock) => Err(IcyBoardError::BoardInUse(root_path.display().to_string()).into()),
             Err(TryLockError::Error(e)) => Err(e.into()),
         }
     }

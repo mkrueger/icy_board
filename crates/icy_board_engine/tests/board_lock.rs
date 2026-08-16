@@ -38,3 +38,27 @@ fn the_file_lock_is_held_until_the_last_handle_goes() {
     drop(outer);
     assert!(probe().try_lock().is_ok(), "the last handle releases the board");
 }
+
+/// The refusal is what a user gets to see, so it has to say which board is busy.
+#[test]
+fn a_busy_board_is_named_in_the_refusal() {
+    let dir = tempfile::tempdir().unwrap();
+    let held = OpenOptions::new()
+        .create(true)
+        .read(true)
+        .write(true)
+        .truncate(false)
+        .open(dir.path().join(LOCK_FILE_NAME))
+        .unwrap();
+    held.try_lock().expect("the board starts out free");
+
+    let Err(refused) = BoardLock::acquire(dir.path()) else {
+        panic!("a locked board has to be refused");
+    };
+
+    let message = refused.to_string();
+    assert!(
+        message.contains(&dir.path().display().to_string()),
+        "the refusal does not say which board it is about: {message}"
+    );
+}

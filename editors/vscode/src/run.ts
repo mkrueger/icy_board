@@ -137,12 +137,16 @@ export async function runPpe(output: vscode.OutputChannel, options: { singleFile
   ];
 
   const name = "IcyBoard PPL";
-  const terminal =
-    vscode.window.terminals.find((candidate) => candidate.name === name) ??
-    vscode.window.createTerminal({
-      name,
-      cwd: workspaceFolder ?? vscode.Uri.file(path.dirname(source)),
-    });
+  // A board still running from the last time would take the command line as
+  // keystrokes, and would hold the board lock against the new one. Only the
+  // terminal this extension made is closed.
+  for (const candidate of vscode.window.terminals.filter((terminal) => terminal.name === name)) {
+    candidate.dispose();
+  }
+  const terminal = vscode.window.createTerminal({
+    name,
+    cwd: workspaceFolder ?? vscode.Uri.file(path.dirname(source)),
+  });
 
   terminal.show();
   terminal.sendText(commandLine(parts));
