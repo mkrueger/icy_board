@@ -864,13 +864,16 @@ impl SemanticVisitor {
     }
 
     fn has_variable_defined(&self, id: &unicase::Ascii<String>) -> bool {
-        if self.lookup_constant(id).is_some() {
-            return true;
-        }
         if let Some(local_lookup) = &self.local_variable_lookup {
-            return local_lookup.variable_lookup.contains_key(id);
+            let local_name = self.local_constants.as_ref().is_some_and(|constants| constants.contains_key(id)) || local_lookup.variable_lookup.contains_key(id);
+            let global_routine = self
+                .global_lookup
+                .variable_lookup
+                .get(id)
+                .is_some_and(|index| matches!(self.references[*index].0, ReferenceType::Function(_) | ReferenceType::Procedure(_)));
+            return local_name || global_routine;
         }
-        self.global_lookup.variable_lookup.contains_key(id)
+        self.global_constants.contains_key(id) || self.global_lookup.variable_lookup.contains_key(id)
     }
 
     fn lookup_constant(&self, id: &unicase::Ascii<String>) -> Option<&(VariableType, VariableValue)> {
@@ -878,6 +881,13 @@ impl SemanticVisitor {
             if let Some(constant) = local.get(id) {
                 return Some(constant);
             }
+        }
+        if self
+            .local_variable_lookup
+            .as_ref()
+            .is_some_and(|lookup| lookup.variable_lookup.contains_key(id))
+        {
+            return None;
         }
         self.global_constants.get(id)
     }

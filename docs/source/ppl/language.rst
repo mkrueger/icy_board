@@ -209,9 +209,11 @@ produce, whatever runtime it is built for. That also means a decompiled PPE show
 the value, never the name, and that a constant cannot be passed to a ``VAR``
 parameter - there is no variable to write back to.
 
-Writing to a constant is an error, and a constant and a variable may not share a
-name. ``CONST`` is a keyword from 400 on, so a 3.50 source may still have a
-variable called ``const``.
+Writing to a constant is an error. A constant, parameter and variable may not
+share a name in the same scope. A local declaration may use the name of a global
+constant or variable; inside the routine the local declaration wins. ``CONST``
+is a keyword from 400 on, so a 3.50 source may still have a variable called
+``const``.
 
 ``;$DEFINE`` looks similar but is a different thing: it substitutes text before
 the language is even read, it carries no type, and it works whatever version is

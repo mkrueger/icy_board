@@ -121,9 +121,10 @@ name while compiling, so a constant costs nothing at runtime: the PPE is the one
 the value written out by hand would produce, whatever runtime it targets. A
 decompiled PPE therefore shows the value, never the name.
 
-Writing to a constant is an error, a constant and a variable may not share a
-name, and a constant cannot be passed to a `VAR` parameter - there is no variable
-to write back to.
+Writing to a constant is an error. A constant, parameter and variable may not
+share a name in the same scope, but a local declaration may shadow a global
+constant or variable. A constant cannot be passed to a `VAR` parameter - there
+is no variable to write back to.
 
 `;$DEFINE` is the other way to name a value: it substitutes text before the
 language is read, carries no type and works at any version. `CONST` is typed and

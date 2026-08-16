@@ -5,8 +5,8 @@ use crate::{
     ast::{
         Ast, AstNode, AstVisitorMut, BinaryExpression, BlockStatement, CommentAstNode, ConstDeclarationStatement, Constant, ConstantExpression,
         DimensionSpecifier, Expression, ForStatement, FunctionImplementation, GotoStatement, IdentifierExpression, IfStatement, LabelStatement, LetStatement,
-        MemberReferenceExpression, ProcedureImplementation, ReturnStatement, SelectStatement, Statement, VariableDeclarationStatement, VariableSpecifier,
-        const_expression, const_value_with_members, constant::NumberFormat,
+        MemberReferenceExpression, ParameterSpecifier, ProcedureImplementation, ReturnStatement, SelectStatement, Statement, VariableDeclarationStatement,
+        VariableSpecifier, const_expression, const_value_with_members, constant::NumberFormat,
     },
     decompiler::evaluation_visitor::{ConstantFolder, OptimizationVisitor},
     executable::VariableValue,
@@ -23,6 +23,7 @@ pub struct AstTransformationVisitor {
     labels: usize,
     global_constants: HashMap<unicase::Ascii<String>, (crate::executable::VariableType, VariableValue)>,
     local_constants: Option<HashMap<unicase::Ascii<String>, (crate::executable::VariableType, VariableValue)>>,
+    local_bindings: Option<HashSet<unicase::Ascii<String>>>,
     enums: Vec<EnumDefinition>,
     loop_counters: HashSet<usize>,
 }
@@ -36,6 +37,7 @@ impl AstTransformationVisitor {
             labels: 0,
             global_constants: HashMap::new(),
             local_constants: None,
+            local_bindings: None,
             enums,
             loop_counters: HashSet::new(),
         }
@@ -74,7 +76,30 @@ impl AstTransformationVisitor {
                 return Some(constant);
             }
         }
+        if self.local_bindings.as_ref().is_some_and(|bindings| bindings.contains(id)) {
+            return None;
+        }
         self.global_constants.get(id)
+    }
+
+    fn collect_local_bindings(&mut self, parameters: &[ParameterSpecifier], statements: &[Statement]) {
+        let mut bindings = HashSet::new();
+        for parameter in parameters {
+            let identifier = match parameter {
+                ParameterSpecifier::Variable(parameter) => parameter.get_variable().as_ref().map(VariableSpecifier::get_identifier),
+                ParameterSpecifier::Function(parameter) => Some(parameter.get_identifier()),
+                ParameterSpecifier::Procedure(parameter) => Some(parameter.get_identifier()),
+            };
+            if let Some(identifier) = identifier {
+                bindings.insert(identifier.clone());
+            }
+        }
+        for statement in statements {
+            if let Statement::VariableDeclaration(declaration) = statement {
+                bindings.extend(declaration.get_variables().iter().map(|variable| variable.get_identifier().clone()));
+            }
+        }
+        self.local_bindings = Some(bindings);
     }
 
     /// A constant may be written in terms of an earlier one, so the values are worked
@@ -462,6 +487,7 @@ impl AstVisitorMut for AstTransformationVisitor {
     fn visit_function_implementation(&mut self, function: &FunctionImplementation) -> AstNode {
         self.cur_function = Some(function.get_identifier().clone());
         self.local_constants = Some(HashMap::new());
+        self.collect_local_bindings(function.get_parameters(), function.get_statements());
         self.collect_constants(function.get_statements(), true);
         let res = AstNode::Function(FunctionImplementation::new(
             function.id,
@@ -481,11 +507,13 @@ impl AstVisitorMut for AstTransformationVisitor {
 
         self.cur_function = None;
         self.local_constants = None;
+        self.local_bindings = None;
         res
     }
 
     fn visit_procedure_implementation(&mut self, procedure: &ProcedureImplementation) -> AstNode {
         self.local_constants = Some(HashMap::new());
+        self.collect_local_bindings(procedure.get_parameters(), procedure.get_statements());
         self.collect_constants(procedure.get_statements(), true);
         let res = AstNode::Procedure(ProcedureImplementation::new(
             procedure.id,
@@ -501,6 +529,7 @@ impl AstVisitorMut for AstTransformationVisitor {
             procedure.get_endproc_token().clone(),
         ));
         self.local_constants = None;
+        self.local_bindings = None;
         res
     }
 

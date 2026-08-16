@@ -75,6 +75,49 @@ fn a_constant_and_a_variable_cannot_share_a_name() {
     assert_eq!(vec!["Variable name already used (MaxTries)".to_string()], errors);
 }
 
+#[test]
+fn local_names_may_shadow_global_variables_and_constants() {
+    let local_variable =
+        compile("CONST INTEGER Limit = 10\nDECLARE PROCEDURE Show()\nShow()\nPROCEDURE Show()\n  INTEGER Limit\n  Limit = 3\n  PRINTLN Limit\nENDPROC\n")
+            .unwrap();
+    let renamed_global =
+        compile("CONST INTEGER GlobalLimit = 10\nDECLARE PROCEDURE Show()\nShow()\nPROCEDURE Show()\n  INTEGER Limit\n  Limit = 3\n  PRINTLN Limit\nENDPROC\n")
+            .unwrap();
+    assert_eq!(renamed_global.script_buffer, local_variable.script_buffer);
+
+    let parameter =
+        compile("CONST INTEGER Limit = 10\nDECLARE PROCEDURE Show(INTEGER limit)\nShow(3)\nPROCEDURE Show(INTEGER limit)\n  PRINTLN limit\nENDPROC\n").unwrap();
+    let renamed_global =
+        compile("CONST INTEGER GlobalLimit = 10\nDECLARE PROCEDURE Show(INTEGER limit)\nShow(3)\nPROCEDURE Show(INTEGER limit)\n  PRINTLN limit\nENDPROC\n")
+            .unwrap();
+    assert_eq!(renamed_global.script_buffer, parameter.script_buffer);
+
+    let local_constant =
+        compile("INTEGER Limit\nDECLARE PROCEDURE Show()\nShow()\nPROCEDURE Show()\n  CONST INTEGER Limit = 3\n  PRINTLN Limit\nENDPROC\n").unwrap();
+    let renamed_global =
+        compile("INTEGER GlobalLimit\nDECLARE PROCEDURE Show()\nShow()\nPROCEDURE Show()\n  CONST INTEGER Limit = 3\n  PRINTLN Limit\nENDPROC\n").unwrap();
+    assert_eq!(renamed_global.script_buffer, local_constant.script_buffer);
+
+    let local_constant =
+        compile("CONST INTEGER Limit = 10\nDECLARE PROCEDURE Show()\nShow()\nPROCEDURE Show()\n  CONST INTEGER Limit = 3\n  PRINTLN Limit\nENDPROC\n").unwrap();
+    let renamed_global =
+        compile("CONST INTEGER GlobalLimit = 10\nDECLARE PROCEDURE Show()\nShow()\nPROCEDURE Show()\n  CONST INTEGER Limit = 3\n  PRINTLN Limit\nENDPROC\n")
+            .unwrap();
+    assert_eq!(renamed_global.script_buffer, local_constant.script_buffer);
+}
+
+#[test]
+fn variables_parameters_and_constants_still_share_a_local_scope() {
+    let errors = diagnostics("DECLARE PROCEDURE Show()\nPROCEDURE Show()\n  INTEGER Limit\n  CONST INTEGER Limit = 3\nENDPROC\n");
+    assert_eq!(vec!["Variable name already used (Limit)".to_string()], errors);
+
+    let errors = diagnostics("DECLARE PROCEDURE Show()\nPROCEDURE Show()\n  CONST INTEGER Limit = 3\n  INTEGER Limit\nENDPROC\n");
+    assert_eq!(vec!["Variable name already used (Limit)".to_string()], errors);
+
+    let errors = diagnostics("DECLARE PROCEDURE Show(INTEGER Limit)\nPROCEDURE Show(INTEGER Limit)\n  CONST INTEGER Limit = 3\nENDPROC\n");
+    assert_eq!(vec!["Variable name already used (Limit)".to_string()], errors);
+}
+
 /// CONST is a 4.00 word, so a 3.50 source may still have a variable called const.
 #[test]
 fn const_is_a_keyword_from_400_on() {
