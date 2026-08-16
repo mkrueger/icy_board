@@ -70,7 +70,9 @@ fn a_default_answer_stays_inside_a_clamped_field() {
 
     let lines = rendered_lines(&output);
     assert!(lines[0].contains(')'), "the field delimiters were dropped: {:?}", lines[0]);
-    assert!(!lines[1].contains('y'), "the default answer wrapped onto the next line: {:?}", lines[1]);
+    // A run, not a single letter: the completion prompt below is translated and
+    // any single letter may well occur in it.
+    assert!(!lines[1].contains("yyy"), "the default answer wrapped onto the next line: {:?}", lines[1]);
 }
 
 #[test]
