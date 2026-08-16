@@ -46,3 +46,47 @@ export async function reportMissing(command: string, whatItIs: string): Promise<
     await vscode.commands.executeCommand("workbench.action.openSettings", "icyboardPpl.binPath");
   }
 }
+
+/// The name a board configuration has when only its directory is known.
+const BOARD_FILE = "icboard.toml";
+
+function isDirectory(candidate: string): boolean {
+  try {
+    return fs.statSync(candidate).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/// Mirrors how the board looks for its configuration: what it was told, taking a
+/// directory to mean the file in it, and then ICB_PATH.
+export function locateBoardConfig(configured: string | undefined, from: string): string | undefined {
+  const named = configured ? path.resolve(from, configured) : from;
+  const file = isDirectory(named) ? path.join(named, BOARD_FILE) : named;
+  const extension = path.extname(file);
+  const candidate = extension ? `${file.slice(0, -extension.length)}.toml` : `${file}.toml`;
+  if (fs.existsSync(candidate)) {
+    return candidate;
+  }
+
+  const fromEnvironment = process.env.ICB_PATH;
+  if (fromEnvironment) {
+    const path_ = isDirectory(fromEnvironment) ? path.join(fromEnvironment, BOARD_FILE) : fromEnvironment;
+    if (fs.existsSync(path_)) {
+      return path_;
+    }
+  }
+  return undefined;
+}
+
+/// A PPE runs on a board, so there is nothing to run it on without one.
+export async function reportMissingBoard(): Promise<void> {
+  const openSettings = "Open settings";
+  const answer = await vscode.window.showErrorMessage(
+    `IcyBoard PPL: no board to run the PPE on. Point icyboardPpl.boardConfig at an ${BOARD_FILE}, or at the directory holding one.`,
+    openSettings,
+  );
+  if (answer === openSettings) {
+    await vscode.commands.executeCommand("workbench.action.openSettings", "icyboardPpl.boardConfig");
+  }
+}

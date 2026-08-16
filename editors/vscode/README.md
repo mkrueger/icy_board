@@ -23,8 +23,9 @@ button above a `.pps`. If either program is nowhere to be found, it says so and
 offers the setting rather than leaving an error in a log.
 
 A PPE runs on a board, so `icboard` needs a configuration.
-`icyboardPpl.boardConfig` names the `icyboard.toml` or the directory holding it;
-left empty, `icboard` looks in the workspace folder and then in `ICB_PATH`.
+`icyboardPpl.boardConfig` names the `icboard.toml` or the directory holding it;
+left empty, the workspace folder and `ICB_PATH` are searched. Without one, Run
+PPE says so instead of starting a board that has nothing to run on.
 
 `icyboardPpl.runArguments` decides how the board is called. It defaults to
 `["--ppe", "${ppe}"]`, where `${ppe}` is the executable that was just built;

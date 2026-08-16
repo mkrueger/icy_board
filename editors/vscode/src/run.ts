@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import { execFile } from "child_process";
 import * as path from "path";
 
-import { binary, locate, reportMissing } from "./binaries";
+import { binary, locate, locateBoardConfig, reportMissing, reportMissingBoard } from "./binaries";
 
 /// What the board is called with, with the places a path goes filled in.
 function runArguments(replacements: Record<string, string>): string[] {
@@ -78,15 +78,22 @@ export async function runPpe(output: vscode.OutputChannel): Promise<void> {
   }
 
   const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri)?.uri;
-  const config = vscode.workspace.getConfiguration("icyboardPpl").get<string>("boardConfig")?.trim();
+  const from = workspaceFolder?.fsPath ?? path.dirname(source);
+  const configured = vscode.workspace.getConfiguration("icyboardPpl").get<string>("boardConfig")?.trim();
+  const config = locateBoardConfig(configured || undefined, from);
+  if (!config) {
+    await reportMissingBoard();
+    return;
+  }
+
   const parts = [
     board,
     ...runArguments({
       ppe: source.replace(/\.pps$/i, ".ppe"),
       source,
-      workspaceFolder: workspaceFolder?.fsPath ?? path.dirname(source),
+      workspaceFolder: from,
     }),
-    ...(config ? [config] : []),
+    config,
   ];
 
   const name = "IcyBoard PPL";

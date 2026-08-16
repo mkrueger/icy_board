@@ -75,7 +75,7 @@
 					"type": "string",
 					"scope": "machine-overridable",
 					"default": "",
-					"markdownDescription": "The `icyboard.toml` a PPE is run against, or the directory holding it. Leave empty to let `icboard` look in the workspace folder and in `ICB_PATH`."
+					"markdownDescription": "The `icboard.toml` a PPE is run against, or the directory holding it. Leave empty to look in the workspace folder and in `ICB_PATH`."
 				},
 				"icyboardPpl.runArguments": {
 					"type": "array",
