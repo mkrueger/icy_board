@@ -122,6 +122,12 @@
 				"title": "Run PPE",
 				"icon": "$(play)",
 				"enablement": "editorLangId == ppl"
+			},
+			{
+				"command": "icyboard-ppl.runFile",
+				"category": "IcyBoard PPL",
+				"title": "Run PPE (This File Only)",
+				"enablement": "editorLangId == ppl"
 			}
 		],
 		"menus": {

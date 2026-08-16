@@ -90,3 +90,25 @@ export async function reportMissingBoard(): Promise<void> {
     await vscode.commands.executeCommand("workbench.action.openSettings", "icyboardPpl.boardConfig");
   }
 }
+
+/// The manifest that makes a directory a PPL package.
+const MANIFEST = "ppl.toml";
+
+/// The project a file belongs to, looked for upwards from it. The search stops at
+/// the workspace folder so a stray manifest further up cannot claim the file.
+export function findManifest(from: string, stopAt?: string): string | undefined {
+  const last = stopAt ? path.resolve(stopAt) : undefined;
+  let directory = path.resolve(from);
+  for (;;) {
+    const candidate = path.join(directory, MANIFEST);
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+    const parent = path.dirname(directory);
+    if (directory === last || parent === directory) {
+      return undefined;
+    }
+    directory = parent;
+  }
+}
+

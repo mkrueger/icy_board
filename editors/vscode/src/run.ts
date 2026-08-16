@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import { execFile } from "child_process";
 import * as path from "path";
 
-import { binary, locate, locateBoardConfig, reportMissing, reportMissingBoard } from "./binaries";
+import { binary, findManifest, locate, locateBoardConfig, reportMissing, reportMissingBoard } from "./binaries";
 
 /// What the board is called with, with the places a path goes filled in.
 function runArguments(replacements: Record<string, string>): string[] {
@@ -11,9 +11,31 @@ function runArguments(replacements: Record<string, string>): string[] {
   return template.map((argument) => argument.replace(/\$\{(\w+)\}/g, (whole, name) => replacements[name] ?? whole));
 }
 
-function compile(compiler: string, source: string): Promise<string> {
+interface CompilerConfig {
+  output: string;
+}
+
+/// Asks the compiler what it would build and where it would put it, so the
+/// target directory layout is known in one place only.
+function configOf(compiler: string, target: string): Promise<CompilerConfig> {
   return new Promise((resolve, reject) => {
-    execFile(compiler, [source], { cwd: path.dirname(source) }, (error, stdout, stderr) => {
+    execFile(compiler, ["--print-config-json", target], { cwd: path.dirname(target) }, (error, stdout, stderr) => {
+      if (error) {
+        reject(new Error(`${stdout}${stderr}`.trim() || error.message));
+        return;
+      }
+      try {
+        resolve(JSON.parse(stdout) as CompilerConfig);
+      } catch {
+        reject(new Error(`the compiler configuration could not be read:\n${stdout}`));
+      }
+    });
+  });
+}
+
+function compile(compiler: string, target: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    execFile(compiler, [target], { cwd: path.dirname(target) }, (error, stdout, stderr) => {
       const output = `${stdout}${stderr}`.trim();
       if (error) {
         reject(new Error(output || error.message));
@@ -35,7 +57,7 @@ function commandLine(parts: string[]): string {
 ///
 /// The board takes over the terminal it runs in - a PPE asks its caller
 /// questions - so this gets a real terminal rather than a task.
-export async function runPpe(output: vscode.OutputChannel): Promise<void> {
+export async function runPpe(output: vscode.OutputChannel, options: { singleFile?: boolean } = {}): Promise<void> {
   const document = vscode.window.activeTextEditor?.document;
   if (!document || document.uri.scheme !== "file" || !document.fileName.toLowerCase().endsWith(".pps")) {
     vscode.window.showErrorMessage("IcyBoard PPL: open the .pps you want to run.");
@@ -59,29 +81,46 @@ export async function runPpe(output: vscode.OutputChannel): Promise<void> {
   }
 
   const source = document.fileName;
+  const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri)?.uri;
+  // A file that belongs to a project is built as part of it, so the manifest's
+  // language version, defines and data files apply instead of bare defaults.
+  const manifest = options.singleFile ? undefined : findManifest(path.dirname(source), workspaceFolder?.fsPath);
+  const target = manifest ?? source;
+
+  const report = async (reason: unknown, what: string) => {
+    output.appendLine(`${reason}`);
+    const showOutput = "Show output";
+    const answer = await vscode.window.showErrorMessage(`IcyBoard PPL: ${what}`, showOutput);
+    if (answer === showOutput) {
+      output.show(true);
+    }
+  };
+
+  let plan: CompilerConfig;
   try {
-    const built = await compile(compiler, source);
+    plan = await configOf(compiler, target);
+  } catch (error) {
+    await report(error, `the configuration of ${path.basename(target)} could not be read.`);
+    return;
+  }
+
+  if (manifest) {
+    output.appendLine(`Building project ${manifest}`);
+  }
+  try {
+    const built = await compile(compiler, target);
     if (built) {
       output.appendLine(built);
     }
   } catch (error) {
-    output.appendLine(`${error}`);
-    const showOutput = "Show output";
-    const answer = await vscode.window.showErrorMessage(
-      `IcyBoard PPL: ${path.basename(source)} did not build.`,
-      showOutput,
-    );
-    if (answer === showOutput) {
-      output.show(true);
-    }
+    await report(error, `${path.basename(target)} did not build.`);
     return;
   }
 
-  const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri)?.uri;
   const from = workspaceFolder?.fsPath ?? path.dirname(source);
   const configured = vscode.workspace.getConfiguration("icyboardPpl").get<string>("boardConfig")?.trim();
-  const config = locateBoardConfig(configured || undefined, from);
-  if (!config) {
+  const boardConfig = locateBoardConfig(configured || undefined, from);
+  if (!boardConfig) {
     await reportMissingBoard();
     return;
   }
@@ -89,11 +128,11 @@ export async function runPpe(output: vscode.OutputChannel): Promise<void> {
   const parts = [
     board,
     ...runArguments({
-      ppe: source.replace(/\.pps$/i, ".ppe"),
+      ppe: plan.output,
       source,
       workspaceFolder: from,
     }),
-    config,
+    boardConfig,
   ];
 
   const name = "IcyBoard PPL";

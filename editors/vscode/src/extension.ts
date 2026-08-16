@@ -39,6 +39,9 @@ export async function activate(context: vscode.ExtensionContext) {
   const traceOutputChannel = vscode.window.createOutputChannel("PPL Language Server trace");
   context.subscriptions.push(output, traceOutputChannel);
   context.subscriptions.push(vscode.commands.registerCommand("icyboard-ppl.run", () => runPpe(output)));
+  context.subscriptions.push(
+    vscode.commands.registerCommand("icyboard-ppl.runFile", () => runPpe(output, { singleFile: true })),
+  );
 
   const command = serverCommand(context);
   const run: Executable = { command };
