@@ -361,7 +361,9 @@ impl Decompiler {
 
     fn decompile_expression(&self, expression: &PPEExpr) -> Expression {
         match expression {
-            PPEExpr::Invalid => todo!(),
+            // A PPE that cannot be read should come out marked, not bring the
+            // decompiler down with it.
+            PPEExpr::Invalid => ConstantExpression::create_empty_expression(Constant::String("ERROR IN EXPRESSION invalid expression".to_string())),
             PPEExpr::Value(id) => unsafe {
                 let Some(entry) = self.executable.variable_table.try_get_entry(*id) else {
                     return ConstantExpression::create_empty_expression(Constant::String(format!("ERROR IN EXPRESSION can't read table index : {:04X}", *id)));
