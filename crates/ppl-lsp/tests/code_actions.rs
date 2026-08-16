@@ -474,6 +474,93 @@ fn keeping_the_old_language_rewrites_an_existing_directive() {
     assert_eq!(edit["range"]["end"], json!({"line": 0, "character": 17}));
 }
 
+fn upgrade(server: &mut Server, uri: &str, source: &str) -> (Value, Value) {
+    server.open(uri, source);
+    let diagnostics = server.diagnostics(uri);
+    let actions = actions(server, uri, diagnostics.clone());
+    (diagnostics, actions)
+}
+
+fn upgrade_action<'a>(diagnostics: &Value, actions: &'a Value) -> &'a Value {
+    actions
+        .as_array()
+        .and_then(|actions| actions.iter().find(|action| action["title"] == "Upgrade file to language version 400"))
+        .unwrap_or_else(|| panic!("diagnostics={diagnostics}, actions={actions}"))
+}
+
+fn new_texts(action: &Value, uri: &str) -> Vec<Value> {
+    action["edit"]["changes"][uri]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|edit| edit["newText"].clone())
+        .collect()
+}
+
+#[test]
+fn an_old_file_can_be_upgraded_to_the_current_language() {
+    let (mut server, _) = Server::ready();
+    let uri = "file:///tmp/upgrade.pps";
+    let source = ";$LANGVERSION 330\nINTEGER i\nFOR i = 1 TO 3\n  QUIT\nNEXT i\nPRINTLN 2 ** 3\nEND\n";
+    let (diagnostics, actions) = upgrade(&mut server, uri, source);
+
+    let action = upgrade_action(&diagnostics, &actions);
+    assert_eq!(action["kind"], "source.upgrade.ppl");
+    let texts = new_texts(action, uri);
+    assert!(texts.contains(&json!("^")), "{texts:?}");
+    assert!(texts.contains(&json!("BREAK")), "{texts:?}");
+    assert!(texts.contains(&json!("EXIT")), "{texts:?}");
+    assert!(texts.contains(&json!(";$LANGVERSION 400")), "{texts:?}");
+}
+
+#[test]
+fn upgrading_turns_obsolete_braces_into_parentheses() {
+    let (mut server, _) = Server::ready();
+    let uri = "file:///tmp/upgrade-braces.pps";
+    let (diagnostics, actions) = upgrade(&mut server, uri, ";$LANGVERSION 330\nINTEGER values{2}\n");
+
+    let texts = new_texts(upgrade_action(&diagnostics, &actions), uri);
+    assert!(texts.contains(&json!("(")), "{texts:?}");
+    assert!(texts.contains(&json!(")")), "{texts:?}");
+}
+
+#[test]
+fn a_file_that_needs_no_upgrade_is_not_offered_one() {
+    let (mut server, _) = Server::ready();
+    let uri = "file:///tmp/already-modern.pps";
+    let (_, actions) = upgrade(&mut server, uri, "PRINTLN \"hello\"\n");
+
+    assert!(
+        actions
+            .as_array()
+            .is_none_or(|actions| actions.iter().all(|action| action["kind"] != "source.upgrade.ppl")),
+        "{actions}"
+    );
+}
+
+#[test]
+fn a_client_asking_only_for_quick_fixes_gets_no_source_action() {
+    let (mut server, _) = Server::ready();
+    let uri = "file:///tmp/upgrade-filtered.pps";
+    server.open(uri, ";$LANGVERSION 330\nPRINTLN 2 ** 3\nEND\n");
+    let diagnostics = server.diagnostics(uri);
+    let actions = server.request(
+        "textDocument/codeAction",
+        json!({
+            "textDocument": {"uri": uri},
+            "range": {"start": {"line": 0, "character": 0}, "end": {"line": 20, "character": 0}},
+            "context": {"diagnostics": diagnostics, "only": ["quickfix"]}
+        }),
+    );
+
+    assert!(
+        actions
+            .as_array()
+            .is_none_or(|actions| actions.iter().all(|action| action["kind"] != "source.upgrade.ppl")),
+        "{actions}"
+    );
+}
+
 fn project(manifest: &str, source: &str) -> (PathBuf, String, String) {
     let unique = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
     let root = std::env::temp_dir().join(format!("ppl-lsp-actions-{}-{unique}", std::process::id()));

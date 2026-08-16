@@ -1,20 +1,22 @@
 use std::collections::HashMap;
 use std::mem;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use dashmap::DashMap;
 use icy_board_engine::ast::{
-    Ast, AstVisitor, Constant, ConstantExpression, Expression, FunctionCallExpression, ParameterSpecifier, ProcedureCallStatement, RecordLiteralExpression,
-    walk_function_call_expression, walk_function_declaration, walk_function_implementation, walk_predefined_call_statement, walk_procedure_call_statement,
-    walk_variable_declaration_statement,
+    Ast, AstVisitor, BreakStatement, Constant, ConstantExpression, ContinueStatement, Expression, FunctionCallExpression, ParameterSpecifier,
+    PredefinedCallStatement, ProcedureCallStatement, RecordLiteralExpression, walk_function_call_expression, walk_function_declaration,
+    walk_function_implementation, walk_predefined_call_statement, walk_procedure_call_statement, walk_variable_declaration_statement,
 };
-use icy_board_engine::compiler::{CompilationErrorType, CompilationWarningType, workspace::Workspace};
-use icy_board_engine::executable::{FUNCTION_DEFINITIONS, FunctionDefinition, FunctionSignature, VariableType};
+use icy_board_engine::compiler::{CompilationErrorType, CompilationWarningType, workspace::CompilerData, workspace::Workspace};
+use icy_board_engine::executable::{FUNCTION_DEFINITIONS, FunctionDefinition, FunctionSignature, LAST_PPL_LANGUAGE_VERSION, OpCode, VariableType};
 use icy_board_engine::formatting::FormattingVisitor;
 use icy_board_engine::icy_board::read_data_with_encoding_detection;
-use icy_board_engine::parser::lexer::LexingErrorType;
-use icy_board_engine::parser::{Encoding, ErrorReporter, ParserWarningType, UserTypeRegistry, parse_ast_with_predeclared_types, preparse_type_declarations};
+use icy_board_engine::parser::lexer::{LexingErrorType, Spanned, Token};
+use icy_board_engine::parser::{
+    Encoding, ErrorReporter, ParserErrorType, ParserWarningType, UserTypeRegistry, parse_ast_with_predeclared_types, preparse_type_declarations,
+};
 use icy_board_engine::semantic::{FunctionDeclaration, ReferenceType, SemanticVisitor};
 use icyboard_ppl::completion::get_completion;
 use icyboard_ppl::document_symbol::get_document_symbols;
@@ -85,7 +87,11 @@ impl LanguageServer for Backend {
                 rename_provider: Some(OneOf::Left(true)),
                 document_symbol_provider: Some(OneOf::Left(true)),
                 document_highlight_provider: Some(OneOf::Left(true)),
-                code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
+                code_action_provider: Some(CodeActionProviderCapability::Options(CodeActionOptions {
+                    code_action_kinds: Some(vec![CodeActionKind::QUICKFIX, UPGRADE_ACTION_KIND]),
+                    work_done_progress_options: Default::default(),
+                    resolve_provider: None,
+                })),
                 document_formatting_provider: Some(OneOf::Left(true)),
                 document_range_formatting_provider: Some(OneOf::Left(true)),
                 semantic_tokens_provider: Some(SemanticTokensServerCapabilities::SemanticTokensOptions(SemanticTokensOptions {
@@ -149,6 +155,9 @@ impl LanguageServer for Backend {
         };
         let mut actions = Vec::new();
         for diagnostic in params.context.diagnostics {
+            if !wanted(&params.context.only, &CodeActionKind::QUICKFIX) {
+                break;
+            }
             let Some(NumberOrString::String(code)) = diagnostic.code.as_ref() else {
                 continue;
             };
@@ -261,6 +270,12 @@ impl LanguageServer for Backend {
                 _ => continue,
             };
             actions.push(quick_fix(title, target_uri, diagnostic, edits, true));
+        }
+        if wanted(&params.context.only, &UPGRADE_ACTION_KIND) {
+            let language_version = self.workspace.lock().unwrap().language_version();
+            if let Some(action) = upgrade_action(&uri, &rope, language_version) {
+                actions.push(action);
+            }
         }
         Ok((!actions.is_empty()).then_some(actions))
     }
@@ -497,6 +512,117 @@ fn quick_fix(title: &str, target_uri: Url, diagnostic: Diagnostic, edits: Vec<Te
 /// The last language PCBoard actually released - 340 never left beta - and it
 /// still takes END as a statement and braces as parentheses.
 const LAST_LEGACY_LANGUAGE_VERSION: u16 = 330;
+
+const UPGRADE_ACTION_KIND: CodeActionKind = CodeActionKind::new("source.upgrade.ppl");
+
+fn wanted(only: &Option<Vec<CodeActionKind>>, kind: &CodeActionKind) -> bool {
+    match only {
+        None => true,
+        Some(kinds) => kinds.iter().any(|wanted| kind.as_str().starts_with(wanted.as_str())),
+    }
+}
+
+fn token_text_is(token: &Spanned<Token>, name: &str) -> bool {
+    matches!(&token.token, Token::Identifier(identifier) if identifier.eq_ignore_ascii_case(name))
+}
+
+/// The statements an older language spelled differently. They are read from the tree
+/// rather than the text, so a name inside a string or a comment stays untouched.
+struct LegacyStatementVisitor {
+    edits: Vec<(core::ops::Range<usize>, &'static str)>,
+}
+
+impl AstVisitor<()> for LegacyStatementVisitor {
+    fn visit_break_statement(&mut self, break_stmt: &BreakStatement) {
+        let token = break_stmt.get_break_token();
+        if token_text_is(token, "QUIT") {
+            self.edits.push((token.span.clone(), "BREAK"));
+        }
+    }
+
+    fn visit_continue_statement(&mut self, continue_stmt: &ContinueStatement) {
+        let token = continue_stmt.get_continue_token();
+        if token_text_is(token, "LOOP") {
+            self.edits.push((token.span.clone(), "CONTINUE"));
+        }
+    }
+
+    fn visit_predefined_call_statement(&mut self, call: &PredefinedCallStatement) {
+        let token = call.get_identifier_token();
+        if call.get_func().opcode == OpCode::END && token_text_is(token, "END") {
+            self.edits.push((token.span.clone(), "EXIT"));
+        }
+        walk_predefined_call_statement(self, call);
+    }
+}
+
+fn legacy_upgrade_edits(path: &Path, rope: &Rope, language_version: u16) -> Option<Vec<TextEdit>> {
+    let source = rope.to_string();
+    let registry = UserTypeRegistry::icy_board_registry();
+    let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+    let mut workspace = Workspace::default();
+    workspace.compiler.get_or_insert_with(CompilerData::default).language_version = Some(language_version);
+    preparse_type_declarations(path.to_path_buf(), errors.clone(), &source, &registry, Encoding::Utf8, &workspace);
+    let ast = parse_ast_with_predeclared_types(path.to_path_buf(), errors.clone(), &source, &registry, Encoding::Utf8, &workspace);
+
+    let mut rewrites: Vec<(core::ops::Range<usize>, &'static str)> = Vec::new();
+    {
+        let reporter = errors.lock().unwrap();
+        for report in [&reporter.errors, &reporter.warnings] {
+            for entry in report {
+                if entry.file_name != path {
+                    continue;
+                }
+                match entry.error.downcast_ref::<LexingErrorType>() {
+                    Some(LexingErrorType::PowWillGetRemoved) => rewrites.push((entry.span.clone(), "^")),
+                    Some(LexingErrorType::DontUseBraces) => match rope.get_char(entry.span.start) {
+                        Some('{') => rewrites.push((entry.span.clone(), "(")),
+                        Some('}') => rewrites.push((entry.span.clone(), ")")),
+                        _ => {}
+                    },
+                    _ => {}
+                }
+                if matches!(entry.error.downcast_ref::<ParserErrorType>(), Some(ParserErrorType::EndIsNotAStatement)) {
+                    rewrites.push((entry.span.clone(), "EXIT"));
+                }
+            }
+        }
+    }
+
+    let mut visitor = LegacyStatementVisitor { edits: Vec::new() };
+    ast.visit(&mut visitor);
+    rewrites.extend(visitor.edits);
+    if rewrites.is_empty() {
+        return None;
+    }
+
+    rewrites.sort_by_key(|(span, _)| span.start);
+    let mut edits = Vec::new();
+    for (span, replacement) in rewrites {
+        let start = offset_to_position(span.start, rope)?;
+        let end = offset_to_position(span.end, rope)?;
+        edits.push(TextEdit::new(Range::new(start, end), replacement.to_string()));
+    }
+    // The rewritten spellings only mean anything once the file says which language it is in.
+    if ast.language_version < LAST_PPL_LANGUAGE_VERSION {
+        edits.push(language_version_directive_edit(rope, LAST_PPL_LANGUAGE_VERSION)?);
+    }
+    Some(edits)
+}
+
+fn upgrade_action(uri: &Url, rope: &Rope, language_version: u16) -> Option<CodeActionOrCommand> {
+    let path = uri.to_file_path().ok()?;
+    let edits = legacy_upgrade_edits(&path, rope, language_version)?;
+    Some(CodeActionOrCommand::CodeAction(CodeAction {
+        title: format!("Upgrade file to language version {LAST_PPL_LANGUAGE_VERSION}"),
+        kind: Some(UPGRADE_ACTION_KIND),
+        edit: Some(WorkspaceEdit {
+            changes: Some(HashMap::from([(uri.clone(), edits)])),
+            ..WorkspaceEdit::default()
+        }),
+        ..CodeAction::default()
+    }))
+}
 
 /// True for a name that can be called without arguments, so that adding `()` cannot
 /// turn a report into a different one.
