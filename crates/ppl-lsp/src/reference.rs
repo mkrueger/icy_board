@@ -38,5 +38,9 @@ pub fn get_reference(ast: &Ast, offset: usize, semantic_visitor: &SemanticVisito
         }
     }
     reference_list.sort_by(|a, b| if a.0 == b.0 { b.1.span.start.cmp(&a.1.span.start) } else { a.0.cmp(&b.0) });
+    // A spot can be recorded more than once - an argument counts both as a value
+    // and as what it is bound to. Naming it twice would make rename ask the editor
+    // to change the same range twice, which is not a valid edit.
+    reference_list.dedup_by(|a, b| a.0 == b.0 && a.1.span == b.1.span);
     reference_list
 }
