@@ -76,7 +76,7 @@ pub enum CompilationErrorType {
     AssignmentTypeMismatch(VariableType, VariableType),
 
     #[error("Argument {0} expects {1}, got {2}")]
-    ArgumentTypeMismatch(usize, VariableType, VariableType),
+    ArgumentTypeMismatch(usize, String, String),
 
     #[error("Operator {0} is not defined for custom types")]
     CustomTypeOperatorNotSupported(crate::ast::BinOp),
@@ -94,7 +94,7 @@ pub enum CompilationErrorType {
     UnknownRecordLiteralField(VariableType, String),
 
     #[error("Record field '{0}' expects {1}, got {2}")]
-    RecordLiteralFieldTypeMismatch(String, VariableType, VariableType),
+    RecordLiteralFieldTypeMismatch(String, String, String),
 
     #[error("Record literals need runtime {0}")]
     RecordLiteralNeedsRuntime(u16),
@@ -201,11 +201,12 @@ impl PPECompiler {
     pub fn compile(&mut self, asts: &[&Ast]) {
         let mut visted = Vec::new();
         // One transformer for the whole package, so its generated labels stay unique across files.
-        let mut transformer = AstTransformationVisitor::new(true);
+        let mut transformer = AstTransformationVisitor::new(true, self.semantic_visitor.type_registry.enums());
         for prg in asts {
             self.semantic_visitor.errors.lock().unwrap().set_file_name(&prg.file_name);
             let prg = prg.visit_mut(&mut transformer);
             // println!("{}", prg);
+            self.semantic_visitor.set_loop_counters(transformer.take_loop_counters());
             prg.visit(&mut self.semantic_visitor);
             visted.push(prg);
         }

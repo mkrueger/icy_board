@@ -10,7 +10,7 @@ use crate::{
         AstVisitor, CommentAstNode, ConstDeclarationStatement, Constant, ConstantExpression, EnumDeclarationAstNode, Expression, FunctionCallExpression,
         FunctionDeclarationAstNode, FunctionImplementation, GosubStatement, GotoStatement, IdentifierExpression, LabelStatement, LetStatement,
         ParameterSpecifier, PredefinedCallStatement, ProcedureCallStatement, ProcedureDeclarationAstNode, ProcedureImplementation, TypeDeclarationAstNode,
-        VariableDeclarationStatement, VariableParameterSpecifier, const_value, walk_function_implementation, walk_indexer_expression,
+        VariableDeclarationStatement, VariableParameterSpecifier, const_value_with_members, walk_function_implementation, walk_indexer_expression,
         walk_predefined_call_statement, walk_procedure_call_statement, walk_procedure_implementation,
     },
     compiler::{CompilationErrorType, CompilationWarningType, user_data::UserDataMemberRegistry, workspace::Workspace},
@@ -249,6 +249,10 @@ pub struct SemanticVisitor {
     global_constants: HashMap<unicase::Ascii<String>, (VariableType, VariableValue)>,
     local_constants: Option<HashMap<unicase::Ascii<String>, (VariableType, VariableValue)>>,
 
+    /// Where the FOR statements of the current file keep their count, which a
+    /// desugared loop compares and steps itself.
+    loop_counters: HashSet<usize>,
+
     // constants
     pub function_containers: Vec<FunctionContainer>,
 
@@ -407,6 +411,31 @@ impl SemanticVisitor {
         }
         variable_type.to_string()
     }
+
+    pub fn set_loop_counters(&mut self, loop_counters: HashSet<usize>) {
+        self.loop_counters = loop_counters;
+    }
+
+    /// True for the variable a desugared FOR counts with.
+    fn counts_a_loop(&self, expr: &Expression) -> bool {
+        matches!(expr, Expression::Identifier(identifier) if self.loop_counters.contains(&identifier.get_identifier_token().span.start))
+    }
+
+    /// The enum a constant belongs to, if it names one of its members or another
+    /// constant of that type.
+    fn declared_constant_type(&self, expr: &Expression) -> Option<VariableType> {
+        match expr {
+            Expression::Identifier(identifier) => self.lookup_constant(identifier.get_identifier()).map(|(variable_type, _)| *variable_type),
+            Expression::MemberReference(member) => {
+                let Expression::Identifier(base) = member.get_expression() else {
+                    return None;
+                };
+                let definition = self.type_registry.get_enum(base.get_identifier())?;
+                definition.value(member.get_identifier()).map(|_| VariableType::UserData(definition.id))
+            }
+            _ => None,
+        }
+    }
     pub fn is_routine_reference(&self, span_start: usize) -> bool {
         self.allowed_routine_reference_spans.contains(&span_start)
     }
@@ -428,6 +457,7 @@ impl SemanticVisitor {
             local_variable_lookup: None,
             global_constants: HashMap::new(),
             local_constants: None,
+            loop_counters: HashSet::new(),
             require_user_variables: false,
             allow_routine_reference: false,
             allowed_routine_reference_spans: HashSet::new(),
@@ -1287,10 +1317,10 @@ impl SemanticVisitor {
                     let expected = parameter.get_variable_type();
                     let actual = arguments[i].visit(self);
                     if expected != actual && (matches!(expected, VariableType::UserData(_)) || matches!(actual, VariableType::UserData(_))) {
-                        self.errors
-                            .lock()
-                            .unwrap()
-                            .report_error(arguments[i].get_span(), CompilationErrorType::ArgumentTypeMismatch(i + 1, expected, actual));
+                        self.errors.lock().unwrap().report_error(
+                            arguments[i].get_span(),
+                            CompilationErrorType::ArgumentTypeMismatch(i + 1, self.source_type_name(expected), self.source_type_name(actual)),
+                        );
                     }
                 }
             }
@@ -1335,7 +1365,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             if expected != actual && (matches!(expected, VariableType::UserData(_)) || matches!(actual, VariableType::UserData(_))) {
                 self.errors.lock().unwrap().report_error(
                     field.get_value().get_span(),
-                    CompilationErrorType::RecordLiteralFieldTypeMismatch(name.to_string(), expected, actual),
+                    CompilationErrorType::RecordLiteralFieldTypeMismatch(name.to_string(), self.source_type_name(expected), self.source_type_name(actual)),
                 );
             }
         }
@@ -1346,6 +1376,21 @@ impl AstVisitor<VariableType> for SemanticVisitor {
         let left = binary.get_left_expression().visit(self);
         let right = binary.get_right_expression().visit(self);
         let has_enum = self.type_registry.is_enum_type(left) || self.type_registry.is_enum_type(right);
+        if has_enum && self.counts_a_loop(binary.get_left_expression()) {
+            // A FOR writes its own comparison and step, so it may count over an enum.
+            return match binary.get_op() {
+                crate::ast::BinOp::Lower | crate::ast::BinOp::LowerEq | crate::ast::BinOp::Greater | crate::ast::BinOp::GreaterEq => {
+                    if left != right {
+                        self.errors.lock().unwrap().report_error(
+                            binary.get_right_expression().get_span(),
+                            CompilationErrorType::EnumComparisonTypeMismatch(self.source_type_name(left), self.source_type_name(right)),
+                        );
+                    }
+                    VariableType::Boolean
+                }
+                _ => left,
+            };
+        }
         if has_enum && !matches!(binary.get_op(), crate::ast::BinOp::Eq | crate::ast::BinOp::NotEq) {
             self.errors.lock().unwrap().report_error(
                 binary.get_op_token().span.clone(),
@@ -1925,7 +1970,16 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             return VariableType::None;
         }
 
-        let value = const_value(const_decl.get_value(), &|id| self.lookup_constant(id).map(|(_, value)| value.clone()));
+        let value = const_value_with_members(
+            const_decl.get_value(),
+            &|id| self.lookup_constant(id).map(|(_, value)| value.clone()),
+            &|type_name, member| {
+                self.type_registry
+                    .get_enum(type_name)
+                    .and_then(|definition| definition.value(member))
+                    .map(VariableValue::new_int)
+            },
+        );
         let Some(value) = value else {
             self.errors
                 .lock()
@@ -1934,8 +1988,25 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             return VariableType::None;
         };
 
+        let declared_type = const_decl.get_variable_type();
+        if self.type_registry.is_enum_type(declared_type) {
+            let actual = self.declared_constant_type(const_decl.get_value()).unwrap_or_else(|| value.get_type());
+            if actual != declared_type {
+                self.errors.lock().unwrap().report_error(
+                    const_decl.get_value().get_span(),
+                    CompilationErrorType::EnumAssignmentTypeMismatch(self.source_type_name(declared_type), self.source_type_name(actual)),
+                );
+                return VariableType::None;
+            }
+        }
+
         let name = const_decl.get_identifier().clone();
-        let entry = (const_decl.get_variable_type(), value.convert_to(const_decl.get_variable_type()));
+        // An enum keeps the value its member stands for; converting to the type itself would mean nothing.
+        let entry = if self.type_registry.is_enum_type(declared_type) {
+            (declared_type, value)
+        } else {
+            (declared_type, value.convert_to(declared_type))
+        };
         if let Some(local) = &mut self.local_constants {
             local.insert(name, entry);
         } else {

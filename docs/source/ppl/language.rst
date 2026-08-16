@@ -200,7 +200,8 @@ A constant is written where a variable would be, so it may stand at the top of a
 program or at the top of a routine, where it belongs to that routine. Its value
 may be built from literals and from constants declared before it, and it is
 converted to the type it was declared with, the same way an assignment would
-convert it.
+convert it. A constant declared with an enum type names one of that enum's
+members and keeps the enum as its type.
 
 Because the value takes the place of the name while compiling, a constant costs
 nothing: the PPE is byte for byte the one the value written out by hand would
@@ -237,7 +238,9 @@ constant expression. Members are always qualified: ``Color.Green`` is a value,
 Enums are nominal. A ``Color`` may be assigned and compared only with another
 ``Color``; an integer or a member of a different enum is an error. Equality and
 inequality are supported, arithmetic is not. Enum variables, arrays, routine
-parameters and return values, and record fields all work with the same rule.
+parameters and return values, and record fields all work with the same rule. A
+``FOR`` may still count over an enum, because the loop writes its own comparison
+and step; its start and end value have to be of the enum's type.
 
 The type exists while compiling only. Its storage in the PPE is ``INTEGER``, and
 ``Color.Green`` becomes 5, so no new runtime or PPE format is needed. A

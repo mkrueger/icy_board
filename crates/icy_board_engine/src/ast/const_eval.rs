@@ -1,15 +1,26 @@
 use unicase::Ascii;
 
 use crate::{
-    ast::{AstVisitor, BinOp, Constant, ConstantExpression, Expression, UnaryOp, constant::NumberFormat},
+    ast::{AstVisitor, BinOp, Constant, ConstantExpression, Expression, MemberReferenceExpression, UnaryOp, constant::NumberFormat},
     executable::{VariableType, VariableValue},
 };
+
+/// What a name is worth while compiling.
+type ConstantLookup<'a> = &'a dyn Fn(&Ascii<String>) -> Option<VariableValue>;
+
+/// What a member of a named type is worth while compiling.
+type MemberLookup<'a> = &'a dyn Fn(&Ascii<String>, &Ascii<String>) -> Option<VariableValue>;
 
 /// What a constant expression is worth, or `None` if it takes anything the compiler
 /// cannot know. Names are asked for, so one constant may be written in terms of an
 /// earlier one.
-pub fn const_value(expr: &Expression, lookup: &dyn Fn(&Ascii<String>) -> Option<VariableValue>) -> Option<VariableValue> {
-    expr.visit(&mut ConstEvaluator { lookup })
+pub fn const_value(expr: &Expression, lookup: ConstantLookup<'_>) -> Option<VariableValue> {
+    const_value_with_members(expr, lookup, &|_, _| None)
+}
+
+/// As `const_value`, but `Enum.Member` is worth what the member stands for.
+pub fn const_value_with_members(expr: &Expression, lookup: ConstantLookup<'_>, member: MemberLookup<'_>) -> Option<VariableValue> {
+    expr.visit(&mut ConstEvaluator { lookup, member })
 }
 
 /// The literal a value is written as, in the type its constant was declared with.
@@ -30,12 +41,20 @@ pub fn const_expression(value: &VariableValue, variable_type: VariableType) -> O
 }
 
 struct ConstEvaluator<'a> {
-    lookup: &'a dyn Fn(&Ascii<String>) -> Option<VariableValue>,
+    lookup: ConstantLookup<'a>,
+    member: MemberLookup<'a>,
 }
 
 impl AstVisitor<Option<VariableValue>> for ConstEvaluator<'_> {
     fn visit_identifier_expression(&mut self, identifier: &crate::ast::IdentifierExpression) -> Option<VariableValue> {
         (self.lookup)(identifier.get_identifier())
+    }
+
+    fn visit_member_reference_expression(&mut self, member: &MemberReferenceExpression) -> Option<VariableValue> {
+        let Expression::Identifier(base) = member.get_expression() else {
+            return None;
+        };
+        (self.member)(base.get_identifier(), member.get_identifier())
     }
 
     fn visit_constant_expression(&mut self, constant: &ConstantExpression) -> Option<VariableValue> {

@@ -246,6 +246,11 @@ impl EnumDefinition {
     pub fn value(&self, variant: &unicase::Ascii<String>) -> Option<i32> {
         self.variants.iter().find_map(|(name, value)| (name == variant).then_some(*value))
     }
+
+    /// A member standing for `value`, so a lowered value can be written as itself again.
+    pub fn variant_name(&self, value: i32) -> Option<&unicase::Ascii<String>> {
+        self.variants.iter().find_map(|(name, v)| (*v == value).then_some(name))
+    }
 }
 
 impl UserTypeDefinition {
@@ -328,6 +333,10 @@ impl UserTypeRegistry {
 
     pub fn get_enum(&self, identifier: &unicase::Ascii<String>) -> Option<EnumDefinition> {
         self.enums.read().unwrap().iter().find(|def| def.name == *identifier).cloned()
+    }
+
+    pub fn enums(&self) -> Vec<EnumDefinition> {
+        self.enums.read().unwrap().clone()
     }
 
     pub fn get_enum_from_id(&self, id: u8) -> Option<EnumDefinition> {

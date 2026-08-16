@@ -111,7 +111,8 @@ Gives a name to a value the compiler works out.
 
 `name`   The name the value is used under
 
-`value`  An expression of literals and constants declared before it
+`value`  An expression of literals and constants declared before it, or an enum
+member when the declared type is that enum
 
 ### Remarks
 A constant stands where a variable would, so it may open a program or a routine,
@@ -151,7 +152,9 @@ live under the enum name, so `Color.Green` is valid and `Green` alone is not.
 
 Enums are nominal: different enums and plain integers cannot be assigned to or
 compared with each other. Equality and inequality are supported; arithmetic and
-bitflag behavior are not. Enum variables, arrays, routine parameters and return
+bitflag behavior are not. A `FOR` may count over an enum, since the loop writes
+its own comparison and step, and its start and end value must be of the enum's
+type. Enum variables, arrays, routine parameters and return
 values, and record fields are stored as `INTEGER` in the PPE. The type and names
 therefore cost nothing at runtime and cannot be recovered by the decompiler.
 

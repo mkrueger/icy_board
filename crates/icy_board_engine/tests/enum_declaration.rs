@@ -137,6 +137,39 @@ fn duplicate_and_nonconstant_members_are_errors() {
     );
 }
 
+/// A FOR writes its own comparison and step, so it may count over an enum even
+/// though hand-written arithmetic on one stays an error.
+#[test]
+fn a_for_loop_may_count_over_an_enum() {
+    let enum_source = format!("{COLOR}Color shade\nFOR shade = Color.Red TO Color.Blue\n  PRINTLN shade\nNEXT\n");
+    let integer_source = "INTEGER shade\nFOR shade = 0 TO 6\n  PRINTLN shade\nNEXT\n";
+
+    assert_eq!(
+        compile(integer_source).unwrap().to_buffer().unwrap(),
+        compile(&enum_source).unwrap().to_buffer().unwrap()
+    );
+
+    let errors = diagnostics(&format!("{COLOR}Color shade\nFOR shade = Color.Red TO 5\n  PRINTLN shade\nNEXT\n"));
+    assert!(errors.iter().any(|e| e == "Can't compare Color with Integer"), "{errors:?}");
+
+    let errors = diagnostics(&format!("{COLOR}Color shade = Color.Red\nshade = shade + 1\n"));
+    assert!(!errors.is_empty(), "counting an enum up by hand is still an error");
+
+    let errors = diagnostics(&format!("{COLOR}Color shade = Color.Red\nshade += 1\n"));
+    assert!(!errors.is_empty(), "a compound assignment is not loop machinery");
+}
+
+#[test]
+fn an_enum_is_named_in_argument_and_field_errors() {
+    let errors = diagnostics(&format!(
+        "{COLOR}DECLARE PROCEDURE Use(Color value)\nUse(1)\nPROCEDURE Use(Color value)\nENDPROC\n"
+    ));
+    assert!(errors.iter().any(|e| e == "Argument 1 expects Color, got Integer"), "{errors:?}");
+
+    let errors = diagnostics(&format!("{COLOR}TYPE Paint\n  Color Shade\nENDTYPE\nPaint item = Paint {{ Shade = 1 }}\n"));
+    assert!(errors.iter().any(|e| e == "Record field 'Shade' expects Color, got Integer"), "{errors:?}");
+}
+
 #[test]
 fn enum_is_a_keyword_from_400_on() {
     let errors = diagnostics(";$LANGVERSION 350\nINTEGER Enum\nEnum = 2\nPRINTLN Enum\n");

@@ -85,6 +85,22 @@ fn const_is_a_keyword_from_400_on() {
     assert!(!errors.is_empty(), "const should not be a variable name in 400");
 }
 
+/// A constant may name an enum member and keeps the enum as its type.
+#[test]
+fn a_constant_may_hold_an_enum_member() {
+    let color = "ENUM Color\n  Red\n  Green = 5\nENDENUM\n";
+
+    let with_constant = compile(&format!("{color}CONST Color Favorite = Color.Green\nColor shade = Favorite\nPRINTLN shade\n")).unwrap();
+    let with_member = compile(&format!("{color}Color shade = Color.Green\nPRINTLN shade\n")).unwrap();
+    assert_eq!(with_member.to_buffer().unwrap(), with_constant.to_buffer().unwrap());
+
+    let errors = diagnostics(&format!("{color}CONST Color Favorite = 1\n"));
+    assert_eq!(vec!["Can't assign Integer to Color".to_string()], errors);
+
+    let errors = diagnostics(&format!("{color}CONST Color Favorite = Color.Green\nINTEGER count = Favorite\n"));
+    assert!(errors.iter().any(|e| e == "Can't assign Color to Integer"), "{errors:?}");
+}
+
 /// The declared type decides what the value is written as, not the literal.
 #[test]
 fn the_declared_type_decides_the_constant() {

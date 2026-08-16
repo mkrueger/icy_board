@@ -1,16 +1,19 @@
 use core::panic;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::{
     ast::{
         Ast, AstNode, AstVisitorMut, BinaryExpression, BlockStatement, CommentAstNode, ConstDeclarationStatement, Constant, ConstantExpression,
         DimensionSpecifier, Expression, ForStatement, FunctionImplementation, GotoStatement, IdentifierExpression, IfStatement, LabelStatement, LetStatement,
-        ProcedureImplementation, ReturnStatement, SelectStatement, Statement, VariableDeclarationStatement, VariableSpecifier, const_expression, const_value,
-        constant::NumberFormat,
+        MemberReferenceExpression, ProcedureImplementation, ReturnStatement, SelectStatement, Statement, VariableDeclarationStatement, VariableSpecifier,
+        const_expression, const_value_with_members, constant::NumberFormat,
     },
     decompiler::evaluation_visitor::{ConstantFolder, OptimizationVisitor},
     executable::VariableValue,
-    parser::lexer::{Spanned, Token},
+    parser::{
+        EnumDefinition,
+        lexer::{Spanned, Token},
+    },
 };
 
 pub struct AstTransformationVisitor {
@@ -20,10 +23,12 @@ pub struct AstTransformationVisitor {
     labels: usize,
     global_constants: HashMap<unicase::Ascii<String>, (crate::executable::VariableType, VariableValue)>,
     local_constants: Option<HashMap<unicase::Ascii<String>, (crate::executable::VariableType, VariableValue)>>,
+    enums: Vec<EnumDefinition>,
+    loop_counters: HashSet<usize>,
 }
 
 impl AstTransformationVisitor {
-    pub fn new(optimize_output: bool) -> Self {
+    pub fn new(optimize_output: bool, enums: Vec<EnumDefinition>) -> Self {
         Self {
             continue_break_labels: Vec::new(),
             cur_function: None,
@@ -31,12 +36,36 @@ impl AstTransformationVisitor {
             labels: 0,
             global_constants: HashMap::new(),
             local_constants: None,
+            enums,
+            loop_counters: HashSet::new(),
         }
     }
+
+    /// Where the FOR statements of the file just transformed keep their count.
+    pub fn take_loop_counters(&mut self) -> HashSet<usize> {
+        std::mem::take(&mut self.loop_counters)
+    }
+
     pub fn next_label(&mut self) -> unicase::Ascii<String> {
         let label = unicase::Ascii::new(format!("*(label{}", self.labels));
         self.labels += 1;
         label
+    }
+
+    fn enum_member_value(&self, type_name: &unicase::Ascii<String>, member: &unicase::Ascii<String>) -> Option<VariableValue> {
+        let definition = self.enums.iter().find(|definition| definition.name == *type_name)?;
+        definition.value(member).map(VariableValue::new_int)
+    }
+
+    /// The `Enum.Member` a value stands for, so an enum constant keeps its type until
+    /// the members are lowered.
+    fn enum_member_expression(&self, id: u8, value: i32) -> Option<Expression> {
+        let definition = self.enums.iter().find(|definition| definition.id == id)?;
+        let member = definition.variant_name(value)?;
+        Some(MemberReferenceExpression::create_empty_expression(
+            IdentifierExpression::create_empty_expression(definition.name.clone()),
+            member.clone(),
+        ))
     }
 
     fn lookup_constant(&self, id: &unicase::Ascii<String>) -> Option<&(crate::executable::VariableType, VariableValue)> {
@@ -55,7 +84,11 @@ impl AstTransformationVisitor {
             let Statement::ConstDeclaration(const_decl) = statement else {
                 continue;
             };
-            let Some(value) = const_value(const_decl.get_value(), &|id| self.lookup_constant(id).map(|(_, value)| value.clone())) else {
+            let Some(value) = const_value_with_members(
+                const_decl.get_value(),
+                &|id| self.lookup_constant(id).map(|(_, value)| value.clone()),
+                &|type_name, member| self.enum_member_value(type_name, member),
+            ) else {
                 continue;
             };
             let entry = (const_decl.get_variable_type(), value);
@@ -287,6 +320,7 @@ impl AstVisitorMut for AstTransformationVisitor {
 
     fn visit_for_statement(&mut self, for_stmt: &ForStatement) -> Statement {
         let mut statements = Vec::new();
+        self.loop_counters.insert(for_stmt.get_identifier_token().span.start);
 
         let loop_label = self.next_label();
         let continue_label = self.next_label();
@@ -478,7 +512,11 @@ impl AstVisitorMut for AstTransformationVisitor {
 
     fn visit_identifier_expression(&mut self, identifier: &IdentifierExpression) -> Expression {
         if let Some((variable_type, value)) = self.lookup_constant(identifier.get_identifier()) {
-            if let Some(expr) = const_expression(value, *variable_type) {
+            if let crate::executable::VariableType::UserData(id) = variable_type {
+                if let Some(expr) = self.enum_member_expression(*id, value.as_int()) {
+                    return expr;
+                }
+            } else if let Some(expr) = const_expression(value, *variable_type) {
                 return expr;
             }
         }
