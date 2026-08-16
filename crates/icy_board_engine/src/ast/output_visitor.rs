@@ -15,8 +15,6 @@ pub enum OutputFunc {
     CamelCase,
 }
 
-pub static mut DEFAULT_OUTPUT_FUNC: OutputFunc = OutputFunc::Upper;
-
 #[derive(Default)]
 pub struct OutputVisitor {
     pub version: u16,

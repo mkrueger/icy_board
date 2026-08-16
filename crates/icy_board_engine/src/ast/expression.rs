@@ -1,4 +1,5 @@
 use std::fmt;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use super::{AstVisitor, AstVisitorMut, Constant, ExpressionDepthVisitor, NegateExpressionVisitor};
 use crate::{
@@ -507,7 +508,12 @@ impl fmt::Display for ParensExpression {
     }
 }
 
-static mut FUNC_CALL_ID: u64 = 0;
+static FUNC_CALL_ID: AtomicU64 = AtomicU64::new(0);
+
+/// Function calls are told apart by this, and 0 stands for none.
+fn next_func_call_id() -> u64 {
+    FUNC_CALL_ID.fetch_add(1, Ordering::Relaxed).wrapping_add(1).max(1)
+}
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct FunctionCallExpression {
@@ -521,10 +527,7 @@ pub struct FunctionCallExpression {
 impl FunctionCallExpression {
     pub fn new(expression: Expression, leftpar_token: Spanned<Token>, arguments: Vec<Expression>, rightpar_token: Spanned<Token>) -> Self {
         Self {
-            id: unsafe {
-                FUNC_CALL_ID = FUNC_CALL_ID.wrapping_add(1).max(1);
-                FUNC_CALL_ID
-            },
+            id: next_func_call_id(),
             expression: Box::new(expression),
             lpar_token: leftpar_token,
             arguments,
@@ -534,10 +537,7 @@ impl FunctionCallExpression {
 
     pub fn empty(expression: Expression, arguments: Vec<Expression>) -> Self {
         Self {
-            id: unsafe {
-                FUNC_CALL_ID = FUNC_CALL_ID.wrapping_add(1);
-                FUNC_CALL_ID
-            },
+            id: next_func_call_id(),
             expression: Box::new(expression),
             lpar_token: Spanned::create_empty(Token::LPar),
             arguments,
