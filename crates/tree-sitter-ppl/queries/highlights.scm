@@ -60,6 +60,7 @@
   ";$ELSE"
   ";$ENDIF"
   ";$USEFUNCS"
+  ";$LANGVERSION"
 ] @keyword.directive @preproc
 
 (define_directive name: (identifier) @constant.macro)

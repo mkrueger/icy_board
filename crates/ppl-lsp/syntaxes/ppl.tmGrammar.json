@@ -19,7 +19,7 @@
 		"preprocessor": {
 			"patterns": [
 				{
-					"match": "(?i)(;\\$(?:DEFINE|IF|ELSEIF|ELIF|ELSE|ENDIF|USEFUNCS))\\b",
+					"match": "(?i)(;\\$(?:DEFINE|IF|ELSEIF|ELIF|ELSE|ENDIF|USEFUNCS|LANGVERSION))\\b",
 					"name": "keyword.control.directive.ppl"
 				},
 				{

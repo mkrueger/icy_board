@@ -122,6 +122,10 @@
         "named": true
       },
       {
+        "type": "langversion_directive",
+        "named": true
+      },
+      {
         "type": "loop_statement",
         "named": true
       },
@@ -1027,6 +1031,22 @@
     }
   },
   {
+    "type": "langversion_directive",
+    "named": true,
+    "fields": {
+      "version": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "number_literal",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "loop_statement",
     "named": true,
     "fields": {
@@ -1735,6 +1755,10 @@
   },
   {
     "type": ";$IF",
+    "named": false
+  },
+  {
+    "type": ";$LANGVERSION",
     "named": false
   },
   {

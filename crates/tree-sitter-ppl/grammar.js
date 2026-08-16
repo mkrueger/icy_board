@@ -161,6 +161,13 @@ module.exports = grammar({
       $.else_directive,
       $.endif_directive,
       $.usefuncs_directive,
+      $.langversion_directive,
+    ),
+
+    // Says which language the file is written in, before anything else in it.
+    langversion_directive: $ => seq(
+      alias(token(seq(';', ci('$LANGVERSION'))), ';$LANGVERSION'),
+      field('version', $.number_literal),
     ),
 
     define_directive: $ => prec.right(seq(

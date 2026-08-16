@@ -65,6 +65,44 @@
         {
           "type": "SYMBOL",
           "name": "usefuncs_directive"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "langversion_directive"
+        }
+      ]
+    },
+    "langversion_directive": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "SEQ",
+              "members": [
+                {
+                  "type": "STRING",
+                  "value": ";"
+                },
+                {
+                  "type": "PATTERN",
+                  "value": "\\$[lL][aA][nN][gG][vV][eE][rR][sS][iI][oO][nN]"
+                }
+              ]
+            }
+          },
+          "named": false,
+          "value": ";$LANGVERSION"
+        },
+        {
+          "type": "FIELD",
+          "name": "version",
+          "content": {
+            "type": "SYMBOL",
+            "name": "number_literal"
+          }
         }
       ]
     },
