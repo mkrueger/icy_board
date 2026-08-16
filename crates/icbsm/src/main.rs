@@ -65,6 +65,10 @@ struct Cli {
     #[argh(switch)]
     dry_run: bool,
 
+    /// print the version and exit
+    #[argh(switch)]
+    version: bool,
+
     #[argh(positional)]
     /// path/file name of the icyboard.toml configuration file
     file: Option<PathBuf>,
@@ -78,6 +82,10 @@ impl Cli {
 
 fn main() -> Result<()> {
     let arguments: Cli = argh::from_env();
+    if arguments.version {
+        println!("icbsm {}", *VERSION);
+        return Ok(());
+    }
 
     let Some(file) = icy_board_engine::lookup_icyboard_file(&arguments.file) else {
         print_error(icy_board_tui::get_text("error_file_or_path_not_found"));

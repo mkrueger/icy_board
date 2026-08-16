@@ -25,8 +25,12 @@ mod zconnect_experiment;
 #[derive(FromArgs)]
 /// Exchange fidonet mail with the systems listed in ftn.toml
 struct Cli {
+    /// print the version and exit
+    #[argh(switch)]
+    version: bool,
+
     #[argh(subcommand)]
-    command: Command,
+    command: Option<Command>,
 }
 
 #[derive(FromArgs)]
@@ -111,7 +115,17 @@ struct Scan {
 #[tokio::main]
 async fn main() {
     let arguments: Cli = argh::from_env();
-    let result = match arguments.command {
+    if arguments.version {
+        println!("icbmailer {}", env!("CARGO_PKG_VERSION"));
+        return;
+    }
+    let Some(command) = arguments.command else {
+        if let Err(err) = Cli::from_args(&["icbmailer"], &["--help"]) {
+            eprintln!("{}", err.output);
+        }
+        exit(1);
+    };
+    let result = match command {
         Command::Links(arguments) => list_links(&arguments.config),
         Command::Poll(arguments) => match load_and_log(&arguments.config, arguments.verbose) {
             Ok(mut board) => poll_links(&mut board, arguments.address.as_deref(), arguments.keep).await,

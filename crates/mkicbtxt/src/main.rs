@@ -43,6 +43,10 @@ struct Cli {
     #[argh(switch)]
     force: bool,
 
+    /// print the version and exit
+    #[argh(switch)]
+    version: bool,
+
     /// file to edit/create
     #[argh(positional)]
     file: PathBuf,
@@ -53,7 +57,16 @@ struct Cli {
 }
 
 fn main() -> Result<()> {
+    // argh insists on the file argument before it ever looks at the switches.
+    if std::env::args().skip(1).any(|argument| argument == "--version") {
+        println!("mkicbtxt {}", *VERSION);
+        return Ok(());
+    }
     let arguments: Cli = argh::from_env();
+    if arguments.version {
+        println!("mkicbtxt {}", *VERSION);
+        return Ok(());
+    }
 
     let file = arguments.file;
     if !file.exists() && !arguments.create {

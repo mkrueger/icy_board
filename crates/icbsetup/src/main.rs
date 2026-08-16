@@ -32,6 +32,10 @@ struct Cli {
     #[argh(switch, short = 'f')]
     full_screen: bool,
 
+    /// print the version and exit
+    #[argh(switch)]
+    version: bool,
+
     #[argh(subcommand)]
     command: Option<Commands>,
 
@@ -89,6 +93,10 @@ struct PPEConvert {
 
 fn main() -> Result<()> {
     let arguments: Cli = argh::from_env();
+    if arguments.version {
+        println!("icbsetup {}", *VERSION);
+        return Ok(());
+    }
 
     match &arguments.command {
         Some(Commands::Import(Import { name, out, map, dry_run })) => {

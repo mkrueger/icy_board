@@ -24,8 +24,12 @@ type Res<T> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
 #[derive(FromArgs)]
 /// Convert and maintain icy_board file bases
 struct Cli {
+    /// print the version and exit
+    #[argh(switch)]
+    version: bool,
+
     #[argh(subcommand)]
-    command: Command,
+    command: Option<Command>,
 }
 
 #[derive(FromArgs)]
@@ -258,7 +262,17 @@ fn reset_sigpipe() {
 fn reset_sigpipe() {}
 
 fn run(cli: Cli) -> Res<()> {
-    match cli.command {
+    if cli.version {
+        println!("icbfile {}", env!("CARGO_PKG_VERSION"));
+        return Ok(());
+    }
+    let Some(command) = cli.command else {
+        if let Err(err) = Cli::from_args(&["icbfile"], &["--help"]) {
+            eprintln!("{}", err.output);
+        }
+        exit(1);
+    };
+    match command {
         Command::Areas(cmd) => areas(&cmd.areas),
         Command::List(cmd) => list(open(&cmd.target, &cmd.area)?, cmd.long),
         Command::Scan(cmd) => scan(open(&cmd.target, &cmd.area)?, cmd.force),

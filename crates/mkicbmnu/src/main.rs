@@ -36,15 +36,30 @@ struct Cli {
     #[argh(switch, short = 'f')]
     full_screen: bool,
 
+    /// print the version and exit
+    #[argh(switch)]
+    version: bool,
+
     /// file[.mnu] to edit/create (extension will always be .mnu)
     #[argh(positional)]
-    file: PathBuf,
+    file: Option<PathBuf>,
 }
 
 fn main() -> Result<()> {
     let arguments: Cli = argh::from_env();
+    if arguments.version {
+        println!("mkicbmnu {}", *VERSION);
+        return Ok(());
+    }
 
-    let file = arguments.file.with_extension("mnu");
+    let Some(menu_file) = arguments.file.clone() else {
+        if let Err(err) = Cli::from_args(&["mkicbmnu"], &["--help"]) {
+            eprintln!("{}", err.output);
+        }
+        exit(1);
+    };
+
+    let file = menu_file.with_extension("mnu");
     if !file.exists() && !arguments.create {
         print_error(icy_board_tui::get_text("error_file_or_path_not_found"));
         exit(1);
@@ -85,7 +100,7 @@ fn main() -> Result<()> {
         Ok(mnu) => {
             let terminal = &mut term::init()?;
             let mnu = Arc::new(Mutex::new(mnu));
-            let mut app = new_main_window(icy_board, mnu.clone(), arguments.full_screen, &arguments.file);
+            let mut app = new_main_window(icy_board, mnu.clone(), arguments.full_screen, &menu_file);
             app.run(terminal)?;
             term::restore()?;
             if app.save {

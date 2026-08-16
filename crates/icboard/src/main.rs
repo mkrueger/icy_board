@@ -70,6 +70,10 @@ struct Cli {
     /// stuffed key chars
     key: Option<String>,
 
+    /// print the version and exit
+    #[argh(switch)]
+    version: bool,
+
     /// path/file name of the icyboard.toml configuration file
     #[argh(positional)]
     file: Option<PathBuf>,
@@ -83,6 +87,10 @@ lazy_static::lazy_static! {
 #[tokio::main]
 async fn main() -> Res<()> {
     let arguments: Cli = argh::from_env();
+    if arguments.version {
+        println!("icboard {}", *VERSION);
+        return Ok(());
+    }
     let Some(file) = icy_board_engine::lookup_icyboard_file(&arguments.file) else {
         print_error(icy_board_tui::get_text("error_file_or_path_not_found"));
         exit(1);
