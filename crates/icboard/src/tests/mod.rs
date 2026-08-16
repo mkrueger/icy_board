@@ -1,4 +1,4 @@
-use std::{path::PathBuf, sync::Arc, thread};
+use std::{path::PathBuf, sync::Arc};
 
 use icy_board_engine::icy_board::{
     IcyBoard,
@@ -244,11 +244,41 @@ fn test_session_output<P: Fn(&mut IcyBoard)>(cmd: String, init_fn: P, login_syso
             })
             .unwrap();
 
-        thread::sleep(std::time::Duration::from_millis(150));
+        wait_for_the_board_to_go_quiet(&result).await;
         let x = result.as_ref().lock().await.clone();
         x
     });
 
     let result = String::from_utf8(result).expect("board output is not valid UTF-8");
     result.replace("\r\n", "\n")
+}
+
+/// A session does not end - it waits for input that never comes - so the answer is
+/// complete once the board has stopped writing. Waiting for that rather than for a
+/// fixed span keeps the tests honest on a busy machine.
+async fn wait_for_the_board_to_go_quiet(output: &Arc<tokio::sync::Mutex<Vec<u8>>>) {
+    const QUIET: std::time::Duration = std::time::Duration::from_millis(150);
+    const FIRST_BYTE: std::time::Duration = std::time::Duration::from_secs(10);
+    const NEVER_LONGER_THAN: std::time::Duration = std::time::Duration::from_secs(60);
+
+    let start = std::time::Instant::now();
+    let mut seen = 0;
+    let mut last_change = start;
+
+    loop {
+        let len = output.lock().await.len();
+        if len != seen {
+            seen = len;
+            last_change = std::time::Instant::now();
+        } else if seen > 0 && last_change.elapsed() >= QUIET {
+            return;
+        } else if seen == 0 && start.elapsed() >= FIRST_BYTE {
+            return;
+        }
+
+        if start.elapsed() >= NEVER_LONGER_THAN {
+            return;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+    }
 }
