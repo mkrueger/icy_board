@@ -29,7 +29,7 @@ fn a_failed_password_does_not_offer_a_comment_when_disabled() {
 }
 
 #[test]
-fn a_direct_ppe_has_no_login_presentation_or_prompt() {
+fn a_direct_ppe_has_only_its_output_and_the_completion_prompt() {
     let output = test_ppe_output("PRINT \"PPE ONLY\"", |board| {
         setup_conference(board);
         board.conferences[0].news_file = fixture("main/blt1");
@@ -38,5 +38,5 @@ fn a_direct_ppe_has_no_login_presentation_or_prompt() {
         board.config.switches.scan_new_blt = true;
     });
 
-    assert_eq!(output, "PPE ONLY\n");
+    assert_eq!(output, format!("PPE ONLY\n{}\n", icy_board_tui::get_text("run_ppe_completed")));
 }

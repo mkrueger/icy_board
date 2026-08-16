@@ -205,7 +205,7 @@ pub fn test_ppe_output<P: Fn(&mut IcyBoard)>(source: &str, init_fn: P) -> String
     std::fs::write(&ppe_file, compiler.create_executable().unwrap().to_buffer().unwrap()).unwrap();
 
     test_session_output(
-        String::new(),
+        "\r".to_string(),
         init_fn,
         false,
         Some(PPEExecute {
