@@ -1,12 +1,15 @@
 use core::panic;
+use std::collections::HashMap;
 
 use crate::{
     ast::{
-        AstNode, AstVisitorMut, BinaryExpression, BlockStatement, CommentAstNode, Constant, ConstantExpression, DimensionSpecifier, Expression, ForStatement,
-        FunctionImplementation, GotoStatement, IdentifierExpression, IfStatement, LabelStatement, LetStatement, ReturnStatement, SelectStatement, Statement,
-        VariableDeclarationStatement, VariableSpecifier, constant::NumberFormat,
+        Ast, AstNode, AstVisitorMut, BinaryExpression, BlockStatement, CommentAstNode, ConstDeclarationStatement, Constant, ConstantExpression,
+        DimensionSpecifier, Expression, ForStatement, FunctionImplementation, GotoStatement, IdentifierExpression, IfStatement, LabelStatement, LetStatement,
+        ProcedureImplementation, ReturnStatement, SelectStatement, Statement, VariableDeclarationStatement, VariableSpecifier, const_expression, const_value,
+        constant::NumberFormat,
     },
     decompiler::evaluation_visitor::{ConstantFolder, OptimizationVisitor},
+    executable::VariableValue,
     parser::lexer::{Spanned, Token},
 };
 
@@ -15,6 +18,8 @@ pub struct AstTransformationVisitor {
     cur_function: Option<unicase::Ascii<String>>,
     optimize_output: bool,
     labels: usize,
+    global_constants: HashMap<unicase::Ascii<String>, (crate::executable::VariableType, VariableValue)>,
+    local_constants: Option<HashMap<unicase::Ascii<String>, (crate::executable::VariableType, VariableValue)>>,
 }
 
 impl AstTransformationVisitor {
@@ -24,12 +29,43 @@ impl AstTransformationVisitor {
             cur_function: None,
             optimize_output,
             labels: 0,
+            global_constants: HashMap::new(),
+            local_constants: None,
         }
     }
     pub fn next_label(&mut self) -> unicase::Ascii<String> {
         let label = unicase::Ascii::new(format!("*(label{}", self.labels));
         self.labels += 1;
         label
+    }
+
+    fn lookup_constant(&self, id: &unicase::Ascii<String>) -> Option<&(crate::executable::VariableType, VariableValue)> {
+        if let Some(local) = &self.local_constants {
+            if let Some(constant) = local.get(id) {
+                return Some(constant);
+            }
+        }
+        self.global_constants.get(id)
+    }
+
+    /// A constant may be written in terms of an earlier one, so the values are worked
+    /// out in the order they are declared.
+    fn collect_constants(&mut self, statements: &[Statement], local: bool) {
+        for statement in statements {
+            let Statement::ConstDeclaration(const_decl) = statement else {
+                continue;
+            };
+            let Some(value) = const_value(const_decl.get_value(), &|id| self.lookup_constant(id).map(|(_, value)| value.clone())) else {
+                continue;
+            };
+            let entry = (const_decl.get_variable_type(), value);
+            let name = const_decl.get_identifier().clone();
+            if local {
+                self.local_constants.get_or_insert_with(HashMap::new).insert(name, entry);
+            } else {
+                self.global_constants.insert(name, entry);
+            }
+        }
     }
 }
 
@@ -391,6 +427,8 @@ impl AstVisitorMut for AstTransformationVisitor {
 
     fn visit_function_implementation(&mut self, function: &FunctionImplementation) -> AstNode {
         self.cur_function = Some(function.get_identifier().clone());
+        self.local_constants = Some(HashMap::new());
+        self.collect_constants(function.get_statements(), true);
         let res = AstNode::Function(FunctionImplementation::new(
             function.id,
             function.get_function_token().clone(),
@@ -408,7 +446,67 @@ impl AstVisitorMut for AstTransformationVisitor {
         ));
 
         self.cur_function = None;
+        self.local_constants = None;
         res
+    }
+
+    fn visit_procedure_implementation(&mut self, procedure: &ProcedureImplementation) -> AstNode {
+        self.local_constants = Some(HashMap::new());
+        self.collect_constants(procedure.get_statements(), true);
+        let res = AstNode::Procedure(ProcedureImplementation::new(
+            procedure.id,
+            procedure.get_procedure_token().clone(),
+            Spanned {
+                span: procedure.get_identifier_token().span.clone(),
+                token: Token::Identifier(self.visit_identifier(procedure.get_identifier())),
+            },
+            procedure.get_leftpar_token().clone(),
+            procedure.get_parameters().iter().map(|arg| arg.visit_mut(self)).collect(),
+            procedure.get_rightpar_token().clone(),
+            procedure.get_statements().iter().map(|stmt| stmt.visit_mut(self)).collect(),
+            procedure.get_endproc_token().clone(),
+        ));
+        self.local_constants = None;
+        res
+    }
+
+    /// The value takes the place of the name everywhere it is used. The declaration
+    /// itself stays for the checks that come after; the code generator skips it.
+    fn visit_const_declaration_statement(&mut self, const_decl: &ConstDeclarationStatement) -> Statement {
+        Statement::ConstDeclaration(const_decl.clone())
+    }
+
+    fn visit_identifier_expression(&mut self, identifier: &IdentifierExpression) -> Expression {
+        if let Some((variable_type, value)) = self.lookup_constant(identifier.get_identifier()) {
+            if let Some(expr) = const_expression(value, *variable_type) {
+                return expr;
+            }
+        }
+        Expression::Identifier(IdentifierExpression::new(Spanned {
+            span: identifier.get_identifier_token().span.clone(),
+            token: Token::Identifier(self.visit_identifier(identifier.get_identifier())),
+        }))
+    }
+
+    fn visit_ast(&mut self, program: &Ast) -> Ast {
+        // A constant may be used before the line that declares it, so they are all
+        // known before anything is rewritten.
+        for node in &program.nodes {
+            match node {
+                AstNode::TopLevelStatement(stmt) => self.collect_constants(std::slice::from_ref(stmt), false),
+                AstNode::Main(block) => self.collect_constants(block.get_statements(), false),
+                _ => {}
+            }
+        }
+
+        let mut new_program = Ast::new();
+        new_program.file_name.clone_from(&program.file_name);
+        new_program.language_version = program.language_version;
+        new_program.require_user_variables = program.require_user_variables;
+        for node in &program.nodes {
+            new_program.nodes.push(node.visit_mut(self));
+        }
+        new_program
     }
 
     fn visit_return_statement(&mut self, return_stmt: &ReturnStatement) -> Statement {

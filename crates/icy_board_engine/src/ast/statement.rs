@@ -5,7 +5,10 @@ use crate::{
     parser::lexer::{CommentType, Spanned, Token},
 };
 
-use super::{AstVisitor, AstVisitorMut, Constant, ConstantExpression, Expression, UnaryExpression, UnaryOp, VariableDeclarationStatement, VariableSpecifier};
+use super::{
+    AstVisitor, AstVisitorMut, ConstDeclarationStatement, Constant, ConstantExpression, Expression, UnaryExpression, UnaryOp, VariableDeclarationStatement,
+    VariableSpecifier,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
@@ -35,6 +38,7 @@ pub enum Statement {
     PredifinedCall(PredefinedCallStatement),
 
     VariableDeclaration(VariableDeclarationStatement),
+    ConstDeclaration(ConstDeclarationStatement),
 }
 
 impl Statement {
@@ -61,6 +65,7 @@ impl Statement {
             Statement::Call(c) => c.get_identifier_token().span.clone(),
             Statement::PredifinedCall(p) => p.identifier_token.span.clone(),
             Statement::VariableDeclaration(v) => v.get_type_token().span.clone(),
+            Statement::ConstDeclaration(c) => c.get_const_token().span.start..c.get_value().get_span().end,
         }
     }
 
@@ -88,6 +93,7 @@ impl Statement {
             Statement::Call(s) => visitor.visit_procedure_call_statement(s),
             Statement::PredifinedCall(s) => visitor.visit_predefined_call_statement(s),
             Statement::VariableDeclaration(s) => visitor.visit_variable_declaration_statement(s),
+            Statement::ConstDeclaration(s) => visitor.visit_const_declaration_statement(s),
         }
     }
 
@@ -115,6 +121,7 @@ impl Statement {
             Statement::Call(s) => visitor.visit_procedure_call_statement(s),
             Statement::PredifinedCall(s) => visitor.visit_predefined_call_statement(s),
             Statement::VariableDeclaration(s) => visitor.visit_variable_declaration_statement(s),
+            Statement::ConstDeclaration(s) => visitor.visit_const_declaration_statement(s),
         }
     }
 
@@ -268,6 +275,7 @@ impl Statement {
                 }
                 true
             }
+            (Statement::ConstDeclaration(c1), Statement::ConstDeclaration(c2)) => c1.is_similar(c2),
             (Statement::VariableDeclaration(v1), Statement::VariableDeclaration(v2)) => {
                 if v1.get_variable_type() != v2.get_variable_type() {
                     return false;

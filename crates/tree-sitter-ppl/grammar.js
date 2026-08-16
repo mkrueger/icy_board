@@ -270,6 +270,7 @@ module.exports = grammar({
     // ---------- Statements ----------
     _statement: $ => choice(
       $.variable_declaration,
+      $.const_declaration,
       $.assignment_statement,
       $.if_statement,
       $.if_block,
@@ -296,6 +297,15 @@ module.exports = grammar({
     variable_declaration: $ => seq(
       field('type', $._type),
       commaSep1($.variable_declarator),
+    ),
+
+    // The value has to be one the compiler can work out.
+    const_declaration: $ => seq(
+      kw('CONST'),
+      field('type', $._type),
+      field('name', $.identifier),
+      '=',
+      field('value', $._expression),
     ),
 
     variable_declarator: $ => prec.right(seq(

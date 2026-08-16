@@ -593,6 +593,16 @@ impl AstVisitor<()> for OutputVisitor {
         }
     }
 
+    fn visit_const_declaration_statement(&mut self, const_decl: &super::ConstDeclarationStatement) {
+        self.output_keyword("Const");
+        self.output.push(' ');
+        self.output_type(const_decl.get_variable_type(), const_decl.get_type_token());
+        self.output.push(' ');
+        self.output(const_decl.get_identifier());
+        self.output.push_str(" = ");
+        const_decl.get_value().visit(self);
+    }
+
     fn visit_type_declaration(&mut self, type_decl: &super::TypeDeclarationAstNode) {
         self.output_keyword("Type ");
         let identifier = type_decl.get_identifier().to_string();

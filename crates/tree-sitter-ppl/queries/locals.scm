@@ -8,6 +8,7 @@
 (procedure_parameter name: (identifier) @local.definition.parameter)
 
 (variable_declarator name: (identifier) @local.definition.var)
+(const_declaration name: (identifier) @local.definition.constant)
 (field_declaration name: (identifier) @local.definition.field)
 
 (type_declaration name: (identifier) @local.definition.type)

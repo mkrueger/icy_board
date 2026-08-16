@@ -7,10 +7,11 @@ use std::{
 
 use crate::{
     ast::{
-        AstVisitor, CommentAstNode, Constant, ConstantExpression, Expression, FunctionCallExpression, FunctionDeclarationAstNode, FunctionImplementation,
-        GosubStatement, GotoStatement, IdentifierExpression, LabelStatement, LetStatement, ParameterSpecifier, PredefinedCallStatement, ProcedureCallStatement,
-        ProcedureDeclarationAstNode, ProcedureImplementation, TypeDeclarationAstNode, VariableDeclarationStatement, VariableParameterSpecifier,
-        walk_function_implementation, walk_indexer_expression, walk_predefined_call_statement, walk_procedure_call_statement, walk_procedure_implementation,
+        AstVisitor, CommentAstNode, ConstDeclarationStatement, Constant, ConstantExpression, Expression, FunctionCallExpression, FunctionDeclarationAstNode,
+        FunctionImplementation, GosubStatement, GotoStatement, IdentifierExpression, LabelStatement, LetStatement, ParameterSpecifier, PredefinedCallStatement,
+        ProcedureCallStatement, ProcedureDeclarationAstNode, ProcedureImplementation, TypeDeclarationAstNode, VariableDeclarationStatement,
+        VariableParameterSpecifier, const_value, walk_function_implementation, walk_indexer_expression, walk_predefined_call_statement,
+        walk_procedure_call_statement, walk_procedure_implementation,
     },
     compiler::{CompilationErrorType, CompilationWarningType, user_data::UserDataMemberRegistry, workspace::Workspace},
     executable::{
@@ -242,6 +243,11 @@ pub struct SemanticVisitor {
 
     local_variable_lookup: Option<VariableLookups>,
 
+    /// Named constants never reach the variable table - the value takes the place of
+    /// the name - so they are kept beside it.
+    global_constants: HashMap<unicase::Ascii<String>, (VariableType, VariableValue)>,
+    local_constants: Option<HashMap<unicase::Ascii<String>, (VariableType, VariableValue)>>,
+
     // constants
     pub function_containers: Vec<FunctionContainer>,
 
@@ -403,6 +409,8 @@ impl SemanticVisitor {
 
             global_lookup: VariableLookups::default(),
             local_variable_lookup: None,
+            global_constants: HashMap::new(),
+            local_constants: None,
             require_user_variables: false,
             allow_routine_reference: false,
             allowed_routine_reference_spans: HashSet::new(),
@@ -794,20 +802,34 @@ impl SemanticVisitor {
 
     fn start_parse_function_body(&mut self) {
         self.local_variable_lookup = Some(VariableLookups::default());
+        self.local_constants = Some(HashMap::new());
 
         // TODO: clear the local label lookup on each new functions for future language versions?
         // self.label_lookup_table.clear();
     }
 
     fn end_parse_function_body(&mut self) -> Option<VariableLookups> {
+        self.local_constants = None;
         self.local_variable_lookup.take()
     }
 
     fn has_variable_defined(&self, id: &unicase::Ascii<String>) -> bool {
+        if self.lookup_constant(id).is_some() {
+            return true;
+        }
         if let Some(local_lookup) = &self.local_variable_lookup {
             return local_lookup.variable_lookup.contains_key(id);
         }
         self.global_lookup.variable_lookup.contains_key(id)
+    }
+
+    fn lookup_constant(&self, id: &unicase::Ascii<String>) -> Option<&(VariableType, VariableValue)> {
+        if let Some(local) = &self.local_constants {
+            if let Some(constant) = local.get(id) {
+                return Some(constant);
+            }
+        }
+        self.global_constants.get(id)
     }
 
     fn add_predefined_variable(&mut self, name: &str, val: &VariableValue) {
@@ -1329,6 +1351,9 @@ impl AstVisitor<VariableType> for SemanticVisitor {
     }
 
     fn visit_identifier_expression(&mut self, identifier: &IdentifierExpression) -> VariableType {
+        if let Some((variable_type, _)) = self.lookup_constant(identifier.get_identifier()) {
+            return *variable_type;
+        }
         let predef = FunctionDefinition::get_function_definitions(identifier.get_identifier());
         if !predef.is_empty() {
             let def = &FUNCTION_DEFINITIONS[predef[0]];
@@ -1736,6 +1761,13 @@ impl AstVisitor<VariableType> for SemanticVisitor {
 
     fn visit_let_statement(&mut self, let_stmt: &LetStatement) -> VariableType {
         let mut target_type = VariableType::None;
+        if self.lookup_constant(let_stmt.get_identifier()).is_some() {
+            self.errors.lock().unwrap().report_error(
+                let_stmt.get_identifier_token().span.clone(),
+                CompilationErrorType::CannotAssignToConstant(let_stmt.get_identifier().to_string()),
+            );
+            return VariableType::None;
+        }
         if let Some(idx) = self.lookup_variable(let_stmt.get_identifier()) {
             if self.references[idx].1.variable_type == VariableType::Procedure {
                 self.errors
@@ -1820,6 +1852,36 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             );
         };
         crate::ast::walk_for_stmt(self, for_stmt);
+        VariableType::None
+    }
+
+    fn visit_const_declaration_statement(&mut self, const_decl: &ConstDeclarationStatement) -> VariableType {
+        // The value is never read at runtime, so walking it would put literals nobody
+        // uses into the table.
+        if self.has_variable_defined(const_decl.get_identifier()) {
+            self.errors.lock().unwrap().report_error(
+                const_decl.get_identifier_token().span.clone(),
+                CompilationErrorType::VariableAlreadyDefined(const_decl.get_identifier().to_string()),
+            );
+            return VariableType::None;
+        }
+
+        let value = const_value(const_decl.get_value(), &|id| self.lookup_constant(id).map(|(_, value)| value.clone()));
+        let Some(value) = value else {
+            self.errors
+                .lock()
+                .unwrap()
+                .report_error(const_decl.get_value().get_span(), CompilationErrorType::ConstantValueExpected);
+            return VariableType::None;
+        };
+
+        let name = const_decl.get_identifier().clone();
+        let entry = (const_decl.get_variable_type(), value.convert_to(const_decl.get_variable_type()));
+        if let Some(local) = &mut self.local_constants {
+            local.insert(name, entry);
+        } else {
+            self.global_constants.insert(name, entry);
+        }
         VariableType::None
     }
 

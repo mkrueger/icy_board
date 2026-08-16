@@ -30,6 +30,9 @@ pub use self::expression_depth_visitor::*;
 pub mod negate_expression_visitor;
 pub use self::negate_expression_visitor::*;
 
+pub mod const_eval;
+pub use self::const_eval::*;
+
 use crate::executable::VariableType;
 use crate::parser::lexer::{Spanned, Token};
 

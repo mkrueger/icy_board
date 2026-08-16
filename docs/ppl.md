@@ -632,6 +632,7 @@ back at the column its `BEGIN` starts on.
 * `[` and `]` are index operators.
 * `BEGIN` is a keyword, so a 3.50 source may still have a variable called
   `begin` while a 4.00 source may not.
+* `CONST` is a keyword, so a 3.50 source may still have a variable called `const`.
 * `END` is a block terminator rather than a statement; `EXIT` ends a program and
   `STOP` aborts one.
 * `EXIT` is a statement name from 4.00 on, so a 3.50 source may still have a

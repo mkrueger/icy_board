@@ -109,7 +109,7 @@
 					"name": "keyword.control.ppl"
 				},
 				{
-					"match": "(?i)\\b(DECLARE|FUNCTION|PROCEDURE|ENDPROC|ENDFUNC|TYPE|ENDTYPE|LET|VAR)\\b",
+					"match": "(?i)\\b(DECLARE|FUNCTION|PROCEDURE|ENDPROC|ENDFUNC|TYPE|ENDTYPE|LET|VAR|CONST)\\b",
 					"name": "keyword.other.ppl"
 				}
 			]

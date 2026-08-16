@@ -1,12 +1,12 @@
 use crate::parser::lexer::{Spanned, Token};
 
 use super::{
-    ArrayInitializerExpression, Ast, AstNode, BinaryExpression, BlockStatement, BreakStatement, CaseBlock, CaseSpecifier, CommentAstNode, ConstantExpression,
-    ContinueStatement, ElseBlock, ElseIfBlock, Expression, ForStatement, FunctionCallExpression, FunctionDeclarationAstNode, FunctionImplementation,
-    GosubStatement, GotoStatement, IdentifierExpression, IfStatement, IfThenStatement, IndexerExpression, LabelStatement, LetStatement, LoopStatement,
-    MemberReferenceExpression, ParameterSpecifier, ParensExpression, PredefinedCallStatement, ProcedureCallStatement, ProcedureDeclarationAstNode,
-    ProcedureImplementation, RecordLiteralExpression, RepeatUntilStatement, ReturnStatement, SelectStatement, Statement, TypeDeclarationAstNode,
-    UnaryExpression, VariableDeclarationStatement, VariableSpecifier, WhileDoStatement, WhileStatement,
+    ArrayInitializerExpression, Ast, AstNode, BinaryExpression, BlockStatement, BreakStatement, CaseBlock, CaseSpecifier, CommentAstNode,
+    ConstDeclarationStatement, ConstantExpression, ContinueStatement, ElseBlock, ElseIfBlock, Expression, ForStatement, FunctionCallExpression,
+    FunctionDeclarationAstNode, FunctionImplementation, GosubStatement, GotoStatement, IdentifierExpression, IfStatement, IfThenStatement, IndexerExpression,
+    LabelStatement, LetStatement, LoopStatement, MemberReferenceExpression, ParameterSpecifier, ParensExpression, PredefinedCallStatement,
+    ProcedureCallStatement, ProcedureDeclarationAstNode, ProcedureImplementation, RecordLiteralExpression, RepeatUntilStatement, ReturnStatement,
+    SelectStatement, Statement, TypeDeclarationAstNode, UnaryExpression, VariableDeclarationStatement, VariableSpecifier, WhileDoStatement, WhileStatement,
 };
 
 #[allow(unused_variables)]
@@ -144,6 +144,10 @@ pub trait AstVisitor<T: Default>: Sized {
 
     fn visit_variable_declaration_statement(&mut self, var_decl: &VariableDeclarationStatement) -> T {
         walk_variable_declaration_statement(self, var_decl);
+        T::default()
+    }
+    fn visit_const_declaration_statement(&mut self, const_decl: &ConstDeclarationStatement) -> T {
+        const_decl.get_value().visit(self);
         T::default()
     }
     fn visit_procedure_declaration(&mut self, proc_decl: &ProcedureDeclarationAstNode) -> T {
@@ -617,6 +621,17 @@ pub trait AstVisitorMut: Sized {
             var_decl.get_type_token().clone(),
             var_decl.get_variable_type(),
             var_decl.get_variables().iter().map(|var| var.visit_mut(self)).collect(),
+        ))
+    }
+
+    fn visit_const_declaration_statement(&mut self, const_decl: &ConstDeclarationStatement) -> Statement {
+        Statement::ConstDeclaration(ConstDeclarationStatement::new(
+            const_decl.get_const_token().clone(),
+            const_decl.get_type_token().clone(),
+            const_decl.get_variable_type(),
+            const_decl.get_identifier_token().clone(),
+            const_decl.get_eq_token().clone(),
+            const_decl.get_value().visit_mut(self),
         ))
     }
 

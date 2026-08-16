@@ -56,6 +56,12 @@ pub enum CompilationErrorType {
     #[error("Can't assign value to.")]
     InvalidLetVariable,
 
+    #[error("'{0}' is a constant, it can only be read")]
+    CannotAssignToConstant(String),
+
+    #[error("A constant needs a value the compiler can work out")]
+    ConstantValueExpected,
+
     #[error("Can't assign {1} to {0}")]
     AssignmentTypeMismatch(VariableType, VariableType),
 
@@ -303,6 +309,8 @@ impl PPECompiler {
             }
 
             Statement::VariableDeclaration(_) => None,
+            // The value took the place of the name before this point, so nothing is left to emit.
+            Statement::ConstDeclaration(_) => None,
 
             Statement::Let(let_smt) => {
                 let var_name = let_smt.get_identifier();

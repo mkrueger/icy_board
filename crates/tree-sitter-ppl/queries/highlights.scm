@@ -118,6 +118,10 @@
   "ENDTYPE"
 ] @keyword.type @keyword.storage.type
 
+"CONST" @keyword @keyword.storage.modifier
+
+(const_declaration name: (identifier) @constant)
+
 [
   "LET"
   "VAR"

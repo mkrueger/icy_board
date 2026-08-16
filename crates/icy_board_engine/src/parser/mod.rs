@@ -590,7 +590,7 @@ impl<'a> Parser<'a> {
                     }
 
                     if self.parsed_block || (self.use_funcs && !self.parsed_begin) {
-                        if matches!(stmt, Statement::Comment(_)) || matches!(stmt, Statement::VariableDeclaration(_)) {
+                        if matches!(stmt, Statement::Comment(_) | Statement::VariableDeclaration(_) | Statement::ConstDeclaration(_)) {
                             return Some(AstNode::TopLevelStatement(stmt));
                         }
 
@@ -604,7 +604,7 @@ impl<'a> Parser<'a> {
                         self.report_error(stmt.get_span(), ParserErrorType::NoStatementsAfterFunctions);
                         return None;
                     }
-                    if !self.got_statement && !matches!(stmt, Statement::VariableDeclaration(_)) && !matches!(stmt, Statement::Comment(_)) {
+                    if !self.got_statement && !matches!(stmt, Statement::VariableDeclaration(_) | Statement::ConstDeclaration(_) | Statement::Comment(_)) {
                         let mut main_block = vec![stmt];
                         loop {
                             let Some(cur_token) = &self.cur_token else {

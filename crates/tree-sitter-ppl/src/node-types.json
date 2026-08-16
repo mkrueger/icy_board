@@ -66,6 +66,10 @@
         "named": true
       },
       {
+        "type": "const_declaration",
+        "named": true
+      },
+      {
         "type": "continue_statement",
         "named": true
       },
@@ -486,6 +490,46 @@
           "named": true
         }
       ]
+    }
+  },
+  {
+    "type": "const_declaration",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "type": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "builtin_type",
+            "named": true
+          },
+          {
+            "type": "type_identifier",
+            "named": true
+          }
+        ]
+      },
+      "value": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "_expression",
+            "named": true
+          }
+        ]
+      }
     }
   },
   {
@@ -1835,6 +1879,10 @@
   },
   {
     "type": "CONFERENCE",
+    "named": false
+  },
+  {
+    "type": "CONST",
     "named": false
   },
   {

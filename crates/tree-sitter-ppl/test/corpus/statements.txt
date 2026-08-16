@@ -194,3 +194,32 @@ END
   (gosub_statement
     label: (identifier))
   (end_statement))
+
+================================================================================
+Constant declarations
+================================================================================
+
+CONST INTEGER MaxTries = 3
+CONST STRING Greeting = "Hello"
+CONST INTEGER Doubled = MaxTries * 2
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (const_declaration
+    type: (builtin_type)
+    name: (identifier)
+    value: (constant
+      (number_literal)))
+  (const_declaration
+    type: (builtin_type)
+    name: (identifier)
+    value: (constant
+      (string_literal)))
+  (const_declaration
+    type: (builtin_type)
+    name: (identifier)
+    value: (binary_expression
+      left: (identifier)
+      right: (constant
+        (number_literal)))))

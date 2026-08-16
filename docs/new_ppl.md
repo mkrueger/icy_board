@@ -99,6 +99,35 @@ For multidimensional arrays, `dim` is zero-based.
 
 `dim`      The dimension to get the length of
 
+## `CONST` Declaration (4.00)
+
+### Function
+Gives a name to a value the compiler works out.
+
+### Syntax
+`CONST <type> <name> = <value>`
+
+`type`   The type the value is converted to, written like any other declaration
+
+`name`   The name the value is used under
+
+`value`  An expression of literals and constants declared before it
+
+### Remarks
+A constant stands where a variable would, so it may open a program or a routine,
+and one declared in a routine belongs to it. The value takes the place of the
+name while compiling, so a constant costs nothing at runtime: the PPE is the one
+the value written out by hand would produce, whatever runtime it targets. A
+decompiled PPE therefore shows the value, never the name.
+
+Writing to a constant is an error, a constant and a variable may not share a
+name, and a constant cannot be passed to a `VAR` parameter - there is no variable
+to write back to.
+
+`;$DEFINE` is the other way to name a value: it substitutes text before the
+language is read, carries no type and works at any version. `CONST` is typed and
+belongs to 4.00.
+
 ## `BEGIN ... END` Block (4.00)
 
 ### Function

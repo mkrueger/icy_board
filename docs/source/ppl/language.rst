@@ -187,6 +187,35 @@ Language version 4.00
 400 is where the language stops being bound by what PCBoard 15.4 could express.
 A PPE built at runtime 400 or 401 will not load on an original PCBoard.
 
+CONST
+~~~~~
+
+A name for a value the compiler works out::
+
+    CONST INTEGER MaxTries = 3
+    CONST STRING  Greeting = "Welcome"
+    CONST INTEGER Warning  = MaxTries - 1
+
+A constant is written where a variable would be, so it may stand at the top of a
+program or at the top of a routine, where it belongs to that routine. Its value
+may be built from literals and from constants declared before it, and it is
+converted to the type it was declared with, the same way an assignment would
+convert it.
+
+Because the value takes the place of the name while compiling, a constant costs
+nothing: the PPE is byte for byte the one the value written out by hand would
+produce, whatever runtime it is built for. That also means a decompiled PPE shows
+the value, never the name, and that a constant cannot be passed to a ``VAR``
+parameter - there is no variable to write back to.
+
+Writing to a constant is an error, and a constant and a variable may not share a
+name. ``CONST`` is a keyword from 400 on, so a 3.50 source may still have a
+variable called ``const``.
+
+``;$DEFINE`` looks similar but is a different thing: it substitutes text before
+the language is even read, it carries no type, and it works whatever version is
+set. Reach for ``CONST`` unless the value has to steer the preprocessor.
+
 Parentheses, brackets and braces
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -431,5 +460,7 @@ What 4.00 breaks
   program and :PPL:`STOP` aborts one.
 * ``EXIT`` is a statement name from 4.00 on, so a 3.50 source may still have a
   variable called ``exit``.
+* ``CONST`` is a keyword, so a 3.50 source may still have a variable called
+  ``const``.
 * A decompiled PPE names its records ``TYPE001`` and their fields ``FIELD001``,
   because the file carries no names to recover.

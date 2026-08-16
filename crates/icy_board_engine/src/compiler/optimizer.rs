@@ -41,7 +41,7 @@ fn flatten(statements: &[Statement], result: &mut Vec<Statement>) {
 fn emits_no_code(statement: &Statement) -> bool {
     matches!(
         statement,
-        Statement::Empty | Statement::Comment(_) | Statement::Label(_) | Statement::VariableDeclaration(_)
+        Statement::Empty | Statement::Comment(_) | Statement::Label(_) | Statement::VariableDeclaration(_) | Statement::ConstDeclaration(_)
     )
 }
 
@@ -103,7 +103,7 @@ fn remove_unreachable_statements(statements: &mut Vec<Statement>) {
         }
         // A declaration may sit in a part of the program that is never entered and the
         // variable it introduces is still expected to exist.
-        let keep = reachable || matches!(statement, Statement::VariableDeclaration(_));
+        let keep = reachable || matches!(statement, Statement::VariableDeclaration(_) | Statement::ConstDeclaration(_));
         if reachable && ends_the_flow(statement) {
             reachable = false;
         }

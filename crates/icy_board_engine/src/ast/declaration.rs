@@ -261,6 +261,86 @@ impl VariableDeclarationStatement {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub struct ConstDeclarationStatement {
+    const_token: Spanned<Token>,
+    type_token: Spanned<Token>,
+    variable_type: VariableType,
+    identifier_token: Spanned<Token>,
+    eq_token: Spanned<Token>,
+    value: Expression,
+}
+
+impl ConstDeclarationStatement {
+    pub fn new(
+        const_token: Spanned<Token>,
+        type_token: Spanned<Token>,
+        variable_type: VariableType,
+        identifier_token: Spanned<Token>,
+        eq_token: Spanned<Token>,
+        value: Expression,
+    ) -> Self {
+        Self {
+            const_token,
+            type_token,
+            variable_type,
+            identifier_token,
+            eq_token,
+            value,
+        }
+    }
+
+    pub fn empty(variable_type: VariableType, identifier: unicase::Ascii<String>, value: Expression) -> Self {
+        Self {
+            const_token: Spanned::create_empty(Token::ConstDecl),
+            type_token: Spanned::create_empty(Token::Identifier(unicase::Ascii::new(variable_type.to_string()))),
+            variable_type,
+            identifier_token: Spanned::create_empty(Token::Identifier(identifier)),
+            eq_token: Spanned::create_empty(Token::Eq),
+            value,
+        }
+    }
+
+    pub fn get_const_token(&self) -> &Spanned<Token> {
+        &self.const_token
+    }
+
+    pub fn get_type_token(&self) -> &Spanned<Token> {
+        &self.type_token
+    }
+
+    pub fn get_variable_type(&self) -> VariableType {
+        self.variable_type
+    }
+
+    pub fn get_identifier_token(&self) -> &Spanned<Token> {
+        &self.identifier_token
+    }
+
+    pub fn get_identifier(&self) -> &unicase::Ascii<String> {
+        if let Token::Identifier(id) = &self.identifier_token.token {
+            return id;
+        }
+        panic!("Expected identifier token")
+    }
+
+    pub fn get_eq_token(&self) -> &Spanned<Token> {
+        &self.eq_token
+    }
+
+    pub fn get_value(&self) -> &Expression {
+        &self.value
+    }
+
+    pub fn create_empty_statement(variable_type: VariableType, identifier: unicase::Ascii<String>, value: Expression) -> Statement {
+        Statement::ConstDeclaration(ConstDeclarationStatement::empty(variable_type, identifier, value))
+    }
+
+    pub fn is_similar(&self, other: &ConstDeclarationStatement) -> bool {
+        self.variable_type == other.variable_type && self.get_identifier() == other.get_identifier() && self.value.is_similar(&other.value)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum ParameterSpecifier {
     Variable(VariableParameterSpecifier),
     Function(FunctionParameterSpecifier),

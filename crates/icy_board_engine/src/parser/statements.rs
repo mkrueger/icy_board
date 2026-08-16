@@ -1,9 +1,9 @@
 use crate::{
     ast::{
-        BlockStatement, BreakStatement, CaseBlock, CaseSpecifier, CommentAstNode, Constant, ContinueStatement, ElseBlock, ElseIfBlock, ForStatement,
-        GosubStatement, GotoStatement, IdentifierExpression, IfStatement, IfThenStatement, LabelStatement, LetStatement, LoopStatement,
-        PredefinedCallStatement, ProcedureCallStatement, RepeatUntilStatement, ReturnStatement, SelectStatement, Statement, VariableDeclarationStatement,
-        WhileDoStatement, WhileStatement,
+        BlockStatement, BreakStatement, CaseBlock, CaseSpecifier, CommentAstNode, ConstDeclarationStatement, Constant, ContinueStatement, ElseBlock,
+        ElseIfBlock, ForStatement, GosubStatement, GotoStatement, IdentifierExpression, IfStatement, IfThenStatement, LabelStatement, LetStatement,
+        LoopStatement, PredefinedCallStatement, ProcedureCallStatement, RepeatUntilStatement, ReturnStatement, SelectStatement, Statement,
+        VariableDeclarationStatement, WhileDoStatement, WhileStatement,
     },
     executable::{OpCode, StatementDefinition},
     parser::ParserErrorType,
@@ -125,10 +125,52 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// `CONST <type> <name> = <value>` - the value has to be known while compiling.
+    fn parse_const_declaration(&mut self) -> Option<Statement> {
+        let const_token = self.save_spanned_token();
+        self.next_token();
+
+        let Some(variable_type) = self.get_variable_type() else {
+            self.report_error(self.lex.span(), ParserErrorType::TypeExpected(self.save_token()));
+            self.next_token();
+            return None;
+        };
+        let type_token = self.save_spanned_token();
+        self.next_token();
+
+        if !matches!(self.get_cur_token(), Some(Token::Identifier(_))) {
+            self.report_error(self.lex.span(), ParserErrorType::IdentifierExpected(self.save_token()));
+            self.next_token();
+            return None;
+        }
+        let identifier_token = self.save_spanned_token();
+        self.next_token();
+
+        if self.get_cur_token() != Some(Token::Eq) {
+            self.report_error(self.lex.span(), ParserErrorType::EqTokenExpected(self.save_token()));
+            return None;
+        }
+        let eq_token = self.save_spanned_token();
+        self.next_token();
+
+        let Some(value) = self.parse_expression() else {
+            self.report_error(self.lex.span(), ParserErrorType::ExpressionExpected(self.save_token()));
+            return None;
+        };
+
+        Some(Statement::ConstDeclaration(ConstDeclarationStatement::new(
+            const_token,
+            type_token,
+            variable_type,
+            identifier_token,
+            eq_token,
+            value,
+        )))
+    }
+
     fn parse_repeat_until(&mut self) -> Option<Statement> {
         let repeat_token = self.save_spanned_token();
         self.next_token();
-
         let mut statements = Vec::new();
         self.skip_eol();
         while self.get_cur_token() != Some(Token::Until) {
@@ -565,6 +607,7 @@ impl<'a> Parser<'a> {
                 None
             }
             Some(Token::Begin) => self.parse_block(),
+            Some(Token::ConstDecl) => self.parse_const_declaration(),
             Some(Token::While) => self.parse_while(),
             Some(Token::Repeat) => self.parse_repeat_until(),
             Some(Token::Loop) => self.parse_loop(),

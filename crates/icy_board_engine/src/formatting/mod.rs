@@ -187,6 +187,14 @@ impl<'a> AstVisitor<()> for FormattingVisitor<'a> {
         }
     }
 
+    fn visit_const_declaration_statement(&mut self, declaration: &ConstDeclarationStatement) {
+        self.ensure_space_before(declaration.get_type_token().span.start);
+        self.ensure_space_before(declaration.get_identifier_token().span.start);
+        self.ensure_space_before(declaration.get_eq_token().span.start);
+        self.ensure_text_or_newline(declaration.get_eq_token().span.end..declaration.get_value().get_span().start, " ");
+        declaration.get_value().visit(self);
+    }
+
     fn visit_let_statement(&mut self, let_stmt: &LetStatement) {
         // `p . X = 1` names its members with tokens rather than an expression.
         let mut left = let_stmt.get_identifier_token().span.end;
