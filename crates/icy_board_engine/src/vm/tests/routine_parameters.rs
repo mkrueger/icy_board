@@ -83,6 +83,19 @@ ENDPROC
 }
 
 #[test]
+fn a_procedure_call_reports_excess_arguments() {
+    let errors = compile_errors(
+        r#"
+Show(1, 2)
+
+PROCEDURE Show(INTEGER value)
+ENDPROC
+"#,
+    );
+    assert!(errors.iter().any(|error| error.contains("Too many arguments passed (Show:2:1)")), "{errors:?}");
+}
+
+#[test]
 fn a_bare_routine_name_is_still_not_a_general_value() {
     let errors = compile_errors(
         r#"

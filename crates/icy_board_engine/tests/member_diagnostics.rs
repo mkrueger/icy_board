@@ -43,13 +43,13 @@ fn a_field_of_a_declared_record_compiles() {
 #[test]
 fn a_field_a_record_does_not_have_is_reported() {
     let errors = diagnostics("TYPE FooBar\n  INTEGER a\nENDTYPE\n\nFooBar foo\n\nPRINTLN foo.b\n");
-    assert!(errors.iter().any(|e| e == "Member not found"), "{errors:?}");
+    assert!(errors.iter().any(|e| e == "Record type UserData(100) has no member named b"), "{errors:?}");
 }
 
 #[test]
 fn assigning_to_a_field_a_record_does_not_have_is_reported() {
     let errors = diagnostics("TYPE FooBar\n  INTEGER a\nENDTYPE\n\nFooBar foo\n\nfoo.b = 1\n");
-    assert!(errors.iter().any(|e| e == "Member not found"), "{errors:?}");
+    assert!(errors.iter().any(|e| e == "Record type UserData(100) has no member named b"), "{errors:?}");
 }
 
 #[test]

@@ -1115,10 +1115,10 @@ impl SemanticVisitor {
             return VariableType::None;
         };
         let Some(index) = definition.field_index(member) else {
-            self.errors
-                .lock()
-                .unwrap()
-                .report_error(span.clone(), CompilationErrorType::InvalidMemberReferenceExpression);
+            self.errors.lock().unwrap().report_error(
+                span.clone(),
+                CompilationErrorType::RecordMemberNotFound(VariableType::UserData(type_id), member.to_string()),
+            );
             return VariableType::None;
         };
         self.user_type_lookup.insert(span.start, type_id);
@@ -2083,9 +2083,9 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                     let arg_count = call.get_arguments().len();
                     let par_len = f.get_parameters().len();
 
+                    self.check_arg_count(par_len, arg_count, call.get_identifier_token());
                     let arg_count = arg_count.min(par_len);
                     let pass_flags = f.get_pass_flags();
-                    self.check_arg_count(par_len, arg_count, call.get_identifier_token());
                     self.check_arg_types(f.get_parameters(), call.get_arguments());
 
                     for i in 0..arg_count {

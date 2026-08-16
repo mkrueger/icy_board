@@ -123,6 +123,9 @@ pub enum CompilationErrorType {
     #[error("Member not found")]
     InvalidMemberReferenceExpression,
 
+    #[error("Record type {0} has no member named {1}")]
+    RecordMemberNotFound(VariableType, String),
+
     #[error("Type not found.")]
     TypeNotFound,
 
