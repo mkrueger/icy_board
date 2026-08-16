@@ -1,7 +1,7 @@
 use std::collections::HashMap;
+use std::mem;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use std::{env, mem, process};
 
 use dashmap::DashMap;
 use icy_board_engine::ast::{
@@ -9,7 +9,7 @@ use icy_board_engine::ast::{
     walk_predefined_call_statement, walk_variable_declaration_statement,
 };
 use icy_board_engine::compiler::workspace::Workspace;
-use icy_board_engine::executable::{FUNCTION_DEFINITIONS, FunctionDefinition, LAST_PPE_RUNTIME};
+use icy_board_engine::executable::{FUNCTION_DEFINITIONS, FunctionDefinition};
 use icy_board_engine::formatting::FormattingVisitor;
 use icy_board_engine::icy_board::read_data_with_encoding_detection;
 use icy_board_engine::parser::{Encoding, ErrorReporter, UserTypeRegistry, parse_ast, parse_ast_with_predeclared_types, preparse_type_declarations};
@@ -24,15 +24,12 @@ use icyboard_ppl::reference::get_reference;
 use icyboard_ppl::signature_help::get_signature_help;
 use icyboard_ppl::{line_before_cursor, offset_to_position};
 use ropey::Rope;
-use serde_json::Value;
 use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer, LspService, Server};
 
 struct Backend {
     client: Client,
-
-    cur_process: Mutex<Option<process::Child>>,
 
     workspace: Mutex<Workspace>,
     workspace_visitor: Mutex<SemanticVisitor>,
@@ -68,11 +65,6 @@ impl LanguageServer for Backend {
                 signature_help_provider: Some(SignatureHelpOptions {
                     trigger_characters: Some(vec!["(".to_string(), ",".to_string(), " ".to_string()]),
                     retrigger_characters: Some(vec![",".to_string()]),
-                    work_done_progress_options: Default::default(),
-                }),
-
-                execute_command_provider: Some(ExecuteCommandOptions {
-                    commands: vec!["icyboard-ppl.run".to_string()],
                     work_done_progress_options: Default::default(),
                 }),
 
@@ -355,50 +347,6 @@ impl LanguageServer for Backend {
                 .collect(),
         ))
     }
-
-    async fn execute_command(&self, params: ExecuteCommandParams) -> Result<Option<Value>> {
-        match params.command.as_str() {
-            "icyboard-ppl.run" => {
-                let ws_file: PathBuf = self.workspace.lock().unwrap().file_name.clone();
-                if ws_file.exists() {
-                    self.client.log_message(MessageType::INFO, "compile workspace!").await;
-
-                    let output = process::Command::new("pplc").arg(ws_file).output().expect("failed to execute process");
-                    if let Ok(output) = String::from_utf8(output.stdout) {
-                        self.client.log_message(MessageType::INFO, format!("{}", output)).await;
-                    }
-                    let out_file: String = self.workspace.lock().unwrap().package.name().to_string();
-                    let target_file = self
-                        .workspace
-                        .lock()
-                        .unwrap()
-                        .target_path(LAST_PPE_RUNTIME)
-                        .join(out_file)
-                        .with_extension("ppe");
-                    self.client.log_message(MessageType::INFO, format!("Execute:{}", target_file.display())).await;
-
-                    let shell = env::var("SHELL").unwrap_or("sh".to_string());
-                    if let Ok(process) = process::Command::new(shell)
-                        .arg("-c")
-                        .arg(format!("\"icboard --ppe {}\"", target_file.display()))
-                        .spawn()
-                    {
-                        let mut state: std::sync::MutexGuard<'_, Option<process::Child>> = self.cur_process.lock().unwrap();
-                        if let Some(mut child) = mem::replace(&mut *state, Some(process)) {
-                            child.kill().unwrap();
-                        }
-                    }
-                } else {
-                    self.client.log_message(MessageType::ERROR, "no workspace open!").await;
-                }
-            }
-            _ => {
-                self.client.log_message(MessageType::INFO, "unknown command!").await;
-            }
-        }
-
-        Ok(None)
-    }
 }
 
 struct TextDocumentItem {
@@ -596,7 +544,6 @@ async fn main() {
             UserTypeRegistry::default(),
         )),
         workspace_map: DashMap::new(),
-        cur_process: Mutex::new(None),
     })
     .finish();
 
