@@ -687,6 +687,9 @@ impl IcyBoardState {
             return Ok(false);
         }
 
+        // The logoff cannot unwind a running PPE, so the check has to be disarmed
+        // here or every later poll would report the timeout again.
+        self.session.keyboard_timer_check = false;
         self.display_text(IceText::KeyboardTimeExpired, display_flags::NEWLINE | display_flags::LFBEFORE)
             .await?;
         self.hangup().await?;

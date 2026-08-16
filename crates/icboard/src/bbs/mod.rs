@@ -227,6 +227,7 @@ pub async fn internal_handle_client(mut state: IcyBoardState, login_options: Opt
     let mut cmd = PcbBoardCommand::new(state);
 
     cmd.state.session.disp_options.force_count_lines();
+    cmd.state.session.is_local = local;
     cmd.state.session.term_caps = if local {
         TerminalCaps::LOCAL
     } else {
@@ -241,7 +242,7 @@ pub async fn internal_handle_client(mut state: IcyBoardState, login_options: Opt
             cmd.state.new_line().await?;
             if local {
                 cmd.state.println(TerminalTarget::Both, &icy_board_tui::get_text("run_ppe_completed")).await?;
-                while cmd.state.get_char(TerminalTarget::Both).await?.is_none() {}
+                while !cmd.state.session.request_logoff && cmd.state.get_char(TerminalTarget::Both).await?.is_none() {}
             }
             return Ok(());
         }

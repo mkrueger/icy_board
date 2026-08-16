@@ -72,3 +72,11 @@ fn a_default_answer_stays_inside_a_clamped_field() {
     assert!(lines[0].contains(')'), "the field delimiters were dropped: {:?}", lines[0]);
     assert!(!lines[1].contains('y'), "the default answer wrapped onto the next line: {:?}", lines[1]);
 }
+
+#[test]
+fn a_local_session_knows_that_it_is_local() {
+    // A session that does not know it is local runs into the keyboard timeout.
+    let output = test_ppe_output("PRINT \"LOCAL=\", ONLOCAL()", |_| {});
+
+    assert!(output.starts_with("LOCAL=1"), "{output:?}");
+}
