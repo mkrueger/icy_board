@@ -1,21 +1,11 @@
-/* --------------------------------------------------------------------------------------------
- * Copyright (c) Microsoft Corporation. All rights reserved.
- * Licensed under the MIT License. See License.txt in the project root for license information.
- * ------------------------------------------------------------------------------------------ */
-
 import * as vscode from "vscode";
 import * as fs from "fs";
 
-import {
-  Disposable,
-  Executable,
-  LanguageClient,
-  LanguageClientOptions,
-  ServerOptions,
-} from "vscode-languageclient/node";
+import { Executable, LanguageClient, LanguageClientOptions, ServerOptions } from "vscode-languageclient/node";
 
-let client: LanguageClient;
-// type a = Parameters<>;
+import { runPpe } from "./run";
+
+let client: LanguageClient | undefined;
 
 /// The server is looked for where the user said, then in the environment, then
 /// in the extension itself, then on the PATH.
@@ -44,41 +34,26 @@ function serverCommand(context: vscode.ExtensionContext): string {
 }
 
 export async function activate(context: vscode.ExtensionContext) {
-
+  const output = vscode.window.createOutputChannel("IcyBoard PPL");
   const traceOutputChannel = vscode.window.createOutputChannel("PPL Language Server trace");
+  context.subscriptions.push(output, traceOutputChannel);
+  context.subscriptions.push(vscode.commands.registerCommand("icyboard-ppl.run", () => runPpe(output)));
+
   const command = serverCommand(context);
-  const run: Executable = {
-    command,
-    options: {
-      env: {
-        ...process.env,
-        // eslint-disable-next-line @typescript-eslint/naming-convention
-        RUST_LOG: "debug",
-      },
-    },
-  };
-  const serverOptions: ServerOptions = {
-    run,
-    debug: run,
-  };
-  // If the extension is launched in debug mode then the debug server options are used
-  // Otherwise the run options are used
-  // Options to control the language client
-  let clientOptions: LanguageClientOptions = {
-    // Register the server for plain text documents
+  const run: Executable = { command };
+  const serverOptions: ServerOptions = { run, debug: run };
+  const clientOptions: LanguageClientOptions = {
     documentSelector: [{ scheme: "file", language: "ppl" }],
-    synchronize: {
-      // Notify the server about file changes to '.clientrc files contained in the workspace
-      fileEvents: vscode.workspace.createFileSystemWatcher("**/.clientrc"),
-    },
     traceOutputChannel,
   };
-  // Create the language client and start the client.
+
   client = new LanguageClient("icyboard-ppl", "IcyBoard PPL language server", serverOptions, clientOptions);
-  // activateInlayHints(context);
+  context.subscriptions.push(client);
+
   try {
     await client.start();
   } catch (error) {
+    output.appendLine(`${error}`);
     const openSettings = "Open settings";
     const answer = await vscode.window.showErrorMessage(
       `IcyBoard PPL: could not start '${command}'. Install a build for your platform, or set icyboardPpl.serverPath to a server you built yourself.`,
@@ -105,87 +80,5 @@ export async function activate(context: vscode.ExtensionContext) {
 }
 
 export function deactivate(): Thenable<void> | undefined {
-  if (!client) {
-    return undefined;
-  }
-  return client.stop();
-}
-
-export function activateInlayHints(ctx: vscode.ExtensionContext) {
-  const maybeUpdater = {
-    hintsProvider: null as Disposable | null,
-    updateHintsEventEmitter: new vscode.EventEmitter<void>(),
-
-    async onConfigChange() {
-      this.dispose();
-
-      const event = this.updateHintsEventEmitter.event;
-      // this.hintsProvider = languages.registerInlayHintsProvider(
-      //   { scheme: "file", language: "nrs" },
-      //   // new (class implements InlayHintsProvider {
-      //   //   onDidChangeInlayHints = event;
-      //   //   resolveInlayHint(hint: InlayHint, token: CancellationToken): ProviderResult<InlayHint> {
-      //   //     const ret = {
-      //   //       label: hint.label,
-      //   //       ...hint,
-      //   //     };
-      //   //     return ret;
-      //   //   }
-      //   //   async provideInlayHints(
-      //   //     document: TextDocument,
-      //   //     range: Range,
-      //   //     token: CancellationToken
-      //   //   ): Promise<InlayHint[]> {
-      //   //     const hints = (await client
-      //   //       .sendRequest("custom/inlay_hint", { path: document.uri.toString() })
-      //   //       .catch(err => null)) as [number, number, string][];
-      //   //     if (hints == null) {
-      //   //       return [];
-      //   //     } else {
-      //   //       return hints.map(item => {
-      //   //         const [start, end, label] = item;
-      //   //         let startPosition = document.positionAt(start);
-      //   //         let endPosition = document.positionAt(end);
-      //   //         return {
-      //   //           position: endPosition,
-      //   //           paddingLeft: true,
-      //   //           label: [
-      //   //             {
-      //   //               value: `${label}`,
-      //   //               // location: {
-      //   //               //   uri: document.uri,
-      //   //               //   range: new Range(1, 0, 1, 0)
-      //   //               // }
-      //   //               command: {
-      //   //                 title: "hello world",
-      //   //                 command: "helloworld.helloWorld",
-      //   //                 arguments: [document.uri],
-      //   //               },
-      //   //             },
-      //   //           ],
-      //   //         };
-      //   //       });
-      //   //     }
-      //   //   }
-      //   // })()
-      // );
-    },
-
-    onDidChangeTextDocument({ contentChanges, document }: vscode.TextDocumentChangeEvent) {
-      // debugger
-      // this.updateHintsEventEmitter.fire();
-    },
-
-    dispose() {
-      this.hintsProvider?.dispose();
-      this.hintsProvider = null;
-      this.updateHintsEventEmitter.dispose();
-    },
-  };
-
-  vscode.workspace.onDidChangeConfiguration(maybeUpdater.onConfigChange, maybeUpdater, ctx.subscriptions);
-  vscode.workspace.onDidChangeTextDocument(maybeUpdater.onDidChangeTextDocument, maybeUpdater, ctx.subscriptions);
-  vscode.workspace.onDidCloseTextDocument(maybeUpdater.onConfigChange, maybeUpdater, ctx.subscriptions);
-
-  maybeUpdater.onConfigChange().catch(console.error);
+  return client?.stop();
 }
