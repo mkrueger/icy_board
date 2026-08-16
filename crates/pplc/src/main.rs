@@ -9,7 +9,7 @@ use icy_board_engine::{
         PPECompiler,
         workspace::{CompilerData, Package, Workspace},
     },
-    executable::{LAST_PPL_LANGUAGE_VERSION, SUPPORTED_PPE_VERSIONS, SUPPORTED_PPL_LANGUAGE_VERSIONS},
+    executable::{LAST_PPL_LANGUAGE_VERSION, SUPPORTED_PPE_VERSIONS, SUPPORTED_PPL_LANGUAGE_VERSIONS, language_version_from_env},
     formatting::{FormattingVisitor, StringFormattingBackend},
     icy_board::{read_with_encoding_detection, write_atomic},
     parser::{
@@ -48,7 +48,7 @@ struct Cli {
     #[argh(option)]
     runtime: Option<u16>,
 
-    /// language version (defaults to runtime, capped at 400)
+    /// language version (defaults to the manifest, PPL_LANG_VERSION, then runtime capped at 400)
     #[argh(option)]
     lang_version: Option<u16>,
 
@@ -106,7 +106,6 @@ fn main() {
             std::process::exit(2);
         }
     }
-
     if arguments.init {
         let Some(file) = arguments.file.clone() else {
             eprintln!("No target directory specified.");
@@ -190,7 +189,7 @@ fn init_package(file: &Path, src_dir: &Path, arguments: &Cli) -> Res<()> {
         authors: None,
     };
     ws.compiler = Some(CompilerData {
-        language_version: Some(arguments.lang_version.unwrap_or(LAST_PPL_LANGUAGE_VERSION)),
+        language_version: Some(arguments.lang_version.or_else(read_environment).unwrap_or(LAST_PPL_LANGUAGE_VERSION)),
         defines: if let Some(defines) = &arguments.defines {
             Some(defines.split(';').map(|s| s.to_string()).collect())
         } else {
@@ -199,6 +198,24 @@ fn init_package(file: &Path, src_dir: &Path, arguments: &Cli) -> Res<()> {
     });
     ws.save(file.join("ppl.toml"))?;
     Ok(())
+}
+
+fn read_environment() -> Option<u16> {
+    match language_version_from_env() {
+        Ok(version) => version,
+        Err(err) => {
+            eprintln!("{err}");
+            std::process::exit(2);
+        }
+    }
+}
+
+/// A manifest and the command line are explicit, so the user's environment only
+/// fills in what neither of them decided.
+fn apply_environment(workspace: &mut Workspace, arguments: &Cli) {
+    if arguments.lang_version.is_none() && workspace.compiler.as_ref().and_then(|compiler| compiler.language_version).is_none() {
+        workspace.compiler.get_or_insert_with(CompilerData::default).language_version = read_environment();
+    }
 }
 
 /// The command line wins over the manifest, and a package that has none still needs these.
@@ -320,6 +337,7 @@ fn write_formatted(file: &Path, text: &str) -> Res<()> {
 
 fn compile_files(arguments: &Cli, encoding: Encoding, workspace: &mut Workspace, out_file_name: &Path) -> Res<()> {
     apply_declared_language_version(workspace, encoding)?;
+    apply_environment(workspace, arguments);
     let errors = Arc::new(Mutex::new(ErrorReporter::default()));
 
     let reg = UserTypeRegistry::icy_board_registry();

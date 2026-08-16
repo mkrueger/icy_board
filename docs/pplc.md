@@ -87,8 +87,10 @@ Let's take a look at the toml:
 [package]
 name = "lread"
 version = "0.1.0"
-language_version = 350
 authors = ["Mike Krüger <mkrueger@posteo.de>"]
+
+[compiler]
+language_version = 350
 
 [data]
 text_files = ["lread.cfg"]
@@ -96,6 +98,9 @@ art_files = ["data/screen.icy"]
 ```
 
 `name` specifies the name of the output ppe file.
+`language_version` is the project's source language. Without one,
+`PPL_LANG_VERSION` supplies a personal default; `--lang-version` and a
+``;$LANGVERSION`` source directive take precedence over both.
 `text_files` specify a number of text files that are copied to the target directory and converted to CP437 if needed.
 `art_files` specify a number of files that are copied to the target directory and converted to CP437 if needed. In case of `icy` files they're converted to `pcb` so in that case in the target is a file data/screen.pcb with the correct encoding.
 `files` just get copied

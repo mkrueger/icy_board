@@ -19,16 +19,19 @@ set independently, because wanting new syntax and wanting a file an old board ca
 load are two different wishes.
 
 .. csv-table:: Runtime and language versions
-   :header: "Version", "Command line", "ppl.toml", "What it controls"
-   :widths: 15, 25, 30, 30
+    :header: "Version", "Command line", "ppl.toml", "Environment", "What it controls"
+    :widths: 12, 20, 24, 20, 24
 
-   "Runtime", "``--runtime``", "``[package] runtime``", "The PPE format written to disk"
-   "Language", "``--lang-version``", "``[compiler] language_version``", "Which syntax and built-ins are accepted"
+    "Runtime", "``--runtime``", "``[package] runtime``", "", "The PPE format written to disk"
+    "Language", "``--lang-version``", "``[compiler] language_version``", "``PPL_LANG_VERSION``", "Which syntax and built-ins are accepted"
 
 The runtime defaults to 401, the newest format. The language defaults to the
 runtime version up to 400, so the default pair is runtime 401 and language 400.
 A format-only runtime bump therefore does not invent a new language version. The
-command line wins over ``ppl.toml``.
+source's ``;$LANGVERSION`` wins over the command line, the command line wins over
+``ppl.toml``, and the manifest wins over ``PPL_LANG_VERSION``. The environment
+variable is therefore a personal default for loose sources rather than a way to
+silently change a project.
 
 To write a PPE an original PCBoard can load, ask for its format::
 

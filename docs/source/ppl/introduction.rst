@@ -317,11 +317,13 @@ Options
   Keyword casing: ``u`` = UPPER (default), ``l`` = lower, ``c`` = CamelCase.
 
 ``--lang-version <version>``
-  Language version the source is written for. Defaults to the newest one; an
-  older version writes the syntax that generation used, down to ``END`` for the
-  end of a program and parentheses around a condition. It also decides which
-  constructs may be reconstructed: :PPL:`REPEAT`/:PPL:`UNTIL` and :PPL:`LOOP`
-  arrived in 350, so below that their loops come back as labels and jumps.
+  Language version the source is written for. It defaults to
+  ``PPL_LANG_VERSION`` and then to the newest one; an explicit option wins over
+  the environment. An older version writes the syntax that generation used,
+  down to ``END`` for the end of a program and parentheses around a condition.
+  It also decides which constructs may be reconstructed:
+  :PPL:`REPEAT`/:PPL:`UNTIL` and :PPL:`LOOP` arrived in 350, so below that their
+  loops come back as labels and jumps.
 
 ``file``  
   PPE file to decompile (with or without ``.ppe``).

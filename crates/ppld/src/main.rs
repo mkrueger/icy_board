@@ -15,6 +15,7 @@ use icy_board_engine::executable::Executable;
 use icy_board_engine::executable::LAST_PPL_LANGUAGE_VERSION;
 use icy_board_engine::executable::PPEScript;
 use icy_board_engine::executable::SUPPORTED_PPL_LANGUAGE_VERSIONS;
+use icy_board_engine::executable::language_version_from_env;
 use semver::Version;
 use std::ffi::OsStr;
 use std::fs::*;
@@ -55,7 +56,7 @@ struct Cli {
     /// keyword casing style, valid values are u=upper (default), l=lower, c=camel
     style: Option<char>,
 
-    /// language version the source is written for, defaults to the newest one
+    /// language version the source is written for, defaults to PPL_LANG_VERSION then the newest one
     #[argh(option)]
     lang_version: Option<u16>,
 
@@ -77,6 +78,17 @@ fn main() {
             std::process::exit(2);
         }
     }
+    let env_language_version = if arguments.lang_version.is_none() {
+        match language_version_from_env() {
+            Ok(version) => version,
+            Err(err) => {
+                eprintln!("{err}");
+                std::process::exit(2);
+            }
+        }
+    } else {
+        None
+    };
     let mut output_func = OutputFunc::Upper;
     match arguments.style {
         Some('u') => output_func = OutputFunc::Upper,
@@ -139,7 +151,7 @@ fn main() {
                 return;
             }
 
-            let lang_version = arguments.lang_version.unwrap_or(LAST_PPL_LANGUAGE_VERSION);
+            let lang_version = arguments.lang_version.or(env_language_version).unwrap_or(LAST_PPL_LANGUAGE_VERSION);
             match decompile(executable, arguments.raw, lang_version) {
                 Ok((decompilation, issues)) => {
                     let mut output_visitor: output_visitor::OutputVisitor = output_visitor::OutputVisitor::default();

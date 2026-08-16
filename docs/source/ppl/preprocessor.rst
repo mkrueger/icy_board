@@ -15,9 +15,10 @@ Directive                  Meaning
 =========================  ====================================================
 
 A source states which language it is written in, so it wins over
-``language_version`` in ``ppl.toml`` and over ``pplc --lang-version``. That is
-not a preference but a fact: a file that uses ``BEGIN`` as a block cannot be
-read as 3.50, where ``begin`` may still be a variable name.
+``language_version`` in ``ppl.toml``, ``pplc --lang-version`` and
+``PPL_LANG_VERSION``. That is not a preference but a fact: a file that uses
+``BEGIN`` as a block cannot be read as 3.50, where ``begin`` may still be a
+variable name.
 
 .. code-block:: PPL
 

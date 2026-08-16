@@ -177,15 +177,17 @@ A PPE has a *runtime* version and a source has a *language* version. They are se
 independently, because wanting new syntax and wanting a file an old board can load
 are two different wishes.
 
-| | Command line | `ppl.toml` | What it controls |
-| :--- | :--- | :--- | :--- |
-| Runtime | `--runtime` | `[package] runtime` | The PPE format written to disk. Valid: 100, 200, 300, 310, 320, 330, 340, 400, 401. |
-| Language | `--lang-version` | `[compiler] language_version` | Which syntax and which built-ins the compiler accepts. Valid: 100, 200, 300, 310, 320, 330, 340, 350, 400. |
+| | Command line | `ppl.toml` | Environment | What it controls |
+| :--- | :--- | :--- | :--- | :--- |
+| Runtime | `--runtime` | `[package] runtime` | | The PPE format written to disk. Valid: 100, 200, 300, 310, 320, 330, 340, 400, 401. |
+| Language | `--lang-version` | `[compiler] language_version` | `PPL_LANG_VERSION` | Which syntax and which built-ins the compiler accepts. Valid: 100, 200, 300, 310, 320, 330, 340, 350, 400. |
 
 The runtime defaults to 401. The language defaults to the runtime version up to
 400, so the default pair is runtime 401 and language 400. A format-only runtime
-bump therefore does not invent a new language version. The command line wins
-over `ppl.toml`.
+bump therefore does not invent a new language version. A source directive wins
+over the command line, the command line wins over `ppl.toml`, and the manifest
+wins over `PPL_LANG_VERSION`. The environment is a personal default for loose
+sources.
 
 Anything below is grouped by the language version that introduced it. A feature
 listed under 350 is available at 350 *and* 400; a feature listed under 400 needs

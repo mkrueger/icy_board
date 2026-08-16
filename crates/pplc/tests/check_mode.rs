@@ -1,7 +1,9 @@
 use std::{fs, process::Command};
 
 fn pplc() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_pplc"))
+    let mut command = Command::new(env!("CARGO_BIN_EXE_pplc"));
+    command.env_remove("PPL_LANG_VERSION");
+    command
 }
 
 fn check(source: &str) -> (i32, String) {
@@ -51,6 +53,81 @@ fn invalid_versions_fail() {
         let output = pplc().args([option, "999", "ignored.pps"]).output().unwrap();
         assert_eq!(output.status.code(), Some(2));
     }
+}
+
+#[test]
+fn the_environment_is_the_default_for_a_loose_source() {
+    let dir = tempfile::tempdir().unwrap();
+    let source = dir.path().join("const.pps");
+    fs::write(&source, "CONST INTEGER Answer = 42\nPRINTLN Answer\n").unwrap();
+
+    let old = pplc().env("PPL_LANG_VERSION", "340").arg(&source).output().unwrap();
+    assert_eq!(old.status.code(), Some(1), "{}", String::from_utf8_lossy(&old.stderr));
+
+    let modern = pplc().env("PPL_LANG_VERSION", "350").arg(&source).output().unwrap();
+    assert!(modern.status.success(), "{}", String::from_utf8_lossy(&modern.stderr));
+}
+
+#[test]
+fn command_line_and_source_win_over_the_environment() {
+    let dir = tempfile::tempdir().unwrap();
+    let source = dir.path().join("const.pps");
+    fs::write(&source, "CONST INTEGER Answer = 42\nPRINTLN Answer\n").unwrap();
+
+    let cli = pplc()
+        .env("PPL_LANG_VERSION", "340")
+        .args(["--lang-version", "350"])
+        .arg(&source)
+        .output()
+        .unwrap();
+    assert!(cli.status.success(), "{}", String::from_utf8_lossy(&cli.stderr));
+
+    fs::write(&source, ";$LANGVERSION 350\nCONST INTEGER Answer = 42\nPRINTLN Answer\n").unwrap();
+    let declared = pplc().env("PPL_LANG_VERSION", "340").arg(&source).output().unwrap();
+    assert!(declared.status.success(), "{}", String::from_utf8_lossy(&declared.stderr));
+}
+
+#[test]
+fn a_manifest_wins_over_the_environment() {
+    let dir = tempfile::tempdir().unwrap();
+    let package = dir.path().join("package");
+    let init = pplc().args(["--init", "--lang-version", "350"]).arg(&package).output().unwrap();
+    assert!(init.status.success(), "{}", String::from_utf8_lossy(&init.stderr));
+    fs::write(package.join("src/main.pps"), "CONST INTEGER Answer = 42\nPRINTLN Answer\n").unwrap();
+
+    let output = pplc().env("PPL_LANG_VERSION", "340").current_dir(&package).output().unwrap();
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+}
+
+#[test]
+fn explicit_versions_ignore_an_invalid_environment() {
+    let dir = tempfile::tempdir().unwrap();
+    let source = dir.path().join("source.pps");
+    fs::write(&source, "PRINTLN 1\n").unwrap();
+
+    let output = pplc()
+        .env("PPL_LANG_VERSION", "latest")
+        .args(["--lang-version", "350"])
+        .arg(&source)
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+
+    fs::write(&source, ";$LANGVERSION 350\nPRINTLN 1\n").unwrap();
+    let declared = pplc().env("PPL_LANG_VERSION", "latest").arg(&source).output().unwrap();
+    assert!(declared.status.success(), "{}", String::from_utf8_lossy(&declared.stderr));
+}
+
+#[test]
+fn an_invalid_environment_language_version_fails() {
+    let dir = tempfile::tempdir().unwrap();
+    let source = dir.path().join("source.pps");
+    fs::write(&source, "PRINTLN 1\n").unwrap();
+
+    let output = pplc().env("PPL_LANG_VERSION", "latest").arg(&source).output().unwrap();
+    let text = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(output.status.code(), Some(2), "{text}");
+    assert!(text.contains("Invalid PPL_LANG_VERSION 'latest'"), "{text}");
 }
 
 #[test]

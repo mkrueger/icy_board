@@ -40,6 +40,26 @@ pub const SUPPORTED_PPE_VERSIONS: &[u16] = &[100, 200, 300, 310, 320, 330, 340, 
 
 pub const SUPPORTED_PPL_LANGUAGE_VERSIONS: &[u16] = &[100, 200, 300, 310, 320, 330, 340, 350, 400];
 
+pub const PPL_LANG_VERSION_ENV: &str = "PPL_LANG_VERSION";
+
+/// The user's default language version for loose sources and decompilation.
+pub fn language_version_from_env() -> Result<Option<u16>, String> {
+    let value = match std::env::var(PPL_LANG_VERSION_ENV) {
+        Ok(value) => value,
+        Err(std::env::VarError::NotPresent) => return Ok(None),
+        Err(std::env::VarError::NotUnicode(_)) => return Err(format!("{PPL_LANG_VERSION_ENV} is not valid text")),
+    };
+    let version = value
+        .parse::<u16>()
+        .map_err(|_| format!("Invalid {PPL_LANG_VERSION_ENV} '{value}', valid values are {SUPPORTED_PPL_LANGUAGE_VERSIONS:?}"))?;
+    if !SUPPORTED_PPL_LANGUAGE_VERSIONS.contains(&version) {
+        return Err(format!(
+            "Invalid {PPL_LANG_VERSION_ENV} '{value}', valid values are {SUPPORTED_PPL_LANGUAGE_VERSIONS:?}"
+        ));
+    }
+    Ok(Some(version))
+}
+
 /// The first runtime that stores a type table. A 4.00 file has none at all.
 pub const FIRST_TYPE_TABLE_RUNTIME: u16 = 401;
 
