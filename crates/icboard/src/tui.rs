@@ -23,7 +23,7 @@ use icy_board_engine::icy_board::{
     state::{GraphicsMode, NodeState, PPEExecute},
 };
 use icy_board_tui::{
-    get_text, get_text_args,
+    get_text_args,
     theme::{DOS_BLACK, DOS_BLUE, DOS_LIGHT_GRAY, DOS_LIGHT_GREEN, DOS_RED, DOS_WHITE, DOS_YELLOW},
 };
 use icy_engine::{BufferType, EditableScreen, Screen, TextPane, TextScreen};
@@ -39,7 +39,6 @@ pub struct Tui {
     handle: Arc<Mutex<Vec<Option<NodeState>>>>,
     node: usize,
     node_state: Arc<Mutex<Vec<Option<NodeState>>>>,
-    wait_after_run: bool,
 }
 
 impl Tui {
@@ -50,7 +49,6 @@ impl Tui {
         ppe: Option<PPEExecute>,
         stuffed_chars: String,
     ) -> Res<Self> {
-        let wait_after_run = ppe.is_some();
         let board = board.clone();
         let bbs2 = bbs.clone();
 
@@ -89,7 +87,6 @@ impl Tui {
             node,
             node_state,
             handle: bbs.lock().await.get_open_connections().await.clone(),
-            wait_after_run,
         })
     }
 
@@ -123,7 +120,6 @@ impl Tui {
             node,
             node_state,
             handle: bbs.get_open_connections().await.clone(),
-            wait_after_run: false,
         })
     }
 
@@ -138,14 +134,12 @@ impl Tui {
                 if let Some(handle) = node_state.handle.as_ref() {
                     if handle.is_finished() {
                         let handle = node_state.handle.take().unwrap();
-                        let result: Res<()> = match handle.join() {
-                            Ok(res) => res,
-                            Err(_err) => Err(Box::new(IcyBoardError::ThreadCrashed)),
-                        };
-                        if result.is_ok() && self.wait_after_run {
-                            self.wait_for_run_exit(&mut terminal, board).await?;
+                        match handle.join() {
+                            Ok(res) => {
+                                return res;
+                            }
+                            Err(_err) => return Err(Box::new(IcyBoardError::ThreadCrashed)),
                         }
-                        return result;
                     }
                 } else {
                     // thread has gone
@@ -219,22 +213,6 @@ impl Tui {
 
             if last_tick.elapsed() >= tick_rate {
                 last_tick = Instant::now();
-            }
-        }
-    }
-
-    async fn wait_for_run_exit(&self, terminal: &mut Terminal<CrosstermBackend<Stdout>>, board: &Arc<tokio::sync::Mutex<IcyBoard>>) -> Res<()> {
-        loop {
-            let status_bar_info = StatusBarInfo::get_info(board, &self.node_state, self.node).await;
-            terminal.draw(|frame| {
-                self.ui(frame, status_bar_info);
-                draw_run_completed(frame, &get_text("run_ppe_completed"));
-            })?;
-
-            if let Event::Key(key) = event::read()? {
-                if key.kind == KeyEventKind::Press {
-                    return Ok(());
-                }
             }
         }
     }
@@ -439,31 +417,6 @@ impl Tui {
         }
         let _res = self.tx.send(SendData::Data(s)).await;
         Ok(())
-    }
-}
-
-fn draw_run_completed(frame: &mut Frame, message: &str) {
-    let area = Rect::new(0, frame.area().height.saturating_sub(1), frame.area().width, 1);
-    frame.render_widget(Paragraph::new(message).centered().style(Style::new().fg(DOS_YELLOW).bg(DOS_BLUE).bold()), area);
-}
-
-#[cfg(test)]
-mod tests {
-    use ratatui::{Terminal, backend::TestBackend};
-
-    use super::draw_run_completed;
-
-    #[test]
-    fn completed_run_waits_with_a_visible_status() {
-        let backend = TestBackend::new(60, 4);
-        let mut terminal = Terminal::new(backend).unwrap();
-        terminal
-            .draw(|frame| draw_run_completed(frame, "Run completed - press any key to exit"))
-            .unwrap();
-
-        let buffer = terminal.backend().buffer();
-        let line: String = (0..60).map(|x| buffer[(x, 3)].symbol().chars().next().unwrap_or(' ')).collect();
-        assert!(line.contains("Run completed - press any key to exit"), "{line:?}");
     }
 }
 

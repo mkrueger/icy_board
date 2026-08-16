@@ -131,6 +131,9 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
                 };
                 run_message(cmd, &mut terminal, &board, &mut bbs, arguments.full_screen, stuffed, None).await?;
                 restore_terminal()?;
+                if arguments.ppe.is_some() {
+                    println!("{}", icy_board_tui::get_text("run_ppe_completed"));
+                }
                 return Ok(());
             }
 
@@ -141,6 +144,7 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
                         let mut terminal = init_terminal()?;
                         run_message(cmd, &mut terminal, &board, &mut bbs, arguments.full_screen, stuffed, None).await?;
                         restore_terminal()?;
+                        println!("{}", icy_board_tui::get_text("run_ppe_completed"));
                     }
                     Err(err) => {
                         print_error(err.to_string());
