@@ -43,7 +43,7 @@ If something is missing just let me know.
 | Statistics | 80%  | Calls, messages, uploads and downloads are counted for the board and the caller, and the daily figures roll over; transfer limits still do not read them |
 | Help Files | 80%  | Every command reaches a help file, the German set is 20 of 52 | 
 | Modem Support | Not started yet | Telnet, SSH and websockets work |
-| Limits | 60% | Session limits and the keyboard timeout apply; the daily-time-limit switch is not enforced |
+| Limits | 85% | Time, ratios, credits and daily/total byte limits are enforced from the PWRD level, off until switched on; accounting credits are not modelled |
 | Events | 80% | The nightly event runs, clears the board and can suspend callers; PCBoard's per node and expedited modes are missing | 
 | Subscriptions | 20% | Expiry is warned about, a new period is never set and an expired user keeps their level | 
 | Accounting | 20% | Charges and the warning file work, peak rates and the money display do not | 

@@ -9,7 +9,10 @@ use crate::icy_board::sec_levels::SecurityLevel;
 /// What the caller is allowed, resolved from their PWRD entry when they log on.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct TransferLimits {
-    /// Bytes still available today; `None` is PCBoard's -1, an unlimited allowance.
+    /// The whole day's allowance from the level, before anything was spent against it.
+    /// `None` is PCBoard's -1, an unlimited allowance.
+    pub daily_allowance: Option<i64>,
+    /// What is left of it today.
     pub bytes_remaining: Option<i64>,
     /// Files the caller may download until the sysop resets the count. 0 disables it.
     pub total_file_limit: u64,
@@ -72,8 +75,10 @@ impl TransferLimits {
     /// Resolves the allowance from a PWRD entry. `bps` is the speed the caller connected
     /// at, which scales the daily allowance against the level's base baud rate.
     pub fn from_security_level(level: &SecurityLevel, bps: u32) -> Self {
+        let allowance = daily_allowance(level, bps);
         Self {
-            bytes_remaining: daily_allowance(level, bps),
+            daily_allowance: allowance,
+            bytes_remaining: allowance,
             total_file_limit: level.file_limit,
             total_byte_limit: level.file_kb_limit.saturating_mul(1024),
             file_ratio_tenths: level.uldl_ratio_tenths as u64,
@@ -262,6 +267,18 @@ pub fn session_time_limit(time_per_day: u32, minutes_used_today: u16, enforce_da
 /// which is what `@TIMELEFT@` has always reported it as.
 pub fn session_expired(time_limit: i32, minutes_online: i64) -> bool {
     time_limit != 0 && minutes_online >= time_limit as i64
+}
+
+/// The ceiling PCBoard reports for a day's downloading, in kilobytes: the tighter of the
+/// day's allowance and the total limit, or `None` when neither applies.
+pub fn kilobyte_limit(daily_allowance: Option<i64>, total_byte_limit: u64) -> Option<i64> {
+    let total_kb = (total_byte_limit / 1024) as i64;
+    match (daily_allowance, total_byte_limit) {
+        (None, 0) => None,
+        (None, _) => Some(total_kb),
+        (Some(allowance), 0) => Some(allowance / 1024),
+        (Some(allowance), _) => Some(total_kb.min(allowance / 1024)),
+    }
 }
 
 #[cfg(test)]
@@ -701,5 +718,33 @@ mod tests {
     #[test]
     fn an_unlimited_session_never_ends() {
         assert!(!session_expired(0, 100_000));
+    }
+
+    // --- the reported ceiling --------------------------------------------------
+
+    #[test]
+    fn nothing_caps_a_caller_with_neither_limit() {
+        assert_eq!(kilobyte_limit(None, 0), None);
+    }
+
+    #[test]
+    fn the_tighter_of_the_two_is_reported() {
+        assert_eq!(kilobyte_limit(Some(400 * 1024), 100 * 1024), Some(100));
+        assert_eq!(kilobyte_limit(Some(50 * 1024), 100 * 1024), Some(50));
+    }
+
+    #[test]
+    fn one_limit_on_its_own_is_reported() {
+        assert_eq!(kilobyte_limit(None, 100 * 1024), Some(100));
+        assert_eq!(kilobyte_limit(Some(400 * 1024), 0), Some(400));
+    }
+
+    /// Today's spending does not lower the ceiling that gets reported.
+    #[test]
+    fn the_allowance_survives_being_charged() {
+        let mut limits = TransferLimits::from_security_level(&level(100, 0), 2400);
+        limits.charge_todays_usage(60 * 1024);
+        assert_eq!(limits.daily_allowance, Some(100 * 1024));
+        assert_eq!(limits.bytes_remaining, Some(40 * 1024));
     }
 }

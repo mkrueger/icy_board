@@ -1,9 +1,14 @@
+use chrono::{Duration, Local};
 use dizbase::file_base::FileBase;
-use icy_board_engine::icy_board::{
-    IcyBoard,
-    conferences::Conference,
-    file_directory::{DirectoryList, FileDirectory},
-    sec_levels::SecurityLevel,
+use icy_board_engine::{
+    datetime::IcbTime,
+    icy_board::{
+        IcyBoard,
+        conferences::Conference,
+        events::BoardEvent,
+        file_directory::{DirectoryList, FileDirectory},
+        sec_levels::SecurityLevel,
+    },
 };
 
 use crate::tests::{test_dir, test_output};
@@ -162,5 +167,27 @@ fn test_a_free_area_still_costs_time() {
         ..Default::default()
     };
     let output = test_output("D BIG.ZIP\n\n".to_string(), move |board| setup(board, level.clone(), true));
+    assert!(output.contains("Insufficient time"), "{output}");
+}
+
+/// A session is cut short so the caller is gone before an event runs, and a transfer
+/// that would outlast what is left of it is refused.
+#[test]
+fn test_an_event_shortens_the_session_and_blocks_a_long_download() {
+    let level = SecurityLevel {
+        daily_file_kb_limit: 32767,
+        time_per_day: 600,
+        ..Default::default()
+    };
+    let output = test_output("D BIG.ZIP\n\n".to_string(), move |board| {
+        setup(board, level.clone(), false);
+        let soon = Local::now() + Duration::minutes(1);
+        board.config.event.enabled = true;
+        board.config.event.suspend_minutes = 0;
+        board.events.push(BoardEvent {
+            time: IcbTime::parse(&soon.format("%H:%M:%S").to_string()),
+            ..Default::default()
+        });
+    });
     assert!(output.contains("Insufficient time"), "{output}");
 }

@@ -791,6 +791,13 @@ impl IcyBoardState {
     /// Takes the time limit and the transfer allowance of the caller from the PWRD
     /// security level definitions.
     async fn apply_security_level_limits(&mut self) {
+        self.apply_pwrd_limits().await;
+        // The level hands out a fresh limit every time it is read, so the event has to be
+        // taken off again afterwards or a conference join would undo it.
+        self.limit_time_for_event().await;
+    }
+
+    async fn apply_pwrd_limits(&mut self) {
         let board = self.get_board().await;
         let Some(level) = board.sec_levels.iter().find(|l| l.security == self.session.cur_security) else {
             return;
@@ -1526,7 +1533,9 @@ impl IcyBoardState {
         let Some(window) = self.event_window().await else {
             return;
         };
-        let minutes = window.minutes_until_suspend(&now) as i32;
+        // Never zero, which reads as an unlimited session; a caller this close to an
+        // event gets a minute and is then hung up on.
+        let minutes = (window.minutes_until_suspend(&now) as i32).max(1);
         if minutes < self.session.time_limit {
             self.session.time_limit = minutes;
             self.session.time_adjusted_for_event = true;
@@ -2184,7 +2193,7 @@ impl IcyBoardState {
 
             MacroCommand::ByteCredit => result = self.session.transfer_limits.byte_credit.to_string(),
             MacroCommand::ByteLimit => {
-                result = match self.session.transfer_limits.bytes_remaining {
+                result = match self.session.transfer_limits.daily_allowance {
                     None => self.unlimited_text(),
                     Some(bytes) => bytes.to_string(),
                 }
@@ -2235,7 +2244,22 @@ impl IcyBoardState {
                     result = user.bus_data_phone.to_string();
                 }
             }
-            MacroCommand::DayBytes | MacroCommand::DlBytes | MacroCommand::DlFiles | MacroCommand::Event => {}
+            MacroCommand::DayBytes => {
+                if let Some(user) = &self.session.current_user {
+                    result = user.stats.today_dnld_bytes.to_string();
+                }
+            }
+            MacroCommand::DlBytes => {
+                if let Some(user) = &self.session.current_user {
+                    result = user.stats.total_dnld_bytes.to_string();
+                }
+            }
+            MacroCommand::DlFiles => {
+                if let Some(user) = &self.session.current_user {
+                    result = user.stats.num_downloads.to_string();
+                }
+            }
+            MacroCommand::Event => {}
 
             MacroCommand::Delay(delay) => {
                 sleep(Duration::from_millis(*delay as u64 * 10)).await;
@@ -2276,7 +2300,6 @@ impl IcyBoardState {
                     result = limits::format_ratio(user.stats.num_downloads, user.stats.num_uploads);
                 }
             }
-            MacroCommand::FBytes | MacroCommand::FFiles => {}
             MacroCommand::First => {
                 result = fix_casing(self.session.get_first_name());
             }
@@ -2343,8 +2366,55 @@ impl IcyBoardState {
                 result = self.session.last_msg_read.to_string();
             }
 
-            MacroCommand::KBLimit | MacroCommand::LastCallerNode | MacroCommand::LastCallerSystem | MacroCommand::MaxBytes | MacroCommand::MaxFiles => {}
-            MacroCommand::MinLeft => result = "1000".to_string(),
+            MacroCommand::KBLimit => {
+                result = match limits::kilobyte_limit(self.session.transfer_limits.daily_allowance, self.session.transfer_limits.total_byte_limit) {
+                    None => self.unlimited_text(),
+                    Some(kb) => kb.to_string(),
+                }
+            }
+            MacroCommand::MaxBytes => {
+                let limit = self.session.transfer_limits.total_byte_limit;
+                result = if limit == 0 { self.unlimited_text() } else { limit.to_string() };
+            }
+            MacroCommand::MaxFiles => {
+                let limit = self.session.transfer_limits.total_file_limit;
+                result = if limit == 0 { self.unlimited_text() } else { limit.to_string() };
+            }
+            MacroCommand::RatioBytes => {
+                let ratio = self.session.transfer_limits.byte_ratio_tenths;
+                result = if ratio == 0 {
+                    self.unlimited_text()
+                } else {
+                    format!("{}.{}:1", ratio / 10, ratio % 10)
+                };
+            }
+            MacroCommand::RatioFiles => {
+                let ratio = self.session.transfer_limits.file_ratio_tenths;
+                result = if ratio == 0 {
+                    self.unlimited_text()
+                } else {
+                    format!("{}.{}:1", ratio / 10, ratio % 10)
+                };
+            }
+            MacroCommand::FBytes => {
+                result = self
+                    .session
+                    .flagged_files
+                    .iter()
+                    .filter_map(|f| std::fs::metadata(f).ok())
+                    .map(|m| m.len())
+                    .sum::<u64>()
+                    .to_string()
+            }
+            MacroCommand::FFiles => result = self.session.flagged_files.len().to_string(),
+
+            MacroCommand::LastCallerNode | MacroCommand::LastCallerSystem => {}
+            MacroCommand::MinLeft => {
+                result = match self.minutes_left() {
+                    None => self.unlimited_text(),
+                    Some(minutes) => minutes.max(0).to_string(),
+                }
+            }
             MacroCommand::More => {
                 if let Err(err) = self.more_promt().await {
                     log::error!("Error in more prompt: {}", err);
@@ -2456,7 +2526,7 @@ impl IcyBoardState {
                 self.session.disp_options.allow_break = true;
                 return None;
             }
-            MacroCommand::PwxDate | MacroCommand::PwxDays | MacroCommand::RatioBytes | MacroCommand::RatioFiles => {}
+            MacroCommand::PwxDate | MacroCommand::PwxDays => {}
             MacroCommand::RCPS => result = self.transfer_statistics.uploaded_cps.to_string(),
             MacroCommand::RBytes => result = self.transfer_statistics.uploaded_bytes.to_string(),
             MacroCommand::RFiles => result = self.transfer_statistics.uploaded_files.to_string(),
