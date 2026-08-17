@@ -446,6 +446,32 @@ pub enum NodeStatus {
 }
 
 impl NodeStatus {
+    /// The line the node list shows in its status column.
+    pub fn text(&self) -> IceText {
+        match self {
+            NodeStatus::NoCaller => IceText::NoCaller,
+            NodeStatus::Available => IceText::Available,
+            NodeStatus::RunningDoor => IceText::InADOOR,
+            NodeStatus::EnterMessage => IceText::EnterMessage,
+            NodeStatus::GroupChat => IceText::GroupChat,
+            NodeStatus::HandlingMail => IceText::HandlingMail,
+            NodeStatus::LogoffPending => IceText::LogoffPending,
+            NodeStatus::NodeMessage => IceText::ReceivedMessage,
+            NodeStatus::RunningEvent => IceText::RunningEvent,
+            NodeStatus::LogIntoSystem => IceText::LogIntoSystem,
+            NodeStatus::PagingSysop => IceText::PagingSysop,
+            NodeStatus::ChatWithSysop => IceText::ChatWithSysop,
+            NodeStatus::RecycleBBS => IceText::RecycleBBS,
+            NodeStatus::TakeSurvey => IceText::AnswerSurvey,
+            NodeStatus::Transfer => IceText::Transfer,
+            NodeStatus::Unavailable => IceText::Unavailable,
+            NodeStatus::DropDOSDelayed => IceText::DropDOSDelayed,
+            NodeStatus::DropDOSNow => IceText::DropDOSNow,
+            // PCBoard had no such state, so it needs a line of its own.
+            NodeStatus::ReadBulletins => IceText::ReadingBulletins,
+        }
+    }
+
     pub fn to_char(&self) -> char {
         match self {
             NodeStatus::NoCaller => ' ',
@@ -1508,32 +1534,7 @@ impl IcyBoardState {
     }
 
     pub async fn set_activity(&self, node_status: NodeStatus) {
-        let text = match node_status {
-            NodeStatus::LogIntoSystem => IceText::LogIntoSystem,
-            NodeStatus::Available => IceText::Available,
-            NodeStatus::Unavailable => IceText::Unavailable,
-            NodeStatus::EnterMessage => IceText::EnterMessage,
-
-            NodeStatus::Transfer => IceText::Transfer,
-
-            NodeStatus::HandlingMail => IceText::HandlingMail,
-            NodeStatus::TakeSurvey => IceText::AnswerSurvey,
-
-            NodeStatus::ReadBulletins => IceText::HandlingMail,
-
-            NodeStatus::RunningDoor => IceText::InADOOR,
-            NodeStatus::ChatWithSysop => IceText::ChatWithSysop,
-            NodeStatus::GroupChat => IceText::GroupChat,
-            NodeStatus::PagingSysop => IceText::PagingSysop,
-            NodeStatus::LogoffPending => IceText::LogoffPending,
-            NodeStatus::NoCaller => IceText::NoCaller,
-            NodeStatus::NodeMessage => IceText::ReceivedMessage,
-            NodeStatus::RunningEvent => IceText::RunningEvent,
-            NodeStatus::RecycleBBS => IceText::RecycleBBS,
-            NodeStatus::DropDOSDelayed => IceText::DropDOSDelayed,
-            NodeStatus::DropDOSNow => IceText::DropDOSNow,
-        };
-        let txt = self.display_text.get_display_text(text).unwrap();
+        let txt = self.display_text.get_display_text(node_status.text()).unwrap();
         if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
             state.operation = txt.text;
             state.status = node_status;
@@ -3296,5 +3297,48 @@ fn adjust_canonicalization<P: AsRef<Path>>(p: P) -> String {
         p[VERBATIM_PREFIX.len()..].to_string()
     } else {
         p
+    }
+}
+
+#[cfg(test)]
+mod node_status_tests {
+    use super::*;
+
+    /// The status column and the node record used to carry their own copy of this
+    /// table, and reading bulletins was labelled as handling mail in one of them.
+    #[test]
+    fn every_state_has_its_own_line() {
+        let states = [
+            NodeStatus::NoCaller,
+            NodeStatus::Available,
+            NodeStatus::RunningDoor,
+            NodeStatus::EnterMessage,
+            NodeStatus::GroupChat,
+            NodeStatus::HandlingMail,
+            NodeStatus::LogoffPending,
+            NodeStatus::NodeMessage,
+            NodeStatus::RunningEvent,
+            NodeStatus::LogIntoSystem,
+            NodeStatus::PagingSysop,
+            NodeStatus::ChatWithSysop,
+            NodeStatus::RecycleBBS,
+            NodeStatus::TakeSurvey,
+            NodeStatus::Transfer,
+            NodeStatus::Unavailable,
+            NodeStatus::DropDOSDelayed,
+            NodeStatus::DropDOSNow,
+            NodeStatus::ReadBulletins,
+        ];
+        let mut seen = Vec::new();
+        for state in states {
+            let text = state.text();
+            assert!(!seen.contains(&text), "two states share the line {text:?}");
+            seen.push(text);
+        }
+    }
+
+    #[test]
+    fn reading_bulletins_is_not_handling_mail() {
+        assert_ne!(NodeStatus::ReadBulletins.text(), NodeStatus::HandlingMail.text());
     }
 }

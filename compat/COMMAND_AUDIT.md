@@ -108,7 +108,9 @@ icy_board resolves these in `try_find_command` (`state/mod.rs:833-960`).
 
 | Cmd | Notes | Status |
 |---|---|---|
-| ALIAS, BYE, BROADCAST, CHAT, FLAG, HELP, JOIN, LANG, MENU, NEWS, PPE, QWK, REPLY, RM/RM+/RM-, SELECT, TEST, USERS, WHO | present, prompt sequences line up | ✅ |
+| ALIAS, BYE, BROADCAST, CHAT, FLAG, HELP, JOIN, LANG, MENU, NEWS, PPE, QWK, REPLY, RM/RM+/RM-, SELECT, TEST | present, prompt sequences line up | ✅ |
+| USERS | USERSCAN (559) when no token, then USERSHEADER (558) and USERSCANLINE (730); all tokens make up the search text, which runs through the same parser as the file scans | same, over the callers registered in the conference | ✅ |
+| WHO | no prompt; `X` token adds the operation line for a caller who reaches the level of sysop command 11 | same; the status column names the node state, the operation goes in the user column | ✅ verified against the original |
 | DOOR / OPEN | PCBoard adds PWRDFORDOOR (415) and CONTINUEDOOR (604) when files are flagged | both present; the sysop skips them as in PCBoard | ✅ |
 | SELECT | asks SELECTCONFFLAGS (564) in register mode, and the letters set the flags as the original does | ✅ |
 | TS | area token `S` scans from the stored date, like the file scan | ✅ |

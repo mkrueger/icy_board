@@ -1605,9 +1605,12 @@ pub enum IceText {
 
     /// `E-Mail`
     PersonalMailBase = 779,
+
+    /// `Reading Bulletins`
+    ReadingBulletins = 780,
 }
 
-const LAST_ENTRY: usize = 779;
+const LAST_ENTRY: usize = 780;
 
 impl IceText {
     /// A number a file or a PPE names. Anything past the last message has no
@@ -1903,7 +1906,7 @@ mod tests {
     #[test]
     fn text_numbers_are_checked_before_they_become_an_enum() {
         assert_eq!(IceText::try_from_number(0), Some(IceText::UnusedStatusLine));
-        assert_eq!(IceText::try_from_number(LAST_ENTRY), Some(IceText::PersonalMailBase));
+        assert_eq!(IceText::try_from_number(LAST_ENTRY), Some(IceText::ReadingBulletins));
         assert_eq!(IceText::try_from_number(LAST_ENTRY + 1), None);
         assert_eq!(IceText::try_from_number(usize::MAX), None);
     }

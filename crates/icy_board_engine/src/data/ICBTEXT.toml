@@ -2983,3 +2983,7 @@ style = "Yellow"
 [PersonalMailBase]
 text = "E-Mail"
 style = "Green"
+
+[ReadingBulletins]
+text = "Reading Bulletins"
+style = "Cyan"

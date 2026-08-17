@@ -91,8 +91,8 @@ If something is missing just let me know.
 | !  | Recall Command | 💯 | 
 | MENU  | Redisplay Menu | 💯 | 
 | REPLY  | Reply Message | 💯 | 
-| USERS  | User List | 90% |
-| WHO  |WHO is Online | 90% | 
+| USERS  | User List | 💯 | Only the callers registered in the conference, searched by name and location |
+| WHO  |WHO is Online | 💯 | Node, status and caller as in the original; `X` adds the operation line for sysops |
 | QWK  | QWK command | 90% | Download, upload and the scanned bases work; upload needs more testing [^2]
 | CHAT  | Group Chat| 💯 | Built in, the PPEs are no longer needed
 | NODE | Group Chat alias | 💯 | PCBoard alias for `CHAT` |

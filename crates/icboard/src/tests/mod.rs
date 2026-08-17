@@ -39,9 +39,11 @@ mod cmd_q;
 mod cmd_r;
 mod cmd_t;
 mod cmd_u;
+mod cmd_users;
 mod cmd_v;
 
 mod cmd_w;
+mod cmd_who;
 mod cmd_x;
 mod cmd_y;
 
