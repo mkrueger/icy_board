@@ -67,7 +67,7 @@ use super::{
     limits::{self, BatchSoFar, TransferHistory, TransferLimits},
     macro_parser::{Macro, MacroCommand},
     security_expr::SecurityExpression,
-    user_base::{ConferenceFlags, FSEMode, Password, User},
+    user_base::{ConferenceFlags, FSEMode, Password, PasswordVerdict, User},
 };
 
 #[derive(Clone, Copy, PartialEq, Default)]
@@ -1164,6 +1164,7 @@ impl IcyBoardState {
             "TS" => convert_cmd(CommandType::TextSearch),
             "1" => convert_cmd(CommandType::ViewCallerLog),
             "2" => convert_cmd(CommandType::ViewUserFile),
+            "3" => convert_cmd(CommandType::PackMessageBase),
             "4" => convert_cmd(CommandType::RestoreMessage),
             "5" => convert_cmd(CommandType::HeaderScan),
             "6" => convert_cmd(CommandType::ViewTextFile),
@@ -3168,24 +3169,20 @@ impl IcyBoardState {
         Ok(new_pwd.len() >= self.board.lock().await.config.limits.min_pwd_length as usize)
     }
 
+    /// Takes a password on behalf of PPL's `NEWPWD`, which PCBoard put through
+    /// the same rules as the `W` command.
     pub async fn change_password(&mut self, new_pwd: &str) -> Res<bool> {
-        if !self.is_valid_password(new_pwd).await? {
+        let min_len = self.get_board().await.config.limits.min_pwd_length;
+        let exp_days = self.get_board().await.config.limits.password_expire_days;
+        let Some(user) = &self.session.current_user else {
+            return Ok(false);
+        };
+        if user.password.check_new_password(&user.get_name(), new_pwd, min_len) != PasswordVerdict::Ok {
             return Ok(false);
         }
-        let exp_days = self.get_board().await.config.limits.password_expire_days;
-        let pw = self.create_password(new_pwd).await;
+        let password = self.create_password(new_pwd.to_string()).await;
         if let Some(user) = &mut self.session.current_user {
-            let old = user.password.password.clone();
-            user.password.password = pw;
-            user.password.times_changed = user.password.times_changed.wrapping_add(1);
-            user.password.last_change = Utc::now();
-            user.password.prev_pwd.push(old);
-            while user.password.prev_pwd.len() > 3 {
-                user.password.prev_pwd.remove(0);
-            }
-            if exp_days > 0 {
-                user.password.expire_date = Utc::now() + chrono::Duration::days(exp_days as i64);
-            }
+            user.password.accept_new_password(password, Utc::now(), exp_days);
             self.get_board().await.save_userbase()?;
             return Ok(true);
         }

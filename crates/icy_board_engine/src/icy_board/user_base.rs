@@ -204,6 +204,81 @@ pub struct PasswordInfo {
     pub expire_date: DateTime<Utc>,
 }
 
+/// What PCBoard's `checkpassword` makes of a password the caller wants to take.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PasswordVerdict {
+    Ok,
+    /// The one they already have - the record is left alone.
+    Unchanged,
+    TooShort,
+    PartOfName,
+    PreviouslyUsed,
+}
+
+/// PCBoard never let a password be longer than this, so a longer minimum is
+/// one nobody could ever satisfy.
+const MAX_PASSWORD_LEN: usize = 12;
+
+/// How many old passwords are remembered and refused.
+pub const PASSWORD_HISTORY_LEN: usize = 3;
+
+impl PasswordInfo {
+    /// The rules PCBoard's `checkpassword` applied: long enough, not a piece of
+    /// the caller's own name and not one of the last three.
+    ///
+    /// The original also refused a password sharing the first `min_len - 2`
+    /// characters with an old one. That needs the old passwords in the clear,
+    /// which is exactly what hashing them takes away, so it is not checked here.
+    pub fn check_new_password(&self, name: &str, candidate: &str, min_len: u8) -> PasswordVerdict {
+        let candidate = candidate.trim_end();
+        if candidate.len() < (min_len as usize).min(MAX_PASSWORD_LEN) {
+            return PasswordVerdict::TooShort;
+        }
+
+        let upper_name = name.to_uppercase();
+        let upper_candidate = candidate.to_uppercase();
+        if upper_name.contains(&upper_candidate) {
+            return PasswordVerdict::PartOfName;
+        }
+        for part in upper_name.split_whitespace() {
+            if part.contains(&upper_candidate) || upper_candidate.contains(part) {
+                return PasswordVerdict::PartOfName;
+            }
+        }
+
+        if self.password.is_valid(candidate) {
+            return PasswordVerdict::Unchanged;
+        }
+        if self.prev_pwd.iter().any(|previous| previous.is_valid(candidate)) {
+            return PasswordVerdict::PreviouslyUsed;
+        }
+        PasswordVerdict::Ok
+    }
+
+    /// Takes the new password on, pushing the old one onto the history.
+    ///
+    /// PCBoard rotated the history at most once a day so that changing the
+    /// password repeatedly could not flush out what came before.
+    pub fn accept_new_password(&mut self, password: Password, now: DateTime<Utc>, expire_days: u16) {
+        if self.last_change.date_naive() != now.date_naive() {
+            self.last_change = now;
+            self.times_changed = self.times_changed.wrapping_add(1);
+            self.prev_pwd.push(self.password.clone());
+            while self.prev_pwd.len() > PASSWORD_HISTORY_LEN {
+                self.prev_pwd.remove(0);
+            }
+            self.expire_date = if expire_days == 0 {
+                DateTime::default()
+            } else {
+                // The date only ever moves further out.
+                let next = now + chrono::Duration::days(expire_days as i64);
+                if next > self.expire_date { next } else { self.expire_date }
+            };
+        }
+        self.password = password;
+    }
+}
+
 #[derive(Default, Clone, Serialize, Deserialize, PartialEq)]
 pub struct UserStats {
     /// First date on
@@ -1327,5 +1402,116 @@ impl Deref for UserBase {
 impl DerefMut for UserBase {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.users
+    }
+}
+
+#[cfg(test)]
+mod password_tests {
+    use super::*;
+    use chrono::TimeZone;
+
+    fn info(current: &str, previous: &[&str]) -> PasswordInfo {
+        PasswordInfo {
+            password: Password::new_plaintext(current).unwrap(),
+            prev_pwd: previous.iter().map(|p| Password::new_plaintext(*p).unwrap()).collect(),
+            ..Default::default()
+        }
+    }
+
+    fn day(day: u32) -> DateTime<Utc> {
+        Utc.with_ymd_and_hms(2026, 1, day, 12, 0, 0).unwrap()
+    }
+
+    #[test]
+    fn no_expiry_period_clears_the_date() {
+        let mut info = info("one", &[]);
+        info.accept_new_password(Password::new_plaintext("two").unwrap(), day(1), 30);
+        info.accept_new_password(Password::new_plaintext("three").unwrap(), day(2), 0);
+
+        assert_eq!(info.expire_date, DateTime::<Utc>::default());
+    }
+
+    #[test]
+    fn a_good_password_is_taken() {
+        assert_eq!(info("old", &[]).check_new_password("JOHN DOE", "kaleidoscope", 6), PasswordVerdict::Ok);
+    }
+
+    #[test]
+    fn a_short_password_is_refused() {
+        assert_eq!(info("old", &[]).check_new_password("JOHN DOE", "abc", 6), PasswordVerdict::TooShort);
+    }
+
+    /// PCBoard capped the minimum at the 12 characters a password could hold,
+    /// so a larger setting cannot lock everyone out.
+    #[test]
+    fn the_minimum_cannot_exceed_the_field() {
+        assert_eq!(info("old", &[]).check_new_password("JOHN DOE", "123456789012", 20), PasswordVerdict::Ok);
+    }
+
+    #[test]
+    fn a_password_out_of_the_callers_name_is_refused() {
+        let info = info("old", &[]);
+        assert_eq!(info.check_new_password("JOHN DOE", "JOHN", 0), PasswordVerdict::PartOfName);
+        // A name that is part of the password is refused just as well.
+        assert_eq!(info.check_new_password("JOHN DOE", "DOEDOEDOE", 0), PasswordVerdict::PartOfName);
+        assert_eq!(info.check_new_password("JOHN DOE", "john doe", 0), PasswordVerdict::PartOfName);
+    }
+
+    #[test]
+    fn the_password_they_already_have_counts_as_unchanged() {
+        assert_eq!(info("secret", &[]).check_new_password("JOHN DOE", "secret", 0), PasswordVerdict::Unchanged);
+    }
+
+    #[test]
+    fn an_old_password_is_refused() {
+        let info = info("current", &["former", "ancient"]);
+        assert_eq!(info.check_new_password("JOHN DOE", "former", 0), PasswordVerdict::PreviouslyUsed);
+        assert_eq!(info.check_new_password("JOHN DOE", "ancient", 0), PasswordVerdict::PreviouslyUsed);
+    }
+
+    #[test]
+    fn accepting_pushes_the_old_password_onto_the_history() {
+        let mut info = info("first", &[]);
+        info.accept_new_password(Password::new_plaintext("second").unwrap(), day(1), 0);
+
+        assert!(info.password.is_valid("second"));
+        assert!(info.prev_pwd[0].is_valid("first"));
+        assert_eq!(info.times_changed, 1);
+    }
+
+    #[test]
+    fn the_history_keeps_the_last_three() {
+        let mut info = info("one", &[]);
+        for (no, pwd) in ["two", "three", "four", "five"].iter().enumerate() {
+            info.accept_new_password(Password::new_plaintext(*pwd).unwrap(), day(no as u32 + 1), 0);
+        }
+
+        assert_eq!(info.prev_pwd.len(), PASSWORD_HISTORY_LEN);
+        assert!(info.prev_pwd[0].is_valid("two"));
+        assert!(info.prev_pwd[2].is_valid("four"));
+    }
+
+    /// Changing twice in one day must not push the history along, otherwise the
+    /// old passwords could be flushed out and used again right away.
+    #[test]
+    fn the_history_moves_once_a_day() {
+        let mut info = info("one", &[]);
+        info.accept_new_password(Password::new_plaintext("two").unwrap(), day(1), 0);
+        info.accept_new_password(Password::new_plaintext("three").unwrap(), day(1), 0);
+
+        assert!(info.password.is_valid("three"));
+        assert_eq!(info.prev_pwd.len(), 1);
+        assert!(info.prev_pwd[0].is_valid("one"));
+        assert_eq!(info.times_changed, 1);
+    }
+
+    #[test]
+    fn the_expiry_date_only_moves_further_out() {
+        let mut info = info("one", &[]);
+        info.accept_new_password(Password::new_plaintext("two").unwrap(), day(1), 30);
+        let far = info.expire_date;
+
+        info.accept_new_password(Password::new_plaintext("three").unwrap(), day(2), 1);
+        assert_eq!(info.expire_date, far, "a shorter period pulled the expiry date back");
     }
 }

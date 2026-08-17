@@ -35,7 +35,10 @@ fn test_cmd_w_prompt_order() {
 #[test]
 fn test_cmd_w_empty_password_skips_confirmation() {
     let output = test_output(format!("W\n{}", "\n".repeat(30)), |_| {});
-    assert!(!output.contains("Re-Enter"), "an empty password must not ask for a confirmation:\n{output}");
+    assert!(
+        !output.contains("Re-enter password"),
+        "an empty password must not ask for a confirmation:\n{output}"
+    );
 }
 
 fn setup_existing_alias(board: &mut icy_board_engine::icy_board::IcyBoard, allow_change: bool) {
@@ -77,5 +80,54 @@ fn assert_prompt_order(output: &str, prompts: &[&str]) {
             Some(found) => pos += found + prompt.len(),
             None => panic!("prompt {prompt:?} is missing or out of order, searched from byte {pos} of:\n{output}"),
         }
+    }
+}
+
+/// PCBoard judged the password before it asked for the confirmation, and asked
+/// the question again for every refusal.
+fn change_password(answers: &str, min_len: u8) -> String {
+    test_output(format!("W\n{answers}{}", "\n".repeat(30)), move |board| {
+        board.config.limits.min_pwd_length = min_len;
+    })
+}
+
+#[test]
+fn test_cmd_w_refuses_a_short_password() {
+    let output = change_password("abc\n", 6);
+    assert!(output.contains("Password too short"), "a password under the minimum was taken:\n{output}");
+    assert!(
+        !output.contains("Re-enter password"),
+        "a refused password must not reach the confirmation:\n{output}"
+    );
+}
+
+#[test]
+fn test_cmd_w_refuses_a_password_out_of_the_name() {
+    let output = change_password("sysop\n", 0);
+    assert!(
+        output.contains("cannot be a subset of your name"),
+        "a password taken from the caller's name was accepted:\n{output}"
+    );
+}
+
+#[test]
+fn test_cmd_w_asks_again_after_a_refusal() {
+    let output = change_password("abc\nkaleidoscope\nkaleidoscope\n", 6);
+    assert!(output.contains("Password too short"), "the short password was not refused:\n{output}");
+    assert!(output.contains("Re-enter password"), "the retry never reached the confirmation:\n{output}");
+    assert!(!output.contains("do not match"), "the confirmation was rejected:\n{output}");
+}
+
+#[test]
+fn test_cmd_w_refuses_a_mistyped_confirmation() {
+    let output = change_password("kaleidoscope\nkaleidoscopf\n", 0);
+    assert!(output.contains("do not match"), "the mistyped confirmation was accepted:\n{output}");
+}
+
+#[test]
+fn test_cmd_w_takes_a_good_password() {
+    let output = change_password("kaleidoscope\nkaleidoscope\n", 6);
+    for refusal in ["too short", "do not match", "subset of your name", "already used"] {
+        assert!(!output.contains(refusal), "a good password was refused with {refusal:?}:\n{output}");
     }
 }

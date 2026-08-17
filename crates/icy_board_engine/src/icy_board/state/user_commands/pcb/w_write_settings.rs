@@ -11,6 +11,7 @@ use crate::{
             user_commands::pcb::select_conferences::SelectMode,
         },
         user_base::FSEMode,
+        user_base::PasswordVerdict,
     },
     vm::TerminalTarget,
 };
@@ -55,6 +56,28 @@ impl IcyBoardState {
             if pw1.is_empty() {
                 break;
             }
+
+            // PCBoard judges the password before it asks for the confirmation.
+            let min_len = self.get_board().await.config.limits.min_pwd_length;
+            let verdict = new_user.password.check_new_password(&new_user.get_name(), &pw1, min_len);
+            match verdict {
+                PasswordVerdict::TooShort => {
+                    self.session.op_text = min_len.to_string();
+                    self.display_text(IceText::PasswordTooShort, display_flags::NEWLINE).await?;
+                    continue;
+                }
+                PasswordVerdict::PartOfName => {
+                    self.display_text(IceText::NeedUniquePassword, display_flags::NEWLINE).await?;
+                    continue;
+                }
+                PasswordVerdict::PreviouslyUsed => {
+                    self.display_text(IceText::PreviouslyUsedPassword, display_flags::NEWLINE | display_flags::LOGIT)
+                        .await?;
+                    continue;
+                }
+                PasswordVerdict::Ok | PasswordVerdict::Unchanged => {}
+            }
+
             let pw2 = self
                 .input_field(
                     IceText::ReEnterPassword,
@@ -74,12 +97,11 @@ impl IcyBoardState {
                 self.display_text(IceText::PasswordsDontMatch, display_flags::NEWLINE).await?;
                 continue;
             }
-            new_user.password.password = self.create_password(pw1).await;
-            new_user.password.last_change = Utc::now();
-            new_user.password.times_changed += 1;
-            let exp_days = self.get_board().await.config.limits.password_expire_days;
-            if exp_days > 0 {
-                new_user.password.expire_date = Utc::now() + chrono::Duration::days(exp_days as i64);
+            // Keeping the same password leaves the record untouched.
+            if verdict == PasswordVerdict::Ok {
+                let password = self.create_password(pw1).await;
+                let exp_days = self.get_board().await.config.limits.password_expire_days;
+                new_user.password.accept_new_password(password, Utc::now(), exp_days);
             }
             break;
         }
