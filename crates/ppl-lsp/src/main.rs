@@ -43,6 +43,7 @@ struct Backend {
 
     ast_map: Arc<Mutex<HashMap<Url, (Ast, SemanticVisitor)>>>,
     document_map: DashMap<Url, Rope>,
+    document_versions: DashMap<Url, i32>,
 }
 
 #[tower_lsp::async_trait]
@@ -120,7 +121,7 @@ impl LanguageServer for Backend {
         self.on_change(TextDocumentItem {
             uri: params.text_document.uri,
             text: params.text_document.text,
-            //version: params.text_document.version,
+            version: params.text_document.version,
         })
         .await
     }
@@ -132,7 +133,7 @@ impl LanguageServer for Backend {
         self.on_change(TextDocumentItem {
             uri: params.text_document.uri,
             text: std::mem::take(&mut change.text),
-            // version: params.text_document.version,
+            version: params.text_document.version,
         })
         .await;
     }
@@ -146,6 +147,7 @@ impl LanguageServer for Backend {
         self.client.publish_diagnostics(uri.clone(), Vec::new(), None).await;
         self.ast_map.lock().unwrap().remove(&uri);
         self.document_map.remove(&uri);
+        self.document_versions.remove(&uri);
     }
 
     async fn code_action(&self, params: CodeActionParams) -> Result<Option<CodeActionResponse>> {
@@ -280,7 +282,18 @@ impl LanguageServer for Backend {
                         ManifestSetting::LanguageVersion
                     };
                     let workspace = self.workspace.lock().unwrap();
-                    let Some((manifest_uri, edit)) = manifest_version_edit(&workspace.file_name, setting, required as u16) else {
+                    let Ok(manifest_uri) = Url::from_file_path(&workspace.file_name) else {
+                        continue;
+                    };
+                    // An unsaved manifest is what the edit will be applied to, so measure that one.
+                    let manifest = match self.document_map.get(&manifest_uri) {
+                        Some(document) => document.clone(),
+                        None => match std::fs::read_to_string(&workspace.file_name) {
+                            Ok(source) => Rope::from_str(&source),
+                            Err(_) => continue,
+                        },
+                    };
+                    let Some(edit) = manifest_version_edit(&manifest, setting, required as u16) else {
                         continue;
                     };
                     let title = format!("Set project version to {required}");
@@ -735,6 +748,7 @@ fn language_version_directive_edit(rope: &Rope, version: u16) -> Option<TextEdit
 struct TextDocumentItem {
     uri: Url,
     text: String,
+    version: i32,
 }
 
 impl Backend {
@@ -825,7 +839,8 @@ impl Backend {
         let rope: Rope = ropey::Rope::from_str(&params.text);
         let uri = params.uri;
         self.document_map.insert(uri.clone(), rope.clone());
-        self.client.publish_diagnostics(uri.clone(), Vec::new(), None).await;
+        self.document_versions.insert(uri.clone(), params.version);
+        self.client.publish_diagnostics(uri.clone(), Vec::new(), Some(params.version)).await;
 
         if self.workspace_map.get(&uri).is_some() {
             let semantic_visitor = {
@@ -870,7 +885,7 @@ impl Backend {
                 semantic_visitor.finish();
                 semantic_visitor
             };
-            self.add_diagnostics(&semantic_visitor).await;
+            self.add_diagnostics(&semantic_visitor, &uri, params.version).await;
             {
                 let mut state: std::sync::MutexGuard<'_, SemanticVisitor> = self.workspace_visitor.lock().unwrap();
                 let _ = mem::replace(&mut *state, semantic_visitor);
@@ -888,13 +903,13 @@ impl Backend {
             ast.visit(&mut semantic_visitor);
             semantic_visitor.finish();
 
-            self.add_diagnostics(&semantic_visitor).await;
+            self.add_diagnostics(&semantic_visitor, &uri, params.version).await;
 
             self.ast_map.lock().unwrap().insert(uri, (ast, semantic_visitor));
         }
     }
 
-    async fn add_diagnostics(&self, semantic_visitor: &SemanticVisitor) {
+    async fn add_diagnostics(&self, semantic_visitor: &SemanticVisitor, changed: &Url, version: i32) {
         let mut diagnostics: HashMap<Url, Vec<Diagnostic>> = HashMap::new();
         // Every file that was looked at gets an answer, so that a report which no
         // longer applies is taken back rather than left standing.
@@ -930,9 +945,17 @@ impl Backend {
                     let mut diag = Diagnostic::new_simple(Range::new(start_position, end_position), format!("{}", err.error));
                     diag.severity = Some(severity);
                     diag.source = Some("ppl".to_string());
-                    let (code, data) = diagnostic_details(&*err.error, rope, err.span.start, semantic_visitor);
+                    let (code, data) = diagnostic_details(&*err.error, rope, &err.file_name, err.span.start, semantic_visitor);
                     diag.code = code;
                     diag.data = data;
+                    if let Some((path, span)) = earlier_declaration(&*err.error, semantic_visitor) {
+                        if let Some(location) = self.location(&path, span) {
+                            diag.related_information = Some(vec![DiagnosticRelatedInformation {
+                                location,
+                                message: "the name is already taken here".to_string(),
+                            }]);
+                        }
+                    }
                     if matches!(
                         diag.code.as_ref(),
                         Some(NumberOrString::String(code)) if matches!(code.as_str(), "ppl.unused-label" | "ppl.unused-routine" | "ppl.unused-variable")
@@ -945,7 +968,12 @@ impl Backend {
         }
 
         for (uri, diagnostics) in diagnostics {
-            self.client.publish_diagnostics(uri, diagnostics, None).await;
+            // A newer edit is already being looked at, so this answer is out of date.
+            if self.document_versions.get(changed).is_some_and(|current| *current != version) {
+                return;
+            }
+            let published = self.document_versions.get(&uri).map(|version| *version);
+            self.client.publish_diagnostics(uri, diagnostics, published).await;
         }
     }
 }
@@ -953,6 +981,7 @@ impl Backend {
 fn diagnostic_details(
     error: &(dyn std::error::Error + Send + Sync + 'static),
     rope: &Rope,
+    file: &Path,
     start: usize,
     semantic_visitor: &SemanticVisitor,
 ) -> (Option<NumberOrString>, Option<Value>) {
@@ -988,13 +1017,7 @@ fn diagnostic_details(
             CompilationErrorType::UnusedFunction(_) => "ppl.unused-routine",
             CompilationErrorType::MissingImplementation(_) => "ppl.missing-implementation",
             CompilationErrorType::VariableNotFound(unknown) => {
-                // A label is no name an expression could have meant.
-                let names = semantic_visitor
-                    .references
-                    .iter()
-                    .filter(|(kind, _)| !matches!(kind, ReferenceType::Label(_)))
-                    .filter_map(|(_, references)| references.declaration.as_ref().map(|(_, declaration)| declaration.token.as_str()));
-                let Some(replacement) = closest_name(unknown, names) else {
+                let Some(replacement) = closest_name(unknown, visible_names(semantic_visitor, file, start).into_iter()) else {
                     return (None, None);
                 };
                 data = Some(serde_json::json!({"replacement": replacement}));
@@ -1067,6 +1090,58 @@ fn diagnostic_details(
         return (None, None);
     };
     (Some(NumberOrString::String(code.to_string())), data)
+}
+
+/// The names an expression at `offset` could have meant: everything global, plus what
+/// the routine around it declares. A local of another routine is not in scope there.
+fn visible_names<'a>(visitor: &'a SemanticVisitor, file: &Path, offset: usize) -> Vec<&'a str> {
+    let mut owner: Vec<Option<usize>> = vec![None; visitor.references.len()];
+    for (index, container) in visitor.function_containers.iter().enumerate() {
+        for reference in container.parameters.clone().chain(container.local_variables.clone()) {
+            if let Some(slot) = owner.get_mut(reference) {
+                *slot = Some(index);
+            }
+        }
+    }
+    // Routine bodies follow one another, so the last one starting before the offset holds it.
+    let mut bodies: Vec<(usize, usize)> = visitor
+        .function_containers
+        .iter()
+        .enumerate()
+        .filter_map(|(index, container)| {
+            let (path, implementation) = visitor.references.get(container.id)?.1.implementation.as_ref()?;
+            (path == file).then_some((implementation.span.start, index))
+        })
+        .collect();
+    bodies.sort_unstable();
+    let current = bodies.iter().rev().find(|(start, _)| *start <= offset).map(|(_, index)| *index);
+
+    visitor
+        .references
+        .iter()
+        .enumerate()
+        .filter(|(index, (kind, _))| {
+            // A label is no name an expression could have meant.
+            !matches!(kind, ReferenceType::Label(_)) && owner.get(*index).copied().flatten().is_none_or(|owner| Some(owner) == current)
+        })
+        .filter_map(|(_, (_, references))| references.declaration.as_ref().map(|(_, declaration)| declaration.token.as_str()))
+        .collect()
+}
+
+/// Where a name was taken before, so a clash can point at both places.
+fn earlier_declaration(error: &(dyn std::error::Error + Send + Sync + 'static), visitor: &SemanticVisitor) -> Option<(PathBuf, core::ops::Range<usize>)> {
+    let taken = match error.downcast_ref::<CompilationErrorType>()? {
+        CompilationErrorType::VariableAlreadyDefined(name) | CompilationErrorType::LabelAlreadyDefined(name) => name.trim_start_matches(':'),
+        _ => return None,
+    };
+    visitor.references.iter().find_map(|(_, references)| {
+        let (path, declaration) = references.declaration.as_ref()?;
+        declaration
+            .token
+            .trim_start_matches(':')
+            .eq_ignore_ascii_case(taken)
+            .then(|| (path.clone(), declaration.span.clone()))
+    })
 }
 
 fn closest_name<'a>(unknown: &str, candidates: impl Iterator<Item = &'a str>) -> Option<String> {
@@ -1176,12 +1251,7 @@ enum ManifestSetting {
     LanguageVersion,
 }
 
-fn manifest_version_edit(path: &std::path::Path, setting: ManifestSetting, required: u16) -> Option<(Url, TextEdit)> {
-    if path.as_os_str().is_empty() {
-        return None;
-    }
-    let source = std::fs::read_to_string(path).ok()?;
-    let rope = Rope::from_str(&source);
+fn manifest_version_edit(rope: &Rope, setting: ManifestSetting, required: u16) -> Option<TextEdit> {
     let (section, key) = match setting {
         ManifestSetting::Runtime => ("package", "runtime"),
         ManifestSetting::LanguageVersion => ("compiler", "language_version"),
@@ -1189,8 +1259,9 @@ fn manifest_version_edit(path: &std::path::Path, setting: ManifestSetting, requi
     let mut section_line = None;
     let mut section_end = rope.len_lines();
     for line_index in 0..rope.len_lines() {
-        let line = rope.get_line(line_index)?.to_string();
-        let trimmed = line.trim();
+        let line: Vec<char> = rope.get_line(line_index)?.chars().collect();
+        let text: String = line.iter().collect();
+        let trimmed = text.trim();
         if trimmed == format!("[{section}]") {
             section_line = Some(line_index);
             continue;
@@ -1204,24 +1275,24 @@ fn manifest_version_edit(path: &std::path::Path, setting: ManifestSetting, requi
                 continue;
             };
             if name.trim() == key {
-                let equals = line.find('=')?;
-                let value_start = equals + 1 + line[equals + 1..].len() - line[equals + 1..].trim_start().len();
-                let value_end = line.trim_end_matches(['\r', '\n']).len();
+                let equals = line.iter().position(|ch| *ch == '=')?;
+                let value_start = equals + 1 + line[equals + 1..].iter().take_while(|ch| ch.is_whitespace()).count();
+                let value_end = line.iter().rposition(|ch| !matches!(ch, '\r' | '\n')).map_or(value_start, |last| last + 1);
                 let line_start = rope.try_line_to_char(line_index).ok()?;
-                let start = offset_to_position(line_start + line[..value_start].chars().count(), &rope)?;
-                let end = offset_to_position(line_start + line[..value_end].chars().count(), &rope)?;
-                return Some((Url::from_file_path(path).ok()?, TextEdit::new(Range::new(start, end), required.to_string())));
+                let start = offset_to_position(line_start + value_start, rope)?;
+                let end = offset_to_position(line_start + value_end, rope)?;
+                return Some(TextEdit::new(Range::new(start, end), required.to_string()));
             }
         }
     }
     let (at, text) = if section_line.is_some() {
         (Position::new(section_end as u32, 0), format!("{key} = {required}\n"))
     } else {
-        let at = offset_to_position(rope.len_chars(), &rope)?;
-        let prefix = if source.is_empty() || source.ends_with('\n') { "" } else { "\n" };
+        let at = offset_to_position(rope.len_chars(), rope)?;
+        let prefix = if at.character == 0 { "" } else { "\n" };
         (at, format!("{prefix}\n[{section}]\n{key} = {required}\n"))
     };
-    Some((Url::from_file_path(path).ok()?, TextEdit::new(Range::new(at, at), text)))
+    Some(TextEdit::new(Range::new(at, at), text))
 }
 
 fn remove_line_edit(rope: &Rope, line: u32) -> TextEdit {
@@ -1236,12 +1307,13 @@ fn remove_line_edit(rope: &Rope, line: u32) -> TextEdit {
 
 fn remove_variable_edit(rope: &Rope, diagnostic: Range) -> Option<TextEdit> {
     let line_start = rope.try_line_to_char(diagnostic.start.line as usize).ok()?;
-    let line = rope.get_line(diagnostic.start.line as usize)?.to_string();
+    // Characters throughout: a byte index would not line up with the reported column.
+    let line: Vec<char> = rope.get_line(diagnostic.start.line as usize)?.chars().collect();
     let identifier_start = position_to_offset(rope, diagnostic.start)?.checked_sub(line_start)?;
     let mut commas = Vec::new();
     let mut depth = 0usize;
     let mut quoted = false;
-    for (offset, ch) in line.char_indices() {
+    for (offset, ch) in line.iter().copied().enumerate() {
         match ch {
             '"' => quoted = !quoted,
             '(' | '[' | '{' if !quoted => depth += 1,
@@ -1253,26 +1325,27 @@ fn remove_variable_edit(rope: &Rope, diagnostic: Range) -> Option<TextEdit> {
     let previous = commas.iter().copied().take_while(|comma| *comma < identifier_start).last();
     let next = commas.iter().copied().find(|comma| *comma > identifier_start);
     if previous.is_none() && next.is_none() {
-        if line[identifier_start..].contains('=') {
+        if line[identifier_start..].contains(&'=') {
             return None;
         }
         return Some(remove_line_edit(rope, diagnostic.start.line));
     }
-    let (start_byte, mut end_byte) = match (previous, next) {
+    let code_end = line.iter().rposition(|ch| !matches!(ch, '\r' | '\n')).map_or(0, |last| last + 1);
+    let (start, mut end) = match (previous, next) {
         (None, None) => unreachable!(),
         (None, Some(next)) => (identifier_start, next + 1),
-        (Some(previous), _) => (previous, next.unwrap_or_else(|| line.trim_end_matches(['\r', '\n']).len())),
+        (Some(previous), _) => (previous, next.unwrap_or(code_end)),
     };
-    if line[start_byte..end_byte].contains('=') {
+    if line[start..end].contains(&'=') {
         return None;
     }
     if previous.is_none() {
-        while line.as_bytes().get(end_byte).is_some_and(u8::is_ascii_whitespace) && !matches!(line.as_bytes()[end_byte], b'\r' | b'\n') {
-            end_byte += 1;
+        while line.get(end).is_some_and(|ch| *ch == ' ' || *ch == '\t') {
+            end += 1;
         }
     }
-    let start = offset_to_position(line_start + line[..start_byte].chars().count(), rope)?;
-    let end = offset_to_position(line_start + line[..end_byte].chars().count(), rope)?;
+    let start = offset_to_position(line_start + start, rope)?;
+    let end = offset_to_position(line_start + end, rope)?;
     Some(TextEdit::new(Range::new(start, end), String::new()))
 }
 
@@ -1348,16 +1421,28 @@ fn brace_pairs(rope: &Rope) -> Vec<(usize, usize)> {
     let mut open = Vec::new();
     let mut quoted = false;
     let mut commented = false;
+    let mut at_line_start = true;
     for (offset, ch) in rope.chars().enumerate() {
-        match ch {
-            '\n' => {
+        if ch == '\n' {
+            quoted = false;
+            commented = false;
+            at_line_start = true;
+            continue;
+        }
+        if commented {
+            continue;
+        }
+        if quoted {
+            // A doubled quote stands for one inside the text, and toggling twice leaves the state right.
+            if ch == '"' {
                 quoted = false;
-                commented = false;
             }
-            _ if commented => {}
-            '"' => quoted = !quoted,
-            _ if quoted => {}
-            ';' => commented = true,
+            continue;
+        }
+        match ch {
+            '"' => quoted = true,
+            ';' | '\'' => commented = true,
+            '*' if at_line_start => commented = true,
             '{' => open.push(offset),
             '}' => {
                 if let Some(start) = open.pop() {
@@ -1365,6 +1450,9 @@ fn brace_pairs(rope: &Rope) -> Vec<(usize, usize)> {
                 }
             }
             _ => {}
+        }
+        if !ch.is_whitespace() {
+            at_line_start = false;
         }
     }
     pairs
@@ -1449,6 +1537,7 @@ async fn main() {
         client,
         ast_map: Arc::new(Mutex::new(HashMap::new())),
         document_map: DashMap::new(),
+        document_versions: DashMap::new(),
         workspace: Mutex::new(Workspace::default()),
         workspace_visitor: Mutex::new(SemanticVisitor::new(
             &Workspace::default(),

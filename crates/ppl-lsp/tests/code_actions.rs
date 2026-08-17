@@ -255,6 +255,117 @@ fn first_and_last_unused_variables_have_comma_aware_edits() {
 }
 
 #[test]
+fn a_name_before_the_unused_one_may_hold_wide_characters() {
+    let (mut server, _) = Server::ready();
+    let uri = "file:///tmp/unused-wide.pps";
+    server.open(uri, "INTEGER A¢A¢, Spare\nA¢A¢ = 1\nPRINTLN A¢A¢\n");
+    let diagnostics = server.diagnostics(uri);
+    let actions = actions(&mut server, uri, diagnostics.clone());
+
+    let action = actions
+        .as_array()
+        .and_then(|actions| actions.iter().find(|action| action["title"] == "Remove unused variable"))
+        .unwrap_or_else(|| panic!("diagnostics={diagnostics}, actions={actions}"));
+    let edit = &action["edit"]["changes"][uri][0];
+    // Only ", Spare" goes; the declaration before it has to stay.
+    assert_eq!(edit["range"]["start"], json!({"line": 0, "character": 12}));
+    assert_eq!(edit["range"]["end"], json!({"line": 0, "character": 19}));
+}
+
+#[test]
+fn a_local_of_another_routine_is_not_suggested() {
+    let (mut server, _) = Server::ready();
+    let uri = "file:///tmp/scope-suggestion.pps";
+    server.open(
+        uri,
+        "DECLARE PROCEDURE First()\nDECLARE PROCEDURE Second()\nFirst()\nSecond()\nPROCEDURE First()\n  INTEGER Counter\n  Counter = 1\n  PRINTLN Counter\nENDPROC\nPROCEDURE Second()\n  PRINTLN Countr\nENDPROC\n",
+    );
+    let diagnostics = server.diagnostics(uri);
+    let actions = actions(&mut server, uri, diagnostics.clone());
+
+    assert!(
+        diagnostics
+            .as_array()
+            .is_some_and(|list| list.iter().any(|entry| entry["message"].as_str().is_some_and(|text| text.contains("Countr")))),
+        "the unknown name was not reported: {diagnostics}"
+    );
+    assert!(
+        actions
+            .as_array()
+            .is_none_or(|actions| actions.iter().all(|action| action["title"] != "Replace with Counter")),
+        "a local of another routine is out of scope: {actions}"
+    );
+}
+
+#[test]
+fn a_local_of_the_same_routine_is_still_suggested() {
+    let (mut server, _) = Server::ready();
+    let uri = "file:///tmp/scope-suggestion-same.pps";
+    server.open(
+        uri,
+        "DECLARE PROCEDURE First()\nFirst()\nPROCEDURE First()\n  INTEGER Counter\n  Counter = 1\n  PRINTLN Countr\nENDPROC\n",
+    );
+    let diagnostics = server.diagnostics(uri);
+    let actions = actions(&mut server, uri, diagnostics.clone());
+
+    assert!(
+        actions
+            .as_array()
+            .is_some_and(|actions| actions.iter().any(|action| action["title"] == "Replace with Counter")),
+        "diagnostics={diagnostics}, actions={actions}"
+    );
+}
+
+#[test]
+fn a_brace_in_a_comment_does_not_pair_with_code() {
+    let (mut server, _) = Server::ready();
+    let uri = "file:///tmp/comment-brace.pps";
+    // Both of the other comment markers, so neither brace may take part in a pair.
+    server.open(uri, ";$LANGVERSION 330\n' a note about }\n* another }\nINTEGER values{2}\n");
+    let diagnostics = server.diagnostics(uri);
+    let actions = actions(&mut server, uri, diagnostics.clone());
+
+    let action = actions
+        .as_array()
+        .and_then(|actions| actions.iter().find(|action| action["title"] == "Replace braces with parentheses"))
+        .unwrap_or_else(|| panic!("diagnostics={diagnostics}, actions={actions}"));
+    let edits = action["edit"]["changes"][uri].as_array().unwrap();
+    assert_eq!(edits.len(), 2, "{edits:?}");
+    assert_eq!(edits[0]["range"]["start"], json!({"line": 3, "character": 14}));
+    assert_eq!(edits[1]["range"]["start"], json!({"line": 3, "character": 16}));
+}
+
+#[test]
+fn a_name_that_is_taken_twice_points_at_the_first_place() {
+    let (mut server, _) = Server::ready();
+    let uri = "file:///tmp/duplicate-name.pps";
+    server.open(uri, "INTEGER Value\nINTEGER Value\nValue = 1\nPRINTLN Value\n");
+    let diagnostics = server.diagnostics(uri);
+
+    let reported = diagnostics
+        .as_array()
+        .and_then(|list| {
+            list.iter()
+                .find(|entry| entry["message"].as_str().is_some_and(|text| text.contains("already used")))
+        })
+        .unwrap_or_else(|| panic!("no clash was reported: {diagnostics}"));
+    let related = &reported["relatedInformation"][0];
+    assert_eq!(related["location"]["uri"], uri);
+    assert_eq!(related["location"]["range"]["start"]["line"], 0);
+}
+
+#[test]
+fn diagnostics_say_which_version_of_the_document_they_describe() {
+    let (mut server, _) = Server::ready();
+    let uri = "file:///tmp/versioned.pps";
+    server.open(uri, "INTEGER Spare\nPRINTLN \"hello\"\n");
+
+    let published = server.notification("textDocument/publishDiagnostics");
+    assert_eq!(published["params"]["uri"], uri);
+    assert_eq!(published["params"]["version"], json!(1));
+}
+
+#[test]
 fn an_initialized_unused_variable_is_not_removed() {
     let (mut server, _) = Server::ready();
     let uri = "file:///tmp/initialized-unused.pps";
@@ -665,6 +776,30 @@ fn a_required_runtime_can_be_set_in_the_manifest() {
     let manifest_uri = format!("file://{}", root.join("ppl.toml").display());
     assert_eq!(action["edit"]["changes"][&manifest_uri][0]["newText"], "401");
     assert_eq!(action["title"], "Set project version to 401");
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn an_open_manifest_is_measured_as_the_editor_holds_it() {
+    let manifest = "[package]\nname = \"buffered\"\nversion = \"0.1.0\"\nruntime = 400\n";
+    let source = "TYPE Point\n INTEGER X\nENDTYPE\nPoint value\nvalue = Point { X = 1 }\n";
+    let (root, root_uri, uri) = project(manifest, source);
+    let (mut server, _) = Server::ready_at(&root_uri);
+
+    // The same manifest with the key further down, as an unsaved edit would leave it.
+    let manifest_uri = format!("file://{}", root.join("ppl.toml").display());
+    server.open(&manifest_uri, "[package]\nname = \"buffered\"\nversion = \"0.1.0\"\n\n\nruntime = 400\n");
+    server.open(&uri, source);
+    let diagnostics = server.diagnostics(&uri);
+    let actions = actions(&mut server, &uri, diagnostics.clone());
+
+    let action = actions
+        .as_array()
+        .and_then(|actions| actions.iter().find(|action| action["diagnostics"][0]["code"] == "ppl.runtime-too-old"))
+        .unwrap_or_else(|| panic!("diagnostics={diagnostics}, actions={actions}"));
+    let edit = &action["edit"]["changes"][&manifest_uri][0];
+    assert_eq!(edit["newText"], "401");
+    assert_eq!(edit["range"]["start"]["line"], 5, "the buffer holds it on another line: {edit}");
     fs::remove_dir_all(root).unwrap();
 }
 
