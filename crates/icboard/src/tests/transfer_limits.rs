@@ -128,3 +128,39 @@ fn test_the_total_file_limit_refuses_a_download() {
     });
     assert!(output.contains("would exceed your file limit"), "{output}");
 }
+
+/// A caller with a minute to their name cannot start a transfer that outlasts it.
+#[test]
+fn test_a_download_that_outlasts_the_session_is_refused() {
+    let level = SecurityLevel {
+        daily_file_kb_limit: 32767,
+        time_per_day: 1,
+        ..Default::default()
+    };
+    let output = test_output("D BIG.ZIP\n\n".to_string(), move |board| setup(board, level.clone(), false));
+    assert!(output.contains("Insufficient time"), "{output}");
+}
+
+/// With the day ahead of them the same transfer is fine.
+#[test]
+fn test_a_download_that_fits_the_session_is_allowed() {
+    let level = SecurityLevel {
+        daily_file_kb_limit: 32767,
+        time_per_day: 600,
+        ..Default::default()
+    };
+    let output = test_output("D BIG.ZIP\n\n".to_string(), move |board| setup(board, level.clone(), false));
+    assert!(!output.contains("Insufficient time"), "{output}");
+}
+
+/// Time is charged even where bytes are not.
+#[test]
+fn test_a_free_area_still_costs_time() {
+    let level = SecurityLevel {
+        daily_file_kb_limit: 32767,
+        time_per_day: 1,
+        ..Default::default()
+    };
+    let output = test_output("D BIG.ZIP\n\n".to_string(), move |board| setup(board, level.clone(), true));
+    assert!(output.contains("Insufficient time"), "{output}");
+}

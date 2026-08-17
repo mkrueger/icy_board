@@ -238,6 +238,32 @@ fn exceeds_limit(limit: u64, downloaded: u64, new: u64) -> bool {
     limit != 0 && downloaded + new > limit
 }
 
+/// Seconds PCBoard reckons a transfer needs: the raw time at the caller's speed, seven
+/// percent for protocol overhead, and ten seconds so every transfer costs something.
+pub fn seconds_for_transfer(size: u64, bps: u32) -> i64 {
+    let cps = (bps / 10).max(1) as u64;
+    ((size / cps) * 107 / 100) as i64 + 10
+}
+
+/// Minutes the caller gets this session, with earlier calls today taken off when the
+/// board enforces a daily limit rather than a per-session one.
+///
+/// Never returns zero, which elsewhere means an unlimited session: a caller who has
+/// already used the day up is given a minute and then hung up on, which is close to what
+/// PCBoard does with its own one minute of slack.
+pub fn session_time_limit(time_per_day: u32, minutes_used_today: u16, enforce_daily: bool) -> i32 {
+    if !enforce_daily {
+        return time_per_day as i32;
+    }
+    (time_per_day as i32 - minutes_used_today as i32).max(1)
+}
+
+/// Whether the caller's session time is gone. A limit of zero is an unlimited session,
+/// which is what `@TIMELEFT@` has always reported it as.
+pub fn session_expired(time_limit: i32, minutes_online: i64) -> bool {
+    time_limit != 0 && minutes_online >= time_limit as i64
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -617,5 +643,63 @@ mod tests {
         assert_eq!(format_ratio(0, 0), "0:0");
         assert_eq!(format_ratio(500, 0), "500.0:0");
         assert_eq!(format_ratio(0, 500), "0:500.0");
+    }
+
+    // --- how long a transfer takes ---------------------------------------------
+
+    /// 2400 bps is 240 characters a second, so 24000 bytes is 100 seconds before the
+    /// overhead and the flat ten seconds are added.
+    #[test]
+    fn a_transfer_is_costed_at_the_callers_speed() {
+        assert_eq!(seconds_for_transfer(24_000, 2400), 117);
+    }
+
+    #[test]
+    fn a_faster_caller_is_charged_less_time() {
+        assert!(seconds_for_transfer(24_000, 9600) < seconds_for_transfer(24_000, 2400));
+    }
+
+    /// Even an empty file costs the handshake, so a batch cannot be free of time.
+    #[test]
+    fn every_transfer_costs_at_least_the_handshake() {
+        assert_eq!(seconds_for_transfer(0, 2400), 10);
+    }
+
+    #[test]
+    fn a_local_caller_without_a_speed_is_still_costed() {
+        assert!(seconds_for_transfer(1_000_000, 0) > 0);
+    }
+
+    // --- how much of the day is left -------------------------------------------
+
+    /// A per-session limit hands out the whole allowance on every call.
+    #[test]
+    fn a_session_limit_ignores_earlier_calls() {
+        assert_eq!(session_time_limit(60, 45, false), 60);
+    }
+
+    #[test]
+    fn a_daily_limit_counts_earlier_calls() {
+        assert_eq!(session_time_limit(60, 45, true), 15);
+    }
+
+    /// Zero would read as an unlimited session everywhere else, so a caller who has spent
+    /// the day gets a minute rather than the run of the board.
+    #[test]
+    fn a_spent_day_does_not_turn_into_unlimited_time() {
+        assert_eq!(session_time_limit(60, 60, true), 1);
+        assert_eq!(session_time_limit(60, 500, true), 1);
+    }
+
+    #[test]
+    fn a_session_ends_when_its_minutes_are_gone() {
+        assert!(!session_expired(30, 29));
+        assert!(session_expired(30, 30));
+        assert!(session_expired(30, 31));
+    }
+
+    #[test]
+    fn an_unlimited_session_never_ends() {
+        assert!(!session_expired(0, 100_000));
     }
 }

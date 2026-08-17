@@ -6,7 +6,7 @@ use async_recursion::async_recursion;
 use humanize_bytes::humanize_bytes_decimal;
 
 use crate::icy_board::icb_config::IcbColor;
-use crate::icy_board::limits::{BatchSoFar, LimitVerdict, TransferHistory};
+use crate::icy_board::limits::{self, BatchSoFar, LimitVerdict, TransferHistory};
 use crate::icy_board::state::functions::{MASK_NUM, transfer_cps};
 use crate::{Res, icy_board::state::IcyBoardState};
 
@@ -258,21 +258,39 @@ impl IcyBoardState {
         limits.bytes_remaining = (self.session.bytes_remaining >= 0).then_some(self.session.bytes_remaining);
 
         let free_areas = self.free_download_areas().await;
+        let bps = self.get_bps().max(0) as u32;
+        let minutes_left = self.minutes_left();
+        let mut seconds_so_far = 0i64;
         let mut so_far = BatchSoFar::default();
         let mut allowed = Vec::new();
         for path in files {
             let size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
             let free = path.parent().map_or(false, |dir| free_areas.iter().any(|area| area == dir));
             let verdict = limits.check_file(&history, so_far, size, free);
-            if verdict.is_allowed() {
-                so_far.accept(size, free);
-                allowed.push(path);
+            if !verdict.is_allowed() {
+                if let Some(user) = &mut self.session.current_user {
+                    user.stats.num_reach_dnld_lim += 1;
+                }
+                self.report_limit(&path, verdict).await?;
                 continue;
             }
-            if let Some(user) = &mut self.session.current_user {
-                user.stats.num_reach_dnld_lim += 1;
+
+            // A free download still costs time; only PCBoard's NOTIME files were spared,
+            // and those came from an FSEC file we do not read.
+            let seconds = limits::seconds_for_transfer(size, bps);
+            if let Some(minutes) = minutes_left {
+                // PCBoard keeps a minute back so a transfer cannot run into the logoff.
+                let seconds_left = (minutes - 1) * 60 - seconds_so_far;
+                if seconds > seconds_left {
+                    self.session.op_text = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+                    self.display_text(IceText::NoTimeForDownload, display_flags::NEWLINE | display_flags::LOGIT | display_flags::BELL)
+                        .await?;
+                    continue;
+                }
             }
-            self.report_limit(&path, verdict).await?;
+            seconds_so_far += seconds;
+            so_far.accept(size, free);
+            allowed.push(path);
         }
         Ok(allowed)
     }

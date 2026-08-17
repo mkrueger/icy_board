@@ -718,8 +718,24 @@ impl IcyBoardState {
         self.session.disp_options.grapics_mode != GraphicsMode::Ansi && self.session.disp_options.grapics_mode != GraphicsMode::Ctty
     }
 
-    fn check_time_left(&self) {
-        // TODO: Check time left.
+    /// Hangs up once the caller's time is gone. PCBoard watches the session clock from
+    /// its keyboard loop, so the check sits in front of every prompt. It watches it for
+    /// everyone, sysop included - an unlimited sysop holds a level that says so.
+    async fn check_time_left(&mut self) {
+        if self.session.request_logoff {
+            return;
+        }
+        let online = (Utc::now() - self.session.login_date).num_minutes();
+        if !limits::session_expired(self.session.time_limit, online) {
+            return;
+        }
+        let _ = self
+            .display_text(
+                IceText::TimelimitExceeded,
+                display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LOGIT | display_flags::BELL,
+            )
+            .await;
+        let _ = self.hangup().await;
     }
 
     pub async fn reset_color(&mut self, target: TerminalTarget) -> Res<()> {
@@ -781,10 +797,15 @@ impl IcyBoardState {
         };
         let time_per_day = level.time_per_day;
         let batch_limit = level.batch_limit;
+        // Earlier calls only count against the limit when the board enforces a daily one
+        // and the level asks for it. A demo account shares its id, so it never carries
+        // time over from whoever was on it before.
+        let enforce_daily_time = board.config.system_control.enforce_daily_time_limit && level.enforce_time_limit && !level.is_demo_account;
         let mut limits = TransferLimits::from_security_level(level, self.get_bps().max(0) as u32);
         drop(board);
         if time_per_day > 0 {
-            self.session.time_limit = time_per_day as i32;
+            let used_today = self.session.current_user.as_ref().map_or(0, |user| user.stats.minutes_today);
+            self.session.time_limit = limits::session_time_limit(time_per_day, used_today, enforce_daily_time);
         }
         if batch_limit > 0 {
             self.session.batch_limit = batch_limit as usize;
@@ -796,6 +817,16 @@ impl IcyBoardState {
         }
         self.session.bytes_remaining = limits.bytes_remaining.unwrap_or(-1);
         self.session.transfer_limits = limits;
+    }
+
+    /// Minutes the caller has left before the board hangs up on them. `None` when the
+    /// session is not limited at all, which is what a time limit of zero means.
+    pub fn minutes_left(&self) -> Option<i64> {
+        if self.session.time_limit == 0 {
+            return None;
+        }
+        let online = (Utc::now() - self.session.login_date).num_minutes();
+        Some(self.session.time_limit as i64 - online)
     }
 
     /// Bytes the caller may still download, counting what the flagged batch will take.

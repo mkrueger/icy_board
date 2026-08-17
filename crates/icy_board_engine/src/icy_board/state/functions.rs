@@ -376,7 +376,7 @@ impl IcyBoardState {
         } else {
             true
         };
-        self.check_time_left();
+        self.check_time_left().await;
 
         if display_flags & display_flags::LFBEFORE != 0 {
             self.new_line().await?;
