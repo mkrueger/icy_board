@@ -24,10 +24,10 @@ If something is missing just let me know.
 | MKPCBTXT  | 💯 | Much better |
 | ICBSM      | 75% | User and group editor plus the bulk maintenance; no reports or index files |
 | MKPCBMNU  | 💯 | MKICBMNU can do much more |
-| PCBSETUP  | 80% | Most runtime options work; 19 of 126 options and 12 of 29 sysop security levels are still inactive - see the options audit |
+| PCBSETUP  | 80% | Most runtime options work; 19 of 126 options and 11 of 29 sysop security levels are still inactive - see the options audit |
 | Call Waiting Screen  | 💯 | Almost the same, some improvements |
 | New User Creation  | 💯 | Much better & detailed |
-| Security and Access Checks | 85% | User command, conference, group and age expressions work; 12 of 29 configurable sysop security levels are still inactive |
+| Security and Access Checks | 85% | User command, conference, group and age expressions work; 11 of 29 configurable sysop security levels are still inactive |
 | Languages | 80% | Language files and `LANG` work; the global multilingual enable switch is currently ignored |
 | Local logons  | 💯  | | 
 | Sysop local session view  | 💯  | Some ppl may hate it but sysops can view local sessions and chat 
@@ -68,17 +68,17 @@ If something is missing just let me know.
 | L  | Find Files | 💯 | 
 | M  | Toggle Graphics  | 💯 | 
 | N  | New Files | 💯 | 
-| O  | Page Sysop | 90% | 
+| O  | Page Sysop | 90% | Issue is that Sysop doesn't get informed. Need a new way - maybe an App. But it works if sysop is around and watching the session.
 | P  | Set Page Length | 💯 | 
-| Q  | Quick Message Scan | 90% | Prompt and range parser match PCBoard; capture/QWK reader actions remain incomplete |
+| Q  | Quick Message Scan | 💯 | Scans every area of the conference [^3] |
 | R  | Read Message | 70% | Prompt and read loops match; capture (`C/D/Z`) and some transfer actions parse but do not run |
 | S  | Take Survey  | 💯 | 
 | T  | Set Transfer Protocol | 💯 | 
 | U  | Upload  | 90% | Description, private/public placement, batch protocol and byte credits work; verification/test-extraction is missing. Aliases: `UB`, `UPLOAD` |
-| V  | View Settings  | 90% | Uses a built-in display when PCBoard's `STAT` file is absent |
-| W  | Write Settings  | 90% | 
+| V  | View Settings  | 💯 | Every line of PCBoard's block; falls back to a built-in display when the `STAT` file is absent |
+| W  | Write Settings  | 💯 | 
 | X  | Toggle Expert Mode  | 💯 | 
-| Y  | Your Mail Scan  | 70% | Prompt modes work; message scanning still shares the incomplete reader surface |
+| Y  | Your Mail Scan  | 💯 | Quick and long form, scan direction and conference selection as in the original, plus the private mail base [^3] |
 | Z  | Zippy Directory Scan  | 💯 | 
 | ALIAS  |  Alias | 💯 | 
 | BROADCAST | Broadcast to nodes | 💯 | Sysop word command |
@@ -109,7 +109,7 @@ If something is missing just let me know.
 | :--- | :--- | :--- | :--- |
 | 1 | View caller log | 💯 | Shared node-stamped log instead of one DOS file per node |
 | 2 | View/print users | 90% | Listing works; printer output is intentionally absent |
-| 3 | Pack message base | Missing | Message-base pack/renumber flow is not implemented |
+| 3 | Pack message base | 90% | PCBoard's prompts and criteria, run in-process over every area of the conference instead of shelling out to PCBPack |
 | 4 | Recover message | 💯 | |
 | 5 | Quick/header scan | 💯 | |
 | 6 | View text file | 💯 | Confined to the board directory |
@@ -128,6 +128,10 @@ If something is missing just let me know.
   #587 changed to `#   Name                                                   Flags`
 
 [^2]: PCBTEXT #678 `QWK Commands: (D)ownload, (U)pload, (S)canned bases`
+
+[^3]: A conference holds several message areas here, so a scan covers all of
+  them. `Y` also reports the private mail base, which PCBoard had no equivalent
+  for, on a line of its own (PCBTEXT #779 `E-Mail`).
 
 # Unsupported Features
 

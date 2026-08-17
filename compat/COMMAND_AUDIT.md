@@ -24,8 +24,8 @@ is still analysis.
 | D | `Enter the filename to Download (Enter)=none?` repeats after every name, whether the name was typed or stacked as a token, and only an empty answer ends it. A missing file prints `Checking file transfer request...` and `(NAME) not found on disk!` and then asks again. | `crates/icboard/src/tests/cmd_d.rs` |
 | E | A stacked name **pre-fills** the To field and the prompt is still shown - `(SYSOP)` above `To (Enter)='ALL'?` - then `Subject (Enter)=abort?`, where an empty answer abandons the message. | `crates/icboard/src/tests/cmd_e.rs` |
 | F | One prompt, `(H)elp, (1-8), File List Command?`, after the directory list. | |
-| Q | One prompt, `(H)elp, (1-4), Message Scan Command?`. | |
-| Y | One prompt, `Msg Scan: (A)ll, (C)urrent, (S)ince, (Q)uick, (L)ong, (Enter)=abort?`. | |
+| Q | One prompt, `(H)elp, (1-N), Message Scan Command?`. Live 2026-08-17 on the DOSBox oracle printed `(H)elp, (1-6)` — the range is `LowMsgNum-HighMsgNum` of the current base, not a fixed 1-4. A number lists headers from there (this board had only 5 and 6 left) and then drops into `(H)elp, (1-6), Message Read Command?`. Empty at the scan prompt returns to the menu. | `crates/icboard/src/tests/cmd_q.rs` |
+| Y | One prompt, `Msg Scan: (A)ll, (C)urrent, (S)ince, (Q)uick, (L)ong, (Enter)=abort?`. Empty aborts. `L` listed `Msgs For You: None`, `Msgs From You: 6  5` (newest first), `# Msgs Found: 2`. `Q` printed the To You / Total Found columns as `0` / `2` for conference 0. No private-mail line on the original. | `crates/icboard/src/tests/cmd_y.rs` |
 | U | `Enter the Filename to Upload (Enter)=none?`, then the description block (`Before beginning, enter a description of: NAME`, `Begin description with (/) to make upload 'Private'`, one `?` per line, empty line ends it), then `Protocol Type for Transfer, (Enter) or (N)=abort?`. An empty description returns to the filename prompt, which repeats like D's does. | |
 | R | `(H)elp, (1-N), Message Read Command?`, a number prints the header (`Date/Number/To/From/Subj`) and the body, then `(N min left), (H)elp, End of Message Command?`, and an empty answer returns to the read prompt rather than to the menu. | `crates/icboard/src/tests/cmd_r.rs` |
 
@@ -87,15 +87,15 @@ Zmodem transfer.
 | N | DATETOSEARCH (72), FILENUMEXPERT/NOVICE | same | ✅ |
 | O | forced `NumTokens=1` so tokens are ignored; SYSOPUNAVAILABLE then COMMENTINSTEAD (571) **only if user has SEC_C** | gated on SEC_C, asked once, and also asked after a page that rang out | ✅ |
 | P | CURPAGELEN (284) then ENTERPAGELENGTH (146); token skips both | same | ✅ |
-| Q | MSGSCANCMDEXPERT (613)/MSGSCANCOMMAND (424); tokens skip it; shares R's command parser | same parser, quick-scan number semantics | ✅ verified against the original |
+| Q | MSGSCANCMDEXPERT (613)/MSGSCANCOMMAND (424); tokens skip it; shares R's command parser | same parser, quick-scan number semantics; the offered range is the base's low-high | ✅ verified against the original |
 | R | MSGREADCMDEXPRT (584)/MSGREADCOMMAND (425); per-message loop ENDOFMSGEXPERT (612)/ENDOFMESSAGE (197); MOVE (465)/COPY (569) | prompts and parser match; the capture and QWK commands parse but do nothing yet | ⚠️ prompt sequence verified against the original, the capture commands are still empty |
 | S | QNUMTOANSWER (67), **always prompts, ignores tokens** | same | ✅ |
 | T | DESIREDPROTOCOL (198); token skips | same | ✅ |
 | U | CONTINUEUPLOAD (449), FILENAMETOUPLOAD (68)/(729), ENTERDESCRIPTION (160) block, PROTOCOLFORXFER (280), GOODBYEAFTERUP (474) in batch mode only | same, in that order, and an abandoned description returns to 68 | ✅ |
-| V | no prompts; returns if STAT display file missing | built-in settings display as fallback | ⚠️ improvement, divergent |
+| V | no prompts; returns if STAT display file missing | same block, built-in settings display as fallback | ⚠️ improvement, divergent |
 | W | NEWPASSWORD (152), REENTERPASSWORD (111), CITYSTATE (265), BUSDATAPHONE (113), HOMEVOICEPHONE (114), COMMENTFIELDPROMPT (2), CLSBETWEENMSGS (556), SCROLLMSGBODY (627), USEBIGHEADERS (628), SETFSEDEFAULT (583), DEFAULTWIDEMSGS (637), GETALIASNAME (690), USESHORTDESC (746), SELECTCONFS (325), address block, QWK limits (732-735) | same, then the icy_board extras | ✅ |
 | X | no prompt; ON/OFF token | same | ✅ |
-| Y | MSGSCANPROMPT (155); tokens skip | same | ✅ verified against the original |
+| Y | MSGSCANPROMPT (155); tokens skip; single letters plus `ALL`, `C+`, `C-`; quick shows to-you and total found, long lists the message numbers under MSGSFORYOU (422)/MSGSFROMYOU (423)/TOTALMSGSFOUND (347) | same, plus a line for the private mail base | ⚠️ prompts verified against the original, the e-mail line is an addition |
 | Z | DATETOSEARCH (72) conditional, TEXTTOSCANFOR (70), FILENUMEXPERT/NOVICE | all three; `N` prompts, `S` takes the stored date without asking | ✅ |
 
 ## Word commands
@@ -129,13 +129,13 @@ wins in both, so an abbreviation can resolve to a different command.
 
 ## Numeric commands (sysop functions)
 
-PCBoard maps 1-16. icy_board implements `1`, `2`, `4`, `5`, `6`, `7`, `8`, `11`, `12`, `13` and `16`.
+PCBoard maps 1-16. icy_board implements `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`, `11`, `12`, `13` and `16`.
 
 | # | Function | PCBoard prompts | Status |
 |---|---|---|---|
 | 1 | view callers log | VIEWCALLERS (212), TEXTTOSCANFOR (70), DELETECALLERSLOG (80) | ✅ |
 | 2 | view/print users | VIEWPRINTUSERS (213) | ✅ |
-| 3 | pack message base | PACKTHEMSGBASE (79), GENERATENEWINDEX (461), PURGEOLDERTHAN (106), PURGEPRIVRECEIVED (89), RENUMBERDURINGPACK (82), NEWLOWMSGNUM (83) | ❌ missing |
+| 3 | pack message base | PACKTHEMSGBASE (79), GENERATENEWINDEX (461), PURGEOLDERTHAN (106), PURGEPRIVRECEIVED (89), RENUMBERDURINGPACK (82), NEWLOWMSGNUM (83) | ⚠️ same prompts and criteria, but it packs every area of the conference in-process instead of shelling out to PCBPack |
 | 4 | recover message | MSGNUMTOACTIVATE (77) | ✅ |
 | 5 | quick/header scan | 613/424 via message reader | ✅ |
 | 6 | view a text file | TEXTVIEWFILENAME (62) | ✅ |
