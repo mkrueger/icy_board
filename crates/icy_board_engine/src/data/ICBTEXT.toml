@@ -2979,3 +2979,7 @@ style = "White"
 [SelectArea]
 text = "@OPTEXT@ Select Area"
 style = "Yellow"
+
+[PersonalMailBase]
+text = "E-Mail"
+style = "Green"

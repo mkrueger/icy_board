@@ -20,6 +20,7 @@ use icy_net::{Connection, ConnectionType, channel::ChannelConnection};
 
 use crate::bbs::{LoginOptions, internal_handle_client};
 
+mod cmd_3;
 mod cmd_7;
 mod cmd_a;
 mod cmd_alias;
@@ -34,13 +35,16 @@ mod cmd_j;
 mod cmd_m;
 mod cmd_o;
 mod cmd_p;
+mod cmd_q;
 mod cmd_r;
 mod cmd_t;
 mod cmd_u;
+mod cmd_v;
 
 mod cmd_w;
 mod cmd_x;
 mod cmd_y;
+
 
 mod display_file;
 mod login_options;

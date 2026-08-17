@@ -641,16 +641,22 @@ impl IcyBoardState {
         Ok(())
     }
 
-    pub async fn get_email_msgbase(&mut self, user_name: &str) -> Res<JamMessageBase> {
+    /// Where the private mail everyone shares lives.
+    pub async fn email_msgbase_path(&mut self) -> std::path::PathBuf {
         let name = self.get_board().await.config.paths.email_msgbase.clone();
-        let mut msg_base = self.resolve_path(&name);
-        if msg_base.is_dir() {
-            msg_base = msg_base.join("email");
-        }
+        let msg_base = self.resolve_path(&name);
+        if msg_base.is_dir() { msg_base.join("email") } else { msg_base }
+    }
+
+    pub async fn get_email_msgbase(&mut self, user_name: &str) -> Res<JamMessageBase> {
+        let msg_base = self.email_msgbase_path().await;
         Ok(if msg_base.with_extension("jhr").exists() {
             JamMessageBase::open(msg_base)?
         } else {
             log::info!("Creating new email message base for user {}", user_name);
+            if let Some(parent) = msg_base.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
             JamMessageBase::create(msg_base)?
         })
     }

@@ -74,7 +74,7 @@ impl IcyBoardState {
             IceText::MessageScanCommand
         };
         let low = message_base.base_messagenumber();
-        let high = low + message_base.active_messages();
+        let high = message_base.active_messages();
         self.session.op_text = format!("{}-{}", low, high);
 
         let text = self
@@ -105,7 +105,7 @@ impl IcyBoardState {
         };
         let number = range.first.clamp(low as i64, high as i64) as u32;
 
-        if number < 1 || number > message_base.active_messages() {
+        if number < low || high < low {
             self.display_text(IceText::NoMailFound, display_flags::NEWLINE).await?;
             return Ok(());
         }
@@ -124,7 +124,7 @@ impl IcyBoardState {
         .await?;
 
         self.set_color(TerminalTarget::Both, IcbColor::dos_light_cyan()).await?;
-        for i in number..message_base.active_messages() {
+        for i in number..=high {
             match message_base.read_header(i) {
                 Ok(header) => {
                     // Only the header scan lists what has been killed.
