@@ -45,7 +45,7 @@ If something is missing just let me know.
 | Modem Support | Not started yet | Telnet, SSH and websockets work |
 | Limits | 85% | Time, ratios, credits and daily/total byte limits are enforced from the PWRD level, off until switched on; accounting credits are not modelled |
 | Events | 80% | The nightly event runs, clears the board and can suspend callers; PCBoard's per node and expedited modes are missing | 
-| Subscriptions | 20% | Expiry is warned about, a new period is never set and an expired user keeps their level | 
+| Subscriptions | 90% | New-user periods, warning/expired files, temporary expired security, R/X conference access, macros and sysop renewal work; no payment-driven renewal exists |
 | Accounting | 20% | Charges and the warning file work, peak rates and the money display do not | 
 
 ## PCBoard Commands

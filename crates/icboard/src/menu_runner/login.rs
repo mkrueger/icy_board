@@ -255,7 +255,14 @@ impl PcbBoardCommand {
 
         let mut new_user = User::default();
         let settings = self.state.get_board().await.config.new_user_settings.clone();
+        let subscription = self.state.get_board().await.config.subscription_info.clone();
         new_user.security_level = settings.sec_level;
+        new_user.exp_security_level = subscription.default_expired_level;
+        new_user.expiration_date = icy_board_engine::icy_board::subscription::new_user_expiration(
+            subscription.is_enabled,
+            subscription.subscription_length,
+            self.state.session.login_date,
+        );
         new_user.stats.first_date_on = Utc::now();
         new_user.set_name(self.state.session.user_name.clone());
         loop {
@@ -708,21 +715,24 @@ impl PcbBoardCommand {
             return Ok(false);
         }
 
-        if self.state.get_board().await.config.subscription_info.is_enabled {
-            if let Some(user) = &self.state.session.current_user {
-                if user.expiration_date < Utc::now() {
+        let subscription = self.state.get_board().await.config.subscription_info.clone();
+        if let Some(user) = &self.state.session.current_user {
+            match icy_board_engine::icy_board::subscription::status(
+                subscription.is_enabled,
+                user.expiration_date,
+                subscription.warning_days,
+                self.state.session.login_date.date_naive(),
+            ) {
+                icy_board_engine::icy_board::subscription::SubscriptionStatus::Expired { .. } => {
                     log::warn!("Login from expired user {} at {}", self.state.session.user_name, Local::now().to_rfc2822());
-                    let exp_file: std::path::PathBuf = self.state.get_board().await.config.paths.expired.clone();
-                    self.state.display_file(&self.state.resolve_path(&exp_file)).await?;
-                    self.state.hangup().await?;
-                    return Ok(false);
+                    let path = self.state.get_board().await.config.paths.expired.clone();
+                    self.state.display_file(&self.state.resolve_path(&path)).await?;
                 }
-                let warn_days = self.state.get_board().await.config.subscription_info.warning_days as i64;
-                if user.expiration_date + chrono::Duration::days(warn_days) < Utc::now() {
-                    let exp_file = self.state.get_board().await.config.paths.expire_warning.clone();
-                    self.state.display_file(&self.state.resolve_path(&exp_file)).await?;
-                    self.state.press_enter().await?;
+                icy_board_engine::icy_board::subscription::SubscriptionStatus::Warning { .. } => {
+                    let path = self.state.get_board().await.config.paths.expire_warning.clone();
+                    self.state.display_file(&self.state.resolve_path(&path)).await?;
                 }
+                _ => {}
             }
         }
 

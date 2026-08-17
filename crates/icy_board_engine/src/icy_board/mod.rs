@@ -56,6 +56,7 @@ pub mod sec_levels;
 pub mod security_expr;
 pub mod state;
 pub mod statistics;
+pub mod subscription;
 pub mod surveys;
 pub mod user_base;
 pub mod user_maintenance;

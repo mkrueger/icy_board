@@ -16,7 +16,7 @@ use crate::{
     vm::expressions::fix_casing,
 };
 use async_recursion::async_recursion;
-use chrono::{DateTime, Datelike, Local, Utc};
+use chrono::{DateTime, Local, Utc};
 use codepages::tables::UNICODE_TO_CP437;
 use dizbase::file_base::FileBase;
 use icy_engine::Position;
@@ -63,7 +63,7 @@ use super::{
     conferences::Conference,
     events::{self, EventWindow},
     icb_config::{DEFAULT_PCBOARD_DATE_FORMAT, IcbColor, SysopCommandLevels, UserCommandLevels},
-    icb_text::{IcbTextFile, IcbTextStyle, IceText},
+    icb_text::{IcbTextFile, IceText},
     limits::{self, BatchSoFar, TransferHistory, TransferLimits},
     macro_parser::{Macro, MacroCommand},
     security_expr::SecurityExpression,
@@ -212,6 +212,7 @@ pub struct Session {
     pub current_user: Option<User>,
     pub cur_user_id: i32,
     pub cur_security: u8,
+    pub subscription_expired: bool,
     pub cur_groups: Vec<String>,
     pub language: String,
 
@@ -307,6 +308,7 @@ impl Session {
             current_user: None,
             cur_user_id: -1,
             cur_security: 0,
+            subscription_expired: false,
             caller_number: 0,
             cur_groups: Vec::new(),
             security_violations: 0,
@@ -890,7 +892,11 @@ impl IcyBoardState {
         let Some(user) = &self.session.current_user else {
             return;
         };
-        let base = user.security_level as i32;
+        let base = if self.session.subscription_expired {
+            user.exp_security_level
+        } else {
+            user.security_level
+        } as i32;
         let adjusted = (base + self.session.current_conference.add_conference_security).clamp(0, u8::MAX as i32) as u8;
         if adjusted == self.session.cur_security {
             return;
@@ -1346,7 +1352,19 @@ impl IcyBoardState {
             self.session.date_format = user.date_format.clone();
         }
         self.session.language = user.language.clone();
-        self.session.cur_security = user.security_level;
+        let subscription = self.get_board().await.config.subscription_info.clone();
+        self.session.subscription_expired = super::subscription::status(
+            subscription.is_enabled,
+            user.expiration_date,
+            subscription.warning_days,
+            self.session.login_date.date_naive(),
+        )
+        .is_expired();
+        self.session.cur_security = if self.session.subscription_expired {
+            user.exp_security_level
+        } else {
+            user.security_level
+        };
         self.session.page_len = user.page_len;
         self.session.user_name = user.get_name().clone();
         self.session.alias_name = user.alias.clone();
@@ -1358,7 +1376,12 @@ impl IcyBoardState {
             self.update_language().await;
         }
         if join_conference {
-            self.join_conference(last_conference, false, false).await?;
+            let conference = if self.subscription_can_access_conference(last_conference) {
+                last_conference
+            } else {
+                0
+            };
+            self.join_conference(conference, false, false).await?;
         }
         return Ok(());
     }
@@ -1664,12 +1687,23 @@ impl IcyBoardState {
     pub fn is_lockedout(&self, conf_number: u16) -> bool {
         if let Some(user) = &self.session.current_user {
             if let Some(flags) = user.conference_flags.get(&(conf_number as usize)) {
-                if flags.contains(ConferenceFlags::Expired | ConferenceFlags::Registered) {
+                if flags.contains(ConferenceFlags::Expired) && !flags.contains(ConferenceFlags::Registered) {
                     return true;
                 }
             }
         }
         false
+    }
+
+    pub fn subscription_can_access_conference(&self, conf_number: u16) -> bool {
+        if !self.session.subscription_expired || conf_number == 0 || self.session.is_sysop {
+            return true;
+        }
+        self.session
+            .current_user
+            .as_ref()
+            .and_then(|user| user.conference_flags.get(&(conf_number as usize)))
+            .is_some_and(|flags| super::subscription::conference_access(true, *flags))
     }
 
     pub fn is_registered(&self, conference: &Conference, conf_number: u16) -> bool {
@@ -2287,32 +2321,23 @@ impl IcyBoardState {
                 return None;
             }
             MacroCommand::ExpDate => {
-                if let Some(user) = &self.session.current_user {
-                    result = self.format_date(user.expiration_date.clone());
-                } else {
-                    result = "NEVER".to_string();
-                }
-            }
-            MacroCommand::ExpDays => {
-                if self.get_board().await.config.subscription_info.is_enabled {
+                let enabled = self.get_board().await.config.subscription_info.is_enabled;
+                if enabled {
                     if let Some(user) = &self.session.current_user {
-                        if user.expiration_date.year() != 0 {
-                            result  =
-                                0.to_string() // TODO
-                                               /*
-                                               (self.session.login_date.to_julian_date()
-                                                   - user.user.reg_exp_date.to_julian_date())
-                                               .to_string(),*/
-                            ;
+                        if user.expiration_date != DateTime::<Utc>::default() {
+                            result = self.format_date(user.expiration_date);
                         }
                     }
                 }
                 if result.is_empty() {
-                    let entry = self.display_text.get_display_text(IceText::Unlimited).unwrap();
-                    if entry.style != IcbTextStyle::Plain {
-                        let _ = self.set_color(target, entry.style.to_color());
-                    }
-                    result = entry.text;
+                    result = "00-00-00".to_string();
+                }
+            }
+            MacroCommand::ExpDays => {
+                let enabled = self.get_board().await.config.subscription_info.is_enabled;
+                if let Some(user) = &self.session.current_user {
+                    result = super::subscription::days_until_expiration(enabled, user.expiration_date, self.session.login_date.date_naive())
+                        .map_or_else(|| self.unlimited_text(), |days| days.to_string());
                 }
             }
             MacroCommand::FileCredit => result = self.session.transfer_limits.file_credit.to_string(),

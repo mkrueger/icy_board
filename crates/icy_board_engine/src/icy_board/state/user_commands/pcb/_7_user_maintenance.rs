@@ -1,10 +1,11 @@
+use crate::datetime::IcbDate;
 use crate::icy_board::commands::CommandType;
 use crate::icy_board::user_base::User;
 use crate::{Res, icy_board::state::IcyBoardState};
 use crate::{
     icy_board::{
         icb_text::IceText,
-        state::functions::{MASK_COMMAND, display_flags},
+        state::functions::{MASK_COMMAND, MASK_DATE, display_flags},
     },
     vm::TerminalTarget,
 };
@@ -129,6 +130,46 @@ impl IcyBoardState {
                             .await?;
                         show_record = false;
                     }
+                }
+                "C" | "E" => {
+                    let current = {
+                        let board = self.board.lock().await;
+                        let user = &board.users[record];
+                        if user.expiration_date == chrono::DateTime::<chrono::Utc>::default() {
+                            String::new()
+                        } else {
+                            self.format_date(user.expiration_date)
+                        }
+                    };
+                    let date = self
+                        .input_field(
+                            IceText::ViewSettingsExpireDate,
+                            10,
+                            &MASK_DATE,
+                            CommandType::UserMaintenance.get_help(),
+                            Some(current),
+                            display_flags::NEWLINE | display_flags::LFBEFORE,
+                        )
+                        .await?;
+                    let digits = date.chars().filter(|ch| ch.is_ascii_digit()).collect::<String>();
+                    let expiration_date = if date.trim().is_empty() || (!digits.is_empty() && digits.chars().all(|ch| ch == '0')) {
+                        chrono::DateTime::<chrono::Utc>::default()
+                    } else {
+                        let parsed = IcbDate::parse(&date);
+                        if parsed.is_empty() {
+                            self.session.op_text = date;
+                            self.display_text(IceText::InvalidEntry, display_flags::NEWLINE | display_flags::LFBEFORE)
+                                .await?;
+                            show_record = false;
+                            continue;
+                        }
+                        parsed.to_utc_date_time()
+                    };
+                    let mut board = self.board.lock().await;
+                    board.users[record].expiration_date = expiration_date;
+                    let result = board.save_userbase();
+                    drop(board);
+                    self.report_save(result).await?;
                 }
                 "L" | "S" => {
                     self.view_user_file().await?;

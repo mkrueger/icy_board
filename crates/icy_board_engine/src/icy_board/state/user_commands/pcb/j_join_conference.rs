@@ -139,6 +139,13 @@ impl IcyBoardState {
                 continue;
             };
 
+            if !self.subscription_can_access_conference(conf_num as u16) {
+                self.session.op_text = conference.name.clone();
+                self.display_text(IceText::NotRegisteredInConference, display_flags::NEWLINE | display_flags::LFBEFORE)
+                    .await?;
+                continue;
+            }
+
             if !conference.required_security.session_can_access(&self.session) {
                 self.session.op_text = conference.name.clone();
                 self.display_text(IceText::NotRegisteredInConference, display_flags::NEWLINE | display_flags::LFBEFORE)

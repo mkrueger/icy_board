@@ -15,7 +15,6 @@ for where a command answers differently than PCBoard did, and
 | :--- | :--- |
 | Modem | Callers reach the board over telnet, SSH and websockets. There is no serial or modem support, and no FOSSIL driver. |
 | Accounting | Charges, the config and the warning file work. Peak rates (`peak_usage_start`, `peak_usage_end`, `peak_days_of_week`, `peak_holiday_list_file`) are never applied, amounts are always shown as units, and the info and logoff files are not displayed. |
-| Subscriptions | An expiring subscription is warned about. A new period is never set and an expired user keeps their security level. |
 | Upload credits | Uploading earns neither time nor bytes, and uploads are not test-extracted. The configured free-space threshold is enforced before a transfer starts. |
 | FTN | icy_board is a leaf or point over BinkP: scan, poll and toss. There is no BinkP answering side, netmail arrives in a single dump base, AreaFix is missing and the AKA and link setup is hand-edited TOML. |
 | Web | There is no web frontend, and the PPL web statements and functions are not implemented. |
