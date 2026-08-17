@@ -1111,6 +1111,7 @@ impl<T> ConfigMenu<T> {
         let mut i = 0;
 
         state.area_height = area.height;
+        self.snap_to_selectable(state);
 
         let list_area = Rect {
             x: area.x,
@@ -1481,8 +1482,8 @@ impl<T> ConfigMenu<T> {
     pub fn handle_key_press(&mut self, key: KeyEvent, state: &mut ConfigMenuState) -> ResultState {
         let res = self.get_item_mut(state.selected).unwrap().handle_key_press(key, state);
         match res.edit_msg {
-            EditMessage::PrevItem => Self::prev(self.count(), state),
-            EditMessage::NextItem => Self::next(self.count(), state),
+            EditMessage::PrevItem => self.prev(state),
+            EditMessage::NextItem => self.next(state),
             _ => {
                 return res;
             }
@@ -1496,47 +1497,62 @@ impl<T> ConfigMenu<T> {
         }
     }
 
-    fn prev(count: usize, state: &mut ConfigMenuState) {
-        if state.selected > 0 {
-            state.selected -= 1;
+    fn is_selectable(&self, index: usize) -> bool {
+        self.get_item(index).is_some_and(|item| item.editable)
+    }
 
-            if let Some(y) = state.item_pos.get(&state.selected) {
-                if *y < state.first_row {
-                    state.first_row = *y;
-                    if state.first_row == 1 {
-                        state.first_row = 0;
-                    }
-                }
-            }
-        } else {
-            state.selected = count - 1;
-            if let Some(y) = state.item_pos.get(&state.selected) {
-                if *y >= state.area_height {
-                    state.first_row = *y - state.area_height + 1;
-                }
+    /// Puts the cursor on an entry the board actually reads, so it never comes
+    /// to rest on a greyed out one.
+    fn snap_to_selectable(&self, state: &mut ConfigMenuState) {
+        let count = self.count();
+        if count == 0 || self.is_selectable(state.selected) {
+            return;
+        }
+        for offset in 1..=count {
+            let index = (state.selected + offset) % count;
+            if self.is_selectable(index) {
+                state.selected = index;
+                return;
             }
         }
     }
 
-    fn next(count: usize, state: &mut ConfigMenuState) {
-        if state.selected < count - 1 {
-            state.selected += 1;
-            if let Some(y) = state.item_pos.get(&state.selected) {
-                if *y >= state.area_height {
-                    state.first_row = *y - state.area_height + 1;
-                }
-            }
-        } else {
-            state.selected = 0;
+    fn prev(&self, state: &mut ConfigMenuState) {
+        self.move_selection(state, -1);
+    }
 
-            if let Some(y) = state.item_pos.get(&state.selected) {
-                if *y < state.first_row {
-                    state.first_row = *y;
-                    if state.first_row == 1 {
-                        state.first_row = 0;
-                    }
-                }
+    fn next(&self, state: &mut ConfigMenuState) {
+        self.move_selection(state, 1);
+    }
+
+    /// Steps over the entries the board does not read - they are greyed out and
+    /// there is nothing to edit on them. Wraps around at either end and stays
+    /// put when nothing on the page can be selected.
+    fn move_selection(&self, state: &mut ConfigMenuState, delta: isize) {
+        let count = self.count();
+        if count == 0 {
+            return;
+        }
+        let mut index = state.selected as isize;
+        for _ in 0..count {
+            index = (index + delta).rem_euclid(count as isize);
+            if self.is_selectable(index as usize) {
+                state.selected = index as usize;
+                break;
             }
+        }
+        Self::scroll_into_view(state);
+    }
+
+    fn scroll_into_view(state: &mut ConfigMenuState) {
+        let Some(y) = state.item_pos.get(&state.selected).copied() else {
+            return;
+        };
+        if y < state.first_row {
+            // Row 1 means a group header sits above, so show it too.
+            state.first_row = if y == 1 { 0 } else { y };
+        } else if state.area_height > 0 && y >= state.first_row + state.area_height {
+            state.first_row = y - state.area_height + 1;
         }
     }
 
@@ -1616,7 +1632,7 @@ mod tests {
     }
 
     #[test]
-    fn an_inactive_option_says_why_and_stays_reachable() {
+    fn an_inactive_option_says_why() {
         let mut item = bool_item(false)
             .with_status("Option")
             .with_help("What it would do")
@@ -1628,5 +1644,69 @@ mod tests {
         assert!(matches!(press(&mut item, KeyCode::Down).edit_msg, EditMessage::NextItem));
         assert!(matches!(press(&mut item, KeyCode::Up).edit_msg, EditMessage::PrevItem));
         assert!(matches!(press(&mut item, KeyCode::F(1)).edit_msg, EditMessage::DisplayHelp(_)));
+    }
+
+    fn menu(inactive: &[usize]) -> ConfigMenu<()> {
+        let entry = (0..5)
+            .map(|i| {
+                let item = ListItem::new(format!("Option {i}"), ListValue::Bool(false));
+                ConfigEntry::Item(if inactive.contains(&i) { item.with_inactive("nothing reads this") } else { item })
+            })
+            .collect();
+        ConfigMenu { obj: (), entry }
+    }
+
+    fn move_down(menu: &ConfigMenu<()>, state: &mut ConfigMenuState) {
+        menu.next(state);
+    }
+
+    fn move_up(menu: &ConfigMenu<()>, state: &mut ConfigMenuState) {
+        menu.prev(state);
+    }
+
+    #[test]
+    fn navigation_steps_over_inactive_entries() {
+        let menu = menu(&[1, 2]);
+        let mut state = ConfigMenuState::default();
+
+        move_down(&menu, &mut state);
+        assert_eq!(state.selected, 3, "the two greyed out entries were not skipped");
+
+        move_up(&menu, &mut state);
+        assert_eq!(state.selected, 0);
+    }
+
+    #[test]
+    fn navigation_wraps_past_inactive_entries_at_the_end() {
+        let menu = menu(&[3, 4]);
+        let mut state = ConfigMenuState::default();
+        state.selected = 2;
+
+        move_down(&menu, &mut state);
+        assert_eq!(state.selected, 0, "wrapping stopped on a greyed out entry");
+
+        move_up(&menu, &mut state);
+        assert_eq!(state.selected, 2);
+    }
+
+    #[test]
+    fn navigation_stays_put_when_every_entry_is_inactive() {
+        let menu = menu(&[0, 1, 2, 3, 4]);
+        let mut state = ConfigMenuState::default();
+
+        move_down(&menu, &mut state);
+        assert_eq!(state.selected, 0);
+        move_up(&menu, &mut state);
+        assert_eq!(state.selected, 0);
+    }
+
+    /// The cursor starts at index 0, which may well be an option nobody reads.
+    #[test]
+    fn the_cursor_never_starts_on_an_inactive_entry() {
+        let menu = menu(&[0]);
+        let mut state = ConfigMenuState::default();
+
+        menu.snap_to_selectable(&mut state);
+        assert_eq!(state.selected, 1);
     }
 }
