@@ -1403,12 +1403,12 @@ pub async fn adjbytes(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
     let bytes = vm.eval_expr(&args[0]).await?.as_int();
     if let Some(user) = &mut vm.icy_board_state.session.current_user {
         if bytes > 0 {
-            user.stats.total_dnld_bytes += bytes as u64;
+            user.stats.total_dnld_bytes = user.stats.total_dnld_bytes.saturating_add(bytes as u64);
         } else {
             user.stats.total_dnld_bytes = user.stats.total_dnld_bytes.saturating_sub(bytes.unsigned_abs() as u64);
         }
-        user.stats.today_dnld_bytes += bytes as i64;
-        vm.icy_board_state.session.bytes_remaining += bytes as i64;
+        user.stats.today_dnld_bytes = user.stats.today_dnld_bytes.saturating_add(bytes as i64);
+        crate::icy_board::limits::adjust_bytes_remaining(&mut vm.icy_board_state.session.bytes_remaining, bytes as i64);
     }
     Ok(())
 }
@@ -1504,8 +1504,8 @@ pub async fn getaltuser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()
 pub async fn adjdbytes(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let bytes = vm.eval_expr(&args[0]).await?.as_int();
     if let Some(user) = &mut vm.icy_board_state.session.current_user {
-        user.stats.today_dnld_bytes += bytes as i64;
-        vm.icy_board_state.session.bytes_remaining += bytes as i64;
+        user.stats.today_dnld_bytes = user.stats.today_dnld_bytes.saturating_add(bytes as i64);
+        crate::icy_board::limits::adjust_bytes_remaining(&mut vm.icy_board_state.session.bytes_remaining, bytes as i64);
     }
     Ok(())
 }
@@ -1513,9 +1513,9 @@ pub async fn adjtbytes(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
     let bytes: i32 = vm.eval_expr(&args[0]).await?.as_int();
     if let Some(user) = &mut vm.icy_board_state.session.current_user {
         if bytes > 0 {
-            user.stats.total_dnld_bytes += bytes as u64;
+            user.stats.total_dnld_bytes = user.stats.total_dnld_bytes.saturating_add(bytes as u64);
         } else {
-            user.stats.total_dnld_bytes = user.stats.total_dnld_bytes.saturating_sub(bytes as u64);
+            user.stats.total_dnld_bytes = user.stats.total_dnld_bytes.saturating_sub(bytes.unsigned_abs() as u64);
         }
     }
     Ok(())
@@ -1524,9 +1524,9 @@ pub async fn ayjtfiles(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
     let files = vm.eval_expr(&args[0]).await?.as_int();
     if let Some(user) = &mut vm.icy_board_state.session.current_user {
         if files > 0 {
-            user.stats.num_downloads += files as u64;
+            user.stats.num_downloads = user.stats.num_downloads.saturating_add(files as u64);
         } else {
-            user.stats.num_downloads = user.stats.num_downloads.saturating_sub(files as u64);
+            user.stats.num_downloads = user.stats.num_downloads.saturating_sub(files.unsigned_abs() as u64);
         }
     }
     Ok(())

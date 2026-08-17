@@ -48,8 +48,8 @@ impl BatchSoFar {
     /// A free file still travels, but costs the caller nothing.
     pub fn accept(&mut self, size: u64, free: bool) {
         if !free {
-            self.files += 1;
-            self.bytes += size;
+            self.files = self.files.saturating_add(1);
+            self.bytes = self.bytes.saturating_add(size);
         }
     }
 }
@@ -91,13 +91,14 @@ impl TransferLimits {
     /// Takes off what the caller has already used today, the way PCBoard does at logon.
     pub fn charge_todays_usage(&mut self, used_today: i64) {
         if let Some(remaining) = self.bytes_remaining {
-            self.bytes_remaining = Some((remaining - used_today).max(0));
+            self.bytes_remaining = Some(remaining.saturating_sub(used_today).max(0));
         }
     }
 
     /// Bytes left once the batch so far is paid for.
     pub fn bytes_left(&self, so_far: BatchSoFar) -> Option<i64> {
-        self.bytes_remaining.map(|remaining| remaining - so_far.bytes as i64)
+        self.bytes_remaining
+            .map(|remaining| (remaining as i128 - so_far.bytes as i128).clamp(i64::MIN as i128, i64::MAX as i128) as i64)
     }
 
     /// Judges one more file. `free` files bypass every limit, which is how PCBoard treats
@@ -108,15 +109,15 @@ impl TransferLimits {
         }
 
         if let Some(bytes_left) = self.bytes_left(so_far) {
-            if size as i64 > bytes_left {
+            if size as i128 > bytes_left as i128 {
                 return LimitVerdict::DailyBytes { bytes_left };
             }
         }
 
         if let Some(verdict) = check_ratio(
             self.file_ratio_tenths,
-            history.num_uploads + self.file_credit,
-            history.num_downloads + so_far.files,
+            history.num_uploads.saturating_add(self.file_credit),
+            history.num_downloads.saturating_add(so_far.files),
             1,
         ) {
             return LimitVerdict::FileRatio {
@@ -127,8 +128,8 @@ impl TransferLimits {
 
         if let Some(verdict) = check_ratio(
             self.byte_ratio_tenths,
-            history.total_upld_bytes + self.byte_credit,
-            history.total_dnld_bytes + so_far.bytes,
+            history.total_upld_bytes.saturating_add(self.byte_credit),
+            history.total_dnld_bytes.saturating_add(so_far.bytes),
             size,
         ) {
             return LimitVerdict::ByteRatio {
@@ -144,7 +145,7 @@ impl TransferLimits {
             };
         }
 
-        let downloaded_bytes = history.total_dnld_bytes + so_far.bytes;
+        let downloaded_bytes = history.total_dnld_bytes.saturating_add(so_far.bytes);
         if exceeds_limit(self.total_byte_limit, downloaded_bytes, size) {
             return LimitVerdict::ByteLimit {
                 limit: self.total_byte_limit,
@@ -158,12 +159,12 @@ impl TransferLimits {
     /// Bytes the caller may still download once the daily allowance, the total limit and
     /// the byte ratio have each had their say. `None` when nothing constrains them.
     pub fn bytes_available(&self, history: &TransferHistory, so_far: BatchSoFar) -> Option<i64> {
-        let current = so_far.bytes as i64;
+        let current = so_far.bytes as i128;
         let mut unlimited = self.bytes_remaining.is_none();
-        let mut limit = self.bytes_remaining.map_or(i64::MAX, |remaining| remaining - current);
+        let mut limit = self.bytes_remaining.map_or(i128::from(i64::MAX), |remaining| remaining as i128 - current);
 
         if self.total_byte_limit > 0 {
-            let left = self.total_byte_limit as i64 - history.total_dnld_bytes as i64 - current;
+            let left = self.total_byte_limit as i128 - history.total_dnld_bytes as i128 - current;
             if left < limit {
                 limit = left;
                 unlimited = false;
@@ -171,16 +172,17 @@ impl TransferLimits {
         }
 
         if self.byte_ratio_tenths > 0 {
-            let up = (history.total_upld_bytes + self.byte_credit) as i128;
-            let allowed = (up * self.byte_ratio_tenths as i128) / 10;
-            let left = (allowed - (history.total_dnld_bytes as i128 + current as i128)).max(0) as i64;
+            let up = history.total_upld_bytes.saturating_add(self.byte_credit) as u128;
+            let allowed = up.saturating_mul(self.byte_ratio_tenths as u128) / 10;
+            let downloaded = (history.total_dnld_bytes as u128).saturating_add(so_far.bytes as u128);
+            let left = allowed.saturating_sub(downloaded).min(i64::MAX as u128) as i128;
             if left < limit {
                 limit = left;
                 unlimited = false;
             }
         }
 
-        if unlimited { None } else { Some(limit.max(0)) }
+        if unlimited { None } else { Some(limit.clamp(0, i64::MAX as i128) as i64) }
     }
 }
 
@@ -210,7 +212,7 @@ fn daily_allowance(level: &SecurityLevel, bps: u32) -> Option<i64> {
     if level.daily_file_kb_limit == UNLIMITED_KB {
         return None;
     }
-    let mut bytes = (level.daily_file_kb_limit as i64).saturating_mul(1024);
+    let mut bytes = level.daily_file_kb_limit.min((i64::MAX / 1024) as u64) as i64 * 1024;
     let base = level.base_baud_rate;
     if base != 0 {
         if bps >= base {
@@ -231,16 +233,15 @@ fn check_ratio(ratio_tenths: u64, up: u64, down: u64, new: u64) -> Option<u64> {
     // PCBoard substitutes 1 rather than dividing by zero, so a caller who has never
     // uploaded still gets the ratio's worth of downloads.
     let up = up.max(1);
-    let allowed = (up as u128 * ratio_tenths as u128) / 10;
-    let left = allowed as i128 - down as i128;
-    if left < new as i128 {
-        return Some(((down as u128 * 10) / up as u128) as u64);
+    let allowed = (up as u128).saturating_mul(ratio_tenths as u128) / 10;
+    if allowed < (down as u128).saturating_add(new as u128) {
+        return Some(((down as u128 * 10) / up as u128).min(u64::MAX as u128) as u64);
     }
     None
 }
 
 fn exceeds_limit(limit: u64, downloaded: u64, new: u64) -> bool {
-    limit != 0 && downloaded + new > limit
+    limit != 0 && downloaded.saturating_add(new) > limit
 }
 
 /// Seconds PCBoard reckons a transfer needs: the raw time at the caller's speed, seven
@@ -257,6 +258,9 @@ pub fn seconds_for_transfer(size: u64, bps: u32) -> i64 {
 /// already used the day up is given a minute and then hung up on, which is close to what
 /// PCBoard does with its own one minute of slack.
 pub fn session_time_limit(time_per_day: u32, minutes_used_today: u16, enforce_daily: bool) -> i32 {
+    if time_per_day == 0 {
+        return 0;
+    }
     if !enforce_daily {
         return time_per_day as i32;
     }
@@ -269,10 +273,19 @@ pub fn session_expired(time_limit: i32, minutes_online: i64) -> bool {
     time_limit != 0 && minutes_online >= time_limit as i64
 }
 
+/// Applies signed download usage to the live allowance. Positive values spend it,
+/// negative values restore credit, and -1 remains the unlimited marker.
+pub fn adjust_bytes_remaining(bytes_remaining: &mut i64, adjustment: i64) {
+    if *bytes_remaining < 0 {
+        return;
+    }
+    *bytes_remaining = bytes_remaining.saturating_sub(adjustment).max(0);
+}
+
 /// The ceiling PCBoard reports for a day's downloading, in kilobytes: the tighter of the
 /// day's allowance and the total limit, or `None` when neither applies.
 pub fn kilobyte_limit(daily_allowance: Option<i64>, total_byte_limit: u64) -> Option<i64> {
-    let total_kb = (total_byte_limit / 1024) as i64;
+    let total_kb = (total_byte_limit / 1024).min(i64::MAX as u64) as i64;
     match (daily_allowance, total_byte_limit) {
         (None, 0) => None,
         (None, _) => Some(total_kb),
@@ -718,6 +731,27 @@ mod tests {
     #[test]
     fn an_unlimited_session_never_ends() {
         assert!(!session_expired(0, 100_000));
+    }
+
+    #[test]
+    fn positive_usage_spends_the_live_allowance() {
+        let mut remaining = 1000;
+        adjust_bytes_remaining(&mut remaining, 400);
+        assert_eq!(remaining, 600);
+    }
+
+    #[test]
+    fn a_negative_adjustment_restores_credit() {
+        let mut remaining = 1000;
+        adjust_bytes_remaining(&mut remaining, -400);
+        assert_eq!(remaining, 1400);
+    }
+
+    #[test]
+    fn the_unlimited_marker_is_never_adjusted() {
+        let mut remaining = -1;
+        adjust_bytes_remaining(&mut remaining, 400);
+        assert_eq!(remaining, -1);
     }
 
     // --- the reported ceiling --------------------------------------------------

@@ -181,13 +181,14 @@ impl IcyBoardState {
                         self.log_transfer(false, &sent, &protocol_str, state.send_state.errors, cps).await?;
 
                         self.count_downloads(&files, &sent).await;
-                        let bytes = state.send_state.total_bytes_transfered;
+                        let (charged_files, charged_bytes) = self.charged_downloads(&state.send_state.finished_files).await;
                         if let Some(user) = &mut self.session.current_user {
-                            user.stats.num_downloads += sent.len() as u64;
-                            user.stats.today_num_downloads += sent.len() as u64;
-                            user.stats.total_dnld_bytes += bytes;
-                            user.stats.today_dnld_bytes += bytes as i64;
+                            user.stats.num_downloads = user.stats.num_downloads.saturating_add(charged_files);
+                            user.stats.today_num_downloads = user.stats.today_num_downloads.saturating_add(charged_files);
+                            user.stats.total_dnld_bytes = user.stats.total_dnld_bytes.saturating_add(charged_bytes);
+                            user.stats.today_dnld_bytes = user.stats.today_dnld_bytes.saturating_add(charged_bytes.min(i64::MAX as u64) as i64);
                         }
+                        limits::adjust_bytes_remaining(&mut self.session.bytes_remaining, charged_bytes.min(i64::MAX as u64) as i64);
                         self.board.lock().await.statistics.add_download(&state);
                         self.board.lock().await.save_statistics()?;
                     }
@@ -235,24 +236,31 @@ impl IcyBoardState {
         }
     }
 
+    async fn charged_downloads(&mut self, finished: &[(String, PathBuf)]) -> (u64, u64) {
+        let free_areas = self.free_download_areas().await;
+        finished
+            .iter()
+            .map(|(_, path)| path)
+            .filter(|path| !path.parent().is_some_and(|dir| free_areas.iter().any(|area| area == dir)))
+            .fold((0u64, 0u64), |(files, bytes), path| {
+                let size = std::fs::metadata(path).map(|metadata| metadata.len()).unwrap_or(0);
+                (files.saturating_add(1), bytes.saturating_add(size))
+            })
+    }
+
     /// Drops the files the caller's limits will not cover.
     ///
     /// PCBoard judges every file on its own against what the batch has already taken, so
     /// one refusal does not cost the caller the rest of their batch. There is no sysop
     /// exemption in the original either - a sysop simply holds a level with no limits.
     async fn screen_transfer_limits(&mut self, files: Vec<PathBuf>) -> Res<Vec<PathBuf>> {
-        if !self.get_board().await.config.system_control.enforce_transfer_limits {
-            return Ok(files);
-        }
-        let Some(user) = &self.session.current_user else {
-            return Ok(files);
-        };
-        let history = TransferHistory {
+        let enforce_transfer_limits = self.get_board().await.config.system_control.enforce_transfer_limits;
+        let history = self.session.current_user.as_ref().map(|user| TransferHistory {
             num_uploads: user.stats.num_uploads,
             num_downloads: user.stats.num_downloads,
             total_upld_bytes: user.stats.total_upld_bytes,
             total_dnld_bytes: user.stats.total_dnld_bytes,
-        };
+        });
         let mut limits = self.session.transfer_limits.clone();
         // PPL can move the allowance around during the session, so take the live figure.
         limits.bytes_remaining = (self.session.bytes_remaining >= 0).then_some(self.session.bytes_remaining);
@@ -266,12 +274,19 @@ impl IcyBoardState {
         for path in files {
             let size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
             let free = path.parent().map_or(false, |dir| free_areas.iter().any(|area| area == dir));
-            let verdict = limits.check_file(&history, so_far, size, free);
+            let verdict = if enforce_transfer_limits {
+                history
+                    .as_ref()
+                    .map_or(LimitVerdict::Allowed, |history| limits.check_file(history, so_far, size, free))
+            } else {
+                LimitVerdict::Allowed
+            };
             if !verdict.is_allowed() {
                 if let Some(user) = &mut self.session.current_user {
                     user.stats.num_reach_dnld_lim += 1;
                 }
                 self.report_limit(&path, verdict).await?;
+                self.session.flagged_files.push(path);
                 continue;
             }
 
@@ -285,6 +300,7 @@ impl IcyBoardState {
                     self.session.op_text = path.file_name().unwrap_or_default().to_string_lossy().to_string();
                     self.display_text(IceText::NoTimeForDownload, display_flags::NEWLINE | display_flags::LOGIT | display_flags::BELL)
                         .await?;
+                    self.session.flagged_files.push(path);
                     continue;
                 }
             }

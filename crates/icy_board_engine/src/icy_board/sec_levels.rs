@@ -119,6 +119,13 @@ impl DerefMut for SecurityLevelDefinitions {
 }
 
 impl SecurityLevelDefinitions {
+    /// PCBoard stops at the first entry whose level and optional password match.
+    pub fn find_match(&self, security: u8, password: &str) -> Option<&SecurityLevel> {
+        self.levels
+            .iter()
+            .find(|level| level.security == security && (level.password.is_empty() || level.password.eq_ignore_ascii_case(password)))
+    }
+
     pub fn export_pcboard(&self, file: &std::path::PathBuf) -> Res<()> {
         let mut data = String::new();
         for level in &self.levels {
@@ -146,6 +153,44 @@ impl SecurityLevelDefinitions {
         }
         std::fs::write(file, data)?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{SecurityLevel, SecurityLevelDefinitions};
+
+    #[test]
+    fn pwrd_lookup_uses_the_first_matching_entry() {
+        let levels = SecurityLevelDefinitions {
+            levels: vec![
+                SecurityLevel {
+                    security: 10,
+                    password: "SPECIAL".to_string(),
+                    time_per_day: 30,
+                    ..Default::default()
+                },
+                SecurityLevel {
+                    security: 10,
+                    time_per_day: 60,
+                    ..Default::default()
+                },
+            ],
+        };
+
+        assert_eq!(levels.find_match(10, "special").unwrap().time_per_day, 30);
+        assert_eq!(levels.find_match(10, "other").unwrap().time_per_day, 60);
+    }
+
+    #[test]
+    fn pwrd_lookup_does_not_use_another_security_level() {
+        let levels = SecurityLevelDefinitions {
+            levels: vec![SecurityLevel {
+                security: 20,
+                ..Default::default()
+            }],
+        };
+        assert!(levels.find_match(10, "").is_none());
     }
 }
 

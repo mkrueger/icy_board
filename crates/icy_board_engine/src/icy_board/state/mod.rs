@@ -799,7 +799,19 @@ impl IcyBoardState {
 
     async fn apply_pwrd_limits(&mut self) {
         let board = self.get_board().await;
-        let Some(level) = board.sec_levels.iter().find(|l| l.security == self.session.cur_security) else {
+        let Some(level) = board.sec_levels.find_match(self.session.cur_security, &self.session.last_password) else {
+            if board.sec_levels.is_empty() {
+                return;
+            }
+            drop(board);
+            self.session.time_limit = 10;
+            self.session.batch_limit = 30;
+            self.session.transfer_limits = TransferLimits {
+                daily_allowance: Some(0),
+                bytes_remaining: Some(0),
+                ..Default::default()
+            };
+            self.session.bytes_remaining = 0;
             return;
         };
         let time_per_day = level.time_per_day;
@@ -810,13 +822,9 @@ impl IcyBoardState {
         let enforce_daily_time = board.config.system_control.enforce_daily_time_limit && level.enforce_time_limit && !level.is_demo_account;
         let mut limits = TransferLimits::from_security_level(level, self.get_bps().max(0) as u32);
         drop(board);
-        if time_per_day > 0 {
-            let used_today = self.session.current_user.as_ref().map_or(0, |user| user.stats.minutes_today);
-            self.session.time_limit = limits::session_time_limit(time_per_day, used_today, enforce_daily_time);
-        }
-        if batch_limit > 0 {
-            self.session.batch_limit = batch_limit as usize;
-        }
+        let used_today = self.session.current_user.as_ref().map_or(0, |user| user.stats.minutes_today);
+        self.session.time_limit = limits::session_time_limit(time_per_day, used_today, enforce_daily_time);
+        self.session.batch_limit = if batch_limit == 0 { 30 } else { batch_limit as usize };
         // What the caller already spent today comes off the allowance, so re-reading the
         // level on a conference join cannot hand them a fresh one.
         if let Some(user) = &self.session.current_user {
@@ -850,10 +858,22 @@ impl IcyBoardState {
         };
         let mut limits = self.session.transfer_limits.clone();
         limits.bytes_remaining = (self.session.bytes_remaining >= 0).then_some(self.session.bytes_remaining);
+        let free_areas: Vec<&Path> = self
+            .session
+            .current_conference
+            .directories
+            .as_ref()
+            .map(|directories| directories.iter())
+            .into_iter()
+            .flatten()
+            .filter(|area| area.is_free)
+            .map(|area| area.path.as_path())
+            .collect();
         let flagged = self
             .session
             .flagged_files
             .iter()
+            .filter(|file| !file.parent().is_some_and(|dir| free_areas.contains(&dir)))
             .filter_map(|f| std::fs::metadata(f).ok())
             .map(|m| m.len())
             .sum();
@@ -1310,6 +1330,7 @@ impl IcyBoardState {
         // The daily figures belong to the day they were made on, and `last_on` still holds
         // the previous call until the user is saved again.
         if user.stats.last_on.date_naive() != Utc::now().date_naive() {
+            user.stats.minutes_today = 0;
             user.stats.today_num_downloads = 0;
             user.stats.today_num_uploads = 0;
             user.stats.today_dnld_bytes = 0;
@@ -1536,7 +1557,7 @@ impl IcyBoardState {
         // Never zero, which reads as an unlimited session; a caller this close to an
         // event gets a minute and is then hung up on.
         let minutes = (window.minutes_until_suspend(&now) as i32).max(1);
-        if minutes < self.session.time_limit {
+        if self.session.time_limit == 0 || minutes < self.session.time_limit {
             self.session.time_limit = minutes;
             self.session.time_adjusted_for_event = true;
         }
@@ -2671,6 +2692,10 @@ impl IcyBoardState {
         }
 
         if self.keyboard_timed_out().await? {
+            return Ok(None);
+        }
+        self.check_time_left().await;
+        if self.session.request_logoff {
             return Ok(None);
         }
 

@@ -36,6 +36,7 @@ impl SystemControl {
                 cfg_entry_bool!("allow_alias_change", label_width, system_control, allow_alias_change, lock),
                 cfg_entry_bool!("is_closed_board", label_width, system_control, is_closed_board, lock),
                 cfg_entry_bool!("enforce_daily_time_limit", label_width, system_control, enforce_daily_time_limit, lock),
+                cfg_entry_bool!("enforce_transfer_limits", label_width, system_control, enforce_transfer_limits, lock),
                 cfg_entry_bool!(
                     "allow_password_failure_comment",
                     label_width,

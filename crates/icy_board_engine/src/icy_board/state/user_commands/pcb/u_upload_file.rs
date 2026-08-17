@@ -267,12 +267,16 @@ impl IcyBoardState {
                     self.log_transfer(true, &received, &protocol_str, state.recieve_state.errors, cps).await?;
 
                     let bytes = state.recieve_state.total_bytes_transfered;
+                    let credit_rate = self.get_board().await.config.file_transfer.upload_credit_bytes as u64;
+                    let credit = bytes.saturating_mul(credit_rate) / 10;
                     if let Some(user) = &mut self.session.current_user {
-                        user.stats.num_uploads += received.len() as u64;
-                        user.stats.today_num_uploads += received.len() as u64;
-                        user.stats.total_upld_bytes += bytes;
-                        user.stats.today_upld_bytes += bytes;
+                        user.stats.num_uploads = user.stats.num_uploads.saturating_add(received.len() as u64);
+                        user.stats.today_num_uploads = user.stats.today_num_uploads.saturating_add(received.len() as u64);
+                        user.stats.total_upld_bytes = user.stats.total_upld_bytes.saturating_add(bytes);
+                        user.stats.today_upld_bytes = user.stats.today_upld_bytes.saturating_add(bytes);
+                        user.stats.today_dnld_bytes = user.stats.today_dnld_bytes.saturating_sub(credit.min(i64::MAX as u64) as i64);
                     }
+                    crate::icy_board::limits::adjust_bytes_remaining(&mut self.session.bytes_remaining, -(credit.min(i64::MAX as u64) as i64));
                     self.board.lock().await.statistics.add_upload(&state);
                     self.board.lock().await.save_statistics()?;
 

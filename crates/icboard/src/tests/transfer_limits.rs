@@ -102,6 +102,21 @@ fn test_limits_are_not_enforced_by_default() {
     assert!(!output.contains("download bytes left"), "{output}");
 }
 
+/// Session time is independent of the opt-in ratio and byte/file limits.
+#[test]
+fn test_transfer_time_is_checked_while_other_limits_are_off() {
+    let level = SecurityLevel {
+        daily_file_kb_limit: 32767,
+        time_per_day: 1,
+        ..Default::default()
+    };
+    let output = test_output("D BIG.ZIP\n\n".to_string(), move |board| {
+        setup(board, level.clone(), false);
+        board.config.system_control.enforce_transfer_limits = false;
+    });
+    assert!(output.contains("Insufficient time"), "{output}");
+}
+
 /// A ratio of 5.0:1 stops the caller who has downloaded five for every upload.
 #[test]
 fn test_the_file_ratio_refuses_a_download() {
@@ -176,7 +191,7 @@ fn test_a_free_area_still_costs_time() {
 fn test_an_event_shortens_the_session_and_blocks_a_long_download() {
     let level = SecurityLevel {
         daily_file_kb_limit: 32767,
-        time_per_day: 600,
+        time_per_day: 0,
         ..Default::default()
     };
     let output = test_output("D BIG.ZIP\n\n".to_string(), move |board| {

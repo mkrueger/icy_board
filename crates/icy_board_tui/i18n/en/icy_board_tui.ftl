@@ -828,6 +828,9 @@ is_closed_board-help=TODO
 enforce_daily_time_limit=Enforce Daily Time Limit
 enforce_daily_time_limit-status=Switch between session and daily time limits.
 enforce_daily_time_limit-help=TODO
+enforce_transfer_limits=Enforce Transfer Limits
+enforce_transfer_limits-status=Apply PWRD byte, file and ratio limits to downloads
+enforce_transfer_limits-help=Off by default so imported boards do not begin refusing downloads until the limits have been reviewed.
 
 allow_password_failure_comment=Allow Password Failure Comment
 allow_password_failure_comment-status=On PW failures message to sysop can be entered.
