@@ -16,6 +16,12 @@ pub enum SelectMode {
     SelectCmd,
 }
 const MASK_CONFNUMBERS: &str = "0123456789-DQSH?";
+/// PCBoard's mask_crsxn: locked out, registered, scan, conference sysop, net status.
+const MASK_CONFFLAGS: &str = "CLRSXN";
+
+fn with_flag(value: ConferenceFlags, flag: ConferenceFlags, on: bool) -> ConferenceFlags {
+    if on { value | flag } else { value & !flag }
+}
 
 impl IcyBoardState {
     pub async fn select_conferences(&mut self, select_mode: SelectMode) -> Res<()> {
@@ -66,17 +72,37 @@ impl IcyBoardState {
             } else {
                 done = true;
             }
-            while let Some(token) = self.session.tokens.pop_front() {
+
+            // A pending token answers the next question instead of it being asked, so the
+            // numbers are held aside while the flags question is put.
+            let pending: Vec<String> = self.session.tokens.drain(..).collect();
+
+            // Registering asks which flags the numbers that follow should get, once per answer.
+            let flags = if select_mode == SelectMode::Register && pending.first().is_some_and(|token| token != "Q") {
+                self.input_field(
+                    IceText::SelectConferenceFlags,
+                    5,
+                    MASK_CONFFLAGS,
+                    "",
+                    None,
+                    display_flags::NEWLINE | display_flags::FIELDLEN | display_flags::GUIDE | display_flags::UPCASE,
+                )
+                .await?
+            } else {
+                String::new()
+            };
+
+            for token in pending {
                 match token.as_str() {
                     "Q" => {
                         done = true;
                         break;
                     }
                     "S" => {
-                        self.change_selection(0, num_conf, Some(true)).await?;
+                        self.apply_selection(0, num_conf, Some(true), select_mode, &flags).await?;
                     }
                     "D" => {
-                        self.change_selection(0, num_conf, Some(false)).await?;
+                        self.apply_selection(0, num_conf, Some(false), select_mode, &flags).await?;
                     }
                     _ => {
                         let mut str = token;
@@ -95,12 +121,12 @@ impl IcyBoardState {
                             let mut parts = str.split('-');
                             if let (Some(from), Some(to)) = (parts.next(), parts.next()) {
                                 if let (Ok(from), Ok(to)) = (from.parse::<usize>(), to.parse::<usize>()) {
-                                    self.change_selection(from, to, value).await?;
+                                    self.apply_selection(from, to, value, select_mode, &flags).await?;
                                 }
                             }
                         } else {
                             if let Ok(num) = str.parse::<usize>() {
-                                self.change_selection(num, num, value).await?;
+                                self.apply_selection(num, num, value, select_mode, &flags).await?;
                             }
                         }
                     }
@@ -169,6 +195,52 @@ impl IcyBoardState {
 
         let str = format!(" {:<5}", flag_str);
         self.println(TerminalTarget::Both, &str).await?;
+        Ok(())
+    }
+
+    async fn apply_selection(&mut self, from: usize, to: usize, set_selection_to: Option<bool>, select_mode: SelectMode, flags: &str) -> Res<()> {
+        if select_mode == SelectMode::Register {
+            self.apply_conference_flags(from, to, flags).await
+        } else {
+            self.change_selection(from, to, set_selection_to).await
+        }
+    }
+
+    /// The answer names the flags a conference should end up with, so a letter that is
+    /// absent clears its own flag.
+    async fn apply_conference_flags(&mut self, from: usize, to: usize, flags: &str) -> Res<()> {
+        let sysop_level = self.get_board().await.config.sysop_command_level.sysop;
+        let locked_out = flags.contains('L');
+        let registered = flags.contains('R');
+        let expired = flags.contains('X');
+        let selected = flags.contains('S');
+        let conference_sysop = flags.contains('C');
+        let net_status = flags.contains('N');
+
+        if let Some(user) = &mut self.session.current_user {
+            // The caller's own level decides this, not one raised by conference sysop access.
+            let may_set_sysop = user.security_level >= sysop_level;
+            for i in from..=to {
+                let mut value = *user.conference_flags.get(&i).unwrap_or(&ConferenceFlags::empty());
+                if locked_out {
+                    value &= !ConferenceFlags::Registered;
+                    value |= ConferenceFlags::Expired;
+                } else {
+                    value = with_flag(value, ConferenceFlags::Registered, registered);
+                    value = with_flag(value, ConferenceFlags::Expired, expired);
+                    value = with_flag(value, ConferenceFlags::Selected, selected);
+                    if may_set_sysop {
+                        value = with_flag(value, ConferenceFlags::Sysop, conference_sysop);
+                    }
+                    value = with_flag(value, ConferenceFlags::NetStatus, net_status);
+                }
+                if value.is_empty() {
+                    user.conference_flags.remove(&i);
+                } else {
+                    user.conference_flags.insert(i, value);
+                }
+            }
+        }
         Ok(())
     }
 

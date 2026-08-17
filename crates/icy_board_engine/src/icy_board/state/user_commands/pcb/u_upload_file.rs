@@ -123,29 +123,32 @@ impl IcyBoardState {
             return Ok(());
         }
 
-        // A name stacked on the command line skips the prompt.
-        let stacked_name = self.session.tokens.pop_front();
-        let had_token = stacked_name.is_some();
-        let file_name = if let Some(token) = stacked_name {
-            token
-        } else {
-            self.input_field(
-                IceText::FileNameToUpload,
-                60,
-                &MASK_ASCII,
-                CommandType::UploadFile.get_help(),
-                None,
-                display_flags::NEWLINE | display_flags::LFBEFORE,
-            )
-            .await?
-        };
+        // PCBoard asks for a name until the answer is empty or a file is accepted, so an
+        // abandoned description comes back here rather than ending the command.
+        let (description, private_upload, had_token) = loop {
+            let stacked_name = self.session.tokens.pop_front();
+            let had_token = stacked_name.is_some();
+            let file_name = if let Some(token) = stacked_name {
+                token
+            } else {
+                self.input_field(
+                    IceText::FileNameToUpload,
+                    60,
+                    &MASK_ASCII,
+                    CommandType::UploadFile.get_help(),
+                    None,
+                    display_flags::NEWLINE | display_flags::LFBEFORE,
+                )
+                .await?
+            };
 
-        if file_name.is_empty() {
-            return Ok(());
-        }
+            if file_name.is_empty() {
+                return Ok(());
+            }
 
-        let Some((description, private_upload)) = self.ask_upload_description(&file_name).await? else {
-            return Ok(());
+            if let Some((description, private_upload)) = self.ask_upload_description(&file_name).await? {
+                break (description, private_upload, had_token);
+            }
         };
 
         // PCBoard receives into the private location and moves the file to the public

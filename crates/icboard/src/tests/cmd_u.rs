@@ -19,11 +19,16 @@ fn test_upload_asks_for_a_description() {
     assert!(output.contains("Private"), "the private hint is missing:\n{output}");
 }
 
-/// An empty first line abandons an upload that has not started yet.
+/// An empty first line abandons the file, and the original then asks for a name
+/// again rather than dropping out of the command.
 #[test]
-fn test_upload_empty_description_aborts() {
+fn test_upload_empty_description_asks_for_another_name() {
     let output = test_output("U\nTESTUP.ZIP\n\n\n".to_string(), setup_upload_directory);
     assert!(!output.contains("Protocol"), "the upload should have been abandoned:\n{output}");
+    assert!(
+        output.matches("Filename to Upload").count() >= 2,
+        "the filename prompt should come back:\n{output}"
+    );
 }
 
 /// Fewer than five characters is not a description, so the original asks again.

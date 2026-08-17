@@ -81,7 +81,7 @@ Zmodem transfer.
 | H | HELPPROMPT (63), token skips | same | ✅ |
 | I | none | none | ✅ |
 | J | JOINCONFNUM (64), TEXTTOSCANFOR (70), PWRDTOJOIN (640), then VIEWCONFMEMBERS (88), SCANMSGBASE (296) | all five, and only on the first join of a conference | ✅ |
-| K | MSGNUMBERTOKILL (330), YOURPASSWORD (148) | uses PasswordToReadMessage | ⚠️ wrong prompt id |
+| K | MSGNUMBERTOKILL (330), YOURPASSWORD (148) | same | ✅ |
 | L | DATETOSEARCH (72) when OptionalNewScan, SEARCHFILENAME (71), FILENUMEXPERT (352)/NOVICE (353) | all three; 72 appears only for `N`, while `S` takes the stored date without asking | ✅ |
 | M | no prompt; CT/AN/GR/RI token | same + AvatarOn | ✅ extension is fine |
 | N | DATETOSEARCH (72), FILENUMEXPERT/NOVICE | same | ✅ |
@@ -91,7 +91,7 @@ Zmodem transfer.
 | R | MSGREADCMDEXPRT (584)/MSGREADCOMMAND (425); per-message loop ENDOFMSGEXPERT (612)/ENDOFMESSAGE (197); MOVE (465)/COPY (569) | prompts and parser match; the capture and QWK commands parse but do nothing yet | ⚠️ prompt sequence verified against the original, the capture commands are still empty |
 | S | QNUMTOANSWER (67), **always prompts, ignores tokens** | same | ✅ |
 | T | DESIREDPROTOCOL (198); token skips | same | ✅ |
-| U | CONTINUEUPLOAD (449), FILENAMETOUPLOAD (68)/(729), ENTERDESCRIPTION (160) block, PROTOCOLFORXFER (280), GOODBYEAFTERUP (474) in batch mode only | same, in that order | ⚠️ the original repeats 68 after each file, icy_board still asks once |
+| U | CONTINUEUPLOAD (449), FILENAMETOUPLOAD (68)/(729), ENTERDESCRIPTION (160) block, PROTOCOLFORXFER (280), GOODBYEAFTERUP (474) in batch mode only | same, in that order, and an abandoned description returns to 68 | ✅ |
 | V | no prompts; returns if STAT display file missing | built-in settings display as fallback | ⚠️ improvement, divergent |
 | W | NEWPASSWORD (152), REENTERPASSWORD (111), CITYSTATE (265), BUSDATAPHONE (113), HOMEVOICEPHONE (114), COMMENTFIELDPROMPT (2), CLSBETWEENMSGS (556), SCROLLMSGBODY (627), USEBIGHEADERS (628), SETFSEDEFAULT (583), DEFAULTWIDEMSGS (637), GETALIASNAME (690), USESHORTDESC (746), SELECTCONFS (325), address block, QWK limits (732-735) | same, then the icy_board extras | ✅ |
 | X | no prompt; ON/OFF token | same | ✅ |
@@ -110,7 +110,7 @@ icy_board resolves these in `try_find_command` (`state/mod.rs:833-960`).
 |---|---|---|
 | ALIAS, BYE, BROADCAST, CHAT, FLAG, HELP, JOIN, LANG, MENU, NEWS, PPE, QWK, REPLY, RM/RM+/RM-, SELECT, TEST, USERS, WHO | present, prompt sequences line up | ✅ |
 | DOOR / OPEN | PCBoard adds PWRDFORDOOR (415) and CONTINUEDOOR (604) when files are flagged | both present; the sysop skips them as in PCBoard | ✅ |
-| SELECT | PCBoard can ask SELECTCONFFLAGS (564) | ⚠️ 1 missing |
+| SELECT | asks SELECTCONFFLAGS (564) in register mode, and the letters set the flags as the original does | ✅ |
 | TS | area token `S` scans from the stored date, like the file scan | ✅ |
 | BD, BU | delegate to D/U with the batch flag on, as PCBoard does | ✅ |
 | DB, UB, NODE | PCBoard aliases for download / upload / chat | ✅ recognised |
@@ -242,8 +242,11 @@ Blocked on features that do not exist yet rather than on the prompt code:
 
 ### P2 — smaller divergences
 
-- [ ] **K**: use YOURPASSWORD (148).
-- [ ] **SELECT**: SELECTCONFFLAGS (564).
+- [x] **K**: use YOURPASSWORD (148).
+- [x] **SELECT**: SELECTCONFFLAGS (564). Asked in register mode only, before the
+      numbers are applied, and `CLRSXN` sets the flags absolutely - a letter that
+      is absent clears its own flag, `L` means locked out, `C` needs the caller's
+      own security to reach the sysop level.
 - [x] Fix the `"Open"` case bug and add aliases `NODE`, `DB`, `UB`.
 - [x] Fall back to the door list for unknown words when the user has OPEN access.
 - [ ] Match PCBoard's minimum-abbreviation rule instead of accepting any prefix.

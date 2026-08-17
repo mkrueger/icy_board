@@ -55,11 +55,8 @@ impl IcyBoardState {
 
     pub(crate) async fn try_to_kill_message(&mut self, message_base: &JamMessageBase, number: u32) -> Res<()> {
         if let Ok(header) = message_base.read_header(number) {
-            if header.needs_password()
-                && !self
-                    .check_password(IceText::PasswordToReadMessage, 0, |pwd| header.is_password_valid(pwd))
-                    .await?
-            {
+            // Killing asks for the caller's own password, not the one that guards reading.
+            if header.needs_password() && !self.check_password(IceText::YourPassword, 0, |pwd| header.is_password_valid(pwd)).await? {
                 return Ok(());
             }
         }

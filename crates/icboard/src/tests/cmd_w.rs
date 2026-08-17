@@ -61,6 +61,15 @@ fn test_cmd_w_asks_for_an_existing_alias_when_changes_are_allowed() {
     assert!(output.contains("Alias Name"), "the alias question is missing:\n{output}");
 }
 
+/// Saying yes to the conference question hands over to the register mode of
+/// SELECT, which asks which flags the numbers that follow should get.
+#[test]
+fn test_cmd_w_select_conferences_asks_for_the_flags() {
+    let input = format!("W\n{}Y\n1\n\nQ\n{}", "\n".repeat(11), "\n".repeat(20));
+    let output = test_output(input, setup_conference);
+    assert!(output.contains("Conf. Flags"), "the conference flags prompt is missing:\n{output}");
+}
+
 fn assert_prompt_order(output: &str, prompts: &[&str]) {
     let mut pos = 0;
     for prompt in prompts {
