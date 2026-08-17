@@ -1222,6 +1222,15 @@ impl IcyBoardState {
         }
         let mut user = self.get_board().await.users[user_number].clone();
 
+        // The daily figures belong to the day they were made on, and `last_on` still holds
+        // the previous call until the user is saved again.
+        if user.stats.last_on.date_naive() != Utc::now().date_naive() {
+            user.stats.today_num_downloads = 0;
+            user.stats.today_num_uploads = 0;
+            user.stats.today_dnld_bytes = 0;
+            user.stats.today_upld_bytes = 0;
+        }
+
         let old_language = self.session.language.clone();
         user.stats.num_times_on += 1;
         let last_conference: u16 = user.last_conference;

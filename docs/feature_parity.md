@@ -40,7 +40,7 @@ If something is missing just let me know.
 | File Bases  | 90% | SQLite base with the metadata the archives do not carry, long file names, archives read through unarc-rs |
 | Mail Bases | 80% | JAM base, search, QWK and an FTN leaf; netmail still lands in one dump base |
 | Up/Download  | 90%  | Commands need to be checked for 100% parity, but protocols should work |
-| Statistics | 30%  | Works a bit but not checked - modelling is done | 
+| Statistics | 80%  | Calls, messages, uploads and downloads are counted for the board and the caller, and the daily figures roll over; transfer limits still do not read them |
 | Help Files | 80%  | Every command reaches a help file, the German set is 20 of 52 | 
 | Modem Support | Not started yet | Telnet, SSH and websockets work |
 | Limits | 60% | Session limits and the keyboard timeout apply; the daily-time-limit switch is not enforced |

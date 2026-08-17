@@ -266,6 +266,16 @@ impl IcyBoardState {
                     let cps = transfer_cps(state.recieve_state.total_bytes_transfered, started);
                     self.log_transfer(true, &received, &protocol_str, state.recieve_state.errors, cps).await?;
 
+                    let bytes = state.recieve_state.total_bytes_transfered;
+                    if let Some(user) = &mut self.session.current_user {
+                        user.stats.num_uploads += received.len() as u64;
+                        user.stats.today_num_uploads += received.len() as u64;
+                        user.stats.total_upld_bytes += bytes;
+                        user.stats.today_upld_bytes += bytes;
+                    }
+                    self.board.lock().await.statistics.add_upload(&state);
+                    self.board.lock().await.save_statistics()?;
+
                     for (x, path) in state.recieve_state.finished_files {
                         let dest = upload_location.join(x);
                         std::fs::copy(&path, &dest)?;

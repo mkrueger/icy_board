@@ -43,6 +43,7 @@ mod cmd_y;
 
 mod display_file;
 mod login_options;
+mod statistics;
 mod sysop_security;
 
 // !

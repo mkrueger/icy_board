@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use crate::{Res, tables::import_cp437_string};
-use chrono::Utc;
+use chrono::{Local, Utc};
 use serde::{Deserialize, Serialize};
 
 use super::{IcyBoardSerializer, PCBoardBinImporter, PCBoardImport};
@@ -27,15 +27,33 @@ pub struct LastCaller {
 #[derive(Default, Clone, Serialize, Deserialize)]
 pub struct Statistics {
     pub last_callers: Vec<LastCaller>,
+    /// The day `today` counts, so the daily figures can be cleared when the board rolls
+    /// into the next one.
+    #[serde(default)]
+    pub today_date: String,
     pub today: UsageStatistics,
     pub total: UsageStatistics,
 }
 
 impl Statistics {
+    /// Every call the board has ever taken - the number PCBoard writes to the caller log
+    /// and PPL reports, which runs into the millions on an old system.
     pub fn cur_caller_number(&self) -> u64 {
-        self.today.calls
+        self.total.calls
     }
+
+    /// Clears the daily figures once the date has moved on. Every counter goes through
+    /// here, so a board left running over midnight starts the new day on its next event.
+    fn begin_day(&mut self) {
+        let today = Local::now().date_naive().to_string();
+        if self.today_date != today {
+            self.today = UsageStatistics::default();
+            self.today_date = today;
+        }
+    }
+
     pub fn add_caller(&mut self, user_name: String) {
+        self.begin_day();
         self.total.calls += 1;
         self.today.calls += 1;
         self.last_callers.push(LastCaller {
@@ -47,20 +65,34 @@ impl Statistics {
         }
     }
 
-    pub fn add_download(&mut self, state: &icy_net::protocol::TransferState) {
-        self.total.downloads += state.send_state.finished_files.len() as u64;
-        self.total.downloads_kb += state.send_state.file_size;
+    pub fn add_message(&mut self) {
+        self.begin_day();
+        self.total.messages += 1;
+        self.today.messages += 1;
+    }
 
-        self.today.downloads += state.send_state.finished_files.len() as u64;
-        self.today.downloads_kb += state.send_state.file_size;
+    pub fn add_download(&mut self, state: &icy_net::protocol::TransferState) {
+        self.begin_day();
+        let files = state.send_state.finished_files.len() as u64;
+        // `file_size` is the file being sent and is cleared as each one finishes, so the
+        // running total is the only thing left to count once a batch is done.
+        let kb = state.send_state.total_bytes_transfered / 1024;
+        self.total.downloads += files;
+        self.total.downloads_kb += kb;
+
+        self.today.downloads += files;
+        self.today.downloads_kb += kb;
     }
 
     pub fn add_upload(&mut self, state: &icy_net::protocol::TransferState) {
-        self.total.uploads += state.recieve_state.finished_files.len() as u64;
-        self.total.uploads_kb += state.recieve_state.file_size;
+        self.begin_day();
+        let files = state.recieve_state.finished_files.len() as u64;
+        let kb = state.recieve_state.total_bytes_transfered / 1024;
+        self.total.uploads += files;
+        self.total.uploads_kb += kb;
 
-        self.today.uploads += state.recieve_state.finished_files.len() as u64;
-        self.today.uploads_kb += state.recieve_state.file_size;
+        self.today.uploads += files;
+        self.today.uploads_kb += kb;
     }
 }
 
@@ -100,5 +132,91 @@ impl PCBoardBinImporter for Statistics {
 impl PCBoardImport for Statistics {
     fn import_pcboard<P: AsRef<Path>>(path: &P) -> Res<Self> {
         PCBoardBinImporter::import_pcboard(path)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Statistics, UsageStatistics};
+    use icy_net::protocol::TransferState;
+    use std::path::PathBuf;
+
+    /// What a protocol leaves behind after a batch: every file moved to `finished_files`,
+    /// with the running total in `total_bytes_transfered` and `file_size` cleared.
+    fn finished_batch(files: &[(&str, u64)]) -> TransferState {
+        let mut state = TransferState::new("Test".to_string());
+        for (name, size) in files {
+            state.send_state.file_name = name.to_string();
+            state.send_state.file_size = *size;
+            state.send_state.total_bytes_transfered += *size;
+            state.send_state.finish_file(PathBuf::from(name));
+
+            state.recieve_state.file_name = name.to_string();
+            state.recieve_state.file_size = *size;
+            state.recieve_state.total_bytes_transfered += *size;
+            state.recieve_state.finish_file(PathBuf::from(name));
+        }
+        state.is_finished = true;
+        state
+    }
+
+    #[test]
+    fn a_finished_download_counts_files_and_kilobytes() {
+        let mut stats = Statistics::default();
+        stats.add_download(&finished_batch(&[("A.ZIP", 2048), ("B.ZIP", 1024)]));
+        assert_eq!(stats.total.downloads, 2);
+        assert_eq!(stats.total.downloads_kb, 3);
+        assert_eq!(stats.today.downloads_kb, 3);
+    }
+
+    #[test]
+    fn a_finished_upload_counts_files_and_kilobytes() {
+        let mut stats = Statistics::default();
+        stats.add_upload(&finished_batch(&[("A.ZIP", 4096)]));
+        assert_eq!(stats.total.uploads, 1);
+        assert_eq!(stats.total.uploads_kb, 4);
+        assert_eq!(stats.today.uploads_kb, 4);
+    }
+
+    /// The caller number is the lifetime one, which is what ends up in the caller log.
+    #[test]
+    fn the_caller_number_counts_every_call_ever_taken() {
+        let mut stats = Statistics::default();
+        stats.total.calls = 1_061_431;
+        stats.add_caller("RAY COOK".to_string());
+        assert_eq!(stats.cur_caller_number(), 1_061_432);
+    }
+
+    #[test]
+    fn yesterdays_figures_are_cleared_on_the_next_day() {
+        let mut stats = Statistics {
+            today_date: "1993-09-06".to_string(),
+            today: UsageStatistics {
+                calls: 42,
+                downloads: 7,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        stats.add_caller("RAY COOK".to_string());
+        assert_eq!(stats.today.calls, 1);
+        assert_eq!(stats.today.downloads, 0);
+    }
+
+    /// A second call on the same day adds to it rather than starting over.
+    #[test]
+    fn todays_figures_survive_within_the_day() {
+        let mut stats = Statistics::default();
+        stats.add_caller("RAY COOK".to_string());
+        stats.add_caller("JOHN DOE".to_string());
+        assert_eq!(stats.today.calls, 2);
+    }
+
+    #[test]
+    fn a_posted_message_is_counted() {
+        let mut stats = Statistics::default();
+        stats.add_message();
+        assert_eq!(stats.total.messages, 1);
+        assert_eq!(stats.today.messages, 1);
     }
 }

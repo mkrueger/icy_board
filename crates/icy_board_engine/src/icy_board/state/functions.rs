@@ -622,6 +622,12 @@ impl IcyBoardState {
                 let number = msg_base.write_message(&msg)?;
                 msg_base.write_jhr_header()?;
 
+                if let Some(user) = &mut self.session.current_user {
+                    user.stats.messages_left += 1;
+                }
+                self.get_board().await.statistics.add_message();
+                self.get_board().await.save_statistics()?;
+
                 self.display_text(text, display_flags::DEFAULT).await?;
                 self.println(TerminalTarget::Both, &number.to_string()).await?;
                 self.new_line().await?;

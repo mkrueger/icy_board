@@ -176,6 +176,13 @@ impl IcyBoardState {
                         self.log_transfer(false, &sent, &protocol_str, state.send_state.errors, cps).await?;
 
                         self.count_downloads(&files, &sent).await;
+                        let bytes = state.send_state.total_bytes_transfered;
+                        if let Some(user) = &mut self.session.current_user {
+                            user.stats.num_downloads += sent.len() as u64;
+                            user.stats.today_num_downloads += sent.len() as u64;
+                            user.stats.total_dnld_bytes += bytes;
+                            user.stats.today_dnld_bytes += bytes;
+                        }
                         self.board.lock().await.statistics.add_download(&state);
                         self.board.lock().await.save_statistics()?;
                     }

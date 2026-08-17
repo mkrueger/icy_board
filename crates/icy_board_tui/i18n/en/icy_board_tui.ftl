@@ -65,6 +65,7 @@ call_wait_screen_num_uls = U/Ls:
 # System Statistics
 icb_system_statistics_title = [ IcyBoard System Statistics ]
 icb_system_statistics_footer = [ (↑), (↓), (Del) Reset Stats, (Esc) to End ]
+icb_system_statistics_confirm_reset = [ Reset ALL statistics, including the caller number? (Y) to confirm ]
 icb_system_statistics_header = Statistic
 
 icb_system_statistics_total_calls = All Time Calls

@@ -26,6 +26,9 @@ pub struct SystemStatisticsScreen {
     statistics: Statistics,
     scroll_state: ScrollbarState,
     table_state: TableState,
+    /// Set once Del has been pressed; the reset wipes the all time figures, so it takes
+    /// a second key rather than going on a slip of the finger.
+    confirming_reset: bool,
 }
 
 impl SystemStatisticsScreen {
@@ -35,6 +38,7 @@ impl SystemStatisticsScreen {
             statistics,
             scroll_state: ScrollbarState::default().content_length(NUM_LINES),
             table_state: TableState::default().with_selected(0),
+            confirming_reset: false,
         }
     }
 
@@ -92,9 +96,14 @@ impl SystemStatisticsScreen {
                                 }
                             }
                             KeyCode::Delete => {
+                                self.confirming_reset = true;
+                            }
+                            KeyCode::Char('y') | KeyCode::Char('Y') if self.confirming_reset => {
                                 return Ok(SystemStatisticsScreenMessage::Reset);
                             }
-                            _ => {}
+                            _ => {
+                                self.confirming_reset = false;
+                            }
                         }
                     }
                 }
@@ -108,7 +117,11 @@ impl SystemStatisticsScreen {
 
     fn ui(&mut self, frame: &mut Frame, full_screen: bool) {
         let now = Local::now();
-        let footer = get_text("icb_system_statistics_footer");
+        let footer = if self.confirming_reset {
+            get_text("icb_system_statistics_confirm_reset")
+        } else {
+            get_text("icb_system_statistics_footer")
+        };
 
         let area: Rect = get_screen_size(&frame, full_screen);
 
