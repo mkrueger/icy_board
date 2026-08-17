@@ -628,6 +628,12 @@ pub struct SystemControlOptions {
     /// Re-read the security level limits when joining a conference changes the level.
     #[serde(default)]
     pub reread_sec_level_on_join: bool,
+
+    /// Refuse downloads that break the caller's ratios, daily allowance or total limits.
+    /// Off by default: a board imported from PCBoard carries limits that were never
+    /// applied here, and switching them on would start turning callers away unannounced.
+    #[serde(default)]
+    pub enforce_transfer_limits: bool,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -1083,6 +1089,7 @@ impl IcbConfig {
                 password_storage_method: PasswordStorageMethod::default(),
                 confirm_caller_name: false,
                 reread_sec_level_on_join: false,
+                enforce_transfer_limits: false,
             },
             switches: ConfigSwitches {
                 display_news_behavior: DisplayNewsBehavior::OnlyNewer,

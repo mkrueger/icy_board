@@ -45,6 +45,7 @@ mod display_file;
 mod login_options;
 mod statistics;
 mod sysop_security;
+mod transfer_limits;
 
 // !
 #[test]

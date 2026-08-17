@@ -647,6 +647,8 @@ impl PCBoardImporter {
                 password_storage_method: PasswordStorageMethod::default(),
                 confirm_caller_name: self.data.confirm_caller,
                 reread_sec_level_on_join: self.data.conf_pwrd_adjust,
+                // The limits come across from PWRD, but the sysop has to turn enforcement on.
+                enforce_transfer_limits: false,
             },
             switches: ConfigSwitches {
                 display_news_behavior: DisplayNewsBehavior::from_pcb_char(self.data.display_news),

@@ -130,7 +130,7 @@ fn create_test_user(name: &str, idx: u8) -> User {
             num_downloads: 10 + idx as u64 * 2,
             total_dnld_bytes: 1024 * 1024 * idx as u64,
             total_upld_bytes: 512 * 1024 * idx as u64,
-            today_dnld_bytes: 1024 * idx as u64,
+            today_dnld_bytes: 1024 * idx as i64,
             today_upld_bytes: 512 * idx as u64,
             today_num_downloads: idx as u64,
             today_num_uploads: idx as u64 / 2,

@@ -64,6 +64,7 @@ use super::{
     events::{self, EventWindow},
     icb_config::{DEFAULT_PCBOARD_DATE_FORMAT, IcbColor, SysopCommandLevels, UserCommandLevels},
     icb_text::{IcbTextFile, IcbTextStyle, IceText},
+    limits::TransferLimits,
     macro_parser::{Macro, MacroCommand},
     security_expr::SecurityExpression,
     user_base::{ConferenceFlags, FSEMode, Password, User},
@@ -263,7 +264,11 @@ pub struct Session {
 
     pub emsi: Option<EmsiICI>,
 
+    /// Bytes the caller may still download today; -1 is PCBoard's unlimited.
     pub bytes_remaining: i64,
+
+    /// What the caller's security level allows them to download.
+    pub transfer_limits: TransferLimits,
 
     // The maximum number of files in flagged_files
     pub batch_limit: usize,
@@ -338,6 +343,7 @@ impl Session {
             emsi: None,
             paged_sysop: false,
             bytes_remaining: 0,
+            transfer_limits: TransferLimits::default(),
 
             // Seems to be hardcoded in PCBoard
             batch_limit: 30,
@@ -766,17 +772,30 @@ impl IcyBoardState {
         }
     }
 
-    /// Takes the time limit of the caller from the PWRD security level definitions.
+    /// Takes the time limit and the transfer allowance of the caller from the PWRD
+    /// security level definitions.
     async fn apply_security_level_limits(&mut self) {
         let board = self.get_board().await;
         let Some(level) = board.sec_levels.iter().find(|l| l.security == self.session.cur_security) else {
             return;
         };
         let time_per_day = level.time_per_day;
+        let batch_limit = level.batch_limit;
+        let mut limits = TransferLimits::from_security_level(level, self.get_bps().max(0) as u32);
         drop(board);
         if time_per_day > 0 {
             self.session.time_limit = time_per_day as i32;
         }
+        if batch_limit > 0 {
+            self.session.batch_limit = batch_limit as usize;
+        }
+        // What the caller already spent today comes off the allowance, so re-reading the
+        // level on a conference join cannot hand them a fresh one.
+        if let Some(user) = &self.session.current_user {
+            limits.charge_todays_usage(user.stats.today_dnld_bytes);
+        }
+        self.session.bytes_remaining = limits.bytes_remaining.unwrap_or(-1);
+        self.session.transfer_limits = limits;
     }
 
     /// A conference may raise or lower the security level of the caller while they

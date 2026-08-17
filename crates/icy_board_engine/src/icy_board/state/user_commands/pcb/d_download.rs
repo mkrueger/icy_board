@@ -1,11 +1,12 @@
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use async_recursion::async_recursion;
 use humanize_bytes::humanize_bytes_decimal;
 
 use crate::icy_board::icb_config::IcbColor;
+use crate::icy_board::limits::{BatchSoFar, LimitVerdict, TransferHistory};
 use crate::icy_board::state::functions::{MASK_NUM, transfer_cps};
 use crate::{Res, icy_board::state::IcyBoardState};
 
@@ -156,6 +157,10 @@ impl IcyBoardState {
                         return Ok(());
                     }
                 }
+                let files = self.screen_transfer_limits(files).await?;
+                if files.is_empty() {
+                    return Ok(());
+                }
                 match prot.initiate_send(&mut *self.connection, &files).await {
                     Ok(mut state) => {
                         let started = Instant::now();
@@ -228,6 +233,92 @@ impl IcyBoardState {
                 log::error!("Could not record downloads in {}: {}", dir.display(), err);
             }
         }
+    }
+
+    /// Drops the files the caller's limits will not cover.
+    ///
+    /// PCBoard judges every file on its own against what the batch has already taken, so
+    /// one refusal does not cost the caller the rest of their batch. There is no sysop
+    /// exemption in the original either - a sysop simply holds a level with no limits.
+    async fn screen_transfer_limits(&mut self, files: Vec<PathBuf>) -> Res<Vec<PathBuf>> {
+        if !self.get_board().await.config.system_control.enforce_transfer_limits {
+            return Ok(files);
+        }
+        let Some(user) = &self.session.current_user else {
+            return Ok(files);
+        };
+        let history = TransferHistory {
+            num_uploads: user.stats.num_uploads,
+            num_downloads: user.stats.num_downloads,
+            total_upld_bytes: user.stats.total_upld_bytes,
+            total_dnld_bytes: user.stats.total_dnld_bytes,
+        };
+        let mut limits = self.session.transfer_limits.clone();
+        // PPL can move the allowance around during the session, so take the live figure.
+        limits.bytes_remaining = (self.session.bytes_remaining >= 0).then_some(self.session.bytes_remaining);
+
+        let free_areas = self.free_download_areas().await;
+        let mut so_far = BatchSoFar::default();
+        let mut allowed = Vec::new();
+        for path in files {
+            let size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+            let free = path.parent().map_or(false, |dir| free_areas.iter().any(|area| area == dir));
+            let verdict = limits.check_file(&history, so_far, size, free);
+            if verdict.is_allowed() {
+                so_far.accept(size, free);
+                allowed.push(path);
+                continue;
+            }
+            if let Some(user) = &mut self.session.current_user {
+                user.stats.num_reach_dnld_lim += 1;
+            }
+            self.report_limit(&path, verdict).await?;
+        }
+        Ok(allowed)
+    }
+
+    /// Directories the sysop marked free, which PCBoard's FSEC file did with a password.
+    async fn free_download_areas(&mut self) -> Vec<PathBuf> {
+        let Some(directories) = &self.session.current_conference.directories else {
+            return Vec::new();
+        };
+        directories.iter().filter(|area| area.is_free).map(|area| area.path.clone()).collect()
+    }
+
+    /// Tells the caller which limit stopped the file, in the order PCBoard prints it:
+    /// where they stand, what the limit is, then the file that broke it.
+    async fn report_limit(&mut self, path: &Path, verdict: LimitVerdict) -> Res<()> {
+        let name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+        let (standing, limit_text, limit_value, exceeded) = match verdict {
+            LimitVerdict::Allowed => return Ok(()),
+            LimitVerdict::DailyBytes { .. } => {
+                self.session.op_text = name;
+                self.display_text(IceText::BytesLeftAre, display_flags::NEWLINE | display_flags::LFBEFORE)
+                    .await?;
+                return Ok(());
+            }
+            LimitVerdict::FileRatio { limit_tenths, .. } => (
+                IceText::FileRatio,
+                IceText::RatioLimit,
+                format!("{}:1", tenths(limit_tenths)),
+                IceText::FileRatioExceeded,
+            ),
+            LimitVerdict::ByteRatio { limit_tenths, .. } => (
+                IceText::ByteRatio,
+                IceText::RatioLimit,
+                format!("{}:1", tenths(limit_tenths)),
+                IceText::ByteRatioExceeded,
+            ),
+            LimitVerdict::FileLimit { limit, .. } => (IceText::FilesDownloaded, IceText::DownloadLimit, limit.to_string(), IceText::FileLimitExceeded),
+            LimitVerdict::ByteLimit { limit, .. } => (IceText::BytesDownloaded, IceText::DownloadLimit, limit.to_string(), IceText::ByteLimitExceeded),
+        };
+
+        self.display_text(standing, display_flags::NEWLINE | display_flags::LFBEFORE).await?;
+        self.session.op_text = limit_value;
+        self.display_text(limit_text, display_flags::NEWLINE).await?;
+        self.session.op_text = name;
+        self.display_text(exceeded, display_flags::NEWLINE | display_flags::LFAFTER).await?;
+        Ok(())
     }
 
     #[async_recursion(?Send)]
@@ -320,6 +411,11 @@ impl IcyBoardState {
 
 const DL_LISTMASK: &str = "AEGLP";
 const DL_EDITMASK: &str = "ARL";
+
+/// Ratios are held in tenths, and PCBoard shows them with the one decimal back.
+fn tenths(value: u64) -> String {
+    format!("{}.{}", value / 10, value % 10)
+}
 
 /// Groups the files that really went out by the directory they came from, so each area's
 /// counters can be written in one go.
