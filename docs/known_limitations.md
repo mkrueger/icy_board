@@ -14,8 +14,8 @@ for where a command answers differently than PCBoard did, and
 | Area | What is missing |
 | :--- | :--- |
 | Modem | Callers reach the board over telnet, SSH and websockets. There is no serial or modem support, and no FOSSIL driver. |
-| Accounting | Charges, the config and the warning file work. Peak rates (`peak_usage_start`, `peak_usage_end`, `peak_days_of_week`, `peak_holiday_list_file`) are never applied, amounts are always shown as units, and the info and logoff files are not displayed. |
-| Upload credits | Uploading earns neither time nor bytes, and uploads are not test-extracted. The configured free-space threshold is enforced before a transfer starts. |
+| Accounting | PPL `ACCOUNT`/`RECORDUSAGE` and tracking work, but normal board activity is not charged. Balance enforcement, peak rates, money display, credit macros and the warning/info/logoff files are missing. |
+| Upload credits | Uploading earns configured byte credit but not time credit, and uploads are not test-extracted. The configured free-space threshold is enforced before a transfer starts. |
 | FTN | icy_board is a leaf or point over BinkP: scan, poll and toss. There is no BinkP answering side, netmail arrives in a single dump base, AreaFix is missing and the AKA and link setup is hand-edited TOML. |
 | Web | There is no web frontend, and the PPL web statements and functions are not implemented. |
 | Sysop numeric commands | Commands `3`, `9`, `10`, `14` and `15` are missing. The level named for command 10 protects `PPE` instead; commands `1`, `2`, `4`, `5`, `6`, `7`, `8`, `11`, `12`, `13` and `16` work. |

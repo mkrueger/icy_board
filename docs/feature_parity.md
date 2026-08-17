@@ -24,61 +24,64 @@ If something is missing just let me know.
 | MKPCBTXT  | 💯 | Much better |
 | ICBSM      | 75% | User and group editor plus the bulk maintenance; no reports or index files |
 | MKPCBMNU  | 💯 | MKICBMNU can do much more |
-| PCBSETUP  | 90% | Most is implemented, but 38 of the switches are read by nobody - see the options audit |
+| PCBSETUP  | 80% | Most runtime options work; 19 of 126 options and 12 of 29 sysop security levels are still inactive - see the options audit |
 | Call Waiting Screen  | 💯 | Almost the same, some improvements |
 | New User Creation  | 💯 | Much better & detailed |
-| Security Level check  | 💯 | |
+| Security and Access Checks | 85% | User command, conference, group and age expressions work; 12 of 29 configurable sysop security levels are still inactive |
+| Languages | 80% | Language files and `LANG` work; the global multilingual enable switch is currently ignored |
 | Local logons  | 💯  | | 
 | Sysop local session view  | 💯  | Some ppl may hate it but sysops can view local sessions and chat 
 | Doors  | 💯 | Much more drop files supported + BBSLINK |
-| Bullettins | 💯 | | 
-| Questionnaires | 💯 | Renamed them so "Surveys" | 
+| Bulletins | 💯 | |
+| Surveys | 💯 | PCBoard called them questionnaires |
 | Built in Message Editor | 80% | I consider line & fse done but needs 1-2 test passes to the real one to make it 100% | 
 | PPE Runtime  | 90% | Every existing PPE not running is considered as a bug. Due to the Nature the PPE runtime it won't reach 100% since it's not running on DOS anymore. dBase III statements and functions are in. |
 | Conferences  | 90% | Basically works, INTRO and NEWS are displayed on join |
-| @ Macro support | 80% | Most should work, all @ features work  | 
+| @ Macro support | 80% | Most work; accounting credits, event/off-hours, free-space and a few caller/password macros remain stubs |
 | File Bases  | 90% | SQLite base with the metadata the archives do not carry, long file names, archives read through unarc-rs |
 | Mail Bases | 80% | JAM base, search, QWK and an FTN leaf; netmail still lands in one dump base |
+| FTN Mailer | 70% | Leaf/point scan, poll and toss over BinkP work; no answering side, AreaFix, per-user netmail or setup UI for AKA/links |
 | Up/Download  | 90%  | Commands need to be checked for 100% parity, but protocols should work |
-| Statistics | 80%  | Calls, messages, uploads and downloads are counted for the board and the caller, and the daily figures roll over; transfer limits still do not read them |
+| Statistics | 80%  | Board and caller activity, daily rollover and per-file download counts work; PCBoard's per-node statistics are not modelled |
 | Help Files | 80%  | Every command reaches a help file, the German set is 20 of 52 | 
-| Modem Support | Not started yet | Telnet, SSH and websockets work |
-| Limits | 85% | Time, ratios, credits and daily/total byte limits are enforced from the PWRD level, off until switched on; accounting credits are not modelled |
+| Serial/Modem Support | Not started | Telnet, SSH and websockets work; serial ports, FOSSIL and modem control are out of scope |
+| Limits | 85% | PWRD time, ratios, credits and daily/total byte/file limits work; FSEC `NOTIME` and per-file `FREE` are not imported |
 | Events | 80% | The nightly event runs, clears the board and can suspend callers; PCBoard's per node and expedited modes are missing | 
 | Subscriptions | 90% | New-user periods, warning/expired files, temporary expired security, R/X conference access, macros and sysop renewal work; no payment-driven renewal exists |
-| Accounting | 20% | Charges and the warning file work, peak rates and the money display do not | 
+| Accounting | 20% | Config plus PPL `ACCOUNT`/`RECORDUSAGE` and tracking work; built-in actions do not charge, balance enforcement, peak rates, credit macros and display files are missing |
 
 ## PCBoard Commands
 
 | Command | Description | Progress | Notes | 
 | :--- | :--- | :--- | :--- | 
 | A  | Abandon  | 💯 | 
-| B  | Bullettins | 💯 | 
+| B  | Bulletins | 💯 |
 | C  | Comment to Sysop  | 💯 | 
-| D  | Download | 90% | 
+| D  | Download | 90% | Filename/prompt flow and limits work; message capture and last-viewed filename default are missing. Aliases: `DB`, `DOWNLOAD` |
 | E  | Enter Msg  | 90% | 
 | F  | Files  | 90% | 
 | G  | Goodbye | 💯 | 
-| H  | Help  | 💯 | 
+| H  | Help  | 💯 | Alias: `HELP` |
 | I  | Initial Welcome  | 💯 | 
-| J  | Join Conference  | 💯 | 
+| J  | Join Conference  | 💯 | Alias: `JOIN` |
 | K  | Delete Message | 90% | 
 | L  | Find Files | 💯 | 
 | M  | Toggle Graphics  | 💯 | 
 | N  | New Files | 💯 | 
 | O  | Page Sysop | 90% | 
 | P  | Set Page Length | 💯 | 
-| Q  | Quick Message Scan | 90% | 
-| R  | Read Message | 70% | 
+| Q  | Quick Message Scan | 90% | Prompt and range parser match PCBoard; capture/QWK reader actions remain incomplete |
+| R  | Read Message | 70% | Prompt and read loops match; capture (`C/D/Z`) and some transfer actions parse but do not run |
 | S  | Take Survey  | 💯 | 
 | T  | Set Transfer Protocol | 💯 | 
-| U  | Upload  | 90% | 
-| V  | View Settings  | 90% | 
+| U  | Upload  | 90% | Description, private/public placement, batch protocol and byte credits work; verification/test-extraction is missing. Aliases: `UB`, `UPLOAD` |
+| V  | View Settings  | 90% | Uses a built-in display when PCBoard's `STAT` file is absent |
 | W  | Write Settings  | 90% | 
 | X  | Toggle Expert Mode  | 💯 | 
-| Y  | Your Mail Scan  | 70% | 
+| Y  | Your Mail Scan  | 70% | Prompt modes work; message scanning still shares the incomplete reader surface |
 | Z  | Zippy Directory Scan  | 💯 | 
 | ALIAS  |  Alias | 💯 | 
+| BROADCAST | Broadcast to nodes | 💯 | Sysop word command |
 | BYE  | Force logoff | 💯 | 
 | FLAG  | Flag Files | 💯 | 
 | LANG  | Set Language | 💯 | 
@@ -88,15 +91,38 @@ If something is missing just let me know.
 | !  | Recall Command | 💯 | 
 | MENU  | Redisplay Menu | 💯 | 
 | REPLY  | Reply Message | 💯 | 
-| USER  | User List | 90% | 
+| USERS  | User List | 90% |
 | WHO  |WHO is Online | 90% | 
 | QWK  | QWK command | 90% | Download, upload and the scanned bases work; upload needs more testing [^2]
 | CHAT  | Group Chat| 💯 | Built in, the PPEs are no longer needed
-| BD/DB  | Batch Download | 90% | Delegates to the download command with the batch flag
-| BU/UB  | Batch Upload | 90% | Delegates to the upload command, which drives a batch protocol
+| NODE | Group Chat alias | 💯 | PCBoard alias for `CHAT` |
+| TS | Text search | 💯 | Searches message text across selected areas |
+| BD | Batch Download | 90% | Delegates to the download command with the batch flag |
+| BU | Batch Upload | 90% | Delegates to the upload command, which drives a batch protocol |
 | RM  | Read Message | 💯 | Read remembered message
 | SELECT | Select Conference | 99% | Changes were needed due to message areas [^1]
 | TEST | Test File | 💯 | Slight improvements - search for pattern
+
+## Sysop Numeric Commands
+
+| Command | Description | Progress | Notes |
+| :--- | :--- | :--- | :--- |
+| 1 | View caller log | 💯 | Shared node-stamped log instead of one DOS file per node |
+| 2 | View/print users | 90% | Listing works; printer output is intentionally absent |
+| 3 | Pack message base | Missing | Message-base pack/renumber flow is not implemented |
+| 4 | Recover message | 💯 | |
+| 5 | Quick/header scan | 💯 | |
+| 6 | View text file | 💯 | Confined to the board directory |
+| 7 | User maintenance | 80% | Browse, find, delete/undelete and change expiration; full record editing remains in ICBSM |
+| 8 | Pack users file | 90% | Record 1 only; protects online users and writes a backup |
+| 9 | Remote DOS | Out of scope | DOS shelling is intentionally unsupported |
+| 10 | DOS command | Out of scope | The configured level currently protects `PPE`; DOS commands are unsupported |
+| 11 | Node list | 💯 | |
+| 12 | Log off node | 💯 | Uses the board's node shutdown channel |
+| 13 | View node caller log | 💯 | Filters the shared caller log by node |
+| 14 | Drop node to DOS | Out of scope | DOS shelling is intentionally unsupported |
+| 15 | Recycle node | Missing | A non-DOS recycle equivalent has not been implemented |
+| 16 | Directory listing | 90% | Safe name/size/date listing rather than shelling out to DOS `DIR` |
 
 [^1]: PCBTEXT #586 changed to `Conference`,
   #587 changed to `#   Name                                                   Flags`

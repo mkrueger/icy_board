@@ -48,13 +48,7 @@ pub const UNREAD_OPTIONS: &[UnreadOption] = &[
         section: "file_transfer",
         option: "upload_credit_time",
         kind: Unread::NotReadYet,
-        note: "uploading earns neither time nor bytes",
-    },
-    UnreadOption {
-        section: "file_transfer",
-        option: "upload_credit_bytes",
-        kind: Unread::NotReadYet,
-        note: "",
+        note: "uploading earns byte credit, but not time credit",
     },
     UnreadOption {
         section: "file_transfer",
@@ -73,12 +67,6 @@ pub const UNREAD_OPTIONS: &[UnreadOption] = &[
         option: "is_multi_lingual",
         kind: Unread::NotReadYet,
         note: "LANG works whether or not this is set",
-    },
-    UnreadOption {
-        section: "system_control",
-        option: "enforce_daily_time_limit",
-        kind: Unread::NotReadYet,
-        note: "only session limits exist",
     },
     UnreadOption {
         section: "switches",
@@ -148,27 +136,21 @@ pub const UNREAD_OPTIONS: &[UnreadOption] = &[
     },
     UnreadOption {
         section: "accounting",
+        option: "warning_file",
+        kind: Unread::NotReadYet,
+        note: "stored and editable, but none is displayed",
+    },
+    UnreadOption {
+        section: "accounting",
         option: "info_file",
         kind: Unread::NotReadYet,
-        note: "only the warning file is displayed",
+        note: "stored and editable, but none is displayed",
     },
     UnreadOption {
         section: "accounting",
         option: "logoff_file",
         kind: Unread::NotReadYet,
-        note: "only the warning file is displayed",
-    },
-    UnreadOption {
-        section: "subs",
-        option: "subscription_length",
-        kind: Unread::ImportedOnly,
-        note: "a new subscription period is never set",
-    },
-    UnreadOption {
-        section: "subs",
-        option: "default_expired_level",
-        kind: Unread::ImportedOnly,
-        note: "an expired user keeps their level",
+        note: "stored and editable, but none is displayed",
     },
     UnreadOption {
         section: "sysop_sec",
@@ -284,7 +266,6 @@ mod tests {
 
     #[test]
     fn the_renamed_sections_are_found() {
-        assert!(lookup("subscription_info", "subscription_length").is_some());
         assert!(lookup("sysop_command_level", "sec_14_drop_alt_node_to_dos").is_some());
         assert!(lookup("user_command_level", "edit_own_messages").is_some());
     }
@@ -292,6 +273,7 @@ mod tests {
     #[test]
     fn an_option_the_board_reads_is_not_listed() {
         assert!(lookup("board", "name").is_none());
+        assert!(lookup("subscription_info", "subscription_length").is_none());
         assert!(lookup("sysop_command_level", "sec_4_recover_deleted_msg").is_none());
         assert!(lookup("event", "enabled").is_none());
     }

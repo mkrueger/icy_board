@@ -17,7 +17,7 @@ Legend:
 - ❌ stored and editable, but nothing reads it
 - 📥 filled in by the `PCBOARD.DAT` importer, but nothing reads it afterwards
 
-**22 of 125 options and 12 of 29 sysop security levels do nothing today.**
+**19 of 126 options and 12 of 29 sysop security levels do nothing today.**
 
 ## board — general information
 
@@ -61,7 +61,7 @@ matching questions of the `W` command.
 
 ## file_transfer
 
-Four of nine do nothing. This is the worst section, and the one a sysop is
+Three of nine do nothing. This is the worst section, and the one a sysop is
 most likely to touch.
 
 | Option | Status | Note |
@@ -69,8 +69,8 @@ most likely to touch.
 | `display_uploader` | ✅ | file listing |
 | `disallow_batch_uploads` | ❌ | `BU` is a stub anyway |
 | `promote_to_batch_transfers` | ✅ | upload, decides whether a batch upload is offered and with it the goodbye question |
-| `upload_credit_time` | ❌ | uploading earns neither time nor bytes |
-| `upload_credit_bytes` | ❌ | |
+| `upload_credit_time` | ❌ | uploading earns byte credit, but not time credit |
+| `upload_credit_bytes` | ✅ | successful uploads add to the caller's daily byte allowance |
 | `verify_files_uploaded` | ❌ | uploads are never test-extracted |
 | `upload_descr_lines` | ✅ | upload, how many description lines the caller may type; `limits.max_number_upload_descr_lines` is still dead |
 | `disable_drive_size_check` | ✅ | disables the free-space preflight check |
@@ -89,7 +89,8 @@ most likely to touch.
 | `allow_alias_change` | ✅ | `W` asks for an alias again only when this is enabled; an empty alias is always asked |
 | `disable_full_record_updating` | ❌ | `W` always asks everything |
 | `is_multi_lingual` | ❌ | `LANG` works whether or not this is set |
-| `enforce_daily_time_limit` | ❌ | only session limits exist |
+| `enforce_daily_time_limit` | ✅ | subtracts minutes used on earlier calls from the PWRD time allowance |
+| `enforce_transfer_limits` | ✅ | opts into PWRD daily/total byte, file and ratio enforcement |
 | `allow_password_failure_comment` | ✅ | after four failed password attempts, offers a private comment to the sysop before logoff |
 
 ## switches
@@ -135,20 +136,18 @@ no equivalent.
 
 | Option | Status | Note |
 |---|---|---|
-| `enabled`, `cfg_file`, `tracking_file`, `warning_file`, `accounting_config` | ✅ | |
+| `enabled`, `cfg_file`, `tracking_file`, `accounting_config` | ✅ | PPL accounting statements use these |
 | `use_money` | ❌ | amounts are always shown as units |
 | `concurrent_tracking` | ❌ | |
 | `ignore_empty_sec_level` | ❌ | |
 | `peak_usage_start`, `peak_usage_end`, `peak_days_of_week`, `peak_holiday_list_file` | ❌ | peak rates are never applied |
-| `info_file`, `logoff_file` | ❌ | only the warning file is displayed |
+| `warning_file`, `info_file`, `logoff_file` | ❌ | stored and editable, but none is displayed |
 
 ## subs — subscription mode
 
 | Option | Status | Note |
 |---|---|---|
-| `is_enabled`, `warning_days` | ✅ | |
-| `subscription_length` | 📥 | a new subscription period is never set |
-| `default_expired_level` | 📥 | an expired user keeps their level |
+| `is_enabled`, `warning_days`, `subscription_length`, `default_expired_level` | ✅ | new-user defaults, login warning/expiry and temporary expired security |
 
 ## qwk_settings
 
