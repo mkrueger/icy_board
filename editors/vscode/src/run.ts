@@ -54,6 +54,52 @@ function commandLine(parts: string[]): string {
   return parts.map(quote).join(" ");
 }
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function alive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    // One we may not signal is still one that is running.
+    return (error as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
+
+async function waitForExit(pid: number): Promise<void> {
+  for (let waited = 0; waited < 2000 && alive(pid); waited += 50) {
+    await sleep(50);
+  }
+  if (!alive(pid)) {
+    return;
+  }
+  try {
+    process.kill(pid, "SIGKILL");
+  } catch {
+    // It ended between the question and the signal.
+  }
+  for (let waited = 0; waited < 1000 && alive(pid); waited += 50) {
+    await sleep(50);
+  }
+}
+
+/// A board holds the lock on its directory for as long as it runs, so the next
+/// run waits for the process itself rather than only for its terminal, which
+/// closes without having reaped it yet.
+async function stopPreviousRun(name: string): Promise<void> {
+  const previous = vscode.window.terminals.filter((terminal) => terminal.name === name);
+  // Only a terminal that has not reported an exit still owns its process id; a
+  // finished one may name a number the system has given away since.
+  const running = previous.filter((terminal) => terminal.exitStatus === undefined);
+  const pids = await Promise.all(running.map((terminal) => terminal.processId));
+  previous.forEach((terminal) => terminal.dispose());
+  for (const pid of pids) {
+    if (pid !== undefined) {
+      await waitForExit(pid);
+    }
+  }
+}
+
 /// Builds the open source and runs what came out of it.
 ///
 /// The board takes over the terminal it runs in - a PPE asks its caller
@@ -137,17 +183,16 @@ export async function runPpe(output: vscode.OutputChannel, options: { singleFile
   ];
 
   const name = "IcyBoard PPL";
-  // A board still running from the last time would take the command line as
-  // keystrokes, and would hold the board lock against the new one. Only the
-  // terminal this extension made is closed.
-  for (const candidate of vscode.window.terminals.filter((terminal) => terminal.name === name)) {
-    candidate.dispose();
-  }
+  await stopPreviousRun(name);
+
+  output.appendLine(`Running ${commandLine(parts)}`);
+  // Started without a shell, so the terminal's process id is the board's own.
   const terminal = vscode.window.createTerminal({
     name,
     cwd: workspaceFolder ?? vscode.Uri.file(path.dirname(source)),
+    shellPath: parts[0],
+    shellArgs: parts.slice(1),
   });
 
   terminal.show();
-  terminal.sendText(commandLine(parts));
 }
