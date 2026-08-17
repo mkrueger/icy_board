@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::mem;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -154,6 +154,8 @@ impl LanguageServer for Backend {
             return Ok(None);
         };
         let mut actions = Vec::new();
+        let mut braces: Option<Vec<(usize, usize)>> = None;
+        let mut replaced_pairs = HashSet::new();
         for diagnostic in params.context.diagnostics {
             if !wanted(&params.context.only, &CodeActionKind::QUICKFIX) {
                 break;
@@ -172,8 +174,20 @@ impl LanguageServer for Backend {
                     uri.clone(),
                     vec![TextEdit::new(diagnostic.range, "ENDFUNC".to_string())],
                 ),
-                "ppl.obsolete-brace-open" => ("Replace { with (", uri.clone(), vec![TextEdit::new(diagnostic.range, "(".to_string())]),
-                "ppl.obsolete-brace-close" => ("Replace } with )", uri.clone(), vec![TextEdit::new(diagnostic.range, ")".to_string())]),
+                "ppl.obsolete-brace-open" | "ppl.obsolete-brace-close" => {
+                    let Some(offset) = position_to_offset(&rope, diagnostic.range.start) else {
+                        continue;
+                    };
+                    let pairs = braces.get_or_insert_with(|| brace_pairs(&rope));
+                    let Some((key, edits)) = brace_pair_edits(&rope, pairs, offset, diagnostic.range) else {
+                        continue;
+                    };
+                    // Both halves report themselves, but the pair is one change.
+                    if !replaced_pairs.insert(key) {
+                        continue;
+                    }
+                    ("Replace braces with parentheses", uri.clone(), edits)
+                }
                 "ppl.obsolete-pow" => ("Replace ** with ^", uri.clone(), vec![TextEdit::new(diagnostic.range, "^".to_string())]),
                 "ppl.var-not-allowed" => (
                     "Remove VAR",
@@ -1325,6 +1339,58 @@ fn implementation_stub_edit(rope: &Rope, line: u32) -> Option<TextEdit> {
     let at = offset_to_position(rope.len_chars(), rope)?;
     let separator = if at.character == 0 { "\n" } else { "\n\n" };
     Some(TextEdit::new(Range::new(at, at), format!("{separator}{header}\n{terminator}\n")))
+}
+
+/// Every brace pair a source holds, ignoring what only looks like one inside a
+/// string or a comment.
+fn brace_pairs(rope: &Rope) -> Vec<(usize, usize)> {
+    let mut pairs = Vec::new();
+    let mut open = Vec::new();
+    let mut quoted = false;
+    let mut commented = false;
+    for (offset, ch) in rope.chars().enumerate() {
+        match ch {
+            '\n' => {
+                quoted = false;
+                commented = false;
+            }
+            _ if commented => {}
+            '"' => quoted = !quoted,
+            _ if quoted => {}
+            ';' => commented = true,
+            '{' => open.push(offset),
+            '}' => {
+                if let Some(start) = open.pop() {
+                    pairs.push((start, offset));
+                }
+            }
+            _ => {}
+        }
+    }
+    pairs
+}
+
+fn single_char_range(rope: &Rope, offset: usize) -> Option<Range> {
+    Some(Range::new(offset_to_position(offset, rope)?, offset_to_position(offset + 1, rope)?))
+}
+
+fn brace_pair_edits(rope: &Rope, pairs: &[(usize, usize)], offset: usize, reported: Range) -> Option<(usize, Vec<TextEdit>)> {
+    let Some((start, end)) = pairs.iter().find(|(start, end)| *start == offset || *end == offset) else {
+        // A brace whose partner is missing is still worth turning into what it means.
+        let replacement = match rope.get_char(offset)? {
+            '{' => "(",
+            '}' => ")",
+            _ => return None,
+        };
+        return Some((offset, vec![TextEdit::new(reported, replacement.to_string())]));
+    };
+    Some((
+        *start,
+        vec![
+            TextEdit::new(single_char_range(rope, *start)?, "(".to_string()),
+            TextEdit::new(single_char_range(rope, *end)?, ")".to_string()),
+        ],
+    ))
 }
 
 fn starts_routine(line: &str) -> bool {

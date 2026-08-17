@@ -62,16 +62,44 @@ fn obsolete_braces_can_be_replaced() {
     let uri = "file:///tmp/braces.pps";
     server.open(uri, ";$LANGVERSION 340\nINTEGER values{2}\n");
     let diagnostics = server.diagnostics(uri);
-    let actions = actions(&mut server, uri, diagnostics);
+    let actions = actions(&mut server, uri, diagnostics.clone());
 
-    let replacements: Vec<_> = actions
+    let matching: Vec<_> = actions
         .as_array()
         .unwrap()
         .iter()
-        .map(|action| action["edit"]["changes"][uri][0]["newText"].clone())
+        .filter(|action| action["title"] == "Replace braces with parentheses")
         .collect();
-    assert!(replacements.contains(&json!("(")), "{actions}");
-    assert!(replacements.contains(&json!(")")), "{actions}");
+    assert_eq!(matching.len(), 1, "one pair is one change: {actions}");
+    let edits = matching[0]["edit"]["changes"][uri].as_array().unwrap();
+    assert_eq!(edits.len(), 2, "{edits:?}");
+    assert_eq!(edits[0]["newText"], "(");
+    assert_eq!(edits[0]["range"]["start"], json!({"line": 1, "character": 14}));
+    assert_eq!(edits[1]["newText"], ")");
+    assert_eq!(edits[1]["range"]["start"], json!({"line": 1, "character": 16}));
+}
+
+#[test]
+fn nested_braces_are_replaced_pair_by_pair() {
+    let (mut server, _) = Server::ready();
+    let uri = "file:///tmp/nested-braces.pps";
+    server.open(uri, ";$LANGVERSION 330\nINTEGER TEST(10)\nTEST{ABS{1}} = 5\n");
+    let diagnostics = server.diagnostics(uri);
+    let actions = actions(&mut server, uri, diagnostics.clone());
+
+    let columns: Vec<_> = actions
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|action| action["title"] == "Replace braces with parentheses")
+        .map(|action| {
+            let edits = action["edit"]["changes"][uri].as_array().unwrap();
+            (edits[0]["range"]["start"]["character"].clone(), edits[1]["range"]["start"]["character"].clone())
+        })
+        .collect();
+    assert!(columns.contains(&(json!(4), json!(11))), "outer pair missing: {columns:?}");
+    assert!(columns.contains(&(json!(8), json!(10))), "inner pair missing: {columns:?}");
+    assert_eq!(columns.len(), 2, "{columns:?}");
 }
 
 #[test]
