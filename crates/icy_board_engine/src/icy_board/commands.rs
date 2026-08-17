@@ -230,6 +230,9 @@ pub enum CommandType {
     /// SYSOP '2' command
     ViewUserFile,
 
+    /// SYSOP '3' command
+    PackMessageBase,
+
     /// SYSOP '6' command
     ViewTextFile,
 
@@ -351,6 +354,7 @@ impl Display for CommandType {
             CommandType::RestoreMessage => write!(f, "RestoreMessage"),
             CommandType::ViewCallerLog => write!(f, "ViewCallerLog"),
             CommandType::ViewUserFile => write!(f, "ViewUserFile"),
+            CommandType::PackMessageBase => write!(f, "PackMessageBase"),
             CommandType::ViewTextFile => write!(f, "ViewTextFile"),
             CommandType::UserMaintenance => write!(f, "UserMaintenance"),
             CommandType::PackUserFile => write!(f, "PackUserFile"),
@@ -439,6 +443,7 @@ impl Display for CommandType {
             CommandType::RestoreMessage => write!(f, "(RESTORE)\tRestoreMessage"),
             CommandType::ViewCallerLog => write!(f, "(1)\tViewCallerLog"),
             CommandType::ViewUserFile => write!(f, "(2)\tViewUserFile"),
+            CommandType::PackMessageBase => write!(f, "(3)\tPackMessageBase"),
             CommandType::ViewTextFile => write!(f, "(6)\tViewTextFile"),
             CommandType::UserMaintenance => write!(f, "(7)\tUserMaintenance"),
             CommandType::PackUserFile => write!(f, "(8)\tPackUserFile"),
@@ -528,6 +533,7 @@ impl FromStr for CommandType {
             "restoremessage" => Ok(CommandType::RestoreMessage),
             "viewcallerlog" => Ok(CommandType::ViewCallerLog),
             "viewuserfile" => Ok(CommandType::ViewUserFile),
+            "packmessagebase" => Ok(CommandType::PackMessageBase),
             "viewtextfile" => Ok(CommandType::ViewTextFile),
             "usermaintenance" => Ok(CommandType::UserMaintenance),
             "packuserfile" => Ok(CommandType::PackUserFile),
@@ -620,6 +626,7 @@ impl CommandType {
             CommandType::RestoreMessage,
             CommandType::ViewCallerLog,
             CommandType::ViewUserFile,
+            CommandType::PackMessageBase,
             CommandType::ViewTextFile,
             CommandType::UserMaintenance,
             CommandType::PackUserFile,
@@ -690,6 +697,7 @@ impl CommandType {
             CommandType::RestoreMessage => "hlp4",
             CommandType::ViewCallerLog => "hlp1",
             CommandType::ViewUserFile => "hlp2",
+            CommandType::PackMessageBase => "hlp3",
             CommandType::ViewTextFile => "hlp6",
             CommandType::UserMaintenance => "hlp7",
             CommandType::PackUserFile => "hlp8",

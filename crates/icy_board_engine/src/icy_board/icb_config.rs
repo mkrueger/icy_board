@@ -52,6 +52,7 @@ impl SysopCommandLevels {
         match command_type {
             CommandType::ViewCallerLog => Some(self.sec_1_view_caller_log.clone()),
             CommandType::ViewUserFile => Some(self.sec_2_view_usr_list.clone()),
+            CommandType::PackMessageBase => Some(self.sec_3_pack_renumber_msg.clone()),
             CommandType::RestoreMessage => Some(self.sec_4_recover_deleted_msg.clone()),
             CommandType::HeaderScan => Some(self.sec_5_list_message_hdr.clone()),
             CommandType::ViewTextFile | CommandType::DirCommand => Some(self.sec_6_view_any_file.clone()),

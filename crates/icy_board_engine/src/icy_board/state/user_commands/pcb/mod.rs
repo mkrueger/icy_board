@@ -3,6 +3,7 @@ pub mod _12_logoff_node;
 pub mod _16_dir_command;
 pub mod _1_view_caller_log;
 pub mod _2_view_user_file;
+pub mod _3_pack_message_base;
 pub mod _4_recover_message;
 pub mod _6_view_text_file;
 pub mod _7_user_maintenance;

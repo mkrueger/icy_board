@@ -27,6 +27,7 @@ macro_rules! denied_sysop_command {
 
 denied_sysop_command!(command_1_checks_view_caller_log, "1", sec_1_view_caller_log, "View, Print, Scan or Delete");
 denied_sysop_command!(command_2_checks_view_users, "2", sec_2_view_usr_list, "View or Print the User File");
+denied_sysop_command!(command_3_checks_pack_message_base, "3", sec_3_pack_renumber_msg, "Pack the message base");
 denied_sysop_command!(command_4_checks_recover_message, "4", sec_4_recover_deleted_msg, "Message Number to Activate");
 denied_sysop_command!(command_5_checks_header_scan, "5", sec_5_list_message_hdr, "Message Scan Command");
 denied_sysop_command!(command_6_checks_view_file, "6", sec_6_view_any_file, "Filename to View");

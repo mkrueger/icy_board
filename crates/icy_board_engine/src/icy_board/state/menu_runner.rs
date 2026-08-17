@@ -485,6 +485,14 @@ impl IcyBoardState {
                 // 2
                 self.view_user_file().await?;
             }
+            CommandType::PackMessageBase => {
+                let sec = self.session.sysop_command_level.sec_3_pack_renumber_msg.clone();
+                if check_security && !self.check_sec("3", &sec).await? {
+                    return Ok(());
+                }
+                // 3
+                self.pack_message_base().await?;
+            }
             CommandType::ViewTextFile => {
                 let sec = self.session.sysop_command_level.sec_6_view_any_file.clone();
                 if check_security && !self.check_sec("6", &sec).await? {
@@ -492,8 +500,7 @@ impl IcyBoardState {
                 }
                 // 6
                 self.view_text_file().await?;
-            }
-            CommandType::UserMaintenance => {
+            }            CommandType::UserMaintenance => {
                 let sec = self.session.sysop_command_level.sec_7_user_maint.clone();
                 if check_security && !self.check_sec("7", &sec).await? {
                     return Ok(());
