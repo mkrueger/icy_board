@@ -184,6 +184,12 @@ impl LanguageServer for Backend {
                     let at = Range::new(diagnostic.range.end, diagnostic.range.end);
                     ("Call the routine", uri.clone(), vec![TextEdit::new(at, "()".to_string())])
                 }
+                "ppl.statement-after-routines" => {
+                    let Some(edits) = usefuncs_edits(&rope, diagnostic.range.start.line) else {
+                        continue;
+                    };
+                    ("Add $USEFUNCS and a BEGIN block", uri.clone(), edits)
+                }
                 "ppl.duplicate-record-field" => {
                     let Some(start) = position_to_offset(&rope, diagnostic.range.start) else {
                         continue;
@@ -1040,6 +1046,7 @@ fn diagnostic_details(
                 "ppl.end-is-not-a-statement"
             }
             icy_board_engine::parser::ParserErrorType::VarNotAllowedInFunctions => "ppl.var-not-allowed",
+            icy_board_engine::parser::ParserErrorType::NoStatementsAfterFunctions => "ppl.statement-after-routines",
             _ => return (None, None),
         }
     } else {
@@ -1314,22 +1321,55 @@ fn implementation_stub_edit(rope: &Rope, line: u32) -> Option<TextEdit> {
     } else {
         return None;
     };
-    let mut insertion_line = line + 1;
-    while let Some(next) = rope.get_line(insertion_line as usize) {
-        let text = next.to_string();
-        let trimmed = text.trim_start();
-        if trimmed.is_empty() || trimmed.starts_with(';') || trimmed.get(..7).is_some_and(|prefix| prefix.eq_ignore_ascii_case("DECLARE")) {
-            insertion_line += 1;
-        } else {
-            break;
+    // A routine body belongs behind the main program - a statement after it needs $USEFUNCS.
+    let at = offset_to_position(rope.len_chars(), rope)?;
+    let separator = if at.character == 0 { "\n" } else { "\n\n" };
+    Some(TextEdit::new(Range::new(at, at), format!("{separator}{header}\n{terminator}\n")))
+}
+
+fn starts_routine(line: &str) -> bool {
+    let line = line.trim_start();
+    let Some(word) = line.split(|ch: char| ch.is_whitespace() || ch == '(').next() else {
+        return false;
+    };
+    word.eq_ignore_ascii_case("FUNCTION") || word.eq_ignore_ascii_case("PROCEDURE")
+}
+
+/// `$USEFUNCS` on its own only moves the complaint - it lets routines come first, but
+/// then the main program has to say where it begins.
+fn usefuncs_edits(rope: &Rope, line: u32) -> Option<Vec<TextEdit>> {
+    let mut directive_line = 0;
+    for index in 0..rope.len_lines() {
+        let text = rope.get_line(index)?.to_string();
+        let trimmed = text.trim();
+        if trimmed.eq_ignore_ascii_case("BEGIN") {
+            return None;
+        }
+        if index == 0 && trimmed.to_ascii_uppercase().starts_with(";$LANGVERSION") {
+            directive_line = 1;
         }
     }
-    let at = if insertion_line as usize >= rope.len_lines() {
+    let mut end_line = line + 1;
+    while (end_line as usize) < rope.len_lines() {
+        if starts_routine(&rope.get_line(end_line as usize)?.to_string()) {
+            break;
+        }
+        end_line += 1;
+    }
+    let at_end = if end_line as usize >= rope.len_lines() {
         offset_to_position(rope.len_chars(), rope)?
     } else {
-        Position::new(insertion_line, 0)
+        Position::new(end_line, 0)
     };
-    Some(TextEdit::new(Range::new(at, at), format!("\n{header}\n{terminator}\n")))
+    let closing = if at_end.character == 0 { "END\n".to_string() } else { "\nEND\n".to_string() };
+    Some(vec![
+        TextEdit::new(
+            Range::new(Position::new(directive_line, 0), Position::new(directive_line, 0)),
+            ";$USEFUNCS\n".to_string(),
+        ),
+        TextEdit::new(Range::new(Position::new(line, 0), Position::new(line, 0)), "BEGIN\n".to_string()),
+        TextEdit::new(Range::new(at_end, at_end), closing),
+    ])
 }
 
 #[tokio::main]

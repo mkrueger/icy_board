@@ -30,11 +30,14 @@ fn a_function_closed_with_endproc_can_be_fixed() {
         "DECLARE FUNCTION Answer() INTEGER\nFUNCTION Answer() INTEGER\nRETURN 42\nENDPROC\nPRINTLN Answer()\n",
     );
     let diagnostics = server.diagnostics(uri);
-    let actions = actions(&mut server, uri, diagnostics);
+    let actions = actions(&mut server, uri, diagnostics.clone());
 
-    assert_eq!(actions[0]["title"], "Replace ENDPROC with ENDFUNC");
-    assert_eq!(actions[0]["edit"]["changes"][uri][0]["newText"], "ENDFUNC");
-    assert_eq!(actions[0]["diagnostics"][0]["code"], "ppl.function-closed-with-endproc");
+    let action = actions
+        .as_array()
+        .and_then(|actions| actions.iter().find(|action| action["title"] == "Replace ENDPROC with ENDFUNC"))
+        .unwrap_or_else(|| panic!("diagnostics={diagnostics}, actions={actions}"));
+    assert_eq!(action["edit"]["changes"][uri][0]["newText"], "ENDFUNC");
+    assert_eq!(action["diagnostics"][0]["code"], "ppl.function-closed-with-endproc");
 }
 
 #[test]
@@ -43,11 +46,14 @@ fn a_procedure_closed_with_endfunc_can_be_fixed() {
     let uri = "file:///tmp/procedure-end-token.pps";
     server.open(uri, "DECLARE PROCEDURE Show()\nPROCEDURE Show()\nPRINTLN \"hello\"\nENDFUNC\nShow()\n");
     let diagnostics = server.diagnostics(uri);
-    let actions = actions(&mut server, uri, diagnostics);
+    let actions = actions(&mut server, uri, diagnostics.clone());
 
-    assert_eq!(actions[0]["title"], "Replace ENDFUNC with ENDPROC");
-    assert_eq!(actions[0]["edit"]["changes"][uri][0]["newText"], "ENDPROC");
-    assert_eq!(actions[0]["diagnostics"][0]["code"], "ppl.procedure-closed-with-endfunc");
+    let action = actions
+        .as_array()
+        .and_then(|actions| actions.iter().find(|action| action["title"] == "Replace ENDFUNC with ENDPROC"))
+        .unwrap_or_else(|| panic!("diagnostics={diagnostics}, actions={actions}"));
+    assert_eq!(action["edit"]["changes"][uri][0]["newText"], "ENDPROC");
+    assert_eq!(action["diagnostics"][0]["code"], "ppl.procedure-closed-with-endfunc");
 }
 
 #[test]
@@ -254,7 +260,8 @@ fn a_missing_function_implementation_can_be_created() {
         action["edit"]["changes"][uri][0]["newText"],
         "\nFUNCTION Answer(INTEGER Value) INTEGER\nENDFUNC\n"
     );
-    assert_eq!(action["edit"]["changes"][uri][0]["range"]["start"]["line"], 1);
+    // The body has to follow the main program, not push it behind the routines.
+    assert_eq!(action["edit"]["changes"][uri][0]["range"]["start"]["line"], 2);
     assert_eq!(action["diagnostics"][0]["code"], "ppl.missing-implementation");
 }
 
@@ -273,6 +280,45 @@ fn a_missing_procedure_implementation_can_be_created() {
         .find(|action| action["title"] == "Create missing routine implementation")
         .unwrap();
     assert_eq!(action["edit"]["changes"][uri][0]["newText"], "\nPROCEDURE Show(STRING Value)\nENDPROC\n");
+    assert_eq!(action["edit"]["changes"][uri][0]["range"]["start"]["line"], 2);
+}
+
+#[test]
+fn a_statement_after_a_routine_can_get_usefuncs_and_a_block() {
+    let (mut server, _) = Server::ready();
+    let uri = "file:///tmp/statement-after-routine.pps";
+    server.open(uri, "DECLARE PROCEDURE Foo()\nPROCEDURE Foo()\nENDPROC\nPRINTLN \"x\"\n");
+    let diagnostics = server.diagnostics(uri);
+    let actions = actions(&mut server, uri, diagnostics.clone());
+
+    let action = actions
+        .as_array()
+        .and_then(|actions| actions.iter().find(|action| action["title"] == "Add $USEFUNCS and a BEGIN block"))
+        .unwrap_or_else(|| panic!("diagnostics={diagnostics}, actions={actions}"));
+    assert_eq!(action["diagnostics"][0]["code"], "ppl.statement-after-routines");
+    let edits = action["edit"]["changes"][uri].as_array().unwrap();
+    assert_eq!(edits[0]["newText"], ";$USEFUNCS\n");
+    assert_eq!(edits[0]["range"]["start"]["line"], 0);
+    assert_eq!(edits[1]["newText"], "BEGIN\n");
+    assert_eq!(edits[1]["range"]["start"]["line"], 3);
+    assert_eq!(edits[2]["newText"], "END\n");
+    assert_eq!(edits[2]["range"]["start"]["line"], 4);
+}
+
+#[test]
+fn a_file_that_already_has_a_block_is_not_given_another_one() {
+    let (mut server, _) = Server::ready();
+    let uri = "file:///tmp/statement-after-routine-block.pps";
+    server.open(uri, "DECLARE PROCEDURE Foo()\nBEGIN\n  Foo()\nEND\nPROCEDURE Foo()\nENDPROC\nPRINTLN \"x\"\n");
+    let diagnostics = server.diagnostics(uri);
+    let actions = actions(&mut server, uri, diagnostics);
+
+    assert!(
+        actions
+            .as_array()
+            .is_none_or(|actions| actions.iter().all(|action| action["title"] != "Add $USEFUNCS and a BEGIN block")),
+        "{actions}"
+    );
 }
 
 #[test]
