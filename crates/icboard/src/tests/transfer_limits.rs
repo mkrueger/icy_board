@@ -37,7 +37,8 @@ fn setup(board: &mut IcyBoard, level: SecurityLevel, free_area: bool) {
     board.sec_levels.push(SecurityLevel { security: 255, ..level });
 }
 
-/// One kilobyte a day does not cover a four kilobyte file.
+/// One kilobyte a day does not cover a four kilobyte file, and the message says how
+/// much is actually left rather than leaving the macro blank.
 #[test]
 fn test_daily_allowance_refuses_a_file_that_does_not_fit() {
     let level = SecurityLevel {
@@ -46,6 +47,7 @@ fn test_daily_allowance_refuses_a_file_that_does_not_fit() {
     };
     let output = test_output("D BIG.ZIP\n\n".to_string(), move |board| setup(board, level.clone(), false));
     assert!(output.contains("download bytes left"), "{output}");
+    assert!(output.contains("1024"), "the bytes left macro did not expand:\n{output}");
 }
 
 /// The same file goes out once the allowance covers it.

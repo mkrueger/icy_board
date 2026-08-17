@@ -64,7 +64,7 @@ use super::{
     events::{self, EventWindow},
     icb_config::{DEFAULT_PCBOARD_DATE_FORMAT, IcbColor, SysopCommandLevels, UserCommandLevels},
     icb_text::{IcbTextFile, IcbTextStyle, IceText},
-    limits::TransferLimits,
+    limits::{self, BatchSoFar, TransferHistory, TransferLimits},
     macro_parser::{Macro, MacroCommand},
     security_expr::SecurityExpression,
     user_base::{ConferenceFlags, FSEMode, Password, User},
@@ -796,6 +796,34 @@ impl IcyBoardState {
         }
         self.session.bytes_remaining = limits.bytes_remaining.unwrap_or(-1);
         self.session.transfer_limits = limits;
+    }
+
+    /// Bytes the caller may still download, counting what the flagged batch will take.
+    /// `None` when nothing constrains them.
+    fn bytes_available(&self) -> Option<i64> {
+        let Some(user) = &self.session.current_user else {
+            return None;
+        };
+        let history = TransferHistory {
+            num_uploads: user.stats.num_uploads,
+            num_downloads: user.stats.num_downloads,
+            total_upld_bytes: user.stats.total_upld_bytes,
+            total_dnld_bytes: user.stats.total_dnld_bytes,
+        };
+        let mut limits = self.session.transfer_limits.clone();
+        limits.bytes_remaining = (self.session.bytes_remaining >= 0).then_some(self.session.bytes_remaining);
+        let flagged = self
+            .session
+            .flagged_files
+            .iter()
+            .filter_map(|f| std::fs::metadata(f).ok())
+            .map(|m| m.len())
+            .sum();
+        limits.bytes_available(&history, BatchSoFar { files: 0, bytes: flagged })
+    }
+
+    fn unlimited_text(&mut self) -> String {
+        self.get_display_text(IceText::Unlimited).unwrap_or_default()
     }
 
     /// A conference may raise or lower the security level of the caller while they
@@ -2123,11 +2151,30 @@ impl IcyBoardState {
             MacroCommand::BoardName => result = self.get_board().await.config.board.name.to_string(),
             MacroCommand::BPS | MacroCommand::Carrier => result = self.get_bps().to_string(),
 
-            // TODO
-            MacroCommand::ByteCredit | MacroCommand::ByteLimit | MacroCommand::ByteRatio | MacroCommand::BytesLeft => {
-                // todo
+            MacroCommand::ByteCredit => result = self.session.transfer_limits.byte_credit.to_string(),
+            MacroCommand::ByteLimit => {
+                result = match self.session.transfer_limits.bytes_remaining {
+                    None => self.unlimited_text(),
+                    Some(bytes) => bytes.to_string(),
+                }
             }
-
+            MacroCommand::ByteRatio => {
+                if let Some(user) = &self.session.current_user {
+                    result = limits::format_ratio(user.stats.total_dnld_bytes, user.stats.total_upld_bytes);
+                }
+            }
+            MacroCommand::BytesLeft => {
+                result = match self.bytes_available() {
+                    None => self.unlimited_text(),
+                    Some(bytes) => bytes.to_string(),
+                }
+            }
+            MacroCommand::KBLeft => {
+                result = match self.bytes_available() {
+                    None => self.unlimited_text(),
+                    Some(bytes) => (bytes / 1024).to_string(),
+                }
+            }
             MacroCommand::City => {
                 if let Some(user) = &self.session.current_user {
                     result = user.city_or_state.to_string();
@@ -2192,7 +2239,13 @@ impl IcyBoardState {
                     result = entry.text;
                 }
             }
-            MacroCommand::FBytes | MacroCommand::FFiles | MacroCommand::FileCredit | MacroCommand::FileRatio => {}
+            MacroCommand::FileCredit => result = self.session.transfer_limits.file_credit.to_string(),
+            MacroCommand::FileRatio => {
+                if let Some(user) = &self.session.current_user {
+                    result = limits::format_ratio(user.stats.num_downloads, user.stats.num_uploads);
+                }
+            }
+            MacroCommand::FBytes | MacroCommand::FFiles => {}
             MacroCommand::First => {
                 result = fix_casing(self.session.get_first_name());
             }
@@ -2259,12 +2312,7 @@ impl IcyBoardState {
                 result = self.session.last_msg_read.to_string();
             }
 
-            MacroCommand::KBLeft
-            | MacroCommand::KBLimit
-            | MacroCommand::LastCallerNode
-            | MacroCommand::LastCallerSystem
-            | MacroCommand::MaxBytes
-            | MacroCommand::MaxFiles => {}
+            MacroCommand::KBLimit | MacroCommand::LastCallerNode | MacroCommand::LastCallerSystem | MacroCommand::MaxBytes | MacroCommand::MaxFiles => {}
             MacroCommand::MinLeft => result = "1000".to_string(),
             MacroCommand::More => {
                 if let Err(err) = self.more_promt().await {

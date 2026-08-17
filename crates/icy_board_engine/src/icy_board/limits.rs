@@ -149,6 +149,53 @@ impl TransferLimits {
 
         LimitVerdict::Allowed
     }
+
+    /// Bytes the caller may still download once the daily allowance, the total limit and
+    /// the byte ratio have each had their say. `None` when nothing constrains them.
+    pub fn bytes_available(&self, history: &TransferHistory, so_far: BatchSoFar) -> Option<i64> {
+        let current = so_far.bytes as i64;
+        let mut unlimited = self.bytes_remaining.is_none();
+        let mut limit = self.bytes_remaining.map_or(i64::MAX, |remaining| remaining - current);
+
+        if self.total_byte_limit > 0 {
+            let left = self.total_byte_limit as i64 - history.total_dnld_bytes as i64 - current;
+            if left < limit {
+                limit = left;
+                unlimited = false;
+            }
+        }
+
+        if self.byte_ratio_tenths > 0 {
+            let up = (history.total_upld_bytes + self.byte_credit) as i128;
+            let allowed = (up * self.byte_ratio_tenths as i128) / 10;
+            let left = (allowed - (history.total_dnld_bytes as i128 + current as i128)).max(0) as i64;
+            if left < limit {
+                limit = left;
+                unlimited = false;
+            }
+        }
+
+        if unlimited { None } else { Some(limit.max(0)) }
+    }
+}
+
+/// The caller's standing as PCBoard prints it: always anchored on 1, so a caller who has
+/// taken more than they gave reads "5.0:1" and one who gave more reads "1:5.0".
+pub fn format_ratio(down: u64, up: u64) -> String {
+    fn part(a: u64, b: u64) -> String {
+        if b == 0 {
+            format!("{:.1}", a as f64)
+        } else {
+            format!("{:.1}", a as f64 / b as f64)
+        }
+    }
+    if down > up {
+        format!("{}{}", part(down, up), if up == 0 { ":0" } else { ":1" })
+    } else if down == up {
+        if up == 0 { "0:0".to_string() } else { "1:1".to_string() }
+    } else {
+        format!("{}{}", if down == 0 { "0:" } else { "1:" }, part(up, down))
+    }
 }
 
 /// PCBoard's daily allowance: 32767 K means unlimited, and the figure is scaled by how
@@ -508,5 +555,67 @@ mod tests {
             limits.check_file(&history, BatchSoFar::default(), 100, false),
             LimitVerdict::DailyBytes { bytes_left: 10 }
         );
+    }
+
+    // --- what is left ----------------------------------------------------------
+
+    #[test]
+    fn nothing_constrains_a_caller_without_limits() {
+        assert_eq!(limits().bytes_available(&TransferHistory::default(), BatchSoFar::default()), None);
+    }
+
+    #[test]
+    fn the_tightest_limit_decides_what_is_left() {
+        let limits = TransferLimits {
+            bytes_remaining: Some(50_000),
+            total_byte_limit: 30_000,
+            ..Default::default()
+        };
+        let history = TransferHistory {
+            total_dnld_bytes: 25_000,
+            ..Default::default()
+        };
+        assert_eq!(limits.bytes_available(&history, BatchSoFar::default()), Some(5_000));
+    }
+
+    #[test]
+    fn a_ratio_can_be_the_tightest_limit() {
+        let limits = TransferLimits {
+            bytes_remaining: Some(1_000_000),
+            byte_ratio_tenths: 10,
+            ..Default::default()
+        };
+        let history = TransferHistory {
+            total_upld_bytes: 5_000,
+            total_dnld_bytes: 4_000,
+            ..Default::default()
+        };
+        assert_eq!(limits.bytes_available(&history, BatchSoFar::default()), Some(1_000));
+    }
+
+    #[test]
+    fn what_is_left_never_goes_negative() {
+        let limits = TransferLimits {
+            bytes_remaining: Some(100),
+            ..Default::default()
+        };
+        let so_far = BatchSoFar { files: 1, bytes: 500 };
+        assert_eq!(limits.bytes_available(&TransferHistory::default(), so_far), Some(0));
+    }
+
+    // --- how a ratio reads -----------------------------------------------------
+
+    #[test]
+    fn a_ratio_is_anchored_on_one() {
+        assert_eq!(format_ratio(10_000, 2_000), "5.0:1");
+        assert_eq!(format_ratio(2_000, 10_000), "1:5.0");
+        assert_eq!(format_ratio(100, 100), "1:1");
+    }
+
+    #[test]
+    fn a_ratio_reads_sensibly_with_nothing_on_one_side() {
+        assert_eq!(format_ratio(0, 0), "0:0");
+        assert_eq!(format_ratio(500, 0), "500.0:0");
+        assert_eq!(format_ratio(0, 500), "0:500.0");
     }
 }
