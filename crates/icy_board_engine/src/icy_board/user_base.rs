@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 use super::{
     IcyBoardSerializer, PcbUser,
     icb_config::DEFAULT_PCBOARD_DATE_FORMAT,
-    is_false, is_null_16, is_null_64,
+    is_false, is_null_16, is_null_64, is_null_i64,
     user_inf::{AccountUserInf, BankUserInf, QwkConfigUserInf},
 };
 
@@ -285,8 +285,9 @@ pub struct UserStats {
     pub today_num_uploads: u64,
 
     #[serde(default)]
-    #[serde(skip_serializing_if = "is_null_64")]
-    pub today_dnld_bytes: u64,
+    #[serde(skip_serializing_if = "is_null_i64")]
+    /// Goes negative when an upload earns more credit than the caller has spent today.
+    pub today_dnld_bytes: i64,
 
     #[serde(default)]
     #[serde(skip_serializing_if = "is_null_64")]
@@ -1009,7 +1010,7 @@ impl User {
                 num_downloads: u.user.num_downloads as u64,
                 total_dnld_bytes: u.user.ul_tot_dnld_bytes,
                 total_upld_bytes: u.user.ul_tot_upld_bytes,
-                today_dnld_bytes: u.user.daily_downloaded_bytes as u64,
+                today_dnld_bytes: u.user.daily_downloaded_bytes as i64,
                 today_upld_bytes: 0,
                 today_num_downloads: 0,
                 today_num_uploads: 0,
@@ -1074,7 +1075,7 @@ impl User {
             num_downloads: self.stats.num_downloads as i32,
             ul_tot_dnld_bytes: self.stats.total_dnld_bytes,
             ul_tot_upld_bytes: self.stats.total_upld_bytes,
-            daily_downloaded_bytes: self.stats.today_dnld_bytes as usize,
+            daily_downloaded_bytes: self.stats.today_dnld_bytes.max(0) as usize,
             // Arrays and remaining fields defaulted:
             last_message_read_ptr: [0; 40].to_vec(),
             ..Default::default()

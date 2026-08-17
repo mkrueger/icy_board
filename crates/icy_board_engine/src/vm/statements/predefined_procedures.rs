@@ -1404,11 +1404,10 @@ pub async fn adjbytes(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
     if let Some(user) = &mut vm.icy_board_state.session.current_user {
         if bytes > 0 {
             user.stats.total_dnld_bytes += bytes as u64;
-            user.stats.today_dnld_bytes += bytes as u64;
         } else {
-            user.stats.total_dnld_bytes = user.stats.total_dnld_bytes.saturating_sub(bytes as u64);
-            user.stats.today_dnld_bytes = user.stats.today_dnld_bytes.saturating_sub(bytes as u64);
+            user.stats.total_dnld_bytes = user.stats.total_dnld_bytes.saturating_sub(bytes.unsigned_abs() as u64);
         }
+        user.stats.today_dnld_bytes += bytes as i64;
         vm.icy_board_state.session.bytes_remaining += bytes as i64;
     }
     Ok(())
@@ -1505,11 +1504,7 @@ pub async fn getaltuser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()
 pub async fn adjdbytes(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let bytes = vm.eval_expr(&args[0]).await?.as_int();
     if let Some(user) = &mut vm.icy_board_state.session.current_user {
-        if bytes > 0 {
-            user.stats.today_dnld_bytes += bytes as u64;
-        } else {
-            user.stats.today_dnld_bytes = user.stats.today_dnld_bytes.saturating_sub(bytes as u64);
-        }
+        user.stats.today_dnld_bytes += bytes as i64;
         vm.icy_board_state.session.bytes_remaining += bytes as i64;
     }
     Ok(())

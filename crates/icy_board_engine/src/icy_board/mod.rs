@@ -45,6 +45,7 @@ pub mod group_list;
 pub mod icb_config;
 pub mod icb_text;
 pub mod language;
+pub mod limits;
 pub mod lock;
 pub mod login_server;
 pub mod macro_parser;
@@ -946,6 +947,9 @@ pub fn is_null_8(b: impl std::borrow::Borrow<u8>) -> bool {
 }
 
 pub fn is_null_64(b: impl std::borrow::Borrow<u64>) -> bool {
+    *b.borrow() == 0
+}
+pub fn is_null_i64(b: impl std::borrow::Borrow<i64>) -> bool {
     *b.borrow() == 0
 }
 pub fn is_null_32(b: impl std::borrow::Borrow<u32>) -> bool {

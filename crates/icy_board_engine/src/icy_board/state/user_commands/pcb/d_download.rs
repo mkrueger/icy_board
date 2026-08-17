@@ -181,7 +181,7 @@ impl IcyBoardState {
                             user.stats.num_downloads += sent.len() as u64;
                             user.stats.today_num_downloads += sent.len() as u64;
                             user.stats.total_dnld_bytes += bytes;
-                            user.stats.today_dnld_bytes += bytes;
+                            user.stats.today_dnld_bytes += bytes as i64;
                         }
                         self.board.lock().await.statistics.add_download(&state);
                         self.board.lock().await.save_statistics()?;

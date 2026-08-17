@@ -49,8 +49,10 @@ impl<'a> SecurityLevelEditor<'a> {
                     password: "".to_string(),
                     description: "Expired".to_string(),
                     security: 0,
-                    uldl_ratio: 0,
-                    uldl_kb_ratio: 0,
+                    base_baud_rate: 0,
+                    batch_limit: 0,
+                    uldl_ratio_tenths: 0,
+                    uldl_kb_ratio_tenths: 0,
                     daily_file_limit: 0,
                     daily_file_kb_limit: 0,
                     file_limit: 0,
@@ -69,8 +71,10 @@ impl<'a> SecurityLevelEditor<'a> {
                     password: "".to_string(),
                     description: "User".to_string(),
                     security: 10,
-                    uldl_ratio: 0,
-                    uldl_kb_ratio: 0,
+                    base_baud_rate: 0,
+                    batch_limit: 0,
+                    uldl_ratio_tenths: 0,
+                    uldl_kb_ratio_tenths: 0,
                     daily_file_limit: 0,
                     daily_file_kb_limit: 0,
                     file_limit: 0,
@@ -89,8 +93,10 @@ impl<'a> SecurityLevelEditor<'a> {
                     password: "".to_string(),
                     description: "Sysop".to_string(),
                     security: 100,
-                    uldl_ratio: 0,
-                    uldl_kb_ratio: 0,
+                    base_baud_rate: 0,
+                    batch_limit: 0,
+                    uldl_ratio_tenths: 0,
+                    uldl_kb_ratio_tenths: 0,
                     daily_file_limit: 0,
                     daily_file_kb_limit: 0,
                     file_limit: 0,
@@ -259,8 +265,10 @@ impl<'a> Page for SecurityLevelEditor<'a> {
                         description: "New Sec Level".to_string(),
                         password: "".to_string(),
                         security: 0,
-                        uldl_ratio: 0,
-                        uldl_kb_ratio: 0,
+                        base_baud_rate: 0,
+                        batch_limit: 0,
+                        uldl_ratio_tenths: 0,
+                        uldl_kb_ratio_tenths: 0,
                         daily_file_limit: 0,
                         daily_file_kb_limit: 0,
 
@@ -354,21 +362,26 @@ impl<'a> Page for SecurityLevelEditor<'a> {
                                     ),
                                 ),
                                 ConfigEntry::Item(
-                                    ListItem::new(get_text("sec_level_editor_file_ratio"), ListValue::U32(action.uldl_ratio as u32, 0, u32::MAX))
-                                        .with_label_width(16)
-                                        .with_update_u32_value(&|(i, list): &(usize, Arc<Mutex<SecurityLevelDefinitions>>), value: u32| {
-                                            list.lock().unwrap()[*i].uldl_ratio = value;
-                                        }),
-                                ),
-                                ConfigEntry::Item(
                                     ListItem::new(
-                                        get_text("sec_level_editor_byte_ratio"),
-                                        ListValue::U32(action.uldl_kb_ratio as u32, 0, u32::MAX),
+                                        get_text("sec_level_editor_file_ratio"),
+                                        ListValue::U32(action.uldl_ratio_tenths as u32, 0, u32::MAX),
                                     )
                                     .with_label_width(16)
                                     .with_update_u32_value(
                                         &|(i, list): &(usize, Arc<Mutex<SecurityLevelDefinitions>>), value: u32| {
-                                            list.lock().unwrap()[*i].uldl_kb_ratio = value;
+                                            list.lock().unwrap()[*i].uldl_ratio_tenths = value;
+                                        },
+                                    ),
+                                ),
+                                ConfigEntry::Item(
+                                    ListItem::new(
+                                        get_text("sec_level_editor_byte_ratio"),
+                                        ListValue::U32(action.uldl_kb_ratio_tenths as u32, 0, u32::MAX),
+                                    )
+                                    .with_label_width(16)
+                                    .with_update_u32_value(
+                                        &|(i, list): &(usize, Arc<Mutex<SecurityLevelDefinitions>>), value: u32| {
+                                            list.lock().unwrap()[*i].uldl_kb_ratio_tenths = value;
                                         },
                                     ),
                                 ),

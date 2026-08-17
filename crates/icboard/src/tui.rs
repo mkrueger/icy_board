@@ -357,7 +357,7 @@ impl Tui {
                         status_bar_info.msg_read,
                         status_bar_info.dn,
                         status_bar_info.dnbytes,
-                        status_bar_info.today_dn as i64 + status_bar_info.today_ul as i64,
+                        status_bar_info.today_dn + status_bar_info.today_ul as i64,
                     ))
                     .style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY)),
                 ]);
@@ -465,7 +465,7 @@ pub struct StatusBarInfo {
     pub msg_left: u64,
     pub msg_read: u64,
     pub today_ul: u64,
-    pub today_dn: u64,
+    pub today_dn: i64,
     pub bus_phone: String,
     pub home_phone: String,
     pub email: String,

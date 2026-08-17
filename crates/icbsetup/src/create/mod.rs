@@ -492,8 +492,8 @@ fn generate_security_level_data(security_file_path: &PathBuf) -> Res<()> {
         security: 10,
         time_per_day: 60,
         allow_alias: true,
-        uldl_ratio: 10,
-        uldl_kb_ratio: 10,
+        uldl_ratio_tenths: 10,
+        uldl_kb_ratio_tenths: 10,
         ..Default::default()
     });
 
@@ -501,8 +501,8 @@ fn generate_security_level_data(security_file_path: &PathBuf) -> Res<()> {
         security: 20,
         time_per_day: 90,
         allow_alias: true,
-        uldl_ratio: 90,
-        uldl_kb_ratio: 90,
+        uldl_ratio_tenths: 90,
+        uldl_kb_ratio_tenths: 90,
         ..Default::default()
     });
 
@@ -510,8 +510,8 @@ fn generate_security_level_data(security_file_path: &PathBuf) -> Res<()> {
         security: 100,
         time_per_day: 540,
         allow_alias: true,
-        uldl_ratio: 150,
-        uldl_kb_ratio: 150,
+        uldl_ratio_tenths: 150,
+        uldl_kb_ratio_tenths: 150,
         ..Default::default()
     });
 
@@ -519,8 +519,8 @@ fn generate_security_level_data(security_file_path: &PathBuf) -> Res<()> {
         security: 110,
         time_per_day: 999,
         allow_alias: true,
-        uldl_ratio: 250,
-        uldl_kb_ratio: 250,
+        uldl_ratio_tenths: 250,
+        uldl_kb_ratio_tenths: 250,
         daily_file_kb_limit: 32767,
         ..Default::default()
     });

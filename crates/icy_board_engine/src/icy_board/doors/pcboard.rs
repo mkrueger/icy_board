@@ -238,7 +238,7 @@ pub fn read_user_sys(user: &mut User, path: &std::path::Path) -> Res<()> {
     user.page_len = r.u8() as u16;
     user.stats.num_uploads = r.u16() as u64;
     user.stats.num_downloads = r.u16() as u64;
-    user.stats.today_dnld_bytes = r.u32() as u64;
+    user.stats.today_dnld_bytes = r.u32() as i64;
     user.user_comment = r.string(31);
     user.sysop_comment = r.string(31);
     r.skip(4); // daily download bytes, written a second time

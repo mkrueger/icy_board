@@ -27,18 +27,33 @@ pub struct SecurityLevel {
     #[serde(skip_serializing_if = "is_null_32")]
     pub calls_per_day: u32,
 
+    /// Download allowance scales with how fast the caller connected, relative to this.
+    /// 0 leaves the allowance alone.
     #[serde(default)]
     #[serde(skip_serializing_if = "is_null_32")]
-    pub uldl_ratio: u32,
+    pub base_baud_rate: u32,
 
+    /// Files allowed in one batch. 0 falls back to the system default.
     #[serde(default)]
     #[serde(skip_serializing_if = "is_null_32")]
-    pub uldl_kb_ratio: u32,
+    pub batch_limit: u32,
+
+    /// Download:upload file ratio in tenths - PCBoard stores 5.0 as 50. 0 disables it.
+    #[serde(default, alias = "uldl_ratio")]
+    #[serde(skip_serializing_if = "is_null_32")]
+    pub uldl_ratio_tenths: u32,
+
+    /// Download:upload byte ratio in tenths. 0 disables it.
+    #[serde(default, alias = "uldl_kb_ratio")]
+    #[serde(skip_serializing_if = "is_null_32")]
+    pub uldl_kb_ratio_tenths: u32,
 
     #[serde(default)]
     #[serde(skip_serializing_if = "is_null_64")]
     pub daily_file_limit: u64,
 
+    /// Kilobytes the caller may download per day. 32767 means unlimited, 0 blocks
+    /// everything that is not a free download.
     #[serde(default)]
     #[serde(skip_serializing_if = "is_null_64")]
     pub daily_file_kb_limit: u64,
@@ -113,10 +128,10 @@ impl SecurityLevelDefinitions {
                 level.security,
                 level.time_per_day,
                 level.daily_file_kb_limit,
-                0, // base baud
-                0, // batch limit
-                level.uldl_ratio,
-                level.uldl_kb_ratio,
+                level.base_baud_rate,
+                level.batch_limit,
+                level.uldl_ratio_tenths,
+                level.uldl_kb_ratio_tenths,
                 level.file_limit,
                 level.file_kb_limit,
                 if level.enforce_time_limit { "Y" } else { "N" },
@@ -150,11 +165,11 @@ impl PCBoardTextImport for SecurityLevelDefinitions {
             let security = splitted_line[1].parse::<u8>().unwrap_or(0);
             let time_per_day = splitted_line[2].parse::<u32>().unwrap_or(0);
             let daily_file_kb_limit = splitted_line[3].parse::<u64>().unwrap_or(0);
-            // 4 Base Baud - not needed
-            // 5 Batch Limit - not needed
+            let base_baud_rate = splitted_line[4].parse::<u32>().unwrap_or(0);
+            let batch_limit = splitted_line[5].parse::<u32>().unwrap_or(0);
 
-            let uldl_ratio = splitted_line[6].parse::<u32>().unwrap_or(0);
-            let uldl_kb_ratio = splitted_line[7].parse::<u32>().unwrap_or(0);
+            let uldl_ratio_tenths = splitted_line[6].parse::<u32>().unwrap_or(0);
+            let uldl_kb_ratio_tenths = splitted_line[7].parse::<u32>().unwrap_or(0);
 
             let file_limit = splitted_line[8].parse::<u64>().unwrap_or(0);
             let file_kb_limit = splitted_line[9].parse::<u64>().unwrap_or(0);
@@ -163,7 +178,7 @@ impl PCBoardTextImport for SecurityLevelDefinitions {
             let allow_alias = splitted_line[11] == "Y";
             let enforce_read_mail = splitted_line[12] == "Y";
             let is_demo_account = splitted_line[13] == "Y";
-            // skip 14? - seems to be unused bool flag
+            // 14 Allow multiple users on one id, 15 Verify caller via the Verification PSA
             let file_credit = splitted_line[15].parse::<u64>().unwrap_or(0);
             let file_kb_credit = splitted_line[16].parse::<u64>().unwrap_or(0);
 
@@ -179,12 +194,14 @@ impl PCBoardTextImport for SecurityLevelDefinitions {
                 security,
                 time_per_day,
                 calls_per_day,
+                base_baud_rate,
+                batch_limit,
                 is_demo_account,
                 allow_alias,
                 enforce_time_limit,
                 enforce_read_mail,
-                uldl_ratio,
-                uldl_kb_ratio,
+                uldl_ratio_tenths,
+                uldl_kb_ratio_tenths,
                 daily_file_limit,
                 daily_file_kb_limit,
                 file_limit,
