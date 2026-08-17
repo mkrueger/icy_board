@@ -1,3 +1,4 @@
+use crate::icy_board::state::user_commands::mods::filebrowser::FileFilter;
 use crate::{
     Res,
     datetime::IcbDate,
@@ -89,7 +90,7 @@ impl IcyBoardState {
                     self.new_line().await?;
                     self.reset_color(TerminalTarget::Both).await?;
                     let r = search_date.clone();
-                    self.display_file_area(&path, &metadata, Box::new(move |p, _| p.date() >= r)).await?;
+                    self.display_file_area(&path, &metadata, FileFilter::header(move |p| p.date() >= r)).await?;
                     if self.session.disp_options.abort_printout {
                         break;
                     }

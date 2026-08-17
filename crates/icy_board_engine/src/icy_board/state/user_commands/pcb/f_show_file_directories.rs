@@ -1,13 +1,10 @@
 use std::path::PathBuf;
 
-use dizbase::file_base::file_header::FileHeader;
-use dizbase::file_base::metadata::MetadataHeader;
-
 use crate::Res;
 use crate::icy_board::commands::CommandType;
 use crate::icy_board::state::IcyBoardState;
 use crate::icy_board::state::functions::MASK_COMMAND;
-use crate::icy_board::state::user_commands::mods::filebrowser::FileList;
+use crate::icy_board::state::user_commands::mods::filebrowser::{FileFilter, FileList};
 use crate::{
     icy_board::{
         icb_text::IceText,
@@ -66,7 +63,7 @@ impl IcyBoardState {
                 if 1 <= number && (number as usize) <= self.session.current_conference.directories.as_ref().unwrap().len() {
                     let area = &self.session.current_conference.directories.as_ref().unwrap()[number as usize - 1];
                     if area.list_security.session_can_access(&self.session) {
-                        self.display_file_area(&area.path.to_path_buf(), &area.metadata_path.clone(), Box::new(|_f, _| true))
+                        self.display_file_area(&area.path.to_path_buf(), &area.metadata_path.clone(), FileFilter::all())
                             .await?;
                         self.new_line().await?;
                         continue;
@@ -84,7 +81,7 @@ impl IcyBoardState {
                         self.display_file_area(
                             &self.session.current_conference.pub_upload_location.clone(),
                             &self.session.current_conference.private_upload_metadata.clone(),
-                            Box::new(|_f, _| true),
+                            FileFilter::all(),
                         )
                         .await?;
                     }
@@ -93,7 +90,7 @@ impl IcyBoardState {
                             self.display_file_area(
                                 &self.session.current_conference.private_upload_location.clone(),
                                 &self.session.current_conference.private_upload_metadata.clone(),
-                                Box::new(|_f, _| true),
+                                FileFilter::all(),
                             )
                             .await?;
                         }
@@ -138,7 +135,7 @@ impl IcyBoardState {
         Ok(())
     }
 
-    pub async fn display_file_area(&mut self, dir: &PathBuf, meta_data_path: &PathBuf, f: Box<dyn Fn(&FileHeader, &[MetadataHeader]) -> bool>) -> Res<()> {
+    pub async fn display_file_area(&mut self, dir: &PathBuf, meta_data_path: &PathBuf, filter: FileFilter) -> Res<()> {
         let colors = self.get_board().await.config.color_configuration.clone();
         let Ok(base) = self.get_filebase(dir, meta_data_path).await else {
             return Ok(());
@@ -157,7 +154,7 @@ impl IcyBoardState {
 
         let mut list = FileList::new(dir.to_path_buf(), base);
         let lines = self.session.disp_options.num_lines_printed;
-        list.display_file_list(self, f).await?;
+        list.display_file_list(self, filter).await?;
 
         if self.session.disp_options.num_lines_printed > lines {
             self.filebase_more().await?;

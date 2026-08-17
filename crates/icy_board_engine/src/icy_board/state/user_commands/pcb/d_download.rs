@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Instant;
 
@@ -174,6 +175,7 @@ impl IcyBoardState {
                         let cps = transfer_cps(state.send_state.total_bytes_transfered, started);
                         self.log_transfer(false, &sent, &protocol_str, state.send_state.errors, cps).await?;
 
+                        self.count_downloads(&files, &sent).await;
                         self.board.lock().await.statistics.add_download(&state);
                         self.board.lock().await.save_statistics()?;
                     }
@@ -191,6 +193,34 @@ impl IcyBoardState {
             }
         }
         Ok(())
+    }
+
+    /// Raises the per file download counter, the way PCBoard reports how popular a file is.
+    ///
+    /// The counter lives in the area the file came from, so an offered file whose area is
+    /// not part of this conference is skipped.
+    async fn count_downloads(&mut self, offered: &[PathBuf], sent: &[String]) {
+        let Some(directories) = self.session.current_conference.directories.clone() else {
+            return;
+        };
+        for (dir, names) in downloads_per_area(offered, sent) {
+            let Some(area) = directories.iter().find(|area| area.path == dir) else {
+                continue;
+            };
+            let (path, metadata_path) = (area.path.clone(), area.metadata_path.clone());
+            let Ok(base) = self.get_filebase(&path, &metadata_path).await else {
+                continue;
+            };
+            let mut base = base.lock().await;
+            for name in names {
+                if let Some(header) = base.iter_mut().find(|header| header.name().eq_ignore_ascii_case(&name)) {
+                    header.dl_counter += 1;
+                }
+            }
+            if let Err(err) = base.save() {
+                log::error!("Could not record downloads in {}: {}", dir.display(), err);
+            }
+        }
     }
 
     #[async_recursion(?Send)]
@@ -283,3 +313,61 @@ impl IcyBoardState {
 
 const DL_LISTMASK: &str = "AEGLP";
 const DL_EDITMASK: &str = "ARL";
+
+/// Groups the files that really went out by the directory they came from, so each area's
+/// counters can be written in one go.
+///
+/// A batch can be aborted part way through, so only what the protocol reported as finished
+/// counts - and it reports bare names, which is why they are matched the way DOS did.
+fn downloads_per_area(offered: &[PathBuf], sent: &[String]) -> HashMap<PathBuf, Vec<String>> {
+    let mut per_area: HashMap<PathBuf, Vec<String>> = HashMap::new();
+    for path in offered {
+        let (Some(dir), Some(name)) = (path.parent(), path.file_name().and_then(|name| name.to_str())) else {
+            continue;
+        };
+        if sent.iter().any(|s| s.eq_ignore_ascii_case(name)) {
+            per_area.entry(dir.to_path_buf()).or_default().push(name.to_string());
+        }
+    }
+    per_area
+}
+
+#[cfg(test)]
+mod download_counter_tests {
+    use super::downloads_per_area;
+    use std::path::PathBuf;
+
+    #[test]
+    fn only_finished_files_are_counted() {
+        let offered = vec![PathBuf::from("/files/A.ZIP"), PathBuf::from("/files/B.ZIP")];
+        let sent = vec!["A.ZIP".to_string()];
+        let per_area = downloads_per_area(&offered, &sent);
+        assert_eq!(per_area[&PathBuf::from("/files")], vec!["A.ZIP".to_string()]);
+    }
+
+    #[test]
+    fn nothing_is_counted_when_the_transfer_failed() {
+        let offered = vec![PathBuf::from("/files/A.ZIP")];
+        assert!(downloads_per_area(&offered, &[]).is_empty());
+    }
+
+    /// The protocol may echo a name back in another case than the area holds it.
+    #[test]
+    fn names_are_matched_without_regard_to_case() {
+        let offered = vec![PathBuf::from("/files/A.ZIP")];
+        let sent = vec!["a.zip".to_string()];
+        let per_area = downloads_per_area(&offered, &sent);
+        assert_eq!(per_area[&PathBuf::from("/files")], vec!["A.ZIP".to_string()]);
+    }
+
+    /// A batch can span areas, and each one keeps its own counters.
+    #[test]
+    fn files_are_grouped_by_their_area() {
+        let offered = vec![PathBuf::from("/one/A.ZIP"), PathBuf::from("/two/B.ZIP")];
+        let sent = vec!["A.ZIP".to_string(), "B.ZIP".to_string()];
+        let per_area = downloads_per_area(&offered, &sent);
+        assert_eq!(per_area.len(), 2);
+        assert_eq!(per_area[&PathBuf::from("/one")], vec!["A.ZIP".to_string()]);
+        assert_eq!(per_area[&PathBuf::from("/two")], vec!["B.ZIP".to_string()]);
+    }
+}

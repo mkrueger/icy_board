@@ -1,3 +1,4 @@
+use crate::icy_board::state::user_commands::mods::filebrowser::FileFilter;
 use dizbase::file_base::pattern::{MatchOptions, Pattern};
 
 use crate::{
@@ -102,7 +103,7 @@ impl IcyBoardState {
                     self.display_file_area(
                         &path,
                         &metadata,
-                        Box::new(move |p, _| {
+                        FileFilter::header(move |p| {
                             if let Some(date) = scan_date {
                                 if p.date() < date {
                                     return false;

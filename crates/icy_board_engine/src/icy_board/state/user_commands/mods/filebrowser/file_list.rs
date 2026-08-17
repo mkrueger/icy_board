@@ -14,6 +14,42 @@ use crate::{
     vm::TerminalTarget,
 };
 
+/// Decides which files a listing shows.
+///
+/// The first stage only looks at the index entry, which is already in memory. The second
+/// stage is optional and is the only reason to touch a file's description, so a plain
+/// listing or a name search never pays for reading - or scanning - metadata it discards.
+pub struct FileFilter {
+    accepts: Box<dyn Fn(&FileHeader) -> bool>,
+    accepts_described: Option<Box<dyn Fn(&FileHeader, &[MetadataHeader]) -> bool>>,
+}
+
+impl FileFilter {
+    /// Shows everything in the area.
+    pub fn all() -> Self {
+        Self::header(|_| true)
+    }
+
+    /// Decides from the index entry alone.
+    pub fn header(accepts: impl Fn(&FileHeader) -> bool + 'static) -> Self {
+        Self {
+            accepts: Box::new(accepts),
+            accepts_described: None,
+        }
+    }
+
+    /// Narrows by index entry first and consults the description only for what survives.
+    pub fn with_description(
+        accepts: impl Fn(&FileHeader) -> bool + 'static,
+        accepts_described: impl Fn(&FileHeader, &[MetadataHeader]) -> bool + 'static,
+    ) -> Self {
+        Self {
+            accepts: Box::new(accepts),
+            accepts_described: Some(Box::new(accepts_described)),
+        }
+    }
+}
+
 pub struct FileList {
     pub path: PathBuf,
     pub files: Arc<Mutex<FileBase>>,
@@ -24,7 +60,7 @@ impl FileList {
         Self { path, files }
     }
 
-    pub async fn display_file_list(&mut self, cmd: &mut IcyBoardState, f: Box<dyn Fn(&FileHeader, &[MetadataHeader]) -> bool>) -> Res<()> {
+    pub async fn display_file_list(&mut self, cmd: &mut IcyBoardState, filter: FileFilter) -> Res<()> {
         let short_header = if let Some(user) = &cmd.session.current_user {
             user.flags.use_short_filedescr
         } else {
@@ -37,10 +73,17 @@ impl FileList {
         let sysop_name = cmd.board.lock().await.config.sysop.name.clone();
         let headers = self.files.lock().await.clone();
         for entry in headers.iter() {
-            let full_path = dir.join(entry.name());
-            let meta_data = self.files.lock().await.read_metadata(&full_path)?;
-            if !f(entry, &meta_data) {
+            if !(filter.accepts)(entry) {
                 continue;
+            }
+            let full_path = dir.join(entry.name());
+            // Only reached by files that are candidates, so an area is not scanned wholesale
+            // just to list a handful of matches.
+            let meta_data = self.files.lock().await.read_metadata(&full_path)?;
+            if let Some(accepts_described) = &filter.accepts_described {
+                if !accepts_described(entry, &meta_data) {
+                    continue;
+                }
             }
             if cmd.session.request_logoff {
                 break;

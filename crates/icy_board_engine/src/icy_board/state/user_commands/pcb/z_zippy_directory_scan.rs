@@ -1,3 +1,4 @@
+use crate::icy_board::state::user_commands::mods::filebrowser::FileFilter;
 use dizbase::file_base::metadata::MetadataType;
 
 use crate::{
@@ -113,31 +114,31 @@ impl IcyBoardState {
                     self.reset_color(TerminalTarget::Both).await?;
                     let r = r.clone();
                     let date_time = dir_numbers.date_time.clone();
+                    let name_pattern = r.clone();
                     self.display_file_area(
                         &path,
                         &metadata,
-                        Box::new(move |p, md| {
-                            if let Some(date) = date_time {
-                                if p.date() < date {
-                                    return false;
-                                }
-                            }
-
-                            if r.is_match(p.name()) {
-                                return true;
-                            }
-
-                            for d in md {
-                                if d.metadata_type != MetadataType::FileID {
-                                    continue;
-                                }
-                                let desc = import_cp437_string(&d.data, true);
-                                if r.is_match(&desc) {
+                        FileFilter::with_description(
+                            // The date is the one thing that can rule a file out before its
+                            // description has to be read.
+                            move |p| date_time.map_or(true, |date| p.date() >= date),
+                            move |p, md| {
+                                if name_pattern.is_match(p.name()) {
                                     return true;
                                 }
-                            }
-                            false
-                        }),
+
+                                for d in md {
+                                    if d.metadata_type != MetadataType::FileID {
+                                        continue;
+                                    }
+                                    let desc = import_cp437_string(&d.data, true);
+                                    if name_pattern.is_match(&desc) {
+                                        return true;
+                                    }
+                                }
+                                false
+                            },
+                        ),
                     )
                     .await?;
                     if self.session.disp_options.abort_printout {
