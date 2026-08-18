@@ -244,7 +244,7 @@ fn main() -> Result<()> {
             exit(1);
         }
     };
-    init_log(&file.parent().unwrap().join("icbsetup.log"));
+    init_log(&file.parent().unwrap().join("icbsetup.log"))?;
     let _board_lock = match BoardLock::acquire(file.parent().unwrap_or_else(|| Path::new("."))) {
         Ok(lock) => lock,
         Err(err) => {
@@ -362,7 +362,7 @@ fn ask_to_create(path: &Path, inside_the_board: bool) -> Answer {
     }
 }
 
-fn init_log(path: &Path) {
+fn init_log(path: &Path) -> Result<()> {
     fern::Dispatch::new()
         // Perform allocation-free log formatting
         .format(|out, message, record| {
@@ -379,10 +379,11 @@ fn init_log(path: &Path) {
         // - and per-module overrides
         .level_for("hyper", log::LevelFilter::Info)
         // Output to stdout, files, and other Dispatch configurations
-        .chain(fern::log_file(path).unwrap())
+        .chain(fern::log_file(path).map_err(|err| eyre!("Can't open log file {}: {err}", path.display()))?)
         // Apply globally
         .apply()
-        .unwrap();
+        .map_err(|err| eyre!("Can't initialize logging: {err}"))?;
+    Ok(())
 }
 
 fn convert_file(entry: &Path) -> Result<()> {

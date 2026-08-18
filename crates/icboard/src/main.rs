@@ -126,10 +126,10 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
         // - and per-module overrides
         .level_for("hyper", log::LevelFilter::Info)
         // Output to stdout, files, and other Dispatch configurations
-        .chain(fern::log_file(&log_file).unwrap())
+        .chain(fern::log_file(&log_file).map_err(|err| std::io::Error::new(err.kind(), format!("Can't open log file {}: {err}", log_file.display())))?)
         // Apply globally
         .apply()
-        .unwrap();
+        .map_err(|err| format!("Can't initialize logging: {err}"))?;
     match IcyBoard::load(&config_file) {
         Ok(mut icy_board) => {
             icy_board.resolve_paths();
@@ -516,33 +516,30 @@ where
             config.options.alarm = !config.options.alarm;
         }
         CallWaitMessage::SystemManager => {
-            let path = std::env::current_exe().unwrap().with_file_name("icbsm");
-            let mut cmd = Command::new(path)
-                .arg(format!("{}", board.lock().await.file_name.display()))
-                .spawn()
-                .expect("icbsm command failed to start");
-            cmd.wait().expect("icbsm command failed to run");
+            let path = std::env::current_exe()?.with_file_name("icbsm");
+            Command::new(&path)
+                .arg(board.lock().await.file_name.as_os_str())
+                .status()
+                .map_err(|err| format!("Can't run {}: {err}", path.display()))?;
             return Ok(true);
         }
         CallWaitMessage::Setup => {
-            let path = std::env::current_exe().unwrap().with_file_name("icbsetup");
-            let mut cmd = Command::new(path)
-                .arg(format!("{}", board.lock().await.file_name.display()))
-                .spawn()
-                .expect("icbsetup command failed to start");
-            cmd.wait().expect("icbsetup command failed to run");
+            let path = std::env::current_exe()?.with_file_name("icbsetup");
+            Command::new(&path)
+                .arg(board.lock().await.file_name.as_os_str())
+                .status()
+                .map_err(|err| format!("Can't run {}: {err}", path.display()))?;
             return Ok(true);
         }
         CallWaitMessage::IcbText => {
             let icbtxt_path = board.lock().await.config.paths.icbtext.clone();
             let icbtxt_path = board.lock().await.resolve_file(&icbtxt_path);
 
-            let path = std::env::current_exe().unwrap().with_file_name("mkicbtxt");
-            let mut cmd = Command::new(path)
-                .arg(format!("{}", icbtxt_path.display()))
-                .spawn()
-                .expect("mkicbtxt command failed to start");
-            cmd.wait().expect("mkicbtxt command failed to run");
+            let path = std::env::current_exe()?.with_file_name("mkicbtxt");
+            Command::new(&path)
+                .arg(icbtxt_path.as_os_str())
+                .status()
+                .map_err(|err| format!("Can't run {}: {err}", path.display()))?;
             return Ok(true);
         }
         CallWaitMessage::ToggleStatistics => unsafe {

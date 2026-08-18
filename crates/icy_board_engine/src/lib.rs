@@ -48,6 +48,11 @@ pub fn lookup_icyboard_file(file: &Option<PathBuf>) -> Option<PathBuf> {
 }
 
 pub fn resolve_icyboard_file(file: &Option<PathBuf>) -> Result<PathBuf, IcyBoardFileLookupError> {
+    resolve_icyboard_file_with_env(file, env::var_os("ICB_PATH").map(PathBuf::from))
+}
+
+fn resolve_icyboard_file_with_env(file: &Option<PathBuf>, icb_path: Option<PathBuf>) -> Result<PathBuf, IcyBoardFileLookupError> {
+    let explicit_path = file.is_some();
     let mut file_path = file.clone().unwrap_or(PathBuf::from("."));
     if file_path.is_dir() {
         file_path = file_path.join(DEFAULT_ICYBOARD_FILE);
@@ -57,8 +62,7 @@ pub fn resolve_icyboard_file(file: &Option<PathBuf>) -> Result<PathBuf, IcyBoard
     if file_path.exists() {
         return Ok(file_path);
     }
-    if let Ok(var) = env::var("ICB_PATH") {
-        let mut path = PathBuf::from(var);
+    if !explicit_path && let Some(mut path) = icb_path {
         if path.is_dir() {
             path.push(DEFAULT_ICYBOARD_FILE);
         }
@@ -68,4 +72,33 @@ pub fn resolve_icyboard_file(file: &Option<PathBuf>) -> Result<PathBuf, IcyBoard
     }
 
     Err(IcyBoardFileLookupError::FileNotFound(file_path))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{IcyBoardFileLookupError, resolve_icyboard_file_with_env};
+    use std::fs;
+    use tempfile::tempdir;
+
+    #[test]
+    fn explicit_missing_path_does_not_fall_back_to_icb_path() {
+        let directory = tempdir().unwrap();
+        fs::write(directory.path().join("icboard.toml"), "").unwrap();
+        let missing = directory.path().join("missing.toml");
+
+        let result = resolve_icyboard_file_with_env(&Some(missing.clone()), Some(directory.path().to_path_buf()));
+
+        assert!(matches!(result, Err(IcyBoardFileLookupError::FileNotFound(path)) if path == missing));
+    }
+
+    #[test]
+    fn omitted_path_can_fall_back_to_icb_path() {
+        let directory = tempdir().unwrap();
+        let board = directory.path().join("icboard.toml");
+        fs::write(&board, "").unwrap();
+
+        let result = resolve_icyboard_file_with_env(&None, Some(directory.path().to_path_buf()));
+
+        assert_eq!(result.ok(), Some(board));
+    }
 }

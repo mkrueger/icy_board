@@ -1,11 +1,9 @@
 use argh::FromArgs;
 use codepages::tables::write_cp437;
-use crossterm::ExecutableCommand;
 use crossterm::execute;
 use crossterm::style::Attribute;
 use crossterm::style::Color;
 use crossterm::style::Print;
-use crossterm::style::ResetColor;
 use crossterm::style::SetAttribute;
 use crossterm::style::SetForegroundColor;
 use icy_board_engine::ast::OutputFunc;
@@ -184,15 +182,7 @@ fn main() {
                             File::create(&out_file_name).and_then(|mut output| write!(output, "{}", output_visitor.output))
                         };
                         if let Err(err) = res {
-                            stdout()
-                                .execute(SetForegroundColor(Color::Red))
-                                .unwrap()
-                                .execute(Print(format!("Can't create {:?} on disk, reason: {}", &out_file_name, err)))
-                                .unwrap()
-                                .execute(ResetColor)
-                                .unwrap()
-                                .flush()
-                                .unwrap();
+                            eprintln!("ERROR: Can't create {}: {err}", out_file_name.display());
                             std::process::exit(1);
                         }
                         let _ = execute!(
@@ -233,34 +223,13 @@ fn main() {
                     std::process::exit(if issues.is_empty() { 0 } else { 1 });
                 }
                 Err(err) => {
-                    let _ = execute!(
-                        stdout(),
-                        SetAttribute(Attribute::Bold),
-                        SetForegroundColor(Color::Red),
-                        Print("ERROR: ".to_string()),
-                        SetAttribute(Attribute::Reset),
-                        SetAttribute(Attribute::Bold),
-                        Print(format!("{}", err)),
-                        SetAttribute(Attribute::Reset),
-                    );
-                    println!();
+                    eprintln!("ERROR: Can't decompile {file_name}: {err}");
                     std::process::exit(1);
                 }
             }
         }
         Err(err) => {
-            let _ = execute!(
-                stdout(),
-                SetAttribute(Attribute::Bold),
-                SetForegroundColor(Color::Red),
-                Print("ERROR: ".to_string()),
-                SetAttribute(Attribute::Reset),
-                SetAttribute(Attribute::Bold),
-                Print(format!("{}", err)),
-                SetAttribute(Attribute::Reset),
-            );
-            println!();
-            println!();
+            eprintln!("ERROR: Can't read {file_name}: {err}");
             std::process::exit(1);
         }
     }

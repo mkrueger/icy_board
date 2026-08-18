@@ -3,7 +3,7 @@ use argh::FromArgs;
 use chrono::Local;
 use color_eyre::Result;
 use icy_board_engine::{
-    DEFAULT_ICYBOARD_FILE, Res,
+    DEFAULT_ICYBOARD_FILE,
     icy_board::{IcyBoard, IcyBoardSerializer, menu::Menu},
 };
 use icy_board_tui::{print_error, term};
@@ -65,10 +65,14 @@ fn main() -> Result<()> {
         exit(1);
     }
 
-    let icy_board = match load_icy_board(file.parent()) {
+    let Some(board_file) = find_icy_board(file.parent()) else {
+        icy_board_tui::print_parent_board_config_not_found("mkicbmnu", &file);
+        exit(1);
+    };
+    let icy_board = match IcyBoard::load(&board_file) {
         Ok(icy_board) => icy_board,
-        Err(_) => {
-            icy_board_tui::print_parent_board_config_not_found("mkicbmnu", &file);
+        Err(err) => {
+            print_error(format!("Can't load {}: {err}", board_file.display()));
             exit(1);
         }
     };
@@ -90,13 +94,25 @@ fn main() -> Result<()> {
         // - and per-module overrides
         .level_for("hyper", log::LevelFilter::Info)
         // Output to stdout, files, and other Dispatch configurations
-        .chain(fern::log_file(&log_file).unwrap())
+        .chain(match fern::log_file(&log_file) {
+            Ok(log) => log,
+            Err(err) => {
+                print_error(format!("Can't open log file {}: {err}", log_file.display()));
+                exit(1);
+            }
+        })
         // Apply globally
         .apply()
-        .unwrap();
+        .unwrap_or_else(|err| {
+            print_error(format!("Can't initialize logging: {err}"));
+            exit(1);
+        });
 
     if arguments.create {
-        Menu::default().save(&file).unwrap();
+        if let Err(err) = Menu::default().save(&file) {
+            print_error(format!("Can't create {}: {err}", file.display()));
+            exit(1);
+        }
     }
 
     match Menu::load(&file) {
@@ -107,7 +123,10 @@ fn main() -> Result<()> {
             app.run(terminal)?;
             term::restore()?;
             if app.save.writes() {
-                mnu.lock().unwrap().save(&file).unwrap();
+                if let Err(err) = mnu.lock().unwrap().save(&file) {
+                    print_error(format!("Can't save {}: {err}", file.display()));
+                    exit(1);
+                }
             }
             Ok(())
         }
@@ -118,15 +137,16 @@ fn main() -> Result<()> {
     }
 }
 
-fn load_icy_board(parent: Option<&std::path::Path>) -> Res<IcyBoard> {
+fn find_icy_board(parent: Option<&std::path::Path>) -> Option<PathBuf> {
     let mut path = parent;
     while path.is_some() {
         let icb_path = path.unwrap();
-        if icb_path.join(DEFAULT_ICYBOARD_FILE).exists() {
-            return IcyBoard::load(&icb_path.join(DEFAULT_ICYBOARD_FILE));
+        let board_file = icb_path.join(DEFAULT_ICYBOARD_FILE);
+        if board_file.exists() {
+            return Some(board_file);
         }
         path = icb_path.parent();
     }
 
-    Err(std::io::Error::new(std::io::ErrorKind::NotFound, format!("{} not found", DEFAULT_ICYBOARD_FILE)).into())
+    None
 }

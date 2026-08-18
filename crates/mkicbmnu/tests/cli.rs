@@ -51,3 +51,26 @@ fn missing_parent_board_explains_where_it_is_expected() {
 
     fs::remove_dir(directory).unwrap();
 }
+
+#[test]
+fn malformed_parent_board_reports_the_file_and_load_error() {
+    let directory = temp_dir("malformed-board");
+    fs::create_dir(&directory).unwrap();
+    fs::write(directory.join("icboard.toml"), b"not valid toml").unwrap();
+    let menu = directory.join("main.mnu");
+
+    let output = mkicbmnu()
+        .args(["--create", menu.to_str().unwrap()])
+        .env("LANG", "en_US.UTF-8")
+        .output()
+        .unwrap();
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert!(!output.status.success());
+    assert!(stderr.contains("Can't load"));
+    assert!(stderr.contains("icboard.toml"));
+    assert!(!stderr.contains("No icboard.toml found"));
+    assert!(!stderr.contains("panicked"));
+
+    fs::remove_dir_all(directory).unwrap();
+}
