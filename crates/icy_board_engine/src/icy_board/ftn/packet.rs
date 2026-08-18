@@ -6,7 +6,7 @@ use std::{
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use chrono::{Datelike, NaiveDate, NaiveDateTime, Timelike};
-use jamjam::util::echmoail::EchomailAddress;
+use jamjam::util::echomail::EchomailAddress;
 use thiserror::Error;
 
 /// A packet is a stream of messages, terminated where the next message type

@@ -8,7 +8,7 @@ use bstr::BString;
 use chrono::{DateTime, Local, Utc};
 use jamjam::{
     jam::{JamMessage, JamMessageBase},
-    qwk::{control::ControlDat, qwk_message::QWKMessage},
+    qwk::{control::ControlDat, qwk_message::QwkMessage},
     util::basic_real::BasicReal,
 };
 use tokio::fs;
@@ -397,6 +397,8 @@ impl IcyBoardState {
                 welcome_screen: welcome.as_ref().map(|(name, _)| name.as_str()).unwrap_or_default().into(),
                 news_screen: news.as_ref().map(|(name, _)| name.as_str()).unwrap_or_default().into(),
                 logoff_screen: goodbye.as_ref().map(|(name, _)| name.as_str()).unwrap_or_default().into(),
+                // Only mail doors put anything after the screen names.
+                extra_lines: Vec::new(),
             };
             let Some(user) = &mut self.session.current_user else {
                 return Ok(());
@@ -441,19 +443,18 @@ impl IcyBoardState {
 
                         match JamMessageBase::open(&message_base_file) {
                             Ok(message_base) => {
-                                let base = message_base.base_messagenumber();
-                                let active = message_base.active_messages();
+                                let highest = message_base.highest_message_number();
 
                                 ndx_data.insert(conference_number, Vec::new());
-                                for i in ptr.highest_msg_read as u32..(base + active) {
+                                for i in ptr.highest_msg_read as u32..=highest {
                                     if let Ok(header) = message_base.read_header(i) {
-                                        if let Ok(text) = message_base.read_msg_text(&header) {
+                                        if let Ok(text) = message_base.read_message_text(&header) {
                                             let date_time = DateTime::from_timestamp(header.date_written as i64, 0).unwrap_or(Utc::now());
-                                            let qwk_msg = QWKMessage {
+                                            let qwk_msg = QwkMessage {
                                                 msg_number: header.message_number,
-                                                from: header.get_from().unwrap().clone(),
-                                                to: header.get_to().unwrap().clone(),
-                                                subj: header.get_subject().unwrap().clone(),
+                                                from: header.from().unwrap().clone(),
+                                                to: header.to().unwrap().clone(),
+                                                subj: header.subject().unwrap().clone(),
                                                 date_time: date_time.format("%m-%d-%y%H:%M").to_string().into(),
                                                 text,
                                                 status: b' ',
@@ -570,7 +571,7 @@ impl IcyBoardState {
                             }
                         }
 
-                        while let Ok(msg) = QWKMessage::read(&mut cursor, true) {
+                        while let Ok(msg) = QwkMessage::read(&mut cursor, true) {
                             if let Some((conf, area)) = number_to_msgid.get(msg.msg_number as usize) {
                                 let jam_msg = JamMessage::default()
                                     .with_from(msg.from)

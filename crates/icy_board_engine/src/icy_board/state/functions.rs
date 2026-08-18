@@ -604,7 +604,7 @@ impl IcyBoardState {
 
     pub async fn send_message(&mut self, conf: i32, area: i32, msg: JamMessage, text: IceText) -> Res<()> {
         let msg_base = if conf < 0 {
-            let user_name = msg.get_to().unwrap().to_string();
+            let user_name = msg.to().unwrap().to_string();
             self.get_email_msgbase(&user_name).await
         } else {
             let msg_base = self.get_board().await.conferences[conf as usize].areas.as_ref().unwrap()[area as usize]
@@ -615,6 +615,7 @@ impl IcyBoardState {
             } else {
                 JamMessageBase::create(msg_base)
             }
+            .map_err(Into::into)
         };
 
         match msg_base {

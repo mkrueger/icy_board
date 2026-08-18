@@ -5,7 +5,7 @@ use std::{
 };
 
 use chrono::{Datelike, NaiveDateTime, Weekday};
-use jamjam::util::echmoail::EchomailAddress;
+use jamjam::util::echomail::EchomailAddress;
 use thiserror::Error;
 use zip::write::SimpleFileOptions;
 

@@ -69,7 +69,7 @@ pub fn remove(config: &FtnConfig, record: usize) -> Res<bool> {
 mod tests {
     use super::*;
     use crate::icy_board::ftn::FtnLink;
-    use jamjam::util::echmoail::EchomailAddress;
+    use jamjam::util::echomail::EchomailAddress;
 
     fn config(directory: &Path) -> FtnConfig {
         FtnConfig {

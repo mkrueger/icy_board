@@ -98,21 +98,21 @@ impl IcyBoardState {
         let Some(path) = self.message_area_path(self.session.current_message_area) else {
             return Ok(());
         };
-        let Ok(mut message_base) = JamMessageBase::open(&path) else {
+        let Ok(message_base) = JamMessageBase::open(&path) else {
             log::error!("View settings could not open the message base {}", path.display());
             return Ok(());
         };
 
-        let low = message_base.base_messagenumber();
-        let high = message_base.active_messages();
-        let crc = JamMessageBase::get_crc(&BString::from(self.session.user_name.as_bytes()));
+        let low = message_base.lowest_message_number();
+        let high = message_base.highest_message_number();
+        let crc = JamMessageBase::crc(&BString::from(self.session.user_name.as_bytes()));
         let last_read = match message_base.find_last_read(crc, self.session.cur_user_id as u32) {
             Ok(Some(entry)) => entry.last_read_msg,
             _ => 0,
         };
         // A pointer outside the base is what packing the base leaves behind.
         let last_read = last_read.clamp(low.saturating_sub(1), high);
-        let active = (low..=high).filter(|no| message_base.read_header(*no).is_ok()).count();
+        let active = message_base.active_messages();
 
         self.show_setting_number(IceText::ViewSettingsLastMessageRead, last_read as i64).await?;
         self.show_setting_number(IceText::ViewSettingsHighMessageNumber, high as i64).await?;

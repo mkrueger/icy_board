@@ -27,6 +27,7 @@ use icy_net::crc::update_crc32;
 use jamjam::jam::JamMessageBase;
 use jamjam::jam::attributes as jam_attributes;
 use jamjam::jam::msg_header::JamMessageHeader;
+use jamjam::jam::raw;
 use jamjam::util::basic_real::{BasicDouble, BasicReal};
 use radix_fmt::radix;
 
@@ -1679,7 +1680,7 @@ pub async fn lomsgnum(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
     let area = 0;
     let msg_base: PathBuf = vm.icy_board_state.session.current_conference.areas.as_ref().unwrap()[area].path.clone();
     match JamMessageBase::open(msg_base) {
-        Ok(base) => Ok(VariableValue::new_int(base.base_messagenumber() as i32)),
+        Ok(base) => Ok(VariableValue::new_int(base.lowest_message_number() as i32)),
         Err(err) => {
             log::error!("LOMSGNUM can't open message base in area {area}: {err}");
             Ok(VariableValue::new_int(0))
@@ -1691,7 +1692,7 @@ pub async fn himsgnum(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
     let area = 0;
     let msg_base = vm.icy_board_state.session.current_conference.areas.as_ref().unwrap()[area].path.clone();
     match JamMessageBase::open(&msg_base) {
-        Ok(base) => Ok(VariableValue::new_int((base.base_messagenumber() + base.active_messages() - 1) as i32)),
+        Ok(base) => Ok(VariableValue::new_int(base.highest_message_number() as i32)),
         Err(err) => {
             log::error!("HIMSGNUM can't open message base in area {area}: {err}");
             Ok(VariableValue::new_int(0))
@@ -2508,7 +2509,7 @@ fn get_field(field_num: i32, header: &JamMessageHeader) -> Res<VariableValue> {
             String::new()
         })),
         HDR_FROM => {
-            if let Some(from) = header.get_from() {
+            if let Some(from) = header.from() {
                 Ok(VariableValue::new_string(from.to_string()))
             } else {
                 Ok(VariableValue::new_string(String::new()))
@@ -2518,12 +2519,12 @@ fn get_field(field_num: i32, header: &JamMessageHeader) -> Res<VariableValue> {
         HDR_MSGREF => Ok(VariableValue::new_int(header.reply_to as i32)),
         HDR_PWD => Ok(VariableValue::new_int(header.password_crc as i32)),
         // PCBoard keeps a one character flag here, blank when nobody replied.
-        HDR_REPLY => Ok(VariableValue::new_string(if header.reply1st != 0 { "R".to_string() } else { String::new() })),
+        HDR_REPLY => Ok(VariableValue::new_string(if header.reply_first != 0 { "R".to_string() } else { String::new() })),
         HDR_RPLYDATE => Ok(VariableValue::new_int(0)),
         HDR_RPLYTIME => Ok(VariableValue::new_string(String::new())),
         HDR_STATUS => Ok(VariableValue::new_string(message_status(header).to_string())),
         HDR_SUBJ => {
-            if let Some(subj) = header.get_subject() {
+            if let Some(subj) = header.subject() {
                 Ok(VariableValue::new_string(subj.to_string()))
             } else {
                 Ok(VariableValue::new_string(String::new()))
@@ -2535,7 +2536,7 @@ fn get_field(field_num: i32, header: &JamMessageHeader) -> Res<VariableValue> {
             Ok(VariableValue::new_string(format!("{:02}:{:02}", time.get_hour(), time.get_minute())))
         }
         HDR_TO => {
-            if let Some(to) = header.get_to() {
+            if let Some(to) = header.to() {
                 Ok(VariableValue::new_string(to.to_string()))
             } else {
                 Ok(VariableValue::new_string(String::new()))
@@ -2562,14 +2563,14 @@ pub async fn setmsghdr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Var
         log::error!("SETMSGHDR: no message base {conf_num}:{area_num}");
         return Ok(VariableValue::new_int(0));
     };
-    let base = JamMessageBase::open(msg_base)?;
+    let mut base = JamMessageBase::open(msg_base)?;
     let Ok(mut header) = base.read_header(msg_num) else {
         return Ok(VariableValue::new_int(0));
     };
     if !set_field(field_num, &mut header, &value) {
         return Ok(VariableValue::new_int(0));
     }
-    match base.update_header(msg_num, &header) {
+    match raw::update_header(&mut base, msg_num, &header) {
         Ok(()) => Ok(VariableValue::new_int(msg_num as i32)),
         Err(err) => {
             log::error!("SETMSGHDR: can't write header {msg_num} in {conf_num}:{area_num} ({err})");
@@ -2598,7 +2599,7 @@ fn set_field(field_num: i32, header: &mut JamMessageHeader, value: &str) -> bool
             true
         }
         4 | HDR_PWD => {
-            header.password_crc = JamMessageBase::get_crc(&BString::from(value.to_lowercase()));
+            header.password_crc = JamMessageBase::crc(&BString::from(value.to_lowercase()));
             true
         }
         5 | HDR_ECHO => {
@@ -2642,8 +2643,8 @@ pub async fn scanmsghdr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Va
         return Ok(VariableValue::new_int(0));
     };
     let base = JamMessageBase::open(msg_base)?;
-    let last = base.base_messagenumber() + base.active_messages();
-    for number in start_msg.max(base.base_messagenumber())..last {
+    let last = base.highest_message_number();
+    for number in start_msg.max(base.lowest_message_number())..=last {
         let Ok(header) = base.read_header(number) else {
             continue;
         };

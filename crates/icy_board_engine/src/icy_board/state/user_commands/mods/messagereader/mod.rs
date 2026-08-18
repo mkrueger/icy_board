@@ -163,7 +163,7 @@ impl MessageViewer {
             "{} {} {} ({} {})",
             header.message_number,
             self.separator.text,
-            msg_base.active_messages(),
+            msg_base.highest_message_number(),
             self.refer_num.text,
             if header.reply_to == 0 {
                 self.none.text.clone()
@@ -176,7 +176,7 @@ impl MessageViewer {
 
         let c1 = state.get_board().await.config.color_configuration.msg_hdr_to.clone();
         state.set_color(TerminalTarget::Both, c1).await?;
-        let txt = self.format_hdr_text(&self.to_line.text, &header.get_to().unwrap().to_string(), "");
+        let txt = self.format_hdr_text(&self.to_line.text, &header.to().unwrap().to_string(), "");
         if state.session.search_pattern.is_some() {
             state.print_found_text(TerminalTarget::Both, &txt).await?;
         } else {
@@ -185,7 +185,7 @@ impl MessageViewer {
 
         let c1 = state.get_board().await.config.color_configuration.msg_hdr_from.clone();
         state.set_color(TerminalTarget::Both, c1).await?;
-        let txt = self.format_hdr_text(&self.from_line.text, &header.get_from().unwrap().to_string(), "");
+        let txt = self.format_hdr_text(&self.from_line.text, &header.from().unwrap().to_string(), "");
         if state.session.search_pattern.is_some() {
             state.print_found_text(TerminalTarget::Both, &txt).await?;
         } else {
@@ -194,7 +194,7 @@ impl MessageViewer {
 
         let c1 = state.get_board().await.config.color_configuration.msg_hdr_subj.clone();
         state.set_color(TerminalTarget::Both, c1).await?;
-        let txt = self.format_hdr_text(&self.subj_line.text, &header.get_subject().unwrap().to_string(), "");
+        let txt = self.format_hdr_text(&self.subj_line.text, &header.subject().unwrap().to_string(), "");
         if state.session.search_pattern.is_some() {
             state.print_found_text(TerminalTarget::Both, &txt).await?;
         } else {
@@ -244,12 +244,12 @@ impl MessageViewer {
 impl IcyBoardState {
     pub async fn read_msgs_from_base(&mut self, mut message_base: JamMessageBase, only_personal: bool) -> Res<()> {
         let viewer = MessageViewer::load(&self.display_text)?;
-        let mut base_number = message_base.base_messagenumber();
-        let mut active_messages = message_base.active_messages();
+        let mut low_number = message_base.lowest_message_number();
+        let mut high_number = message_base.highest_message_number();
         let mut messages = Vec::new();
         if only_personal {
-            for msg in message_base.iter().flatten() {
-                if let Some(to) = msg.get_to() {
+            for msg in message_base.messages().flatten() {
+                if let Some(to) = msg.to() {
                     let mut to = to.clone();
                     to.make_ascii_uppercase();
                     if to == self.session.alias_name.to_ascii_uppercase() || to == self.session.user_name.to_ascii_uppercase() {
@@ -258,11 +258,12 @@ impl IcyBoardState {
                 }
             }
             if !messages.is_empty() {
-                base_number = messages.first().unwrap_or(&0).to_owned();
+                low_number = messages.first().unwrap_or(&0).to_owned();
+                high_number = messages.last().unwrap_or(&0).to_owned();
             } else {
-                base_number = 0;
+                low_number = 0;
+                high_number = 0;
             }
-            active_messages = messages.len() as u32;
         }
         while !self.session.disp_options.abort_printout {
             let prompt = if self.session.expert_mode() {
@@ -270,7 +271,7 @@ impl IcyBoardState {
             } else {
                 IceText::MessageReadCommand
             };
-            self.session.op_text = format!("{}-{}", base_number, active_messages);
+            self.session.op_text = format!("{}-{}", low_number, high_number);
 
             if self.session.tokens.is_empty() {
                 let text = self
@@ -314,8 +315,7 @@ impl IcyBoardState {
             // bottom of the base.
             if cmd.since {
                 let last_read = self.last_read_pointer(&mut message_base)?;
-                let high = base_number.saturating_add(active_messages).saturating_sub(1).max(base_number);
-                if last_read >= high {
+                if last_read >= high_number {
                     self.display_text(IceText::NoMailFound, display_flags::NEWLINE | display_flags::LFAFTER).await?;
                     continue;
                 }
@@ -336,7 +336,7 @@ impl IcyBoardState {
             let filter = MessageFilter::new(&cmd, &self.session);
 
             for range in cmd.numbers.clone() {
-                let (first, last) = self.clamp_range(range, base_number, active_messages);
+                let (first, last) = self.clamp_range(range, low_number, high_number);
                 if first == 0 {
                     continue;
                 }
@@ -351,7 +351,7 @@ impl IcyBoardState {
     /// Where this message base left the current user's last-read pointer.
     fn last_read_pointer(&mut self, message_base: &mut JamMessageBase) -> Res<u32> {
         unsafe {
-            let crc = JamMessageBase::get_crc(&bstr::BString::new(self.session.user_name.as_mut_vec().clone()));
+            let crc = JamMessageBase::crc(&bstr::BString::new(self.session.user_name.as_mut_vec().clone()));
             let last_read = message_base
                 .find_last_read(crc, self.session.cur_user_id as u32)?
                 .unwrap_or(message_base.create_last_read(crc, self.session.cur_user_id as u32)?);
@@ -380,9 +380,9 @@ impl IcyBoardState {
     }
 
     /// Turn a parsed range into the message numbers this base actually holds.
-    fn clamp_range(&self, range: read_command::MsgRange, base_number: u32, active_messages: u32) -> (u32, u32) {
-        let high = base_number.saturating_add(active_messages).saturating_sub(1).max(base_number);
-        let clamp = |value: i64| -> u32 { value.clamp(base_number as i64, high as i64) as u32 };
+    fn clamp_range(&self, range: read_command::MsgRange, low_number: u32, high_number: u32) -> (u32, u32) {
+        let high = high_number.max(low_number);
+        let clamp = |value: i64| -> u32 { value.clamp(low_number as i64, high as i64) as u32 };
         (clamp(range.first), clamp(range.last))
     }
 
@@ -543,13 +543,13 @@ impl IcyBoardState {
             return Ok(());
         }
         self.session.current_messagenumber = number;
-        self.session.low_msg_num = message_base.base_messagenumber();
-        self.session.high_msg_num = message_base.base_messagenumber() + message_base.active_messages();
+        self.session.low_msg_num = message_base.lowest_message_number();
+        self.session.high_msg_num = message_base.highest_message_number();
 
         // PCBoard's LastReadUpdate decides whether reading drags the pointer along.
         let update_last_read = self.get_board().await.config.message.update_last_read_pointer;
         unsafe {
-            let crc = JamMessageBase::get_crc(&bstr::BString::new(self.session.user_name.as_mut_vec().clone()));
+            let crc = JamMessageBase::crc(&bstr::BString::new(self.session.user_name.as_mut_vec().clone()));
             let mut opt = message_base
                 .find_last_read(crc, self.session.cur_user_id as u32)?
                 .unwrap_or(message_base.create_last_read(crc, self.session.cur_user_id as u32)?);
@@ -559,7 +559,7 @@ impl IcyBoardState {
             if update_last_read {
                 opt.last_read_msg = number;
                 opt.high_read_msg = opt.high_read_msg.max(number);
-                message_base.write_last_read(opt)?;
+                message_base.write_last_read(&opt)?;
             }
         }
         let last_read = self.session.last_msg_read;
@@ -573,7 +573,7 @@ impl IcyBoardState {
                 let found = loop {
                     match message_base.read_header(number) {
                         Ok(header) => {
-                            let text = message_base.read_msg_text(&header)?.to_string();
+                            let text = message_base.read_message_text(&header)?.to_string();
                             if filter.matches(&header, &text, last_read) {
                                 break Some((header, text));
                             }

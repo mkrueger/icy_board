@@ -57,9 +57,7 @@ pub struct MessageArea {
 
 impl MessageArea {
     pub fn get_high_msg(&self) -> u32 {
-        JamMessageBase::open(&self.path)
-            .map(|jam| jam.base_messagenumber() + jam.active_messages())
-            .unwrap_or(0)
+        JamMessageBase::open(&self.path).map(|jam| jam.highest_message_number()).unwrap_or(0)
     }
 }
 

@@ -27,7 +27,7 @@ use icy_board_engine::{
     },
 };
 use icy_engine::{CharacterFormatOptions, FileFormat, FormatOptions, SaveOptions, ScreenPreperation};
-use jamjam::{jam::JamMessageBase, util::echmoail::EchomailAddress};
+use jamjam::{jam::JamMessageBase, util::echomail::EchomailAddress};
 
 use crate::import::{OutputLogger, console_logger::ConsoleLogger};
 
@@ -458,7 +458,7 @@ impl IcyBoardCreator {
 }
 
 fn write_welcome_msg() -> jamjam::jam::JamMessage {
-    jamjam::jam::JamMessage::new(1, &EchomailAddress::default())
+    jamjam::jam::JamMessage::new(&EchomailAddress::default())
         .with_date_time(Utc::now())
         .with_from(BString::from("Mike Krueger"))
         .with_to(BString::from("SYSOP"))

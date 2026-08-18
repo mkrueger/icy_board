@@ -36,6 +36,22 @@ fn view_settings_shows_the_message_base_stats() {
     assert!(active.contains('3'), "the three messages of the area were not counted:\n{output}");
 }
 
+/// A deleted message leaves a gap, so the count and the highest number part ways.
+#[test]
+fn view_settings_counts_active_messages_apart_from_the_high_number() {
+    let output = test_output("V\n".to_string(), |board| {
+        setup_conference_with_messages(board);
+        let path = board.conferences[0].areas.as_ref().unwrap()[0].path.clone();
+        let mut base = jamjam::jam::JamMessageBase::open(path).unwrap();
+        base.delete_message(2).unwrap();
+    });
+
+    let high = output.lines().find(|line| line.contains("High Msg. #")).unwrap_or_default();
+    assert!(high.contains('3'), "the highest number should survive the deletion:\n{output}");
+    let active = output.lines().find(|line| line.contains("Active Msgs")).unwrap_or_default();
+    assert!(active.contains('2'), "the deleted message should not be counted:\n{output}");
+}
+
 #[test]
 fn view_settings_shows_the_ratios_when_the_level_sets_them() {
     let output = test_output("V\n".to_string(), |board| {

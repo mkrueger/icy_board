@@ -265,14 +265,14 @@ impl IcyBoardState {
     /// Walks one base the way PCBoard does: forward from the last-read pointer
     /// when scanning since the last call, backwards from the top otherwise.
     fn scan_base(&self, msg_base: &mut JamMessageBase, scan: &YourMailScan, name: &BString, alias: &BString, result: &mut ScanResult) {
-        let low = msg_base.base_messagenumber();
-        let high = msg_base.active_messages();
+        let low = msg_base.lowest_message_number();
+        let high = msg_base.highest_message_number();
         if high < low {
             return;
         }
         let last_read = if scan.since {
             msg_base
-                .find_last_read(JamMessageBase::get_crc(name), self.session.cur_user_id as u32)
+                .find_last_read(JamMessageBase::crc(name), self.session.cur_user_id as u32)
                 .ok()
                 .flatten()
                 .map_or(0, |entry| entry.last_read_msg)
@@ -299,10 +299,10 @@ impl IcyBoardState {
                 number,
                 read: header.is_read(),
             };
-            if matches_user(header.get_to(), name, alias) {
+            if matches_user(header.to(), name, alias) {
                 result.to_you.push(entry(number, &header));
             }
-            if matches_user(header.get_from(), name, alias) {
+            if matches_user(header.from(), name, alias) {
                 result.from_you.push(entry(number, &header));
             }
         }
@@ -313,7 +313,7 @@ impl IcyBoardState {
         if !header.is_private() || self.session.is_sysop {
             return true;
         }
-        matches_user(header.get_to(), name, alias) || matches_user(header.get_from(), name, alias)
+        matches_user(header.to(), name, alias) || matches_user(header.from(), name, alias)
     }
 }
 

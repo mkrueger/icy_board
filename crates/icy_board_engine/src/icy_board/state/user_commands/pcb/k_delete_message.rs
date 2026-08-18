@@ -13,11 +13,11 @@ impl IcyBoardState {
         let message_base_file = self.session.current_conference.areas.as_ref().unwrap()[0].path.clone();
 
         match JamMessageBase::open(&message_base_file) {
-            Ok(message_base) => {
+            Ok(mut message_base) => {
                 let msg = if let Some(token) = self.session.tokens.pop_front() {
                     token
                 } else {
-                    self.session.op_text = format!("{}-{}", message_base.base_messagenumber(), message_base.active_messages());
+                    self.session.op_text = format!("{}-{}", message_base.lowest_message_number(), message_base.highest_message_number());
 
                     self.input_field(
                         IceText::MessageNumberToKill,
@@ -31,7 +31,7 @@ impl IcyBoardState {
                 };
 
                 if let Ok(number) = msg.parse::<u32>() {
-                    self.try_to_kill_message(&message_base, number).await?;
+                    self.try_to_kill_message(&mut message_base, number).await?;
                 }
                 Ok(())
             }
@@ -53,7 +53,7 @@ impl IcyBoardState {
         }
     }
 
-    pub(crate) async fn try_to_kill_message(&mut self, message_base: &JamMessageBase, number: u32) -> Res<()> {
+    pub(crate) async fn try_to_kill_message(&mut self, message_base: &mut JamMessageBase, number: u32) -> Res<()> {
         if let Ok(header) = message_base.read_header(number) {
             // Killing asks for the caller's own password, not the one that guards reading.
             if header.needs_password() && !self.check_password(IceText::YourPassword, 0, |pwd| header.is_password_valid(pwd)).await? {
@@ -63,14 +63,14 @@ impl IcyBoardState {
 
         match message_base.delete_message(number) {
             Ok(_) => {
-                log::error!("Deleted message {} ({})", number, message_base.get_filename().display());
+                log::error!("Deleted message {} ({})", number, message_base.path().display());
                 self.display_text(IceText::MessageKilled, display_flags::DEFAULT).await?;
                 self.print(TerminalTarget::Both, &format!("{}", number)).await?;
                 self.new_line().await?;
                 self.new_line().await?;
             }
             Err(err) => {
-                log::error!("Error deleting message:{} ({})/ {}", number, message_base.get_filename().display(), err);
+                log::error!("Error deleting message:{} ({})/ {}", number, message_base.path().display(), err);
                 self.display_text(IceText::NoSuchMessageNumber, display_flags::DEFAULT).await?;
                 self.print(TerminalTarget::Both, &format!("{}", number)).await?;
                 self.new_line().await?;

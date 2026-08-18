@@ -2,7 +2,7 @@
 
 use bstr::BString;
 use jamjam::jam::msg_header::{JamMessageHeader, MessageSubfield, SubfieldType};
-use jamjam::jam::{JamMessage, JamMessageBase, attributes};
+use jamjam::jam::{JamMessage, JamMessageBase, attributes, raw};
 
 use crate::Res;
 use crate::icy_board::icb_text::IceText;
@@ -14,7 +14,7 @@ use super::read_command::{MsgFunc, ReadCommand};
 
 /// Swaps one variable length header field for a new value.
 fn replace_sub_field(header: &mut JamMessageHeader, field: SubfieldType, value: &str) {
-    header.sub_fields.retain(|sub_field| sub_field.get_type() != &field);
+    header.sub_fields.retain(|sub_field| sub_field.field_type() != field);
     header.sub_fields.push(MessageSubfield::new(field, BString::from(value)));
 }
 
@@ -51,7 +51,7 @@ impl IcyBoardState {
                     } else {
                         (0, attributes::MSG_PRIVATE)
                     };
-                    if let Err(err) = message_base.set_attributes(number, set, clear) {
+                    if let Err(err) = raw::set_attributes(message_base, number, set, clear) {
                         log::error!("Error changing the protection of message {number}: {err}");
                         self.display_text(IceText::MessageBaseError, display_flags::NEWLINE).await?;
                     }
@@ -156,12 +156,12 @@ impl IcyBoardState {
             self.display_text(IceText::NoSuchMessageNumber, display_flags::NEWLINE).await?;
             return Ok(false);
         };
-        let text = message_base.read_msg_text(&header)?;
+        let text = message_base.read_message_text(&header)?;
 
         let mut msg = JamMessage::default()
-            .with_from(header.get_from().cloned().unwrap_or_default())
-            .with_to(header.get_to().cloned().unwrap_or_default())
-            .with_subject(header.get_subject().cloned().unwrap_or_default())
+            .with_from(header.from().cloned().unwrap_or_default())
+            .with_to(header.to().cloned().unwrap_or_default())
+            .with_subject(header.subject().cloned().unwrap_or_default())
             .with_date_time(chrono::Utc::now())
             .with_attributes(header.attributes)
             .with_text(BString::from(text));
@@ -188,7 +188,7 @@ impl IcyBoardState {
             return Ok(());
         };
 
-        let from = header.get_from().map(|f| f.to_string()).unwrap_or_default();
+        let from = header.from().map(|f| f.to_string()).unwrap_or_default();
         let edit_all = self.get_board().await.config.sysop_command_level.edit_any_message.clone();
         let own = from.eq_ignore_ascii_case(&self.session.user_name) || from.eq_ignore_ascii_case(&self.session.alias_name);
         if !own && !edit_all.session_can_access(&self.session) {
@@ -197,8 +197,8 @@ impl IcyBoardState {
             return Ok(());
         }
 
-        let to = header.get_to().map(|f| f.to_string()).unwrap_or_default();
-        let subject = header.get_subject().map(|f| f.to_string()).unwrap_or_default();
+        let to = header.to().map(|f| f.to_string()).unwrap_or_default();
+        let subject = header.subject().map(|f| f.to_string()).unwrap_or_default();
         self.display_text(IceText::To, display_flags::DEFAULT).await?;
         self.println(TerminalTarget::Both, &to).await?;
         self.display_text(IceText::From, display_flags::DEFAULT).await?;
@@ -260,7 +260,7 @@ impl IcyBoardState {
                 match answer.as_str() {
                     "N" => {
                         header.attributes &= !attributes::MSG_PRIVATE;
-                        header.password_crc = JamMessageBase::get_crc(&BString::from(""));
+                        header.password_crc = JamMessageBase::crc(&BString::from(""));
                     }
                     "R" => header.attributes |= attributes::MSG_PRIVATE,
                     "S" | "G" => {
@@ -275,7 +275,7 @@ impl IcyBoardState {
                                 display_flags::FIELDLEN | display_flags::UPCASE | display_flags::NEWLINE | display_flags::HIGHASCII,
                             )
                             .await?;
-                        header.password_crc = JamMessageBase::get_crc(&BString::from(password.as_str()));
+                        header.password_crc = JamMessageBase::crc(&BString::from(password.as_str()));
                     }
                     _ => return Ok(()),
                 }
@@ -331,7 +331,7 @@ impl IcyBoardState {
     }
 
     async fn write_header(&mut self, message_base: &mut JamMessageBase, number: u32, header: &JamMessageHeader) -> Res<()> {
-        if let Err(err) = message_base.update_header(number, header) {
+        if let Err(err) = raw::update_header(message_base, number, header) {
             log::error!("Error writing the header of message {number}: {err}");
             self.display_text(IceText::MessageBaseError, display_flags::NEWLINE).await?;
         }
@@ -340,8 +340,8 @@ impl IcyBoardState {
 
     /// R's SET command: move this conference's last-read pointer.
     pub(super) async fn set_last_message_read(&mut self, cmd: &ReadCommand, message_base: &mut JamMessageBase) -> Res<()> {
-        let low = message_base.base_messagenumber();
-        let high = low + message_base.active_messages().saturating_sub(1);
+        let low = message_base.lowest_message_number();
+        let high = message_base.highest_message_number();
 
         let number = match cmd.new_last_read {
             Some(number) => number,
@@ -369,12 +369,12 @@ impl IcyBoardState {
 
         let number = number.clamp(0, high as i64) as u32;
         unsafe {
-            let crc = JamMessageBase::get_crc(&BString::new(self.session.user_name.as_mut_vec().clone()));
+            let crc = JamMessageBase::crc(&BString::new(self.session.user_name.as_mut_vec().clone()));
             let mut last_read = message_base
                 .find_last_read(crc, self.session.cur_user_id as u32)?
                 .unwrap_or(message_base.create_last_read(crc, self.session.cur_user_id as u32)?);
             last_read.last_read_msg = number;
-            message_base.write_last_read(last_read)?;
+            message_base.write_last_read(&last_read)?;
         }
         self.session.last_msg_read = number;
 

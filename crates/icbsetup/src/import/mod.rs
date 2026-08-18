@@ -55,7 +55,7 @@ use icy_board_engine::{
         user_base::{PasswordInfo, User},
     },
 };
-use jamjam::util::echmoail::EchomailAddress;
+use jamjam::util::echomail::EchomailAddress;
 use relative_path::{PathExt, RelativePathBuf};
 use walkdir::WalkDir;
 

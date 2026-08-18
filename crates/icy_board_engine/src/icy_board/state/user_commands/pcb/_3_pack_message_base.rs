@@ -25,10 +25,7 @@ impl IcyBoardState {
             return Ok(());
         }
 
-        let mut options = PackOptions {
-            index_only: self.ask_yes_no(IceText::GenerateNewIndex, false).await?,
-            ..Default::default()
-        };
+        let mut options = PackOptions::default().with_index_only(self.ask_yes_no(IceText::GenerateNewIndex, false).await?);
 
         if !options.index_only {
             let answer = self
@@ -44,9 +41,11 @@ impl IcyBoardState {
             let purge_date = IcbDate::parse(answer.trim());
             // "010180" is the answer that switches the date criteria off.
             let unset = purge_date.is_empty() || (purge_date.year() == 1980 && purge_date.month() == 1 && purge_date.day() == 1);
-            options.purge_before = (!unset).then(|| purge_date.to_utc_date_time());
+            if !unset {
+                options = options.with_purge_before(purge_date.to_utc_date_time());
+            }
 
-            options.purge_received_private = self.ask_yes_no(IceText::PurgePrivateReceived, false).await?;
+            options = options.with_purge_received_private(self.ask_yes_no(IceText::PurgePrivateReceived, false).await?);
 
             if self.ask_yes_no(IceText::RenumberDuringPack, false).await? {
                 let answer = self
@@ -60,7 +59,9 @@ impl IcyBoardState {
                     )
                     .await?;
                 // A number of zero, or none at all, aborts the renumbering.
-                options.renumber_from = answer.trim().parse::<u32>().ok().filter(|number| *number > 0);
+                if let Some(number) = answer.trim().parse::<u32>().ok().filter(|number| *number > 0) {
+                    options = options.with_renumber_from(number);
+                }
             }
         }
 

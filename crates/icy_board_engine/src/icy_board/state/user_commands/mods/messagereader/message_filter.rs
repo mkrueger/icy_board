@@ -80,9 +80,9 @@ impl MessageFilter {
     }
 
     pub fn matches(&self, header: &JamMessageHeader, body: &str, last_read: u32) -> bool {
-        let to = field(header.get_to());
-        let from = field(header.get_from());
-        let subject = field(header.get_subject());
+        let to = field(header.to());
+        let from = field(header.from());
+        let subject = field(header.subject());
 
         if !self.any_msgs && !(self.your_msgs && self.is_own(&to) || self.from_msgs && self.is_own(&from) || self.msgs_to_all && to == "ALL") {
             return false;

@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use jamjam::util::echmoail::EchomailAddress;
+use jamjam::util::echomail::EchomailAddress;
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 

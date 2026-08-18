@@ -2647,7 +2647,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.62.2",
+ "windows-core 0.58.0",
 ]
 
 [[package]]
@@ -3342,7 +3342,7 @@ checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 [[package]]
 name = "jamjam"
 version = "0.3.0"
-source = "git+https://github.com/mkrueger/jamjam?branch=main#a4ebe51de35f8f18c4c29a321f7aaa43fb37f14d"
+source = "git+https://github.com/mkrueger/jamjam?branch=main#fbe459511e761baffeb7b4e89732c49d4bb07e67"
 dependencies = [
  "bstr",
  "chrono",

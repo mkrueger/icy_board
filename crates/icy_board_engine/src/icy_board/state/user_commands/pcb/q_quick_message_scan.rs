@@ -73,8 +73,8 @@ impl IcyBoardState {
         } else {
             IceText::MessageScanCommand
         };
-        let low = message_base.base_messagenumber();
-        let high = message_base.active_messages();
+        let low = message_base.lowest_message_number();
+        let high = message_base.highest_message_number();
         self.session.op_text = format!("{}-{}", low, high);
 
         let text = self
@@ -134,7 +134,7 @@ impl IcyBoardState {
                     let status = if header.needs_password() {
                         if header.is_read() { '^' } else { '%' }
                     } else if header.is_private() {
-                        if header.get_to().unwrap().eq_ignore_ascii_case(b"SYSOP") {
+                        if header.to().unwrap().eq_ignore_ascii_case(b"SYSOP") {
                             if header.is_read() { '~' } else { '`' }
                         } else {
                             if header.is_read() { '+' } else { '*' }
@@ -160,9 +160,9 @@ impl IcyBoardState {
                             status,
                             header.message_number,
                             if header.reply_to > 0 { header.reply_to.to_string() } else { "-".to_string() },
-                            get_str(header.get_to(), 15),
-                            get_str(header.get_from(), 15),
-                            get_str(header.get_subject(), 25)
+                            get_str(header.to(), 15),
+                            get_str(header.from(), 15),
+                            get_str(header.subject(), 25)
                         ),
                     )
                     .await?;

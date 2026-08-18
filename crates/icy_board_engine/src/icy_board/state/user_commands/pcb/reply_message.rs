@@ -82,10 +82,10 @@ impl IcyBoardState {
 
             if let Ok(base) = JamMessageBase::open(msg_base) {
                 if let Ok(msg) = base.read_header(msg_number) {
-                    if let Some(s) = msg.get_to() {
+                    if let Some(s) = msg.to() {
                         to = s.to_string();
                     }
-                    if let Some(s) = msg.get_subject() {
+                    if let Some(s) = msg.subject() {
                         subject = s.to_string();
                     }
                 } else {

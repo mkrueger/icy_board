@@ -10,8 +10,9 @@ use jamjam::{
     jam::{
         JamMessage, JamMessageBase, attributes,
         msg_header::{MessageSubfield, SubfieldType},
+        raw,
     },
-    util::echmoail::EchomailAddress,
+    util::echomail::EchomailAddress,
 };
 use serde::{Deserialize, Serialize};
 
@@ -218,7 +219,7 @@ impl Tosser<'_> {
         let base = self.bases.get(path)?;
         if self.config.options.check_dupe_msg_id {
             if let Some(id) = &kludges.msgid {
-                let crc = JamMessageBase::get_crc(&BString::from(id.as_str()));
+                let crc = JamMessageBase::crc(&BString::from(id.as_str()));
                 if !base.seen.insert(crc) {
                     report.duplicates += 1;
                     return Ok(());
@@ -350,7 +351,7 @@ impl OpenBases {
     fn get(&mut self, path: &Path) -> Res<&mut OpenBase> {
         if !self.bases.contains_key(path) {
             let base = open_base(path)?;
-            let mut ids: Vec<u32> = base.iter().flatten().map(|header| header.msgid_crc).filter(|crc| *crc != NO_MSGID).collect();
+            let mut ids: Vec<u32> = base.messages().flatten().map(|header| header.msgid_crc).filter(|crc| *crc != NO_MSGID).collect();
             if self.track > 0 && ids.len() > self.track as usize {
                 ids.drain(..ids.len() - self.track as usize);
             }
@@ -486,8 +487,8 @@ pub fn scan_outbound(config: &FtnConfig, areas: &AreaMap, now: &NaiveDateTime) -
         if subscribers.is_empty() || !path.with_extension("jhr").exists() {
             continue;
         }
-        let base = JamMessageBase::open(path)?;
-        let high = base.active_messages();
+        let mut base = JamMessageBase::open(path)?;
+        let high = base.highest_message_number();
         let Some(last) = state.exported.get(tag).copied() else {
             // Nothing was ever sent out of this area, and handing a link the
             // whole history of a board it just met would be rude.
@@ -516,24 +517,24 @@ pub fn scan_outbound(config: &FtnConfig, areas: &AreaMap, now: &NaiveDateTime) -
                 None => {
                     state.serial = state.serial.wrapping_add(1);
                     let id = format!("{} {:08x}", aka.address, state.serial);
-                    header.msgid_crc = JamMessageBase::get_crc(&BString::from(id.as_str()));
+                    header.msgid_crc = JamMessageBase::crc(&BString::from(id.as_str()));
                     header.sub_fields.push(MessageSubfield::new(SubfieldType::MsgID, BString::from(id.as_str())));
                     // The id is written back so that a reply arriving for it
                     // still finds the message it belongs to.
-                    base.update_header(number, &header)?;
+                    raw::update_header(&mut base, number, &header)?;
                     id
                 }
             };
-            let text = base.read_msg_text(&header)?;
+            let text = base.read_message_text(&header)?;
             let message = PackedMessage {
                 orig: aka.address.clone(),
                 dest: EchomailAddress::default(),
                 attributes: 0,
                 cost: 0,
                 written: chrono::DateTime::from_timestamp(header.date_written as i64, 0).unwrap_or_default().naive_utc(),
-                to: header.get_to().map(|to| to.to_string()).unwrap_or_default(),
-                from: header.get_from().map(|from| from.to_string()).unwrap_or_default(),
-                subject: header.get_subject().map(|subject| subject.to_string()).unwrap_or_default(),
+                to: header.to().map(|to| to.to_string()).unwrap_or_default(),
+                from: header.from().map(|from| from.to_string()).unwrap_or_default(),
+                subject: header.subject().map(|subject| subject.to_string()).unwrap_or_default(),
                 text: exported_text(
                     tag,
                     &msgid,
@@ -591,8 +592,8 @@ fn subfield(header: &jamjam::jam::msg_header::JamMessageHeader, kind: SubfieldTy
     header
         .sub_fields
         .iter()
-        .find(|field| *field.get_type() == kind)
-        .map(|field| field.get_string().to_string())
+        .find(|field| field.field_type() == kind)
+        .map(|field| field.content().to_string())
 }
 
 /// Builds what the other side gets to see: the area, the kludges that say where
@@ -761,8 +762,8 @@ mod tests {
         assert!(report.failed.is_empty());
         let base = JamMessageBase::open(&areas[0].1).unwrap();
         let header = base.read_header(1).unwrap();
-        assert_eq!(base.read_msg_text(&header).unwrap().to_string(), "Body");
-        assert_eq!(header.get_from().unwrap().to_string(), "Someone");
+        assert_eq!(base.read_message_text(&header).unwrap().to_string(), "Body");
+        assert_eq!(header.from().unwrap().to_string(), "Someone");
         assert_eq!(subfield(&header, SubfieldType::MsgID).unwrap(), "21:1/2 11223344");
         assert!(fs::read_dir(&config.inbound).unwrap().next().is_none());
     }
@@ -885,7 +886,7 @@ mod tests {
         assert_eq!(report.netmail, 2);
         assert_eq!(JamMessageBase::open(&config.bad_netmail).unwrap().active_messages(), 1);
         let base = JamMessageBase::open(&config.netmail).unwrap();
-        assert_eq!(base.read_header(1).unwrap().get_to().unwrap().to_string(), "The Sysop");
+        assert_eq!(base.read_header(1).unwrap().to().unwrap().to_string(), "The Sysop");
     }
 
     #[test]

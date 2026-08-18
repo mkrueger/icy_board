@@ -1792,10 +1792,10 @@ pub async fn setlmr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
         }
     };
 
-    let highest = base.base_messagenumber() + base.active_messages();
+    let highest = base.highest_message_number();
     let number = requested.min(highest);
 
-    let crc = JamMessageBase::get_crc(&BString::from(vm.icy_board_state.session.user_name.to_lowercase()));
+    let crc = JamMessageBase::crc(&BString::from(vm.icy_board_state.session.user_name.to_lowercase()));
     let user_id = vm.icy_board_state.session.cur_user_id as u32;
     let mut last_read = match base.find_last_read(crc, user_id)? {
         Some(last_read) => last_read,
@@ -1803,7 +1803,7 @@ pub async fn setlmr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     };
     last_read.last_read_msg = number;
     last_read.high_read_msg = last_read.high_read_msg.max(number);
-    base.write_last_read(last_read)?;
+    base.write_last_read(&last_read)?;
     Ok(())
 }
 
@@ -2136,7 +2136,7 @@ pub async fn msgtofile(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
             return Ok(());
         }
     };
-    let msg_text = match base.read_msg_text(&header) {
+    let msg_text = match base.read_message_text(&header) {
         Ok(text) => text,
         Err(err) => {
             log::error!("MSGTOFILE can't read message text {msg_number} in area {area}: {err}");
@@ -2152,21 +2152,21 @@ pub async fn msgtofile(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
     // spills anything longer into extended headers (MSGENTER.C).
     let mut ext_headers: Vec<(&str, String)> = Vec::new();
     let to = split_fixed_field(
-        header.get_to().map(ToString::to_string).unwrap_or_default(),
+        header.to().map(ToString::to_string).unwrap_or_default(),
         "TO",
         "TO2",
         true,
         &mut ext_headers,
     );
     let from = split_fixed_field(
-        header.get_from().map(ToString::to_string).unwrap_or_default(),
+        header.from().map(ToString::to_string).unwrap_or_default(),
         "FROM",
         "FROM2",
         true,
         &mut ext_headers,
     );
     let subject = split_fixed_field(
-        header.get_subject().map(ToString::to_string).unwrap_or_default(),
+        header.subject().map(ToString::to_string).unwrap_or_default(),
         "SUBJECT",
         "SUBJ2",
         false,
@@ -2176,8 +2176,8 @@ pub async fn msgtofile(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
         push_ext_header(&mut ext_headers, "REQRR", "Caller has requested a Return Receipt");
     }
     for field in &header.sub_fields {
-        let value = field.get_string().to_string();
-        match field.get_type() {
+        let value = field.content().to_string();
+        match field.field_type() {
             SubfieldType::EnclFile => push_ext_header(&mut ext_headers, "ATTACH", &value),
             SubfieldType::AddressD => push_ext_header(&mut ext_headers, "ROUTE", &value),
             SubfieldType::PackoutDate => {
@@ -2465,7 +2465,7 @@ pub async fn killmsg(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
         return Ok(());
     };
     match JamMessageBase::open(&msg_base) {
-        Ok(base) => {
+        Ok(mut base) => {
             if let Err(err) = base.delete_message(number) {
                 log::error!("KILLMSG can't delete message {number} in {conference}:{area}: {err}");
             }
@@ -2592,7 +2592,7 @@ pub async fn move_msg(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
         return Ok(());
     };
 
-    let source = match JamMessageBase::open(&source_path) {
+    let mut source = match JamMessageBase::open(&source_path) {
         Ok(base) => base,
         Err(err) => {
             log::error!("MOVE_MSG can't open message base {from_conf}:{from_area}: {err}");
@@ -2603,12 +2603,12 @@ pub async fn move_msg(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
         log::error!("MOVE_MSG: no message {number} in {from_conf}:{from_area}");
         return Ok(());
     };
-    let text = source.read_msg_text(&header)?;
+    let text = source.read_message_text(&header)?;
 
     let mut message = JamMessage::default()
-        .with_from(header.get_from().cloned().unwrap_or_default())
-        .with_to(header.get_to().cloned().unwrap_or_default())
-        .with_subject(header.get_subject().cloned().unwrap_or_default())
+        .with_from(header.from().cloned().unwrap_or_default())
+        .with_to(header.to().cloned().unwrap_or_default())
+        .with_subject(header.subject().cloned().unwrap_or_default())
         .with_date_time(Utc::now())
         .with_attributes(header.attributes)
         .with_text(text);
