@@ -46,6 +46,26 @@ struct Backend {
     document_versions: DashMap<Url, i32>,
 }
 
+/// The language version the caller set in their environment, the way pplc and
+/// ppld read it. A language server is started once, so this is read once too.
+fn env_language_version() -> Option<u16> {
+    static VERSION: std::sync::OnceLock<Option<u16>> = std::sync::OnceLock::new();
+    *VERSION.get_or_init(|| match icy_board_engine::executable::language_version_from_env() {
+        Ok(version) => version,
+        Err(err) => {
+            log::error!("{err}");
+            None
+        }
+    })
+}
+
+/// A file that belongs to no package still follows the environment.
+fn loose_workspace() -> Workspace {
+    let mut workspace = Workspace::default();
+    workspace.set_default_language_version(env_language_version());
+    workspace
+}
+
 #[tower_lsp::async_trait]
 impl LanguageServer for Backend {
     async fn initialize(&self, params: InitializeParams) -> Result<InitializeResult> {
@@ -787,7 +807,9 @@ impl Backend {
     fn load_workspace(&self, roo_path: PathBuf) {
         let ws_file = roo_path.join("ppl.toml");
         if ws_file.exists() {
-            if let Ok(ws) = Workspace::load(ws_file) {
+            if let Ok(mut ws) = Workspace::load(ws_file) {
+                // The manifest is explicit; the environment only fills in what it left open.
+                ws.set_default_language_version(env_language_version());
                 let errors = Arc::new(Mutex::new(ErrorReporter::default()));
                 let registry = UserTypeRegistry::icy_board_registry();
                 let mut sources = Vec::new();
@@ -896,10 +918,11 @@ impl Backend {
             let Ok(path) = uri.to_file_path() else {
                 return;
             };
-            preparse_type_declarations(path.clone(), errors.clone(), &params.text, &reg, Encoding::Utf8, &Workspace::default());
-            let ast = parse_ast_with_predeclared_types(path, errors.clone(), &params.text, &reg, Encoding::Utf8, &Workspace::default());
+            let workspace = loose_workspace();
+            preparse_type_declarations(path.clone(), errors.clone(), &params.text, &reg, Encoding::Utf8, &workspace);
+            let ast = parse_ast_with_predeclared_types(path, errors.clone(), &params.text, &reg, Encoding::Utf8, &workspace);
 
-            let mut semantic_visitor = SemanticVisitor::new(&Workspace::default(), errors, reg);
+            let mut semantic_visitor = SemanticVisitor::new(&workspace, errors, reg);
             ast.visit(&mut semantic_visitor);
             semantic_visitor.finish();
 
@@ -1538,9 +1561,9 @@ async fn main() {
         ast_map: Arc::new(Mutex::new(HashMap::new())),
         document_map: DashMap::new(),
         document_versions: DashMap::new(),
-        workspace: Mutex::new(Workspace::default()),
+        workspace: Mutex::new(loose_workspace()),
         workspace_visitor: Mutex::new(SemanticVisitor::new(
-            &Workspace::default(),
+            &loose_workspace(),
             Arc::new(Mutex::new(ErrorReporter::default())),
             UserTypeRegistry::default(),
         )),

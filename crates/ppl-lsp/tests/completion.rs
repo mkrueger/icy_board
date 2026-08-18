@@ -176,17 +176,26 @@ fn the_argument_the_cursor_is_in_is_marked() {
 
 /// The words offered in an empty file written for that language version.
 fn offered(version: u16) -> Vec<String> {
+    offered_in(version, "")
+}
+
+/// The words offered in a file the workspace says is written for `version`.
+fn offered_in(version: u16, source: &str) -> Vec<String> {
     let mut workspace = Workspace::default();
     workspace.compiler.get_or_insert_with(CompilerData::default).language_version = Some(version);
 
     let registry = UserTypeRegistry::icy_board_registry();
     let errors = Arc::new(Mutex::new(ErrorReporter::default()));
-    let ast = parse_ast(PathBuf::from("test.pps"), errors.clone(), "", &registry, Encoding::Utf8, &workspace);
+    let ast = parse_ast(PathBuf::from("test.pps"), errors.clone(), source, &registry, Encoding::Utf8, &workspace);
     let mut visitor = SemanticVisitor::new(&workspace, errors, registry);
     ast.visit(&mut visitor);
     visitor.finish();
 
-    get_completion(&ast, &visitor, "", 0).into_iter().map(|item| item.label).collect()
+    let line = source.lines().last().unwrap_or("");
+    get_completion(&ast, &visitor, line, source.chars().count())
+        .into_iter()
+        .map(|item| item.label)
+        .collect()
 }
 
 #[test]
@@ -200,5 +209,21 @@ fn a_word_is_offered_from_the_version_that_gave_it_meaning() {
     for word in ["CONST", "ENUM", "REPEAT", "TYPE", "EXIT"] {
         assert!(!old.contains(&word.to_string()), "{word} should not be offered in 340");
         assert!(new.contains(&word.to_string()), "{word} should be offered in 400");
+    }
+}
+
+#[test]
+fn a_source_states_which_language_it_is_written_in() {
+    // The workspace says 400, but the file itself says otherwise.
+    let items = offered_in(400, ";$LANGVERSION 340\n");
+    assert!(items.contains(&"WHILE".to_string()), "{items:?}");
+    for word in ["CONST", "ENUM", "TYPE"] {
+        assert!(!items.contains(&word.to_string()), "{word} should not be offered after $LANGVERSION 340: {items:?}");
+    }
+
+    // And the other way round: an old workspace with a file written for 400.
+    let items = offered_in(340, ";$LANGVERSION 400\n");
+    for word in ["CONST", "ENUM", "TYPE"] {
+        assert!(items.contains(&word.to_string()), "{word} should be offered after $LANGVERSION 400: {items:?}");
     }
 }

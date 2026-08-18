@@ -157,6 +157,18 @@ impl Workspace {
         }
         self.runtime().min(LAST_PPL_LANGUAGE_VERSION)
     }
+
+    /// Takes a language version the caller found elsewhere, for a workspace that
+    /// does not state one itself. A manifest is explicit, so it is left alone.
+    pub fn set_default_language_version(&mut self, version: Option<u16>) {
+        let Some(version) = version else {
+            return;
+        };
+        if self.compiler.as_ref().and_then(|compiler| compiler.language_version).is_some() {
+            return;
+        }
+        self.compiler.get_or_insert_with(CompilerData::default).language_version = Some(version);
+    }
 }
 
 #[cfg(test)]
@@ -175,5 +187,27 @@ mod tests {
         let mut workspace = Workspace::default();
         workspace.package.runtime = Some(340);
         assert_eq!(340, workspace.language_version());
+    }
+
+    #[test]
+    fn a_default_language_version_is_taken_when_none_is_stated() {
+        let mut workspace = Workspace::default();
+        workspace.set_default_language_version(Some(340));
+        assert_eq!(340, workspace.language_version());
+    }
+
+    #[test]
+    fn a_stated_language_version_wins_over_the_default() {
+        let mut workspace = Workspace::default();
+        workspace.compiler.get_or_insert_with(CompilerData::default).language_version = Some(350);
+        workspace.set_default_language_version(Some(340));
+        assert_eq!(350, workspace.language_version());
+    }
+
+    #[test]
+    fn no_default_leaves_the_workspace_alone() {
+        let mut workspace = Workspace::default();
+        workspace.set_default_language_version(None);
+        assert_eq!(LAST_PPL_LANGUAGE_VERSION, workspace.language_version());
     }
 }

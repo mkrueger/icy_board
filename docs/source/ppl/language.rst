@@ -33,6 +33,12 @@ source's ``;$LANGVERSION`` wins over the command line, the command line wins ove
 variable is therefore a personal default for loose sources rather than a way to
 silently change a project.
 
+The language server reads the same sources, so the editor judges a file the way
+``pplc`` will compile it. It has no command line, so for it ``;$LANGVERSION``
+wins over ``ppl.toml``, which wins over ``PPL_LANG_VERSION``. A language server
+inherits the environment of the editor that started it, which is not always the
+shell's.
+
 To write a PPE an original PCBoard can load, ask for its format::
 
     pplc --runtime 340 myscript.pps

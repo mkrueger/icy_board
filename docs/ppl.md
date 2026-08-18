@@ -189,6 +189,12 @@ over the command line, the command line wins over `ppl.toml`, and the manifest
 wins over `PPL_LANG_VERSION`. The environment is a personal default for loose
 sources.
 
+The language server reads the same sources, so the editor judges a file the way
+`pplc` will compile it. It has no command line, so for it a `;$LANGVERSION`
+directive wins over `ppl.toml`, which wins over `PPL_LANG_VERSION`. Note that a
+language server inherits the environment of the editor that started it, which is
+not always the shell's.
+
 Anything below is grouped by the language version that introduced it. A feature
 listed under 350 is available at 350 *and* 400; a feature listed under 400 needs
 `--lang-version 400`.
