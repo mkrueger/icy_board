@@ -149,3 +149,30 @@ rst_epilog = f"""
 .. |icy_version| replace:: {release}
 .. |icy_version_short| replace:: {version}
 """
+# -- Options for the printed handbook ----------------------------------------
+# The manual is the long form and ships as a PDF, so it is set as a book rather
+# than as a stack of web pages.
+
+latex_documents = [
+    ("index", "icyboard.tex", "Icy Board Handbook", author, "manual"),
+]
+
+latex_toplevel_sectioning = "chapter"
+
+# A link in print is only useful if the address is on the page.
+latex_show_urls = "footnote"
+
+latex_elements = {
+    "papersize": "a4paper",
+    "pointsize": "10pt",
+    "figure_align": "H",
+    "sphinxsetup": ",".join(
+        [
+            "verbatimwithframe=true",
+            "VerbatimColor={RGB}{248,248,248}",
+            "VerbatimBorderColor={RGB}{200,200,200}",
+            "hmargin={2.5cm,2.5cm}",
+            "vmargin={2.5cm,2.5cm}",
+        ]
+    ),
+}
