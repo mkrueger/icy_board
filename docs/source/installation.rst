@@ -109,6 +109,23 @@ board.
 The command exits with a non-zero status when it found something, so it can
 guard a start-up script.
 
+``--create-dirs`` asks, for each missing directory, whether to make it. A
+directory inside the board answers yes by default; one outside it answers no,
+because that is what a mistyped absolute path looks like. ``a`` makes the rest
+without asking and ``q`` stops the questions.
+
+The same report runs when ICBSetup is left. Escape offers the three answers
+PCBSetup offered:
+
+===========  ==================================================================
+Yes          Write the files, then check the paths and offer to make missing
+             directories.
+Quick        Write the files and ask nothing.
+No           Leave the files as they are.
+===========  ==================================================================
+
+The dialog only appears when something was actually changed.
+
 Converting PPE data files
 -------------------------
 

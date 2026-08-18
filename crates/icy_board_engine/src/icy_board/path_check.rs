@@ -35,7 +35,10 @@ pub enum PathProblem {
 pub struct PathReport {
     /// Where the path is written down, in the words the sysop sees.
     pub context: String,
+    /// The path as the configuration states it.
     pub path: PathBuf,
+    /// The same path against the board root, which is where it was looked for.
+    pub resolved: PathBuf,
     pub kind: PathKind,
     pub problem: PathProblem,
 }
@@ -84,7 +87,13 @@ impl IcyBoard {
         }
         let resolved = if path.is_absolute() { path.clone() } else { self.root_path.join(&path) };
         if let Some(problem) = check_path(&resolved, kind) {
-            reports.push(PathReport { context, path, kind, problem });
+            reports.push(PathReport {
+                context,
+                path,
+                resolved,
+                kind,
+                problem,
+            });
         }
     }
 

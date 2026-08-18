@@ -29,7 +29,26 @@ pub struct App {
     pub tabs: Vec<Box<dyn TabPage>>,
     pub help_state: HelpViewState,
 
-    pub save: bool,
+    pub save: SaveChoice,
+    /// Whether the exit dialog offers PCBSetup's third answer next to yes and no.
+    pub offers_quick_save: bool,
+}
+
+/// The answers PCBSetup gave to "Save configuration files (Y/N/Q=Quick Save)".
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub enum SaveChoice {
+    /// Write the files and look over what they point at.
+    Save,
+    /// Write the files and ask nothing.
+    QuickSave,
+    #[default]
+    Discard,
+}
+
+impl SaveChoice {
+    pub fn writes(self) -> bool {
+        self != SaveChoice::Discard
+    }
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -113,16 +132,7 @@ impl App {
         }
 
         if self.mode == Mode::RequestQuit {
-            match key.code {
-                KeyCode::Left | KeyCode::Right => self.save = !self.save,
-                KeyCode::Enter => {
-                    self.mode = Mode::Quit;
-                }
-                KeyCode::Esc => {
-                    self.mode = Mode::Command;
-                }
-                _ => {}
-            };
+            self.handle_quit_dialog(key.code);
             return;
         }
 
@@ -145,7 +155,7 @@ impl App {
         match key.code {
             KeyCode::Esc => {
                 if self.tabs.iter().any(|t| t.is_dirty()) {
-                    self.save = true;
+                    self.save = SaveChoice::Save;
                     self.mode = Mode::RequestQuit;
                 } else {
                     self.mode = Mode::Quit;
@@ -192,12 +202,22 @@ impl App {
 
         if self.mode == Mode::RequestQuit {
             let save_text = format!("{} ", get_text("icbtext_save_changes"));
-            let mut save_area = Rect::new(
-                area.x + (area.width - (save_text.len() as u16 + 10)) / 2,
-                area.y + (area.height - 3) / 2,
-                save_text.len() as u16 + 10,
-                3,
-            );
+            let mut spans = vec![Span::styled(save_text.clone(), Style::default().fg(DOS_LIGHT_GRAY))];
+            for (at, choice) in self.choices().iter().enumerate() {
+                if at > 0 {
+                    spans.push(Span::styled("/", Style::default().fg(DOS_LIGHT_GRAY)));
+                }
+                let label = match choice {
+                    SaveChoice::Save => get_text("yes"),
+                    SaveChoice::QuickSave => get_text("quick_save"),
+                    SaveChoice::Discard => get_text("no"),
+                };
+                let color = if *choice == self.save { DOS_WHITE } else { DOS_DARK_GRAY };
+                spans.push(Span::styled(label, Style::default().fg(color)));
+            }
+            let width = spans.iter().map(|span| span.content.chars().count()).sum::<usize>() as u16 + 4;
+
+            let mut save_area = Rect::new(area.x + (area.width.saturating_sub(width)) / 2, area.y + (area.height - 3) / 2, width, 3);
 
             Clear.render(save_area, frame.buffer_mut());
 
@@ -207,12 +227,7 @@ impl App {
                 .border_type(BorderType::Double)
                 .render(save_area, frame.buffer_mut());
 
-            let field = Line::from(vec![
-                Span::styled(save_text, Style::default().fg(DOS_LIGHT_GRAY)),
-                Span::styled(get_text("yes"), Style::default().fg(if self.save { DOS_WHITE } else { DOS_DARK_GRAY })),
-                Span::styled("/", Style::default().fg(DOS_LIGHT_GRAY)),
-                Span::styled(get_text("no"), Style::default().fg(if !self.save { DOS_WHITE } else { DOS_DARK_GRAY })),
-            ]);
+            let field = Line::from(spans);
             save_area.y += 1;
             save_area.x += 1;
             field.render(save_area.inner(Margin { horizontal: 1, vertical: 0 }), frame.buffer_mut());
@@ -224,6 +239,35 @@ impl App {
         self.status_line = state.status_line;
     }
 
+    fn handle_quit_dialog(&mut self, key: KeyCode) {
+        match key {
+            KeyCode::Left => self.save = self.previous_choice(),
+            KeyCode::Right => self.save = self.next_choice(),
+            KeyCode::Enter => self.mode = Mode::Quit,
+            KeyCode::Esc => self.mode = Mode::Command,
+            _ => {}
+        }
+    }
+
+    fn choices(&self) -> &'static [SaveChoice] {
+        if self.offers_quick_save {
+            &[SaveChoice::Save, SaveChoice::QuickSave, SaveChoice::Discard]
+        } else {
+            &[SaveChoice::Save, SaveChoice::Discard]
+        }
+    }
+
+    fn next_choice(&self) -> SaveChoice {
+        let choices = self.choices();
+        let at = choices.iter().position(|choice| *choice == self.save).unwrap_or(0);
+        choices[(at + 1) % choices.len()]
+    }
+
+    fn previous_choice(&self) -> SaveChoice {
+        let choices = self.choices();
+        let at = choices.iter().position(|choice| *choice == self.save).unwrap_or(0);
+        choices[(at + choices.len() - 1) % choices.len()]
+    }
     fn show_help(&mut self, frame: &mut Frame, screen: Rect) {
         let area = screen.inner(Margin { horizontal: 2, vertical: 2 });
         Clear.render(area, frame.buffer_mut());
@@ -297,5 +341,78 @@ pub fn get_screen_size(frame: &Frame, is_full_screen: bool) -> Rect {
         let x = frame.area().x + (frame.area().width - width) / 2;
         let y = frame.area().y + (frame.area().height - height) / 2;
         Rect::new(x, y, width, height)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn dialog(offers_quick_save: bool) -> App {
+        App {
+            mode: Mode::RequestQuit,
+            tab: 0,
+            title: String::new(),
+            status_line: String::new(),
+            full_screen: false,
+            date_format: String::new(),
+            tabs: Vec::new(),
+            help_state: HelpViewState::new(),
+            save: SaveChoice::Save,
+            offers_quick_save,
+        }
+    }
+
+    fn press(app: &mut App, code: KeyCode) {
+        app.handle_quit_dialog(code);
+    }
+
+    #[test]
+    fn without_the_offer_the_dialog_has_two_answers() {
+        let mut app = dialog(false);
+        press(&mut app, KeyCode::Right);
+        assert_eq!(app.save, SaveChoice::Discard);
+        press(&mut app, KeyCode::Right);
+        assert_eq!(app.save, SaveChoice::Save);
+    }
+
+    #[test]
+    fn the_quick_save_sits_between_yes_and_no() {
+        let mut app = dialog(true);
+        press(&mut app, KeyCode::Right);
+        assert_eq!(app.save, SaveChoice::QuickSave);
+        press(&mut app, KeyCode::Right);
+        assert_eq!(app.save, SaveChoice::Discard);
+        press(&mut app, KeyCode::Right);
+        assert_eq!(app.save, SaveChoice::Save);
+    }
+
+    #[test]
+    fn the_answers_can_be_walked_backwards() {
+        let mut app = dialog(true);
+        press(&mut app, KeyCode::Left);
+        assert_eq!(app.save, SaveChoice::Discard);
+        press(&mut app, KeyCode::Left);
+        assert_eq!(app.save, SaveChoice::QuickSave);
+    }
+
+    #[test]
+    fn enter_takes_the_answer_and_escape_goes_back() {
+        let mut app = dialog(true);
+        press(&mut app, KeyCode::Right);
+        press(&mut app, KeyCode::Enter);
+        assert_eq!(app.mode, Mode::Quit);
+        assert_eq!(app.save, SaveChoice::QuickSave);
+
+        let mut app = dialog(true);
+        press(&mut app, KeyCode::Esc);
+        assert_eq!(app.mode, Mode::Command);
+    }
+
+    #[test]
+    fn only_discarding_leaves_the_files_alone() {
+        assert!(SaveChoice::Save.writes());
+        assert!(SaveChoice::QuickSave.writes());
+        assert!(!SaveChoice::Discard.writes());
     }
 }

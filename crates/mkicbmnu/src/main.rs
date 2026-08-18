@@ -103,7 +103,7 @@ fn main() -> Result<()> {
             let mut app = new_main_window(icy_board, mnu.clone(), arguments.full_screen, &menu_file);
             app.run(terminal)?;
             term::restore()?;
-            if app.save {
+            if app.save.writes() {
                 mnu.lock().unwrap().save(&file).unwrap();
             }
             Ok(())

@@ -3,8 +3,13 @@ use argh::FromArgs;
 use chrono::Local;
 use color_eyre::{Result, eyre::eyre};
 use create::IcyBoardCreator;
-use icy_board_engine::icy_board::{IcyBoard, lock::BoardLock, read_with_encoding_detection, write_atomic};
-use icy_board_tui::{print_error, term};
+use icy_board_engine::icy_board::{
+    IcyBoard,
+    lock::BoardLock,
+    path_check::{PathKind, PathProblem, PathReport},
+    read_with_encoding_detection, write_atomic,
+};
+use icy_board_tui::{app::SaveChoice, print_error, term};
 use import::{PCBoardImporter, console_logger::ConsoleLogger};
 use semver::Version;
 use std::{
@@ -96,6 +101,10 @@ struct PPEConvert {
 /// Reports every path in the configuration that doesn't lead where it says
 #[argh(subcommand, name = "check")]
 struct Check {
+    /// offer to create the directories that are missing
+    #[argh(switch)]
+    create_dirs: bool,
+
     /// path/file name of the icyboard.toml configuration file
     #[argh(positional)]
     file: Option<PathBuf>,
@@ -206,7 +215,7 @@ fn main() -> Result<()> {
             }
             return Ok(());
         }
-        Some(Commands::Check(Check { file })) => {
+        Some(Commands::Check(Check { file, create_dirs })) => {
             let Some(config) = icy_board_engine::lookup_icyboard_file(file) else {
                 print_error(icy_board_tui::get_text("error_file_or_path_not_found"));
                 process::exit(1);
@@ -218,15 +227,9 @@ fn main() -> Result<()> {
                     process::exit(1);
                 }
             };
-            let reports = board.check_paths();
-            for report in &reports {
-                println!("{}", report);
-            }
-            if reports.is_empty() {
-                println!("All paths in {} lead where they say.", config.display());
+            if report_paths(&board, *create_dirs) == 0 {
                 return Ok(());
             }
-            println!("\n{} path(s) need attention.", reports.len());
             process::exit(1);
         }
         _ => {}
@@ -249,19 +252,106 @@ fn main() -> Result<()> {
             let icy_board = Arc::new(Mutex::new(icy_board));
             let mut app = new_main_window(icy_board.clone(), arguments.full_screen);
             app.run(terminal)?;
-
-            if app.save
-                && let Err(err) = icy_board.lock().unwrap().save()
-            {
-                term::restore()?;
-                return Err(eyre!(err.to_string()));
-            }
             term::restore()?;
+
+            if app.save.writes() {
+                if let Err(err) = icy_board.lock().unwrap().save() {
+                    return Err(eyre!(err.to_string()));
+                }
+            }
+            // PCBSetup left its editor for a plain screen to report on the paths. See writefile() in DATAWRIT.C.
+            if app.save == SaveChoice::Save {
+                println!("Checking directories while saving files...");
+                if report_paths(&icy_board.lock().unwrap(), true) > 0 {
+                    print!("press any key to continue...");
+                    let _ = std::io::Write::flush(&mut std::io::stdout());
+                    let mut line = String::new();
+                    let _ = std::io::BufRead::read_line(&mut std::io::stdin().lock(), &mut line);
+                }
+            }
             Ok(())
         }
         Err(err) => {
             print_error(format!("Error loading main config file: {}", err));
             exit(1);
+        }
+    }
+}
+
+/// Reports on the paths and, when asked, offers to make the missing
+/// directories, the way PCBSetup did after a full save. See checkexistence()
+/// in CHKEXIST.C. Answers how many paths need attention.
+fn report_paths(board: &IcyBoard, offer_to_create: bool) -> usize {
+    let reports = board.check_paths();
+    if reports.is_empty() {
+        println!("All paths lead where they say.");
+        return 0;
+    }
+
+    let mut create_the_rest = false;
+    for report in &reports {
+        println!("{}", report);
+        if !offer_to_create || !offers_to_create(report) {
+            continue;
+        }
+        if !create_the_rest {
+            match ask_to_create(&report.resolved, is_inside(&board.root_path, &report.resolved)) {
+                Answer::No => continue,
+                Answer::Stop => break,
+                Answer::AllOfThem => create_the_rest = true,
+                Answer::Yes => {}
+            }
+        }
+        match fs::create_dir_all(&report.resolved) {
+            Ok(()) => println!("  created {}", report.resolved.display()),
+            Err(err) => println!("  {} could not be created: {}", report.resolved.display(), err),
+        }
+    }
+
+    println!("\n{} path(s) need attention.", reports.len());
+    reports.len()
+}
+
+fn offers_to_create(report: &PathReport) -> bool {
+    report.kind == PathKind::Directory && report.problem == PathProblem::Missing
+}
+
+fn is_inside(root: &Path, path: &Path) -> bool {
+    path.starts_with(root)
+}
+
+enum Answer {
+    Yes,
+    No,
+    AllOfThem,
+    Stop,
+}
+
+/// A path outside the board is not offered a default, because that is what a
+/// mistyped absolute path looks like.
+fn ask_to_create(path: &Path, inside_the_board: bool) -> Answer {
+    let prompt = if inside_the_board {
+        "  create it now (Y,n,a=all,q=stop asking)? "
+    } else {
+        "  this is outside the board - create it now (y,N,a=all,q=stop asking)? "
+    };
+    print!("{prompt}");
+    let _ = std::io::Write::flush(&mut std::io::stdout());
+
+    let mut answer = String::new();
+    if std::io::BufRead::read_line(&mut std::io::stdin().lock(), &mut answer).is_err() {
+        return Answer::Stop;
+    }
+    match answer.trim().to_ascii_lowercase().as_str() {
+        "y" => Answer::Yes,
+        "n" => Answer::No,
+        "a" => Answer::AllOfThem,
+        "q" => Answer::Stop,
+        "" if inside_the_board => Answer::Yes,
+        "" => Answer::No,
+        _ => {
+            println!("  {} left alone", path.display());
+            Answer::No
         }
     }
 }

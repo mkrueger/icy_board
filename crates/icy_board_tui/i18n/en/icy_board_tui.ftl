@@ -114,6 +114,7 @@ icbmoni_web_admin_token = Token: { $token }
 
 yes=Yes
 no=No
+quick_save=Quick
 
 icbtext_save_changes=Save changes?
 icbtext_edit_title=Edit Record #{ $number }

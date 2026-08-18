@@ -5,7 +5,7 @@ use std::{
 
 use icy_board_engine::icy_board::{IcyBoard, menu::Menu};
 use icy_board_tui::{
-    app::{App, Mode},
+    app::{App, Mode, SaveChoice},
     help_view::HelpViewState,
 };
 
@@ -27,6 +27,7 @@ pub fn new_main_window(icy_board: IcyBoard, mnu: Arc<Mutex<Menu>>, full_screen: 
         tabs: vec![Box::new(general_tab), Box::new(command_tab), Box::new(AboutTab::default())],
         status_line: String::new(),
         help_state: HelpViewState::new(),
-        save: false,
+        save: SaveChoice::default(),
+        offers_quick_save: false,
     }
 }
