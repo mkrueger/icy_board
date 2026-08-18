@@ -164,3 +164,41 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
         run: gh release upload "$TAG" editors/vscode/*.vsix --repo "$REPO" --clobber
+
+  manual:
+    needs: open_release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref_name }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install what the PDF needs
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            latexmk \
+            texlive-latex-recommended \
+            texlive-latex-extra \
+            texlive-fonts-recommended \
+            texlive-fonts-extra \
+            texlive-xetex \
+            xindy
+          pip install --upgrade pip
+          pip install sphinx sphinx_rtd_theme
+
+      - name: Build the manual
+        run: |
+          make -C docs latex
+          make -C docs/build/latex
+          cp docs/build/latex/*.pdf "icy_board_documentation_$TAG.pdf"
+
+      - name: Attach it to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: gh release upload "$TAG" "icy_board_documentation_$TAG.pdf" --repo "$REPO" --clobber
