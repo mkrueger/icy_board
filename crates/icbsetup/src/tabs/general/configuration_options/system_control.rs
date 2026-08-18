@@ -70,7 +70,7 @@ impl SystemControl {
                             PasswordStorageMethod::Argon2
                         };
                     })
-                    .with_help(get_text("password_storage_method_help")),
+                    .with_help(get_text("password_storage_method-help")),
                 ),
                 cfg_entry_bool!("guard_logoff", label_width, system_control, guard_logoff, lock),
                 cfg_entry_bool!("confirm_caller_name", label_width, system_control, confirm_caller_name, lock),

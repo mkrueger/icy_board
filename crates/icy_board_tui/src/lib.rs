@@ -47,10 +47,39 @@ pub static LANGUAGE_LOADER: Lazy<FluentLanguageLoader> = Lazy::new(|| {
 });
 
 pub fn get_text(message_id: &str) -> String {
-    if !crate::LANGUAGE_LOADER.has(message_id) {
+    let has_translation = crate::LANGUAGE_LOADER.has(message_id);
+    if !has_translation {
         log::error!("Missing translation for: {}", message_id);
     }
-    crate::LANGUAGE_LOADER.get(message_id)
+    let text = crate::LANGUAGE_LOADER.get(message_id);
+    if message_id.ends_with("-help") && (!has_translation || is_placeholder(&text)) {
+        return fallback_help(message_id.trim_end_matches("-help"));
+    }
+    text
+}
+
+fn is_placeholder(text: &str) -> bool {
+    text.trim().is_empty() || text.trim().eq_ignore_ascii_case("TODO")
+}
+
+fn fallback_help(message_id: &str) -> String {
+    let label = crate::LANGUAGE_LOADER.get(message_id);
+    let status = crate::LANGUAGE_LOADER.get(&format!("{message_id}-status"));
+    let explanation = if !is_placeholder(&status) && status != format!("{message_id}-status") {
+        status
+    } else if message_id.starts_with("user_sec_") {
+        format!("Set the minimum security level a caller needs to use {label}.")
+    } else {
+        match message_id {
+            "min_pwd_length" => "Set the minimum number of characters accepted for a new password.".to_string(),
+            "connection_info_enabled" => "Enable or disable this connection service.".to_string(),
+            "connection_info_port" => "Set the TCP port on which this connection service listens.".to_string(),
+            "connection_info_address" => "Set the local address on which this connection service listens.".to_string(),
+            "connection_info_display_file" => "Select the screen shown when a caller connects through this service.".to_string(),
+            _ => format!("Configure {label}."),
+        }
+    };
+    format!("# {label}\n\n{explanation}")
 }
 
 pub fn get_text_args(message_id: &str, args: HashMap<String, String>) -> String {
@@ -122,3 +151,46 @@ pub static BORDER_SET: border::Set = border::Set {
     horizontal_top: "─",
     horizontal_bottom: "─",
 };
+
+#[cfg(test)]
+mod help_tests {
+    use super::get_text;
+
+    const ENGLISH_FTL: &str = include_str!("../i18n/en/icy_board_tui.ftl");
+
+    #[test]
+    fn every_declared_help_entry_resolves_without_a_placeholder() {
+        let help_keys: Vec<_> = ENGLISH_FTL
+            .lines()
+            .filter_map(|line| line.split_once('='))
+            .map(|(key, _)| key.trim())
+            .filter(|key| key.ends_with("-help"))
+            .collect();
+
+        assert!(!help_keys.is_empty());
+        for key in help_keys {
+            let help = get_text(key);
+            assert!(!help.trim().is_empty(), "{key} resolved to empty help");
+            assert!(!help.to_ascii_uppercase().contains("TODO"), "{key} still contains a TODO placeholder");
+        }
+    }
+
+    #[test]
+    fn help_explains_the_option_rather_than_naming_it() {
+        assert!(get_text("user_sec_cmd_d-help").contains("batch transfer level"));
+        assert!(get_text("connection_info_port-help").contains("TCP port"));
+        assert!(get_text("paths_trashcan_user-help").contains("may not be registered"));
+
+        for key in ["user_sec_cmd_d-help", "connection_info_port-help", "paths_trashcan_user-help"] {
+            assert!(get_text(key).lines().count() > 2, "{key} should carry a heading and an explanation");
+        }
+    }
+
+    #[test]
+    fn a_help_key_without_a_translation_still_says_something() {
+        let help = get_text("future_setup_option-help");
+
+        assert!(!help.contains("future_setup_option-help"));
+        assert!(!help.trim().is_empty());
+    }
+}

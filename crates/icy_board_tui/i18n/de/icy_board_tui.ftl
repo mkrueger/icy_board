@@ -1,8 +1,8 @@
 error_cmd_line_label = Fehler:
 error_board_config_not_found = IcyBoard-Konfiguration nicht gefunden: { $path }
 error_board_config_help =
-    IcyBoard sucht icboard.toml im angegebenen Pfad oder Verzeichnis, im
-    aktuellen Verzeichnis und unter ICB_PATH.
+    Ein angegebener Pfad wird genau so verwendet. Ohne Pfad sucht IcyBoard
+    icboard.toml im aktuellen Verzeichnis und danach unter ICB_PATH.
 
     Verwendung: { $program } [Optionen] [DATEI|VERZEICHNIS]
     Board erstellen: icbsetup create mybbs
