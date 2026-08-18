@@ -372,7 +372,10 @@ mod tests {
     #[test]
     fn a_file_where_a_directory_belongs_is_reported() {
         let root = board(&["help"], &[]);
-        assert_eq!(check_path(&root.path().join("help"), PathKind::Directory), Some(PathProblem::ExpectedDirectoryFoundFile));
+        assert_eq!(
+            check_path(&root.path().join("help"), PathKind::Directory),
+            Some(PathProblem::ExpectedDirectoryFoundFile)
+        );
     }
 
     #[test]
@@ -440,7 +443,10 @@ mod tests {
         board.conferences.push(conference);
 
         let reports = board.check_paths();
-        let report = reports.iter().find(|report| report.path == PathBuf::from("main/news")).expect("the news file is not reported");
+        let report = reports
+            .iter()
+            .find(|report| report.path == PathBuf::from("main/news"))
+            .expect("the news file is not reported");
         assert_eq!(report.context, "Conference 0 (Sysop), news file");
     }
 }

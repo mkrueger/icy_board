@@ -71,15 +71,35 @@ old PPEs where practical, but they are not a second writable source of truth.
 
 ## Messages use JAM
 
-Message areas use JAM, including private mail, QWK/QWKE and FTN-backed areas.
-A conference may contain several message areas; scans cover all selected areas.
+Message areas use JAM, including QWK/QWKE and FTN-backed areas. A conference
+may contain several named message areas instead of one message base. Each area
+has its own base, access expression and optional FTN area tag; scans cover all
+selected areas.
 
 **Why:** JAM is an established open format with existing tooling and does not
-carry the proprietary layout of PCBoard's message base.
+carry the proprietary layout of PCBoard's message base. Separating the caller's
+conference membership from its message bases lets one subject community carry
+several local or networked discussions without creating artificial conferences.
 
 **Compatibility cost:** PPEs and external utilities that open PCBoard message
 files directly must be changed. PPEs that use PPL message functions continue to
-work through the runtime API.
+work through the runtime API and address the default area, so old code does not
+need to understand the extension. Area-aware PPL uses `AreaId(conf, area)` or
+the 4.00 conference and area objects.
+
+## Personal mail has its own inbox
+
+Icy Board keeps person-to-person mail in a separate JAM base rather than making
+it another conference. `@` reads the current caller's inbox, `@W` writes to a
+user or alias, and `Y` includes an `E-Mail` line in both quick and long personal
+mail scans. Comments to the sysop can be delivered to the same mailbox.
+
+**Why:** a caller has one inbox across conferences, and private correspondence
+does not depend on which public area currently happens to be selected.
+
+**Compatibility cost:** PCBoard had no separate inbox base. A PPE that opens
+conference message files directly cannot see it; caller commands and PPL's
+message API do.
 
 ## File areas carry richer metadata
 

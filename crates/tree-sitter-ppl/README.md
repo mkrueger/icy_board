@@ -3,7 +3,8 @@
 A [tree-sitter](https://tree-sitter.github.io) grammar for PPL, the PCBoard
 Programming Language, as IcyBoard implements it.
 
-It covers PPL 1.00 through 4.01: the classic PCBoard statements and the later
+It covers PPL language versions 1.00 through 4.00, including syntax whose PPE
+representation needs runtime 4.01: the classic PCBoard statements and the later
 additions - `REPEAT`/`LOOP`, bracket indexing, brace array initializers, the dot
 operator with the board objects, `TYPE ... ENDTYPE`, record literals and
 routines passed as parameters.

@@ -1650,7 +1650,11 @@ mod tests {
         let entry = (0..5)
             .map(|i| {
                 let item = ListItem::new(format!("Option {i}"), ListValue::Bool(false));
-                ConfigEntry::Item(if inactive.contains(&i) { item.with_inactive("nothing reads this") } else { item })
+                ConfigEntry::Item(if inactive.contains(&i) {
+                    item.with_inactive("nothing reads this")
+                } else {
+                    item
+                })
             })
             .collect();
         ConfigMenu { obj: (), entry }

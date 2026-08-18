@@ -218,7 +218,10 @@ fn a_source_states_which_language_it_is_written_in() {
     let items = offered_in(400, ";$LANGVERSION 340\n");
     assert!(items.contains(&"WHILE".to_string()), "{items:?}");
     for word in ["CONST", "ENUM", "TYPE"] {
-        assert!(!items.contains(&word.to_string()), "{word} should not be offered after $LANGVERSION 340: {items:?}");
+        assert!(
+            !items.contains(&word.to_string()),
+            "{word} should not be offered after $LANGVERSION 340: {items:?}"
+        );
     }
 
     // And the other way round: an old workspace with a file written for 400.

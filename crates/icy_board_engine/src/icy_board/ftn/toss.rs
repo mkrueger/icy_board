@@ -351,7 +351,12 @@ impl OpenBases {
     fn get(&mut self, path: &Path) -> Res<&mut OpenBase> {
         if !self.bases.contains_key(path) {
             let base = open_base(path)?;
-            let mut ids: Vec<u32> = base.messages().flatten().map(|header| header.msgid_crc).filter(|crc| *crc != NO_MSGID).collect();
+            let mut ids: Vec<u32> = base
+                .messages()
+                .flatten()
+                .map(|header| header.msgid_crc)
+                .filter(|crc| *crc != NO_MSGID)
+                .collect();
             if self.track > 0 && ids.len() > self.track as usize {
                 ids.drain(..ids.len() - self.track as usize);
             }

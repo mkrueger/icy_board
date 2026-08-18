@@ -137,8 +137,9 @@ literal has not named yet, and writing arguments shows the signature of the
 routine being called. Editors that highlight with tree-sitter - Neovim, Helix,
 Zed, Emacs - read the grammar in
 [crates/tree-sitter-ppl](../crates/tree-sitter-ppl/README.md) instead. It parses
-the whole language up to 4.01, including `TYPE`, record literals and routine
-parameters, and ships highlight, locals, fold and indent queries. Its README has
+the whole language through language 4.00 and the syntax whose PPE representation
+needs runtime 4.01, including `TYPE`, record literals and routine parameters. It
+ships highlight, locals, fold and indent queries. Its README has
 the setup for Neovim and Helix; the grammar is checked against every `.pps` in
 this repository, so what the compiler reads is what an editor colours.
 
@@ -178,19 +179,22 @@ Anything below is grouped by the language version that introduced it. A feature
 listed under 350 is available at 350 *and* 400; a feature listed under 400 needs
 `--lang-version 400`.
 
+Some conveniences belong to this compiler rather than to a language version:
+
+* `DECLARE FUNCTION` and `DECLARE PROCEDURE` are optional because every routine
+  signature is collected before code generation. Existing declarations remain
+  valid and are checked against the implementation.
+* `RETURN expression` sets a function's result and returns in one statement.
+  It is accepted even when compiling a source as language 3.40; a value in a
+  procedure remains an error.
+* Declaration/implementation mismatches, invalid argument types, unknown record
+  members and writes to constants are diagnostics instead of silent output.
+
 ### Language version 350
 
 3.50 is the "quality of life" version. It adds no new PPE format, so a 3.50
 source can still be compiled down to an older runtime as long as it does not
 call newer built-ins.
-
-#### DECLARE is optional
-
-`DECLARE FUNCTION` / `DECLARE PROCEDURE` before the implementation is no longer
-required; the compiler reads every signature in the file before it compiles the
-code, so a routine may be called before the file gets to it. Existing forward
-declarations are still accepted, and a parameter count or return type that
-disagrees between a declaration and its implementation is an error.
 
 #### Variable initializers
 
@@ -261,27 +265,6 @@ LOOP
     IF n > 10 BREAK
 ENDLOOP
 ```
-
-#### RETURN with a value
-
-Inside a function, `RETURN expr` both sets the result and returns:
-
-```PPL
-FUNCTION Total(INTEGER v) INTEGER
-    RETURN v + 1
-ENDFUNC
-```
-
-which is the same as the old two-step form:
-
-```PPL
-FUNCTION Total(INTEGER v) INTEGER
-    Total = v + 1
-    RETURN
-ENDFUNC
-```
-
-`RETURN expr` in a procedure is an error.
 
 #### Parentheses are optional on IF and WHILE
 

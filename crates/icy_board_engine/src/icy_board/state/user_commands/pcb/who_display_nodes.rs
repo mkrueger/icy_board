@@ -59,7 +59,11 @@ impl IcyBoardState {
             self.set_color(TerminalTarget::Both, IcbColor::dos_light_cyan()).await?;
             self.print(
                 TerminalTarget::Both,
-                &format!("{number:>4}   {status:<width$} ", status = truncate(&status_text, STATUS_WIDTH), width = STATUS_WIDTH),
+                &format!(
+                    "{number:>4}   {status:<width$} ",
+                    status = truncate(&status_text, STATUS_WIDTH),
+                    width = STATUS_WIDTH
+                ),
             )
             .await?;
 

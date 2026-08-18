@@ -7,7 +7,10 @@ fn sysop_pack_message_base_asks_pcboards_questions() {
     assert!(output.contains("Pack the message base"), "the confirmation is missing:\n{output}");
     assert!(output.contains("Generate ONLY a New Index File"), "the index question is missing:\n{output}");
     assert!(output.contains("Purge older than"), "the date question is missing:\n{output}");
-    assert!(output.contains("Purge RECEIVED+PRIVATE Msgs"), "the private mail question is missing:\n{output}");
+    assert!(
+        output.contains("Purge RECEIVED+PRIVATE Msgs"),
+        "the private mail question is missing:\n{output}"
+    );
     assert!(output.contains("Renumber during repack"), "the renumber question is missing:\n{output}");
     assert!(output.contains("Messages Successfully Packed"), "the pack did not report success:\n{output}");
 }
@@ -42,5 +45,8 @@ fn sysop_pack_message_base_index_only_skips_the_criteria() {
 
     assert!(output.contains("Generate ONLY a New Index File"), "the index question is missing:\n{output}");
     assert!(!output.contains("Purge older than"), "the criteria were asked for anyway:\n{output}");
-    assert!(output.contains("Messages Successfully Packed"), "the index rebuild did not report success:\n{output}");
+    assert!(
+        output.contains("Messages Successfully Packed"),
+        "the index rebuild did not report success:\n{output}"
+    );
 }

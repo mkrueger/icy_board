@@ -23,8 +23,11 @@ mock-up. It can:
 - take local, telnet, SSH and WebSocket callers on multiple nodes
 - create users, enforce security and access expressions, and manage users and
   groups with `icbsm`
-- run conferences with multiple message areas, private mail, JAM bases, search,
-  QWK/QWKE and the familiar enter/read/scan commands
+- split a conference into several named message areas, each with its own JAM
+  base, access rule and optional FTN area tag
+- give every caller a personal mail inbox outside the public conference areas;
+  `@` reads it, `@W` writes mail and `Y` includes it in the personal-mail scan
+- search, enter, read and scan messages, including QWK/QWKE and private messages
 - manage file areas, extract `FILE_ID.DIZ`, import old DIR files, enforce
   transfer limits and run external transfer protocols
 - execute PPEs, compile and decompile PPL, and provide diagnostics, completion,
@@ -68,12 +71,43 @@ Compatibility is the baseline, not a ban on improvements:
 | CP437-only content | CP437 compatibility plus explicit UTF-8 support |
 | Plain-text passwords | Argon2id or bcrypt hashes, with an opt-in compatibility fallback |
 | One numeric security level | Security level, groups and age expressions |
+| One message base per conference | Several named message areas per conference, without breaking old PPE calls |
+| Private messages mixed into conferences | A personal mail inbox with `@`/`@W` and `Y`-scan integration |
 | Proprietary message and DIR formats | JAM messages and richer SQLite-backed file metadata |
-| Closed PPL tooling | Compiler, decompiler, formatter, language server and tree-sitter grammar |
+| Frozen PPL and closed tooling | Versioned PPL 3.50/4.00 additions, records and board objects, plus compiler, decompiler, formatter, language server and tree-sitter grammar |
 | Setup tied to a DOS console | Familiar TUIs that also work over SSH, plus scriptable maintenance commands |
 
 See [Differences and improvements](docs/differences.md) for the compatibility
 cost of each change.
+
+### Conferences are no longer one message base
+
+PCBoard tied a conference to one message base. Icy Board keeps the conference
+as the caller-facing group but lets it contain several named message areas. A
+caller can move between them without joining another conference, scans cover
+the selected areas, and each area can carry its own access expression and FTN
+area tag. Old PPE calls still address the default area; PPL 4.00 adds
+`MSGAREAID`, `AreaId()` and board objects for code that wants to be area-aware.
+
+### Personal mail has an inbox
+
+Private person-to-person mail no longer has to live among conference messages.
+Each caller has a view into the separate personal JAM mail base. `@` opens the
+inbox, `@W` writes to another user or alias, the login mail check can lead into
+it, and `Y` reports waiting inbox mail alongside conference mail.
+
+### PPL can evolve without abandoning PPEs
+
+Language version 3.50 adds typed constants and enums, variable and array
+initializers, bracket indexing, compound assignments, `REPEAT` and `LOOP`, and
+routines passed as parameters. Language version 4.00 adds
+real `BEGIN ... END` blocks, `EXIT`, records and record literals, member access,
+board objects, message-area identifiers and overloaded built-ins. Features that
+need stored record layouts or routine references use runtime 4.01; classic
+source can stay on its original language and runtime version. Independently of
+the selected language, the compiler resolves routines before code generation,
+accepts `RETURN value`, checks declarations against implementations and reports
+many mistakes the original compiler silently accepted.
 
 ## What it looks like
 

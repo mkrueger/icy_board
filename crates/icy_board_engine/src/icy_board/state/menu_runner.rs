@@ -500,7 +500,8 @@ impl IcyBoardState {
                 }
                 // 6
                 self.view_text_file().await?;
-            }            CommandType::UserMaintenance => {
+            }
+            CommandType::UserMaintenance => {
                 let sec = self.session.sysop_command_level.sec_7_user_maint.clone();
                 if check_security && !self.check_sec("7", &sec).await? {
                     return Ok(());

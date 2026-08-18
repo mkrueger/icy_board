@@ -35,7 +35,7 @@ under DOSBox as an oracle; see [`compat/README.md`](../compat/README.md).
 | :--- | :--- |
 | [PPL and PPEs](ppl.md) | Language overview, runtime compatibility and the toolchain. |
 | [PPL compiler](pplc.md) | Projects, language versions, output and diagnostics. |
-| [New in PPL](new_ppl.md) | Icy Board language extensions. |
+| [New in PPL 3.50 and 4.x](new_ppl.md) | Version matrix for loops, initializers, constants, enums, routine parameters, records and board objects. |
 | [New `@` macros](new_macros.md) | Macros beyond PCBoard's set. |
 | [PPE format](ppe_format.md) | Binary format reference for tooling authors. |
 

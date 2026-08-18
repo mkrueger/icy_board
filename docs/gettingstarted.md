@@ -70,11 +70,13 @@ The TUIs require a terminal of at least 80 columns by 25 rows.
 Use the first local call as a smoke test:
 
 1. `J` joins a conference.
-2. `E` enters a message.
-3. `R` reads it back and tries the reply and scan commands.
-4. `F` opens the file directories.
-5. `V` shows the caller settings.
-6. `G` logs off.
+2. If the conference has several message areas, use the area-change command to
+  select one; areas organize discussions without requiring another conference.
+3. `E` enters a message and `R` reads it back.
+4. `@W` sends personal mail; `@` opens the caller's inbox and `Y` includes it in
+  the personal-mail scan.
+5. `F` opens the file directories.
+6. `V` shows the caller settings, then `G` logs off.
 
 Read `icboard.log` afterwards. It is the first place to look when a display
 file, PPE, protocol or data file does not load.

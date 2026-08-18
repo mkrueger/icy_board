@@ -1,4 +1,176 @@
-## `AreaId()`  Function (4.00)
+# New in PPL 3.50 and 4.x
+
+Icy Board evolves PPL through an explicit *language version*. A source can put
+`;$LANGVERSION 350` or `;$LANGVERSION 400` in its header; the same choice is
+available as `pplc --lang-version`, `[compiler] language_version` in `ppl.toml`
+and the `PPL_LANG_VERSION` environment default.
+
+The *runtime version* is separate. It controls the PPE format written to disk.
+There is no language version 401: runtime 4.01 adds storage needed by some 4.00
+language features.
+
+| Feature | Language | Minimum runtime | What it adds |
+| :--- | :---: | :---: | :--- |
+| Scalar variable initializer | 350 | any compatible runtime | `INTEGER n = 1` |
+| Array initializer | 350 | any compatible runtime | `INTEGER values = { 1, 2, 3 }` |
+| Bracket indexing | 350 | any compatible runtime | `values[0]` without confusing indexing with a call |
+| Compound assignment | 350 | any compatible runtime | `+=`, `-=`, `*=`, `/=`, `%=`, `&=`, `|=` |
+| Post-test and infinite loops | 350 | any compatible runtime | `REPEAT ... UNTIL`, `LOOP ... ENDLOOP` |
+| Optional parentheses | 350 | any compatible runtime | `IF condition THEN`, `WHILE condition ...` |
+| Typed constants | 350 | any compatible runtime | `CONST`, erased to its value during compilation |
+| Nominal integer enums | 350 | any compatible runtime | `ENUM ... ENDENUM`, scoped members such as `Color.Red` |
+| Routine parameters | 350 | 401 | Pass a matching function or procedure as a checked callable value |
+| Main-program block | 400 | 400 | Real `BEGIN ... END`; `EXIT` replaces the old terminating use of `END` |
+| Board objects and member calls | 400 | 400 | `CONFERENCE`, `DIRECTORY`, `AREA`, `DOOR`, `PASSWORD`, `ConfInfo()` |
+| Message-area identifiers | 400 | 400 | `MSGAREAID` and `AreaId(conf, area)` |
+| Overloaded built-ins | 400 | 400 | Argument-count overloads such as `ConfInfo(conf)` and `Len(array, dim)` |
+| Web requests | 400 | 400 | String-returning function and file-writing statement forms |
+| User-defined records | 400 | 401 | `TYPE ... ENDTYPE`, nested fields, arrays of records and nominal type checking |
+| Named record literals | 400 | 401 | `Point { X = 1, Y = 2 }` with checked and optional fields |
+
+Several compiler improvements are deliberately **not** tied to 3.50. The
+compiler collects routine signatures before generating code, so `DECLARE` is
+optional at every language version. `RETURN expression` is likewise accepted
+when compiling classic source. In both cases the generated PPE uses ordinary
+old instructions; declarations that disagree with implementations are errors.
+
+## Language version 3.50
+
+3.50 is mostly syntax that lowers to classic PPE instructions, so constants,
+enums, loops, initializers, brackets and compound assignments can target an old
+runtime. Passing a routine is the exception because only runtime 4.01 can mark
+a routine reference as a value.
+
+### Initializers and indexing
+
+```PPL
+INTEGER count = 1
+INTEGER values = { 10, 20, 30 }
+
+values[0] += count
+```
+
+The brace initializer declares the array and determines its size. Parenthesis
+indexing remains valid for old source; brackets are recommended because they
+cannot be mistaken for a function call.
+
+### Loops
+
+```PPL
+REPEAT
+	count += 1
+UNTIL count >= 10
+
+LOOP
+	IF Finished() BREAK
+ENDLOOP
+```
+
+`CONTINUE` and `BREAK` work in both forms. At 3.50, `LOOP` becomes a real
+keyword and is no longer the old alias for `CONTINUE`; `QUIT` is no longer an
+alias for `BREAK`.
+
+### Constants and enums
+
+```PPL
+CONST INTEGER MaxAttempts = 3
+
+ENUM Color
+	Red
+	Green = 5
+	Blue
+ENDENUM
+
+Color selected = Color.Green
+```
+
+Constants are typed compile-time expressions. Enums are nominal integer types:
+members are scoped below the enum name, and two different enum types cannot be
+mixed merely because their stored numbers match. Both are erased before the PPE
+is written, so a decompiler can recover the value but not the source name.
+
+### Functions and procedures as parameters
+
+```PPL
+PROCEDURE Apply(PROCEDURE action(), FUNCTION check(INTEGER n) BOOLEAN)
+	IF check(1) action()
+ENDPROC
+```
+
+The compiler checks routine kind, parameter types and dimensions, `VAR` flags
+and function return type. A routine parameter is callable and can be passed on
+to another routine. The callable reference needs runtime 4.01.
+
+## Language version 4.00
+
+4.00 adds syntax and board APIs that do not exist on PCBoard. A runtime 4.00 or
+4.01 PPE therefore targets Icy Board rather than the original board.
+
+### Blocks and program exit
+
+```PPL
+BEGIN
+	IF !HasAccess() STOP
+	PRINTLN "Welcome"
+	EXIT
+END
+```
+
+`BEGIN ... END` is a real block and marks the main body without `;$USEFUNCS`.
+`END` only closes a block; `EXIT` performs the normal program termination that
+`END` represented in old source. `STOP` remains the aborting form.
+
+### User-defined records
+
+```PPL
+TYPE Point
+	INTEGER X, Y
+ENDTYPE
+
+TYPE Line
+	Point Start
+	Point Finish
+ENDTYPE
+
+Point origin = Point { X = 0, Y = 0 }
+Line axis
+axis.Start = origin
+axis.Finish.Y = 10
+```
+
+Records are nominal values. Fields can contain a previously declared record,
+record variables can be arrays, member chains can be read or assigned, and
+routine parameters and return values retain the exact record type. Equality is
+defined between individual records of the same type; arithmetic and ordering
+are not. Record fields cannot currently be arrays.
+
+The PPE must store each record layout, so any use of `TYPE` requires runtime
+4.01. Field and type names are not stored; a decompiler invents names for them.
+
+### Board objects
+
+Board objects are read-only snapshots rather than custom records. They expose
+the configured conferences, message areas, file directories and doors without
+making a PPE parse Icy Board's TOML files. The detailed member table follows
+below.
+
+## Runtime 4.01
+
+Runtime 4.01 is a PPE-format extension, not another source language. It adds:
+
+- a type table for `TYPE ... ENDTYPE` layouts
+- a routine-reference marker for functions and procedures passed as values
+- a record-literal opcode carrying type and field identifiers
+
+Use language 400 with runtime 401 for the complete feature set. A language 350
+source also needs runtime 401 when it passes routines; all its other additions
+can lower to an older compatible runtime.
+
+For the full rules, limits, diagnostics and compatibility breaks, see
+[PPL](ppl.md#the-ppl-40-language). The sections below are the library and
+declaration reference.
+
+## `AreaId()` Function (4.00)
 
 ### Function
 Returns the value for conference/message area. This is used for all message releated functions

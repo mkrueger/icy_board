@@ -26,10 +26,12 @@ impl IcyBoardState {
 
         let user = self.session.current_user.clone().unwrap();
         if !(self.session.is_local || self.get_board().await.config.switches.exclude_local_calls_stats) {
-            self.show_setting_number(IceText::ViewSettingsCallerNumber, self.session.caller_number as i64).await?;
+            self.show_setting_number(IceText::ViewSettingsCallerNumber, self.session.caller_number as i64)
+                .await?;
         }
 
-        self.show_setting(IceText::ViewSettingsLastDateOne, &self.format_date(user.stats.last_on)).await?;
+        self.show_setting(IceText::ViewSettingsLastDateOne, &self.format_date(user.stats.last_on))
+            .await?;
 
         // The line is printed either way - PCBoard says "None" when nothing expires.
         let expires = if user.expiration_date == chrono::DateTime::<chrono::Utc>::default() {
@@ -39,7 +41,8 @@ impl IcyBoardState {
         };
         self.show_setting(IceText::ViewSettingsExpireDate, &expires).await?;
 
-        self.show_setting_number(IceText::ViewSettingsNumberTimesOn, user.stats.num_times_on as i64).await?;
+        self.show_setting_number(IceText::ViewSettingsNumberTimesOn, user.stats.num_times_on as i64)
+            .await?;
         self.show_setting_number(IceText::ViewSettingsPageLength, self.session.page_len as i64).await?;
 
         if self.session.expert_mode() {
@@ -50,8 +53,10 @@ impl IcyBoardState {
         self.reset_color(TerminalTarget::Both).await?;
 
         self.show_setting_number(IceText::ViewSettingsSecurityLevel, user.security_level as i64).await?;
-        self.show_setting_number(IceText::ViewSettingsNumberDownloads, user.stats.num_downloads as i64).await?;
-        self.show_setting_number(IceText::ViewSettingsNumberUploads, user.stats.num_uploads as i64).await?;
+        self.show_setting_number(IceText::ViewSettingsNumberDownloads, user.stats.num_downloads as i64)
+            .await?;
+        self.show_setting_number(IceText::ViewSettingsNumberUploads, user.stats.num_uploads as i64)
+            .await?;
 
         // -1 stands for "no limit" and comes back out as the Unlimited text.
         self.show_setting_number(IceText::ViewSettingsBytesAvailable, self.bytes_available().unwrap_or(-1))

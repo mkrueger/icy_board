@@ -97,6 +97,11 @@ Some old tools cannot be carried over because the storage they access changed:
 
 See [File areas](icbfile.md) for archive and description import.
 
+PCBoard's one-message-base-per-conference model remains valid after import: it
+becomes the default message area. Additional named areas can then be added to a
+conference without changing old PPE calls. Icy Board's personal mail inbox is a
+new, separate JAM base and therefore has no PCBoard database to import.
+
 ## 6. Review every PPE
 
 The PPL runtime targets PCBoard compatibility, but no importer can infer what a

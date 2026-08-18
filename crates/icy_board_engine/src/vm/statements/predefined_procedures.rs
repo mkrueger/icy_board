@@ -2151,13 +2151,7 @@ pub async fn msgtofile(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
     // PCBoard keeps at most 25 characters in the fixed To/From/Subject fields and
     // spills anything longer into extended headers (MSGENTER.C).
     let mut ext_headers: Vec<(&str, String)> = Vec::new();
-    let to = split_fixed_field(
-        header.to().map(ToString::to_string).unwrap_or_default(),
-        "TO",
-        "TO2",
-        true,
-        &mut ext_headers,
-    );
+    let to = split_fixed_field(header.to().map(ToString::to_string).unwrap_or_default(), "TO", "TO2", true, &mut ext_headers);
     let from = split_fixed_field(
         header.from().map(ToString::to_string).unwrap_or_default(),
         "FROM",
