@@ -593,6 +593,11 @@ pub struct FileTransferOptions {
     pub upload_descr_lines: u8,
     pub display_uploader: bool,
 
+    /// Drops the colours a FILE_ID.DIZ brings with it, so a listing stays in the
+    /// colours the board was configured with.
+    #[serde(default)]
+    pub strip_colors_in_descriptions: bool,
+
     pub disable_drive_size_check: bool,
     pub stop_uploads_free_space: u32,
 }
@@ -1075,6 +1080,7 @@ impl IcbConfig {
                 upload_credit_time: 100,
                 upload_credit_bytes: 0,
                 verify_files_uploaded: true,
+                strip_colors_in_descriptions: false,
                 disable_drive_size_check: false,
                 stop_uploads_free_space: 1024,
             },

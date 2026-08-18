@@ -938,6 +938,10 @@ display_uploader=Include 'Uploaded By' in Desc.
 display_uploader-status=Include 'Uploaded By' in Description.
 display_uploader-help=TODO
 
+strip_colors_in_descriptions=Strip Colors in Descriptions
+strip_colors_in_descriptions-status=Drop the colors a FILE_ID.DIZ brings with it.
+strip_colors_in_descriptions-help=A FILE_ID.DIZ carries whatever colors its author chose, and a reset in one of them puts the caller back to the terminal default rather than the color this board lists files in. Turn this on to keep a listing in the board's own colors. Spacing and line art are left alone either way.
+
 verify_files_uploaded=Verify Files Uploaded
 verify_files_uploaded-status=Verify files uploaded after upload.
 verify_files_uploaded-help=TODO

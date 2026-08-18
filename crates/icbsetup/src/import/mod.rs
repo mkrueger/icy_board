@@ -627,7 +627,8 @@ impl PCBoardImporter {
                 verify_files_uploaded: self.data.test_uploads,
                 display_uploader: self.data.upload_by,
                 upload_descr_lines: self.data.num_ul_desc_lines as u8,
-
+                // PCBoard listed whatever the DIR file held, so an import keeps it.
+                strip_colors_in_descriptions: false,
                 disallow_batch_uploads: self.data.no_batch_up,
                 promote_to_batch_transfers: self.data.promote_batch,
                 upload_credit_time: self.data.upload_credit.max(0) as u32,

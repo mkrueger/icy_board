@@ -26,6 +26,7 @@ impl FileTransfers {
                 cfg_entry_u32!("upload_credit_time", label_with, 0, 10000, file_transfer, upload_credit_time, lock),
                 cfg_entry_u32!("upload_credit_bytes", label_with, 0, 10000, file_transfer, upload_credit_bytes, lock),
                 cfg_entry_bool!("display_uploader", label_with, file_transfer, display_uploader, lock),
+                cfg_entry_bool!("strip_colors_in_descriptions", label_with, file_transfer, strip_colors_in_descriptions, lock),
                 cfg_entry_bool!("verify_files_uploaded", label_with, file_transfer, verify_files_uploaded, lock),
                 cfg_entry_bool!("disable_drive_size_check", label_with, file_transfer, disable_drive_size_check, lock),
                 ConfigEntry::Separator,

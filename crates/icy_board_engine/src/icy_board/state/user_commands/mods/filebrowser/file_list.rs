@@ -92,6 +92,45 @@ fn clamp_to_column(line: &str, left: usize) -> String {
     out
 }
 
+/// Takes the colours out of a description and leaves everything else standing.
+///
+/// A DIZ carries whatever colours its author liked, including a reset that puts
+/// the caller back to the terminal default and so loses the colour the board
+/// chose for the column. A sysop who wants the listing to look like their board
+/// rather than like 1994 turns `strip_colors_in_descriptions` on.
+fn strip_colors(line: &str) -> String {
+    let mut out = String::with_capacity(line.len());
+    let mut chars = line.chars().peekable();
+
+    while let Some(ch) = chars.next() {
+        if ch != '\x1b' || chars.peek() != Some(&'[') {
+            out.push(ch);
+            continue;
+        }
+        chars.next();
+        let mut params = String::new();
+        let mut final_byte = None;
+        for c in chars.by_ref() {
+            if c.is_ascii_digit() || c == ';' || c == '?' {
+                params.push(c);
+            } else {
+                final_byte = Some(c);
+                break;
+            }
+        }
+        let Some(final_byte) = final_byte else {
+            break;
+        };
+        if final_byte != 'm' {
+            out.push('\x1b');
+            out.push('[');
+            out.push_str(&params);
+            out.push(final_byte);
+        }
+    }
+    out
+}
+
 /// Decides which files a listing shows.
 ///
 /// The first stage only looks at the index entry, which is already in memory. The second
@@ -148,6 +187,7 @@ impl FileList {
         let colors = cmd.get_board().await.config.color_configuration.clone();
         let dir = self.files.lock().await.dir().to_path_buf();
         let show_uploader = cmd.board.lock().await.config.file_transfer.display_uploader;
+        let strip_description_colors = cmd.board.lock().await.config.file_transfer.strip_colors_in_descriptions;
         let sysop_name = cmd.board.lock().await.config.sysop.name.clone();
         let headers = self.files.lock().await.clone();
         for entry in headers.iter() {
@@ -218,6 +258,7 @@ impl FileList {
                             cmd.print(TerminalTarget::Both, &format!("{:33}", " ")).await?;
                         }
                         let line = clamp_to_column(line, DESCRIPTION_COLUMN);
+                        let line = if strip_description_colors { strip_colors(&line) } else { line };
                         if cmd.session.search_pattern.is_some() {
                             cmd.print_found_text(TerminalTarget::Both, &line).await?;
                         } else {
@@ -314,5 +355,26 @@ mod description_tests {
     fn other_sequences_are_untouched() {
         let line = "\x1b[1;33mhello\x1b[0m";
         assert_eq!(clamp_to_column(line, DESCRIPTION_COLUMN), line);
+    }
+}
+
+#[cfg(test)]
+mod strip_color_tests {
+    use super::strip_colors;
+
+    #[test]
+    fn colours_go_and_the_text_stays() {
+        assert_eq!(strip_colors("\x1b[1;36mhello\x1b[0m"), "hello");
+    }
+
+    /// Only colour goes: the art needs its spacing to keep its shape.
+    #[test]
+    fn movement_survives() {
+        assert_eq!(strip_colors("\x1b[0m\x1b[5Cart\x1b[3D"), "\x1b[5Cart\x1b[3D");
+    }
+
+    #[test]
+    fn a_line_without_colour_is_unchanged() {
+        assert_eq!(strip_colors("plain text"), "plain text");
     }
 }

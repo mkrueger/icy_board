@@ -67,6 +67,7 @@ most likely to touch.
 | Option | Status | Note |
 |---|---|---|
 | `display_uploader` | ✅ | file listing |
+| `strip_colors_in_descriptions` | ✅ | ours, not PCBoard's - PCBoard listed the DIR file as it stood, icy_board reads the FILE_ID.DIZ out of the archive and so has to decide what its colours mean |
 | `disallow_batch_uploads` | ❌ | `BU` is a stub anyway |
 | `promote_to_batch_transfers` | ✅ | upload, decides whether a batch upload is offered and with it the goodbye question |
 | `upload_credit_time` | ❌ | uploading earns byte credit, but not time credit |
