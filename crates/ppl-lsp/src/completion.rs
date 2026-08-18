@@ -1,7 +1,7 @@
 use icy_board_engine::{
     ast::{Ast, AstVisitor, IdentifierExpression, PredefinedCallStatement, constant::BUILTIN_CONSTS, walk_predefined_call_statement},
     executable::{FUNCTION_DEFINITIONS, STATEMENT_DEFINITIONS, StatementSignature},
-    parser::lexer::KEYWORDS,
+    parser::{built_in_type_names, lexer::KEYWORDS},
     semantic::{ReferenceType, SemanticVisitor},
 };
 use tower_lsp::lsp_types::{CompletionItem, CompletionItemKind, Documentation, HoverContents, InsertTextFormat};
@@ -20,36 +20,6 @@ pub enum ImCompleteCompletionItem {
 /// Words the parser reads by name instead of as a token, with the version that gave
 /// them their meaning. EXIT is the statement END used to be.
 const CONTEXTUAL_WORDS: &[(&str, u16)] = &[("EXIT", 400)];
-
-const TYPES: [&str; 27] = [
-    "BOOLEAN",
-    "DATE",
-    "DDATE",
-    "INTEGER",
-    "SDWORD",
-    "LONG",
-    "MONEY",
-    "STRING",
-    "TIME",
-    "BIGSTR",
-    "EDATE",
-    "REAL",
-    "FLOAT",
-    "DREAL",
-    "DOUBLE",
-    "UNSIGNED",
-    "DWORD",
-    "UDWORD",
-    "BYTE",
-    "UBYTE",
-    "WORD",
-    "UWORD",
-    "SBYTE",
-    "SHORT",
-    "SWORD",
-    "INT",
-    "MSGAREAID",
-];
 
 /// return (need_to_continue_search, founded reference)
 pub fn get_completion(ast: &Ast, semantic_visitor: &SemanticVisitor, line_before_cursor: &str, offset: usize) -> Vec<CompletionItem> {
@@ -84,7 +54,7 @@ pub fn get_completion(ast: &Ast, semantic_visitor: &SemanticVisitor, line_before
                 ..Default::default()
             });
         }
-        for stmt in TYPES {
+        for stmt in built_in_type_names(ast.language_version) {
             map.items.push(CompletionItem {
                 label: stmt.to_string(),
                 insert_text: Some(stmt.to_string()),

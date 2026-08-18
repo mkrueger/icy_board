@@ -240,3 +240,19 @@ fn a_built_in_statement_is_offered_from_the_version_that_added_it() {
     assert!(new.contains(&"WebRequest".to_string()), "{new:?}");
     assert!(new.contains(&"MoveMsg".to_string()), "{new:?}");
 }
+
+#[test]
+fn a_type_is_offered_from_the_version_that_named_it() {
+    let first = offered(100);
+    assert!(first.contains(&"INTEGER".to_string()), "{first:?}");
+    for word in ["BIGSTR", "DDATE", "MSGAREAID"] {
+        assert!(!first.contains(&word.to_string()), "{word} should not be offered in 100: {first:?}");
+    }
+
+    let second = offered(200);
+    assert!(second.contains(&"BIGSTR".to_string()), "{second:?}");
+    assert!(!second.contains(&"DDATE".to_string()), "{second:?}");
+
+    assert!(offered(300).contains(&"DDATE".to_string()));
+    assert!(offered(400).contains(&"MSGAREAID".to_string()));
+}

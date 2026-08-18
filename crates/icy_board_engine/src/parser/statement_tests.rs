@@ -719,6 +719,19 @@ fn an_older_language_still_ends_a_program_with_end() {
 }
 
 #[test]
+fn a_type_is_only_known_from_the_version_that_named_it() {
+    // The PPL release notes put the widths and the big string in 2.00 and the
+    // DBase date in 3.00.
+    for (source, since) in [("BIGSTR s\n", 200), ("DDATE d\n", 300), ("MSGAREAID a\n", 400)] {
+        let (_, messages) = parse_program(source, since);
+        assert!(messages.is_empty(), "{source:?} at {since}: {messages:?}");
+
+        let (_, messages) = parse_program(source, since - 100);
+        assert!(!messages.is_empty(), "{source:?} should not be a type before {since}");
+    }
+}
+
+#[test]
 fn exit_ends_a_program_from_400() {
     let (ast, messages) = parse_program("BEGIN\n  IF (1) THEN\n    EXIT\n  ENDIF\n  PRINT 1\nEND\n", 400);
     assert!(messages.is_empty(), "{messages:?}");
