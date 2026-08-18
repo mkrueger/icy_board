@@ -19,7 +19,7 @@ async-trait =  { workspace = true }
 
 bytes = "1"
 # MODEM
-serial2-tokio = { version = "0.1.19", features = ["unix"] }
+serial2-tokio = { version = "0.1.25", features = ["unix"] }
 
 # SSH
 russh = { workspace = true }
@@ -30,15 +30,15 @@ tokio-tungstenite = { version = "0.30.0", features = [
     "__rustls-tls",            # use Rustls
 ]}
 
-http = "1.1.0"
-url = "2.5.0"
-rustls = { version = "0.23.0", features = [
+http = "1.5.0"
+url = "2.5.8"
+rustls = { version = "0.23.43", features = [
     "tls12",
  #   "dangerous_configuration"  # Allow invalid certs/etc.
 ]}
 rustls-pemfile = "2"
-webpki-roots = "1.0.3"
-futures-util = { version = "0.3.30", default-features = false, features = ["sink", "std"] }
+webpki-roots = "1.0.9"
+futures-util = { version = "0.3.34", default-features = false, features = ["sink", "std"] }
 md5 = "0.8"
 
 [target.'cfg(unix)'.dependencies]

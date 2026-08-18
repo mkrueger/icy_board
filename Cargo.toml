@@ -36,21 +36,21 @@ icy_engine = { git = "https://github.com/mkrueger/icy_tools" }
 icy_parser_core = { git = "https://github.com/mkrueger/icy_tools" }
 
 lazy_static = "1.5.0"
-semver = { version = "1.0.23", features = ["serde"] }
+semver = { version = "1.0.28", features = ["serde"] }
 thiserror = "2.0.20"
-argh = "0.1.12"
+argh = "0.1.19"
 crossterm = "0.29.0"
-ratatui = "0.30.0"
-log = "0.4.25"
-chrono = { version = "0.4.37", features = ["serde"] }
+ratatui = "0.30.2"
+log = "0.4.33"
+chrono = { version = "0.4.45", features = ["serde"] }
 bstr = "1.13.1"
-serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.135"
-tokio = { version = "1.43.0", features = ["full"] }
-rayon = "1.10.0"
-regex = "1.11.3"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+tokio = { version = "1.53.1", features = ["full"] }
+rayon = "1.12.0"
+regex = "1.13.1"
 bitflag = "0.10.1"
-async-trait = "0.1.89"
+async-trait = "0.1.92"
 async-recursion = "1.1.1"
 rand = "0.10.2"
 zip = "8.6.0"
@@ -60,28 +60,27 @@ i18n-embed = { version = "0.16.0", features = [
 	"fluent-system",
 	"desktop-requester",
 ] }
-i18n-embed-fl = "0.10.0"
+i18n-embed-fl = "0.10.1"
 fluent-bundle = "0.16.0"
-rust-embed = "8.5.0"
-once_cell = "1.20.2"
-unicase = "2.7.0"
-toml = "1.1.0"
+rust-embed = "8.12.0"
+once_cell = "1.21.4"
+unicase = "2.9.0"
+toml = "1.1.4"
 fastrand = "2"
-color-eyre = "0.6.2"
-tempfile = "3.23.0"
+color-eyre = "0.6.5"
+tempfile = "3.27.0"
 substring = "1.4.5"
 strum = "0.28.0"
 strum_macros = "0.28.0"
 itertools = "0.15.0"
-fern = "0.7.0"
+fern = "0.7.1"
 ariadne = "0.6.0"
 relative-path = "2.0.1"
-bitflags = "2.10.0"
+bitflags = "2.13.1"
 tui-markdown = "0.3"
-tui-input = "0.15.3"
-# tui-markdown = { git = "https://github.com/joshka/tui-markdown" }
+tui-input = "0.15.4"
 
-russh = "0.62.0"
+russh = "0.62.7"
 
 [profile.release]
 opt-level = 'z'   # Optimize for size
