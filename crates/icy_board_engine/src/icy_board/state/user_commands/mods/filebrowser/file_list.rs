@@ -14,6 +14,84 @@ use crate::{
     vm::TerminalTarget,
 };
 
+/// Where a description starts, once the name, size and date columns are written.
+const DESCRIPTION_COLUMN: usize = 33;
+
+/// Keeps a description inside its column.
+///
+/// A FILE_ID.DIZ is drawn for a screen that starts at column 0, and the ANSI ones
+/// usually open with a cursor-back to get there - `ESC[255D` is common. Printed as
+/// it stands, that walks over the name and size of the file it belongs to. The
+/// movement is shortened rather than dropped, so the art keeps its shape and its
+/// colours and only loses the part that would leave the column.
+fn clamp_to_column(line: &str, left: usize) -> String {
+    let mut out = String::with_capacity(line.len());
+    let mut column = left;
+    let mut chars = line.chars().peekable();
+
+    while let Some(ch) = chars.next() {
+        if ch == '\r' {
+            // A carriage return is a cursor-back to column zero by another name.
+            if column > left {
+                out.push_str(&format!("\x1b[{}D", column - left));
+                column = left;
+            }
+            continue;
+        }
+        if ch != '\x1b' || chars.peek() != Some(&'[') {
+            out.push(ch);
+            if !ch.is_control() {
+                column += 1;
+            }
+            continue;
+        }
+
+        chars.next();
+        let mut params = String::new();
+        let mut final_byte = None;
+        for c in chars.by_ref() {
+            if c.is_ascii_digit() || c == ';' || c == '?' {
+                params.push(c);
+            } else {
+                final_byte = Some(c);
+                break;
+            }
+        }
+        let Some(final_byte) = final_byte else {
+            break;
+        };
+        let first = || params.split(';').next().unwrap_or("").parse::<usize>().unwrap_or(1).max(1);
+
+        match final_byte {
+            'D' => {
+                let wanted = first();
+                let room = column - left;
+                if room > 0 {
+                    out.push_str(&format!("\x1b[{}D", wanted.min(room)));
+                    column -= wanted.min(room);
+                }
+            }
+            'C' => {
+                let by = first();
+                out.push_str(&format!("\x1b[{by}C"));
+                column += by;
+            }
+            'G' => {
+                let wanted = first().max(left + 1);
+                out.push_str(&format!("\x1b[{wanted}G"));
+                column = wanted - 1;
+            }
+            _ => {
+                out.push('\x1b');
+                out.push('[');
+                out.push_str(&params);
+                out.push(final_byte);
+            }
+        }
+    }
+    out
+}
+
 /// Decides which files a listing shows.
 ///
 /// The first stage only looks at the index entry, which is already in memory. The second
@@ -139,10 +217,11 @@ impl FileList {
                         } else {
                             cmd.print(TerminalTarget::Both, &format!("{:33}", " ")).await?;
                         }
+                        let line = clamp_to_column(line, DESCRIPTION_COLUMN);
                         if cmd.session.search_pattern.is_some() {
-                            cmd.print_found_text(TerminalTarget::Both, line).await?;
+                            cmd.print_found_text(TerminalTarget::Both, &line).await?;
                         } else {
-                            cmd.print(TerminalTarget::Both, line).await?;
+                            cmd.print(TerminalTarget::Both, &line).await?;
                         }
                         cmd.new_line().await?;
                         printed_lines = true;
@@ -182,5 +261,58 @@ impl FileList {
         }
         cmd.session.disp_options.in_file_list = None;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod description_tests {
+    use super::{DESCRIPTION_COLUMN, clamp_to_column};
+
+    /// The line that started this: the first line of the FILE_ID.DIZ in
+    /// 3nt1094.zip walks back 255 columns before writing anything.
+    #[test]
+    fn a_cursor_back_cannot_leave_the_column() {
+        let line = "\x1b[255D\x1b[0m \x1b[CTHE iNCREDiBlE WASTE oF TiME";
+        let clamped = clamp_to_column(line, DESCRIPTION_COLUMN);
+
+        assert!(!clamped.contains("255D"), "the walk back is still there: {clamped:?}");
+        assert!(!clamped.contains("\x1b[D"), "an empty move should be dropped: {clamped:?}");
+        assert!(clamped.contains("\x1b[0m"), "colour must survive: {clamped:?}");
+        assert!(clamped.contains("\x1b[1C"), "forward movement must survive: {clamped:?}");
+    }
+
+    /// Walking back over text that was written inside the column is fine.
+    #[test]
+    fn a_cursor_back_inside_the_column_is_left_alone() {
+        let clamped = clamp_to_column("abcdef\x1b[3D", DESCRIPTION_COLUMN);
+        assert_eq!(clamped, "abcdef\x1b[3D");
+    }
+
+    /// Only the part that would leave the column is taken off.
+    #[test]
+    fn a_cursor_back_is_shortened_rather_than_dropped() {
+        let clamped = clamp_to_column("abc\x1b[10D", DESCRIPTION_COLUMN);
+        assert_eq!(clamped, "abc\x1b[3D");
+    }
+
+    /// A carriage return is the same move under another name.
+    #[test]
+    fn a_carriage_return_becomes_a_move_to_the_column() {
+        assert_eq!(clamp_to_column("abcde\r", DESCRIPTION_COLUMN), "abcde\x1b[5D");
+        assert_eq!(clamp_to_column("\rx", DESCRIPTION_COLUMN), "x");
+    }
+
+    /// An absolute column cannot point outside the column either.
+    #[test]
+    fn an_absolute_column_is_pushed_into_the_column() {
+        assert_eq!(clamp_to_column("\x1b[1G", DESCRIPTION_COLUMN), "\x1b[34G");
+        assert_eq!(clamp_to_column("\x1b[50G", DESCRIPTION_COLUMN), "\x1b[50G");
+    }
+
+    /// Anything that is not movement is passed through untouched.
+    #[test]
+    fn other_sequences_are_untouched() {
+        let line = "\x1b[1;33mhello\x1b[0m";
+        assert_eq!(clamp_to_column(line, DESCRIPTION_COLUMN), line);
     }
 }
