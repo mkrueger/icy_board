@@ -113,6 +113,11 @@ The Extensions view does the same through *Install from VSIX...* in its `...`
 menu. The platform packages carry the server; the package without a platform in
 its name expects `icyboard-ppl` on your `PATH`.
 
+[![A PPL project in VS Code](assets/editor_vscode.png)](assets/editor_vscode.png)
+
+The extension supplies PPL highlighting and the language client. The integrated
+terminal can build or run the PPE beside its source.
+
 ### Zed
 
 Open the extension list and install **PPL**. It brings the grammar and fetches
@@ -122,6 +127,11 @@ there is nothing else to install.
 While the extension is still on its way into Zed's registry, install it from its
 [repository](https://github.com/mkrueger/zed-ppl) instead: clone it, then run
 `zed: install dev extension` and select the clone.
+
+[![PPL diagnostics in Zed](assets/editor_zed.png)](assets/editor_zed.png)
+
+Zed combines the tree-sitter grammar with language-server diagnostics, hover
+information, completion and navigation.
 
 ### Helix and Neovim
 
@@ -137,6 +147,11 @@ tools/setup-editor.sh neovim
 
 [tree-sitter-ppl](crates/tree-sitter-ppl/README.md) spells out what that amounts
 to, for anyone who would rather do it by hand.
+
+[![PPL completion in Helix](assets/editor_helix.png)](assets/editor_helix.png)
+
+Helix shows completion details from `icyboard-ppl` while its tree-sitter grammar
+handles highlighting, indentation, folding and text objects.
 
 ### Other editors
 

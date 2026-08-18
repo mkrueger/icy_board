@@ -131,6 +131,13 @@ I think it improves the language and it's open for discussion. Note that some al
 `tools/setup-editor.sh` installs the language server and sets up every editor it
 finds, so the usual case is one command.
 
+| VS Code | Zed | Helix |
+| :---: | :---: | :---: |
+| [![PPL in VS Code](../assets/editor_vscode.png)](../assets/editor_vscode.png) | [![PPL in Zed](../assets/editor_zed.png)](../assets/editor_zed.png) | [![PPL in Helix](../assets/editor_helix.png)](../assets/editor_helix.png) |
+| A multi-file PPE project with the board running in the integrated terminal | Inline diagnostics and type information from the language server | Completion with the built-in statement documentation beside it |
+
+The screenshots are linked to their full-size versions.
+
 The language server covers editors that speak LSP. It knows the 4.x types, so a
 `.` offers what a record or a board object holds, `Point { ` offers the fields a
 literal has not named yet, and writing arguments shows the signature of the

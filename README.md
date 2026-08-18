@@ -184,7 +184,9 @@ compatibility references and PPL/tooling material. Common starting points:
 
 PPL has editor support for [VS Code](editors/vscode),
 [Zed](https://github.com/mkrueger/zed-ppl) and, through the
-[tree-sitter grammar](crates/tree-sitter-ppl), Neovim and Helix.
+[tree-sitter grammar](crates/tree-sitter-ppl), Neovim and Helix. The
+[PPL editor overview](docs/ppl.md#editors) shows the same project in VS Code,
+Zed and Helix.
 
 ## Where it came from
 
