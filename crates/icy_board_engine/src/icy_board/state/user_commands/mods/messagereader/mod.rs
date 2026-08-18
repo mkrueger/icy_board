@@ -681,7 +681,7 @@ impl IcyBoardState {
 
                 keep_going |= cmd.keep_going;
                 if let Some(range) = cmd.numbers.first() {
-                    let (lo, hi) = self.clamp_range(*range, self.session.low_msg_num, self.session.high_msg_num - self.session.low_msg_num + 1);
+                    let (lo, hi) = self.clamp_range(*range, self.session.low_msg_num, self.session.high_msg_num);
                     if lo == 0 {
                         break;
                     }

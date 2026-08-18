@@ -95,6 +95,21 @@ fn test_cmd_r_text_search_skips_the_other_messages() {
     assert!(!output.contains("Subject 3"), "a message without the text was shown:\n{output}");
 }
 
+/// Packing may renumber a base so it no longer starts at one. Jumping to a
+/// number from inside the read loop has to clamp against the numbers the base
+/// holds rather than against how many it has.
+#[test]
+fn test_cmd_r_jumps_within_a_renumbered_base() {
+    let output = test_output("R\n500\n502\n\n\n".to_string(), |board| {
+        crate::tests::setup_conference_with_messages(board);
+        let path = board.conferences[0].areas.as_ref().unwrap()[0].path.clone();
+        let mut base = jamjam::jam::JamMessageBase::open(path).unwrap();
+        base.pack(&jamjam::jam::pack::PackOptions::default().with_renumber_from(500)).unwrap();
+    });
+
+    assert!(output.contains("Subject 3"), "the jump to 502 did not arrive:\n{output}");
+}
+
 /// Y reads only what is addressed to you. The test messages go to ALL, so there
 /// is nothing to read.
 #[test]
