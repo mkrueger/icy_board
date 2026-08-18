@@ -37,11 +37,14 @@ use crate::VERSION;
 pub struct GeneralTab {
     pub page: IcbSetupMenuUI,
     icy_board: Arc<Mutex<IcyBoard>>,
+    /// The board as it was loaded, to compare against when the user leaves.
+    loaded_settings: String,
 }
 
 impl GeneralTab {
     pub fn new(icy_board: Arc<Mutex<IcyBoard>>) -> Self {
         let left_title = icy_board.as_ref().lock().unwrap().file_name.file_name().unwrap().to_string_lossy().to_string();
+        let loaded_settings = icy_board.as_ref().lock().unwrap().settings_fingerprint();
         let center_title = get_text("icb_setup_main_title");
         let right_title = get_text_args("icb_setup_main_use_label", HashMap::from([("version".to_string(), VERSION.to_string())]));
         Self {
@@ -64,6 +67,7 @@ impl GeneralTab {
             .with_center_title(center_title)
             .with_right_title(right_title),
             icy_board,
+            loaded_settings,
         }
     }
 }
@@ -71,6 +75,10 @@ impl GeneralTab {
 impl TabPage for GeneralTab {
     fn title(&self) -> String {
         "Main".to_string()
+    }
+
+    fn is_dirty(&self) -> bool {
+        self.icy_board.lock().unwrap().settings_fingerprint() != self.loaded_settings
     }
 
     fn render(&mut self, frame: &mut Frame, area: Rect) {
@@ -156,5 +164,30 @@ impl TabPage for GeneralTab {
             }
         }
         state
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn tab() -> (GeneralTab, Arc<Mutex<IcyBoard>>) {
+        let mut board = IcyBoard::default();
+        board.file_name = std::path::PathBuf::from("icboard.toml");
+        let board = Arc::new(Mutex::new(board));
+        (GeneralTab::new(board.clone()), board)
+    }
+
+    #[test]
+    fn a_board_nobody_changed_is_not_dirty() {
+        let (tab, _board) = tab();
+        assert!(!tab.is_dirty());
+    }
+
+    #[test]
+    fn a_changed_option_makes_the_tab_dirty() {
+        let (tab, board) = tab();
+        board.lock().unwrap().config.file_transfer.strip_colors_in_descriptions = true;
+        assert!(tab.is_dirty());
     }
 }

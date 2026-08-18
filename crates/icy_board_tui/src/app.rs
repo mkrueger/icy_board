@@ -145,6 +145,7 @@ impl App {
         match key.code {
             KeyCode::Esc => {
                 if self.tabs.iter().any(|t| t.is_dirty()) {
+                    self.save = true;
                     self.mode = Mode::RequestQuit;
                 } else {
                     self.mode = Mode::Quit;

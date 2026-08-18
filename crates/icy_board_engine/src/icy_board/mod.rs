@@ -543,6 +543,15 @@ impl IcyBoard {
         Ok(())
     }
 
+    /// Everything `save` would write, as one string, so an editor can tell a
+    /// board somebody changed from one they only looked at.
+    pub fn settings_fingerprint(&self) -> String {
+        let config = toml::to_string(&self.config).unwrap_or_default();
+        let conferences = toml::to_string(&self.conferences).unwrap_or_default();
+        let ftn = toml::to_string(&self.ftn).unwrap_or_default();
+        format!("{config}\n{conferences}\n{ftn}")
+    }
+
     pub fn save_userbase(&mut self) -> Res<()> {
         let users_file = PathBuf::from(self.resolve_file(&self.config.paths.user_file));
         if let Err(e) = self.users.save(&users_file) {
@@ -1168,6 +1177,32 @@ mod tests {
         let root = board(&["gen/BRDM.PPE"]);
         let path = root.path().join("gen/BRDM.PPE");
         assert_eq!(lookup_case_insensitive(&path), path);
+    }
+
+    #[test]
+    fn a_board_nobody_touched_has_the_fingerprint_it_started_with() {
+        let board = IcyBoard::default();
+        assert_eq!(board.settings_fingerprint(), IcyBoard::default().settings_fingerprint());
+    }
+
+    #[test]
+    fn a_changed_option_shows_up_in_the_fingerprint() {
+        let mut board = IcyBoard::default();
+        let before = board.settings_fingerprint();
+
+        board.config.file_transfer.strip_colors_in_descriptions = !board.config.file_transfer.strip_colors_in_descriptions;
+
+        assert_ne!(board.settings_fingerprint(), before);
+    }
+
+    #[test]
+    fn a_changed_conference_shows_up_in_the_fingerprint() {
+        let mut board = IcyBoard::default();
+        let before = board.settings_fingerprint();
+
+        board.conferences.push(crate::icy_board::conferences::Conference::default());
+
+        assert_ne!(board.settings_fingerprint(), before);
     }
 
     #[test]
