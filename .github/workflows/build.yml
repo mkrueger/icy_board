@@ -28,6 +28,7 @@ jobs:
        mv target/release/icbsetup bin
        mv target/release/icbmailer bin
        mv target/release/icbsm bin
+       mv target/release/icbfile bin
        mv target/release/mkicbmnu bin
        mv target/release/mkicbtxt bin
        mv target/release/pplc bin
@@ -42,6 +43,7 @@ jobs:
          bin/icbsetup
          bin/icbmailer
          bin/icbsm
+         bin/icbfile
          bin/mkicbmnu
          bin/mkicbtxt
          bin/pplc
@@ -70,6 +72,7 @@ jobs:
        move target/release/icbsetup.exe bin
        move target/release/icbmailer.exe bin
        move target/release/icbsm.exe bin
+       move target/release/icbfile.exe bin
        move target/release/mkicbmnu.exe bin
        move target/release/mkicbtxt.exe bin
        move target/release/pplc.exe bin
@@ -84,6 +87,7 @@ jobs:
          bin/icbsetup.exe
          bin/icbmailer.exe
          bin/icbsm.exe
+         bin/icbfile.exe
          bin/mkicbmnu.exe
          bin/mkicbtxt.exe
          bin/pplc.exe
@@ -117,6 +121,7 @@ jobs:
         mv target/aarch64-apple-darwin/release/icbsetup aarch64-apple-darwin/bin
         mv target/aarch64-apple-darwin/release/icbmailer aarch64-apple-darwin/bin
         mv target/aarch64-apple-darwin/release/icbsm aarch64-apple-darwin/bin
+        mv target/aarch64-apple-darwin/release/icbfile aarch64-apple-darwin/bin
         mv target/aarch64-apple-darwin/release/mkicbmnu aarch64-apple-darwin/bin
         mv target/aarch64-apple-darwin/release/mkicbtxt aarch64-apple-darwin/bin
         mv target/aarch64-apple-darwin/release/pplc aarch64-apple-darwin/bin
@@ -128,6 +133,7 @@ jobs:
         mv target/x86_64-apple-darwin/release/icbsetup x86_64-apple-darwin/bin
         mv target/x86_64-apple-darwin/release/icbmailer x86_64-apple-darwin/bin
         mv target/x86_64-apple-darwin/release/icbsm x86_64-apple-darwin/bin
+        mv target/x86_64-apple-darwin/release/icbfile x86_64-apple-darwin/bin
         mv target/x86_64-apple-darwin/release/mkicbmnu x86_64-apple-darwin/bin
         mv target/x86_64-apple-darwin/release/mkicbtxt x86_64-apple-darwin/bin
         mv target/x86_64-apple-darwin/release/pplc x86_64-apple-darwin/bin
@@ -143,6 +149,7 @@ jobs:
          aarch64-apple-darwin/bin/icbsetup
          aarch64-apple-darwin/bin/icbmailer
          aarch64-apple-darwin/bin/icbsm
+         aarch64-apple-darwin/bin/icbfile
          aarch64-apple-darwin/bin/mkicbmnu
          aarch64-apple-darwin/bin/mkicbtxt
          aarch64-apple-darwin/bin/pplc
@@ -159,6 +166,7 @@ jobs:
          x86_64-apple-darwin/bin/icbsetup
          x86_64-apple-darwin/bin/icbmailer
          x86_64-apple-darwin/bin/icbsm
+         x86_64-apple-darwin/bin/icbfile
          x86_64-apple-darwin/bin/mkicbmnu
          x86_64-apple-darwin/bin/mkicbtxt
          x86_64-apple-darwin/bin/pplc

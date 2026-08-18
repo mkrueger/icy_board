@@ -1,0 +1,166 @@
+name: Release
+
+# Everything a tag should hand out: the board and its tools for each platform,
+# the bare language server the editor extensions download, and one VS Code
+# package per platform. Every file is attached to the release on its own, so it
+# can be downloaded without unpacking an archive of archives first.
+on:
+  push:
+    tags: ["*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The tag whose release the files are attached to
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  TAG: ${{ github.event.inputs.tag || github.ref_name }}
+
+jobs:
+  open_release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Open the release unless it is already there
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            echo "$TAG already has a release, attaching to it"
+          else
+            gh release create "$TAG" --repo "$REPO" --draft --title "$TAG" --generate-notes
+            echo "opened a draft release for $TAG - review it and press publish"
+          fi
+
+  board:
+    needs: open_release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            archive: icy_board_linux
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            archive: icy_board_windows
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            archive: icy_board_osx_aarch64-apple-darwin
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            archive: icy_board_osx_x86_64-apple-darwin
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref_name }}
+
+      - name: Add the target
+        run: rustup target add ${{ matrix.target }}
+
+      - name: Build
+        run: cargo build --release --locked --target ${{ matrix.target }}
+
+      # The layout INSTALL.md describes: bin/ with every program beside it.
+      - name: Collect what a sysop downloads
+        shell: bash
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          suffix=""
+          case "$TARGET" in *windows*) suffix=".exe";; esac
+
+          mkdir -p bin
+          for tool in icboard icbsetup icbsm icbfile icbmailer mkicbmnu mkicbtxt pplc ppld icyboard-ppl; do
+            cp "target/$TARGET/release/$tool$suffix" bin/
+          done
+          sed "s/#VERSION/$TAG/g" data/file_id.diz > file_id.diz
+
+          echo "ARCHIVE=${{ matrix.archive }}_$TAG.zip" >> "$GITHUB_ENV"
+          echo "SERVER=target/$TARGET/release/icyboard-ppl$suffix" >> "$GITHUB_ENV"
+
+      - name: Pack it
+        if: matrix.os != 'windows-latest'
+        shell: bash
+        run: |
+          zip -r "$ARCHIVE" bin file_id.diz INSTALL.md LICENSE
+          tar -czf "icyboard-ppl-${{ matrix.target }}.tar.gz" -C "target/${{ matrix.target }}/release" icyboard-ppl
+
+      - name: Pack it
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          Compress-Archive -Path bin, file_id.diz, INSTALL.md, LICENSE -DestinationPath "$env:ARCHIVE"
+          Compress-Archive -Path "target\${{ matrix.target }}\release\icyboard-ppl.exe" -DestinationPath "icyboard-ppl-${{ matrix.target }}.zip"
+
+      - name: Attach it to the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: gh release upload "$TAG" "$ARCHIVE" icyboard-ppl-${{ matrix.target }}.* --repo "$REPO" --clobber
+
+      # The VS Code packages carry the server that belongs to their platform.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: server-${{ matrix.target }}
+          path: ${{ env.SERVER }}
+          if-no-files-found: error
+
+  vscode:
+    needs: board
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref_name }}
+
+      - uses: pnpm/action-setup@v2
+        name: Install pnpm
+        with:
+          version: 8.15.7
+          run_install: false
+
+      - name: Download the servers
+        uses: actions/download-artifact@v4
+        with:
+          path: servers
+
+      - name: Build one package per platform
+        run: |
+          cd editors/vscode
+          pnpm install --frozen-lockfile
+          npm run compile
+
+          package() {
+            server="$GITHUB_WORKSPACE/servers/server-$2/$3"
+            if [ ! -f "$server" ]; then
+              echo "no server for $1 at $server"
+              exit 1
+            fi
+            rm -rf server
+            mkdir server
+            cp "$server" server/
+            chmod +x server/*
+            pnpm exec vsce package --no-dependencies --target "$1"
+          }
+          package linux-x64    x86_64-unknown-linux-gnu icyboard-ppl
+          package win32-x64    x86_64-pc-windows-msvc   icyboard-ppl.exe
+          package darwin-arm64 aarch64-apple-darwin     icyboard-ppl
+          package darwin-x64   x86_64-apple-darwin      icyboard-ppl
+
+          # And one for everyone else, which asks for a server on the PATH.
+          rm -rf server
+          pnpm run package
+
+      - name: Attach every package to the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: gh release upload "$TAG" editors/vscode/*.vsix --repo "$REPO" --clobber
