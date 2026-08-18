@@ -550,22 +550,18 @@ impl Page for ConferenceEditor {
                     }
 
                     let editor = &self.menu.obj.1.lock().unwrap().config.sysop.external_editor;
-                    match std::process::Command::new(editor).arg(format!("{}", path.display())).spawn() {
-                        Ok(mut child) => match child.wait() {
-                            Ok(_) => {
-                                return PageMessage::ExternalProgramStarted;
-                            }
-                            Err(e) => {
-                                log::error!("Error opening editor: {}", e);
-                                return PageMessage::ResultState(ResultState {
-                                    edit_msg: icy_board_tui::config_menu::EditMessage::None,
-                                    status_line: format!("Error: {}", e),
-                                });
-                            }
-                        },
+                    let started = icy_board_tui::term::with_terminal(|| {
+                        std::process::Command::new(editor)
+                            .arg(format!("{}", path.display()))
+                            .spawn()
+                            .and_then(|mut child| child.wait())
+                    });
+                    match started {
+                        Ok(_) => {
+                            return PageMessage::ExternalProgramStarted;
+                        }
                         Err(e) => {
                             log::error!("Error opening editor: {}", e);
-                            ratatui::init();
                             return PageMessage::ResultState(ResultState {
                                 edit_msg: icy_board_tui::config_menu::EditMessage::None,
                                 status_line: format!("Error: {}", e),

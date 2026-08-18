@@ -58,6 +58,10 @@ impl App {
 
     /// Draw a single frame of the app.
     fn draw(&mut self, terminal: &mut TerminalType) -> Result<()> {
+        // Somebody else wrote on the screen, so there is nothing left to compare against.
+        if crate::term::take_needs_full_redraw() {
+            terminal.clear()?;
+        }
         terminal
             .draw(|frame| {
                 let screen: Rect = get_screen_size(&frame, self.full_screen);

@@ -112,19 +112,18 @@ impl ICBConfigMenuUI {
                     }
 
                     let editor: &String = &self.menu.obj.lock().unwrap().config.sysop.external_editor;
-                    match std::process::Command::new(editor).arg(format!("{}", path.display())).spawn() {
-                        Ok(mut child) => match child.wait() {
-                            Ok(_) => {
-                                return PageMessage::ExternalProgramStarted;
-                            }
-                            Err(e) => {
-                                log::error!("Error opening editor: {}", e);
-                                return PageMessage::InfoBox(InfoState::Error, format!("{}\n\n{}", editor, e));
-                            }
-                        },
+                    let started = crate::term::with_terminal(|| {
+                        std::process::Command::new(editor)
+                            .arg(format!("{}", path.display()))
+                            .spawn()
+                            .and_then(|mut child| child.wait())
+                    });
+                    match started {
+                        Ok(_) => {
+                            return PageMessage::ExternalProgramStarted;
+                        }
                         Err(e) => {
                             log::error!("Error opening editor: {}", e);
-                            ratatui::init();
                             return PageMessage::InfoBox(InfoState::Error, format!("{}\n\n{}", editor, e));
                         }
                     }

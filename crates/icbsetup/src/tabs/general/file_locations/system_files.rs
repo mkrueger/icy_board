@@ -19,26 +19,20 @@ pub struct SystemFiles {
 
 fn edit_icbtext(_board: Arc<Mutex<IcyBoard>>, path: PathBuf) -> PageMessage {
     let mkicbtxt = std::env::current_exe().unwrap().with_file_name("mkicbtxt");
-    match std::process::Command::new(mkicbtxt).arg(format!("{}", path.display())).spawn() {
-        Ok(mut child) => match child.wait() {
-            Ok(_) => {
-                return PageMessage::ExternalProgramStarted;
-            }
-            Err(e) => {
-                log::error!("Error opening mkicbtxt: {}", e);
-                return PageMessage::ResultState(ResultState {
-                    edit_msg: icy_board_tui::config_menu::EditMessage::None,
-                    status_line: format!("Error: {}", e),
-                });
-            }
-        },
+    let started = icy_board_tui::term::with_terminal(|| {
+        std::process::Command::new(mkicbtxt)
+            .arg(format!("{}", path.display()))
+            .spawn()
+            .and_then(|mut child| child.wait())
+    });
+    match started {
+        Ok(_) => PageMessage::ExternalProgramStarted,
         Err(e) => {
             log::error!("Error opening mkicbtxt: {}", e);
-            ratatui::init();
-            return PageMessage::ResultState(ResultState {
+            PageMessage::ResultState(ResultState {
                 edit_msg: icy_board_tui::config_menu::EditMessage::None,
                 status_line: format!("Error: {}", e),
-            });
+            })
         }
     }
 }
