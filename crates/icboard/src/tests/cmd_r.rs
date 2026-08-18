@@ -216,11 +216,14 @@ fn test_cmd_r_walks_like_the_original() {
     }
 }
 
-/// WHO inside the read loop runs the node list instead of being swallowed.
+/// WHO inside the read loop runs the node list instead of being swallowed, and
+/// waits before the message is drawn over the top of it.
 #[test]
 fn test_cmd_r_who_runs_inside_the_read_loop() {
     let output = test_output("R\n1\nWHO\n\n\n\n".to_string(), crate::tests::setup_conference_with_messages);
     assert!(output.contains("Handling Mail"), "WHO did not run:\n{output}");
+    let after_who = output.split("WHO").nth(1).unwrap_or_default();
+    assert!(after_who.contains("Press (Enter) to continue"), "the node list was not held on screen:\n{output}");
 }
 
 /// SKIP leaves the read loop rather than asking for another message command.

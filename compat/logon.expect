@@ -12,11 +12,18 @@
 More\? \[Y=
 
 # --- identification ---
+# A board with the stock PCBTEXT asks for the two name halves and whether the
+# caller wants graphics; a customised one may ask for the name in one prompt.
+# Patterns cannot carry an "=" because a rule splits on the first one.
+you want graphics=N
+What is your first name=ORACLE
+What is your last name=TESTER
 username:=ORACLE TESTER
 apply as a new user=Y
 
 # Once the account exists the board asks for the password directly, so the same
 # script drives both a fresh registration and a returning logon.
+Password \(Dots will echo=QX7742ZK
 password:=QX7742ZK
 
 # "Re-enter" must precede the generic password rule.

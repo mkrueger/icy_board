@@ -89,11 +89,14 @@ impl IcyBoardState {
             MsgFunc::Join | MsgFunc::JumpOut => Ok(AfterAction::Quit),
             MsgFunc::Skip => {
                 // SKIPEND drags the pointer to the end before leaving, so the
-                // conference counts as read.
+                // conference counts as read, and says where it left it.
                 let high = message_base.highest_message_number();
                 self.session.last_msg_read = high;
                 self.session.highest_msg_read = self.session.highest_msg_read.max(high);
                 self.store_last_read(message_base, high).await?;
+                self.session.op_text = high.to_string();
+                self.display_text(IceText::LastMessageReadSetTo, display_flags::NEWLINE | display_flags::LFBEFORE)
+                    .await?;
                 Ok(AfterAction::Quit)
             }
             MsgFunc::EnterMessage => {
@@ -125,6 +128,8 @@ impl IcyBoardState {
                 let sec = self.session.user_command_level.cmd_chat.clone();
                 if self.check_sec("CHAT", &sec).await? {
                     self.group_chat_command().await?;
+                    // The message is redrawn over the top, so PCBoard waits here.
+                    self.press_enter().await?;
                 }
                 Ok(AfterAction::Redisplay)
             }
@@ -132,6 +137,7 @@ impl IcyBoardState {
                 let sec = self.session.user_command_level.cmd_who.clone();
                 if self.check_sec("WHO", &sec).await? {
                     self.who_display_nodes().await?;
+                    self.press_enter().await?;
                 }
                 Ok(AfterAction::Redisplay)
             }
