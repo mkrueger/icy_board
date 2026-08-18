@@ -92,41 +92,46 @@ fn clamp_to_column(line: &str, left: usize) -> String {
     out
 }
 
-/// Takes the colours out of a description and leaves everything else standing.
+/// Reduces a description to plain text.
 ///
-/// A DIZ carries whatever colours its author liked, including a reset that puts
-/// the caller back to the terminal default and so loses the colour the board
-/// chose for the column. A sysop who wants the listing to look like their board
-/// rather than like 1994 turns `strip_colors_in_descriptions` on.
-fn strip_colors(line: &str) -> String {
+/// A DIZ carries whatever its author liked - colours, cursor movement, and on a
+/// PCBoard the `@X` pairs on top. A reset among them puts the caller back to the
+/// terminal default and so loses the colour the board lists files in. A sysop who
+/// wants the listing to read as their board rather than as 1994 turns
+/// `strip_colors_in_descriptions` on and gets the words and nothing else.
+fn strip_descriptions_markup(line: &str) -> String {
     let mut out = String::with_capacity(line.len());
     let mut chars = line.chars().peekable();
 
     while let Some(ch) = chars.next() {
-        if ch != '\x1b' || chars.peek() != Some(&'[') {
-            out.push(ch);
+        if ch == '\x1b' {
+            // Every escape goes, not only the colours: what is left has to sit
+            // in the column as written.
+            if chars.peek() == Some(&'[') {
+                chars.next();
+                for c in chars.by_ref() {
+                    if !(c.is_ascii_digit() || c == ';' || c == '?') {
+                        break;
+                    }
+                }
+            } else {
+                chars.next();
+            }
             continue;
         }
-        chars.next();
-        let mut params = String::new();
-        let mut final_byte = None;
-        for c in chars.by_ref() {
-            if c.is_ascii_digit() || c == ';' || c == '?' {
-                params.push(c);
-            } else {
-                final_byte = Some(c);
-                break;
+        if ch == '@' {
+            // `@X` plus two hex digits is PCBoard's colour pair.
+            let mut look = chars.clone();
+            if matches!(look.next(), Some('X' | 'x')) {
+                let first = look.next();
+                let second = look.next();
+                if first.is_some_and(|c| c.is_ascii_hexdigit()) && second.is_some_and(|c| c.is_ascii_hexdigit()) {
+                    chars = look;
+                    continue;
+                }
             }
         }
-        let Some(final_byte) = final_byte else {
-            break;
-        };
-        if final_byte != 'm' {
-            out.push('\x1b');
-            out.push('[');
-            out.push_str(&params);
-            out.push(final_byte);
-        }
+        out.push(ch);
     }
     out
 }
@@ -257,8 +262,12 @@ impl FileList {
                         } else {
                             cmd.print(TerminalTarget::Both, &format!("{:33}", " ")).await?;
                         }
-                        let line = clamp_to_column(line, DESCRIPTION_COLUMN);
-                        let line = if strip_description_colors { strip_colors(&line) } else { line };
+                        // Plain text has nothing left that could leave the column.
+                        let line = if strip_description_colors {
+                            strip_descriptions_markup(line)
+                        } else {
+                            clamp_to_column(line, DESCRIPTION_COLUMN)
+                        };
                         if cmd.session.search_pattern.is_some() {
                             cmd.print_found_text(TerminalTarget::Both, &line).await?;
                         } else {
@@ -360,21 +369,37 @@ mod description_tests {
 
 #[cfg(test)]
 mod strip_color_tests {
-    use super::strip_colors;
+    use super::strip_descriptions_markup;
 
     #[test]
     fn colours_go_and_the_text_stays() {
-        assert_eq!(strip_colors("\x1b[1;36mhello\x1b[0m"), "hello");
+        assert_eq!(strip_descriptions_markup("\x1b[1;36mhello\x1b[0m"), "hello");
     }
 
-    /// Only colour goes: the art needs its spacing to keep its shape.
+    /// Everything goes, movement included - what is left has to sit where it is
+    /// written.
     #[test]
-    fn movement_survives() {
-        assert_eq!(strip_colors("\x1b[0m\x1b[5Cart\x1b[3D"), "\x1b[5Cart\x1b[3D");
+    fn movement_goes_too() {
+        assert_eq!(strip_descriptions_markup("\x1b[0m\x1b[5Cart\x1b[3D"), "art");
+        assert_eq!(strip_descriptions_markup("\x1b[255Dtitle"), "title");
+    }
+
+    /// PCBoard wrote its colours as `@X` and two hex digits.
+    #[test]
+    fn pcboard_colour_pairs_go() {
+        assert_eq!(strip_descriptions_markup("@X0Fbright@X07plain"), "brightplain");
+        assert_eq!(strip_descriptions_markup("@x1elower case too"), "lower case too");
+    }
+
+    /// An `@` that is not a colour pair is part of the description.
+    #[test]
+    fn an_ordinary_at_sign_stays() {
+        assert_eq!(strip_descriptions_markup("mail@example.com"), "mail@example.com");
+        assert_eq!(strip_descriptions_markup("@XZZ"), "@XZZ");
     }
 
     #[test]
-    fn a_line_without_colour_is_unchanged() {
-        assert_eq!(strip_colors("plain text"), "plain text");
+    fn a_line_without_markup_is_unchanged() {
+        assert_eq!(strip_descriptions_markup("plain text"), "plain text");
     }
 }
