@@ -7,6 +7,18 @@ completion, signature help, hover, document symbols and formatting for `.pps`,
 parameters, routines, types, enum members, record fields and labels, and follows
 the language version of the file.
 
+## Installing it
+
+Take the package for your platform from the
+[IcyBoard releases](https://github.com/mkrueger/icy_board/releases) and install
+it:
+
+```sh
+code --install-extension icyboard-ppl-<version>-<platform>.vsix
+```
+
+*Install from VSIX...* in the `...` menu of the Extensions view does the same.
+
 ## Requirements
 
 None, if you took the package for your platform: the `icyboard-ppl`

@@ -120,13 +120,22 @@ terminal can build or run the PPE beside its source.
 
 ### Zed
 
-Open the extension list and install **PPL**. It brings the grammar and fetches
-the language server from the IcyBoard releases on the first `.pps` file, so
-there is nothing else to install.
+The extension is not in Zed's registry yet, so it is installed from its
+[repository](https://github.com/mkrueger/zed-ppl):
 
-While the extension is still on its way into Zed's registry, install it from its
-[repository](https://github.com/mkrueger/zed-ppl) instead: clone it, then run
-`zed: install dev extension` and select the clone.
+```sh
+git clone https://github.com/mkrueger/zed-ppl
+```
+
+Then run `zed: install dev extension` from the command palette, or press
+*Install Dev Extension* in the extension list, and select the clone. Zed builds
+the extension and the grammar itself, so a [Rust toolchain](https://rustup.rs)
+has to be there; the first build takes a few seconds.
+
+Open a `.pps` file afterwards. The grammar highlights it, and the language server
+is fetched from the newest IcyBoard release when it is first needed. An
+`icyboard-ppl` on your `PATH` is taken instead, so a local build wins over the
+downloaded one.
 
 [![PPL diagnostics in Zed](assets/editor_zed.png)](assets/editor_zed.png)
 

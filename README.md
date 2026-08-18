@@ -182,9 +182,18 @@ compatibility references and PPL/tooling material. Common starting points:
 | [PPL](docs/ppl.md) · [PPLC](docs/pplc.md) · [New in PPL](docs/new_ppl.md) | The language, its compiler, and what 4.0 added |
 | [Feature status](docs/feature_parity.md) · [Known limitations](docs/known_limitations.md) | Compatibility details |
 
-PPL has editor support for [VS Code](editors/vscode),
-[Zed](https://github.com/mkrueger/zed-ppl) and, through the
-[tree-sitter grammar](crates/tree-sitter-ppl), Neovim and Helix. The
+PPL has editor support for VS Code, Zed, Helix and Neovim. Highlighting comes
+from the [tree-sitter grammar](crates/tree-sitter-ppl), while diagnostics,
+completion, hover and navigation come from the `icyboard-ppl` language server.
+
+| Editor | How it is installed |
+| :--- | :--- |
+| [VS Code](editors/vscode) | `code --install-extension icyboard-ppl-<version>-<platform>.vsix`, taken from a [release](https://github.com/mkrueger/icy_board/releases). The platform packages carry the server. |
+| [Zed](https://github.com/mkrueger/zed-ppl) | Clone the extension and run `zed: install dev extension` on the clone. It fetches the server from the newest release by itself. |
+| Helix, Neovim | `tools/setup-editor.sh` from a source checkout builds the grammar and the server and writes the configuration. |
+| Anything else with LSP | Point it at `icyboard-ppl` for `.pps`; it talks over stdio and takes no arguments. |
+
+[Editor installation](INSTALL.md#ppl-in-your-editor) has the details, and the
 [PPL editor overview](docs/ppl.md#editors) shows the same project in VS Code,
 Zed and Helix.
 
