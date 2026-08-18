@@ -4,7 +4,7 @@ A re-creation of PCBoard, the DOS bulletin board system, for machines that are
 still running. Same commands, same `@` macros, same PPEs — on Linux, macOS,
 Windows and the Raspberry Pi, over telnet, SSH and websockets.
 
-![Login screen](assets/login_screen.png?raw=true "Login screen")
+![Main menu](assets/main_menu.png?raw=true "Main menu")
 
 ## Status
 
@@ -18,6 +18,17 @@ to be discovered:
 
 There is no modem and no serial support, and there never will be. Everything
 else that PCBoard did is either here or on the list.
+
+## What it looks like
+
+| | | |
+| :---: | :---: | :---: |
+| ![Reading a message](assets/message_reader.png?raw=true) | ![File listing](assets/file_list.png?raw=true) | ![Call waiting screen](assets/call_waiting_screen.png?raw=true) |
+| The message reader | A file listing, descriptions read out of each archive | The call waiting screen the sysop sees |
+| ![icbsetup](assets/icbsetup.png?raw=true) | ![icbsm](assets/icbsm.png?raw=true) | ![mkicbtxt](assets/mkicbtxt.png?raw=true) |
+| `icbsetup` — the board | `icbsm` — users and groups | `mkicbtxt` — every prompt |
+
+The configuration tools are TUIs, so they work over SSH.
 
 ## Try it
 

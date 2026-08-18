@@ -5,8 +5,8 @@ Icy Board
 Call Waiting Screen
 -------------------
 
-.. image:: _images/login_screen.png
-   :alt: Login screen
+.. image:: ../../assets/call_waiting_screen.png
+   :alt: Call waiting screen
    :width: 400px
 
 The call waiting screen is what you see when you start Icy Board. It's like the PCBoard call 
@@ -44,6 +44,11 @@ Toggle the alarm bell. If on, the terminal bell will ring when a user logs in.
 ICBSM
 ~~~~~
 Start the system manager utility. This is a TUI utility to manage users and groups.
+
+.. image:: ../../assets/icbsm.png
+   :alt: The ICBSM user file maintenance menu
+   :width: 400px
+
 Its menu carries the entries of the utility it replaces: besides the record editor
 it sorts and packs the user file and runs the bulk edits over a selection of users -
 security levels, expiration dates, conference registration and phone formats. The
@@ -69,15 +74,46 @@ ICBText
 ~~~~~~~
 Start the ICBText editor. This is a TUI utility to edit the system messages and prompts.
 
+.. image:: ../../assets/mkicbtxt.png
+   :alt: The ICBText editor
+   :width: 400px
+
 ICBSetup
 ~~~~~~~~
 Start the setup utility. This is a TUI utility to create and configure an Icy Board
-installation.
+installation. Its main menu is shown in :doc:`installation`.
 
 ICBMoni
 ~~~~~~~
 Start the monitor utility. This is a TUI utility to monitor system activity.
 Nodes & logged on users and which ports Icy Board is listening on.
+
+What a Caller Sees
+------------------
+
+Past the login prompt the board looks the way PCBoard looked, because that is
+the point. The main menu is drawn from ``art/brdm``, so it is the first thing a
+board usually makes its own.
+
+.. image:: ../../assets/main_menu.png
+   :alt: The main menu
+   :width: 400px
+
+The message reader shows the header PCBoard showed and takes the commands it
+took.
+
+.. image:: ../../assets/message_reader.png
+   :alt: Reading a message
+   :width: 400px
+
+File listings read the ``FILE_ID.DIZ`` out of the archive, so a description
+arrives with whatever colours and cursor moves its author gave it. The listing
+keeps it inside its column either way; ``strip_colors_in_descriptions`` reduces
+it to plain text.
+
+.. image:: ../../assets/file_list.png
+   :alt: A file listing with FILE_ID.DIZ descriptions
+   :width: 400px
 
 Tools
 -----

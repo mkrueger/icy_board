@@ -67,6 +67,13 @@ reads ``icboard.toml`` in the current directory; alternatively, ``ICB_PATH`` may
 name the board directory. ``icboard --localon`` opens a local sysop session
 immediately. Telnet is enabled on port 1337 in a newly created board.
 
+Running ``icbsetup`` without a subcommand opens the editor on an existing board.
+Its main menu carries the screens PCBSetup carried, in the same order:
+
+.. image:: ../../assets/icbsetup.png
+   :alt: The ICBSetup main menu
+   :width: 400px
+
 Importing an existing board
 ---------------------------
 
