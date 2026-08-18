@@ -8,6 +8,7 @@ use crate::Res;
 use crate::icy_board::icb_text::IceText;
 use crate::icy_board::state::IcyBoardState;
 use crate::icy_board::state::functions::{MASK_ASCII, MASK_NUM, display_flags};
+use crate::icy_board::state::user_commands::pcb::select_conferences::SelectMode;
 use crate::vm::TerminalTarget;
 
 use super::read_command::{MsgFunc, ReadCommand};
@@ -28,6 +29,8 @@ pub(super) enum AfterAction {
     Redisplay,
     /// Move on to the next message (PCBoard's READNEXT).
     Next,
+    /// Leave the read loop (PCBoard's QUITREAD/QUITLOOP/SKIPNEXT).
+    Quit,
 }
 
 impl IcyBoardState {
@@ -81,8 +84,95 @@ impl IcyBoardState {
                 }
                 Ok(AfterAction::Redisplay)
             }
+            // J remembers nothing here: PCBoard leaves the reader and lets the
+            // main prompt run the join with the tokens that follow.
+            MsgFunc::Join | MsgFunc::JumpOut => Ok(AfterAction::Quit),
+            MsgFunc::Skip => {
+                // SKIPEND drags the pointer to the end before leaving, so the
+                // conference counts as read.
+                let high = message_base.highest_message_number();
+                self.session.last_msg_read = high;
+                self.session.highest_msg_read = self.session.highest_msg_read.max(high);
+                self.store_last_read(message_base, high).await?;
+                Ok(AfterAction::Quit)
+            }
+            MsgFunc::EnterMessage => {
+                let sec = self.session.user_command_level.cmd_e.clone();
+                if self.check_sec("E", &sec).await? {
+                    self.enter_message().await?;
+                }
+                Ok(AfterAction::Quit)
+            }
+            MsgFunc::Reply | MsgFunc::ReplyOther => {
+                self.new_line().await?;
+                let sec = self.session.user_command_level.cmd_e.clone();
+                if self.check_sec("REPLY", &sec).await? {
+                    // The reply command reads the number it answers from the tokens.
+                    self.session.tokens.push_front(number.to_string());
+                    self.reply_message_command().await?;
+                }
+                Ok(AfterAction::Redisplay)
+            }
+            MsgFunc::QuickScan => {
+                self.quick_message_scan().await?;
+                Ok(AfterAction::Redisplay)
+            }
+            MsgFunc::SelectConference | MsgFunc::DeselectConference => {
+                self.select_conferences(SelectMode::SelectCmd).await?;
+                Ok(AfterAction::Next)
+            }
+            MsgFunc::Chat => {
+                let sec = self.session.user_command_level.cmd_chat.clone();
+                if self.check_sec("CHAT", &sec).await? {
+                    self.group_chat_command().await?;
+                }
+                Ok(AfterAction::Redisplay)
+            }
+            MsgFunc::Who => {
+                let sec = self.session.user_command_level.cmd_who.clone();
+                if self.check_sec("WHO", &sec).await? {
+                    self.who_display_nodes().await?;
+                }
+                Ok(AfterAction::Redisplay)
+            }
+            MsgFunc::FlagFile => {
+                self.flag_files_cmd(true).await?;
+                Ok(AfterAction::Redisplay)
+            }
+            // PCBoard answers the sender or recipient of the message in front of
+            // the reader by handing the name to user maintenance.
+            MsgFunc::FindTo | MsgFunc::FindFrom => {
+                self.new_line().await?;
+                let sec = self.get_board().await.config.sysop_command_level.sec_7_user_maint.clone();
+                if self.check_sec("F", &sec).await? {
+                    let Ok(header) = message_base.read_header(number) else {
+                        return Ok(AfterAction::Redisplay);
+                    };
+                    let name = if cmd.func == MsgFunc::FindTo { header.to() } else { header.from() };
+                    if let Some(name) = name {
+                        self.session.tokens.push_front(name.to_string());
+                    }
+                    self.user_maintenance().await?;
+                }
+                Ok(AfterAction::Redisplay)
+            }
             _ => Ok(AfterAction::NotHandled),
         }
+    }
+
+    /// Moves this user's last-read pointer for the base in front of the reader.
+    async fn store_last_read(&mut self, message_base: &mut JamMessageBase, number: u32) -> Res<()> {
+        unsafe {
+            let crc = JamMessageBase::crc(&BString::new(self.session.user_name.as_mut_vec().clone()));
+            let user_id = self.session.cur_user_id as u32;
+            let mut last_read = message_base
+                .find_last_read(crc, user_id)?
+                .unwrap_or(message_base.create_last_read(crc, user_id)?);
+            last_read.last_read_msg = number;
+            last_read.high_read_msg = last_read.high_read_msg.max(number);
+            message_base.write_last_read(&last_read)?;
+        }
+        Ok(())
     }
 
     /// PCBoard asks for the conference only when the command line did not carry one.

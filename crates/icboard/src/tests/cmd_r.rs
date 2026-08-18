@@ -215,3 +215,27 @@ fn test_cmd_r_walks_like_the_original() {
         assert!(output.contains(field), "the header is missing {field}:\n{output}");
     }
 }
+
+/// WHO inside the read loop runs the node list instead of being swallowed.
+#[test]
+fn test_cmd_r_who_runs_inside_the_read_loop() {
+    let output = test_output("R\n1\nWHO\n\n\n\n".to_string(), crate::tests::setup_conference_with_messages);
+    assert!(output.contains("Handling Mail"), "WHO did not run:\n{output}");
+}
+
+/// SKIP leaves the read loop rather than asking for another message command.
+#[test]
+fn test_cmd_r_skip_leaves_the_read_loop() {
+    let output = test_output("R\n1\nSKIP\n\n\n".to_string(), crate::tests::setup_conference_with_messages);
+    let after_skip = output.split("SKIP").nth(1).unwrap_or_default();
+    assert!(!after_skip.contains("End of Message"), "SKIP stayed in the read loop:\n{output}");
+    assert!(!after_skip.contains("Invalid Entry"), "SKIP was not handled:\n{output}");
+}
+
+/// A command the reader parses but cannot run has to answer. Silence reads as a
+/// broken board rather than a missing feature. X is the export PCBoard had.
+#[test]
+fn test_cmd_r_an_unrunnable_command_still_answers() {
+    let output = test_output("R\n1\nX\n\n\n\n".to_string(), crate::tests::setup_conference_with_messages);
+    assert!(output.contains("Invalid Entry"), "the reader stayed silent:\n{output}");
+}

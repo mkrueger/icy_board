@@ -71,7 +71,7 @@ If something is missing just let me know.
 | O  | Page Sysop | 90% | Issue is that Sysop doesn't get informed. Need a new way - maybe an App. But it works if sysop is around and watching the session.
 | P  | Set Page Length | 💯 | 
 | Q  | Quick Message Scan | 💯 | Scans every area of the conference [^3] |
-| R  | Read Message | 70% | Prompt and read loops match; capture (`C/D/Z`) and some transfer actions parse but do not run |
+| R  | Read Message | 85% | Prompt and read loops match; REPLY, WHO, CHAT, JOIN, E, SKIP, JUMP, SEL/DESEL, Q, FLAG and F/TO run in the loop. Export, EDIT, FORWARD, VIEW and the capture actions (`C/D/Z`) are parsed and answered but not carried out |
 | S  | Take Survey  | 💯 | 
 | T  | Set Transfer Protocol | 💯 | 
 | U  | Upload  | 90% | Description, private/public placement, batch protocol and byte credits work; verification/test-extraction is missing. Aliases: `UB`, `UPLOAD` |

@@ -676,7 +676,17 @@ impl IcyBoardState {
                     AfterAction::Next => {
                         keep_going = true;
                     }
-                    AfterAction::NotHandled => {}
+                    AfterAction::Quit => break,
+                    AfterAction::NotHandled => {
+                        // A command the reader parses but cannot run must say so;
+                        // silence reads as a broken board rather than a missing one.
+                        if cmd.func != MsgFunc::None {
+                            self.display_text(IceText::InvalidEntry, display_flags::NEWLINE | display_flags::LFBEFORE)
+                                .await?;
+                            display_msg = true;
+                            continue;
+                        }
+                    }
                 }
 
                 keep_going |= cmd.keep_going;

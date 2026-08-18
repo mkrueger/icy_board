@@ -18,7 +18,8 @@ for where a command answers differently than PCBoard did, and
 | Upload credits | Uploading earns configured byte credit but not time credit, and uploads are not test-extracted. The configured free-space threshold is enforced before a transfer starts. |
 | FTN | icy_board is a leaf or point over BinkP: scan, poll and toss. There is no BinkP answering side, netmail arrives in a single dump base, AreaFix is missing and the AKA and link setup is hand-edited TOML. |
 | Web | There is no web frontend, and the PPL web statements and functions are not implemented. |
-| Sysop numeric commands | Commands `3`, `9`, `10`, `14` and `15` are missing. The level named for command 10 protects `PPE` instead; commands `1`, `2`, `4`, `5`, `6`, `7`, `8`, `11`, `12`, `13` and `16` work. |
+| Sysop numeric commands | Commands `9`, `10`, `14` and `15` are missing. The level named for command 10 protects `PPE` instead; commands `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`, `11`, `12`, `13` and `16` work. |
+| Message reader | Inside the read loop, export (`X`), `EDIT`, `FORWARD`, `VIEW` and the capture actions (`C`, `D`, `Z`) are recognised and answered but do not run. |
 | ICBSM | Editing users and groups, sorting and packing the user file, the bulk edits over a selection of users and the security level tables. Reports, index files and the user info file of the original have no equivalent here. |
 | German help | 20 of 52 help files are translated. The English set is complete apart from the sysop help, which PCBoard never shipped either. |
 
