@@ -1,5 +1,26 @@
 error_cmd_line_label = error:
-error_file_or_path_not_found = File or path not found
+error_board_config_not_found = IcyBoard configuration not found: { $path }
+error_board_config_help =
+    IcyBoard looks for icboard.toml at the supplied file or directory, in the
+    current directory, and at ICB_PATH.
+
+    Usage: { $program } [options] [FILE|DIRECTORY]
+    Create a board: icbsetup create mybbs
+    Then start it: icboard mybbs
+    Command help: { $program } --help
+    Guide: https://github.com/mkrueger/icy_board/blob/main/docs/gettingstarted.md
+error_input_file_not_found = Input file not found: { $path }
+error_input_file_help =
+    Usage: { $program } [options] FILE
+    Create it: { $program } --create { $path }
+    Command help: { $program } --help
+error_parent_board_config_not_found = No icboard.toml found for: { $path }
+error_parent_board_config_help =
+    { $program } looks for icboard.toml in the file's directory and its parents.
+
+    Create a board: icbsetup create mybbs
+    Command help: { $program } --help
+    Guide: https://github.com/mkrueger/icy_board/blob/main/docs/gettingstarted.md
 run_ppe_completed = Run completed - press any key to exit
 
 # Shown for an option the board does not read yet

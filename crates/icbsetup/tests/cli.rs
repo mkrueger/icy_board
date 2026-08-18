@@ -16,6 +16,37 @@ fn icbsetup() -> Command {
 }
 
 #[test]
+fn missing_board_configuration_explains_how_to_start() {
+    let path = temp_dir("missing-board");
+    let output = icbsetup().arg(&path).env("LANG", "en_US.UTF-8").env_remove("ICB_PATH").output().unwrap();
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert!(!output.status.success());
+    assert!(stderr.contains("IcyBoard configuration not found:"));
+    assert!(stderr.contains("Usage: "));
+    assert!(stderr.contains("icbsetup create mybbs"));
+    assert!(stderr.contains("docs/gettingstarted.md"));
+}
+
+#[test]
+fn check_with_missing_board_configuration_explains_how_to_start() {
+    let path = temp_dir("missing-check-board");
+    let output = icbsetup()
+        .args(["check", path.to_str().unwrap()])
+        .env("LANG", "en_US.UTF-8")
+        .env_remove("ICB_PATH")
+        .output()
+        .unwrap();
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert!(!output.status.success());
+    assert!(stderr.contains("IcyBoard configuration not found:"));
+    assert!(stderr.contains("icbsetup check"));
+    assert!(stderr.contains("icbsetup create mybbs"));
+    assert!(stderr.contains("docs/gettingstarted.md"));
+}
+
+#[test]
 fn missing_import_source_is_a_failure() {
     let source = temp_dir("missing-source");
     let output = temp_dir("missing-output");

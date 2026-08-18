@@ -87,9 +87,12 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    let Some(file) = icy_board_engine::lookup_icyboard_file(&arguments.file) else {
-        print_error(icy_board_tui::get_text("error_file_or_path_not_found"));
-        exit(1);
+    let file = match icy_board_engine::resolve_icyboard_file(&arguments.file) {
+        Ok(file) => file,
+        Err(icy_board_engine::IcyBoardFileLookupError::FileNotFound(path)) => {
+            icy_board_tui::print_board_config_not_found("icbsm", &path);
+            exit(1);
+        }
     };
 
     // The log belongs to the board, not to wherever the tool was started from.

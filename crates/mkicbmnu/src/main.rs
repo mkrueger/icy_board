@@ -61,13 +61,16 @@ fn main() -> Result<()> {
 
     let file = menu_file.with_extension("mnu");
     if !file.exists() && !arguments.create {
-        print_error(icy_board_tui::get_text("error_file_or_path_not_found"));
+        icy_board_tui::print_input_file_not_found("mkicbmnu", &file);
         exit(1);
     }
 
-    let Ok(icy_board) = load_icy_board(file.parent()) else {
-        print_error(format!("{} not found", icy_board_engine::DEFAULT_ICYBOARD_FILE));
-        exit(1);
+    let icy_board = match load_icy_board(file.parent()) {
+        Ok(icy_board) => icy_board,
+        Err(_) => {
+            icy_board_tui::print_parent_board_config_not_found("mkicbmnu", &file);
+            exit(1);
+        }
     };
 
     let log_file = icy_board.file_name.with_extension("log");

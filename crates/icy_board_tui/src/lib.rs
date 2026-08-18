@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Display, io::stderr};
+use std::{collections::HashMap, fmt::Display, io::stderr, path::Path};
 
 use crossterm::{
     execute,
@@ -74,6 +74,42 @@ pub fn print_error<A: Display>(error: A) {
         SetAttribute(Attribute::Reset)
     )
     .unwrap();
+}
+
+pub fn print_board_config_not_found(program: &str, path: &Path) {
+    print_error(get_text_args(
+        "error_board_config_not_found",
+        HashMap::from([("path".to_string(), path.display().to_string())]),
+    ));
+    eprintln!(
+        "{}",
+        get_text_args("error_board_config_help", HashMap::from([("program".to_string(), program.to_string())]),)
+    );
+}
+
+pub fn print_input_file_not_found(program: &str, path: &Path) {
+    print_error(get_text_args(
+        "error_input_file_not_found",
+        HashMap::from([("path".to_string(), path.display().to_string())]),
+    ));
+    eprintln!(
+        "{}",
+        get_text_args(
+            "error_input_file_help",
+            HashMap::from([("program".to_string(), program.to_string()), ("path".to_string(), path.display().to_string()),]),
+        )
+    );
+}
+
+pub fn print_parent_board_config_not_found(program: &str, path: &Path) {
+    print_error(get_text_args(
+        "error_parent_board_config_not_found",
+        HashMap::from([("path".to_string(), path.display().to_string())]),
+    ));
+    eprintln!(
+        "{}",
+        get_text_args("error_parent_board_config_help", HashMap::from([("program".to_string(), program.to_string())]),)
+    );
 }
 
 pub static BORDER_SET: border::Set = border::Set {

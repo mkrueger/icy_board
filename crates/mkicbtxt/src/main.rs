@@ -70,7 +70,7 @@ fn main() -> Result<()> {
 
     let file = arguments.file;
     if !file.exists() && !arguments.create {
-        print_error(icy_board_tui::get_text("error_file_or_path_not_found"));
+        icy_board_tui::print_input_file_not_found("mkicbtxt", &file);
         exit(1);
     }
 

@@ -216,9 +216,12 @@ fn main() -> Result<()> {
             return Ok(());
         }
         Some(Commands::Check(Check { file, create_dirs })) => {
-            let Some(config) = icy_board_engine::lookup_icyboard_file(file) else {
-                print_error(icy_board_tui::get_text("error_file_or_path_not_found"));
-                process::exit(1);
+            let config = match icy_board_engine::resolve_icyboard_file(file) {
+                Ok(config) => config,
+                Err(icy_board_engine::IcyBoardFileLookupError::FileNotFound(path)) => {
+                    icy_board_tui::print_board_config_not_found("icbsetup check", &path);
+                    process::exit(1);
+                }
             };
             let board = match IcyBoard::load(&config) {
                 Ok(board) => board,
@@ -234,9 +237,12 @@ fn main() -> Result<()> {
         }
         _ => {}
     }
-    let Some(file) = icy_board_engine::lookup_icyboard_file(&arguments.file) else {
-        print_error(icy_board_tui::get_text("error_file_or_path_not_found"));
-        exit(1);
+    let file = match icy_board_engine::resolve_icyboard_file(&arguments.file) {
+        Ok(file) => file,
+        Err(icy_board_engine::IcyBoardFileLookupError::FileNotFound(path)) => {
+            icy_board_tui::print_board_config_not_found("icbsetup", &path);
+            exit(1);
+        }
     };
     init_log(&file.parent().unwrap().join("icbsetup.log"));
     let _board_lock = match BoardLock::acquire(file.parent().unwrap_or_else(|| Path::new("."))) {

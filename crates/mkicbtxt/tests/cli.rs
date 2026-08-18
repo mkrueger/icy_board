@@ -14,6 +14,19 @@ fn mkicbtxt() -> Command {
 }
 
 #[test]
+fn missing_file_explains_how_to_create_it() {
+    let path = temp_file("missing");
+    let output = mkicbtxt().arg(&path).env("LANG", "en_US.UTF-8").output().unwrap();
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert!(!output.status.success());
+    assert!(stderr.contains("Input file not found:"));
+    assert!(stderr.contains("Usage: "));
+    assert!(stderr.contains("--create"));
+    assert!(stderr.contains("--help"));
+}
+
+#[test]
 fn create_refuses_to_replace_a_file_without_force() {
     let path = temp_file("create");
     fs::write(&path, b"keep me").unwrap();

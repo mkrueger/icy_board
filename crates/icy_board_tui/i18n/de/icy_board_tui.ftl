@@ -1,5 +1,26 @@
 error_cmd_line_label = Fehler:
-error_file_or_path_not_found = Datei oder Verzeichnis nicht gefunden
+error_board_config_not_found = IcyBoard-Konfiguration nicht gefunden: { $path }
+error_board_config_help =
+    IcyBoard sucht icboard.toml im angegebenen Pfad oder Verzeichnis, im
+    aktuellen Verzeichnis und unter ICB_PATH.
+
+    Verwendung: { $program } [Optionen] [DATEI|VERZEICHNIS]
+    Board erstellen: icbsetup create mybbs
+    Danach starten: icboard mybbs
+    Kommandohilfe: { $program } --help
+    Anleitung: https://github.com/mkrueger/icy_board/blob/main/docs/gettingstarted.md
+error_input_file_not_found = Eingabedatei nicht gefunden: { $path }
+error_input_file_help =
+    Verwendung: { $program } [Optionen] DATEI
+    Datei erstellen: { $program } --create { $path }
+    Kommandohilfe: { $program } --help
+error_parent_board_config_not_found = Keine icboard.toml gefunden für: { $path }
+error_parent_board_config_help =
+    { $program } sucht icboard.toml im Verzeichnis der Datei und darüber.
+
+    Board erstellen: icbsetup create mybbs
+    Kommandohilfe: { $program } --help
+    Anleitung: https://github.com/mkrueger/icy_board/blob/main/docs/gettingstarted.md
 run_ppe_completed = Ausführung abgeschlossen - beliebige Taste zum Beenden
 
 option_not_read_yet = wird vom Board noch nicht ausgewertet

@@ -39,15 +39,23 @@ lazy_static::lazy_static! {
 
 pub const DEFAULT_ICYBOARD_FILE: &str = "icboard.toml";
 
+pub enum IcyBoardFileLookupError {
+    FileNotFound(PathBuf),
+}
+
 pub fn lookup_icyboard_file(file: &Option<PathBuf>) -> Option<PathBuf> {
-    let mut file = file.clone().unwrap_or(PathBuf::from("."));
-    if file.is_dir() {
-        file = file.join(DEFAULT_ICYBOARD_FILE);
+    resolve_icyboard_file(file).ok()
+}
+
+pub fn resolve_icyboard_file(file: &Option<PathBuf>) -> Result<PathBuf, IcyBoardFileLookupError> {
+    let mut file_path = file.clone().unwrap_or(PathBuf::from("."));
+    if file_path.is_dir() {
+        file_path = file_path.join(DEFAULT_ICYBOARD_FILE);
     }
 
-    let file = file.with_extension("toml");
-    if file.exists() {
-        return Some(file);
+    let file_path = file_path.with_extension("toml");
+    if file_path.exists() {
+        return Ok(file_path);
     }
     if let Ok(var) = env::var("ICB_PATH") {
         let mut path = PathBuf::from(var);
@@ -55,9 +63,9 @@ pub fn lookup_icyboard_file(file: &Option<PathBuf>) -> Option<PathBuf> {
             path.push(DEFAULT_ICYBOARD_FILE);
         }
         if path.exists() {
-            return Some(path);
+            return Ok(path);
         }
     }
 
-    None
+    Err(IcyBoardFileLookupError::FileNotFound(file_path))
 }
