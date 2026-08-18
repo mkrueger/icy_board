@@ -50,6 +50,7 @@ enum Commands {
     Import(Import),
     Create(Create),
     PPEConvert(PPEConvert),
+    Check(Check),
 }
 
 #[derive(FromArgs, PartialEq, Debug)]
@@ -89,6 +90,15 @@ struct PPEConvert {
     /// directory to convert
     #[argh(positional)]
     path: PathBuf,
+}
+
+#[derive(FromArgs, PartialEq, Debug)]
+/// Reports every path in the configuration that doesn't lead where it says
+#[argh(subcommand, name = "check")]
+struct Check {
+    /// path/file name of the icyboard.toml configuration file
+    #[argh(positional)]
+    file: Option<PathBuf>,
 }
 
 fn main() -> Result<()> {
@@ -195,6 +205,29 @@ fn main() -> Result<()> {
                 process::exit(1);
             }
             return Ok(());
+        }
+        Some(Commands::Check(Check { file })) => {
+            let Some(config) = icy_board_engine::lookup_icyboard_file(file) else {
+                print_error(icy_board_tui::get_text("error_file_or_path_not_found"));
+                process::exit(1);
+            };
+            let board = match IcyBoard::load(&config) {
+                Ok(board) => board,
+                Err(err) => {
+                    print_error(format!("Error loading main config file: {}", err));
+                    process::exit(1);
+                }
+            };
+            let reports = board.check_paths();
+            for report in &reports {
+                println!("{}", report);
+            }
+            if reports.is_empty() {
+                println!("All paths in {} lead where they say.", config.display());
+                return Ok(());
+            }
+            println!("\n{} path(s) need attention.", reports.len());
+            process::exit(1);
         }
         _ => {}
     }

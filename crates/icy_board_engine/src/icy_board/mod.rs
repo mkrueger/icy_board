@@ -51,6 +51,7 @@ pub mod login_server;
 pub mod macro_parser;
 pub mod menu;
 pub mod message_area;
+pub mod path_check;
 pub mod pcb;
 pub mod sec_levels;
 pub mod security_expr;

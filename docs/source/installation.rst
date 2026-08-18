@@ -83,6 +83,32 @@ The result is a starting point rather than a finished migration. Read
 a migrated user and inspect third-party PPE configuration files before opening
 the network listeners.
 
+Checking the paths
+------------------
+
+PCBSetup checked every drive and path in the configuration when the sysop
+answered ``Y`` to the save prompt. ``icbsetup check`` does the same thing on
+demand, without opening the editor:
+
+.. code-block:: bash
+
+   icbsetup check mybbs/icboard.toml
+
+Every path that does not lead where it says is printed with the screen and the
+field it came from, together with the conference if it belongs to one. Display
+files are looked up the way the board looks them up, so a ``welcome`` that only
+exists as ``welcomeg.ans`` counts as present. Paths the board creates while it
+runs - logs, answer files, message bases, file base metadata - are left alone,
+as is anything left blank.
+
+A path that exists under a different spelling is reported separately from one
+that is missing. DOS did not distinguish uppercase from lowercase; a Linux file
+system does, which makes this the most common problem in a freshly imported
+board.
+
+The command exits with a non-zero status when it found something, so it can
+guard a start-up script.
+
 Converting PPE data files
 -------------------------
 
