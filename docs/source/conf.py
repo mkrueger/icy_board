@@ -159,6 +159,10 @@ latex_documents = [
 
 latex_toplevel_sectioning = "chapter"
 
+# pdflatex drops the box drawing characters without a word; xelatex takes them
+# from the font instead.
+latex_engine = "xelatex"
+
 # A link in print is only useful if the address is on the page.
 latex_show_urls = "footnote"
 
@@ -169,8 +173,8 @@ latex_elements = {
     # The board draws itself with CP437 line art, so the monospace face has to
     # carry the box drawing characters or every screen listing comes out ragged.
     "fontpkg": r"""
-\usepackage{lmodern}
-\usepackage[scaled=0.85]{DejaVuSansMono}
+\usepackage{fontspec}
+\setmonofont{DejaVu Sans Mono}[Scale=0.85]
 """,
     "sphinxsetup": ",".join(
         [
