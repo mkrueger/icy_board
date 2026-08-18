@@ -279,6 +279,9 @@ pub const MESSAGE_AREA_ID: usize = 31;
 pub const FILE_DIRECTORY_ID: usize = 32;
 pub const DOOR_ID: usize = 33;
 
+/// The board objects are ours, so no PCBoard language knows their names.
+pub const FIRST_BOARD_OBJECT_LANGUAGE_VERSION: u16 = 400;
+
 /// Types a program declares itself start here, so the board can keep adding
 /// objects of its own below without ever running into them.
 pub const FIRST_USER_TYPE_ID: usize = 100;
@@ -306,9 +309,16 @@ impl UserTypeRegistry {
     }
 
     pub fn get_type(&self, identifier: &unicase::Ascii<String>) -> Option<VariableType> {
-        if let Some(vt) = self.registered_types.get(identifier) {
-            return Some(*vt);
-        }
+        self.get_board_object(identifier).or_else(|| self.get_declared_type(identifier))
+    }
+
+    /// One of the objects the board itself provides, such as a conference.
+    pub fn get_board_object(&self, identifier: &unicase::Ascii<String>) -> Option<VariableType> {
+        self.registered_types.get(identifier).copied()
+    }
+
+    /// A record or an enum the program declared for itself.
+    pub fn get_declared_type(&self, identifier: &unicase::Ascii<String>) -> Option<VariableType> {
         self.get_user_type(identifier)
             .map(|def| VariableType::UserData(def.id as u8))
             .or_else(|| self.get_enum(identifier).map(|def| VariableType::UserData(def.id)))
@@ -1155,8 +1165,14 @@ impl<'a> Parser<'a> {
                 if let Some(vt) = built_in_type(id, self.lang_version) {
                     return Some(vt);
                 }
-                if let Some(ut) = self.type_registry.get_type(id) {
-                    return Some(ut);
+                if self.lang_version >= FIRST_BOARD_OBJECT_LANGUAGE_VERSION {
+                    if let Some(vt) = self.type_registry.get_board_object(id) {
+                        return Some(vt);
+                    }
+                }
+                // An enum is a type from 350 on, so this is not gated with the objects.
+                if let Some(vt) = self.type_registry.get_declared_type(id) {
+                    return Some(vt);
                 }
                 None
             } else {

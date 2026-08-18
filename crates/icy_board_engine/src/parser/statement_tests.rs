@@ -732,6 +732,27 @@ fn a_type_is_only_known_from_the_version_that_named_it() {
 }
 
 #[test]
+fn a_board_object_is_only_a_type_from_400() {
+    let parse = |language_version: u16| {
+        let registry = UserTypeRegistry::icy_board_registry();
+        let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+        let mut workspace = Workspace::default();
+        workspace.compiler = Some(CompilerData {
+            language_version: Some(language_version),
+            defines: None,
+        });
+        parse_ast(PathBuf::from("."), errors.clone(), "Conference c\n", &registry, Encoding::Utf8, &workspace);
+        let messages: Vec<String> = errors.lock().unwrap().errors.iter().map(|error| error.error.to_string()).collect();
+        messages
+    };
+
+    assert!(parse(400).is_empty(), "{:?}", parse(400));
+    // 350 has enums, so this has to be the objects being unknown rather than
+    // declared types as a whole.
+    assert!(!parse(350).is_empty(), "Conference should not be a type in 350");
+}
+
+#[test]
 fn exit_ends_a_program_from_400() {
     let (ast, messages) = parse_program("BEGIN\n  IF (1) THEN\n    EXIT\n  ENDIF\n  PRINT 1\nEND\n", 400);
     assert!(messages.is_empty(), "{messages:?}");

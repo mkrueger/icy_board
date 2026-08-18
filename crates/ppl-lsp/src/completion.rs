@@ -1,7 +1,7 @@
 use icy_board_engine::{
     ast::{Ast, AstVisitor, IdentifierExpression, PredefinedCallStatement, constant::BUILTIN_CONSTS, walk_predefined_call_statement},
     executable::{FUNCTION_DEFINITIONS, STATEMENT_DEFINITIONS, StatementSignature},
-    parser::{built_in_type_names, lexer::KEYWORDS},
+    parser::{FIRST_BOARD_OBJECT_LANGUAGE_VERSION, built_in_type_names, lexer::KEYWORDS},
     semantic::{ReferenceType, SemanticVisitor},
 };
 use tower_lsp::lsp_types::{CompletionItem, CompletionItemKind, Documentation, HoverContents, InsertTextFormat};
@@ -64,7 +64,7 @@ pub fn get_completion(ast: &Ast, semantic_visitor: &SemanticVisitor, line_before
             });
         }
 
-        for name in declared_type_names(semantic_visitor) {
+        for name in declared_type_names(semantic_visitor, ast.language_version) {
             map.items.push(CompletionItem {
                 label: name.clone(),
                 insert_text: Some(name),
@@ -153,10 +153,13 @@ pub fn get_completion(ast: &Ast, semantic_visitor: &SemanticVisitor, line_before
     map.items
 }
 
-/// The names of the record types the program declares plus the board objects.
-fn declared_type_names(visitor: &SemanticVisitor) -> Vec<String> {
+/// The names of the record types the program declares plus, from the version that
+/// brought them, the board objects.
+fn declared_type_names(visitor: &SemanticVisitor, lang_version: u16) -> Vec<String> {
     let mut names: Vec<String> = visitor.type_registry.user_types().iter().map(|def| def.name.to_string()).collect();
-    names.extend(visitor.type_registry.registered_types.keys().map(|name| name.to_string()));
+    if lang_version >= FIRST_BOARD_OBJECT_LANGUAGE_VERSION {
+        names.extend(visitor.type_registry.registered_types.keys().map(|name| name.to_string()));
+    }
     names.sort();
     names
 }
