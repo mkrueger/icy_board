@@ -1,46 +1,48 @@
-
 # PPL
 
-IcyBoard features a rewriten engine for ppl execution, a compiler and a decompiler.
+PPL is PCBoard's extension language; a compiled program is a PPE. Icy Board
+keeps PPE compatibility as a first-class part of the board and supplies the
+toolchain that was missing from the original ecosystem:
 
-Features:
+| Tool | Purpose |
+| :--- | :--- |
+| Icy Board runtime | Runs existing PPEs against the board APIs callers and scripts expect. |
+| `pplc` | Compiles a `.pps` source or a `ppl.toml` project to PPE. |
+| `ppld` | Decompiles and disassembles PPEs, including old anti-decompiler patterns. |
+| `icyboard-ppl` | Diagnostics, completion, hover, signatures, navigation, references and formatting over LSP. |
+| `tree-sitter-ppl` | Highlighting, locals, folding, indentation and syntax trees for editors. |
 
-* A compiler (pplc) that compiles UTF-8/CP437 files to output CP437 PPEs
-* A decompiler (ppld) that decompiles all old .PPE files (up to PCBoard 15.4 PPEs) 
-  - Reconstructs PPL all old statements 
-* A language server that provides developer functionality in any editor that supports lsp
-  - Included VS Code Extension (.vsix) for easy installation - just dnd it into the vs code extensions panel.
+Existing PPEs that use documented PPL and PCBoard APIs are expected to run. A
+failure is a compatibility bug. Direct access to PCBoard's binary databases,
+DOS and assembler calls, drive-letter assumptions and reads of a plain-text
+password cross the compatibility boundary described in
+[Differences and improvements](differences.md).
 
-## What works
+The compiler supports the PCBoard language and Icy Board's versioned additions.
+It is deliberately stricter where the original compiler silently accepted a
+type or declaration mismatch; warnings are intended to expose ambiguous old
+source without changing the generated program unnecessarily.
 
-* Both compiler & decompiler is DONE. I would say it's better than everything we had back in the 90'.
-Everything that doesn't work is a bug - please report issues.
-* The decompiler should be able to decompile existing PPE files, including 4.x files with custom types, and handle the anti-decompilation tricks that were common in the 90s.
-* Compiler should be able to parse a PPS and generate running PPE files
-  - There are slight differences to PPLC - the new one is more strict. Issues should be easy fixable
-  - Be prepared for tons of warnings of non trivial .PPS files. The old PPLC hasn't had much error checks. In doubt I added a warning instead.
-* IcyBoard should be able to run most PPE files
-  - PPE data files can be converted to UTF8 with (icbsetup ppe-convert <PATH>) but backup all files first
-  - ppe-convert can take a <FILENAME> to convert the single file to UTF8
-  - WARNING: Handle ppe-convert with care - can potentially destroy things. Convert one PPE after another.
-  - No need to convert PPE - CP437 works, just consider that - I do it because no modern editor supports CP437 anymore.
-* LSP should provide help, find all refs/goto definition and code completion
-  - Highlighting is the editor's own grammar - tree-sitter for Helix and Neovim, TextMate
-    for the VS Code extension
-  - Completion knows the record types a program declares: `.` offers the fields of a record
-    or the members of a board object, and `Point { ` offers the fields the literal has not named
-  - Signature help shows the parameters of a user routine, of a built-in function and of a
-    built-in statement, with the argument the cursor is in marked
+Old source and data files do not have to be converted: `pplc --cp437` reads
+CP437 and the runtime reads legacy display files. `icbsetup ppe-convert` is for
+projects that deliberately move their editable text to UTF-8; make a backup and
+convert one PPE tree at a time because an arbitrary plugin directory may also
+contain binary data.
 
-### Decompiler
+Detailed references:
 
-First Decompiler was based upon ppld. Find the original code here:
-https://github.com/astuder/ppld
+- [PPL compiler](pplc.md) — projects, command-line options, output and language versions
+- [New in PPL](new_ppl.md) — language additions beyond PCBoard
+- [PPE format](ppe_format.md) — binary format for tooling authors
+- [Editor installation](../INSTALL.md#ppl-in-your-editor) — VS Code, Zed, Helix and Neovim
 
-Much effort was done for implementing the decompiler. Existing PPEs may need to be altered for IcyBoard or at least analyzed so being able to decompile
-the old PPEs is important for the project.
+## Decompiler
 
-The current Decompiler is completely rewritten and uses a ppl machine language - which it can disassemble - to reconstruct a PPL AST.
+The first decompiler was based on Adrian Studer's
+[ppld](https://github.com/astuder/ppld). The current implementation is a
+rewrite: it disassembles the PPL machine language and reconstructs an AST from
+the instruction stream. That makes old PPEs inspectable when a migration needs
+to find hard-coded paths, direct database access or other assumptions.
 
 * PPE 3.40 Support
 * Full reconstruction of IF/THEN, SWITH, WHEN etc.
@@ -77,42 +79,18 @@ Options:
   --help, help      display usage information
 ```
 
-The dissamble output can be used to see what the compilers are generating and for debugging purposes.
+The disassembly output shows what a compiler generated and is useful when a
+reconstructed source cannot express an unusual instruction sequence exactly.
 
-### Compiler
+## Compiler
 
-Supports up to 15.4 PPL (1.0 -> 3.40 PPE format)
+`pplc` supports PCBoard runtime formats from 1.00 through 3.40 and Icy Board
+formats 4.00 and 4.01. Runtime and language versions are separate: the runtime
+version controls which board can load the PPE, while the language version
+controls which syntax, statements, types and board objects the source may name.
 
-Should be compatible to the old PCB compiler with some slight differences (see PPL differences)
-
-The compiler decides itself if uservars are generated or not (so --novars is no longer needed)
-
-pplc has following options:
-
-```text
-Usage: pplc [-d] [--nowarnings] [--runtime <runtime>] [--lang-version <lang-version>] [--cp437] [--init] [--defines <defines>] [--format] [--check] [--] [<file>]
-
-PCBoard Programming Language Compiler
-
-Positional Arguments:
-  file              file[.pps] to compile (extension defaults to .pps if not
-                    specified)
-
-Options:
-  -d, --disassemble output the disassembly instead of compiling
-  --nowarnings      don't report any warnings
-  --runtime         version number for the compiled PPE, valid: 100, 200, 300,
-                    310, 320, 330, 340, 400, 401 (default)
-  --lang-version    language version, valid: 100, 200, 300, 310, 320, 330, 340,
-                    350, 400 (default)
-  --cp437           specify the encoding of the file (cp437 = true, utf8 =
-                    false), defaults to autodetection
-  --init            create & init new ppl package in target directory
-  --defines         semicolon separated list of pre processor variables
-  --format          formats source file instead of compile
-  --check           checks source/package for errors without compiling
-  --help, help      display usage information
-```
+The complete and current command-line reference is in [pplc.md](pplc.md).
+`pplc --help` is authoritative for the installed build.
 
 As default the compiler takes UTF8 input - DOS special chars are translated to CP437 in the output.
 
@@ -133,9 +111,10 @@ version = "0.1.0"
 language_version = 400
 ```
 
-Note:  All old DOS files are usually CP437 - so it's recommended to use --cp437 for compiling these.
+Old DOS sources are usually CP437, so use `--cp437` unless they have already
+been converted deliberately.
 
-#### PPL differences
+### Compiler differences
 
 The aim is to be as compatible as possible.
 

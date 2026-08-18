@@ -9,6 +9,9 @@ can set but the board ignores, [compat/COMMAND_AUDIT.md](../compat/COMMAND_AUDIT
 for where a command answers differently than PCBoard did, and
 [differences.md](differences.md) for the deliberate departures.
 
+For an existing installation, use the [migration guide](migration.md) as the
+procedure and this page as its risk checklist.
+
 ## Not implemented
 
 | Area | What is missing |
@@ -30,7 +33,7 @@ for where a command answers differently than PCBoard did, and
 | Config files | TOML, editable in any text editor. Old formats are written out again for PPEs that read them, but a PPE that writes one will not be heard. |
 | Message bases | JAM. Tools that read PCBoard's old base will not work. |
 | DIR files | Binary, they carry the metadata the archives do not. |
-| Encoding | Everything is UTF-8 unless a file starts with a CP437 byte order mark. See [differences.md](differences.md). |
+| Encoding | Structural text is UTF-8. Display files with a UTF-8 BOM are UTF-8; display files without it are read as CP437. See [differences.md](differences.md). |
 | Passwords | Hashed by default. The plain text fallback exists for PPEs that read the password and is a security risk. |
 | Access | Security level, group and age instead of a single level. |
 | Events | The nightly event runs, clears the board and can suspend callers. PCBoard's per node, expedited, fido and mail event modes have no equivalent, and `EVENT.DAT` is not read. |
@@ -41,7 +44,8 @@ Importing a PCBoard installation is best effort. Simple installations come over
 well; the more a board relied on PPEs, absolute paths or drive letters, the more
 hand work is left. `icbsetup import --dry-run` reports what it could not
 resolve before anything is written, and `--map` translates a drive to a
-directory. Every PPE has to be looked at one by one.
+directory. Every PPE has to be looked at one by one. The complete sequence is
+in [Migrating from PCBoard](migration.md).
 
 The importer is the part that most needs real installations to test against. If
 one of yours does not come over, that is worth a bug report more than anything

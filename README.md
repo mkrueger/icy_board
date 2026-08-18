@@ -1,23 +1,79 @@
 # Icy Board
 
-A re-creation of PCBoard, the DOS bulletin board system, for machines that are
-still running. Same commands, same `@` macros, same PPEs — on Linux, macOS,
-Windows and the Raspberry Pi, over telnet, SSH and websockets.
+Icy Board is a PCBoard-compatible bulletin board system for current machines.
+It preserves the command set, `@` macros, display files, conferences and PPE
+runtime that made a PCBoard installation its own, while replacing the DOS-era
+server underneath them with a native Rust application for Linux, macOS,
+Windows and the Raspberry Pi.
+
+This is not PCBoard in an emulator and not a generic BBS wearing a PCBoard
+theme. Existing callers should recognize the board, existing PPEs are expected
+to run, and the setup and maintenance tools follow the original utilities. At
+the same time, a sysop gets telnet, SSH and WebSocket listeners, long file
+names, UTF-8, JAM message bases, modern password hashing, FTN over BinkP and
+configuration files that can be versioned and edited as text.
 
 ![Main menu](assets/main_menu.png?raw=true "Main menu")
 
-## Status
+## What works today
 
-Beta. A board runs, takes callers, carries message and file areas, runs PPEs and
-speaks FTN as a leaf. What it does not do yet is written down rather than left
-to be discovered:
+Icy Board is in beta, but it is a running board rather than a framework or a
+mock-up. It can:
 
-* [Feature status](docs/feature_parity.md) — every PCBoard command and how far it got
-* [Known limitations](docs/known_limitations.md) — read this before moving a board over
-* [Differences](docs/differences.md) — where icy_board departs from the original on purpose
+- take local, telnet, SSH and WebSocket callers on multiple nodes
+- create users, enforce security and access expressions, and manage users and
+  groups with `icbsm`
+- run conferences with multiple message areas, private mail, JAM bases, search,
+  QWK/QWKE and the familiar enter/read/scan commands
+- manage file areas, extract `FILE_ID.DIZ`, import old DIR files, enforce
+  transfer limits and run external transfer protocols
+- execute PPEs, compile and decompile PPL, and provide diagnostics, completion,
+  navigation and formatting through the PPL language server
+- scan, poll and toss FTN mail as a leaf or point over BinkP
+- run timed events and expose board maintenance as command-line tools suitable
+  for cron and scripts
 
-There is no modem and no serial support, and there never will be. Everything
-else that PCBoard did is either here or on the list.
+The compatibility target is PCBoard 15.4. The implementation is checked
+against its source and against a real copy running under DOSBox, including
+prompts and edge cases rather than only command names.
+
+Compatibility is broad, not absolute:
+
+| Surface | Compatibility |
+| :--- | :--- |
+| Caller commands and prompts | All user commands resolve; the remaining differences are tracked command by command. |
+| PPE runtime | Existing PPEs are expected to run. DOS, assembler and direct access to old binary databases are outside that contract. |
+| Display files and `@` macros | PCBoard/ANSI/Avatar/RIP files and the large majority of macros work, with UTF-8 available alongside CP437. |
+| Configuration | Imported into TOML and edited with Icy Board tools; compatibility files are generated where old PPEs need them. |
+| Message and file storage | Deliberately modern formats. JAM replaces PCBoard message bases; SQLite-backed file areas replace DIR databases. |
+
+The exact status is documented rather than hidden behind the word “beta”:
+
+- [Feature status](docs/feature_parity.md) — every PCBoard command and major subsystem
+- [Known limitations](docs/known_limitations.md) — what is missing before moving a real board
+- [Differences and improvements](docs/differences.md) — deliberate departures and why they exist
+- [Compatibility audits](compat/README.md) — options, commands and the PCBoard oracle
+
+Serial ports, modem control, FOSSIL drivers, DOS shelling and printer support
+are intentionally out of scope.
+
+## Better where DOS no longer needs to win
+
+Compatibility is the baseline, not a ban on improvements:
+
+| PCBoard constraint | Icy Board |
+| :--- | :--- |
+| DOS, modem and fixed node files | Native processes with local, telnet, SSH and WebSocket sessions |
+| Short, drive-bound paths | Long file names and portable paths relative to the board root |
+| CP437-only content | CP437 compatibility plus explicit UTF-8 support |
+| Plain-text passwords | Argon2id or bcrypt hashes, with an opt-in compatibility fallback |
+| One numeric security level | Security level, groups and age expressions |
+| Proprietary message and DIR formats | JAM messages and richer SQLite-backed file metadata |
+| Closed PPL tooling | Compiler, decompiler, formatter, language server and tree-sitter grammar |
+| Setup tied to a DOS console | Familiar TUIs that also work over SSH, plus scriptable maintenance commands |
+
+See [Differences and improvements](docs/differences.md) for the compatibility
+cost of each change.
 
 ## What it looks like
 
@@ -30,7 +86,7 @@ else that PCBoard did is either here or on the list.
 
 The configuration tools are TUIs, so they work over SSH.
 
-## Try it
+## Start a board
 
 ```sh
 icbsetup create mybbs     # writes a complete board into mybbs/
@@ -44,15 +100,31 @@ source needs nothing but a [Rust toolchain](https://rustup.rs). See
 [INSTALL.md](INSTALL.md) for both, and for the list of programs — the board is a
 set of command line tools, not one binary.
 
-An existing PCBoard installation can be brought over. The original is only read,
-never written:
+An existing PCBoard installation can be brought over. The importer only reads
+the original:
 
 ```sh
 icbsetup import /path/to/PCBOARD.DAT mybbs
 ```
 
-The importer is the part that most needs real installations to test against. If
-yours does not come over, that is worth a bug report more than anything else.
+An import is a migration starting point, not a claim that arbitrary drive
+layouts and third-party PPE configuration can be translated without review.
+Use `--dry-run`, map old drives explicitly and run the path checker before
+starting the board. The [migration guide](docs/migration.md) walks through it.
+
+## Tools
+
+Icy Board is a small suite rather than one oversized executable:
+
+| Program | Purpose |
+| :--- | :--- |
+| `icboard` | Board server, local session and call-waiting screen |
+| `icbsetup` | Create, import, configure and validate a board |
+| `icbsm` | Users, groups, bulk edits, sorting and packing |
+| `mkicbtxt`, `mkicbmnu` | System-text and menu editors |
+| `icbfile` | Import and maintain file areas |
+| `icbmailer` | FTN scan, poll and toss |
+| `pplc`, `ppld`, `icyboard-ppl` | PPL compiler, decompiler and language server |
 
 ## Documentation
 
@@ -64,36 +136,21 @@ FTN mailer, customizing, and a complete PPL reference. It is built from
 cd docs && make latexpdf     # or: make html
 ```
 
-Shorter pieces live beside it in the repository:
+The [Markdown documentation index](docs/README.md) separates guides from
+compatibility references and PPL/tooling material. Common starting points:
 
 | | |
 | :--- | :--- |
-| [Getting started](docs/gettingstarted.md) | What to do after `icbsetup create` |
-| [File areas](docs/icbfile.md) | Bringing a file base into shape |
+| [Getting started](docs/gettingstarted.md) | Create, configure and test a board |
+| [Migrating from PCBoard](docs/migration.md) | Dry-run import, drive maps, PPE review and validation |
+| [Differences and improvements](docs/differences.md) | What changed, why, and the compatibility cost |
+| [File areas](docs/icbfile.md) | Importing and maintaining a file base |
 | [PPL](docs/ppl.md) · [PPLC](docs/pplc.md) · [New in PPL](docs/new_ppl.md) | The language, its compiler, and what 4.0 added |
-| [New @ macros](docs/new_macros.md) | Beyond PCBoard's set |
-| [PPE format](docs/ppe_format.md) | The executable format, for tooling |
-| [Roadmap](docs/roadmap.md) | What is done and what is next |
+| [Feature status](docs/feature_parity.md) · [Known limitations](docs/known_limitations.md) | Compatibility details |
 
 PPL has editor support for [VS Code](editors/vscode),
 [Zed](https://github.com/mkrueger/zed-ppl) and, through the
 [tree-sitter grammar](crates/tree-sitter-ppl), Neovim and Helix.
-
-## What it is trying to be
-
-* PCBoard on a machine you can still buy, especially Linux and the Raspberry Pi
-* As compatible as a rewrite can be — PPEs are the hard case and the interesting one
-* The whole ecosystem, config tools included, not just the board
-* PCBoard's look and feel, kept on purpose
-* Extended where it helps, without breaking what already ran
-
-And what it is not trying to be:
-
-* A board that is easy out of the box. PCBoard was not, and neither is this. Every
-  modern BBS looks the same because it ships one way of doing things; here you
-  configure it, and it looks like yours.
-* A GUI. The tools are TUIs so they work over SSH. A GUI is welcome if someone
-  writes one, but nothing waits for it.
 
 ## Where it came from
 

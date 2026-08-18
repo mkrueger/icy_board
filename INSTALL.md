@@ -62,9 +62,10 @@ only read, never changed:
 icbsetup import /path/to/PCBOARD.DAT mybbs
 ```
 
-The import gets you a starting point, not a finished board. Read
+The import gets you a starting point, not a finished board. Follow the
+[migration guide](docs/migration.md), and read
 [known limitations](docs/known_limitations.md) before moving a board you care
-about, and see [getting started](docs/gettingstarted.md) for what to do next.
+about.
 
 ## The programs
 
@@ -145,8 +146,12 @@ files is all it needs.
 
 ## Where to read on
 
+- [Documentation index](docs/README.md) - guides, compatibility references and
+  PPL/tooling documentation
 - [Getting started](docs/gettingstarted.md) - the board, its directories and the
   first steps
+- [Migrating from PCBoard](docs/migration.md) - dry-run import, drive maps, PPE
+  review and validation
 - [Known limitations](docs/known_limitations.md) - what is missing and what
   behaves differently than PCBoard did
 - [PPL](docs/ppl.md) - the language, the compiler and what IcyBoard added

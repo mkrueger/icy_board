@@ -2,7 +2,8 @@
 
 `icbfile` is the maintenance tool for Icy Board file areas. It creates and repairs the
 database behind an area, imports descriptions from an existing PCBoard board, and lets you
-edit entries without starting the BBS.
+edit entries without starting the BBS. For a complete board move, start with
+[Migrating from PCBoard](migration.md), then return here for the file-base step.
 
 ## How file handling works
 

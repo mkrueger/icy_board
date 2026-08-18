@@ -1,132 +1,128 @@
-# Getting Started
+# Getting started
 
-## A board in five minutes
+This guide takes a new board from an empty directory to a tested local call.
+For packages and source builds, start with [INSTALL.md](../INSTALL.md). To move
+an existing PCBoard installation, use the [migration guide](migration.md)
+instead.
+
+## Create a board
 
 ```sh
-icbsetup create mybbs     # writes a complete board into mybbs/
+icbsetup create mybbs
 cd mybbs
-icboard                   # call waiting screen, telnet on port 1337
 ```
 
-Pick *Sysop* on the call waiting screen with the arrow keys and press Enter to
-log in locally, start the board with `icboard --localon` to go straight in, or
-reach it from another terminal with `telnet localhost 1337`. Your terminal
-needs at least 80x25.
+`icbsetup` creates a complete board, prints a random initial sysop password and
+does not write outside `mybbs/`. Keep the password until the first login.
 
-That is a running board. What follows is where everything lives and how to
-bring an old installation over. Before you move a real board, read
-[known limitations](known_limitations.md) - it says what is missing and what
-works differently than PCBoard did.
+The generated board uses paths relative to `icboard.toml`. You can move or back
+up the whole directory without rewriting drive letters.
 
-## Getting the programs
+## Configure the essentials
 
-Grab a release for your operating system:
-https://github.com/mkrueger/icy_board/releases/latest
+From the board directory, run:
 
-Or build from source, which needs a [rust toolchain](https://www.rust-lang.org/tools/install):
+```sh
+icbsetup
+```
 
-`cargo build --release`
+Set the board and sysop names, choose a permanent sysop password, inspect the
+network listeners and confirm the node count. Options that the runtime does not
+use yet are greyed out and explain why.
 
-If something is missing on your system cargo build will tell you. If you know hat a development environment is it should be straightforward.
+Escape returns through the menus. When something changed, the exit dialog has
+the answers PCBSetup had:
 
-Update: On my pi I needed to install openssl-dev:
-`sudo apt-get install openssl-dev`
+- **Yes** saves, validates configured paths and offers to create missing
+  directories.
+- **Quick** saves without the path check.
+- **No** discards the changes.
 
+The same validation is available without opening the editor:
 
-I develop this software on linux - next time I set up I'll add a more detailed description.
+```sh
+icbsetup check icboard.toml
+```
 
-## The programs
+## Make the first call
 
-| Program | What it is for |
+```sh
+icboard
+```
+
+The call-waiting screen starts the network listeners. Pick **Sysop** and press
+Enter for a local session, or skip the screen entirely with:
+
+```sh
+icboard --localon
+```
+
+From another terminal, the generated board accepts telnet on port 1337:
+
+```sh
+telnet localhost 1337
+```
+
+The TUIs require a terminal of at least 80 columns by 25 rows.
+
+## Walk the board once
+
+Use the first local call as a smoke test:
+
+1. `J` joins a conference.
+2. `E` enters a message.
+3. `R` reads it back and tries the reply and scan commands.
+4. `F` opens the file directories.
+5. `V` shows the caller settings.
+6. `G` logs off.
+
+Read `icboard.log` afterwards. It is the first place to look when a display
+file, PPE, protocol or data file does not load.
+
+## Make it your board
+
+PCBoard boards were defined by their data and artwork rather than by one fixed
+theme. Icy Board keeps that model:
+
+| Tool or directory | What to change |
 | :--- | :--- |
-| `icboard` | The board itself. Started in the directory that holds `icboard.toml`. |
-| `icbsetup` | Creates a board, imports a PCBoard one, and edits every setting. Start here. |
-| `icbsm` | User and group editor, packs the user file and runs the bulk edits. |
-| `mkicbtxt` | Edits the system messages, which is how most of the board is reworded. |
-| `mkicbmnu` | Edits menus. |
-| `icbfile` | Brings a file base into shape - see [icbfile](icbfile.md). |
-| `icbmailer` | FTN mail, scan, poll and toss. |
-| `pplc`, `ppld` | PPL compiler and decompiler - see [PPL](ppl.md). |
-| `icyboard-ppl` | Editor support for PPL: diagnostics, completion, formatting. |
+| `icbsetup` | Board, node, listener, conference, security, event and transfer settings |
+| `mkicbtxt` | Prompts and system messages |
+| `mkicbmnu` | Menus and their commands |
+| `icbsm` | Users, groups, bulk maintenance and user-file packing |
+| `art/` | PCB, ANSI, Avatar, RIP and plain display files |
+| `art/help/` | Command help |
+| `conferences/` | Per-conference menus, message areas, file areas and scripts |
 
-I recommend putting the bin/ directory in the path but you can just `cd bin` for now.
+Display files may be CP437 or UTF-8. UTF-8 files need the UTF-8 BOM so the
+runtime can distinguish them from legacy CP437 without guessing. Files without
+that BOM are read as CP437.
 
-## The first half hour
+Use extensions such as `.pcb`, `.ans`, `.avt`, `.rip` and `.asc`. The runtime
+also understands PCBoard's graphics, language and security variants when a
+configuration names the extensionless base file.
 
-1. `icbsetup create mybbs`, then `cd mybbs`.
-2. `icbsetup` - board name, sysop name and password, and the number of nodes.
-   Options the board does not read yet are greyed out and say so.
-3. `mkicbtxt` if you want to reword prompts, `icbsm` for users.
-4. `icboard` and log in locally, then walk the menu once: `J` join a
-   conference, `E` enter a message, `R` read it back, `F` the file
-   directories, `G` goodbye.
-5. Read `icboard.log` afterwards. It is the first place to look when something
-   goes wrong.
+## Board layout
 
-NOTE: Ensure that your terminal screen is big enough - 80x25 at least.
+The important generated paths are:
 
-# Directory Layout
+| Path | Purpose |
+| :--- | :--- |
+| `icboard.toml` | Main configuration and paths to the other data files |
+| `icboard.log` | Runtime log |
+| `art/` | Display, menu, help and command artwork |
+| `main/` | Users, conferences, commands, languages, protocols and security data |
+| `conferences/` | Conference-specific message, file and display data |
+| `tmp/` | Generated compatibility and work files |
 
-I tried to simplify the PCBoard system a bit but it has limits.
+Most individual locations can be changed in `icboard.toml`; the tools are
+preferable to hand-editing until the board has been tested.
 
-I designed IcyBoard for using relative paths. However absolute ones can be used. Relative path root is always where the main icboard.toml is. Regardless of file position.
-This makes it easier to move files around - if needed and cut & paste etc.
+## What to read next
 
-Basically the file Layout is:
-| File/Dir | Description|
-| --- | --- |
-|icyboard.toml | Main Config File |
-|icyboard.log | Log File |
-|art/| All ANSIS go in there | 
-|art/help/| Help Files | 
-|main/| All other bbs files are here | 
-|conferences/| Conference data (files/messages) |
-|tmp/| Generated Files for backwards compatiblity |
-
-The log file is very important. If something goes wrong it's likely that the log file tells you why.
-
-## main/ files 
-
-| File | Description|
-| --- | --- |
-|commands.toml | All Commands |
-|conferences.toml | Conference data |
-|groups| Unix Like /etc/gorups file | 
-|icbtext.toml| Contains all Icy Board System Messages | 
-|languages.toml| Language descriptions (Date Formats, yes/no characters & localized icbtext.toml locations) | 
-|protocols.toml| List & Description of available transfer protocols |
-|security_levels.toml| Security Levels & Limits |
-|users.toml| Contains registered all User Records |
-|tcan_user.txt| Forbidden user names |
-|tcan_passwords.txt| Forbidden user passwords |
-|tcan_email.txt| Forbidden emails |
-|tcan_uploads.txt| Forbidden upload file names |
-|vip_user.txt| Users where the sysop is informed about a login |
-|email.*| Email message base |
-
-*NOTE: The location & name of all files can be changed in the main icboard.toml.*
-
-# ART files
-
-It's recommended to use .pcb, .ans, .rip, .asc extensions instead of the old *G, *R sheme. 
-This makes it easier to draw files with an ansi drawing tool as well. And file name lengths ar no longer
-an issue.
-Files can either be CP437 or UTF-8 - IcyBoard will do all conversions automatically. Note that UTF-8 requires the UTF-8 BOM. This is by design it's the only way to make a fast and correct decision about the file encoding.
-
-Note: UTF-8 is recommended for everything.
-
-# Importing old installations
-
-Importing old installatins is generally difficult mostly because of complex setup situations, PPEs and so on. However `icbsetup import PCBDAT.OLD <OUT_PATH>` will try to import old installations. Instead of the file the directory of the PCBoard installation can be given - `icbsetup import ~/CSB <OUT_PATH>` looks the PCBOARD.DAT up itself.
-
-`--dry-run` imports into a temporary directory and only reports which paths could not be resolved. Paths that pointed to another drive can be given with `--map`, the option may be repeated:
-
-`icbsetup import ~/CSB out --dry-run --map 'D:\FILES=/mnt/files'`
-
-Beside the importlog.txt the import writes an import_report.txt with the counts and the list of unresolved paths.
-
-the importlog.txt contains all operations done and it should usually be enough to turn on an existing pcboard installation in icyboard.
-
-However it'll be required to update all PPEs one by one. Moving them to another directory, making file names relative etc.
-
-I'm interested in bugs & existing installations to improve the import process. But it should be a good starting point to update an existing PCBoard to Icy Board.
+- [Differences and improvements](differences.md) explains how Icy Board
+  modernizes PCBoard and which old tools that affects.
+- [Known limitations](known_limitations.md) is the pre-production checklist.
+- [File areas](icbfile.md) covers importing and maintaining file bases.
+- [PPL and PPEs](ppl.md) covers the runtime and toolchain.
+- [Feature status](feature_parity.md) is the detailed compatibility matrix.

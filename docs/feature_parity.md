@@ -4,6 +4,11 @@ That is the current state of PCBoard features supported.
 Not the state of ICY BOARD features - that would make it too long and it's important to know what works
 from PCBoard.
 
+For the deliberate improvements that are not part of PCBoard parity, see
+[differences and improvements](differences.md). For a production-readiness
+checklist, see [known limitations](known_limitations.md); for an old board, use
+the [migration guide](migration.md).
+
 A percentage here is what the code does, not what it is meant to do. What a
 sysop can set but the board ignores is listed in
 [compat/OPTIONS_AUDIT.md](../compat/OPTIONS_AUDIT.md), where a command answers
