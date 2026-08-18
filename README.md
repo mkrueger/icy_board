@@ -13,7 +13,7 @@ the same time, a sysop gets telnet, SSH and WebSocket listeners, long file
 names, UTF-8, JAM message bases, modern password hashing, FTN over BinkP and
 configuration files that can be versioned and edited as text.
 
-![Main menu](assets/main_menu.png?raw=true "Main menu")
+![Main menu](assets/main_menu.png "Main menu")
 
 ## What works today
 
@@ -113,9 +113,9 @@ many mistakes the original compiler silently accepted.
 
 | | | |
 | :---: | :---: | :---: |
-| ![Reading a message](assets/message_reader.png?raw=true) | ![File listing](assets/file_list.png?raw=true) | ![Call waiting screen](assets/call_waiting_screen.png?raw=true) |
+| ![Reading a message](assets/message_reader.png) | ![File listing](assets/file_list.png) | ![Call waiting screen](assets/call_waiting_screen.png) |
 | The message reader | A file listing, descriptions read out of each archive | The call waiting screen the sysop sees |
-| ![icbsetup](assets/icbsetup.png?raw=true) | ![icbsm](assets/icbsm.png?raw=true) | ![mkicbtxt](assets/mkicbtxt.png?raw=true) |
+| ![icbsetup](assets/icbsetup.png) | ![icbsm](assets/icbsm.png) | ![mkicbtxt](assets/mkicbtxt.png) |
 | `icbsetup` — the board | `icbsm` — users and groups | `mkicbtxt` — every prompt |
 
 The configuration tools are TUIs, so they work over SSH.
