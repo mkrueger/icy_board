@@ -659,6 +659,25 @@ fn keeping_the_old_language_rewrites_an_existing_directive() {
     assert_eq!(edit["range"]["end"], json!({"line": 0, "character": 17}));
 }
 
+#[test]
+fn a_file_is_never_offered_a_word_its_language_version_lacks() {
+    let (mut server, _) = Server::ready();
+    let uri = "file:///tmp/end-statement-330.pps";
+    // EXIT arrived in 400, so in 330 END is simply the way to end a program.
+    server.open(uri, ";$LANGVERSION 330\nPRINTLN \"hello\"\nEND\n");
+    let diagnostics = server.diagnostics(uri);
+    let actions = actions(&mut server, uri, diagnostics.clone());
+
+    assert!(
+        !diagnostics.as_array().unwrap().iter().any(|d| d["code"] == "ppl.end-is-not-a-statement"),
+        "{diagnostics}"
+    );
+    assert!(
+        !actions.as_array().unwrap().iter().any(|action| action["title"] == "Replace END with EXIT"),
+        "{actions}"
+    );
+}
+
 fn upgrade(server: &mut Server, uri: &str, source: &str) -> (Value, Value) {
     server.open(uri, source);
     let diagnostics = server.diagnostics(uri);

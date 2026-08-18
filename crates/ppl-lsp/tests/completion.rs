@@ -227,3 +227,16 @@ fn a_source_states_which_language_it_is_written_in() {
         assert!(items.contains(&word.to_string()), "{word} should be offered after $LANGVERSION 400: {items:?}");
     }
 }
+
+#[test]
+fn a_built_in_statement_is_offered_from_the_version_that_added_it() {
+    // WebRequest arrived in 400, MoveMsg in 340.
+    let old = offered(330);
+    assert!(old.contains(&"PrintLn".to_string()), "{old:?}");
+    assert!(!old.contains(&"WebRequest".to_string()), "{old:?}");
+    assert!(!old.contains(&"MoveMsg".to_string()), "{old:?}");
+
+    let new = offered(400);
+    assert!(new.contains(&"WebRequest".to_string()), "{new:?}");
+    assert!(new.contains(&"MoveMsg".to_string()), "{new:?}");
+}

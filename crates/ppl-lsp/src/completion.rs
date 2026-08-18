@@ -105,7 +105,7 @@ pub fn get_completion(ast: &Ast, semantic_visitor: &SemanticVisitor, line_before
         }
 
         for stmt in STATEMENT_DEFINITIONS.iter() {
-            if stmt.sig == StatementSignature::Invalid {
+            if stmt.sig == StatementSignature::Invalid || stmt.version > ast.language_version {
                 continue;
             }
             let content = if let Some(hover) = get_statement_hover(stmt) {
