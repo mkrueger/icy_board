@@ -166,6 +166,12 @@ latex_elements = {
     "papersize": "a4paper",
     "pointsize": "10pt",
     "figure_align": "H",
+    # The board draws itself with CP437 line art, so the monospace face has to
+    # carry the box drawing characters or every screen listing comes out ragged.
+    "fontpkg": r"""
+\usepackage{lmodern}
+\usepackage[scaled=0.85]{DejaVuSansMono}
+""",
     "sphinxsetup": ",".join(
         [
             "verbatimwithframe=true",
@@ -175,4 +181,21 @@ latex_elements = {
             "vmargin={2.5cm,2.5cm}",
         ]
     ),
+    "maketitle": rf"""
+\hypersetup{{pdftitle={{Icy Board Handbook}}, pdfauthor={{{author}}}}}
+\begin{{titlepage}}
+  \centering
+  \vspace*{{5cm}}
+  {{\Huge\bfseries Icy Board\par}}
+  \vspace{{1cm}}
+  {{\Large A re-creation of PCBoard\par}}
+  \vspace{{3cm}}
+  {{\large Version {release}\par}}
+  \vfill
+  {{\large {author}\par}}
+\end{{titlepage}}
+\sphinxtableofcontents
+""",
+    # The table of contents is part of the title page block above.
+    "tableofcontents": "",
 }
