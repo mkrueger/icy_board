@@ -23,6 +23,7 @@ serial2-tokio = { version = "0.1.25", features = ["unix"] }
 
 # SSH
 russh = { workspace = true }
+zeroize = "1.8.2"
 
 # WEBSOCKETS
 tokio-tungstenite = { version = "0.30.0", features = [
