@@ -1396,6 +1396,18 @@
             "type": "TOKEN",
             "content": {
               "type": "PATTERN",
+              "value": "[cC][oO][nN][tT][aA][cC][tT]"
+            }
+          },
+          "named": false,
+          "value": "CONTACT"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
               "value": "[dD][iI][rR][eE][cC][tT][oO][rR][yY]"
             }
           },

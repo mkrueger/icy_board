@@ -267,6 +267,7 @@ impl UserTypeDefinition {
 pub struct UserTypeRegistry {
     pub registered_types: HashMap<unicase::Ascii<String>, VariableType>,
     pub types: Vec<UserDataRegistry>,
+    built_in_records: HashMap<u8, UserTypeDefinition>,
     /// Records the compiled program declares. Shared across every file of a
     /// compilation so a type declared in one is visible in the next.
     user_types: RwLock<Vec<UserTypeDefinition>>,
@@ -278,6 +279,7 @@ pub const CONFERENCE_ID: usize = 30;
 pub const MESSAGE_AREA_ID: usize = 31;
 pub const FILE_DIRECTORY_ID: usize = 32;
 pub const DOOR_ID: usize = 33;
+pub const CONTACT_ID: usize = 34;
 
 /// The board objects are ours, so no PCBoard language knows their names.
 pub const FIRST_BOARD_OBJECT_LANGUAGE_VERSION: u16 = 400;
@@ -304,6 +306,14 @@ impl UserTypeRegistry {
         reg.register::<MessageArea>();
         reg.register::<FileDirectory>();
         reg.register::<Door>();
+        reg.register_record(
+            CONTACT_ID,
+            "CONTACT",
+            vec![
+                (unicase::Ascii::new("Service".to_string()), VariableType::String),
+                (unicase::Ascii::new("Account".to_string()), VariableType::String),
+            ],
+        );
 
         reg
     }
@@ -335,6 +345,14 @@ impl UserTypeRegistry {
             return None;
         }
         self.user_types.read().unwrap().get(id - FIRST_USER_TYPE_ID).cloned()
+    }
+
+    pub fn get_record_type_from_id(&self, id: u8) -> Option<UserTypeDefinition> {
+        self.built_in_records.get(&id).cloned().or_else(|| self.get_user_type_from_id(id))
+    }
+
+    pub fn is_record_type(&self, id: u8) -> bool {
+        self.built_in_records.contains_key(&id) || is_user_declared_type(id)
     }
 
     pub fn user_types(&self) -> Vec<UserTypeDefinition> {
@@ -370,13 +388,10 @@ impl UserTypeRegistry {
         Some(id as u8)
     }
 
-    /// The position of a field inside a record the program declared, which doubles
+    /// The position of a field inside a record, which doubles
     /// as its member id in the generated code.
     pub fn record_field_index(&self, id: u8, field: &unicase::Ascii<String>) -> Option<usize> {
-        if !is_user_declared_type(id) {
-            return None;
-        }
-        self.get_user_type_from_id(id)?.field_index(field)
+        self.get_record_type_from_id(id)?.field_index(field)
     }
 
     /// Adds a record and hands back its type id, or `None` when the id space is full.
@@ -398,6 +413,19 @@ impl UserTypeRegistry {
         self.registered_types
             .insert(unicase::Ascii::new(T::TYPE_NAME.to_string()), VariableType::UserData((FIRST_ID + id) as u8));
         self.types.push(registry);
+    }
+
+    fn register_record(&mut self, id: usize, name: &str, fields: Vec<(unicase::Ascii<String>, VariableType)>) {
+        self.registered_types
+            .insert(unicase::Ascii::new(name.to_string()), VariableType::UserData(id as u8));
+        self.built_in_records.insert(
+            id as u8,
+            UserTypeDefinition {
+                id,
+                name: unicase::Ascii::new(name.to_string()),
+                fields,
+            },
+        );
     }
 
     pub fn get_type_from_id(&self, d: u8) -> Option<&UserDataRegistry> {

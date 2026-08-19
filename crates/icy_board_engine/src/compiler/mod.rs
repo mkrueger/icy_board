@@ -382,7 +382,7 @@ impl PPECompiler {
                         log::error!("Not a record: {}", var_name);
                         return None;
                     };
-                    let Some(definition) = self.semantic_visitor.type_registry.get_user_type_from_id(type_id) else {
+                    let Some(definition) = self.semantic_visitor.type_registry.get_record_type_from_id(type_id) else {
                         log::error!("Not a record: {}", var_name);
                         return None;
                     };

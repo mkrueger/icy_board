@@ -433,6 +433,9 @@ pub fn get_function_hover(func: &FunctionDefinition) -> Option<Hover> {
         FuncOpCode::AreaId => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-areaid")),
         FuncOpCode::WebRequest => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-webrequest")),
         FuncOpCode::Len_Dim => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-len_dim")),
+        FuncOpCode::BASE64ENC => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-base64enc")),
+        FuncOpCode::BASE64DEC => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-base64dec")),
+        FuncOpCode::SHA256 => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-sha256")),
         _ => None,
     }
 }

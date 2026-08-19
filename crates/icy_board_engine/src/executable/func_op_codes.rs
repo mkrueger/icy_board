@@ -310,9 +310,12 @@ pub enum FuncOpCode {
     Len_Dim = -296,
     RoutineReference = -297,
     RecordLiteral = -298,
+    BASE64ENC = -299,
+    BASE64DEC = -300,
+    SHA256 = -301,
 }
 
-pub const LAST_FUNC: i16 = -298;
+pub const LAST_FUNC: i16 = -301;
 
 impl FuncOpCode {
     pub fn get_definition(self) -> &'static FunctionDefinition {
@@ -380,7 +383,7 @@ impl FunctionDefinition {
     }
 }
 lazy_static::lazy_static! {
-    pub static ref FUNCTION_DEFINITIONS: [FunctionDefinition; 310] = [
+    pub static ref FUNCTION_DEFINITIONS: [FunctionDefinition; 313] = [
         FunctionDefinition {
             name: "END",
             version: 100,
@@ -3140,6 +3143,33 @@ lazy_static::lazy_static! {
             return_type: VariableType::None,
             args: None,
             signature: FunctionSignature::Invalid,
+        },
+
+        FunctionDefinition {
+            name: "Base64Enc",
+            version: 400,
+            opcode: FuncOpCode::BASE64ENC,
+            return_type: VariableType::BigStr,
+            args: Some(vec![ArgumentDefinition::new("value", VariableType::BigStr)]),
+            signature: FunctionSignature::FixedParameters(1),
+        },
+
+        FunctionDefinition {
+            name: "Base64Dec",
+            version: 400,
+            opcode: FuncOpCode::BASE64DEC,
+            return_type: VariableType::BigStr,
+            args: Some(vec![ArgumentDefinition::new("value", VariableType::BigStr)]),
+            signature: FunctionSignature::FixedParameters(1),
+        },
+
+        FunctionDefinition {
+            name: "Sha256",
+            version: 400,
+            opcode: FuncOpCode::SHA256,
+            return_type: VariableType::String,
+            args: Some(vec![ArgumentDefinition::new("value", VariableType::BigStr)]),
+            signature: FunctionSignature::FixedParameters(1),
         },
 
         // ALIASES (need to be last in the list)

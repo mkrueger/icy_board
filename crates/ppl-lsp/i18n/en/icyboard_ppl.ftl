@@ -1102,6 +1102,9 @@ hint-function-cwd=
     The current working directory
 hint-function-instrr=
     Returns the right most position of @2 in @1 `(1-LEN(@1))` or `0` if @2 not in @1
+hint-function-base64enc=Encodes the UTF-8 bytes of @1 as base64 text.
+hint-function-base64dec=Decodes base64 text in @1 as UTF-8. Characters outside the base64 alphabet are ignored.
+hint-function-sha256=Returns the lowercase hexadecimal SHA-256 digest of the UTF-8 bytes of @1.
 hint-function-fdordaka=
     Returns the address this board answers to, as zone:net/node with the point
     appended when there is one, or an empty string when there is no such record

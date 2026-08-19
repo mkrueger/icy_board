@@ -110,7 +110,15 @@ impl VarHeader {
 /// A record value with every field set up, so a field that is itself a record gets
 /// its own fields too. A type can only name types declared before it, so this ends.
 pub fn create_record_value(type_id: u8, user_types: &[Vec<VariableType>]) -> Option<VariableValue> {
-    let fields = user_types.get(type_id as usize - crate::parser::FIRST_USER_TYPE_ID)?;
+    let built_in_fields = match type_id as usize {
+        crate::parser::CONTACT_ID => Some(vec![VariableType::String, VariableType::String]),
+        _ => None,
+    };
+    let fields = if let Some(fields) = built_in_fields.as_ref() {
+        fields
+    } else {
+        user_types.get(type_id as usize - crate::parser::FIRST_USER_TYPE_ID)?
+    };
     let mut values = Vec::with_capacity(fields.len());
     for field in fields {
         let value = match field {
@@ -916,7 +924,7 @@ impl VariableTable {
             let VariableType::UserData(type_id) = entry.header.variable_type else {
                 continue;
             };
-            if !crate::parser::is_user_declared_type(type_id) {
+            if !crate::parser::is_user_declared_type(type_id) && type_id as usize != crate::parser::CONTACT_ID {
                 continue;
             }
             let Some(value) = create_record_value(type_id, user_types) else {
@@ -988,7 +996,7 @@ pub struct UserVariable {
 }
 
 lazy_static::lazy_static! {
-    pub static ref USER_VARIABLES: [UserVariable;29] = [
+    pub static ref USER_VARIABLES: [UserVariable;30] = [
         UserVariable { name: "U_EXPERT", runtime_version:100, value: VariableValue::new_bool(false)  },
         UserVariable { name: "U_FSE", runtime_version:100, value:VariableValue::new_bool(false) },
         UserVariable { name: "U_FSEP", runtime_version:100, value:VariableValue::new_bool(false) },
@@ -1023,5 +1031,9 @@ lazy_static::lazy_static! {
         UserVariable { name: "U_BIRTHDATE", runtime_version:340, value:VariableValue::new_string(String::new()) },
         UserVariable { name: "U_EMAIL", runtime_version:340, value:VariableValue::new_string(String::new()) },
         UserVariable { name: "U_WEB", runtime_version:340, value:VariableValue::new_string(String::new()) },
+        UserVariable { name: "U_CONTACT", runtime_version:400, value:VariableValue::new_vector(
+            VariableType::UserData(crate::parser::CONTACT_ID as u8),
+            vec![create_record_value(crate::parser::CONTACT_ID as u8, &[]).unwrap()],
+        )},
     ];
 }

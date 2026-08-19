@@ -272,8 +272,8 @@ impl Decompiler {
         let VariableType::UserData(type_id) = self.expression_type(base)? else {
             return None;
         };
-        if is_user_declared_type(type_id) {
-            return self.type_registry.get_user_type_from_id(type_id)?.fields.get(id).cloned();
+        if self.type_registry.is_record_type(type_id) {
+            return self.type_registry.get_record_type_from_id(type_id)?.fields.get(id).cloned();
         }
         let registry = self.type_registry.get_type_from_id(type_id)?;
         match registry.id_table.get(id)? {

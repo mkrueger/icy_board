@@ -25,6 +25,8 @@ language features.
 | Message-area identifiers | 400 | 400 | `MSGAREAID` and `AreaId(conf, area)` |
 | Overloaded built-ins | 400 | 400 | Argument-count overloads such as `ConfInfo(conf)` and `Len(array, dim)` |
 | Web requests | 400 | 400 | String-returning function and file-writing statement forms |
+| UTF-8 encoding and digest functions | 400 | 400 | `BASE64ENC`, `BASE64DEC` and `SHA256` |
+| Extensible user contacts | 400 | 400 | Mutable `CONTACT` records in `U_CONTACT` |
 | User-defined records | 400 | 401 | `TYPE ... ENDTYPE`, nested fields, arrays of records and nominal type checking |
 | Named record literals | 400 | 401 | `Point { X = 1, Y = 2 }` with checked and optional fields |
 
@@ -218,6 +220,54 @@ FOR i = 0 TO conf.Doors - 1
 	DOOR item = conf.GetDoor(i)
 	IF item.HasAccess() PRINTLN item.Name
 NEXT
+```
+
+## User contacts (4.00)
+
+`U_CONTACT` is a mutable array of built-in `CONTACT` records. Each record has
+two `STRING` fields: `Service` and `Account`. Service names are open strings,
+so a PPE can store new services without a language or user-schema change.
+
+`GETUSER` fills the array and `PUTUSER` writes it back. On write, service names
+are trimmed and converted to lowercase; entries with a blank service or account
+are discarded. Duplicate services are allowed. Because PPL arrays use inclusive
+upper bounds, an empty contact list is represented by one blank element at
+index zero.
+
+`U_EMAIL` and `U_WEB` remain separate predefined variables for PCBoard 3.40
+compatibility and are not duplicated in `U_CONTACT`.
+
+```PPL
+GETUSER
+
+INTEGER i
+FOR i = 0 TO LEN(U_CONTACT, 1)
+	IF U_CONTACT[i].Service <> "" THEN
+		PRINTLN U_CONTACT[i].Service, ": ", U_CONTACT[i].Account
+	ENDIF
+NEXT
+
+REDIM U_CONTACT(LEN(U_CONTACT, 1) + 1)
+U_CONTACT[LEN(U_CONTACT, 1)].Service = "matrix"
+U_CONTACT[LEN(U_CONTACT, 1)].Account = "@sysop:example.org"
+PUTUSER
+```
+
+## Encoding and digest functions (4.00)
+
+`BASE64ENC(value)` encodes the UTF-8 bytes of a string and returns base64 text.
+`BASE64DEC(value)` ignores characters outside the base64 alphabet, decodes the
+remaining text, and interprets the result as UTF-8. Invalid UTF-8 bytes become
+the Unicode replacement character.
+
+`SHA256(value)` returns the 64-character lowercase hexadecimal SHA-256 digest
+of the value's UTF-8 bytes. It is intended for content integrity and identity,
+not password storage.
+
+```PPL
+PRINTLN BASE64ENC("Grüße")
+PRINTLN BASE64DEC("R3LDvMOfZQ==")
+PRINTLN SHA256("abc")
 ```
 
 ## `WebRequest()`  Function (4.00)

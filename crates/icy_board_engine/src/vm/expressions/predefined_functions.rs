@@ -20,6 +20,7 @@ use crate::icy_board::user_base::{ConferenceFlags, Password};
 use crate::icy_board::user_inf::{BankUserInf, QwkConfigUserInf};
 use crate::parser::CONFERENCE_ID;
 use crate::vm::{TerminalTarget, VirtualMachine, dbase, get_file_channel};
+use base64::{Engine as _, engine::general_purpose};
 use bstr::BString;
 use chrono::{DateTime, Datelike, Timelike, Utc};
 use icy_engine::{Position, TextPane};
@@ -30,6 +31,7 @@ use jamjam::jam::msg_header::JamMessageHeader;
 use jamjam::jam::raw;
 use jamjam::util::basic_real::{BasicDouble, BasicReal};
 use radix_fmt::radix;
+use sha2::{Digest, Sha256};
 
 const HDR_ACTIVE: i32 = 0x0E;
 const HDR_BLOCKS: i32 = 0x04;
@@ -439,6 +441,29 @@ pub async fn stripstr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
     let input = vm.eval_expr(&args[0]).await?.as_string();
     let search = vm.eval_expr(&args[1]).await?.as_string();
     Ok(VariableValue::new_string(input.replace(&search, "")))
+}
+
+pub async fn base64enc(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let value = vm.eval_expr(&args[0]).await?.as_string();
+    Ok(VariableValue::new_string(general_purpose::STANDARD.encode(value.as_bytes())))
+}
+
+pub async fn base64dec(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let value = vm.eval_expr(&args[0]).await?.as_string();
+    let filtered = value
+        .bytes()
+        .filter(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'+' | b'/' | b'='))
+        .collect::<Vec<_>>();
+    let decoded = general_purpose::STANDARD
+        .decode(&filtered)
+        .or_else(|_| general_purpose::STANDARD_NO_PAD.decode(&filtered))
+        .unwrap_or_default();
+    Ok(VariableValue::new_string(String::from_utf8_lossy(&decoded).into_owned()))
+}
+
+pub async fn sha256(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let value = vm.eval_expr(&args[0]).await?.as_string();
+    Ok(VariableValue::new_string(format!("{:x}", Sha256::digest(value.as_bytes()))))
 }
 
 /// Trim specified characters from the end of a string

@@ -207,7 +207,7 @@ impl<'a> Parser<'a> {
                 self.next_token();
                 if self.lang_version >= 400 && self.get_cur_token() == Some(Token::LBrace) {
                     if let Some(VariableType::UserData(type_id)) = variable_type {
-                        if crate::parser::is_user_declared_type(type_id) {
+                        if self.type_registry.is_record_type(type_id) {
                             let lbrace_token = self.save_spanned_token();
                             self.next_token();
                             let mut fields = Vec::new();

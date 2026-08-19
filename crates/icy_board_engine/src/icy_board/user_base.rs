@@ -481,6 +481,12 @@ pub struct UserFlags {
 }
 
 #[derive(Clone, Default, Serialize, Deserialize, PartialEq)]
+pub struct UserContact {
+    pub service: String,
+    pub account: String,
+}
+
+#[derive(Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct User {
     /// Path to the user file
     pub path: Option<PathBuf>,
@@ -530,6 +536,10 @@ pub struct User {
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
     pub web: String,
+
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub contacts: Vec<UserContact>,
 
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
@@ -1002,6 +1012,7 @@ impl User {
             birth_date,
             email,
             web,
+            contacts: Vec::new(),
 
             city,
             street1,

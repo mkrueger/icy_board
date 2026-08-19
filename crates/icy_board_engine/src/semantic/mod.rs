@@ -1110,7 +1110,7 @@ impl SemanticVisitor {
     /// Resolves a field of a record the program declared and remembers the type, so
     /// code generation can look the field up again by the member's source position.
     fn resolve_record_field(&mut self, type_id: u8, member: &unicase::Ascii<String>, span: &core::ops::Range<usize>) -> VariableType {
-        let Some(definition) = self.type_registry.get_user_type_from_id(type_id) else {
+        let Some(definition) = self.type_registry.get_record_type_from_id(type_id) else {
             self.errors.lock().unwrap().report_error(span.clone(), CompilationErrorType::TypeNotFound);
             return VariableType::None;
         };
@@ -1520,7 +1520,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
         }
         let t = member_reference_expression.get_expression().visit(self);
         if let VariableType::UserData(d) = t {
-            if crate::parser::is_user_declared_type(d) {
+            if self.type_registry.is_record_type(d) {
                 return self.resolve_record_field(
                     d,
                     member_reference_expression.get_identifier(),
@@ -1907,7 +1907,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 let mut variable_type = target_type;
                 for member_token in let_stmt.get_members() {
                     match variable_type {
-                        VariableType::UserData(type_id) if crate::parser::is_user_declared_type(type_id) => {
+                        VariableType::UserData(type_id) if self.type_registry.is_record_type(type_id) => {
                             let Token::Identifier(member) = &member_token.token else {
                                 break;
                             };

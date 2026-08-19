@@ -7,6 +7,7 @@
 
 #![cfg(test)]
 
+mod contacts;
 mod control_flow;
 mod dbase;
 mod display_pause;

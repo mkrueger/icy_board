@@ -1942,6 +1942,10 @@
     "named": false
   },
   {
+    "type": "CONTACT",
+    "named": false
+  },
+  {
     "type": "CONTINUE",
     "named": false
   },

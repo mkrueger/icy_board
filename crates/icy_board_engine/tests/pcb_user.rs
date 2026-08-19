@@ -22,6 +22,7 @@ fn create_test_user(name: &str, idx: u8) -> User {
         gender: if idx % 2 == 0 { "M" } else { "F" }.to_string(),
         email: format!("user{}@example.com", idx),
         web: format!("http://example{}.com", idx),
+        contacts: Vec::new(),
         date_format: DEFAULT_PCBOARD_DATE_FORMAT.to_string(),
         language: "EN".to_string(),
         bus_data_phone: format!("555-{:04}", (idx as u32) * 100),
