@@ -205,9 +205,14 @@ board to run them against, and a general-purpose runtime does not help because
 PPEs are specific to PCBoard down to the last data structure. So the decompiler
 needed a BBS, and the BBS is this.
 
-The leaked PCBoard 15.4 sources and a copy of the real thing running under
+The leaked PCBoard 15.3 sources and a copy of the 15.4 beta running under
 DOSBox settle the arguments about what correct means — see
 [compat/](compat/README.md) for how that oracle is driven.
+For compatibility check I've used an AI testing all commands of icy_board inside dosbox-x to ensure that PPE kbdstuf approach for extending pcboard doesn't fail in icy_board. 
+
+Started the project back ~2018 long before AI was a thing - but these days it really helps improving software development :).
+(As well as writing docs)
+
 
 ## License
 
