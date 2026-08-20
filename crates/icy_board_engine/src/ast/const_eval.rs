@@ -1,7 +1,7 @@
 use unicase::Ascii;
 
 use crate::{
-    ast::{AstVisitor, BinOp, Constant, ConstantExpression, Expression, MemberReferenceExpression, UnaryOp, constant::NumberFormat},
+    ast::{AstVisitor, BinOp, Constant, ConstantExpression, Expression, FunctionCallExpression, MemberReferenceExpression, UnaryOp, constant::NumberFormat},
     executable::{VariableType, VariableValue},
 };
 
@@ -31,7 +31,9 @@ pub fn const_expression(value: &VariableValue, variable_type: VariableType) -> O
         VariableType::String | VariableType::BigStr => Constant::String(value.as_string()),
         VariableType::Double | VariableType::Float => Constant::Double(value.as_double()),
         VariableType::Money => Constant::Money(value.as_int()),
-        VariableType::Unsigned | VariableType::Byte | VariableType::Word | VariableType::DDate => Constant::Unsigned(value.as_unsigned()),
+        VariableType::Unsigned | VariableType::Byte | VariableType::Word | VariableType::DDate => {
+            Constant::Unsigned(value.as_unsigned(), NumberFormat::Default)
+        }
         VariableType::Integer | VariableType::SByte | VariableType::SWord | VariableType::Date | VariableType::EDate | VariableType::Time => {
             Constant::Integer(value.as_int(), NumberFormat::Default)
         }
@@ -64,7 +66,7 @@ impl AstVisitor<Option<VariableValue>> for ConstEvaluator<'_> {
             Constant::String(s) => Some(VariableValue::new_string(s.clone())),
             Constant::Double(f) => Some(VariableValue::new_double(*f)),
             Constant::Money(m) => Some(VariableValue::new_int(*m)),
-            Constant::Unsigned(u) => Some(VariableValue::new_unsigned(*u)),
+            Constant::Unsigned(u, _) => Some(VariableValue::new_unsigned(*u)),
             Constant::Builtin(b) => Some(VariableValue::new_int(b.value)),
         }
     }
@@ -97,5 +99,23 @@ impl AstVisitor<Option<VariableValue>> for ConstEvaluator<'_> {
             BinOp::Greater => VariableValue::new_bool(left > right),
             BinOp::GreaterEq => VariableValue::new_bool(left >= right),
         })
+    }
+
+    fn visit_function_call_expression(&mut self, call: &FunctionCallExpression) -> Option<VariableValue> {
+        let Expression::Identifier(identifier) = call.get_expression() else {
+            return None;
+        };
+        let arguments = call.get_arguments().iter().map(|argument| argument.visit(self)).collect::<Option<Vec<_>>>()?;
+        let alpha = match identifier.get_identifier().as_ref().to_ascii_uppercase().as_str() {
+            "RGB" if arguments.len() == 3 => 255,
+            "RGB" if arguments.len() == 4 => arguments[3].as_int(),
+            _ => return None,
+        };
+        Some(VariableValue::new_unsigned(u64::from(crate::icy_board::state::ppl_graphics::rgba_value(
+            arguments[0].as_int(),
+            arguments[1].as_int(),
+            arguments[2].as_int(),
+            alpha,
+        ))))
     }
 }

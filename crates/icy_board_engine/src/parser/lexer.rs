@@ -1010,12 +1010,16 @@ impl Lexer {
                                 }
                             }
                             'H' | 'h' => {
-                                let r = i32::from_str_radix(&self.text[start..self.token_end - 1].iter().collect::<String>(), 16);
+                                let literal = self.text[start..self.token_end - 1].iter().collect::<String>();
+                                let r = i32::from_str_radix(&literal, 16);
                                 match r {
                                     Ok(i) => {
                                         return Some(Token::Const(Constant::Integer(i, NumberFormat::Hex)));
                                     }
                                     Err(r) => {
+                                        if let Ok(i) = u64::from_str_radix(&literal, 16) {
+                                            return Some(Token::Const(Constant::Unsigned(i, NumberFormat::Hex)));
+                                        }
                                         self.errors.lock().unwrap().report_warning(
                                             self.token_start..self.token_end,
                                             LexingErrorType::InvalidInteger(r.to_string(), self.text[self.token_start..self.token_end].iter().collect::<String>())
@@ -1122,13 +1126,13 @@ impl Lexer {
                                 return Some(Token::Const(Constant::Integer(i as i32, NumberFormat::Default)));
                             }
                             if i >= 0 {
-                                return Some(Token::Const(Constant::Unsigned(i as u64)));
+                                return Some(Token::Const(Constant::Unsigned(i as u64, NumberFormat::Default)));
                             }
                         }
                         Err(r) => {
                             let r2 = self.text[start..end].iter().collect::<String>().parse::<u64>();
                             if let Ok(i) = r2 {
-                                return Some(Token::Const(Constant::Unsigned(i)));
+                                return Some(Token::Const(Constant::Unsigned(i, NumberFormat::Default)));
                             }
                             self.errors.lock().unwrap().report_warning(
                                 self.token_start..self.token_end,
@@ -1927,12 +1931,16 @@ impl Lexer {
                                 }
                             }
                             'H' | 'h' => {
-                                let r = i32::from_str_radix(&self.text[start..self.token_end - 1].iter().collect::<String>(), 16);
+                                let literal = self.text[start..self.token_end - 1].iter().collect::<String>();
+                                let r = i32::from_str_radix(&literal, 16);
                                 match r {
                                     Ok(i) => {
                                         return Some(Token::Const(Constant::Integer(i, NumberFormat::Hex)));
                                     }
                                     Err(r) => {
+                                        if let Ok(i) = u64::from_str_radix(&literal, 16) {
+                                            return Some(Token::Const(Constant::Unsigned(i, NumberFormat::Hex)));
+                                        }
                                         self.errors.lock().unwrap().report_warning(
                                             self.token_start..self.token_end,
                                             LexingErrorType::InvalidInteger(
@@ -2048,13 +2056,13 @@ impl Lexer {
                                 return Some(Token::Const(Constant::Integer(i as i32, NumberFormat::Default)));
                             }
                             if i >= 0 {
-                                return Some(Token::Const(Constant::Unsigned(i as u64)));
+                                return Some(Token::Const(Constant::Unsigned(i as u64, NumberFormat::Default)));
                             }
                         }
                         Err(r) => {
                             let r2 = self.text[start..end].iter().collect::<String>().parse::<u64>();
                             if let Ok(i) = r2 {
-                                return Some(Token::Const(Constant::Unsigned(i)));
+                                return Some(Token::Const(Constant::Unsigned(i, NumberFormat::Default)));
                             }
                             self.errors.lock().unwrap().report_warning(
                                 self.token_start..self.token_end,

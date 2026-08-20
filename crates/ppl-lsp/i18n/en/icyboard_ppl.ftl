@@ -1105,6 +1105,15 @@ hint-function-instrr=
 hint-function-base64enc=Encodes the UTF-8 bytes of @1 as base64 text.
 hint-function-base64dec=Decodes base64 text in @1 as UTF-8. Characters outside the base64 alphabet are ignored.
 hint-function-sha256=Returns the lowercase hexadecimal SHA-256 digest of the UTF-8 bytes of @1.
+hint-function-gfx-api=Queries graphics backend, capability, surface, geometry or error state.
+hint-function-mouse-api=Polls or inspects the current mouse event and coordinate mode.
+hint-function-rgb=Packs red, green, blue and optional alpha components into an RGBA color.
+hint-function-sound-api=Queries SyncTERM audio capability, format support or channel state.
+hint-function-key-api=Polls or inspects a CTerm physical key press/release event.
+hint-statement-gfx-api=Creates, draws, presents or controls Sixel/JPEG XL graphics surfaces.
+hint-statement-sound-api=Preloads, plays, fades, stops or changes SyncTERM audio.
+hint-statement-mouse-api=Enables or disables cell/pixel mouse event reporting.
+hint-statement-key-api=Enables, suppresses translated input for, or disables physical key events.
 hint-function-fdordaka=
     Returns the address this board answers to, as zone:net/node with the point
     appended when there is one, or an empty string when there is no such record

@@ -329,7 +329,7 @@ impl VirtualMachine<'_> {
             self.variable_table.set_value(U_EMAIL, VariableValue::new_string(cur_user.email.clone()));
             self.variable_table.set_value(U_WEB, VariableValue::new_string(cur_user.web.clone()));
         }
-        if self.variable_table.get_version() >= 400 {
+        if self.variable_table.has_u_contact() {
             let mut contacts = cur_user
                 .contacts
                 .iter()
@@ -419,7 +419,7 @@ impl VirtualMachine<'_> {
             cur_user.email = self.variable_table.get_value(U_EMAIL).as_string();
             cur_user.web = self.variable_table.get_value(U_WEB).as_string();
         }
-        if self.variable_table.get_version() >= 400 {
+        if self.variable_table.has_u_contact() {
             cur_user.contacts = contacts_from_value(self.variable_table.get_value(U_CONTACT));
         }
     }

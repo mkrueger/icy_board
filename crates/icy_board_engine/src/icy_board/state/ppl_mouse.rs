@@ -39,8 +39,11 @@ pub struct PplMouseState {
 }
 
 impl PplMouseState {
-    pub fn enable(&mut self, mode: i32) -> bool {
+    pub fn enable(&mut self, mode: i32, tracking: i32) -> bool {
         if !matches!(mode, MOUSE_MODE_TEXT | MOUSE_MODE_GRAPHICS) {
+            return false;
+        }
+        if !(0..=2).contains(&tracking) {
             return false;
         }
         self.enabled = true;
@@ -158,8 +161,14 @@ impl PplMouseState {
         self.current
     }
 
-    pub fn enable_sequence(&self) -> Vec<u8> {
-        let mut sequence = b"\x1b[?1000l\x1b[?1002l\x1b[?1003h\x1b[?1006h".to_vec();
+    pub fn enable_sequence(&self, tracking: i32) -> Vec<u8> {
+        let mut sequence = b"\x1b[?1000l\x1b[?1002l\x1b[?1003l".to_vec();
+        sequence.extend_from_slice(match tracking {
+            0 => b"\x1b[?1000h".as_slice(),
+            1 => b"\x1b[?1002h".as_slice(),
+            _ => b"\x1b[?1003h".as_slice(),
+        });
+        sequence.extend_from_slice(b"\x1b[?1006h");
         if self.graphics_mode {
             sequence.extend_from_slice(b"\x1b[?1016h\x1b[?1016$p");
         } else {
@@ -221,7 +230,7 @@ mod tests {
     #[test]
     fn parses_sgr_press_motion_release_and_wheel() {
         let mut mouse = PplMouseState::default();
-        assert!(mouse.enable(MOUSE_MODE_TEXT));
+        assert!(mouse.enable(MOUSE_MODE_TEXT, 2));
         for byte in b"\x1b[<0;11;6M\x1b[<36;12;7M\x1b[<0;12;7m\x1b[<65;12;7M" {
             assert!(mouse.feed(*byte).is_empty());
         }
@@ -248,7 +257,7 @@ mod tests {
     #[test]
     fn replays_non_mouse_escape_sequences() {
         let mut mouse = PplMouseState::default();
-        assert!(mouse.enable(MOUSE_MODE_TEXT));
+        assert!(mouse.enable(MOUSE_MODE_TEXT, 2));
         let mut replayed = Vec::new();
         for byte in b"\x1b[A" {
             replayed.extend(mouse.feed(*byte));
@@ -259,7 +268,7 @@ mod tests {
     #[test]
     fn legacy_syncterm_96_and_97_are_motion_not_wheel() {
         let mut mouse = PplMouseState::default();
-        assert!(mouse.enable(MOUSE_MODE_TEXT));
+        assert!(mouse.enable(MOUSE_MODE_TEXT, 2));
         for byte in b"\x1b[<96;11;6M\x1b[<97;12;7M" {
             assert!(mouse.feed(*byte).is_empty());
         }
@@ -272,7 +281,7 @@ mod tests {
     #[test]
     fn pixel_mode_requires_terminal_confirmation() {
         let mut mouse = PplMouseState::default();
-        assert!(mouse.enable(MOUSE_MODE_GRAPHICS));
+        assert!(mouse.enable(MOUSE_MODE_GRAPHICS, 2));
         assert!(!mouse.pixels());
         for byte in b"\x1b[?1016;1$y" {
             assert!(mouse.feed(*byte).is_empty());
@@ -283,7 +292,7 @@ mod tests {
     #[test]
     fn pixel_confirmation_can_be_followed_by_a_click_in_one_read() {
         let mut mouse = PplMouseState::default();
-        assert!(mouse.enable(MOUSE_MODE_GRAPHICS));
+        assert!(mouse.enable(MOUSE_MODE_GRAPHICS, 2));
         for byte in b"\x1b[?1016;1$y\x1b[<0;101;51M" {
             assert!(mouse.feed(*byte).is_empty());
         }

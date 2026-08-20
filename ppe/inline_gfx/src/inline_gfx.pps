@@ -5,7 +5,7 @@ STRING key
 CLS
 
 ; FALSE keeps normal text mode: no clear, hidden cursor, or wrap changes.
-GfxInit 0, FALSE
+GfxInit GFX_AUTO, FALSE
 IF GfxBackend() >= 0 THEN
     GfxLoad 1, "./banner.png"
     ; Coordinates are normal 1-based text columns and rows.

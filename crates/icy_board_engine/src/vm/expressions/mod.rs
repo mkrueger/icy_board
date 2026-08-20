@@ -299,6 +299,22 @@ pub async fn run_function(opcode: FuncOpCode, arg: &mut VirtualMachine<'_>, argu
         FuncOpCode::MouseButton => predefined_functions::mousebutton(arg, arguments).await,
         FuncOpCode::MouseModifiers => predefined_functions::mousemodifiers(arg, arguments).await,
         FuncOpCode::MousePixels => predefined_functions::mousepixels(arg, arguments).await,
+        FuncOpCode::Rgb | FuncOpCode::RgbAlpha => predefined_functions::rgb(arg, arguments).await,
+        FuncOpCode::GfxCaps => predefined_functions::gfxcaps(arg, arguments).await,
+        FuncOpCode::GfxValid => predefined_functions::gfxvalid(arg, arguments).await,
+        FuncOpCode::GfxWidth => predefined_functions::gfxwidth(arg, arguments).await,
+        FuncOpCode::GfxHeight => predefined_functions::gfxheight(arg, arguments).await,
+        FuncOpCode::GfxCellWidth => predefined_functions::gfxcellwidth(arg, arguments).await,
+        FuncOpCode::GfxCellHeight => predefined_functions::gfxcellheight(arg, arguments).await,
+        FuncOpCode::SndAvailable => predefined_functions::sndavailable(arg, arguments).await,
+        FuncOpCode::SndSupports => predefined_functions::sndsupports(arg, arguments).await,
+        FuncOpCode::SndPlaying => predefined_functions::sndplaying(arg, arguments).await,
+        FuncOpCode::KeyPoll => predefined_functions::keypoll(arg, arguments).await,
+        FuncOpCode::KeyCode => predefined_functions::keycode(arg, arguments).await,
+        FuncOpCode::KeyPressed => predefined_functions::keypressed(arg, arguments).await,
+        FuncOpCode::GfxScreenWidth => predefined_functions::gfxscreenwidth(arg, arguments).await,
+        FuncOpCode::GfxScreenHeight => predefined_functions::gfxscreenheight(arg, arguments).await,
+        FuncOpCode::GfxError => predefined_functions::gfxerror(arg, arguments).await,
         FuncOpCode::END
         | FuncOpCode::CPAR
         | FuncOpCode::UPLUS

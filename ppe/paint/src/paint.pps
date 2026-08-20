@@ -12,15 +12,9 @@ CONST INTEGER SWATCH_STEP = 34
 CONST INTEGER SWATCH_SIZE = 26
 CONST INTEGER COLOR_COUNT = 8
 
-CONST INTEGER MOUSE_NONE = 0
-CONST INTEGER MOUSE_PRESS = 1
-CONST INTEGER MOUSE_RELEASE = 2
-CONST INTEGER MOUSE_MOTION = 3
-CONST INTEGER MOUSE_WHEEL = 4
-
-CONST UNSIGNED C_CANVAS = 4294967295
-CONST UNSIGNED C_INK = 16909311
-CONST UNSIGNED C_FRAME = 588911615
+CONST UNSIGNED C_CANVAS = Rgb(255, 255, 255)
+CONST UNSIGNED C_INK = Rgb(1, 2, 3)
+CONST UNSIGNED C_FRAME = Rgb(35, 26, 19)
 
 UNSIGNED colors(7)
 INTEGER selected, brushSize
@@ -34,10 +28,10 @@ InitColors()
 CLS
 PRINTLN "Starting PPE Paint..."
 
-GfxInit 0
+GfxInit GFX_AUTO
 IF GfxBackend() < 0 THEN
     CLS
-    PRINTLN "PPE Paint requires a Sixel-capable terminal."
+    PRINTLN "PPE Paint requires a graphics-capable terminal."
     EXIT
 ENDIF
 GfxCreate 0, SCREEN_W, SCREEN_H
@@ -50,7 +44,7 @@ dragging = FALSE
 dirty = FALSE
 RenderToolbar()
 
-MouseOn 1
+MouseOn MOUSE_PIXELS, MOUSE_TRACK_ALL
 tries = 0
 WHILE !MousePixels() & tries < 30 DO
     event = MousePoll()
@@ -130,14 +124,14 @@ GfxShutdown
 CLS
 
 PROCEDURE InitColors()
-    colors[0] = 572727039
-    colors[1] = 4033308671
-    colors[2] = 4120529663
-    colors[3] = 4124395519
-    colors[4] = 1691773951
-    colors[5] = 1121577215
-    colors[6] = 1536162303
-    colors[7] = 2809004031
+    colors[0] = Rgb(34, 34, 34)
+    colors[1] = Rgb(240, 103, 103)
+    colors[2] = Rgb(245, 154, 74)
+    colors[3] = Rgb(245, 213, 71)
+    colors[4] = Rgb(100, 214, 107)
+    colors[5] = Rgb(66, 217, 232)
+    colors[6] = Rgb(91, 143, 249)
+    colors[7] = Rgb(167, 109, 255)
 ENDPROC
 
 FUNCTION InsideCanvas(INTEGER x, INTEGER y) BOOLEAN

@@ -185,7 +185,7 @@ fn print_config_json_is_machine_readable() {
     let config: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(config["languageVersion"]["effective"], 350);
     assert_eq!(config["languageVersion"]["source"], "environment");
-    assert_eq!(config["runtimeVersion"]["effective"], 401);
+    assert_eq!(config["runtimeVersion"]["effective"], 402);
     assert_eq!(config["sources"].as_array().unwrap().len(), 1);
 }
 

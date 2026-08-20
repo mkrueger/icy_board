@@ -374,7 +374,7 @@ impl Decompiler {
                         VariableType::Float => Constant::Double(entry.value.data.float_value as f64),
                         VariableType::Double => Constant::Double(entry.value.data.double_value),
                         VariableType::Boolean => Constant::Boolean(entry.value.as_bool()),
-                        VariableType::Unsigned => Constant::Unsigned(entry.value.data.unsigned_value),
+                        VariableType::Unsigned => Constant::Unsigned(entry.value.data.unsigned_value, NumberFormat::Default),
                         //VariableType::Integer |
                         _ => Constant::Integer(entry.value.as_int(), NumberFormat::Default),
                     };

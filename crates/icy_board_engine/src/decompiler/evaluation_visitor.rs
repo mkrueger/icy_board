@@ -14,7 +14,7 @@ impl AstVisitor<Option<VariableValue>> for EvaluationVisitor {
             Constant::String(s) => Some(VariableValue::new_string(s.clone())),
             Constant::Double(f) => Some(VariableValue::new_double(*f)),
             Constant::Money(m) => Some(VariableValue::new_int(*m)),
-            Constant::Unsigned(u) => Some(VariableValue::new_unsigned(*u)),
+            Constant::Unsigned(u, _) => Some(VariableValue::new_unsigned(*u)),
             Constant::Builtin(b) => Some(VariableValue::new_int(b.value)),
         }
     }
@@ -211,9 +211,10 @@ fn value_to_expression(value: &VariableValue) -> Option<Expression> {
             })));
         }
         VariableType::Unsigned => {
-            return Some(ConstantExpression::create_empty_expression(Constant::Unsigned(unsafe {
-                value.data.unsigned_value
-            })));
+            return Some(ConstantExpression::create_empty_expression(Constant::Unsigned(
+                unsafe { value.data.unsigned_value },
+                crate::ast::constant::NumberFormat::Default,
+            )));
         }
         _ => {}
     }

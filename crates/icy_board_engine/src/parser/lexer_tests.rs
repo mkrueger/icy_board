@@ -175,7 +175,11 @@ fn test_constants() {
     assert_eq!(Token::Const(Constant::Double(3.15)), get_token("3.15"));
     assert_eq!(Token::Const(Constant::Double(3.15)), get_token("3.15"));
     assert_eq!(Token::Const(Constant::Integer(0x0B00, NumberFormat::Hex)), get_token("0B00h"));
-    assert_eq!(Token::Const(Constant::Unsigned(142_9496_7296u64)), get_token("14294967296"));
+    assert_eq!(Token::Const(Constant::Unsigned(0xFF00_00FF, NumberFormat::Hex)), get_token("0FF0000FFh"));
+    assert_eq!(
+        Token::Const(Constant::Unsigned(142_9496_7296u64, NumberFormat::Default)),
+        get_token("14294967296")
+    );
 }
 
 #[test]

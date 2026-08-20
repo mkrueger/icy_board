@@ -366,6 +366,11 @@ impl VariableTable {
         self.has_user_vars
     }
 
+    pub fn has_u_contact(&self) -> bool {
+        self.try_get_entry(crate::vm::U_CONTACT)
+            .is_some_and(|entry| entry.header.variable_type == VariableType::UserData(crate::parser::CONTACT_ID as u8) && entry.header.dim == 1)
+    }
+
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
@@ -1144,7 +1149,7 @@ pub static USER_VARIABLES: std::sync::LazyLock<[UserVariable; 30]> = std::sync::
         },
         UserVariable {
             name: "U_CONTACT",
-            runtime_version: 400,
+            runtime_version: 402,
             value: VariableValue::new_vector(
                 VariableType::UserData(crate::parser::CONTACT_ID as u8),
                 vec![create_record_value(crate::parser::CONTACT_ID as u8, &[]).unwrap()],

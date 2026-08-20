@@ -290,8 +290,13 @@ pub enum OpCode {
     GfxPresentAt = 248,
     MouseOn = 249,
     MouseOff = 250,
+    GfxPin = 251,
+    GfxSetPacing = 252,
+    SndFade = 253,
+    SndStopAll = 254,
+    KeyEvents = 255,
 }
-pub const LAST_STMT: i16 = OpCode::MouseOff as i16;
+pub const LAST_STMT: i16 = OpCode::KeyEvents as i16;
 
 impl OpCode {
     pub fn get_definition(self) -> &'static StatementDefinition {
@@ -613,7 +618,7 @@ pub fn format_argument_type_last(arg: &ArgumentDefinition) -> String {
 // "WAIT FOR" == "WAITFOR"
 // "GO SUB"
 // " GO TO"
-pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 256]> = std::sync::LazyLock::new(|| {
+pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 261]> = std::sync::LazyLock::new(|| {
     [
         StatementDefinition {
             // helps to map opcode to array index.
@@ -2738,7 +2743,7 @@ pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 256]
                 ArgumentDefinition::new("Width", VariableType::Integer),
                 ArgumentDefinition::new("Height", VariableType::Integer),
             ]),
-            sig: StatementSignature::ArgumentsWithVariable(0, 5),
+            sig: StatementSignature::VariableArguments(0, 5, 7),
         },
         StatementDefinition {
             name: "GfxWaitFrame",
@@ -2776,8 +2781,11 @@ pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 256]
             name: "MouseOn",
             version: 400,
             opcode: OpCode::MouseOn,
-            args: Some(vec![ArgumentDefinition::new("Mode", VariableType::Integer)]),
-            sig: StatementSignature::ArgumentsWithVariable(0, 1),
+            args: Some(vec![
+                ArgumentDefinition::new("Mode", VariableType::Integer),
+                ArgumentDefinition::new("Tracking", VariableType::Integer),
+            ]),
+            sig: StatementSignature::VariableArguments(0, 1, 2),
         },
         StatementDefinition {
             name: "MouseOff",
@@ -2785,6 +2793,48 @@ pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 256]
             opcode: OpCode::MouseOff,
             args: None,
             sig: StatementSignature::ArgumentsWithVariable(0, 0),
+        },
+        StatementDefinition {
+            name: "GfxPin",
+            version: 400,
+            opcode: OpCode::GfxPin,
+            args: Some(vec![
+                ArgumentDefinition::new("Slot", VariableType::Integer),
+                ArgumentDefinition::new("Enabled", VariableType::Boolean),
+            ]),
+            sig: StatementSignature::VariableArguments(0, 1, 2),
+        },
+        StatementDefinition {
+            name: "GfxSetPacing",
+            version: 400,
+            opcode: OpCode::GfxSetPacing,
+            args: Some(vec![ArgumentDefinition::new("FramesInFlight", VariableType::Integer)]),
+            sig: StatementSignature::ArgumentsWithVariable(0, 1),
+        },
+        StatementDefinition {
+            name: "SndFade",
+            version: 400,
+            opcode: OpCode::SndFade,
+            args: Some(vec![
+                ArgumentDefinition::new("Channel", VariableType::Integer),
+                ArgumentDefinition::new("Volume", VariableType::Integer),
+                ArgumentDefinition::new("Milliseconds", VariableType::Integer),
+            ]),
+            sig: StatementSignature::ArgumentsWithVariable(0, 3),
+        },
+        StatementDefinition {
+            name: "SndStopAll",
+            version: 400,
+            opcode: OpCode::SndStopAll,
+            args: None,
+            sig: StatementSignature::ArgumentsWithVariable(0, 0),
+        },
+        StatementDefinition {
+            name: "KeyEvents",
+            version: 400,
+            opcode: OpCode::KeyEvents,
+            args: Some(vec![ArgumentDefinition::new("Mode", VariableType::Integer)]),
+            sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         // Alias section
         // Moving to the end, so that the opcode <--> index mapping is not broken

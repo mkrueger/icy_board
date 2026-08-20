@@ -18,7 +18,7 @@ pub enum NumberFormat {
 pub enum Constant {
     Money(i32),
     Integer(i32, NumberFormat),
-    Unsigned(u64),
+    Unsigned(u64, NumberFormat),
     String(String),
     Double(f64),
     Boolean(bool),
@@ -43,7 +43,7 @@ impl BuiltinConst {
 }
 
 pub const STACK_LIMIT: i32 = 6022 + 1024;
-pub const BUILTIN_CONSTS: [BuiltinConst; 104] = [
+pub const BUILTIN_CONSTS: [BuiltinConst; 148] = [
     BuiltinConst { name: "TRUE", value: 0x01 },
     BuiltinConst { name: "FALSE", value: 0x00 },
     BuiltinConst {
@@ -310,13 +310,146 @@ pub const BUILTIN_CONSTS: [BuiltinConst; 104] = [
     BuiltinConst { name: "S_DN", value: 0x00 },
     BuiltinConst { name: "S_DR", value: 0x01 },
     BuiltinConst { name: "S_DW", value: 0x02 },
+    // GFXINIT backends. New names go at the end; the index of a constant is part of the
+    // statement argument tables.
+    BuiltinConst { name: "GFX_NONE", value: -1 },
+    BuiltinConst { name: "GFX_AUTO", value: 0x00 },
+    BuiltinConst {
+        name: "GFX_SIXEL",
+        value: 0x02,
+    },
+    BuiltinConst { name: "GFX_JXL", value: 0x03 },
+    BuiltinConst {
+        name: "GFX_CAP_SIXEL",
+        value: 0x01,
+    },
+    BuiltinConst {
+        name: "GFX_CAP_JXL",
+        value: 0x02,
+    },
+    BuiltinConst {
+        name: "GFX_CAP_JXL_BLOB",
+        value: 0x04,
+    },
+    BuiltinConst {
+        name: "GFX_CAP_PIXEL_MOUSE",
+        value: 0x08,
+    },
+    BuiltinConst {
+        name: "GFX_CAP_CLIENT_BLIT",
+        value: 0x10,
+    },
+    BuiltinConst {
+        name: "GFX_CAP_PHYSICAL_KEYS",
+        value: 0x20,
+    },
+    BuiltinConst {
+        name: "GFX_CAP_AUDIO",
+        value: 0x40,
+    },
+    BuiltinConst {
+        name: "KEY_EVENTS_OFF",
+        value: 0,
+    },
+    BuiltinConst {
+        name: "KEY_EVENTS_ON",
+        value: 1,
+    },
+    BuiltinConst {
+        name: "KEY_EVENTS_SUPPRESS",
+        value: 2,
+    },
+    BuiltinConst { name: "GFX_OK", value: 0 },
+    BuiltinConst {
+        name: "GFX_ERR_NOT_INITIALIZED",
+        value: 1,
+    },
+    BuiltinConst {
+        name: "GFX_ERR_INVALID_SLOT",
+        value: 2,
+    },
+    BuiltinConst { name: "GFX_ERR_IO", value: 3 },
+    BuiltinConst {
+        name: "GFX_ERR_DECODE",
+        value: 4,
+    },
+    BuiltinConst {
+        name: "GFX_ERR_LIMIT",
+        value: 5,
+    },
+    BuiltinConst {
+        name: "GFX_ERR_UNSUPPORTED",
+        value: 6,
+    },
+    BuiltinConst { name: "MOUSE_TEXT", value: 0 },
+    BuiltinConst {
+        name: "MOUSE_PIXELS",
+        value: 1,
+    },
+    BuiltinConst { name: "MOUSE_NONE", value: 0 },
+    BuiltinConst { name: "MOUSE_PRESS", value: 1 },
+    BuiltinConst {
+        name: "MOUSE_RELEASE",
+        value: 2,
+    },
+    BuiltinConst {
+        name: "MOUSE_MOTION",
+        value: 3,
+    },
+    BuiltinConst { name: "MOUSE_WHEEL", value: 4 },
+    BuiltinConst { name: "MOUSE_LEFT", value: 0 },
+    BuiltinConst {
+        name: "MOUSE_MIDDLE",
+        value: 1,
+    },
+    BuiltinConst { name: "MOUSE_RIGHT", value: 2 },
+    BuiltinConst {
+        name: "MOUSE_WHEEL_UP",
+        value: 3,
+    },
+    BuiltinConst {
+        name: "MOUSE_WHEEL_DOWN",
+        value: 4,
+    },
+    BuiltinConst { name: "MOUSE_SHIFT", value: 1 },
+    BuiltinConst { name: "MOUSE_ALT", value: 2 },
+    BuiltinConst { name: "MOUSE_CTRL", value: 4 },
+    BuiltinConst {
+        name: "MOUSE_TRACK_BUTTONS",
+        value: 0,
+    },
+    BuiltinConst {
+        name: "MOUSE_TRACK_DRAG",
+        value: 1,
+    },
+    BuiltinConst {
+        name: "MOUSE_TRACK_ALL",
+        value: 2,
+    },
+    BuiltinConst { name: "SND_FMT_WAV", value: 1 },
+    BuiltinConst {
+        name: "SND_FMT_AIFF",
+        value: 2,
+    },
+    BuiltinConst {
+        name: "SND_FMT_FLAC",
+        value: 3,
+    },
+    BuiltinConst {
+        name: "SND_FMT_OGG_VORBIS",
+        value: 4,
+    },
+    BuiltinConst {
+        name: "SND_FMT_OGG_OPUS",
+        value: 5,
+    },
 ];
 
 impl Constant {
     pub fn get_var_type(&self) -> VariableType {
         match self {
             Constant::Money(_) => VariableType::Money,
-            Constant::Unsigned(_) => VariableType::Unsigned,
+            Constant::Unsigned(_, _) => VariableType::Unsigned,
             Constant::String(_) => VariableType::String,
             Constant::Double(_) => VariableType::Float,
             Constant::Boolean(_) => VariableType::Boolean,
@@ -335,7 +468,7 @@ impl Constant {
                 data.int_value = *i;
                 VariableValue::new(VariableType::Integer, data)
             }
-            Constant::Unsigned(i) => {
+            Constant::Unsigned(i, _) => {
                 data.unsigned_value = *i;
                 VariableValue::new(VariableType::Unsigned, data)
             }
@@ -368,7 +501,12 @@ impl fmt::Display for Constant {
                 NumberFormat::Binary => write!(f, "{i:b}b"),
                 NumberFormat::Default => write!(f, "{i}"),
             },
-            Constant::Unsigned(i) => write!(f, "{i}"),
+            Constant::Unsigned(i, format) => match format {
+                NumberFormat::Hex => write!(f, "{i:X}h"),
+                NumberFormat::Octal => write!(f, "{i:o}o"),
+                NumberFormat::Binary => write!(f, "{i:b}b"),
+                _ => write!(f, "{i}"),
+            },
             Constant::String(str) => write!(f, "\"{str}\""),
             Constant::Double(i) => write!(f, "{i}"),
             Constant::Boolean(b) => write!(f, "{}", if *b { "1" } else { "0" }),

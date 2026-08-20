@@ -1,7 +1,14 @@
 use crate::{
     icy_board::user_base::UserContact,
-    vm::tests::{run_ppl, run_ppl_on},
+    vm::tests::{compile_errors_with_runtime, run_ppl, run_ppl_on},
 };
+
+#[test]
+fn u_contact_requires_runtime_402() {
+    let errors = compile_errors_with_runtime("PRINT U_CONTACT[0].Service", 401);
+
+    assert!(!errors.is_empty(), "U_CONTACT unexpectedly compiled for runtime 401");
+}
 
 #[test]
 fn a_predefined_contact_can_be_written_and_read() {

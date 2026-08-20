@@ -2746,6 +2746,149 @@ pub async fn gfxbackend(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<V
     Ok(VariableValue::new_int(backend))
 }
 
+pub async fn gfxcaps(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
+    let capabilities = vm.icy_board_state.query_gfx_capabilities().await?;
+    let mut flags = u64::from(capabilities.sixel);
+    if capabilities.jxl {
+        flags |= 2;
+    }
+    if capabilities.inline_blobs() {
+        flags |= 4;
+    }
+    if capabilities.cterm_revision.is_some_and(|revision| revision >= 1330) {
+        flags |= 8;
+    }
+    if capabilities.cterm_revision.is_some_and(|revision| revision >= 1318) {
+        flags |= 16;
+    }
+    if capabilities.physical_keys {
+        flags |= 32;
+    }
+    if vm.icy_board_state.query_sound_available().await? {
+        flags |= 64;
+    }
+    Ok(VariableValue::new_unsigned(flags))
+}
+
+pub async fn gfxerror(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
+    Ok(VariableValue::new_int(vm.icy_board_state.gfx_error))
+}
+
+async fn gfx_surface_dimension(vm: &mut VirtualMachine<'_>, args: &[PPEExpr], width: bool) -> Res<VariableValue> {
+    let slot = vm.eval_expr(&args[0]).await?.as_int();
+    let value = vm
+        .icy_board_state
+        .ppl_graphics
+        .as_ref()
+        .and_then(|graphics| graphics.surfaces.get(&slot))
+        .map_or(0, |surface| if width { surface.width } else { surface.height });
+    Ok(VariableValue::new_int(value as i32))
+}
+
+pub async fn gfxvalid(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let slot = vm.eval_expr(&args[0]).await?.as_int();
+    let valid = vm
+        .icy_board_state
+        .ppl_graphics
+        .as_ref()
+        .is_some_and(|graphics| graphics.surfaces.contains_key(&slot));
+    Ok(VariableValue::new_bool(valid))
+}
+
+pub async fn gfxwidth(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    gfx_surface_dimension(vm, args, true).await
+}
+
+pub async fn gfxheight(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    gfx_surface_dimension(vm, args, false).await
+}
+
+pub async fn gfxcellwidth(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
+    let capabilities = vm.icy_board_state.query_gfx_capabilities().await?;
+    Ok(VariableValue::new_int(capabilities.cell_width))
+}
+
+pub async fn gfxcellheight(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
+    let capabilities = vm.icy_board_state.query_gfx_capabilities().await?;
+    Ok(VariableValue::new_int(capabilities.cell_height))
+}
+
+pub async fn gfxscreenwidth(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
+    let capabilities = vm.icy_board_state.query_gfx_capabilities().await?;
+    Ok(VariableValue::new_int(capabilities.screen_width))
+}
+
+pub async fn gfxscreenheight(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
+    let capabilities = vm.icy_board_state.query_gfx_capabilities().await?;
+    Ok(VariableValue::new_int(capabilities.screen_height))
+}
+
+pub async fn sndavailable(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
+    Ok(VariableValue::new_bool(vm.icy_board_state.query_sound_available().await?))
+}
+
+fn sound_format(format: i32) -> Option<(u32, u32)> {
+    match format {
+        1 => Some((1, 0)),
+        2 => Some((2, 0)),
+        3 => Some((23, 0)),
+        4 => Some((32, 96)),
+        5 => Some((32, 100)),
+        _ => None,
+    }
+}
+
+pub async fn sndsupports(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let format = vm.eval_expr(&args[0]).await?.as_int();
+    let Some((major, subtype)) = sound_format(format) else {
+        return Ok(VariableValue::new_bool(false));
+    };
+    let supported = vm.icy_board_state.query_sound_format(format, major, subtype).await?;
+    Ok(VariableValue::new_bool(supported))
+}
+
+pub async fn sndplaying(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let logical_channel = vm.eval_expr(&args[0]).await?.as_int().clamp(0, 13) as usize;
+    let channel = logical_channel + 2;
+    let query = format!("\x1b[=7;{channel}n");
+    let prefix = format!("\x1b[=7;{channel};");
+    let playing = vm
+        .icy_board_state
+        .query_terminal_csi(query.as_bytes(), |reply| {
+            let state = reply.strip_prefix(&prefix)?.strip_suffix('n')?;
+            Some(state == "1")
+        })
+        .await?
+        .unwrap_or(vm.icy_board_state.sound_active[logical_channel]);
+    vm.icy_board_state.sound_active[logical_channel] = playing;
+    Ok(VariableValue::new_bool(playing))
+}
+
+pub async fn keypoll(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
+    Ok(VariableValue::new_bool(vm.icy_board_state.poll_ppl_key_event().await?))
+}
+
+pub async fn keycode(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
+    Ok(VariableValue::new_int(vm.icy_board_state.ppl_keys.current().code))
+}
+
+pub async fn keypressed(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
+    Ok(VariableValue::new_bool(vm.icy_board_state.ppl_keys.current().pressed))
+}
+
+pub async fn rgb(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let red = vm.eval_expr(&args[0]).await?.as_int();
+    let green = vm.eval_expr(&args[1]).await?.as_int();
+    let blue = vm.eval_expr(&args[2]).await?.as_int();
+    let alpha = match args.get(3) {
+        Some(alpha) => vm.eval_expr(alpha).await?.as_int(),
+        None => 255,
+    };
+    Ok(VariableValue::new_unsigned(u64::from(crate::icy_board::state::ppl_graphics::rgba_value(
+        red, green, blue, alpha,
+    ))))
+}
+
 pub async fn mousepoll(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_int(vm.icy_board_state.poll_ppl_mouse_event().await?))
 }

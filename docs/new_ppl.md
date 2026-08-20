@@ -26,9 +26,10 @@ language features.
 | Overloaded built-ins | 400 | 400 | Argument-count overloads such as `ConfInfo(conf)` and `Len(array, dim)` |
 | Web requests | 400 | 400 | String-returning function and file-writing statement forms |
 | UTF-8 encoding and digest functions | 400 | 400 | `BASE64ENC`, `BASE64DEC` and `SHA256` |
-| Extensible user contacts | 400 | 400 | Mutable `CONTACT` records in `U_CONTACT` |
+| Extensible user contacts | 400 | 402 | Mutable `CONTACT` records in `U_CONTACT` |
 | User-defined records | 400 | 401 | `TYPE ... ENDTYPE`, nested fields, arrays of records and nominal type checking |
 | Named record literals | 400 | 401 | `Point { X = 1, Y = 2 }` with checked and optional fields |
+| Terminal multimedia | 400 | 400 | Sixel/JXL graphics, SyncTERM audio, mouse and physical key events |
 
 Several compiler improvements are deliberately **not** tied to 3.50. The
 compiler collects routine signatures before generating code, so `DECLARE` is
@@ -156,6 +157,86 @@ the configured conferences, message areas, file directories and doors without
 making a PPE parse Icy Board's TOML files. The detailed member table follows
 below.
 
+### Terminal multimedia
+
+Graphics use an in-memory RGBA surface model and select Sixel or SyncTERM JPEG
+XL at presentation time. `GFX_AUTO` probes the terminal and returns `GFX_NONE`
+when neither backend is advertised; `GFX_SIXEL` explicitly selects Sixel for
+terminals that cannot report capabilities.
+
+```PPL
+GfxInit GFX_AUTO
+IF GfxBackend() = GFX_NONE EXIT
+
+GfxCreate 0, 640, 400
+GfxClear 0, Rgb(20, 24, 32)
+GfxFillRect 0, 20, 20, 100, 40, Rgb(255, 80, 40, 192)
+GfxPresent 0
+GfxShutdown
+```
+
+`Rgb(red, green, blue[, alpha])` returns packed `0xRRGGBBAA`; components clamp
+to 0 through 255 and alpha defaults to 255. It is a constant expression, so it
+can be used in `CONST` declarations. Large hexadecimal literals such as
+`0FF0000FFh` are also `UNSIGNED` and retain hexadecimal formatting.
+
+The surface API is:
+
+| API | Purpose |
+| :--- | :--- |
+| `GfxCreate slot, width, height` | Create a transparent surface |
+| `GfxLoad slot, file` | Load PNG, JPEG XL or another supported image |
+| `GfxClear`, `GfxFillRect`, `GfxRect` | Draw packed RGBA colors |
+| `GfxBlit`, `GfxBlitRect` | Alpha-compose surfaces in memory |
+| `GfxPresent slot` | Present a complete surface |
+| `GfxPresentRect slot, sx, sy, w, h[, dx, dy]` | Present a source rectangle at a pixel destination |
+| `GfxPresentAt slot, column, row` | Present at a text-cell position |
+| `GfxPin slot[, enabled]` | Load/unload an immutable JXL surface in a SyncTERM client buffer |
+| `GfxSetPacing frames` | Enable DSR-acknowledged presentation when positive |
+| `GfxWaitFrame fps` | Rate-limit a rendering loop |
+| `GfxFree`, `GfxShutdown` | Release resources and restore terminal modes |
+
+`GfxValid`, `GfxWidth`, `GfxHeight` and `GfxError` report surface status.
+`GfxCaps` is a bitmask of `GFX_CAP_*` constants. `GfxCellWidth`,
+`GfxCellHeight`, `GfxScreenWidth` and `GfxScreenHeight` report probed pixel
+geometry. `GfxPin` uses at most the two client pixel buffers; drawing onto a
+pinned surface automatically invalidates its client copy.
+
+Sound channels are logical channels 0 through 13, mapped to SyncTERM APC
+channels 2 through 15 because CTerm reserves channels 0 and 1. Playback probes
+the exact container/codec before uploading it.
+
+```PPL
+IF SndSupports(SND_FMT_OGG_OPUS) THEN
+	SndPlay 0, "music.opus", TRUE
+	SndFade 0, 50, 500
+ENDIF
+```
+
+`SndAvailable`, `SndSupports` and `SndPlaying` query terminal state.
+`SndPreload`, `SndPlay`, `SndStop`, `SndVolume`, `SndFade` and `SndStopAll`
+control playback. Uploaded files use the caller's per-board SyncTERM cache.
+
+Mouse modes and event values have named `MOUSE_*` constants. The optional
+second `MouseOn` argument selects button-only, drag or all-motion tracking:
+
+```PPL
+MouseOn MOUSE_PIXELS, MOUSE_TRACK_DRAG
+WHILE MousePoll() <> MOUSE_NONE
+	PRINTLN MouseX(), ",", MouseY()
+ENDWHILE
+MouseOff
+```
+
+CTerm physical key edges are enabled with `KeyEvents KEY_EVENTS_ON`, or
+`KEY_EVENTS_SUPPRESS` to suppress translated characters. `KeyPoll`, `KeyCode`
+and `KeyPressed` report one press/release edge at a time. `KEY_EVENTS_OFF`
+restores ordinary input.
+
+The outermost PPE always disables mouse/key modes, stops sound it started,
+releases graphics and restores cursor, wrapping, palette and Sixel scrolling
+state, including after `STOP` or an execution error.
+
 ## Runtime 4.01
 
 Runtime 4.01 is a PPE-format extension, not another source language. It adds:
@@ -224,7 +305,8 @@ NEXT
 
 ## User contacts (4.00)
 
-`U_CONTACT` is a mutable array of built-in `CONTACT` records. Each record has
+`U_CONTACT` is a mutable array of built-in `CONTACT` records and requires
+runtime 4.02 because it extends the predefined user-variable prefix. Each record has
 two `STRING` fields: `Service` and `Account`. Service names are open strings,
 so a PPE can store new services without a language or user-schema change.
 

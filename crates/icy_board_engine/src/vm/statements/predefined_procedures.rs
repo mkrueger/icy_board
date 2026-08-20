@@ -2747,8 +2747,34 @@ async fn send_apc(vm: &mut VirtualMachine<'_>, body: &str) -> Res<()> {
     vm.icy_board_state.connection.send(&seq).await
 }
 
+async fn finish_gfx_frame(vm: &mut VirtualMachine<'_>) -> Res<()> {
+    let pacing = vm.icy_board_state.ppl_graphics.as_ref().is_some_and(|graphics| graphics.pacing);
+    if pacing {
+        let _ = vm
+            .icy_board_state
+            .query_terminal_csi(b"\x1b[6n", |reply| {
+                let body = reply.strip_prefix("\x1b[")?.strip_suffix('R')?;
+                let (row, column) = body.split_once(';')?;
+                row.parse::<u16>().ok()?;
+                column.parse::<u16>().ok()?;
+                Some(true)
+            })
+            .await?;
+    }
+    Ok(())
+}
+
+async fn send_gfx_apc(vm: &mut VirtualMachine<'_>, body: &str) -> Res<()> {
+    send_apc(vm, body).await?;
+    finish_gfx_frame(vm).await
+}
+
 async fn send_audio_apc(vm: &mut VirtualMachine<'_>, body: &str) -> Res<()> {
     send_apc(vm, &format!("SyncTERM:A;{body}")).await
+}
+
+fn sound_channel(channel: i32) -> u8 {
+    channel.clamp(0, 13) as u8 + 2
 }
 
 /// Uploads a file into the client's on-disk media cache (shared with the
@@ -2787,9 +2813,38 @@ async fn sndcache_store(vm: &mut VirtualMachine<'_>, file_name: &str) -> Res<Opt
     Ok(Some(cache_name))
 }
 
-async fn sndload_and_queue(vm: &mut VirtualMachine<'_>, file_name: &str, channel: u8, looping: bool) -> Res<()> {
+async fn sound_file_supported(vm: &mut VirtualMachine<'_>, file_name: &str) -> Res<bool> {
+    let path = vm.resolve_file(&file_name).await;
+    let mut head = [0u8; 4096];
+    let head_len = std::fs::File::open(&path)
+        .and_then(|mut file| std::io::Read::read(&mut file, &mut head))
+        .unwrap_or(0);
+    let head = &head[..head_len];
+    let extension = path.extension().and_then(|extension| extension.to_str()).unwrap_or_default();
+    let (format, major, subtype) = if extension.eq_ignore_ascii_case("wav") {
+        (1, 1, 0)
+    } else if extension.eq_ignore_ascii_case("aiff") || extension.eq_ignore_ascii_case("aif") {
+        (2, 2, 0)
+    } else if extension.eq_ignore_ascii_case("flac") {
+        (3, 23, 0)
+    } else if extension.eq_ignore_ascii_case("ogg") || extension.eq_ignore_ascii_case("opus") {
+        if head.windows(8).any(|window| window == b"OpusHead") {
+            (5, 32, 100)
+        } else {
+            (4, 32, 96)
+        }
+    } else {
+        return Ok(false);
+    };
+    vm.icy_board_state.query_sound_format(format, major, subtype).await
+}
+
+async fn sndload_and_queue(vm: &mut VirtualMachine<'_>, file_name: &str, channel: u8, logical_channel: usize, looping: bool) -> Res<bool> {
+    if !sound_file_supported(vm, file_name).await? {
+        return Ok(false);
+    }
     let Some(cache_name) = sndcache_store(vm, file_name).await? else {
-        return Ok(());
+        return Ok(false);
     };
 
     // slot == channel: each channel plays one file at a time, so this keeps
@@ -2798,53 +2853,83 @@ async fn sndload_and_queue(vm: &mut VirtualMachine<'_>, file_name: &str, channel
     send_audio_apc(vm, &format!("Load;S={slot};{cache_name}")).await?;
     // Reassert the channel's saved volume (100 by default) every play, since
     // it otherwise sits at the client's quiet default until SNDVOLUME is called.
-    let volume = vm.icy_board_state.sound_volume[channel as usize];
+    let volume = vm.icy_board_state.sound_volume[logical_channel];
     send_audio_apc(vm, &format!("Volume;C={channel};V={:.2}dB", snd_volume_db(volume))).await?;
     if looping {
-        send_audio_apc(vm, &format!("Queue;C={channel};S={slot};L")).await
+        send_audio_apc(vm, &format!("Queue;C={channel};S={slot};L")).await?;
     } else {
-        send_audio_apc(vm, &format!("Queue;C={channel};S={slot}")).await
+        send_audio_apc(vm, &format!("Queue;C={channel};S={slot}")).await?;
     }
+    Ok(true)
 }
 
 /// `SNDPLAY channel, filename$ [, loop]` - loads and plays a WAV/OGG file on
 /// the given channel, looping if the third argument is present and true.
 pub async fn sndplay(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let channel = vm.eval_expr(&args[0]).await?.as_int().clamp(0, 15) as u8;
+    let logical_channel = vm.eval_expr(&args[0]).await?.as_int().clamp(0, 13);
+    let channel = sound_channel(logical_channel);
     let file_name = vm.eval_expr(&args[1]).await?.as_string();
     let looping = match args.get(2) {
         Some(expr) => vm.eval_expr(expr).await?.as_bool(),
         None => false,
     };
-    sndload_and_queue(vm, &file_name, channel, looping).await
+    if sndload_and_queue(vm, &file_name, channel, logical_channel as usize, looping).await? {
+        vm.icy_board_state.sound_active[logical_channel as usize] = true;
+    }
+    Ok(())
 }
 
 /// `SNDSTOP channel` - stops whatever is playing on the given mixer channel (0-15).
 pub async fn sndstop(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let channel = vm.eval_expr(&args[0]).await?.as_int().clamp(0, 15);
+    let logical_channel = vm.eval_expr(&args[0]).await?.as_int().clamp(0, 13);
+    let channel = sound_channel(logical_channel);
+    vm.icy_board_state.sound_active[logical_channel as usize] = false;
     send_audio_apc(vm, &format!("Flush;C={channel};O=0")).await
 }
 
 /// `SNDVOLUME channel, volume` - sets a mixer channel's volume (0-100).
 pub async fn sndvolume(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let channel = vm.eval_expr(&args[0]).await?.as_int().clamp(0, 15);
+    let logical_channel = vm.eval_expr(&args[0]).await?.as_int().clamp(0, 13);
+    let channel = sound_channel(logical_channel);
     let volume = vm.eval_expr(&args[1]).await?.as_int().clamp(0, 100);
-    vm.icy_board_state.sound_volume[channel as usize] = volume;
+    vm.icy_board_state.sound_volume[logical_channel as usize] = volume;
     send_audio_apc(vm, &format!("Volume;C={channel};V={:.2}dB", snd_volume_db(volume))).await
+}
+
+pub async fn sndfade(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let logical_channel = vm.eval_expr(&args[0]).await?.as_int().clamp(0, 13);
+    let channel = sound_channel(logical_channel);
+    let volume = vm.eval_expr(&args[1]).await?.as_int().clamp(0, 100);
+    let milliseconds = vm.eval_expr(&args[2]).await?.as_int().max(0);
+    vm.icy_board_state.sound_volume[logical_channel as usize] = volume;
+    send_audio_apc(vm, &format!("Volume;C={channel};V={:.2}dB;T={milliseconds}", snd_volume_db(volume))).await
+}
+
+pub async fn sndstopall(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
+    for logical_channel in 0..vm.icy_board_state.sound_active.len() {
+        if vm.icy_board_state.sound_active[logical_channel] {
+            let channel = logical_channel + 2;
+            send_audio_apc(vm, &format!("Flush;C={channel};O=0")).await?;
+            vm.icy_board_state.sound_active[logical_channel] = false;
+        }
+    }
+    Ok(())
 }
 
 /// `SNDPRELOAD filename$` - pushes a file to the client's cache ahead of time,
 /// so the first `SNDPLAYMUSIC`/`SNDPLAYFX` for it does not stall on the upload.
 pub async fn sndpreload(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let file_name = vm.eval_expr(&args[0]).await?.as_string();
-    sndcache_store(vm, &file_name).await?;
+    if sound_file_supported(vm, &file_name).await? {
+        sndcache_store(vm, &file_name).await?;
+    }
     Ok(())
 }
 
 pub async fn gfxinit(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    use crate::icy_board::state::ppl_graphics::{GFX_BACKEND_AUTO, PplGraphicsState};
+    use crate::icy_board::state::ppl_graphics::{GFX_BACKEND_AUTO, GFX_BACKEND_JXL, GFX_BACKEND_NONE, GFX_BACKEND_SIXEL, PplGraphicsState};
 
-    let backend = match args.first() {
+    let requested = match args.first() {
         Some(expr) => vm.eval_expr(expr).await?.as_int(),
         None => GFX_BACKEND_AUTO,
     };
@@ -2852,13 +2937,35 @@ pub async fn gfxinit(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
         Some(expr) => vm.eval_expr(expr).await?.as_bool(),
         None => true,
     };
-    let Some(graphics) = PplGraphicsState::new(backend, fullscreen) else {
-        log::warn!("GFXINIT rejected unsupported backend {backend}");
+    if !matches!(requested, GFX_BACKEND_AUTO | GFX_BACKEND_SIXEL | GFX_BACKEND_JXL) {
+        vm.icy_board_state.gfx_error = 6;
+        log::warn!("GFXINIT rejected unknown backend {requested}");
+        vm.icy_board_state.ppl_graphics = None;
+        return Ok(());
+    }
+
+    // Sixel is the one backend with no query of its own, so a plain sixel request
+    // does not make the caller wait for answers nobody needs.
+    let capabilities = if requested == GFX_BACKEND_SIXEL {
+        vm.icy_board_state.gfx_capabilities.unwrap_or_default()
+    } else {
+        vm.icy_board_state.query_gfx_capabilities().await?
+    };
+
+    let backend = capabilities.resolve_backend(requested);
+    if backend == GFX_BACKEND_NONE {
+        vm.icy_board_state.gfx_error = 6;
+        log::warn!("GFXINIT cannot serve backend {requested} to this terminal");
+        vm.icy_board_state.ppl_graphics = None;
+        return Ok(());
+    }
+    let Some(graphics) = PplGraphicsState::new(backend, fullscreen, capabilities) else {
         vm.icy_board_state.ppl_graphics = None;
         return Ok(());
     };
 
     vm.icy_board_state.ppl_graphics = Some(graphics);
+    vm.icy_board_state.gfx_error = 0;
     if fullscreen {
         vm.icy_board_state.connection.send(b"\x1b[2J\x1b[H\x1b[?25l\x1b[?7l\x1b[?80l\x1b[?1070l").await
     } else {
@@ -2871,17 +2978,24 @@ pub async fn gfxcreate(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
     let width = vm.eval_expr(&args[1]).await?.as_int();
     let height = vm.eval_expr(&args[2]).await?.as_int();
     let (Ok(width), Ok(height)) = (usize::try_from(width), usize::try_from(height)) else {
+        vm.icy_board_state.gfx_error = 5;
         log::warn!("GFXCREATE requires positive dimensions");
         return Ok(());
     };
     let Some(surface) = crate::icy_board::state::ppl_graphics::GfxSurface::new(width, height) else {
+        vm.icy_board_state.gfx_error = 5;
         log::warn!("GFXCREATE rejected surface {slot}: {width}x{height}");
         return Ok(());
     };
-    if let Some(graphics) = &mut vm.icy_board_state.ppl_graphics
-        && !graphics.insert_surface(slot, surface)
-    {
-        log::warn!("GFXCREATE graphics memory budget exhausted");
+    if let Some(graphics) = &mut vm.icy_board_state.ppl_graphics {
+        if graphics.insert_surface(slot, surface) {
+            vm.icy_board_state.gfx_error = 0;
+        } else {
+            vm.icy_board_state.gfx_error = 5;
+            log::warn!("GFXCREATE graphics memory budget exhausted");
+        }
+    } else {
+        vm.icy_board_state.gfx_error = 1;
     }
     Ok(())
 }
@@ -2893,6 +3007,7 @@ pub async fn gfxload(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let bytes = match fs::read(&path) {
         Ok(bytes) => bytes,
         Err(err) => {
+            vm.icy_board_state.gfx_error = 3;
             log::warn!("GFXLOAD can't read {}: {err}", path.display());
             return Ok(());
         }
@@ -2909,18 +3024,27 @@ pub async fn gfxload(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
         image::load_from_memory(&bytes).ok()
     };
     let Some(image) = image else {
+        vm.icy_board_state.gfx_error = 4;
         log::warn!("GFXLOAD can't decode {}", path.display());
         return Ok(());
     };
     let image = image.to_rgba8();
-    let Some(surface) = crate::icy_board::state::ppl_graphics::GfxSurface::from_rgba(image.width() as usize, image.height() as usize, image.into_raw()) else {
+    let Some(mut surface) = crate::icy_board::state::ppl_graphics::GfxSurface::from_rgba(image.width() as usize, image.height() as usize, image.into_raw())
+    else {
+        vm.icy_board_state.gfx_error = 5;
         log::warn!("GFXLOAD rejected image dimensions for {}", path.display());
         return Ok(());
     };
-    if let Some(graphics) = &mut vm.icy_board_state.ppl_graphics
-        && !graphics.insert_surface(slot, surface)
-    {
-        log::warn!("GFXLOAD graphics memory budget exhausted for {}", path.display());
+    surface.cacheable = true;
+    if let Some(graphics) = &mut vm.icy_board_state.ppl_graphics {
+        if graphics.insert_surface(slot, surface) {
+            vm.icy_board_state.gfx_error = 0;
+        } else {
+            vm.icy_board_state.gfx_error = 5;
+            log::warn!("GFXLOAD graphics memory budget exhausted for {}", path.display());
+        }
+    } else {
+        vm.icy_board_state.gfx_error = 1;
     }
     Ok(())
 }
@@ -2931,6 +3055,7 @@ pub async fn gfxclear(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
     if let Some(graphics) = &mut vm.icy_board_state.ppl_graphics
         && let Some(surface) = graphics.surfaces.get_mut(&slot)
     {
+        graphics.pinned.remove(&slot);
         surface.clear(color);
     }
     Ok(())
@@ -2946,6 +3071,7 @@ pub async fn gfxfillrect(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<(
     if let Some(graphics) = &mut vm.icy_board_state.ppl_graphics
         && let Some(surface) = graphics.surfaces.get_mut(&slot)
     {
+        graphics.pinned.remove(&slot);
         surface.fill_rect(x, y, width, height, color);
     }
     Ok(())
@@ -2961,6 +3087,7 @@ pub async fn gfxrect(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     if let Some(graphics) = &mut vm.icy_board_state.ppl_graphics
         && let Some(surface) = graphics.surfaces.get_mut(&slot)
     {
+        graphics.pinned.remove(&slot);
         surface.rect(x, y, width, height, color);
     }
     Ok(())
@@ -2975,6 +3102,7 @@ pub async fn gfxblit(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
         && let Some(source_surface) = graphics.surfaces.get(&source).cloned()
         && let Some(destination_surface) = graphics.surfaces.get_mut(&destination)
     {
+        graphics.pinned.remove(&destination);
         destination_surface.blit(&source_surface, (0, 0, source_surface.width as i32, source_surface.height as i32), (x, y));
     }
     Ok(())
@@ -2993,6 +3121,7 @@ pub async fn gfxblitrect(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<(
         && let Some(source_surface) = graphics.surfaces.get(&source).cloned()
         && let Some(destination_surface) = graphics.surfaces.get_mut(&destination)
     {
+        graphics.pinned.remove(&destination);
         destination_surface.blit(&source_surface, (source_x, source_y, source_width, source_height), (x, y));
     }
     Ok(())
@@ -3013,59 +3142,205 @@ fn gfx_sixel_output(surface: &crate::icy_board::state::ppl_graphics::GfxSurface)
     Some(output)
 }
 
+/// A composed image is opaque, so the alpha channel is dropped rather than encoded.
+fn gfx_jxl_encode(surface: &crate::icy_board::state::ppl_graphics::GfxSurface) -> Option<Vec<u8>> {
+    use zune_core::{bit_depth::BitDepth, colorspace::ColorSpace, options::EncoderOptions};
+    use zune_jpegxl::JxlSimpleEncoder;
+
+    let rgb: Vec<u8> = surface.pixels.chunks_exact(4).flat_map(|pixel| [pixel[0], pixel[1], pixel[2]]).collect();
+    let options = EncoderOptions::new(surface.width, surface.height, ColorSpace::RGB, BitDepth::Eight);
+    let mut encoded = Vec::new();
+    match JxlSimpleEncoder::new(&rgb, options).encode(&mut encoded) {
+        Ok(_) => Some(encoded),
+        Err(err) => {
+            log::warn!("GFXPRESENT JPEG XL encode failed: {err:?}");
+            None
+        }
+    }
+}
+
+/// Hands one surface to the caller at a pixel destination, the way the active backend wants it.
+///
+/// The JPEG XL path prefers the per board cache: a surface that still holds what `GFXLOAD`
+/// read is stored under its content hash and drawn by name, so it survives into later
+/// sessions and is uploaded at most once. A composed frame changes every time and would only
+/// fill that cache up, so it goes inline where the terminal is new enough to take it.
+async fn gfx_present_surface(
+    vm: &mut VirtualMachine<'_>,
+    surface: crate::icy_board::state::ppl_graphics::GfxSurface,
+    slot: i32,
+    destination: (i32, i32),
+) -> Res<()> {
+    use crate::icy_board::state::ppl_graphics::{CACHE_PREFIX, GFX_BACKEND_JXL};
+    use base64::{Engine as _, engine::general_purpose};
+    use sha2::{Digest, Sha256};
+
+    let Some((backend, capabilities)) = vm
+        .icy_board_state
+        .ppl_graphics
+        .as_ref()
+        .map(|graphics| (graphics.backend, graphics.capabilities))
+    else {
+        return Ok(());
+    };
+    if backend != GFX_BACKEND_JXL {
+        let Some(output) = gfx_sixel_output(&surface) else {
+            return Ok(());
+        };
+        vm.icy_board_state.connection.send(&output).await?;
+        return finish_gfx_frame(vm).await;
+    }
+    let cacheable = surface.cacheable;
+
+    let Some(encoded) = gfx_jxl_encode(&surface) else {
+        return Ok(());
+    };
+    if encoded.len() > MAX_GFX_FRAME_BYTES {
+        log::warn!("GFXPRESENT frame of {} bytes is too large to send", encoded.len());
+        return Ok(());
+    }
+    let (x, y) = destination;
+    let placement = format!("DX={x};DY={y}");
+
+    if !cacheable && capabilities.inline_blobs() {
+        let payload = general_purpose::STANDARD.encode(&encoded);
+        return send_gfx_apc(vm, &format!("SyncTERM:C;DrawJXLBlob;{placement};{payload}")).await;
+    }
+
+    let name = if cacheable {
+        format!("{CACHE_PREFIX}{}.jxl", &format!("{:x}", Sha256::digest(&encoded))[..32])
+    } else {
+        // A frame that keeps changing reuses one name per node and slot instead of
+        // leaving a new file behind for every frame drawn.
+        format!("{CACHE_PREFIX}n{}s{slot}.jxl", vm.icy_board_state.node)
+    };
+    if !cacheable || vm.icy_board_state.gfx_cache.insert(name.clone()) {
+        let payload = general_purpose::STANDARD.encode(&encoded);
+        send_apc(vm, &format!("SyncTERM:C;S;{name};{payload}")).await?;
+    }
+    send_gfx_apc(vm, &format!("SyncTERM:C;DrawJXL;{placement};{name}")).await
+}
+
+/// Base64 inflates the payload by a third, so the encoded frame is capped well below
+/// what a terminal is willing to buffer.
+const MAX_GFX_FRAME_BYTES: usize = 8 * 1024 * 1024;
+
 pub async fn gfxpresent(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let slot = vm.eval_expr(&args[0]).await?.as_int();
-    let output = vm
+    if let Some(buffer) = vm
+        .icy_board_state
+        .ppl_graphics
+        .as_ref()
+        .and_then(|graphics| graphics.pinned.get(&slot))
+        .copied()
+    {
+        return send_gfx_apc(vm, &format!("SyncTERM:P;Paste;B={buffer};DX=0;DY=0")).await;
+    }
+    let Some(surface) = vm
         .icy_board_state
         .ppl_graphics
         .as_ref()
         .and_then(|graphics| graphics.surfaces.get(&slot))
-        .and_then(gfx_sixel_output);
-    let Some(output) = output else {
+        .cloned()
+    else {
         return Ok(());
     };
-    vm.icy_board_state.connection.send(&output).await
+    gfx_present_surface(vm, surface, slot, (0, 0)).await
 }
 
 pub async fn gfxpresentrect(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    use crate::icy_board::state::ppl_graphics::GFX_BACKEND_JXL;
+
     let slot = vm.eval_expr(&args[0]).await?.as_int();
     let x = vm.eval_expr(&args[1]).await?.as_int();
     let y = vm.eval_expr(&args[2]).await?.as_int();
     let width = vm.eval_expr(&args[3]).await?.as_int();
     let height = vm.eval_expr(&args[4]).await?.as_int();
-    let output = vm
+    let destination = match (args.get(5), args.get(6)) {
+        (Some(destination_x), Some(destination_y)) => (vm.eval_expr(destination_x).await?.as_int(), vm.eval_expr(destination_y).await?.as_int()),
+        _ => (x, y),
+    };
+    if let Some(buffer) = vm
         .icy_board_state
         .ppl_graphics
         .as_ref()
-        .and_then(|graphics| graphics.surfaces.get(&slot))
-        .and_then(|surface| surface.region_from_origin(x, y, width, height))
-        .as_ref()
-        .and_then(gfx_sixel_output);
-    let Some(output) = output else {
+        .and_then(|graphics| graphics.pinned.get(&slot))
+        .copied()
+    {
+        return send_gfx_apc(
+            vm,
+            &format!(
+                "SyncTERM:P;Paste;B={buffer};SX={x};SY={y};SW={width};SH={height};DX={};DY={}",
+                destination.0, destination.1
+            ),
+        )
+        .await;
+    }
+
+    let prepared = {
+        let Some(graphics) = vm.icy_board_state.ppl_graphics.as_ref() else {
+            return Ok(());
+        };
+        let Some(surface) = graphics.surfaces.get(&slot) else {
+            return Ok(());
+        };
+        // Sixel has to draw from the screen origin, so its region keeps the pixels in
+        // place; the image APC takes the region on its own and is told where it goes.
+        if graphics.backend == GFX_BACKEND_JXL {
+            surface.region(x, y, width, height).map(|(region, _, _)| (region, destination.0, destination.1))
+        } else {
+            let Some(output) = surface.region_at((x, y, width, height), destination).as_ref().and_then(gfx_sixel_output) else {
+                return Ok(());
+            };
+            vm.icy_board_state.connection.send(&output).await?;
+            return finish_gfx_frame(vm).await;
+        }
+    };
+    let Some((region, origin_x, origin_y)) = prepared else {
         return Ok(());
     };
-    vm.icy_board_state.connection.send(&output).await
+    gfx_present_surface(vm, region, slot, (origin_x, origin_y)).await
 }
 
 pub async fn gfxpresentat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    use crate::icy_board::state::ppl_graphics::GFX_BACKEND_JXL;
+
     let slot = vm.eval_expr(&args[0]).await?.as_int();
     let column = vm.eval_expr(&args[1]).await?.as_int().max(1);
     let row = vm.eval_expr(&args[2]).await?.as_int().max(1);
-    let encoded = vm
-        .icy_board_state
-        .ppl_graphics
-        .as_ref()
-        .and_then(|graphics| graphics.surfaces.get(&slot))
-        .and_then(|surface| icy_sixel::sixel_encode(&surface.pixels, surface.width, surface.height, &icy_sixel::EncodeOptions::default()).ok());
-    let Some(encoded) = encoded else {
+
+    let prepared = {
+        let Some(graphics) = vm.icy_board_state.ppl_graphics.as_ref() else {
+            return Ok(());
+        };
+        if graphics.backend == GFX_BACKEND_JXL {
+            let capabilities = graphics.capabilities;
+            graphics
+                .surfaces
+                .get(&slot)
+                .cloned()
+                .map(|surface| (surface, ((column - 1) * capabilities.cell_width, (row - 1) * capabilities.cell_height)))
+        } else {
+            let Some(encoded) = graphics
+                .surfaces
+                .get(&slot)
+                .and_then(|surface| icy_sixel::sixel_encode(&surface.pixels, surface.width, surface.height, &icy_sixel::EncodeOptions::default()).ok())
+            else {
+                return Ok(());
+            };
+            let mut output = Vec::with_capacity(encoded.len() + 24);
+            output.extend_from_slice(b"\x1b7");
+            output.extend_from_slice(format!("\x1b[{row};{column}H").as_bytes());
+            output.extend_from_slice(encoded.as_bytes());
+            output.extend_from_slice(b"\x1b8");
+            vm.icy_board_state.connection.send(&output).await?;
+            return finish_gfx_frame(vm).await;
+        }
+    };
+    let Some((surface, destination)) = prepared else {
         return Ok(());
     };
-    let mut output = Vec::with_capacity(encoded.len() + 24);
-    output.extend_from_slice(b"\x1b7");
-    output.extend_from_slice(format!("\x1b[{row};{column}H").as_bytes());
-    output.extend_from_slice(encoded.as_bytes());
-    output.extend_from_slice(b"\x1b8");
-    vm.icy_board_state.connection.send(&output).await
+    gfx_present_surface(vm, surface, slot, destination).await
 }
 
 pub async fn gfxwaitframe(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
@@ -3087,6 +3362,46 @@ pub async fn gfxfree(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let slot = vm.eval_expr(&args[0]).await?.as_int();
     if let Some(graphics) = &mut vm.icy_board_state.ppl_graphics {
         graphics.surfaces.remove(&slot);
+        graphics.pinned.remove(&slot);
+    }
+    Ok(())
+}
+
+pub async fn gfxpin(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    use base64::{Engine as _, engine::general_purpose};
+
+    let slot = vm.eval_expr(&args[0]).await?.as_int();
+    let enabled = match args.get(1) {
+        Some(enabled) => vm.eval_expr(enabled).await?.as_bool(),
+        None => true,
+    };
+    if !enabled {
+        if let Some(graphics) = &mut vm.icy_board_state.ppl_graphics {
+            graphics.pinned.remove(&slot);
+        }
+        return Ok(());
+    }
+    let Some((surface, buffer)) = vm.icy_board_state.ppl_graphics.as_mut().and_then(|graphics| {
+        if graphics.backend != crate::icy_board::state::ppl_graphics::GFX_BACKEND_JXL {
+            return None;
+        }
+        let surface = graphics.surfaces.get(&slot)?.clone();
+        let buffer = graphics.pin(slot)?;
+        Some((surface, buffer))
+    }) else {
+        return Ok(());
+    };
+    let Some(encoded) = gfx_jxl_encode(&surface) else {
+        return Ok(());
+    };
+    let payload = general_purpose::STANDARD.encode(encoded);
+    send_apc(vm, &format!("SyncTERM:C;LoadJXLBlob;B={buffer};{payload}")).await
+}
+
+pub async fn gfxsetpacing(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let frames = vm.eval_expr(&args[0]).await?.as_int();
+    if let Some(graphics) = &mut vm.icy_board_state.ppl_graphics {
+        graphics.pacing = frames > 0;
     }
     Ok(())
 }
@@ -3095,7 +3410,7 @@ pub async fn gfxshutdown(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<
     let fullscreen = vm.icy_board_state.ppl_graphics.as_ref().is_some_and(|graphics| graphics.fullscreen);
     vm.icy_board_state.ppl_graphics = None;
     if fullscreen {
-        vm.icy_board_state.connection.send(b"\x1b[?1070h\x1b[?7h\x1b[?25h").await
+        vm.icy_board_state.connection.send(b"\x1b[?1070h\x1b[?80h\x1b[?7h\x1b[?25h").await
     } else {
         Ok(())
     }
@@ -3103,15 +3418,35 @@ pub async fn gfxshutdown(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<
 
 pub async fn mouseon(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let mode = vm.eval_expr(&args[0]).await?.as_int();
-    if !vm.icy_board_state.ppl_mouse.enable(mode) {
+    let tracking = match args.get(1) {
+        Some(tracking) => vm.eval_expr(tracking).await?.as_int(),
+        None => 2,
+    };
+    if !vm.icy_board_state.ppl_mouse.enable(mode, tracking) {
         log::warn!("MOUSEON rejected unsupported mode {mode}");
         return Ok(());
     }
-    let sequence = vm.icy_board_state.ppl_mouse.enable_sequence();
+    let sequence = vm.icy_board_state.ppl_mouse.enable_sequence(tracking);
     vm.icy_board_state.connection.send(&sequence).await
 }
 
 pub async fn mouseoff(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
     vm.icy_board_state.ppl_mouse.disable();
     vm.icy_board_state.connection.send(crate::icy_board::state::ppl_mouse::MOUSE_OFF_SEQUENCE).await
+}
+
+pub async fn keyevents(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let mode = vm.eval_expr(&args[0]).await?.as_int().clamp(0, 2);
+    if mode == 0 {
+        vm.icy_board_state.ppl_keys.disable();
+        vm.icy_board_state.connection.send(b"\x1b[=2l\x1b[=1l").await
+    } else {
+        vm.icy_board_state.ppl_keys.enable();
+        let sequence = if mode == 2 {
+            b"\x1b[=1h\x1b[=2h".as_slice()
+        } else {
+            b"\x1b[=2l\x1b[=1h".as_slice()
+        };
+        vm.icy_board_state.connection.send(sequence).await
+    }
 }

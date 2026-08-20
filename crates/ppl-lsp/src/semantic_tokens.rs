@@ -105,7 +105,7 @@ fn lexical_tokens(ast: &Ast, source: &str, workspace: &Workspace) -> BTreeMap<us
             match token {
                 Token::Comment(_, _) | Token::UseFuncs(_, _) | Token::Define(_, _, _) => Some((COMMENT, 0)),
                 Token::Const(Constant::String(_)) => Some((STRING, 0)),
-                Token::Const(Constant::Integer(_, _) | Constant::Unsigned(_) | Constant::Money(_) | Constant::Double(_)) => Some((NUMBER, 0)),
+                Token::Const(Constant::Integer(_, _) | Constant::Unsigned(_, _) | Constant::Money(_) | Constant::Double(_)) => Some((NUMBER, 0)),
                 Token::Const(Constant::Boolean(_) | Constant::Builtin(_)) => Some((VARIABLE, READONLY)),
                 Token::Label(_) => Some((LABEL, DEFINITION)),
                 _ => None,

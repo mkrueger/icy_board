@@ -14,10 +14,10 @@ CONST INTEGER GAME_Y = 56
 CONST INTEGER GAME_SURFACE = 2
 
 ; Classic Game Boy DMG 4-shade green palette (0xRRGGBBAA).
-CONST UNSIGNED GB_LIGHTEST = 3774402815
-CONST UNSIGNED GB_LIGHT = 2294313215
-CONST UNSIGNED GB_DARK = 879253247
-CONST UNSIGNED GB_DARKEST = 135799039
+CONST UNSIGNED GB_LIGHTEST = Rgb(224, 248, 208)
+CONST UNSIGNED GB_LIGHT = Rgb(136, 192, 112)
+CONST UNSIGNED GB_DARK = Rgb(52, 104, 86)
+CONST UNSIGNED GB_DARKEST = Rgb(8, 24, 32)
 
 CONST INTEGER BOX_X = 164
 CONST INTEGER BOX_W = 96
@@ -41,7 +41,7 @@ SndPreload "./lock.wav"
 SndPreload "./line.wav"
 SndPreload "./gameover.wav"
 
-GfxInit 0
+GfxInit GFX_AUTO
 IF GfxBackend() < 0 THEN
     CLS
     PRINTLN "Tetris requires a graphics-capable terminal."
@@ -178,20 +178,20 @@ ENDPROC
 
 PROCEDURE InitColors()
     ; I, O, T, S, Z, J, L
-    pieceColor[0] = 1121577215
-    pieceAccent[0] = 343904255
-    pieceColor[1] = 4124395519
-    pieceAccent[1] = 2827229183
-    pieceColor[2] = 2809004031
-    pieceAccent[2] = 1698084351
-    pieceColor[3] = 1691773951
-    pieceAccent[3] = 663436031
-    pieceColor[4] = 4033308671
-    pieceAccent[4] = 2788113151
-    pieceColor[5] = 1536162303
-    pieceAccent[5] = 676636927
-    pieceColor[6] = 4120529663
-    pieceAccent[6] = 2840993791
+    pieceColor[0] = Rgb(66, 217, 232)
+    pieceAccent[0] = Rgb(20, 127, 143)
+    pieceColor[1] = Rgb(245, 213, 71)
+    pieceAccent[1] = Rgb(168, 132, 23)
+    pieceColor[2] = Rgb(167, 109, 255)
+    pieceAccent[2] = Rgb(101, 54, 181)
+    pieceColor[3] = Rgb(100, 214, 107)
+    pieceAccent[3] = Rgb(39, 139, 58)
+    pieceColor[4] = Rgb(240, 103, 103)
+    pieceAccent[4] = Rgb(166, 47, 58)
+    pieceColor[5] = Rgb(91, 143, 249)
+    pieceAccent[5] = Rgb(40, 84, 168)
+    pieceColor[6] = Rgb(245, 154, 74)
+    pieceAccent[6] = Rgb(169, 86, 31)
 ENDPROC
 
 PROCEDURE ClearBoard()

@@ -35,10 +35,14 @@ use crate::{
 pub mod functions;
 pub mod menu_runner;
 pub mod ppl_graphics;
+pub mod ppl_keys;
 pub mod ppl_mouse;
 pub mod user_commands;
 pub mod virtual_screen;
 use self::functions::display_flags;
+
+/// How long a graphics capability query waits before the terminal counts as silent.
+const GFX_PROBE_TIMEOUT: Duration = Duration::from_millis(500);
 
 fn keyboard_timeout_elapsed(is_local: bool, enabled: bool, minutes: u16, elapsed: Duration) -> bool {
     !is_local && enabled && minutes > 0 && elapsed >= Duration::from_secs(u64::from(minutes) * 60)
@@ -639,12 +643,36 @@ pub struct IcyBoardState {
     /// resending the whole file through `LoadBlob`.
     pub sound_cache: HashSet<String>,
 
-    /// Last `SNDVOLUME` percent requested per channel (0-15), defaulting to
+    /// Last `SNDVOLUME` percent requested per logical channel (0-13), defaulting to
     /// 100 so music/fx start at full loudness instead of the client's quiet
     /// default headroom.
-    pub sound_volume: [i32; 16],
+    pub sound_volume: [i32; 14],
+
+    pub sound_active: [bool; 14],
+
+    pub sound_available: Option<bool>,
+
+    pub sound_formats: HashMap<i32, bool>,
+
+    /// What the caller's terminal answered when it was asked what it can draw.
+    /// Kept past `GFXSHUTDOWN`, because a terminal does not change mid call.
+    pub gfx_capabilities: Option<ppl_graphics::GfxCapabilities>,
+
+    pub gfx_error: i32,
+
+    /// Names below `gfx/` that this caller's cache is known to hold already,
+    /// seeded from the terminal's own listing and extended as uploads happen.
+    pub gfx_cache: HashSet<String>,
+
+    gfx_probe: ppl_graphics::GfxProbe,
+
+    /// Bytes read while waiting for a terminal reply that turned out not to be one.
+    /// They stay undecoded until something asks for input, because only then is it
+    /// settled whether they are keystrokes or mouse reports.
+    raw_input: VecDeque<u8>,
 
     pub ppl_graphics: Option<ppl_graphics::PplGraphicsState>,
+    pub ppl_keys: ppl_keys::PplKeyState,
     pub ppl_mouse: ppl_mouse::PplMouseState,
 }
 
@@ -699,8 +727,17 @@ impl IcyBoardState {
             ppe_nesting: 0,
             capture_file: None,
             sound_cache: HashSet::new(),
-            sound_volume: [100; 16],
+            sound_volume: [100; 14],
+            sound_active: [false; 14],
+            sound_available: None,
+            sound_formats: HashMap::new(),
+            gfx_capabilities: None,
+            gfx_error: 0,
+            gfx_cache: HashSet::new(),
+            gfx_probe: ppl_graphics::GfxProbe::default(),
+            raw_input: VecDeque::new(),
             ppl_graphics: None,
+            ppl_keys: ppl_keys::PplKeyState::default(),
             ppl_mouse: ppl_mouse::PplMouseState::default(),
         }
     }
@@ -1073,9 +1110,8 @@ impl IcyBoardState {
         self.ppe_nesting += 1;
         let result = run(&canonicalized_path, &executable, &mut io, self).await;
         self.ppe_nesting -= 1;
-        if self.ppe_nesting == 0 && self.ppl_mouse.is_enabled() {
-            self.ppl_mouse.disable();
-            let _ = self.connection.send(ppl_mouse::MOUSE_OFF_SEQUENCE).await;
+        if self.ppe_nesting == 0 {
+            self.cleanup_ppl_media().await;
         }
         match result {
             Ok(keep_answers) => Ok(keep_answers),
@@ -1085,6 +1121,28 @@ impl IcyBoardState {
                 self.display_text(IceText::ErrorExecPPE, display_flags::LFBEFORE | display_flags::LFAFTER)
                     .await?;
                 Ok(false)
+            }
+        }
+    }
+
+    async fn cleanup_ppl_media(&mut self) {
+        if self.ppl_mouse.is_enabled() {
+            self.ppl_mouse.disable();
+            let _ = self.connection.send(ppl_mouse::MOUSE_OFF_SEQUENCE).await;
+        }
+        if self.ppl_keys.is_enabled() {
+            self.ppl_keys.disable();
+            let _ = self.connection.send(b"\x1b[=2l\x1b[=1l").await;
+        }
+        if self.ppl_graphics.take().is_some_and(|graphics| graphics.fullscreen) {
+            let _ = self.connection.send(b"\x1b[?1070h\x1b[?80h\x1b[?7h\x1b[?25h").await;
+        }
+        for logical_channel in 0..self.sound_active.len() {
+            if self.sound_active[logical_channel] {
+                let channel = logical_channel + 2;
+                let command = format!("\x1b_SyncTERM:A;Flush;C={channel};O=0\x1b\\");
+                let _ = self.connection.send(command.as_bytes()).await;
+                self.sound_active[logical_channel] = false;
             }
         }
     }
@@ -2698,6 +2756,7 @@ impl IcyBoardState {
 
     /// # Errors
     pub async fn get_char(&mut self, target: TerminalTarget) -> Res<Option<KeyChar>> {
+        self.drain_raw_input();
         let stale = self.ppl_mouse.take_stale_keyboard();
         for byte in stale.into_iter().rev() {
             self.char_buffer.push_front(KeyChar::new(KeySource::User, byte as char));
@@ -2884,17 +2943,159 @@ impl IcyBoardState {
     }
 
     fn process_user_input_byte(&mut self, byte: u8) -> Vec<KeyChar> {
-        self.ppl_mouse
-            .feed(byte)
-            .into_iter()
-            .map(|byte| KeyChar::new(KeySource::User, byte as char))
-            .collect()
+        let mut keys = Vec::new();
+        for byte in self.ppl_mouse.feed(byte) {
+            for byte in self.ppl_keys.feed(byte) {
+                for byte in self.gfx_probe.feed(byte) {
+                    keys.push(KeyChar::new(KeySource::User, byte as char));
+                }
+            }
+        }
+        keys
+    }
+
+    /// Asks the terminal what it can draw, once per call.
+    ///
+    /// Every query is answered by a terminal that has the feature and ignored by one
+    /// that does not, so the wait is bounded and a silent terminal simply ends up with
+    /// the sixel defaults.
+    pub async fn query_gfx_capabilities(&mut self) -> Res<ppl_graphics::GfxCapabilities> {
+        if let Some(capabilities) = self.gfx_capabilities {
+            return Ok(capabilities);
+        }
+        self.gfx_probe.start();
+        self.connection.send(ppl_graphics::DEVICE_ATTRIBUTES_QUERY).await?;
+        self.connection.send(ppl_graphics::CTERM_ATTRIBUTES_QUERY).await?;
+        self.connection.send(ppl_graphics::CELL_SIZE_QUERY).await?;
+        self.connection.send(ppl_graphics::PIXEL_SIZE_QUERY).await?;
+        self.connection.send(ppl_graphics::JXL_QUERY).await?;
+        self.collect_gfx_replies(ppl_graphics::GfxProbe::jxl_answered).await?;
+
+        // Only a terminal that draws JPEG XL keeps a cache worth asking about.
+        if self.gfx_probe.capabilities().jxl {
+            self.connection.send(ppl_graphics::CACHE_LIST_QUERY).await?;
+            self.collect_gfx_replies(ppl_graphics::GfxProbe::cache_listed).await?;
+        }
+
+        let (capabilities, listing, leftover) = self.gfx_probe.finish();
+        self.raw_input.extend(leftover);
+        if let Some(listing) = listing {
+            self.gfx_cache.extend(listing);
+        }
+        self.gfx_capabilities = Some(capabilities);
+        Ok(capabilities)
+    }
+
+    async fn collect_gfx_replies(&mut self, answered: impl Fn(&ppl_graphics::GfxProbe) -> bool) -> Res<()> {
+        let deadline = Instant::now() + GFX_PROBE_TIMEOUT;
+        while !answered(&self.gfx_probe) && Instant::now() < deadline {
+            let mut input = [0u8; 256];
+            let read = self.connection.try_read(&mut input).await?;
+            if read == 0 {
+                sleep(Duration::from_millis(5)).await;
+                continue;
+            }
+            for byte in &input[..read] {
+                let passed = self.gfx_probe.feed(*byte);
+                self.raw_input.extend(passed);
+            }
+        }
+        Ok(())
+    }
+
+    pub async fn query_terminal_csi(&mut self, query: &[u8], matches: impl Fn(&str) -> Option<bool>) -> Res<Option<bool>> {
+        self.connection.send(query).await?;
+        let deadline = Instant::now() + GFX_PROBE_TIMEOUT;
+        let mut pending = Vec::new();
+        while Instant::now() < deadline {
+            let mut input = [0u8; 256];
+            let read = if self.raw_input.is_empty() {
+                self.connection.try_read(&mut input).await?
+            } else {
+                let read = self.raw_input.len().min(input.len());
+                for byte in &mut input[..read] {
+                    *byte = self.raw_input.pop_front().unwrap();
+                }
+                read
+            };
+            if read == 0 {
+                sleep(Duration::from_millis(5)).await;
+                continue;
+            }
+            for (index, byte) in input[..read].iter().enumerate() {
+                if pending.is_empty() && *byte != 0x1b {
+                    self.raw_input.push_back(*byte);
+                    continue;
+                }
+                pending.push(*byte);
+                if pending.len() == 2 && pending[1] != b'[' {
+                    self.raw_input.extend(pending.drain(..));
+                    continue;
+                }
+                if pending.len() > 2 && (0x40..=0x7e).contains(byte) {
+                    let sequence = std::mem::take(&mut pending);
+                    if let Ok(text) = std::str::from_utf8(&sequence)
+                        && let Some(result) = matches(text)
+                    {
+                        self.raw_input.extend(&input[index + 1..read]);
+                        return Ok(Some(result));
+                    }
+                    self.raw_input.extend(sequence);
+                }
+            }
+        }
+        self.raw_input.extend(pending);
+        Ok(None)
+    }
+
+    pub async fn query_sound_available(&mut self) -> Res<bool> {
+        if let Some(available) = self.sound_available {
+            return Ok(available);
+        }
+        let available = self
+            .query_terminal_csi(b"\x1b_SyncTERM:Q;libsndfile\x1b\\", |reply| {
+                let values = reply.strip_prefix("\x1b[=7;100;")?.strip_suffix('n')?;
+                Some(values == "1")
+            })
+            .await?
+            .unwrap_or(false);
+        self.sound_available = Some(available);
+        Ok(available)
+    }
+
+    pub async fn query_sound_format(&mut self, format: i32, major: u32, subtype: u32) -> Res<bool> {
+        if let Some(supported) = self.sound_formats.get(&format) {
+            return Ok(*supported);
+        }
+        if !self.query_sound_available().await? {
+            return Ok(false);
+        }
+        let query = format!("\x1b_SyncTERM:Q;libsndfileFormat;{major};{subtype}\x1b\\");
+        let prefix = format!("\x1b[=7;101;{major};{subtype};");
+        let supported = self
+            .query_terminal_csi(query.as_bytes(), |reply| {
+                let value = reply.strip_prefix(&prefix)?.strip_suffix('n')?;
+                Some(value == "1")
+            })
+            .await?
+            .unwrap_or(false);
+        self.sound_formats.insert(format, supported);
+        Ok(supported)
+    }
+
+    /// Turns bytes held back by a capability probe into whatever the caller is reading now.
+    fn drain_raw_input(&mut self) {
+        while let Some(byte) = self.raw_input.pop_front() {
+            let keys = self.process_user_input_byte(byte);
+            self.char_buffer.extend(keys);
+        }
     }
 
     pub async fn poll_ppl_mouse_event(&mut self) -> Res<i32> {
         if !self.ppl_mouse.is_enabled() {
             return Ok(ppl_mouse::MOUSE_EVENT_NONE);
         }
+        self.drain_raw_input();
         while !self.ppl_mouse.has_events() {
             let mut input = [0u8; 64];
             let read = self.connection.try_read(&mut input).await?;
@@ -2907,6 +3108,25 @@ impl IcyBoardState {
             }
         }
         Ok(self.ppl_mouse.poll())
+    }
+
+    pub async fn poll_ppl_key_event(&mut self) -> Res<bool> {
+        if !self.ppl_keys.is_enabled() {
+            return Ok(false);
+        }
+        self.drain_raw_input();
+        while !self.ppl_keys.has_events() {
+            let mut input = [0u8; 64];
+            let read = self.connection.try_read(&mut input).await?;
+            if read == 0 {
+                break;
+            }
+            for byte in &input[..read] {
+                let keys = self.process_user_input_byte(*byte);
+                self.char_buffer.extend(keys);
+            }
+        }
+        Ok(self.ppl_keys.poll())
     }
 
     pub async fn get_char_edit(&mut self) -> Res<Option<KeyChar>> {

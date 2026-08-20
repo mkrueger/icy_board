@@ -491,7 +491,7 @@ impl SemanticVisitor {
 
         if self.require_user_variables {
             for user_var in USER_VARIABLES.iter() {
-                if user_var.runtime_version <= self.lang_version {
+                if user_var.runtime_version <= self.runtime {
                     let header = VarHeader {
                         id: 0,
                         variable_type: user_var.value.get_type(),
@@ -1260,7 +1260,7 @@ impl SemanticVisitor {
         // search if any user variables are used.
         if !self.require_user_variables {
             for user_var in USER_VARIABLES.iter() {
-                if user_var.runtime_version > self.lang_version {
+                if user_var.runtime_version > self.runtime {
                     continue;
                 }
                 for (_rype, r) in &self.references {
@@ -1577,7 +1577,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             Constant::String(_) => VariableType::String,
             Constant::Boolean(_) => VariableType::Boolean,
             Constant::Money(_) => VariableType::Money,
-            Constant::Unsigned(_) => VariableType::Unsigned,
+            Constant::Unsigned(_, _) => VariableType::Unsigned,
             Constant::Double(_) => VariableType::Double,
             Constant::Integer(_, _) | Constant::Builtin(_) => VariableType::Integer,
         }

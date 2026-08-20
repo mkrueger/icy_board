@@ -13,6 +13,8 @@ icy_parser_core =  { workspace = true }
 icy_sixel = { workspace = true }
 image = { workspace = true }
 jxl-oxide = { workspace = true }
+zune-jpegxl = { workspace = true }
+zune-core = { workspace = true }
 codepages = { workspace = true }
 
 lazy_static = { workspace = true }

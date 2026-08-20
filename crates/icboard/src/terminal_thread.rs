@@ -28,6 +28,7 @@ struct LocalMedia {
     cache_directory: PathBuf,
     sound: SoundThread,
     pending: Vec<u8>,
+    pixel_buffers: [Option<Vec<u8>>; 2],
 }
 
 impl LocalMedia {
@@ -40,6 +41,7 @@ impl LocalMedia {
             cache_directory,
             sound,
             pending: Vec::new(),
+            pixel_buffers: std::array::from_fn(|_| None),
         }
     }
 
@@ -71,6 +73,55 @@ impl LocalMedia {
             return None;
         }
         std::fs::read(path).ok()
+    }
+
+    /// The cache entries matching `pattern`, each with its digest, so a board can
+    /// upload only what is missing.
+    fn list(&self, pattern: &str) -> String {
+        let mut entries = Vec::new();
+        collect_cache_entries(&self.cache_directory, "", &mut entries);
+        entries.sort();
+        entries
+            .iter()
+            .filter(|name| cache_glob_matches(pattern, name))
+            .filter_map(|name| {
+                let data = self.read(name)?;
+                Some(format!("{name}\t{:x}\n", md5::compute(&data)))
+            })
+            .collect()
+    }
+}
+
+fn image_buffer(options: &str) -> Option<usize> {
+    options
+        .split(';')
+        .find_map(|option| option.strip_prefix("B="))
+        .and_then(|buffer| buffer.parse::<usize>().ok())
+        .filter(|buffer| *buffer < 2)
+}
+
+fn collect_cache_entries(directory: &Path, prefix: &str, entries: &mut Vec<String>) {
+    let Ok(listing) = std::fs::read_dir(directory) else {
+        return;
+    };
+    for entry in listing.flatten() {
+        let Ok(name) = entry.file_name().into_string() else {
+            continue;
+        };
+        let relative = format!("{prefix}{name}");
+        if entry.file_type().is_ok_and(|kind| kind.is_dir()) {
+            collect_cache_entries(&entry.path(), &format!("{relative}/"), entries);
+        } else {
+            entries.push(relative);
+        }
+    }
+}
+
+/// The listing glob, which in practice is a plain prefix such as `gfx/*`.
+fn cache_glob_matches(pattern: &str, name: &str) -> bool {
+    match pattern.split_once('*') {
+        Some((head, tail)) => name.len() >= head.len() + tail.len() && name.starts_with(head) && name.ends_with(tail),
+        None => pattern == name,
     }
 }
 
@@ -174,6 +225,29 @@ async fn process_terminal_data(connection: &mut ConnectionThreadData, parser: &m
     if contains_sequence(data, b"\x1b[?1016$p") {
         let _ = connection.com.send(b"\x1b[?1016;1$y").await;
     }
+    if contains_sequence(data, b"\x1b[<0c") {
+        let _ = connection.com.send(b"\x1b[<1;4;7c").await;
+    }
+    if contains_sequence(data, b"\x1b[14t") || contains_sequence(data, b"\x1b[16t") {
+        let (pixel_height, pixel_width, cell_height, cell_width) = {
+            let screen = screen.lock().unwrap();
+            let font = screen.font_dimensions();
+            (screen.height() * font.height, screen.width() * font.width, font.height, font.width)
+        };
+        if contains_sequence(data, b"\x1b[14t") {
+            let _ = connection.com.send(format!("\x1b[4;{pixel_height};{pixel_width}t").as_bytes()).await;
+        }
+        if contains_sequence(data, b"\x1b[16t") {
+            let _ = connection.com.send(format!("\x1b[6;{cell_height};{cell_width}t").as_bytes()).await;
+        }
+    }
+    for channel in 0..audio_apc::CHANNELS {
+        let query = format!("\x1b[=7;{channel}n");
+        if contains_sequence(data, query.as_bytes()) {
+            let active = u8::from(audio_apc::status().is_active(channel as u8));
+            let _ = connection.com.send(format!("\x1b[=7;{channel};{active}n").as_bytes()).await;
+        }
+    }
     connection.media.pending.extend_from_slice(data);
     loop {
         let Some(start) = connection.media.pending.windows(2).position(|window| window == b"\x1b_") else {
@@ -240,8 +314,42 @@ async fn handle_apc(connection: &mut ConnectionThreadData, screen: &Arc<Mutex<Te
         }
         return true;
     }
+    if let Some(arguments) = payload.strip_prefix("SyncTERM:C;LoadJXLBlob;") {
+        let Some((options, encoded)) = arguments.rsplit_once(';') else {
+            return true;
+        };
+        let Some(buffer) = image_buffer(options) else {
+            return true;
+        };
+        connection.media.pixel_buffers[buffer] = general_purpose::STANDARD
+            .decode(encoded)
+            .ok()
+            .filter(|bytes| bytes.len() <= MAX_CACHED_MEDIA_SIZE);
+        return true;
+    }
+    if let Some(options) = payload.strip_prefix("SyncTERM:P;Paste;") {
+        let Some(buffer) = image_buffer(options) else {
+            return true;
+        };
+        let Some(bytes) = connection.media.pixel_buffers[buffer].as_deref() else {
+            return true;
+        };
+        let mut screen = screen.lock().unwrap();
+        let font = screen.font_dimensions();
+        let screen_size = Size::new(screen.width(), screen.height());
+        if let Some((position, sixel)) = icy_engine::decode_image_blob(bytes, true, options, font, screen_size) {
+            screen.add_sixel(position, sixel);
+        }
+        return true;
+    }
     if payload == "SyncTERM:Q;JXL" {
         let _ = connection.com.send(b"\x1b[=1;1-n").await;
+        return true;
+    }
+    if let Some(arguments) = payload.strip_prefix("SyncTERM:C;L") {
+        let pattern = arguments.strip_prefix(';').unwrap_or("*");
+        let listing = connection.media.list(pattern);
+        let _ = connection.com.send(format!("\x1b_SyncTERM:C;L\n{listing}\x1b\\").as_bytes()).await;
         return true;
     }
     if let Some(query) = audio_apc::parse_feature_query(payload) {

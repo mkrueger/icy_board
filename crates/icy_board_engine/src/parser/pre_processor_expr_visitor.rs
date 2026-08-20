@@ -26,7 +26,7 @@ impl AstVisitor<Option<VariableValue>> for PreProcessorVisitor<'_> {
             Constant::String(s) => Some(VariableValue::new_string(s.clone())),
             Constant::Double(f) => Some(VariableValue::new_double(*f)),
             Constant::Money(m) => Some(VariableValue::new_int(*m)),
-            Constant::Unsigned(u) => Some(VariableValue::new_unsigned(*u)),
+            Constant::Unsigned(u, _) => Some(VariableValue::new_unsigned(*u)),
             Constant::Builtin(_) => None,
         }
     }

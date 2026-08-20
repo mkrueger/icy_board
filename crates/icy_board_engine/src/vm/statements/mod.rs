@@ -267,5 +267,10 @@ pub async fn run_predefined_statement(opcode: OpCode, arg: &mut VirtualMachine<'
         OpCode::GfxPresentAt => predefined_procedures::gfxpresentat(arg, arguments).await,
         OpCode::MouseOn => predefined_procedures::mouseon(arg, arguments).await,
         OpCode::MouseOff => predefined_procedures::mouseoff(arg, arguments).await,
+        OpCode::GfxPin => predefined_procedures::gfxpin(arg, arguments).await,
+        OpCode::GfxSetPacing => predefined_procedures::gfxsetpacing(arg, arguments).await,
+        OpCode::SndFade => predefined_procedures::sndfade(arg, arguments).await,
+        OpCode::SndStopAll => predefined_procedures::sndstopall(arg, arguments).await,
+        OpCode::KeyEvents => predefined_procedures::keyevents(arg, arguments).await,
     }
 }
