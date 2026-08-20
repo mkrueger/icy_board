@@ -30,7 +30,7 @@ impl ConfigSwitches {
                         get_text("display_news_behavior"),
                         ListValue::Text(1, TextFlags::None, lock.config.switches.display_news_behavior.to_pcb_char().to_string()),
                     )
-                    .with_status(&get_text("display_news_behavior-status"))
+                    .with_status(get_text("display_news_behavior-status"))
                     .with_label_width(label_width)
                     .with_update_text_value(&|board, value| {
                         if let Some(value) = value.chars().next() {

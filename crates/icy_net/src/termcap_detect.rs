@@ -108,10 +108,10 @@ lazy_static::lazy_static! {
     static ref RIP_REGEX:Regex = Regex::new("RIPSCRIP(\\d+)").unwrap();
 }
 fn parse_rip_version(data: &str) -> Option<String> {
-    if let Some(caps) = RIP_REGEX.captures(data) {
-        if let Some(r) = caps.get(1) {
-            return Some(r.as_str().to_string());
-        }
+    if let Some(caps) = RIP_REGEX.captures(data)
+        && let Some(r) = caps.get(1)
+    {
+        return Some(r.as_str().to_string());
     }
     None
 }

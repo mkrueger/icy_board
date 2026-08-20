@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use dizbase::file_base::FileBase;
 use icy_board_engine::icy_board::{
@@ -25,12 +25,12 @@ fn file_area() -> (PathBuf, PathBuf) {
     (dir, metadata_path)
 }
 
-fn setup_area(board: &mut IcyBoard, dir: &PathBuf, metadata_path: &PathBuf) {
+fn setup_area(board: &mut IcyBoard, dir: &Path, metadata_path: &Path) {
     let mut directories = DirectoryList::default();
     directories.push(FileDirectory {
         name: "Test Files".to_string(),
-        path: dir.clone(),
-        metadata_path: metadata_path.clone(),
+        path: dir.to_path_buf(),
+        metadata_path: metadata_path.to_path_buf(),
         ..Default::default()
     });
     board.conferences.push(Conference {

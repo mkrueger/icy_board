@@ -53,7 +53,7 @@ impl IcyBoardState {
                 ..MatchOptions::new()
             };
 
-            self.session.push_tokens(&"A");
+            self.session.push_tokens("A");
             let dir_numbers = self.get_dir_numbers().await?;
             self.session.disp_options.no_change();
             for (_num, _desc, path, metadata) in dir_numbers.numbers {
@@ -71,7 +71,7 @@ impl IcyBoardState {
                     self.display_text(IceText::VerifyingFile, display_flags::DEFAULT).await?;
                     let full_path = path.join(&self.session.op_text);
                     if !full_path.exists() {
-                        log::error!("TEST: File not found: {:?}", full_path);
+                        log::error!("TEST: File not found: {}", full_path.display());
                         self.display_text(IceText::Failed, display_flags::NEWLINE).await?;
                         continue;
                     }
@@ -87,8 +87,8 @@ impl IcyBoardState {
                                 self.display_text(IceText::Passed, display_flags::NEWLINE).await?;
                             } else {
                                 log::error!(
-                                    "TEST: File hash invalid: {:?} {:08X} != {:08X}",
-                                    full_path,
+                                    "TEST: File hash invalid: {} {:08X} != {:08X}",
+                                    full_path.display(),
                                     hash,
                                     FileBase::get_hash(&full_path)?
                                 );

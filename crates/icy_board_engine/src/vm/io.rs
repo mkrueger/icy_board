@@ -12,7 +12,7 @@ use crate::vm::VMError;
 
 const O_RD: i32 = 0;
 const O_WR: i32 = 1;
-/// Not a PPL access mode; FAPPEND is a statement of its own in PCBoard.
+/// Not a PPL access mode; FAPPEND is a statement of its own in `PCBoard`.
 const O_APPEND: i32 = 4;
 pub const MAX_FILE_CHANNELS: i32 = 8;
 
@@ -42,7 +42,7 @@ pub trait PCBoardIO: Send {
     /// Determine if a file error has occured on a channel since last check.
     /// channel - integer expression with the channel to use for the file
     ///
-    /// PCBoard cleared `errStat` when FERR was read (EVALP.CPP TOK_OP_FERR).
+    /// `PCBoard` cleared `errStat` when FERR was read (EVALP.CPP `TOK_OP_FERR`).
     /// Returns true if an error occured on the specified channel since the last check.
     fn ferr(&mut self, channel: i32) -> bool;
 
@@ -182,7 +182,7 @@ impl DiskIO {
         }
     }
 
-    /// The channel a PPE names, or `None` when nothing is open on it - PCBoard remembered
+    /// The channel a PPE names, or `None` when nothing is open on it - `PCBoard` remembered
     /// an error flag for every channel and returned instead of ending the PPE.
     fn open_channel(&mut self, channel: i32) -> Option<&mut FileChannel> {
         let chan = self.channels.entry(channel).or_insert_with(FileChannel::new);
@@ -201,13 +201,13 @@ impl DiskIO {
 impl PCBoardIO for DiskIO {
     fn fappend(&mut self, channel: i32, file_name: &str) {
         if let Err(err) = self.fopen(channel, file_name, O_APPEND, 0) {
-            log::error!("error appending file: {}", err);
+            log::error!("error appending file: {err}");
         }
     }
 
     fn fcreate(&mut self, channel: i32, file_name: &str, _am: i32, sm: i32) {
         if let Err(err) = self.fopen(channel, file_name, O_WR, sm) {
-            log::error!("error creating file: {}", err);
+            log::error!("error creating file: {err}");
         }
     }
 
@@ -242,7 +242,8 @@ impl PCBoardIO for DiskIO {
             match mode & 0x03 {
                 O_RD => File::open(file_name),
                 O_WR => File::create(file_name),
-                _ => OpenOptions::new().read(true).write(true).create(true).open(file_name),
+                // Read-write mode: preserve existing content, only create if missing.
+                _ => OpenOptions::new().read(true).write(true).create(true).truncate(false).open(file_name),
             }
         };
         match file {
@@ -258,7 +259,7 @@ impl PCBoardIO for DiskIO {
                 );
             }
             Err(err) => {
-                log::error!("error opening file {}: {}", file_name, err);
+                log::error!("error opening file {file_name}: {err}");
                 self.set_channel_error(channel);
             }
         }
@@ -286,16 +287,16 @@ impl PCBoardIO for DiskIO {
         };
 
         if let Some(f) = &mut chan.file {
-            if let Ok(md) = f.metadata() {
-                if md.len() == 0 {
-                    const UTF8_BOM: [u8; 3] = [0xEF, 0xBB, 0xBF];
-                    let _ = f.write(&UTF8_BOM);
-                }
+            if let Ok(md) = f.metadata()
+                && md.len() == 0
+            {
+                const UTF8_BOM: [u8; 3] = [0xEF, 0xBB, 0xBF];
+                let _ = f.write(&UTF8_BOM);
             }
             let _ = f.write(text.as_bytes());
             chan.err = false;
         } else {
-            log::error!("channel {} not found", channel);
+            log::error!("channel {channel} not found");
             chan.err = true;
         }
         Ok(())
@@ -326,10 +327,10 @@ impl PCBoardIO for DiskIO {
             match reader.read_line(&mut line) {
                 Ok(size) => {
                     chan.err = size == 0;
-                    Ok(line.trim_end_matches(|c| c == '\r' || c == '\n').to_string())
+                    Ok(line.trim_end_matches(['\r', '\n']).to_string())
                 }
                 Err(err) => {
-                    log::error!("error reading line: {}", err);
+                    log::error!("error reading line: {err}");
                     chan.err = true;
                     Ok(String::new())
                 }
@@ -369,7 +370,7 @@ impl PCBoardIO for DiskIO {
             let _ = f.write(data);
             chan.err = false;
         } else {
-            log::error!("fwrite channel {} not found", channel);
+            log::error!("fwrite channel {channel} not found");
             chan.err = true;
         }
         Ok(())
@@ -381,7 +382,7 @@ impl PCBoardIO for DiskIO {
         };
 
         match &mut chan.file {
-            Some(f) => Ok(f.seek(SeekFrom::Current(0)).unwrap_or_default()),
+            Some(f) => Ok(f.stream_position().unwrap_or_default()),
             _ => {
                 if let Some(reader) = &mut chan.reader {
                     Ok(reader.position())
@@ -406,13 +407,14 @@ impl PCBoardIO for DiskIO {
         };
         let sought = match &mut chan.file {
             Some(f) => f.seek(seek_to).map(|_| ()),
-            _ => match &mut chan.reader {
-                Some(reader) => reader.seek(seek_to).map(|_| ()),
-                None => {
+            _ => {
+                if let Some(reader) = &mut chan.reader {
+                    reader.seek(seek_to).map(|_| ())
+                } else {
                     chan.err = true;
                     return Ok(());
                 }
-            },
+            }
         };
         if sought.is_err() {
             chan.err = true;
@@ -477,6 +479,11 @@ impl PCBoardIO for DiskIO {
     }
 }
 
+pub async fn get_file_channel(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<i32> {
+    let channel = vm.eval_expr(&args[0]).await?.as_int();
+    Ok(channel % MAX_FILE_CHANNELS)
+}
+
 #[cfg(test)]
 mod tests {
     use std::io::Write;
@@ -484,7 +491,7 @@ mod tests {
     use super::{DiskIO, PCBoardIO};
     use tempfile::TempDir;
 
-    /// PCBoard's openChan set the error flag when the file would not open, and the PPE
+    /// `PCBoard`'s openChan set the error flag when the file would not open, and the PPE
     /// carried on to look at FERR itself.
     #[test]
     fn test_fopen_o_rd_missing_file_reports_through_ferr() {
@@ -507,7 +514,7 @@ mod tests {
         assert!(!io.ferr(3));
     }
 
-    /// Every operation on a channel that is not open answers the same way - PCBoard
+    /// Every operation on a channel that is not open answers the same way - `PCBoard`
     /// never let one end a PPE.
     #[test]
     fn test_a_closed_channel_only_sets_the_error_flag() {
@@ -599,7 +606,7 @@ mod tests {
         assert_eq!(content, "hello world");
     }
 
-    /// PCBoard masks the mode to two bits, so 3 is read/write and 8 is plain read.
+    /// `PCBoard` masks the mode to two bits, so 3 is read/write and 8 is plain read.
     #[test]
     fn test_fopen_masks_the_access_mode_to_two_bits() {
         let tmp = TempDir::new().unwrap();
@@ -612,9 +619,4 @@ mod tests {
         io.fopen(2, tmp.path().join("mode8.dat").to_str().unwrap(), 8, 0).unwrap();
         assert!(io.ferr(2));
     }
-}
-
-pub async fn get_file_channel(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<i32> {
-    let channel = vm.eval_expr(&args[0]).await?.as_int();
-    Ok(channel % MAX_FILE_CHANNELS)
 }

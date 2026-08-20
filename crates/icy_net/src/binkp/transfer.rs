@@ -13,6 +13,7 @@ use crate::{
     Connection, NetError,
     binkp::{BinkpCommand, Frame, FrameReader},
 };
+use std::fmt::Write as _;
 
 /// How much of a file goes into one data frame.
 pub const DATA_BLOCK_SIZE: usize = 16384;
@@ -193,12 +194,13 @@ pub async fn transfer_batch(connection: &mut dyn Connection, outbound: Vec<Outbo
                     let Some((info, offset)) = FileInfo::parse(&argument) else {
                         return abort(connection, NetError::BinkpBadArgument("M_GET".to_string(), argument)).await;
                     };
-                    if let Some(current) = &mut sending {
-                        if current.file.info == info && offset <= info.size {
-                            current.handle.seek(std::io::SeekFrom::Start(offset)).await?;
-                            current.offset = offset;
-                            Frame::command(BinkpCommand::File, info.to_argument(Some(offset))).send(connection).await?;
-                        }
+                    if let Some(current) = &mut sending
+                        && current.file.info == info
+                        && offset <= info.size
+                    {
+                        current.handle.seek(std::io::SeekFrom::Start(offset)).await?;
+                        current.offset = offset;
+                        Frame::command(BinkpCommand::File, info.to_argument(Some(offset))).send(connection).await?;
                     }
                 }
 
@@ -274,7 +276,7 @@ pub fn escape_filename(name: &str) -> String {
         if character.is_ascii_alphanumeric() || SAFE.contains(character) {
             escaped.push(character);
         } else {
-            escaped.push_str(&format!("\\x{:02x}", byte));
+            let _ = write!(escaped, "\\x{:02x}", byte);
         }
     }
     escaped
@@ -292,15 +294,14 @@ pub fn unescape_filename(name: &str) -> String {
             } else {
                 index + 1
             };
-            if digits + 2 <= bytes.len() {
-                if let Some(value) = std::str::from_utf8(&bytes[digits..digits + 2])
+            if digits + 2 <= bytes.len()
+                && let Some(value) = std::str::from_utf8(&bytes[digits..digits + 2])
                     .ok()
                     .and_then(|pair| u8::from_str_radix(pair, 16).ok())
-                {
-                    plain.push(value);
-                    index = digits + 2;
-                    continue;
-                }
+            {
+                plain.push(value);
+                index = digits + 2;
+                continue;
             }
         }
         plain.push(bytes[index]);

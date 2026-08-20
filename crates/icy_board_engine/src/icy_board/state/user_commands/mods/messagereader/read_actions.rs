@@ -25,11 +25,11 @@ pub(super) enum AfterAction {
     NotHandled,
     /// Ask for the next command without re-showing the message.
     Prompt,
-    /// Show the message again (PCBoard's REREAD).
+    /// Show the message again (`PCBoard`'s REREAD).
     Redisplay,
-    /// Move on to the next message (PCBoard's READNEXT).
+    /// Move on to the next message (`PCBoard`'s READNEXT).
     Next,
-    /// Leave the read loop (PCBoard's QUITREAD/QUITLOOP/SKIPNEXT).
+    /// Leave the read loop (`PCBoard`'s QUITREAD/QUITLOOP/SKIPNEXT).
     Quit,
 }
 
@@ -93,7 +93,7 @@ impl IcyBoardState {
                 let high = message_base.highest_message_number();
                 self.session.last_msg_read = high;
                 self.session.highest_msg_read = self.session.highest_msg_read.max(high);
-                self.store_last_read(message_base, high).await?;
+                self.store_last_read(message_base, high)?;
                 self.session.op_text = high.to_string();
                 self.display_text(IceText::LastMessageReadSetTo, display_flags::NEWLINE | display_flags::LFBEFORE)
                     .await?;
@@ -167,7 +167,7 @@ impl IcyBoardState {
     }
 
     /// Moves this user's last-read pointer for the base in front of the reader.
-    async fn store_last_read(&mut self, message_base: &mut JamMessageBase, number: u32) -> Res<()> {
+    fn store_last_read(&mut self, message_base: &mut JamMessageBase, number: u32) -> Res<()> {
         unsafe {
             let crc = JamMessageBase::crc(&BString::new(self.session.user_name.as_mut_vec().clone()));
             let user_id = self.session.cur_user_id as u32;
@@ -181,7 +181,7 @@ impl IcyBoardState {
         Ok(())
     }
 
-    /// PCBoard asks for the conference only when the command line did not carry one.
+    /// `PCBoard` asks for the conference only when the command line did not carry one.
     async fn ask_target_conference(&mut self, cmd: &ReadCommand, moving: bool) -> Res<Option<u16>> {
         let num_conferences = self.get_board().await.conferences.len() as u16;
         if let Some(conference) = cmd.move_conf {
@@ -204,8 +204,8 @@ impl IcyBoardState {
         Ok(if conference < num_conferences { Some(conference) } else { None })
     }
 
-    /// A conference is split into message areas in icy_board, which PCBoard has
-    /// no notion of. A board shaped the way PCBoard expects has one area per
+    /// A conference is split into message areas in `icy_board`, which `PCBoard` has
+    /// no notion of. A board shaped the way `PCBoard` expects has one area per
     /// conference, so nothing extra is asked and a PPE stuffing the keyboard
     /// still sees the prompts it was written for.
     async fn ask_target_area(&mut self, conference: u16) -> Res<Option<usize>> {
@@ -260,7 +260,7 @@ impl IcyBoardState {
             .with_subject(header.subject().cloned().unwrap_or_default())
             .with_date_time(chrono::Utc::now())
             .with_attributes(header.attributes)
-            .with_text(BString::from(text));
+            .with_text(text);
         if header.reply_to != 0 {
             msg = msg.with_reply_to(header.reply_to);
         }
@@ -272,7 +272,7 @@ impl IcyBoardState {
 
     /// E inside the read loop: change one field of the header
     /// in front of the reader. The option letter and the follow-up question are
-    /// what a stuffing PPE counts on, so they come in PCBoard's order.
+    /// what a stuffing PPE counts on, so they come in `PCBoard`'s order.
     pub(super) async fn edit_header(&mut self, message_base: &mut JamMessageBase, number: u32) -> Res<()> {
         self.new_line().await?;
         let sec = self.session.user_command_level.cmd_e.clone();
@@ -284,7 +284,7 @@ impl IcyBoardState {
             return Ok(());
         };
 
-        let from = header.from().map(|f| f.to_string()).unwrap_or_default();
+        let from = header.from().map(std::string::ToString::to_string).unwrap_or_default();
         let edit_all = self.get_board().await.config.sysop_command_level.edit_any_message.clone();
         let own = from.eq_ignore_ascii_case(&self.session.user_name) || from.eq_ignore_ascii_case(&self.session.alias_name);
         if !own && !edit_all.session_can_access(&self.session) {
@@ -293,8 +293,8 @@ impl IcyBoardState {
             return Ok(());
         }
 
-        let to = header.to().map(|f| f.to_string()).unwrap_or_default();
-        let subject = header.subject().map(|f| f.to_string()).unwrap_or_default();
+        let to = header.to().map(std::string::ToString::to_string).unwrap_or_default();
+        let subject = header.subject().map(std::string::ToString::to_string).unwrap_or_default();
         self.display_text(IceText::To, display_flags::DEFAULT).await?;
         self.println(TerminalTarget::Both, &to).await?;
         self.display_text(IceText::From, display_flags::DEFAULT).await?;
@@ -315,7 +315,6 @@ impl IcyBoardState {
             .await?;
 
         let (old, len) = match option.as_str() {
-            "" => return Ok(()),
             "E" => {
                 header.attributes ^= attributes::MSG_TYPEECHO;
                 return self.write_header(message_base, number, &header).await;
@@ -439,27 +438,26 @@ impl IcyBoardState {
         let low = message_base.lowest_message_number();
         let high = message_base.highest_message_number();
 
-        let number = match cmd.new_last_read {
-            Some(number) => number,
-            None => {
-                self.session.op_text = format!("{low}-{high}");
-                let answer = self
-                    .input_field(
-                        IceText::SetLastMessageReadPointer,
-                        9,
-                        &MASK_NUM,
-                        "",
-                        Some(self.session.last_msg_read.to_string()),
-                        display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::FIELDLEN | display_flags::GUIDE,
-                    )
-                    .await?;
-                if answer.is_empty() {
-                    return Ok(());
-                }
-                match answer.parse::<i64>() {
-                    Ok(number) => number,
-                    Err(_) => return Ok(()),
-                }
+        let number = if let Some(number) = cmd.new_last_read {
+            number
+        } else {
+            self.session.op_text = format!("{low}-{high}");
+            let answer = self
+                .input_field(
+                    IceText::SetLastMessageReadPointer,
+                    9,
+                    &MASK_NUM,
+                    "",
+                    Some(self.session.last_msg_read.to_string()),
+                    display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::FIELDLEN | display_flags::GUIDE,
+                )
+                .await?;
+            if answer.is_empty() {
+                return Ok(());
+            }
+            match answer.parse::<i64>() {
+                Ok(number) => number,
+                Err(_) => return Ok(()),
             }
         };
 

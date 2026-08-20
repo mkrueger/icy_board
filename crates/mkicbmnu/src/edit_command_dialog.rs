@@ -261,21 +261,21 @@ impl<'a> EditCommandDialog<'a> {
                 }
                 EditCommandMode::Table => match key.code {
                     KeyCode::Char('1') => {
-                        if let Some(selected) = self.insert_table.table_state.selected() {
-                            if selected > 0 {
-                                let mut menu = self.command.lock().unwrap();
-                                menu.actions.swap(selected, selected - 1);
-                                self.insert_table.table_state.select(Some(selected - 1));
-                            }
+                        if let Some(selected) = self.insert_table.table_state.selected()
+                            && selected > 0
+                        {
+                            let mut menu = self.command.lock().unwrap();
+                            menu.actions.swap(selected, selected - 1);
+                            self.insert_table.table_state.select(Some(selected - 1));
                         }
                     }
                     KeyCode::Char('2') => {
-                        if let Some(selected) = self.insert_table.table_state.selected() {
-                            if selected + 1 < self.command.lock().unwrap().actions.len() {
-                                let mut menu = self.command.lock().unwrap();
-                                menu.actions.swap(selected, selected + 1);
-                                self.insert_table.table_state.select(Some(selected + 1));
-                            }
+                        if let Some(selected) = self.insert_table.table_state.selected()
+                            && selected + 1 < self.command.lock().unwrap().actions.len()
+                        {
+                            let mut menu = self.command.lock().unwrap();
+                            menu.actions.swap(selected, selected + 1);
+                            self.insert_table.table_state.select(Some(selected + 1));
                         }
                     }
 
@@ -285,11 +285,11 @@ impl<'a> EditCommandDialog<'a> {
                         self.insert_table.scroll_state = self.insert_table.scroll_state.content_length(self.insert_table.content_length);
                     }
                     KeyCode::Delete => {
-                        if let Some(selected_item) = self.insert_table.table_state.selected() {
-                            if selected_item < self.command.lock().unwrap().actions.len() {
-                                self.command.lock().unwrap().actions.remove(selected_item);
-                                self.insert_table.content_length = self.command.lock().unwrap().actions.len();
-                            }
+                        if let Some(selected_item) = self.insert_table.table_state.selected()
+                            && selected_item < self.command.lock().unwrap().actions.len()
+                        {
+                            self.command.lock().unwrap().actions.remove(selected_item);
+                            self.insert_table.content_length = self.command.lock().unwrap().actions.len();
                         }
                     }
 

@@ -7,6 +7,7 @@ use super::{PCBoardImport, PCBoardTextImport, is_false, is_true, set_true};
 use crate::Res;
 use icy_net::protocol::TransferProtocolType;
 use serde::{Deserialize, Serialize};
+use std::fmt::Write as _;
 
 #[derive(Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct Protocol {
@@ -61,126 +62,110 @@ impl SupportedProtocols {
             let mnp = "N"; // error corrected session
             let port_open = "N"; // leave port open during shell
             let lock_lines = "N"; // lock status lines on screen
-            res.push_str(&format!(
-                "{},{},{},{},{},{},{}\r\n",
-                char_code, prot_type, block_size, description, mnp, port_open, lock_lines
-            ));
+            let _ = write!(res, "{char_code},{prot_type},{block_size},{description},{mnp},{port_open},{lock_lines}\r\n");
         }
         fs::write(output, res)?;
         Ok(())
     }
 
     pub fn find_protocol(&self, char_code: &str) -> Option<&Protocol> {
-        for p in &self.protocols {
-            if p.char_code == char_code {
-                return Some(p);
-            }
-        }
-        None
+        self.protocols.iter().find(|&p| p.char_code == char_code).map(|v| v as _)
     }
 
     /// Generate a default set of protocols
     pub fn generate_pcboard_defaults() -> Self {
-        let mut protocols = Vec::new();
-        protocols.push(Protocol {
-            is_enabled: true,
-            is_batch: false,
-            is_bi_directional: false,
-            char_code: "A".to_string(),
-            description: "Ascii".to_string(),
-            send_command: TransferProtocolType::ASCII,
-            recv_command: TransferProtocolType::ASCII,
-        });
-
-        protocols.push(Protocol {
-            is_enabled: true,
-            is_batch: false,
-            is_bi_directional: false,
-            char_code: "X".to_string(),
-            description: "Xmodem/Checksum".to_string(),
-            send_command: TransferProtocolType::XModem,
-            recv_command: TransferProtocolType::XModem,
-        });
-
-        protocols.push(Protocol {
-            is_enabled: true,
-            is_batch: false,
-            is_bi_directional: false,
-            char_code: "C".to_string(),
-            description: "Xmodem/CRC".to_string(),
-            send_command: TransferProtocolType::XModemCRC,
-            recv_command: TransferProtocolType::XModemCRC,
-        });
-
-        protocols.push(Protocol {
-            is_enabled: true,
-            is_batch: false,
-            is_bi_directional: false,
-            char_code: "O".to_string(),
-            description: "1K-Xmodem       (a.k.a. non-BATCH Ymodem)".to_string(),
-            send_command: TransferProtocolType::XModem1k,
-            recv_command: TransferProtocolType::XModem1k,
-        });
-
-        protocols.push(Protocol {
-            is_enabled: true,
-            is_batch: false,
-            is_bi_directional: false,
-            char_code: "F".to_string(),
-            description: "1K-Xmodem/G     (a.k.a. non-BATCH Ymodem/G)".to_string(),
-            send_command: TransferProtocolType::XModem1kG,
-            recv_command: TransferProtocolType::XModem1kG,
-        });
-
-        protocols.push(Protocol {
-            is_enabled: true,
-            is_batch: true,
-            is_bi_directional: false,
-            char_code: "Y".to_string(),
-            description: "Ymodem BATCH".to_string(),
-            send_command: TransferProtocolType::YModem,
-            recv_command: TransferProtocolType::YModem,
-        });
-
-        protocols.push(Protocol {
-            is_enabled: true,
-            is_batch: true,
-            is_bi_directional: false,
-            char_code: "G".to_string(),
-            description: "Ymodem/G BATCH".to_string(),
-            send_command: TransferProtocolType::YModemG,
-            recv_command: TransferProtocolType::YModemG,
-        });
-
-        protocols.push(Protocol {
-            is_enabled: true,
-            is_batch: true,
-            is_bi_directional: false,
-            char_code: "Z".to_string(),
-            description: "Zmodem (batch)".to_string(),
-            send_command: TransferProtocolType::ZModem,
-            recv_command: TransferProtocolType::ZModem,
-        });
-
-        protocols.push(Protocol {
-            is_enabled: true,
-            is_batch: true,
-            is_bi_directional: false,
-            char_code: "8".to_string(),
-            description: "Zmodem 8k (batch)".to_string(),
-            send_command: TransferProtocolType::ZModem8k,
-            recv_command: TransferProtocolType::ZModem8k,
-        });
-
-        protocols.push(Protocol {
-            is_enabled: true,
-            is_batch: true,
-            is_bi_directional: false,
-            char_code: "N".to_string(),
-            description: "None".to_string(),
-            send_command: TransferProtocolType::None,
-            recv_command: TransferProtocolType::None,
-        });
+        let protocols = vec![
+            Protocol {
+                is_enabled: true,
+                is_batch: false,
+                is_bi_directional: false,
+                char_code: "A".to_string(),
+                description: "Ascii".to_string(),
+                send_command: TransferProtocolType::ASCII,
+                recv_command: TransferProtocolType::ASCII,
+            },
+            Protocol {
+                is_enabled: true,
+                is_batch: false,
+                is_bi_directional: false,
+                char_code: "X".to_string(),
+                description: "Xmodem/Checksum".to_string(),
+                send_command: TransferProtocolType::XModem,
+                recv_command: TransferProtocolType::XModem,
+            },
+            Protocol {
+                is_enabled: true,
+                is_batch: false,
+                is_bi_directional: false,
+                char_code: "C".to_string(),
+                description: "Xmodem/CRC".to_string(),
+                send_command: TransferProtocolType::XModemCRC,
+                recv_command: TransferProtocolType::XModemCRC,
+            },
+            Protocol {
+                is_enabled: true,
+                is_batch: false,
+                is_bi_directional: false,
+                char_code: "O".to_string(),
+                description: "1K-Xmodem       (a.k.a. non-BATCH Ymodem)".to_string(),
+                send_command: TransferProtocolType::XModem1k,
+                recv_command: TransferProtocolType::XModem1k,
+            },
+            Protocol {
+                is_enabled: true,
+                is_batch: false,
+                is_bi_directional: false,
+                char_code: "F".to_string(),
+                description: "1K-Xmodem/G     (a.k.a. non-BATCH Ymodem/G)".to_string(),
+                send_command: TransferProtocolType::XModem1kG,
+                recv_command: TransferProtocolType::XModem1kG,
+            },
+            Protocol {
+                is_enabled: true,
+                is_batch: true,
+                is_bi_directional: false,
+                char_code: "Y".to_string(),
+                description: "Ymodem BATCH".to_string(),
+                send_command: TransferProtocolType::YModem,
+                recv_command: TransferProtocolType::YModem,
+            },
+            Protocol {
+                is_enabled: true,
+                is_batch: true,
+                is_bi_directional: false,
+                char_code: "G".to_string(),
+                description: "Ymodem/G BATCH".to_string(),
+                send_command: TransferProtocolType::YModemG,
+                recv_command: TransferProtocolType::YModemG,
+            },
+            Protocol {
+                is_enabled: true,
+                is_batch: true,
+                is_bi_directional: false,
+                char_code: "Z".to_string(),
+                description: "Zmodem (batch)".to_string(),
+                send_command: TransferProtocolType::ZModem,
+                recv_command: TransferProtocolType::ZModem,
+            },
+            Protocol {
+                is_enabled: true,
+                is_batch: true,
+                is_bi_directional: false,
+                char_code: "8".to_string(),
+                description: "Zmodem 8k (batch)".to_string(),
+                send_command: TransferProtocolType::ZModem8k,
+                recv_command: TransferProtocolType::ZModem8k,
+            },
+            Protocol {
+                is_enabled: true,
+                is_batch: true,
+                is_bi_directional: false,
+                char_code: "N".to_string(),
+                description: "None".to_string(),
+                send_command: TransferProtocolType::None,
+                recv_command: TransferProtocolType::None,
+            },
+        ];
         Self { protocols }
     }
 }
@@ -218,8 +203,7 @@ impl PCBoardTextImport for SupportedProtocols {
                 'X' => (true, false, TransferProtocolType::XModem),
                 'C' => (true, false, TransferProtocolType::XModemCRC),
                 'O' => (true, false, TransferProtocolType::XModem1k),
-                'F' => (true, false, TransferProtocolType::XModem1kG),
-                'Y' => (true, false, TransferProtocolType::XModem1kG),
+                'F' | 'Y' => (true, false, TransferProtocolType::XModem1kG),
                 'G' => (true, true, TransferProtocolType::YModemG),
                 'Z' => (true, true, TransferProtocolType::ZModem),
                 _ => (false, true, TransferProtocolType::External("todo".to_string())),

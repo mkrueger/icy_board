@@ -57,30 +57,30 @@ impl<'a> CommandsEditor<'a> {
                 get_text("command_editor_header_parameter"),
             ],
             get_content: Box::new(move |_table, i, j| {
-                if let Ok(mnu2) = mnu2.lock() {
-                    if *i < mnu2.commands.len() {
-                        return match j {
-                            0 => Line::from(format!("{})", i + 1)),
-                            1 => Line::from(mnu2.commands[*i].keyword.clone()),
-                            2 => {
-                                if let Some(act) = mnu2.commands[*i].actions.get(0) {
-                                    Line::from(act.command_type.to_string())
-                                } else {
-                                    Line::from("No Action")
-                                }
+                if let Ok(mnu2) = mnu2.lock()
+                    && *i < mnu2.commands.len()
+                {
+                    return match j {
+                        0 => Line::from(format!("{})", i + 1)),
+                        1 => Line::from(mnu2.commands[*i].keyword.clone()),
+                        2 => {
+                            if let Some(act) = mnu2.commands[*i].actions.first() {
+                                Line::from(act.command_type.to_string())
+                            } else {
+                                Line::from("No Action")
                             }
-                            3 => {
-                                if let Some(act) = mnu2.commands[*i].actions.get(0) {
-                                    Line::from(act.parameter.to_string())
-                                } else {
-                                    Line::from("No Action")
-                                }
+                        }
+                        3 => {
+                            if let Some(act) = mnu2.commands[*i].actions.first() {
+                                Line::from(act.parameter.to_string())
+                            } else {
+                                Line::from("No Action")
                             }
-                            _ => Line::from("".to_string()),
-                        };
-                    }
+                        }
+                        _ => Line::from("".to_string()),
+                    };
                 }
-                return Line::from("".to_string());
+                Line::from("".to_string())
             }),
             content_length,
         };
@@ -128,13 +128,13 @@ impl<'a> CommandsEditor<'a> {
     }
 
     fn move_up(&mut self) {
-        if let Some(selected) = self.insert_table.table_state.selected() {
-            if selected > 0 {
-                if let Ok(mut menu) = self.command_list.lock() {
-                    menu.commands.swap(selected, selected - 1);
-                }
-                self.insert_table.table_state.select(Some(selected - 1));
+        if let Some(selected) = self.insert_table.table_state.selected()
+            && selected > 0
+        {
+            if let Ok(mut menu) = self.command_list.lock() {
+                menu.commands.swap(selected, selected - 1);
             }
+            self.insert_table.table_state.select(Some(selected - 1));
         }
     }
 
@@ -245,7 +245,7 @@ impl<'a> Page for CommandsEditor<'a> {
                         let Some(cur_prot) = cmd.get_mut(selected_item) else {
                             return PageMessage::None;
                         };
-                        if cur_prot.actions.len() == 0 {
+                        if cur_prot.actions.is_empty() {
                             cur_prot.actions.push(CommandAction::default());
                         }
                         self.edit_config = Some(ConfigMenu {

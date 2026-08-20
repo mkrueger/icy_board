@@ -15,14 +15,15 @@ fn crypt3(block: &mut [u8]) {
 }
 
 fn decrypt2(block: &mut [u8]) {
-    if block.len() > CHUNK_SIZE {
-        panic!("Block size is too large.");
-    }
+    assert!(block.len() <= CHUNK_SIZE, "Block size is too large.");
     let size = block.len() as i32;
     let mut seed = 0xDB24;
     let mut rotate_count = 0;
     unsafe {
-        let mut p = block.as_mut_ptr() as *mut u16;
+        // Only ever accessed via `read_unaligned`/`write_unaligned` below, so the
+        // pointer's alignment (or lack thereof) is never actually relied upon.
+        #[allow(clippy::cast_ptr_alignment)]
+        let mut p = block.as_mut_ptr().cast::<u16>();
         let mut x = size >> 1;
         while x > 0 {
             let mut dx = (x & 0xFF) as u16;
@@ -62,9 +63,7 @@ fn decrypt2(block: &mut [u8]) {
 }
 
 fn encrypt2(block: &mut [u8]) {
-    if block.len() > CHUNK_SIZE {
-        panic!("Block size is too large.");
-    }
+    assert!(block.len() <= CHUNK_SIZE, "Block size is too large.");
     let size = block.len() as i32;
     let mut seed = 0xDB24;
     let mut rotate_count = 0;
@@ -91,7 +90,7 @@ fn encrypt2(block: &mut [u8]) {
 
 #[allow(clippy::pedantic)]
 fn decrypt(block: &mut [u8], version: u16) {
-    if version < 300 || version >= 400 {
+    if !(300..400).contains(&version) {
         return;
     }
     if version >= 330 {
@@ -107,7 +106,7 @@ fn decrypt(block: &mut [u8], version: u16) {
 
 #[allow(clippy::pedantic)]
 fn encrypt(block: &mut [u8], version: u16) {
-    if version < 300 || version >= 400 {
+    if !(300..400).contains(&version) {
         return;
     }
     if version >= 340 {
@@ -251,20 +250,20 @@ mod tests {
     #[test]
     fn test_large_crypt3() {
         let mut data = vec![0u8; CHUNK_SIZE];
-        for i in 0..data.len() {
+        for (i, item) in data.iter_mut().enumerate() {
             if is_prime(i) {
-                data[i] = i as u8;
+                *item = i as u8;
             }
         }
 
         crypt3(&mut data);
         crypt3(&mut data);
 
-        for i in 0..data.len() {
+        for (i, item) in data.iter().enumerate() {
             if is_prime(i) {
-                assert_eq!(data[i], i as u8);
+                assert_eq!(*item, i as u8);
             } else {
-                assert_eq!(data[i], 0);
+                assert_eq!(*item, 0);
             }
         }
     }
@@ -272,20 +271,20 @@ mod tests {
     #[test]
     fn test_large_crypt2() {
         let mut data = vec![0u8; CHUNK_SIZE];
-        for i in 0..data.len() {
+        for (i, item) in data.iter_mut().enumerate() {
             if is_prime(i) {
-                data[i] = i as u8;
+                *item = i as u8;
             }
         }
 
         encrypt2(&mut data);
         decrypt2(&mut data);
 
-        for i in 0..data.len() {
+        for (i, item) in data.iter().enumerate() {
             if is_prime(i) {
-                assert_eq!(data[i], i as u8);
+                assert_eq!(*item, i as u8);
             } else {
-                assert_eq!(data[i], 0);
+                assert_eq!(*item, 0);
             }
         }
     }
@@ -293,18 +292,18 @@ mod tests {
     #[test]
     fn test_chunks_with_rle_330() {
         let mut data = vec![0u8; CHUNK_SIZE * 16];
-        for i in 0..data.len() {
+        for (i, item) in data.iter_mut().enumerate() {
             if is_prime(i) {
-                data[i] = i as u8;
+                *item = i as u8;
             }
         }
         encrypt_chunks(&mut data, 330, true);
         decrypt_chunks(&mut data, 330, true);
-        for i in 0..data.len() {
+        for (i, item) in data.iter().enumerate() {
             if is_prime(i) {
-                assert_eq!(data[i], i as u8);
+                assert_eq!(*item, i as u8);
             } else {
-                assert_eq!(data[i], 0);
+                assert_eq!(*item, 0);
             }
         }
     }
@@ -312,18 +311,18 @@ mod tests {
     #[test]
     fn test_chunks_with_rle_300() {
         let mut data = vec![0u8; CHUNK_SIZE * 16];
-        for i in 0..data.len() {
+        for (i, item) in data.iter_mut().enumerate() {
             if is_prime(i) {
-                data[i] = i as u8;
+                *item = i as u8;
             }
         }
         encrypt_chunks(&mut data, 300, true);
         decrypt_chunks(&mut data, 300, true);
-        for i in 0..data.len() {
+        for (i, item) in data.iter().enumerate() {
             if is_prime(i) {
-                assert_eq!(data[i], i as u8);
+                assert_eq!(*item, i as u8);
             } else {
-                assert_eq!(data[i], 0);
+                assert_eq!(*item, 0);
             }
         }
     }
@@ -331,18 +330,18 @@ mod tests {
     #[test]
     fn test_chunks_with_rle_340() {
         let mut data = vec![0u8; CHUNK_SIZE * 16];
-        for i in 0..data.len() {
+        for (i, item) in data.iter_mut().enumerate() {
             if is_prime(i) {
-                data[i] = i as u8;
+                *item = i as u8;
             }
         }
         encrypt_chunks(&mut data, 340, true);
         decrypt_chunks(&mut data, 340, true);
-        for i in 0..data.len() {
+        for (i, item) in data.iter().enumerate() {
             if is_prime(i) {
-                assert_eq!(data[i], i as u8);
+                assert_eq!(*item, i as u8);
             } else {
-                assert_eq!(data[i], 0);
+                assert_eq!(*item, 0);
             }
         }
     }
@@ -350,18 +349,18 @@ mod tests {
     #[test]
     fn test_chunks_without_rle() {
         let mut data = vec![0u8; CHUNK_SIZE * 16];
-        for i in 0..data.len() {
+        for (i, item) in data.iter_mut().enumerate() {
             if is_prime(i) {
-                data[i] = i as u8;
+                *item = i as u8;
             }
         }
         encrypt_chunks(&mut data, 330, false);
         decrypt_chunks(&mut data, 330, false);
-        for i in 0..data.len() {
+        for (i, item) in data.iter().enumerate() {
             if is_prime(i) {
-                assert_eq!(data[i], i as u8);
+                assert_eq!(*item, i as u8);
             } else {
-                assert_eq!(data[i], 0);
+                assert_eq!(*item, 0);
             }
         }
     }
@@ -372,7 +371,7 @@ mod tests {
         }
 
         for i in 2..=(num as f64).sqrt() as usize {
-            if num % i == 0 {
+            if num.is_multiple_of(i) {
                 return false;
             }
         }

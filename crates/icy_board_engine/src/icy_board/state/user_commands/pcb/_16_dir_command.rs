@@ -13,7 +13,7 @@ use crate::{
 };
 
 impl IcyBoardState {
-    /// Sysop command 16 - list a directory of the board. PCBoard shelled out to
+    /// Sysop command 16 - list a directory of the board. `PCBoard` shelled out to
     /// DOS for this; here it is name, size and date and nothing else.
     pub async fn dir_command(&mut self) -> Res<()> {
         let answer = if let Some(token) = self.session.tokens.pop_front() {
@@ -73,8 +73,7 @@ impl IcyBoardState {
                 Some(date) => format!("{} {}", self.format_date(date.to_utc()), self.format_time(date.to_utc())),
                 None => String::new(),
             };
-            self.println(TerminalTarget::Both, &format!("{:<40} {:>12} {}", name, size_str, date_str))
-                .await?;
+            self.println(TerminalTarget::Both, &format!("{name:<40} {size_str:>12} {date_str}")).await?;
             if !is_dir {
                 total += size;
             }

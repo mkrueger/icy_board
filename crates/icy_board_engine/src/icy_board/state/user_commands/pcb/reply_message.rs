@@ -56,7 +56,7 @@ impl IcyBoardState {
                 self.display_text(IceText::MessageAborted, display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::BELL)
                     .await?;
                 return Ok(());
-            };
+            }
 
             let Ok(msg_number) = msg_num.parse::<u32>() else {
                 self.display_text(IceText::InvalidEntry, display_flags::NEWLINE | display_flags::LFBEFORE)
@@ -69,13 +69,11 @@ impl IcyBoardState {
             self.display_text(IceText::Scanning, display_flags::DEFAULT).await?;
             let area_str = format!(
                 "{} ({})",
-                self.session.current_conference.areas.as_ref().unwrap()[self.session.current_message_area as usize].name,
+                self.session.current_conference.areas.as_ref().unwrap()[self.session.current_message_area].name,
                 self.session.current_message_area
             );
             self.println(crate::vm::TerminalTarget::Both, &area_str).await?;
-            let msg_base = self.get_board().await.conferences[conf as usize].areas.as_ref().unwrap()[area as usize]
-                .path
-                .clone();
+            let msg_base = self.get_board().await.conferences[conf as usize].areas.as_ref().unwrap()[area].path.clone();
 
             let mut subject = String::new();
             let mut to = String::new();
@@ -107,7 +105,7 @@ impl IcyBoardState {
 
             if new_subject.is_empty() {
                 new_subject = subject;
-            };
+            }
             let ret_receipt = self.get_ret_receipt().await?;
             let msg_attributes = if ret_receipt { attributes::MSG_RECEIPTREQ } else { 0 };
 

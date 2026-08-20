@@ -7,30 +7,31 @@ use crate::{
         state::{GraphicsMode, IcyBoardState},
     },
 };
+use std::fmt::Write as _;
 
-/// CALLINFO.BBS format from the RyBBS software.
+/// CALLINFO.BBS format from the `RyBBS` software.
 pub fn create_curruser_bbs(state: &IcyBoardState, path: &std::path::Path) -> Res<()> {
     let mut contents = String::new();
-    contents.push_str(&format!("{}\r\n", state.session.user_name));
-    contents.push_str(&format!("{}\r\n", state.session.cur_security));
-    contents.push_str(&format!("{}\r\n", state.session.cur_user_id));
-    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().home_voice_phone));
-    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().city_or_state));
-    contents.push_str(&format!("{}\r\n", DOOR_COM_PORT)); // COM Port
-    contents.push_str(&format!("{}\r\n", DOOR_BPS_RATE)); // Com Port Speed
+    let _ = write!(contents, "{}\r\n", state.session.user_name);
+    let _ = write!(contents, "{}\r\n", state.session.cur_security);
+    let _ = write!(contents, "{}\r\n", state.session.cur_user_id);
+    let _ = write!(contents, "{}\r\n", state.session.current_user.as_ref().unwrap().home_voice_phone);
+    let _ = write!(contents, "{}\r\n", state.session.current_user.as_ref().unwrap().city_or_state);
+    let _ = write!(contents, "{DOOR_COM_PORT}\r\n"); // COM Port
+    let _ = write!(contents, "{DOOR_BPS_RATE}\r\n"); // Com Port Speed
     contents.push_str("N\r\n");
     contents.push_str("8\r\n");
     contents.push_str("1\r\n");
     contents.push_str("\r\n");
     contents.push_str("DOORM.MNU\r\n");
-    contents.push_str(&format!("{}\r\n", state.session.minutes_left()));
+    let _ = write!(contents, "{}\r\n", state.session.minutes_left());
 
     let emulation = match state.session.disp_options.grapics_mode {
         GraphicsMode::Ctty => "NONE",
         GraphicsMode::Ansi => "IBM",
         _ => "ANSI",
     };
-    contents.push_str(&format!("{}\r\n", emulation));
+    let _ = write!(contents, "{emulation}\r\n");
 
     let path = path.join("CURRUSER.BBS");
     log::info!("create CURRUSER.BBS: {}", path.display());

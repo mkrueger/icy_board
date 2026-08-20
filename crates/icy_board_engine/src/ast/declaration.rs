@@ -203,12 +203,11 @@ impl VariableSpecifier {
         if self.get_initalizer().is_some() != check.get_initalizer().is_some() {
             return false;
         }
-        if let Some(init) = self.get_initalizer() {
-            if let Some(check_init) = check.get_initalizer() {
-                if !init.is_similar(check_init) {
-                    return false;
-                }
-            }
+        if let Some(init) = self.get_initalizer()
+            && let Some(check_init) = check.get_initalizer()
+            && !init.is_similar(check_init)
+        {
+            return false;
         }
 
         true
@@ -445,7 +444,7 @@ impl VariableParameterSpecifier {
         } else if p2.get_variable().is_some() {
             return false;
         }
-        return true;
+        true
     }
 }
 
@@ -924,7 +923,7 @@ impl FunctionParameterSpecifier {
                 return false;
             }
         }
-        return true;
+        true
     }
 }
 
@@ -1016,6 +1015,6 @@ impl ProcedureParameterSpecifier {
                 return false;
             }
         }
-        return true;
+        true
     }
 }

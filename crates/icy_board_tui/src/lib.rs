@@ -1,3 +1,9 @@
+// This TUI layer leans heavily on ratatui/crossterm closures and callback tables,
+// which naturally produce complex generic types and wide constructor argument
+// lists; introducing type aliases/param structs for all of them (verified during
+// a workspace-wide clippy cleanup) would churn a lot of call sites for no
+// behavioral benefit, so these are suppressed at the crate level.
+#![allow(clippy::type_complexity, clippy::too_many_arguments, clippy::large_enum_variant)]
 use std::{collections::HashMap, fmt::Display, io::stderr, path::Path};
 
 use crossterm::{

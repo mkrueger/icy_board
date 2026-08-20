@@ -7,9 +7,7 @@ use crate::icy_board::state::IcyBoardState;
 
 pub mod more_prompt;
 
-lazy_static::lazy_static! {
-    static ref re:Regex = Regex::new("(\\S+)\\s+[\\.\\d]+\\s+(\\w+\\s+)?(\\d\\d/\\d\\d/\\d\\d)").unwrap();
-}
+static RE: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| Regex::new("(\\S+)\\s+[\\.\\d]+\\s+(\\w+\\s+)?(\\d\\d/\\d\\d/\\d\\d)").unwrap());
 
 impl IcyBoardState {
     /// Used for the ppe function SCRFILE
@@ -25,7 +23,7 @@ impl IcyBoardState {
                 str.push(ch.ch);
             }
 
-            if let Some(cap) = re.captures(&str) {
+            if let Some(cap) = RE.captures(&str) {
                 let file_name = cap.get(1).unwrap().as_str();
                 return Some((y, file_name.to_string()));
             }
@@ -38,14 +36,14 @@ impl IcyBoardState {
 
 #[cfg(test)]
 mod test {
-    use crate::icy_board::state::user_commands::mods::filebrowser::re;
+    use crate::icy_board::state::user_commands::mods::filebrowser::RE;
 
     #[test]
     fn test_regex() {
         let str = "3001-USM.ZIP  18.7 kB  07/27/95  █▀▀▀▀▀▀▀▀▀▀▀▀▀▀████████████████             ";
-        assert!(re.is_match(&str));
+        assert!(RE.is_match(str));
 
-        if let Some(cap) = re.captures(&str) {
+        if let Some(cap) = RE.captures(str) {
             let file_name = cap.get(1).unwrap().as_str();
             assert_eq!(file_name, "3001-USM.ZIP");
             let date = cap.get(3).unwrap().as_str();

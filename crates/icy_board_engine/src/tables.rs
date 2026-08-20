@@ -39,6 +39,6 @@ pub fn export_cp437_string(txt: &str, len: usize, filler: u8) -> Vec<u8> {
             break;
         }
     }
-    res.extend(std::iter::repeat(filler).take(len - res.len()));
+    res.extend(std::iter::repeat_n(filler, len - res.len()));
     res
 }

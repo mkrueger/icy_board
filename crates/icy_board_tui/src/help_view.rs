@@ -17,6 +17,12 @@ pub struct HelpViewState {
     pub markdown: Option<ComponentRoot>,
 }
 
+impl Default for HelpViewState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl HelpViewState {
     pub fn new() -> Self {
         let cfg: ColorConfig = ColorConfig {

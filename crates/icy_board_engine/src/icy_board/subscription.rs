@@ -17,7 +17,7 @@ impl SubscriptionStatus {
     }
 }
 
-/// PCBoard compares calendar dates: the expiration date itself is still valid.
+/// `PCBoard` compares calendar dates: the expiration date itself is still valid.
 pub fn status(enabled: bool, expiration: DateTime<Utc>, warning_days: u32, today: NaiveDate) -> SubscriptionStatus {
     if !enabled {
         return SubscriptionStatus::Disabled;

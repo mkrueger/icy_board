@@ -49,7 +49,7 @@ impl PatternExpr {
         for (token, _span) in lexer.spanned() {
             match token {
                 Ok(ok) => tokens.push(ok),
-                Err(_) => return Err(Box::new(ParseError::ParseTokenError)),
+                Err(()) => return Err(Box::new(ParseError::ParseTokenError)),
             }
         }
         match parser().parse(tokens.as_slice()).into_result() {
@@ -62,8 +62,9 @@ impl PatternExpr {
         match self {
             PatternExpr::Match(id) => id.clone(),
             PatternExpr::Not(pattern_expr) => format!("!({})", pattern_expr.to_regex()),
-            PatternExpr::And(pattern_expr, pattern_expr1) => format!("({}|{})", pattern_expr.to_regex(), pattern_expr1.to_regex()),
-            PatternExpr::Or(pattern_expr, pattern_expr1) => format!("({}|{})", pattern_expr.to_regex(), pattern_expr1.to_regex()),
+            PatternExpr::And(pattern_expr, pattern_expr1) | PatternExpr::Or(pattern_expr, pattern_expr1) => {
+                format!("({}|{})", pattern_expr.to_regex(), pattern_expr1.to_regex())
+            }
         }
     }
 }
@@ -97,7 +98,7 @@ mod test {
 
     #[test]
     fn test_identifier() {
-        let input = r#"FOO"#;
+        let input = r"FOO";
         let expr = PatternExpr::parse(input).unwrap();
         assert_eq!(expr, PatternExpr::Match("FOO".to_owned()));
     }
@@ -111,14 +112,14 @@ mod test {
 
     #[test]
     fn test_identifier3() {
-        let input = r#"FOO BAR"#;
+        let input = r"FOO BAR";
         let expr = PatternExpr::parse(input).unwrap();
         assert_eq!(expr, PatternExpr::Match("FOO BAR".to_owned()));
     }
 
     #[test]
     fn test_parser() {
-        let input = r#"(a & b) | c"#;
+        let input = r"(a & b) | c";
         let expr = PatternExpr::parse(input).unwrap();
         assert_eq!(
             expr,

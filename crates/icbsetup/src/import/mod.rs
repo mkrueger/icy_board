@@ -60,6 +60,7 @@ use relative_path::{PathExt, RelativePathBuf};
 use walkdir::WalkDir;
 
 use self::import_log::ImportLog;
+use std::fmt::Write as _;
 
 pub mod console_logger;
 pub mod import_log;
@@ -196,19 +197,19 @@ impl PCBoardImporter {
                 }
 
                 //let len = to_str().unwrap().len();
-                if let Some(k) = help_loc.parent() {
-                    if let Some(v) = file_path.parent() {
-                        let k = k.to_str().unwrap_or_default().to_string();
-                        let v = v.to_path_buf().to_str().unwrap_or_default().to_string();
-                        paths.entry(k).or_insert(v);
-                    }
+                if let Some(k) = help_loc.parent()
+                    && let Some(v) = file_path.parent()
+                {
+                    let k = k.to_str().unwrap_or_default().to_string();
+                    let v = v.to_path_buf().to_str().unwrap_or_default().to_string();
+                    paths.entry(k).or_insert(v);
                 }
 
                 // A board below C:\PCB has the rest of the drive next to it, so C: is worth a guess.
-                if let Some((drive, _)) = help.split_once(':') {
-                    if let Some(drive_root) = source_directory.parent() {
-                        paths.entry(format!("{}:", drive)).or_insert(drive_root.to_string_lossy().to_string());
-                    }
+                if let Some((drive, _)) = help.split_once(':')
+                    && let Some(drive_root) = source_directory.parent()
+                {
+                    paths.entry(format!("{}:", drive)).or_insert(drive_root.to_string_lossy().to_string());
                 }
 
                 let mut map_paths = HashMap::new();
@@ -227,7 +228,7 @@ impl PCBoardImporter {
                     unresolved: RefCell::new(BTreeSet::new()),
                 })
             }
-            Err(err) => Err(Box::new(IcyBoardError::Error(format!("Error reading PCBoard data: {}", err.to_string())))),
+            Err(err) => Err(Box::new(IcyBoardError::Error(format!("Error reading PCBoard data: {}", err)))),
         }
     }
 
@@ -385,8 +386,8 @@ impl PCBoardImporter {
         let accounting_config_file = self.convert_accounting_cfg(&self.data.account_config.clone(), "main/accounting_cfg.toml")?;
         let accounting_holiday_list_file = self.convert_display_file(&self.data.holidays_file.clone(), "art/acc_holidays")?;
         let accounting_info_file = self.convert_display_file(&self.data.account_info.clone(), "art/acc_info")?;
-        let accounting_warning_file = self.convert_display_file(&&self.data.account_warn.clone(), "art/acc_warn")?;
-        let accounting_logoff_file = self.convert_display_file(&&self.data.account_logoff.clone(), "art/acc_logoff")?;
+        let accounting_warning_file = self.convert_display_file(&self.data.account_warn.clone(), "art/acc_warn")?;
+        let accounting_logoff_file = self.convert_display_file(&self.data.account_logoff.clone(), "art/acc_logoff")?;
 
         let conf_join_menu = self.convert_display_file(&self.data.path.conf_menu.clone(), "art/cnfn")?;
         let group_chat = self.convert_display_file(&self.data.path.group_chat.clone(), "art/group")?;
@@ -791,28 +792,29 @@ impl PCBoardImporter {
     fn write_report(&mut self) -> Res<()> {
         let unresolved = self.unresolved_paths();
         let mut report = String::new();
-        report.push_str(&format!(
+        let _ = write!(
+            report,
             "Imported {} to {}\n\n",
             self.source_directory.display(),
             self.output_directory.display()
-        ));
-        report.push_str(&format!("Conferences   {}\n", self.stats.conferences));
-        report.push_str(&format!("Users         {}\n", self.stats.users));
-        report.push_str(&format!("Message bases {}\n", self.stats.message_bases));
-        report.push_str(&format!("PPEs          {}\n", self.stats.ppes));
-        report.push_str(&format!("Files         {}\n", self.stats.converted_files));
+        );
+        let _ = writeln!(report, "Conferences   {}", self.stats.conferences);
+        let _ = writeln!(report, "Users         {}", self.stats.users);
+        let _ = writeln!(report, "Message bases {}", self.stats.message_bases);
+        let _ = writeln!(report, "PPEs          {}", self.stats.ppes);
+        let _ = writeln!(report, "Files         {}", self.stats.converted_files);
         if self.stats.users_without_inf > 0 {
-            report.push_str(&format!("Users without USERS.INF record {}\n", self.stats.users_without_inf));
+            let _ = writeln!(report, "Users without USERS.INF record {}", self.stats.users_without_inf);
         }
-        report.push_str(&format!("\nUnresolved paths ({}):\n", unresolved.len()));
+        let _ = write!(report, "\nUnresolved paths ({}):\n", unresolved.len());
         for path in &unresolved {
-            report.push_str(&format!("  {}\n", path));
+            let _ = writeln!(report, "  {}", path);
         }
         report.push_str("\nPaths are looked up through:\n");
         let mut mappings: Vec<_> = self.resolve_paths.iter().collect();
         mappings.sort();
         for (dos, local) in mappings {
-            report.push_str(&format!("  {} -> {}\n", dos, local));
+            let _ = writeln!(report, "  {} -> {}", dos, local);
         }
         report.push_str("\nAdd --map 'D:\\FILES=/path/to/files' for paths that point to another drive.\n");
 
@@ -840,7 +842,7 @@ impl PCBoardImporter {
             self.output
                 .warning(format!("Can't find conference file {}/{}", conf.display(), conference_file));
             self.logger
-                .log(&format!("Can't find conference file {}/{}", conf.display(), conference_file).as_str());
+                .log(format!("Can't find conference file {}/{}", conf.display(), conference_file).as_str());
             return Ok(PathBuf::new());
         }
         let conferences = PcbConferenceHeader::import_pcboard(&conf, self.data.num_conf as usize)?;
@@ -849,14 +851,14 @@ impl PCBoardImporter {
         let conf_old_add = self.resolve_file(&(conference_file.to_string() + ".@@@"));
 
         let add_conferences = if conf_add.exists() {
-            self.logger.log(&format!("import conference header {}", conf_add.display()).as_str());
+            self.logger.log(format!("import conference header {}", conf_add.display()).as_str());
             PcbAdditionalConferenceHeader::import_pcboard(&conf_add)?
         } else if conf_old_add.exists() {
-            self.logger.log(&format!("read old conference header {}", conf_old_add.display()).as_str());
+            self.logger.log(format!("read old conference header {}", conf_old_add.display()).as_str());
             PcbAdditionalConferenceHeader::import_old_pcboard(&conf_old_add)?
         } else {
             self.output.warning(format!("Can't find conference add file {}", conf_add.display()));
-            self.logger.log(&format!("Can't find conference add file {}", conf_add.display()).as_str());
+            self.logger.log(format!("Can't find conference add file {}", conf_add.display()).as_str());
             vec![PcbAdditionalConferenceHeader::default(); conferences.len()]
         };
         self.logger.log("imported conference headers, converting...");
@@ -887,7 +889,7 @@ impl PCBoardImporter {
             conf.blt_menu = self.convert_conference_display_file(&output, &conf.blt_menu)?;
             conf.blt_file = self.convert_bullettin_file(&destination, &output, &conf.blt_file)?;
 
-            self.logger.log(&format!("convert survey menus {}", conf.survey_menu.display()).as_str());
+            self.logger.log(format!("convert survey menus {}", conf.survey_menu.display()).as_str());
             conf.survey_menu = self.convert_conference_display_file(&output, &conf.survey_menu)?;
 
             conf.survey_file = self.convert_questionnaires(&destination, &output, &conf.survey_file)?;
@@ -983,27 +985,26 @@ impl PCBoardImporter {
                     .unwrap()
                     .to_ascii_uppercase()
                     .starts_with(&resolved_file.file_name().unwrap().to_str().unwrap().to_ascii_uppercase())
+                    && let Ok(mut text_file) = IcbTextFile::load(&entry.path())
                 {
-                    if let Ok(mut text_file) = IcbTextFile::load(&entry.path()) {
-                        for (i, entry) in text_file.iter_mut().enumerate() {
-                            entry.text = self.scan_pcb_text_line_for_commands(&entry.text, i)?;
-                        }
-                        let destination: PathBuf = PathBuf::from(
-                            destination
-                                .with_extension(entry.path().extension().unwrap_or_default().to_ascii_lowercase())
-                                .to_string_lossy()
-                                .to_string()
-                                + ".toml",
-                        );
-                        self.logger
-                            .log(&format!("------------- PCBTEXT import: {} ->{}", entry.path().display(), destination.display()));
-
-                        if let Err(err) = text_file.save(&destination) {
-                            self.logger.log_boxed_error(&*err);
-                        }
-                        self.logger.converted_file(&resolved_file, &destination, true);
-                        self.logger.log("");
+                    for (i, entry) in text_file.iter_mut().enumerate() {
+                        entry.text = self.scan_pcb_text_line_for_commands(&entry.text, i)?;
                     }
+                    let destination: PathBuf = PathBuf::from(
+                        destination
+                            .with_extension(entry.path().extension().unwrap_or_default().to_ascii_lowercase())
+                            .to_string_lossy()
+                            .to_string()
+                            + ".toml",
+                    );
+                    self.logger
+                        .log(&format!("------------- PCBTEXT import: {} ->{}", entry.path().display(), destination.display()));
+
+                    if let Err(err) = text_file.save(&destination) {
+                        self.logger.log_boxed_error(&*err);
+                    }
+                    self.logger.converted_file(&resolved_file, &destination, true);
+                    self.logger.log("");
                 }
             }
         }
@@ -1111,14 +1112,11 @@ impl PCBoardImporter {
         self.converted_files.insert(upper_file_name.clone(), rel_name.clone());
 
         let output_path = self.output_directory.join(&rel_name);
-        match self.import_and_scan_file(&resolved_file, &output_path) {
-            Err(err) => {
-                self.logger.log_boxed_error(&*err);
-                return Ok(resolved_file.to_str().unwrap().to_string());
-            }
-            _ => {}
+        if let Err(err) = self.import_and_scan_file(&resolved_file, &output_path) {
+            self.logger.log_boxed_error(&*err);
+            return Ok(resolved_file.to_str().unwrap().to_string());
         }
-        return Ok(rel_name);
+        Ok(rel_name)
 
         /*
         let rel_name = format!("gen/{}", resolved_file.file_name().unwrap().to_ascii_lowercase().to_string_lossy());
@@ -1447,7 +1445,7 @@ impl PCBoardImporter {
         };
         let destination: PathBuf = self.output_directory.join(new_rel_name);
         if user_base.is_empty() {
-            self.logger.log(&format!("User base empty, generating sysop."));
+            self.logger.log("User base empty, generating sysop.");
 
             let mut user = User {
                 name: "SYSOP".to_string(),
@@ -1477,7 +1475,7 @@ impl PCBoardImporter {
     ) -> Res<()> {
         self.logger.log(&format!("\n=== Converting {} ===", category));
         if dir_loc.is_empty() {
-            self.logger.log(&format!("\ndir wasn't set."));
+            self.logger.log("\ndir wasn't set.");
             return Ok(());
         }
         let help_loc = self.resolve_file(dir_loc);
@@ -1509,10 +1507,10 @@ impl PCBoardImporter {
                 if entry.path().is_dir() {
                     continue;
                 }
-                if let Some(prefix) = &flat_prefix {
-                    if !entry.file_name().to_string_lossy().to_ascii_uppercase().starts_with(prefix) {
-                        continue;
-                    }
+                if let Some(prefix) = &flat_prefix
+                    && !entry.file_name().to_string_lossy().to_ascii_uppercase().starts_with(prefix)
+                {
+                    continue;
                 }
                 if !filter(entry.path()) {
                     continue;
@@ -1520,15 +1518,14 @@ impl PCBoardImporter {
                 let rel_path: RelativePathBuf = entry.path().relative_to(&help_loc).unwrap();
                 let lower_case = RelativePathBuf::from_path(rel_path.as_str().to_lowercase()).unwrap();
                 let to = lower_case.to_logical_path(&o);
-                if let Some(parent_dir) = to.parent() {
-                    if !parent_dir.exists() {
-                        if let Err(err) = fs::create_dir(parent_dir) {
-                            self.logger.log(&format!("Can't create directory {}:", parent_dir.display()));
-                            self.logger.log_error(Some(err))?;
-                            self.output.warning(format!("Can't create directory {}", parent_dir.display()));
-                            continue;
-                        }
-                    }
+                if let Some(parent_dir) = to.parent()
+                    && !parent_dir.exists()
+                    && let Err(err) = fs::create_dir(parent_dir)
+                {
+                    self.logger.log(&format!("Can't create directory {}:", parent_dir.display()));
+                    self.logger.log_error(Some(err))?;
+                    self.output.warning(format!("Can't create directory {}", parent_dir.display()));
+                    continue;
                 }
                 self.import_and_scan_file(&entry.path(), &to)?;
             }
@@ -1568,10 +1565,10 @@ impl PCBoardImporter {
                 }
                 let rel_path = entry.path().relative_to(&resolved_file).unwrap();
                 let to = rel_path.to_logical_path(&destination);
-                if let Some(parent_dir) = to.parent() {
-                    if !parent_dir.exists() {
-                        fs::create_dir(parent_dir).unwrap();
-                    }
+                if let Some(parent_dir) = to.parent()
+                    && !parent_dir.exists()
+                {
+                    fs::create_dir(parent_dir).unwrap();
                 }
                 fs::copy(entry.path(), &to)?;
                 self.logger.copy_file(entry.path(), &to);

@@ -173,7 +173,7 @@ impl PcbUserRecord {
 
             let exp_security_level = data[0];
             data = &data[1..];
-            let _last_conference_old = data[0];
+            // last_conference (unused, format compatibility only)
             data = &data[1..];
 
             let mut conf_reg_flags = [0; 5];

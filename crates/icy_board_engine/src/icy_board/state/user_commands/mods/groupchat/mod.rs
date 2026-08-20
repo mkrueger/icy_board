@@ -159,17 +159,16 @@ impl IcyBoardState {
                         break;
                     }
                     _ => {
-                        if let Some(number) = cmd.parse::<u8>().ok() {
+                        if let Ok(number) = cmd.parse::<u8>() {
                             return self.group_chat(number).await;
                         }
                         self.display_text(IceText::InvalidEntry, display_flags::LFBEFORE | display_flags::NEWLINE)
                             .await?;
-                        continue;
                     }
                 }
             }
         }
-        return Ok(());
+        Ok(())
     }
 
     pub async fn group_chat(&mut self, _room: u8) -> Res<()> {
@@ -195,7 +194,7 @@ impl IcyBoardState {
             }
         };
         self.session.group_chat.current_room = Some(room);
-        self.dispatch_group_chat_events(events).await?;
+        self.dispatch_group_chat_events(events)?;
         self.display_text(IceText::NodeChatEntered, display_flags::LFBEFORE | display_flags::NEWLINE)
             .await?;
         if let Some(user) = &mut self.session.current_user {
@@ -220,7 +219,7 @@ impl IcyBoardState {
                                     guard.send_public_message(node_id, &buffer)
                                 };
                                 match events {
-                                    Ok(events) => self.dispatch_group_chat_events(events).await?,
+                                    Ok(events) => self.dispatch_group_chat_events(events)?,
                                     Err(err) => self.show_chat_error(err).await?,
                                 }
                                 buffer.clear();
@@ -253,8 +252,7 @@ impl IcyBoardState {
                     }
                     match self.handle_chat_command(&manager, command.trim()).await? {
                         ChatCommandResult::Continue => mode = ChatLoopMode::Chat,
-                        ChatCommandResult::ExitChat => break,
-                        ChatCommandResult::Logoff => break,
+                        ChatCommandResult::ExitChat | ChatCommandResult::Logoff => break,
                     }
                 }
             }
@@ -263,7 +261,7 @@ impl IcyBoardState {
             let mut guard = manager.lock().await;
             let events = guard.leave_room(node_id);
             guard.clear_monitoring(node_id);
-            self.dispatch_group_chat_events(events).await?;
+            self.dispatch_group_chat_events(events)?;
         }
         self.session.group_chat.current_room = None;
         self.session.group_chat.monitor_rooms.clear();
@@ -311,7 +309,7 @@ impl IcyBoardState {
                 match events {
                     Ok((room, events)) => {
                         self.session.group_chat.current_room = Some(room);
-                        self.dispatch_group_chat_events(events).await?;
+                        self.dispatch_group_chat_events(events)?;
                     }
                     Err(err) => self.show_chat_error(err).await?,
                 }
@@ -323,7 +321,7 @@ impl IcyBoardState {
                     guard.set_topic(self.node + 1, if topic.is_empty() { None } else { Some(topic.to_string()) })
                 };
                 match events {
-                    Ok(events) => self.dispatch_group_chat_events(events).await?,
+                    Ok(events) => self.dispatch_group_chat_events(events)?,
                     Err(err) => self.show_chat_error(err).await?,
                 }
             }
@@ -333,7 +331,7 @@ impl IcyBoardState {
                     guard.set_private(self.node + 1, true)
                 };
                 match events {
-                    Ok(events) => self.dispatch_group_chat_events(events).await?,
+                    Ok(events) => self.dispatch_group_chat_events(events)?,
                     Err(err) => self.show_chat_error(err).await?,
                 }
             }
@@ -343,7 +341,7 @@ impl IcyBoardState {
                     guard.set_private(self.node + 1, false)
                 };
                 match events {
-                    Ok(events) => self.dispatch_group_chat_events(events).await?,
+                    Ok(events) => self.dispatch_group_chat_events(events)?,
                     Err(err) => self.show_chat_error(err).await?,
                 }
             }
@@ -376,7 +374,7 @@ impl IcyBoardState {
                     match events {
                         Ok(events) => {
                             self.session.group_chat.handle = rest.to_string();
-                            self.dispatch_group_chat_events(events).await?;
+                            self.dispatch_group_chat_events(events)?;
                         }
                         Err(err) => self.show_chat_error(err).await?,
                     }
@@ -397,7 +395,7 @@ impl IcyBoardState {
                     guard.send_private_message(self.node + 1, target, message)
                 };
                 match events {
-                    Ok(events) => self.dispatch_group_chat_events(events).await?,
+                    Ok(events) => self.dispatch_group_chat_events(events)?,
                     Err(err) => self.show_chat_error(err).await?,
                 }
             }
@@ -410,7 +408,7 @@ impl IcyBoardState {
                         guard.call_handle(self.node + 1, rest)
                     };
                     match events {
-                        Ok(events) => self.dispatch_group_chat_events(events).await?,
+                        Ok(events) => self.dispatch_group_chat_events(events)?,
                         Err(err) => self.show_chat_error(err).await?,
                     }
                 }
@@ -437,10 +435,10 @@ impl IcyBoardState {
                 } else {
                     let key = rest.to_ascii_uppercase();
                     if self.session.group_chat.ignore_handles.remove(&key) {
-                        self.println(TerminalTarget::User, &format!("No longer ignoring {}", rest)).await?;
+                        self.println(TerminalTarget::User, &format!("No longer ignoring {rest}")).await?;
                     } else {
                         self.session.group_chat.ignore_handles.insert(key);
-                        self.println(TerminalTarget::User, &format!("Ignoring {}", rest)).await?;
+                        self.println(TerminalTarget::User, &format!("Ignoring {rest}")).await?;
                     }
                 }
             }
@@ -468,7 +466,7 @@ impl IcyBoardState {
                             } else {
                                 self.session.group_chat.monitor_rooms.remove(&room);
                             }
-                            self.dispatch_group_chat_events(std::mem::take(&mut events)).await?;
+                            self.dispatch_group_chat_events(std::mem::take(&mut events))?;
                         }
                         Err(err) => self.show_chat_error(err).await?,
                     }
@@ -505,7 +503,7 @@ impl IcyBoardState {
                 return Ok(ChatCommandResult::Logoff);
             }
             other => {
-                self.println(TerminalTarget::User, &format!("Unknown command: {}", other)).await?;
+                self.println(TerminalTarget::User, &format!("Unknown command: {other}")).await?;
             }
         }
         Ok(ChatCommandResult::Continue)
@@ -526,17 +524,17 @@ impl IcyBoardState {
 
     async fn show_chat_error(&mut self, err: GroupChatError) -> Res<()> {
         self.set_color(TerminalTarget::User, IcbColor::dos_yellow()).await?;
-        self.println(TerminalTarget::User, &format!("! {}", err)).await?;
+        self.println(TerminalTarget::User, &format!("! {err}")).await?;
         self.reset_color(TerminalTarget::User).await?;
         Ok(())
     }
 
-    pub async fn dispatch_group_chat_events(&mut self, _events: Vec<GroupChatEvent>) -> Res<()> {
+    pub fn dispatch_group_chat_events(&mut self, _events: Vec<GroupChatEvent>) -> Res<()> {
         /* same body as in state/mod.rs, but kept here for cohesion */
         Ok(())
     }
 
-    pub async fn handle_group_chat_event(&mut self, _event: GroupChatEvent) -> Res<()> {
+    pub fn handle_group_chat_event(&mut self, _event: GroupChatEvent) -> Res<()> {
         /* render logic described above */
         Ok(())
     }

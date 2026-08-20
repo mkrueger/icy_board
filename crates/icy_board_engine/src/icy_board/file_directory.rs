@@ -40,7 +40,7 @@ impl FromStr for SortOrder {
             "FileName" => Ok(SortOrder::FileName),
             "FileDate" => Ok(SortOrder::FileDate),
             _ => {
-                log::error!("Invalid SortOrder: {}", s);
+                log::error!("Invalid SortOrder: {s}");
                 Ok(SortOrder::NoSort)
             }
         }
@@ -55,7 +55,7 @@ pub enum SortDirection {
 }
 
 /// A survey is a question and answer pair.
-/// PCBoard calles them "Questionnairies" but we call them surveys.
+/// `PCBoard` calles them "Questionnairies" but we call them surveys.
 #[serde_as]
 #[derive(Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct FileDirectory {
@@ -127,6 +127,11 @@ impl DirectoryList {
     pub fn len(&self) -> usize {
         self.areas.len()
     }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.areas.is_empty()
+    }
 }
 
 impl Deref for DirectoryList {
@@ -196,10 +201,8 @@ impl UserData for FileDirectory {
     }
 }
 
-lazy_static::lazy_static! {
-    pub static ref NAME: unicase::Ascii<String> = unicase::Ascii::new("Name".to_string());
-    pub static ref HAS_ACCESS: unicase::Ascii<String> = unicase::Ascii::new("HasAccess".to_string());
-}
+pub static NAME: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Name".to_string()));
+pub static HAS_ACCESS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("HasAccess".to_string()));
 
 #[async_trait]
 impl UserDataValue for FileDirectory {
@@ -207,12 +210,12 @@ impl UserDataValue for FileDirectory {
         if *name == *NAME {
             return Ok(VariableValue::new_string(self.name.clone()));
         }
-        log::error!("Invalid user data call on FileDirectory ({})", name);
+        log::error!("Invalid user data call on FileDirectory ({name})");
         Ok(VariableValue::new_int(-1))
     }
 
     fn set_property_value(&mut self, _vm: &mut crate::vm::VirtualMachine, name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
-        log::error!("Invalid user data set on FileDirectory ({})", name);
+        log::error!("Invalid user data set on FileDirectory ({name})");
         Ok(())
     }
 
@@ -226,12 +229,12 @@ impl UserDataValue for FileDirectory {
             let res = self.list_security.session_can_access(&vm.icy_board_state.session);
             return Ok(VariableValue::new_bool(res));
         }
-        log::error!("Invalid function call on FileDirectory ({})", name);
+        log::error!("Invalid function call on FileDirectory ({name})");
         Err("Function not found".into())
     }
 
     async fn call_method(&mut self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _arguments: &[VariableValue]) -> crate::Res<()> {
-        log::error!("Invalid method call on FileDirectory ({})", name);
+        log::error!("Invalid method call on FileDirectory ({name})");
         Err("Function not found".into())
     }
 }

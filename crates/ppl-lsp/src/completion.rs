@@ -99,53 +99,53 @@ pub fn get_completion(ast: &Ast, semantic_visitor: &SemanticVisitor, line_before
         }
 
         for (rt, r) in &semantic_visitor.references {
-            if matches!(rt, ReferenceType::Procedure(_)) {
-                if let Some((_, decl)) = &r.declaration {
-                    map.items.push(CompletionItem {
-                        label: decl.token.to_string(),
-                        insert_text: Some(decl.token.to_string()),
-                        kind: Some(tower_lsp::lsp_types::CompletionItemKind::METHOD),
-                        insert_text_format: Some(tower_lsp::lsp_types::InsertTextFormat::PLAIN_TEXT),
-                        ..Default::default()
-                    });
-                }
+            if matches!(rt, ReferenceType::Procedure(_))
+                && let Some((_, decl)) = &r.declaration
+            {
+                map.items.push(CompletionItem {
+                    label: decl.token.to_string(),
+                    insert_text: Some(decl.token.to_string()),
+                    kind: Some(tower_lsp::lsp_types::CompletionItemKind::METHOD),
+                    insert_text_format: Some(tower_lsp::lsp_types::InsertTextFormat::PLAIN_TEXT),
+                    ..Default::default()
+                });
             }
-            if matches!(rt, ReferenceType::Variable(_)) {
-                if let Some((_, decl)) = &r.declaration {
-                    map.items.push(CompletionItem {
-                        label: decl.token.to_string(),
-                        insert_text: Some(decl.token.to_string()),
-                        kind: Some(tower_lsp::lsp_types::CompletionItemKind::VARIABLE),
-                        insert_text_format: Some(tower_lsp::lsp_types::InsertTextFormat::PLAIN_TEXT),
-                        ..Default::default()
-                    });
-                }
+            if matches!(rt, ReferenceType::Variable(_))
+                && let Some((_, decl)) = &r.declaration
+            {
+                map.items.push(CompletionItem {
+                    label: decl.token.to_string(),
+                    insert_text: Some(decl.token.to_string()),
+                    kind: Some(tower_lsp::lsp_types::CompletionItemKind::VARIABLE),
+                    insert_text_format: Some(tower_lsp::lsp_types::InsertTextFormat::PLAIN_TEXT),
+                    ..Default::default()
+                });
             }
         }
     } else {
         for (rt, r) in &semantic_visitor.references {
-            if matches!(rt, ReferenceType::Function(_)) {
-                if let Some((_, decl)) = &r.declaration {
-                    map.items.push(CompletionItem {
-                        label: decl.token.to_string(),
-                        insert_text: Some(decl.token.to_string()),
-                        kind: Some(tower_lsp::lsp_types::CompletionItemKind::FUNCTION),
-                        insert_text_format: Some(tower_lsp::lsp_types::InsertTextFormat::PLAIN_TEXT),
-                        ..Default::default()
-                    });
-                }
+            if matches!(rt, ReferenceType::Function(_))
+                && let Some((_, decl)) = &r.declaration
+            {
+                map.items.push(CompletionItem {
+                    label: decl.token.to_string(),
+                    insert_text: Some(decl.token.to_string()),
+                    kind: Some(tower_lsp::lsp_types::CompletionItemKind::FUNCTION),
+                    insert_text_format: Some(tower_lsp::lsp_types::InsertTextFormat::PLAIN_TEXT),
+                    ..Default::default()
+                });
             }
 
-            if matches!(rt, ReferenceType::Variable(_)) {
-                if let Some((_, decl)) = &r.declaration {
-                    map.items.push(CompletionItem {
-                        label: decl.token.to_string(),
-                        insert_text: Some(decl.token.to_string()),
-                        kind: Some(tower_lsp::lsp_types::CompletionItemKind::VARIABLE),
-                        insert_text_format: Some(tower_lsp::lsp_types::InsertTextFormat::PLAIN_TEXT),
-                        ..Default::default()
-                    });
-                }
+            if matches!(rt, ReferenceType::Variable(_))
+                && let Some((_, decl)) = &r.declaration
+            {
+                map.items.push(CompletionItem {
+                    label: decl.token.to_string(),
+                    insert_text: Some(decl.token.to_string()),
+                    kind: Some(tower_lsp::lsp_types::CompletionItemKind::VARIABLE),
+                    insert_text_format: Some(tower_lsp::lsp_types::InsertTextFormat::PLAIN_TEXT),
+                    ..Default::default()
+                });
             }
         }
     }

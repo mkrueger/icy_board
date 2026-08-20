@@ -37,7 +37,7 @@ impl IcyBoardState {
         let expires = if user.expiration_date == chrono::DateTime::<chrono::Utc>::default() {
             self.get_display_text(IceText::None)?
         } else {
-            self.format_date(user.expiration_date.clone())
+            self.format_date(user.expiration_date)
         };
         self.show_setting(IceText::ViewSettingsExpireDate, &expires).await?;
 
@@ -131,7 +131,7 @@ impl IcyBoardState {
         self.reset_color(TerminalTarget::Both).await
     }
 
-    /// PCBoard leads the number with a blank and prints -1 as the Unlimited text.
+    /// `PCBoard` leads the number with a blank and prints -1 as the Unlimited text.
     async fn show_setting_number(&mut self, label: IceText, value: i64) -> Res<()> {
         let value = if value == -1 { self.unlimited_text() } else { value.to_string() };
         self.show_setting(label, &format!(" {value}")).await

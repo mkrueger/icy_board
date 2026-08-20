@@ -57,7 +57,7 @@ pub struct MessageArea {
 
 impl MessageArea {
     pub fn get_high_msg(&self) -> u32 {
-        JamMessageBase::open(&self.path).map(|jam| jam.highest_message_number()).unwrap_or(0)
+        JamMessageBase::open(&self.path).map_or(0, |jam| jam.highest_message_number())
     }
 }
 
@@ -98,10 +98,8 @@ impl UserData for MessageArea {
     }
 }
 
-lazy_static::lazy_static! {
-    pub static ref NAME: unicase::Ascii<String> = unicase::Ascii::new("Name".to_string());
-    pub static ref HAS_ACCESS: unicase::Ascii<String> = unicase::Ascii::new("HasAccess".to_string());
-}
+pub static NAME: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Name".to_string()));
+pub static HAS_ACCESS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("HasAccess".to_string()));
 
 #[async_trait]
 impl UserDataValue for MessageArea {
@@ -109,7 +107,7 @@ impl UserDataValue for MessageArea {
         if *name == *NAME {
             return Ok(VariableValue::new_string(self.name.clone()));
         }
-        log::error!("Invalid user data call on MessageArea ({})", name);
+        log::error!("Invalid user data call on MessageArea ({name})");
         Ok(VariableValue::new_int(-1))
     }
 
@@ -131,11 +129,11 @@ impl UserDataValue for MessageArea {
             let res = self.req_level_to_list.session_can_access(&vm.icy_board_state.session);
             return Ok(VariableValue::new_bool(res));
         }
-        log::error!("Invalid function call on MessageArea ({})", name);
+        log::error!("Invalid function call on MessageArea ({name})");
         Err("Function not found".into())
     }
     async fn call_method(&mut self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _arguments: &[VariableValue]) -> crate::Res<()> {
-        log::error!("Invalid method call on MessageArea ({})", name);
+        log::error!("Invalid method call on MessageArea ({name})");
         Err("Function not found".into())
     }
 }

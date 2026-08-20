@@ -266,11 +266,11 @@ impl SSHConnection {
             .request_pty(false, &terminal_type, caps.window_size.0 as u32, caps.window_size.1 as u32, 1, 1, &[])
             .await?;
         channel.request_shell(false).await?;
-        return Ok(Self {
+        Ok(Self {
             client: ssh,
             channel,
             read_buffer: Vec::new(), // Initialize empty buffer
-        });
+        })
     }
 
     fn default_port() -> u16 {

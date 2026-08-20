@@ -1,6 +1,6 @@
 use std::{
     fs,
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
 
@@ -8,6 +8,7 @@ use icy_board_engine::{
     compiler::{PPECompiler, workspace::Workspace},
     parser::{Encoding, ErrorReporter, UserTypeRegistry, parse_ast},
 };
+use std::fmt::Write as _;
 
 /// Emitted code size in bytes per test program. Nothing here may grow without a reason,
 /// and a shrinking number is the point of the exercise, so both directions are reported.
@@ -43,12 +44,12 @@ const EXPECTED_CODE_SIZE: &[(&str, usize)] = &[
     ("use_funcs1.pps", 22),
 ];
 
-fn code_size(file_name: &PathBuf, source: &str) -> usize {
+fn code_size(file_name: &Path, source: &str) -> usize {
     let reg = UserTypeRegistry::default();
     let errors = Arc::new(Mutex::new(ErrorReporter::default()));
     let workspace = Workspace::default();
 
-    let ast = parse_ast(file_name.clone(), errors.clone(), source, &reg, Encoding::Utf8, &workspace);
+    let ast = parse_ast(file_name.to_path_buf(), errors.clone(), source, &reg, Encoding::Utf8, &workspace);
     let mut compiler = PPECompiler::new(&workspace, reg, errors.clone());
     compiler.compile(&[&ast]);
 
@@ -90,13 +91,13 @@ fn test_the_emitted_code_does_not_grow() {
         let was = expected.iter().find(|(n, _)| n == name).map(|(_, s)| *s);
         match was {
             Some(was) if was == *size => {}
-            Some(was) => report.push_str(&format!("  {name}: {was} -> {size} ({:+})\n", *size as isize - was as isize)),
-            None => report.push_str(&format!("  {name}: new, {size}\n")),
+            Some(was) => _ = writeln!(report, "  {name}: {was} -> {size} ({:+})", *size as isize - was as isize),
+            None => _ = writeln!(report, "  {name}: new, {size}"),
         }
     }
     for (name, size) in &expected {
         if !measured.iter().any(|(n, _)| n == name) {
-            report.push_str(&format!("  {name}: gone, was {size}\n"));
+            let _ = writeln!(report, "  {name}: gone, was {size}");
         }
     }
 

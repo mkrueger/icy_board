@@ -1,4 +1,4 @@
-//! The MASK_* functions, whose character sets PCBoard's callers rely on.
+//! The MASK_* functions, whose character sets `PCBoard`'s callers rely on.
 
 use super::run_ppl;
 

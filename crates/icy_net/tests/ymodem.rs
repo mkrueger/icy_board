@@ -73,7 +73,7 @@ async fn test_send_ymodem() {
         let mut received = Vec::new();
 
         // Send initial 'C' to request CRC mode
-        receiver_conn.send(&[b'C']).await.unwrap();
+        receiver_conn.send(b"C").await.unwrap();
 
         // Read header block
         let mut buf = vec![0u8; 133];
@@ -82,7 +82,7 @@ async fn test_send_ymodem() {
         receiver_conn.send(&[ACK]).await.unwrap();
 
         // Send 'C' for data transfer
-        receiver_conn.send(&[b'C']).await.unwrap();
+        receiver_conn.send(b"C").await.unwrap();
 
         // Read data block
         receiver_conn.read(&mut buf).await.unwrap();
@@ -97,7 +97,7 @@ async fn test_send_ymodem() {
         receiver_conn.send(&[ACK]).await.unwrap();
 
         // Send 'C' for end of batch
-        receiver_conn.send(&[b'C']).await.unwrap();
+        receiver_conn.send(b"C").await.unwrap();
 
         // Read end-of-batch block (empty header)
         receiver_conn.read(&mut buf).await.unwrap();
@@ -107,7 +107,7 @@ async fn test_send_ymodem() {
         assert_eq!(received[..expected_clone.len()], expected_clone[..]);
     });
 
-    let state = test_sender(&mut sender_conn, &mut protocol, &[temp_path.clone()]).await;
+    let state = test_sender(&mut sender_conn, &mut protocol, std::slice::from_ref(&temp_path)).await;
 
     assert_eq!(state.send_state.finished_files.len(), 1);
     assert_eq!(state.send_state.total_bytes_transfered, data.len() as u64);
@@ -234,13 +234,13 @@ async fn test_ymodem_multiple_files() {
     // Spawn receiver simulation
     tokio::spawn(async move {
         // First file header
-        receiver_conn.send(&[b'C']).await.unwrap();
+        receiver_conn.send(b"C").await.unwrap();
         let mut buf = vec![0u8; 133];
         receiver_conn.read(&mut buf).await.unwrap();
         receiver_conn.send(&[ACK]).await.unwrap();
 
         // First file data
-        receiver_conn.send(&[b'C']).await.unwrap();
+        receiver_conn.send(b"C").await.unwrap();
         receiver_conn.read(&mut buf).await.unwrap();
         receiver_conn.send(&[ACK]).await.unwrap();
 
@@ -250,12 +250,12 @@ async fn test_ymodem_multiple_files() {
         receiver_conn.send(&[ACK]).await.unwrap();
 
         // Second file header
-        receiver_conn.send(&[b'C']).await.unwrap();
+        receiver_conn.send(b"C").await.unwrap();
         receiver_conn.read(&mut buf).await.unwrap();
         receiver_conn.send(&[ACK]).await.unwrap();
 
         // Second file data
-        receiver_conn.send(&[b'C']).await.unwrap();
+        receiver_conn.send(b"C").await.unwrap();
         receiver_conn.read(&mut buf).await.unwrap();
         receiver_conn.send(&[ACK]).await.unwrap();
 
@@ -264,7 +264,7 @@ async fn test_ymodem_multiple_files() {
         receiver_conn.send(&[ACK]).await.unwrap();
 
         // End of batch
-        receiver_conn.send(&[b'C']).await.unwrap();
+        receiver_conn.send(b"C").await.unwrap();
         receiver_conn.read(&mut buf).await.unwrap();
         receiver_conn.send(&[ACK]).await.unwrap();
     });
@@ -292,12 +292,12 @@ async fn test_ymodem_large_file() {
         let mut eot_buf = [0u8; 1];
 
         // File header
-        receiver_conn.send(&[b'C']).await.unwrap();
+        receiver_conn.send(b"C").await.unwrap();
         receiver_conn.read(&mut buf).await.unwrap();
         receiver_conn.send(&[ACK]).await.unwrap();
 
         // Request data transfer
-        receiver_conn.send(&[b'C']).await.unwrap();
+        receiver_conn.send(b"C").await.unwrap();
 
         // 3 data blocks (300 bytes = 3 * 128 byte blocks)
         for _ in 0..3 {
@@ -310,7 +310,7 @@ async fn test_ymodem_large_file() {
         receiver_conn.send(&[ACK]).await.unwrap();
 
         // End of batch
-        receiver_conn.send(&[b'C']).await.unwrap();
+        receiver_conn.send(b"C").await.unwrap();
         receiver_conn.read(&mut buf).await.unwrap();
         receiver_conn.send(&[ACK]).await.unwrap();
     });

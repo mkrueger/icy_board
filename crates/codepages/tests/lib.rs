@@ -8,14 +8,11 @@ mod test {
 
     #[test]
     fn test_get_from_uft8() {
-        assert_eq!(
-            get_utf8(&"\u{1F680}\u{1F642}".to_string().bytes().into_iter().collect::<Vec<u8>>()),
-            "\u{1F680}\u{1F642}"
-        );
+        assert_eq!(get_utf8(&"\u{1F680}\u{1F642}".to_string().bytes().collect::<Vec<u8>>()), "\u{1F680}\u{1F642}");
     }
 
     #[test]
     fn test_get_from_ascii() {
-        assert_eq!(get_utf8(&"Hello World".to_string().bytes().into_iter().collect::<Vec<u8>>()), "Hello World");
+        assert_eq!(get_utf8(&"Hello World".to_string().bytes().collect::<Vec<u8>>()), "Hello World");
     }
 }

@@ -13,13 +13,14 @@ use crate::{
     icy_board::{icb_text::IceText, state::IcyBoardState},
     vm::TerminalTarget,
 };
+use std::fmt::Write as _;
 
 /// Where a description starts, once the name, size and date columns are written.
 const DESCRIPTION_COLUMN: usize = 33;
 
 /// Keeps a description inside its column.
 ///
-/// A FILE_ID.DIZ is drawn for a screen that starts at column 0, and the ANSI ones
+/// A `FILE_ID.DIZ` is drawn for a screen that starts at column 0, and the ANSI ones
 /// usually open with a cursor-back to get there - `ESC[255D` is common. Printed as
 /// it stands, that walks over the name and size of the file it belongs to. The
 /// movement is shortened rather than dropped, so the art keeps its shape and its
@@ -33,7 +34,7 @@ fn clamp_to_column(line: &str, left: usize) -> String {
         if ch == '\r' {
             // A carriage return is a cursor-back to column zero by another name.
             if column > left {
-                out.push_str(&format!("\x1b[{}D", column - left));
+                let _ = write!(out, "\x1b[{}D", column - left);
                 column = left;
             }
             continue;
@@ -67,18 +68,18 @@ fn clamp_to_column(line: &str, left: usize) -> String {
                 let wanted = first();
                 let room = column - left;
                 if room > 0 {
-                    out.push_str(&format!("\x1b[{}D", wanted.min(room)));
+                    let _ = write!(out, "\x1b[{}D", wanted.min(room));
                     column -= wanted.min(room);
                 }
             }
             'C' => {
                 let by = first();
-                out.push_str(&format!("\x1b[{by}C"));
+                let _ = write!(out, "\x1b[{by}C");
                 column += by;
             }
             'G' => {
                 let wanted = first().max(left + 1);
-                out.push_str(&format!("\x1b[{wanted}G"));
+                let _ = write!(out, "\x1b[{wanted}G");
                 column = wanted - 1;
             }
             _ => {
@@ -95,7 +96,7 @@ fn clamp_to_column(line: &str, left: usize) -> String {
 /// Reduces a description to plain text.
 ///
 /// A DIZ carries whatever its author liked - colours, cursor movement, and on a
-/// PCBoard the `@X` pairs on top. A reset among them puts the caller back to the
+/// `PCBoard` the `@X` pairs on top. A reset among them puts the caller back to the
 /// terminal default and so loses the colour the board lists files in. A sysop who
 /// wants the listing to read as their board rather than as 1994 turns
 /// `strip_colors_in_descriptions` on and gets the words and nothing else.
@@ -195,7 +196,7 @@ impl FileList {
         let strip_description_colors = cmd.board.lock().await.config.file_transfer.strip_colors_in_descriptions;
         let sysop_name = cmd.board.lock().await.config.sysop.name.clone();
         let headers = self.files.lock().await.clone();
-        for entry in headers.iter() {
+        for entry in &headers {
             if !(filter.accepts)(entry) {
                 continue;
             }
@@ -203,10 +204,10 @@ impl FileList {
             // Only reached by files that are candidates, so an area is not scanned wholesale
             // just to list a handful of matches.
             let meta_data = self.files.lock().await.read_metadata(&full_path)?;
-            if let Some(accepts_described) = &filter.accepts_described {
-                if !accepts_described(entry, &meta_data) {
-                    continue;
-                }
+            if let Some(accepts_described) = &filter.accepts_described
+                && !accepts_described(entry, &meta_data)
+            {
+                continue;
             }
             if cmd.session.request_logoff {
                 break;
@@ -219,9 +220,9 @@ impl FileList {
             let name = entry.name();
             cmd.set_color(TerminalTarget::Both, colors.file_name.clone()).await?;
             if cmd.session.search_pattern.is_some() {
-                cmd.print_found_text(TerminalTarget::Both, &format!("{:<12} ", name)).await?;
+                cmd.print_found_text(TerminalTarget::Both, &format!("{name:<12} ")).await?;
             } else {
-                cmd.print(TerminalTarget::Both, &format!("{:<12} ", name)).await?;
+                cmd.print(TerminalTarget::Both, &format!("{name:<12} ")).await?;
             }
             if name.len() > 12 {
                 cmd.new_line().await?;
@@ -318,7 +319,7 @@ impl FileList {
 mod description_tests {
     use super::{DESCRIPTION_COLUMN, clamp_to_column};
 
-    /// The line that started this: the first line of the FILE_ID.DIZ in
+    /// The line that started this: the first line of the `FILE_ID.DIZ` in
     /// 3nt1094.zip walks back 255 columns before writing anything.
     #[test]
     fn a_cursor_back_cannot_leave_the_column() {
@@ -384,7 +385,7 @@ mod strip_color_tests {
         assert_eq!(strip_descriptions_markup("\x1b[255Dtitle"), "title");
     }
 
-    /// PCBoard wrote its colours as `@X` and two hex digits.
+    /// `PCBoard` wrote its colours as `@X` and two hex digits.
     #[test]
     fn pcboard_colour_pairs_go() {
         assert_eq!(strip_descriptions_markup("@X0Fbright@X07plain"), "brightplain");

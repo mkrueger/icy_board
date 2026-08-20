@@ -10,7 +10,7 @@ use serde_with::{DisplayFromStr, serde_as};
 use super::{IcyBoardSerializer, PCBoardRecordImporter, security_expr::SecurityExpression};
 
 /// A survey is a question and answer pair.
-/// PCBoard calles them "Questionnairies" but we call them surveys.
+/// `PCBoard` calles them "Questionnairies" but we call them surveys.
 #[serde_as]
 #[derive(Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct Survey {

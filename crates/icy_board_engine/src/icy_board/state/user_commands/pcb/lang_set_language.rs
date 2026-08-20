@@ -62,13 +62,14 @@ impl IcyBoardState {
             if language.is_empty() {
                 return Ok(language);
             }
-            if let Ok(number) = language.parse::<usize>() {
-                if number > 0 && number <= l.len() {
-                    if number == 1 {
-                        self.display_text(IceText::LanguageActive, display_flags::NEWLINE).await?;
-                    }
-                    return Ok(l[number - 1].extension.clone());
+            if let Ok(number) = language.parse::<usize>()
+                && number > 0
+                && number <= l.len()
+            {
+                if number == 1 {
+                    self.display_text(IceText::LanguageActive, display_flags::NEWLINE).await?;
                 }
+                return Ok(l[number - 1].extension.clone());
             }
             self.display_text(IceText::LanguageNotAvailable, display_flags::NEWLINE).await?;
         }

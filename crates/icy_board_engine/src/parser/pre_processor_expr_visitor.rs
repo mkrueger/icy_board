@@ -18,7 +18,7 @@ pub struct PreProcessorVisitor<'a> {
     pub errors: Arc<Mutex<ErrorReporter>>,
 }
 
-impl<'a> AstVisitor<Option<VariableValue>> for PreProcessorVisitor<'a> {
+impl AstVisitor<Option<VariableValue>> for PreProcessorVisitor<'_> {
     fn visit_constant_expression(&mut self, constant: &crate::ast::ConstantExpression) -> Option<VariableValue> {
         match constant.get_constant_value() {
             Constant::Boolean(b) => Some(VariableValue::new_bool(*b)),
@@ -27,7 +27,7 @@ impl<'a> AstVisitor<Option<VariableValue>> for PreProcessorVisitor<'a> {
             Constant::Double(f) => Some(VariableValue::new_double(*f)),
             Constant::Money(m) => Some(VariableValue::new_int(*m)),
             Constant::Unsigned(u) => Some(VariableValue::new_unsigned(*u)),
-            _ => None,
+            Constant::Builtin(_) => None,
         }
     }
 
@@ -108,10 +108,8 @@ fn partial_evaluate(get_op: BinOp, val: &VariableValue) -> Option<VariableValue>
                 return Some(VariableValue::new_bool(true));
             }
         }
-        BinOp::And => {
-            if !val.as_bool() {
-                return Some(VariableValue::new_bool(false));
-            }
+        BinOp::And if !val.as_bool() => {
+            return Some(VariableValue::new_bool(false));
         }
         _ => {}
     }

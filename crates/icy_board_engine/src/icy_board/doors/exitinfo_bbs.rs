@@ -11,7 +11,7 @@ use icy_engine::TextPane;
 use icy_net::crc::get_crc32;
 use std::fs;
 
-/// EXITINFO.BBS format from the RemoteAccess software. (2.62 extensions)
+/// EXITINFO.BBS format from the `RemoteAccess` software. (2.62 extensions)
 pub async fn create_exitinfo_bbs(state: &IcyBoardState, path: &std::path::Path) -> Res<()> {
     let mut contents = Vec::new();
     contents.extend(u16::to_le_bytes(DOOR_BPS_RATE as u16));
@@ -47,7 +47,7 @@ pub async fn create_exitinfo_bbs(state: &IcyBoardState, path: &std::path::Path) 
     }
 
     // USERSrecord
-    contents.extend(export_cp437_string(&user.get_name(), 35, 0));
+    contents.extend(export_cp437_string(user.get_name(), 35, 0));
     contents.extend(export_cp437_string(&user.city_or_state, 25, 0));
     contents.extend(export_cp437_string("", 50, 0)); // Organisation
     contents.extend(export_cp437_string(&user.street1, 50, 0));
@@ -84,7 +84,7 @@ pub async fn create_exitinfo_bbs(state: &IcyBoardState, path: &std::path::Path) 
     contents.extend(u32::to_le_bytes((user.stats.total_dnld_bytes / 1024) as u32));
     contents.extend(u32::to_le_bytes((user.stats.today_dnld_bytes / 1024) as u32));
     contents.extend(u32::to_le_bytes(0)); // Elapsed
-    contents.extend(u16::to_le_bytes(state.session.page_len as u16));
+    contents.extend(u16::to_le_bytes(state.session.page_len));
     contents.push(0); // LastPwdChange
     contents.extend(u16::to_le_bytes(0)); // Group
 
@@ -174,20 +174,20 @@ pub async fn create_exitinfo_bbs(state: &IcyBoardState, path: &std::path::Path) 
         contents.extend(export_cp437_string(&ici.term.software, 40, 0));
     } else {
         contents.push(0); // EMSI_Session
-        contents.extend(export_cp437_string(&"", 40, 0));
-        contents.extend(export_cp437_string(&"", 40, 0));
-        contents.extend(export_cp437_string(&"", 40, 0));
-        contents.extend(export_cp437_string(&"", 40, 0));
-        contents.extend(export_cp437_string(&"", 40, 0));
+        contents.extend(export_cp437_string("", 40, 0));
+        contents.extend(export_cp437_string("", 40, 0));
+        contents.extend(export_cp437_string("", 40, 0));
+        contents.extend(export_cp437_string("", 40, 0));
+        contents.extend(export_cp437_string("", 40, 0));
     }
 
     contents.push(0); // Hold_Attr1
     contents.push(0); // Hold_Attr2
     contents.push(0); // Hold_Len
 
-    contents.extend(export_cp437_string(&"", 80, 0)); // PageReason
+    contents.extend(export_cp437_string("", 80, 0)); // PageReason
     contents.push(0); // StatusLine
-    contents.extend(export_cp437_string(&"", 8, 0)); // LastCostMenu
+    contents.extend(export_cp437_string("", 8, 0)); // LastCostMenu
     contents.extend(u16::to_le_bytes(0)); // MenuCostPerMin
 
     if state.session.disp_options.grapics_mode == GraphicsMode::Avatar {

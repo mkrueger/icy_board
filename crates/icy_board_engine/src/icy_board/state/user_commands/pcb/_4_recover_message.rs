@@ -25,7 +25,7 @@ impl IcyBoardState {
                         IceText::MessageNumberToActivate,
                         40,
                         MASK_COMMAND,
-                        &CommandType::RestoreMessage.get_help(),
+                        CommandType::RestoreMessage.get_help(),
                         None,
                         display_flags::NEWLINE | display_flags::LFAFTER | display_flags::HIGHASCII,
                     )
@@ -39,7 +39,7 @@ impl IcyBoardState {
                 Ok(())
             }
             Err(err) => {
-                log::error!("Message index load error {}", err);
+                log::error!("Message index load error {err}");
                 log::error!("Creating new message index at {}", &message_base_file.display());
                 self.display_text(IceText::CreatingNewMessageIndex, display_flags::NEWLINE | display_flags::LFAFTER)
                     .await?;
@@ -59,17 +59,17 @@ impl IcyBoardState {
 
     async fn try_to_restore_message(&mut self, message_base: &mut JamMessageBase, number: u32) -> Res<()> {
         match message_base.restore_message(number) {
-            Ok(_) => {
+            Ok(()) => {
                 log::error!("Restore message {} ({})", number, message_base.path().display());
                 self.display_text(IceText::MessageRestored, display_flags::DEFAULT).await?;
-                self.print(TerminalTarget::Both, &format!("{}", number)).await?;
+                self.print(TerminalTarget::Both, &format!("{number}")).await?;
                 self.new_line().await?;
                 self.new_line().await?;
             }
             Err(err) => {
                 log::error!("Error restoring message:{} ({})/ {}", number, message_base.path().display(), err);
                 self.display_text(IceText::NoSuchMessageNumber, display_flags::DEFAULT).await?;
-                self.print(TerminalTarget::Both, &format!("{}", number)).await?;
+                self.print(TerminalTarget::Both, &format!("{number}")).await?;
                 self.new_line().await?;
                 self.new_line().await?;
             }

@@ -11,7 +11,7 @@ use crate::{
 };
 
 impl IcyBoardState {
-    /// Sysop command 3 - PCBoard shelled out to PCBPack for the current conference here.
+    /// Sysop command 3 - `PCBoard` shelled out to `PCBPack` for the current conference here.
     pub async fn pack_message_base(&mut self) -> Res<()> {
         let Some(areas) = self.session.current_conference.areas.clone() else {
             return Ok(());

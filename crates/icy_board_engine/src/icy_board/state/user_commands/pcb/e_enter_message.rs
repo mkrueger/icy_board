@@ -17,7 +17,7 @@ use jamjam::jam::{
     msg_header::{MessageSubfield, SubfieldType},
 };
 
-/// PCBoard treats conference types 3 and 4 as "internet" for the routing,
+/// `PCBoard` treats conference types 3 and 4 as "internet" for the routing,
 /// newsgroup and follow-up questions.
 fn is_usenet(conference_type: &ConferenceType) -> bool {
     matches!(conference_type, ConferenceType::UsnetModeratedNewsgroup | ConferenceType::UsnetPublicNewsgroup)
@@ -79,7 +79,7 @@ impl IcyBoardState {
 
         if subject.is_empty() {
             return Ok(());
-        };
+        }
 
         let to_all = to.eq_ignore_ascii_case("ALL");
         let options = self.get_message_options(to_all).await?;
@@ -140,7 +140,7 @@ impl IcyBoardState {
                 return Ok(Some(to));
             }
 
-            self.session.op_text = to.clone();
+            self.session.op_text.clone_from(&to);
             self.display_text(
                 if found {
                     IceText::UserNotRegisteredInConference
@@ -168,7 +168,7 @@ impl IcyBoardState {
     }
 
     /// Prompts for message security, return receipt and echo flag, mirroring the
-    /// original PCBoard flow.
+    /// original `PCBoard` flow.
     async fn get_message_options(&mut self, to_all: bool) -> Res<MessageOptions> {
         let mut options = MessageOptions {
             attributes: 0,
@@ -361,7 +361,7 @@ impl IcyBoardState {
                     }
                     return Ok(false);
                 }
-                _ => continue,
+                _ => {}
             }
         }
     }

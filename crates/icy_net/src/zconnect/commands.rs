@@ -42,16 +42,16 @@ pub mod system_paths {
 fn get_mail_attr(attr: u8) -> String {
     let mut mail = String::new();
     if attr & mails::PERSONAL != 0 {
-        mail.push_str("P");
+        mail.push('P');
     }
     if attr & mails::URGENT != 0 {
-        mail.push_str("E");
+        mail.push('E');
     }
     if attr & mails::NEWS != 0 {
-        mail.push_str("B");
+        mail.push('B');
     }
     if attr & mails::ERRORS != 0 {
-        mail.push_str("F");
+        mail.push('F');
     }
     mail
 }
@@ -139,7 +139,7 @@ impl ZConnectBlock for ZConnectCommandBlock {
                 self.commands.push(ZConnectCmd::PgpKeyreq);
             }
             "EXECUTE" => {
-                self.commands.push(ZConnectCmd::Execute(Execute::from_str(&parameter)));
+                self.commands.push(ZConnectCmd::Execute(Execute::parse(&parameter)));
             }
             "WAIT" => {
                 let p = match parameter.as_str() {
@@ -294,7 +294,7 @@ pub enum Execute {
 }
 
 impl Execute {
-    pub fn from_str(s: &str) -> Self {
+    pub fn parse(s: &str) -> Self {
         match s {
             "J" | "Y" => Execute::Yes,
             "N" => Execute::No,

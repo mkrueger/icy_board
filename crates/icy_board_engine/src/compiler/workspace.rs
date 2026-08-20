@@ -121,14 +121,14 @@ impl Workspace {
             return files;
         };
 
-        for entry in walkdir::WalkDir::new(&base_path.join("src")).into_iter().flatten() {
+        for entry in walkdir::WalkDir::new(base_path.join("src")).into_iter().flatten() {
             if !entry.path().is_file() {
                 continue;
             }
-            if let Some(ext) = entry.path().extension() {
-                if ext != "pps" {
-                    continue;
-                }
+            if let Some(ext) = entry.path().extension()
+                && ext != "pps"
+            {
+                continue;
             }
             files.push(entry.path().to_path_buf());
         }
@@ -150,10 +150,10 @@ impl Workspace {
     }
 
     pub fn language_version(&self) -> u16 {
-        if let Some(compiler) = &self.compiler {
-            if let Some(language_version) = compiler.language_version {
-                return language_version;
-            }
+        if let Some(compiler) = &self.compiler
+            && let Some(language_version) = compiler.language_version
+        {
+            return language_version;
         }
         self.runtime().min(LAST_PPL_LANGUAGE_VERSION)
     }

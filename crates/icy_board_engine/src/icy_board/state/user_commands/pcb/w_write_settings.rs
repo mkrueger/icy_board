@@ -21,9 +21,9 @@ impl IcyBoardState {
     ///
     /// The prompt sequence is a compatibility contract: PPEs pre-answer it with
     /// KBDSTUFF, so a missing or extra question shifts every following stuffed
-    /// answer onto the wrong field. The order below is the one PCBoard walks,
-    /// verified against a live board. Anything icy_board asks on top of that is
-    /// appended after the last PCBoard question so the indices stay stable.
+    /// answer onto the wrong field. The order below is the one `PCBoard` walks,
+    /// verified against a live board. Anything `icy_board` asks on top of that is
+    /// appended after the last `PCBoard` question so the indices stay stable.
     pub async fn write_settings(&mut self) -> Res<()> {
         // PCBoard ignores any argument to W.
         self.session.tokens.clear();
@@ -59,7 +59,7 @@ impl IcyBoardState {
 
             // PCBoard judges the password before it asks for the confirmation.
             let min_len = self.get_board().await.config.limits.min_pwd_length;
-            let verdict = new_user.password.check_new_password(&new_user.get_name(), &pw1, min_len);
+            let verdict = new_user.password.check_new_password(new_user.get_name(), &pw1, min_len);
             match verdict {
                 PasswordVerdict::TooShort => {
                     self.session.op_text = min_len.to_string();
@@ -187,7 +187,7 @@ impl IcyBoardState {
                 .input_field(
                     IceText::SetFSEDefault,
                     1,
-                    &"YNA",
+                    "YNA",
                     "",
                     Some(str.to_string()),
                     display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::UPCASE,
@@ -417,10 +417,10 @@ impl IcyBoardState {
         if settings.ask_xfer_protocol {
             let protocol = self.ask_protocols("N").await?;
             self.new_line().await?;
-            if !protocol.is_empty() {
-                new_user.protocol = protocol;
-            } else {
+            if protocol.is_empty() {
                 new_user.protocol = "N".to_string();
+            } else {
+                new_user.protocol = protocol;
             }
         }
 
@@ -516,7 +516,7 @@ impl IcyBoardState {
     }
 
     /// A yes/no question that keeps the current setting when the user just
-    /// presses Enter, the way PCBoard's `getfield` pre-loads the answer buffer.
+    /// presses Enter, the way `PCBoard`'s `getfield` pre-loads the answer buffer.
     pub(crate) async fn ask_yes_no(&mut self, text: IceText, current: bool) -> Res<bool> {
         let yes_char = self.session.yes_char.to_ascii_uppercase();
         let default = if current { yes_char } else { self.session.no_char.to_ascii_uppercase() };
@@ -560,11 +560,12 @@ impl IcyBoardState {
                 display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER | display_flags::UPCASE | display_flags::FIELDLEN,
             )
             .await?;
-        if let Ok(number) = date_format.parse::<usize>() {
-            if number > 0 && number <= date_formats.len() {
-                return Ok(date_formats[number - 1].1.clone());
-            }
+        if let Ok(number) = date_format.parse::<usize>()
+            && number > 0
+            && number <= date_formats.len()
+        {
+            return Ok(date_formats[number - 1].1.clone());
         }
-        return Ok(cur_format.to_string());
+        Ok(cur_format.to_string())
     }
 }

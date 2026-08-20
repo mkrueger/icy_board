@@ -30,11 +30,10 @@ impl Display for GroupList {
                     if i > 0 {
                         write!(f, ", ")?;
                     }
-                    write!(f, "{}", member)?;
+                    write!(f, "{member}")?;
                 }
             }
-            write!(f, "\n")?;
-            continue;
+            writeln!(f)?;
         }
         Ok(())
     }
@@ -73,18 +72,18 @@ impl FromStr for GroupList {
         for ch in s.chars() {
             match state {
                 ParseState::GroupName => {
-                    if ch == '#' && grp.name.len() == 0 {
+                    if ch == '#' && grp.name.is_empty() {
                         state = ParseState::Comment;
                     } else if ch == ':' {
                         state = ParseState::Description;
-                    } else if !ch.is_whitespace() || grp.name.len() > 0 {
+                    } else if !ch.is_whitespace() || !grp.name.is_empty() {
                         grp.name.push(ch);
                     }
                 }
                 ParseState::Description => {
                     if ch == ':' {
                         state = ParseState::MemberStart;
-                    } else if !ch.is_whitespace() || grp.description.len() > 0 {
+                    } else if !ch.is_whitespace() || !grp.description.is_empty() {
                         grp.description.push(ch);
                     }
                 }

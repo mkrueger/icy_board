@@ -44,7 +44,7 @@ pub async fn await_ssh_connections(ssh: SSH, board: Arc<tokio::sync::Mutex<IcyBo
     match russh::server::Server::run_on_address(&mut server_impl, config.clone(), (configured_addr.as_str(), ssh.port)).await {
         Ok(_) => {
             log::info!("SSH listening on {}:{}", configured_addr, ssh.port);
-            return Ok(());
+            Ok(())
         }
         Err(e) => {
             log::error!("SSH bind failed on {}:{} -> {e}; kind={:?}", configured_addr, ssh.port, e);
@@ -54,13 +54,13 @@ pub async fn await_ssh_connections(ssh: SSH, board: Arc<tokio::sync::Mutex<IcyBo
                 log::warn!("Retrying SSH listener on fallback {}:{}", fallback, ssh.port);
                 if let Err(e2) = russh::server::Server::run_on_address(&mut server_impl, config, (fallback, ssh.port)).await {
                     log::error!("SSH fallback bind also failed on {}:{} -> {e2}", fallback, ssh.port);
-                    return Err(e2.into());
+                    Err(e2.into())
                 } else {
                     log::info!("SSH listening on fallback {}:{}", fallback, ssh.port);
-                    return Ok(());
+                    Ok(())
                 }
             } else {
-                return Err(e.into());
+                Err(e.into())
             }
         }
     }
@@ -97,7 +97,7 @@ impl server::Handler for SshSession {
     async fn channel_open_session(&mut self, channel: Channel<Msg>, reply: ChannelOpenHandle, session: &mut Session) -> Result<(), Self::Error> {
         let bbs2 = self.bbs.clone();
         let node = self.bbs.lock().await.create_new_node(ConnectionType::SSH).await;
-        let node_list = self.bbs.lock().await.get_open_connections().await.clone();
+        let node_list = self.bbs.lock().await.get_open_connections().clone();
         let board = self.board.clone();
 
         let channel_id = channel.id();
@@ -117,7 +117,7 @@ impl server::Handler for SshSession {
             })
             .unwrap();
 
-        self.bbs.lock().await.get_open_connections().await.lock().await[node].as_mut().unwrap().handle = Some(handle);
+        self.bbs.lock().await.get_open_connections().lock().await[node].as_mut().unwrap().handle = Some(handle);
 
         reply.accept().await;
         Ok(())

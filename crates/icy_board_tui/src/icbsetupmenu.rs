@@ -173,16 +173,16 @@ impl IcbSetupMenuUI {
                 }
             }
         }
-        if let KeyCode::F(1) = key.code {
-            if let Some(str) = self.menu.help(&mut self.state) {
-                return (
-                    ResultState {
-                        edit_msg: EditMessage::DisplayHelp(str.to_string()),
-                        ..Default::default()
-                    },
-                    None,
-                );
-            }
+        if let KeyCode::F(1) = key.code
+            && let Some(str) = self.menu.help(&mut self.state)
+        {
+            return (
+                ResultState {
+                    edit_msg: EditMessage::DisplayHelp(str.to_string()),
+                    ..Default::default()
+                },
+                None,
+            );
         }
 
         (ResultState::default(), self.menu.handle_key_press(key, &mut self.state).cloned())

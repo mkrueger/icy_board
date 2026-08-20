@@ -1,5 +1,6 @@
 use chrono::{DateTime, NaiveDate, TimeZone, Utc};
 use codepages::tables::get_utf8;
+use std::fmt::Write as _;
 
 /// One file as it appeared in a PCBoard DIR listing or a FILES.BBS.
 #[derive(Debug, PartialEq)]
@@ -193,7 +194,7 @@ fn strip_leading_size_and_date(rest: &str) -> &str {
 pub fn format_files_bbs(entries: &[(String, String)]) -> String {
     let mut result = String::new();
     for (name, description) in entries {
-        result.push_str(&format!("{:<12} ", name));
+        let _ = write!(result, "{:<12} ", name);
         for (i, line) in description.lines().enumerate() {
             if i > 0 {
                 result.push_str(&" ".repeat(13));

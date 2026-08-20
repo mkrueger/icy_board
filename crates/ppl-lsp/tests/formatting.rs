@@ -45,7 +45,7 @@ fn format_as_editor(path: &Path, source: &str) -> String {
         visitor.format(&ast);
         backend.edits
     };
-    edits.sort_by(|a, b| b.range.start.cmp(&a.range.start));
+    edits.sort_by_key(|b| std::cmp::Reverse(b.range.start));
 
     let mut text = rope;
     for edit in &edits {

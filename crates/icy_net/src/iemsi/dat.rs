@@ -33,6 +33,12 @@ impl std::fmt::Display for EmsiDAT {
     }
 }
 
+impl Default for EmsiDAT {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EmsiDAT {
     pub fn new() -> Self {
         EmsiDAT {

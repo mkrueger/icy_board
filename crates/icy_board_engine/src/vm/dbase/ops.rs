@@ -4,6 +4,10 @@
 //! reports success, so each operation lives here once and both forms call it. The `bool`
 //! that comes back is PPL's own convention: `true` means the operation failed.
 
+// Every opcode handler is called with `.await` from the statement/function dispatch
+// tables, so the signature stays async even where a given handler never awaits.
+#![allow(clippy::unused_async)]
+
 use std::path::PathBuf;
 
 use crate::{
@@ -304,7 +308,7 @@ pub async fn dseek(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<i32> {
 
 // -- locking ----------------------------------------------------------------------------
 
-/// Every lock succeeds. PCBoard's locks only mean anything against other DOS nodes
+/// Every lock succeeds. `PCBoard`'s locks only mean anything against other DOS nodes
 /// sharing the file, which is not a situation this engine can be in.
 pub async fn dlock(_vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<bool> {
     Ok(false)
@@ -315,7 +319,7 @@ pub async fn fnext(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<i32> {
     Ok((0..MAX_FILE_CHANNELS).find(|c| !vm.io.is_open(*c)).unwrap_or(-1))
 }
 
-/// PCBoard has no message for any of its dBase error codes, and neither do we.
+/// `PCBoard` has no message for any of its dBase error codes, and neither do we.
 pub async fn derrmsg(_vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<String> {
     Ok(String::new())
 }

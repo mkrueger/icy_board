@@ -3,7 +3,7 @@ use crate::{Res, icy_board::state::IcyBoardState, vm::TerminalTarget};
 
 impl IcyBoardState {
     /// Sysop command 11 - the node list WHO shows, including the nodes that carry
-    /// no caller, which is what PCBoard's expanded display adds.
+    /// no caller, which is what `PCBoard`'s expanded display adds.
     pub async fn node_list(&mut self) -> Res<()> {
         self.display_text(IceText::UserNetHeader, display_flags::NEWLINE).await?;
         self.display_text(IceText::UsernetUnderline, display_flags::NEWLINE).await?;

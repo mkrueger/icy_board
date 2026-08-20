@@ -1,3 +1,6 @@
+// See icy_board_tui's crate-level allow for the rationale (ratatui config-menu
+// callback/closure types are inherently complex; not worth type-aliasing).
+#![allow(clippy::type_complexity)]
 use app::new_main_window;
 use argh::FromArgs;
 use chrono::Local;
@@ -260,10 +263,10 @@ fn main() -> Result<()> {
             app.run(terminal)?;
             term::restore()?;
 
-            if app.save.writes() {
-                if let Err(err) = icy_board.lock().unwrap().save() {
-                    return Err(eyre!(err.to_string()));
-                }
+            if app.save.writes()
+                && let Err(err) = icy_board.lock().unwrap().save()
+            {
+                return Err(eyre!(err.to_string()));
             }
             // PCBSetup left its editor for a plain screen to report on the paths. See writefile() in DATAWRIT.C.
             if app.save == SaveChoice::Save {

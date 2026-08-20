@@ -49,30 +49,29 @@ pub mod display_flags {
 
 const TXT_STOPCHAR: char = '_';
 
-lazy_static::lazy_static! {
-    pub static ref MASK_PWD: String = (' '..='~').collect::<String>();
-    pub static ref MASK_ALPHA: String = ('A'..='Z').collect::<String>() + ('a'..='z').collect::<String>().as_str();
-    pub static ref MASK_NUM: String = ('0'..='9').collect::<String>();
-    /// PPL's MASK_ALNUM(), which is narrower than the name suggests elsewhere:
-    /// PCBoard's own "alphanumeric" mask is all of printable ASCII.
-    pub static ref MASK_ALNUM: String = ('A'..='Z').collect::<String>() + ('a'..='z').collect::<String>().as_str() + ('0'..='9').collect::<String>().as_str();
-    pub static ref MASK_FILE: String =  ('@'..='z').collect::<String>() + ('0'..=':').collect::<String>().as_str() + "!#$%&'()-.~";
-    pub static ref MASK_PATH: String =  ('@'..='z').collect::<String>()
-    + ('0'..=':').collect::<String>().as_str()
-    + "!#$%&'()-.~:\\";
-    pub static ref MASK_ASCII: String = (' '..='~').collect::<String>();
-    /// What PCBoard lets through where line noise is not a concern: printable
-    /// ASCII plus the high half, so an accented name survives.
-    pub static ref MASK_MESSAGE: String = (' '..='~').collect::<String>() + ('\u{80}'..='\u{FE}').collect::<String>().as_str();
-    pub static ref MASK_WEB: String = ('A'..='Z').collect::<String>() + ('a'..='z').collect::<String>().as_str() + ('0'..='9').collect::<String>().as_str() + "@.:!#$%&'*+-/=?^_`{|}~";
-
-    pub static ref MASK_PHONE: String = ('0'..='9').collect::<String>() + "/()-+ ";
-
-    pub static ref MASK_NAME: String = ('A'..='Z').collect::<String>() + ('a'..='z').collect::<String>().as_str() + " .,-'";
-
-    pub static ref MASK_DATE: String = ('0'..='9').collect::<String>() + "./";
-
-}
+pub static MASK_PWD: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| (' '..='~').collect::<String>());
+pub static MASK_ALPHA: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| ('A'..='Z').collect::<String>() + ('a'..='z').collect::<String>().as_str());
+pub static MASK_NUM: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| ('0'..='9').collect::<String>());
+/// PPL's `MASK_ALNUM()`, which is narrower than the name suggests elsewhere:
+/// `PCBoard`'s own "alphanumeric" mask is all of printable ASCII.
+pub static MASK_ALNUM: std::sync::LazyLock<String> =
+    std::sync::LazyLock::new(|| ('A'..='Z').collect::<String>() + ('a'..='z').collect::<String>().as_str() + ('0'..='9').collect::<String>().as_str());
+pub static MASK_FILE: std::sync::LazyLock<String> =
+    std::sync::LazyLock::new(|| ('@'..='z').collect::<String>() + ('0'..=':').collect::<String>().as_str() + "!#$%&'()-.~");
+pub static MASK_PATH: std::sync::LazyLock<String> =
+    std::sync::LazyLock::new(|| ('@'..='z').collect::<String>() + ('0'..=':').collect::<String>().as_str() + "!#$%&'()-.~:\\");
+pub static MASK_ASCII: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| (' '..='~').collect::<String>());
+/// What `PCBoard` lets through where line noise is not a concern: printable
+/// ASCII plus the high half, so an accented name survives.
+pub static MASK_MESSAGE: std::sync::LazyLock<String> =
+    std::sync::LazyLock::new(|| (' '..='~').collect::<String>() + ('\u{80}'..='\u{FE}').collect::<String>().as_str());
+pub static MASK_WEB: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
+    ('A'..='Z').collect::<String>() + ('a'..='z').collect::<String>().as_str() + ('0'..='9').collect::<String>().as_str() + "@.:!#$%&'*+-/=?^_`{|}~"
+});
+pub static MASK_PHONE: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| ('0'..='9').collect::<String>() + "/()-+ ");
+pub static MASK_NAME: std::sync::LazyLock<String> =
+    std::sync::LazyLock::new(|| ('A'..='Z').collect::<String>() + ('a'..='z').collect::<String>().as_str() + " .,-'");
+pub static MASK_DATE: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| ('0'..='9').collect::<String>() + "./");
 
 pub const MASK_COMMAND: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;':,.<>?/\\\" ";
 
@@ -166,7 +165,7 @@ impl IcyBoardState {
         }
 
         if display_flags & display_flags::LOGIT != 0 {
-            log::info!("{}", txt);
+            log::info!("{txt}");
         }
 
         // let old_color = self.user_screen.caret.get_attribute().as_u8(icy_engine::IceMode::Blink);
@@ -208,7 +207,7 @@ impl IcyBoardState {
                     return Ok(());
                 }
                 for sc in call.arguments {
-                    self.session.tokens.push_back(sc.to_string());
+                    self.session.tokens.push_back(sc.clone());
                 }
                 match call.call_type {
                     PPECallType::PPE => {
@@ -222,17 +221,16 @@ impl IcyBoardState {
                     }
                 }
                 return Ok(());
-            } else {
-                // display text
-                self.print(TerminalTarget::Both, txt).await?;
             }
+            // display text
+            self.print(TerminalTarget::Both, txt).await?;
         }
         Ok(())
     }
 
     pub async fn display_menu<P: AsRef<Path>>(&mut self, file_name: &P) -> Res<bool> {
         let resolved_name_ppe = self.get_board().await.resolve_file(&(file_name.as_ref().with_extension("ppe")));
-        let path = PathBuf::from(resolved_name_ppe);
+        let path = resolved_name_ppe;
         if path.exists() {
             self.run_ppe(&path, None).await?;
             return Ok(true);
@@ -332,35 +330,35 @@ impl IcyBoardState {
         if self.session.request_logoff {
             return Ok(String::new());
         }
-        self.session.default_answer = default_answer.clone();
+        self.session.default_answer.clone_from(&default_answer);
         self.session.disp_options.no_change();
 
         // we've data from a PPE here, so take that input and return it.
         // ignoring all other settings.
-        if let Some(front) = self.char_buffer.front() {
-            if front.source.is_hidden() {
-                let mut result = String::new();
-                while let Some(key) = self.char_buffer.pop_front() {
-                    if key.ch == '\n' || key.ch == '\r' {
-                        break;
-                    }
-                    result.push(key.ch);
+        if let Some(front) = self.char_buffer.front()
+            && front.source.is_hidden()
+        {
+            let mut result = String::new();
+            while let Some(key) = self.char_buffer.pop_front() {
+                if key.ch == '\n' || key.ch == '\r' {
+                    break;
                 }
-                if result.is_empty() {
-                    return Ok(String::new());
-                }
-                // Return the whole stuffed line so the caller can tokenize it
-                // (the same way typed input is handled). Returning only the
-                // first token here corrupted the token order when the caller
-                // re-pushed the returned value.
-                let result = if display_flags & display_flags::UPCASE != 0 {
-                    result.to_uppercase()
-                } else {
-                    result
-                };
-                self.session.last_answer = Some(result.clone());
-                return Ok(result);
+                result.push(key.ch);
             }
+            if result.is_empty() {
+                return Ok(String::new());
+            }
+            // Return the whole stuffed line so the caller can tokenize it
+            // (the same way typed input is handled). Returning only the
+            // first token here corrupted the token order when the caller
+            // re-pushed the returned value.
+            let result = if display_flags & display_flags::UPCASE != 0 {
+                result.to_uppercase()
+            } else {
+                result
+            };
+            self.session.last_answer = Some(result.clone());
+            return Ok(result);
         }
         if let Some(token) = self.session.tokens.pop_front() {
             self.session.last_answer = Some(token.clone());
@@ -391,24 +389,24 @@ impl IcyBoardState {
 
         // we've data from a PPE here, so take that input and return it.
         // ignoring all other settings.
-        if let Some(front) = self.char_buffer.front() {
-            if front.source.is_hidden() {
-                let mut result = String::new();
-                while let Some(key) = self.char_buffer.pop_front() {
-                    if key.ch == '\n' || key.ch == '\r' {
-                        break;
-                    }
-                    result.push(key.ch);
+        if let Some(front) = self.char_buffer.front()
+            && front.source.is_hidden()
+        {
+            let mut result = String::new();
+            while let Some(key) = self.char_buffer.pop_front() {
+                if key.ch == '\n' || key.ch == '\r' {
+                    break;
                 }
-                log::info!("PPE stuffed input: {}", result);
-                let result = if display_flags & display_flags::UPCASE != 0 {
-                    result.to_uppercase()
-                } else {
-                    result
-                };
-                self.session.last_answer = Some(result.clone());
-                return Ok(result);
+                result.push(key.ch);
             }
+            log::info!("PPE stuffed input: {result}");
+            let result = if display_flags & display_flags::UPCASE != 0 {
+                result.to_uppercase()
+            } else {
+                result
+            };
+            self.session.last_answer = Some(result.clone());
+            return Ok(result);
         }
 
         let mut show_field_len = display_flags & display_flags::FIELDLEN != 0 && self.use_ansi();
@@ -438,10 +436,10 @@ impl IcyBoardState {
                 }
                 // A default longer than the field it sits in would overwrite the
                 // closing delimiter, so it is cut to what the field can hold.
-                if let Some(default) = &mut default_answer {
-                    if default.chars().count() as i32 > len {
-                        *default = default.chars().take(len as usize).collect();
-                    }
+                if let Some(default) = &mut default_answer
+                    && default.chars().count() as i32 > len
+                {
+                    *default = default.chars().take(len as usize).collect();
                 }
             }
             self.forward(len).await?;
@@ -476,13 +474,13 @@ impl IcyBoardState {
                 key_char.ch = key_char.ch.to_ascii_uppercase();
             }
             if key_char.ch == '\n' || key_char.ch == '\r' {
-                if !help.is_empty() {
-                    if let Some(cmd) = self.try_find_command(&output, true).await {
-                        if !cmd.actions.is_empty() && cmd.actions[0].command_type == CommandType::Help {
-                            self.show_help(help).await?;
-                            return self.input_string(color, prompt, len, valid_mask, help, default_answer, display_flags).await;
-                        }
-                    }
+                if !help.is_empty()
+                    && let Some(cmd) = self.try_find_command(&output, true).await
+                    && !cmd.actions.is_empty()
+                    && cmd.actions[0].command_type == CommandType::Help
+                {
+                    self.show_help(help).await?;
+                    return self.input_string(color, prompt, len, valid_mask, help, default_answer, display_flags).await;
                 }
 
                 if display_flags & display_flags::ERASELINE != 0 {
@@ -525,11 +523,11 @@ impl IcyBoardState {
             self.new_line().await?;
         }
 
-        if output.is_empty() {
-            if let Some(default) = default_answer {
-                self.session.last_answer = Some(default.clone());
-                return Ok(default);
-            }
+        if output.is_empty()
+            && let Some(default) = default_answer
+        {
+            self.session.last_answer = Some(default.clone());
+            return Ok(default);
         }
         self.session.last_answer = Some(output.clone());
         Ok(output)
@@ -634,7 +632,7 @@ impl IcyBoardState {
                 self.new_line().await?;
             }
             Err(err) => {
-                log::error!("while opening message base: {}", err.to_string());
+                log::error!("while opening message base: {err}");
                 self.display_text(IceText::MessageBaseError, display_flags::NEWLINE).await?;
             }
         }
@@ -654,7 +652,7 @@ impl IcyBoardState {
         Ok(if msg_base.with_extension("jhr").exists() {
             JamMessageBase::open(msg_base)?
         } else {
-            log::info!("Creating new email message base for user {}", user_name);
+            log::info!("Creating new email message base for user {user_name}");
             if let Some(parent) = msg_base.parent() {
                 std::fs::create_dir_all(parent)?;
             }

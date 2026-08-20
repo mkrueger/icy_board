@@ -1,11 +1,11 @@
-//! PCBoard compatibility status of the predefined PPL statements and functions.
+//! `PCBoard` compatibility status of the predefined PPL statements and functions.
 //!
 //! This is the single source of truth consumed both at runtime (`ppld --check`)
 //! and by the `opcode_coverage` integration test. The test derives the real status by
 //! scanning the VM dispatch tables and handler bodies, so these lists cannot drift out
 //! of sync with the implementation.
 
-/// How faithfully an opcode is implemented compared to the original PCBoard.
+/// How faithfully an opcode is implemented compared to the original `PCBoard`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ImplStatus {
     /// Implemented and expected to behave like the original.

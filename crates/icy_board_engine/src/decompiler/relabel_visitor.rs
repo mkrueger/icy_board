@@ -30,17 +30,17 @@ impl TransformLabelVisitor {
 }
 impl AstVisitorMut for TransformLabelVisitor {
     fn visit_goto_statement(&mut self, goto_stmt: &crate::ast::GotoStatement) -> crate::ast::Statement {
-        let label = self.get_label(&goto_stmt.get_label());
+        let label = self.get_label(goto_stmt.get_label());
         GotoStatement::create_empty_statement(label)
     }
 
     fn visit_gosub_statement(&mut self, gosub: &crate::ast::GosubStatement) -> crate::ast::Statement {
-        let label = self.get_label(&gosub.get_label());
+        let label = self.get_label(gosub.get_label());
         GosubStatement::create_empty_statement(label)
     }
 
     fn visit_label_statement(&mut self, label_stmt: &crate::ast::LabelStatement) -> crate::ast::Statement {
-        let label = self.get_label(&label_stmt.get_label());
+        let label = self.get_label(label_stmt.get_label());
         LabelStatement::create_empty_statement(label)
     }
 }

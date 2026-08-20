@@ -490,30 +490,28 @@ pub const KEYWORDS: &[Keyword] = &[
     Keyword { name: "begin",     token: Token::Begin,     since: 400 },
 ];
 
-lazy_static::lazy_static! {
-    /// One table per version that reserves a word, in ascending order.
-    static ref TOKEN_LOOKUP_TABLES: Vec<(u16, HashMap<unicase::Ascii<String>, Token>)> = {
-        let mut versions: Vec<u16> = KEYWORDS.iter().map(|keyword| keyword.since).collect();
-        versions.sort_unstable();
-        versions.dedup();
+/// One table per version that reserves a word, in ascending order.
+static TOKEN_LOOKUP_TABLES: std::sync::LazyLock<Vec<(u16, HashMap<unicase::Ascii<String>, Token>)>> = std::sync::LazyLock::new(|| {
+    let mut versions: Vec<u16> = KEYWORDS.iter().map(|keyword| keyword.since).collect();
+    versions.sort_unstable();
+    versions.dedup();
 
-        versions
-            .into_iter()
-            .map(|version| {
-                let mut m: HashMap<unicase::Ascii<String>, Token> = KEYWORDS
-                    .iter()
-                    .filter(|keyword| keyword.since <= version)
-                    .map(|keyword| (unicase::Ascii::new(keyword.name.to_string()), keyword.token.clone()))
-                    .collect();
+    versions
+        .into_iter()
+        .map(|version| {
+            let mut m: HashMap<unicase::Ascii<String>, Token> = KEYWORDS
+                .iter()
+                .filter(|keyword| keyword.since <= version)
+                .map(|keyword| (unicase::Ascii::new(keyword.name.to_string()), keyword.token.clone()))
+                .collect();
 
-                for c in &BUILTIN_CONSTS {
-                    m.insert(unicase::Ascii::new(c.name.to_string()), Token::Const(Constant::Builtin(c)));
-                }
-                (version, m)
-            })
-            .collect()
-    };
-}
+            for c in &BUILTIN_CONSTS {
+                m.insert(unicase::Ascii::new(c.name.to_string()), Token::Const(Constant::Builtin(c)));
+            }
+            (version, m)
+        })
+        .collect()
+});
 
 /// The words a source of this language version may not use as a name.
 fn token_lookup_table(lang_version: u16) -> &'static HashMap<unicase::Ascii<String>, Token> {
@@ -1155,10 +1153,7 @@ impl Lexer {
     fn read_identifier(&mut self) -> Option<Token> {
         self.lexer_state = LexerState::BeyondEOL;
         let mut open_bracket = false;
-        loop {
-            let Some(ch) = self.next_ch() else {
-                break;
-            };
+        while let Some(ch) = self.next_ch() {
             //assert!(ch.is_some(), "Unexpected eof in string_literal at ({}, {}).", self.line, self.col);
             if !(ch.is_ascii_alphanumeric() || "_@#$¢£¥€".contains(ch)) {
                 let mut ch2 = ch;
@@ -1177,20 +1172,15 @@ impl Lexer {
         }
 
         let identifier = unicase::Ascii::new(self.text[self.token_start..self.token_end].iter().collect::<String>());
-        if !open_bracket {
-            if let Some(token) = self.lookup_table.get(&identifier) {
-                return Some(token.clone());
-            }
+        if !open_bracket && let Some(token) = self.lookup_table.get(&identifier) {
+            return Some(token.clone());
         }
         Some(Token::Identifier(identifier))
     }
 
     fn read_define(&mut self) -> Option<Token> {
         let mut define = String::new();
-        loop {
-            let Some(ch) = self.next_ch() else {
-                break;
-            };
+        while let Some(ch) = self.next_ch() {
             if !char::is_alphanumeric(ch) {
                 self.put_back();
                 break;
@@ -1243,7 +1233,7 @@ impl Lexer {
             }
 
             let line_str: String = line_chars.iter().collect();
-            let is_comment_line = matches!(first_non_ws, Some(';') | Some('\'') | Some('*'));
+            let is_comment_line = matches!(first_non_ws, Some(';' | '\'' | '*'));
 
             if !is_comment_line {
                 collected.push_str(&line_str);
@@ -1357,18 +1347,17 @@ impl Lexer {
             if already {
                 self.eval_preproc_bool(expr_src);
                 return Some(self.collect_inactive_region(raw, cmt_type));
-            } else {
-                let cond = self.eval_preproc_bool(expr_src);
-                if let Some(f) = self.if_stack.last_mut() {
-                    if cond {
-                        f.taken = true;
-                    }
-                }
-                if !cond {
-                    return Some(self.collect_inactive_region(raw, cmt_type));
-                }
-                return self.next_token();
             }
+            let cond = self.eval_preproc_bool(expr_src);
+            if let Some(f) = self.if_stack.last_mut()
+                && cond
+            {
+                f.taken = true;
+            }
+            if !cond {
+                return Some(self.collect_inactive_region(raw, cmt_type));
+            }
+            return self.next_token();
         }
 
         // $ELSE
@@ -1384,10 +1373,10 @@ impl Lexer {
                 let f = self.if_stack.last().unwrap();
                 !f.taken
             };
-            if let Some(f) = self.if_stack.last_mut() {
-                if activate {
-                    f.taken = true;
-                }
+            if let Some(f) = self.if_stack.last_mut()
+                && activate
+            {
+                f.taken = true;
             }
             if !activate {
                 return Some(self.collect_inactive_region(raw, cmt_type));
@@ -1528,15 +1517,11 @@ impl Lexer {
         // Handle include files first
         if let Some(lexer) = &mut self.include_lexer {
             let result = lexer.next_token();
-            match result {
-                Some(token) => {
-                    return Some(token);
-                }
-                None => {
-                    self.check_eof();
-                    self.include_lexer = None;
-                }
+            if let Some(token) = result {
+                return Some(token);
             }
+            self.check_eof();
+            self.include_lexer = None;
         }
 
         // Now process normal tokens (we're in an active region or no conditionals)
@@ -1648,10 +1633,7 @@ impl Lexer {
                 }
                 let mut got_non_ws = false;
                 let mut label_start = 0;
-                loop {
-                    let Some(ch) = self.next_ch() else {
-                        break;
-                    };
+                while let Some(ch) = self.next_ch() {
                     if !got_non_ws && (ch == ' ' || ch == '\t') {
                         label_start += 1;
                         continue;
@@ -1783,10 +1765,8 @@ impl Lexer {
                 if let Some('&') = next {
                     Some(Token::And)
                 } else {
-                    if self.lang_version >= 350 {
-                        if next == Some('=') {
-                            return Some(Token::AndAssign);
-                        }
+                    if self.lang_version >= 350 && next == Some('=') {
+                        return Some(Token::AndAssign);
                     }
                     self.put_back();
                     Some(Token::And)
@@ -1797,10 +1777,8 @@ impl Lexer {
                 if let Some('|') = next {
                     Some(Token::Or)
                 } else {
-                    if self.lang_version >= 350 {
-                        if next == Some('=') {
-                            return Some(Token::OrAssign);
-                        }
+                    if self.lang_version >= 350 && next == Some('=') {
+                        return Some(Token::OrAssign);
                     }
                     self.put_back();
                     Some(Token::Or)
@@ -1923,10 +1901,7 @@ impl Lexer {
                     // ... (rest of numeric handling unchanged) ...
                     let start = self.token_start;
                     let mut cur_ch = ch;
-                    loop {
-                        let Some(ch) = self.next_ch() else {
-                            break;
-                        };
+                    while let Some(ch) = self.next_ch() {
                         cur_ch = ch;
 
                         match ch {

@@ -286,7 +286,7 @@ impl IcyBoard {
                 })
                 .collect();
         */
-        return lookup_case_insensitive(&s);
+        lookup_case_insensitive(&s)
     }
 
     pub fn load<P: AsRef<Path>>(path: &P) -> Res<Self> {
@@ -298,7 +298,7 @@ impl IcyBoard {
         let mut p = PathBuf::from(path.as_ref());
         if !p.is_absolute() {
             if let Ok(cur) = std::env::current_dir() {
-                p = cur.join(path.as_ref())
+                p = cur.join(path.as_ref());
             } else {
                 p = p.canonicalize().unwrap();
             }
@@ -554,9 +554,9 @@ impl IcyBoard {
     }
 
     pub fn save_userbase(&mut self) -> Res<()> {
-        let users_file = PathBuf::from(self.resolve_file(&self.config.paths.user_file));
+        let users_file = self.resolve_file(&self.config.paths.user_file);
         if let Err(e) = self.users.save(&users_file) {
-            log::error!("Error saving user base: {}", e);
+            log::error!("Error saving user base: {e}");
             Err(e)
         } else {
             Ok(())
@@ -569,7 +569,7 @@ impl IcyBoard {
         pcb_dat.sysop_info.require_pwrd_to_exit = self.config.sysop.require_password_to_exit;
 
         // Line 2 Sysop Display Name (if answered NO to "Use Real Name")
-        pcb_dat.sysop_info.sysop = self.config.sysop.name.to_string();
+        pcb_dat.sysop_info.sysop.clone_from(&self.config.sysop.name);
         // Line 3 Sysop Password (from call waiting screen)
         pcb_dat.sysop_info.password = self.config.sysop.password.to_string();
         // Line 4
@@ -594,7 +594,7 @@ impl IcyBoard {
 
         // Line 31
         let cnames = base_loc.join("cnames");
-        self.export_conference_files(&base_loc, &cnames)?;
+        self.export_conference_files(base_loc, &cnames)?;
         pcb_dat.path.conference_file = cnames.to_string_lossy().to_string();
 
         // Line 32 - PWRD File
@@ -640,7 +640,7 @@ impl IcyBoard {
         pcb_dat.display_news = self.config.switches.display_news_behavior.to_pcb_char();
 
         // Line 94
-        pcb_dat.board_name = self.config.board.name.to_string();
+        pcb_dat.board_name.clone_from(&self.config.board.name);
 
         // Line 108
         pcb_dat.num_conf = self.conferences.len() as i32 - 1;
@@ -701,7 +701,7 @@ impl IcyBoard {
         // Line 215
         pcb_dat.auto_reg_conf = self.config.new_user_settings.auto_register_conferences;
         // Line 251
-        pcb_dat.qwk_file = self.config.qwk_settings.bbs_id.clone();
+        pcb_dat.qwk_file.clone_from(&self.config.qwk_settings.bbs_id);
         // Line 252
         pcb_dat.path.file_tcan = self.resolve_file(&self.config.paths.trashcan_upload_files).to_string_lossy().to_string();
 
@@ -733,7 +733,7 @@ impl IcyBoard {
         Ok(())
     }
 
-    /// PCBoard's records hold 32 byte paths, so what is exported stays relative to the board.
+    /// `PCBoard`'s records hold 32 byte paths, so what is exported stays relative to the board.
     fn export_path(&self, path: &Path) -> String {
         path.strip_prefix(&self.root_path).unwrap_or(path).to_string_lossy().to_string()
     }
@@ -749,7 +749,7 @@ impl IcyBoard {
             dirs += 1;
 
             // Convert dir file
-            let dir_file = base_loc.join(&format!("dir{}", dirs));
+            let dir_file = base_loc.join(format!("dir{dirs}"));
             let dir_file = if let Ok(area_list) = DirectoryList::load(&conf.dir_file) {
                 area_list.export_pcboard(&dir_file)?;
                 self.export_path(&dir_file)
@@ -786,7 +786,7 @@ impl IcyBoard {
                 script_menu: String::new(), // todo
                 script_file: String::new(),
                 dir_menu: String::new(), // todo
-                dir_file: dir_file.to_string(),
+                dir_file: dir_file.clone(),
                 dlpth_list_file: String::new(),
             };
             headers.extend(header.serialize());
@@ -801,7 +801,7 @@ impl IcyBoard {
                 priv_msgs: conf.private_msgs,
                 req_sec_level: conf.required_security.level() as u16,
                 add_sec: conf.add_conference_security as u16,
-                add_time: conf.add_conference_time as u16,
+                add_time: conf.add_conference_time,
                 msg_blocks: 0,
                 msg_file: String::new(),
                 user_menu: self.export_path(&conf.users_menu),
@@ -879,7 +879,7 @@ impl IcyBoard {
     }
 }
 
-/// PPEs and PCBoard configurations name their files the way DOS did, so the case of a
+/// PPEs and `PCBoard` configurations name their files the way DOS did, so the case of a
 /// path says nothing about what is on disk.
 pub fn lookup_case_insensitive(path: &Path) -> PathBuf {
     if path.exists() {
@@ -913,7 +913,7 @@ fn entry_ignoring_case(dir: &Path, name: &OsStr) -> Option<OsString> {
     let name = name.to_str()?;
     fs::read_dir(dir)
         .ok()?
-        .filter_map(|entry| entry.ok())
+        .filter_map(std::result::Result::ok)
         .map(|entry| entry.file_name())
         .find(|entry| entry.to_str().is_some_and(|entry| entry.eq_ignore_ascii_case(name)))
 }
@@ -998,7 +998,7 @@ pub fn read_data_with_encoding_detection(data: &[u8]) -> Res<String> {
     let import = if data.starts_with(&UTF8_BOM) {
         String::from_utf8_lossy(&data[UTF8_BOM.len()..]).to_string()
     } else {
-        crate::tables::import_cp437_string(&data, false)
+        crate::tables::import_cp437_string(data, false)
     };
     Ok(import)
 }
@@ -1056,7 +1056,7 @@ pub fn write_atomic<P: AsRef<Path>>(path: P, contents: &[u8]) -> std::io::Result
 pub(crate) fn save_internal<T: IcyBoardSerializer, P: AsRef<Path>>(s: &T, path: &P) -> Res<()> {
     match toml::to_string(s) {
         Ok(txt) => match write_atomic(path, txt.as_bytes()) {
-            Ok(_) => Ok(()),
+            Ok(()) => Ok(()),
             Err(e) => {
                 log::error!("Error writing {} file '{}': {}", T::FILE_TYPE, path.as_ref().display(), e);
                 Err(IcyError::ErrorGeneratingToml(path.as_ref().to_string_lossy().to_string(), e.to_string()).into())
@@ -1098,7 +1098,7 @@ pub trait PCBoardRecordImporter<T>: Sized + Default {
                 let mut data = &data[..];
                 while !data.is_empty() {
                     if data.len() < Self::RECORD_SIZE {
-                        log::error!("Importing file '{}' from pcboard binary file ended prematurely", path.as_ref().display(),);
+                        log::error!("Importing file '{}' from pcboard binary file ended prematurely", path.as_ref().display());
                         return Err(IcyBoardError::InvalidRecordSize(path.as_ref().display().to_string(), Self::RECORD_SIZE, data.len()).into());
                     }
                     match Self::load_pcboard_record(&data[..Self::RECORD_SIZE]) {
@@ -1131,7 +1131,7 @@ pub trait PCBoardBinImporter: Sized + Default {
         match &std::fs::read(path) {
             Ok(data) => {
                 if data.len() < Self::SIZE {
-                    log::error!("Importing file '{}' from pcboard binary file ended prematurely", path.as_ref().display(),);
+                    log::error!("Importing file '{}' from pcboard binary file ended prematurely", path.as_ref().display());
                     return Err(IcyBoardError::InvalidRecordSize(path.as_ref().display().to_string(), Self::SIZE, data.len()).into());
                 }
                 Self::import_data(data)
@@ -1158,7 +1158,7 @@ pub trait PCBoardTextImport: PCBoardImport {
     }
 }
 
-/// Tests of the path lookup that stands in for the case insensitive file system PCBoard had.
+/// Tests of the path lookup that stands in for the case insensitive file system `PCBoard` had.
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -158,7 +158,7 @@ impl UserEditor {
                         }),
                 ),
                 ConfigEntry::Item(
-                    ListItem::new(get_text("user_editor_reg_ex_date"), ListValue::date(user.expiration_date.clone()))
+                    ListItem::new(get_text("user_editor_reg_ex_date"), ListValue::date(user.expiration_date))
                         .with_status(get_text("user_editor_reg_ex_date-status"))
                         .with_help(get_text("user_editor_reg_ex_date-help"))
                         .with_label_width(label_width)
@@ -456,7 +456,7 @@ impl UserEditor {
                         }),
                 ),
                 ConfigEntry::Item(
-                    ListItem::new(get_text("user_editor_birthdate"), ListValue::date(user.birth_date.clone()))
+                    ListItem::new(get_text("user_editor_birthdate"), ListValue::date(user.birth_date))
                         .with_label_width(label_width)
                         .with_status(get_text("user_editor_birthdate-status"))
                         .with_help(get_text("user_editor_birthdate-help"))

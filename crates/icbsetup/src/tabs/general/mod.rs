@@ -172,8 +172,10 @@ mod tests {
     use super::*;
 
     fn tab() -> (GeneralTab, Arc<Mutex<IcyBoard>>) {
-        let mut board = IcyBoard::default();
-        board.file_name = std::path::PathBuf::from("icboard.toml");
+        let board = IcyBoard {
+            file_name: std::path::PathBuf::from("icboard.toml"),
+            ..Default::default()
+        };
         let board = Arc::new(Mutex::new(board));
         (GeneralTab::new(board.clone()), board)
     }

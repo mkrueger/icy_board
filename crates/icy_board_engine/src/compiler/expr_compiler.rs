@@ -10,7 +10,7 @@ pub struct ExpressionCompiler<'a> {
     pub compiler: &'a mut PPECompiler,
 }
 
-impl<'a> AstVisitor<PPEExpr> for ExpressionCompiler<'a> {
+impl AstVisitor<PPEExpr> for ExpressionCompiler<'_> {
     fn visit_record_literal_expression(&mut self, record: &crate::ast::RecordLiteralExpression) -> PPEExpr {
         let VariableType::UserData(type_id) = record.get_variable_type() else {
             return PPEExpr::Value(0);
@@ -68,7 +68,7 @@ impl<'a> AstVisitor<PPEExpr> for ExpressionCompiler<'a> {
         let Some(typ) = self.compiler.semantic_visitor.type_registry.get_type_from_id(*type_id) else {
             return PPEExpr::Value(0);
         };
-        let Some(member_id) = typ.member_id_lookup.get(&member_reference_expression.get_identifier()) else {
+        let Some(member_id) = typ.member_id_lookup.get(member_reference_expression.get_identifier()) else {
             return PPEExpr::Value(0);
         };
 
@@ -100,29 +100,29 @@ impl<'a> AstVisitor<PPEExpr> for ExpressionCompiler<'a> {
 
         match function_type {
             SemanticInfo::PredefinedFunc(op_code) => {
-                return PPEExpr::PredefinedFunctionCall(
+                PPEExpr::PredefinedFunctionCall(
                     op_code.get_definition(), // to de-alias aliases
                     call.get_arguments().iter().map(|e| e.visit(self)).collect(),
-                );
+                )
             }
             SemanticInfo::MemberFunctionCall(idx) => {
                 let idx = *idx;
                 let expr = call.get_expression().visit(self);
-                return PPEExpr::MemberFunctionCall(Box::new(expr), arguments, idx);
+                PPEExpr::MemberFunctionCall(Box::new(expr), arguments, idx)
             }
             SemanticInfo::FunctionReference(idx) => {
                 let reference_index = self.compiler.semantic_visitor.function_containers[*idx].id;
                 let table_index = self.compiler.semantic_visitor.references[reference_index].1.variable_table_index;
-                return PPEExpr::FunctionCall(table_index, arguments);
+                PPEExpr::FunctionCall(table_index, arguments)
             }
             SemanticInfo::VariableReference(reference_index) => {
                 let r = &self.compiler.semantic_visitor.references[*reference_index];
                 let table_index = r.1.variable_table_index;
-                return PPEExpr::Dim(table_index, arguments);
+                PPEExpr::Dim(table_index, arguments)
             }
-            _ => {
-                log::error!("Invalid function call: {:?}", function_type);
-                return PPEExpr::Value(0);
+            SemanticInfo::PredefFunctionGroup(_) => {
+                log::error!("Invalid function call: {function_type:?}");
+                PPEExpr::Value(0)
             }
         }
     }
@@ -132,7 +132,7 @@ impl<'a> AstVisitor<PPEExpr> for ExpressionCompiler<'a> {
 
         if self.compiler.lookup_table.has_variable(indexer.get_identifier()) {
             let Some(table_idx) = self.compiler.lookup_variable_index(indexer.get_identifier()) else {
-                log::error!("function not found: {}", indexer.get_identifier().to_string());
+                log::error!("function not found: {}", indexer.get_identifier());
                 return PPEExpr::Value(0);
             };
 
@@ -141,13 +141,13 @@ impl<'a> AstVisitor<PPEExpr> for ExpressionCompiler<'a> {
                 return PPEExpr::FunctionCall(var.header.id, arguments);
             }
             if var.header.dim as usize != arguments.len() {
-                log::error!("Invalid dimensions for function call: {}", indexer.get_identifier().to_string());
+                log::error!("Invalid dimensions for function call: {}", indexer.get_identifier());
                 return PPEExpr::Value(0);
             }
             return PPEExpr::Dim(var.header.id, arguments);
         }
-        log::error!("Invalid indexer call: {}", indexer.get_identifier().to_string());
-        return PPEExpr::Value(0);
+        log::error!("Invalid indexer call: {}", indexer.get_identifier());
+        PPEExpr::Value(0)
     }
 
     fn visit_parens_expression(&mut self, parens: &crate::ast::ParensExpression) -> PPEExpr {

@@ -293,7 +293,12 @@ fn test_a_record_field_initializer_is_rejected_explicitly() {
 }
 
 fn many_types(count: usize) -> String {
-    (0..count).map(|index| format!("TYPE Type{index:03}\n  INTEGER Value\nENDTYPE\n")).collect()
+    use std::fmt::Write as _;
+    let mut result = String::new();
+    for index in 0..count {
+        let _ = writeln!(result, "TYPE Type{index:03}\n  INTEGER Value\nENDTYPE");
+    }
+    result
 }
 
 #[test]

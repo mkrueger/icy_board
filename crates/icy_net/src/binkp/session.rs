@@ -75,7 +75,7 @@ impl RemoteInfo {
     pub fn cram_challenge(&self) -> Option<Vec<u8>> {
         self.options
             .iter()
-            .find_map(|option| option.to_ascii_uppercase().strip_prefix("CRAM-MD5-").and_then(|hex| from_hex(hex)))
+            .find_map(|option| option.to_ascii_uppercase().strip_prefix("CRAM-MD5-").and_then(from_hex))
     }
 
     fn password_answer(&self, password: &str) -> String {

@@ -202,15 +202,15 @@ impl ModemCommand {
                                 }
                             }
                         }
-                        if hex_str.len() == 2 {
-                            if let Ok(byte) = u8::from_str_radix(&hex_str, 16) {
-                                // Flush text buffer
-                                if !text_buffer.is_empty() {
-                                    tokens.push(ModemCommandToken::Text(std::mem::take(&mut text_buffer)));
-                                }
-                                tokens.push(ModemCommandToken::Byte(byte));
-                                continue;
+                        if hex_str.len() == 2
+                            && let Ok(byte) = u8::from_str_radix(&hex_str, 16)
+                        {
+                            // Flush text buffer
+                            if !text_buffer.is_empty() {
+                                tokens.push(ModemCommandToken::Text(std::mem::take(&mut text_buffer)));
                             }
+                            tokens.push(ModemCommandToken::Byte(byte));
+                            continue;
                         }
                         // Should not reach here after validation
                         text_buffer.push('\\');

@@ -2,14 +2,14 @@
 //!
 //! Such a PPE still carries the paths of the DOS installation it came from, so a path
 //! that leads nowhere is looked for below the PPE's own directory and below the board.
-//! A name without a directory is not - that one is the board's, the way PCBoard read it
+//! A name without a directory is not - that one is the board's, the way `PCBoard` read it
 //! from its own directory.
 
 use super::run_ppl_in_ppe_dir;
 
 const CONTENT: &[u8] = b"data\r\n";
 
-/// GREED does `DELETE "GREED.TMP"`, which on PCBoard removed a file in the board
+/// GREED does `DELETE "GREED.TMP"`, which on `PCBoard` removed a file in the board
 /// directory and never the one the PPE displays afterwards.
 #[test]
 fn a_bare_name_does_not_delete_the_file_next_to_the_ppe() {

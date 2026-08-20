@@ -37,7 +37,7 @@ pub fn bundle_stem(from: &EchomailAddress, to: &EchomailAddress) -> String {
 pub fn bundle_extension(weekday: Weekday, counter: usize) -> Option<String> {
     let day = WEEKDAYS.get(weekday.num_days_from_monday() as usize)?;
     let counter = *COUNTERS.get(counter)? as char;
-    Some(format!("{}{}", day, counter))
+    Some(format!("{day}{counter}"))
 }
 
 /// The first name of the day that nobody has taken yet.
@@ -47,7 +47,7 @@ pub fn next_bundle(directory: &Path, from: &EchomailAddress, to: &EchomailAddres
         let Some(extension) = bundle_extension(when.weekday(), counter) else {
             break;
         };
-        let candidate = directory.join(format!("{}.{}", stem, extension));
+        let candidate = directory.join(format!("{stem}.{extension}"));
         if !candidate.exists() {
             return Ok(candidate);
         }

@@ -73,7 +73,7 @@ impl FromStr for DoorType {
         match s {
             "Local" => Ok(DoorType::Local),
             "BBSlink" => Ok(DoorType::BBSlink),
-            _ => Err(format!("Invalid DoorType: {}", s)),
+            _ => Err(format!("Invalid DoorType: {s}")),
         }
     }
 }
@@ -94,15 +94,15 @@ pub enum DropFile {
     CallInfo,
     /// Solar Realms doorfile.sr format
     DoorFileSR,
-    /// RyBBS
+    /// `RyBBS`
     CurruserBBS,
     /// Chain.TXT format from the WWIV software.
     ChainTXT,
-    /// TriBBS doorfile format
+    /// `TriBBS` doorfile format
     TriBBSSYS,
-    /// SpitFire BBS
+    /// `SpitFire` BBS
     SFDoorsDAT,
-    /// QuickBBS + RemoteAccess 2.62 extensions
+    /// `QuickBBS` + `RemoteAccess` 2.62 extensions
     ExitInfoBBS,
     /// 2AM BBS
     JumperDat, // currently unsupported (need more info on them)
@@ -175,12 +175,12 @@ impl UserDataValue for Door {
                 &self.password,
             )));
         }
-        log::error!("Invalid user data call on Door ({})", name);
+        log::error!("Invalid user data call on Door ({name})");
         Ok(VariableValue::new_int(-1))
     }
 
     fn set_property_value(&mut self, _vm: &mut crate::vm::VirtualMachine, name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
-        log::error!("Invalid set field call on Door ({})", name);
+        log::error!("Invalid set field call on Door ({name})");
         Ok(())
     }
 
@@ -194,22 +194,20 @@ impl UserDataValue for Door {
             let res = self.securiy_level.session_can_access(&vm.icy_board_state.session);
             return Ok(VariableValue::new_bool(res));
         }
-        log::error!("Invalid function call on Door ({})", name);
+        log::error!("Invalid function call on Door ({name})");
         Err("Function not found".into())
     }
 
     async fn call_method(&mut self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _arguments: &[VariableValue]) -> crate::Res<()> {
-        log::error!("Invalid method call on Door ({})", name);
+        log::error!("Invalid method call on Door ({name})");
         Err("Function not found".into())
     }
 }
 
-lazy_static::lazy_static! {
-    pub static ref NAME: unicase::Ascii<String> = unicase::Ascii::new("Name".to_string());
-    pub static ref DESCRIPTION: unicase::Ascii<String> = unicase::Ascii::new("Description".to_string());
-    pub static ref PASSWORD: unicase::Ascii<String> = unicase::Ascii::new("Password".to_string());
-    pub static ref HAS_ACCESS: unicase::Ascii<String> = unicase::Ascii::new("HasAccess".to_string());
-}
+pub static NAME: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Name".to_string()));
+pub static DESCRIPTION: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Description".to_string()));
+pub static PASSWORD: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Password".to_string()));
+pub static HAS_ACCESS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("HasAccess".to_string()));
 
 #[derive(Serialize, Deserialize, Default, Clone, PartialEq)]
 pub struct DoorList {

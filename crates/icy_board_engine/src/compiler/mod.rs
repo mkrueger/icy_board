@@ -267,9 +267,9 @@ impl PPECompiler {
                     self.lookup_table.variable_table.get_var_entry_mut(idx).value.data.procedure_value.start_offset = self.cur_offset as u16 * 2;
 
                     self.lookup_table.start_compile_function_body(proc.get_identifier());
-                    optimize_statements(proc.get_statements()).iter().for_each(|s| {
+                    for s in &optimize_statements(proc.get_statements()) {
                         self.compile_add_statement(s);
-                    });
+                    }
                     self.lookup_table.end_compile_function_body();
 
                     self.commands.add_statement(&mut self.cur_offset, PPECommand::EndProc);
@@ -282,9 +282,9 @@ impl PPECompiler {
                     };
                     self.lookup_table.variable_table.get_var_entry_mut(idx).value.data.function_value.start_offset = self.cur_offset as u16 * 2;
                     self.lookup_table.start_compile_function_body(func.get_identifier());
-                    optimize_statements(func.get_statements()).iter().for_each(|s| {
+                    for s in &optimize_statements(func.get_statements()) {
                         self.compile_add_statement(s);
-                    });
+                    }
                     self.lookup_table.end_compile_function_body();
 
                     self.commands.add_statement(&mut self.cur_offset, PPECommand::EndFunc);
@@ -309,8 +309,6 @@ impl PPECompiler {
 
     fn compile_statement(&mut self, s: &Statement) -> Option<PPECommand> {
         match s {
-            Statement::Empty => None,
-            Statement::Comment(_) => None,
             Statement::Return(_) => Some(PPECommand::Return),
             Statement::Gosub(gosub_stmt) => Some(PPECommand::Gosub(self.get_label_index(gosub_stmt.get_label_token()))),
             Statement::Goto(goto_stmt) => Some(PPECommand::Goto(self.get_label_index(goto_stmt.get_label_token()))),
@@ -327,17 +325,14 @@ impl PPECompiler {
                 Some(PPECommand::IfNot(Box::new(cond_buffer), self.get_label_index(goto_stmt.get_label_token())))
             }
 
-            Statement::VariableDeclaration(_) => None,
             // The value took the place of the name before this point, so nothing is left to emit.
-            Statement::ConstDeclaration(_) => None,
+            Statement::Empty | Statement::Comment(_) | Statement::VariableDeclaration(_) | Statement::ConstDeclaration(_) => None,
 
             Statement::Let(let_smt) => {
                 let var_name = let_smt.get_identifier();
-                if let_smt.get_let_variant() != &Token::Eq {
-                    panic!("Let variants allowed in output AST.");
-                }
+                assert!(let_smt.get_let_variant() == &Token::Eq, "Let variants allowed in output AST.");
                 let Some(decl_idx) = self.lookup_variable_index(var_name) else {
-                    log::error!("Variable not found: {}", var_name);
+                    log::error!("Variable not found: {var_name}");
                     return None;
                 };
 
@@ -352,7 +347,7 @@ impl PPECompiler {
                 }
 
                 if decl.header.dim != let_smt.get_arguments().len() as u8 {
-                    log::error!("Invalid dimensions for variable: {}", var_name.to_string());
+                    log::error!("Invalid dimensions for variable: {var_name}");
                     return None;
                 }
                 let decl_id = if decl.header.variable_type == VariableType::Function {
@@ -379,15 +374,15 @@ impl PPECompiler {
                         return None;
                     };
                     let VariableType::UserData(type_id) = member_type else {
-                        log::error!("Not a record: {}", var_name);
+                        log::error!("Not a record: {var_name}");
                         return None;
                     };
                     let Some(definition) = self.semantic_visitor.type_registry.get_record_type_from_id(type_id) else {
-                        log::error!("Not a record: {}", var_name);
+                        log::error!("Not a record: {var_name}");
                         return None;
                     };
                     let Some(field) = definition.field_index(member) else {
-                        log::error!("Field not found: {}.{}", var_name, member);
+                        log::error!("Field not found: {var_name}.{member}");
                         return None;
                     };
                     member_type = definition.field_type(field).unwrap_or(VariableType::None);
@@ -412,7 +407,7 @@ impl PPECompiler {
             }
             Statement::Call(call_stmt) => {
                 let Some(decl_idx) = self.lookup_variable_index(call_stmt.get_identifier()) else {
-                    log::error!("Procedure not found: {}", call_stmt.get_identifier().to_string());
+                    log::error!("Procedure not found: {}", call_stmt.get_identifier());
                     return None;
                 };
                 let mut arguments = Vec::new();
@@ -440,7 +435,7 @@ impl PPECompiler {
                     ))
                 } else {
                     log::error!("Invalid call to variable: {}", call_stmt.get_identifier());
-                    return None;
+                    None
                 }
             }
             Statement::While(_) => panic!("While not allowed in output AST."),
@@ -511,10 +506,10 @@ impl PPECompiler {
 
     fn get_label_index(&mut self, label_token: &Spanned<Token>) -> usize {
         let Token::Identifier(label) = &label_token.token else {
-            panic!("Invalid label token {:?}", label_token);
+            panic!("Invalid label token {label_token:?}");
         };
 
-        if let Some(idx) = self.label_lookup_table.get(&label) {
+        if let Some(idx) = self.label_lookup_table.get(label) {
             *idx
         } else {
             self.define_label_at_cur_pos(label)
@@ -530,13 +525,13 @@ impl PPECompiler {
 
     fn set_label_offset(&mut self, label_token: &Spanned<Token>) {
         let Token::Label(identifier) = &label_token.token else {
-            log::error!("Invalid label token {:?}", label_token);
+            log::error!("Invalid label token {label_token:?}");
             return;
         };
         if let Some(idx) = self.label_lookup_table.get_mut(identifier) {
             let label_descr = &mut self.label_table[*idx];
             if label_descr.offset.is_some() {
-                log::error!("Label already defined: {}", identifier);
+                log::error!("Label already defined: {identifier}");
                 return;
             }
             label_descr.offset = Some(self.cur_offset);

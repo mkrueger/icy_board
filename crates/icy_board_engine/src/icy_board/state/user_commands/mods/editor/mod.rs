@@ -68,7 +68,7 @@ impl EditState {
                             IceText::MessageCommandExpertmode,
                             30,
                             "",
-                            &CommandType::EnterMessage.get_help(),
+                            CommandType::EnterMessage.get_help(),
                             None,
                             display_flags::NEWLINE | display_flags::UPCASE,
                         )
@@ -83,8 +83,8 @@ impl EditState {
                         .input_field(
                             IceText::TextEntryCommand,
                             30,
-                            &MASK_COMMAND,
-                            &CommandType::EnterMessage.get_help(),
+                            MASK_COMMAND,
+                            CommandType::EnterMessage.get_help(),
                             None,
                             display_flags::NEWLINE | display_flags::LFAFTER | display_flags::UPCASE,
                         )
@@ -99,7 +99,7 @@ impl EditState {
                                 IceText::MessageAbort,
                                 1,
                                 "",
-                                &"",
+                                "",
                                 Some(state.session.no_char.to_string()),
                                 display_flags::YESNO | display_flags::NEWLINE | display_flags::UPCASE | display_flags::FIELDLEN,
                             )
@@ -124,7 +124,7 @@ impl EditState {
                         if line > 0 && (line as usize - 1) < self.msg.len() {
                             self.print_divider(state).await?;
                             state.set_color(TerminalTarget::Both, IcbColor::dos_light_cyan()).await?;
-                            state.print(TerminalTarget::Both, &format!("{}: ", line)).await?;
+                            state.print(TerminalTarget::Both, &format!("{line}: ")).await?;
                             state.reset_color(TerminalTarget::Both).await?;
                             state.println(TerminalTarget::Both, &self.msg[line - 1]).await?;
 
@@ -133,7 +133,7 @@ impl EditState {
                                     IceText::WantToDeleteLine,
                                     1,
                                     "",
-                                    &"",
+                                    "",
                                     Some(state.session.no_char.to_string()),
                                     display_flags::YESNO | display_flags::NEWLINE | display_flags::UPCASE | display_flags::FIELDLEN | display_flags::LFBEFORE,
                                 )
@@ -181,12 +181,6 @@ impl EditState {
                         state.session.disp_options.force_count_lines();
                         return Ok(EditResult::CarbonCopy);
                     }
-                    "Q" => { // quote message
-                        // TODO: quote
-                    }
-                    "U" => { // upload message
-                        // TODO: upload
-                    }
                     _ => {}
                 }
             }
@@ -200,7 +194,7 @@ impl EditState {
         let to_part = format!("{}{}", to_txt, self.to);
         let subj_part = format!("{}{} {}", subj_txt, self.subj, Local::now().format("%H:%M"));
         state.set_color(TerminalTarget::Both, IcbColor::dos_yellow()).await?;
-        state.println(TerminalTarget::Both, &format!("{:<38}{:<38}", to_part, subj_part)).await?;
+        state.println(TerminalTarget::Both, &format!("{to_part:<38}{subj_part:<38}")).await?;
         self.print_divider(state).await?;
 
         Ok(())
@@ -217,10 +211,10 @@ impl EditState {
         let line_number = if let Some(token) = state.session.tokens.pop_front() {
             token
         } else {
-            state.input_field(msg, 340, &MASK_NUM, &"", None, display_flags::NEWLINE).await?
+            state.input_field(msg, 340, &MASK_NUM, "", None, display_flags::NEWLINE).await?
         };
         let line = line_number.parse::<usize>().unwrap_or_default();
-        if line < 1 || line >= self.msg.len() + 1 {
+        if line < 1 || line > self.msg.len() {
             state
                 .display_text(IceText::NoSuchLineNumber, display_flags::NEWLINE | display_flags::LFBEFORE)
                 .await?;
@@ -314,7 +308,7 @@ impl EditState {
                 control_codes::CTRL_LEFT => {
                     for i in (self.cursor.x..0).rev() {
                         if i == 0 || self.cur_line().chars().nth(i as usize).unwrap() == ' ' {
-                            state.backward((self.cursor.x - i) as i32).await?;
+                            state.backward(self.cursor.x - i).await?;
                             self.cursor.x = i;
                             break;
                         }
@@ -324,7 +318,7 @@ impl EditState {
                 control_codes::CTRL_RIGHT => {
                     for i in self.cursor.x..=self.cur_line().len() as i32 {
                         if i == self.cur_line().len() as i32 || self.cur_line().chars().nth(i as usize).unwrap() == ' ' {
-                            state.forward((i - self.cursor.x) as i32).await?;
+                            state.forward(i - self.cursor.x).await?;
                             self.cursor.x = i;
                             break;
                         }
@@ -351,7 +345,7 @@ impl EditState {
                         state.up(1).await?;
                         self.print_line_number(state).await?;
                     } else if self.top_line > 0 {
-                        let y = state.session.page_len as i32 - (Self::HEADER_SIZE as i32) - 1;
+                        let y = state.session.page_len as i32 - Self::HEADER_SIZE - 1;
                         self.top_line = ((self.top_line as i32) - y).max(0) as usize;
                         self.redraw_fse(state).await?;
                     }
@@ -373,7 +367,7 @@ impl EditState {
 
                 control_codes::HOME => {
                     if self.cursor.x > 0 {
-                        state.backward(self.cursor.x as i32).await?;
+                        state.backward(self.cursor.x).await?;
                         self.cursor.x = 0;
                     }
                 }
@@ -385,7 +379,7 @@ impl EditState {
 
                 control_codes::END => {
                     if self.cursor.x < self.cur_line().len() as i32 {
-                        state.forward(self.cur_line().len() as i32 - self.cursor.x as i32).await?;
+                        state.forward(self.cur_line().len() as i32 - self.cursor.x).await?;
                         self.cursor.x = self.cur_line().len() as i32;
                     }
                 }
@@ -414,7 +408,7 @@ impl EditState {
                 }
 
                 ch => {
-                    if ch >= ' ' && ch <= '~' {
+                    if (' '..='~').contains(&ch) {
                         let o = self.cursor.x as usize;
 
                         while self.cursor.x >= self.cur_line().len() as i32 {
@@ -423,11 +417,11 @@ impl EditState {
 
                         if self.insert_mode {
                             self.cur_line().insert(o, ch);
-                            let txt = format!("{}", &self.cur_line()[o..]);
+                            let txt = self.cur_line()[o..].to_string();
                             state.print(TerminalTarget::Both, &txt).await?;
                             state.backward(txt.len() as i32).await?;
                         } else {
-                            self.cur_line().replace_range(o..o + 1, ch.to_string().as_str());
+                            self.cur_line().replace_range(o..=o, ch.to_string().as_str());
                         }
 
                         if self.cur_line().len() > self.max_line_length {
@@ -601,12 +595,12 @@ impl EditState {
                 '\r' | '\n' => {
                     edit_line = edit_line.trim().to_string();
                     state.new_line().await?;
-                    return Ok((edit_line, "".to_string()));
+                    return Ok((edit_line, String::new()));
                 }
                 ch => {
-                    if ch >= ' ' && ch <= '~' {
+                    if (' '..='~').contains(&ch) {
                         if caret_x < edit_line.len() {
-                            edit_line.replace_range(caret_x..caret_x + 1, ch.to_string().as_str());
+                            edit_line.replace_range(caret_x..=caret_x, ch.to_string().as_str());
                         } else {
                             edit_line.insert(caret_x, ch);
                         }
@@ -652,7 +646,7 @@ impl EditState {
             while cur_line.len() < self.max_line_length && !next_line.is_empty() {
                 let pos = next_line.iter().position(|c| *c == ' ').unwrap_or(next_line.len() - 1);
                 if pos + cur_line.len() <= self.max_line_length {
-                    let word = next_line.drain(0..pos + 1).collect::<String>();
+                    let word = next_line.drain(0..=pos).collect::<String>();
                     cur_line.extend(word.chars());
                 } else {
                     break;
@@ -704,10 +698,10 @@ impl EditState {
         if x < self.cur_line().len() {
             let o = self.cursor.x as usize;
             self.cur_line().remove(o);
-            return EditUpdate::UpdateCurrentLineFrom(o);
+            EditUpdate::UpdateCurrentLineFrom(o)
         } else {
             self.merge_line(self.cursor.y);
-            return EditUpdate::UpdateLinesFrom(self.cursor.y as usize);
+            EditUpdate::UpdateLinesFrom(self.cursor.y as usize)
         }
     }
 
@@ -717,7 +711,7 @@ impl EditState {
             EditUpdate::UpdateCurrentLineFrom(pos) => {
                 state.print(TerminalTarget::Both, &self.cur_line()[pos..]).await?;
                 state.clear_eol(TerminalTarget::Both).await?;
-                let len = self.cur_line().len() as i32 - self.cursor.x as i32 + 1;
+                let len = self.cur_line().len() as i32 - self.cursor.x + 1;
                 if len > 0 {
                     state.backward(len).await?;
                 }
@@ -747,11 +741,11 @@ impl EditState {
         }
         self.cursor.y += 1;
         self.cursor.x = 0;
-        return EditUpdate::UpdateLinesFrom(y);
+        EditUpdate::UpdateLinesFrom(y)
     }
 
     pub fn left_justify(&mut self) -> EditUpdate {
-        if self.cur_line().len() > 0 && self.cur_line().chars().next().unwrap().is_whitespace() {
+        if !self.cur_line().is_empty() && self.cur_line().chars().next().unwrap().is_whitespace() {
             *self.cur_line() = self.cur_line().trim_start().to_string();
             self.cursor.x = self.cur_line().len() as i32;
             return EditUpdate::UpdateCurrentLineFrom(0);
@@ -760,13 +754,13 @@ impl EditState {
     }
 
     pub fn center(&mut self) -> EditUpdate {
-        if self.cur_line().len() > 0 {
+        if !self.cur_line().is_empty() {
             let len = self.cur_line().len();
             let mut line = self.cur_line().clone();
             let spaces = self.max_line_length - len;
             let left = spaces / 2;
             line.insert_str(0, &str::repeat(" ", left));
-            *self.cur_line() = line.to_string();
+            self.cur_line().clone_from(&line);
             self.cursor.x = self.cur_line().len() as i32;
             return EditUpdate::UpdateCurrentLineFrom(0);
         }

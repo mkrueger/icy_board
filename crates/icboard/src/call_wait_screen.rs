@@ -220,30 +220,30 @@ impl CallWaitScreen {
 
             let timeout = tick_rate.saturating_sub(last_tick.elapsed());
 
-            if self.selected.is_none() && event::poll(timeout)? {
-                if let Event::Key(key) = event::read()? {
-                    if key.kind == KeyEventKind::Press {
-                        match key.code {
-                            KeyCode::Esc => {
-                                return Ok(CallWaitMessage::Exit(false));
-                            }
-                            KeyCode::Down | KeyCode::Char('s') => self.set_if_valid(self.x, self.y + 1),
-                            KeyCode::Up | KeyCode::Char('w') => self.set_if_valid(self.x, self.y - 1),
-                            KeyCode::Right | KeyCode::Char('d') => self.set_if_valid(self.x + 1, self.y),
-                            KeyCode::Left | KeyCode::Char('a') => self.set_if_valid(self.x - 1, self.y),
-                            KeyCode::Enter => {
-                                self.selected = Some(Instant::now());
-                            }
-                            _ => {}
-                        }
+            if self.selected.is_none()
+                && event::poll(timeout)?
+                && let Event::Key(key) = event::read()?
+                && key.kind == KeyEventKind::Press
+            {
+                match key.code {
+                    KeyCode::Esc => {
+                        return Ok(CallWaitMessage::Exit(false));
                     }
+                    KeyCode::Down | KeyCode::Char('s') => self.set_if_valid(self.x, self.y + 1),
+                    KeyCode::Up | KeyCode::Char('w') => self.set_if_valid(self.x, self.y - 1),
+                    KeyCode::Right | KeyCode::Char('d') => self.set_if_valid(self.x + 1, self.y),
+                    KeyCode::Left | KeyCode::Char('a') => self.set_if_valid(self.x - 1, self.y),
+                    KeyCode::Enter => {
+                        self.selected = Some(Instant::now());
+                    }
+                    _ => {}
                 }
             }
 
-            if let Some(selected) = self.selected {
-                if selected.elapsed() >= Duration::from_millis(150) {
-                    return Ok(self.buttons[(self.y * 3 + self.x) as usize].message.clone());
-                }
+            if let Some(selected) = self.selected
+                && selected.elapsed() >= Duration::from_millis(150)
+            {
+                return Ok(self.buttons[(self.y * 3 + self.x) as usize].message.clone());
             }
 
             if last_tick.elapsed() >= tick_rate {
@@ -259,7 +259,7 @@ impl CallWaitScreen {
         let dt = now.format(&self.date_format);
 
         let ver = VERSION.to_string();
-        let area = get_screen_size(&frame, full_screen);
+        let area = get_screen_size(frame, full_screen);
 
         let b = Block::default()
             .title_top(Line::from(format!(" {} ", dt)).style(Style::new().white()).left_aligned())

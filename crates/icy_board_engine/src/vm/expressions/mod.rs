@@ -14,26 +14,6 @@ use super::VirtualMachine;
 
 pub async fn run_function(opcode: FuncOpCode, arg: &mut VirtualMachine<'_>, arguments: &[PPEExpr]) -> Res<VariableValue> {
     match opcode {
-        FuncOpCode::END => predefined_functions::invalid(arg, arguments).await,
-        FuncOpCode::CPAR => predefined_functions::invalid(arg, arguments).await,
-        FuncOpCode::UPLUS => predefined_functions::invalid(arg, arguments).await,
-        FuncOpCode::UMINUS => predefined_functions::invalid(arg, arguments).await,
-        FuncOpCode::EXP => predefined_functions::invalid(arg, arguments).await,
-        FuncOpCode::TIMES => predefined_functions::invalid(arg, arguments).await,
-        FuncOpCode::DIVIDE => predefined_functions::invalid(arg, arguments).await,
-        FuncOpCode::MOD => predefined_functions::invalid(arg, arguments).await,
-        FuncOpCode::PLUS => predefined_functions::invalid(arg, arguments).await,
-        FuncOpCode::MINUS => predefined_functions::invalid(arg, arguments).await,
-        FuncOpCode::EQ => predefined_functions::invalid(arg, arguments).await,
-        FuncOpCode::NE => predefined_functions::invalid(arg, arguments).await,
-        FuncOpCode::LT => predefined_functions::invalid(arg, arguments).await,
-        FuncOpCode::LE => predefined_functions::invalid(arg, arguments).await,
-        FuncOpCode::GT => predefined_functions::invalid(arg, arguments).await,
-        FuncOpCode::GE => predefined_functions::invalid(arg, arguments).await,
-        FuncOpCode::NOT => predefined_functions::invalid(arg, arguments).await,
-        FuncOpCode::AND => predefined_functions::invalid(arg, arguments).await,
-        FuncOpCode::OR => predefined_functions::invalid(arg, arguments).await,
-        FuncOpCode::OPAR => predefined_functions::invalid(arg, arguments).await,
         FuncOpCode::LEN => predefined_functions::len(arg, arguments).await,
         FuncOpCode::LOWER => predefined_functions::lower(arg, arguments).await,
         FuncOpCode::UPPER => predefined_functions::upper(arg, arguments).await,
@@ -305,8 +285,6 @@ pub async fn run_function(opcode: FuncOpCode, arg: &mut VirtualMachine<'_>, argu
         FuncOpCode::GetBankBal => predefined_functions::getbankbal(arg, arguments).await,
         FuncOpCode::GetMsgHdr => predefined_functions::getmsghdr(arg, arguments).await,
         FuncOpCode::SetMsgHdr => predefined_functions::setmsghdr(arg, arguments).await,
-        FuncOpCode::MemberReference => predefined_functions::invalid(arg, arguments).await,
-        FuncOpCode::MemberCall => predefined_functions::invalid(arg, arguments).await,
         FuncOpCode::NewConfInfo => predefined_functions::new_confinfo(arg, arguments).await,
         FuncOpCode::AreaId => predefined_functions::area_id(arg, arguments).await,
         FuncOpCode::WebRequest => predefined_functions::web_request(arg, arguments).await,
@@ -314,7 +292,29 @@ pub async fn run_function(opcode: FuncOpCode, arg: &mut VirtualMachine<'_>, argu
         FuncOpCode::BASE64ENC => predefined_functions::base64enc(arg, arguments).await,
         FuncOpCode::BASE64DEC => predefined_functions::base64dec(arg, arguments).await,
         FuncOpCode::SHA256 => predefined_functions::sha256(arg, arguments).await,
-        FuncOpCode::RoutineReference => predefined_functions::invalid(arg, arguments).await,
-        FuncOpCode::RecordLiteral => predefined_functions::invalid(arg, arguments).await,
+        FuncOpCode::END
+        | FuncOpCode::CPAR
+        | FuncOpCode::UPLUS
+        | FuncOpCode::UMINUS
+        | FuncOpCode::EXP
+        | FuncOpCode::TIMES
+        | FuncOpCode::DIVIDE
+        | FuncOpCode::MOD
+        | FuncOpCode::PLUS
+        | FuncOpCode::MINUS
+        | FuncOpCode::EQ
+        | FuncOpCode::NE
+        | FuncOpCode::LT
+        | FuncOpCode::LE
+        | FuncOpCode::GT
+        | FuncOpCode::GE
+        | FuncOpCode::NOT
+        | FuncOpCode::AND
+        | FuncOpCode::OR
+        | FuncOpCode::OPAR
+        | FuncOpCode::MemberReference
+        | FuncOpCode::MemberCall
+        | FuncOpCode::RoutineReference
+        | FuncOpCode::RecordLiteral => predefined_functions::invalid(arg, arguments).await,
     }
 }

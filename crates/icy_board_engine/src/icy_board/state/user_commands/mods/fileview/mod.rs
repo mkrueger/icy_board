@@ -22,7 +22,7 @@ impl IcyBoardState {
                 IceText::ArchiveViewFileName,
                 60,
                 &MASK_ASCII,
-                &"",
+                "",
                 None,
                 display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFAFTER | display_flags::HIGHASCII,
             )
@@ -49,7 +49,7 @@ impl IcyBoardState {
             }
 
             if flagged.is_empty() || !flagged.first().unwrap().exists() {
-                self.session.op_text = input.clone();
+                self.session.op_text.clone_from(&input);
                 self.display_text(IceText::NotFoundOnDisk, display_flags::NEWLINE | display_flags::LFBEFORE)
                     .await?;
                 return Ok(());
@@ -62,56 +62,53 @@ impl IcyBoardState {
                     .await?;
                 return Ok(());
             }
-            match dizbase::scan_file_contents(&file) {
-                Ok(file_content) => {
-                    let sav = self.session.disp_options.in_file_list.take();
-                    self.session.disp_options.abort_printout = false;
-                    let mut len = 0;
-                    let colors: crate::icy_board::icb_config::ColorConfiguration = self.get_board().await.config.color_configuration.clone();
-                    self.set_color(TerminalTarget::Both, colors.file_head.clone()).await?;
-                    self.println(TerminalTarget::Both, &format!(" Archive: {}", file.file_name().unwrap().to_string_lossy()))
-                        .await?;
-                    self.println(TerminalTarget::Both, "  Length      Date    Time   Name").await?;
-                    self.println(TerminalTarget::Both, " ========  ========== ===== ======").await?;
-                    self.set_color(TerminalTarget::Both, IcbColor::dos_light_cyan()).await?;
-                    for info in &file_content {
-                        if self.session.disp_options.abort_printout {
-                            break;
-                        }
-                        self.set_color(TerminalTarget::Both, colors.file_size.clone()).await?;
-                        self.print(TerminalTarget::Both, &format!("{:>9}  ", humanize_bytes_decimal!(info.size).to_string()))
-                            .await?;
-                        self.set_color(TerminalTarget::Both, colors.file_date.clone()).await?;
-                        self.print(
-                            TerminalTarget::Both,
-                            &format!("{:04}-{:02}-{:02} ", info.date.year() % 10000, info.date.month(), info.date.day()),
-                        )
-                        .await?;
-                        self.print(TerminalTarget::Both, &format!("{:02}:{:02} ", info.date.hour(), info.date.minute()))
-                            .await?;
-                        self.set_color(TerminalTarget::Both, colors.file_name.clone()).await?;
-                        self.println(TerminalTarget::Both, &info.name).await?;
-                        len += info.size;
+            if let Ok(file_content) = dizbase::scan_file_contents(file) {
+                let sav = self.session.disp_options.in_file_list.take();
+                self.session.disp_options.abort_printout = false;
+                let mut len = 0;
+                let colors: crate::icy_board::icb_config::ColorConfiguration = self.get_board().await.config.color_configuration.clone();
+                self.set_color(TerminalTarget::Both, colors.file_head.clone()).await?;
+                self.println(TerminalTarget::Both, &format!(" Archive: {}", file.file_name().unwrap().to_string_lossy()))
+                    .await?;
+                self.println(TerminalTarget::Both, "  Length      Date    Time   Name").await?;
+                self.println(TerminalTarget::Both, " ========  ========== ===== ======").await?;
+                self.set_color(TerminalTarget::Both, IcbColor::dos_light_cyan()).await?;
+                for info in &file_content {
+                    if self.session.disp_options.abort_printout {
+                        break;
                     }
-                    self.set_color(TerminalTarget::Both, IcbColor::dos_yellow()).await?;
-                    self.set_color(TerminalTarget::Both, colors.file_head.clone()).await?;
-                    self.println(TerminalTarget::Both, "---------                   ------").await?;
-                    self.set_color(TerminalTarget::Both, colors.file_size).await?;
-                    self.set_color(TerminalTarget::Both, IcbColor::dos_white()).await?;
-                    self.println(
+                    self.set_color(TerminalTarget::Both, colors.file_size.clone()).await?;
+                    self.print(TerminalTarget::Both, &format!("{:>9}  ", humanize_bytes_decimal!(info.size).to_string()))
+                        .await?;
+                    self.set_color(TerminalTarget::Both, colors.file_date.clone()).await?;
+                    self.print(
                         TerminalTarget::Both,
-                        &format!("{:>9}                   {} files", humanize_bytes_decimal!(len).to_string(), file_content.len()),
+                        &format!("{:04}-{:02}-{:02} ", info.date.year() % 10000, info.date.month(), info.date.day()),
                     )
                     .await?;
-                    self.reset_color(TerminalTarget::Both).await?;
-                    self.new_line().await?;
-                    self.session.disp_options.in_file_list = sav;
-                }
-                Err(_) => {
-                    self.session.op_text = file.file_name().unwrap().to_string_lossy().to_string();
-                    self.display_text(IceText::ErrorViewingFile, display_flags::NEWLINE | display_flags::LFBEFORE)
+                    self.print(TerminalTarget::Both, &format!("{:02}:{:02} ", info.date.hour(), info.date.minute()))
                         .await?;
+                    self.set_color(TerminalTarget::Both, colors.file_name.clone()).await?;
+                    self.println(TerminalTarget::Both, &info.name).await?;
+                    len += info.size;
                 }
+                self.set_color(TerminalTarget::Both, IcbColor::dos_yellow()).await?;
+                self.set_color(TerminalTarget::Both, colors.file_head.clone()).await?;
+                self.println(TerminalTarget::Both, "---------                   ------").await?;
+                self.set_color(TerminalTarget::Both, colors.file_size).await?;
+                self.set_color(TerminalTarget::Both, IcbColor::dos_white()).await?;
+                self.println(
+                    TerminalTarget::Both,
+                    &format!("{:>9}                   {} files", humanize_bytes_decimal!(len).to_string(), file_content.len()),
+                )
+                .await?;
+                self.reset_color(TerminalTarget::Both).await?;
+                self.new_line().await?;
+                self.session.disp_options.in_file_list = sav;
+            } else {
+                self.session.op_text = file.file_name().unwrap().to_string_lossy().to_string();
+                self.display_text(IceText::ErrorViewingFile, display_flags::NEWLINE | display_flags::LFBEFORE)
+                    .await?;
             }
         }
         Ok(())

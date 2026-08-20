@@ -12,7 +12,7 @@ use super::{encode_emsi, get_crc32string, get_length_string};
 /// and Server-related information to the Server. It contains Server
 /// parameters, Client options, and Client capabilities.
 /// Note that the information in the `EMSI_ICI` packet may not exceed 2,048 bytes.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct ICIUserSettings {
     ///  The name of the user (Client). This must be treated case insensitively by the Server.
     pub name: String,

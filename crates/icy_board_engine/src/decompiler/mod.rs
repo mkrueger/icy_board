@@ -113,7 +113,7 @@ impl Decompiler {
             }
         }
         let mut label_list = labels.into_iter().collect::<Vec<usize>>();
-        label_list.sort();
+        label_list.sort_unstable();
 
         let mut label_offsets = HashMap::new();
         for (i, label) in label_list.iter().enumerate() {
@@ -186,7 +186,7 @@ impl Decompiler {
         // Generate exit label - there is a case where this is needed
         // Gets removed if not used
         statements.push(LabelStatement::create_empty_statement(unicase::Ascii::new("EXIT_LABEL".to_string())));
-        for (offset, _i) in &self.label_lookup {
+        for offset in self.label_lookup.keys() {
             if !self.used_labels.contains(offset) {
                 statements.push(LabelStatement::create_empty_statement(self.get_label_name(*offset)));
             }
@@ -451,10 +451,10 @@ impl Decompiler {
                     .enumerate()
                     .map(|(i, e)| {
                         let expr = self.decompile_expression(e);
-                        if let Some(args) = &f.args {
-                            if let Some(arg) = args.get(i) {
-                                return convert_argument(expr, arg);
-                            }
+                        if let Some(args) = &f.args
+                            && let Some(arg) = args.get(i)
+                        {
+                            return convert_argument(expr, arg);
                         }
                         expr
                     })
@@ -491,10 +491,10 @@ impl Decompiler {
                     .enumerate()
                     .map(|(i, e)| {
                         let expr = self.decompile_expression(e);
-                        if let Some(args) = &p.args {
-                            if let Some(arg) = args.get(i) {
-                                return convert_argument(expr, arg);
-                            }
+                        if let Some(args) = &p.args
+                            && let Some(arg) = args.get(i)
+                        {
+                            return convert_argument(expr, arg);
                         }
                         expr
                     })
@@ -678,12 +678,11 @@ fn convert_argument(expr: Expression, arg: &crate::executable::ArgumentDefinitio
     if arg.arg_type == VariableType::Boolean {
         return Statement::try_boolean_conversion(&expr);
     }
-    if arg.number_format == NumberFormat::Hex {
-        if let Expression::Const(c) = &expr {
-            if let Constant::Integer(i, _) = c.get_constant_value() {
-                return ConstantExpression::create_empty_expression(Constant::Integer(*i, NumberFormat::ColorCode));
-            }
-        }
+    if arg.number_format == NumberFormat::Hex
+        && let Expression::Const(c) = &expr
+        && let Constant::Integer(i, _) = c.get_constant_value()
+    {
+        return ConstantExpression::create_empty_expression(Constant::Integer(*i, NumberFormat::ColorCode));
     }
     arg.flags.convert_expr(expr)
 }
@@ -765,8 +764,8 @@ struct VariableConstantVisitor<'a> {
     executable: &'a mut Executable,
 }
 
-impl<'a> PPEVisitor<()> for VariableConstantVisitor<'a> {
-    fn visit_dim_expression(&mut self, id: usize, dim: &[PPEExpr]) -> () {
+impl PPEVisitor<()> for VariableConstantVisitor<'_> {
+    fn visit_dim_expression(&mut self, id: usize, dim: &[PPEExpr]) {
         // Changes CONST[expr] to VAR[expr]
         // There are some files out there that try to change the entry typ to constant for DIM variables
         if self.executable.variable_table.get_var_entry(id).entry_type == EntryType::Constant {
@@ -777,78 +776,78 @@ impl<'a> PPEVisitor<()> for VariableConstantVisitor<'a> {
         }
     }
 
-    fn visit_value(&mut self, _id: usize) -> () {}
-    fn visit_record_literal(&mut self, _type_id: u8, fields: &[(usize, PPEExpr)]) -> () {
+    fn visit_value(&mut self, _id: usize) {}
+    fn visit_record_literal(&mut self, _type_id: u8, fields: &[(usize, PPEExpr)]) {
         for (_, value) in fields {
             value.visit(self);
         }
     }
-    fn visit_member(&mut self, expr: &PPEExpr, _id: usize) -> () {
-        expr.visit(self)
+    fn visit_member(&mut self, expr: &PPEExpr, _id: usize) {
+        expr.visit(self);
     }
-    fn visit_unary_expression(&mut self, _op: UnaryOp, expr: &PPEExpr) -> () {
-        expr.visit(self)
+    fn visit_unary_expression(&mut self, _op: UnaryOp, expr: &PPEExpr) {
+        expr.visit(self);
     }
-    fn visit_binary_expression(&mut self, _op: BinOp, left: &PPEExpr, right: &PPEExpr) -> () {
+    fn visit_binary_expression(&mut self, _op: BinOp, left: &PPEExpr, right: &PPEExpr) {
         left.visit(self);
         right.visit(self);
     }
 
-    fn visit_predefined_function_call(&mut self, _def: &crate::executable::FunctionDefinition, arguments: &[PPEExpr]) -> () {
+    fn visit_predefined_function_call(&mut self, _def: &crate::executable::FunctionDefinition, arguments: &[PPEExpr]) {
         for arg in arguments {
             arg.visit(self);
         }
     }
-    fn visit_function_call(&mut self, _id: usize, arguments: &[PPEExpr]) -> () {
+    fn visit_function_call(&mut self, _id: usize, arguments: &[PPEExpr]) {
         for arg in arguments {
             arg.visit(self);
         }
     }
-    fn visit_member_function_call(&mut self, _expr: &PPEExpr, arguments: &[PPEExpr], _id: usize) -> () {
+    fn visit_member_function_call(&mut self, _expr: &PPEExpr, arguments: &[PPEExpr], _id: usize) {
         for arg in arguments {
             arg.visit(self);
         }
     }
 
-    fn visit_end(&mut self) -> () {}
-    fn visit_return(&mut self) -> () {}
-    fn visit_if(&mut self, cond: &PPEExpr, _label: &usize) -> () {
+    fn visit_end(&mut self) {}
+    fn visit_return(&mut self) {}
+    fn visit_if(&mut self, cond: &PPEExpr, _label: &usize) {
         cond.visit(self);
     }
-    fn visit_proc_call(&mut self, _id: usize, arguments: &[PPEExpr]) -> () {
+    fn visit_proc_call(&mut self, _id: usize, arguments: &[PPEExpr]) {
         for arg in arguments {
             arg.visit(self);
         }
     }
-    fn visit_predefined_call(&mut self, def: &StatementDefinition, arguments: &[PPEExpr]) -> () {
+    fn visit_predefined_call(&mut self, def: &StatementDefinition, arguments: &[PPEExpr]) {
         match def.sig {
-            crate::executable::StatementSignature::Invalid => {}
-            crate::executable::StatementSignature::ArgumentsWithVariable(_, _) => {}
-            crate::executable::StatementSignature::VariableArguments(_, _, _) => {}
-            crate::executable::StatementSignature::SpecialCaseDlockg => {}
-            crate::executable::StatementSignature::SpecialCaseDcreate => {}
             crate::executable::StatementSignature::SpecialCaseSort => {
                 // Ensure that #1 sort argument is a variable
-                if let PPEExpr::Value(id) = &arguments[0] {
-                    if self.executable.variable_table.get_var_entry(*id).entry_type == EntryType::Constant {
-                        self.executable.variable_table.get_var_entry_mut(*id).entry_type = EntryType::Variable;
-                    }
+                if let PPEExpr::Value(id) = &arguments[0]
+                    && self.executable.variable_table.get_var_entry(*id).entry_type == EntryType::Constant
+                {
+                    self.executable.variable_table.get_var_entry_mut(*id).entry_type = EntryType::Variable;
                 }
             }
-            crate::executable::StatementSignature::SpecialCaseVarSeg => {}
-            crate::executable::StatementSignature::SpecialCasePop => {}
+            crate::executable::StatementSignature::Invalid
+            | crate::executable::StatementSignature::ArgumentsWithVariable(_, _)
+            | crate::executable::StatementSignature::VariableArguments(_, _, _)
+            | crate::executable::StatementSignature::SpecialCaseDlockg
+            | crate::executable::StatementSignature::SpecialCaseDcreate
+            | crate::executable::StatementSignature::SpecialCaseVarSeg
+            | crate::executable::StatementSignature::SpecialCasePop => {}
         }
         for arg in arguments {
             arg.visit(self);
         }
     }
-    fn visit_goto(&mut self, _label: &usize) -> () {}
-    fn visit_gosub(&mut self, _label: &usize) -> () {}
-    fn visit_end_func(&mut self) -> () {}
-    fn visit_end_proc(&mut self) -> () {}
-    fn visit_stop(&mut self) -> () {}
-    fn visit_let(&mut self, target: &PPEExpr, value: &PPEExpr) -> () {
+    fn visit_goto(&mut self, _label: &usize) {}
+    fn visit_gosub(&mut self, _label: &usize) {}
+    fn visit_end_func(&mut self) {}
+    fn visit_end_proc(&mut self) {}
+    fn visit_stop(&mut self) {}
+    fn visit_let(&mut self, target: &PPEExpr, value: &PPEExpr) {
         target.visit(self);
-        value.visit(self)
+        value.visit(self);
     }
 }

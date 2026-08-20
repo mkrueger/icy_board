@@ -126,15 +126,15 @@ fn reference_tokens(ast: &Ast, visitor: &SemanticVisitor, tokens: &mut BTreeMap<
             ReferenceType::Label(_) => LABEL,
             ReferenceType::Variable(_) => VARIABLE,
         };
-        if let Some((path, declaration)) = &reference.declaration {
-            if same_file(path, &ast.file_name) {
-                insert(tokens, &declaration.span, token_type, DECLARATION);
-            }
+        if let Some((path, declaration)) = &reference.declaration
+            && same_file(path, &ast.file_name)
+        {
+            insert(tokens, &declaration.span, token_type, DECLARATION);
         }
-        if let Some((path, implementation)) = &reference.implementation {
-            if same_file(path, &ast.file_name) {
-                insert(tokens, &implementation.span, token_type, DEFINITION);
-            }
+        if let Some((path, implementation)) = &reference.implementation
+            && same_file(path, &ast.file_name)
+        {
+            insert(tokens, &implementation.span, token_type, DEFINITION);
         }
         for (path, usage) in reference.usages.iter().chain(&reference.return_types) {
             if same_file(path, &ast.file_name) {

@@ -161,8 +161,7 @@ impl TransferState {
 
         // Round to 2 significant figures
         let divisor = 10_usize.pow((magnitude - 1) as u32);
-        let rounded = ((bps + divisor / 2) / divisor) * divisor;
 
-        rounded
+        ((bps + divisor / 2) / divisor) * divisor
     }
 }

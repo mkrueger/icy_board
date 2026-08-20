@@ -69,10 +69,10 @@ fn loose_workspace() -> Workspace {
 #[tower_lsp::async_trait]
 impl LanguageServer for Backend {
     async fn initialize(&self, params: InitializeParams) -> Result<InitializeResult> {
-        if let Some(root) = params.root_uri {
-            if let Ok(root) = root.to_file_path() {
-                self.load_workspace(root);
-            }
+        if let Some(root) = params.root_uri
+            && let Ok(root) = root.to_file_path()
+        {
+            self.load_workspace(root);
         }
         Ok(InitializeResult {
             server_info: None,
@@ -268,11 +268,11 @@ impl LanguageServer for Backend {
                     let legacy = diagnostic.data.as_ref().and_then(|data| data.get("legacy")).and_then(Value::as_u64);
                     let upgrade = vec![TextEdit::new(diagnostic.range, "EXIT".to_string())];
                     actions.push(quick_fix("Replace END with EXIT", uri.clone(), diagnostic.clone(), upgrade, true));
-                    if let Some(legacy) = legacy {
-                        if let Some(edit) = language_version_directive_edit(&rope, legacy as u16) {
-                            let title = format!("Read this file as language version {legacy}");
-                            actions.push(quick_fix(&title, uri.clone(), diagnostic, vec![edit], false));
-                        }
+                    if let Some(legacy) = legacy
+                        && let Some(edit) = language_version_directive_edit(&rope, legacy as u16)
+                    {
+                        let title = format!("Read this file as language version {legacy}");
+                        actions.push(quick_fix(&title, uri.clone(), diagnostic, vec![edit], false));
                     }
                     continue;
                 }
@@ -357,7 +357,7 @@ impl LanguageServer for Backend {
             let rope = self.document_map.get(&uri2)?;
 
             let offset = position_to_offset(&rope, params.text_document_position_params.position)?;
-            if let Some((path, r)) = get_definition(&ast, visitor, offset) {
+            if let Some((path, r)) = get_definition(ast, visitor, offset) {
                 return self.location(&path, r.span).map(GotoDefinitionResponse::Scalar);
             }
             None
@@ -478,7 +478,7 @@ impl LanguageServer for Backend {
 
         self.client.log_message(MessageType::INFO, format!("OFFSET {offset}!")).await;
 
-        let reference_list = self.get_ast(&uri, |ast: &Ast, visitor| get_reference(&ast, offset, visitor, true))?;
+        let reference_list = self.get_ast(&uri, |ast: &Ast, visitor| get_reference(ast, offset, visitor, true))?;
 
         self.client.log_message(MessageType::INFO, format!("got {} refs!", reference_list.len())).await;
 
@@ -500,7 +500,7 @@ impl LanguageServer for Backend {
 
         self.client.log_message(MessageType::INFO, format!("OFFSET {offset}!")).await;
 
-        let reference_list = self.get_ast(&uri, |ast: &Ast, visitor| get_reference(&ast, offset, visitor, true))?;
+        let reference_list = self.get_ast(&uri, |ast: &Ast, visitor| get_reference(ast, offset, visitor, true))?;
 
         self.client.log_message(MessageType::INFO, format!("got {} refs!", reference_list.len())).await;
 
@@ -800,48 +800,48 @@ impl Backend {
             visitor.format(ast);
             backend.edits
         })?;
-        result.sort_by(|a, b| b.range.start.cmp(&a.range.start));
+        result.sort_by_key(|b| std::cmp::Reverse(b.range.start));
         Ok(Some(result))
     }
 
     fn load_workspace(&self, roo_path: PathBuf) {
         let ws_file = roo_path.join("ppl.toml");
-        if ws_file.exists() {
-            if let Ok(mut ws) = Workspace::load(ws_file) {
-                // The manifest is explicit; the environment only fills in what it left open.
-                ws.set_default_language_version(env_language_version());
-                let errors = Arc::new(Mutex::new(ErrorReporter::default()));
-                let registry = UserTypeRegistry::icy_board_registry();
-                let mut sources = Vec::new();
-                for file in ws.files() {
-                    let Ok(data) = std::fs::read(&file) else {
-                        continue;
-                    };
-                    let Ok(content) = read_data_with_encoding_detection(&data) else {
-                        continue;
-                    };
-                    preparse_type_declarations(file.clone(), errors.clone(), &content, &registry, Encoding::Utf8, &ws);
-                    sources.push((file, content));
-                }
-
-                let mut asts = Vec::new();
-                for (file, content) in sources {
-                    let ast = parse_ast_with_predeclared_types(file.clone(), errors.clone(), &content, &registry, Encoding::Utf8, &ws);
-                    asts.push(ast);
-                }
-
-                let mut semantic_visitor = SemanticVisitor::new(&ws, errors, registry);
-                for ast in asts {
-                    ast.visit(&mut semantic_visitor);
-                    if let Ok(uri) = Url::from_file_path(&ast.file_name) {
-                        self.workspace_map.insert(uri, ast);
-                    }
-                }
-                semantic_visitor.finish();
-
-                let mut state = self.workspace.lock().unwrap();
-                let _ = mem::replace(&mut *state, ws);
+        if ws_file.exists()
+            && let Ok(mut ws) = Workspace::load(ws_file)
+        {
+            // The manifest is explicit; the environment only fills in what it left open.
+            ws.set_default_language_version(env_language_version());
+            let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+            let registry = UserTypeRegistry::icy_board_registry();
+            let mut sources = Vec::new();
+            for file in ws.files() {
+                let Ok(data) = std::fs::read(&file) else {
+                    continue;
+                };
+                let Ok(content) = read_data_with_encoding_detection(&data) else {
+                    continue;
+                };
+                preparse_type_declarations(file.clone(), errors.clone(), &content, &registry, Encoding::Utf8, &ws);
+                sources.push((file, content));
             }
+
+            let mut asts = Vec::new();
+            for (file, content) in sources {
+                let ast = parse_ast_with_predeclared_types(file.clone(), errors.clone(), &content, &registry, Encoding::Utf8, &ws);
+                asts.push(ast);
+            }
+
+            let mut semantic_visitor = SemanticVisitor::new(&ws, errors, registry);
+            for ast in asts {
+                ast.visit(&mut semantic_visitor);
+                if let Ok(uri) = Url::from_file_path(&ast.file_name) {
+                    self.workspace_map.insert(uri, ast);
+                }
+            }
+            semantic_visitor.finish();
+
+            let mut state = self.workspace.lock().unwrap();
+            let _ = mem::replace(&mut *state, ws);
         }
     }
 
@@ -971,13 +971,13 @@ impl Backend {
                     let (code, data) = diagnostic_details(&*err.error, rope, &err.file_name, err.span.start, semantic_visitor);
                     diag.code = code;
                     diag.data = data;
-                    if let Some((path, span)) = earlier_declaration(&*err.error, semantic_visitor) {
-                        if let Some(location) = self.location(&path, span) {
-                            diag.related_information = Some(vec![DiagnosticRelatedInformation {
-                                location,
-                                message: "the name is already taken here".to_string(),
-                            }]);
-                        }
+                    if let Some((path, span)) = earlier_declaration(&*err.error, semantic_visitor)
+                        && let Some(location) = self.location(&path, span)
+                    {
+                        diag.related_information = Some(vec![DiagnosticRelatedInformation {
+                            location,
+                            message: "the name is already taken here".to_string(),
+                        }]);
                     }
                     if matches!(
                         diag.code.as_ref(),
@@ -1582,13 +1582,10 @@ struct TooltipVisitor {
 
 impl AstVisitor<()> for TooltipVisitor {
     fn visit_constant_expression(&mut self, const_expr: &ConstantExpression) {
-        if const_expr.get_constant_token().span.contains(&self.offset) {
-            match const_expr.get_constant_value() {
-                Constant::Builtin(c) => {
-                    self.tooltip = get_const_hover(c);
-                }
-                _ => {}
-            }
+        if const_expr.get_constant_token().span.contains(&self.offset)
+            && let Constant::Builtin(c) = const_expr.get_constant_value()
+        {
+            self.tooltip = get_const_hover(c);
         }
     }
 
@@ -1645,14 +1642,14 @@ impl AstVisitor<()> for TooltipVisitor {
 
     fn visit_function_call_expression(&mut self, call: &icy_board_engine::ast::FunctionCallExpression) {
         icy_board_engine::ast::walk_function_call_expression(self, call);
-        if let Expression::Identifier(identifier) = call.get_expression() {
-            if identifier.get_identifier_token().span.contains(&self.offset) {
-                let predef = FunctionDefinition::get_function_definitions(identifier.get_identifier());
-                for p in predef {
-                    if FUNCTION_DEFINITIONS[p].parameter_count() == call.get_arguments().len() {
-                        self.tooltip = get_function_hover(&FUNCTION_DEFINITIONS[p]);
-                        return;
-                    }
+        if let Expression::Identifier(identifier) = call.get_expression()
+            && identifier.get_identifier_token().span.contains(&self.offset)
+        {
+            let predef = FunctionDefinition::get_function_definitions(identifier.get_identifier());
+            for p in predef {
+                if FUNCTION_DEFINITIONS[p].parameter_count() == call.get_arguments().len() {
+                    self.tooltip = get_function_hover(&FUNCTION_DEFINITIONS[p]);
+                    return;
                 }
             }
         }

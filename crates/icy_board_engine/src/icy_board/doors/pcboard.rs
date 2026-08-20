@@ -37,7 +37,7 @@ fn create_pcboard_sys(state: &IcyBoardState, path: &std::path::Path) -> Res<()> 
     contents.extend(b"Local"); // Connect Speed (5 chars)
     contents.extend(u16::to_le_bytes(state.session.cur_user_id as u16)); // Users record number
     contents.extend(export_cp437_string(&state.session.get_first_name(), 15, b' ')); // User's First Name (padded to 15 characters)
-    contents.extend(export_cp437_string(&"SECRET", 12, b' ')); // User's Password (padded to 12 characters)
+    contents.extend(export_cp437_string("SECRET", 12, b' ')); // User's Password (padded to 12 characters)
     contents.extend(u16::to_le_bytes((state.session.login_date.time().num_seconds_from_midnight() / 60) as u16)); // Time User Logged On (in minutes since midnight)
     contents.extend(u16::to_le_bytes((Utc::now() - state.session.login_date).num_minutes() as u16)); // Time used so far today (negative number of minutes)
     contents.extend(state.session.login_date.format("%H:%M").to_string().as_bytes()); // Time User Logged On (in "HH:MM" format)
@@ -51,7 +51,7 @@ fn create_pcboard_sys(state: &IcyBoardState, path: &std::path::Path) -> Res<()> 
 
     contents.extend([0, 0, 0, 0, 0]); // Conference Areas the user has joined this session - 5 bytes
     contents.extend([0, 0, 0, 0, 0]); // Conference Areas the user has scanned this session - 5 bytes
-    contents.extend(u16::to_le_bytes(state.session.current_conference.add_conference_time as u16)); // Conference Add Time in minutes
+    contents.extend(u16::to_le_bytes(state.session.current_conference.add_conference_time)); // Conference Add Time in minutes
     contents.extend(u16::to_le_bytes(0)); // Upload/Sysop CHAT Credit Minutes
     contents.extend(export_cp437_string(&state.session.language, 4, b' ')); // Language Extension
     contents.extend(export_cp437_string(&state.session.user_name, 25, b' ')); // User's Full Name (padded to 25 characters)

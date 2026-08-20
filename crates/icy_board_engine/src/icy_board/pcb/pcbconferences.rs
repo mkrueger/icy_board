@@ -10,7 +10,7 @@ use codepages::tables::UNICODE_TO_CP437;
 
 use crate::icy_board::pcboard_data::{append_bool, append_int, append_line, read_bool, read_int, read_line};
 
-/// Only for compatibility with very old PCBoard PPEs
+/// Only for compatibility with very old `PCBoard` PPEs
 /// Even pcboard itself only generates that for compatiblity purposes
 #[derive(Default, Clone, Debug)]
 pub struct PcbLegacyConferenceHeader {
@@ -65,12 +65,12 @@ impl PcbLegacyConferenceHeader {
         let mut res = Vec::new();
 
         append_cp437(&mut res, &self.name, 14);
-        res.push(if self.public_conf { 1 } else { 0 });
-        res.push(if self.auto_rejoin { 1 } else { 0 });
-        res.push(if self.view_members { 1 } else { 0 });
-        res.push(if self.priv_uplds { 1 } else { 0 });
-        res.push(if self.priv_msgs { 1 } else { 0 });
-        res.push(if self.echo_mail { 1 } else { 0 });
+        res.push(u8::from(self.public_conf));
+        res.push(u8::from(self.auto_rejoin));
+        res.push(u8::from(self.view_members));
+        res.push(u8::from(self.priv_uplds));
+        res.push(u8::from(self.priv_msgs));
+        res.push(u8::from(self.echo_mail));
         res.extend(&self.req_sec_level.to_le_bytes());
         res.extend(&self.add_sec.to_le_bytes());
         res.extend(&self.add_time.to_le_bytes());
@@ -138,7 +138,7 @@ impl PcbLegacyConferenceHeader {
     pub fn deserialize(reader: &mut BufReader<File>) -> Res<Self> {
         let mut name = [14; 0];
         reader.read_exact(&mut name)?;
-        let name = import_cp437_string(&mut name, true);
+        let name = import_cp437_string(&name, true);
         let public_conf = reader.read_u8()? != 0;
         let auto_rejoin = reader.read_u8()? != 0;
         let view_members = reader.read_u8()? != 0;
@@ -151,66 +151,66 @@ impl PcbLegacyConferenceHeader {
         let msg_blocks = reader.read_u8()?;
         let mut msg_file = [32; 0];
         reader.read_exact(&mut msg_file)?;
-        let msg_file = import_cp437_string(&mut msg_file, true);
+        let msg_file = import_cp437_string(&msg_file, true);
         let mut user_menu = [32; 0];
         reader.read_exact(&mut user_menu)?;
-        let user_menu = import_cp437_string(&mut user_menu, true);
+        let user_menu = import_cp437_string(&user_menu, true);
         let mut sysop_menu = [32; 0];
         reader.read_exact(&mut sysop_menu)?;
-        let sysop_menu = import_cp437_string(&mut sysop_menu, true);
+        let sysop_menu = import_cp437_string(&sysop_menu, true);
         let mut news_file = [32; 0];
         reader.read_exact(&mut news_file)?;
-        let news_file = import_cp437_string(&mut news_file, true);
+        let news_file = import_cp437_string(&news_file, true);
         let pub_upld_sort = reader.read_u8()?;
         let mut upld_dir = [29; 0];
         reader.read_exact(&mut upld_dir)?;
-        let upld_dir = import_cp437_string(&mut upld_dir, true);
+        let upld_dir = import_cp437_string(&upld_dir, true);
         let mut pub_upld_loc = [26; 0];
         reader.read_exact(&mut pub_upld_loc)?;
-        let pub_upld_loc = import_cp437_string(&mut pub_upld_loc, true);
+        let pub_upld_loc = import_cp437_string(&pub_upld_loc, true);
         let prv_upld_sort = reader.read_u8()?;
         let mut priv_dir = [29; 0];
         reader.read_exact(&mut priv_dir)?;
-        let priv_dir = import_cp437_string(&mut priv_dir, true);
+        let priv_dir = import_cp437_string(&priv_dir, true);
         let mut prv_upld_loc = [26; 0];
         reader.read_exact(&mut prv_upld_loc)?;
-        let prv_upld_loc = import_cp437_string(&mut prv_upld_loc, true);
+        let prv_upld_loc = import_cp437_string(&prv_upld_loc, true);
 
         let mut drs_menu = [29; 0];
         reader.read_exact(&mut drs_menu)?;
-        let drs_menu = import_cp437_string(&mut drs_menu, true);
+        let drs_menu = import_cp437_string(&drs_menu, true);
 
         let mut drs_file = [33; 0];
         reader.read_exact(&mut drs_file)?;
-        let drs_file = import_cp437_string(&mut drs_file, true);
+        let drs_file = import_cp437_string(&drs_file, true);
 
         let mut blt_menu = [29; 0];
         reader.read_exact(&mut blt_menu)?;
-        let blt_menu = import_cp437_string(&mut blt_menu, true);
+        let blt_menu = import_cp437_string(&blt_menu, true);
 
         let mut blt_name_loc = [33; 0];
         reader.read_exact(&mut blt_name_loc)?;
-        let blt_name_loc = import_cp437_string(&mut blt_name_loc, true);
+        let blt_name_loc = import_cp437_string(&blt_name_loc, true);
 
         let mut scr_menu = [29; 0];
         reader.read_exact(&mut scr_menu)?;
-        let scr_menu = import_cp437_string(&mut scr_menu, true);
+        let scr_menu = import_cp437_string(&scr_menu, true);
 
         let mut scr_name_loc = [33; 0];
         reader.read_exact(&mut scr_name_loc)?;
-        let scr_name_loc = import_cp437_string(&mut scr_name_loc, true);
+        let scr_name_loc = import_cp437_string(&scr_name_loc, true);
 
         let mut dir_menu = [29; 0];
         reader.read_exact(&mut dir_menu)?;
-        let dir_menu = import_cp437_string(&mut dir_menu, true);
+        let dir_menu = import_cp437_string(&dir_menu, true);
 
         let mut dir_name_loc = [33; 0];
         reader.read_exact(&mut dir_name_loc)?;
-        let dir_name_loc = import_cp437_string(&mut dir_name_loc, true);
+        let dir_name_loc = import_cp437_string(&dir_name_loc, true);
 
         let mut pth_name_loc = [33; 0];
         reader.read_exact(&mut pth_name_loc)?;
-        let pth_name_loc = import_cp437_string(&mut pth_name_loc, true);
+        let pth_name_loc = import_cp437_string(&pth_name_loc, true);
 
         Ok(Self {
             name,
@@ -499,16 +499,17 @@ impl PcbAdditionalConferenceHeader {
     }
 
     pub(crate) fn serialize(&self) -> Vec<u8> {
-        let mut res = Vec::new();
-        res.push(if self.force_echo { 1 } else { 0 });
-        res.push(if self.read_only { 1 } else { 0 });
-        res.push(if self.no_private_msgs { 1 } else { 0 });
-        res.push(self.ret_receipt_level);
-        res.push(if self.record_origin { 1 } else { 0 });
-        res.push(if self.prompt_for_routing { 1 } else { 0 });
-        res.push(if self.allow_aliases { 1 } else { 0 });
-        res.push(if self.show_intro_on_ra { 1 } else { 0 });
-        res.push(self.req_level_to_enter);
+        let mut res = vec![
+            u8::from(self.force_echo),
+            u8::from(self.read_only),
+            u8::from(self.no_private_msgs),
+            self.ret_receipt_level,
+            u8::from(self.record_origin),
+            u8::from(self.prompt_for_routing),
+            u8::from(self.allow_aliases),
+            u8::from(self.show_intro_on_ra),
+            self.req_level_to_enter,
+        ];
         append_cp437(&mut res, &self.password, 13);
         append_cp437(&mut res, &self.intro, 32);
         append_cp437(&mut res, &self.attach_loc, 32);
@@ -516,8 +517,8 @@ impl PcbAdditionalConferenceHeader {
         res.push(self.attach_level);
         res.push(self.carbon_limit);
         append_cp437(&mut res, &self.cmd_lst, 32);
-        res.push(if self.old_index { 1 } else { 0 });
-        res.push(if self.long_to_names { 1 } else { 0 });
+        res.push(u8::from(self.old_index));
+        res.push(u8::from(self.long_to_names));
         res.push(self.carbon_level);
         res.push(self.conf_type);
         res.extend(&self.export_ptr.to_le_bytes());

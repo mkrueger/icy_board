@@ -111,8 +111,8 @@ fn run_executable(file_name: &str, executable: &Executable) -> String {
             println!("Error while executing: {}", err);
         }
         thread::sleep(std::time::Duration::from_millis(50));
-        let x = result.as_ref().lock().await.clone();
-        x
+
+        result.as_ref().lock().await.clone()
     });
 
     let result = read_data_with_encoding_detection(&result).unwrap();

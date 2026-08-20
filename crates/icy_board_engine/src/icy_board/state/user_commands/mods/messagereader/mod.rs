@@ -257,12 +257,12 @@ impl IcyBoardState {
                     }
                 }
             }
-            if !messages.is_empty() {
-                low_number = messages.first().unwrap_or(&0).to_owned();
-                high_number = messages.last().unwrap_or(&0).to_owned();
-            } else {
+            if messages.is_empty() {
                 low_number = 0;
                 high_number = 0;
+            } else {
+                low_number = messages.first().unwrap_or(&0).to_owned();
+                high_number = messages.last().unwrap_or(&0).to_owned();
             }
         }
         while !self.session.disp_options.abort_printout {
@@ -271,7 +271,7 @@ impl IcyBoardState {
             } else {
                 IceText::MessageReadCommand
             };
-            self.session.op_text = format!("{}-{}", low_number, high_number);
+            self.session.op_text = format!("{low_number}-{high_number}");
 
             if self.session.tokens.is_empty() {
                 let text = self
@@ -279,7 +279,7 @@ impl IcyBoardState {
                         prompt,
                         40,
                         MASK_COMMAND,
-                        &CommandType::ReadMessages.get_help(),
+                        CommandType::ReadMessages.get_help(),
                         None,
                         display_flags::UPCASE | display_flags::NEWLINE | display_flags::LFBEFORE,
                     )
@@ -386,7 +386,7 @@ impl IcyBoardState {
         (clamp(range.first), clamp(range.last))
     }
 
-    /// The questions PCBoard asks once it has read the whole line
+    /// The questions `PCBoard` asks once it has read the whole line
     /// and finds a search with nothing to search for.
     async fn resolve_read_command(&mut self, cmd: &mut ReadCommand) -> Res<Resolution> {
         if cmd.not_memorized {
@@ -579,7 +579,7 @@ impl IcyBoardState {
                             }
                         }
                         Err(err) => {
-                            log::error!("Error reading message header: {}", err);
+                            log::error!("Error reading message header: {err}");
                         }
                     }
                     match next_in_range(number, first, last) {

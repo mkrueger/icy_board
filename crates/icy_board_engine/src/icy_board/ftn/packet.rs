@@ -7,6 +7,7 @@ use std::{
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use chrono::{Datelike, NaiveDate, NaiveDateTime, Timelike};
 use jamjam::util::echomail::EchomailAddress;
+use std::fmt::Write as _;
 use thiserror::Error;
 
 /// A packet is a stream of messages, terminated where the next message type
@@ -278,13 +279,13 @@ impl PackedMessage {
         }
         let mut prefix = String::new();
         if !has_kludge(&self.text, "INTL") {
-            prefix.push_str(&format!("\x01INTL {} {}\r", to_3d(&self.dest), to_3d(&self.orig)));
+            let _ = write!(prefix, "\x01INTL {} {}\r", to_3d(&self.dest), to_3d(&self.orig));
         }
         if self.orig.point != 0 && !has_kludge(&self.text, "FMPT") {
-            prefix.push_str(&format!("\x01FMPT {}\r", self.orig.point));
+            let _ = write!(prefix, "\x01FMPT {}\r", self.orig.point);
         }
         if self.dest.point != 0 && !has_kludge(&self.text, "TOPT") {
-            prefix.push_str(&format!("\x01TOPT {}\r", self.dest.point));
+            let _ = write!(prefix, "\x01TOPT {}\r", self.dest.point);
         }
         prefix + self.text.as_str()
     }
@@ -372,7 +373,7 @@ fn to_3d(address: &EchomailAddress) -> String {
 }
 
 fn has_kludge(text: &str, name: &str) -> bool {
-    text.split('\r').any(|line| line.starts_with(&format!("\x01{} ", name)))
+    text.split('\r').any(|line| line.starts_with(&format!("\x01{name} ")))
 }
 
 fn to_date_time(year: u16, month: u16, day: u16, hour: u16, minute: u16, second: u16) -> NaiveDateTime {

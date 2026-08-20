@@ -190,16 +190,7 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
                             drop(board_lock.take());
                         }
 
-                        let result = run_message(
-                            msg,
-                            &mut terminal,
-                            &mut board,
-                            &mut bbs,
-                            arguments.full_screen,
-                            String::new(),
-                            web_admin.clone(),
-                        )
-                        .await;
+                        let result = run_message(msg, &mut terminal, &board, &mut bbs, arguments.full_screen, String::new(), web_admin.clone()).await;
 
                         if launches_board_tool {
                             board_lock = Some(BoardLock::acquire(&board.lock().await.root_path)?);
@@ -222,7 +213,7 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
                             }
                             Err(err) => {
                                 restore_terminal()?;
-                                log::error!("while processing call wait screen message: {}", err.to_string());
+                                log::error!("while processing call wait screen message: {}", err);
                                 print_error(err.to_string());
                                 return Err(err);
                             }
@@ -230,7 +221,7 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
                     }
                     Err(err) => {
                         restore_terminal()?;
-                        log::error!("while running call wait screen: {}", err.to_string());
+                        log::error!("while running call wait screen: {}", err);
                         print_error(err.to_string());
                         return Err(err);
                     }
@@ -238,9 +229,9 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
             }
         }
         Err(err) => {
-            log::error!("while loading icy board configuration: {}", err.to_string());
+            log::error!("while loading icy board configuration: {}", err);
             print_error(err.to_string());
-            return Err(err);
+            Err(err)
         }
     }
 }
@@ -410,16 +401,16 @@ where
             stdout().execute(Clear(crossterm::terminal::ClearType::All)).unwrap();
             match Tui::local_mode(board, bbs, false, None, stuffed_chars).await {
                 Ok(mut tui) => {
-                    if let Err(err) = tui.run(bbs, &board).await {
+                    if let Err(err) = tui.run(bbs, board).await {
                         restore_terminal()?;
-                        log::error!("while running board in local mode: {}", err.to_string());
+                        log::error!("while running board in local mode: {}", err);
                         println!("Error: {}", err);
                         process::exit(1);
                     }
                 }
                 Err(err) => {
                     restore_terminal()?;
-                    log::error!("while initializing board in local mode: {}", err.to_string());
+                    log::error!("while initializing board in local mode: {}", err);
                     println!("Error: {}", err);
                     process::exit(1);
                 }
@@ -442,16 +433,16 @@ where
             .await
             {
                 Ok(mut tui) => {
-                    if let Err(err) = tui.run(bbs, &board).await {
+                    if let Err(err) = tui.run(bbs, board).await {
                         restore_terminal()?;
-                        log::error!("while running board in local mode: {}", err.to_string());
+                        log::error!("while running board in local mode: {}", err);
                         println!("Error: {}", err);
                         process::exit(1);
                     }
                 }
                 Err(err) => {
                     restore_terminal()?;
-                    log::error!("while initializing board in local mode: {}", err.to_string());
+                    log::error!("while initializing board in local mode: {}", err);
                     println!("Error: {}", err);
                     process::exit(1);
                 }
@@ -461,16 +452,16 @@ where
             stdout().execute(Clear(crossterm::terminal::ClearType::All)).unwrap();
             match Tui::local_mode(board, bbs, true, None, stuffed_chars).await {
                 Ok(mut tui) => {
-                    if let Err(err) = tui.run(bbs, &board).await {
+                    if let Err(err) = tui.run(bbs, board).await {
                         restore_terminal()?;
-                        log::error!("while running board in local mode: {}", err.to_string());
+                        log::error!("while running board in local mode: {}", err);
                         println!("Error: {}", err);
                         process::exit(1);
                     }
                 }
                 Err(err) => {
                     restore_terminal()?;
-                    log::error!("while initializing board in local mode: {}", err.to_string());
+                    log::error!("while initializing board in local mode: {}", err);
                     println!("Error: {}", err);
                     process::exit(1);
                 }
@@ -482,14 +473,14 @@ where
             process::exit(0);
         }
         CallWaitMessage::Monitor => {
-            let mut app = node_monitoring_screen::NodeMonitoringScreen::new(&board).await;
-            match app.run(terminal, &board, bbs, full_screen, web_admin.as_ref()).await {
+            let mut app = node_monitoring_screen::NodeMonitoringScreen::new(board).await;
+            match app.run(terminal, board, bbs, full_screen, web_admin.as_ref()).await {
                 Ok(msg) => {
                     if let NodeMonitoringScreenMessage::EnterNode(node) = msg {
                         let mut tui = Tui::sysop_mode(bbs, node).await?;
-                        if let Err(err) = tui.run(bbs, &board).await {
+                        if let Err(err) = tui.run(bbs, board).await {
                             restore_terminal()?;
-                            log::error!("while running board in local mode: {}", err.to_string());
+                            log::error!("while running board in local mode: {}", err);
                             println!("Error: {}", err);
                             process::exit(1);
                         }
@@ -497,7 +488,7 @@ where
                 }
                 Err(err) => {
                     restore_terminal()?;
-                    log::error!("while running node monitoring screen: {}", err.to_string());
+                    log::error!("while running node monitoring screen: {}", err);
                     print_error(err.to_string());
                     process::exit(1);
                 }
@@ -546,7 +537,7 @@ where
             SHOW_TOTAL_STATS = !SHOW_TOTAL_STATS;
         },
         CallWaitMessage::ShowStatistics => {
-            let mut app = SystemStatisticsScreen::new(&board).await;
+            let mut app = SystemStatisticsScreen::new(board).await;
             match app.run(terminal, full_screen).await {
                 Ok(msg) => {
                     if msg == SystemStatisticsScreenMessage::Reset {
@@ -558,7 +549,7 @@ where
                 }
                 Err(err) => {
                     restore_terminal()?;
-                    log::error!("while running system statistics screen: {}", err.to_string());
+                    log::error!("while running system statistics screen: {}", err);
                     print_error(err.to_string());
                     process::exit(1);
                 }
@@ -605,8 +596,7 @@ async fn handle_runppe(params: &str) -> Res<CallWaitMessage> {
 
     let mut first_name = String::new();
     let mut last_name = String::new();
-    let password;
-    let ppe_file;
+
     let mut ppe_params = Vec::new();
     let mut idx = 0;
 
@@ -628,14 +618,14 @@ async fn handle_runppe(params: &str) -> Res<CallWaitMessage> {
     if idx >= parts.len() || !parts[idx].to_uppercase().starts_with("PWRD:") {
         return Err("Error in Password - missing PWRD: prefix".into());
     }
-    password = parts[idx][5..].to_string();
+    let password = parts[idx][5..].to_string();
     idx += 1;
 
     // Parse PPE file
     if idx >= parts.len() || !parts[idx].to_uppercase().starts_with("PPE:") {
         return Err("PPE Name is missing - missing PPE: prefix".into());
     }
-    ppe_file = PathBuf::from(&parts[idx][4..]);
+    let ppe_file = PathBuf::from(&parts[idx][4..]);
     idx += 1;
 
     // Remaining parts are PPE parameters

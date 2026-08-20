@@ -595,10 +595,10 @@ impl IfStatement {
     }
 
     pub fn set_statement(&mut self, statement: Statement) {
-        self.statement = Box::new(statement);
+        *self.statement = statement;
     }
     pub fn set_condition(&mut self, condition: Expression) {
-        self.condition = Box::new(condition);
+        *self.condition = condition;
     }
 
     pub fn create_empty_statement(condition: Expression, statement: Statement) -> Statement {
@@ -1144,10 +1144,10 @@ impl ForStatement {
     ///
     /// Panics if .
     pub fn get_next_identifier(&self) -> Option<&unicase::Ascii<String>> {
-        if let Some(ni) = &self.next_identifier_token {
-            if let Token::Identifier(id) = &ni.token {
-                return Some(id);
-            }
+        if let Some(ni) = &self.next_identifier_token
+            && let Token::Identifier(id) = &ni.token
+        {
+            return Some(id);
         }
         None
     }
@@ -1889,8 +1889,8 @@ impl LoopStatement {
     pub fn new(loop_token: Spanned<Token>, statements: Vec<Statement>, endloop_token: Spanned<Token>) -> Self {
         Self {
             loop_token,
-            endloop_token,
             statements,
+            endloop_token,
         }
     }
 

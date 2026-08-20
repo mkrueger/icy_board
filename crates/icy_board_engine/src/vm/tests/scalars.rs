@@ -9,7 +9,7 @@ fn test_toddate_reads_a_ccyymmdd_string() {
 }
 
 /// PCBACCSTAT field 0 answers 0 when accounting is off and 2 when it is on;
-/// icy_board has no separate tracking mode, so an enabled system is fully on.
+/// `icy_board` has no separate tracking mode, so an enabled system is fully on.
 #[test]
 fn test_pcbaccstat_reports_the_accounting_status() {
     assert_eq!(run_ppl("PRINT PCBACCSTAT(0)"), "0");
@@ -181,8 +181,8 @@ fn test_a_loop_can_keep_asking_for_objects() {
     assert_eq!(output, "500 Main");
 }
 
-/// PCBoard kept a name and a city per node in USERNET, so what WRUNET writes is
-/// what UN_NAME and UN_CITY read back.
+/// `PCBoard` kept a name and a city per node in USERNET, so what WRUNET writes is
+/// what `UN_NAME` and `UN_CITY` read back.
 #[test]
 fn test_wrunet_keeps_the_name_and_city_a_ppe_wrote() {
     let output = run_ppl(
@@ -196,7 +196,7 @@ fn test_wrunet_keeps_the_name_and_city_a_ppe_wrote() {
 }
 
 /// A DDATE holds the julian date a DATE holds; only its text form is CCYYMMDD.
-/// Verified against PCBoard 15.4/M.
+/// Verified against `PCBoard` 15.4/M.
 #[test]
 fn test_a_ddate_holds_the_julian_date_behind_its_ccyymmdd_text() {
     assert_eq!(run_ppl("INTEGER i\ni = TODDATE(\"19940527\")\nPRINT i"), "34480");
@@ -210,7 +210,7 @@ fn test_an_edate_shows_the_date_as_yymm_dd() {
     assert_eq!(run_ppl("EDATE e\ne = MKDATE(1996, 3, 15)\nPRINT TOINTEGER(e)"), "35138");
 }
 
-/// PCBoard does not read a date out of a string for an EDATE, it answers 0.
+/// `PCBoard` does not read a date out of a string for an EDATE, it answers 0.
 #[test]
 fn test_an_edate_does_not_read_a_date_out_of_a_string() {
     assert_eq!(run_ppl("PRINT TOEDATE(\"03-15-96\")"), "0000.00");

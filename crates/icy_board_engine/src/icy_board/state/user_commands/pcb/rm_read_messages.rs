@@ -15,9 +15,6 @@ impl IcyBoardState {
         };
 
         match t {
-            1 => {
-                self.session.push_tokens("RM+");
-            }
             2 => {
                 self.session.push_tokens("RM-");
             }

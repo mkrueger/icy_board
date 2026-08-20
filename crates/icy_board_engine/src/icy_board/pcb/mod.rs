@@ -145,7 +145,7 @@ impl PcbBoard {
         let conferences = PcbConferenceHeader::import_pcboard(&r, max_conferences)?;
         res.conferences = conferences;
 
-        let r = res.resolve_file(&(res.data.path.conference_file.to_string() + ".ADD"));
+        let r = res.resolve_file(&(res.data.path.conference_file.clone() + ".ADD"));
         let add_conferences = PcbAdditionalConferenceHeader::import_pcboard(&r)?;
         res.add_conferences = add_conferences;
 

@@ -28,17 +28,17 @@ impl<'a> CommandsTab<'a> {
             table_state: TableState::default().with_selected(0),
             headers: vec!["   ".to_string(), "Keyword".to_string(), "Display".to_string()],
             get_content: Box::new(move |_table, i, j| {
-                if let Ok(mnu2) = mnu2.lock() {
-                    if *i < mnu2.commands.len() {
-                        return match j {
-                            0 => Line::from(format!("{})", i + 1)),
-                            1 => Line::from(mnu2.commands[*i].keyword.clone()),
-                            2 => get_styled_pcb_line(&mnu2.commands[*i].display),
-                            _ => Line::from("".to_string()),
-                        };
-                    }
+                if let Ok(mnu2) = mnu2.lock()
+                    && *i < mnu2.commands.len()
+                {
+                    return match j {
+                        0 => Line::from(format!("{})", i + 1)),
+                        1 => Line::from(mnu2.commands[*i].keyword.clone()),
+                        2 => get_styled_pcb_line(&mnu2.commands[*i].display),
+                        _ => Line::from("".to_string()),
+                    };
                 }
-                return Line::from("".to_string());
+                Line::from("".to_string())
             }),
             content_length: len,
         };
@@ -83,13 +83,13 @@ impl<'a> CommandsTab<'a> {
     }
 
     fn move_up(&mut self) {
-        if let Some(selected) = self.insert_table.table_state.selected() {
-            if selected > 0 {
-                if let Ok(mut menu) = self.menu.lock() {
-                    menu.commands.swap(selected, selected - 1);
-                }
-                self.insert_table.table_state.select(Some(selected - 1));
+        if let Some(selected) = self.insert_table.table_state.selected()
+            && selected > 0
+        {
+            if let Ok(mut menu) = self.menu.lock() {
+                menu.commands.swap(selected, selected - 1);
             }
+            self.insert_table.table_state.select(Some(selected - 1));
         }
     }
 

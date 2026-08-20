@@ -20,6 +20,7 @@ use super::{
     FtnAka, FtnConfig, FtnLink, bundle,
     packet::{self, PackedMessage, Packet, PacketHeader},
 };
+use std::fmt::Write as _;
 
 type Res<T> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
@@ -95,7 +96,7 @@ pub fn toss_inbound(config: &FtnConfig, areas: &AreaMap, target: &TossTarget) ->
     files.sort();
 
     for file in files {
-        let Some(name) = file.file_name().and_then(|name| name.to_str()).map(|name| name.to_ascii_lowercase()) else {
+        let Some(name) = file.file_name().and_then(|name| name.to_str()).map(str::to_ascii_lowercase) else {
             continue;
         };
         let result = if bundle::is_bundle(&name) {
@@ -133,7 +134,7 @@ impl Tosser<'_> {
         let work = tempfile::tempdir_in(&self.config.inbound)?;
         let mut done = true;
         for packet in bundle::unpack(file, work.path())? {
-            let Some(name) = packet.file_name().and_then(|name| name.to_str()).map(|name| name.to_ascii_lowercase()) else {
+            let Some(name) = packet.file_name().and_then(|name| name.to_str()).map(str::to_ascii_lowercase) else {
                 continue;
             };
             if !bundle::is_packet(&name) {
@@ -217,13 +218,13 @@ impl Tosser<'_> {
             return Ok(());
         }
         let base = self.bases.get(path)?;
-        if self.config.options.check_dupe_msg_id {
-            if let Some(id) = &kludges.msgid {
-                let crc = JamMessageBase::crc(&BString::from(id.as_str()));
-                if !base.seen.insert(crc) {
-                    report.duplicates += 1;
-                    return Ok(());
-                }
+        if self.config.options.check_dupe_msg_id
+            && let Some(id) = &kludges.msgid
+        {
+            let crc = JamMessageBase::crc(&BString::from(id.as_str()));
+            if !base.seen.insert(crc) {
+                report.duplicates += 1;
+                return Ok(());
             }
         }
         base.base.write_message(&to_jam(message, &kludges, echo))?;
@@ -260,7 +261,7 @@ impl Tosser<'_> {
         let Some(aka) = self.config.aka_for(&self.config.links[*first]).cloned() else {
             return false;
         };
-        let addresses: Vec<EchomailAddress> = takers.iter().map(|index| self.config.links[*index].address.clone()).collect();
+        let addresses: Vec<EchomailAddress> = takers.iter().map(|index| self.config.links[*index].address).collect();
         let mut passed = message.clone();
         passed.text = handed_on_text(&message.text, &aka, &addresses);
         for index in takers {
@@ -374,7 +375,7 @@ fn open_base(path: &Path) -> Res<JamMessageBase> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
-    Ok(JamMessageBase::create(path.to_path_buf())?)
+    Ok(JamMessageBase::create(path)?)
 }
 
 /// The lines a message carries for the machines rather than for the reader.
@@ -517,29 +518,28 @@ pub fn scan_outbound(config: &FtnConfig, areas: &AreaMap, now: &NaiveDateTime) -
             if header.attributes & attributes::MSG_TYPEECHO != 0 {
                 continue;
             }
-            let msgid = match subfield(&header, SubfieldType::MsgID) {
-                Some(id) => id,
-                None => {
-                    state.serial = state.serial.wrapping_add(1);
-                    let id = format!("{} {:08x}", aka.address, state.serial);
-                    header.msgid_crc = JamMessageBase::crc(&BString::from(id.as_str()));
-                    header.sub_fields.push(MessageSubfield::new(SubfieldType::MsgID, BString::from(id.as_str())));
-                    // The id is written back so that a reply arriving for it
-                    // still finds the message it belongs to.
-                    raw::update_header(&mut base, number, &header)?;
-                    id
-                }
+            let msgid = if let Some(id) = subfield(&header, SubfieldType::MsgID) {
+                id
+            } else {
+                state.serial = state.serial.wrapping_add(1);
+                let id = format!("{} {:08x}", aka.address, state.serial);
+                header.msgid_crc = JamMessageBase::crc(&BString::from(id.as_str()));
+                header.sub_fields.push(MessageSubfield::new(SubfieldType::MsgID, BString::from(id.as_str())));
+                // The id is written back so that a reply arriving for it
+                // still finds the message it belongs to.
+                raw::update_header(&mut base, number, &header)?;
+                id
             };
             let text = base.read_message_text(&header)?;
             let message = PackedMessage {
-                orig: aka.address.clone(),
+                orig: aka.address,
                 dest: EchomailAddress::default(),
                 attributes: 0,
                 cost: 0,
                 written: chrono::DateTime::from_timestamp(header.date_written as i64, 0).unwrap_or_default().naive_utc(),
-                to: header.to().map(|to| to.to_string()).unwrap_or_default(),
-                from: header.from().map(|from| from.to_string()).unwrap_or_default(),
-                subject: header.subject().map(|subject| subject.to_string()).unwrap_or_default(),
+                to: header.to().map(std::string::ToString::to_string).unwrap_or_default(),
+                from: header.from().map(std::string::ToString::to_string).unwrap_or_default(),
+                subject: header.subject().map(std::string::ToString::to_string).unwrap_or_default(),
                 text: exported_text(
                     tag,
                     &msgid,
@@ -547,7 +547,7 @@ pub fn scan_outbound(config: &FtnConfig, areas: &AreaMap, now: &NaiveDateTime) -
                     &text.to_string(),
                     config,
                     &aka,
-                    &subscribers.iter().map(|index| config.links[*index].address.clone()).collect::<Vec<_>>(),
+                    &subscribers.iter().map(|index| config.links[*index].address).collect::<Vec<_>>(),
                 ),
             };
             for index in &subscribers {
@@ -579,10 +579,10 @@ fn deliver(config: &FtnConfig, link: &FtnLink, aka: &FtnAka, mut messages: Vec<P
     fs::create_dir_all(&directory)?;
 
     for message in &mut messages {
-        message.orig = aka.address.clone();
-        message.dest = link.address.clone();
+        message.orig = aka.address;
+        message.dest = link.address;
     }
-    let mut packet = Packet::new(PacketHeader::new(aka.address.clone(), link.address.clone(), *now, &link.password));
+    let mut packet = Packet::new(PacketHeader::new(aka.address, link.address, *now, &link.password));
     packet.messages = messages;
 
     let work = tempfile::tempdir_in(&directory)?;
@@ -606,25 +606,25 @@ fn subfield(header: &jamjam::jam::msg_header::JamMessageHeader, kind: SubfieldTy
 fn exported_text(tag: &str, msgid: &str, reply: Option<&str>, body: &str, config: &FtnConfig, aka: &FtnAka, links: &[EchomailAddress]) -> String {
     let mut text = format!("AREA:{}\r\x01MSGID: {}\r", tag.to_uppercase(), msgid);
     if let Some(reply) = reply {
-        text.push_str(&format!("\x01REPLY: {}\r", reply));
+        let _ = write!(text, "\x01REPLY: {reply}\r");
     }
-    text.push_str(&format!("\x01PID: {}\r", product()));
+    let _ = write!(text, "\x01PID: {}\r", product());
     text.push_str(&body.replace("\r\n", "\n").replace('\n', "\r"));
     if !text.ends_with('\r') {
         text.push('\r');
     }
     if !body.contains(" * Origin:") {
-        text.push_str(&format!("\r--- {}\r * Origin: {} ({})\r", product(), config.origin, aka.address));
+        let _ = write!(text, "\r--- {}\r * Origin: {} ({})\r", product(), config.origin, aka.address);
     }
 
     let mut seen: Vec<(u16, u16)> = links.iter().map(|link| (link.net, link.node)).collect();
     seen.push((aka.address.net, aka.address.node));
     seen.sort_unstable();
     seen.dedup();
-    for line in fold(&seen.iter().map(|(net, node)| format!("{}/{}", net, node)).collect::<Vec<_>>()) {
-        text.push_str(&format!("SEEN-BY: {}\r", line));
+    for line in fold(&seen.iter().map(|(net, node)| format!("{net}/{node}")).collect::<Vec<_>>()) {
+        let _ = write!(text, "SEEN-BY: {line}\r");
     }
-    text.push_str(&format!("\x01PATH: {}/{}\r", aka.address.net, aka.address.node));
+    let _ = write!(text, "\x01PATH: {}/{}\r", aka.address.net, aka.address.node);
     text
 }
 
@@ -656,10 +656,10 @@ fn handed_on_text(text: &str, aka: &FtnAka, links: &[EchomailAddress]) -> String
     seen.push((aka.address.net, aka.address.node));
     seen.sort_unstable();
     seen.dedup();
-    for line in fold(&seen.iter().map(|(net, node)| format!("{}/{}", net, node)).collect::<Vec<_>>()) {
-        out.push_str(&format!("SEEN-BY: {}\r", line));
+    for line in fold(&seen.iter().map(|(net, node)| format!("{net}/{node}")).collect::<Vec<_>>()) {
+        let _ = write!(out, "SEEN-BY: {line}\r");
     }
-    out.push_str(&format!("\x01PATH: {}/{}\r", aka.address.net, aka.address.node));
+    let _ = write!(out, "\x01PATH: {}/{}\r", aka.address.net, aka.address.node);
     out
 }
 
@@ -742,7 +742,7 @@ mod tests {
             to: "All".to_string(),
             from: "Someone".to_string(),
             subject: "Hello".to_string(),
-            text: format!("AREA:{}\r{}", area, text),
+            text: format!("AREA:{area}\r{text}"),
             ..Default::default()
         }
     }
@@ -995,11 +995,11 @@ mod tests {
         let packet = Packet::load(&packets[0]).unwrap();
         assert_eq!(packet.header.dest, address("21:1/1"));
         let text = &packet.messages[0].text;
-        assert!(text.starts_with("AREA:FSX_GEN\r"), "{:?}", text);
-        assert!(text.contains("\x01MSGID: 21:1/100 "), "{:?}", text);
-        assert!(text.contains(" * Origin: A board (21:1/100)\r"), "{:?}", text);
-        assert!(text.contains("SEEN-BY: 1/1 1/100\r"), "{:?}", text);
-        assert!(text.contains("\x01PATH: 1/100\r"), "{:?}", text);
+        assert!(text.starts_with("AREA:FSX_GEN\r"), "{text:?}");
+        assert!(text.contains("\x01MSGID: 21:1/100 "), "{text:?}");
+        assert!(text.contains(" * Origin: A board (21:1/100)\r"), "{text:?}");
+        assert!(text.contains("SEEN-BY: 1/1 1/100\r"), "{text:?}");
+        assert!(text.contains("\x01PATH: 1/100\r"), "{text:?}");
     }
 
     #[test]

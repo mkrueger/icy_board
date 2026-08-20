@@ -66,7 +66,7 @@ impl<'a> DirsEditor<'a> {
                 }
                 match j {
                     0 => Line::from(format!("{})", *i + 1)),
-                    1 => Line::from(format!("{}", dl2.lock().unwrap()[*i].name)),
+                    1 => Line::from(dl2.lock().unwrap()[*i].name.to_string()),
                     2 => Line::from(format!("{}", dl2.lock().unwrap()[*i].path.display())),
                     _ => Line::from("".to_string()),
                 }
@@ -92,22 +92,22 @@ impl<'a> DirsEditor<'a> {
     }
 
     fn move_up(&mut self) {
-        if let Some(selected) = self.insert_table.table_state.selected() {
-            if selected > 0 {
-                let mut levels = self.dir_list.lock().unwrap();
-                levels.swap(selected, selected - 1);
-                self.insert_table.table_state.select(Some(selected - 1));
-            }
+        if let Some(selected) = self.insert_table.table_state.selected()
+            && selected > 0
+        {
+            let mut levels = self.dir_list.lock().unwrap();
+            levels.swap(selected, selected - 1);
+            self.insert_table.table_state.select(Some(selected - 1));
         }
     }
 
     fn move_down(&mut self) {
-        if let Some(selected) = self.insert_table.table_state.selected() {
-            if selected + 1 < self.dir_list.lock().unwrap().len() {
-                let mut levels = self.dir_list.lock().unwrap();
-                levels.swap(selected, selected + 1);
-                self.insert_table.table_state.select(Some(selected + 1));
-            }
+        if let Some(selected) = self.insert_table.table_state.selected()
+            && selected + 1 < self.dir_list.lock().unwrap().len()
+        {
+            let mut levels = self.dir_list.lock().unwrap();
+            levels.swap(selected, selected + 1);
+            self.insert_table.table_state.select(Some(selected + 1));
         }
     }
 }
@@ -202,11 +202,11 @@ impl<'a> Page for DirsEditor<'a> {
                 self.insert_table.content_length += 1;
             }
             KeyCode::Delete => {
-                if let Some(selected_item) = self.insert_table.table_state.selected() {
-                    if selected_item < self.dir_list.lock().unwrap().len() {
-                        self.dir_list.lock().unwrap().remove(selected_item);
-                        self.insert_table.content_length -= 1;
-                    }
+                if let Some(selected_item) = self.insert_table.table_state.selected()
+                    && selected_item < self.dir_list.lock().unwrap().len()
+                {
+                    self.dir_list.lock().unwrap().remove(selected_item);
+                    self.insert_table.content_length -= 1;
                 }
             }
 

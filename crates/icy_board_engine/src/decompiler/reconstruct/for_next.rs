@@ -58,7 +58,6 @@ pub fn scan_for_next(visitor: &SemanticVisitor, statements: &mut Vec<Statement>,
                     continue;
                 }
 
-                let step_expr;
                 let Statement::Let(inner_let) = &statements[matching_goto as usize - 1] else {
                     continue;
                 };
@@ -72,17 +71,17 @@ pub fn scan_for_next(visitor: &SemanticVisitor, statements: &mut Vec<Statement>,
                 if bin_expr.get_op() != BinOp::Add {
                     continue;
                 } // always add even if step is negative
-                if let Expression::Identifier(lstr) = bin_expr.get_left_expression() {
-                    if *lstr.get_identifier() != index_variable {
-                        continue;
-                    }
+                if let Expression::Identifier(lstr) = bin_expr.get_left_expression()
+                    && *lstr.get_identifier() != index_variable
+                {
+                    continue;
                 }
-                step_expr = bin_expr.get_right_expression().clone();
+                let step_expr = bin_expr.get_right_expression().clone();
 
                 let from_expr: Expression = outer_let.get_value_expression().clone();
                 let var_name = outer_let.get_identifier().clone();
 
-                let mut for_block: Vec<Statement> = statements.drain(i..matching_goto as usize + 1).collect();
+                let mut for_block: Vec<Statement> = statements.drain(i..=(matching_goto as usize)).collect();
                 // pop for header
                 for_block.drain(0..body_start - i);
 

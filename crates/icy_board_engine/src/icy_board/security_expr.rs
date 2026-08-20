@@ -56,9 +56,9 @@ pub enum Value {
 impl Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Value::Bool(b) => write!(f, "{}", b),
-            Value::Integer(i) => write!(f, "{}", i),
-            Value::String(s) => write!(f, "\"{}\"", s),
+            Value::Bool(b) => write!(f, "{b}"),
+            Value::Integer(i) => write!(f, "{i}"),
+            Value::String(s) => write!(f, "\"{s}\""),
             Value::Time(t) => write!(f, "{:02}:{:02}:{:02}", t.hour(), t.minute(), t.second()),
         }
     }
@@ -82,11 +82,16 @@ impl Default for SecurityExpression {
 impl Display for SecurityExpression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SecurityExpression::UnaryExpression(op, expr) => write!(f, "{}{}", op, expr),
-            SecurityExpression::BinaryExpression(op, left, right) => write!(f, "{} {} {}", left, op, right),
-            SecurityExpression::Call(name, args) => write!(f, "{}({})", name, args.iter().map(|a| a.to_string()).collect::<Vec<_>>().join(", ")),
-            SecurityExpression::Constant(value) => write!(f, "{}", value),
-            SecurityExpression::Parens(expr) => write!(f, "({})", expr),
+            SecurityExpression::UnaryExpression(op, expr) => write!(f, "{op}{expr}"),
+            SecurityExpression::BinaryExpression(op, left, right) => write!(f, "{left} {op} {right}"),
+            SecurityExpression::Call(name, args) => write!(
+                f,
+                "{}({})",
+                name,
+                args.iter().map(std::string::ToString::to_string).collect::<Vec<_>>().join(", ")
+            ),
+            SecurityExpression::Constant(value) => write!(f, "{value}"),
+            SecurityExpression::Parens(expr) => write!(f, "({expr})"),
         }
     }
 }
@@ -99,7 +104,7 @@ impl FromStr for SecurityExpression {
             return Ok(SecurityExpression::default());
         }
         let mut a = Token::lexer(s).peekable();
-        Ok(bool_oper(&mut a)?)
+        bool_oper(&mut a)
     }
 }
 
@@ -157,12 +162,12 @@ enum Token {
     #[token("<")]
     LT,
     #[token("<=")]
-    LTE,
+    Lte,
 
     #[token(">")]
     GT,
     #[token(">=")]
-    GTE,
+    Gte,
 
     #[regex("\"[_a-zA-Z0-9]+\"", |lex| lex.slice().to_string())]
     String(String),
@@ -193,7 +198,7 @@ impl SecData for Session {
 
     fn birth_day(&self) -> Option<DateTime<Utc>> {
         if let Some(user) = &self.current_user {
-            return Some(user.birth_date.clone());
+            return Some(user.birth_date);
         }
         None
     }
@@ -213,7 +218,7 @@ impl SecData for User {
     }
 
     fn birth_day(&self) -> Option<DateTime<Utc>> {
-        Some(self.birth_date.clone())
+        Some(self.birth_date)
     }
 
     fn is_in_goup(&self, _group: &str) -> bool {
@@ -231,17 +236,17 @@ impl SecurityExpression {
             SecurityExpression::UnaryExpression(op, expr) => match op {
                 UnaryOp::Not => match expr.eval(sec_data)? {
                     Value::Bool(b) => Ok(Value::Bool(!b)),
-                    expr => Err(format!("Invalid operand for NOT operator {}", expr).into()),
+                    expr => Err(format!("Invalid operand for NOT operator {expr}").into()),
                 },
             },
             SecurityExpression::BinaryExpression(op, left, right) => match op {
                 BinaryOp::And => match (left.eval(sec_data)?, right.eval(sec_data)?) {
                     (Value::Bool(l), Value::Bool(r)) => Ok(Value::Bool(l && r)),
-                    (l, r) => Err(format!("Invalid operands for AND operator {} {}", l, r).into()),
+                    (l, r) => Err(format!("Invalid operands for AND operator {l} {r}").into()),
                 },
                 BinaryOp::Or => match (left.eval(sec_data)?, right.eval(sec_data)?) {
                     (Value::Bool(l), Value::Bool(r)) => Ok(Value::Bool(l || r)),
-                    (l, r) => Err(format!("Invalid operands for AND operator {} {}", l, r).into()),
+                    (l, r) => Err(format!("Invalid operands for AND operator {l} {r}").into()),
                 },
                 BinaryOp::Equal => {
                     let l = left.eval(sec_data)?;
@@ -259,7 +264,7 @@ impl SecurityExpression {
                     match (l, r) {
                         (Value::Integer(l), Value::Integer(r)) => Ok(Value::Bool(l > r)),
                         (Value::Time(l), Value::Time(r)) => Ok(Value::Bool(l > r)),
-                        (l, r) => Err(format!("Invalid operands for > operator {} {}", l, r).into()),
+                        (l, r) => Err(format!("Invalid operands for > operator {l} {r}").into()),
                     }
                 }
                 BinaryOp::GreaterEqual => {
@@ -268,7 +273,7 @@ impl SecurityExpression {
                     match (l, r) {
                         (Value::Integer(l), Value::Integer(r)) => Ok(Value::Bool(l >= r)),
                         (Value::Time(l), Value::Time(r)) => Ok(Value::Bool(l >= r)),
-                        (l, r) => Err(format!("Invalid operands for >= operator {} {}", l, r).into()),
+                        (l, r) => Err(format!("Invalid operands for >= operator {l} {r}").into()),
                     }
                 }
                 BinaryOp::Less => {
@@ -277,7 +282,7 @@ impl SecurityExpression {
                     match (l, r) {
                         (Value::Integer(l), Value::Integer(r)) => Ok(Value::Bool(l < r)),
                         (Value::Time(l), Value::Time(r)) => Ok(Value::Bool(l < r)),
-                        (l, r) => Err(format!("Invalid operands for < operator {} {}", l, r).into()),
+                        (l, r) => Err(format!("Invalid operands for < operator {l} {r}").into()),
                     }
                 }
                 BinaryOp::LessEqual => {
@@ -286,7 +291,7 @@ impl SecurityExpression {
                     match (l, r) {
                         (Value::Integer(l), Value::Integer(r)) => Ok(Value::Bool(l <= r)),
                         (Value::Time(l), Value::Time(r)) => Ok(Value::Bool(l <= r)),
-                        (l, r) => Err(format!("Invalid operands for <= operator {} {}", l, r).into()),
+                        (l, r) => Err(format!("Invalid operands for <= operator {l} {r}").into()),
                     }
                 }
             },
@@ -330,11 +335,11 @@ impl SecurityExpression {
             Ok(Value::Bool(b)) => b,
             Ok(Value::Integer(i)) => session.cur_security >= i as u8,
             Ok(_) => {
-                log::error!("expression didn't evaluate to bool ({})", self);
+                log::error!("expression didn't evaluate to bool ({self})");
                 false
             }
             Err(err) => {
-                log::error!("Error evaluating security expression: {} ({})", err, self);
+                log::error!("Error evaluating security expression: {err} ({self})");
                 false
             }
         }
@@ -345,11 +350,11 @@ impl SecurityExpression {
             Ok(Value::Bool(b)) => b,
             Ok(Value::Integer(i)) => user.security_level >= i as u8,
             Ok(_) => {
-                log::error!("expression didn't evaluate to bool ({})", self);
+                log::error!("expression didn't evaluate to bool ({self})");
                 false
             }
             Err(err) => {
-                log::error!("Error evaluating security expression: {} ({})", err, self);
+                log::error!("Error evaluating security expression: {err} ({self})");
                 false
             }
         }
@@ -360,10 +365,7 @@ impl SecurityExpression {
     }
 
     pub fn is_empty(&self) -> bool {
-        match self {
-            SecurityExpression::Constant(Value::Bool(true)) => true,
-            _ => false,
-        }
+        matches!(self, SecurityExpression::Constant(Value::Bool(true)))
     }
 
     pub(crate) fn level(&self) -> u8 {
@@ -416,7 +418,7 @@ fn eq_oper(lexer: &mut Peekable<Lexer<Token>>) -> Result<SecurityExpression, Str
             let right = factor(lexer)?;
             Ok(SecurityExpression::BinaryExpression(BinaryOp::Less, Box::new(left), Box::new(right)))
         }
-        Ok(Token::LTE) => {
+        Ok(Token::Lte) => {
             lexer.next();
             let right = factor(lexer)?;
             Ok(SecurityExpression::BinaryExpression(BinaryOp::LessEqual, Box::new(left), Box::new(right)))
@@ -426,7 +428,7 @@ fn eq_oper(lexer: &mut Peekable<Lexer<Token>>) -> Result<SecurityExpression, Str
             let right = factor(lexer)?;
             Ok(SecurityExpression::BinaryExpression(BinaryOp::Greater, Box::new(left), Box::new(right)))
         }
-        Ok(Token::GTE) => {
+        Ok(Token::Gte) => {
             lexer.next();
             let right = factor(lexer)?;
             Ok(SecurityExpression::BinaryExpression(BinaryOp::GreaterEqual, Box::new(left), Box::new(right)))
@@ -484,7 +486,7 @@ fn factor(lexer: &mut Peekable<Lexer<Token>>) -> Result<SecurityExpression, Stri
                 let comma = lexer.next();
                 match comma {
                     Some(Ok(Token::RPar)) => break,
-                    Some(Ok(Token::Comma)) => continue,
+                    Some(Ok(Token::Comma)) => {}
                     _ => return Err("Expected ',' or ')'".into()),
                 }
             }

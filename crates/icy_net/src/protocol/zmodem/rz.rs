@@ -234,9 +234,7 @@ impl Rz {
             }
 
             #[allow(non_snake_case)]
-            Ok(None) => {
-                return Ok(false);
-            }
+            Ok(None) => Ok(false),
 
             Err(err) => {
                 if self.can_count >= 5 {
@@ -251,7 +249,7 @@ impl Rz {
                 transfer_state
                     .recieve_state
                     .log_warning(format!("Header read error #{}: {:?}", transfer_state.recieve_state.errors, err));
-                return Ok(false);
+                Ok(false)
             }
         }
     }
@@ -389,13 +387,13 @@ impl Rz {
                         ));
 
                         Header::empty(ZFrameType::Ack).write(com, HeaderType::Hex, self.can_esc_control).await?;
-                        return Ok(true);
+                        Ok(true)
                     }
                     Err(err) => {
                         log::error!("{err}");
                         transfer_state.recieve_state.log_error(format!("Failed to read ZSINIT data: {}", err));
                         Header::empty(ZFrameType::Nak).write(com, HeaderType::Hex, self.can_esc_control).await?;
-                        return Ok(false);
+                        Ok(false)
                     }
                 }
             }
@@ -404,7 +402,7 @@ impl Rz {
                 transfer_state.recieve_state.log_info("ZRQINIT received, sending ZRINIT".to_string());
                 self.send_zrinit(com).await?;
                 self.state = RecvState::SendZRINIT;
-                return Ok(true);
+                Ok(true)
             }
             ZFrameType::File => {
                 transfer_state.recieve_state.log_info("ZFILE header received, reading file info".to_string());
@@ -443,7 +441,7 @@ impl Rz {
                             .log_info(format!("Requesting start position: {}", transfer_state.recieve_state.cur_bytes_transfered));
 
                         self.request_zpos(com, transfer_state.recieve_state.cur_bytes_transfered as u32).await?;
-                        return Ok(true);
+                        Ok(true)
                     }
                     Err(err) => {
                         // Classify recoverable vs fatal for ZFILE subpacket (same criteria as data packets)
@@ -485,11 +483,11 @@ impl Rz {
                                 Zmodem::cancel(com).await?;
                                 return Err(err);
                             }
-                            return Ok(false);
+                            Ok(false)
                         } else {
                             log::error!("{err}");
                             transfer_state.recieve_state.log_error(format!("Failed to read file info: {}", err));
-                            return Err(err);
+                            Err(err)
                         }
                     }
                 }
@@ -532,7 +530,7 @@ impl Rz {
                     }
                 }
                 self.state = RecvState::AwaitFileData;
-                return Ok(true);
+                Ok(true)
             }
             ZFrameType::Eof => {
                 let expected_size = header.number() as u64;
@@ -565,13 +563,13 @@ impl Rz {
                     return Err(ZModemError::NoFileOpen.into());
                 }
                 self.state = RecvState::SendZRINIT;
-                return Ok(true);
+                Ok(true)
             }
             ZFrameType::Fin => {
                 transfer_state.recieve_state.log_info("ZFIN received, session ending".to_string());
                 Header::empty(ZFrameType::Fin).write(com, HeaderType::Hex, self.can_esc_control).await?;
                 self.state = RecvState::Idle;
-                return Ok(true);
+                Ok(true)
             }
             ZFrameType::Challenge => {
                 transfer_state
@@ -580,7 +578,7 @@ impl Rz {
                 Header::from_number(ZFrameType::Ack, header.number())
                     .write(com, HeaderType::Hex, self.can_esc_control)
                     .await?;
-                return Ok(true);
+                Ok(true)
             }
             ZFrameType::FreeCnt => {
                 transfer_state
@@ -590,7 +588,7 @@ impl Rz {
                 Header::from_number(ZFrameType::Ack, 0)
                     .write(com, HeaderType::Hex, self.can_esc_control)
                     .await?;
-                return Ok(true);
+                Ok(true)
             }
             ZFrameType::Command => {
                 // just protocol it.
@@ -611,7 +609,7 @@ impl Rz {
                 Header::from_number(ZFrameType::Compl, 0)
                     .write(com, HeaderType::Hex, self.can_esc_control)
                     .await?;
-                return Ok(true);
+                Ok(true)
             }
             ZFrameType::Abort | ZFrameType::FErr | ZFrameType::Can => {
                 transfer_state
@@ -619,11 +617,11 @@ impl Rz {
                     .log_error(format!("Abort signal received: {:?}", header.frame_type));
                 Header::empty(ZFrameType::Fin).write(com, HeaderType::Hex, self.can_esc_control).await?;
                 self.state = RecvState::Idle;
-                return Ok(false);
+                Ok(false)
             }
             unk_frame => {
                 transfer_state.recieve_state.log_error(format!("Unsupported frame type: {:?}", unk_frame));
-                return Err(ZModemError::UnsupportedFrame(unk_frame).into());
+                Err(ZModemError::UnsupportedFrame(unk_frame).into())
             }
         }
     }

@@ -23,7 +23,7 @@ impl IceText {
         for (i, c) in text.chars().enumerate() {
             let new_color = if c.is_uppercase() {
                 DOS_LIGHT_GRAY
-            } else if c.is_digit(10) {
+            } else if c.is_ascii_digit() {
                 DOS_LIGHT_CYAN
             } else if c.is_ascii_punctuation() {
                 DOS_LIGHT_BLUE

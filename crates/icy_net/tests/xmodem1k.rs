@@ -36,7 +36,7 @@ async fn test_send_xmodem1k() {
 
     // Spawn receiver simulation
     tokio::spawn(async move {
-        receiver_conn.send(&[b'C']).await.unwrap(); // Request CRC mode
+        receiver_conn.send(b"C").await.unwrap(); // Request CRC mode
         receiver_conn.send(&[ACK]).await.unwrap(); // ACK data block
         receiver_conn.send(&[ACK]).await.unwrap(); // ACK EOT
     });
@@ -113,7 +113,7 @@ async fn test_send_xmodem1k_multiple_blocks() {
 
     // Spawn receiver simulation
     tokio::spawn(async move {
-        receiver_conn.send(&[b'C']).await.unwrap(); // Request CRC mode
+        receiver_conn.send(b"C").await.unwrap(); // Request CRC mode
         receiver_conn.send(&[ACK]).await.unwrap(); // ACK block 1
         receiver_conn.send(&[ACK]).await.unwrap(); // ACK block 2
         receiver_conn.send(&[ACK]).await.unwrap(); // ACK block 3

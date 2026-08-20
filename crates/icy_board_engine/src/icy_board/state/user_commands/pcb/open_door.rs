@@ -21,7 +21,7 @@ use thiserror::Error;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 impl IcyBoardState {
-    /// PCBoard's command dispatcher falls through to the door list when a caller
+    /// `PCBoard`'s command dispatcher falls through to the door list when a caller
     /// with OPEN access types a word that is not a command; the door name is
     /// matched as a prefix, the way `searchdoorlist` does (DOORS.C). Returns true
     /// when a door was found and run.
@@ -84,12 +84,12 @@ impl IcyBoardState {
         }
 
         if let Ok(number) = text.parse::<usize>() {
-            if number > 0 {
-                if let Some(b) = doors.get(number - 1) {
-                    self.run_door(&doors, b, number).await?;
-                    //                    self.display_current_menu = true;
-                    return Ok(());
-                }
+            if number > 0
+                && let Some(b) = doors.get(number - 1)
+            {
+                self.run_door(&doors, b, number).await?;
+                //                    self.display_current_menu = true;
+                return Ok(());
             }
         } else {
             for (i, d) in doors.doors.iter().enumerate() {
@@ -139,7 +139,7 @@ impl IcyBoardState {
         if !self.session.flagged_files.is_empty() {
             self.display_text(IceText::FilesAreFlagged, display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::BELL)
                 .await?;
-            self.session.op_text = door.name.clone();
+            self.session.op_text.clone_from(&door.name);
             let answer = self
                 .input_field(
                     IceText::ContinueDOOR,
@@ -174,7 +174,7 @@ impl IcyBoardState {
             return Ok(());
         }
         let working_directory = file_name.parent().unwrap();
-        door.create_drop_file(&self, &working_directory, door_number).await?;
+        door.create_drop_file(self, working_directory, door_number).await?;
         let mut cmd = if door.use_shell_execute {
             tokio::process::Command::new("sh")
                 .arg("-c")
@@ -203,23 +203,22 @@ impl IcyBoardState {
                         Ok(size) => {
                             if size > 0 {
                                 log::info!("{}", String::from_utf8_lossy(&read_buf[0..size]));
-                                if let Err(_) = self.connection.send(&read_buf[0..size]).await {
+                                if self.connection.send(&read_buf[0..size]).await.is_err() {
                                     break;
                                 }
                                 let mut remove_sysop_connection = false;
                                 let node_state = &mut self.node_state.lock().await;
-                                if let Some(sysop_connection) = &mut node_state[self.node].as_mut().unwrap().sysop_connection {
-                                    if let Err(_) = sysop_connection.send(&read_buf[0..size]).await {
+                                if let Some(sysop_connection) = &mut node_state[self.node].as_mut().unwrap().sysop_connection
+                                    && let Err(_) = sysop_connection.send(&read_buf[0..size]).await {
                                         remove_sysop_connection = true;
                                     }
-                                }
                                 if remove_sysop_connection {
                                     node_state[self.node].as_mut().unwrap().sysop_connection = None;
                                 }
                             }
                         }
                         Err(e) => {
-                            log::error!("Error reading from door: {}", e);
+                            log::error!("Error reading from door: {e}");
                             break;
                         }
                     }
@@ -227,7 +226,7 @@ impl IcyBoardState {
                 read_data = self.connection.read(&mut write_buf) => {
                     match read_data {
                         Ok(size) => {
-                            if let Err(_) = stidn.write_all(&write_buf[0..size]).await {
+                            if stidn.write_all(&write_buf[0..size]).await.is_err() {
                                 break;
                             }
                         }
@@ -240,9 +239,8 @@ impl IcyBoardState {
 
             if cmd.try_wait()?.is_some() {
                 break;
-            } else {
-                std::thread::sleep(Duration::from_millis(25));
             }
+            std::thread::sleep(Duration::from_millis(25));
         }
         log::info!("door exited.");
 
@@ -258,7 +256,7 @@ impl IcyBoardState {
             })
             .collect();
         let token = reqwest::get(format!("https://games.bbslink.net/token.php?{x_key}")).await?.text().await?;
-        log::info!("got token {}, sending credentials", token);
+        log::info!("got token {token}, sending credentials");
         /* Not sure why this doesn't work:
         let mut map = http::header::HeaderMap::new();
         map.insert("X-User", self.session.cur_user.into());
@@ -282,17 +280,17 @@ impl IcyBoardState {
         */
 
         let url = format!(
-            "https://games.bbslink.net/auth.php?key={}&user={}&system={}&auth={}&scheme={}&rows={}&door={}&token={}&type={}&version={}",
+            "https://games.bbslink.net/auth.php?key={}&user={}&system={}&auth={:x}&scheme={:x}&rows={}&door={}&token={}&type={}&version={}",
             x_key,
             self.session.cur_user_id,
             bbslink.system_code,
-            format!("{:x}", md5::compute(bbslink.auth_code.clone() + token.as_str())),
-            format!("{:x}", md5::compute(bbslink.sheme_code.clone() + token.as_str())),
+            md5::compute(bbslink.auth_code.clone() + token.as_str()),
+            md5::compute(bbslink.sheme_code.clone() + token.as_str()),
             self.display_screen().buffer.height(),
             door.path,
             token,
             "icy_board",
-            crate::VERSION.to_string()
+            *crate::VERSION
         );
         let response = reqwest::get(url).await?.text().await;
 
@@ -309,12 +307,12 @@ impl IcyBoardState {
                     )
                     .await?;
                     log::info!("Connected to door server");
-                    let _ = execute_door(&mut connection, self).await?;
+                    let () = execute_door(&mut connection, self).await?;
                     return Ok(());
                 }
-                log::info!("got server response '{}'", str);
+                log::info!("got server response '{str}'");
                 for e in parse_bbslink_error(&str) {
-                    log::error!("Unauthorised: {}", e);
+                    log::error!("Unauthorised: {e}");
                 }
                 self.display_text(
                     IceText::DOORNotAvailable,
@@ -323,7 +321,7 @@ impl IcyBoardState {
                 .await?;
             }
             Err(e) => {
-                log::error!("Error opening door : {}", e);
+                log::error!("Error opening door : {e}");
             }
         }
 
@@ -351,8 +349,8 @@ async fn execute_door(door_connection: &mut dyn Connection, state: &mut crate::i
                           }
                      }
                      Err(e) => {
-                        log::error!("Error reading from connection: {}", e);
-                        return Err(e.into());
+                        log::error!("Error reading from connection: {e}");
+                        return Err(e);
                     }
                }
             }
@@ -372,8 +370,8 @@ async fn execute_door(door_connection: &mut dyn Connection, state: &mut crate::i
                         }
                     }
                     Err(e) => {
-                        log::error!("Error reading from connection: {}", e);
-                        return Err(e.into());
+                        log::error!("Error reading from connection: {e}");
+                        return Err(e);
                     }
                 }
             }
@@ -385,19 +383,19 @@ pub fn parse_bbslink_error(error: &str) -> Vec<BBSLinkError> {
     let re = Regex::new("\\(Error\\s(\\d+)\\)").unwrap();
     let mut errors = Vec::new();
     for cp in re.captures_iter(error) {
-        if let Some(m) = cp.get(1) {
-            if let Ok(e) = m.as_str().parse::<usize>() {
-                match e {
-                    0 => errors.push(BBSLinkError::Error0),
-                    1 => errors.push(BBSLinkError::Error1),
-                    2 => errors.push(BBSLinkError::Error2),
-                    3 => errors.push(BBSLinkError::Error3),
-                    4 => errors.push(BBSLinkError::Error4),
-                    5 => errors.push(BBSLinkError::Error5),
-                    6 => errors.push(BBSLinkError::Error6),
-                    7 => errors.push(BBSLinkError::Error7),
-                    _ => errors.push(BBSLinkError::UnknownError(e)),
-                }
+        if let Some(m) = cp.get(1)
+            && let Ok(e) = m.as_str().parse::<usize>()
+        {
+            match e {
+                0 => errors.push(BBSLinkError::Error0),
+                1 => errors.push(BBSLinkError::Error1),
+                2 => errors.push(BBSLinkError::Error2),
+                3 => errors.push(BBSLinkError::Error3),
+                4 => errors.push(BBSLinkError::Error4),
+                5 => errors.push(BBSLinkError::Error5),
+                6 => errors.push(BBSLinkError::Error6),
+                7 => errors.push(BBSLinkError::Error7),
+                _ => errors.push(BBSLinkError::UnknownError(e)),
             }
         }
     }

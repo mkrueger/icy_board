@@ -23,6 +23,12 @@ pub struct SaveChangesDialog {
     save: bool,
 }
 
+impl Default for SaveChangesDialog {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SaveChangesDialog {
     pub fn new() -> Self {
         Self { save: false }

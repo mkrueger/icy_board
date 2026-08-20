@@ -78,11 +78,11 @@ fn main() {
         return;
     }
     println!("PPLD v{} - PCBoard Programming Language Decompiler", *VERSION);
-    if let Some(version) = arguments.lang_version {
-        if !SUPPORTED_PPL_LANGUAGE_VERSIONS.contains(&version) {
-            eprintln!("Invalid language version valid values {SUPPORTED_PPL_LANGUAGE_VERSIONS:?}");
-            std::process::exit(2);
-        }
+    if let Some(version) = arguments.lang_version
+        && !SUPPORTED_PPL_LANGUAGE_VERSIONS.contains(&version)
+    {
+        eprintln!("Invalid language version valid values {SUPPORTED_PPL_LANGUAGE_VERSIONS:?}");
+        std::process::exit(2);
     }
     let env_language_version = if arguments.lang_version.is_none() {
         match language_version_from_env() {

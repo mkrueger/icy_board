@@ -192,7 +192,7 @@ pub struct VirtualMachine<'a> {
     pub dbase: dbase::DbaseState,
 }
 
-impl<'a> VirtualMachine<'a> {
+impl VirtualMachine<'_> {
     fn set_user_variables(&mut self) -> Res<()> {
         if !self.variable_table.has_user_vars() {
             log::warn!("Tried to set user variables, but no user variables defined.");
@@ -233,7 +233,7 @@ impl<'a> VirtualMachine<'a> {
         self.variable_table
             .set_value(U_HVPHONE, VariableValue::new_string(cur_user.home_voice_phone.clone()));
 
-        self.variable_table.set_value(U_TRANS, VariableValue::new_string(cur_user.protocol.to_string()));
+        self.variable_table.set_value(U_TRANS, VariableValue::new_string(cur_user.protocol.clone()));
         self.variable_table.set_value(U_CMNT1, VariableValue::new_string(cur_user.user_comment.clone()));
         self.variable_table
             .set_value(U_CMNT2, VariableValue::new_string(cur_user.sysop_comment.clone()));
@@ -246,10 +246,9 @@ impl<'a> VirtualMachine<'a> {
             .set_value(U_LONGHDR, VariableValue::new_bool(!cur_user.flags.use_short_filedescr));
 
         self.variable_table.set_value(U_DEF79, VariableValue::new_bool(cur_user.flags.wide_editor));
-        self.variable_table.set_value(U_ALIAS, VariableValue::new_string(cur_user.alias.to_string()));
+        self.variable_table.set_value(U_ALIAS, VariableValue::new_string(cur_user.alias.clone()));
 
-        self.variable_table
-            .set_value(U_VER, VariableValue::new_string(cur_user.verify_answer.to_string()));
+        self.variable_table.set_value(U_VER, VariableValue::new_string(cur_user.verify_answer.clone()));
 
         self.variable_table
             .get_var_entry_mut(U_ADDR)
@@ -281,27 +280,27 @@ impl<'a> VirtualMachine<'a> {
         self.variable_table
             .get_var_entry_mut(U_NOTES)
             .value
-            .set_array_value(0, 0, 0, VariableValue::new_string(cur_user.custom_comment1.to_string()))?;
+            .set_array_value(0, 0, 0, VariableValue::new_string(cur_user.custom_comment1.clone()))?;
 
         self.variable_table
             .get_var_entry_mut(U_NOTES)
             .value
-            .set_array_value(1, 0, 0, VariableValue::new_string(cur_user.custom_comment2.to_string()))?;
+            .set_array_value(1, 0, 0, VariableValue::new_string(cur_user.custom_comment2.clone()))?;
 
         self.variable_table
             .get_var_entry_mut(U_NOTES)
             .value
-            .set_array_value(2, 0, 0, VariableValue::new_string(cur_user.custom_comment3.to_string()))?;
+            .set_array_value(2, 0, 0, VariableValue::new_string(cur_user.custom_comment3.clone()))?;
 
         self.variable_table
             .get_var_entry_mut(U_NOTES)
             .value
-            .set_array_value(3, 0, 0, VariableValue::new_string(cur_user.custom_comment4.to_string()))?;
+            .set_array_value(3, 0, 0, VariableValue::new_string(cur_user.custom_comment4.clone()))?;
 
         self.variable_table
             .get_var_entry_mut(U_NOTES)
             .value
-            .set_array_value(4, 0, 0, VariableValue::new_string(cur_user.custom_comment5.to_string()))?;
+            .set_array_value(4, 0, 0, VariableValue::new_string(cur_user.custom_comment5.clone()))?;
 
         let mut i = 0;
         while i < 5 {
@@ -445,7 +444,7 @@ impl<'a> VirtualMachine<'a> {
             PPEExpr::Member(base_expr, member_id) => {
                 let val = self.eval_expr(base_expr).await?;
                 let VariableType::UserData(type_id) = val.get_type() else {
-                    log::error!("No user type base for value: {:?} on expr {:?}", val, base_expr);
+                    log::error!("No user type base for value: {val:?} on expr {base_expr:?}");
                     return Err(VMError::NoUserTypeBase.into());
                 };
                 if let GenericVariableData::Record(fields) = &val.generic_data {
@@ -455,7 +454,7 @@ impl<'a> VirtualMachine<'a> {
                     return Ok(field.clone());
                 }
                 let Some(registry) = self.type_registry.get_type_from_id(type_id) else {
-                    log::error!("No user data registry entry for value: {:?} type :{} on expr {:?}", val, type_id, base_expr);
+                    log::error!("No user data registry entry for value: {val:?} type :{type_id} on expr {base_expr:?}");
                     return Err(VMError::TypeNotFoundInRegistry(type_id).into());
                 };
                 let GenericVariableData::UserData(object) = val.generic_data else {
@@ -485,11 +484,11 @@ impl<'a> VirtualMachine<'a> {
             PPEExpr::MemberFunctionCall(base_expr, arguments, id) => {
                 let val = self.eval_expr(base_expr).await?;
                 let VariableType::UserData(type_id) = val.get_type() else {
-                    log::error!("No user type base for value: {:?} on expr {:?}", val, base_expr);
+                    log::error!("No user type base for value: {val:?} on expr {base_expr:?}");
                     return Err(VMError::NoUserTypeBase.into());
                 };
                 let Some(registry) = self.type_registry.get_type_from_id(type_id) else {
-                    log::error!("No user data registry entry for value: {:?} type :{} on expr {:?}", val, type_id, base_expr);
+                    log::error!("No user data registry entry for value: {val:?} type :{type_id} on expr {base_expr:?}");
                     return Err(VMError::TypeNotFoundInRegistry(type_id).into());
                 };
                 let GenericVariableData::UserData(object) = val.generic_data else {
@@ -882,9 +881,9 @@ impl<'a> VirtualMachine<'a> {
         }
 
         let board_root = self.icy_board_state.get_board().await.root_path.clone();
-        let resolved = if file.starts_with("C:/") {
-            log::warn!("Absolute path detected: {}, change the src file.", file);
-            self.icy_board_state.get_board().await.resolve_file(&PathBuf::from(&file[3..]))
+        let resolved = if let Some(stripped) = file.strip_prefix("C:/") {
+            log::warn!("Absolute path detected: {file}, change the src file.");
+            self.icy_board_state.get_board().await.resolve_file(&PathBuf::from(stripped))
         } else {
             self.icy_board_state.get_board().await.resolve_file(&file)
         };
@@ -985,8 +984,8 @@ impl<'a> VirtualMachine<'a> {
             to_base_36(2, (y1 - 1) * font_y),
             to_base_36(2, (x2 - 1) * font_x),
             to_base_36(2, (y2 - 1) * font_y),
-            if invert { 1 } else { 0 },
-            if clear { 1 } else { 0 },
+            i32::from(invert),
+            i32::from(clear),
             "00000", // unused
             text
         );

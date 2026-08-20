@@ -31,7 +31,7 @@ impl IcyBoardState {
                 }
                 Err(err) => {
                     if !message_base_file.with_extension("jhr").exists() {
-                        log::error!("Message index load error {}", err);
+                        log::error!("Message index load error {err}");
                         log::error!("Creating new message index at {}", message_base_file.display());
                         self.display_text(IceText::CreatingNewMessageIndex, display_flags::NEWLINE | display_flags::LFAFTER)
                             .await?;
@@ -48,7 +48,7 @@ impl IcyBoardState {
                 }
             }
         }
-        return Ok(());
+        Ok(())
     }
 
     pub(crate) fn message_area_path(&self, msg_area: usize) -> Option<std::path::PathBuf> {

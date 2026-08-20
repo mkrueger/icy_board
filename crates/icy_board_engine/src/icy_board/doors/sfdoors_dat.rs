@@ -9,47 +9,48 @@ use crate::{
         state::{GraphicsMode, IcyBoardState},
     },
 };
+use std::fmt::Write as _;
 
-/// SpitFire BBS
+/// `SpitFire` BBS
 pub async fn create_sfdoors_dat(state: &IcyBoardState, path: &std::path::Path) -> Res<()> {
     let mut contents = String::new();
-    contents.push_str(&format!("{}\r\n", state.session.cur_user_id));
-    contents.push_str(&format!("{}\r\n", state.session.user_name));
-    contents.push_str(&format!("{}\r\n", state.door_user_password().await));
-    contents.push_str(&format!("{}\r\n", state.session.get_first_name()));
-    contents.push_str(&format!("{}\r\n", DOOR_BPS_RATE));
-    contents.push_str(&format!("{}\r\n", DOOR_COM_PORT));
-    contents.push_str(&format!("{}\r\n", state.session.minutes_left())); // User Time Left
-    contents.push_str(&format!("{}\r\n", Local::now().time().num_seconds_from_midnight())); // Seconds since midnight (now)
+    let _ = write!(contents, "{}\r\n", state.session.cur_user_id);
+    let _ = write!(contents, "{}\r\n", state.session.user_name);
+    let _ = write!(contents, "{}\r\n", state.door_user_password().await);
+    let _ = write!(contents, "{}\r\n", state.session.get_first_name());
+    let _ = write!(contents, "{DOOR_BPS_RATE}\r\n");
+    let _ = write!(contents, "{DOOR_COM_PORT}\r\n");
+    let _ = write!(contents, "{}\r\n", state.session.minutes_left()); // User Time Left
+    let _ = write!(contents, "{}\r\n", Local::now().time().num_seconds_from_midnight()); // Seconds since midnight (now)
     contents.push_str("C:\\SFBBS\\\r\n"); // Spitfire Directory ?
     let graphics_mode = match state.session.disp_options.grapics_mode {
         GraphicsMode::Ctty => "FALSE",
         _ => "TRUE",
     };
-    contents.push_str(&format!("{}\r\n", graphics_mode));
-    contents.push_str(&format!("{}\r\n", state.session.cur_security));
-    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().stats.num_uploads));
-    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().stats.num_downloads));
-    contents.push_str(&format!("{}\r\n", state.session.minutes_left()));
-    contents.push_str(&format!("{}\r\n", state.session.login_date.time().num_seconds_from_midnight())); // Secs since midnight (logon)
+    let _ = write!(contents, "{graphics_mode}\r\n");
+    let _ = write!(contents, "{}\r\n", state.session.cur_security);
+    let _ = write!(contents, "{}\r\n", state.session.current_user.as_ref().unwrap().stats.num_uploads);
+    let _ = write!(contents, "{}\r\n", state.session.current_user.as_ref().unwrap().stats.num_downloads);
+    let _ = write!(contents, "{}\r\n", state.session.minutes_left());
+    let _ = write!(contents, "{}\r\n", state.session.login_date.time().num_seconds_from_midnight()); // Secs since midnight (logon)
     contents.push_str("0\r\n"); // Extra time in seconds
     contents.push_str("FALSȨ\r\n"); // Sysop next
     contents.push_str("FALSȨ\r\n"); // From Front-end
-    contents.push_str(&format!("{}\r\n", if state.session.is_local { "TRUE" } else { "FALSE" }));
-    contents.push_str(&format!("{}\r\n", DOOR_BPS_RATE));
+    let _ = write!(contents, "{}\r\n", if state.session.is_local { "TRUE" } else { "FALSE" });
+    let _ = write!(contents, "{DOOR_BPS_RATE}\r\n");
     contents.push_str("FALSE\r\n"); // Error correcting connection
-    contents.push_str(&format!("{}\r\n", state.session.current_conference_number));
+    let _ = write!(contents, "{}\r\n", state.session.current_conference_number);
     contents.push_str("1\r\n"); // Last File Area
-    contents.push_str(&format!("{}\r\n", state.node + 1));
+    let _ = write!(contents, "{}\r\n", state.node + 1);
 
     contents.push_str("32768\r\n"); // Downloads allowed per day
-    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().stats.today_num_downloads));
+    let _ = write!(contents, "{}\r\n", state.session.current_user.as_ref().unwrap().stats.today_num_downloads);
     contents.push_str("1000000\r\n"); // Download bytes allowed/day
-    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().stats.today_dnld_bytes));
-    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().stats.total_upld_bytes / 1024));
-    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().stats.total_dnld_bytes / 1024));
-    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().home_voice_phone));
-    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().city_or_state));
+    let _ = write!(contents, "{}\r\n", state.session.current_user.as_ref().unwrap().stats.today_dnld_bytes);
+    let _ = write!(contents, "{}\r\n", state.session.current_user.as_ref().unwrap().stats.total_upld_bytes / 1024);
+    let _ = write!(contents, "{}\r\n", state.session.current_user.as_ref().unwrap().stats.total_dnld_bytes / 1024);
+    let _ = write!(contents, "{}\r\n", state.session.current_user.as_ref().unwrap().home_voice_phone);
+    let _ = write!(contents, "{}\r\n", state.session.current_user.as_ref().unwrap().city_or_state);
 
     contents.push_str("3600\r\n"); // Minutes Allowed per day
     contents.push_str("FALSE\r\n"); // ?

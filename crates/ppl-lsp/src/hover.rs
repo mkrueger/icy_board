@@ -12,6 +12,7 @@ use crate::{
     signature_help::routine_signature,
     type_lookup::{type_name, type_of_member},
 };
+use std::fmt::Write as _;
 
 fn hover(text: String) -> Hover {
     Hover {
@@ -49,7 +50,7 @@ pub fn get_user_hover(ast: &Ast, visitor: &SemanticVisitor, offset: usize) -> Op
                         _ => Vec::new(),
                     };
                     if !dimensions.is_empty() {
-                        text.push_str(&format!("({})", dimensions.iter().map(usize::to_string).collect::<Vec<_>>().join(", ")));
+                        let _ = write!(text, "({})", dimensions.iter().map(usize::to_string).collect::<Vec<_>>().join(", "));
                     }
                 }
                 Some(hover(text))
@@ -78,7 +79,7 @@ impl<'a> MemberHoverVisitor<'a> {
         let definition = self.visitor.type_registry.get_user_type_from_id(id)?;
         let mut text = format!("TYPE {}", definition.name);
         for (name, field_type) in &definition.fields {
-            text.push_str(&format!("\n    {} {}", type_name(&self.visitor.type_registry, *field_type), name));
+            let _ = write!(text, "\n    {} {}", type_name(&self.visitor.type_registry, *field_type), name);
         }
         text.push_str("\nENDTYPE");
         Some(hover(text))

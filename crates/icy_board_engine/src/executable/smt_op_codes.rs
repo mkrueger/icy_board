@@ -292,10 +292,10 @@ pub enum ArgumentDefinitionFlags {
     /// NC | FNS | FCL
     StartDisplayFlags,
 
-    /// O_RD, O_WR, O_RW
+    /// `O_RD`, `O_WR`, `O_RW`
     FileAccessMode,
 
-    /// S_DN, S_DR, S_DW, S_DB  
+    /// `S_DN`, `S_DR`, `S_DW`, `S_DB`
     FileShareMode,
 
     /// ECHODOTS, FIELDLEN, GUIDE, UPCASE, STACKED, ERASELINE, NEWLINE, LFBEFORE, LFAFTER, WORDWRAP, NOCLEAR, HIGHASCII, AUTO, YESNO  
@@ -304,40 +304,103 @@ pub enum ArgumentDefinitionFlags {
     /// NEWLINE, LFBEFORE, LFAFTER, BELL, LOGIT, LOGITLEFT
     DisplayTextFlags,
 
-    /// SEEK_SET, SEEK_CUR, SEEK_END
+    /// `SEEK_SET`, `SEEK_CUR`, `SEEK_END`
     SeekPosition,
 
     /// NORMAL = 1, CRASH  = 2, HOLD   = 3
     FidoFlags,
 
-    /// CRC_FILE = true, CRC_FALSE = false
+    /// `CRC_FILE` = true, `CRC_FALSE` = false
     Crc32,
 
-    /// F_MW, F_SYS, F_SEL, F_EXP, F_REG
+    /// `F_MW`, `F_SYS`, `F_SEL`, `F_EXP`, `F_REG`
     ConfFlags,
 }
-lazy_static::lazy_static! {
-    pub static ref DISPLAY_FLAGS_CONST: Vec<BuiltinConst> = BUILTIN_CONSTS.iter().cloned().filter(|c| c.name == "GRAPH" || c.name == "SEC" || c.name == "LANG").collect();
-
-    pub static ref START_DISPLAY_FLAGS_CONST: Vec<BuiltinConst> = BUILTIN_CONSTS.iter().cloned().filter(|c| c.name == "NC" || c.name == "FNS" || c.name == "FCL").collect();
-
-    pub static ref FILE_ACCESS_MODE_CONST: Vec<BuiltinConst> = BUILTIN_CONSTS.iter().cloned().filter(|c| c.name == "O_RD" || c.name == "O_WR" || c.name == "O_RW").collect();
-
-    pub static ref FILE_SHARE_MODE_CONST: Vec<BuiltinConst> = BUILTIN_CONSTS.iter().cloned().filter(|c| c.name == "S_DN" || c.name == "S_DR" || c.name == "S_DW" || c.name == "S_DB").collect();
-
-    pub static ref INPUT_FLAGS_CONST: Vec<BuiltinConst> = BUILTIN_CONSTS.iter().cloned().filter(|c| c.name == "ECHODOTS" || c.name == "FIELDLEN" || c.name == "GUIDE" || c.name == "UPCASE" || c.name == "STACKED" || c.name == "ERASELINE" || c.name == "NEWLINE" || c.name == "LFBEFORE" || c.name == "LFAFTER" || c.name == "WORDWRAP" || c.name == "NOCLEAR" || c.name == "HIGHASCII" || c.name == "AUTO" || c.name == "YESNO").collect();
-
-    pub static ref DISPLAY_TEXT_FLAGS_CONST: Vec<BuiltinConst> = BUILTIN_CONSTS.iter().cloned().filter(|c| c.name == "NEWLINE" || c.name == "LFBEFORE" || c.name == "LFAFTER" || c.name == "BELL" || c.name == "LOGIT" || c.name == "LOGITLEFT").collect();
-
-    pub static ref SEEK_POSITION_CONST: Vec<BuiltinConst> = BUILTIN_CONSTS.iter().cloned().filter(|c| c.name == "SEEK_SET" || c.name == "SEEK_CUR" || c.name == "SEEK_END").collect();
-
-    pub static ref FIDO_FLAGS_CONST: Vec<BuiltinConst> = BUILTIN_CONSTS.iter().cloned().filter(|c| c.name == "NORMAL" || c.name == "CRASH" || c.name == "HOLD").collect();
-
-    pub static ref CRC32_CONST: Vec<BuiltinConst> = BUILTIN_CONSTS.iter().cloned().filter(|c| c.name == "CRC_FILE" || c.name == "CRC_STR").collect();
-
-    pub static ref CONFFLAG_CONST: Vec<BuiltinConst> = BUILTIN_CONSTS.iter().cloned().filter(|c| c.name == "F_MW" || c.name == "F_SYS" || c.name == "F_SEL" || c.name == "F_EXP" || c.name == "F_REG").collect();
-
-}
+pub static DISPLAY_FLAGS_CONST: std::sync::LazyLock<Vec<BuiltinConst>> = std::sync::LazyLock::new(|| {
+    BUILTIN_CONSTS
+        .iter()
+        .filter(|&c| c.name == "GRAPH" || c.name == "SEC" || c.name == "LANG")
+        .cloned()
+        .collect()
+});
+pub static START_DISPLAY_FLAGS_CONST: std::sync::LazyLock<Vec<BuiltinConst>> = std::sync::LazyLock::new(|| {
+    BUILTIN_CONSTS
+        .iter()
+        .filter(|&c| c.name == "NC" || c.name == "FNS" || c.name == "FCL")
+        .cloned()
+        .collect()
+});
+pub static FILE_ACCESS_MODE_CONST: std::sync::LazyLock<Vec<BuiltinConst>> = std::sync::LazyLock::new(|| {
+    BUILTIN_CONSTS
+        .iter()
+        .filter(|&c| c.name == "O_RD" || c.name == "O_WR" || c.name == "O_RW")
+        .cloned()
+        .collect()
+});
+pub static FILE_SHARE_MODE_CONST: std::sync::LazyLock<Vec<BuiltinConst>> = std::sync::LazyLock::new(|| {
+    BUILTIN_CONSTS
+        .iter()
+        .filter(|&c| c.name == "S_DN" || c.name == "S_DR" || c.name == "S_DW" || c.name == "S_DB")
+        .cloned()
+        .collect()
+});
+pub static INPUT_FLAGS_CONST: std::sync::LazyLock<Vec<BuiltinConst>> = std::sync::LazyLock::new(|| {
+    BUILTIN_CONSTS
+        .iter()
+        .filter(|&c| {
+            c.name == "ECHODOTS"
+                || c.name == "FIELDLEN"
+                || c.name == "GUIDE"
+                || c.name == "UPCASE"
+                || c.name == "STACKED"
+                || c.name == "ERASELINE"
+                || c.name == "NEWLINE"
+                || c.name == "LFBEFORE"
+                || c.name == "LFAFTER"
+                || c.name == "WORDWRAP"
+                || c.name == "NOCLEAR"
+                || c.name == "HIGHASCII"
+                || c.name == "AUTO"
+                || c.name == "YESNO"
+        })
+        .cloned()
+        .collect()
+});
+pub static DISPLAY_TEXT_FLAGS_CONST: std::sync::LazyLock<Vec<BuiltinConst>> = std::sync::LazyLock::new(|| {
+    BUILTIN_CONSTS
+        .iter()
+        .filter(|&c| c.name == "NEWLINE" || c.name == "LFBEFORE" || c.name == "LFAFTER" || c.name == "BELL" || c.name == "LOGIT" || c.name == "LOGITLEFT")
+        .cloned()
+        .collect()
+});
+pub static SEEK_POSITION_CONST: std::sync::LazyLock<Vec<BuiltinConst>> = std::sync::LazyLock::new(|| {
+    BUILTIN_CONSTS
+        .iter()
+        .filter(|&c| c.name == "SEEK_SET" || c.name == "SEEK_CUR" || c.name == "SEEK_END")
+        .cloned()
+        .collect()
+});
+pub static FIDO_FLAGS_CONST: std::sync::LazyLock<Vec<BuiltinConst>> = std::sync::LazyLock::new(|| {
+    BUILTIN_CONSTS
+        .iter()
+        .filter(|&c| c.name == "NORMAL" || c.name == "CRASH" || c.name == "HOLD")
+        .cloned()
+        .collect()
+});
+pub static CRC32_CONST: std::sync::LazyLock<Vec<BuiltinConst>> = std::sync::LazyLock::new(|| {
+    BUILTIN_CONSTS
+        .iter()
+        .filter(|&c| c.name == "CRC_FILE" || c.name == "CRC_STR")
+        .cloned()
+        .collect()
+});
+pub static CONFFLAG_CONST: std::sync::LazyLock<Vec<BuiltinConst>> = std::sync::LazyLock::new(|| {
+    BUILTIN_CONSTS
+        .iter()
+        .filter(|&c| c.name == "F_MW" || c.name == "F_SYS" || c.name == "F_SEL" || c.name == "F_EXP" || c.name == "F_REG")
+        .cloned()
+        .collect()
+});
 
 impl ArgumentDefinitionFlags {
     pub fn convert_expr(&self, expr: crate::ast::Expression) -> crate::ast::Expression {
@@ -360,35 +423,32 @@ impl ArgumentDefinitionFlags {
 fn replace_constants(expr: crate::ast::Expression, consts: &'static [BuiltinConst]) -> crate::ast::Expression {
     match &expr {
         Expression::Const(c) => {
-            match c.get_constant_value() {
-                &Constant::Integer(value, _) => {
-                    for c in consts {
-                        if c.value == value {
-                            return ConstantExpression::create_empty_expression(Constant::Builtin(c));
-                        }
+            if let &Constant::Integer(value, _) = c.get_constant_value() {
+                for c in consts {
+                    if c.value == value {
+                        return ConstantExpression::create_empty_expression(Constant::Builtin(c));
                     }
-                    let mut used_consts = Vec::new();
-                    let mut cur_val = value;
-                    for c in consts {
-                        if c.value & cur_val == c.value {
-                            used_consts.push(ConstantExpression::create_empty_expression(Constant::Builtin(c)));
-                            cur_val &= !c.value;
-                        }
-                    }
-                    if used_consts.is_empty() {
-                        if value == 0 {
-                            // DEFS
-                            return ConstantExpression::create_empty_expression(Constant::Builtin(&BUILTIN_CONSTS[15]));
-                        }
-                        return expr;
-                    }
-                    let mut last = used_consts.pop().unwrap();
-                    while !used_consts.is_empty() {
-                        last = BinaryExpression::create_empty_expression(BinOp::Add, used_consts.pop().unwrap(), last);
-                    }
-                    return last;
                 }
-                _ => {}
+                let mut used_consts = Vec::new();
+                let mut cur_val = value;
+                for c in consts {
+                    if c.value & cur_val == c.value {
+                        used_consts.push(ConstantExpression::create_empty_expression(Constant::Builtin(c)));
+                        cur_val &= !c.value;
+                    }
+                }
+                if used_consts.is_empty() {
+                    if value == 0 {
+                        // DEFS
+                        return ConstantExpression::create_empty_expression(Constant::Builtin(&BUILTIN_CONSTS[15]));
+                    }
+                    return expr;
+                }
+                let mut last = used_consts.pop().unwrap();
+                while !used_consts.is_empty() {
+                    last = BinaryExpression::create_empty_expression(BinOp::Add, used_consts.pop().unwrap(), last);
+                }
+                return last;
             }
         }
         Expression::Binary(bin_op) => {
@@ -479,21 +539,21 @@ impl StatementDefinition {
                 let mut res = self.name.to_ascii_uppercase();
                 let sig_args;
                 if let Some(args) = &self.args {
-                    res.push_str(" ");
+                    res.push(' ');
                     if let StatementSignature::VariableArguments(_, argc, _) = self.sig {
                         if argc == 0 {
-                            res.push_str("[");
+                            res.push('[');
                         }
-                        res.push_str(&args.iter().map(|arg| format_argument_type_last(arg)).collect::<Vec<String>>().join(", "));
+                        res.push_str(&args.iter().map(format_argument_type_last).collect::<Vec<String>>().join(", "));
                         sig_args = args.iter().map(|arg| arg.name.to_string()).collect::<Vec<String>>();
                         res.push_str("[, ");
                         res.push_str(&format_argument_type_last(args.iter().last().unwrap()));
                         res.push_str("]*");
                         if argc == 0 {
-                            res.push_str("]");
+                            res.push(']');
                         }
                     } else {
-                        res.push_str(&args.iter().map(|arg| format_argument_type_last(arg)).collect::<Vec<String>>().join(", "));
+                        res.push_str(&args.iter().map(format_argument_type_last).collect::<Vec<String>>().join(", "));
                         sig_args = args.iter().map(|arg| arg.name.to_string()).collect::<Vec<String>>();
                     }
                 } else {
@@ -525,13 +585,13 @@ pub fn format_argument_type_last(arg: &ArgumentDefinition) -> String {
     format!("{} : {}", arg.name, ts)
 }
 
-lazy_static::lazy_static! {
-    // Missing:
-    // "LAST IN" == "LASTIN"
-    // "WAIT FOR" == "WAITFOR"
-    // "GO SUB"
-    // " GO TO"
-    pub static ref STATEMENT_DEFINITIONS: [StatementDefinition; 236] = [
+// Missing:
+// "LAST IN" == "LASTIN"
+// "WAIT FOR" == "WAITFOR"
+// "GO SUB"
+// " GO TO"
+pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 236]> = std::sync::LazyLock::new(|| {
+    [
         StatementDefinition {
             // helps to map opcode to array index.
             name: "Placeholder",
@@ -579,9 +639,7 @@ lazy_static::lazy_static! {
             name: "Color",
             version: 100,
             opcode: OpCode::COLOR,
-            args: Some(vec![
-                ArgumentDefinition::new("fg", VariableType::Integer)
-            ]),
+            args: Some(vec![ArgumentDefinition::new("fg", VariableType::Integer)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
@@ -602,18 +660,14 @@ lazy_static::lazy_static! {
             name: "Print",
             version: 100,
             opcode: OpCode::PRINT,
-            args: Some(vec![
-                ArgumentDefinition::new("str", VariableType::String),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("str", VariableType::String)]),
             sig: StatementSignature::VariableArguments(0, 1, 0),
         },
         StatementDefinition {
             name: "PrintLn",
             version: 100,
             opcode: OpCode::PRINTLN,
-            args: Some(vec![
-                ArgumentDefinition::new("str", VariableType::String),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("str", VariableType::String)]),
             sig: StatementSignature::VariableArguments(0, 0, 0),
         },
         StatementDefinition {
@@ -629,7 +683,7 @@ lazy_static::lazy_static! {
             opcode: OpCode::CONFFLAG,
             args: Some(vec![
                 ArgumentDefinition::new("conf", VariableType::Integer),
-                ArgumentDefinition::new_flags("flags", ArgumentDefinitionFlags::ConfFlags)
+                ArgumentDefinition::new_flags("flags", ArgumentDefinitionFlags::ConfFlags),
             ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 2),
         },
@@ -639,7 +693,7 @@ lazy_static::lazy_static! {
             opcode: OpCode::CONFUNFLAG,
             args: Some(vec![
                 ArgumentDefinition::new("conf", VariableType::Integer),
-                ArgumentDefinition::new_flags("flags", ArgumentDefinitionFlags::ConfFlags)
+                ArgumentDefinition::new_flags("flags", ArgumentDefinitionFlags::ConfFlags),
             ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 2),
         },
@@ -649,7 +703,7 @@ lazy_static::lazy_static! {
             opcode: OpCode::DISPFILE,
             args: Some(vec![
                 ArgumentDefinition::new("file", VariableType::Integer),
-                ArgumentDefinition::new_flags("flag", ArgumentDefinitionFlags::DisplayFileFlags)
+                ArgumentDefinition::new_flags("flag", ArgumentDefinitionFlags::DisplayFileFlags),
             ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 2),
         },
@@ -703,9 +757,7 @@ lazy_static::lazy_static! {
             name: "FClose",
             version: 100,
             opcode: OpCode::FCLOSE,
-            args: Some(vec![
-                ArgumentDefinition::new("chnl", VariableType::Integer),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("chnl", VariableType::Integer)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
@@ -749,9 +801,7 @@ lazy_static::lazy_static! {
             name: "StartDisp",
             version: 100,
             opcode: OpCode::STARTDISP,
-            args: Some(vec![
-                ArgumentDefinition::new_flags("str", ArgumentDefinitionFlags::StartDisplayFlags),
-            ]),
+            args: Some(vec![ArgumentDefinition::new_flags("str", ArgumentDefinitionFlags::StartDisplayFlags)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
@@ -797,9 +847,7 @@ lazy_static::lazy_static! {
             name: "Delete",
             version: 100,
             opcode: OpCode::DELETE,
-            args: Some(vec![
-                ArgumentDefinition::new("file", VariableType::String),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("file", VariableType::String)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
@@ -813,9 +861,7 @@ lazy_static::lazy_static! {
             name: "AdjTime",
             version: 100,
             opcode: OpCode::ADJTIME,
-            args: Some(vec![
-                ArgumentDefinition::new("min", VariableType::Integer),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("min", VariableType::Integer)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
@@ -967,36 +1013,28 @@ lazy_static::lazy_static! {
             name: "Delay",
             version: 100,
             opcode: OpCode::DELAY,
-            args: Some(vec![
-                ArgumentDefinition::new("dlay", VariableType::Integer),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("dlay", VariableType::Integer)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "SendModem",
             version: 100,
             opcode: OpCode::SENDMODEM,
-            args: Some(vec![
-                ArgumentDefinition::new("str", VariableType::String),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("str", VariableType::String)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "Inc",
             version: 100,
             opcode: OpCode::INC,
-            args: Some(vec![
-                ArgumentDefinition::new("var", VariableType::None),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("var", VariableType::None)]),
             sig: StatementSignature::ArgumentsWithVariable(1, 1),
         },
         StatementDefinition {
             name: "Dec",
             version: 100,
             opcode: OpCode::DEC,
-            args: Some(vec![
-                ArgumentDefinition::new("var", VariableType::None),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("var", VariableType::None)]),
             sig: StatementSignature::ArgumentsWithVariable(1, 1),
         },
         StatementDefinition {
@@ -1010,27 +1048,21 @@ lazy_static::lazy_static! {
             name: "NewLines",
             version: 100,
             opcode: OpCode::NEWLINES,
-            args: Some(vec![
-                ArgumentDefinition::new("var", VariableType::Integer),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("var", VariableType::Integer)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "Tokenize",
             version: 100,
             opcode: OpCode::TOKENIZE,
-            args: Some(vec![
-                ArgumentDefinition::new("str", VariableType::String),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("str", VariableType::String)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "GetToken",
             version: 100,
             opcode: OpCode::GETTOKEN,
-            args: Some(vec![
-                ArgumentDefinition::new("var", VariableType::String),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("var", VariableType::String)]),
             sig: StatementSignature::ArgumentsWithVariable(1, 1),
         },
         StatementDefinition {
@@ -1085,81 +1117,63 @@ lazy_static::lazy_static! {
             name: "Push",
             version: 100,
             opcode: OpCode::PUSH,
-            args: Some(vec![
-                ArgumentDefinition::new("var", VariableType::None),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("var", VariableType::None)]),
             sig: StatementSignature::VariableArguments(0, 1, 0),
         },
         StatementDefinition {
             name: "Pop",
             version: 100,
             opcode: OpCode::POP,
-            args: Some(vec![
-                ArgumentDefinition::new("var", VariableType::None),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("var", VariableType::None)]),
             sig: StatementSignature::SpecialCasePop,
         },
         StatementDefinition {
             name: "KbdStuff",
             version: 100,
             opcode: OpCode::KBDSTUFF,
-            args: Some(vec![
-                ArgumentDefinition::new("str", VariableType::String),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("str", VariableType::String)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "Call",
             version: 100,
             opcode: OpCode::CALL,
-            args: Some(vec![
-                ArgumentDefinition::new("ppename", VariableType::String),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("ppename", VariableType::String)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "Join",
             version: 100,
             opcode: OpCode::JOIN,
-            args: Some(vec![
-                ArgumentDefinition::new("conf", VariableType::Integer),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("conf", VariableType::Integer)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "Quest",
             version: 100,
             opcode: OpCode::QUEST,
-            args: Some(vec![
-                ArgumentDefinition::new("nr", VariableType::Integer),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("nr", VariableType::Integer)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "Blt",
             version: 100,
             opcode: OpCode::BLT,
-            args: Some(vec![
-                ArgumentDefinition::new("nr", VariableType::Integer),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("nr", VariableType::Integer)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "Dir",
             version: 100,
             opcode: OpCode::DIR,
-            args: Some(vec![
-                ArgumentDefinition::new("arg", VariableType::String),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("arg", VariableType::String)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "KbdFile",
             version: 100,
             opcode: OpCode::KBDFILE,
-            args: Some(vec![
-                ArgumentDefinition::new("file", VariableType::String),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("file", VariableType::String)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
@@ -1216,27 +1230,21 @@ lazy_static::lazy_static! {
             name: "OpText",
             version: 100,
             opcode: OpCode::OPTEXT,
-            args: Some(vec![
-                ArgumentDefinition::new("str", VariableType::String),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("str", VariableType::String)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "DispStr",
             version: 100,
             opcode: OpCode::DISPSTR,
-            args: Some(vec![
-                ArgumentDefinition::new("str", VariableType::String),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("str", VariableType::String)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "RDUnet",
             version: 100,
             opcode: OpCode::RDUNET,
-            args: Some(vec![
-                ArgumentDefinition::new("node", VariableType::Integer),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("node", VariableType::Integer)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
@@ -1335,18 +1343,14 @@ lazy_static::lazy_static! {
             name: "Backup",
             version: 100,
             opcode: OpCode::BACKUP,
-            args: Some(vec![
-                ArgumentDefinition::new("col", VariableType::Integer),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("col", VariableType::Integer)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "Forward",
             version: 100,
             opcode: OpCode::FORWARD,
-            args: Some(vec![
-                ArgumentDefinition::new("col", VariableType::Integer),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("col", VariableType::Integer)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
@@ -1410,7 +1414,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("msgdate", VariableType::Date),
                 ArgumentDefinition::new("retreceipt", VariableType::Boolean),
                 ArgumentDefinition::new("echo", VariableType::Boolean),
-                ArgumentDefinition::new("file", VariableType::String)
+                ArgumentDefinition::new("file", VariableType::String),
             ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 9),
         },
@@ -1432,9 +1436,7 @@ lazy_static::lazy_static! {
             name: "Sound",
             version: 100,
             opcode: OpCode::SOUND,
-            args: Some(vec![
-                ArgumentDefinition::new("freq", VariableType::Integer),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("freq", VariableType::Integer)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
@@ -1448,36 +1450,28 @@ lazy_static::lazy_static! {
             name: "SPrint",
             version: 100,
             opcode: OpCode::SPRINT,
-            args: Some(vec![
-                ArgumentDefinition::new("str", VariableType::String),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("str", VariableType::String)]),
             sig: StatementSignature::VariableArguments(0, 1, 0),
         },
         StatementDefinition {
             name: "SPrintLN",
             version: 100,
             opcode: OpCode::SPRINTLN,
-            args: Some(vec![
-                ArgumentDefinition::new("str", VariableType::String),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("str", VariableType::String)]),
             sig: StatementSignature::VariableArguments(0, 0, 0),
         },
         StatementDefinition {
             name: "MPrint",
             version: 100,
             opcode: OpCode::MPRINT,
-            args: Some(vec![
-                ArgumentDefinition::new("str", VariableType::String),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("str", VariableType::String)]),
             sig: StatementSignature::VariableArguments(0, 1, 0),
         },
         StatementDefinition {
             name: "MPrintLn",
             version: 100,
             opcode: OpCode::MPRINTLN,
-            args: Some(vec![
-                ArgumentDefinition::new("str", VariableType::String),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("str", VariableType::String)]),
             sig: StatementSignature::VariableArguments(0, 0, 0),
         },
         StatementDefinition {
@@ -1494,9 +1488,7 @@ lazy_static::lazy_static! {
             name: "FRewind",
             version: 100,
             opcode: OpCode::FREWIND,
-            args: Some(vec![
-                ArgumentDefinition::new("chnl", VariableType::Integer),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("chnl", VariableType::Integer)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
@@ -1513,9 +1505,7 @@ lazy_static::lazy_static! {
             name: "DbgLevel",
             version: 100,
             opcode: OpCode::DBGLEVEL,
-            args: Some(vec![
-                ArgumentDefinition::new("level", VariableType::Integer),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("level", VariableType::Integer)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
@@ -1561,9 +1551,7 @@ lazy_static::lazy_static! {
             name: "FFlush",
             version: 200,
             opcode: OpCode::FFLUSH,
-            args: Some(vec![
-                ArgumentDefinition::new("chnl", VariableType::Integer),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("chnl", VariableType::Integer)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
@@ -1592,45 +1580,35 @@ lazy_static::lazy_static! {
             name: "FDefIn",
             version: 200,
             opcode: OpCode::FDEFIN,
-            args: Some(vec![
-                ArgumentDefinition::new("chnl", VariableType::Integer),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("chnl", VariableType::Integer)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "FDefOut",
             version: 200,
             opcode: OpCode::FDEFOUT,
-            args: Some(vec![
-                ArgumentDefinition::new("chnl", VariableType::Integer),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("chnl", VariableType::Integer)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "FDGet",
             version: 200,
             opcode: OpCode::FDGET,
-            args: Some(vec![
-                ArgumentDefinition::new("var", VariableType::None),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("var", VariableType::None)]),
             sig: StatementSignature::ArgumentsWithVariable(1, 1),
         },
         StatementDefinition {
             name: "FDPut",
             version: 200,
             opcode: OpCode::FDPUT,
-            args: Some(vec![
-                ArgumentDefinition::new("str", VariableType::String),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("str", VariableType::String)]),
             sig: StatementSignature::VariableArguments(0, 1, 0),
         },
         StatementDefinition {
             name: "FDPutLn",
             version: 200,
             opcode: OpCode::FDPUTLN,
-            args: Some(vec![
-                ArgumentDefinition::new("str", VariableType::String),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("str", VariableType::String)]),
             sig: StatementSignature::VariableArguments(0, 0, 0),
         },
         StatementDefinition {
@@ -1667,27 +1645,21 @@ lazy_static::lazy_static! {
             name: "AdjBytes",
             version: 200,
             opcode: OpCode::ADJBYTES,
-            args: Some(vec![
-                ArgumentDefinition::new("bytes", VariableType::Integer),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("bytes", VariableType::Integer)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "KbdString",
             version: 200,
             opcode: OpCode::KBDSTRING,
-            args: Some(vec![
-                ArgumentDefinition::new("str", VariableType::String),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("str", VariableType::String)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "Alias",
             version: 200,
             opcode: OpCode::ALIAS,
-            args: Some(vec![
-                ArgumentDefinition::new("on", VariableType::Boolean),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("on", VariableType::Boolean)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
@@ -1742,81 +1714,63 @@ lazy_static::lazy_static! {
             name: "LastIn",
             version: 200,
             opcode: OpCode::LASTIN,
-            args: Some(vec![
-                ArgumentDefinition::new("conf", VariableType::Integer),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("conf", VariableType::Integer)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "Flag",
             version: 200,
             opcode: OpCode::FLAG,
-            args: Some(vec![
-                ArgumentDefinition::new("filepath", VariableType::String),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("filepath", VariableType::String)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "Download",
             version: 200,
             opcode: OpCode::DOWNLOAD,
-            args: Some(vec![
-                ArgumentDefinition::new("cmd", VariableType::String),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("cmd", VariableType::String)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "WRUsysDoor",
             version: 200,
             opcode: OpCode::WRUSYSDOOR,
-            args: Some(vec![
-                ArgumentDefinition::new("str", VariableType::String),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("str", VariableType::String)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "GetAltUser",
             version: 200,
             opcode: OpCode::GETALTUSER,
-            args: Some(vec![
-                ArgumentDefinition::new("user", VariableType::Integer),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("user", VariableType::Integer)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "AdjDBytes",
             version: 200,
             opcode: OpCode::ADJDBYTES,
-            args: Some(vec![
-                ArgumentDefinition::new("bytes", VariableType::Integer),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("bytes", VariableType::Integer)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "AdjTBytes",
             version: 200,
             opcode: OpCode::ADJTBYTES,
-            args: Some(vec![
-                ArgumentDefinition::new("bytes", VariableType::Integer),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("bytes", VariableType::Integer)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "AdjTFiles",
             version: 200,
             opcode: OpCode::ADJTFILES,
-            args: Some(vec![
-                ArgumentDefinition::new("files", VariableType::Integer),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("files", VariableType::Integer)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "Lang",
             version: 200,
             opcode: OpCode::LANG,
-            args: Some(vec![
-                ArgumentDefinition::new("num", VariableType::Integer),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("num", VariableType::Integer)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
@@ -1843,7 +1797,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("fontY", VariableType::Integer),
                 ArgumentDefinition::new("invert", VariableType::Boolean),
                 ArgumentDefinition::new("clear", VariableType::Boolean),
-                ArgumentDefinition::new("text", VariableType::String)
+                ArgumentDefinition::new("text", VariableType::String),
             ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 10),
         },
@@ -1888,18 +1842,14 @@ lazy_static::lazy_static! {
             name: "PrFound",
             version: 200,
             opcode: OpCode::PRFOUND,
-            args: Some(vec![
-                ArgumentDefinition::new("str", VariableType::String),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("str", VariableType::String)]),
             sig: StatementSignature::VariableArguments(0, 1, 0),
         },
         StatementDefinition {
             name: "PrFoundLn",
             version: 200,
             opcode: OpCode::PRFOUNDLN,
-            args: Some(vec![
-                ArgumentDefinition::new("str", VariableType::String),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("str", VariableType::String)]),
             sig: StatementSignature::VariableArguments(0, 0, 0),
         },
         StatementDefinition {
@@ -2034,9 +1984,7 @@ lazy_static::lazy_static! {
             name: "SetEnv",
             version: 200,
             opcode: OpCode::SETENV,
-            args: Some(vec![
-                ArgumentDefinition::new("envVar", VariableType::String),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("envVar", VariableType::String)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
@@ -2106,9 +2054,7 @@ lazy_static::lazy_static! {
             name: "StackAbort",
             version: 200,
             opcode: OpCode::STACKABORT,
-            args: Some(vec![
-                ArgumentDefinition::new("abort", VariableType::Boolean),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("abort", VariableType::Boolean)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
@@ -2119,7 +2065,7 @@ lazy_static::lazy_static! {
                 ArgumentDefinition::new("channel", VariableType::Integer),
                 ArgumentDefinition::new("name", VariableType::String),
                 ArgumentDefinition::new("exclusive", VariableType::Boolean),
-                ArgumentDefinition::new("fieldInfo", VariableType::String)
+                ArgumentDefinition::new("fieldInfo", VariableType::String),
             ]),
             sig: StatementSignature::SpecialCaseDcreate,
         },
@@ -2138,9 +2084,7 @@ lazy_static::lazy_static! {
             name: "DClose",
             version: 300,
             opcode: OpCode::DCLOSE,
-            args: Some(vec![
-                ArgumentDefinition::new("channel", VariableType::Integer),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("channel", VariableType::Integer)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
@@ -2157,9 +2101,7 @@ lazy_static::lazy_static! {
             name: "DPack",
             version: 300,
             opcode: OpCode::DPACK,
-            args: Some(vec![
-                ArgumentDefinition::new("channel", VariableType::Integer),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("channel", VariableType::Integer)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
@@ -2173,9 +2115,7 @@ lazy_static::lazy_static! {
             name: "DLock",
             version: 300,
             opcode: OpCode::DLOCK,
-            args: Some(vec![
-                ArgumentDefinition::new("channel", VariableType::Integer),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("channel", VariableType::Integer)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
@@ -2203,9 +2143,7 @@ lazy_static::lazy_static! {
             name: "DUnlock",
             version: 300,
             opcode: OpCode::DUNLOCK,
-            args: Some(vec![
-                ArgumentDefinition::new("channel", VariableType::Integer),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("channel", VariableType::Integer)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
@@ -2243,45 +2181,35 @@ lazy_static::lazy_static! {
             name: "DNCloseAll",
             version: 300,
             opcode: OpCode::DNCLOSEALL,
-            args: Some(vec![
-                ArgumentDefinition::new("name", VariableType::String),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("name", VariableType::String)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "DNew",
             version: 300,
             opcode: OpCode::DNEW,
-            args: Some(vec![
-                ArgumentDefinition::new("name", VariableType::String),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("name", VariableType::String)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "DAdd",
             version: 300,
             opcode: OpCode::DADD,
-            args: Some(vec![
-                ArgumentDefinition::new("channel", VariableType::Integer),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("channel", VariableType::Integer)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "DAppend",
             version: 300,
             opcode: OpCode::DAPPEND,
-            args: Some(vec![
-                ArgumentDefinition::new("channel", VariableType::Integer),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("channel", VariableType::Integer)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "DTop",
             version: 300,
             opcode: OpCode::DTOP,
-            args: Some(vec![
-                ArgumentDefinition::new("channel", VariableType::Integer),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("channel", VariableType::Integer)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
@@ -2298,9 +2226,7 @@ lazy_static::lazy_static! {
             name: "DBottom",
             version: 300,
             opcode: OpCode::DBOTTOM,
-            args: Some(vec![
-                ArgumentDefinition::new("channel", VariableType::Integer),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("channel", VariableType::Integer)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
@@ -2317,27 +2243,21 @@ lazy_static::lazy_static! {
             name: "DBlank",
             version: 300,
             opcode: OpCode::DBLANK,
-            args: Some(vec![
-                ArgumentDefinition::new("channel", VariableType::Integer),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("channel", VariableType::Integer)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "DDelete",
             version: 300,
             opcode: OpCode::DDELETE,
-            args: Some(vec![
-                ArgumentDefinition::new("channel", VariableType::Integer),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("channel", VariableType::Integer)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "DRecall",
             version: 300,
             opcode: OpCode::DRECALL,
-            args: Some(vec![
-                ArgumentDefinition::new("channel", VariableType::Integer),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("channel", VariableType::Integer)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
@@ -2469,9 +2389,7 @@ lazy_static::lazy_static! {
             name: "UseLMRs",
             version: 300,
             opcode: OpCode::USELMRS,
-            args: Some(vec![
-                ArgumentDefinition::new("useLMR", VariableType::Boolean),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("useLMR", VariableType::Boolean)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
@@ -2489,18 +2407,14 @@ lazy_static::lazy_static! {
             name: "AdjTUBytes",
             version: 300,
             opcode: OpCode::ADJTUBYTES,
-            args: Some(vec![
-                ArgumentDefinition::new("bytes", VariableType::Integer),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("bytes", VariableType::Integer)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "GrafMode",
             version: 300,
             opcode: OpCode::GRAFMODE,
-            args: Some(vec![
-                ArgumentDefinition::new("mode", VariableType::Integer),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("mode", VariableType::Integer)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
@@ -2527,27 +2441,21 @@ lazy_static::lazy_static! {
             name: "ChDir",
             version: 300,
             opcode: OpCode::CHDIR,
-            args: Some(vec![
-                ArgumentDefinition::new("path", VariableType::String),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("path", VariableType::String)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "MkDir",
             version: 300,
             opcode: OpCode::MKDIR,
-            args: Some(vec![
-                ArgumentDefinition::new("path", VariableType::String),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("path", VariableType::String)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "ReDir",
             version: 300,
             opcode: OpCode::RMDIR,
-            args: Some(vec![
-                ArgumentDefinition::new("path", VariableType::String),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("path", VariableType::String)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
@@ -2605,9 +2513,7 @@ lazy_static::lazy_static! {
             name: "FDOQDel",
             version: 300,
             opcode: OpCode::FDOQDEL,
-            args: Some(vec![
-                ArgumentDefinition::new("recnum", VariableType::Integer),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("recnum", VariableType::Integer)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
@@ -2620,15 +2526,12 @@ lazy_static::lazy_static! {
             ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 2),
         },
-
         // 3.4 statements
         StatementDefinition {
             name: "ShortDesc",
             version: 340,
             opcode: OpCode::ShortDesc,
-            args: Some(vec![
-                ArgumentDefinition::new("val", VariableType::Boolean),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("val", VariableType::Boolean)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
@@ -2652,7 +2555,6 @@ lazy_static::lazy_static! {
             ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 2),
         },
-
         StatementDefinition {
             name: "WebRequest",
             version: 400,
@@ -2663,7 +2565,6 @@ lazy_static::lazy_static! {
             ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 2),
         },
-
         // Alias section
         // Moving to the end, so that the opcode <--> index mapping is not broken
         StatementDefinition {
@@ -2684,9 +2585,7 @@ lazy_static::lazy_static! {
             name: "Erase",
             version: 100,
             opcode: OpCode::DELETE,
-            args: Some(vec![
-                ArgumentDefinition::new("file", VariableType::String),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("file", VariableType::String)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
@@ -2706,13 +2605,11 @@ lazy_static::lazy_static! {
             name: "RmDir",
             version: 300,
             opcode: OpCode::RMDIR,
-            args: Some(vec![
-                ArgumentDefinition::new("path", VariableType::String),
-            ]),
+            args: Some(vec![ArgumentDefinition::new("path", VariableType::String)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
-    ];
-}
+    ]
+});
 
 #[test]
 fn check_table_consistency() {

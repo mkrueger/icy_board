@@ -87,10 +87,10 @@ pub fn repack_file(path: &Path, fingerprints: &FingerprintData, options: &Repack
         let mut file_options = zip::write::FileOptions::<ExtendedFileOptions>::default()
             .compression_method(zip::CompressionMethod::Deflated)
             .compression_level(Some(9));
-        if let Some(time) = entry.modified_time() {
-            if let Ok(time) = zip::DateTime::from_date_and_time(time.year(), time.month(), time.day(), time.hour(), time.minute(), time.second()) {
-                file_options = file_options.last_modified_time(time);
-            }
+        if let Some(time) = entry.modified_time()
+            && let Ok(time) = zip::DateTime::from_date_and_time(time.year(), time.month(), time.day(), time.hour(), time.minute(), time.second())
+        {
+            file_options = file_options.last_modified_time(time);
         }
         zip.start_file(name, file_options)?;
         zip.write_all(&content)?;

@@ -1,8 +1,8 @@
 //! What counts towards the MORE prompt.
 //!
-//! PCBoard counted a line in `newline()` and nowhere else, so a PPE that draws its own
+//! `PCBoard` counted a line in `newline()` and nowhere else, so a PPE that draws its own
 //! screen with `PRINT` and cursor positioning never ran into a MORE prompt halfway
-//! through. See newline() and print() in DISPLAY.C.
+//! through. See `newline()` and `print()` in DISPLAY.C.
 
 use super::run_ppl;
 

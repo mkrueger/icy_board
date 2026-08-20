@@ -1,6 +1,6 @@
 //! What a PPE gets back from a file channel that is not open.
 //!
-//! PCBoard's channel routines set an error flag and returned - openChan, closeChan,
+//! `PCBoard`'s channel routines set an error flag and returned - openChan, closeChan,
 //! getChan and their neighbours in SCREXEC.CPP never ended a PPE. Boards are full of
 //! PPEs that rewind a channel they just closed or open a file that is not there.
 
@@ -20,8 +20,8 @@ fn a_file_that_is_not_there_reports_through_ferr() {
     assert_eq!(output, "err=1\nstill running\n");
 }
 
-/// PCBoard scans fileArr for the first channel that is not in use and answers -1
-/// when all eight are busy. Verified against PCBoard 15.4/M.
+/// `PCBoard` scans fileArr for the first channel that is not in use and answers -1
+/// when all eight are busy. Verified against `PCBoard` 15.4/M.
 #[test]
 fn fnext_answers_the_first_free_channel_and_minus_one_when_full() {
     let output = run_ppl_with_files(
@@ -41,14 +41,14 @@ fn fnext_answers_the_first_free_channel_and_minus_one_when_full() {
     assert_eq!(output, "start=0\nfull=-1\nafter_close=3\n");
 }
 
-/// A channel nothing ever touched has no error flag set (PCBoard's fileArr starts zeroed).
+/// A channel nothing ever touched has no error flag set (`PCBoard`'s fileArr starts zeroed).
 #[test]
 fn ferr_on_a_channel_nothing_touched_is_false() {
     let output = run_ppl(r#"PRINTLN "err=", FERR(5)"#);
     assert_eq!(output, "err=0\n");
 }
 
-/// PCBoard cleared errStat when FERR was read (EVALP.CPP), so a second FERR is false
+/// `PCBoard` cleared errStat when FERR was read (EVALP.CPP), so a second FERR is false
 /// until another failing op sets the flag again.
 #[test]
 fn ferr_clears_the_error_flag_when_it_is_read() {
@@ -115,7 +115,7 @@ fn a_channel_can_be_opened_again_after_it_was_closed() {
 }
 
 /// FREAD past the end of a file used to index into an empty buffer and take the
-/// whole board down with it. PCBoard set the error flag and carried on.
+/// whole board down with it. `PCBoard` set the error flag and carried on.
 #[test]
 fn reading_a_byte_past_the_end_sets_the_error_flag() {
     let output = run_ppl_with_files(

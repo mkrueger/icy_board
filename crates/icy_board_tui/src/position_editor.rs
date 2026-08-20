@@ -39,7 +39,7 @@ impl PositionEditor {
     }
 
     pub fn handle_event(&mut self, event: KeyEvent, pos: &Position) -> Position {
-        let mut res = pos.clone();
+        let mut res = *pos;
 
         match event.code {
             KeyCode::Char('h') | KeyCode::Left => res.x = res.x.saturating_sub(1),

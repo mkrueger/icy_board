@@ -60,8 +60,10 @@ impl IcyBoardState {
         }
         self.session.push_tokens(&text);
 
-        let mut scan = YourMailScan::default();
-        scan.quick = self.get_board().await.config.message.default_quick_personal_scan;
+        let mut scan = YourMailScan {
+            quick: self.get_board().await.config.message.default_quick_personal_scan,
+            ..Default::default()
+        };
         while let Some(cmd) = self.session.tokens.pop_front() {
             apply_option(&mut scan, &cmd);
         }
@@ -262,7 +264,7 @@ impl IcyBoardState {
         Ok(result)
     }
 
-    /// Walks one base the way PCBoard does: forward from the last-read pointer
+    /// Walks one base the way `PCBoard` does: forward from the last-read pointer
     /// when scanning since the last call, backwards from the top otherwise.
     fn scan_base(&self, msg_base: &mut JamMessageBase, scan: &YourMailScan, name: &BString, alias: &BString, result: &mut ScanResult) {
         let low = msg_base.lowest_message_number();

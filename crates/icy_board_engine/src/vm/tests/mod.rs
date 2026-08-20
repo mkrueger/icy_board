@@ -1,6 +1,6 @@
 //! Runs PPL snippets through the real compiler and the real VM.
 //!
-//! The point of these tests is PCBoard compatibility, so they assert on what a
+//! The point of these tests is `PCBoard` compatibility, so they assert on what a
 //! caller would have seen rather than on the VM's internal state. Anything worth
 //! checking can be printed, which keeps the assertions in the same language as
 //! the behaviour they describe.

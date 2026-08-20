@@ -2,6 +2,7 @@ use super::IcyBoardSerializer;
 use super::{PCBoardImport, PCBoardTextImport, is_false, is_null_8, is_null_32, is_null_64};
 use crate::Res;
 use serde::{Deserialize, Serialize};
+use std::fmt::Write as _;
 use std::ops::{Deref, DerefMut};
 use std::path::Path;
 
@@ -38,7 +39,7 @@ pub struct SecurityLevel {
     #[serde(skip_serializing_if = "is_null_32")]
     pub batch_limit: u32,
 
-    /// Download:upload file ratio in tenths - PCBoard stores 5.0 as 50. 0 disables it.
+    /// Download:upload file ratio in tenths - `PCBoard` stores 5.0 as 50. 0 disables it.
     #[serde(default, alias = "uldl_ratio")]
     #[serde(skip_serializing_if = "is_null_32")]
     pub uldl_ratio_tenths: u32,
@@ -119,7 +120,7 @@ impl DerefMut for SecurityLevelDefinitions {
 }
 
 impl SecurityLevelDefinitions {
-    /// PCBoard stops at the first entry whose level and optional password match.
+    /// `PCBoard` stops at the first entry whose level and optional password match.
     pub fn find_match(&self, security: u8, password: &str) -> Option<&SecurityLevel> {
         self.levels
             .iter()
@@ -129,8 +130,9 @@ impl SecurityLevelDefinitions {
     pub fn export_pcboard(&self, file: &std::path::PathBuf) -> Res<()> {
         let mut data = String::new();
         for level in &self.levels {
-            data.push_str(&format!(
-                "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\r\n",
+            let _ = write!(
+                data,
+                "{},{},{},{},{},{},{},{},{},{},{},{},{},{},N,{},{},{}\r\n",
                 level.password,
                 level.security,
                 level.time_per_day,
@@ -144,53 +146,14 @@ impl SecurityLevelDefinitions {
                 if level.enforce_time_limit { "Y" } else { "N" },
                 if level.allow_alias { "Y" } else { "N" },
                 if level.enforce_read_mail { "Y" } else { "N" },
-                if level.is_demo_account { "Y" } else { "N" },
-                "N", // unused
+                if level.is_demo_account { "Y" } else { "N" }, // unused
                 level.file_credit,
                 level.file_kb_credit,
                 if level.is_enabled { "Y" } else { "N" }
-            ));
+            );
         }
         std::fs::write(file, data)?;
         Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{SecurityLevel, SecurityLevelDefinitions};
-
-    #[test]
-    fn pwrd_lookup_uses_the_first_matching_entry() {
-        let levels = SecurityLevelDefinitions {
-            levels: vec![
-                SecurityLevel {
-                    security: 10,
-                    password: "SPECIAL".to_string(),
-                    time_per_day: 30,
-                    ..Default::default()
-                },
-                SecurityLevel {
-                    security: 10,
-                    time_per_day: 60,
-                    ..Default::default()
-                },
-            ],
-        };
-
-        assert_eq!(levels.find_match(10, "special").unwrap().time_per_day, 30);
-        assert_eq!(levels.find_match(10, "other").unwrap().time_per_day, 60);
-    }
-
-    #[test]
-    fn pwrd_lookup_does_not_use_another_security_level() {
-        let levels = SecurityLevelDefinitions {
-            levels: vec![SecurityLevel {
-                security: 20,
-                ..Default::default()
-            }],
-        };
-        assert!(levels.find_match(10, "").is_none());
     }
 }
 
@@ -253,7 +216,7 @@ impl PCBoardTextImport for SecurityLevelDefinitions {
                 file_kb_limit,
                 file_credit,
                 file_kb_credit,
-                description: "".to_string(),
+                description: String::new(),
             });
         }
         Ok(res)
@@ -268,4 +231,42 @@ impl PCBoardImport for SecurityLevelDefinitions {
 
 impl IcyBoardSerializer for SecurityLevelDefinitions {
     const FILE_TYPE: &'static str = "securiy level";
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{SecurityLevel, SecurityLevelDefinitions};
+
+    #[test]
+    fn pwrd_lookup_uses_the_first_matching_entry() {
+        let levels = SecurityLevelDefinitions {
+            levels: vec![
+                SecurityLevel {
+                    security: 10,
+                    password: "SPECIAL".to_string(),
+                    time_per_day: 30,
+                    ..Default::default()
+                },
+                SecurityLevel {
+                    security: 10,
+                    time_per_day: 60,
+                    ..Default::default()
+                },
+            ],
+        };
+
+        assert_eq!(levels.find_match(10, "special").unwrap().time_per_day, 30);
+        assert_eq!(levels.find_match(10, "other").unwrap().time_per_day, 60);
+    }
+
+    #[test]
+    fn pwrd_lookup_does_not_use_another_security_level() {
+        let levels = SecurityLevelDefinitions {
+            levels: vec![SecurityLevel {
+                security: 20,
+                ..Default::default()
+            }],
+        };
+        assert!(levels.find_match(10, "").is_none());
+    }
 }

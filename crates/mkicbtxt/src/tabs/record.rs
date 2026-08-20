@@ -182,25 +182,25 @@ impl<'a> TabPage for RecordTab<'a> {
                 }
             }
             KeyCode::PageDown => {
-                if let Some(idx) = self.table_state.selected() {
-                    if self.entries() > 0 {
-                        self.table_state.select(Some((idx + page_len).min(self.entries() - 1)));
-                    }
+                if let Some(idx) = self.table_state.selected()
+                    && self.entries() > 0
+                {
+                    self.table_state.select(Some((idx + page_len).min(self.entries() - 1)));
                 }
             }
 
             KeyCode::Down | KeyCode::Char('s') => {
-                if let Some(idx) = self.table_state.selected() {
-                    if idx + 1 < self.entries() {
-                        self.table_state.select(Some(idx + 1));
-                    }
+                if let Some(idx) = self.table_state.selected()
+                    && idx + 1 < self.entries()
+                {
+                    self.table_state.select(Some(idx + 1));
                 }
             }
             KeyCode::Up | KeyCode::Char('w') => {
-                if let Some(idx) = self.table_state.selected() {
-                    if idx > 0 {
-                        self.table_state.select(Some(idx - 1));
-                    }
+                if let Some(idx) = self.table_state.selected()
+                    && idx > 0
+                {
+                    self.table_state.select(Some(idx - 1));
                 }
             }
             _ => {}

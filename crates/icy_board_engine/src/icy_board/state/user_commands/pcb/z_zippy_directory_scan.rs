@@ -105,15 +105,15 @@ impl IcyBoardState {
 
                 for (num, desc, path, metadata) in dir_numbers.numbers {
                     self.display_text(IceText::ScanningDirectory, display_flags::DEFAULT).await?;
-                    self.print(TerminalTarget::Both, &format!(" {}", num)).await?;
+                    self.print(TerminalTarget::Both, &format!(" {num}")).await?;
                     if !desc.is_empty() {
                         self.set_color(TerminalTarget::Both, IcbColor::dos_light_green()).await?;
-                        self.print(TerminalTarget::Both, &format!(" ({})", desc)).await?;
+                        self.print(TerminalTarget::Both, &format!(" ({desc})")).await?;
                     }
                     self.new_line().await?;
                     self.reset_color(TerminalTarget::Both).await?;
                     let r = r.clone();
-                    let date_time = dir_numbers.date_time.clone();
+                    let date_time = dir_numbers.date_time;
                     let name_pattern = r.clone();
                     self.display_file_area(
                         &path,
@@ -121,7 +121,7 @@ impl IcyBoardState {
                         FileFilter::with_description(
                             // The date is the one thing that can rule a file out before its
                             // description has to be read.
-                            move |p| date_time.map_or(true, |date| p.date() >= date),
+                            move |p| date_time.is_none_or(|date| p.date() >= date),
                             move |p, md| {
                                 if name_pattern.is_match(p.name()) {
                                     return true;
@@ -151,10 +151,10 @@ impl IcyBoardState {
         Ok(())
     }
 
-    /// PCBoard treats a lone N or S on the command line as a new file scan and
+    /// `PCBoard` treats a lone N or S on the command line as a new file scan and
     /// then asks for a date before it asks for the search text. The tokens are
     /// taken out of the queue so the later directory parse does not see them twice.
-    /// S wins over N, the way PCBoard's date buffer keeps the last thing written to it.
+    /// S wins over N, the way `PCBoard`'s date buffer keeps the last thing written to it.
     pub fn tokens_request_new_scan(&mut self) -> Option<NewScanKind> {
         let mut kind = None;
         self.session.tokens.retain(|token| {
@@ -197,7 +197,7 @@ impl IcyBoardState {
                 let Some(default) = &default else {
                     return Ok(None);
                 };
-                answer = default.clone();
+                answer.clone_from(default);
             }
             if answer == "000000" {
                 return Ok(None);
@@ -287,7 +287,7 @@ impl IcyBoardState {
                 self.get_display_text(IceText::RecentUploads)?,
                 self.session.current_conference.private_upload_location.clone(),
                 self.session.current_conference.private_upload_metadata.clone(),
-            ))
+            ));
         }
 
         for p in numbers {
@@ -306,7 +306,7 @@ impl IcyBoardState {
                 self.get_display_text(IceText::RecentUploads)?,
                 self.session.current_conference.pub_upload_location.clone(),
                 self.session.current_conference.private_upload_metadata.clone(),
-            ))
+            ));
         }
 
         Ok(res)

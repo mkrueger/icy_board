@@ -176,7 +176,7 @@ pub trait ZConnectBlock {
                 }
                 continue;
             }
-            if c < ' ' || c >= '\x7F' {
+            if !(' '..'\x7F').contains(&c) {
                 continue;
             }
             crc = crc::buggy_update(crc, c as u8);

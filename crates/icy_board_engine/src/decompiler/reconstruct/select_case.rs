@@ -1,7 +1,7 @@
 use crate::ast::{BinOp, CaseBlock, CaseSpecifier, Expression, SelectStatement, Statement};
 
 /// Reads the condition of one branch as the case labels it stands for, together with the
-/// expression they all test. A CASE with several labels arrives as a chain of ORed
+/// expression they all test. A CASE with several labels arrives as a chain of `ORed`
 /// comparisons and a range as a pair of bounds, so both collapse back here.
 fn match_case(condition: &Expression) -> Option<(Expression, Vec<CaseSpecifier>)> {
     let Expression::Binary(bin_expr) = Statement::try_boolean_conversion(condition) else {

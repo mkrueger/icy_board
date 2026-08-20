@@ -41,8 +41,8 @@ impl TestConnection {
 
     fn drain_into(&mut self, buf: &mut [u8]) -> usize {
         let n = buf.len().min(self.buffer.len());
-        for i in 0..n {
-            buf[i] = self.buffer.pop_front().unwrap();
+        for slot in buf.iter_mut().take(n) {
+            *slot = self.buffer.pop_front().unwrap();
         }
         n
     }
@@ -121,10 +121,10 @@ impl Connection for TestConnection {
     }
 
     async fn send(&mut self, buf: &[u8]) -> icy_net::Result<()> {
-        if let Some(tx) = &self.tx {
-            if tx.send(buf.to_vec()).is_err() {
-                // peer closed; treat as success or map to your error type
-            }
+        if let Some(tx) = &self.tx
+            && tx.send(buf.to_vec()).is_err()
+        {
+            // peer closed; treat as success or map to your error type
         }
         Ok(())
     }

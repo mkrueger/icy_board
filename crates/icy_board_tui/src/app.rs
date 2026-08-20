@@ -83,16 +83,12 @@ impl App {
         }
         terminal
             .draw(|frame| {
-                let screen: Rect = get_screen_size(&frame, self.full_screen);
+                let screen: Rect = get_screen_size(frame, self.full_screen);
                 self.help_state.set_area(screen);
                 self.ui(frame, screen);
 
-                match self.mode {
-                    Mode::ShowHelp => {
-                        self.show_help(frame, screen);
-                    }
-
-                    _ => {}
+                if self.mode == Mode::ShowHelp {
+                    self.show_help(frame, screen);
                 }
             })
             .wrap_err("terminal.draw")?;
@@ -287,7 +283,7 @@ impl App {
             if i == self.tab {
                 format!(" {} ", t.title())
             } else if i == self.tab + 1 {
-                format!("{}", t.title())
+                t.title().to_string()
             } else {
                 format!(" {}", t.title())
             }
@@ -295,7 +291,7 @@ impl App {
         Tabs::new(titles)
             .style(get_tui_theme().tabs)
             .highlight_style(get_tui_theme().tabs_selected)
-            .select(self.tab as usize)
+            .select(self.tab)
             .divider("")
             .padding("", "")
             .render(tabs, buf);

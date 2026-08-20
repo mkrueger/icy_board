@@ -54,7 +54,7 @@ impl Tui {
 
         let ui_node = bbs.lock().await.create_new_node(ConnectionType::Channel).await;
         let node_state = bbs.lock().await.open_connections.clone();
-        let node = ui_node.clone();
+        let node = ui_node;
         let mut screen_buffer = TextScreen::new((80, 25));
         screen_buffer.buffer.buffer_type = BufferType::Unicode;
         let screen = Arc::new(std::sync::Mutex::new(screen_buffer));
@@ -65,18 +65,14 @@ impl Tui {
         let handle = std::thread::Builder::new()
             .name("Local mode handle".to_string())
             .spawn(move || {
-                let foo = tokio::runtime::Builder::new_current_thread()
+                tokio::runtime::Builder::new_current_thread()
                     .enable_all()
                     .build()
                     .unwrap()
-                    .block_on(async { handle_client(bbs2, board, node_state2, node, Box::new(connection), Some(options), &stuffed_chars).await });
-                foo
+                    .block_on(async { handle_client(bbs2, board, node_state2, node, Box::new(connection), Some(options), &stuffed_chars).await })
             })
             .unwrap();
-        bbs.lock().await.get_open_connections().await.as_ref().lock().await[node]
-            .as_mut()
-            .unwrap()
-            .handle = Some(handle);
+        bbs.lock().await.get_open_connections().as_ref().lock().await[node].as_mut().unwrap().handle = Some(handle);
         let (_handle2, tx) = crate::terminal_thread::start_update_thread(Box::new(ui_connection), screen.clone());
 
         Ok(Self {
@@ -86,7 +82,7 @@ impl Tui {
             status_bar: 0,
             node,
             node_state,
-            handle: bbs.lock().await.get_open_connections().await.clone(),
+            handle: bbs.lock().await.get_open_connections().clone(),
         })
     }
 
@@ -103,7 +99,7 @@ impl Tui {
         log::info!("Creating sysop mode");
         let node_state = bbs.open_connections.clone();
 
-        if let Some(node_state) = bbs.get_open_connections().await.lock().await[node].as_mut() {
+        if let Some(node_state) = bbs.get_open_connections().lock().await[node].as_mut() {
             node_state.sysop_connection = Some(connection);
         }
         bbs.bbs_channels[node].as_ref().unwrap().send(BBSMessage::SysopLogin).await?;
@@ -119,7 +115,7 @@ impl Tui {
             status_bar: 0,
             node,
             node_state,
-            handle: bbs.get_open_connections().await.clone(),
+            handle: bbs.get_open_connections().clone(),
         })
     }
 
@@ -155,58 +151,57 @@ impl Tui {
                 });
             }
             let timeout = tick_rate.saturating_sub(last_tick.elapsed());
-            if event::poll(timeout)? {
-                if let Event::Key(key) = event::read()? {
-                    if key.kind == KeyEventKind::Press {
-                        if key.modifiers.contains(KeyModifiers::ALT) {
-                            match key.code {
-                                KeyCode::Char('h') => {
-                                    self.status_bar = (self.status_bar + 1) % 4;
-                                    //redraw = true;
-                                }
-                                KeyCode::Char('x') => {
-                                    self.logoff_sysop(bbs).await?;
-                                    return Ok(());
-                                }
-                                _ => {}
+            if event::poll(timeout)?
+                && let Event::Key(key) = event::read()?
+                && key.kind == KeyEventKind::Press
+            {
+                if key.modifiers.contains(KeyModifiers::ALT) {
+                    match key.code {
+                        KeyCode::Char('h') => {
+                            self.status_bar = (self.status_bar + 1) % 4;
+                            //redraw = true;
+                        }
+                        KeyCode::Char('x') => {
+                            self.logoff_sysop(bbs).await?;
+                            return Ok(());
+                        }
+                        _ => {}
+                    }
+                } else if key.modifiers.contains(KeyModifiers::CONTROL) {
+                    match key.code {
+                        KeyCode::Char(c) => {
+                            if c == 'x' || c == 'c' {
+                                self.logoff_sysop(bbs).await?;
+                                return Ok(());
                             }
-                        } else if key.modifiers.contains(KeyModifiers::CONTROL) {
-                            match key.code {
-                                KeyCode::Char(c) => {
-                                    if c == 'x' || c == 'c' {
-                                        self.logoff_sysop(bbs).await?;
-                                        return Ok(());
-                                    }
-                                    if ('a'..='z').contains(&c) {
-                                        self.add_input(((c as u8 - b'a' + 1) as char).to_string().chars()).await?;
-                                    }
-                                }
-
-                                KeyCode::Left => self.add_input("\x01".chars()).await?,
-                                KeyCode::Right => self.add_input("\x06".chars()).await?,
-                                KeyCode::End => self.add_input("\x0B".chars()).await?,
-                                _ => {}
-                            }
-                        } else {
-                            match key.code {
-                                KeyCode::Char(c) => self.add_input(c.to_string().chars()).await?,
-                                KeyCode::Enter => self.add_input("\r".chars()).await?,
-                                KeyCode::Backspace => self.add_input("\x08".chars()).await?,
-                                KeyCode::Esc => self.add_input("\x1B".chars()).await?,
-                                KeyCode::Tab => self.add_input("\x09".chars()).await?,
-                                KeyCode::Delete => self.add_input("\x7F".chars()).await?,
-                                KeyCode::Insert => self.add_input("\x1B[2~".chars()).await?,
-                                KeyCode::Home => self.add_input("\x1B[H".chars()).await?,
-                                KeyCode::End => self.add_input("\x1B[F".chars()).await?,
-                                KeyCode::Up => self.add_input("\x1B[A".chars()).await?,
-                                KeyCode::Down => self.add_input("\x1B[B".chars()).await?,
-                                KeyCode::Right => self.add_input("\x1B[C".chars()).await?,
-                                KeyCode::Left => self.add_input("\x1B[D".chars()).await?,
-                                KeyCode::PageUp => self.add_input("\x1B[V".chars()).await?,
-                                KeyCode::PageDown => self.add_input("\x1B[U".chars()).await?,
-                                _ => {}
+                            if c.is_ascii_lowercase() {
+                                self.add_input(((c as u8 - b'a' + 1) as char).to_string().chars()).await?;
                             }
                         }
+
+                        KeyCode::Left => self.add_input("\x01".chars()).await?,
+                        KeyCode::Right => self.add_input("\x06".chars()).await?,
+                        KeyCode::End => self.add_input("\x0B".chars()).await?,
+                        _ => {}
+                    }
+                } else {
+                    match key.code {
+                        KeyCode::Char(c) => self.add_input(c.to_string().chars()).await?,
+                        KeyCode::Enter => self.add_input("\r".chars()).await?,
+                        KeyCode::Backspace => self.add_input("\x08".chars()).await?,
+                        KeyCode::Esc => self.add_input("\x1B".chars()).await?,
+                        KeyCode::Tab => self.add_input("\x09".chars()).await?,
+                        KeyCode::Delete => self.add_input("\x7F".chars()).await?,
+                        KeyCode::Insert => self.add_input("\x1B[2~".chars()).await?,
+                        KeyCode::Home => self.add_input("\x1B[H".chars()).await?,
+                        KeyCode::End => self.add_input("\x1B[F".chars()).await?,
+                        KeyCode::Up => self.add_input("\x1B[A".chars()).await?,
+                        KeyCode::Down => self.add_input("\x1B[B".chars()).await?,
+                        KeyCode::Right => self.add_input("\x1B[C".chars()).await?,
+                        KeyCode::Left => self.add_input("\x1B[D".chars()).await?,
+                        KeyCode::PageUp => self.add_input("\x1B[V".chars()).await?,
+                        KeyCode::PageDown => self.add_input("\x1B[U".chars()).await?,
+                        _ => {}
                     }
                 }
             }
@@ -244,7 +239,7 @@ impl Tui {
                 frame.buffer_mut().set_span(area.x + x as u16, area.y + y as u16, &span, 1);
             }
         }
-        let y = area.y as u16;
+        let y = area.y;
         area.y += area.height;
         area.height = 2;
         if area.y + area.height < frame.area().height {
@@ -319,7 +314,7 @@ impl Tui {
             1 => {
                 let line = Line::from(vec![
                     Span::from(format!("{}", self.node + 1)).style(Style::new().fg(DOS_YELLOW).bg(DOS_RED)),
-                    Span::from(format!(" Alt-> X=OS")).style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY)),
+                    Span::from(" Alt-> X=OS".to_string()).style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY)),
                 ]);
                 frame.buffer_mut().set_line(area.x, area.y, &line, area.width);
             }

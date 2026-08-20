@@ -8,6 +8,7 @@ use icy_board_engine::{
 use tower_lsp::lsp_types::{ParameterInformation, ParameterLabel, SignatureHelp, SignatureInformation};
 
 use crate::{context::call_context, type_lookup::type_name};
+use std::fmt::Write as _;
 
 /// Builds one signature out of a name, its parameters and what it returns.
 struct SignatureBuilder {
@@ -57,10 +58,10 @@ fn render_parameter(visitor: &SemanticVisitor, parameter: &ParameterSpecifier) -
             text.push_str(&type_name(&visitor.type_registry, variable.get_variable_type()));
             if let Some(specifier) = variable.get_variable() {
                 text.push(' ');
-                text.push_str(&specifier.get_identifier().to_string());
+                text.push_str(specifier.get_identifier().as_ref());
                 if !specifier.get_dimensions().is_empty() {
                     let dimensions = specifier.get_dimensions().iter().map(|d| d.get_dimension().to_string()).collect::<Vec<_>>();
-                    text.push_str(&format!("({})", dimensions.join(", ")));
+                    let _ = write!(text, "({})", dimensions.join(", "));
                 }
             }
             text

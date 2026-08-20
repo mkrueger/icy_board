@@ -1,7 +1,7 @@
 pub fn tokenize(str: &str) -> Vec<String> {
     let mut result = Vec::new();
     let mut cur = String::new();
-    if str.len() == 0 {
+    if str.is_empty() {
         return result;
     }
 
@@ -10,7 +10,7 @@ pub fn tokenize(str: &str) -> Vec<String> {
             result.push(cur.trim_ascii_end().to_string());
             cur.clear();
         } else if c == ' ' {
-            if cur.len() == 0 {
+            if cur.is_empty() {
                 continue;
             }
             result.push(cur.trim_ascii_end().to_string());
@@ -19,7 +19,7 @@ pub fn tokenize(str: &str) -> Vec<String> {
             cur.push(c);
         }
     }
-    if cur.len() > 0 {
+    if !cur.is_empty() {
         result.push(cur.trim_ascii_end().to_string());
     }
 

@@ -25,19 +25,16 @@ fn parse_statement(input: &str, assert_eof: bool) -> Statement {
     let errors = Arc::new(Mutex::new(ErrorReporter::default()));
     let mut parser = Parser::new(PathBuf::from("."), errors, &reg, input, Encoding::Utf8, &Workspace::default());
     parser.next_token();
-    match parser.parse_statement() {
-        Some(stmt) => {
-            if assert_eof {
-                assert!(parser.get_cur_token().is_none());
-            }
-            stmt
+    if let Some(stmt) = parser.parse_statement() {
+        if assert_eof {
+            assert!(parser.get_cur_token().is_none());
         }
-        None => {
-            for error in &parser.error_reporter.lock().unwrap().errors {
-                println!("{}", error.error);
-            }
-            panic!("Error");
+        stmt
+    } else {
+        for error in &parser.error_reporter.lock().unwrap().errors {
+            println!("{}", error.error);
         }
+        panic!("Error");
     }
 }
 

@@ -28,7 +28,7 @@ impl IcyBoardState {
         self.message_scan(false).await
     }
 
-    /// Sysop command 5. PCBoard runs the quick scan with its header scan flag on,
+    /// Sysop command 5. `PCBoard` runs the quick scan with its header scan flag on,
     /// which adds the active/inactive column and lists killed messages too.
     #[async_recursion(?Send)]
     pub async fn header_message_scan(&mut self) -> Res<()> {
@@ -50,7 +50,7 @@ impl IcyBoardState {
                 Ok(())
             }
             Err(err) => {
-                log::error!("Message index load error {}", err);
+                log::error!("Message index load error {err}");
                 log::error!("Creating new message index at {}", message_base_file.display());
                 self.display_text(IceText::CreatingNewMessageIndex, display_flags::NEWLINE | display_flags::LFAFTER)
                     .await?;
@@ -75,7 +75,7 @@ impl IcyBoardState {
         };
         let low = message_base.lowest_message_number();
         let high = message_base.highest_message_number();
-        self.session.op_text = format!("{}-{}", low, high);
+        self.session.op_text = format!("{low}-{high}");
 
         let text = self
             .input_field(
@@ -93,7 +93,7 @@ impl IcyBoardState {
 
         // Q shares R's command language, and a bare number scans forward from
         // there rather than showing that one message.
-        let tokens: Vec<String> = text.split_whitespace().map(|t| t.to_ascii_uppercase()).collect();
+        let tokens: Vec<String> = text.split_whitespace().map(str::to_ascii_uppercase).collect();
         let mut ctx = self.read_parse_context(0).await;
         ctx.quick_scan = true;
         let mut cmd = read_command::parse(&tokens, ReadLoop::Outside, &ctx);
@@ -113,7 +113,7 @@ impl IcyBoardState {
         let conf = format!(
             "{}/{}",
             self.session.current_conference.name,
-            self.session.current_conference.areas.as_ref().unwrap()[area as usize].name
+            self.session.current_conference.areas.as_ref().unwrap()[area].name
         );
         self.println(TerminalTarget::Both, &conf).await?;
 
@@ -125,49 +125,46 @@ impl IcyBoardState {
 
         self.set_color(TerminalTarget::Both, IcbColor::dos_light_cyan()).await?;
         for i in number..=high {
-            match message_base.read_header(i) {
-                Ok(header) => {
-                    // Only the header scan lists what has been killed.
-                    if header.is_deleted() && !header_scan {
-                        continue;
-                    }
-                    let status = if header.needs_password() {
-                        if header.is_read() { '^' } else { '%' }
-                    } else if header.is_private() {
-                        if header.to().unwrap().eq_ignore_ascii_case(b"SYSOP") {
-                            if header.is_read() { '~' } else { '`' }
-                        } else {
-                            if header.is_read() { '+' } else { '*' }
-                        }
-                    } else if header.is_read() {
-                        ' '
-                    } else {
-                        '-'
-                    };
-                    let active = if !header_scan {
-                        String::new()
-                    } else if header.is_deleted() {
-                        "I".to_string()
-                    } else {
-                        "A".to_string()
-                    };
-
-                    self.println(
-                        TerminalTarget::Both,
-                        &format!(
-                            "{}{}{:<7} {:<7} {:<15} {:<15} {:<25}",
-                            active,
-                            status,
-                            header.message_number,
-                            if header.reply_to > 0 { header.reply_to.to_string() } else { "-".to_string() },
-                            get_str(header.to(), 15),
-                            get_str(header.from(), 15),
-                            get_str(header.subject(), 25)
-                        ),
-                    )
-                    .await?;
+            if let Ok(header) = message_base.read_header(i) {
+                // Only the header scan lists what has been killed.
+                if header.is_deleted() && !header_scan {
+                    continue;
                 }
-                _ => continue,
+                let status = if header.needs_password() {
+                    if header.is_read() { '^' } else { '%' }
+                } else if header.is_private() {
+                    if header.to().unwrap().eq_ignore_ascii_case(b"SYSOP") {
+                        if header.is_read() { '~' } else { '`' }
+                    } else {
+                        if header.is_read() { '+' } else { '*' }
+                    }
+                } else if header.is_read() {
+                    ' '
+                } else {
+                    '-'
+                };
+                let active = if !header_scan {
+                    String::new()
+                } else if header.is_deleted() {
+                    "I".to_string()
+                } else {
+                    "A".to_string()
+                };
+
+                self.println(
+                    TerminalTarget::Both,
+                    &format!(
+                        "{}{}{:<7} {:<7} {:<15} {:<15} {:<25}",
+                        active,
+                        status,
+                        header.message_number,
+                        if header.reply_to > 0 { header.reply_to.to_string() } else { "-".to_string() },
+                        get_str(header.to(), 15),
+                        get_str(header.from(), 15),
+                        get_str(header.subject(), 25)
+                    ),
+                )
+                .await?;
             }
         }
 
@@ -188,6 +185,6 @@ fn get_str(s: Option<&BString>, len: usize) -> String {
                 s.to_str_lossy().to_string()
             }
         }
-        None => "".to_string(),
+        None => String::new(),
     }
 }

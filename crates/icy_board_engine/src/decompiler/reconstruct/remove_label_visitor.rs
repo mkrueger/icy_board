@@ -16,7 +16,7 @@ impl RemoveLabelVisitor {
 
 impl AstVisitorMut for RemoveLabelVisitor {
     fn visit_label_statement(&mut self, label: &LabelStatement) -> Statement {
-        if self.remove_labels.contains(&label.get_label()) {
+        if self.remove_labels.contains(label.get_label()) {
             Statement::Empty
         } else {
             Statement::Label(label.clone())

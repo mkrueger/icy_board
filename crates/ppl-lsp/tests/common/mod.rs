@@ -4,7 +4,7 @@ use std::{
     collections::VecDeque,
     io::{BufRead, BufReader, Write},
     process::{Child, ChildStdin, Command, Stdio},
-    sync::mpsc::{Receiver, RecvTimeoutError, channel},
+    sync::mpsc::{Receiver, channel},
     thread,
     time::{Duration, Instant},
 };
@@ -168,10 +168,7 @@ impl Server {
         if let Some(message) = self.pending.pop_front() {
             return Some(message);
         }
-        match self.messages.recv_timeout(timeout) {
-            Ok(message) => Some(message),
-            Err(RecvTimeoutError::Timeout | RecvTimeoutError::Disconnected) => None,
-        }
+        self.messages.recv_timeout(timeout).ok()
     }
 }
 

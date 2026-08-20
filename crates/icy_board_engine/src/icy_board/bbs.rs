@@ -37,7 +37,7 @@ impl BBS {
         }
     }
 
-    pub async fn get_open_connections(&mut self) -> &Arc<Mutex<Vec<Option<NodeState>>>> {
+    pub fn get_open_connections(&mut self) -> &Arc<Mutex<Vec<Option<NodeState>>>> {
         &self.open_connections
     }
 

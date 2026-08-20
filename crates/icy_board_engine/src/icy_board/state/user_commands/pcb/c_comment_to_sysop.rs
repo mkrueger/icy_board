@@ -106,7 +106,7 @@ impl IcyBoardState {
 
         if leave_comment.is_empty() || leave_comment.chars().next().unwrap() == self.session.no_char {
             return Ok(());
-        };
+        }
 
         self.enter_comment_to_sysop().await?;
 
@@ -116,13 +116,13 @@ impl IcyBoardState {
     pub async fn enter_comment_to_sysop(&mut self) -> Res<()> {
         let to = self.get_board().await.config.sysop.name.clone();
         let (conf, area) = self.comment_target().await;
-        let subj = format!("COMMENT {}", IcbTime::now().to_string());
+        let subj = format!("COMMENT {}", IcbTime::now());
         let receipt = self
             .input_field(
                 IceText::RequireReturnReceipt,
                 1,
                 "",
-                &"",
+                "",
                 Some(self.session.no_char.to_string()),
                 display_flags::NEWLINE | display_flags::UPCASE | display_flags::YESNO | display_flags::FIELDLEN,
             )
@@ -195,8 +195,8 @@ impl IcyBoardState {
         Ok(())
     }
 
-    /// Asks the user whether to use the full screen editor (mirrors PCBoard's
-    /// msgeditor() TXT_USEFULLSCREEN prompt). Only called when the user's editor
+    /// Asks the user whether to use the full screen editor (mirrors `PCBoard`'s
+    /// `msgeditor()` `TXT_USEFULLSCREEN` prompt). Only called when the user's editor
     /// preference is "ask".
     async fn prompt_use_fse(&mut self) -> Res<bool> {
         let ansi = self.session.disp_options.grapics_mode != GraphicsMode::Ctty;

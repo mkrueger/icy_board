@@ -16,7 +16,7 @@ pub enum SelectMode {
     SelectCmd,
 }
 const MASK_CONFNUMBERS: &str = "0123456789-DQSH?";
-/// PCBoard's mask_crsxn: locked out, registered, scan, conference sysop, net status.
+/// `PCBoard`'s `mask_crsxn`: locked out, registered, scan, conference sysop, net status.
 const MASK_CONFFLAGS: &str = "CLRSXN";
 
 fn with_flag(value: ConferenceFlags, flag: ConferenceFlags, on: bool) -> ConferenceFlags {
@@ -44,7 +44,7 @@ impl IcyBoardState {
                     if select_mode == SelectMode::SelectCmd && !self.is_registered(conference, x as u16) {
                         continue;
                     }
-                    self.print_conference_line(&conference, x, select_mode).await?;
+                    self.print_conference_line(conference, x, select_mode).await?;
                     line_number += 1;
                 }
                 for _ in line_number..num_lines {
@@ -119,15 +119,13 @@ impl IcyBoardState {
 
                         if str.contains('-') {
                             let mut parts = str.split('-');
-                            if let (Some(from), Some(to)) = (parts.next(), parts.next()) {
-                                if let (Ok(from), Ok(to)) = (from.parse::<usize>(), to.parse::<usize>()) {
-                                    self.apply_selection(from, to, value, select_mode, &flags).await?;
-                                }
+                            if let (Some(from), Some(to)) = (parts.next(), parts.next())
+                                && let (Ok(from), Ok(to)) = (from.parse::<usize>(), to.parse::<usize>())
+                            {
+                                self.apply_selection(from, to, value, select_mode, &flags).await?;
                             }
-                        } else {
-                            if let Ok(num) = str.parse::<usize>() {
-                                self.apply_selection(num, num, value, select_mode, &flags).await?;
-                            }
+                        } else if let Ok(num) = str.parse::<usize>() {
+                            self.apply_selection(num, num, value, select_mode, &flags).await?;
                         }
                     }
                 }
@@ -160,40 +158,40 @@ impl IcyBoardState {
         }
         self.set_color(TerminalTarget::Both, IcbColor::dos_gray()).await?;
         let mut flag_str = String::new();
-        if let Some(user) = &self.session.current_user {
-            if let Some(flags) = user.conference_flags.get(&num) {
-                match select_mode {
-                    SelectMode::SelectCmd => {
-                        if flags.contains(ConferenceFlags::Selected) {
+        if let Some(user) = &self.session.current_user
+            && let Some(flags) = user.conference_flags.get(&num)
+        {
+            match select_mode {
+                SelectMode::SelectCmd => {
+                    if flags.contains(ConferenceFlags::Selected) {
+                        flag_str.push('X');
+                    }
+                }
+                SelectMode::Register => {
+                    if flags.contains(ConferenceFlags::Registered) {
+                        flag_str.push('R');
+                        if flags.contains(ConferenceFlags::Expired) {
                             flag_str.push('X');
                         }
+                    } else if flags.contains(ConferenceFlags::Expired) {
+                        flag_str.push('L');
                     }
-                    SelectMode::Register => {
-                        if flags.contains(ConferenceFlags::Registered) {
-                            flag_str.push('R');
-                            if flags.contains(ConferenceFlags::Expired) {
-                                flag_str.push('X');
-                            }
-                        } else if flags.contains(ConferenceFlags::Expired) {
-                            flag_str.push('L');
-                        }
-                        if flags.contains(ConferenceFlags::Selected) {
-                            flag_str.push('S');
-                        }
+                    if flags.contains(ConferenceFlags::Selected) {
+                        flag_str.push('S');
+                    }
 
-                        if flags.contains(ConferenceFlags::Sysop) {
-                            flag_str.push('S');
-                        }
-                        if flags.contains(ConferenceFlags::NetStatus) {
-                            flag_str.push('N');
-                        }
+                    if flags.contains(ConferenceFlags::Sysop) {
+                        flag_str.push('S');
+                    }
+                    if flags.contains(ConferenceFlags::NetStatus) {
+                        flag_str.push('N');
                     }
                 }
             }
         }
         self.set_color(TerminalTarget::Both, IcbColor::dos_light_cyan()).await?;
 
-        let str = format!(" {:<5}", flag_str);
+        let str = format!(" {flag_str:<5}");
         self.println(TerminalTarget::Both, &str).await?;
         Ok(())
     }
@@ -202,7 +200,7 @@ impl IcyBoardState {
         if select_mode == SelectMode::Register {
             self.apply_conference_flags(from, to, flags).await
         } else {
-            self.change_selection(from, to, set_selection_to).await
+            self.change_selection(from, to, set_selection_to)
         }
     }
 
@@ -244,7 +242,7 @@ impl IcyBoardState {
         Ok(())
     }
 
-    async fn change_selection(&mut self, from: usize, to: usize, set_selection_to: Option<bool>) -> Res<()> {
+    fn change_selection(&mut self, from: usize, to: usize, set_selection_to: Option<bool>) -> Res<()> {
         if let Some(user) = &mut self.session.current_user {
             for i in from..=to {
                 let value = *user.conference_flags.get(&i).unwrap_or(&ConferenceFlags::empty());

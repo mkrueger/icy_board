@@ -64,7 +64,6 @@ impl IcyBoardState {
                     }
                     _ => {
                         // Invalid option, loop back to prompt
-                        continue;
                     }
                 }
             }

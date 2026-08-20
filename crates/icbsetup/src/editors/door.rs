@@ -117,8 +117,8 @@ impl<'a> DoorEditor<'a> {
                     return Line::from("".to_string());
                 }
                 match j {
-                    0 => Line::from(format!("{}", cmd2.lock().unwrap()[*i].name)),
-                    1 => Line::from(format!("{}", cmd2.lock().unwrap()[*i].description)),
+                    0 => Line::from(cmd2.lock().unwrap()[*i].name.to_string()),
+                    1 => Line::from(cmd2.lock().unwrap()[*i].description.to_string()),
                     2 => Line::from(format!("{}", cmd2.lock().unwrap()[*i].door_type)),
                     _ => Line::from("".to_string()),
                 }
@@ -278,11 +278,11 @@ impl<'a> Page for DoorEditor<'a> {
                         self.insert_table.content_length += 1;
                     }
                     KeyCode::Delete => {
-                        if let Some(selected_item) = self.insert_table.table_state.selected() {
-                            if selected_item < self.door_list.lock().unwrap().len() {
-                                self.door_list.lock().unwrap().remove(selected_item);
-                                self.insert_table.content_length -= 1;
-                            }
+                        if let Some(selected_item) = self.insert_table.table_state.selected()
+                            && selected_item < self.door_list.lock().unwrap().len()
+                        {
+                            self.door_list.lock().unwrap().remove(selected_item);
+                            self.insert_table.content_length -= 1;
                         }
                     }
 

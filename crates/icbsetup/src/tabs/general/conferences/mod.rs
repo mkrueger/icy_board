@@ -99,7 +99,7 @@ impl ConferenceListEditor {
             None => 0,
         };
         self.table_state.select(Some(i));
-        self.scroll_state = self.scroll_state.position(i * 1);
+        self.scroll_state = self.scroll_state.position(i);
     }
 
     fn next(&mut self) {
@@ -117,7 +117,7 @@ impl ConferenceListEditor {
             None => 0,
         };
         self.table_state.select(Some(i));
-        self.scroll_state = self.scroll_state.position(i * 1);
+        self.scroll_state = self.scroll_state.position(i);
     }
 
     fn insert(&mut self) {
@@ -133,10 +133,10 @@ impl ConferenceListEditor {
 
     fn remove(&mut self) {
         if let Some(i) = self.table_state.selected() {
-            if let Some(state) = self.table_state.selected() {
-                if state + 1 >= self.icy_board.lock().unwrap().conferences.len() {
-                    return;
-                }
+            if let Some(state) = self.table_state.selected()
+                && state + 1 >= self.icy_board.lock().unwrap().conferences.len()
+            {
+                return;
             }
 
             if i > 0 {
@@ -205,19 +205,20 @@ impl Page for ConferenceListEditor {
             KeyCode::Delete => self.remove(),
             KeyCode::Esc => return PageMessage::Close,
             KeyCode::PageDown => {
-                if let Some(state) = self.table_state.selected() {
-                    if state + 2 < self.icy_board.lock().unwrap().conferences.len() {
-                        self.icy_board.lock().unwrap().conferences.swap(state + 2, state + 1);
-                        self.table_state.select(Some(state + 1));
-                    }
+                if let Some(state) = self.table_state.selected()
+                    && state + 2 < self.icy_board.lock().unwrap().conferences.len()
+                {
+                    self.icy_board.lock().unwrap().conferences.swap(state + 2, state + 1);
+                    self.table_state.select(Some(state + 1));
                 }
             }
             KeyCode::PageUp => {
-                if let Some(state) = self.table_state.selected() {
-                    if state >= 1 && state + 1 < self.icy_board.lock().unwrap().conferences.len() {
-                        self.icy_board.lock().unwrap().conferences.swap(state, state + 1);
-                        self.table_state.select(Some(state - 1));
-                    }
+                if let Some(state) = self.table_state.selected()
+                    && state >= 1
+                    && state + 1 < self.icy_board.lock().unwrap().conferences.len()
+                {
+                    self.icy_board.lock().unwrap().conferences.swap(state, state + 1);
+                    self.table_state.select(Some(state - 1));
                 }
             }
             KeyCode::Enter => {

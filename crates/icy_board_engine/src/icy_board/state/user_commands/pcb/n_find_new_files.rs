@@ -25,11 +25,7 @@ impl IcyBoardState {
         let search_pattern = if let Some(token) = self.session.tokens.pop_front() {
             token
         } else {
-            let date = if let Some(user) = &self.session.current_user {
-                Some(user.stats.last_on.format("%m%d%y").to_string())
-            } else {
-                None
-            };
+            let date = self.session.current_user.as_ref().map(|user| user.stats.last_on.format("%m%d%y").to_string());
 
             self.input_field(
                 IceText::DateToSearch,
@@ -82,14 +78,14 @@ impl IcyBoardState {
 
                 for (num, desc, path, metadata) in dir_numbers.numbers {
                     self.display_text(IceText::ScanningDirectory, display_flags::DEFAULT).await?;
-                    self.print(TerminalTarget::Both, &format!(" {}", num)).await?;
+                    self.print(TerminalTarget::Both, &format!(" {num}")).await?;
                     if !desc.is_empty() {
                         self.set_color(TerminalTarget::Both, IcbColor::dos_light_green()).await?;
-                        self.print(TerminalTarget::Both, &format!(" ({})", desc)).await?;
+                        self.print(TerminalTarget::Both, &format!(" ({desc})")).await?;
                     }
                     self.new_line().await?;
                     self.reset_color(TerminalTarget::Both).await?;
-                    let r = search_date.clone();
+                    let r = search_date;
                     self.display_file_area(&path, &metadata, FileFilter::header(move |p| p.date() >= r)).await?;
                     if self.session.disp_options.abort_printout {
                         break;

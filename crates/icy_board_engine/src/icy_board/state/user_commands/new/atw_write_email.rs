@@ -52,7 +52,7 @@ impl IcyBoardState {
         if subject.is_empty() {
             self.new_line().await?;
             return Ok(());
-        };
+        }
 
         self.write_message(-1, -1, &to, &subject, attributes::MSG_PRIVATE, None, None, Vec::new(), IceText::SavingMessage)
             .await?;

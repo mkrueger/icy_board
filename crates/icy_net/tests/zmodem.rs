@@ -70,7 +70,7 @@ async fn test_zmodem_simple_send() {
 
     // Spawn sender task
     let sender_handle = tokio::spawn(async move {
-        let mut state = z.initiate_send(&mut a, &[path.clone()]).await.expect("init send failed");
+        let mut state = z.initiate_send(&mut a, std::slice::from_ref(&path)).await.expect("init send failed");
 
         while !state.is_finished {
             z.update_transfer(&mut a, &mut state).await.expect("update failed");
@@ -220,7 +220,7 @@ async fn test_encode_char_table() {
         // Read and verify this single encoded byte
         let (decoded, last, _) = read_subpacket(&mut conn, 1024, true, true)
             .await
-            .expect(&format!("decode subpacket for byte {}", i));
+            .unwrap_or_else(|_| panic!("decode subpacket for byte {}", i));
         assert!(last, "Each generated subpacket should terminate");
         assert_eq!(data, decoded, "Mismatch at byte {i}");
     }
@@ -290,13 +290,12 @@ async fn test_zrqinit_zrinit_handshake() {
 
         // Wait for and read ZRINIT response
         let mut can_count = 0;
-        let response = tokio::time::timeout(std::time::Duration::from_secs(2), Header::read(&mut sender_conn, &mut can_count))
+
+        tokio::time::timeout(std::time::Duration::from_secs(2), Header::read(&mut sender_conn, &mut can_count))
             .await
             .expect("Timeout waiting for ZRINIT response - receiver didn't send ZRINIT!")
             .expect("Failed to read header")
-            .expect("No header received");
-
-        response
+            .expect("No header received")
     });
 
     // Give sender time to send ZRQINIT

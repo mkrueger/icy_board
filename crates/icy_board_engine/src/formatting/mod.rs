@@ -1,4 +1,10 @@
-use crate::ast::*;
+use crate::ast::{
+    ArrayInitializerExpression, Ast, AstNode, AstVisitor, BinaryExpression, BlockStatement, ConstDeclarationStatement, EnumDeclarationAstNode, Expression,
+    ForStatement, FunctionCallExpression, FunctionDeclarationAstNode, FunctionImplementation, IfThenStatement, IndexerExpression, LetStatement, LoopStatement,
+    MemberReferenceExpression, ParameterSpecifier, PredefinedCallStatement, ProcedureCallStatement, ProcedureDeclarationAstNode, ProcedureImplementation,
+    RecordLiteralExpression, RepeatUntilStatement, SelectStatement, Statement, TypeDeclarationAstNode, UnaryExpression, VariableDeclarationStatement,
+    WhileDoStatement, walk_binary_expression,
+};
 
 pub mod options;
 pub use options::*;
@@ -155,7 +161,7 @@ impl<'a> FormattingVisitor<'a> {
     }
 }
 
-impl<'a> AstVisitor<()> for FormattingVisitor<'a> {
+impl AstVisitor<()> for FormattingVisitor<'_> {
     fn visit_main(&mut self, block: &BlockStatement) {
         self.format_delimited_block(block);
     }
@@ -295,7 +301,7 @@ impl<'a> AstVisitor<()> for FormattingVisitor<'a> {
         let expr_start = unary.get_expression().get_span().start;
         self.ensure_text_or_newline(op_end..expr_start, "");
 
-        unary.get_expression().visit(self)
+        unary.get_expression().visit(self);
     }
 
     fn visit_binary_expression(&mut self, binary: &BinaryExpression) {
@@ -315,16 +321,16 @@ impl<'a> AstVisitor<()> for FormattingVisitor<'a> {
         walk_binary_expression(self, binary);
     }
 
-    fn visit_function_call_expression(&mut self, call: &FunctionCallExpression) -> () {
+    fn visit_function_call_expression(&mut self, call: &FunctionCallExpression) {
         call.get_expression().visit(self);
         self.format_arguments(call.get_arguments());
     }
 
-    fn visit_procedure_call_statement(&mut self, call: &ProcedureCallStatement) -> () {
+    fn visit_procedure_call_statement(&mut self, call: &ProcedureCallStatement) {
         self.format_arguments(call.get_arguments());
     }
 
-    fn visit_predefined_call_statement(&mut self, call: &PredefinedCallStatement) -> () {
+    fn visit_predefined_call_statement(&mut self, call: &PredefinedCallStatement) {
         self.format_arguments(call.get_arguments());
     }
 

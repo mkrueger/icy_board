@@ -47,8 +47,8 @@ impl BoardConfiguration {
                             ],
                         ),
                     )
-                    .with_status(&get_text("date_format-status"))
-                    .with_help(&get_text("date_format-help"))
+                    .with_status(get_text("date_format-status"))
+                    .with_help(get_text("date_format-help"))
                     .with_label_width(14)
                     .with_update_value(Box::new(|board: &Arc<Mutex<IcyBoard>>, value: &ListValue| {
                         let ListValue::ValueList(val, _) = value else {

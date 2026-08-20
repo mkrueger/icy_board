@@ -78,6 +78,7 @@ impl Default for UserSelection {
 }
 
 impl UserSelection {
+    #[must_use]
     pub fn with_security_range(mut self, min: u8, max: u8) -> Self {
         self.min_security = min;
         self.max_security = max;
@@ -526,8 +527,8 @@ pub fn initialize_counters(base: &mut UserBase, selection: &UserSelection, init:
                 CounterInit::BytesFromFileRatio => {
                     let files = stats.num_uploads + stats.num_downloads;
                     let bytes = stats.total_upld_bytes + stats.total_dnld_bytes;
-                    if files > 0 {
-                        stats.total_upld_bytes = bytes * stats.num_uploads / files;
+                    if let Some(per_upload) = (bytes * stats.num_uploads).checked_div(files) {
+                        stats.total_upld_bytes = per_upload;
                         stats.total_dnld_bytes = bytes - stats.total_upld_bytes;
                     }
                 }
@@ -679,7 +680,7 @@ fn clear_lastread(user: &mut User, conference: usize) -> bool {
 }
 
 fn format_phone(phone: &str) -> String {
-    let digits: Vec<char> = phone.chars().filter(|c| c.is_ascii_digit()).collect();
+    let digits: Vec<char> = phone.chars().filter(char::is_ascii_digit).collect();
     if digits.is_empty() {
         return String::new();
     }

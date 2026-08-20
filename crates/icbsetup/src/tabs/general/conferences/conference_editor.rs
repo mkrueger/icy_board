@@ -505,12 +505,12 @@ impl Page for ConferenceEditor {
         };
 
         let mut bottom_text = get_text("icb_setup_key_menu_help");
-        if let Some(item) = self.menu.get_item(self.state.selected) {
-            if let ListValue::Path(path) = &item.value {
-                let path = self.menu.obj.1.lock().unwrap().resolve_file(path);
-                if path.exists() && path.is_file() && item.editable() {
-                    bottom_text = get_text("icb_setup_key_menu_edit_help");
-                }
+        if let Some(item) = self.menu.get_item(self.state.selected)
+            && let ListValue::Path(path) = &item.value
+        {
+            let path = self.menu.obj.1.lock().unwrap().resolve_file(path);
+            if path.exists() && path.is_file() && item.editable() {
+                bottom_text = get_text("icb_setup_key_menu_edit_help");
             }
         }
 
@@ -541,33 +541,33 @@ impl Page for ConferenceEditor {
     }
 
     fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
-        if let Some(item) = self.menu.get_item(self.state.selected) {
-            if let ListValue::Path(path) = &item.value {
-                if key.code == crossterm::event::KeyCode::F(2) && item.editable() {
-                    let path = self.menu.obj.1.lock().unwrap().resolve_file(path);
-                    if let Some(editor) = &item.path_editor {
-                        return editor(self.menu.obj.clone(), path);
-                    }
+        if let Some(item) = self.menu.get_item(self.state.selected)
+            && let ListValue::Path(path) = &item.value
+            && key.code == crossterm::event::KeyCode::F(2)
+            && item.editable()
+        {
+            let path = self.menu.obj.1.lock().unwrap().resolve_file(path);
+            if let Some(editor) = &item.path_editor {
+                return editor(self.menu.obj.clone(), path);
+            }
 
-                    let editor = &self.menu.obj.1.lock().unwrap().config.sysop.external_editor;
-                    let started = icy_board_tui::term::with_terminal(|| {
-                        std::process::Command::new(editor)
-                            .arg(format!("{}", path.display()))
-                            .spawn()
-                            .and_then(|mut child| child.wait())
+            let editor = &self.menu.obj.1.lock().unwrap().config.sysop.external_editor;
+            let started = icy_board_tui::term::with_terminal(|| {
+                std::process::Command::new(editor)
+                    .arg(format!("{}", path.display()))
+                    .spawn()
+                    .and_then(|mut child| child.wait())
+            });
+            match started {
+                Ok(_) => {
+                    return PageMessage::ExternalProgramStarted;
+                }
+                Err(e) => {
+                    log::error!("Error opening editor: {}", e);
+                    return PageMessage::ResultState(ResultState {
+                        edit_msg: icy_board_tui::config_menu::EditMessage::None,
+                        status_line: format!("Error: {}", e),
                     });
-                    match started {
-                        Ok(_) => {
-                            return PageMessage::ExternalProgramStarted;
-                        }
-                        Err(e) => {
-                            log::error!("Error opening editor: {}", e);
-                            return PageMessage::ResultState(ResultState {
-                                edit_msg: icy_board_tui::config_menu::EditMessage::None,
-                                status_line: format!("Error: {}", e),
-                            });
-                        }
-                    }
                 }
             }
         }

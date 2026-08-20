@@ -39,12 +39,12 @@ impl ICBConfigMenuUI {
             height: disp_area.height.saturating_sub(1),
         };
         let mut bottom_text = get_text("icb_setup_key_menu_help");
-        if let Some(item) = self.menu.get_item(self.state.selected) {
-            if let ListValue::Path(path) = &item.value {
-                let path = self.menu.obj.lock().unwrap().resolve_file(path);
-                if !path.as_os_str().is_empty() && !path.is_dir() && item.editable() {
-                    bottom_text = get_text("icb_setup_key_menu_edit_help");
-                }
+        if let Some(item) = self.menu.get_item(self.state.selected)
+            && let ListValue::Path(path) = &item.value
+        {
+            let path = self.menu.obj.lock().unwrap().resolve_file(path);
+            if !path.as_os_str().is_empty() && !path.is_dir() && item.editable() {
+                bottom_text = get_text("icb_setup_key_menu_edit_help");
             }
         }
 
@@ -93,40 +93,40 @@ impl ICBConfigMenuUI {
     }
 
     pub fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
-        if let Some(item) = self.menu.get_item(self.state.selected) {
-            if let ListValue::Path(path) = &item.value {
-                if key.code == crossterm::event::KeyCode::F(2) && item.editable() {
-                    let path = self.menu.obj.lock().unwrap().resolve_file(path);
-                    if path.as_os_str().is_empty() {
-                        return PageMessage::InfoBox(InfoState::Warning, get_text("no_file_name_given"));
-                    }
-                    if let Some(editor) = &item.path_editor {
-                        return editor(self.menu.obj.clone(), path);
-                    }
-                    // A file that is only named in the configuration is created on demand.
-                    if !path.exists() {
-                        if let Err(e) = create_empty_file(&path) {
-                            log::error!("Error creating {}: {}", path.display(), e);
-                            return PageMessage::InfoBox(InfoState::Error, format!("{}\n\n{}", path.display(), e));
-                        }
-                    }
+        if let Some(item) = self.menu.get_item(self.state.selected)
+            && let ListValue::Path(path) = &item.value
+            && key.code == crossterm::event::KeyCode::F(2)
+            && item.editable()
+        {
+            let path = self.menu.obj.lock().unwrap().resolve_file(path);
+            if path.as_os_str().is_empty() {
+                return PageMessage::InfoBox(InfoState::Warning, get_text("no_file_name_given"));
+            }
+            if let Some(editor) = &item.path_editor {
+                return editor(self.menu.obj.clone(), path);
+            }
+            // A file that is only named in the configuration is created on demand.
+            if !path.exists()
+                && let Err(e) = create_empty_file(&path)
+            {
+                log::error!("Error creating {}: {}", path.display(), e);
+                return PageMessage::InfoBox(InfoState::Error, format!("{}\n\n{}", path.display(), e));
+            }
 
-                    let editor: &String = &self.menu.obj.lock().unwrap().config.sysop.external_editor;
-                    let started = crate::term::with_terminal(|| {
-                        std::process::Command::new(editor)
-                            .arg(format!("{}", path.display()))
-                            .spawn()
-                            .and_then(|mut child| child.wait())
-                    });
-                    match started {
-                        Ok(_) => {
-                            return PageMessage::ExternalProgramStarted;
-                        }
-                        Err(e) => {
-                            log::error!("Error opening editor: {}", e);
-                            return PageMessage::InfoBox(InfoState::Error, format!("{}\n\n{}", editor, e));
-                        }
-                    }
+            let editor: &String = &self.menu.obj.lock().unwrap().config.sysop.external_editor;
+            let started = crate::term::with_terminal(|| {
+                std::process::Command::new(editor)
+                    .arg(format!("{}", path.display()))
+                    .spawn()
+                    .and_then(|mut child| child.wait())
+            });
+            match started {
+                Ok(_) => {
+                    return PageMessage::ExternalProgramStarted;
+                }
+                Err(e) => {
+                    log::error!("Error opening editor: {}", e);
+                    return PageMessage::InfoBox(InfoState::Error, format!("{}\n\n{}", editor, e));
                 }
             }
         }

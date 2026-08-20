@@ -1,6 +1,6 @@
-//! dBase opcodes, checked against tables PCBoard 15.4 itself wrote.
+//! dBase opcodes, checked against tables `PCBoard` 15.4 itself wrote.
 //!
-//! The fixtures in `tests/dbase_data` came out of a real PCBoard running under DOS, and
+//! The fixtures in `tests/dbase_data` came out of a real `PCBoard` running under DOS, and
 //! the expected strings below are what the original printed for the same operations. PPL
 //! hands a PPE the raw padded field bytes, so the padding is part of what is being tested.
 
@@ -8,7 +8,7 @@ use super::{run_ppl, run_ppl_with_files};
 
 const PCBOARD_DBF: &[u8] = include_bytes!("../../../tests/dbase_data/pcboard.dbf");
 const PCBOARD_NDX: &[u8] = include_bytes!("../../../tests/dbase_data/pcboard.ndx");
-/// A table this engine created and PCBoard then read, deleted from and appended to.
+/// A table this engine created and `PCBoard` then read, deleted from and appended to.
 const ROUNDTRIP_DBF: &[u8] = include_bytes!("../../../tests/dbase_data/roundtrip.dbf");
 
 fn on_fixture(source: &str) -> String {

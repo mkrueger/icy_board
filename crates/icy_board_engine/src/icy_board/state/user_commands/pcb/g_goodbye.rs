@@ -18,12 +18,12 @@ impl IcyBoardState {
         self.displaycmdfile("g").await?;
         let is_flagged = !self.session.flagged_files.is_empty();
         if self.board.lock().await.config.system_control.guard_logoff || is_flagged {
-            if let Some(token) = self.session.tokens.pop_front() {
-                if token.eq_ignore_ascii_case(&self.session.yes_char.to_string()) {
-                    self.logoff_user(false).await?;
-                    return Ok(());
-                }
-            };
+            if let Some(token) = self.session.tokens.pop_front()
+                && token.eq_ignore_ascii_case(&self.session.yes_char.to_string())
+            {
+                self.logoff_user(false).await?;
+                return Ok(());
+            }
             if is_flagged {
                 self.display_text(IceText::FilesAreFlagged, display_flags::NEWLINE | display_flags::BELL | display_flags::LFBEFORE)
                     .await?;

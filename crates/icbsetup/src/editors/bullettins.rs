@@ -47,8 +47,7 @@ impl<'a> BullettinsEditor<'a> {
         let bullettins = if path.exists() {
             BullettinList::load(&path)?
         } else {
-            let sec_levels = BullettinList::default();
-            sec_levels
+            BullettinList::default()
         };
         let command_arc = Arc::new(Mutex::new(bullettins.bullettins.clone()));
         let scroll_state = ScrollbarState::default().content_length(bullettins.bullettins.len());
@@ -90,22 +89,22 @@ impl<'a> BullettinsEditor<'a> {
     }
 
     fn move_up(&mut self) {
-        if let Some(selected) = self.insert_table.table_state.selected() {
-            if selected > 0 {
-                let mut levels = self.sec_levels.lock().unwrap();
-                levels.swap(selected, selected - 1);
-                self.insert_table.table_state.select(Some(selected - 1));
-            }
+        if let Some(selected) = self.insert_table.table_state.selected()
+            && selected > 0
+        {
+            let mut levels = self.sec_levels.lock().unwrap();
+            levels.swap(selected, selected - 1);
+            self.insert_table.table_state.select(Some(selected - 1));
         }
     }
 
     fn move_down(&mut self) {
-        if let Some(selected) = self.insert_table.table_state.selected() {
-            if selected + 1 < self.sec_levels.lock().unwrap().len() {
-                let mut levels = self.sec_levels.lock().unwrap();
-                levels.swap(selected, selected + 1);
-                self.insert_table.table_state.select(Some(selected + 1));
-            }
+        if let Some(selected) = self.insert_table.table_state.selected()
+            && selected + 1 < self.sec_levels.lock().unwrap().len()
+        {
+            let mut levels = self.sec_levels.lock().unwrap();
+            levels.swap(selected, selected + 1);
+            self.insert_table.table_state.select(Some(selected + 1));
         }
     }
 }
@@ -195,11 +194,11 @@ impl<'a> Page for BullettinsEditor<'a> {
                     self.insert_table.content_length += 1;
                 }
                 KeyCode::Delete => {
-                    if let Some(selected_item) = self.insert_table.table_state.selected() {
-                        if selected_item < self.sec_levels.lock().unwrap().len() {
-                            self.sec_levels.lock().unwrap().remove(selected_item);
-                            self.insert_table.content_length -= 1;
-                        }
+                    if let Some(selected_item) = self.insert_table.table_state.selected()
+                        && selected_item < self.sec_levels.lock().unwrap().len()
+                    {
+                        self.sec_levels.lock().unwrap().remove(selected_item);
+                        self.insert_table.content_length -= 1;
                     }
                 }
 

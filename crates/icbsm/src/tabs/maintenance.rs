@@ -238,12 +238,14 @@ fn date_item(label: &str, value: DateTime<Utc>, update: &'static dyn Fn(&Obj, Da
 
 impl MaintenancePage {
     pub fn new(icy_board: Arc<Mutex<IcyBoard>>, op: MaintenanceOp) -> Self {
-        let mut params = Params::default();
-        // The screens that ask for a range start at the one the utility used;
-        // the screens without such a question must not filter at all.
-        params.max_security = match op {
-            MaintenanceOp::Pack | MaintenanceOp::StandardizePhones | MaintenanceOp::CopyExpiredSecurity | MaintenanceOp::InitializeCounters => 255,
-            _ => 110,
+        let params = Params {
+            // The screens that ask for a range start at the one the utility used;
+            // the screens without such a question must not filter at all.
+            max_security: match op {
+                MaintenanceOp::Pack | MaintenanceOp::StandardizePhones | MaintenanceOp::CopyExpiredSecurity | MaintenanceOp::InitializeCounters => 255,
+                _ => 110,
+            },
+            ..Default::default()
         };
 
         let width = screen_label_width(op);
@@ -775,11 +777,11 @@ impl Page for MaintenancePage {
             }
         }
 
-        if let Some(error) = &self.error {
-            if !matches!(self.stage, Stage::Done { .. }) {
-                let lines = vec![Line::from(error.clone())];
-                self.render_lines(frame, area, self.op.title(), get_text("icbsm_done_keys"), lines);
-            }
+        if let Some(error) = &self.error
+            && !matches!(self.stage, Stage::Done { .. })
+        {
+            let lines = vec![Line::from(error.clone())];
+            self.render_lines(frame, area, self.op.title(), get_text("icbsm_done_keys"), lines);
         }
     }
 

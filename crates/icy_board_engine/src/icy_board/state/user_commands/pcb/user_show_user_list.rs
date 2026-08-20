@@ -12,7 +12,7 @@ use crate::{
 const NAME_WIDTH: usize = 25;
 const CITY_WIDTH: usize = 24;
 
-/// PCBoard's FidoNet placeholder account, which is not a caller.
+/// `PCBoard`'s `FidoNet` placeholder account, which is not a caller.
 const FIDO_ACCOUNT: &str = "~FIDO~";
 
 impl IcyBoardState {
@@ -72,10 +72,10 @@ impl IcyBoardState {
                 continue;
             }
             // The search covers the name and the location, as it did in the original.
-            if let Some(pattern) = &pattern {
-                if !pattern.is_match(&format!("{} {}", user.get_name(), user.city_or_state)) {
-                    continue;
-                }
+            if let Some(pattern) = &pattern
+                && !pattern.is_match(&format!("{} {}", user.get_name(), user.city_or_state))
+            {
+                continue;
             }
             lines.push(format!(
                 "{:<name_width$} {:<city_width$}  {:<8}  {:<5}",

@@ -46,17 +46,17 @@ pub enum CommandType {
     /// Specify the door number or name to execute in the Parameters field of the option you are defining.
     Door,
 
-    /// While this option type is similar to QuitMenu, it is different because it will
+    /// While this option type is similar to `QuitMenu`, it is different because it will
     /// quit all active menus.
     ExitMenus,
 
     /// To quit the current menu and return to the previous menu (if any), define a menu option
     /// that uses this option type. Remember that only the current menu will be exited.
-    /// To exit all menus, use the ExitMenus option instead.
+    /// To exit all menus, use the `ExitMenus` option instead.
     QuitMenu,
 
     /// If you want to display a text file to the caller, you may do so using this option type.
-    /// As with normal PCBoard display files, you can create security, graphics, and language specific
+    /// As with normal `PCBoard` display files, you can create security, graphics, and language specific
     /// versions of the file you are displaying to the caller.
     /// In the Parameters field, specify the path and filename to display.
     DisplayFile,
@@ -558,7 +558,7 @@ impl FromStr for CommandType {
             // "readmemorizedmessage0" => Ok(CommandType::ReadMemorizedMessage(0)),
             // "readmemorizedmessage1" => Ok(CommandType::ReadMemorizedMessage(1)),
             // "readmemorizedmessage2" => Ok(CommandType::ReadMemorizedMessage(2)),
-            _ => Err(format!("Invalid CommandType: {}", s)),
+            _ => Err(format!("Invalid CommandType: {s}")),
         }
     }
 }
@@ -659,12 +659,11 @@ impl CommandType {
             CommandType::AbandonConference => "hlpa",
             CommandType::BulletinList => "hlpb",
             CommandType::CommentToSysop => "hlpc",
-            CommandType::Download => "hlpd",
+            CommandType::Download | CommandType::BatchDownload => "hlpd",
             CommandType::EnterMessage => "hlpe",
             CommandType::FileDirectory => "hlpf",
             CommandType::FlagFiles => "hlpflag",
-            CommandType::Goodbye => "hlpg",
-            CommandType::Bye => "hlpg",
+            CommandType::Goodbye | CommandType::Bye => "hlpg",
             CommandType::Help => "hlph",
             CommandType::InitialWelcome => "hlpi",
             CommandType::JoinConference => "hlpj",
@@ -678,7 +677,7 @@ impl CommandType {
             CommandType::ReadMessages => "hlpr",
             CommandType::Survey => "hlps",
             CommandType::SetTransferProtocol => "hlpt",
-            CommandType::UploadFile => "hlpu",
+            CommandType::UploadFile | CommandType::BatchUpload => "hlpu",
             CommandType::ViewSettings => "hlpv",
             CommandType::WriteSettings => "hlpw",
             CommandType::ExpertMode => "hlpx",
@@ -715,8 +714,6 @@ impl CommandType {
             CommandType::SelectConferences => "hlpsel",
             CommandType::ReadMemorizedMessage(_) => "hlprm",
             // PCBoard sends the batch commands to the plain transfer help.
-            CommandType::BatchDownload => "hlpd",
-            CommandType::BatchUpload => "hlpu",
             _ => "",
         }
     }
@@ -800,7 +797,7 @@ impl FromStr for AutoRun {
             "Every" => Ok(AutoRun::Every),
             "After" => Ok(AutoRun::After),
             "Loop" => Ok(AutoRun::Loop),
-            _ => Err(format!("Invalid AutoRun: {}", s)),
+            _ => Err(format!("Invalid AutoRun: {s}")),
         }
     }
 }
@@ -909,9 +906,9 @@ pub fn find_exact<'a>(commands: &'a [Command], keyword: &str) -> Option<&'a Comm
 
 /// The same, for a keyword the caller has only typed the beginning of.
 ///
-/// PCBoard took an abbreviation from two characters on - one character is never enough,
+/// `PCBoard` took an abbreviation from two characters on - one character is never enough,
 /// no matter what a command list holds, so `G` stays Goodbye next to a `GREED` entry.
-/// See runcmds() in PCBoard's CMDS.C.
+/// See `runcmds()` in `PCBoard`'s CMDS.C.
 pub fn find_prefix<'a>(commands: &'a [Command], keyword: &str) -> Option<&'a Command> {
     if keyword.len() < 2 {
         return None;
@@ -937,7 +934,7 @@ impl PCBoardRecordImporter<Command> for CommandList {
         let parameter = crate::tables::import_cp437_string(&data[16..56], true);
 
         let uc = parameter.to_uppercase();
-        let command_type = if uc.ends_with(".MNU") {
+        let command_type = if std::path::Path::new(&uc).extension().is_some_and(|ext| ext.eq_ignore_ascii_case("MNU")) {
             CommandType::Menu
         } else if uc.contains(".PPE") {
             CommandType::RunPPE
@@ -947,9 +944,9 @@ impl PCBoardRecordImporter<Command> for CommandList {
 
         Ok(Command {
             keyword: name,
-            display: "".to_string(),
-            lighbar_display: "".to_string(),
-            help: "".to_string(),
+            display: String::new(),
+            lighbar_display: String::new(),
+            help: String::new(),
             auto_run: AutoRun::Disabled,
             autorun_time: 0,
             position: Position::default(),

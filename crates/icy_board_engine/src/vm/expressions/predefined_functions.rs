@@ -1,4 +1,6 @@
-#![allow(clippy::needless_pass_by_value, clippy::unnecessary_wraps)]
+// Every opcode handler is called with `.await` from the dispatch table in `mod.rs`,
+// so the signature stays async even where a given handler never awaits.
+#![allow(clippy::needless_pass_by_value, clippy::unnecessary_wraps, clippy::unused_async)]
 
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -32,6 +34,7 @@ use jamjam::jam::raw;
 use jamjam::util::basic_real::{BasicDouble, BasicReal};
 use radix_fmt::radix;
 use sha2::{Digest, Sha256};
+use std::fmt::Write as _;
 
 const HDR_ACTIVE: i32 = 0x0E;
 const HDR_BLOCKS: i32 = 0x04;
@@ -49,7 +52,7 @@ const HDR_SUBJ: i32 = 0x0C;
 const HDR_TIME: i32 = 0x06;
 const HDR_TO: i32 = 0x07;
 
-/// A function that is not implemented yet. PCBoard never aborted a PPE over one,
+/// A function that is not implemented yet. `PCBoard` never aborted a PPE over one,
 /// so the call is logged and the given "nothing happened" value is returned.
 macro_rules! unimplemented_function {
     ($name:expr, $default:expr) => {{
@@ -151,10 +154,10 @@ pub async fn lower(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variabl
     let value = vm.eval_expr(&args[0]).await?;
 
     // Check if it's a non-plaintext password and return unchanged
-    if let GenericVariableData::Password(ref pwd) = value.generic_data {
-        if !matches!(pwd, Password::PlainText(_)) {
-            return Ok(value.clone());
-        }
+    if let GenericVariableData::Password(ref pwd) = value.generic_data
+        && !matches!(pwd, Password::PlainText(_))
+    {
+        return Ok(value.clone());
     }
 
     let str = value.as_string();
@@ -170,10 +173,10 @@ pub async fn upper(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variabl
     let value = vm.eval_expr(&args[0]).await?;
 
     // Check if it's a non-plaintext password and return unchanged
-    if let GenericVariableData::Password(ref pwd) = value.generic_data {
-        if !matches!(pwd, Password::PlainText(_)) {
-            return Ok(value.clone());
-        }
+    if let GenericVariableData::Password(ref pwd) = value.generic_data
+        && !matches!(pwd, Password::PlainText(_))
+    {
+        return Ok(value.clone());
     }
 
     let str = value.as_string();
@@ -227,7 +230,9 @@ pub async fn left(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variable
         if chars < str.len() as i32 {
             str.iter().take(chars as usize).for_each(|c| res.push(*c));
         } else {
-            str.iter().for_each(|c| res.push(*c));
+            for c in &str {
+                res.push(*c);
+            }
             chars -= str.len() as i32;
             while chars > 0 {
                 res.push(' ');
@@ -643,26 +648,25 @@ pub async fn target_inkey(vm: &mut VirtualMachine<'_>, target: TerminalTarget) -
             return Ok(VariableValue::new_string("DEL".to_string()));
         }
         if key_char.ch == '\x1B' {
-            if let Some(key_char) = vm.icy_board_state.get_char(target).await? {
-                if key_char.ch == '[' {
-                    if let Some(key_char) = vm.icy_board_state.get_char(target).await? {
-                        match key_char.ch {
-                            'A' => return Ok(VariableValue::new_string("UP".to_string())),
-                            'B' => return Ok(VariableValue::new_string("DOWN".to_string())),
-                            'C' => return Ok(VariableValue::new_string("RIGHT".to_string())),
-                            'D' => return Ok(VariableValue::new_string("LEFT".to_string())),
+            if let Some(key_char) = vm.icy_board_state.get_char(target).await?
+                && key_char.ch == '['
+                && let Some(key_char) = vm.icy_board_state.get_char(target).await?
+            {
+                match key_char.ch {
+                    'A' => return Ok(VariableValue::new_string("UP".to_string())),
+                    'B' => return Ok(VariableValue::new_string("DOWN".to_string())),
+                    'C' => return Ok(VariableValue::new_string("RIGHT".to_string())),
+                    'D' => return Ok(VariableValue::new_string("LEFT".to_string())),
 
-                            'H' => return Ok(VariableValue::new_string("HOME".to_string())),
-                            'F' => return Ok(VariableValue::new_string("END".to_string())),
+                    'H' => return Ok(VariableValue::new_string("HOME".to_string())),
+                    'F' => return Ok(VariableValue::new_string("END".to_string())),
 
-                            'V' => return Ok(VariableValue::new_string("PGUP".to_string())),
-                            'U' => return Ok(VariableValue::new_string("PGDN".to_string())),
+                    'V' => return Ok(VariableValue::new_string("PGUP".to_string())),
+                    'U' => return Ok(VariableValue::new_string("PGDN".to_string())),
 
-                            '@' => return Ok(VariableValue::new_string("INS".to_string())),
+                    '@' => return Ok(VariableValue::new_string("INS".to_string())),
 
-                            _ => return Ok(VariableValue::new_string(key_char.ch.to_string())),
-                        }
-                    }
+                    _ => return Ok(VariableValue::new_string(key_char.ch.to_string())),
                 }
             }
             return Ok(VariableValue::new_string("\x1B".to_string()));
@@ -807,7 +811,7 @@ pub async fn gettoken(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
     }
 }
 pub async fn minleft(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_int(vm.icy_board_state.session.minutes_left() as i32))
+    Ok(VariableValue::new_int(vm.icy_board_state.session.minutes_left()))
 }
 
 pub async fn minon(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -818,7 +822,7 @@ pub async fn minon(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variabl
 pub async fn getenv(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let var = &vm.eval_expr(&args[0]).await?.as_string();
     if let Some(var) = vm.icy_board_state.get_env(var) {
-        Ok(VariableValue::new_string(var.to_string()))
+        Ok(VariableValue::new_string(var.clone()))
     } else {
         Ok(VariableValue::new_string(String::new()))
     }
@@ -975,11 +979,7 @@ pub async fn ansion(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variab
 
 pub async fn valcc(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let ccnum = vm.eval_expr(&args[0]).await?.as_string();
-    let is_valid = if let Ok(card) = ccnum.parse::<creditcard::CreditCard>() {
-        true
-    } else {
-        false
-    };
+    let is_valid = matches!(ccnum.parse::<creditcard::CreditCard>(), Ok(card));
     Ok(VariableValue::new_bool(is_valid))
 }
 
@@ -1141,9 +1141,8 @@ pub async fn u_stat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variab
 pub async fn defcolor(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let color = vm.icy_board_state.get_board().await.config.color_configuration.default.clone();
     match color {
-        crate::icy_board::icb_config::IcbColor::None => Ok(VariableValue::new_int(7)),
         crate::icy_board::icb_config::IcbColor::Dos(col) => Ok(VariableValue::new_int(col as i32)),
-        crate::icy_board::icb_config::IcbColor::IcyEngine(_) => Ok(VariableValue::new_int(7)),
+        crate::icy_board::icb_config::IcbColor::None | crate::icy_board::icb_config::IcbColor::IcyEngine(_) => Ok(VariableValue::new_int(7)),
     }
 }
 pub async fn abs(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -1195,59 +1194,51 @@ pub async fn fileinf(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
     // PCBoard (EVALP.CPP TOK_OP_FILEINF): dosfindfirst without FA_DIREC, and if nothing
     // is found memset the find block to 0 - directories and missing files both read as
     // zeroes, never as an error.
-    let meta = path.metadata().ok().filter(|m| m.is_file());
+    let meta = path.metadata().ok().filter(std::fs::Metadata::is_file);
     let exists = meta.is_some();
 
     match item {
         1 => Ok(VariableValue::new_bool(exists)),
         2 => {
             // DOS packed date → MM-DD-YY → julian DATE. Missing file → 0.
-            let date = meta
-                .and_then(|m| m.modified().ok())
-                .map(|t| {
-                    let dt: DateTime<Utc> = t.into();
-                    let local = dt.with_timezone(&chrono::Local);
-                    IcbDate::new(local.month() as u8, local.day() as u8, local.year() as u16).to_pcboard_date()
-                })
-                .unwrap_or(0);
+            let date = meta.and_then(|m| m.modified().ok()).map_or(0, |t| {
+                let dt: DateTime<Utc> = t.into();
+                let local = dt.with_timezone(&chrono::Local);
+                IcbDate::new(local.month() as u8, local.day() as u8, local.year() as u16).to_pcboard_date()
+            });
             Ok(VariableValue::new_date(date))
         }
         3 => {
             // Seconds from midnight (DOS 2-second granularity). Missing → 0.
-            let time = meta
-                .and_then(|m| m.modified().ok())
-                .map(|t| {
-                    let dt: DateTime<Utc> = t.into();
-                    let local = dt.with_timezone(&chrono::Local);
-                    // Drop odd seconds to match DOS time packing (* 2L).
-                    let sec = (local.second() / 2) * 2;
-                    IcbTime::new(local.hour() as u8, local.minute() as u8, sec as u8).to_pcboard_time()
-                })
-                .unwrap_or(0);
+            let time = meta.and_then(|m| m.modified().ok()).map_or(0, |t| {
+                let dt: DateTime<Utc> = t.into();
+                let local = dt.with_timezone(&chrono::Local);
+                // Drop odd seconds to match DOS time packing (* 2L).
+                let sec = (local.second() / 2) * 2;
+                IcbTime::new(local.hour() as u8, local.minute() as u8, sec as u8).to_pcboard_time()
+            });
             Ok(VariableValue::new_time(time))
         }
-        4 => Ok(VariableValue::new_int(meta.as_ref().map_or(0, |data| data.len()) as i32)),
+        4 => Ok(VariableValue::new_int(meta.as_ref().map_or(0, std::fs::Metadata::len) as i32)),
         5 => {
             // Verified against PCBoard 15.4/M: a plain file reads 0x20, a read-only one 0x21.
-            let attrs = meta
-                .map(|m| {
-                    let mut a = 0x20i32;
-                    #[cfg(unix)]
-                    {
-                        use std::os::unix::fs::PermissionsExt;
-                        if m.permissions().mode() & 0o200 == 0 {
-                            a |= 0x01;
-                        }
+            let attrs = meta.map_or(0, |m| {
+                let mut a = 0x20i32;
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    if m.permissions().mode() & 0o200 == 0 {
+                        a |= 0x01;
                     }
-                    #[cfg(not(unix))]
-                    {
-                        if m.permissions().readonly() {
-                            a |= 0x01;
-                        }
+                }
+                #[cfg(not(unix))]
+                {
+                    if m.permissions().readonly() {
+                        a |= 0x01;
                     }
-                    a
-                })
-                .unwrap_or(0);
+                }
+                a
+            });
             Ok(VariableValue::new_int(attrs))
         }
         // PCBoard hands out the drive letter alone (no colon). Without a drive in the
@@ -1305,7 +1296,7 @@ pub async fn fileinf(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
             Ok(VariableValue::new_string(ext))
         }
         _ => {
-            log::error!("Unknown fileinf item: {}", item);
+            log::error!("Unknown fileinf item: {item}");
             Ok(VariableValue::new_int(0))
         }
     }
@@ -1407,18 +1398,17 @@ pub async fn u_inconf(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
     let record = vm.eval_expr(&args[0]).await?.as_int();
     let (area, conf) = vm.eval_expr(&args[1]).await?.as_msg_id();
     let board = vm.icy_board_state.get_board().await;
-    if let Some(user) = board.users.get(record as usize) {
-        if let Some(conf) = &board.conferences.get(conf as usize) {
-            if conf.required_security.user_can_access(user) {
-                return Ok(VariableValue::new_bool(true));
-            }
-            if let Some(areas) = &conf.areas {
-                if let Some(area) = areas.get(area as usize) {
-                    if area.req_level_to_enter.user_can_access(user) {
-                        return Ok(VariableValue::new_bool(true));
-                    }
-                }
-            }
+    if let Some(user) = board.users.get(record as usize)
+        && let Some(conf) = &board.conferences.get(conf as usize)
+    {
+        if conf.required_security.user_can_access(user) {
+            return Ok(VariableValue::new_bool(true));
+        }
+        if let Some(areas) = &conf.areas
+            && let Some(area) = areas.get(area as usize)
+            && area.req_level_to_enter.user_can_access(user)
+        {
+            return Ok(VariableValue::new_bool(true));
         }
     }
     Ok(VariableValue::new_bool(false))
@@ -1447,7 +1437,7 @@ pub async fn scrtext(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
         if code {
             let col = ch.attribute.as_u8(icy_engine::IceMode::Blink) as i32;
             if cur_color != col && (!ch.is_transparent() || cur_color & 0b0111_0000 != col & 0b0111_0000) {
-                res.push_str(&format!("@X{:02X}", col));
+                let _ = write!(res, "@X{col:02X}");
                 cur_color = col;
             }
         }
@@ -1532,10 +1522,10 @@ pub async fn alias(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variabl
 pub async fn confreg(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let conf_num = vm.eval_expr(&args[0]).await?.as_int() as usize;
 
-    if let Some(session_user) = &vm.icy_board_state.session.current_user {
-        if let Some(flags) = session_user.conference_flags.get(&conf_num) {
-            return Ok(VariableValue::new_bool(flags.contains(ConferenceFlags::Registered)));
-        }
+    if let Some(session_user) = &vm.icy_board_state.session.current_user
+        && let Some(flags) = session_user.conference_flags.get(&conf_num)
+    {
+        return Ok(VariableValue::new_bool(flags.contains(ConferenceFlags::Registered)));
     }
 
     Ok(VariableValue::new_bool(false))
@@ -1544,10 +1534,10 @@ pub async fn confreg(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 pub async fn confexp(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let conf_num = vm.eval_expr(&args[0]).await?.as_int() as usize;
 
-    if let Some(session_user) = &vm.icy_board_state.session.current_user {
-        if let Some(flags) = session_user.conference_flags.get(&conf_num) {
-            return Ok(VariableValue::new_bool(flags.contains(ConferenceFlags::Expired)));
-        }
+    if let Some(session_user) = &vm.icy_board_state.session.current_user
+        && let Some(flags) = session_user.conference_flags.get(&conf_num)
+    {
+        return Ok(VariableValue::new_bool(flags.contains(ConferenceFlags::Expired)));
     }
 
     Ok(VariableValue::new_bool(false))
@@ -1556,10 +1546,10 @@ pub async fn confexp(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 pub async fn confsel(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let conf_num = vm.eval_expr(&args[0]).await?.as_int() as usize;
 
-    if let Some(session_user) = &vm.icy_board_state.session.current_user {
-        if let Some(flags) = session_user.conference_flags.get(&conf_num) {
-            return Ok(VariableValue::new_bool(flags.contains(ConferenceFlags::Selected)));
-        }
+    if let Some(session_user) = &vm.icy_board_state.session.current_user
+        && let Some(flags) = session_user.conference_flags.get(&conf_num)
+    {
+        return Ok(VariableValue::new_bool(flags.contains(ConferenceFlags::Selected)));
     }
 
     Ok(VariableValue::new_bool(false))
@@ -1568,10 +1558,10 @@ pub async fn confsel(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 pub async fn confsys(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let conf_num = vm.eval_expr(&args[0]).await?.as_int() as usize;
 
-    if let Some(session_user) = &vm.icy_board_state.session.current_user {
-        if let Some(flags) = session_user.conference_flags.get(&conf_num) {
-            return Ok(VariableValue::new_bool(flags.contains(ConferenceFlags::Sysop)));
-        }
+    if let Some(session_user) = &vm.icy_board_state.session.current_user
+        && let Some(flags) = session_user.conference_flags.get(&conf_num)
+    {
+        return Ok(VariableValue::new_bool(flags.contains(ConferenceFlags::Sysop)));
     }
 
     Ok(VariableValue::new_bool(false))
@@ -1580,10 +1570,10 @@ pub async fn confsys(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 pub async fn confmw(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let conf_num = vm.eval_expr(&args[0]).await?.as_int() as usize;
 
-    if let Some(session_user) = &vm.icy_board_state.session.current_user {
-        if let Some(flags) = session_user.conference_flags.get(&conf_num) {
-            return Ok(VariableValue::new_bool(flags.contains(ConferenceFlags::MailWaiting)));
-        }
+    if let Some(session_user) = &vm.icy_board_state.session.current_user
+        && let Some(flags) = session_user.conference_flags.get(&conf_num)
+    {
+        return Ok(VariableValue::new_bool(flags.contains(ConferenceFlags::MailWaiting)));
     }
 
     Ok(VariableValue::new_bool(false))
@@ -1613,7 +1603,7 @@ pub async fn useralias(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Var
 }
 
 pub async fn curuser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_int(vm.icy_board_state.session.cur_user_id as i32))
+    Ok(VariableValue::new_int(vm.icy_board_state.session.cur_user_id))
 }
 
 pub async fn chatstat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -1672,11 +1662,11 @@ pub async fn fmtreal(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
     let decimal_places = vm.eval_expr(&args[2]).await?.as_int() as usize;
 
     // Format the number with the specified decimal places
-    let formatted = format!("{:.prec$}", value, prec = decimal_places);
+    let formatted = format!("{value:.decimal_places$}");
 
     // Right-justify with spaces if needed
     let result = if formatted.len() < field_width {
-        format!("{:>width$}", formatted, width = field_width)
+        format!("{formatted:>field_width$}")
     } else {
         formatted
     };
@@ -1783,10 +1773,10 @@ fn calc_crc32(buffer: &[u8]) -> u32 {
 
 pub async fn pcbmac(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let var = vm.eval_expr(&args[0]).await?.as_string();
-    if let Ok(pm) = Macro::from_str(&var.trim_matches('@')) {
-        if let Some(expanded) = vm.icy_board_state.run_macro(crate::vm::TerminalTarget::Sysop, pm).await {
-            return Ok(VariableValue::new_string(expanded));
-        }
+    if let Ok(pm) = Macro::from_str(var.trim_matches('@'))
+        && let Some(expanded) = vm.icy_board_state.run_macro(crate::vm::TerminalTarget::Sysop, pm).await
+    {
+        return Ok(VariableValue::new_string(expanded));
     }
     Ok(VariableValue::new_string(String::new()))
 }
@@ -2084,10 +2074,10 @@ pub async fn qwklimits(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Var
     };
 
     let value = match field {
-        0 => qwk_config.max_msgs as i32,              // MAXMSGS - Max messages per QWK packet
-        1 => qwk_config.max_msgs_per_conf as i32,     // CMAXMSGS - Max messages per conference
-        2 => qwk_config.personal_attach_limit as i32, // ATTACH_LIM_U - Personal attachment size limit (bytes)
-        3 => qwk_config.public_attach_limit as i32,   // ATTACH_LIM_P - Public attachment size limit (bytes)
+        0 => qwk_config.max_msgs as i32,          // MAXMSGS - Max messages per QWK packet
+        1 => qwk_config.max_msgs_per_conf as i32, // CMAXMSGS - Max messages per conference
+        2 => qwk_config.personal_attach_limit,    // ATTACH_LIM_U - Personal attachment size limit (bytes)
+        3 => qwk_config.public_attach_limit,      // ATTACH_LIM_P - Public attachment size limit (bytes)
         _ => {
             log::error!("QWKLIMITS: Invalid field number: {field}");
             0
@@ -2102,23 +2092,16 @@ pub async fn findfirst(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Var
     vm.file_list.clear();
 
     if let Ok(g) = glob::glob(&filespec) {
-        for entry in g {
-            match entry {
-                Ok(path) => {
-                    let path = path.to_string_lossy().to_string();
-                    vm.file_list.push_back(path);
-                }
-                Err(e) => {
-                    continue;
-                }
-            }
+        for path in g.flatten() {
+            let path = path.to_string_lossy().to_string();
+            vm.file_list.push_back(path);
         }
     }
-    Ok(VariableValue::new_string(vm.file_list.pop_front().unwrap_or(String::new())))
+    Ok(VariableValue::new_string(vm.file_list.pop_front().unwrap_or_default()))
 }
 
 pub async fn findnext(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_string(vm.file_list.pop_front().unwrap_or(String::new())))
+    Ok(VariableValue::new_string(vm.file_list.pop_front().unwrap_or_default()))
 }
 
 pub async fn uselmrs(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -2130,7 +2113,7 @@ pub async fn new_confinfo(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<
     let conference = if let Some(conference) = &vm.icy_board_state.get_board().await.conferences.get(conf_num) {
         (*conference).clone()
     } else {
-        log::error!("PPL: Can't get conference {} (CONFINFO)", conf_num);
+        log::error!("PPL: Can't get conference {conf_num} (CONFINFO)");
         Conference::default()
     };
     Ok(user_data_value(conference, CONFERENCE_ID))
@@ -2157,8 +2140,8 @@ pub async fn get_confinfo(vm: &mut VirtualMachine<'_>, conf_num: usize, conf_fie
             10 => Ok(VariableValue::new_int(conference.add_conference_time as i32)),
             // Fields 11/12 (msg blocks / msg file) live on the area list in icy_board;
             // keep empty defaults until conference-level msg base metadata is restored.
-            11 => Ok(VariableValue::new_int(0)),
-            12 => Ok(VariableValue::new_string(String::new())),
+            11 | 51 => Ok(VariableValue::new_int(0)),
+            12 | 43 => Ok(VariableValue::new_string(String::new())),
             13 => Ok(VariableValue::new_string(conference.users_menu.to_string_lossy().to_string())),
             14 => Ok(VariableValue::new_string(conference.sysop_menu.to_string_lossy().to_string())),
             15 => Ok(VariableValue::new_string(conference.news_file.to_string_lossy().to_string())),
@@ -2176,7 +2159,7 @@ pub async fn get_confinfo(vm: &mut VirtualMachine<'_>, conf_num: usize, conf_fie
             27 => Ok(VariableValue::new_string(conference.survey_file.to_string_lossy().to_string())),
             28 => Ok(VariableValue::new_string(conference.dir_menu.to_string_lossy().to_string())),
             29 => Ok(VariableValue::new_string(conference.dir_file.to_string_lossy().to_string())),
-            30 => Ok(VariableValue::new_string(conference.attachment_location.to_string_lossy().to_string())), // PthNameLoc
+            30 | 42 => Ok(VariableValue::new_string(conference.attachment_location.to_string_lossy().to_string())), // PthNameLoc
             31 => Ok(VariableValue::new_bool(conference.force_echomail)),
             32 => Ok(VariableValue::new_bool(conference.is_read_only)),
             // PCBoard field 33 is NoPrivateMsgs (SCRMISC.CPP), not PrivMsgs (field 6).
@@ -2189,8 +2172,7 @@ pub async fn get_confinfo(vm: &mut VirtualMachine<'_>, conf_num: usize, conf_fie
             39 => Ok(VariableValue::new_int(conference.sec_write_message.level() as i32)),
             40 => Ok(VariableValue::new_string(conference.password.to_string())),
             41 => Ok(VariableValue::new_string(conference.intro_file.to_string_lossy().to_string())),
-            42 => Ok(VariableValue::new_string(conference.attachment_location.to_string_lossy().to_string())),
-            43 => Ok(VariableValue::new_string(String::new())), // reg flags
+            // reg flags
             44 => Ok(VariableValue::new_byte(conference.sec_attachments.level())),
             45 => Ok(VariableValue::new_byte(conference.carbon_list_limit)),
             46 => Ok(VariableValue::new_string(conference.command_file.to_string_lossy().to_string())),
@@ -2198,7 +2180,7 @@ pub async fn get_confinfo(vm: &mut VirtualMachine<'_>, conf_num: usize, conf_fie
             48 => Ok(VariableValue::new_bool(conference.long_to_names)),
             49 => Ok(VariableValue::new_byte(conference.sec_carbon_copy.level())),
             50 => Ok(VariableValue::new_byte(conference.conference_type.to_u8())),
-            51 => Ok(VariableValue::new_int(0)), // export ptr
+            // export ptr
             52 => Ok(VariableValue::new_double(conference.charge_time)),
             53 => Ok(VariableValue::new_double(conference.charge_msg_read)),
             54 => Ok(VariableValue::new_double(conference.charge_msg_write)),
@@ -2222,16 +2204,16 @@ pub async fn set_confinfo(vm: &mut VirtualMachine<'_>, conf_num: usize, conf_fie
             8 => conference.required_security = SecurityExpression::Constant(crate::icy_board::security_expr::Value::Integer(value.as_int() as i64)),
             9 => conference.add_conference_security = value.as_int(),
             10 => conference.add_conference_time = value.as_int() as u16,
-            11 => (), // message blocks
-            12 => (), // message file
+            // message blocks
+            // message file
             13 => conference.users_menu = PathBuf::from_str(&value.as_string())?,
             14 => conference.sysop_menu = PathBuf::from_str(&value.as_string())?,
             15 => conference.news_file = PathBuf::from_str(&value.as_string())?,
             16 => conference.pub_upload_sort = value.as_int() as u8,
-            17 => (), // public upload dir file
+            // public upload dir file
             18 => conference.pub_upload_location = PathBuf::from_str(&value.as_string())?,
             19 => conference.private_upload_sort = value.as_int() as u8,
-            20 => (), // private upload dir file
+            // private upload dir file
             21 => conference.private_upload_location = PathBuf::from_str(&value.as_string())?,
             22 => conference.doors_menu = PathBuf::from_str(&value.as_string())?,
             23 => conference.doors_file = PathBuf::from_str(&value.as_string())?,
@@ -2241,7 +2223,7 @@ pub async fn set_confinfo(vm: &mut VirtualMachine<'_>, conf_num: usize, conf_fie
             27 => conference.survey_file = PathBuf::from_str(&value.as_string())?,
             28 => conference.dir_menu = PathBuf::from_str(&value.as_string())?,
             29 => conference.dir_file = PathBuf::from_str(&value.as_string())?,
-            30 => conference.attachment_location = PathBuf::from_str(&value.as_string())?,
+            30 | 42 => conference.attachment_location = PathBuf::from_str(&value.as_string())?,
             31 => conference.force_echomail = value.as_bool(),
             32 => conference.is_read_only = value.as_bool(),
             // Field 33 is NoPrivateMsgs on PCBoard (not PrivMsgs / field 6).
@@ -2254,16 +2236,15 @@ pub async fn set_confinfo(vm: &mut VirtualMachine<'_>, conf_num: usize, conf_fie
             39 => conference.sec_write_message = SecurityExpression::Constant(crate::icy_board::security_expr::Value::Integer(value.as_int() as i64)),
             40 => conference.password = Password::PlainText(value.as_string()),
             41 => conference.intro_file = PathBuf::from_str(&value.as_string())?,
-            42 => conference.attachment_location = PathBuf::from_str(&value.as_string())?,
-            43 => (), // reg flags
+            // reg flags
             44 => conference.sec_attachments = SecurityExpression::Constant(crate::icy_board::security_expr::Value::Integer(value.as_int() as i64)),
             45 => conference.carbon_list_limit = value.as_byte(),
             46 => conference.command_file = PathBuf::from_str(&value.as_string())?,
-            47 => (), // old index
+            // old index
             48 => conference.long_to_names = value.as_bool(),
             49 => conference.sec_carbon_copy = SecurityExpression::Constant(crate::icy_board::security_expr::Value::Integer(value.as_int() as i64)),
             50 => conference.conference_type = ConferenceType::from_u8(value.as_byte()),
-            51 => (), // export ptr
+            // export ptr
             52 => conference.charge_time = value.as_double(),
             53 => conference.charge_msg_read = value.as_double(),
             54 => conference.charge_msg_write = value.as_double(),
@@ -2358,7 +2339,7 @@ pub async fn fdoqrd(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variab
         Ok(Some(file)) => Ok(VariableValue::new_string(file.to_string_lossy().to_string())),
         Ok(None) => Ok(VariableValue::new_string(String::new())),
         Err(err) => {
-            log::error!("FDOQRD: {}", err);
+            log::error!("FDOQRD: {err}");
             Ok(VariableValue::new_string(String::new()))
         }
     }
@@ -2448,7 +2429,7 @@ pub async fn getbankbal(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Va
                 10 => VariableValue::new_int(bank.byte_info.max_withdrawl_per_day as i32),
                 11 => VariableValue::new_int(bank.byte_info.max_stored_amount as i32),
                 _ => {
-                    log::error!("GET_BANK_BAL: Invalid field {}", field);
+                    log::error!("GET_BANK_BAL: Invalid field {field}");
                     return Ok(VariableValue::new_int(0));
                 }
             };
@@ -2462,10 +2443,12 @@ pub async fn getmsghdr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Var
     let (conf_num, area_num) = vm.eval_expr(&args[0]).await?.as_msg_id();
     let field_num = vm.eval_expr(&args[2]).await?.as_int();
     let msg_num = vm.eval_expr(&args[1]).await?.as_int() as u32;
-    if let Some((cn, an, mn, header)) = &vm.cached_msg_header {
-        if conf_num == *cn && area_num == *an && msg_num == *mn {
-            return get_field(field_num, header);
-        }
+    if let Some((cn, an, mn, header)) = &vm.cached_msg_header
+        && conf_num == *cn
+        && area_num == *an
+        && msg_num == *mn
+    {
+        return get_field(field_num, header);
     }
 
     let msg_base = {
@@ -2489,16 +2472,16 @@ pub async fn getmsghdr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Var
             res
         }
         Err(err) => {
-            log::error!("Can't read header {msg_num} from {conf_num}:{area_num} ({})", err);
+            log::error!("Can't read header {msg_num} from {conf_num}:{area_num} ({err})");
             if field_num == HDR_ACTIVE {
                 return Ok(VariableValue::new_int(226));
             }
-            return Ok(VariableValue::new_bool(false));
+            Ok(VariableValue::new_bool(false))
         }
     }
 }
 
-/// The one character PCBoard kept in the header to say what kind of message this
+/// The one character `PCBoard` kept in the header to say what kind of message this
 /// is and whether it has been read (MESSAGES.H).
 pub(crate) fn message_status(header: &JamMessageHeader) -> char {
     let read = header.is_read();

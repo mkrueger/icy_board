@@ -42,7 +42,7 @@ impl IcyBoardState {
                 return Ok(());
             }
 
-            let sender = self.bbs.lock().await.bbs_channels.get(node - 1).and_then(|c| c.clone());
+            let sender = self.bbs.lock().await.bbs_channels.get(node - 1).and_then(std::clone::Clone::clone);
             let Some(sender) = sender else {
                 self.display_text(IceText::InvalidEntry, display_flags::NEWLINE | display_flags::LFBEFORE)
                     .await?;
@@ -50,8 +50,8 @@ impl IcyBoardState {
             };
 
             let name = self.session.user_name.clone();
-            let _ = sender.send(BBSMessage::Shutdown(format!("Node {} was logged off by {}", node, name))).await;
-            self.write_caller_log(&format!("Forced node {} to logoff", node)).await;
+            let _ = sender.send(BBSMessage::Shutdown(format!("Node {node} was logged off by {name}"))).await;
+            self.write_caller_log(&format!("Forced node {node} to logoff")).await;
             return Ok(());
         }
     }

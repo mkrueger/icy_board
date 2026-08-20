@@ -133,7 +133,7 @@ impl<'a> DisassembleVisitor<'a> {
     }
 }
 
-impl<'a> PPEVisitor<()> for DisassembleVisitor<'a> {
+impl PPEVisitor<()> for DisassembleVisitor<'_> {
     fn visit_value(&mut self, id: usize) {
         let _ = execute!(
             stdout(),
@@ -165,12 +165,12 @@ impl<'a> PPEVisitor<()> for DisassembleVisitor<'a> {
         let _ = execute!(stdout(), Print(" }"));
     }
 
-    fn visit_member(&mut self, expr: &PPEExpr, id: usize) -> () {
+    fn visit_member(&mut self, expr: &PPEExpr, id: usize) {
         expr.visit(self);
         let _ = execute!(
             stdout(),
             SetForegroundColor(Color::Blue),
-            Print(format!(".[{:03X}]", id)),
+            Print(format!(".[{id:03X}]")),
             SetAttribute(Attribute::Reset),
         );
     }
@@ -213,11 +213,11 @@ impl<'a> PPEVisitor<()> for DisassembleVisitor<'a> {
         let _ = execute!(
             stdout(),
             SetForegroundColor(Color::Magenta),
-            Print(format!("Member:#{:02X}", id)),
+            Print(format!("Member:#{id:02X}")),
             SetAttribute(Attribute::Reset),
             Print(" on ["),
             SetForegroundColor(Color::Green),
-            Print(format!("{:?}", expr)),
+            Print(format!("{expr:?}")),
             SetAttribute(Attribute::Reset),
             Print("] ("),
         );

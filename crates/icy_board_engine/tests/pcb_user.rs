@@ -19,7 +19,7 @@ fn create_test_user(name: &str, idx: u8) -> User {
         street2: format!("Apt {}", idx),
         zip: format!("{:05}", (idx as i32) * 1000),
         country: "USA".to_string(),
-        gender: if idx % 2 == 0 { "M" } else { "F" }.to_string(),
+        gender: if idx.is_multiple_of(2) { "M" } else { "F" }.to_string(),
         email: format!("user{}@example.com", idx),
         web: format!("http://example{}.com", idx),
         contacts: Vec::new(),
@@ -49,10 +49,10 @@ fn create_test_user(name: &str, idx: u8) -> User {
         expiration_date: IcbDate::new(12, 31, 2025).to_utc_date_time(),
         exp_security_level: 5 + idx,
         flags: UserFlags {
-            expert_mode: idx % 2 == 0,
-            is_dirty: idx % 3 == 0,
-            msg_clear: idx % 4 == 0,
-            has_mail: idx % 5 == 0,
+            expert_mode: idx.is_multiple_of(2),
+            is_dirty: idx.is_multiple_of(3),
+            msg_clear: idx.is_multiple_of(4),
+            has_mail: idx.is_multiple_of(5),
             fse_mode: match idx % 3 {
                 0 => FSEMode::Yes,
                 1 => FSEMode::No,
@@ -65,7 +65,7 @@ fn create_test_user(name: &str, idx: u8) -> User {
             delete_flag: false,
             disabled_flag: false,
             use_graphics: true,
-            use_alias: idx % 2 == 0,
+            use_alias: idx.is_multiple_of(2),
         },
         protocol: match idx % 4 {
             0 => "Z",
@@ -84,9 +84,9 @@ fn create_test_user(name: &str, idx: u8) -> User {
             personal_attach_limit: 1024 * idx as i32,
             public_attach_limit: 2048 * idx as i32,
             new_blt_limit: idx as i32,
-            new_files: idx % 2 == 0,
+            new_files: idx.is_multiple_of(2),
         }),
-        account: if idx % 2 == 0 {
+        account: if idx.is_multiple_of(2) {
             Some(AccountUserInf {
                 starting_balance: 100.0 + idx as f64,
                 start_this_session: 10.0 + idx as f64,
@@ -138,7 +138,11 @@ fn create_test_user(name: &str, idx: u8) -> User {
             total_doors_executed: idx as u64 * 5,
             minutes_today: 30 + idx as u16 * 5,
         },
-        chat_status: if idx % 2 == 0 { ChatStatus::Available } else { ChatStatus::Unavailable },
+        chat_status: if idx.is_multiple_of(2) {
+            ChatStatus::Available
+        } else {
+            ChatStatus::Unavailable
+        },
         conference_flags: HashMap::new(),
         lastread_ptr_flags: HashMap::new(),
         path: None,

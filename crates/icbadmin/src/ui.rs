@@ -1,4 +1,5 @@
 use crate::dto::*;
+use std::fmt::Write as _;
 
 pub const STYLESHEET: &str = include_str!("style.css");
 
@@ -119,15 +120,15 @@ pub fn escape(text: &str) -> String {
 fn nav_links(active: Option<SectionId>, conferences_active: bool) -> String {
     let mut links = String::from(r#"<a href="/" class="nav-home">Overview</a>"#);
     for (group, sections) in SectionId::groups() {
-        links.push_str(&format!(r#"<span class="nav-group">{}</span>"#, escape(group)));
+        let _ = write!(links, r#"<span class="nav-group">{}</span>"#, escape(group));
         for section in *sections {
             let class = if active == Some(*section) { " class=\"active\"" } else { "" };
-            links.push_str(&format!(r#"<a href="/settings/{}"{}>{}</a>"#, section.slug(), class, escape(section.title())));
+            let _ = write!(links, r#"<a href="/settings/{}"{}>{}</a>"#, section.slug(), class, escape(section.title()));
         }
     }
     links.push_str(r#"<span class="nav-group">Conferences</span>"#);
     let class = if conferences_active { " class=\"active\"" } else { "" };
-    links.push_str(&format!(r#"<a href="/conferences"{class}>Conferences</a>"#));
+    let _ = write!(links, r#"<a href="/conferences"{class}>Conferences</a>"#);
     links
 }
 
@@ -182,10 +183,11 @@ pub fn overview_page(overview: &OverviewDto) -> String {
     let mut body = String::new();
 
     if !overview.config_loaded {
-        body.push_str(&format!(
+        let _ = write!(
+            body,
             r#"<div class="notice err"><strong>Configuration could not be loaded</strong><p>{}</p></div>"#,
             escape(overview.load_error.as_deref().unwrap_or("unknown error"))
-        ));
+        );
     }
 
     body.push_str(r#"<section class="hero-grid">"#);
@@ -228,12 +230,13 @@ pub fn overview_page(overview: &OverviewDto) -> String {
                 (_, true) => r#"<span class="state ok">ok</span>"#,
                 (_, false) => r#"<span class="state missing">missing</span>"#,
             };
-            body.push_str(&format!(
+            let _ = write!(
+                body,
                 "<tr><td>{}</td><td class=\"path\">{}</td><td>{}</td></tr>",
                 escape(&check.label),
                 escape(&check.path),
                 state
-            ));
+            );
         }
         body.push_str("</tbody></table></section>");
     }
@@ -241,7 +244,7 @@ pub fn overview_page(overview: &OverviewDto) -> String {
     if !overview.warnings.is_empty() {
         body.push_str("<section class=\"panel\"><h2>Warnings</h2><ul class=\"warnings\">");
         for warning in &overview.warnings {
-            body.push_str(&format!("<li>{}</li>", escape(warning)));
+            let _ = write!(body, "<li>{}</li>", escape(warning));
         }
         body.push_str("</ul></section>");
     }
@@ -279,7 +282,7 @@ pub fn general_page(settings: &GeneralSettingsResponse, csrf: &str, notice: Opti
     let mut date_options = String::new();
     for (value, label) in DATE_FORMATS {
         let selected = if *value == s.date_format { " selected" } else { "" };
-        date_options.push_str(&format!(r#"<option value="{}"{}>{}</option>"#, escape(value), selected, escape(label)));
+        let _ = write!(date_options, r#"<option value="{}"{}>{}</option>"#, escape(value), selected, escape(label));
     }
     let fields = format!(
         r#"<fieldset><legend>Board identity</legend>
@@ -410,7 +413,7 @@ pub fn system_control_page(settings: &SystemControlSettingsResponse, csrf: &str,
     let mut options = String::new();
     for (value, label) in PASSWORD_STORAGE_METHODS {
         let selected = if *value == s.password_storage_method { " selected" } else { "" };
-        options.push_str(&format!(r#"<option value="{}"{}>{}</option>"#, value, selected, escape(label)));
+        let _ = write!(options, r#"<option value="{}"{}>{}</option>"#, value, selected, escape(label));
     }
     let fields = format!(
         r#"<fieldset><legend>System control</legend>
@@ -449,7 +452,7 @@ pub fn switches_page(settings: &SwitchesSettingsResponse, csrf: &str, notice: Op
     let mut options = String::new();
     for (value, label) in DISPLAY_NEWS_BEHAVIORS {
         let selected = if *value == s.display_news_behavior { " selected" } else { "" };
-        options.push_str(&format!(r#"<option value="{}"{}>{}</option>"#, value, selected, escape(label)));
+        let _ = write!(options, r#"<option value="{}"{}>{}</option>"#, value, selected, escape(label));
     }
     let fields = format!(
         r#"<fieldset><legend>Display &amp; registration</legend>
@@ -896,7 +899,8 @@ pub fn conference_list_page(list: &ConferenceListResponse, csrf: &str, notice: O
         if conf.password_set {
             flags.push(r#"<span class="state unset">password</span>"#.to_string());
         }
-        rows.push_str(&format!(
+        let _ = write!(
+            rows,
             r#"<tr><td>{index}</td><td><a href="/conferences/{index}">{name}</a></td><td>{kind}</td><td>{security}</td><td>{flags}</td>
 <td class="row-actions"><form method="post" action="/conferences/{index}/delete" onsubmit="return confirm('Delete conference {index}?')">
 <input type="hidden" name="csrf" value="{csrf}"><input type="hidden" name="fingerprint" value="{fingerprint}">
@@ -908,7 +912,7 @@ pub fn conference_list_page(list: &ConferenceListResponse, csrf: &str, notice: O
             flags = flags.join(" "),
             csrf = escape(csrf),
             fingerprint = escape(&list.fingerprint),
-        ));
+        );
     }
 
     if rows.is_empty() {
@@ -984,7 +988,7 @@ fn conference_fields(dto: &ConferenceDto, password_set: bool) -> String {
     let mut types = String::new();
     for (value, label) in CONFERENCE_TYPES {
         let selected = if *value == dto.conference_type { " selected" } else { "" };
-        types.push_str(&format!(r#"<option value="{}"{}>{}</option>"#, value, selected, escape(label)));
+        let _ = write!(types, r#"<option value="{}"{}>{}</option>"#, value, selected, escape(label));
     }
 
     let password_state = if password_set { "set" } else { "not set" };
@@ -1098,12 +1102,13 @@ fn select_field(label: &str, name: &str, value: &str, options: &[(&str, &str)]) 
     let mut rendered = String::new();
     for (option_value, option_label) in options {
         let selected = if *option_value == value { " selected" } else { "" };
-        rendered.push_str(&format!(
+        let _ = write!(
+            rendered,
             r#"<option value="{}"{}>{}</option>"#,
             escape(option_value),
             selected,
             escape(option_label)
-        ));
+        );
     }
     format!(r#"<label>{}<select name="{}">{}</select></label>"#, escape(label), escape(name), rendered)
 }

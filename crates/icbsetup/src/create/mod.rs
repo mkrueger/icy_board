@@ -1,4 +1,7 @@
-use std::{fs, path::PathBuf};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 use bstr::BString;
 use chrono::Utc;
@@ -94,9 +97,9 @@ lazy_static::lazy_static! {
 }
 
 impl IcyBoardCreator {
-    pub fn new(destination: &PathBuf) -> Self {
+    pub fn new(destination: &Path) -> Self {
         Self {
-            destination: destination.clone(),
+            destination: destination.to_path_buf(),
             logger: ConsoleLogger::default(),
         }
     }
@@ -104,8 +107,8 @@ impl IcyBoardCreator {
     pub fn create(&mut self) -> Res<()> {
         self.logger.start_action(format!("Creating IcyBoard at {}", self.destination.display()));
         fs::create_dir_all(&self.destination)?;
-        fs::create_dir_all(&self.destination.join("main"))?;
-        fs::create_dir_all(&self.destination.join("art/help"))?;
+        fs::create_dir_all(self.destination.join("main"))?;
+        fs::create_dir_all(self.destination.join("art/help"))?;
 
         self.logger.start_action("Creating main configuration… at {}".to_string());
 
@@ -116,7 +119,7 @@ impl IcyBoardCreator {
         config.qwk_settings.bbs_id = "QWKMAIL".to_string();
 
         self.logger.start_action("Creating required paths.".to_string());
-        fs::create_dir_all(&self.destination.join(&config.paths.help_path))?;
+        fs::create_dir_all(self.destination.join(&config.paths.help_path))?;
 
         let options = SaveOptions {
             format: FormatOptions::Character(CharacterFormatOptions {
@@ -131,11 +134,11 @@ impl IcyBoardCreator {
             convert_to_pcb_opt(&path, &hlp.1, &options)?;
         }
 
-        fs::create_dir_all(&self.destination.join(&config.paths.tmp_work_path))?;
-        fs::create_dir_all(&self.destination.join(&config.paths.security_file_path))?;
-        fs::create_dir_all(&self.destination.join(&config.paths.command_display_path))?;
+        fs::create_dir_all(self.destination.join(&config.paths.tmp_work_path))?;
+        fs::create_dir_all(self.destination.join(&config.paths.security_file_path))?;
+        fs::create_dir_all(self.destination.join(&config.paths.command_display_path))?;
         config.paths.security_file_path = PathBuf::from("art/secmsgs");
-        fs::create_dir_all(&self.destination.join(&config.paths.security_file_path))?;
+        fs::create_dir_all(self.destination.join(&config.paths.security_file_path))?;
 
         self.logger.start_action("Write ICBTEXT…".to_string());
         DEFAULT_DISPLAY_TEXT.save(&self.destination.join(&config.paths.icbtext))?;
@@ -143,22 +146,22 @@ impl IcyBoardCreator {
         self.logger.start_action("Write trashcan files…".to_string());
         config.paths.trashcan_upload_files = PathBuf::from("main/tcan_uploads.txt");
         fs::write(
-            &self.destination.join(&config.paths.trashcan_upload_files),
+            self.destination.join(&config.paths.trashcan_upload_files),
             include_str!("../../data/tcan_uploads.txt"),
         )?;
 
         config.paths.trashcan_user = PathBuf::from("main/tcan_user.txt");
-        fs::write(&self.destination.join(&config.paths.trashcan_user), include_str!("../../data/tcan_users.txt"))?;
+        fs::write(self.destination.join(&config.paths.trashcan_user), include_str!("../../data/tcan_users.txt"))?;
 
         config.paths.trashcan_email = PathBuf::from("main/tcan_email.txt");
-        fs::write(&self.destination.join(&config.paths.trashcan_email), include_str!("../../data/tcan_email.txt"))?;
+        fs::write(self.destination.join(&config.paths.trashcan_email), include_str!("../../data/tcan_email.txt"))?;
         config.paths.trashcan_passwords = PathBuf::from("main/tcan_passwords.txt");
         fs::write(
-            &self.destination.join(&config.paths.trashcan_passwords),
+            self.destination.join(&config.paths.trashcan_passwords),
             include_str!("../../data/tcan_passwords.txt"),
         )?;
         config.paths.vip_users = PathBuf::from("main/vip_users.txt");
-        fs::write(&self.destination.join(&config.paths.vip_users), include_str!("../../data/vip_users.txt"))?;
+        fs::write(self.destination.join(&config.paths.vip_users), include_str!("../../data/vip_users.txt"))?;
 
         self.logger.start_action("Write protocol data files…".to_string());
         config.paths.protocol_data_file = PathBuf::from("main/protocols.toml");
@@ -214,13 +217,13 @@ impl IcyBoardCreator {
 
         config.paths.no_ansi = PathBuf::from("art/noansi");
         fs::write(
-            &self.destination.join(&config.paths.no_ansi).with_extension("asc"),
+            self.destination.join(&config.paths.no_ansi).with_extension("asc"),
             include_str!("../../data/new_bbs/noansi.asc"),
         )?;
 
         config.paths.conf_join_menu = PathBuf::from("art/cnfn");
         fs::write(
-            &self.destination.join(&config.paths.conf_join_menu).with_extension("ppe"),
+            self.destination.join(&config.paths.conf_join_menu).with_extension("ppe"),
             include_bytes!("../../../../ppe/cnfn.ppe"),
         )?;
 
@@ -259,8 +262,8 @@ impl IcyBoardCreator {
         self.logger.start_action("Write default fidonet config file".to_string());
         config.paths.ftn_file = PathBuf::from("main/ftn.toml");
         let ftn = FtnConfig::default();
-        fs::create_dir_all(&self.destination.join(&ftn.inbound))?;
-        fs::create_dir_all(&self.destination.join(&ftn.outbound))?;
+        fs::create_dir_all(self.destination.join(&ftn.inbound))?;
+        fs::create_dir_all(self.destination.join(&ftn.outbound))?;
         ftn.save(&self.destination.join(&config.paths.ftn_file))?;
 
         self.logger.start_action("Write default event file".to_string());
@@ -297,13 +300,13 @@ impl IcyBoardCreator {
 
         AccountingConfig::default().save(&self.destination.join(&config.accounting.cfg_file))?;
 
-        fs::write(&self.destination.join(&config.accounting.peak_holiday_list_file), [])?;
+        fs::write(self.destination.join(&config.accounting.peak_holiday_list_file), [])?;
 
-        fs::write(&self.destination.join(&config.accounting.tracking_file), [])?;
+        fs::write(self.destination.join(&config.accounting.tracking_file), [])?;
 
-        fs::write(&self.destination.join(&config.accounting.info_file).with_extension("pcb"), [])?;
-        fs::write(&self.destination.join(&config.accounting.warning_file).with_extension("pcb"), [])?;
-        fs::write(&self.destination.join(&config.accounting.logoff_file).with_extension("pcb"), [])?;
+        fs::write(self.destination.join(&config.accounting.info_file).with_extension("pcb"), [])?;
+        fs::write(self.destination.join(&config.accounting.warning_file).with_extension("pcb"), [])?;
+        fs::write(self.destination.join(&config.accounting.logoff_file).with_extension("pcb"), [])?;
 
         config.save(&self.destination.join(icy_board_engine::DEFAULT_ICYBOARD_FILE))?;
 
@@ -316,17 +319,19 @@ impl IcyBoardCreator {
     }
 
     fn generate_default_conference(&self, conf_path: &PathBuf) -> Res<()> {
-        let mut conf = Conference::default();
-        conf.name = "Main Board".to_string();
-        conf.is_public = true;
-        conf.auto_rejoin = true;
-        conf.use_main_commands = true;
+        let mut conf = Conference {
+            name: "Main Board".to_string(),
+            is_public: true,
+            auto_rejoin: true,
+            use_main_commands: true,
+            ..Default::default()
+        };
 
         self.logger.start_action("Create conference directories".to_string());
         conf.attachment_location = PathBuf::from("conferences/main/attach");
-        fs::create_dir_all(&self.destination.join(&conf.attachment_location))?;
+        fs::create_dir_all(self.destination.join(&conf.attachment_location))?;
         conf.pub_upload_location = PathBuf::from("conferences/main/upload");
-        fs::create_dir_all(&self.destination.join(&conf.pub_upload_location))?;
+        fs::create_dir_all(self.destination.join(&conf.pub_upload_location))?;
 
         self.logger.start_action("Write user & sysop menus…".to_string());
         conf.users_menu = PathBuf::from("conferences/main/brdm");
@@ -393,7 +398,7 @@ impl IcyBoardCreator {
             answer_file: PathBuf::from("conferences/main/script2.answer"),
             ..Default::default()
         };
-        fs::write(&self.destination.join(&s.survey_file), include_bytes!("../../../../ppe/script2.ppe"))?;
+        fs::write(self.destination.join(&s.survey_file), include_bytes!("../../../../ppe/script2.ppe"))?;
         list.push(s);
         list.save(&self.destination.join(&conf.survey_file))?;
 
@@ -401,7 +406,7 @@ impl IcyBoardCreator {
         self.logger.start_action("Create file directories…".to_string());
         conf.dir_menu = PathBuf::from("conferences/main/dir");
         fs::write(
-            &self.destination.join(&conf.dir_menu).with_extension("ppe"),
+            self.destination.join(&conf.dir_menu).with_extension("ppe"),
             include_bytes!("../../../../ppe/dir.ppe"),
         )?;
         conf.dir_file = PathBuf::from("conferences/main/dir.toml");
@@ -411,7 +416,7 @@ impl IcyBoardCreator {
             path: PathBuf::from("conferences/main/general/files/dir00"),
             ..Default::default()
         };
-        fs::create_dir_all(&self.destination.join(&fd.path))?;
+        fs::create_dir_all(self.destination.join(&fd.path))?;
         list.push(fd);
         list.save(&self.destination.join(&conf.dir_file))?;
 
@@ -419,7 +424,7 @@ impl IcyBoardCreator {
         self.logger.start_action("Create message areas…".to_string());
         conf.area_menu = PathBuf::from("conferences/main/area");
         fs::write(
-            &self.destination.join(&conf.area_menu).with_extension("ppe"),
+            self.destination.join(&conf.area_menu).with_extension("ppe"),
             include_bytes!("../../../../ppe/area.ppe"),
         )?;
         conf.area_file = PathBuf::from("conferences/main/area.toml");
@@ -429,8 +434,8 @@ impl IcyBoardCreator {
             path: PathBuf::from("conferences/main/messages/general"),
             ..Default::default()
         };
-        fs::create_dir_all(&self.destination.join("conferences/main/messages"))?;
-        let mut msg_base = JamMessageBase::create(&self.destination.join(&fd.path))?;
+        fs::create_dir_all(self.destination.join("conferences/main/messages"))?;
+        let mut msg_base = JamMessageBase::create(self.destination.join(&fd.path))?;
         msg_base.write_message(&write_welcome_msg())?;
         msg_base.write_jhr_header()?;
 
@@ -442,7 +447,7 @@ impl IcyBoardCreator {
         self.logger.start_action("Create door file…".to_string());
         conf.doors_menu = PathBuf::from("conferences/main/door");
         fs::write(
-            &self.destination.join(&conf.doors_menu).with_extension("ppe"),
+            self.destination.join(&conf.doors_menu).with_extension("ppe"),
             include_bytes!("../../../../ppe/door.ppe"),
         )?;
         conf.doors_file = PathBuf::from("conferences/main/door.toml");
@@ -534,12 +539,12 @@ fn generate_protocol_data(protocol_data_file: &PathBuf) -> Res<()> {
     Ok(())
 }
 
-pub fn convert_to_pcb(path: &PathBuf, data: &[u8]) -> Res<()> {
+pub fn convert_to_pcb(path: &Path, data: &[u8]) -> Res<()> {
     let options = SaveOptions::default();
     convert_to_pcb_opt(path, data, &options)
 }
 
-pub fn convert_to_pcb_opt(path: &PathBuf, data: &[u8], opt: &SaveOptions) -> Res<()> {
+pub fn convert_to_pcb_opt(path: &Path, data: &[u8], opt: &SaveOptions) -> Res<()> {
     let loaded = FileFormat::IcyDraw.from_bytes(data, None).unwrap();
     let bytes: Vec<u8> = FileFormat::PCBoard.to_bytes(&loaded.screen.buffer, opt).unwrap();
     fs::write(path.with_extension("pcb"), &bytes)?;

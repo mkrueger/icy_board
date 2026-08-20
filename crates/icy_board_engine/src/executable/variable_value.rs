@@ -176,7 +176,7 @@ impl VariableType {
             VariableType::Table => "TABLE".to_string(),
             VariableType::MessageAreaID => "MSGAREAID".to_string(),
             VariableType::Password => "PASSWORD".to_string(),
-            VariableType::UserData(u) => format!("USERDATA({})", u),
+            VariableType::UserData(u) => format!("USERDATA({u})"),
             VariableType::None => "NONE".to_string(),
         };
         Signature::new(sig)
@@ -208,7 +208,7 @@ impl fmt::Display for VariableType {
             VariableType::Table => write!(f, "Table"),             // Generic key-value table
             VariableType::MessageAreaID => write!(f, "MsgAreaID"), // 2*u8
             VariableType::Password => write!(f, "Password"),       // Password type
-            VariableType::UserData(u) => write!(f, "UserData({})", u),
+            VariableType::UserData(u) => write!(f, "UserData({u})"),
         }
     }
 }
@@ -252,7 +252,7 @@ impl VariableData {
 
     pub fn from_bool(b: bool) -> VariableData {
         let mut res = VariableData::default();
-        res.unsigned_value = if b { 1 } else { 0 };
+        res.unsigned_value = u64::from(b);
         res
     }
 
@@ -321,10 +321,10 @@ impl GenericVariableData {
         match dim {
             1 => {
                 if vector_size > MAX_ARRAY_SIZE {
-                    log::error!("Creating a large array of size: {} elements - probably file is corrupt.", vector_size,);
+                    log::error!("Creating a large array of size: {vector_size} elements - probably file is corrupt.");
                     return None;
                 }
-                return Some(GenericVariableData::Dim1(vec![base_value; vector_size + 1]));
+                Some(GenericVariableData::Dim1(vec![base_value; vector_size + 1]))
             }
             2 => {
                 if vector_size * matrix_size > MAX_ARRAY_SIZE {
@@ -336,7 +336,7 @@ impl GenericVariableData {
                     );
                     return None;
                 }
-                return Some(GenericVariableData::Dim2(vec![vec![base_value; matrix_size + 1]; vector_size + 1]));
+                Some(GenericVariableData::Dim2(vec![vec![base_value; matrix_size + 1]; vector_size + 1]))
             }
             3 => {
                 if vector_size * matrix_size * cube_size > MAX_ARRAY_SIZE {
@@ -349,10 +349,10 @@ impl GenericVariableData {
                     );
                     return None;
                 }
-                return Some(GenericVariableData::Dim3(vec![
+                Some(GenericVariableData::Dim3(vec![
                     vec![vec![base_value; cube_size + 1]; matrix_size + 1];
                     vector_size + 1
-                ]));
+                ]))
             }
             _ => panic!("Invalid dimension: {dim}"),
         }
@@ -888,7 +888,7 @@ impl Neg for VariableValue {
         let mut data = VariableData::default();
         let generic_data = GenericVariableData::None;
         match dest_type {
-            VariableType::Boolean => data.unsigned_value = unsafe { if self.data.unsigned_value == 0 { 1 } else { 0 } },
+            VariableType::Boolean => data.unsigned_value = unsafe { u64::from(self.data.unsigned_value == 0) },
             VariableType::Integer => data.int_value = -self.as_int(),
             VariableType::SByte => data.sbyte_value = -self.as_sbyte(),
             VariableType::SWord => data.sword_value = -self.as_sword(),
@@ -909,6 +909,7 @@ impl Neg for VariableValue {
 #[allow(clippy::needless_pass_by_value)]
 impl VariableValue {
     /// The same value emptied out, keeping the fields a record is made of.
+    #[must_use]
     pub fn emptied(&self) -> VariableValue {
         match &self.generic_data {
             GenericVariableData::Record(fields) => VariableValue {
@@ -1262,41 +1263,19 @@ impl VariableValue {
                 if self.as_bool() {
                     return 1;
                 }
-                return 0;
+                0
             }
-            VariableType::Unsigned => {
-                return unsafe { self.data.unsigned_value as i32 };
-            }
-            VariableType::Date | VariableType::DDate | VariableType::EDate | VariableType::Integer => {
-                return unsafe { self.data.int_value };
-            }
-            VariableType::Money => {
-                return unsafe { self.data.money_value as i32 };
-            }
-            VariableType::Float => {
-                return unsafe { self.data.float_value as i32 };
-            }
-            VariableType::Double => {
-                return unsafe { self.data.double_value as i32 };
-            }
-            VariableType::Time => {
-                return unsafe { self.data.time_value };
-            }
-            VariableType::Byte => {
-                return unsafe { self.data.byte_value as i32 };
-            }
-            VariableType::Word => {
-                return unsafe { self.data.word_value as i32 };
-            }
-            VariableType::SByte => {
-                return unsafe { self.data.sbyte_value as i32 };
-            }
-            VariableType::SWord => {
-                return unsafe { self.data.sword_value as i32 };
-            }
-            VariableType::MessageAreaID => {
-                return unsafe { self.data.message_id_value.conference as i32 };
-            }
+            VariableType::Unsigned => unsafe { self.data.unsigned_value as i32 },
+            VariableType::Date | VariableType::DDate | VariableType::EDate | VariableType::Integer => unsafe { self.data.int_value },
+            VariableType::Money => unsafe { self.data.money_value },
+            VariableType::Float => unsafe { self.data.float_value as i32 },
+            VariableType::Double => unsafe { self.data.double_value as i32 },
+            VariableType::Time => unsafe { self.data.time_value },
+            VariableType::Byte => unsafe { self.data.byte_value as i32 },
+            VariableType::Word => unsafe { self.data.word_value as i32 },
+            VariableType::SByte => unsafe { self.data.sbyte_value as i32 },
+            VariableType::SWord => unsafe { self.data.sword_value as i32 },
+            VariableType::MessageAreaID => unsafe { self.data.message_id_value.conference },
             _ => {
                 panic!("Unsupported type: {:?}", self.vtype);
             }
@@ -1307,7 +1286,7 @@ impl VariableValue {
         if let GenericVariableData::String(s) = &self.generic_data {
             let mut res = 0;
             for c in s.chars() {
-                if c.is_digit(10) {
+                if c.is_ascii_digit() {
                     if let Some(c) = c.to_digit(10) {
                         res = res * 10 + c as u64;
                     } else {
@@ -1323,38 +1302,18 @@ impl VariableValue {
                 if self.as_bool() {
                     return 1;
                 }
-                return 0;
+                0
             }
-            VariableType::Unsigned => {
-                return unsafe { self.data.unsigned_value };
-            }
-            VariableType::Date | VariableType::DDate | VariableType::EDate | VariableType::Integer => {
-                return unsafe { self.data.int_value as u64 };
-            }
-            VariableType::Money => {
-                return unsafe { self.data.money_value as u64 };
-            }
-            VariableType::Float => {
-                return unsafe { self.data.float_value as u64 };
-            }
-            VariableType::Double => {
-                return unsafe { self.data.double_value as u64 };
-            }
-            VariableType::Time => {
-                return unsafe { self.data.time_value as u64 };
-            }
-            VariableType::Byte => {
-                return unsafe { self.data.byte_value as u64 };
-            }
-            VariableType::Word => {
-                return unsafe { self.data.word_value as u64 };
-            }
-            VariableType::SByte => {
-                return unsafe { self.data.sbyte_value as u64 };
-            }
-            VariableType::SWord => {
-                return unsafe { self.data.sword_value as u64 };
-            }
+            VariableType::Unsigned => unsafe { self.data.unsigned_value },
+            VariableType::Date | VariableType::DDate | VariableType::EDate | VariableType::Integer => unsafe { self.data.int_value as u64 },
+            VariableType::Money => unsafe { self.data.money_value as u64 },
+            VariableType::Float => unsafe { self.data.float_value as u64 },
+            VariableType::Double => unsafe { self.data.double_value as u64 },
+            VariableType::Time => unsafe { self.data.time_value as u64 },
+            VariableType::Byte => unsafe { self.data.byte_value as u64 },
+            VariableType::Word => unsafe { self.data.word_value as u64 },
+            VariableType::SByte => unsafe { self.data.sbyte_value as u64 },
+            VariableType::SWord => unsafe { self.data.sword_value as u64 },
             _ => {
                 panic!("Unsupported type: {:?}", self.vtype);
             }
@@ -1371,38 +1330,18 @@ impl VariableValue {
                 if self.as_bool() {
                     return 1.0;
                 }
-                return 0.0;
+                0.0
             }
-            VariableType::Unsigned => {
-                return unsafe { self.data.unsigned_value as f64 };
-            }
-            VariableType::Date | VariableType::DDate | VariableType::EDate | VariableType::Integer => {
-                return unsafe { self.data.int_value as f64 };
-            }
-            VariableType::Money => {
-                return unsafe { self.data.money_value as f64 };
-            }
-            VariableType::Float => {
-                return unsafe { self.data.float_value as f64 };
-            }
-            VariableType::Double => {
-                return unsafe { self.data.double_value as f64 };
-            }
-            VariableType::Time => {
-                return unsafe { self.data.time_value as f64 };
-            }
-            VariableType::Byte => {
-                return unsafe { self.data.byte_value as f64 };
-            }
-            VariableType::Word => {
-                return unsafe { self.data.word_value as f64 };
-            }
-            VariableType::SByte => {
-                return unsafe { self.data.sbyte_value as f64 };
-            }
-            VariableType::SWord => {
-                return unsafe { self.data.sword_value as f64 };
-            }
+            VariableType::Unsigned => unsafe { self.data.unsigned_value as f64 },
+            VariableType::Date | VariableType::DDate | VariableType::EDate | VariableType::Integer => unsafe { self.data.int_value as f64 },
+            VariableType::Money => unsafe { self.data.money_value as f64 },
+            VariableType::Float => unsafe { self.data.float_value as f64 },
+            VariableType::Double => unsafe { self.data.double_value },
+            VariableType::Time => unsafe { self.data.time_value as f64 },
+            VariableType::Byte => unsafe { self.data.byte_value as f64 },
+            VariableType::Word => unsafe { self.data.word_value as f64 },
+            VariableType::SByte => unsafe { self.data.sbyte_value as f64 },
+            VariableType::SWord => unsafe { self.data.sword_value as f64 },
             _ => {
                 panic!("Unsupported type: {:?}", self.vtype);
             }
@@ -1419,38 +1358,18 @@ impl VariableValue {
                 if self.as_bool() {
                     return 1.0;
                 }
-                return 0.0;
+                0.0
             }
-            VariableType::Unsigned => {
-                return unsafe { self.data.unsigned_value as f32 };
-            }
-            VariableType::Date | VariableType::DDate | VariableType::EDate | VariableType::Integer => {
-                return unsafe { self.data.int_value as f32 };
-            }
-            VariableType::Money => {
-                return unsafe { self.data.money_value as f32 };
-            }
-            VariableType::Float => {
-                return unsafe { self.data.float_value };
-            }
-            VariableType::Double => {
-                return unsafe { self.data.double_value as f32 };
-            }
-            VariableType::Time => {
-                return unsafe { self.data.time_value as f32 };
-            }
-            VariableType::Byte => {
-                return unsafe { self.data.byte_value as f32 };
-            }
-            VariableType::Word => {
-                return unsafe { self.data.word_value as f32 };
-            }
-            VariableType::SByte => {
-                return unsafe { self.data.sbyte_value as f32 };
-            }
-            VariableType::SWord => {
-                return unsafe { self.data.sword_value as f32 };
-            }
+            VariableType::Unsigned => unsafe { self.data.unsigned_value as f32 },
+            VariableType::Date | VariableType::DDate | VariableType::EDate | VariableType::Integer => unsafe { self.data.int_value as f32 },
+            VariableType::Money => unsafe { self.data.money_value as f32 },
+            VariableType::Float => unsafe { self.data.float_value },
+            VariableType::Double => unsafe { self.data.double_value as f32 },
+            VariableType::Time => unsafe { self.data.time_value as f32 },
+            VariableType::Byte => unsafe { self.data.byte_value as f32 },
+            VariableType::Word => unsafe { self.data.word_value as f32 },
+            VariableType::SByte => unsafe { self.data.sbyte_value as f32 },
+            VariableType::SWord => unsafe { self.data.sword_value as f32 },
             _ => {
                 panic!("Unsupported type: {:?}", self.vtype);
             }
@@ -1467,38 +1386,18 @@ impl VariableValue {
                 if self.as_bool() {
                     return 1;
                 }
-                return 0;
+                0
             }
-            VariableType::Unsigned => {
-                return unsafe { self.data.unsigned_value as u8 };
-            }
-            VariableType::Date | VariableType::DDate | VariableType::EDate | VariableType::Integer => {
-                return unsafe { self.data.int_value as u8 };
-            }
-            VariableType::Money => {
-                return unsafe { self.data.money_value as u8 };
-            }
-            VariableType::Float => {
-                return unsafe { self.data.float_value as u8 };
-            }
-            VariableType::Double => {
-                return unsafe { self.data.double_value as u8 };
-            }
-            VariableType::Time => {
-                return unsafe { self.data.time_value as u8 };
-            }
-            VariableType::Byte => {
-                return unsafe { self.data.byte_value as u8 };
-            }
-            VariableType::Word => {
-                return unsafe { self.data.word_value as u8 };
-            }
-            VariableType::SByte => {
-                return unsafe { self.data.sbyte_value as u8 };
-            }
-            VariableType::SWord => {
-                return unsafe { self.data.sword_value as u8 };
-            }
+            VariableType::Unsigned => unsafe { self.data.unsigned_value as u8 },
+            VariableType::Date | VariableType::DDate | VariableType::EDate | VariableType::Integer => unsafe { self.data.int_value as u8 },
+            VariableType::Money => unsafe { self.data.money_value as u8 },
+            VariableType::Float => unsafe { self.data.float_value as u8 },
+            VariableType::Double => unsafe { self.data.double_value as u8 },
+            VariableType::Time => unsafe { self.data.time_value as u8 },
+            VariableType::Byte => unsafe { self.data.byte_value },
+            VariableType::Word => unsafe { self.data.word_value as u8 },
+            VariableType::SByte => unsafe { self.data.sbyte_value as u8 },
+            VariableType::SWord => unsafe { self.data.sword_value as u8 },
             _ => {
                 panic!("Unsupported type: {:?}", self.vtype);
             }
@@ -1519,38 +1418,17 @@ impl VariableValue {
                 if self.as_bool() {
                     return 1;
                 }
-                return 0;
+                0
             }
-            VariableType::Unsigned => {
-                return unsafe { self.data.unsigned_value as u16 };
-            }
-            VariableType::Date | VariableType::DDate | VariableType::EDate | VariableType::Integer => {
-                return unsafe { self.data.word_value };
-            }
-            VariableType::Money => {
-                return unsafe { self.data.money_value as u16 };
-            }
-            VariableType::Float => {
-                return unsafe { self.data.float_value as u16 };
-            }
-            VariableType::Double => {
-                return unsafe { self.data.double_value as u16 };
-            }
-            VariableType::Time => {
-                return unsafe { self.data.time_value as u16 };
-            }
-            VariableType::Byte => {
-                return unsafe { self.data.byte_value as u16 };
-            }
-            VariableType::Word => {
-                return unsafe { self.data.word_value as u16 };
-            }
-            VariableType::SByte => {
-                return unsafe { self.data.sbyte_value as u16 };
-            }
-            VariableType::SWord => {
-                return unsafe { self.data.sword_value as u16 };
-            }
+            VariableType::Unsigned => unsafe { self.data.unsigned_value as u16 },
+            VariableType::Date | VariableType::DDate | VariableType::EDate | VariableType::Integer | VariableType::Word => unsafe { self.data.word_value },
+            VariableType::Money => unsafe { self.data.money_value as u16 },
+            VariableType::Float => unsafe { self.data.float_value as u16 },
+            VariableType::Double => unsafe { self.data.double_value as u16 },
+            VariableType::Time => unsafe { self.data.time_value as u16 },
+            VariableType::Byte => unsafe { self.data.byte_value as u16 },
+            VariableType::SByte => unsafe { self.data.sbyte_value as u16 },
+            VariableType::SWord => unsafe { self.data.sword_value as u16 },
             _ => {
                 panic!("Unsupported type: {:?}", self.vtype);
             }
@@ -1569,9 +1447,9 @@ impl VariableValue {
     pub fn as_string(&self) -> String {
         unsafe {
             match &self.generic_data {
-                GenericVariableData::String(s) => s.to_string(),
+                GenericVariableData::String(s) => s.clone(),
                 GenericVariableData::Password(p) => match p {
-                    Password::PlainText(s) => s.to_string(),
+                    Password::PlainText(s) => s.clone(),
                     _ => "******".to_string(),
                 },
                 _ => match self.vtype {
@@ -1605,20 +1483,18 @@ impl VariableValue {
     }
 
     pub fn as_date(&self) -> IcbDate {
-        return unsafe { IcbDate::from_pcboard(self.data.date_value) };
+        unsafe { IcbDate::from_pcboard(self.data.date_value) }
     }
 
     pub fn as_time(&self) -> IcbTime {
-        return unsafe { IcbTime::from_pcboard(self.data.time_value) };
+        unsafe { IcbTime::from_pcboard(self.data.time_value) }
     }
 
     /// Returns (conference, area) for a message id
     pub fn as_msg_id(&self) -> (i32, i32) {
         match self.vtype {
-            VariableType::MessageAreaID => return unsafe { (self.data.message_id_value.conference, self.data.message_id_value.area) },
-            _ => {
-                return (self.as_int(), 0);
-            }
+            VariableType::MessageAreaID => unsafe { (self.data.message_id_value.conference, self.data.message_id_value.area) },
+            _ => (self.as_int(), 0),
         }
     }
 
@@ -1734,27 +1610,23 @@ impl VariableValue {
             GenericVariableData::Dim2(data) => {
                 if dim1 < data.len() && dim2 < data[dim1].len() {
                     data[dim1][dim2] = val.convert_to(self.vtype);
+                } else if dim1 < data.len() {
+                    log::error!("dim2 out of bounds: {} > {}", dim2, data[dim1].len());
                 } else {
-                    if dim1 < data.len() {
-                        log::error!("dim2 out of bounds: {} > {}", dim2, data[dim1].len());
-                    } else {
-                        log::error!("dim1 out of bounds: {} > {}", dim1, data.len());
-                    }
+                    log::error!("dim1 out of bounds: {} > {}", dim1, data.len());
                 }
             }
             GenericVariableData::Dim3(data) => {
                 if dim1 < data.len() && dim2 < data[dim1].len() && dim3 < data[dim1][dim2].len() {
                     data[dim1][dim2][dim3] = val.convert_to(self.vtype);
-                } else {
-                    if dim1 < data.len() {
-                        if dim2 < data[dim1].len() {
-                            log::error!("dim3 out of bounds: {} > {}", dim3, data[dim1][dim2].len());
-                        } else {
-                            log::error!("dim2 out of bounds: {} > {}", dim2, data[dim1].len());
-                        }
+                } else if dim1 < data.len() {
+                    if dim2 < data[dim1].len() {
+                        log::error!("dim3 out of bounds: {} > {}", dim3, data[dim1][dim2].len());
                     } else {
-                        log::error!("dim1 out of bounds: {} > {}", dim1, data.len());
+                        log::error!("dim2 out of bounds: {} > {}", dim2, data[dim1].len());
                     }
+                } else {
+                    log::error!("dim1 out of bounds: {} > {}", dim1, data.len());
                 }
             }
             _ => {
@@ -1792,7 +1664,7 @@ impl VariableValue {
 
         match convert_to_type {
             VariableType::Boolean => {
-                data.unsigned_value = if self.as_bool() { 1 } else { 0 };
+                data.unsigned_value = u64::from(self.as_bool());
             }
             VariableType::Unsigned => {
                 data.unsigned_value = self.as_int() as u64;
@@ -1811,7 +1683,7 @@ impl VariableValue {
                     _ => self.as_int() as u32,
                 };
             }
-            VariableType::Integer => {
+            VariableType::Integer | VariableType::MessageAreaID => {
                 data.int_value = self.as_int();
             }
             VariableType::Money => {
@@ -1862,9 +1734,6 @@ impl VariableValue {
             VariableType::Table => {
                 panic!("Not supported for tables.")
             }
-            VariableType::MessageAreaID => {
-                data.int_value = self.as_int();
-            }
             VariableType::Function => {
                 unsafe { data.function_value = self.data.function_value };
             }
@@ -1872,7 +1741,7 @@ impl VariableValue {
                 unsafe { data.procedure_value = self.data.procedure_value };
             }
             VariableType::UserData(x) => {
-                log::error!("can't convert {:?} to user data type {x}", self);
+                log::error!("can't convert {self:?} to user data type {x}");
                 data.int_value = -1;
             }
             VariableType::Password => {
@@ -1894,7 +1763,7 @@ impl VariableValue {
     }
 }
 
-/// PCBoard prints a date as MM/DD/YY and an empty one as 00/00/00.
+/// `PCBoard` prints a date as MM/DD/YY and an empty one as 00/00/00.
 fn pcb_date_string(date: u32) -> String {
     if date == 0 {
         return "00/00/00".to_string();
@@ -1913,7 +1782,7 @@ fn date_from_string(str: &str) -> u32 {
     IcbDate::try_parse(str).map_or(0, |date| date.to_pcboard_date().max(0) as u32)
 }
 
-/// PCBoard reads money as dollars and keeps cents, cutting off anything finer.
+/// `PCBoard` reads money as dollars and keeps cents, cutting off anything finer.
 /// It drops the sign on the way in: "-1.50" is worth as much as "1.50".
 fn money_from_string(str: &str) -> i32 {
     let mut dollars: i64 = 0;
@@ -1967,7 +1836,7 @@ fn pcb_ddate_string(date: i32) -> String {
 
 /// A DDATE reads a date out of CCYYMMDD text and keeps the julian for it.
 fn ddate_from_string(str: &str) -> i32 {
-    let digits: String = str.chars().filter(|c| c.is_ascii_digit()).collect();
+    let digits: String = str.chars().filter(char::is_ascii_digit).collect();
     if digits.len() != 8 {
         return 0;
     }
@@ -1980,7 +1849,7 @@ fn ddate_from_string(str: &str) -> i32 {
     IcbDate::new(month, day, year).to_pcboard_date()
 }
 
-/// A date unpacked from PCBoard's format carries only two year digits.
+/// A date unpacked from `PCBoard`'s format carries only two year digits.
 fn full_year(date: &IcbDate) -> i32 {
     match date.year() {
         year if year >= 100 => year as i32,

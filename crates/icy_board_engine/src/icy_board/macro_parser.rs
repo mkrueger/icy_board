@@ -15,13 +15,13 @@ pub enum MacroCommand {
     /// In order for you to hear this audible tone, you must have the Bell turned on at the call waiting screen.
     Beep,
 
-    /// Used internally by PCBoard to display file transfer statistics.
+    /// Used internally by `PCBoard` to display file transfer statistics.
     BICPS,
 
-    /// Displays the name of the BBS. This information is stored in ICBSetup > System Information
+    /// Displays the name of the BBS. This information is stored in `ICBSetup` > System Information
     BoardName,
 
-    /// Displays the connect speed that ICBoard announced at login.
+    /// Displays the connect speed that `ICBoard` announced at login.
     /// For error-correcting connections, the opening port speed will be displayed.
     /// Otherwise, the actual carrier speed will be displayed.
     /// If you want to always display the carrier speed of the caller, use the @CARRIER@ macro instead.
@@ -69,7 +69,6 @@ pub enum MacroCommand {
     /// Displays the current conference number Example output: 3
     ConfNum,
 
-    ///
     CredLeft,
 
     CredNow,
@@ -94,7 +93,7 @@ pub enum MacroCommand {
     /// 52,322 bytes in addition to their normal daily limit. Example output: 332,356
     DayBytes,
 
-    /// Delays for nn tenths of a second. If you enter @DELAY:50@, PCBoard will pause for 5 seconds (50 * .10 = 5.0).
+    /// Delays for nn tenths of a second. If you enter @DELAY:50@, `PCBoard` will pause for 5 seconds (50 * .10 = 5.0).
     /// You can enter any value between 0 and 255 meaning that you can pause between 0 and 25.5 seconds.
     Delay(u16),
 
@@ -154,7 +153,7 @@ pub enum MacroCommand {
     /// This macro will disconnect the current caller. When the caller is disconnected, the number of minutes used and the Thanks
     /// for calling message will be displayed. This macro may only be used in display files but not in messages.
     ///
-    /// In order for PCBoard to recognize this macro, it must begin at the first character of the line.
+    /// In order for `PCBoard` to recognize this macro, it must begin at the first character of the line.
     Hangup,
 
     /// This macro will display the business/data phone number stored in each user record. The actual text is not formatted –
@@ -250,10 +249,10 @@ pub enum MacroCommand {
     NumTimesOn,
 
     /// This macro will display the hours you allow lower speed callers to call your system. All hour displays are listed in 24 hour format.
-    /// These hours are defined in PCBSetup > Modem Information > Allowed Access Speeds. Example output: 01:00-06:00
+    /// These hours are defined in `PCBSetup` > Modem Information > Allowed Access Speeds. Example output: 01:00-06:00
     OffHours,
 
-    /// This macro is used throughout PCBTEXT to pass information from PCBoard into the records in PCBTEXT.
+    /// This macro is used throughout PCBTEXT to pass information from `PCBoard` into the records in PCBTEXT.
     /// You should only use this macro within those records that were designed to use @OPTEXT@.
     OpText,
 
@@ -296,41 +295,41 @@ pub enum MacroCommand {
 
     RatioFiles,
 
-    /// Used internally by ICBoard for file transfer statistics.
+    /// Used internally by `ICBoard` for file transfer statistics.
     RBytes,
 
-    /// Used internally by ICBoard for file transfer statistics.
+    /// Used internally by `ICBoard` for file transfer statistics.
     RCPS,
 
     /// The real name of the user.
     Real,
 
-    /// Used internally by ICBoard for file transfer statistics.
+    /// Used internally by `ICBoard` for file transfer statistics.
     RFiles,
 
-    /// Used internally by ICBoard for file transfer statistics.
+    /// Used internally by `ICBoard` for file transfer statistics.
     SBytes,
 
-    /// Used internally by ICBoard for file transfer statistics.
+    /// Used internally by `ICBoard` for file transfer statistics.
     SCPS,
 
     /// Displays the security level of the user.
     /// Any security level adjustments added when joining a conference will be reflected in the value displayed. Example output: 60
     Security,
 
-    /// Used internally by PCBoard for file transfer statistics.
+    /// Used internally by `PCBoard` for file transfer statistics.
     SFiles,
 
     /// Displays the current date. Example output: 09-23-93
     SysDate,
 
-    /// Displays the beginning time a user may page the SysOp for chat.
-    /// This time is defined in PCBSetup > Configuration Options > Limits.
+    /// Displays the beginning time a user may page the `SysOp` for chat.
+    /// This time is defined in `PCBSetup` > Configuration Options > Limits.
     /// All time displays are in 24-hour format. Example output: 18:00
     SysopIn,
 
-    /// This macro will display the ending time a user may page the SysOp for chat.
-    /// This time is defined in PCBSetup > Configuration Options > Limits..
+    /// This macro will display the ending time a user may page the `SysOp` for chat.
+    /// This time is defined in `PCBSetup` > Configuration Options > Limits..
     /// All time displays are in 24-hour format. Example output: 17:00
     SysopOut,
 
@@ -338,7 +337,7 @@ pub enum MacroCommand {
     SysTime,
 
     /// Displays the total time in minutes a user can use per day/session.
-    /// This limit is defined in the PWRD file in PCBSetup. Example output: 60
+    /// This limit is defined in the PWRD file in `PCBSetup`. Example output: 60
     TimeLimit,
 
     /// Displays the amount of time the caller has left for this session.
@@ -367,7 +366,7 @@ pub enum MacroCommand {
     /// this prompt is for the caller to press EMTER.
     Wait,
 
-    /// This macro will display the exact same thing as if the user had typed WHO at the PCBoard command prompt.
+    /// This macro will display the exact same thing as if the user had typed WHO at the `PCBoard` command prompt.
     /// The display includes all active node numbers and who is on each of the respective nodes. NOTE: Once the @WHO@ macro is used,
     /// the page line counter is reset to maximize screen output. Therefore, if you put the @WHO@ macro in the middle of the
     /// screen, be aware that the top of the screen may scroll off. To prevent this, you should put an @PAUSE@ or an @MORE@
@@ -395,7 +394,7 @@ pub enum MacroCommand {
     /// New in ICB : Current Message Area number,
     SysopName,
 
-    /// New in ICB : IcyBoard version number
+    /// New in ICB : `IcyBoard` version number
     Version,
 }
 
@@ -431,7 +430,7 @@ pub enum PcbToken {
     #[token("CURMSGNUM", |_| MacroCommand::CurMsgNum, ignore(case))]
     #[token("DATAPHONE", |_| MacroCommand::DataPhone, ignore(case))]
     #[token("DAYBYTES", |_| MacroCommand::DayBytes, ignore(case))]
-    #[regex("DELAY:\\d+", |lex| MacroCommand::Delay(get_macro_number(6, &lex.slice())), ignore(case))]
+    #[regex("DELAY:\\d+", |lex| MacroCommand::Delay(get_macro_number(6, lex.slice())), ignore(case))]
     #[token("DIRNAME", |_| MacroCommand::DirName, ignore(case))]
     #[token("DIRNUM", |_| MacroCommand::DirNum, ignore(case))]
     #[token("DLBYTES", |_| MacroCommand::DlBytes, ignore(case))]
@@ -485,7 +484,7 @@ pub enum PcbToken {
     #[token("PAUSE", |_| MacroCommand::Pause, ignore(case))]
     #[token("POFF", |_| MacroCommand::POFF, ignore(case))]
     #[token("PON", |_| MacroCommand::PON, ignore(case))]
-    #[regex("POS:\\d+", |lex| MacroCommand::POS(get_macro_number(4, &lex.slice())), ignore(case))]
+    #[regex("POS:\\d+", |lex| MacroCommand::POS(get_macro_number(4, lex.slice())), ignore(case))]
     #[token("PROLTR", |_| MacroCommand::ProLTR, ignore(case))]
     #[token("PRODESC", |_| MacroCommand::ProDesc, ignore(case))]
     #[token("PWXDATE", |_| MacroCommand::PwxDate, ignore(case))]
@@ -520,11 +519,11 @@ pub enum PcbToken {
     #[token("XOFF", |_| MacroCommand::XOff, ignore(case))]
     #[token("XON", |_| MacroCommand::XON, ignore(case))]
     #[token("YESCHAR", |_| MacroCommand::YesChar, ignore(case))]
-    #[regex("X([a-fA-F0-9]{2})", |lex| MacroCommand::SwitchColor(get_macrohex_color(&lex.slice())), ignore(case))]
+    #[regex("X([a-fA-F0-9]{2})", |lex| MacroCommand::SwitchColor(get_macrohex_color(lex.slice())), ignore(case))]
     Macro(MacroCommand),
 
     #[regex(":(\\d)+(T)?[C|R]?", |lex| {
-        parse_formatting(&lex.slice())
+        parse_formatting(lex.slice())
     }, ignore(case))]
     Format((u16, bool, MacroJustification)),
 }
@@ -537,7 +536,7 @@ fn parse_formatting(str: &str) -> (u16, bool, MacroJustification) {
     for c in str.chars().skip(1) {
         if parse_num {
             if let Some(digit) = c.to_digit(10) {
-                num = num.saturating_mul(10 as u16).saturating_add(digit as u16);
+                num = num.saturating_mul(10_u16).saturating_add(digit as u16);
                 continue;
             }
             parse_num = false;
@@ -554,7 +553,7 @@ fn parse_formatting(str: &str) -> (u16, bool, MacroJustification) {
 }
 
 fn get_macro_number(offset: usize, s: &str) -> u16 {
-    u16::from_str_radix(&s[offset..], 10).unwrap_or(0)
+    s[offset..].parse::<u16>().unwrap_or(0)
 }
 
 fn get_macrohex_color(hex_color: &str) -> u8 {
@@ -597,25 +596,18 @@ impl FromStr for Macro {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut lexer = PcbToken::lexer(s);
 
-        let command;
-        match lexer.next() {
-            Some(Ok(PcbToken::Macro(cmd))) => {
-                command = cmd;
-            }
-            _ => return Err("Invalid macro format".into()),
-        }
+        let Some(Ok(PcbToken::Macro(command))) = lexer.next() else {
+            return Err("Invalid macro format".into());
+        };
 
         let mut justification = MacroJustification::LeftJustify;
         let mut length = 0;
         let mut truncate = false;
 
-        match lexer.next() {
-            Some(Ok(PcbToken::Format((len, trunc, just)))) => {
-                length = len;
-                truncate = trunc;
-                justification = just;
-            }
-            _ => {}
+        if let Some(Ok(PcbToken::Format((len, trunc, just)))) = lexer.next() {
+            length = len;
+            truncate = trunc;
+            justification = just;
         }
 
         Ok(Macro {
@@ -645,7 +637,7 @@ mod tests {
         assert_eq!(macro_parsed.command, MacroCommand::Env("FOOBAR".to_string()));
         assert_eq!(macro_parsed.justification, MacroJustification::RightJustify);
         assert_eq!(macro_parsed.length, 209);
-        assert_eq!(macro_parsed.truncate, true);
+        assert!(macro_parsed.truncate);
     }
 
     #[test]
@@ -729,7 +721,7 @@ mod tests {
         let token = lexer.next().unwrap().unwrap();
         if let PcbToken::Format((len, truncate, justify)) = token {
             assert_eq!(len, 209);
-            assert_eq!(truncate, false);
+            assert!(!truncate);
             assert_eq!(justify, MacroJustification::LeftJustify);
         } else {
             panic!("Expected POS macro");
@@ -742,7 +734,7 @@ mod tests {
         let token = lexer.next().unwrap().unwrap();
         if let PcbToken::Format((len, truncate, justify)) = token {
             assert_eq!(len, 209);
-            assert_eq!(truncate, true);
+            assert!(truncate);
             assert_eq!(justify, MacroJustification::LeftJustify);
         } else {
             panic!("Expected POS macro");
@@ -755,7 +747,7 @@ mod tests {
         let token = lexer.next().unwrap().unwrap();
         if let PcbToken::Format((len, truncate, justify)) = token {
             assert_eq!(len, 9);
-            assert_eq!(truncate, false);
+            assert!(!truncate);
             assert_eq!(justify, MacroJustification::Center);
         } else {
             panic!("Expected POS macro");
@@ -768,7 +760,7 @@ mod tests {
         let token = lexer.next().unwrap().unwrap();
         if let PcbToken::Format((len, truncate, justify)) = token {
             assert_eq!(len, 99);
-            assert_eq!(truncate, true);
+            assert!(truncate);
             assert_eq!(justify, MacroJustification::RightJustify);
         } else {
             panic!("Expected POS macro");

@@ -69,7 +69,7 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> Connection for WebSocketConnectio
     }
 
     async fn read(&mut self, buf: &mut [u8]) -> crate::Result<usize> {
-        if self.data.len() > 0 {
+        if !self.data.is_empty() {
             let len = buf.len().min(self.data.len());
             buf[..len].copy_from_slice(&self.data[..len]);
             self.data = self.data.slice(len..);
@@ -98,7 +98,7 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> Connection for WebSocketConnectio
 
     async fn try_read(&mut self, buf: &mut [u8]) -> crate::Result<usize> {
         // First return any buffered data
-        if self.data.len() > 0 {
+        if !self.data.is_empty() {
             let len = buf.len().min(self.data.len());
             buf[..len].copy_from_slice(&self.data[..len]);
             self.data = self.data.slice(len..);
@@ -154,7 +154,7 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> Connection for WebSocketConnectio
                     }
                     Message::Binary(data) => {
                         // We got data, store it in our buffer for the next read
-                        self.data = Bytes::from(data);
+                        self.data = data;
                         Ok(ConnectionState::Connected)
                     }
                     Message::Text(_) => Ok(ConnectionState::Connected),

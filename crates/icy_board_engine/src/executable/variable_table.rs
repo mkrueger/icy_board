@@ -53,7 +53,7 @@ impl VarHeader {
         }
         let mut dim = cur_block[2];
         if dim > 3 {
-            log::warn!("Invalid dimension: {}, setting to 3", dim);
+            log::warn!("Invalid dimension: {dim}, setting to 3");
             dim = 3;
         }
 
@@ -327,7 +327,7 @@ impl TableEntry {
                 buffer.extend(string_buffer);
             } else {
                 buffer.extend_from_slice(&[0, 0]);
-            };
+            }
         } else {
             if version < 340 {
                 // VTABLE - get's ignored by PCBoard - pure garbage
@@ -494,7 +494,6 @@ impl VariableTable {
                             vtype,
                             data,
                             generic_data: header.create_generic_data().unwrap_or(GenericVariableData::None),
-                            ..Default::default()
                         };
                         i += 4;
                     } else {
@@ -684,10 +683,11 @@ impl VariableTable {
         while let PPEExpr::Member(base, _) = variable {
             variable = base;
         }
-        if let Some(id) = variable.get_id() {
-            if id < self.entries.len() + 1 && id > 0 {
-                self.get_var_entry_mut(id).report_variable_usage();
-            }
+        if let Some(id) = variable.get_id()
+            && id < self.entries.len() + 1
+            && id > 0
+        {
+            self.get_var_entry_mut(id).report_variable_usage();
         }
     }
 
@@ -949,7 +949,7 @@ impl VariableTable {
     }
 
     pub(crate) fn analyze_locals(&mut self) {
-        for t in self.entries.clone().iter() {
+        for t in &self.entries.clone() {
             if t.header.variable_type == VariableType::Function {
                 unsafe {
                     // A routine with no start offset owns nothing, its variables stay global.
@@ -995,45 +995,160 @@ pub struct UserVariable {
     pub value: VariableValue,
 }
 
-lazy_static::lazy_static! {
-    pub static ref USER_VARIABLES: [UserVariable;30] = [
-        UserVariable { name: "U_EXPERT", runtime_version:100, value: VariableValue::new_bool(false)  },
-        UserVariable { name: "U_FSE", runtime_version:100, value:VariableValue::new_bool(false) },
-        UserVariable { name: "U_FSEP", runtime_version:100, value:VariableValue::new_bool(false) },
-        UserVariable { name: "U_CLS", runtime_version:100, value:VariableValue::new_bool(false) },
-        UserVariable { name: "U_EXPDATE", runtime_version:100, value:VariableValue::new(VariableType::Date, VariableData::default()) },
-        UserVariable { name: "U_SEC", runtime_version:100, value:VariableValue::new_int(0) },
-        UserVariable { name: "U_PAGELEN", runtime_version:100, value:VariableValue::new_int(0) },
-        UserVariable { name: "U_EXPSEC", runtime_version:100, value:VariableValue::new_int(0) },
-        UserVariable { name: "U_CITY", runtime_version:100, value:VariableValue::new_string(String::new()) },
-        UserVariable { name: "U_BDPHONE", runtime_version:100, value:VariableValue::new_string(String::new()) },
-        UserVariable { name: "U_HVPHONE", runtime_version:100, value:VariableValue::new_string(String::new()) },
-        UserVariable { name: "U_TRANS", runtime_version:100, value:VariableValue::new_string(String::new()) },
-        UserVariable { name: "U_CMNT1", runtime_version:100, value:VariableValue::new_string(String::new()) },
-        UserVariable { name: "U_CMNT2", runtime_version:100, value:VariableValue::new_string(String::new()) },
-        UserVariable { name: "U_PWD", runtime_version:100, value:VariableValue::new_string(String::new()) },
-        UserVariable { name: "U_SCROLL", runtime_version:100, value:VariableValue::new_bool(false) },
-        UserVariable { name: "U_LONGHDR", runtime_version:100, value:VariableValue::new_bool(false) },
-        UserVariable { name: "U_DEF79", runtime_version:100, value:VariableValue::new_bool(false) },
-        UserVariable { name: "U_ALIAS", runtime_version:100, value:VariableValue::new_string(String::new()) },
-        UserVariable { name: "U_VER", runtime_version:100, value:VariableValue::new_string(String::new()) },
-        UserVariable { name: "U_ADDR", runtime_version:100, value:VariableValue::new_vector(
-            VariableType::String,
-            vec![VariableValue::new_string(String::new()); 5 + 1],
-        )},
-        UserVariable { name: "U_NOTES", runtime_version:100, value:VariableValue::new_vector(VariableType::String, vec![VariableValue::new_string(String::new()); 4 + 1]) },
-        UserVariable { name: "U_PWDEXP", runtime_version:100, value:VariableValue::new(VariableType::Date, VariableData::default()) },
-
-        UserVariable { name: "U_ACCOUNT", runtime_version:300, value:VariableValue::new_vector(VariableType::Integer, vec![VariableValue::new_int(0); 16 + 1]) },
-
-        UserVariable { name: "U_SHORTDESC", runtime_version:340, value:VariableValue::new_bool(false) },
-        UserVariable { name: "U_GENDER", runtime_version:340, value:VariableValue::new_string(String::new()) },
-        UserVariable { name: "U_BIRTHDATE", runtime_version:340, value:VariableValue::new_string(String::new()) },
-        UserVariable { name: "U_EMAIL", runtime_version:340, value:VariableValue::new_string(String::new()) },
-        UserVariable { name: "U_WEB", runtime_version:340, value:VariableValue::new_string(String::new()) },
-        UserVariable { name: "U_CONTACT", runtime_version:400, value:VariableValue::new_vector(
-            VariableType::UserData(crate::parser::CONTACT_ID as u8),
-            vec![create_record_value(crate::parser::CONTACT_ID as u8, &[]).unwrap()],
-        )},
-    ];
-}
+pub static USER_VARIABLES: std::sync::LazyLock<[UserVariable; 30]> = std::sync::LazyLock::new(|| {
+    [
+        UserVariable {
+            name: "U_EXPERT",
+            runtime_version: 100,
+            value: VariableValue::new_bool(false),
+        },
+        UserVariable {
+            name: "U_FSE",
+            runtime_version: 100,
+            value: VariableValue::new_bool(false),
+        },
+        UserVariable {
+            name: "U_FSEP",
+            runtime_version: 100,
+            value: VariableValue::new_bool(false),
+        },
+        UserVariable {
+            name: "U_CLS",
+            runtime_version: 100,
+            value: VariableValue::new_bool(false),
+        },
+        UserVariable {
+            name: "U_EXPDATE",
+            runtime_version: 100,
+            value: VariableValue::new(VariableType::Date, VariableData::default()),
+        },
+        UserVariable {
+            name: "U_SEC",
+            runtime_version: 100,
+            value: VariableValue::new_int(0),
+        },
+        UserVariable {
+            name: "U_PAGELEN",
+            runtime_version: 100,
+            value: VariableValue::new_int(0),
+        },
+        UserVariable {
+            name: "U_EXPSEC",
+            runtime_version: 100,
+            value: VariableValue::new_int(0),
+        },
+        UserVariable {
+            name: "U_CITY",
+            runtime_version: 100,
+            value: VariableValue::new_string(String::new()),
+        },
+        UserVariable {
+            name: "U_BDPHONE",
+            runtime_version: 100,
+            value: VariableValue::new_string(String::new()),
+        },
+        UserVariable {
+            name: "U_HVPHONE",
+            runtime_version: 100,
+            value: VariableValue::new_string(String::new()),
+        },
+        UserVariable {
+            name: "U_TRANS",
+            runtime_version: 100,
+            value: VariableValue::new_string(String::new()),
+        },
+        UserVariable {
+            name: "U_CMNT1",
+            runtime_version: 100,
+            value: VariableValue::new_string(String::new()),
+        },
+        UserVariable {
+            name: "U_CMNT2",
+            runtime_version: 100,
+            value: VariableValue::new_string(String::new()),
+        },
+        UserVariable {
+            name: "U_PWD",
+            runtime_version: 100,
+            value: VariableValue::new_string(String::new()),
+        },
+        UserVariable {
+            name: "U_SCROLL",
+            runtime_version: 100,
+            value: VariableValue::new_bool(false),
+        },
+        UserVariable {
+            name: "U_LONGHDR",
+            runtime_version: 100,
+            value: VariableValue::new_bool(false),
+        },
+        UserVariable {
+            name: "U_DEF79",
+            runtime_version: 100,
+            value: VariableValue::new_bool(false),
+        },
+        UserVariable {
+            name: "U_ALIAS",
+            runtime_version: 100,
+            value: VariableValue::new_string(String::new()),
+        },
+        UserVariable {
+            name: "U_VER",
+            runtime_version: 100,
+            value: VariableValue::new_string(String::new()),
+        },
+        UserVariable {
+            name: "U_ADDR",
+            runtime_version: 100,
+            value: VariableValue::new_vector(VariableType::String, vec![VariableValue::new_string(String::new()); 5 + 1]),
+        },
+        UserVariable {
+            name: "U_NOTES",
+            runtime_version: 100,
+            value: VariableValue::new_vector(VariableType::String, vec![VariableValue::new_string(String::new()); 4 + 1]),
+        },
+        UserVariable {
+            name: "U_PWDEXP",
+            runtime_version: 100,
+            value: VariableValue::new(VariableType::Date, VariableData::default()),
+        },
+        UserVariable {
+            name: "U_ACCOUNT",
+            runtime_version: 300,
+            value: VariableValue::new_vector(VariableType::Integer, vec![VariableValue::new_int(0); 16 + 1]),
+        },
+        UserVariable {
+            name: "U_SHORTDESC",
+            runtime_version: 340,
+            value: VariableValue::new_bool(false),
+        },
+        UserVariable {
+            name: "U_GENDER",
+            runtime_version: 340,
+            value: VariableValue::new_string(String::new()),
+        },
+        UserVariable {
+            name: "U_BIRTHDATE",
+            runtime_version: 340,
+            value: VariableValue::new_string(String::new()),
+        },
+        UserVariable {
+            name: "U_EMAIL",
+            runtime_version: 340,
+            value: VariableValue::new_string(String::new()),
+        },
+        UserVariable {
+            name: "U_WEB",
+            runtime_version: 340,
+            value: VariableValue::new_string(String::new()),
+        },
+        UserVariable {
+            name: "U_CONTACT",
+            runtime_version: 400,
+            value: VariableValue::new_vector(
+                VariableType::UserData(crate::parser::CONTACT_ID as u8),
+                vec![create_record_value(crate::parser::CONTACT_ID as u8, &[]).unwrap()],
+            ),
+        },
+    ]
+});

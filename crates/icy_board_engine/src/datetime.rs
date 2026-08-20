@@ -139,7 +139,7 @@ impl IcbDate {
             (month, day, year)
         } else {
             let parts = str
-                .split(|c| c == '-' || c == '/' || c == '.' || c == ' ')
+                .split(['-', '/', '.', ' '])
                 .map(|c| c.parse::<i32>().unwrap_or_default())
                 .collect::<Vec<i32>>();
             if parts.len() != 3 || parts[0] == 0 || parts[1] == 0 {
@@ -162,7 +162,7 @@ impl IcbDate {
 
     pub fn try_parse(str: &str) -> Option<Self> {
         let parts = str
-            .split(|c| c == '-' || c == '/' || c == '.' || c == ' ')
+            .split(['-', '/', '.', ' '])
             .map(|c| c.parse::<i32>().unwrap_or_default())
             .collect::<Vec<i32>>();
         if parts.len() != 3 || parts[0] == 0 || parts[1] == 0 {
@@ -316,7 +316,7 @@ fn test_pcb_date() {
     assert_eq!(format!("{date}"), "12-30-76");
 }
 
-/// The numbers PCBoard 15.4/M answered for a file stamped 03-15-1996 14:22:36.
+/// The numbers `PCBoard` 15.4/M answered for a file stamped 03-15-1996 14:22:36.
 #[test]
 fn test_file_stamp_matches_pcboard() {
     assert_eq!(35138, IcbDate::new(3, 15, 1996).to_pcboard_date());
@@ -373,10 +373,7 @@ impl IcbTime {
     }
 
     pub fn parse(str: &str) -> Self {
-        let parts = str
-            .split(|c| c == ':' || c == ' ')
-            .map(|c| c.parse::<i32>().unwrap_or_default())
-            .collect::<Vec<i32>>();
+        let parts = str.split([':', ' ']).map(|c| c.parse::<i32>().unwrap_or_default()).collect::<Vec<i32>>();
         if parts.len() != 3 {
             return IcbTime::new(0, 0, 0);
         }
@@ -493,7 +490,7 @@ impl IcbDoW {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.dow & 0b0111_1111 == 0
+        self.dow.trailing_zeros() >= 7
     }
 
     pub fn contains(&self, day: chrono::Weekday) -> bool {
@@ -511,7 +508,7 @@ impl fmt::Display for IcbDoW {
                 s.push('N');
             }
         }
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }
 

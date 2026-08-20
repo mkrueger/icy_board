@@ -3,15 +3,17 @@ use crate::icy_board::state::user_commands::mods::editor::EditUpdate;
 use super::EditState;
 
 fn create_state(text: &str) -> EditState {
-    let mut state = EditState::default();
-    state.max_line_length = 79;
-    state.max_lines = 100;
+    let mut state = EditState {
+        max_line_length: 79,
+        max_lines: 100,
+        ..Default::default()
+    };
     for (i, line) in text.lines().enumerate() {
         let mut line = line.to_string();
         if line.contains('|') {
             let pos = line.chars().position(|c| c == '|').unwrap();
             state.cursor = (pos, i).into();
-            line = line.replace("|", "");
+            line = line.replace('|', "");
         }
         state.msg.push(line);
     }

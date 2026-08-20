@@ -8,6 +8,7 @@ use icy_board_engine::{
     executable::{Executable, ExecutableError, FIRST_TYPE_TABLE_RUNTIME, GenericVariableData, TableEntry, VariableType},
     parser::{Encoding, ErrorReporter, MAX_TYPE_FIELDS, MAX_USER_TYPES, UserTypeRegistry, parse_ast},
 };
+use std::fmt::Write as _;
 
 fn compile(source: &str) -> Executable {
     let registry = UserTypeRegistry::icy_board_registry();
@@ -140,7 +141,7 @@ fn runtime_400_carries_no_type_table() {
 fn a_record_filled_to_the_byte_limit_round_trips() {
     let mut source = String::from("TYPE Wide\n");
     for i in 0..MAX_TYPE_FIELDS {
-        source.push_str(&format!("  INTEGER Field{i}\n"));
+        let _ = writeln!(source, "  INTEGER Field{i}");
     }
     source.push_str("ENDTYPE\nWide item\n");
 
@@ -156,7 +157,7 @@ fn a_record_filled_to_the_byte_limit_round_trips() {
 fn a_record_past_the_byte_limit_is_rejected() {
     let mut source = String::from("TYPE Wide\n");
     for i in 0..=MAX_TYPE_FIELDS {
-        source.push_str(&format!("  INTEGER Field{i}\n"));
+        let _ = writeln!(source, "  INTEGER Field{i}");
     }
     source.push_str("ENDTYPE\n");
 

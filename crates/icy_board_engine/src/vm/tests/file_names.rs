@@ -5,7 +5,7 @@ use super::run_ppl_with_files;
 const CONTENT: &[u8] = b"the file was found\r\n";
 
 /// A PPE that pulls a name out of a fixed width record, which `MID` pads out to the
-/// width it asked for, still hands PCBoard a name it opens.
+/// width it asked for, still hands `PCBoard` a name it opens.
 #[test]
 fn a_file_name_padded_out_by_mid_still_finds_the_file() {
     let output = run_ppl_with_files(
@@ -69,7 +69,7 @@ fn dispstr_hands_the_words_after_the_name_over_as_tokens() {
     assert_eq!(output, "the file was found\ntokens=2\n");
 }
 
-/// PCBoard zeroed its find record for a file that is not there, so asking for the size
+/// `PCBoard` zeroed its find record for a file that is not there, so asking for the size
 /// of one answers 0. Boards are full of PPEs that write `EXIST(f) & FILEINF(f,4)`.
 #[test]
 fn fileinf_of_a_file_that_is_not_there_answers_zero() {
@@ -84,7 +84,7 @@ fn fileinf_of_a_file_that_is_not_there_answers_zero() {
 }
 
 /// FILEINF hands out the name without its extension and the extension without its dot.
-/// PCBoard uppercased the path string before splitting (EVALP.CPP TOK_OP_FILEINF).
+/// `PCBoard` uppercased the path string before splitting (EVALP.CPP `TOK_OP_FILEINF`).
 #[test]
 fn fileinf_splits_a_name_the_way_pcboard_did() {
     let output = run_ppl_with_files(
@@ -99,7 +99,7 @@ fn fileinf_splits_a_name_the_way_pcboard_did() {
 }
 
 /// FILEINF date/time/size/attrs come from the file; a missing file zeroes them
-/// (PCBoard zeroed the find block). Printed DATE/TIME of 0 show as the type defaults.
+/// (`PCBoard` zeroed the find block). Printed DATE/TIME of 0 show as the type defaults.
 #[test]
 fn fileinf_date_time_and_attrs_are_real_for_existing_files() {
     let output = run_ppl_with_files(
@@ -117,8 +117,8 @@ fn fileinf_date_time_and_attrs_are_real_for_existing_files() {
     assert_eq!(output, "size=20\nattr0=0\ndate_ok=1\ntime_ok=1\nattr=32\nmiss_date_zero=1\nmiss_time_zero=1\n");
 }
 
-/// PCBoard looked for files with dosfindfirst and never passed FA_DIREC, so a directory
-/// answers like a name that is not there. Verified against PCBoard 15.4/M.
+/// `PCBoard` looked for files with dosfindfirst and never passed `FA_DIREC`, so a directory
+/// answers like a name that is not there. Verified against `PCBoard` 15.4/M.
 #[test]
 fn fileinf_reads_a_directory_as_nothing() {
     let output = run_ppl_with_files(
@@ -132,8 +132,8 @@ fn fileinf_reads_a_directory_as_nothing() {
     assert_eq!(output, "exist=0\nattr=0\nsize=0\n");
 }
 
-/// PCBoard printed such a line as it stood when the file behind it was not there -
-/// displayfile() falls through to printxlated() when runscriptwithparams() finds nothing.
+/// `PCBoard` printed such a line as it stood when the file behind it was not there -
+/// `displayfile()` falls through to `printxlated()` when `runscriptwithparams()` finds nothing.
 #[test]
 fn a_line_naming_a_file_that_is_not_there_is_printed() {
     let output = run_ppl_with_files(r#"DISPSTR "%missing.pcb""#, &[]);

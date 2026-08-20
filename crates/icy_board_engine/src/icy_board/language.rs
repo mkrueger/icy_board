@@ -54,7 +54,7 @@ impl Default for SupportedLanguages {
                 ("DD-MM-YY".to_string(), "%d-%m-%y".to_string()),
                 ("YY-MM-DD".to_string(), "%y-%m-%d".to_string()),
             ],
-            languages: Default::default(),
+            languages: Vec::default(),
         }
     }
 }
@@ -105,58 +105,58 @@ impl IcyBoardSerializer for SupportedLanguages {
 
 fn convert_dos_country_code(cc: i32) -> String {
     let res = match cc {
-        1 => "en_US",   // United_States
-        2 => "fr_CA",   // Candian_French
-        3 => "es_41",   // Latin_America
-        7 => "ru_RU",   // Russia
-        30 => "el_GR",  // Greece
-        31 => "nl_NL",  // Netherlands
-        32 => "fr_BE",  // Belgium
-        33 => "fr_FR",  // France
-        34 => "es_ES",  // Spain
-        36 => "hu_HU",  // Hungary
-        38 => "sr_RS",  // Yugoslavia
-        39 => "it_IT",  // Italy
-        40 => "ro_RO",  // Romania
-        41 => "ch_CH",  // Switzerland
-        42 => "cs_CZ",  // Czech_Slovak
-        43 => "de_AT",  // Austria
-        44 => "en_GB",  // United_Kingdom
-        45 => "da_DK",  // Denmark
-        46 => "sv_SE",  // Sweden
-        47 => "nn_NO",  // Norway
-        48 => "pl_PL",  // Poland
-        49 => "de_DE",  // Germany
-        54 => "es_AR",  // Argentina
-        55 => "pt_BR",  // Brazil
-        60 => "ms_MY",  // Malaysia
-        61 => "en_AU",  // Australia
-        63 => "fil_P",  // Philippines
-        65 => "ms_SG",  // Singapore
-        77 => "kk_KZ",  // Kazakhstan
-        81 => "ja_JP",  // Japan
-        82 => "ko_KR",  // South_Korea
-        84 => "vi_VN",  // Vietnam
-        86 => "zh_CN",  // China
-        90 => "tr_TR",  // Turkey
-        91 => "hi_IN",  // India
-        227 => "fr_NE", // Niger
-        229 => "fr_BJ", // Benin
-        234 => "en_NG", // Nigeria
-        298 => "fo_FO", // Faeroe_Islands
-        351 => "pt_PT", // Portugal
-        354 => "is_IS", // Iceland
-        355 => "sq_AL", // Albania
-        356 => "mt_MT", // Malta
-        358 => "fi_FI", // Finland
-        359 => "bg_BG", // Bulgaria
-        370 => "lt_LT", // Lithuania
-        371 => "lv_LV", // Latvia
-        372 => "et_EE", // Estonia
-        374 => "hy_AM", // Armenia
-        375 => "be_BY", // Belarus
-        380 => "uk_UA", // Ukraine
-        381 => "sr_RS", // Serbia
+        // United_States
+        2 => "fr_CA",        // Candian_French
+        3 => "es_41",        // Latin_America
+        7 => "ru_RU",        // Russia
+        30 => "el_GR",       // Greece
+        31 => "nl_NL",       // Netherlands
+        32 => "fr_BE",       // Belgium
+        33 => "fr_FR",       // France
+        34 => "es_ES",       // Spain
+        36 => "hu_HU",       // Hungary
+        38 | 381 => "sr_RS", // Yugoslavia
+        39 => "it_IT",       // Italy
+        40 => "ro_RO",       // Romania
+        41 => "ch_CH",       // Switzerland
+        42 => "cs_CZ",       // Czech_Slovak
+        43 => "de_AT",       // Austria
+        44 => "en_GB",       // United_Kingdom
+        45 => "da_DK",       // Denmark
+        46 => "sv_SE",       // Sweden
+        47 => "nn_NO",       // Norway
+        48 => "pl_PL",       // Poland
+        49 => "de_DE",       // Germany
+        54 => "es_AR",       // Argentina
+        55 => "pt_BR",       // Brazil
+        60 => "ms_MY",       // Malaysia
+        61 => "en_AU",       // Australia
+        63 => "fil_P",       // Philippines
+        65 => "ms_SG",       // Singapore
+        77 => "kk_KZ",       // Kazakhstan
+        81 => "ja_JP",       // Japan
+        82 => "ko_KR",       // South_Korea
+        84 => "vi_VN",       // Vietnam
+        86 => "zh_CN",       // China
+        90 => "tr_TR",       // Turkey
+        91 => "hi_IN",       // India
+        227 => "fr_NE",      // Niger
+        229 => "fr_BJ",      // Benin
+        234 => "en_NG",      // Nigeria
+        298 => "fo_FO",      // Faeroe_Islands
+        351 => "pt_PT",      // Portugal
+        354 => "is_IS",      // Iceland
+        355 => "sq_AL",      // Albania
+        356 => "mt_MT",      // Malta
+        358 => "fi_FI",      // Finland
+        359 => "bg_BG",      // Bulgaria
+        370 => "lt_LT",      // Lithuania
+        371 => "lv_LV",      // Latvia
+        372 => "et_EE",      // Estonia
+        374 => "hy_AM",      // Armenia
+        375 => "be_BY",      // Belarus
+        380 => "uk_UA",      // Ukraine
+        // Serbia
         382 => "sr_ME", // Montenegro
         384 => "hr_HR", // Croatia
         386 => "sk_SK", // Slovenia

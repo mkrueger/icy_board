@@ -9,78 +9,80 @@ use crate::{
         state::{GraphicsMode, IcyBoardState},
     },
 };
+use std::fmt::Write as _;
 
 ///  GAP, 52-line format
 pub async fn create_door_sys(state: &IcyBoardState, path: &std::path::Path) -> Res<()> {
     let mut contents = String::new();
-    contents.push_str(&format!("COM{}:\r\n", DOOR_COM_PORT)); // COM Port
-    contents.push_str(&format!("{}\r\n", DOOR_BPS_RATE)); // Com Port Speed
+    let _ = write!(contents, "COM{DOOR_COM_PORT}:\r\n"); // COM Port
+    let _ = write!(contents, "{DOOR_BPS_RATE}\r\n"); // Com Port Speed
     contents.push_str("8\r\n"); // Data bits
-    contents.push_str(&format!("{}\r\n", state.node + 1)); // Node number
+    let _ = write!(contents, "{}\r\n", state.node + 1); // Node number
     contents.push_str("Y\r\n"); // Screen display On
     contents.push_str("N\r\n"); // Printer toggle Off
     contents.push_str("N\r\n"); // Page bell Off
     contents.push_str("N\r\n"); // Caller alarm Off
-    contents.push_str(&format!("{}\r\n", state.session.user_name)); // User full name
-    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().city_or_state)); // User location
-    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().home_voice_phone)); // Home/voice telephone number
-    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().bus_data_phone)); // Work/data telephone number
-    contents.push_str(&format!("{}\r\n", state.door_user_password().await));
-    contents.push_str(&format!("{}\r\n", state.session.cur_security)); // Security level
-    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().stats.num_times_on)); // User's total number of calls to the system
-    contents.push_str(&format!(
+    let _ = write!(contents, "{}\r\n", state.session.user_name); // User full name
+    let _ = write!(contents, "{}\r\n", state.session.current_user.as_ref().unwrap().city_or_state); // User location
+    let _ = write!(contents, "{}\r\n", state.session.current_user.as_ref().unwrap().home_voice_phone); // Home/voice telephone number
+    let _ = write!(contents, "{}\r\n", state.session.current_user.as_ref().unwrap().bus_data_phone); // Work/data telephone number
+    let _ = write!(contents, "{}\r\n", state.door_user_password().await);
+    let _ = write!(contents, "{}\r\n", state.session.cur_security); // Security level
+    let _ = write!(contents, "{}\r\n", state.session.current_user.as_ref().unwrap().stats.num_times_on); // User's total number of calls to the system
+    let _ = write!(
+        contents,
         "{}\r\n",
         state.session.current_user.as_ref().unwrap().stats.last_on.format("%m/%d/%y")
-    )); // User's last call date
-    contents.push_str(&format!("{}\r\n", state.session.seconds_left()));
-    contents.push_str(&format!("{}\r\n", state.session.minutes_left()));
+    ); // User's last call date
+    let _ = write!(contents, "{}\r\n", state.session.seconds_left());
+    let _ = write!(contents, "{}\r\n", state.session.minutes_left());
 
     let emulation = match state.session.disp_options.grapics_mode {
         GraphicsMode::Ctty => "NG",
         _ => "GR",
     };
-    contents.push_str(&format!("{}\r\n", emulation)); //Graphics mode (GR=ANSI, NG=ASCII)
-    contents.push_str(&format!("{}\r\n", state.session.page_len)); // Screen length
+    let _ = write!(contents, "{emulation}\r\n"); //Graphics mode (GR=ANSI, NG=ASCII)
+    let _ = write!(contents, "{}\r\n", state.session.page_len); // Screen length
     contents.push_str(if state.session.expert_mode() { "Y\r\n" } else { "N\r\n" }); // User Mode
     contents.push_str("\r\n"); // Always blank
     contents.push_str("\r\n"); // Always blank
 
     contents.push_str("01/01/99\r\n"); // expiration date
-    contents.push_str(&format!("{}\r\n", state.session.cur_user_id + 1)); // User's record number
-    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().protocol)); // Default protocol
-    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().stats.num_uploads)); // User's total number of uploads
-    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().stats.num_downloads)); // User's total number of downloads
-    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().stats.today_dnld_bytes / 1024)); // User's daily download kilobytes total
-    contents.push_str(&format!("999999\r\n")); // Daily download kilobyte limit
-    contents.push_str(&format!(
+    let _ = write!(contents, "{}\r\n", state.session.cur_user_id + 1); // User's record number
+    let _ = write!(contents, "{}\r\n", state.session.current_user.as_ref().unwrap().protocol); // Default protocol
+    let _ = write!(contents, "{}\r\n", state.session.current_user.as_ref().unwrap().stats.num_uploads); // User's total number of uploads
+    let _ = write!(contents, "{}\r\n", state.session.current_user.as_ref().unwrap().stats.num_downloads); // User's total number of downloads
+    let _ = write!(contents, "{}\r\n", state.session.current_user.as_ref().unwrap().stats.today_dnld_bytes / 1024); // User's daily download kilobytes total
+    let _ = write!(contents, "999999\r\n"); // Daily download kilobyte limit
+    let _ = write!(
+        contents,
         "{}\r\n",
         IcbDate::from_utc(&state.session.current_user.as_ref().unwrap().birth_date).to_country_date()
-    )); // Birth Date
+    ); // Birth Date
     contents.push_str("C:\\HOME\r\n"); // Path to the user database files
     contents.push_str("C:\\MSGS\r\n"); // Path to the message database files
-    contents.push_str(&format!("{}\r\n", state.get_board().await.config.sysop.name)); // Sysop name
-    contents.push_str(&format!("{}\r\n", state.session.alias_name)); // User's handle (alias)
+    let _ = write!(contents, "{}\r\n", state.get_board().await.config.sysop.name); // Sysop name
+    let _ = write!(contents, "{}\r\n", state.session.alias_name); // User's handle (alias)
     contents.push_str("00:00\r\n"); // Next event starting time
     contents.push_str("Y\r\n"); // Error-free connection (Y=Yes N=No)
     contents.push_str("N\r\n"); // Always set to N
     contents.push_str("Y\r\n"); // Always set to Y
     let default_color = match state.get_board().await.config.color_configuration.default {
-        IcbColor::None => 7,
         IcbColor::Dos(col) => col % 15,
-        IcbColor::IcyEngine(_) => 7,
+        IcbColor::None | IcbColor::IcyEngine(_) => 7,
     };
-    contents.push_str(&format!("{}\r\n", default_color)); // BBS Default fg Color
+    let _ = write!(contents, "{default_color}\r\n"); // BBS Default fg Color
     contents.push_str("0\r\n"); // Always set to 0
     contents.push_str("01/01/70\r\n"); // Last new files scan date
-    contents.push_str(&format!("{}\r\n", state.session.login_date.format("%H:%M"))); // Time of this call
-    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().stats.last_on.format("%H:%M"))); // Time of last call
+    let _ = write!(contents, "{}\r\n", state.session.login_date.format("%H:%M")); // Time of this call
+    let _ = write!(contents, "{}\r\n", state.session.current_user.as_ref().unwrap().stats.last_on.format("%H:%M")); // Time of last call
     contents.push_str("32768\r\n"); // Always set to 32768
-    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().stats.today_num_downloads)); // Number of files downloaded today
-    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().stats.total_upld_bytes / 1024)); // Total kilobytes uploaded
-    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().stats.total_dnld_bytes / 1024)); // Total kilobytes downloaded
-    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().user_comment)); // Comment stored in user record
-    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().stats.total_doors_executed)); // Doors Opened
-    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().stats.messages_left)); // Total number of messages posted
+    let _ = write!(contents, "{}\r\n", state.session.current_user.as_ref().unwrap().stats.today_num_downloads); // Number of files downloaded today
+    let _ = write!(contents, "{}\r\n", state.session.current_user.as_ref().unwrap().stats.total_upld_bytes / 1024); // Total kilobytes uploaded
+    let _ = write!(contents, "{}\r\n", state.session.current_user.as_ref().unwrap().stats.total_dnld_bytes / 1024); // Total kilobytes downloaded
+    let _ = write!(contents, "{}\r\n", state.session.current_user.as_ref().unwrap().user_comment); // Comment stored in user record
+    let _ = write!(contents, "{}\r\n", state.session.current_user.as_ref().unwrap().stats.total_doors_executed); // Doors Opened
+    let _ = write!(contents, "{}\r\n", state.session.current_user.as_ref().unwrap().stats.messages_left); // Total number of messages posted
 
     let path = path.join("DOOR.SYS");
     log::info!("create DOOR.SYS: {}", path.display());

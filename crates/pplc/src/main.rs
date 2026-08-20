@@ -178,17 +178,17 @@ fn main() {
         println!("PPLC v{} - PCBoard Programming Language Compiler", *VERSION);
     }
 
-    if let Some(version) = arguments.runtime {
-        if !SUPPORTED_PPE_VERSIONS.contains(&version) {
-            eprintln!("Invalid version number valid values {SUPPORTED_PPE_VERSIONS:?}");
-            std::process::exit(2);
-        }
+    if let Some(version) = arguments.runtime
+        && !SUPPORTED_PPE_VERSIONS.contains(&version)
+    {
+        eprintln!("Invalid version number valid values {SUPPORTED_PPE_VERSIONS:?}");
+        std::process::exit(2);
     }
-    if let Some(version) = arguments.lang_version {
-        if !SUPPORTED_PPL_LANGUAGE_VERSIONS.contains(&version) {
-            eprintln!("Invalid language version valid values {SUPPORTED_PPL_LANGUAGE_VERSIONS:?}");
-            std::process::exit(2);
-        }
+    if let Some(version) = arguments.lang_version
+        && !SUPPORTED_PPL_LANGUAGE_VERSIONS.contains(&version)
+    {
+        eprintln!("Invalid language version valid values {SUPPORTED_PPL_LANGUAGE_VERSIONS:?}");
+        std::process::exit(2);
     }
     if arguments.init {
         let Some(file) = arguments.file.clone() else {
@@ -283,11 +283,7 @@ fn init_package(file: &Path, src_dir: &Path, arguments: &Cli) -> Res<()> {
     };
     ws.compiler = Some(CompilerData {
         language_version: Some(arguments.lang_version.or_else(read_environment).unwrap_or(LAST_PPL_LANGUAGE_VERSION)),
-        defines: if let Some(defines) = &arguments.defines {
-            Some(defines.split(';').map(|s| s.to_string()).collect())
-        } else {
-            None
-        },
+        defines: arguments.defines.as_ref().map(|defines| defines.split(';').map(|s| s.to_string()).collect()),
     });
     ws.save(file.join("ppl.toml"))?;
     Ok(())
@@ -579,8 +575,8 @@ fn compile_toml(file_name: &PathBuf, arguments: &Cli) -> Res<()> {
     if let Some(data) = &workspace.data {
         if let Some(art_files) = &data.art_files {
             for file in art_files {
-                let src_file = base_path.join(&file);
-                let out_file = target_path.join(&file);
+                let src_file = base_path.join(file);
+                let out_file = target_path.join(file);
                 fs::create_dir_all(out_file.parent().unwrap())?;
 
                 if src_file.extension().is_some_and(|extension| extension == "icy") {
@@ -607,8 +603,8 @@ fn compile_toml(file_name: &PathBuf, arguments: &Cli) -> Res<()> {
         }
         if let Some(text_files) = &data.text_files {
             for file in text_files {
-                let src_file = base_path.join(&file);
-                let out_file = target_path.join(&file);
+                let src_file = base_path.join(file);
+                let out_file = target_path.join(file);
                 fs::create_dir_all(out_file.parent().unwrap())?;
                 let txt = read_with_encoding_detection(&src_file)?;
 
@@ -711,7 +707,7 @@ fn compile_files(arguments: &Cli, encoding: Encoding, workspace: &mut Workspace,
                     }
                 }
                 asts.push((ast, src));
-                if check_errors(errors.clone(), &arguments, &asts) {
+                if check_errors(errors.clone(), arguments, &asts) {
                     std::process::exit(1);
                 }
             }
@@ -732,9 +728,9 @@ fn compile_files(arguments: &Cli, encoding: Encoding, workspace: &mut Workspace,
     if !arguments.check {
         println!("Compiling...");
     }
-    let mut compiler = PPECompiler::new(&workspace, reg, errors.clone());
+    let mut compiler = PPECompiler::new(workspace, reg, errors.clone());
     compiler.compile(&asts.iter().map(|(ast, _)| ast).collect::<Vec<&Ast>>());
-    if check_errors(errors.clone(), &arguments, &asts) {
+    if check_errors(errors.clone(), arguments, &asts) {
         std::process::exit(1);
     }
     if arguments.check {
@@ -836,5 +832,5 @@ fn check_errors(errors: std::sync::Arc<std::sync::Mutex<icy_board_engine::parser
         }
         return error_count > 0;
     }
-    return false;
+    false
 }

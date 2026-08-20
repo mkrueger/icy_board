@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::icy_board::state::user_commands::groupchat::*;
+use crate::icy_board::state::user_commands::groupchat::{GroupChatError, GroupChatEvent, GroupChatEventKind, GroupChatPreferences};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ChatParticipant {
@@ -60,7 +60,7 @@ impl GroupChatState {
     }
 
     fn display_handle(&self, node: usize) -> String {
-        self.user_handles.get(&node).cloned().unwrap_or_else(|| format!("Node {}", node))
+        self.user_handles.get(&node).cloned().unwrap_or_else(|| format!("Node {node}"))
     }
 
     fn find_node_by_handle(&self, handle: &str) -> Option<usize> {
@@ -101,7 +101,7 @@ impl GroupChatState {
         }
 
         for (monitor_node, rooms) in &self.monitors {
-            if rooms.contains(&room_id) && *monitor_node != skip && self.rooms.get(room_idx).map_or(false, |room| !room.participants.contains(monitor_node)) {
+            if rooms.contains(&room_id) && *monitor_node != skip && self.rooms.get(room_idx).is_some_and(|room| !room.participants.contains(monitor_node)) {
                 events.push(GroupChatEvent {
                     target_node: *monitor_node,
                     kind: kind.clone(),
@@ -122,7 +122,7 @@ impl GroupChatState {
         let current_room = self.current_room(node);
 
         if current_room == Some(room) {
-            if self.user_handles.get(&node).map(|h| !h.eq_ignore_ascii_case(handle)).unwrap_or(true) {
+            if self.user_handles.get(&node).is_none_or(|h| !h.eq_ignore_ascii_case(handle)) {
                 events.extend(self.update_handle(node, handle)?);
             }
             return Ok((room, events));
@@ -151,7 +151,7 @@ impl GroupChatState {
 
         self.user_rooms.insert(node, room);
 
-        let join_message = format!("{} joined channel {}", handle, room);
+        let join_message = format!("{handle} joined channel {room}");
         events.extend(self.broadcast_room_event(
             room_idx,
             Some(node),
@@ -178,7 +178,7 @@ impl GroupChatState {
             room: Some(room),
             from_node: None,
             from_handle: None,
-            text: format!("Joined channel {}", room),
+            text: format!("Joined channel {room}"),
         });
 
         Ok((room, events))
@@ -211,7 +211,7 @@ impl GroupChatState {
             GroupChatEventKind::UserLeft,
             Some(node),
             Some(handle.clone()),
-            format!("{} left channel {}", handle, room),
+            format!("{handle} left channel {room}"),
         );
 
         if let Some(owner) = new_owner {
@@ -222,7 +222,7 @@ impl GroupChatState {
                 GroupChatEventKind::SystemMessage,
                 None,
                 None,
-                format!("{} is now the host of channel {}", owner_handle, room),
+                format!("{owner_handle} is now the host of channel {room}"),
             ));
         }
 
@@ -273,7 +273,7 @@ impl GroupChatState {
             room: Some(room),
             from_node: Some(node),
             from_handle: Some(sender_handle),
-            text: format!("(to {}) {}", target_actual, message),
+            text: format!("(to {target_actual}) {message}"),
         });
 
         Ok(events)
@@ -288,10 +288,10 @@ impl GroupChatState {
             if room_ref.owner != Some(node) {
                 return Err(GroupChatError::NotOwner);
             }
-            room_ref.topic = topic.clone();
+            room_ref.topic.clone_from(&topic);
         }
 
-        let text = topic.map(|t| format!("Topic is now: {}", t)).unwrap_or_else(|| "Topic cleared.".to_string());
+        let text = topic.map_or_else(|| "Topic cleared.".to_string(), |t| format!("Topic is now: {t}"));
 
         Ok(self.broadcast_room_event(
             room_idx,
@@ -316,9 +316,9 @@ impl GroupChatState {
         }
 
         let text = if private {
-            format!("Channel {} is now private.", room)
+            format!("Channel {room} is now private.")
         } else {
-            format!("Channel {} is now public.", room)
+            format!("Channel {room} is now public.")
         };
 
         Ok(self.broadcast_room_event(
@@ -348,14 +348,11 @@ impl GroupChatState {
 
     pub fn update_handle(&mut self, node: usize, new_handle: &str) -> Result<Vec<GroupChatEvent>, GroupChatError> {
         let previous = self.user_handles.insert(node, new_handle.to_string());
-        if previous.as_ref().map(|old| old.eq_ignore_ascii_case(new_handle)).unwrap_or(false) {
+        if previous.as_ref().is_some_and(|old| old.eq_ignore_ascii_case(new_handle)) {
             return Ok(Vec::new());
         }
 
-        let room = match self.current_room(node) {
-            Some(room) => room,
-            None => return Ok(Vec::new()),
-        };
+        let Some(room) = self.current_room(node) else { return Ok(Vec::new()) };
         let room_idx = Self::validate_room(room)?;
 
         Ok(self.broadcast_room_event(
@@ -364,7 +361,7 @@ impl GroupChatState {
             GroupChatEventKind::SystemMessage,
             None,
             None,
-            format!("{} is now known as {}", previous.unwrap_or_else(|| format!("Node {}", node)), new_handle),
+            format!("{} is now known as {}", previous.unwrap_or_else(|| format!("Node {node}")), new_handle),
         ))
     }
 
@@ -383,7 +380,7 @@ impl GroupChatState {
             room: Some(room),
             from_node: Some(node),
             from_handle: Some(caller_handle.clone()),
-            text: format!("{} invites you to channel {}", caller_handle, room),
+            text: format!("{caller_handle} invites you to channel {room}"),
         });
 
         let ack = if self.current_room(target_node) == Some(room) {
@@ -421,9 +418,9 @@ impl GroupChatState {
 
         let mut events = Vec::new();
         let note = if active {
-            format!("Monitoring channel {}", room)
+            format!("Monitoring channel {room}")
         } else {
-            format!("Stopped monitoring channel {}", room)
+            format!("Stopped monitoring channel {room}")
         };
 
         events.push(GroupChatEvent {
@@ -435,17 +432,15 @@ impl GroupChatState {
             text: note,
         });
 
-        if active {
-            if let Some(topic) = self.rooms[room_idx].topic.clone() {
-                events.push(GroupChatEvent {
-                    target_node: node,
-                    kind: GroupChatEventKind::TopicChanged,
-                    room: Some(room),
-                    from_node: self.rooms[room_idx].owner,
-                    from_handle: self.rooms[room_idx].owner.and_then(|owner| self.user_handles.get(&owner).cloned()),
-                    text: topic,
-                });
-            }
+        if active && let Some(topic) = self.rooms[room_idx].topic.clone() {
+            events.push(GroupChatEvent {
+                target_node: node,
+                kind: GroupChatEventKind::TopicChanged,
+                room: Some(room),
+                from_node: self.rooms[room_idx].owner,
+                from_handle: self.rooms[room_idx].owner.and_then(|owner| self.user_handles.get(&owner).cloned()),
+                text: topic,
+            });
         }
 
         Ok((active, events))

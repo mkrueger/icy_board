@@ -1,6 +1,4 @@
-/**
-<http://www.iana.org/assignments/telnet-options/telnet-options.xhtml>
-*/
+// <http://www.iana.org/assignments/telnet-options/telnet-options.xhtml>
 
 /// <https://www.rfc-editor.org/rfc/rfc856>
 pub const TRANSMIT_BINARY: u8 = 0x00;

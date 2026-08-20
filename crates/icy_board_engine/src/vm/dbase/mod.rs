@@ -43,9 +43,9 @@ impl DbaseState {
         self.channels.get_mut(index)?.as_mut()
     }
 
-    fn get(&self, channel: i32) -> Option<&Box<DbaseChannel>> {
+    fn get(&self, channel: i32) -> Option<&DbaseChannel> {
         let index = usize::try_from(channel).ok()?;
-        self.channels.get(index)?.as_ref()
+        self.channels.get(index)?.as_deref()
     }
 
     /// Records an error against a channel and hands back PPL's `true` for failure.
@@ -68,12 +68,12 @@ impl DbaseState {
     }
 
     pub fn error(&self, channel: i32) -> bool {
-        self.get(channel).map_or(true, |c| c.error)
+        self.get(channel).is_none_or(|c| c.error)
     }
 
-    /// The lowest channel with nothing open on it. It is not reserved, matching PCBoard.
+    /// The lowest channel with nothing open on it. It is not reserved, matching `PCBoard`.
     pub fn next_free(&self) -> i32 {
-        self.channels.iter().position(|c| c.is_none()).map_or(NO_CHANNEL, |i| i as i32)
+        self.channels.iter().position(std::option::Option::is_none).map_or(NO_CHANNEL, |i| i as i32)
     }
 
     pub fn select(&self, alias: &str) -> i32 {
@@ -180,7 +180,7 @@ impl DbaseState {
         slot.db.fields().get(index)
     }
 
-    /// PCBoard reports a float field as numeric even though the header keeps `F`.
+    /// `PCBoard` reports a float field as numeric even though the header keeps `F`.
     pub fn field_type(&self, channel: i32, name: &str) -> String {
         self.field(channel, name).map_or_else(String::new, |f| {
             let reported = if f.field_type == TYPE_FLOAT { TYPE_NUMERIC } else { f.field_type };
@@ -209,11 +209,11 @@ impl DbaseState {
     /// A channel with nothing open on it reports both ends of the file at once, so a
     /// record loop written the usual way stops on its first test.
     pub fn bof(&self, channel: i32) -> bool {
-        self.get(channel).map_or(true, |c| c.bof)
+        self.get(channel).is_none_or(|c| c.bof)
     }
 
     pub fn eof(&self, channel: i32) -> bool {
-        self.get(channel).map_or(true, |c| c.eof)
+        self.get(channel).is_none_or(|c| c.eof)
     }
 
     pub fn changed(&self, channel: i32) -> bool {
@@ -467,7 +467,7 @@ impl DbaseState {
         self.ok(channel)
     }
 
-    /// PCBoard answers 1 for an exact or leading match and 0 for anything else, leaving
+    /// `PCBoard` answers 1 for an exact or leading match and 0 for anything else, leaving
     /// the position just past the end when it finds nothing.
     pub fn seek(&mut self, channel: i32, search: &str) -> i32 {
         let Some(slot) = self.get(channel) else {
@@ -479,16 +479,13 @@ impl DbaseState {
             return 0;
         };
         let found = slot.indexes[active].seek(&to_cp437(search));
-        match found {
-            Some(record_no) => {
-                self.go(channel, record_no as i32);
-                1
-            }
-            None => {
-                let past = self.record_count(channel) + 1;
-                self.go(channel, past);
-                0
-            }
+        if let Some(record_no) = found {
+            self.go(channel, record_no as i32);
+            1
+        } else {
+            let past = self.record_count(channel) + 1;
+            self.go(channel, past);
+            0
         }
     }
 }

@@ -10,7 +10,7 @@ async fn test_display_file_with_error_false_returns_false() {
     let result = state.display_file_with_error(&non_existent_file, false).await;
 
     assert!(result.is_ok(), "display_file_with_error should return Ok result");
-    assert_eq!(result.unwrap(), false, "display_file_with_error should return false for non-existent file");
+    assert!(!result.unwrap(), "display_file_with_error should return false for non-existent file");
 }
 
 async fn setup_test_state() -> IcyBoardState {

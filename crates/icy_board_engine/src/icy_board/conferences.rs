@@ -42,7 +42,6 @@ pub enum ConferenceType {
 impl ConferenceType {
     pub fn from_u8(value: u8) -> Self {
         match value {
-            0 => Self::Normal,
             1 => Self::InternetEmail,
             2 => Self::InternetUsenet,
             3 => Self::UsnetModeratedNewsgroup,
@@ -281,7 +280,7 @@ impl ConferenceBase {
             std::fs::create_dir_all(&destination).unwrap();
 
             let areas = AreaList::new(vec![general_area]);
-            areas.save(&destination.join(&"area.toml")).unwrap();
+            areas.save(&destination.join("area.toml")).unwrap();
 
             let new = Conference {
                 name: c.name.clone(),
@@ -300,7 +299,7 @@ impl ConferenceBase {
                 allow_aliases: d.allow_aliases,
                 echo_mail_in_conference: c.echo_mail,
                 add_conference_security: c.add_conference_security,
-                add_conference_time: c.add_conference_time as u16,
+                add_conference_time: c.add_conference_time,
                 users_menu: PathBuf::from(&c.users_menu),
                 sysop_menu: PathBuf::from(&c.sysop_menu),
                 news_file: PathBuf::from(&c.news_file),
@@ -374,7 +373,7 @@ impl IcyBoardSerializer for ConferenceBase {
     const FILE_TYPE: &'static str = "conferences";
 }
 
-impl<'a> UserData for Conference {
+impl UserData for Conference {
     const TYPE_NAME: &'static str = "Conference";
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
@@ -395,18 +394,15 @@ impl<'a> UserData for Conference {
     }
 }
 
-lazy_static::lazy_static! {
-    pub static ref NAME: unicase::Ascii<String> = unicase::Ascii::new("Name".to_string());
-    pub static ref ISPUBLIC: unicase::Ascii<String> = unicase::Ascii::new("IsPublic".to_string());
-    pub static ref FILE_AREAS: unicase::Ascii<String> = unicase::Ascii::new("Directories".to_string());
-    pub static ref DOORS: unicase::Ascii<String> = unicase::Ascii::new("Doors".to_string());
-    pub static ref MESSAGE_AREAS: unicase::Ascii<String> = unicase::Ascii::new("Areas".to_string());
-
-    pub static ref HAS_ACCESS: unicase::Ascii<String> = unicase::Ascii::new("HasAccess".to_string());
-    pub static ref GET_FILE_AREA: unicase::Ascii<String> = unicase::Ascii::new("GetDir".to_string());
-    pub static ref GET_MSG_AREA: unicase::Ascii<String> = unicase::Ascii::new("GetArea".to_string());
-    pub static ref GET_DOOR: unicase::Ascii<String> = unicase::Ascii::new("GetDoor".to_string());
-}
+pub static NAME: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Name".to_string()));
+pub static ISPUBLIC: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("IsPublic".to_string()));
+pub static FILE_AREAS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Directories".to_string()));
+pub static DOORS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Doors".to_string()));
+pub static MESSAGE_AREAS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Areas".to_string()));
+pub static HAS_ACCESS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("HasAccess".to_string()));
+pub static GET_FILE_AREA: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("GetDir".to_string()));
+pub static GET_MSG_AREA: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("GetArea".to_string()));
+pub static GET_DOOR: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("GetDoor".to_string()));
 
 #[async_trait]
 impl UserDataValue for Conference {
@@ -436,7 +432,7 @@ impl UserDataValue for Conference {
             return Ok(VariableValue::new_int(0));
         }
 
-        log::error!("Invalid user data call on Conference ({})", name);
+        log::error!("Invalid user data call on Conference ({name})");
         Ok(VariableValue::new_int(-1))
     }
 
@@ -461,7 +457,7 @@ impl UserDataValue for Conference {
                 if let Some(res) = dir.get(area as usize) {
                     return Ok(user_data_value((*res).clone(), FILE_DIRECTORY_ID));
                 }
-                log::error!("PPL: File area not found ({})", area);
+                log::error!("PPL: File area not found ({area})");
             }
 
             return Ok(user_data_value(FileDirectory::default(), FILE_DIRECTORY_ID));
@@ -472,7 +468,7 @@ impl UserDataValue for Conference {
                 if let Some(res) = areas.get(area as usize) {
                     return Ok(user_data_value((*res).clone(), MESSAGE_AREA_ID));
                 }
-                log::error!("PPL: Message area not found ({})", area);
+                log::error!("PPL: Message area not found ({area})");
             }
 
             return Ok(user_data_value(MessageArea::default(), MESSAGE_AREA_ID));
@@ -484,17 +480,17 @@ impl UserDataValue for Conference {
                 if let Some(res) = doors.get(door as usize) {
                     return Ok(user_data_value((*res).clone(), DOOR_ID));
                 }
-                log::error!("PPL: Door not found ({})", door);
+                log::error!("PPL: Door not found ({door})");
             }
 
             return Ok(user_data_value(Door::default(), DOOR_ID));
         }
-        log::error!("Invalid function call on Conference ({})", name);
+        log::error!("Invalid function call on Conference ({name})");
         Err("Function not found".into())
     }
 
     async fn call_method(&mut self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _arguments: &[VariableValue]) -> crate::Res<()> {
-        log::error!("Invalid method call on Conference ({})", name);
+        log::error!("Invalid method call on Conference ({name})");
         Err("Function not found".into())
     }
 }

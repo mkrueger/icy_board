@@ -13,7 +13,7 @@ pub fn new_main_window(icy_board: Arc<Mutex<IcyBoard>>, full_screen: bool) -> Ap
     let general_tab = GeneralTab::new(icy_board.clone());
     App {
         full_screen,
-        title: format!(" IcyBoard System Manager"),
+        title: " IcyBoard System Manager".to_string(),
         mode: Mode::default(),
         tab: 0,
         date_format,

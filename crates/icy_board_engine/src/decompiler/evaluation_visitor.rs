@@ -81,10 +81,8 @@ fn partial_evaluate(get_op: BinOp, val: &VariableValue) -> Option<VariableValue>
                 return Some(VariableValue::new_bool(true));
             }
         }
-        BinOp::And => {
-            if !val.as_bool() {
-                return Some(VariableValue::new_bool(false));
-            }
+        BinOp::And if !val.as_bool() => {
+            return Some(VariableValue::new_bool(false));
         }
         _ => {}
     }
@@ -96,10 +94,10 @@ pub struct OptimizationVisitor {}
 
 impl AstVisitorMut for OptimizationVisitor {
     fn visit_unary_expression(&mut self, unary: &crate::ast::UnaryExpression) -> crate::ast::Expression {
-        if let Some(value) = EvaluationVisitor::default().visit_unary_expression(unary) {
-            if let Some(value) = value_to_expression(&value) {
-                return value;
-            }
+        if let Some(value) = EvaluationVisitor::default().visit_unary_expression(unary)
+            && let Some(value) = value_to_expression(&value)
+        {
+            return value;
         }
         Expression::Unary(UnaryExpression::empty(unary.get_op(), unary.get_expression().visit_mut(self)))
     }
@@ -174,23 +172,22 @@ pub struct ConstantFolder {}
 
 impl AstVisitorMut for ConstantFolder {
     fn visit_unary_expression(&mut self, unary: &crate::ast::UnaryExpression) -> Expression {
-        if is_foldable_constant(unary.get_expression()) {
-            if let Some(value) = EvaluationVisitor::default().visit_unary_expression(unary) {
-                if let Some(expr) = value_to_expression(&value) {
-                    return expr;
-                }
-            }
+        if is_foldable_constant(unary.get_expression())
+            && let Some(value) = EvaluationVisitor::default().visit_unary_expression(unary)
+            && let Some(expr) = value_to_expression(&value)
+        {
+            return expr;
         }
         Expression::Unary(UnaryExpression::empty(unary.get_op(), unary.get_expression().visit_mut(self)))
     }
 
     fn visit_binary_expression(&mut self, binary: &crate::ast::BinaryExpression) -> Expression {
-        if is_foldable_constant(binary.get_left_expression()) && is_foldable_constant(binary.get_right_expression()) {
-            if let Some(value) = EvaluationVisitor::default().visit_binary_expression(binary) {
-                if let Some(expr) = value_to_expression(&value) {
-                    return expr;
-                }
-            }
+        if is_foldable_constant(binary.get_left_expression())
+            && is_foldable_constant(binary.get_right_expression())
+            && let Some(value) = EvaluationVisitor::default().visit_binary_expression(binary)
+            && let Some(expr) = value_to_expression(&value)
+        {
+            return expr;
         }
         let left = binary.get_left_expression().visit_mut(self);
         let right = binary.get_right_expression().visit_mut(self);

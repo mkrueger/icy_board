@@ -38,7 +38,7 @@ pub fn add(config: &FtnConfig, address: &str, file: &Path) -> Res<PathBuf> {
         .iter()
         .find(|link| link.address.to_string().eq_ignore_ascii_case(address) || link.to_5d().eq_ignore_ascii_case(address))
     else {
-        return Err(format!("No link is configured for {}", address).into());
+        return Err(format!("No link is configured for {address}").into());
     };
     let Some(name) = file.file_name() else {
         return Err(format!("{} is not a file that can be sent", file.display()).into());

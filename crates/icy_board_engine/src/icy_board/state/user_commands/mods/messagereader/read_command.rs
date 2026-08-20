@@ -1,4 +1,4 @@
-//! Port of PCBoard's read command parser.
+//! Port of `PCBoard`'s read command parser.
 //!
 //! R, Q and REPLY all funnel their input through this one parser, so the set of
 //! words it accepts and the order in which it consumes them is part of the
@@ -89,7 +89,7 @@ pub struct ParseContext {
     pub num_conferences: u16,
 }
 
-/// Mirrors PCBoard's `readtype`: the accumulated result of one command line.
+/// Mirrors `PCBoard`'s `readtype`: the accumulated result of one command line.
 #[derive(Clone, Debug)]
 pub struct ReadCommand {
     pub func: MsgFunc,
@@ -565,14 +565,12 @@ pub fn parse(tokens: &[String], flag: ReadLoop, ctx: &ParseContext) -> ReadComma
                 };
                 cmd.valid_cmd = true;
                 cmd.move_conf = None;
-                if remaining > 1 {
-                    if let Some((_, next)) = iter.next() {
-                        if let Ok(num) = next.parse::<u16>() {
-                            if num < ctx.num_conferences {
-                                cmd.move_conf = Some(num);
-                            }
-                        }
-                    }
+                if remaining > 1
+                    && let Some((_, next)) = iter.next()
+                    && let Ok(num) = next.parse::<u16>()
+                    && num < ctx.num_conferences
+                {
+                    cmd.move_conf = Some(num);
                 }
             }
             O_DESEL => {
@@ -775,12 +773,12 @@ pub fn parse(tokens: &[String], flag: ReadLoop, ctx: &ParseContext) -> ReadComma
 fn append_search_text(cmd: &mut ReadCommand, last_search_cmd: Option<usize>, token: &str) {
     match last_search_cmd {
         Some(O_FROM) => add_text(&mut cmd.user_name_from, token, 25),
-        Some(O_TO) | Some(O_USER) => add_text(&mut cmd.user_name_to, token, 25),
+        Some(O_TO | O_USER) => add_text(&mut cmd.user_name_to, token, 25),
         _ => add_text(&mut cmd.search_text, token, 40),
     }
 }
 
-/// Fold in the defaults PCBoard applies once the whole line has
+/// Fold in the defaults `PCBoard` applies once the whole line has
 /// been read and any missing search terms have been prompted for.
 pub fn finalize(cmd: &mut ReadCommand) {
     if !cmd.numbers.is_empty() {
@@ -804,7 +802,7 @@ mod tests {
     use super::*;
 
     fn tokens(line: &str) -> Vec<String> {
-        line.split_whitespace().map(|s| s.to_ascii_uppercase()).collect()
+        line.split_whitespace().map(str::to_ascii_uppercase).collect()
     }
 
     fn ctx() -> ParseContext {

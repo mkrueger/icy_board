@@ -63,7 +63,7 @@ impl IcyBoardState {
         };
         let high_msg = self.board.lock().await.conferences[*conf_num].areas.as_ref().unwrap()[*area_num].get_high_msg() as usize;
 
-        self.session.op_text = format!("(1-{})", high_msg);
+        self.session.op_text = format!("(1-{high_msg})");
 
         let input = self
             .input_field(
@@ -99,7 +99,7 @@ impl IcyBoardState {
                     .input_field(
                         IceText::QWKCommands,
                         2,
-                        &"DSU",
+                        "DSU",
                         CommandType::QWK.get_help(),
                         None,
                         display_flags::UPCASE | display_flags::STACKED | display_flags::NEWLINE | display_flags::LFBEFORE,
@@ -109,7 +109,7 @@ impl IcyBoardState {
                     break;
                 }
                 self.session.push_tokens(&input);
-            };
+            }
 
             if let Some(token) = self.session.tokens.pop_front() {
                 match token.as_str() {
@@ -162,7 +162,7 @@ impl IcyBoardState {
         }
         let mut msgid_to_number = HashMap::new();
 
-        for (k, v) in number_to_msgid.iter() {
+        for (k, v) in &number_to_msgid {
             msgid_to_number.insert(*v, *k);
         }
 
@@ -234,10 +234,10 @@ impl IcyBoardState {
                         break;
                     }
                     "S" => {
-                        self.change_qkw_selection(&number_to_msgid, 0, number_to_msgid.len(), Some(true)).await?;
+                        self.change_qkw_selection(&number_to_msgid, 0, number_to_msgid.len(), Some(true))?;
                     }
                     "D" => {
-                        self.change_qkw_selection(&number_to_msgid, 0, number_to_msgid.len(), Some(false)).await?;
+                        self.change_qkw_selection(&number_to_msgid, 0, number_to_msgid.len(), Some(false))?;
                     }
                     "L" => {
                         self.set_last_read(&number_to_msgid).await?;
@@ -257,15 +257,13 @@ impl IcyBoardState {
 
                         if str.contains('-') {
                             let mut parts = str.split('-');
-                            if let (Some(from), Some(to)) = (parts.next(), parts.next()) {
-                                if let (Ok(from), Ok(to)) = (from.parse::<usize>(), to.parse::<usize>()) {
-                                    self.change_qkw_selection(&number_to_msgid, from, to, value).await?;
-                                }
+                            if let (Some(from), Some(to)) = (parts.next(), parts.next())
+                                && let (Ok(from), Ok(to)) = (from.parse::<usize>(), to.parse::<usize>())
+                            {
+                                self.change_qkw_selection(&number_to_msgid, from, to, value)?;
                             }
-                        } else {
-                            if let Ok(num) = str.parse::<usize>() {
-                                self.change_qkw_selection(&number_to_msgid, num, num, value).await?;
-                            }
+                        } else if let Ok(num) = str.parse::<usize>() {
+                            self.change_qkw_selection(&number_to_msgid, num, num, value)?;
                         }
                     }
                 }
@@ -309,11 +307,11 @@ impl IcyBoardState {
 
             self.set_color(TerminalTarget::Both, IcbColor::dos_white()).await?;
 
-            self.print(TerminalTarget::Both, &format!(" {:<6}", last_read)).await?;
-            self.print(TerminalTarget::Both, &format!(" {:<6}", high)).await?;
+            self.print(TerminalTarget::Both, &format!(" {last_read:<6}")).await?;
+            self.print(TerminalTarget::Both, &format!(" {high:<6}")).await?;
             if include {
                 self.set_color(TerminalTarget::Both, IcbColor::dos_light_cyan()).await?;
-                self.print(TerminalTarget::Both, &"X").await?;
+                self.print(TerminalTarget::Both, "X").await?;
             }
         }
         self.new_line().await?;
@@ -321,7 +319,7 @@ impl IcyBoardState {
         Ok(())
     }
 
-    async fn change_qkw_selection(&mut self, table: &HashMap<u16, (usize, usize)>, from: usize, to: usize, set_selection_to: Option<bool>) -> Res<()> {
+    fn change_qkw_selection(&mut self, table: &HashMap<u16, (usize, usize)>, from: usize, to: usize, set_selection_to: Option<bool>) -> Res<()> {
         if let Some(user) = &mut self.session.current_user {
             for i in from..=to {
                 if let Some((conference, num)) = table.get(&(i as u16)) {
@@ -383,7 +381,7 @@ impl IcyBoardState {
                     board.config.qwk_settings.bbs_sysop_name.clone().into()
                 },
                 bbs_id: if board.config.qwk_settings.bbs_id.is_empty() {
-                    bbs_name.clone().into()
+                    bbs_name.clone()
                 } else {
                     board.config.qwk_settings.bbs_id.clone().into()
                 },
@@ -418,7 +416,7 @@ impl IcyBoardState {
                 if let Some(areas) = &conf.areas {
                     for (j, area) in areas.iter().enumerate() {
                         let ptr = if let Some(ptr) = user.lastread_ptr_flags.get(&(i, j)) {
-                            ptr.clone()
+                            *ptr
                         } else {
                             LastReadStatus::default()
                         };
@@ -447,34 +445,34 @@ impl IcyBoardState {
 
                                 ndx_data.insert(conference_number, Vec::new());
                                 for i in ptr.highest_msg_read as u32..=highest {
-                                    if let Ok(header) = message_base.read_header(i) {
-                                        if let Ok(text) = message_base.read_message_text(&header) {
-                                            let date_time = DateTime::from_timestamp(header.date_written as i64, 0).unwrap_or(Utc::now());
-                                            let qwk_msg = QwkMessage {
-                                                msg_number: header.message_number,
-                                                from: header.from().unwrap().clone(),
-                                                to: header.to().unwrap().clone(),
-                                                subj: header.subject().unwrap().clone(),
-                                                date_time: date_time.format("%m-%d-%y%H:%M").to_string().into(),
-                                                text,
-                                                status: b' ',
-                                                password: BString::from(""),
-                                                ref_msg_number: header.reply_to,
-                                                logical_message_number: control_dat.message_count as u16,
-                                                active_flag: if header.is_deleted() { 226 } else { 225 },
-                                                conference_number,
-                                                net_tag: b' ',
-                                            };
-                                            let blocks = qwk_msg.write(&mut msg_writer, is_extended)?;
-                                            ndx_data.get_mut(&conference_number).unwrap().push(BasicReal::from(cur_block));
-                                            control_dat.message_count += 1;
-                                            cur_block += blocks as i32;
-                                        }
+                                    if let Ok(header) = message_base.read_header(i)
+                                        && let Ok(text) = message_base.read_message_text(&header)
+                                    {
+                                        let date_time = DateTime::from_timestamp(header.date_written as i64, 0).unwrap_or(Utc::now());
+                                        let qwk_msg = QwkMessage {
+                                            msg_number: header.message_number,
+                                            from: header.from().unwrap().clone(),
+                                            to: header.to().unwrap().clone(),
+                                            subj: header.subject().unwrap().clone(),
+                                            date_time: date_time.format("%m-%d-%y%H:%M").to_string().into(),
+                                            text,
+                                            status: b' ',
+                                            password: BString::from(""),
+                                            ref_msg_number: header.reply_to,
+                                            logical_message_number: control_dat.message_count as u16,
+                                            active_flag: if header.is_deleted() { 226 } else { 225 },
+                                            conference_number,
+                                            net_tag: b' ',
+                                        };
+                                        let blocks = qwk_msg.write(&mut msg_writer, is_extended)?;
+                                        ndx_data.get_mut(&conference_number).unwrap().push(BasicReal::from(cur_block));
+                                        control_dat.message_count += 1;
+                                        cur_block += blocks as i32;
                                     }
                                 }
                             }
                             Err(err) => {
-                                log::error!("Message index load error {}", err);
+                                log::error!("Message index load error {err}");
                                 log::error!("Creating new message index at {}", message_base_file.display());
                             }
                         }
@@ -495,11 +493,11 @@ impl IcyBoardState {
                 zip.write_all(&data)?;
             }
 
-            for (cnf, ndx) in ndx_data.iter() {
-                zip.start_file(&format!("{:03}.ndx", cnf), SimpleFileOptions::default())?;
+            for (cnf, ndx) in &ndx_data {
+                zip.start_file(format!("{cnf:03}.ndx"), SimpleFileOptions::default())?;
                 for br in ndx {
                     zip.write_all(br.bytes())?;
-                    zip.write(&[*cnf as u8])?;
+                    zip.write_all(&[*cnf as u8])?;
                 }
             }
             zip.finish()?;
@@ -542,7 +540,7 @@ impl IcyBoardState {
             Ok(mut state) => {
                 while !state.is_finished {
                     if let Err(e) = prot.update_transfer(&mut *self.connection, &mut state).await {
-                        log::error!("Error while updating file transfer with {:?} : {}", protocol, e);
+                        log::error!("Error while updating file transfer with {protocol:?} : {e}");
                         self.display_text(IceText::TransferAborted, display_flags::NEWLINE).await?;
                         break;
                     }
@@ -555,7 +553,7 @@ impl IcyBoardState {
                         .await?;
 
                     let mut archive = zip::ZipArchive::new(std::fs::File::open(&path)?)?;
-                    if let Ok(mut arch) = archive.by_name(&format!("{}.MSG", bbs_id)) {
+                    if let Ok(mut arch) = archive.by_name(&format!("{bbs_id}.MSG")) {
                         let mut buf = Vec::new();
                         arch.read_to_end(&mut buf)?;
                         let mut cursor = Cursor::new(buf);
@@ -592,8 +590,8 @@ impl IcyBoardState {
                 }
             }
             Err(e) => {
-                log::error!("Error while initiating file transfer with {:?} : {}", protocol, e);
-                self.println(TerminalTarget::Both, &format!("Error: {}", e)).await?;
+                log::error!("Error while initiating file transfer with {protocol:?} : {e}");
+                self.println(TerminalTarget::Both, &format!("Error: {e}")).await?;
             }
         }
         Ok(())

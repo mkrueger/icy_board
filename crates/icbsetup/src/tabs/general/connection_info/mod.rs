@@ -56,7 +56,7 @@ impl Page for ConnectionInfo {
         if let Some(selected) = opt {
             return match selected {
                 0 => PageMessage::OpenSubPage(Box::new(telnet::Telnet::new(self.icy_board.clone()))),
-                1 => PageMessage::OpenSubPage(Box::new(ssh::SSH::new(self.icy_board.clone()))),
+                1 => PageMessage::OpenSubPage(Box::new(ssh::Ssh::new(self.icy_board.clone()))),
                 //2 => PageMessage::OpenSubPage(Box::new(Websockets::new(self.icy_board.clone()))),
                 2 => PageMessage::OpenSubPage(Box::new(SecureWebsockets::new(self.icy_board.clone()))),
                 _ => PageMessage::None,

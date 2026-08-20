@@ -437,7 +437,7 @@ impl FileBase {
     }
 
     pub fn get_hash(path: &Path) -> crate::Result<u64> {
-        let data = fs::read(&path)?;
+        let data = fs::read(path)?;
         let hash = XxHash3_64::oneshot(&data);
         Ok(hash)
     }

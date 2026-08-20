@@ -440,20 +440,6 @@ pub fn get_function_hover(func: &FunctionDefinition) -> Option<Hover> {
     }
 }
 
-#[cfg(test)]
-mod test {
-    use icy_board_engine::executable::{FUNCTION_DEFINITIONS, FunctionSignature};
-
-    #[test]
-    fn test_function_translations() {
-        for f in FUNCTION_DEFINITIONS.iter() {
-            if let FunctionSignature::FixedParameters(_) = f.signature {
-                assert!(super::get_function_hover(f).is_some(), "Function {:?} failed", f.opcode);
-            }
-        }
-    }
-}
-
 pub fn get_statement_hover(stmt: &StatementDefinition) -> Option<Hover> {
     let sig = stmt.get_signature();
     match stmt.opcode {
@@ -678,5 +664,19 @@ pub fn get_statement_hover(stmt: &StatementDefinition) -> Option<Hover> {
         OpCode::SetBankBal => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-setbankbal")),
         OpCode::WebRequest => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-webrequest")),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use icy_board_engine::executable::{FUNCTION_DEFINITIONS, FunctionSignature};
+
+    #[test]
+    fn test_function_translations() {
+        for f in FUNCTION_DEFINITIONS.iter() {
+            if let FunctionSignature::FixedParameters(_) = f.signature {
+                assert!(super::get_function_hover(f).is_some(), "Function {:?} failed", f.opcode);
+            }
+        }
     }
 }

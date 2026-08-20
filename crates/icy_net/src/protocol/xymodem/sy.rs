@@ -93,10 +93,10 @@ impl Sy {
                         let variant_str = format!("{:?}", self.configuration.variant);
                         transfer_state
                             .send_state
-                            .log_info(&format!("Receiver ready - using {} mode with {} verification", variant_str, mode_str));
+                            .log_info(format!("Receiver ready - using {} mode with {} verification", variant_str, mode_str));
                     }
                     Err(e) => {
-                        transfer_state.send_state.log_error(&format!("Failed to establish connection mode: {}", e));
+                        transfer_state.send_state.log_error(format!("Failed to establish connection mode: {}", e));
                         return Err(e);
                     }
                 }
@@ -110,7 +110,7 @@ impl Sy {
                         let file_size = next_file.metadata()?.len();
                         transfer_state
                             .send_state
-                            .log_info(&format!("Starting transfer of '{}' ({} bytes)", file_name, file_size));
+                            .log_info(format!("Starting transfer of '{}' ({} bytes)", file_name, file_size));
 
                         transfer_state.send_state.file_name = file_name;
                         transfer_state.send_state.file_size = file_size;
@@ -136,7 +136,7 @@ impl Sy {
                 if retries > 0 {
                     transfer_state
                         .send_state
-                        .log_info(&format!("Retrying YModem header transmission (attempt {})", retries + 1));
+                        .log_info(format!("Retrying YModem header transmission (attempt {})", retries + 1));
                 }
                 self.block_number = 0;
                 self.send_ymodem_header(com, transfer_state).await?;
@@ -150,7 +150,7 @@ impl Sy {
                     transfer_state.current_state = "Encountered error";
                     transfer_state
                         .send_state
-                        .log_info(&format!("NAK received for YModem header (retry {})", retries + 1));
+                        .log_info(format!("NAK received for YModem header (retry {})", retries + 1));
 
                     if retries > 5 {
                         transfer_state.send_state.log_error("Too many NAKs for YModem header, aborting");
@@ -168,7 +168,7 @@ impl Sy {
                     transfer_state.current_state = "Header accepted.";
                     transfer_state
                         .send_state
-                        .log_info(&format!("File header accepted for '{}'", transfer_state.send_state.file_name));
+                        .log_info(format!("File header accepted for '{}'", transfer_state.send_state.file_name));
                     let _ = self.read_command(com).await?;
                     // SKIP - not needed to check that
                     self.send_state = SendState::SendData(0);
@@ -179,7 +179,7 @@ impl Sy {
                 } else {
                     transfer_state
                         .send_state
-                        .log_error(&format!("Unexpected response to YModem header: 0x{:02X}", ack));
+                        .log_error(format!("Unexpected response to YModem header: 0x{:02X}", ack));
                     transfer_state.send_state.errors += 1;
                     self.send_state = SendState::SendYModemHeader(retries + 1);
                 }
@@ -190,7 +190,7 @@ impl Sy {
                 if retries > 0 {
                     transfer_state
                         .send_state
-                        .log_warning(&format!("Retransmitting block {} (attempt {})", self.block_number, retries + 1));
+                        .log_warning(format!("Retransmitting block {} (attempt {})", self.block_number, retries + 1));
                 }
 
                 match self.send_data_block(com, transfer_state).await {
@@ -208,7 +208,7 @@ impl Sy {
                         self.check_eof(com, transfer_state).await?;
                     }
                     Err(e) => {
-                        transfer_state.send_state.log_error(&format!("Error sending data block: {}", e));
+                        transfer_state.send_state.log_error(format!("Error sending data block: {}", e));
                         return Err(e);
                     }
                 }
@@ -227,7 +227,7 @@ impl Sy {
 
                 if ack != ACK {
                     transfer_state.send_state.errors += 1;
-                    transfer_state.send_state.log_error(&format!(
+                    transfer_state.send_state.log_error(format!(
                         "NAK/error for block {} (error count: {})",
                         self.block_number.wrapping_sub(1),
                         transfer_state.send_state.errors
@@ -257,12 +257,10 @@ impl Sy {
             SendState::YModemWaitNextRequest => {
                 transfer_state.current_state = "Await next file request";
                 let cmd = self.read_command(com).await?;
-                if cmd == CAN {
-                    if self.read_command(com).await? == CAN {
-                        transfer_state.send_state.log_warning("Batch cancelled (double CAN)");
-                        self.send_state = SendState::None;
-                        return Err(XYModemError::Cancel.into());
-                    }
+                if cmd == CAN && self.read_command(com).await? == CAN {
+                    transfer_state.send_state.log_warning("Batch cancelled (double CAN)");
+                    self.send_state = SendState::None;
+                    return Err(XYModemError::Cancel.into());
                 }
 
                 let streaming = self.configuration.variant == XYModemVariant::YModemG;
@@ -273,7 +271,7 @@ impl Sy {
                         if !self.file_queue.is_empty() {
                             transfer_state
                                 .send_state
-                                .log_info(&format!("Receiver ready for next file ({} remaining)", self.file_queue.len()));
+                                .log_info(format!("Receiver ready for next file ({} remaining)", self.file_queue.len()));
                             self.send_state = SendState::SendYModemHeader(0);
                         } else {
                             transfer_state.send_state.log_info("Receiver requested terminal header; sending empty block");
@@ -294,7 +292,7 @@ impl Sy {
                     other => {
                         transfer_state
                             .send_state
-                            .log_error(&format!("Unexpected command 0x{:02X} awaiting next file", other));
+                            .log_error(format!("Unexpected command 0x{:02X} awaiting next file", other));
                         self.cancel(com).await?;
                         return Err(XYModemError::InvalidResponse(other).into());
                     }
@@ -318,7 +316,7 @@ impl Sy {
                     }
                     transfer_state
                         .send_state
-                        .log_warning(&format!("Unexpected response during batch end: 0x{:02X}", read_command));
+                        .log_warning(format!("Unexpected response during batch end: 0x{:02X}", read_command));
                     self.cancel(com).await?;
                 }
                 1 => {
@@ -335,7 +333,7 @@ impl Sy {
                         if !self.file_queue.is_empty() {
                             transfer_state
                                 .send_state
-                                .log_info(&format!("Receiver ready for next file in batch ({} files remaining)", self.file_queue.len()));
+                                .log_info(format!("Receiver ready for next file in batch ({} files remaining)", self.file_queue.len()));
                             self.send_state = SendState::SendYModemHeader(0);
                         } else {
                             transfer_state.send_state.log_info("No more files in batch, sending end-of-batch header");
@@ -358,7 +356,7 @@ impl Sy {
 
     async fn check_eof(&mut self, com: &mut dyn Connection, transfer_state: &mut TransferState) -> crate::Result<()> {
         if transfer_state.send_state.cur_bytes_transfered >= transfer_state.send_state.file_size {
-            transfer_state.send_state.log_info(&format!(
+            transfer_state.send_state.log_info(format!(
                 "File '{}' complete ({} bytes)",
                 transfer_state.send_state.file_name, transfer_state.send_state.cur_bytes_transfered
             ));
@@ -368,7 +366,7 @@ impl Sy {
 
             if self.configuration.is_ymodem() {
                 if !self.file_queue.is_empty() {
-                    transfer_state.send_state.log_info(&format!("{} file(s) remaining", self.file_queue.len()));
+                    transfer_state.send_state.log_info(format!("{} file(s) remaining", self.file_queue.len()));
                 } else {
                     transfer_state.send_state.log_info("All files sent; terminal header pending");
                 }
@@ -501,7 +499,7 @@ impl Sy {
             let file_name = next_file.file_name().unwrap().to_string_lossy().to_string();
             transfer_state
                 .send_state
-                .log_info(&format!("Sending header for '{}' ({} bytes)", file_name, size));
+                .log_info(format!("Sending header for '{}' ({} bytes)", file_name, size));
 
             transfer_state.send_state.file_name = file_name;
             transfer_state.send_state.file_size = size;

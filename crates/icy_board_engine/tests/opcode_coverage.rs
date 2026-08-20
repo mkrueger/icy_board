@@ -64,10 +64,10 @@ fn parse_stubbed_handlers(src: &str, stub_macro: &str) -> BTreeSet<String> {
             let name: String = rest.chars().take_while(|c| c.is_alphanumeric() || *c == '_').collect();
             current = Some(name);
         }
-        if trimmed.contains(stub_macro) {
-            if let Some(name) = &current {
-                stubbed.insert(name.clone());
-            }
+        if trimmed.contains(stub_macro)
+            && let Some(name) = &current
+        {
+            stubbed.insert(name.clone());
         }
     }
     stubbed

@@ -281,7 +281,7 @@ pub const FILE_DIRECTORY_ID: usize = 32;
 pub const DOOR_ID: usize = 33;
 pub const CONTACT_ID: usize = 34;
 
-/// The board objects are ours, so no PCBoard language knows their names.
+/// The board objects are ours, so no `PCBoard` language knows their names.
 pub const FIRST_BOARD_OBJECT_LANGUAGE_VERSION: u16 = 400;
 
 /// Types a program declares itself start here, so the board can keep adding
@@ -406,7 +406,7 @@ impl UserTypeRegistry {
         Some(id)
     }
 
-    pub fn register<'a, T: UserData>(&mut self) {
+    pub fn register<T: UserData>(&mut self) {
         let mut registry = UserDataRegistry::default();
         T::register_members(&mut registry);
         let id = self.types.len();
@@ -431,7 +431,7 @@ impl UserTypeRegistry {
     pub fn get_type_from_id(&self, d: u8) -> Option<&UserDataRegistry> {
         let d = d as usize;
         if d < FIRST_ID || d >= self.types.len() + FIRST_ID {
-            log::error!("Invalid user type id: {}", d);
+            log::error!("Invalid user type id: {d}");
             return None;
         }
         Some(&self.types[d - FIRST_ID])
@@ -458,10 +458,8 @@ pub struct Parser<'a> {
     in_function: bool,
     types_predeclared: bool,
 }
-lazy_static::lazy_static! {
-    static ref PROC_TOKEN: unicase::Ascii<String> = unicase::Ascii::new("PROC".to_string());
-    static ref FUNC_TOKEN: unicase::Ascii<String> = unicase::Ascii::new("FUNC".to_string());
-}
+static PROC_TOKEN: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("PROC".to_string()));
+static FUNC_TOKEN: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("FUNC".to_string()));
 
 impl<'a> Parser<'a> {
     pub fn new(
@@ -694,10 +692,10 @@ impl<'a> Parser<'a> {
             _ => {
                 let stmt = self.parse_statement();
                 if let Some(stmt) = stmt {
-                    if let Statement::Label(label) = &stmt {
-                        if *label.get_label() == *statements::BEGIN_LABEL {
-                            self.parsed_begin = true;
-                        }
+                    if let Statement::Label(label) = &stmt
+                        && *label.get_label() == *statements::BEGIN_LABEL
+                    {
+                        self.parsed_begin = true;
                     }
 
                     if self.parsed_block || (self.use_funcs && !self.parsed_begin) {
@@ -717,10 +715,7 @@ impl<'a> Parser<'a> {
                     }
                     if !self.got_statement && !matches!(stmt, Statement::VariableDeclaration(_) | Statement::ConstDeclaration(_) | Statement::Comment(_)) {
                         let mut main_block = vec![stmt];
-                        loop {
-                            let Some(cur_token) = &self.cur_token else {
-                                break;
-                            };
+                        while let Some(cur_token) = &self.cur_token {
                             if cur_token.token == Token::Function || cur_token.token == Token::Procedure {
                                 break;
                             }
@@ -780,11 +775,11 @@ impl<'a> Parser<'a> {
             }
 
             // A record can't contain itself, that has no finite layout.
-            if let Some(Token::Identifier(id)) = self.get_cur_token() {
-                if id == name {
-                    self.report_error(self.save_token_span(), ParserErrorType::TypeUsedInItself(name.clone()));
-                    continue;
-                }
+            if let Some(Token::Identifier(id)) = self.get_cur_token()
+                && id == name
+            {
+                self.report_error(self.save_token_span(), ParserErrorType::TypeUsedInItself(name.clone()));
+                continue;
             }
 
             let Some(field_type) = self.get_variable_type() else {
@@ -800,10 +795,7 @@ impl<'a> Parser<'a> {
             }
             self.next_token();
 
-            loop {
-                let Some(specifier) = self.parse_var_info(false) else {
-                    break;
-                };
+            while let Some(specifier) = self.parse_var_info(false) {
                 let field_name = specifier.get_identifier().clone();
                 if !specifier.get_dimensions().is_empty() {
                     self.error_reporter.lock().unwrap().report_error(
@@ -1004,11 +996,11 @@ impl<'a> Parser<'a> {
             }
 
             let mut var_token = None;
-            if let Some(Token::Identifier(id)) = self.get_cur_token() {
-                if id == Ascii::new("VAR".to_string()) {
-                    var_token = Some(self.save_spanned_token());
-                    self.next_token();
-                }
+            if let Some(Token::Identifier(id)) = self.get_cur_token()
+                && id == Ascii::new("VAR".to_string())
+            {
+                var_token = Some(self.save_spanned_token());
+                self.next_token();
             }
             if let Some(var_type) = self.get_variable_type() {
                 let type_token = self.save_spanned_token();
@@ -1089,11 +1081,11 @@ impl<'a> Parser<'a> {
             }
 
             let mut var_token = None;
-            if let Some(Token::Identifier(id)) = self.get_cur_token() {
-                if id == Ascii::new("VAR".to_string()) {
-                    var_token = Some(self.save_spanned_token());
-                    self.next_token();
-                }
+            if let Some(Token::Identifier(id)) = self.get_cur_token()
+                && id == Ascii::new("VAR".to_string())
+            {
+                var_token = Some(self.save_spanned_token());
+                self.next_token();
             }
             if let Some(var_type) = self.get_variable_type() {
                 let type_token = self.save_spanned_token();
@@ -1124,20 +1116,16 @@ impl<'a> Parser<'a> {
     }
 }
 
-lazy_static::lazy_static! {
-
-    static ref BUILT_IN_TYPE_LOOKUP: HashMap<unicase::Ascii<String>, (VariableType, u16)> = {
-        let mut m = HashMap::new();
-        for (name, variable_type, since) in BUILT_IN_TYPES {
-            m.insert(unicase::Ascii::new((*name).to_string()), (*variable_type, *since));
-        }
-        m
-    };
-
-}
+static BUILT_IN_TYPE_LOOKUP: std::sync::LazyLock<HashMap<unicase::Ascii<String>, (VariableType, u16)>> = std::sync::LazyLock::new(|| {
+    let mut m = HashMap::new();
+    for (name, variable_type, since) in BUILT_IN_TYPES {
+        m.insert(unicase::Ascii::new((*name).to_string()), (*variable_type, *since));
+    }
+    m
+});
 
 /// Which language version gave each built-in type its name, from the PPL release
-/// notes: 2.00 brought the numeric widths and the big string, 3.00 the DBase date.
+/// notes: 2.00 brought the numeric widths and the big string, 3.00 the `DBase` date.
 static BUILT_IN_TYPES: &[(&str, VariableType, u16)] = &[
     ("INTEGER", VariableType::Integer, 100),
     ("STRING", VariableType::String, 100),
@@ -1186,17 +1174,17 @@ pub fn built_in_type_names(lang_version: u16) -> Vec<&'static str> {
         .collect()
 }
 
-impl<'a> Parser<'a> {
+impl Parser<'_> {
     pub fn get_variable_type(&self) -> Option<VariableType> {
         if let Some(token) = &self.cur_token {
             if let Token::Identifier(id) = &token.token {
                 if let Some(vt) = built_in_type(id, self.lang_version) {
                     return Some(vt);
                 }
-                if self.lang_version >= FIRST_BOARD_OBJECT_LANGUAGE_VERSION {
-                    if let Some(vt) = self.type_registry.get_board_object(id) {
-                        return Some(vt);
-                    }
+                if self.lang_version >= FIRST_BOARD_OBJECT_LANGUAGE_VERSION
+                    && let Some(vt) = self.type_registry.get_board_object(id)
+                {
+                    return Some(vt);
                 }
                 // An enum is a type from 350 on, so this is not gated with the objects.
                 if let Some(vt) = self.type_registry.get_declared_type(id) {
@@ -1217,10 +1205,8 @@ impl<'a> Parser<'a> {
     ///
     /// Panics if .
     pub fn parse_var_info(&mut self, can_be_empty: bool) -> Option<VariableSpecifier> {
-        if can_be_empty {
-            if matches!(self.get_cur_token(), Some(Token::Comma)) || matches!(self.get_cur_token(), Some(Token::RPar)) {
-                return None;
-            }
+        if can_be_empty && (matches!(self.get_cur_token(), Some(Token::Comma)) || matches!(self.get_cur_token(), Some(Token::RPar))) {
+            return None;
         }
         let Some(Token::Identifier(_)) = self.get_cur_token() else {
             self.report_error(self.lex.span(), ParserErrorType::IdentifierExpected(self.save_token()));
@@ -1265,13 +1251,13 @@ impl<'a> Parser<'a> {
             }
             rightpar_token = Some(self.save_spanned_token());
             self.next_token();
-        } else if self.lang_version >= 350 {
-            if let Some(Token::Eq) = self.get_cur_token() {
-                let eq_token = self.save_spanned_token();
-                self.next_token();
-                let initializer = self.parse_expression();
-                return Some(VariableSpecifier::new(identifier_token, None, dimensions, None, Some(eq_token), initializer));
-            }
+        } else if self.lang_version >= 350
+            && let Some(Token::Eq) = self.get_cur_token()
+        {
+            let eq_token = self.save_spanned_token();
+            self.next_token();
+            let initializer = self.parse_expression();
+            return Some(VariableSpecifier::new(identifier_token, None, dimensions, None, Some(eq_token), initializer));
         }
 
         Some(VariableSpecifier::new(identifier_token, leftpar_token, dimensions, rightpar_token, None, None))
@@ -1341,15 +1327,15 @@ impl<'a> Parser<'a> {
                 }
             }
 
-            if let Some(Token::Identifier(id)) = self.get_cur_token() {
-                if id == Ascii::new("VAR".to_string()) {
-                    if is_function {
-                        self.report_error(self.lex.span(), ParserErrorType::VarNotAllowedInFunctions);
-                    } else {
-                        var_token = Some(self.save_spanned_token());
-                    }
-                    self.next_token();
+            if let Some(Token::Identifier(id)) = self.get_cur_token()
+                && id == Ascii::new("VAR".to_string())
+            {
+                if is_function {
+                    self.report_error(self.lex.span(), ParserErrorType::VarNotAllowedInFunctions);
+                } else {
+                    var_token = Some(self.save_spanned_token());
                 }
+                self.next_token();
             }
             if let Some(var_type) = self.get_variable_type() {
                 let type_token = self.save_spanned_token();
@@ -1470,11 +1456,11 @@ impl<'a> Parser<'a> {
                 }
 
                 let mut var_token = None;
-                if let Some(Token::Identifier(id)) = self.get_cur_token() {
-                    if id.eq_ignore_ascii_case("VAR") {
-                        var_token = Some(self.save_spanned_token());
-                        self.next_token();
-                    }
+                if let Some(Token::Identifier(id)) = self.get_cur_token()
+                    && id.eq_ignore_ascii_case("VAR")
+                {
+                    var_token = Some(self.save_spanned_token());
+                    self.next_token();
                 }
 
                 if let Some(var_type) = self.get_variable_type() {
@@ -1565,11 +1551,11 @@ impl<'a> Parser<'a> {
 
                     return None;
                 }
-                if let Some(Token::Identifier(id)) = self.get_cur_token() {
-                    if id == Ascii::new("VAR".to_string()) {
-                        self.report_error(self.lex.span(), ParserErrorType::VarNotAllowedInFunctions);
-                        self.next_token();
-                    }
+                if let Some(Token::Identifier(id)) = self.get_cur_token()
+                    && id == Ascii::new("VAR".to_string())
+                {
+                    self.report_error(self.lex.span(), ParserErrorType::VarNotAllowedInFunctions);
+                    self.next_token();
                 }
 
                 if let Some(var_type) = self.get_variable_type() {

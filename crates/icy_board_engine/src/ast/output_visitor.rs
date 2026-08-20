@@ -5,6 +5,7 @@ use crate::{
 };
 
 use super::{AstVisitor, BlockStatement, ParameterSpecifier, Statement};
+use std::fmt::Write as _;
 
 #[repr(u8)]
 #[derive(PartialEq, Debug, Default)]
@@ -35,7 +36,7 @@ impl OutputVisitor {
             OutputFunc::Upper => self.output.push_str(&str.to_uppercase()),
             OutputFunc::Lower => self.output.push_str(&str.to_lowercase()),
             OutputFunc::CamelCase => self.output.push_str(str),
-        };
+        }
     }
 
     fn output_function(&mut self, str: &str) {
@@ -43,7 +44,7 @@ impl OutputVisitor {
             OutputFunc::Upper => self.output.push_str(&str.to_uppercase()),
             OutputFunc::Lower => self.output.push_str(&str.to_lowercase()),
             OutputFunc::CamelCase => self.output.push_str(str),
-        };
+        }
     }
 
     /// A user type has no keyword to print - its name only lives in the token.
@@ -112,7 +113,7 @@ impl OutputVisitor {
 
             ParameterSpecifier::Function(call) => {
                 self.output_keyword("Function");
-                self.output(&call.get_identifier());
+                self.output(call.get_identifier());
                 self.output.push('(');
                 for (i, arg) in call.get_parameters().iter().enumerate() {
                     arg.visit(self);
@@ -126,7 +127,7 @@ impl OutputVisitor {
 
             ParameterSpecifier::Procedure(call) => {
                 self.output_keyword("Procedure");
-                self.output(&call.get_identifier());
+                self.output(call.get_identifier());
                 self.output.push('(');
                 for (i, arg) in call.get_parameters().iter().enumerate() {
                     arg.visit(self);
@@ -170,8 +171,8 @@ impl AstVisitor<()> for OutputVisitor {
                 self.output_keyword(b.name);
             }
             super::Constant::String(s) => {
-                let s = s.replace("\"", "\"\"");
-                self.output.push_str(&format!("\"{s}\""));
+                let s = s.replace('"', "\"\"");
+                let _ = write!(self.output, "\"{s}\"");
             }
             super::Constant::Boolean(b) => {
                 if *b {
@@ -181,7 +182,7 @@ impl AstVisitor<()> for OutputVisitor {
                 }
             }
             val => {
-                self.output.push_str(&format!("{}", val));
+                let _ = write!(self.output, "{val}");
             }
         }
     }
@@ -404,9 +405,9 @@ impl AstVisitor<()> for OutputVisitor {
 
     fn visit_while_do_statement(&mut self, while_do_stmt: &super::WhileDoStatement) {
         self.output_keyword("While");
-        self.output.push_str(" ");
+        self.output.push(' ');
         if self.version < 350 {
-            self.output.push_str("(");
+            self.output.push('(');
         }
         while_do_stmt.get_condition().visit(self);
         if self.version < 350 {
@@ -433,7 +434,7 @@ impl AstVisitor<()> for OutputVisitor {
         self.eol();
         self.indent();
         self.output_keyword("Until");
-        self.output.push_str(" ");
+        self.output.push(' ');
         repeat_until_stmt.get_condition().visit(self);
         self.eol();
     }

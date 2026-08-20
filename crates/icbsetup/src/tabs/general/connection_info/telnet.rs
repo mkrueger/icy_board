@@ -25,7 +25,7 @@ impl Telnet {
                 ConfigEntry::Separator,
                 ConfigEntry::Item(
                     ListItem::new(get_text("connection_info_enabled"), ListValue::Bool(lock.config.login_server.telnet.is_enabled))
-                        .with_status(&get_text("connection_info_enabled-status"))
+                        .with_status(get_text("connection_info_enabled-status"))
                         .with_label_width(label_width)
                         .with_update_bool_value(&|board: &Arc<Mutex<IcyBoard>>, value: bool| {
                             board.lock().unwrap().config.login_server.telnet.is_enabled = value;
@@ -36,7 +36,7 @@ impl Telnet {
                         get_text("connection_info_port"),
                         ListValue::U32(lock.config.login_server.telnet.port as u32, 0, u16::MAX as u32),
                     )
-                    .with_status(&get_text("connection_info_port-status"))
+                    .with_status(get_text("connection_info_port-status"))
                     .with_label_width(label_width)
                     .with_update_u32_value(&|board: &Arc<Mutex<IcyBoard>>, value: u32| {
                         board.lock().unwrap().config.login_server.telnet.port = value as u16;
@@ -47,7 +47,7 @@ impl Telnet {
                         get_text("connection_info_address"),
                         ListValue::Text(60, TextFlags::None, lock.config.login_server.telnet.address.clone()),
                     )
-                    .with_status(&get_text("connection_info_address-status"))
+                    .with_status(get_text("connection_info_address-status"))
                     .with_label_width(label_width)
                     .with_update_text_value(&|board: &Arc<Mutex<IcyBoard>>, value: String| {
                         board.lock().unwrap().config.login_server.telnet.address = value;
@@ -58,7 +58,7 @@ impl Telnet {
                         get_text("connection_info_display_file"),
                         ListValue::Path(lock.config.login_server.telnet.display_file.clone()),
                     )
-                    .with_status(&get_text("connection_info_display_file-status"))
+                    .with_status(get_text("connection_info_display_file-status"))
                     .with_label_width(label_width)
                     .with_update_path_value(&|board: &Arc<Mutex<IcyBoard>>, value: PathBuf| {
                         board.lock().unwrap().config.login_server.telnet.display_file = value;

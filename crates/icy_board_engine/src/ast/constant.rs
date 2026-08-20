@@ -366,7 +366,7 @@ impl fmt::Display for Constant {
                 NumberFormat::ColorCode => write!(f, "@X{i:02X}"),
                 NumberFormat::Octal => write!(f, "{i:o}o"),
                 NumberFormat::Binary => write!(f, "{i:b}b"),
-                _ => write!(f, "{i}"),
+                NumberFormat::Default => write!(f, "{i}"),
             },
             Constant::Unsigned(i) => write!(f, "{i}"),
             Constant::String(str) => write!(f, "\"{str}\""),

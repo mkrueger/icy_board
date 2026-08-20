@@ -136,21 +136,6 @@ pub fn _encode_ism(data: &[u8]) -> Vec<u8> {
     result
 }
 
-impl Default for ICIUserSettings {
-    fn default() -> Self {
-        Self {
-            alias: String::default(),
-            location: String::default(),
-            data_phone: String::default(),
-            voice_phone: String::default(),
-            birth_date: String::default(),
-
-            name: String::default(),
-            password: String::default(),
-        }
-    }
-}
-
 /// IEMSI client state machine for detecting EMSI_IRQ in incoming data stream.
 ///
 /// This struct is used to scan incoming bytes for IEMSI sequences.

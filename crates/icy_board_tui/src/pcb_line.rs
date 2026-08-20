@@ -94,7 +94,7 @@ pub fn get_styled_pcb_line_with_highlight<'a>(txt: &str, highlight: bool) -> Lin
             }
 
             PcbState::GotAt => {
-                if ch.to_ascii_uppercase() == 'X' {
+                if ch.eq_ignore_ascii_case(&'X') {
                     state = PcbState::ReadColor1;
                 } else {
                     span_builder.push('@');

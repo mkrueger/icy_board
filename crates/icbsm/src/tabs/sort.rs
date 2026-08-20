@@ -77,10 +77,10 @@ impl Page for MenuPage {
         if key.code == KeyCode::Esc {
             return PageMessage::Close;
         }
-        if let Some(id) = self.menu.handle_key_press(key, &mut self.state) {
-            if let Some(page) = (self.open)(*id) {
-                return PageMessage::OpenSubPage(page);
-            }
+        if let Some(id) = self.menu.handle_key_press(key, &mut self.state)
+            && let Some(page) = (self.open)(*id)
+        {
+            return PageMessage::OpenSubPage(page);
         }
         PageMessage::None
     }

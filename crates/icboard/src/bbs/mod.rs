@@ -38,7 +38,7 @@ pub async fn await_telnet_connections(con: Telnet, board: Arc<tokio::sync::Mutex
         let (stream, _addr) = listener.accept().await?;
         let bbs2 = bbs.clone();
         let node = bbs.lock().await.create_new_node(ConnectionType::Telnet).await;
-        let node_list = bbs.lock().await.get_open_connections().await.clone();
+        let node_list = bbs.lock().await.get_open_connections().clone();
         let board = board.clone();
         let handle = std::thread::Builder::new()
             .name("Telnet handle".to_string())
@@ -66,7 +66,7 @@ pub async fn await_telnet_connections(con: Telnet, board: Arc<tokio::sync::Mutex
                 Ok(())
             })
             .unwrap();
-        bbs.lock().await.get_open_connections().await.lock().await[node].as_mut().unwrap().handle = Some(handle);
+        bbs.lock().await.get_open_connections().lock().await[node].as_mut().unwrap().handle = Some(handle);
     }
 }
 
@@ -81,7 +81,7 @@ pub async fn await_websocket_connections(con: Websocket, board: Arc<tokio::sync:
         let (stream, _addr) = listener.accept().await?;
         let bbs2 = bbs.clone();
         let node = bbs.lock().await.create_new_node(ConnectionType::Telnet).await;
-        let node_list = bbs.lock().await.get_open_connections().await.clone();
+        let node_list = bbs.lock().await.get_open_connections().clone();
         let board = board.clone();
         let handle = std::thread::Builder::new()
             .name("Websocket handle".to_string())
@@ -109,7 +109,7 @@ pub async fn await_websocket_connections(con: Websocket, board: Arc<tokio::sync:
                 Ok(())
             })
             .unwrap();
-        bbs.lock().await.get_open_connections().await.lock().await[node].as_mut().unwrap().handle = Some(handle);
+        bbs.lock().await.get_open_connections().lock().await[node].as_mut().unwrap().handle = Some(handle);
     }
 }
 
@@ -124,7 +124,7 @@ pub async fn await_securewebsocket_connections(con: SecureWebsocket, board: Arc<
         let (stream, _addr) = listener.accept().await?;
         let bbs2 = bbs.clone();
         let node: usize = bbs.lock().await.create_new_node(ConnectionType::Telnet).await;
-        let node_list = bbs.lock().await.get_open_connections().await.clone();
+        let node_list = bbs.lock().await.get_open_connections().clone();
         let board = board.clone();
         let handle = std::thread::Builder::new()
             .name("Secure Websocket handle".to_string())
@@ -152,7 +152,7 @@ pub async fn await_securewebsocket_connections(con: SecureWebsocket, board: Arc<
                 Ok(())
             })
             .unwrap();
-        bbs.lock().await.get_open_connections().await.lock().await[node].as_mut().unwrap().handle = Some(handle);
+        bbs.lock().await.get_open_connections().lock().await[node].as_mut().unwrap().handle = Some(handle);
     }
 }
 
@@ -234,18 +234,18 @@ pub async fn internal_handle_client(mut state: IcyBoardState, login_options: Opt
         TerminalCaps::detect(&mut *cmd.state.connection).await?
     };
 
-    if let Some(login_options) = &login_options {
-        if let Some(ppe) = &login_options.ppe {
-            if let Err(err) = cmd.state.run_ppe(&ppe.ppe, None).await {
-                log::error!("error running PPE: {}", err);
-            };
-            cmd.state.new_line().await?;
-            if local {
-                cmd.state.println(TerminalTarget::Both, &icy_board_tui::get_text("run_ppe_completed")).await?;
-                while !cmd.state.session.request_logoff && cmd.state.get_char(TerminalTarget::Both).await?.is_none() {}
-            }
-            return Ok(());
+    if let Some(login_options) = &login_options
+        && let Some(ppe) = &login_options.ppe
+    {
+        if let Err(err) = cmd.state.run_ppe(&ppe.ppe, None).await {
+            log::error!("error running PPE: {}", err);
+        };
+        cmd.state.new_line().await?;
+        if local {
+            cmd.state.println(TerminalTarget::Both, &icy_board_tui::get_text("run_ppe_completed")).await?;
+            while !cmd.state.session.request_logoff && cmd.state.get_char(TerminalTarget::Both).await?.is_none() {}
         }
+        return Ok(());
     }
     if !logged_in {
         match cmd.login(local).await {

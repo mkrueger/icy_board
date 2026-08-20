@@ -14,7 +14,7 @@ use super::{
     lexer::{Spanned, Token},
 };
 
-impl<'a> Parser<'a> {
+impl Parser<'_> {
     pub fn skip_eol(&mut self) {
         while self.get_cur_token() == Some(Token::Eol) {
             self.next_token();
@@ -247,11 +247,11 @@ impl<'a> Parser<'a> {
             return None;
         };
 
-        if let Some(Token::Identifier(id)) = self.get_cur_token() {
-            if id != "TO" {
-                self.report_error(self.lex.span(), ParserErrorType::ToExpected(self.save_token()));
-                return None;
-            }
+        if let Some(Token::Identifier(id)) = self.get_cur_token()
+            && id != "TO"
+        {
+            self.report_error(self.lex.span(), ParserErrorType::ToExpected(self.save_token()));
+            return None;
         }
 
         let to_token = self.save_spanned_token();
@@ -1017,21 +1017,15 @@ fn is_assign_token(token_opt: Option<Token>) -> bool {
         || token_opt == Some(Token::OrAssign)
 }
 
-lazy_static::lazy_static! {
-    static ref DO_TOKEN: unicase::Ascii<String> = unicase::Ascii::new("DO".to_string());
-    static ref THEN_TOKEN: unicase::Ascii<String> = unicase::Ascii::new("THEN".to_string());
-
-
-    // potential keywords
-    static ref QUIT_TOKEN: unicase::Ascii<String> = unicase::Ascii::new("QUIT".to_string());
-    static ref LOOP_TOKEN: unicase::Ascii<String> = unicase::Ascii::new("LOOP".to_string());
-
-    static ref BEGIN_TOKEN: unicase::Ascii<String> = unicase::Ascii::new("BEGIN".to_string());
-    pub static ref BEGIN_LABEL: unicase::Ascii<String> = unicase::Ascii::new("~BEGIN~".to_string());
-    static ref END_TOKEN: unicase::Ascii<String> = unicase::Ascii::new("END".to_string());
-    static ref EXIT_TOKEN: unicase::Ascii<String> = unicase::Ascii::new("EXIT".to_string());
-
-}
+static DO_TOKEN: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("DO".to_string()));
+static THEN_TOKEN: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("THEN".to_string()));
+// potential keywords
+static QUIT_TOKEN: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("QUIT".to_string()));
+static LOOP_TOKEN: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("LOOP".to_string()));
+static BEGIN_TOKEN: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("BEGIN".to_string()));
+pub static BEGIN_LABEL: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("~BEGIN~".to_string()));
+static END_TOKEN: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("END".to_string()));
+static EXIT_TOKEN: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("EXIT".to_string()));
 
 /// `END` stays the statement that stops a program, so it never became a keyword of its own.
 fn is_block_end(token: &Token) -> bool {

@@ -1,5 +1,5 @@
 //! Deciding which messages a read command actually wants to see.
-//! PCBoard skips over anything that fails one of these, without prompting.
+//! `PCBoard` skips over anything that fails one of these, without prompting.
 
 use jamjam::jam::msg_header::JamMessageHeader;
 use regex::Regex;
@@ -84,16 +84,16 @@ impl MessageFilter {
         let from = field(header.from());
         let subject = field(header.subject());
 
-        if !self.any_msgs && !(self.your_msgs && self.is_own(&to) || self.from_msgs && self.is_own(&from) || self.msgs_to_all && to == "ALL") {
+        if !(self.any_msgs || self.your_msgs && self.is_own(&to) || self.from_msgs && self.is_own(&from) || self.msgs_to_all && to == "ALL") {
             return false;
         }
         if self.unread_only && header.message_number <= last_read {
             return false;
         }
-        if let Some(after) = self.written_after {
-            if header.date_written < after {
-                return false;
-            }
+        if let Some(after) = self.written_after
+            && header.date_written < after
+        {
+            return false;
         }
         if self.user_search & user_search::TO != 0 && !to.contains(&self.name_to) {
             return false;
@@ -104,10 +104,10 @@ impl MessageFilter {
         if self.user_search == user_search::USER && !to.contains(&self.name_to) && !from.contains(&self.name_to) {
             return false;
         }
-        if let Some(thread) = &self.thread_subject {
-            if !strip_re(&subject).eq_ignore_ascii_case(thread) {
-                return false;
-            }
+        if let Some(thread) = &self.thread_subject
+            && !strip_re(&subject).eq_ignore_ascii_case(thread)
+        {
+            return false;
         }
         if let Some(text) = &self.text {
             // PCBoard searches the To..Subject block first, then the body.
@@ -255,7 +255,7 @@ mod tests {
 
     #[test]
     fn the_new_message_date_is_mmddyy() {
-        assert_eq!(parse_mmddyy("013099"), Some(917654400));
+        assert_eq!(parse_mmddyy("013099"), Some(917_654_400));
         assert_eq!(parse_mmddyy("1"), None);
         assert_eq!(parse_mmddyy("991301"), None);
     }

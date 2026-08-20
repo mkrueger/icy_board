@@ -43,76 +43,76 @@ impl<'a> SecurityLevelEditor<'a> {
         let sec_levels_orig = if path.exists() {
             SecurityLevelDefinitions::load(&path)?
         } else {
-            let mut sec_levels = SecurityLevelDefinitions::default();
-            sec_levels.levels = vec![
-                SecurityLevel {
-                    password: "".to_string(),
-                    description: "Expired".to_string(),
-                    security: 0,
-                    base_baud_rate: 0,
-                    batch_limit: 0,
-                    uldl_ratio_tenths: 0,
-                    uldl_kb_ratio_tenths: 0,
-                    daily_file_limit: 0,
-                    daily_file_kb_limit: 0,
-                    file_limit: 0,
-                    file_kb_limit: 0,
-                    file_credit: 0,
-                    file_kb_credit: 0,
-                    time_per_day: 0,
-                    calls_per_day: 0,
-                    enforce_time_limit: true,
-                    allow_alias: false,
-                    enforce_read_mail: false,
-                    is_demo_account: false,
-                    is_enabled: true,
-                },
-                SecurityLevel {
-                    password: "".to_string(),
-                    description: "User".to_string(),
-                    security: 10,
-                    base_baud_rate: 0,
-                    batch_limit: 0,
-                    uldl_ratio_tenths: 0,
-                    uldl_kb_ratio_tenths: 0,
-                    daily_file_limit: 0,
-                    daily_file_kb_limit: 0,
-                    file_limit: 0,
-                    file_kb_limit: 0,
-                    file_credit: 0,
-                    file_kb_credit: 0,
-                    time_per_day: 0,
-                    calls_per_day: 0,
-                    enforce_time_limit: true,
-                    allow_alias: true,
-                    enforce_read_mail: false,
-                    is_demo_account: false,
-                    is_enabled: true,
-                },
-                SecurityLevel {
-                    password: "".to_string(),
-                    description: "Sysop".to_string(),
-                    security: 100,
-                    base_baud_rate: 0,
-                    batch_limit: 0,
-                    uldl_ratio_tenths: 0,
-                    uldl_kb_ratio_tenths: 0,
-                    daily_file_limit: 0,
-                    daily_file_kb_limit: 0,
-                    file_limit: 0,
-                    file_kb_limit: 0,
-                    file_credit: 0,
-                    file_kb_credit: 0,
-                    time_per_day: 0,
-                    calls_per_day: 0,
-                    enforce_time_limit: true,
-                    allow_alias: true,
-                    enforce_read_mail: false,
-                    is_demo_account: false,
-                    is_enabled: true,
-                },
-            ];
-            sec_levels
+            SecurityLevelDefinitions {
+                levels: vec![
+                    SecurityLevel {
+                        password: "".to_string(),
+                        description: "Expired".to_string(),
+                        security: 0,
+                        base_baud_rate: 0,
+                        batch_limit: 0,
+                        uldl_ratio_tenths: 0,
+                        uldl_kb_ratio_tenths: 0,
+                        daily_file_limit: 0,
+                        daily_file_kb_limit: 0,
+                        file_limit: 0,
+                        file_kb_limit: 0,
+                        file_credit: 0,
+                        file_kb_credit: 0,
+                        time_per_day: 0,
+                        calls_per_day: 0,
+                        enforce_time_limit: true,
+                        allow_alias: false,
+                        enforce_read_mail: false,
+                        is_demo_account: false,
+                        is_enabled: true,
+                    },
+                    SecurityLevel {
+                        password: "".to_string(),
+                        description: "User".to_string(),
+                        security: 10,
+                        base_baud_rate: 0,
+                        batch_limit: 0,
+                        uldl_ratio_tenths: 0,
+                        uldl_kb_ratio_tenths: 0,
+                        daily_file_limit: 0,
+                        daily_file_kb_limit: 0,
+                        file_limit: 0,
+                        file_kb_limit: 0,
+                        file_credit: 0,
+                        file_kb_credit: 0,
+                        time_per_day: 0,
+                        calls_per_day: 0,
+                        enforce_time_limit: true,
+                        allow_alias: true,
+                        enforce_read_mail: false,
+                        is_demo_account: false,
+                        is_enabled: true,
+                    },
+                    SecurityLevel {
+                        password: "".to_string(),
+                        description: "Sysop".to_string(),
+                        security: 100,
+                        base_baud_rate: 0,
+                        batch_limit: 0,
+                        uldl_ratio_tenths: 0,
+                        uldl_kb_ratio_tenths: 0,
+                        daily_file_limit: 0,
+                        daily_file_kb_limit: 0,
+                        file_limit: 0,
+                        file_kb_limit: 0,
+                        file_credit: 0,
+                        file_kb_credit: 0,
+                        time_per_day: 0,
+                        calls_per_day: 0,
+                        enforce_time_limit: true,
+                        allow_alias: true,
+                        enforce_read_mail: false,
+                        is_demo_account: false,
+                        is_enabled: true,
+                    },
+                ],
+            }
         };
         let sec_levels = Arc::new(Mutex::new(sec_levels_orig.clone()));
         let scroll_state = ScrollbarState::default().content_length(sec_levels_orig.levels.len());
@@ -133,7 +133,7 @@ impl<'a> SecurityLevelEditor<'a> {
                 }
                 match j {
                     0 => Line::from(format!("{}", cmd2.lock().unwrap()[*i].security)),
-                    1 => Line::from(format!("{}", cmd2.lock().unwrap()[*i].description)),
+                    1 => Line::from(cmd2.lock().unwrap()[*i].description.to_string()),
                     2 => Line::from(format!("{}", cmd2.lock().unwrap()[*i].time_per_day)),
                     _ => Line::from("".to_string()),
                 }
@@ -158,22 +158,22 @@ impl<'a> SecurityLevelEditor<'a> {
     }
 
     fn move_up(&mut self) {
-        if let Some(selected) = self.insert_table.table_state.selected() {
-            if selected > 0 {
-                let mut levels = self.sec_levels.lock().unwrap();
-                levels.swap(selected, selected - 1);
-                self.insert_table.table_state.select(Some(selected - 1));
-            }
+        if let Some(selected) = self.insert_table.table_state.selected()
+            && selected > 0
+        {
+            let mut levels = self.sec_levels.lock().unwrap();
+            levels.swap(selected, selected - 1);
+            self.insert_table.table_state.select(Some(selected - 1));
         }
     }
 
     fn move_down(&mut self) {
-        if let Some(selected) = self.insert_table.table_state.selected() {
-            if selected + 1 < self.sec_levels.lock().unwrap().len() {
-                let mut levels = self.sec_levels.lock().unwrap();
-                levels.swap(selected, selected + 1);
-                self.insert_table.table_state.select(Some(selected + 1));
-            }
+        if let Some(selected) = self.insert_table.table_state.selected()
+            && selected + 1 < self.sec_levels.lock().unwrap().len()
+        {
+            let mut levels = self.sec_levels.lock().unwrap();
+            levels.swap(selected, selected + 1);
+            self.insert_table.table_state.select(Some(selected + 1));
         }
     }
 }
@@ -287,11 +287,11 @@ impl<'a> Page for SecurityLevelEditor<'a> {
                     self.insert_table.content_length += 1;
                 }
                 KeyCode::Delete => {
-                    if let Some(selected_item) = self.insert_table.table_state.selected() {
-                        if selected_item < self.sec_levels.lock().unwrap().len() {
-                            self.sec_levels.lock().unwrap().remove(selected_item);
-                            self.insert_table.content_length -= 1;
-                        }
+                    if let Some(selected_item) = self.insert_table.table_state.selected()
+                        && selected_item < self.sec_levels.lock().unwrap().len()
+                    {
+                        self.sec_levels.lock().unwrap().remove(selected_item);
+                        self.insert_table.content_length -= 1;
                     }
                 }
 
@@ -338,16 +338,11 @@ impl<'a> Page for SecurityLevelEditor<'a> {
                                     ),
                                 ),
                                 ConfigEntry::Item(
-                                    ListItem::new(
-                                        get_text("sec_level_editor_time_per_day"),
-                                        ListValue::U32(action.time_per_day as u32, 0, u32::MAX),
-                                    )
-                                    .with_label_width(16)
-                                    .with_update_u32_value(
-                                        &|(i, list): &(usize, Arc<Mutex<SecurityLevelDefinitions>>), value: u32| {
+                                    ListItem::new(get_text("sec_level_editor_time_per_day"), ListValue::U32(action.time_per_day, 0, u32::MAX))
+                                        .with_label_width(16)
+                                        .with_update_u32_value(&|(i, list): &(usize, Arc<Mutex<SecurityLevelDefinitions>>), value: u32| {
                                             list.lock().unwrap()[*i].time_per_day = value;
-                                        },
-                                    ),
+                                        }),
                                 ),
                                 ConfigEntry::Item(
                                     ListItem::new(
@@ -362,21 +357,16 @@ impl<'a> Page for SecurityLevelEditor<'a> {
                                     ),
                                 ),
                                 ConfigEntry::Item(
-                                    ListItem::new(
-                                        get_text("sec_level_editor_file_ratio"),
-                                        ListValue::U32(action.uldl_ratio_tenths as u32, 0, u32::MAX),
-                                    )
-                                    .with_label_width(16)
-                                    .with_update_u32_value(
-                                        &|(i, list): &(usize, Arc<Mutex<SecurityLevelDefinitions>>), value: u32| {
+                                    ListItem::new(get_text("sec_level_editor_file_ratio"), ListValue::U32(action.uldl_ratio_tenths, 0, u32::MAX))
+                                        .with_label_width(16)
+                                        .with_update_u32_value(&|(i, list): &(usize, Arc<Mutex<SecurityLevelDefinitions>>), value: u32| {
                                             list.lock().unwrap()[*i].uldl_ratio_tenths = value;
-                                        },
-                                    ),
+                                        }),
                                 ),
                                 ConfigEntry::Item(
                                     ListItem::new(
                                         get_text("sec_level_editor_byte_ratio"),
-                                        ListValue::U32(action.uldl_kb_ratio_tenths as u32, 0, u32::MAX),
+                                        ListValue::U32(action.uldl_kb_ratio_tenths, 0, u32::MAX),
                                     )
                                     .with_label_width(16)
                                     .with_update_u32_value(

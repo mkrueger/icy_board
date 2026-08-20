@@ -6,18 +6,15 @@ impl IcyBoardState {
         self.displaycmdfile("news").await?;
         let news_file = self.session.current_conference.news_file.clone();
 
-        if only_newer {
-            if let Some(user) = &self.session.current_user {
-                if news_file.exists() {
-                    if let Ok(metadata) = std::fs::metadata(&news_file) {
-                        if let Ok(modified) = metadata.modified() {
-                            let modified_time: chrono::DateTime<chrono::Utc> = modified.into();
-                            if modified_time <= user.stats.last_on {
-                                return Ok(());
-                            }
-                        }
-                    }
-                }
+        if only_newer
+            && let Some(user) = &self.session.current_user
+            && news_file.exists()
+            && let Ok(metadata) = std::fs::metadata(&news_file)
+            && let Ok(modified) = metadata.modified()
+        {
+            let modified_time: chrono::DateTime<chrono::Utc> = modified.into();
+            if modified_time <= user.stats.last_on {
+                return Ok(());
             }
         }
 

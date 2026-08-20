@@ -15,6 +15,7 @@ use toml::Value;
 use crate::vm::errors::IcyError;
 
 use super::icb_config::IcbColor;
+use std::fmt::Write as _;
 
 #[repr(usize)]
 #[derive(Clone, Copy, Debug, EnumString, Display, PartialEq, Eq)]
@@ -40,13 +41,13 @@ pub enum IceText {
     DeniedPasswordFailed = 9,
     /// `Access Denied - @USER@ is in use on another Node!`
     NameAlreadyInUse = 10,
-    /// `Sorry, @FIRST@, this is a `Closed' Board ...`
+    /// `` Sorry, @FIRST@, this is a `Closed' Board ... ``
     ClosedBoard = 11,
     /// `Security Violation(s) - Disconnecting ...`
     SecurityViolation = 12,
     /// `There is presently no room for your text, @FIRST@ ...`
     NoRoomForText = 13,
-    /// `A message to `ALL' cannot be protected, @FIRST@ ...`
+    /// `` A message to `ALL' cannot be protected, @FIRST@ ... ``
     CantProtectMessageToAll = 14,
     /// `Callers must know p/w to read message!  Continue (Enter)=no`
     CallerMustKnowPassword = 15,
@@ -116,7 +117,7 @@ pub enum IceText {
     NoRecordAvailableToUpdate = 47,
     /// `Messages Successfully Packed & Purified!`
     MessagesSuccessfullyPacked = 48,
-    /// `Enter `handle' to be used for Node Chat`
+    /// `` Enter `handle' to be used for Node Chat ``
     HandleForChat = 49,
     /// `File Attachment: @OPTEXT@`
     Attachment = 50,
@@ -216,7 +217,7 @@ pub enum IceText {
     Paging = 97,
     /// `Channel @OPTEXT@:~`
     ChannelText = 98,
-    /// `@FIRST@, press (Enter) for `no change' to any item ...`
+    /// `` @FIRST@, press (Enter) for `no change' to any item ... ``
     EnterNoChange = 99,
     /// `SHELL completed on (@OPTEXT@).`
     ShellCompleted = 100,
@@ -228,7 +229,7 @@ pub enum IceText {
     SurveyInfoSaved = 103,
     /// `Automatic Logoff Completed ...`
     AutoLogoff = 104,
-    /// `Keep `LOCKED OUT' users (Enter)=yes`
+    /// `` Keep `LOCKED OUT' users (Enter)=yes ``
     KeepLockedOut = 105,
     /// `Purge older than (Enter)=010180`
     PurgeOlderThan = 106,
@@ -340,7 +341,7 @@ pub enum IceText {
     BytesLeftAre = 159,
     /// `Before beginning, enter a description of: @OPTEXT@`
     EnterDescription = 160,
-    /// `Begin description with (/) to make upload `Private'.`
+    /// `` Begin description with (/) to make upload `Private'. ``
     SlashForPrivate = 161,
     /// `Thanks for the file(s), @FIRST@!`
     ThanksForTheFiles = 162,
@@ -416,7 +417,7 @@ pub enum IceText {
     EndOfMessage = 197,
     /// `Default Protocol Desired (Enter)=no change`
     DesiredProtocol = 198,
-    /// `To (Enter)=`ALL'`
+    /// `` To (Enter)=`ALL' ``
     MessageTo = 199,
     /// `Subject (Enter)=abort`
     MessageSubject = 200,
@@ -454,13 +455,13 @@ pub enum IceText {
     EnterStarts = 216,
     /// `(Ctrl-X) Aborts Transfer`
     AbortsTransfer = 217,
-    /// `File Size is `0' - Aborting ...`
+    /// `` File Size is `0' - Aborting ... ``
     FileSizeIsZero = 218,
     /// `Sysop CHAT ended at~`
     SysopChatEnded = 219,
     /// `Edit: (T)o, (F)rom, (S)ubject, Refer (N)um, (R)ead, (P)rotection`
     EditHeader = 220,
-    /// ``Echo' Message, (Enter)=@OPTEXT@`
+    /// `` `Echo' Message, (Enter)=@OPTEXT@ ``
     EchoMessage = 221,
     /// `Text Entry Command`
     TextEntryCommand = 222,
@@ -482,7 +483,7 @@ pub enum IceText {
     NodeChatEnded = 230,
     /// `Node CHAT entered at @OPTEXT@`
     NodeChatEntered = 231,
-    /// `Enter a new `topic' for Channel @OPTEXT@`
+    /// `` Enter a new `topic' for Channel @OPTEXT@ ``
     TopicForChat = 232,
     /// `Refused to register.`
     RefusedToRegister = 233,
@@ -610,7 +611,7 @@ pub enum IceText {
     ExitedToDOSAt = 294,
     /// `Viewed Text file (@OPTEXT@)`
     TextFileViewed = 295,
-    /// `Scan Message Base Since `Last Read' (Enter)=yes`
+    /// `` Scan Message Base Since `Last Read' (Enter)=yes ``
     ScanMessageBase = 296,
     /// `New Info`
     NewInfo = 297,
@@ -708,7 +709,7 @@ pub enum IceText {
     MorehelpNonstop = 343,
     /// `Drop to DOS - Urgent`
     DropDOSNow = 344,
-    /// `Force logoff now (`N'=wait until caller logs off, then drop to DOS)`
+    /// `` Force logoff now (`N'=wait until caller logs off, then drop to DOS) ``
     DropNow = 345,
     /// `(V) View a file, then continue displaying files`
     MorehelpView = 346,
@@ -882,7 +883,7 @@ pub enum IceText {
     DirectoryScan = 430,
     /// `User File Viewed`
     UsersFileViewed = 431,
-    /// `Sorry, @FIRST@, Insufficient Security for `From' edit!`
+    /// `` Sorry, @FIRST@, Insufficient Security for `From' edit! ``
     InsufficientSecurityForFromEdit = 432,
     /// `This system is set to test uploaded files.  This can be a lengthy process.`
     BeginUploadTest = 433,
@@ -894,7 +895,7 @@ pub enum IceText {
     SysopExitedToDOS = 436,
     /// `Upload aborted ...`
     UploadAborted = 437,
-    /// `Enter (Oldtext;Newtext) or (Enter) alone for `no change'.`
+    /// `` Enter (Oldtext;Newtext) or (Enter) alone for `no change'. ``
     OldTextNewText = 438,
     /// `Date:                               Number:`
     MessageDateNumber = 439,
@@ -1074,7 +1075,7 @@ pub enum IceText {
     _SysopBusyDescription = 526,
     /// `Log in as the Sysop.  RING Alert will be activated.`
     _SysopNotBusyDescription = 527,
-    /// `Toggle `Page Bell' on or off.  System will BEEP when caller pages you.`
+    /// `` Toggle `Page Bell' on or off.  System will BEEP when caller pages you. ``
     TogglePageDescription = 528,
     /// `Run PCBFiler for File Directory maintenance.`
     PCBFilerDescription = 529,
@@ -1084,7 +1085,7 @@ pub enum IceText {
     _DOSBusyDescription = 531,
     /// `Drop to DOS.  Callers will NOT get a busy signal.  Phone will ring!`
     _DOSNotBusyDescription = 532,
-    /// `Toggle `Caller Alarm' on or off.  System BEEPs as caller logs on, etc.`
+    /// `` Toggle `Caller Alarm' on or off.  System BEEPs as caller logs on, etc. ``
     ToggleAlarmDescription = 533,
     /// `Run PCBSetup to change PCBoard configuration.`
     PCBSetupDescription = 534,
@@ -1696,6 +1697,7 @@ impl IcbTextStyle {
         }
     }
 
+    #[must_use]
     pub fn next(&self) -> IcbTextStyle {
         match self {
             IcbTextStyle::Plain => IcbTextStyle::Red,
@@ -1709,6 +1711,7 @@ impl IcbTextStyle {
         }
     }
 
+    #[must_use]
     pub fn prev(&self) -> IcbTextStyle {
         match self {
             IcbTextStyle::Plain => IcbTextStyle::White,
@@ -1732,12 +1735,10 @@ pub struct TextEntry {
 
 const HEADER: &str = "# IcyBoard text file v1.0\n";
 
-lazy_static::lazy_static! {
-    pub static ref DEFAULT_DISPLAY_TEXT: IcbTextFile = {
-        let data = include_bytes!("../data/ICBTEXT.toml");
-        IcbTextFile::deserialize(data, String::new()).unwrap()
-    };
-}
+pub static DEFAULT_DISPLAY_TEXT: std::sync::LazyLock<IcbTextFile> = std::sync::LazyLock::new(|| {
+    let data = include_bytes!("../data/ICBTEXT.toml");
+    IcbTextFile::deserialize(data, String::new()).unwrap()
+});
 
 #[derive(Clone, Default, PartialEq)]
 pub struct IcbTextFile {
@@ -1795,10 +1796,10 @@ impl IcbTextFile {
 
         for (i, entry) in self.entries.iter().enumerate().skip(1) {
             let Some(name) = IceText::try_from_number(i) else {
-                log::warn!("Record {} of the text file has no name and is left out", i);
+                log::warn!("Record {i} of the text file has no name and is left out");
                 continue;
             };
-            let line = format!("[{}]\n", name);
+            let line = format!("[{name}]\n");
             txt.push_str(&line);
             let line = format!("text = \"{}\"\n", escape_toml(&entry.text));
             txt.push_str(&line);
@@ -1899,33 +1900,6 @@ impl TextEntry {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn text_numbers_are_checked_before_they_become_an_enum() {
-        assert_eq!(IceText::try_from_number(0), Some(IceText::UnusedStatusLine));
-        assert_eq!(IceText::try_from_number(LAST_ENTRY), Some(IceText::ReadingBulletins));
-        assert_eq!(IceText::try_from_number(LAST_ENTRY + 1), None);
-        assert_eq!(IceText::try_from_number(usize::MAX), None);
-    }
-
-    #[test]
-    fn pcboard_export_replaces_the_file_and_keeps_record_boundaries() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("PCBTEXT");
-        std::fs::write(&path, b"old contents").unwrap();
-
-        DEFAULT_DISPLAY_TEXT.export_pcboard_format(&path).unwrap();
-
-        let bytes = std::fs::read(&path).unwrap();
-        assert_eq!(bytes.len() % BIN_ENTRY_SIZE, 0);
-        assert!(bytes[1..].starts_with(PCBTEXT_HEADER.as_bytes()));
-        assert!(!dir.path().join(".PCBTEXT.tmp").exists());
-    }
-}
-
 fn load_ice_format(data: &[u8], file: String) -> Res<Vec<TextEntry>> {
     let text = get_utf8(data);
     match toml::from_str::<toml::Table>(&text) {
@@ -1962,7 +1936,7 @@ fn load_ice_format(data: &[u8], file: String) -> Res<Vec<TextEntry>> {
             Ok(res.into_iter().flatten().collect())
         }
         Err(err) => {
-            log::error!("Error parsing icb text file ({}): {} ", file, err);
+            log::error!("Error parsing icb text file ({file}): {err} ");
             Err(Box::new(TextError::NoValidIceTextFile(err.to_string())))
         }
     }
@@ -1970,7 +1944,7 @@ fn load_ice_format(data: &[u8], file: String) -> Res<Vec<TextEntry>> {
 
 const BIN_ENTRY_SIZE: usize = 0x50;
 
-/// PCBoard hard coded justifications
+/// `PCBoard` hard coded justifications
 const RIGHT_JUSTIFY_RECORDS: [usize; 30] = [
     20, 23, 44, 47, 48, 81, 91, 108, 115, 122, 124, 147, 151, 172, 174, 183, 184, 201, 202, 205, 206, 207, 362, 364, 391, 392, 410, 432, 456, 462,
 ];
@@ -1979,14 +1953,14 @@ const PCBTEXT_HEADER: &str = "PCBoard version 14.5 & 15.0 & 15.2 & 15.3 & 15.4 P
 
 fn import_pcboard_format(data: &[u8], file: String) -> Result<Vec<TextEntry>, TextError> {
     let mut res = Vec::new();
-    if data.len() % BIN_ENTRY_SIZE != 0 {
-        log::error!("Invalid file size for PCBoard text file ({})", file);
+    if !data.len().is_multiple_of(BIN_ENTRY_SIZE) {
+        log::error!("Invalid file size for PCBoard text file ({file})");
         return Err(TextError::InvalidFileSize);
     }
     for (i, chunk) in data.chunks(BIN_ENTRY_SIZE).enumerate() {
         let text = import_cp437_string(&chunk[1..], true);
         if i == 0 && !text.starts_with("PCBoard version") {
-            log::error!("Invalid PCBoard text file ({})", file);
+            log::error!("Invalid PCBoard text file ({file})");
             return Err(TextError::NoValidPCBTEXTFile);
         }
         let color = IcbTextStyle::from_pcboard_byte(chunk[0]);
@@ -2015,10 +1989,37 @@ pub fn escape_toml(input: &str) -> String {
                 if c.is_ascii_alphanumeric() || c.is_ascii_punctuation() || c == ' ' {
                     res.push(c);
                 } else {
-                    res.push_str(&format!("\\u{:04x}", c as u32));
+                    let _ = write!(res, "\\u{:04x}", c as u32);
                 }
             }
         }
     }
     res
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn text_numbers_are_checked_before_they_become_an_enum() {
+        assert_eq!(IceText::try_from_number(0), Some(IceText::UnusedStatusLine));
+        assert_eq!(IceText::try_from_number(LAST_ENTRY), Some(IceText::ReadingBulletins));
+        assert_eq!(IceText::try_from_number(LAST_ENTRY + 1), None);
+        assert_eq!(IceText::try_from_number(usize::MAX), None);
+    }
+
+    #[test]
+    fn pcboard_export_replaces_the_file_and_keeps_record_boundaries() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("PCBTEXT");
+        std::fs::write(&path, b"old contents").unwrap();
+
+        DEFAULT_DISPLAY_TEXT.export_pcboard_format(&path).unwrap();
+
+        let bytes = std::fs::read(&path).unwrap();
+        assert_eq!(bytes.len() % BIN_ENTRY_SIZE, 0);
+        assert!(bytes[1..].starts_with(PCBTEXT_HEADER.as_bytes()));
+        assert!(!dir.path().join(".PCBTEXT.tmp").exists());
+    }
 }

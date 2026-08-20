@@ -63,7 +63,7 @@ impl IcyBoardState {
                 if 1 <= number && (number as usize) <= self.session.current_conference.directories.as_ref().unwrap().len() {
                     let area = &self.session.current_conference.directories.as_ref().unwrap()[number as usize - 1];
                     if area.list_security.session_can_access(&self.session) {
-                        self.display_file_area(&area.path.to_path_buf(), &area.metadata_path.clone(), FileFilter::all())
+                        self.display_file_area(&area.path.clone(), &area.metadata_path.clone(), FileFilter::all())
                             .await?;
                         self.new_line().await?;
                         continue;
@@ -119,11 +119,9 @@ impl IcyBoardState {
                     }
                     "NS" => {
                         self.session.disp_options.force_count_lines();
-                        continue;
                     }
                     "R" => {
                         redisplay_menu = true;
-                        continue;
                     }
                     _ => {}
                 }
@@ -152,7 +150,7 @@ impl IcyBoardState {
         )
         .await?;
 
-        let mut list = FileList::new(dir.to_path_buf(), base);
+        let mut list = FileList::new(dir.clone(), base);
         let lines = self.session.disp_options.num_lines_printed;
         list.display_file_list(self, filter).await?;
 

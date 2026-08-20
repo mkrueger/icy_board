@@ -74,12 +74,10 @@ impl TextfieldState {
                 }
             }
 
-            KeyEvent { code: KeyCode::Backspace, .. } => {
-                if self.cursor_position > 0 {
-                    self.cursor_position -= 1;
-                    value.remove(self.cursor_position as usize);
-                    update = true;
-                }
+            KeyEvent { code: KeyCode::Backspace, .. } if self.cursor_position > 0 => {
+                self.cursor_position -= 1;
+                value.remove(self.cursor_position as usize);
+                update = true;
             }
 
             _ => {}
@@ -134,6 +132,12 @@ pub struct TextField {
     background_style: Style,
     background_symbol: char,
     max_len: usize,
+}
+
+impl Default for TextField {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl TextField {

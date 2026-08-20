@@ -92,10 +92,10 @@ impl IcyBoardState {
 
                 for (num, desc, path, metadata) in dir_numbers.numbers {
                     self.display_text(IceText::ScanningDirectory, display_flags::DEFAULT).await?;
-                    self.print(TerminalTarget::Both, &format!(" {}", num)).await?;
+                    self.print(TerminalTarget::Both, &format!(" {num}")).await?;
                     if !desc.is_empty() {
                         self.set_color(TerminalTarget::Both, IcbColor::dos_light_green()).await?;
-                        self.print(TerminalTarget::Both, &format!(" ({})", desc)).await?;
+                        self.print(TerminalTarget::Both, &format!(" ({desc})")).await?;
                     }
                     self.new_line().await?;
                     self.reset_color(TerminalTarget::Both).await?;
@@ -104,10 +104,10 @@ impl IcyBoardState {
                         &path,
                         &metadata,
                         FileFilter::header(move |p| {
-                            if let Some(date) = scan_date {
-                                if p.date() < date {
-                                    return false;
-                                }
+                            if let Some(date) = scan_date
+                                && p.date() < date
+                            {
+                                return false;
                             }
                             r.matches_with(p.name(), &match_options)
                         }),

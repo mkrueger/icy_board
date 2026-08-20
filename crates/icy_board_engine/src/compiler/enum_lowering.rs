@@ -22,12 +22,11 @@ impl AstVisitorMut for EnumLoweringVisitor<'_> {
     }
 
     fn visit_member_reference_expression(&mut self, member: &MemberReferenceExpression) -> Expression {
-        if let Expression::Identifier(base) = member.get_expression() {
-            if let Some(definition) = self.registry.get_enum(base.get_identifier()) {
-                if let Some(value) = definition.value(member.get_identifier()) {
-                    return ConstantExpression::create_empty_expression(Constant::Integer(value, crate::ast::constant::NumberFormat::Default));
-                }
-            }
+        if let Expression::Identifier(base) = member.get_expression()
+            && let Some(definition) = self.registry.get_enum(base.get_identifier())
+            && let Some(value) = definition.value(member.get_identifier())
+        {
+            return ConstantExpression::create_empty_expression(Constant::Integer(value, crate::ast::constant::NumberFormat::Default));
         }
         Expression::MemberReference(MemberReferenceExpression::new(
             member.get_expression().visit_mut(self),

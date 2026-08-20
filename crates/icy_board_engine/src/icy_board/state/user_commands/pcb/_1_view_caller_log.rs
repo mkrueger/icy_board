@@ -47,8 +47,8 @@ impl IcyBoardState {
         }
     }
 
-    /// Sysop command 13 - the caller log of one node. PCBoard had a log file per
-    /// node, icy_board has one file whose lines carry the node they came from.
+    /// Sysop command 13 - the caller log of one node. `PCBoard` had a log file per
+    /// node, `icy_board` has one file whose lines carry the node they came from.
     pub async fn view_node_caller_log(&mut self) -> Res<()> {
         let mut node = None;
         let mut scan_all = false;
@@ -127,11 +127,11 @@ impl IcyBoardState {
             return Ok(());
         }
         let path = self.caller_log_path().await;
-        if path.is_file() {
-            if let Err(err) = std::fs::remove_file(&path) {
-                log::error!("Can't delete caller log {}: {}", path.display(), err);
-                return Ok(());
-            }
+        if path.is_file()
+            && let Err(err) = std::fs::remove_file(&path)
+        {
+            log::error!("Can't delete caller log {}: {}", path.display(), err);
+            return Ok(());
         }
         // PCBoard reopens the log and writes the caller back into it.
         let name = self.session.user_name.clone();
@@ -148,21 +148,21 @@ impl IcyBoardState {
         };
         let content = crate::tables::import_cp437_string(&content, false);
 
-        let node_tag = node.map(|n| format!("[{}]", n));
-        let search = search.map(|s| s.to_ascii_uppercase());
+        let node_tag = node.map(|n| format!("[{n}]"));
+        let search = search.map(str::to_ascii_uppercase);
 
         self.new_line().await?;
         self.session.disp_options.force_count_lines();
         for line in content.lines() {
-            if let Some(tag) = &node_tag {
-                if !line.contains(tag.as_str()) {
-                    continue;
-                }
+            if let Some(tag) = &node_tag
+                && !line.contains(tag.as_str())
+            {
+                continue;
             }
-            if let Some(search) = &search {
-                if !line.to_ascii_uppercase().contains(search.as_str()) {
-                    continue;
-                }
+            if let Some(search) = &search
+                && !line.to_ascii_uppercase().contains(search.as_str())
+            {
+                continue;
             }
             self.print(TerminalTarget::Both, line).await?;
             self.new_line().await?;

@@ -12,14 +12,14 @@ impl Widget for RgbSwatch {
             let value_fg = value / f32::from(area.height);
             let value_bg = (value - 0.5) / f32::from(area.height);
 
-            for (_xi, x) in (area.left()..area.right()).enumerate() {
+            for x in area.left()..area.right() {
                 let mut upper = Color::Rgb((64.0 * value_fg) as u8, (128.0 * value_fg) as u8, (255.0 * value_fg) as u8);
                 let lower = Color::Rgb((64.0 * value_fg) as u8, (128.0 * value_bg) as u8, (255.0 * value_bg) as u8);
 
-                if y == area.top() {
-                    if let Some(col) = get_tui_theme().tabs_selected.fg {
-                        upper = col;
-                    }
+                if y == area.top()
+                    && let Some(col) = get_tui_theme().tabs_selected.fg
+                {
+                    upper = col;
                 }
 
                 buf.cell_mut((x, y)).unwrap().set_char('▀').set_fg(upper).set_bg(lower);

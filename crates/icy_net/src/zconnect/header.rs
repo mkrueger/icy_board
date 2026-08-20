@@ -342,7 +342,7 @@ impl ZConnectHeaderBlock {
     }
 
     pub fn add_acer(&mut self, index: usize, compressor: Acer) {
-        self.acer.entry(index).or_insert_with(Vec::new).push(compressor);
+        self.acer.entry(index).or_default().push(compressor);
     }
 
     pub fn password(&self) -> &str {
@@ -363,14 +363,14 @@ impl ZConnectHeaderBlock {
         self.protocols.get(&index)
     }
     pub fn add_protocol(&mut self, index: usize, protocol: TransferProtocol) {
-        self.protocols.entry(index).or_insert_with(Vec::new).push(protocol);
+        self.protocols.entry(index).or_default().push(protocol);
     }
 
     pub fn crypt(&self, index: usize) -> Option<&Vec<Crypt>> {
         self.crypt.get(&index)
     }
     pub fn add_crypt(&mut self, index: usize, crypt: Crypt) {
-        self.crypt.entry(index).or_insert_with(Vec::new).push(crypt);
+        self.crypt.entry(index).or_default().push(crypt);
     }
 
     pub fn acer_in(&self) -> Option<Acer> {
@@ -391,14 +391,14 @@ impl ZConnectHeaderBlock {
         self.mailer.get(&index)
     }
     pub fn add_mailer(&mut self, index: usize, mailer: Mailer) {
-        self.mailer.entry(index).or_insert_with(Vec::new).push(mailer);
+        self.mailer.entry(index).or_default().push(mailer);
     }
 
     pub fn mailformat(&self, index: usize) -> Option<&Vec<Mailformat>> {
         self.mailformat.get(&index)
     }
     pub fn add_mailformat(&mut self, index: usize, mailformat: Mailformat) {
-        self.mailformat.entry(index).or_insert_with(Vec::new).push(mailformat);
+        self.mailformat.entry(index).or_default().push(mailformat);
     }
 
     pub fn coords(&self) -> Option<&str> {
@@ -526,7 +526,7 @@ impl ZConnectBlock for ZConnectHeaderBlock {
                 let phone = parts.next().unwrap().to_string();
                 self.phone.insert(index - 1, phone);
             }
-            "DOMAIN" => self.domains = parameter.split(|c| c == ';' || c == ' ').map(|s| s.to_string()).collect(),
+            "DOMAIN" => self.domains = parameter.split([';', ' ']).map(|s| s.to_string()).collect(),
             "MAPS" => self.maps = Some(parameter),
             "ISO2" => {
                 let mut parts = parameter.splitn(2, ' ');
@@ -543,7 +543,7 @@ impl ZConnectBlock for ZConnectHeaderBlock {
             "ARC" => {
                 let mut parts = parameter.splitn(2, ' ');
                 let index: usize = parts.next().unwrap().parse()?;
-                let compressors = parts.next().unwrap().split(|c| c == ';' || c == ' ').map(|s| Acer::parse(s)).collect();
+                let compressors = parts.next().unwrap().split([';', ' ']).map(Acer::parse).collect();
                 self.acer.insert(index - 1, compressors);
             }
             "PASSWD" => self.password = parameter,
@@ -551,18 +551,13 @@ impl ZConnectBlock for ZConnectHeaderBlock {
             "PROTO" => {
                 let mut parts = parameter.splitn(2, ' ');
                 let index: usize = parts.next().unwrap().parse()?;
-                let protocols = parts
-                    .next()
-                    .unwrap()
-                    .split(|c| c == ';' || c == ' ')
-                    .map(|s| TransferProtocol::parse(s))
-                    .collect();
+                let protocols = parts.next().unwrap().split([';', ' ']).map(TransferProtocol::parse).collect();
                 self.protocols.insert(index - 1, protocols);
             }
             "CRYPT" => {
                 let mut parts = parameter.splitn(2, ' ');
                 let index: usize = parts.next().unwrap().parse()?;
-                let crypts = parts.next().unwrap().split(|c| c == ';' || c == ' ').map(|s| Crypt::parse(s)).collect();
+                let crypts = parts.next().unwrap().split([';', ' ']).map(Crypt::parse).collect();
                 self.crypt.insert(index - 1, crypts);
             }
             "ACERIN" => self.acer_in = Some(Acer::parse(&parameter)),
@@ -570,13 +565,13 @@ impl ZConnectBlock for ZConnectHeaderBlock {
             "MAILER" => {
                 let mut parts = parameter.splitn(2, ' ');
                 let index: usize = parts.next().unwrap().parse()?;
-                let mailers = parts.next().unwrap().split(|c| c == ';' || c == ' ').map(|s| Mailer::parse(s)).collect();
+                let mailers = parts.next().unwrap().split([';', ' ']).map(Mailer::parse).collect();
                 self.mailer.insert(index - 1, mailers);
             }
             "MAILFORMAT" => {
                 let mut parts = parameter.splitn(2, ' ');
                 let index: usize = parts.next().unwrap().parse()?;
-                let mailformats = parts.next().unwrap().split(|c| c == ';' || c == ' ').map(|s| Mailformat::parse(s)).collect();
+                let mailformats = parts.next().unwrap().split([';', ' ']).map(Mailformat::parse).collect();
                 self.mailformat.insert(index - 1, mailformats);
             }
             "KOORDINATEN" => self.coords = Some(parameter),

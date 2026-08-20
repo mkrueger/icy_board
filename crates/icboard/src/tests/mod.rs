@@ -319,8 +319,8 @@ fn test_session_output<P: Fn(&mut IcyBoard)>(cmd: String, init_fn: P, login_syso
             .unwrap();
 
         wait_for_the_board_to_go_quiet(&result).await;
-        let x = result.as_ref().lock().await.clone();
-        x
+
+        result.as_ref().lock().await.clone()
     });
 
     let result = String::from_utf8(result).expect("board output is not valid UTF-8");
@@ -344,9 +344,7 @@ async fn wait_for_the_board_to_go_quiet(output: &Arc<tokio::sync::Mutex<Vec<u8>>
         if len != seen {
             seen = len;
             last_change = std::time::Instant::now();
-        } else if seen > 0 && last_change.elapsed() >= QUIET {
-            return;
-        } else if seen == 0 && start.elapsed() >= FIRST_BYTE {
+        } else if (seen > 0 && last_change.elapsed() >= QUIET) || (seen == 0 && start.elapsed() >= FIRST_BYTE) {
             return;
         }
 

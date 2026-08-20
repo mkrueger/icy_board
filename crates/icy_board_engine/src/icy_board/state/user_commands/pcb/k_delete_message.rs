@@ -36,7 +36,7 @@ impl IcyBoardState {
                 Ok(())
             }
             Err(err) => {
-                log::error!("Message index load error {}", err);
+                log::error!("Message index load error {err}");
                 log::error!("Creating new message index at {}", message_base_file.display());
                 self.display_text(IceText::CreatingNewMessageIndex, display_flags::NEWLINE | display_flags::LFAFTER)
                     .await?;
@@ -62,17 +62,17 @@ impl IcyBoardState {
         }
 
         match message_base.delete_message(number) {
-            Ok(_) => {
+            Ok(()) => {
                 log::error!("Deleted message {} ({})", number, message_base.path().display());
                 self.display_text(IceText::MessageKilled, display_flags::DEFAULT).await?;
-                self.print(TerminalTarget::Both, &format!("{}", number)).await?;
+                self.print(TerminalTarget::Both, &format!("{number}")).await?;
                 self.new_line().await?;
                 self.new_line().await?;
             }
             Err(err) => {
                 log::error!("Error deleting message:{} ({})/ {}", number, message_base.path().display(), err);
                 self.display_text(IceText::NoSuchMessageNumber, display_flags::DEFAULT).await?;
-                self.print(TerminalTarget::Both, &format!("{}", number)).await?;
+                self.print(TerminalTarget::Both, &format!("{number}")).await?;
                 self.new_line().await?;
                 self.new_line().await?;
             }

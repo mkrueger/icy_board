@@ -25,7 +25,7 @@ impl IcyBoardState {
                         IceText::DownloadTagged,
                         1,
                         "",
-                        &"",
+                        "",
                         Some(self.session.yes_char.to_string()),
                         display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFBEFORE | display_flags::YESNO | display_flags::FIELDLEN,
                     )
@@ -93,8 +93,7 @@ impl IcyBoardState {
             }
             self.display_text(IceText::BatchDownloadSize, display_flags::DEFAULT).await?;
             self.set_color(TerminalTarget::Both, IcbColor::dos_light_green()).await?;
-            self.println(TerminalTarget::Both, &format!(" {}", humanize_bytes_decimal!(total_size).to_string()))
-                .await?;
+            self.println(TerminalTarget::Both, &format!(" {}", humanize_bytes_decimal!(total_size))).await?;
 
             self.display_text(IceText::BatchProtocol, display_flags::DEFAULT).await?;
             self.set_color(TerminalTarget::Both, IcbColor::dos_light_cyan()).await?;
@@ -106,8 +105,8 @@ impl IcyBoardState {
                 .input_field(
                     IceText::GoodbyeAfterDownload,
                     1,
-                    &DL_LISTMASK,
-                    &"",
+                    DL_LISTMASK,
+                    "",
                     None,
                     display_flags::NEWLINE | display_flags::UPCASE | display_flags::FIELDLEN,
                 )
@@ -151,7 +150,7 @@ impl IcyBoardState {
                 let files: Vec<PathBuf> = self.session.flagged_files.drain(..).collect();
                 for f in &files {
                     if !f.exists() {
-                        log::error!("File not found: {:?}", f);
+                        log::error!("File not found: {}", f.display());
                         self.session.op_text = f.file_name().unwrap().to_string_lossy().to_string();
                         self.display_text(IceText::NotFoundOnDisk, display_flags::NEWLINE).await?;
                         return Ok(());
@@ -166,7 +165,7 @@ impl IcyBoardState {
                         let started = Instant::now();
                         while !state.is_finished {
                             if let Err(e) = prot.update_transfer(&mut *self.connection, &mut state).await {
-                                log::error!("Error while updating file transfer with {:?} : {}", protocol, e);
+                                log::error!("Error while updating file transfer with {protocol:?} : {e}");
                                 self.display_text(IceText::TransferAborted, display_flags::NEWLINE).await?;
                                 break;
                             }
@@ -181,7 +180,7 @@ impl IcyBoardState {
                         self.log_transfer(false, &sent, &protocol_str, state.send_state.errors, cps).await?;
 
                         self.count_downloads(&files, &sent).await;
-                        let (charged_files, charged_bytes) = self.charged_downloads(&state.send_state.finished_files).await;
+                        let (charged_files, charged_bytes) = self.charged_downloads(&state.send_state.finished_files);
                         if let Some(user) = &mut self.session.current_user {
                             user.stats.num_downloads = user.stats.num_downloads.saturating_add(charged_files);
                             user.stats.today_num_downloads = user.stats.today_num_downloads.saturating_add(charged_files);
@@ -193,8 +192,8 @@ impl IcyBoardState {
                         self.board.lock().await.save_statistics()?;
                     }
                     Err(e) => {
-                        log::error!("Error while initiating file transfer with {:?} : {}", protocol, e);
-                        self.println(TerminalTarget::Both, &format!("Error: {}", e)).await?;
+                        log::error!("Error while initiating file transfer with {protocol:?} : {e}");
+                        self.println(TerminalTarget::Both, &format!("Error: {e}")).await?;
                     }
                 }
             } else {
@@ -208,7 +207,7 @@ impl IcyBoardState {
         Ok(())
     }
 
-    /// Raises the per file download counter, the way PCBoard reports how popular a file is.
+    /// Raises the per file download counter, the way `PCBoard` reports how popular a file is.
     ///
     /// The counter lives in the area the file came from, so an offered file whose area is
     /// not part of this conference is skipped.
@@ -236,21 +235,21 @@ impl IcyBoardState {
         }
     }
 
-    async fn charged_downloads(&mut self, finished: &[(String, PathBuf)]) -> (u64, u64) {
-        let free_areas = self.free_download_areas().await;
+    fn charged_downloads(&mut self, finished: &[(String, PathBuf)]) -> (u64, u64) {
+        let free_areas = self.free_download_areas();
         finished
             .iter()
             .map(|(_, path)| path)
             .filter(|path| !path.parent().is_some_and(|dir| free_areas.iter().any(|area| area == dir)))
             .fold((0u64, 0u64), |(files, bytes), path| {
-                let size = std::fs::metadata(path).map(|metadata| metadata.len()).unwrap_or(0);
+                let size = std::fs::metadata(path).map_or(0, |metadata| metadata.len());
                 (files.saturating_add(1), bytes.saturating_add(size))
             })
     }
 
     /// Drops the files the caller's limits will not cover.
     ///
-    /// PCBoard judges every file on its own against what the batch has already taken, so
+    /// `PCBoard` judges every file on its own against what the batch has already taken, so
     /// one refusal does not cost the caller the rest of their batch. There is no sysop
     /// exemption in the original either - a sysop simply holds a level with no limits.
     async fn screen_transfer_limits(&mut self, files: Vec<PathBuf>) -> Res<Vec<PathBuf>> {
@@ -265,15 +264,15 @@ impl IcyBoardState {
         // PPL can move the allowance around during the session, so take the live figure.
         limits.bytes_remaining = (self.session.bytes_remaining >= 0).then_some(self.session.bytes_remaining);
 
-        let free_areas = self.free_download_areas().await;
+        let free_areas = self.free_download_areas();
         let bps = self.get_bps().max(0) as u32;
         let minutes_left = self.minutes_left();
         let mut seconds_so_far = 0i64;
         let mut so_far = BatchSoFar::default();
         let mut allowed = Vec::new();
         for path in files {
-            let size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
-            let free = path.parent().map_or(false, |dir| free_areas.iter().any(|area| area == dir));
+            let size = std::fs::metadata(&path).map_or(0, |m| m.len());
+            let free = path.parent().is_some_and(|dir| free_areas.iter().any(|area| area == dir));
             let verdict = if enforce_transfer_limits {
                 history
                     .as_ref()
@@ -311,15 +310,15 @@ impl IcyBoardState {
         Ok(allowed)
     }
 
-    /// Directories the sysop marked free, which PCBoard's FSEC file did with a password.
-    async fn free_download_areas(&mut self) -> Vec<PathBuf> {
+    /// Directories the sysop marked free, which `PCBoard`'s FSEC file did with a password.
+    fn free_download_areas(&mut self) -> Vec<PathBuf> {
         let Some(directories) = &self.session.current_conference.directories else {
             return Vec::new();
         };
         directories.iter().filter(|area| area.is_free).map(|area| area.path.clone()).collect()
     }
 
-    /// Tells the caller which limit stopped the file, in the order PCBoard prints it:
+    /// Tells the caller which limit stopped the file, in the order `PCBoard` prints it:
     /// where they stand, what the limit is, then the file that broke it.
     async fn report_limit(&mut self, path: &Path, verdict: LimitVerdict) -> Res<()> {
         let name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
@@ -364,8 +363,8 @@ impl IcyBoardState {
                 .input_field(
                     IceText::EditBatch,
                     1,
-                    &DL_EDITMASK,
-                    &"",
+                    DL_EDITMASK,
+                    "",
                     None,
                     display_flags::NEWLINE | display_flags::UPCASE | display_flags::FIELDLEN,
                 )
@@ -397,7 +396,7 @@ impl IcyBoardState {
                 IceText::RemoveFileNumber,
                 16,
                 &MASK_NUM,
-                &"",
+                "",
                 None,
                 display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFBEFORE,
             )
@@ -446,7 +445,7 @@ impl IcyBoardState {
 const DL_LISTMASK: &str = "AEGLP";
 const DL_EDITMASK: &str = "ARL";
 
-/// Ratios are held in tenths, and PCBoard shows them with the one decimal back.
+/// Ratios are held in tenths, and `PCBoard` shows them with the one decimal back.
 fn tenths(value: u64) -> String {
     format!("{}.{}", value / 10, value % 10)
 }

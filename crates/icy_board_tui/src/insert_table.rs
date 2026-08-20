@@ -78,7 +78,7 @@ impl<'a> InsertTable<'a> {
             None => 0,
         };
         self.table_state.select(Some(i));
-        self.scroll_state = self.scroll_state.position(i * 1);
+        self.scroll_state = self.scroll_state.position(i);
     }
 
     fn next(&mut self) {
@@ -93,7 +93,7 @@ impl<'a> InsertTable<'a> {
             None => 0,
         };
         self.table_state.select(Some(i));
-        self.scroll_state = self.scroll_state.position(i * 1);
+        self.scroll_state = self.scroll_state.position(i);
     }
 
     fn page_up(&mut self) {
@@ -102,7 +102,7 @@ impl<'a> InsertTable<'a> {
             None => 0,
         };
         self.table_state.select(Some(i));
-        self.scroll_state = self.scroll_state.position(i * 1);
+        self.scroll_state = self.scroll_state.position(i);
     }
 
     fn page_down(&mut self) {
@@ -111,7 +111,7 @@ impl<'a> InsertTable<'a> {
             None => 0,
         };
         self.table_state.select(Some(i));
-        self.scroll_state = self.scroll_state.position(i * 1);
+        self.scroll_state = self.scroll_state.position(i);
     }
 
     fn home(&mut self) {

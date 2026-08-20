@@ -1,3 +1,7 @@
+// Every opcode handler is called with `.await` from the dispatch table in `mod.rs`,
+// so the signature stays async even where a given handler never awaits.
+#![allow(clippy::unused_async)]
+
 use std::{
     env,
     fs::{self},
@@ -34,8 +38,9 @@ use crate::{
 
 use super::super::errors::IcyError;
 use super::super::expressions::predefined_functions::{http_get, message_status};
+use std::fmt::Write as _;
 
-/// A statement that is not implemented yet. PCBoard never aborted a PPE over one,
+/// A statement that is not implemented yet. `PCBoard` never aborted a PPE over one,
 /// so the call is logged and skipped rather than killing the session.
 macro_rules! unimplemented_stmt {
     ($name:expr) => {{
@@ -101,7 +106,7 @@ pub async fn confflag(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
     //32 = net status
 
     if let Some(session_user) = &mut vm.icy_board_state.session.current_user {
-        let mut value = session_user.conference_flags.get(&(conf as usize)).cloned().unwrap_or(ConferenceFlags::None);
+        let mut value = session_user.conference_flags.get(&(conf as usize)).copied().unwrap_or(ConferenceFlags::None);
         value |= ConferenceFlags::from_bits(flags as u8).unwrap_or(ConferenceFlags::None);
         session_user.conference_flags.insert(conf as usize, value);
     }
@@ -123,7 +128,7 @@ pub async fn confunflag(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()
 
     if let Some(session_user) = &mut vm.icy_board_state.session.current_user {
         // Get existing flags or None if conference has no flags set
-        let mut value = session_user.conference_flags.get(&(conf as usize)).cloned().unwrap_or(ConferenceFlags::None);
+        let mut value = session_user.conference_flags.get(&(conf as usize)).copied().unwrap_or(ConferenceFlags::None);
 
         // Clear the specified flags using bitwise operations
         let flags_to_clear = ConferenceFlags::from_bits(flags as u8).unwrap_or(ConferenceFlags::None);
@@ -229,9 +234,9 @@ pub async fn resetdisp(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
 /// # Errors
 /// Errors if the variable is not found.
 pub async fn startdisp(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let channel = vm.eval_expr(&args[0]).await?.as_int();
     const FORCE_NS: i32 = 1;
     const FORCE_COUNTLINES: i32 = 2;
+    let channel = vm.eval_expr(&args[0]).await?.as_int();
     if channel == FORCE_NS {
         vm.icy_board_state.session.disp_options.force_non_stop();
     } else if channel == FORCE_COUNTLINES {
@@ -252,24 +257,20 @@ pub async fn fputpad(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 }
 
 fn fputpad_internal(vm: &mut VirtualMachine<'_>, channel: i32, text: String, width: i32) -> Res<()> {
-    let abs_width = width.abs() as usize;
-    let padded = if width > 0 {
-        // Positive width: right-justify (left-pad with spaces)
-        if text.len() >= abs_width {
-            text
-        } else {
-            format!("{:>width$}", text, width = abs_width)
+    let abs_width = width.unsigned_abs() as usize;
+    let padded = match width.cmp(&0) {
+        std::cmp::Ordering::Greater => {
+            // Positive width: right-justify (left-pad with spaces)
+            if text.len() >= abs_width { text } else { format!("{text:>abs_width$}") }
         }
-    } else if width < 0 {
-        // Negative width: left-justify (right-pad with spaces)
-        if text.len() >= abs_width {
-            text
-        } else {
-            format!("{:<width$}", text, width = abs_width)
+        std::cmp::Ordering::Less => {
+            // Negative width: left-justify (right-pad with spaces)
+            if text.len() >= abs_width { text } else { format!("{text:<abs_width$}") }
         }
-    } else {
-        // Width of 0: just the text as-is
-        text
+        std::cmp::Ordering::Equal => {
+            // Width of 0: just the text as-is
+            text
+        }
     };
     vm.io.fput(channel, padded)?;
     vm.io.fput(channel, "\n".to_string())?;
@@ -313,10 +314,10 @@ pub async fn defcolor(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
 pub async fn delete(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let file = &vm.eval_expr(&args[0]).await?.as_string();
     let file = vm.resolve_file(&file).await.to_string_lossy().to_string();
-    if let Err(err) = vm.io.delete(&file) {
-        if err.kind() != std::io::ErrorKind::NotFound {
-            log::error!("Error deleting file'{}': {}", file, err);
-        }
+    if let Err(err) = vm.io.delete(&file)
+        && err.kind() != std::io::ErrorKind::NotFound
+    {
+        log::error!("Error deleting file'{file}': {err}");
     }
     Ok(())
 }
@@ -342,7 +343,7 @@ pub async fn log(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     if left_justify {
         msg = msg.trim_start().to_string();
     }
-    log::info!("{}", msg);
+    log::info!("{msg}");
     Ok(())
 }
 
@@ -409,7 +410,7 @@ pub async fn inputyn(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
             color.into(),
             prompt,
             len,
-            &"",
+            "",
             "",
             d,
             display_flags::YESNO | display_flags::NEWLINE | display_flags::UPCASE | display_flags::GUIDE,
@@ -659,11 +660,11 @@ pub async fn shell(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
                 }
             }
             Err(e) => {
-                log::error!("Error running process: {}", e);
+                log::error!("Error running process: {e}");
             }
         },
         Err(e) => {
-            log::error!("Error starting process: {}", e);
+            log::error!("Error starting process: {e}");
         }
     }
 
@@ -724,20 +725,20 @@ pub async fn join(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 }
 pub async fn quest(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let nr = vm.eval_expr(&args[0]).await?.as_int();
-    if let Some(surveys) = &vm.icy_board_state.session.current_conference.surveys {
-        if let Some(survey) = surveys.get(nr as usize) {
-            vm.icy_board_state.start_survey(&survey.clone()).await?;
-        }
+    if let Some(surveys) = &vm.icy_board_state.session.current_conference.surveys
+        && let Some(survey) = surveys.get(nr as usize)
+    {
+        vm.icy_board_state.start_survey(&survey.clone()).await?;
     }
     Ok(())
 }
 
 pub async fn blt(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let nr = vm.eval_expr(&args[0]).await?.as_int();
-    if let Some(bulletins) = &vm.icy_board_state.session.current_conference.bulletins {
-        if let Some(bulletin) = bulletins.get(nr as usize) {
-            vm.icy_board_state.display_file(&bulletin.path.clone()).await?;
-        }
+    if let Some(bulletins) = &vm.icy_board_state.session.current_conference.bulletins
+        && let Some(bulletin) = bulletins.get(nr as usize)
+    {
+        vm.icy_board_state.display_file(&bulletin.path.clone()).await?;
     }
     Ok(())
 }
@@ -887,7 +888,7 @@ pub async fn rdunet(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
             operation: node.operation.clone(),
             user_name: node.user_name.clone(),
             city: node.city.clone(),
-            status: node.status.clone(),
+            status: node.status,
             enabled_chat: node.enabled_chat,
             node_number: node.node_number,
             connection_type: node.connection_type,
@@ -940,7 +941,7 @@ pub async fn wrunet(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
         node.user_name = name;
         node.city = city;
     } else {
-        log::error!("PPE wrunet - node invalid: {}", node);
+        log::error!("PPE wrunet - node invalid: {node}");
     }
 
     Ok(())
@@ -1201,7 +1202,7 @@ pub async fn rename(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let new = vm.resolve_file(&new).await.to_string_lossy().to_string();
 
     if let Err(err) = vm.io.rename(&old, &new) {
-        log::error!("Error renaming file: {}", err);
+        log::error!("Error renaming file: {err}");
     }
     Ok(())
 }
@@ -1265,7 +1266,7 @@ fn read_bytes<const N: usize>(data: &[u8]) -> [u8; N] {
 }
 
 async fn internal_fread(vm: &mut VirtualMachine<'_>, channel: i32, size: usize, arg: &PPEExpr) -> Res<()> {
-    let val = vm.eval_expr(&arg).await?;
+    let val = vm.eval_expr(arg).await?;
 
     let result = vm.io.fread(channel, size)?;
 
@@ -1292,28 +1293,26 @@ async fn internal_fread(vm: &mut VirtualMachine<'_>, channel: i32, size: usize, 
         VariableType::Double => {
             vm.set_variable(arg, VariableValue::new_double(f64::from_le_bytes(read_bytes(&result)))).await?;
         }
-        _ => {
-            match result.len() {
-                0 => {
-                    vm.set_variable(arg, VariableValue::new_int(0)).await?;
-                }
-                1 => {
-                    vm.set_variable(arg, VariableValue::new_int(result[0] as i32)).await?;
-                }
-                2 => {
-                    vm.set_variable(arg, VariableValue::new_int(i16::from_le_bytes(result[..2].try_into().unwrap()) as i32))
-                        .await?;
-                }
-                4 => {
-                    vm.set_variable(arg, VariableValue::new_int(i32::from_le_bytes(result[..4].try_into().unwrap())))
-                        .await?;
-                }
-                _ => {
-                    log::error!("fread: invalid size: {}", result.len());
-                }
-            };
-        }
-    };
+        _ => match result.len() {
+            0 => {
+                vm.set_variable(arg, VariableValue::new_int(0)).await?;
+            }
+            1 => {
+                vm.set_variable(arg, VariableValue::new_int(result[0] as i32)).await?;
+            }
+            2 => {
+                vm.set_variable(arg, VariableValue::new_int(i16::from_le_bytes(result[..2].try_into().unwrap()) as i32))
+                    .await?;
+            }
+            4 => {
+                vm.set_variable(arg, VariableValue::new_int(i32::from_le_bytes(result[..4].try_into().unwrap())))
+                    .await?;
+            }
+            _ => {
+                log::error!("fread: invalid size: {}", result.len());
+            }
+        },
+    }
     Ok(())
 }
 
@@ -1344,7 +1343,7 @@ async fn internal_fwrite(vm: &mut VirtualMachine<'_>, channel: i32, val: Variabl
         v.push(0);
     }
     vm.io.fwrite(channel, &v).map_err(|e| {
-        log::error!("fwrite error: {} ({})", e, channel);
+        log::error!("fwrite error: {e} ({channel})");
         e
     })?;
     Ok(())
@@ -1442,7 +1441,7 @@ pub async fn copy(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let old = &vm.eval_expr(&args[0]).await?.as_string();
     let new = &vm.eval_expr(&args[1]).await?.as_string();
     if let Err(err) = vm.io.copy(old, new) {
-        log::error!("Error renaming file: {}", err);
+        log::error!("Error renaming file: {err}");
     }
     Ok(())
 }
@@ -1492,7 +1491,7 @@ pub async fn getaltuser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()
     let user_record = vm.eval_expr(&args[0]).await?.as_int();
     if user_record <= 0 || user_record as usize > vm.icy_board_state.get_board().await.users.len() {
         // it's expected behavior, user record is unchanged.
-        log::warn!("PPE getaltuser: invalid user record #{}", user_record);
+        log::warn!("PPE getaltuser: invalid user record #{user_record}");
         return Ok(());
     }
     vm.user = vm.icy_board_state.get_board().await.users[user_record as usize - 1].clone();
@@ -1537,10 +1536,10 @@ pub async fn lang(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let lang = if let Some(lang) = vm.icy_board_state.board.lock().await.languages.get(language as usize) {
         lang.extension.clone()
     } else {
-        log::error!("PPE: lang(): Language not found: {}", language);
+        log::error!("PPE: lang(): Language not found: {language}");
         return Ok(());
     };
-    vm.icy_board_state.session.language = lang.clone();
+    vm.icy_board_state.session.language.clone_from(&lang);
     if let Some(user) = &mut vm.icy_board_state.session.current_user {
         user.language = lang;
     }
@@ -1988,18 +1987,18 @@ pub async fn account(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
         16 => account.credit_special += value,         // CRED_SPECIAL
         17 => {
             // SEC_DROP - Security level to drop to (stored as u8)
-            account.drop_sec_level = value.max(0.0).min(255.0) as u8;
+            account.drop_sec_level = value.clamp(0.0, 255.0) as u8;
         }
         _ => {
-            log::error!("ACCOUNT statement: Invalid field number: {}", field);
+            log::error!("ACCOUNT statement: Invalid field number: {field}");
         }
     }
 
     // Update session user if this is the current user
-    if let Some(session_user) = &mut vm.icy_board_state.session.current_user {
-        if session_user.get_name() == vm.user.get_name() {
-            session_user.account = vm.user.account.clone();
-        }
+    if let Some(session_user) = &mut vm.icy_board_state.session.current_user
+        && session_user.get_name() == vm.user.get_name()
+    {
+        session_user.account.clone_from(&vm.user.account);
     }
 
     Ok(())
@@ -2019,8 +2018,8 @@ pub async fn recordusage(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<(
     let value = vm.eval_expr(&args[4]).await?.as_int();
 
     // Validate field is in debit/credit range (2-16)
-    if field < 2 || field > 16 {
-        log::error!("RECORDUSAGE: Invalid field number: {} (must be 2-16)", field);
+    if !(2..=16).contains(&field) {
+        log::error!("RECORDUSAGE: Invalid field number: {field} (must be 2-16)");
         return Ok(());
     }
 
@@ -2054,16 +2053,16 @@ pub async fn recordusage(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<(
         15 => account.credit_upload_bytes += total_charge,    // CRED_UPBYTES
         16 => account.credit_special += total_charge,         // CRED_SPECIAL
         _ => {
-            log::error!("RECORDUSAGE: Invalid field number: {}", field);
+            log::error!("RECORDUSAGE: Invalid field number: {field}");
             return Ok(());
         }
     }
 
     // Update session user if this is the current user
-    if let Some(session_user) = &mut vm.icy_board_state.session.current_user {
-        if session_user.get_name() == vm.user.get_name() {
-            session_user.account = vm.user.account.clone();
-        }
+    if let Some(session_user) = &mut vm.icy_board_state.session.current_user
+        && session_user.get_name() == vm.user.get_name()
+    {
+        session_user.account.clone_from(&vm.user.account);
     }
 
     // Write to accounting tracking file if configured
@@ -2095,15 +2094,12 @@ pub async fn recordusage(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<(
             _ => "UNKNOWN",
         };
 
-        let log_line = format!(
-            "{}\t{}\t{}\t{}\t{}\t{:.2}\t{}\t{:.2}\n",
-            timestamp, username, field_name, desc1, desc2, unitcost, value, total_charge
-        );
+        let log_line = format!("{timestamp}\t{username}\t{field_name}\t{desc1}\t{desc2}\t{unitcost:.2}\t{value}\t{total_charge:.2}\n");
 
         // Append to tracking file
         if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(tracking_file) {
             if let Err(e) = file.write_all(log_line.as_bytes()) {
-                log::error!("RECORDUSAGE: Failed to write to tracking file: {}", e);
+                log::error!("RECORDUSAGE: Failed to write to tracking file: {e}");
             }
         } else {
             log::error!("RECORDUSAGE: Failed to open tracking file");
@@ -2198,26 +2194,26 @@ pub async fn msgtofile(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
     let blocks = (stored_len.saturating_add(127) / 128).saturating_add(1).min(255);
 
     let mut msg = String::new();
-    msg.push_str(&format!("          Status: {}\n", message_status(&header)));
-    msg.push_str(&format!("  Message Number: {}\n", header.message_number));
-    msg.push_str(&format!("Reference Number: {}\n", header.reply_to));
-    msg.push_str(&format!("Number of blocks: {blocks}\n"));
-    msg.push_str(&format!("            Date: {:02}-{:02}-{:02}\n", date.month(), date.day(), date.year() % 100));
-    msg.push_str(&format!("            Time: {:02}:{:02}\n", time.get_hour(), time.get_minute()));
-    msg.push_str(&format!("              To: {to}\n"));
+    let _ = writeln!(msg, "          Status: {}", message_status(&header));
+    let _ = writeln!(msg, "  Message Number: {}", header.message_number);
+    let _ = writeln!(msg, "Reference Number: {}", header.reply_to);
+    let _ = writeln!(msg, "Number of blocks: {blocks}");
+    let _ = writeln!(msg, "            Date: {:02}-{:02}-{:02}", date.month(), date.day(), date.year() % 100);
+    let _ = writeln!(msg, "            Time: {:02}:{:02}", time.get_hour(), time.get_minute());
+    let _ = writeln!(msg, "              To: {to}");
     // PCBoard builds a "Reply" line here but overwrites it before writing, so
     // only "Time of reply" ever reaches the file (SCREXEC.CPP).
     msg.push_str("   Time of reply: \n");
-    msg.push_str(&format!("            From: {from}\n"));
-    msg.push_str(&format!("         Subject: {subject}\n"));
+    let _ = writeln!(msg, "            From: {from}");
+    let _ = writeln!(msg, "         Subject: {subject}");
     // JAM keeps only a password CRC, so the plaintext PCBoard printed is gone.
     msg.push_str("        Password: \n");
-    msg.push_str(&format!("          Active: {active}\n"));
-    msg.push_str(&format!("            Echo:{echo}\n"));
+    let _ = writeln!(msg, "          Active: {active}");
+    let _ = writeln!(msg, "            Echo:{echo}");
     if !ext_headers.is_empty() {
-        msg.push_str(&format!("Extended headers: {}\n", ext_headers.len()));
+        let _ = writeln!(msg, "Extended headers: {}", ext_headers.len());
         for (func, value) in &ext_headers {
-            msg.push_str(&format!("{func:<7}:{value:<60}N\n"));
+            let _ = writeln!(msg, "{func:<7}:{value:<60}N");
         }
     }
     msg.push_str("Message Body:\n");
@@ -2250,7 +2246,7 @@ fn pcboard_message_body(text: &str) -> String {
     body
 }
 
-/// Splits a header field the way PCBoard does: up to 25 characters stay in the
+/// Splits a header field the way `PCBoard` does: up to 25 characters stay in the
 /// fixed field, the rest moves into an extended header (and a second one past 60
 /// characters). To and From blank their fixed field, Subject keeps its first 25.
 fn split_fixed_field(value: String, func: &'static str, func2: &'static str, blank_fixed: bool, ext: &mut Vec<(&'static str, String)>) -> String {
@@ -2366,7 +2362,7 @@ pub async fn grafmode(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
             vm.icy_board_state.session.disp_options.grapics_mode = GraphicsMode::Avatar;
         }
         _ => {
-            log::error!("PPE unsupported graphics mode: {}", mode);
+            log::error!("PPE unsupported graphics mode: {mode}");
         }
     }
     Ok(())
@@ -2388,7 +2384,7 @@ pub async fn adduser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     }
 
     // Save current user context before we potentially switch
-    let original_user = if !keep_alt_vars { Some(vm.user.clone()) } else { None };
+    let original_user = if keep_alt_vars { None } else { Some(vm.user.clone()) };
 
     // Acquire board lock to check for duplicates and add user
     let mut board_guard = vm.icy_board_state.board.lock().await;
@@ -2400,7 +2396,7 @@ pub async fn adduser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
         .any(|u| u.get_name().eq_ignore_ascii_case(trimmed) || (!u.alias.is_empty() && u.alias.eq_ignore_ascii_case(trimmed)));
 
     if duplicate {
-        log::warn!("ADDUSER: duplicate username '{}', no user created", trimmed);
+        log::warn!("ADDUSER: duplicate username '{trimmed}', no user created");
         return Ok(());
     }
 
@@ -2412,14 +2408,14 @@ pub async fn adduser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     new_user.security_level = board_guard.config.new_user_settings.sec_level;
 
     // Initialize accounting if enabled
-    if board_guard.config.accounting.enabled {
-        if let Some(acc_cfg) = &board_guard.config.accounting.accounting_config {
-            new_user.account = Some(AccountUserInf {
-                starting_balance: acc_cfg.new_user_balance,
-                start_this_session: acc_cfg.new_user_balance,
-                ..Default::default()
-            });
-        }
+    if board_guard.config.accounting.enabled
+        && let Some(acc_cfg) = &board_guard.config.accounting.accounting_config
+    {
+        new_user.account = Some(AccountUserInf {
+            starting_balance: acc_cfg.new_user_balance,
+            start_this_session: acc_cfg.new_user_balance,
+            ..Default::default()
+        });
     }
 
     // Add user to user base
@@ -2434,7 +2430,7 @@ pub async fn adduser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
         // Like GETALTUSER: switch context to new user
         vm.user = new_user;
         vm.set_user_variables()?;
-        log::info!("ADDUSER: context switched to new user '{}'", trimmed);
+        log::info!("ADDUSER: context switched to new user '{trimmed}'");
     } else {
         // Restore original user context
         if let Some(original) = original_user {
@@ -2449,7 +2445,7 @@ pub async fn adduser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 /// `KILLMSG conf, msgnum`
 ///
 /// Deletes a message. A message nobody can delete is not an error the PPE gets
-/// to see; PCBoard simply carries on.
+/// to see; `PCBoard` simply carries on.
 pub async fn killmsg(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let (conference, area) = vm.eval_expr(&args[0]).await?.as_msg_id();
     let number = vm.eval_expr(&args[1]).await?.as_int() as u32;
@@ -2524,11 +2520,11 @@ pub async fn fdoqmod(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let ftn = vm.icy_board_state.get_board().await.ftn.clone();
 
     if let Err(err) = queue::remove(&ftn, record.max(0) as usize) {
-        log::error!("FDOQMOD {}: {}", record, err);
+        log::error!("FDOQMOD {record}: {err}");
         return Ok(());
     }
     if let Err(err) = queue::add(&ftn, &address, &file) {
-        log::error!("FDOQMOD {}: {}", address, err);
+        log::error!("FDOQMOD {address}: {err}");
     }
     Ok(())
 }
@@ -2542,7 +2538,7 @@ pub async fn fdoqadd(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let ftn = vm.icy_board_state.get_board().await.ftn.clone();
 
     if let Err(err) = queue::add(&ftn, &address, &file) {
-        log::error!("FDOQADD {}: {}", address, err);
+        log::error!("FDOQADD {address}: {err}");
     }
     Ok(())
 }
@@ -2550,8 +2546,8 @@ pub async fn fdoqdel(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let record = vm.eval_expr(&args[0]).await?.as_int();
     let ftn = vm.icy_board_state.get_board().await.ftn.clone();
     match queue::remove(&ftn, record.max(0) as usize) {
-        Ok(false) => log::error!("FDOQDEL: nothing is waiting under number {}", record),
-        Err(err) => log::error!("FDOQDEL {}: {}", record, err),
+        Ok(false) => log::error!("FDOQDEL: nothing is waiting under number {record}"),
+        Err(err) => log::error!("FDOQDEL {record}: {err}"),
         Ok(true) => {}
     }
     Ok(())
@@ -2683,7 +2679,7 @@ pub async fn set_bank_bal(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<
                 }
 
                 _ => {
-                    log::error!("SET_BANK_BAL: Invalid field {}", field);
+                    log::error!("SET_BANK_BAL: Invalid field {field}");
                 }
             }
         }

@@ -25,7 +25,7 @@ impl AstVisitor<()> for UnusedLabelVisitor {
         self.used_labels.insert(unicase::Ascii::new(goto_stmt.get_label().to_string()));
     }
 
-    fn visit_gosub_statement(&mut self, gosub: &crate::ast::GosubStatement) -> () {
+    fn visit_gosub_statement(&mut self, gosub: &crate::ast::GosubStatement) {
         self.used_labels.insert(unicase::Ascii::new(gosub.get_label().to_string()));
     }
 }

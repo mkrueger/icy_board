@@ -63,7 +63,7 @@ fn test_message_leaves_a_public_message_public() {
     assert!(output.ends_with("[ ]"), "unexpected output: {output:?}");
 }
 
-/// An echoed message carries the flag HDR_ECHO reports.
+/// An echoed message carries the flag `HDR_ECHO` reports.
 #[test]
 fn test_message_marks_an_echoed_message() {
     let output = run_ppl_with_messages(
@@ -79,7 +79,7 @@ fn test_message_marks_an_echoed_message() {
     assert!(output.ends_with("[E]"), "unexpected output: {output:?}");
 }
 
-/// PCBoard's entermessagefromfile() returns quietly when the body file is not
+/// `PCBoard`'s `entermessagefromfile()` returns quietly when the body file is not
 /// there, so the program carries on rather than being stopped.
 #[test]
 fn test_message_with_a_missing_file_does_not_stop_the_program() {
@@ -104,8 +104,8 @@ fn test_setmsghdr_changes_a_field_that_getmsghdr_reads_back() {
     );
 }
 
-/// PCBoard 15.4/M numbers the writable fields 1..5, so 3 is the subject rather
-/// than the reference message HDR_MSGREF names.
+/// `PCBoard` 15.4/M numbers the writable fields 1..5, so 3 is the subject rather
+/// than the reference message `HDR_MSGREF` names.
 #[test]
 fn test_setmsghdr_takes_the_documented_field_numbers() {
     assert_eq!(
@@ -118,7 +118,7 @@ fn test_setmsghdr_takes_the_documented_field_numbers() {
     );
 }
 
-/// The status is the character PCBoard kept in the header: a public message
+/// The status is the character `PCBoard` kept in the header: a public message
 /// nobody has read yet is a blank.
 #[test]
 fn test_getmsghdr_reads_the_status_character() {
@@ -190,7 +190,7 @@ const DUMP_AND_READ: &str = r#"
     FCLOSE 1
 "#;
 
-/// The dump carries the header fields PCBoard wrote: the real status character,
+/// The dump carries the header fields `PCBoard` wrote: the real status character,
 /// the number, the parties, an active flag of 225 and the body.
 #[test]
 fn test_msgtofile_writes_the_header_and_body() {
@@ -206,7 +206,7 @@ fn test_msgtofile_writes_the_header_and_body() {
     assert!(output.contains("Message Body:\n"), "body label: {output:?}");
 }
 
-/// PCBoard overwrites its two "Reply" lines before writing them, so only the
+/// `PCBoard` overwrites its two "Reply" lines before writing them, so only the
 /// "Time of reply" line survives.
 #[test]
 fn test_msgtofile_writes_only_the_time_of_reply_line() {
@@ -215,7 +215,7 @@ fn test_msgtofile_writes_only_the_time_of_reply_line() {
     assert!(!output.contains("           Reply:"), "stray reply line: {output:?}");
 }
 
-/// With every field short enough to fit, PCBoard writes no extended-header
+/// With every field short enough to fit, `PCBoard` writes no extended-header
 /// section at all rather than a "0" count.
 #[test]
 fn test_msgtofile_omits_the_extended_headers_when_there_are_none() {
@@ -224,7 +224,7 @@ fn test_msgtofile_omits_the_extended_headers_when_there_are_none() {
 }
 
 /// A recipient longer than the 25-character fixed field moves into an extended
-/// TO header and blanks the fixed line, the way PCBoard stores it.
+/// TO header and blanks the fixed line, the way `PCBoard` stores it.
 #[test]
 fn test_msgtofile_spills_a_long_recipient_into_an_extended_header() {
     let messages: &[(&str, &str, &str)] = &[("SYSOP", "A VERY LONG RECIPIENT NAME INDEED", "Hi")];

@@ -1,4 +1,3 @@
-use core::panic;
 use std::collections::{HashMap, HashSet};
 
 use crate::{
@@ -71,10 +70,10 @@ impl AstTransformationVisitor {
     }
 
     fn lookup_constant(&self, id: &unicase::Ascii<String>) -> Option<&(crate::executable::VariableType, VariableValue)> {
-        if let Some(local) = &self.local_constants {
-            if let Some(constant) = local.get(id) {
-                return Some(constant);
-            }
+        if let Some(local) = &self.local_constants
+            && let Some(constant) = local.get(id)
+        {
+            return Some(constant);
         }
         if self.local_bindings.as_ref().is_some_and(|bindings| bindings.contains(id)) {
             return None;
@@ -579,9 +578,7 @@ impl AstVisitorMut for AstTransformationVisitor {
     fn visit_return_statement(&mut self, return_stmt: &ReturnStatement) -> Statement {
         let mut statements = Vec::new();
         if let Some(expr) = return_stmt.get_expression() {
-            if self.cur_function.is_none() {
-                panic!("Return statement outside of function");
-            }
+            assert!(self.cur_function.is_some(), "Return statement outside of function");
             statements.push(Statement::Let(LetStatement::new(
                 None,
                 Spanned {
@@ -604,64 +601,61 @@ impl AstVisitorMut for AstTransformationVisitor {
         let mut statements = Vec::new();
         for var in var_decl.get_variables() {
             if let Some(init) = var.get_initalizer() {
-                match init {
-                    Expression::ArrayInitializer(array) => {
-                        let stmt = Statement::VariableDeclaration(VariableDeclarationStatement::new(
-                            var_decl.get_type_token().clone(),
-                            var_decl.get_variable_type(),
-                            vec![VariableSpecifier::new(
-                                var.get_identifier_token().clone(),
-                                None,
-                                vec![DimensionSpecifier::empty(array.get_expressions().len())],
-                                None,
-                                None,
-                                None,
-                            )],
-                        ));
-                        statements.push(stmt);
+                if let Expression::ArrayInitializer(array) = init {
+                    let stmt = Statement::VariableDeclaration(VariableDeclarationStatement::new(
+                        var_decl.get_type_token().clone(),
+                        var_decl.get_variable_type(),
+                        vec![VariableSpecifier::new(
+                            var.get_identifier_token().clone(),
+                            None,
+                            vec![DimensionSpecifier::empty(array.get_expressions().len())],
+                            None,
+                            None,
+                            None,
+                        )],
+                    ));
+                    statements.push(stmt);
 
-                        for (idx, expr) in array.get_expressions().iter().enumerate() {
-                            statements.push(Statement::Let(LetStatement::new(
-                                None,
-                                var.get_identifier_token().clone(),
-                                None,
-                                vec![Expression::Const(ConstantExpression::empty(Constant::Integer(
-                                    idx as i32,
-                                    NumberFormat::Default,
-                                )))],
-                                None,
-                                Vec::new(),
-                                Spanned::create_empty(Token::Eq),
-                                expr.visit_mut(self),
-                            )));
-                        }
-                    }
-                    _ => {
-                        let stmt = Statement::VariableDeclaration(VariableDeclarationStatement::new(
-                            var_decl.get_type_token().clone(),
-                            var_decl.get_variable_type(),
-                            vec![VariableSpecifier::new(
-                                var.get_identifier_token().clone(),
-                                None,
-                                var.get_dimensions().clone(),
-                                None,
-                                None,
-                                None,
-                            )],
-                        ));
-                        statements.push(stmt);
-
+                    for (idx, expr) in array.get_expressions().iter().enumerate() {
                         statements.push(Statement::Let(LetStatement::new(
                             None,
                             var.get_identifier_token().clone(),
                             None,
-                            Vec::new(),
+                            vec![Expression::Const(ConstantExpression::empty(Constant::Integer(
+                                idx as i32,
+                                NumberFormat::Default,
+                            )))],
                             None,
                             Vec::new(),
                             Spanned::create_empty(Token::Eq),
-                            init.visit_mut(self),
+                            expr.visit_mut(self),
                         )));
                     }
+                } else {
+                    let stmt = Statement::VariableDeclaration(VariableDeclarationStatement::new(
+                        var_decl.get_type_token().clone(),
+                        var_decl.get_variable_type(),
+                        vec![VariableSpecifier::new(
+                            var.get_identifier_token().clone(),
+                            None,
+                            var.get_dimensions().clone(),
+                            None,
+                            None,
+                            None,
+                        )],
+                    ));
+                    statements.push(stmt);
+
+                    statements.push(Statement::Let(LetStatement::new(
+                        None,
+                        var.get_identifier_token().clone(),
+                        None,
+                        Vec::new(),
+                        None,
+                        Vec::new(),
+                        Spanned::create_empty(Token::Eq),
+                        init.visit_mut(self),
+                    )));
                 }
             } else {
                 statements.push(Statement::VariableDeclaration(VariableDeclarationStatement::new(

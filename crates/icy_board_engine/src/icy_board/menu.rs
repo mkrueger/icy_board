@@ -135,36 +135,33 @@ impl Menu {
                 5 => CommandType::Conference,
                 6 => CommandType::DisplayDir,
                 7 => CommandType::StuffText,
-                8 => CommandType::StuffFile,
+                8 | 18 => CommandType::StuffFile,
                 9 => CommandType::ExpertMode,
-                10 => CommandType::Goodbye,
-                11 => CommandType::Goodbye,
+                10 | 11 => CommandType::Goodbye,
                 12 => CommandType::QuitMenu,
                 13 => CommandType::ExitMenus,
                 14 => CommandType::RunPPE,
                 15 => CommandType::StuffTextAndExitMenu,
-                16 => CommandType::StuffTextAndExitMenuSilent,
+                16 | 19 => CommandType::StuffTextAndExitMenuSilent,
                 17 => CommandType::Disabled,
-                18 => CommandType::StuffFile,
-                19 => CommandType::StuffTextAndExitMenuSilent,
                 20 => CommandType::Command,
                 21 => CommandType::GlobalCommand,
 
                 err => {
-                    log::error!("Invalid command type: {}, defaulting to command.", err);
+                    log::error!("Invalid command type: {err}, defaulting to command.");
                     CommandType::Command
                 }
             };
 
             res.commands.push(Command {
                 keyword,
-                display: "".to_string(),
-                lighbar_display: "".to_string(),
-                position: Default::default(),
+                display: String::new(),
+                lighbar_display: String::new(),
+                position: super::commands::Position::default(),
                 auto_run: AutoRun::Disabled,
                 autorun_time: 0,
                 security: SecurityExpression::from_req_security(security),
-                help: "".to_string(),
+                help: String::new(),
                 actions: vec![CommandAction {
                     command_type: cmd_type,
                     parameter,

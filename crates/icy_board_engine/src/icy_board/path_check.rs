@@ -1,4 +1,4 @@
-//! Walking the paths a board is configured with, the way PCBSetup did on a full
+//! Walking the paths a board is configured with, the way `PCBSetup` did on a full
 //! save. See `writefile` in DATAWRIT.C and `checkexistence` in CHKEXIST.C.
 
 use std::{
@@ -274,7 +274,7 @@ fn find_display_variant(resolved: &Path, kind: PathKind, case: Case) -> Option<P
     let directory = if directory.as_os_str().is_empty() { Path::new(".") } else { directory };
     std::fs::read_dir(directory)
         .ok()?
-        .filter_map(|entry| entry.ok())
+        .filter_map(std::result::Result::ok)
         .find(|entry| entry.file_name().to_str().is_some_and(|name| is_display_variant(name, stem, case)))
         .map(|entry| entry.path())
 }
@@ -435,17 +435,21 @@ mod tests {
     #[test]
     fn a_conference_says_which_field_of_which_conference_is_wrong() {
         let root = board(&[], &[]);
-        let mut board = IcyBoard::default();
-        board.root_path = root.path().to_path_buf();
-        let mut conference = super::super::conferences::Conference::default();
-        conference.name = "Sysop".to_string();
-        conference.news_file = PathBuf::from("main/news");
+        let mut board = IcyBoard {
+            root_path: root.path().to_path_buf(),
+            ..Default::default()
+        };
+        let conference = super::super::conferences::Conference {
+            name: "Sysop".to_string(),
+            news_file: PathBuf::from("main/news"),
+            ..Default::default()
+        };
         board.conferences.push(conference);
 
         let reports = board.check_paths();
         let report = reports
             .iter()
-            .find(|report| report.path == PathBuf::from("main/news"))
+            .find(|report| report.path == *"main/news")
             .expect("the news file is not reported");
         assert_eq!(report.context, "Conference 0 (Sysop), news file");
     }

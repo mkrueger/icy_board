@@ -55,22 +55,22 @@ fn optimize_ifs(visitor: &SemanticVisitor, statements: &mut Vec<Statement>, lang
 }
 
 fn scan_label(statements: &[Statement], from: usize, label: &unicase::Ascii<String>) -> Option<usize> {
-    for j in from..statements.len() {
-        if let Statement::Label(label_stmt) = &statements[j as usize] {
-            if label_stmt.get_label() == label {
-                return Some(j as usize);
-            }
+    for (j, stmt) in statements.iter().enumerate().skip(from) {
+        if let Statement::Label(label_stmt) = stmt
+            && label_stmt.get_label() == label
+        {
+            return Some(j);
         }
     }
     None
 }
 
 fn scan_goto(statements: &[Statement], from: usize, label: &unicase::Ascii<String>) -> Option<usize> {
-    for j in from..statements.len() {
-        if let Statement::Goto(goto_stmt) = &statements[j as usize] {
-            if goto_stmt.get_label() == label {
-                return Some(j as usize);
-            }
+    for (j, stmt) in statements.iter().enumerate().skip(from) {
+        if let Statement::Goto(goto_stmt) = stmt
+            && goto_stmt.get_label() == label
+        {
+            return Some(j);
         }
     }
     None
@@ -86,10 +86,10 @@ fn scan_loop_back_edge(statements: &[Statement], from: usize, head: &unicase::As
         if goto_stmt.get_label() != head {
             continue;
         }
-        if let Statement::Label(label_stmt) = &statements[j + 1] {
-            if label_stmt.get_label() == break_label {
-                return Some(j);
-            }
+        if let Statement::Label(label_stmt) = &statements[j + 1]
+            && label_stmt.get_label() == break_label
+        {
+            return Some(j);
         }
     }
     None
@@ -131,7 +131,6 @@ fn scan_negated_if(_visitor: &SemanticVisitor, statements: &mut Vec<Statement>) 
             i += 1;
         } else {
             i += 1;
-            continue;
         }
     }
 }
@@ -165,10 +164,10 @@ fn scan_if(visitor: &SemanticVisitor, statements: &mut Vec<Statement>, lang_vers
                     return false;
                 }
                 let end_label = format!(":{}", endif_label.get_label());
-                if let Some((_, decl)) = &r.declaration {
-                    if decl.token == end_label {
-                        return r.usages.len() == 1;
-                    }
+                if let Some((_, decl)) = &r.declaration
+                    && decl.token == end_label
+                {
+                    return r.usages.len() == 1;
                 }
                 false
             })
@@ -195,26 +194,21 @@ fn scan_if(visitor: &SemanticVisitor, statements: &mut Vec<Statement>, lang_vers
 
 fn is_simple_statement(statements: &Statement) -> bool {
     match statements {
-        Statement::Gosub(_) => true,
-        Statement::Goto(_) => true,
-        Statement::PredifinedCall(pcall) => match pcall.get_func().opcode {
-            OpCode::RETURN => true,
-            OpCode::END => true,
-            OpCode::STOP => true,
-            OpCode::PRINT => true,
-            OpCode::PRINTLN => true,
-            _ => false,
-        },
+        Statement::Gosub(_) | Statement::Goto(_) => true,
+        Statement::PredifinedCall(pcall) => matches!(
+            pcall.get_func().opcode,
+            OpCode::RETURN | OpCode::END | OpCode::STOP | OpCode::PRINT | OpCode::PRINTLN
+        ),
         _ => false,
     }
 }
 
 fn get_label_index(statements: &[Statement], from: i32, to: i32, label: &String) -> Option<usize> {
     for j in from..to {
-        if let Statement::Label(next_label) = &statements[j as usize] {
-            if next_label.get_label() == label {
-                return Some(j as usize);
-            }
+        if let Statement::Label(next_label) = &statements[j as usize]
+            && next_label.get_label() == label
+        {
+            return Some(j as usize);
         }
     }
     None
@@ -240,10 +234,14 @@ pub fn get_last_label(statements: &[Statement]) -> Ascii<String> {
     if let Some(Statement::Label(continue_label_stmt)) = statements.last() {
         continue_label_stmt.get_label().clone()
     } else {
-        Ascii::new("".to_string())
+        Ascii::new(String::new())
     }
 }
 
+// Kept as `&mut Vec<Statement>`: while_do.rs's caller later moves the same
+// binding by value into `Vec`-typed APIs, and narrowing this to `&mut [Statement]`
+// makes that binding's type ambiguous to infer (confirmed: caused a build break).
+#[allow(clippy::ptr_arg)]
 pub fn handle_break_continue(break_label: Ascii<String>, continue_label: Ascii<String>, statements: &mut Vec<Statement>) {
     let mut break_continue_visitor = BreakContinueVisitor::new(break_label, continue_label);
     for stmt in statements.iter_mut() {
@@ -262,9 +260,9 @@ impl BreakContinueVisitor {
 
 impl AstVisitorMut for BreakContinueVisitor {
     fn visit_goto_statement(&mut self, goto: &crate::ast::GotoStatement) -> Statement {
-        if self.break_label.len() > 0 && goto.get_label() == &self.break_label {
+        if !self.break_label.is_empty() && goto.get_label() == &self.break_label {
             BreakStatement::create_empty_statement()
-        } else if self.continue_label.len() > 0 && goto.get_label() == &self.continue_label {
+        } else if !self.continue_label.is_empty() && goto.get_label() == &self.continue_label {
             ContinueStatement::create_empty_statement()
         } else {
             Statement::Goto(goto.clone())

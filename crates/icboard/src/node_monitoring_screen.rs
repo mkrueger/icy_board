@@ -93,7 +93,7 @@ impl NodeMonitoringScreen {
                 let board = board.lock().await;
                 node_info.clear();
                 bbs.lock().await.clear_closed_connections().await;
-                for a in bbs.lock().await.get_open_connections().await.lock().await.iter() {
+                for a in bbs.lock().await.get_open_connections().lock().await.iter() {
                     if let Some(a) = a {
                         node_info.push(Some(Info::new(&board, a)));
                     } else {
@@ -133,71 +133,70 @@ impl NodeMonitoringScreen {
                 page_len = (frame.area().height as usize).saturating_sub(3);
                 self.ui(frame, &node_info, &connections, web_admin, full_screen);
             })?;
-            if event::poll(timeout)? {
-                if let Event::Key(key) = event::read()? {
-                    if key.kind == KeyEventKind::Press {
-                        match key.code {
-                            KeyCode::Esc => {
-                                return Ok(NodeMonitoringScreenMessage::Exit);
-                            }
-                            KeyCode::Home => {
-                                self.table_state.select(Some(0));
-                            }
-                            KeyCode::End => {
-                                if self.nodes > 0 {
-                                    self.table_state.select(Some(self.nodes - 1));
-                                }
-                            }
-
-                            KeyCode::PageUp => {
-                                if let Some(idx) = self.table_state.selected() {
-                                    self.table_state.select(Some(idx.saturating_sub(page_len)));
-                                }
-                            }
-                            KeyCode::PageDown => {
-                                if let Some(idx) = self.table_state.selected() {
-                                    self.table_state.select(Some((idx + page_len).min(self.nodes - 1)));
-                                }
-                            }
-
-                            KeyCode::Down | KeyCode::Char('s') => {
-                                if let Some(idx) = self.table_state.selected() {
-                                    if idx + 1 < self.nodes {
-                                        self.table_state.select(Some(idx + 1));
-                                    }
-                                }
-                            }
-                            KeyCode::Up | KeyCode::Char('w') => {
-                                if let Some(idx) = self.table_state.selected() {
-                                    if idx > 0 {
-                                        self.table_state.select(Some(idx - 1));
-                                    }
-                                }
-                            }
-                            KeyCode::Enter => {
-                                if let Some(i) = self.table_state.selected() {
-                                    if bbs.lock().await.get_open_connections().await.lock().await[i].is_some() {
-                                        return Ok(NodeMonitoringScreenMessage::EnterNode(i));
-                                    }
-                                }
-                            }
-                            _ => {}
+            if event::poll(timeout)?
+                && let Event::Key(key) = event::read()?
+                && key.kind == KeyEventKind::Press
+            {
+                match key.code {
+                    KeyCode::Esc => {
+                        return Ok(NodeMonitoringScreenMessage::Exit);
+                    }
+                    KeyCode::Home => {
+                        self.table_state.select(Some(0));
+                    }
+                    KeyCode::End => {
+                        if self.nodes > 0 {
+                            self.table_state.select(Some(self.nodes - 1));
                         }
                     }
+
+                    KeyCode::PageUp => {
+                        if let Some(idx) = self.table_state.selected() {
+                            self.table_state.select(Some(idx.saturating_sub(page_len)));
+                        }
+                    }
+                    KeyCode::PageDown => {
+                        if let Some(idx) = self.table_state.selected() {
+                            self.table_state.select(Some((idx + page_len).min(self.nodes - 1)));
+                        }
+                    }
+
+                    KeyCode::Down | KeyCode::Char('s') => {
+                        if let Some(idx) = self.table_state.selected()
+                            && idx + 1 < self.nodes
+                        {
+                            self.table_state.select(Some(idx + 1));
+                        }
+                    }
+                    KeyCode::Up | KeyCode::Char('w') => {
+                        if let Some(idx) = self.table_state.selected()
+                            && idx > 0
+                        {
+                            self.table_state.select(Some(idx - 1));
+                        }
+                    }
+                    KeyCode::Enter => {
+                        if let Some(i) = self.table_state.selected()
+                            && bbs.lock().await.get_open_connections().lock().await[i].is_some()
+                        {
+                            return Ok(NodeMonitoringScreenMessage::EnterNode(i));
+                        }
+                    }
+                    _ => {}
                 }
             }
         }
     }
 
-    fn ui(&mut self, frame: &mut Frame, infos: &Vec<Option<Info>>, connections: &Vec<Connection>, web_admin: Option<&WebAdminInfo>, full_screen: bool) {
+    fn ui(&mut self, frame: &mut Frame, infos: &[Option<Info>], connections: &[Connection], web_admin: Option<&WebAdminInfo>, full_screen: bool) {
         let now = Local::now();
         let mut footer = get_text("icbmoni_footer");
-        if let Some(i) = self.table_state.selected() {
-            if infos[i].is_some() {
-                footer = get_text("icbmoni_on_note_footer")
-            }
+        if let Some(i) = self.table_state.selected()
+            && infos[i].is_some()
+        {
+            footer = get_text("icbmoni_on_note_footer")
         }
-        let area: Rect = get_screen_size(&frame, full_screen);
+        let area: Rect = get_screen_size(frame, full_screen);
 
         let b = Block::default()
             .title_alignment(Alignment::Left)
@@ -252,7 +251,7 @@ impl NodeMonitoringScreen {
             Text::from(token_line).style(Style::new().fg(DOS_LIGHT_CYAN)).render(area, frame.buffer_mut());
         }
     }
-    fn render_table(&mut self, frame: &mut Frame, area: Rect, infos: &Vec<Option<Info>>) {
+    fn render_table(&mut self, frame: &mut Frame, area: Rect, infos: &[Option<Info>]) {
         let header = [
             "#".to_string(),
             get_text("icbmoni_status_header"),

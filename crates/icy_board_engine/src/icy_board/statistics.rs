@@ -36,7 +36,7 @@ pub struct Statistics {
 }
 
 impl Statistics {
-    /// Every call the board has ever taken - the number PCBoard writes to the caller log
+    /// Every call the board has ever taken - the number `PCBoard` writes to the caller log
     /// and PPL reports, which runs into the millions on an old system.
     pub fn cur_caller_number(&self) -> u64 {
         self.total.calls

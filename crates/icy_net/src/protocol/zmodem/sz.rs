@@ -322,7 +322,7 @@ impl Sz {
 
     async fn handle_header(&mut self, com: &mut dyn Connection, transfer_state: &mut TransferState, res: Header) -> crate::Result<()> {
         self.errors = 0;
-        Ok(match res.frame_type {
+        let _: () = match res.frame_type {
             ZFrameType::RIinit => {
                 if self.cur_buf.is_some() {
                     // File transfer completed successfully
@@ -376,12 +376,12 @@ impl Sz {
                     com.send(&packet).await?;
 
                     // Wait for ZACK
-                    if let Ok(Some(ack)) = Header::read(com, &mut self.can_count).await {
-                        if ack.frame_type != ZFrameType::Ack {
-                            transfer_state
-                                .send_state
-                                .log_warning(format!("Expected ZACK after ZSINIT, got {:?}", ack.frame_type));
-                        }
+                    if let Ok(Some(ack)) = Header::read(com, &mut self.can_count).await
+                        && ack.frame_type != ZFrameType::Ack
+                    {
+                        transfer_state
+                            .send_state
+                            .log_warning(format!("Expected ZACK after ZSINIT, got {:?}", ack.frame_type));
                     }
                 }
                 self.state = SendState::SendNextFile;
@@ -404,16 +404,16 @@ impl Sz {
 
                 self.state = SendState::SendZDATA;
 
-                if let SendState::SendDataPackages = self.state {
-                    if self.package_len > 512 {
-                        transfer_state
-                            .send_state
-                            .log_info(format!("Reducing packet size from {} to {}", self.package_len, self.package_len / 2));
-                        //reinit transfer.
-                        self.package_len /= 2;
-                        self.state = SendState::SendZRQInit;
-                        return Ok(());
-                    }
+                if let SendState::SendDataPackages = self.state
+                    && self.package_len > 512
+                {
+                    transfer_state
+                        .send_state
+                        .log_info(format!("Reducing packet size from {} to {}", self.package_len, self.package_len / 2));
+                    //reinit transfer.
+                    self.package_len /= 2;
+                    self.state = SendState::SendZRQInit;
+                    return Ok(());
                 }
             }
 
@@ -440,7 +440,8 @@ impl Sz {
                 transfer_state.send_state.log_error(format!("Unsupported frame type: {:?}", unk_frame));
                 return Err(ZModemError::UnsupportedFrame(unk_frame).into());
             }
-        })
+        };
+        Ok(())
     }
 
     async fn send_zfile(&mut self, com: &mut dyn Connection, transfer_state: &mut TransferState, mut tries: i32) -> crate::Result<()> {

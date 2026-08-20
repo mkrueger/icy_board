@@ -56,55 +56,54 @@ impl SystemStatisticsScreen {
                 page_len = (frame.area().height as usize).saturating_sub(3);
                 self.ui(frame, full_screen);
             })?;
-            if event::poll(timeout)? {
-                if let Event::Key(key) = event::read()? {
-                    if key.kind == KeyEventKind::Press {
-                        match key.code {
-                            KeyCode::Esc => {
-                                return Ok(SystemStatisticsScreenMessage::Exit);
-                            }
-                            KeyCode::Home => {
-                                self.table_state.select(Some(0));
-                            }
-                            KeyCode::End => {
-                                self.table_state.select(Some(NUM_LINES - 1));
-                            }
+            if event::poll(timeout)?
+                && let Event::Key(key) = event::read()?
+                && key.kind == KeyEventKind::Press
+            {
+                match key.code {
+                    KeyCode::Esc => {
+                        return Ok(SystemStatisticsScreenMessage::Exit);
+                    }
+                    KeyCode::Home => {
+                        self.table_state.select(Some(0));
+                    }
+                    KeyCode::End => {
+                        self.table_state.select(Some(NUM_LINES - 1));
+                    }
 
-                            KeyCode::PageUp => {
-                                if let Some(idx) = self.table_state.selected() {
-                                    self.table_state.select(Some(idx.saturating_sub(page_len)));
-                                }
-                            }
-                            KeyCode::PageDown => {
-                                if let Some(idx) = self.table_state.selected() {
-                                    self.table_state.select(Some((idx + page_len).min(NUM_LINES - 1)));
-                                }
-                            }
-
-                            KeyCode::Down | KeyCode::Char('s') => {
-                                if let Some(idx) = self.table_state.selected() {
-                                    if idx + 1 < NUM_LINES {
-                                        self.table_state.select(Some(idx + 1));
-                                    }
-                                }
-                            }
-                            KeyCode::Up | KeyCode::Char('w') => {
-                                if let Some(idx) = self.table_state.selected() {
-                                    if idx > 0 {
-                                        self.table_state.select(Some(idx - 1));
-                                    }
-                                }
-                            }
-                            KeyCode::Delete => {
-                                self.confirming_reset = true;
-                            }
-                            KeyCode::Char('y') | KeyCode::Char('Y') if self.confirming_reset => {
-                                return Ok(SystemStatisticsScreenMessage::Reset);
-                            }
-                            _ => {
-                                self.confirming_reset = false;
-                            }
+                    KeyCode::PageUp => {
+                        if let Some(idx) = self.table_state.selected() {
+                            self.table_state.select(Some(idx.saturating_sub(page_len)));
                         }
+                    }
+                    KeyCode::PageDown => {
+                        if let Some(idx) = self.table_state.selected() {
+                            self.table_state.select(Some((idx + page_len).min(NUM_LINES - 1)));
+                        }
+                    }
+
+                    KeyCode::Down | KeyCode::Char('s') => {
+                        if let Some(idx) = self.table_state.selected()
+                            && idx + 1 < NUM_LINES
+                        {
+                            self.table_state.select(Some(idx + 1));
+                        }
+                    }
+                    KeyCode::Up | KeyCode::Char('w') => {
+                        if let Some(idx) = self.table_state.selected()
+                            && idx > 0
+                        {
+                            self.table_state.select(Some(idx - 1));
+                        }
+                    }
+                    KeyCode::Delete => {
+                        self.confirming_reset = true;
+                    }
+                    KeyCode::Char('y') | KeyCode::Char('Y') if self.confirming_reset => {
+                        return Ok(SystemStatisticsScreenMessage::Reset);
+                    }
+                    _ => {
+                        self.confirming_reset = false;
                     }
                 }
             }
@@ -123,7 +122,7 @@ impl SystemStatisticsScreen {
             get_text("icb_system_statistics_footer")
         };
 
-        let area: Rect = get_screen_size(&frame, full_screen);
+        let area: Rect = get_screen_size(frame, full_screen);
 
         let b = Block::default()
             .title_alignment(Alignment::Left)

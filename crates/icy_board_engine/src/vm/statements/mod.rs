@@ -22,11 +22,21 @@ pub async fn run_predefined_statement(opcode: OpCode, arg: &mut VirtualMachine<'
         OpCode::MORE => predefined_procedures::more(arg, arguments).await,
         OpCode::WAIT => predefined_procedures::wait(arg, arguments).await,
         OpCode::COLOR => predefined_procedures::color(arg, arguments).await,
-        OpCode::GOTO => predefined_procedures::invalid(arg, arguments).await,
-        OpCode::LET => predefined_procedures::invalid(arg, arguments).await,
+        OpCode::GOTO
+        | OpCode::LET
+        | OpCode::IFNOT
+        | OpCode::GOSUB
+        | OpCode::RETURN
+        | OpCode::DECLARE
+        | OpCode::FUNCTION
+        | OpCode::PROCEDURE
+        | OpCode::PCALL
+        | OpCode::FPCLR
+        | OpCode::BEGIN
+        | OpCode::FEND
+        | OpCode::STATIC => predefined_procedures::invalid(arg, arguments).await,
         OpCode::PRINT => predefined_procedures::print(arg, arguments).await,
         OpCode::PRINTLN => predefined_procedures::println(arg, arguments).await,
-        OpCode::IFNOT => predefined_procedures::invalid(arg, arguments).await,
         OpCode::CONFFLAG => predefined_procedures::confflag(arg, arguments).await,
         OpCode::CONFUNFLAG => predefined_procedures::confunflag(arg, arguments).await,
         OpCode::DISPFILE => predefined_procedures::dispfile(arg, arguments).await,
@@ -56,8 +66,6 @@ pub async fn run_predefined_statement(opcode: OpCode, arg: &mut VirtualMachine<'
         OpCode::INPUTCC => predefined_procedures::inputcc(arg, arguments).await,
         OpCode::INPUTDATE => predefined_procedures::inputdate(arg, arguments).await,
         OpCode::INPUTTIME => predefined_procedures::inputtime(arg, arguments).await,
-        OpCode::GOSUB => predefined_procedures::invalid(arg, arguments).await,
-        OpCode::RETURN => predefined_procedures::invalid(arg, arguments).await,
         OpCode::PROMPTSTR => predefined_procedures::promptstr(arg, arguments).await,
         OpCode::DTRON => predefined_procedures::dtron(arg, arguments).await,
         OpCode::DTROFF => predefined_procedures::dtroff(arg, arguments).await,
@@ -180,14 +188,6 @@ pub async fn run_predefined_statement(opcode: OpCode, arg: &mut VirtualMachine<'
         OpCode::SETLMR => predefined_procedures::setlmr(arg, arguments).await,
         OpCode::SETENV => predefined_procedures::setenv(arg, arguments).await,
         OpCode::FCLOSEALL => predefined_procedures::fcloseall(arg, arguments).await,
-        OpCode::DECLARE => predefined_procedures::invalid(arg, arguments).await,
-        OpCode::FUNCTION => predefined_procedures::invalid(arg, arguments).await,
-        OpCode::PROCEDURE => predefined_procedures::invalid(arg, arguments).await,
-        OpCode::PCALL => predefined_procedures::invalid(arg, arguments).await,
-        OpCode::FPCLR => predefined_procedures::invalid(arg, arguments).await,
-        OpCode::BEGIN => predefined_procedures::invalid(arg, arguments).await,
-        OpCode::FEND => predefined_procedures::invalid(arg, arguments).await,
-        OpCode::STATIC => predefined_procedures::invalid(arg, arguments).await,
         OpCode::STACKABORT => predefined_procedures::stackabort(arg, arguments).await,
         OpCode::DCREATE => predefined_procedures::dcreate(arg, arguments).await,
         OpCode::DOPEN => predefined_procedures::dopen(arg, arguments).await,

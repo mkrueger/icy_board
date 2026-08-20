@@ -7,24 +7,25 @@ use crate::{
         state::{GraphicsMode, IcyBoardState},
     },
 };
+use std::fmt::Write as _;
 
 /// Solar Realms doorfile.sr format
 pub fn create_doorfile_sr(state: &IcyBoardState, path: &std::path::Path) -> Res<()> {
     let mut contents = String::new();
-    contents.push_str(&format!("{}\r\n", state.session.get_username_or_alias())); // Complete name or handle of user
+    let _ = write!(contents, "{}\r\n", state.session.get_username_or_alias()); // Complete name or handle of user
 
     let emulation = match state.session.disp_options.grapics_mode {
         GraphicsMode::Ctty => "0",
         _ => "1",
     };
-    contents.push_str(&format!("{}\r\n", emulation)); // ANSI status:  1 = yes, 0 = no, -1 = don't know
+    let _ = write!(contents, "{emulation}\r\n"); // ANSI status:  1 = yes, 0 = no, -1 = don't know
     contents.push_str("1\r\n"); // IBM Graphic characters:  1 = yes, 0 = no, -1 = unknown
-    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().city_or_state)); // Calling From
-    contents.push_str(&format!("{}\r\n", state.session.page_len)); // Page length of screen, in lines.  Assume 25 if unknown
-    contents.push_str(&format!("{}\r\n", DOOR_BPS_RATE)); // Baud Rate
-    contents.push_str(&format!("{}\r\n", DOOR_COM_PORT)); // Baud Rate
-    contents.push_str(&format!("{}\r\n", state.session.minutes_left())); //Time Limit:  (in minutes); -1 if unknown.
-    contents.push_str(&format!("{}\r\n", state.session.user_name)); // Real name (the same as line 1 if not known)
+    let _ = write!(contents, "{}\r\n", state.session.current_user.as_ref().unwrap().city_or_state); // Calling From
+    let _ = write!(contents, "{}\r\n", state.session.page_len); // Page length of screen, in lines.  Assume 25 if unknown
+    let _ = write!(contents, "{DOOR_BPS_RATE}\r\n"); // Baud Rate
+    let _ = write!(contents, "{DOOR_COM_PORT}\r\n"); // Baud Rate
+    let _ = write!(contents, "{}\r\n", state.session.minutes_left()); //Time Limit:  (in minutes); -1 if unknown.
+    let _ = write!(contents, "{}\r\n", state.session.user_name); // Real name (the same as line 1 if not known)
 
     let path = path.join("DOORFILE.SR");
     log::info!("create DOORFILE.SR: {}", path.display());

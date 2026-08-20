@@ -123,7 +123,7 @@ impl GroupEditor {
             None => 0,
         };
         self.table_state.select(Some(i));
-        self.scroll_state = self.scroll_state.position(i * 1);
+        self.scroll_state = self.scroll_state.position(i);
     }
 
     fn next(&mut self) {
@@ -141,13 +141,15 @@ impl GroupEditor {
             None => 0,
         };
         self.table_state.select(Some(i));
-        self.scroll_state = self.scroll_state.position(i * 1);
+        self.scroll_state = self.scroll_state.position(i);
     }
 
     fn insert(&mut self) -> PageMessage {
         let original = self.icy_board.lock().unwrap().groups.clone();
-        let mut group = Group::default();
-        group.name = format!("new_group{}", self.icy_board.lock().unwrap().groups.len() + 1);
+        let group = Group {
+            name: format!("new_group{}", self.icy_board.lock().unwrap().groups.len() + 1),
+            ..Default::default()
+        };
         self.icy_board.lock().unwrap().groups.push(group);
         self.scroll_state = self.scroll_state.content_length(self.icy_board.lock().unwrap().groups.len());
         match self.save_groups() {
@@ -161,17 +163,17 @@ impl GroupEditor {
 
     fn remove(&mut self) -> PageMessage {
         let original = self.icy_board.lock().unwrap().groups.clone();
-        if let Some(i) = self.table_state.selected() {
-            if i > 0 {
-                self.icy_board.lock().unwrap().groups.remove(i);
-                let len = self.icy_board.lock().unwrap().groups.len();
-                self.scroll_state = self.scroll_state.content_length(len);
+        if let Some(i) = self.table_state.selected()
+            && i > 0
+        {
+            self.icy_board.lock().unwrap().groups.remove(i);
+            let len = self.icy_board.lock().unwrap().groups.len();
+            self.scroll_state = self.scroll_state.content_length(len);
 
-                if len >= i - 1 {
-                    self.table_state.select(Some(i - 1));
-                } else {
-                    self.table_state.select(Some(0));
-                }
+            if len >= i - 1 {
+                self.table_state.select(Some(i - 1));
+            } else {
+                self.table_state.select(Some(0));
             }
         }
         match self.save_groups() {
@@ -299,6 +301,6 @@ impl Page for GroupEditor {
             }
             _ => {}
         }
-        return PageMessage::None;
+        PageMessage::None
     }
 }

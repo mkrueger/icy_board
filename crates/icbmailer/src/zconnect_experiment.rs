@@ -19,7 +19,7 @@ use tokio::time::Instant;
 async fn try_connect(connection: &mut dyn Connection, pattern: Vec<&[u8]>, send: &[u8]) -> bool {
     let mut buf = [0; 1024];
 
-    let mut login_pattern = pattern.iter().map(|p| PatternRecognizer::from(*p, true)).collect::<Vec<_>>();
+    let mut login_pattern = pattern.iter().map(|p| PatternRecognizer::from(p, true)).collect::<Vec<_>>();
     let mut instant = Instant::now();
     loop {
         let size = connection.read(&mut buf).await.unwrap();
@@ -41,6 +41,9 @@ async fn try_connect(connection: &mut dyn Connection, pattern: Vec<&[u8]>, send:
     }
 }
 
+// The `Z` prefix matches the two protocols this experiment distinguishes
+// between (ZConnect vs. ZModem); renaming would make call sites less clear.
+#[allow(clippy::enum_variant_names)]
 enum Begin {
     ZConnect,
     ZModemSend,

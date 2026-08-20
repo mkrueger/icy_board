@@ -52,7 +52,7 @@ impl IcyBoardState {
                     break;
                 }
                 self.session.push_tokens(&input);
-            };
+            }
             let mut files = Vec::new();
             let mut download_blt = false;
             let mut search_blt = false;
@@ -107,7 +107,7 @@ impl IcyBoardState {
                     self.display_text(IceText::PunctuationError, display_flags::NEWLINE | display_flags::LFBEFORE)
                         .await?;
                     return Ok(());
-                };
+                }
                 if files.is_empty() {
                     files.extend(0..bulletins.len() as i32);
                 }
@@ -115,12 +115,10 @@ impl IcyBoardState {
             self.session.disp_options.no_change();
             for i in files {
                 if let Some(b) = bulletins.get(i as usize) {
-                    if new_files {
-                        if let Ok(md) = b.path.metadata() {
-                            let mod_time: DateTime<Utc> = md.modified().unwrap().into();
-                            if mod_time < self.session.current_user.as_ref().unwrap().stats.last_on {
-                                continue;
-                            }
+                    if new_files && let Ok(md) = b.path.metadata() {
+                        let mod_time: DateTime<Utc> = md.modified().unwrap().into();
+                        if mod_time < self.session.current_user.as_ref().unwrap().stats.last_on {
+                            continue;
                         }
                     }
                     if download_blt {

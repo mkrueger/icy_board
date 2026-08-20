@@ -108,11 +108,11 @@ fn main() -> Result<()> {
             exit(1);
         });
 
-    if arguments.create {
-        if let Err(err) = Menu::default().save(&file) {
-            print_error(format!("Can't create {}: {err}", file.display()));
-            exit(1);
-        }
+    if arguments.create
+        && let Err(err) = Menu::default().save(&file)
+    {
+        print_error(format!("Can't create {}: {err}", file.display()));
+        exit(1);
     }
 
     match Menu::load(&file) {
@@ -122,11 +122,11 @@ fn main() -> Result<()> {
             let mut app = new_main_window(icy_board, mnu.clone(), arguments.full_screen, &menu_file);
             app.run(terminal)?;
             term::restore()?;
-            if app.save.writes() {
-                if let Err(err) = mnu.lock().unwrap().save(&file) {
-                    print_error(format!("Can't save {}: {err}", file.display()));
-                    exit(1);
-                }
+            if app.save.writes()
+                && let Err(err) = mnu.lock().unwrap().save(&file)
+            {
+                print_error(format!("Can't save {}: {err}", file.display()));
+                exit(1);
             }
             Ok(())
         }

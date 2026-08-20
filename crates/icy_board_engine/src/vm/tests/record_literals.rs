@@ -74,7 +74,7 @@ fn record_literal_fields_are_checked() {
 #[test]
 fn a_record_literal_field_rejects_the_wrong_record_type() {
     let errors = compile_errors(
-        r#"
+        r"
 TYPE First
     INTEGER Value
 ENDTYPE
@@ -85,7 +85,7 @@ TYPE Holder
     First Value
 ENDTYPE
 Holder holder = Holder { Value = Second { Value = 1 } }
-"#,
+",
     );
     assert!(
         errors

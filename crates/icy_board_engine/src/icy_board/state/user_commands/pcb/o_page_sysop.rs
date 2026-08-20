@@ -43,7 +43,7 @@ impl IcyBoardState {
         }
     }
 
-    /// PCBoard offers the comment only to users who may leave one, and it goes
+    /// `PCBoard` offers the comment only to users who may leave one, and it goes
     /// straight into the editor rather than asking a second time.
     async fn ask_comment_instead(&mut self) -> Res<()> {
         self.session.paged_sysop = true;

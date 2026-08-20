@@ -8,7 +8,30 @@
     clippy::cast_lossless,
     clippy::cast_precision_loss,
     clippy::struct_excessive_bools,
-    clippy::module_name_repetitions
+    clippy::module_name_repetitions,
+    // These two ask every fallible/panicking function to carry an `# Errors`/`# Panics`
+    // doc section. Hundreds of internal opcode handlers and helpers would need one each
+    // with no real information beyond restating the signature, so they stay disabled here.
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    // The remaining lints below are pedantic/complexity checks that would require
+    // widespread, risky signature or struct-layout changes (across public PPE-engine
+    // APIs, opcode tables, and internal call sites) for no behavioral benefit. Verified
+    // during a workspace-wide clippy cleanup that mass-applying clippy's own suggestions
+    // for these specific lints breaks the build (e.g. ptr_arg/needless_pass_by_value
+    // signature narrowing changes local type inference at call sites), so they are
+    // suppressed here rather than "fixed" mechanically.
+    clippy::type_complexity,
+    clippy::needless_pass_by_value,
+    clippy::too_many_arguments,
+    clippy::similar_names,
+    clippy::unnecessary_wraps,
+    clippy::trivially_copy_pass_by_ref,
+    clippy::used_underscore_binding,
+    clippy::unused_self,
+    clippy::ref_option,
+    clippy::large_enum_variant,
+    clippy::struct_field_names
 )]
 
 use std::{env, error::Error, path::PathBuf};
@@ -33,9 +56,7 @@ pub mod tokens;
 
 pub type Res<T> = Result<T, Box<dyn Error + Send + Sync>>;
 
-lazy_static::lazy_static! {
-    static ref VERSION: Version = Version::parse(env!("CARGO_PKG_VERSION")).unwrap();
-}
+static VERSION: std::sync::LazyLock<Version> = std::sync::LazyLock::new(|| Version::parse(env!("CARGO_PKG_VERSION")).unwrap());
 
 pub const DEFAULT_ICYBOARD_FILE: &str = "icboard.toml";
 

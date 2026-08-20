@@ -230,16 +230,16 @@ pub struct BoardInformation {
     #[serde(default)]
     pub allow_iemsi: bool,
 
-    /// Location of the board (used in EmsiISI)
+    /// Location of the board (used in `EmsiISI`)
     pub location: String,
 
-    /// Operator of the board (used in EmsiISI)
+    /// Operator of the board (used in `EmsiISI`)
     pub operator: String,
 
-    /// Notice for the board (used in EmsiISI)
+    /// Notice for the board (used in `EmsiISI`)
     pub notice: String,
 
-    /// Capabilities of the board (used in EmsiISI)
+    /// Capabilities of the board (used in `EmsiISI`)
     pub capabilities: String,
 
     /// Local date format
@@ -267,7 +267,7 @@ pub struct SysopInformation {
     #[serde(skip_serializing_if = "Password::is_empty")]
     pub password: Password,
 
-    ///  Require Local Password to drop PCBoard to DOS (v15.0)
+    ///  Require Local Password to drop `PCBoard` to DOS (v15.0)
     #[serde(default)]
     #[serde(skip_serializing_if = "is_false")]
     pub require_password_to_exit: bool,
@@ -416,7 +416,7 @@ impl serde::Serialize for IcbColor {
     {
         match self {
             IcbColor::None => "".serialize(serializer),
-            IcbColor::Dos(u8) => format!("@X{:02X}", u8).serialize(serializer),
+            IcbColor::Dos(u8) => format!("@X{u8:02X}").serialize(serializer),
             IcbColor::IcyEngine(color) => color.to_hex().serialize(serializer),
         }
     }
@@ -593,7 +593,7 @@ pub struct FileTransferOptions {
     pub upload_descr_lines: u8,
     pub display_uploader: bool,
 
-    /// Drops the colours a FILE_ID.DIZ brings with it, so a listing stays in the
+    /// Drops the colours a `FILE_ID.DIZ` brings with it, so a listing stays in the
     /// colours the board was configured with.
     #[serde(default)]
     pub strip_colors_in_descriptions: bool,
@@ -613,7 +613,7 @@ pub struct SystemControlOptions {
 
     pub is_multi_lingual: bool,
 
-    /// Run in NewAsk mode.
+    /// Run in `NewAsk` mode.
     pub is_closed_board: bool,
 
     /// Switch between daily and session limits
@@ -636,7 +636,7 @@ pub struct SystemControlOptions {
     pub reread_sec_level_on_join: bool,
 
     /// Refuse downloads that break the caller's ratios, daily allowance or total limits.
-    /// Off by default: a board imported from PCBoard carries limits that were never
+    /// Off by default: a board imported from `PCBoard` carries limits that were never
     /// applied here, and switching them on would start turning callers away unannounced.
     #[serde(default)]
     pub enforce_transfer_limits: bool,
@@ -655,7 +655,7 @@ pub struct ConfigSwitches {
     #[serde(default)]
     pub exclude_local_calls_stats: bool,
 
-    /// DisplayNewsBehavior
+    /// `DisplayNewsBehavior`
     pub display_news_behavior: DisplayNewsBehavior,
 
     /// TRUE to disable automatic filtering of the data typed in logon prompts
@@ -842,7 +842,7 @@ impl DisplayNewsBehavior {
             'A' => DisplayNewsBehavior::Always,
             'X' => DisplayNewsBehavior::Never,
             _ => {
-                log::warn!("Invalid DisplayNewsBehavior char: {}", c);
+                log::warn!("Invalid DisplayNewsBehavior char: {c}");
                 DisplayNewsBehavior::OnlyNewer
             }
         }
@@ -1180,12 +1180,12 @@ pub struct QwkSettings {
     pub goodbye_screen: PathBuf,
     pub news_sceen: PathBuf,
 
-    /// System wide ceiling for the per user message capture limit, PCBoard's
-    /// MaxTotalMsgs. Shown in the W command as "System Max=".
+    /// System wide ceiling for the per user message capture limit, `PCBoard`'s
+    /// `MaxTotalMsgs`. Shown in the W command as "System Max=".
     #[serde(default = "QwkSettings::default_max_msgs")]
     pub max_msgs: u16,
 
-    /// The same ceiling per conference, PCBoard's MaxConfMsgs.
+    /// The same ceiling per conference, `PCBoard`'s `MaxConfMsgs`.
     #[serde(default = "QwkSettings::default_max_msgs_per_conf")]
     pub max_msgs_per_conf: u16,
 }

@@ -347,9 +347,7 @@ impl UserList {
     }
 
     fn handle_save_dialog_keys(&mut self, key: KeyEvent) -> Option<PageMessage> {
-        if self.save_dialog.is_none() {
-            return None;
-        }
+        self.save_dialog.as_ref()?;
         let dlg = self.save_dialog.as_mut().unwrap();
         match dlg.handle_key_press(key) {
             SaveChangesMessage::Save => {

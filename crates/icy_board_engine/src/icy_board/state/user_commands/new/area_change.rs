@@ -56,16 +56,14 @@ impl IcyBoardState {
                         if search {
                             search_text.push_str(token);
                             search_text.push(' ');
+                        } else if let Ok(num) = token.parse::<i32>() {
+                            area_num = num - 1;
                         } else {
-                            if let Ok(num) = token.parse::<i32>() {
-                                area_num = num - 1;
-                            } else {
-                                if name.len() > 0 {
-                                    name.push(' ');
-                                }
-                                let token = token.to_ascii_uppercase();
-                                name.push_str(&token);
+                            if !name.is_empty() {
+                                name.push(' ');
                             }
+                            let token = token.to_ascii_uppercase();
+                            name.push_str(&token);
                         }
                     }
                 }
@@ -104,8 +102,8 @@ impl IcyBoardState {
                 if let Some(regex) = &self.session.search_pattern.clone() {
                     let c = areas.iter().map(|a| a.name.clone()).collect::<Vec<String>>();
                     for (i, c) in c.iter().enumerate() {
-                        if let Some(_) = regex.find(c) {
-                            self.print(crate::vm::TerminalTarget::Both, &format!("{}) ", i)).await?;
+                        if regex.find(c).is_some() {
+                            self.print(crate::vm::TerminalTarget::Both, &format!("{i}) ")).await?;
                             self.print_found_text(crate::vm::TerminalTarget::Both, c).await?;
                             self.new_line().await?;
                             if self.session.disp_options.abort_printout {
@@ -130,7 +128,7 @@ impl IcyBoardState {
             };
 
             if !area.req_level_to_enter.session_can_access(&self.session) {
-                self.session.op_text = area.name.clone();
+                self.session.op_text.clone_from(&area.name);
                 self.display_text(IceText::NotRegisteredInConference, display_flags::NEWLINE | display_flags::LFBEFORE)
                     .await?;
                 continue;

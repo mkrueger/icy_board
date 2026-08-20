@@ -5,6 +5,7 @@ use crate::icy_board::state::functions::{MASK_ASCII, MASK_COMMAND, pwd_flags};
 use crate::icy_board::user_base::ConferenceFlags;
 use crate::icy_board::{icb_text::IceText, state::functions::display_flags};
 use crate::vm::TerminalTarget;
+use std::fmt::Write as _;
 
 impl IcyBoardState {
     pub async fn join_conference_cmd(&mut self) -> Res<()> {
@@ -63,16 +64,14 @@ impl IcyBoardState {
                         if search || quick_join {
                             search_text.push_str(token);
                             search_text.push(' ');
+                        } else if let Ok(num) = token.parse::<i32>() {
+                            conf_num = num;
                         } else {
-                            if let Ok(num) = token.parse::<i32>() {
-                                conf_num = num;
-                            } else {
-                                if name.len() > 0 {
-                                    name.push(' ');
-                                }
-                                let token = token.to_ascii_uppercase();
-                                name.push_str(&token);
+                            if !name.is_empty() {
+                                name.push(' ');
                             }
+                            let token = token.to_ascii_uppercase();
+                            name.push_str(&token);
                         }
                     }
                 }
@@ -113,8 +112,8 @@ impl IcyBoardState {
                 let c = self.get_board().await.conferences.iter().map(|c| c.name.clone()).collect::<Vec<String>>();
                 if let Some(regex) = &self.session.search_pattern.clone() {
                     for (i, c) in c.iter().enumerate() {
-                        if let Some(_) = regex.find(c) {
-                            self.print(crate::vm::TerminalTarget::Both, &format!("{}) ", i)).await?;
+                        if regex.find(c).is_some() {
+                            self.print(crate::vm::TerminalTarget::Both, &format!("{i}) ")).await?;
                             self.print_found_text(crate::vm::TerminalTarget::Both, c).await?;
                             self.new_line().await?;
 
@@ -140,28 +139,27 @@ impl IcyBoardState {
             };
 
             if !self.subscription_can_access_conference(conf_num as u16) {
-                self.session.op_text = conference.name.clone();
+                self.session.op_text.clone_from(&conference.name);
                 self.display_text(IceText::NotRegisteredInConference, display_flags::NEWLINE | display_flags::LFBEFORE)
                     .await?;
                 continue;
             }
 
             if !conference.required_security.session_can_access(&self.session) {
-                self.session.op_text = conference.name.clone();
+                self.session.op_text.clone_from(&conference.name);
                 self.display_text(IceText::NotRegisteredInConference, display_flags::NEWLINE | display_flags::LFBEFORE)
                     .await?;
                 continue;
             }
 
-            if !conference.password.is_empty() {
-                if !self
+            if !conference.password.is_empty()
+                && !self
                     .check_password(IceText::PasswordToJoin, pwd_flags::PLAIN, |pwd| conference.password.is_valid(pwd))
                     .await?
-                {
-                    self.display_text(IceText::DeniedWrongPassword, display_flags::NEWLINE | display_flags::LFBEFORE)
-                        .await?;
-                    return Ok(());
-                }
+            {
+                self.display_text(IceText::DeniedWrongPassword, display_flags::NEWLINE | display_flags::LFBEFORE)
+                    .await?;
+                return Ok(());
             }
 
             if conf_num == 0 {
@@ -180,7 +178,7 @@ impl IcyBoardState {
         Ok(())
     }
 
-    /// The first of the two questions PCBoard asks the first time a
+    /// The first of the two questions `PCBoard` asks the first time a
     /// conference is entered.
     pub(crate) async fn ask_to_view_conference_members(&mut self, quick_join: bool) -> Res<()> {
         if !self.session.current_conference.allow_view_conf_members || quick_join {
@@ -221,22 +219,23 @@ impl IcyBoardState {
             let registered = user
                 .conference_flags
                 .get(&conference)
-                .map_or(false, |flags| flags.contains(ConferenceFlags::Registered));
+                .is_some_and(|flags| flags.contains(ConferenceFlags::Registered));
             if conference == 0 || registered {
-                output.push_str(&format!(
+                let _ = write!(
+                    output,
                     "{:<25} {:<25} {} {}\r\n",
                     user.get_name(),
                     user.city_or_state,
                     self.format_date(user.stats.last_on),
                     self.format_time(user.stats.last_on)
-                ));
+                );
             }
         }
         self.print(TerminalTarget::Both, &output).await
     }
 
     /// The second question. The answer is a scan command line,
-    /// not just yes or no, and PCBoard appends the SINCE flag to it.
+    /// not just yes or no, and `PCBoard` appends the SINCE flag to it.
     pub(crate) async fn ask_to_scan_message_base(&mut self) -> Res<()> {
         let sec = self.session.user_command_level.cmd_y.clone();
         if self.get_board().await.config.message.disable_message_scan_prompt || !sec.session_can_access(&self.session) {

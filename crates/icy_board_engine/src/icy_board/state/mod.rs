@@ -49,10 +49,10 @@ mod option_tests {
     #[test]
     fn keyboard_timeout_uses_minutes_and_zero_disables_it() {
         assert!(!keyboard_timeout_elapsed(false, true, 5, Duration::from_secs(299)));
-        assert!(keyboard_timeout_elapsed(false, true, 5, Duration::from_secs(300)));
-        assert!(!keyboard_timeout_elapsed(false, true, 0, Duration::from_secs(3600)));
-        assert!(!keyboard_timeout_elapsed(true, true, 1, Duration::from_secs(60)));
-        assert!(!keyboard_timeout_elapsed(false, false, 1, Duration::from_secs(60)));
+        assert!(keyboard_timeout_elapsed(false, true, 5, Duration::from_mins(5)));
+        assert!(!keyboard_timeout_elapsed(false, true, 0, Duration::from_hours(1)));
+        assert!(!keyboard_timeout_elapsed(true, true, 1, Duration::from_mins(1)));
+        assert!(!keyboard_timeout_elapsed(false, false, 1, Duration::from_mins(1)));
     }
 }
 
@@ -186,7 +186,7 @@ pub struct TransferStatistics {
 
 impl TransferStatistics {
     pub fn get_cps_both(&self) -> usize {
-        (self.downloaded_cps + self.uploaded_cps) / 2
+        usize::midpoint(self.downloaded_cps, self.uploaded_cps)
     }
 }
 
@@ -265,7 +265,7 @@ pub struct Session {
 
     pub emsi: Option<EmsiICI>,
 
-    /// Bytes the caller may still download today; -1 is PCBoard's unlimited.
+    /// Bytes the caller may still download today; -1 is `PCBoard`'s unlimited.
     pub bytes_remaining: i64,
 
     /// What the caller's security level allows them to download.
@@ -286,7 +286,7 @@ pub struct Session {
 
     pub search_pattern: Option<Regex>,
 
-    /// The current default answer on last input_string
+    /// The current default answer on last `input_string`
     pub default_answer: Option<String>,
     pub last_answer: Option<String>,
 
@@ -371,7 +371,7 @@ impl Session {
     pub fn push_tokens(&mut self, command: &str) -> usize {
         let mut res = 0;
         for cmd in crate::tokens::tokenize(command) {
-            self.tokens.push_back(cmd.to_string());
+            self.tokens.push_back(cmd.clone());
             res += 1;
         }
         self.disp_options.non_stop_during_cmd = false;
@@ -569,7 +569,7 @@ pub enum KeySource {
     /// KBDSTUFF: originates from a PPE but is echoed like typed input.
     StuffedVisible,
     StuffedHidden,
-    /// KBDFILE: stuffed from a script file, otherwise identical to StuffedHidden.
+    /// KBDFILE: stuffed from a script file, otherwise identical to `StuffedHidden`.
     StuffedFile,
     Sysop,
 }
@@ -648,9 +648,7 @@ impl IcyBoardState {
         node: usize,
         connection: Box<dyn Connection>,
     ) -> Self {
-        if node > node_state.lock().await.len() {
-            panic!("Node number {node} out of range");
-        }
+        assert!(node <= node_state.lock().await.len(), "Node number {node} out of range");
         let mut session = Session::new();
         session.user_command_level = board.lock().await.config.user_command_level.clone();
         session.sysop_command_level = board.lock().await.config.sysop_command_level.clone();
@@ -694,11 +692,11 @@ impl IcyBoardState {
             let lang_file = self.resolve_path(&lang_file);
 
             log::info!("Loading language file: {}", lang_file.display());
-            if lang_file.exists() {
-                if let Ok(display_text) = IcbTextFile::load(&lang_file) {
-                    self.display_text = display_text;
-                    return;
-                }
+            if lang_file.exists()
+                && let Ok(display_text) = IcbTextFile::load(&lang_file)
+            {
+                self.display_text = display_text;
+                return;
             }
         }
         let dt = self.get_board().await.default_display_text.clone();
@@ -746,7 +744,7 @@ impl IcyBoardState {
         self.session.disp_options.grapics_mode != GraphicsMode::Ansi && self.session.disp_options.grapics_mode != GraphicsMode::Ctty
     }
 
-    /// Hangs up once the caller's time is gone. PCBoard watches the session clock from
+    /// Hangs up once the caller's time is gone. `PCBoard` watches the session clock from
     /// its keyboard loop, so the check sits in front of every prompt. It watches it for
     /// everyone, sysop included - an unlimited sysop holds a level that says so.
     async fn check_time_left(&mut self) {
@@ -811,8 +809,7 @@ impl IcyBoardState {
                 }
                 Ok(())
             }
-            GraphicsMode::Ansi | GraphicsMode::Graphics | GraphicsMode::Avatar => self.print(target, "\x1B[K").await,
-            GraphicsMode::Rip => self.print(target, "\x1B[K").await,
+            GraphicsMode::Ansi | GraphicsMode::Graphics | GraphicsMode::Avatar | GraphicsMode::Rip => self.print(target, "\x1B[K").await,
         }
     }
 
@@ -913,7 +910,7 @@ impl IcyBoardState {
     }
 
     /// A conference may raise or lower the security level of the caller while they
-    /// are in it. PCBoard's ConfPwrdAdjust re-reads PWRD when that happens.
+    /// are in it. `PCBoard`'s `ConfPwrdAdjust` re-reads PWRD when that happens.
     async fn apply_conference_security(&mut self) {
         let Some(user) = &self.session.current_user else {
             return;
@@ -976,11 +973,9 @@ impl IcyBoardState {
             self.display_news(only_new).await?;
         }
 
-        if self.get_board().await.config.switches.force_intro_on_join || show_intro {
-            if self.session.current_conference.intro_file.is_file() {
-                let f = self.session.current_conference.intro_file.clone();
-                self.display_file(&f).await?;
-            }
+        if (self.get_board().await.config.switches.force_intro_on_join || show_intro) && self.session.current_conference.intro_file.is_file() {
+            let f = self.session.current_conference.intro_file.clone();
+            self.display_file(&f).await?;
         }
 
         if first_join {
@@ -1016,7 +1011,7 @@ impl IcyBoardState {
                 return Ok(());
             }
             if let Err(err) = self.more_promt().await {
-                log::error!("Error in more prompt: {}", err);
+                log::error!("Error in more prompt: {err}");
             }
         }
         Ok(())
@@ -1032,7 +1027,7 @@ impl IcyBoardState {
             }
             Err(err) => {
                 log::error!("Error loading PPE {}: {}", file_name.as_ref().display(), err);
-                self.session.op_text = format!("{}", err);
+                self.session.op_text = format!("{err}");
                 self.display_text(IceText::ErrorLoadingPPE, display_flags::LFBEFORE | display_flags::LFAFTER)
                     .await?;
             }
@@ -1063,7 +1058,7 @@ impl IcyBoardState {
             Ok(keep_answers) => Ok(keep_answers),
             Err(err) => {
                 log::error!("Error executing PPE {}: {}", canonicalized_path.display(), err);
-                self.session.op_text = format!("{}", err);
+                self.session.op_text = format!("{err}");
                 self.display_text(IceText::ErrorExecPPE, display_flags::LFBEFORE | display_flags::LFAFTER)
                     .await?;
                 Ok(false)
@@ -1085,7 +1080,7 @@ impl IcyBoardState {
             i += 1;
             if c == '^' && i < in_chars.len() {
                 let next = in_chars[i].to_ascii_uppercase();
-                if next >= 'A' && next <= '[' {
+                if ('A'..='[').contains(&next) {
                     let ctrl_c = next as u8 - b'@';
                     self.char_buffer.push_back(KeyChar::new(src, ctrl_c as char));
                     i += 1;
@@ -1103,7 +1098,7 @@ impl IcyBoardState {
     }
 
     /// True when the next command will come out of a PPE's stuffed keyboard buffer.
-    /// PCBoard skips CMD.LST in that case so a PPE started from CMD.LST cannot
+    /// `PCBoard` skips CMD.LST in that case so a PPE started from CMD.LST cannot
     /// stuff its own keyword and re-trigger itself.
     pub fn ppl_typeahead(&self) -> bool {
         self.char_buffer.front().is_some_and(|c| c.source.is_stuffed())
@@ -1113,14 +1108,13 @@ impl IcyBoardState {
         let board = self.get_board().await;
         let path = board.resolve_file(&board.config.paths.tmp_work_path);
 
-        let path = PathBuf::from(path);
         if !path.is_dir() {
             fs::create_dir_all(&path)?;
         }
         let output = path.join("pcboard.dat");
 
         if let Err(err) = board.export_pcboard(&output) {
-            log::error!("Error writing pcbdat.dat file: {}", err);
+            log::error!("Error writing pcbdat.dat file: {err}");
             return Err(err);
         }
         Ok(output.to_str().unwrap().to_string())
@@ -1155,7 +1149,7 @@ impl IcyBoardState {
 
     /// The commands the board answers to when no command list claims the keyword.
     fn builtin_command(command: String) -> Option<super::commands::Command> {
-        return match command.as_str() {
+        match command.as_str() {
             "A" => convert_cmd(CommandType::AbandonConference),
             "B" => convert_cmd(CommandType::BulletinList),
             "C" => convert_cmd(CommandType::CommentToSysop),
@@ -1274,7 +1268,7 @@ impl IcyBoardState {
                 }
                 None
             }
-        };
+        }
     }
 
     pub fn resolve_path<P: AsRef<Path>>(&self, file: &P) -> PathBuf {
@@ -1288,15 +1282,15 @@ impl IcyBoardState {
         self.session.request_logoff = true;
         let _ = self.connection.shutdown().await;
 
-        if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
-            if let Some(sysop_connection) = &mut state.sysop_connection {
-                let _ = sysop_connection.shutdown().await;
-            }
+        if let Some(state) = self.node_state.lock().await[self.node].as_mut()
+            && let Some(sysop_connection) = &mut state.sysop_connection
+        {
+            let _ = sysop_connection.shutdown().await;
         }
     }
 
-    /// Appends one time stamped line to the caller log, PCBoard's CALLER file.
-    /// PCBoard kept one log per node; icy_board shares a single file, so the node
+    /// Appends one time stamped line to the caller log, `PCBoard`'s CALLER file.
+    /// `PCBoard` kept one log per node; `icy_board` shares a single file, so the node
     /// is stamped on every line and sysop command 13 filters on it.
     pub async fn write_caller_log(&self, text: &str) {
         let path = {
@@ -1321,7 +1315,7 @@ impl IcyBoardState {
     }
 
     /// Writes the logon block of the caller log, the extra lines are switchable
-    /// exactly like PCBoard's LogCallerNumber, LogConnectStr and LogSecLevel.
+    /// exactly like `PCBoard`'s `LogCallerNumber`, `LogConnectStr` and `LogSecLevel`.
     pub async fn log_logon_to_caller_log(&mut self) {
         let (log_number, log_connect, log_security, caller_number) = {
             let board = self.get_board().await;
@@ -1355,7 +1349,7 @@ impl IcyBoardState {
             state.graphics_mode = self.session.disp_options.grapics_mode;
         }
         if user_number >= self.get_board().await.users.len() {
-            log::error!("User number {} is out of range", user_number);
+            log::error!("User number {user_number} is out of range");
             return Err(IcyBoardError::UserNumberInvalid(user_number).into());
         }
         let mut user = self.get_board().await.users[user_number].clone();
@@ -1376,9 +1370,9 @@ impl IcyBoardState {
         self.get_board().await.statistics.add_caller(user.get_name().clone());
         self.get_board().await.save_statistics()?;
         if !user.date_format.is_empty() {
-            self.session.date_format = user.date_format.clone();
+            self.session.date_format.clone_from(&user.date_format);
         }
-        self.session.language = user.language.clone();
+        self.session.language.clone_from(&user.language);
         let subscription = self.get_board().await.config.subscription_info.clone();
         self.session.subscription_expired = super::subscription::status(
             subscription.is_enabled,
@@ -1393,8 +1387,8 @@ impl IcyBoardState {
             user.security_level
         };
         self.session.page_len = user.page_len;
-        self.session.user_name = user.get_name().clone();
-        self.session.alias_name = user.alias.clone();
+        self.session.user_name.clone_from(user.get_name());
+        self.session.alias_name.clone_from(&user.alias);
         self.session.fse_mode = user.flags.fse_mode.clone();
 
         self.session.current_user = Some(user);
@@ -1410,18 +1404,18 @@ impl IcyBoardState {
             };
             self.join_conference(conference, false, false).await?;
         }
-        return Ok(());
+        Ok(())
     }
 
     pub async fn save_current_user(&mut self) -> Res<()> {
         let old_language = self.session.language.clone();
         self.session.date_format = if let Some(user) = &self.session.current_user {
-            self.session.language = user.language.clone();
+            self.session.language.clone_from(&user.language);
             self.session.fse_mode = user.flags.fse_mode.clone();
-            if !user.date_format.is_empty() {
-                user.date_format.clone()
-            } else {
+            if user.date_format.is_empty() {
                 self.session.date_format.clone()
+            } else {
+                user.date_format.clone()
             }
         } else {
             self.session.date_format.clone()
@@ -1466,20 +1460,20 @@ impl IcyBoardState {
     }
 
     fn find_more_specific_file_with_graphics(&self, base_name: String) -> Option<PathBuf> {
-        if self.session.disp_options.grapics_mode == GraphicsMode::Rip {
-            if let Some(result) = self.find_more_specific_file_with_language(base_name.clone() + "r") {
-                return Some(result);
-            }
+        if self.session.disp_options.grapics_mode == GraphicsMode::Rip
+            && let Some(result) = self.find_more_specific_file_with_language(base_name.clone() + "r")
+        {
+            return Some(result);
         }
-        if self.session.disp_options.grapics_mode == GraphicsMode::Avatar {
-            if let Some(result) = self.find_more_specific_file_with_language(base_name.clone() + "v") {
-                return Some(result);
-            }
+        if self.session.disp_options.grapics_mode == GraphicsMode::Avatar
+            && let Some(result) = self.find_more_specific_file_with_language(base_name.clone() + "v")
+        {
+            return Some(result);
         }
-        if self.session.disp_options.grapics_mode != GraphicsMode::Ctty {
-            if let Some(result) = self.find_more_specific_file_with_language(base_name.clone() + "g") {
-                return Some(result);
-            }
+        if self.session.disp_options.grapics_mode != GraphicsMode::Ctty
+            && let Some(result) = self.find_more_specific_file_with_language(base_name.clone() + "g")
+        {
+            return Some(result);
         }
 
         self.find_more_specific_file_with_language(base_name)
@@ -1554,10 +1548,10 @@ impl IcyBoardState {
 
     /// Gives back the user password, or 'SECRET' if the user password should not be given to doors.
     pub async fn door_user_password(&self) -> String {
-        if self.get_board().await.config.options.give_user_password_to_doors {
-            if let Some(user) = &self.session.current_user {
-                return user.password.password.to_string();
-            }
+        if self.get_board().await.config.options.give_user_password_to_doors
+            && let Some(user) = &self.session.current_user
+        {
+            return user.password.password.to_string();
         }
 
         "SECRET".to_string()
@@ -1668,18 +1662,17 @@ impl IcyBoardState {
             Ok(pattern) => {
                 let mut pattern = pattern.to_regex();
                 if !case_sensitive {
-                    pattern = format!("(?i){}", pattern);
+                    pattern = format!("(?i){pattern}");
                 }
                 if let Ok(r) = Regex::new(&pattern) {
                     self.session.search_pattern = Some(r);
                     return true;
-                } else {
-                    log::error!("Error parsing search pattern: {}", pattern);
                 }
+                log::error!("Error parsing search pattern: {pattern}");
             }
-            Err(err) => log::error!("Error parsing search pattern: {}", err),
+            Err(err) => log::error!("Error parsing search pattern: {err}"),
         }
-        return false;
+        false
     }
 
     pub fn stop_search(&mut self) {
@@ -1687,12 +1680,12 @@ impl IcyBoardState {
     }
 
     pub fn is_lockedout(&self, conf_number: u16) -> bool {
-        if let Some(user) = &self.session.current_user {
-            if let Some(flags) = user.conference_flags.get(&(conf_number as usize)) {
-                if flags.contains(ConferenceFlags::Expired) && !flags.contains(ConferenceFlags::Registered) {
-                    return true;
-                }
-            }
+        if let Some(user) = &self.session.current_user
+            && let Some(flags) = user.conference_flags.get(&(conf_number as usize))
+            && flags.contains(ConferenceFlags::Expired)
+            && !flags.contains(ConferenceFlags::Registered)
+        {
+            return true;
         }
         false
     }
@@ -1721,12 +1714,11 @@ impl IcyBoardState {
             return false;
         }
 
-        if let Some(user) = &self.session.current_user {
-            if let Some(flags) = user.conference_flags.get(&(conf_number as usize)) {
-                if flags.contains(ConferenceFlags::Selected) {
-                    return true;
-                }
-            }
+        if let Some(user) = &self.session.current_user
+            && let Some(flags) = user.conference_flags.get(&(conf_number as usize))
+            && flags.contains(ConferenceFlags::Selected)
+        {
+            return true;
         }
 
         if conference.is_public {
@@ -1833,7 +1825,7 @@ impl IcyBoardState {
         if self.use_ansi() {
             // Move left num_cols then clear to end of line.
             // Example: ESC[{n}D moves cursor left n cols, ESC[K clears to end of line.
-            let seq = format!("\x1B[{}D\x1B[K", num_cols);
+            let seq = format!("\x1B[{num_cols}D\x1B[K");
             self.write_raw(target, seq.chars().collect::<Vec<char>>().as_slice()).await?;
             return Ok(());
         }
@@ -1853,9 +1845,8 @@ impl IcyBoardState {
         let mut channels_shown = 0;
         for channel_num in 1..=255u8 {
             // Get channel info from the state
-            let participants = match chat_guard.list_participants(channel_num) {
-                Ok(p) => p,
-                Err(_) => continue, // Skip invalid channels
+            let Ok(participants) = chat_guard.list_participants(channel_num) else {
+                continue;
             };
 
             let room_idx = channel_num as usize;
@@ -1873,7 +1864,7 @@ impl IcyBoardState {
 
             // Channel number
 
-            self.session.op_text = format!("{}", channel_num);
+            self.session.op_text = format!("{channel_num}");
             self.display_text(IceText::ChannelText, display_flags::LFBEFORE).await?;
             if let Some(topic) = &room.topic {
                 let max_topic_len = 40;
@@ -1914,8 +1905,8 @@ impl IcyBoardState {
         let mut buf = [0u8; 1];
         match self.connection.read(&mut buf).await {
             Ok(1) => Ok(Some(buf[0])),
-            Ok(0) => Ok(None), // No data available
-            _ => Ok(None),     // Shouldn't happen with 1-byte buffer
+            // No data available
+            _ => Ok(None), // Shouldn't happen with 1-byte buffer
         }
     }
 }
@@ -1948,14 +1939,11 @@ impl IcyBoardState {
             GraphicsMode::Ctty => {
                 // ignore
             }
-            GraphicsMode::Ansi | GraphicsMode::Graphics => {
-                self.print(target, &format!("\x1B[{};{}H", y, x)).await?;
+            GraphicsMode::Ansi | GraphicsMode::Graphics | GraphicsMode::Rip => {
+                self.print(target, &format!("\x1B[{y};{x}H")).await?;
             }
             GraphicsMode::Avatar => {
                 self.print(target, &format!("\x16\x08{}{}", (x as u8) as char, (y as u8) as char)).await?;
-            }
-            GraphicsMode::Rip => {
-                self.print(target, &format!("\x1B[{};{}H", y, x)).await?;
             }
         }
 
@@ -1964,7 +1952,7 @@ impl IcyBoardState {
 
     pub async fn backward(&mut self, chars: i32) -> Res<()> {
         if self.use_ansi() {
-            self.write_raw(TerminalTarget::Both, format!("\x1B[{}D", chars).chars().collect::<Vec<char>>().as_slice())
+            self.write_raw(TerminalTarget::Both, format!("\x1B[{chars}D").chars().collect::<Vec<char>>().as_slice())
                 .await
         } else {
             Ok(())
@@ -1973,7 +1961,7 @@ impl IcyBoardState {
 
     pub async fn forward(&mut self, chars: i32) -> Res<()> {
         if self.use_ansi() {
-            self.write_raw(TerminalTarget::Both, format!("\x1B[{}C", chars).chars().collect::<Vec<char>>().as_slice())
+            self.write_raw(TerminalTarget::Both, format!("\x1B[{chars}C").chars().collect::<Vec<char>>().as_slice())
                 .await
         } else {
             Ok(())
@@ -1982,7 +1970,7 @@ impl IcyBoardState {
 
     pub async fn up(&mut self, chars: i32) -> Res<()> {
         if self.use_ansi() {
-            self.write_raw(TerminalTarget::Both, format!("\x1B[{}A", chars).chars().collect::<Vec<char>>().as_slice())
+            self.write_raw(TerminalTarget::Both, format!("\x1B[{chars}A").chars().collect::<Vec<char>>().as_slice())
                 .await
         } else {
             Ok(())
@@ -1991,7 +1979,7 @@ impl IcyBoardState {
 
     pub async fn down(&mut self, chars: i32) -> Res<()> {
         if self.use_ansi() {
-            self.write_raw(TerminalTarget::Both, format!("\x1B[{}B", chars).chars().collect::<Vec<char>>().as_slice())
+            self.write_raw(TerminalTarget::Both, format!("\x1B[{chars}B").chars().collect::<Vec<char>>().as_slice())
                 .await
         } else {
             Ok(())
@@ -2005,23 +1993,23 @@ impl IcyBoardState {
 
     pub async fn print_found_text(&mut self, target: TerminalTarget, str: &str) -> Res<()> {
         let chars = str.chars().collect::<Vec<char>>();
-        if let Some(regex) = &self.session.search_pattern.clone() {
-            if let Some(find) = regex.find(str) {
-                // regex offsets are byte indices; convert them to char indices for `chars`.
-                let start = str[..find.start()].chars().count();
-                let end = str[..find.end()].chars().count();
-                self.write_raw(target, &chars[..start]).await?;
-                let old_color = self.user_screen.buffer.caret.attribute;
-                if old_color.background() == 0 {
-                    self.set_color(target, IcbColor::Dos(0x70)).await?;
-                } else {
-                    self.set_color(target, IcbColor::Dos(0x07)).await?;
-                }
-                self.write_raw(target, &chars[start..end]).await?;
-                self.set_color(target, IcbColor::Dos(old_color.as_u8(icy_engine::IceMode::Blink))).await?;
-                self.write_raw(target, &chars[end..]).await?;
-                return Ok(());
+        if let Some(regex) = &self.session.search_pattern.clone()
+            && let Some(find) = regex.find(str)
+        {
+            // regex offsets are byte indices; convert them to char indices for `chars`.
+            let start = str[..find.start()].chars().count();
+            let end = str[..find.end()].chars().count();
+            self.write_raw(target, &chars[..start]).await?;
+            let old_color = self.user_screen.buffer.caret.attribute;
+            if old_color.background() == 0 {
+                self.set_color(target, IcbColor::Dos(0x70)).await?;
+            } else {
+                self.set_color(target, IcbColor::Dos(0x07)).await?;
             }
+            self.write_raw(target, &chars[start..end]).await?;
+            self.set_color(target, IcbColor::Dos(old_color.as_u8(icy_engine::IceMode::Blink))).await?;
+            self.write_raw(target, &chars[end..]).await?;
+            return Ok(());
         }
 
         self.write_raw(target, chars.as_slice()).await
@@ -2045,17 +2033,15 @@ impl IcyBoardState {
                 if user_is_utf8 {
                     let encoded = c.encode_utf8(&mut buf);
                     user_bytes.extend_from_slice(encoded.as_bytes());
+                } else if let Some(&cp437) = UNICODE_TO_CP437.get(c) {
+                    user_bytes.push(cp437);
                 } else {
-                    if let Some(&cp437) = UNICODE_TO_CP437.get(&c) {
-                        user_bytes.push(cp437);
-                    } else {
-                        user_bytes.push(b'.');
-                    }
+                    user_bytes.push(b'.');
                 }
             }
             if target != TerminalTarget::User {
                 let _ = self.sysop_screen.print_char(*c);
-                if let Some(&cp437) = UNICODE_TO_CP437.get(&c) {
+                if let Some(&cp437) = UNICODE_TO_CP437.get(c) {
                     sysop_bytes.push(cp437);
                 } else {
                     sysop_bytes.push(b'.');
@@ -2092,30 +2078,26 @@ impl IcyBoardState {
         self.capture_file = None;
     }
 
-    async fn write_chars_internal(&mut self, target: TerminalTarget, user_bytes: &Vec<u8>, sysop_bytes: &Vec<u8>) -> Res<()> {
-        if target != TerminalTarget::Sysop || self.session.is_sysop {
-            if !user_bytes.is_empty() {
-                // A capture sees what the caller sees, whether or not the display is on.
-                if let Some(file) = &mut self.capture_file {
-                    let _ = std::io::Write::write_all(file, user_bytes);
-                }
-                self.connection.send(&user_bytes).await?;
+    async fn write_chars_internal(&mut self, target: TerminalTarget, user_bytes: &[u8], sysop_bytes: &[u8]) -> Res<()> {
+        if (target != TerminalTarget::Sysop || self.session.is_sysop) && !user_bytes.is_empty() {
+            // A capture sees what the caller sees, whether or not the display is on.
+            if let Some(file) = &mut self.capture_file {
+                let _ = std::io::Write::write_all(file, user_bytes);
             }
+            self.connection.send(user_bytes).await?;
         }
 
-        if target != TerminalTarget::User {
-            if !sysop_bytes.is_empty() {
-                // Send user only not to other connections
-                let mut node_state = self.node_state.lock().await;
-                match node_state[self.node].as_mut() {
-                    Some(ns) => {
-                        if let Some(sysop_connection) = &mut ns.sysop_connection {
-                            let _ = sysop_connection.send(&sysop_bytes).await;
-                        }
+        if target != TerminalTarget::User && !sysop_bytes.is_empty() {
+            // Send user only not to other connections
+            let mut node_state = self.node_state.lock().await;
+            match node_state[self.node].as_mut() {
+                Some(ns) => {
+                    if let Some(sysop_connection) = &mut ns.sysop_connection {
+                        let _ = sysop_connection.send(sysop_bytes).await;
                     }
-                    None => {
-                        log::error!("Node {} was empty", self.node);
-                    }
+                }
+                None => {
+                    log::error!("Node {} was empty", self.node);
                 }
             }
         }
@@ -2192,9 +2174,7 @@ impl IcyBoardState {
                     }
                     PcbState::ReadColor2(ch1) => {
                         state = PcbState::Default;
-                        if !c.is_ascii_hexdigit() {
-                            self.write_chars(target, &['@', ch1, *c]).await?;
-                        } else {
+                        if c.is_ascii_hexdigit() {
                             let color = (c.to_digit(16).unwrap() | (ch1.to_digit(16).unwrap() << 4)) as u8;
 
                             if color == 0 {
@@ -2204,6 +2184,8 @@ impl IcyBoardState {
                             } else {
                                 self.set_color(target, color.into()).await?;
                             }
+                        } else {
+                            self.write_chars(target, &['@', ch1, *c]).await?;
                         }
                     }
                 }
@@ -2230,7 +2212,7 @@ impl IcyBoardState {
         match &id.command {
             MacroCommand::Alias => {
                 if let Some(user) = &self.session.current_user {
-                    result = user.alias.to_string();
+                    result = user.alias.clone();
                 }
                 if result.is_empty() {
                     result = self.session.get_first_name();
@@ -2245,7 +2227,7 @@ impl IcyBoardState {
                 return None;
             }
             MacroCommand::BICPS => result = self.transfer_statistics.get_cps_both().to_string(),
-            MacroCommand::BoardName => result = self.get_board().await.config.board.name.to_string(),
+            MacroCommand::BoardName => result = self.get_board().await.config.board.name.clone(),
             MacroCommand::BPS | MacroCommand::Carrier => result = self.get_bps().to_string(),
 
             MacroCommand::ByteCredit => result = self.session.transfer_limits.byte_credit.to_string(),
@@ -2274,7 +2256,7 @@ impl IcyBoardState {
             }
             MacroCommand::City => {
                 if let Some(user) = &self.session.current_user {
-                    result = user.city_or_state.to_string();
+                    result = user.city_or_state.clone();
                 }
             }
             MacroCommand::ClrEol => {
@@ -2285,10 +2267,21 @@ impl IcyBoardState {
                 let _ = self.clear_screen(target).await;
                 return None;
             }
-            MacroCommand::ConfName => result = self.session.current_conference.name.to_string(),
+            MacroCommand::ConfName => result = self.session.current_conference.name.clone(),
             MacroCommand::ConfNum => result = self.session.current_conference_number.to_string(),
 
-            MacroCommand::CredLeft | MacroCommand::CredNow | MacroCommand::CredStart | MacroCommand::CredUsed => {
+            MacroCommand::CredLeft
+            | MacroCommand::CredNow
+            | MacroCommand::CredStart
+            | MacroCommand::CredUsed
+            | MacroCommand::Event
+            | MacroCommand::FreeSpace
+            | MacroCommand::IName
+            | MacroCommand::LastCallerNode
+            | MacroCommand::LastCallerSystem
+            | MacroCommand::OffHours
+            | MacroCommand::PwxDate
+            | MacroCommand::PwxDays => {
                 // todo
             }
 
@@ -2298,7 +2291,7 @@ impl IcyBoardState {
 
             MacroCommand::DataPhone => {
                 if let Some(user) = &self.session.current_user {
-                    result = user.bus_data_phone.to_string();
+                    result = user.bus_data_phone.clone();
                 }
             }
             MacroCommand::DayBytes => {
@@ -2316,20 +2309,17 @@ impl IcyBoardState {
                     result = user.stats.num_downloads.to_string();
                 }
             }
-            MacroCommand::Event => {}
-
             MacroCommand::Delay(delay) => {
                 sleep(Duration::from_millis(*delay as u64 * 10)).await;
                 return None;
             }
             MacroCommand::ExpDate => {
                 let enabled = self.get_board().await.config.subscription_info.is_enabled;
-                if enabled {
-                    if let Some(user) = &self.session.current_user {
-                        if user.expiration_date != DateTime::<Utc>::default() {
-                            result = self.format_date(user.expiration_date);
-                        }
-                    }
+                if enabled
+                    && let Some(user) = &self.session.current_user
+                    && user.expiration_date != DateTime::<Utc>::default()
+                {
+                    result = self.format_date(user.expiration_date);
                 }
                 if result.is_empty() {
                     result = "00-00-00".to_string();
@@ -2358,7 +2348,6 @@ impl IcyBoardState {
             MacroCommand::FNum => {
                 result = (self.session.flagged_files.len() + 1).to_string();
             }
-            MacroCommand::FreeSpace => {}
             MacroCommand::GfxMode => {
                 result = match self.session.disp_options.grapics_mode {
                     GraphicsMode::Ctty => self.display_text.get_display_text(IceText::GfxModeOff).unwrap().text,
@@ -2370,11 +2359,10 @@ impl IcyBoardState {
             }
             MacroCommand::HomePhone => {
                 if let Some(user) = &self.session.current_user {
-                    result = user.home_voice_phone.to_string();
+                    result = user.home_voice_phone.clone();
                 }
             }
             MacroCommand::HighMSGNum => result = self.session.high_msg_num.to_string(),
-            MacroCommand::IName => {}
             MacroCommand::InConf => {
                 if self.session.current_conference_number == 0 {
                     if let Ok(main_board_txt) = self.display_text.get_display_text(IceText::Mainboard) {
@@ -2386,7 +2374,7 @@ impl IcyBoardState {
                     if let Ok(main_board_txt) = self.display_text.get_display_text(IceText::Conference) {
                         result = format!(
                             "{} ({}){} ",
-                            self.session.current_conference.name.to_string(),
+                            self.session.current_conference.name.clone(),
                             self.session.current_conference_number,
                             main_board_txt.text
                         );
@@ -2452,11 +2440,10 @@ impl IcyBoardState {
                     .filter_map(|f| std::fs::metadata(f).ok())
                     .map(|m| m.len())
                     .sum::<u64>()
-                    .to_string()
+                    .to_string();
             }
             MacroCommand::FFiles => result = self.session.flagged_files.len().to_string(),
 
-            MacroCommand::LastCallerNode | MacroCommand::LastCallerSystem => {}
             MacroCommand::MinLeft => {
                 result = match self.minutes_left() {
                     None => self.unlimited_text(),
@@ -2465,7 +2452,7 @@ impl IcyBoardState {
             }
             MacroCommand::More => {
                 if let Err(err) = self.more_promt().await {
-                    log::error!("Error in more prompt: {}", err);
+                    log::error!("Error in more prompt: {err}");
                 }
                 return None;
             }
@@ -2508,7 +2495,7 @@ impl IcyBoardState {
             }
             MacroCommand::DirName => {
                 if let Some(dirs) = &self.session.current_conference.directories {
-                    result = dirs[self.session.current_file_directory].name.to_string();
+                    result = dirs[self.session.current_file_directory].name.clone();
                 } else {
                     result = String::new();
                 }
@@ -2518,7 +2505,7 @@ impl IcyBoardState {
             }
             MacroCommand::AreaName => {
                 if let Some(areas) = &self.session.current_conference.areas {
-                    result = areas[self.session.current_message_area].name.to_string();
+                    result = areas[self.session.current_message_area].name.clone();
                 } else {
                     result = String::new();
                 }
@@ -2531,8 +2518,7 @@ impl IcyBoardState {
                     result = user.stats.num_times_on.to_string();
                 }
             }
-            MacroCommand::OffHours => {}
-            MacroCommand::OpText => result = self.session.op_text.to_string(),
+            MacroCommand::OpText => result = self.session.op_text.clone(),
             MacroCommand::Pause => {
                 self.session.disp_options.auto_more = true;
                 let _ = self.press_enter().await;
@@ -2556,14 +2542,14 @@ impl IcyBoardState {
             }
             MacroCommand::ProLTR => {
                 if let Some(user) = &self.session.current_user {
-                    result = user.protocol.to_string();
+                    result = user.protocol.clone();
                 }
             }
             MacroCommand::ProDesc => {
-                if let Some(user) = &self.session.current_user {
-                    if let Some(prot) = self.board.lock().await.protocols.find_protocol(&user.protocol) {
-                        result = prot.description.to_string();
-                    }
+                if let Some(user) = &self.session.current_user
+                    && let Some(prot) = self.board.lock().await.protocols.find_protocol(&user.protocol)
+                {
+                    result = prot.description.clone();
                 }
             }
             MacroCommand::QOFF => {
@@ -2574,18 +2560,17 @@ impl IcyBoardState {
                 self.session.disp_options.allow_break = true;
                 return None;
             }
-            MacroCommand::PwxDate | MacroCommand::PwxDays => {}
             MacroCommand::RCPS => result = self.transfer_statistics.uploaded_cps.to_string(),
             MacroCommand::RBytes => result = self.transfer_statistics.uploaded_bytes.to_string(),
             MacroCommand::RFiles => result = self.transfer_statistics.uploaded_files.to_string(),
             MacroCommand::Real => {
                 if let Some(user) = &self.session.current_user {
-                    result = user.get_name().to_string();
+                    result = user.get_name().clone();
                 }
             }
             MacroCommand::Security => {
                 if let Some(user) = &self.session.current_user {
-                    result = user.security_level.to_string()
+                    result = user.security_level.to_string();
                 }
             }
             MacroCommand::SCPS => result = self.transfer_statistics.downloaded_cps.to_string(),
@@ -2598,9 +2583,9 @@ impl IcyBoardState {
             MacroCommand::SysopOut => result = self.get_board().await.config.limits.sysop_stop.to_string(),
             MacroCommand::SysopName => {
                 if self.get_board().await.config.sysop.use_real_name {
-                    result = self.get_board().await.users[0].name.to_string();
+                    result = self.get_board().await.users[0].name.clone();
                 } else {
-                    result = self.get_board().await.config.sysop.name.to_string();
+                    result = self.get_board().await.config.sysop.name.clone();
                 }
             }
             MacroCommand::SysTime => {
@@ -2638,12 +2623,12 @@ impl IcyBoardState {
                 if let Some(user) = &self.session.current_user {
                     if self.session.use_alias {
                         if user.alias.is_empty() {
-                            result = user.get_name().to_ascii_uppercase().to_string();
+                            result.clone_from(&user.get_name().to_ascii_uppercase());
                         } else {
-                            result = user.alias.to_ascii_uppercase().to_string();
+                            result.clone_from(&user.alias.to_ascii_uppercase());
                         }
                     } else {
-                        result = user.get_name().to_ascii_uppercase().to_string();
+                        result.clone_from(&user.get_name().to_ascii_uppercase());
                     }
                 } else {
                     result = "0".to_string();
@@ -2672,8 +2657,8 @@ impl IcyBoardState {
             }
             MacroCommand::YesChar => result = self.session.yes_char.to_string(),
             MacroCommand::Env(id) => {
-                if let Some(value) = self.get_env(&id) {
-                    result = value.to_string();
+                if let Some(value) = self.get_env(id) {
+                    result = value.clone();
                 }
             }
             MacroCommand::Hangup => {
@@ -2704,16 +2689,14 @@ impl IcyBoardState {
                             self.session.keyboard_timer_started = Instant::now();
                         }
                         return Ok(Some(ch));
-                    } else {
-                        self.char_buffer.push_back(ch);
                     }
+                    self.char_buffer.push_back(ch);
                 }
                 TerminalTarget::Sysop => {
                     if ch.source == KeySource::Sysop {
                         return Ok(Some(ch));
-                    } else {
-                        self.char_buffer.push_back(ch);
                     }
+                    self.char_buffer.push_back(ch);
                 }
             }
         }
@@ -2767,29 +2750,24 @@ impl IcyBoardState {
                             self.shutdown_for_event(msg).await?;
                         }
                         Some(BBSMessage::GroupChat(event)) => {
-                            self.handle_group_chat_event(event).await?;
+                            self.handle_group_chat_event(event)?;
                         }
                         _ => {}
                     }
                     return Ok(None);
                 }
                 size = sysop_connection.read(&mut sysop_key_data) => {
-                    match size {
-                        Ok(1) => {
-                            if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
-                                state.sysop_connection = Some(sysop_connection);
-                                state.bbs_channel = Some(bbs_channel);
-                            }
-                            if target == TerminalTarget::User {
-                                self.char_buffer.push_back(KeyChar::new(KeySource::Sysop, sysop_key_data[0] as char));
-                                return Ok(None);
-                            }
+                    if let Ok(1) = size {
+                        if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
+                            state.sysop_connection = Some(sysop_connection);
+                            state.bbs_channel = Some(bbs_channel);
+                        }
+                        if target == TerminalTarget::User {
+                            self.char_buffer.push_back(KeyChar::new(KeySource::Sysop, sysop_key_data[0] as char));
+                            return Ok(None);
+                        }
 
-                            return Ok(Some(KeyChar::new(KeySource::Sysop, sysop_key_data[0] as char)));
-                        }
-                        Err(_) => {
-                        }
-                        _ => {}
+                        return Ok(Some(KeyChar::new(KeySource::Sysop, sysop_key_data[0] as char)));
                     }
                 }
                 size2 = self.connection.read(&mut user_key_data) => {
@@ -2806,7 +2784,7 @@ impl IcyBoardState {
                         return Ok(Some(KeyChar::new(KeySource::User, user_key_data[0] as char)));
                     }
                 }
-                _ = sleep(Duration::from_millis(100)) => {
+                () = sleep(Duration::from_millis(100)) => {
                     if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
                         state.sysop_connection = Some(sysop_connection);
                         state.bbs_channel = Some(bbs_channel);
@@ -2821,9 +2799,6 @@ impl IcyBoardState {
                         state.bbs_channel = Some(bbs_channel);
                     }
                     match msg {
-                        Some(BBSMessage::SysopLogout) => {
-                            // Ignore
-                        }
                         Some(BBSMessage::SysopLogin) => {
                             self.print_sysop_screen().await?;
                         }
@@ -2834,7 +2809,7 @@ impl IcyBoardState {
                             self.shutdown_for_event(msg).await?;
                         }
                         Some(BBSMessage::GroupChat(event)) => {
-                            self.handle_group_chat_event(event).await?;
+                            self.handle_group_chat_event(event)?;
                         }
                         _ => {}
                     }
@@ -2854,7 +2829,7 @@ impl IcyBoardState {
                         return Ok(Some(KeyChar::new(KeySource::User, user_key_data[0] as char)));
                     }
                 }
-                _ = sleep(Duration::from_millis(100)) => {
+                () = sleep(Duration::from_millis(100)) => {
                     if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
                         state.bbs_channel = Some(bbs_channel);
                     }
@@ -2879,45 +2854,37 @@ impl IcyBoardState {
                 ch.ch = control_codes::DEL;
             }
             '\x1B' => {
-                if let Some(key_char) = self.get_char(TerminalTarget::Both).await? {
-                    if key_char.ch == '[' {
-                        if let Some(key_char) = self.get_char(TerminalTarget::Both).await? {
-                            match key_char.ch {
-                                'A' => ch.ch = control_codes::UP,
-                                'B' => ch.ch = control_codes::DOWN,
-                                'C' => ch.ch = control_codes::RIGHT,
-                                'D' => ch.ch = control_codes::LEFT,
+                if let Some(key_char) = self.get_char(TerminalTarget::Both).await?
+                    && key_char.ch == '['
+                    && let Some(key_char) = self.get_char(TerminalTarget::Both).await?
+                {
+                    match key_char.ch {
+                        'A' => ch.ch = control_codes::UP,
+                        'B' => ch.ch = control_codes::DOWN,
+                        'C' => ch.ch = control_codes::RIGHT,
+                        'D' => ch.ch = control_codes::LEFT,
 
-                                'H' => ch.ch = control_codes::HOME,
-                                'K' => ch.ch = control_codes::END,
+                        'H' => ch.ch = control_codes::HOME,
+                        'K' | 'F' => ch.ch = control_codes::END,
 
-                                'V' => ch.ch = control_codes::PG_UP,
-                                'U' => ch.ch = control_codes::PG_DN,
-                                '@' => {
-                                    self.get_char(TerminalTarget::Both).await?;
-                                    ch.ch = control_codes::INS;
-                                }
+                        'V' => ch.ch = control_codes::PG_UP,
+                        'U' => ch.ch = control_codes::PG_DN,
+                        '@' | '2' => {
+                            self.get_char(TerminalTarget::Both).await?;
+                            ch.ch = control_codes::INS;
+                        }
 
-                                '6' => {
-                                    self.get_char(TerminalTarget::Both).await?;
-                                    ch.ch = control_codes::PG_UP;
-                                }
-                                '5' => {
-                                    self.get_char(TerminalTarget::Both).await?;
-                                    ch.ch = control_codes::PG_DN;
-                                }
-                                '2' => {
-                                    self.get_char(TerminalTarget::Both).await?;
-                                    ch.ch = control_codes::INS;
-                                }
-
-                                'F' => ch.ch = control_codes::END,
-
-                                _ => {
-                                    // don't pass ctrl codes
-                                    return Ok(None);
-                                }
-                            }
+                        '6' => {
+                            self.get_char(TerminalTarget::Both).await?;
+                            ch.ch = control_codes::PG_UP;
+                        }
+                        '5' => {
+                            self.get_char(TerminalTarget::Both).await?;
+                            ch.ch = control_codes::PG_DN;
+                        }
+                        _ => {
+                            // don't pass ctrl codes
+                            return Ok(None);
                         }
                     }
                 }
@@ -2944,7 +2911,7 @@ impl IcyBoardState {
         self.set_activity(NodeStatus::NodeMessage).await;
         self.new_line().await?;
         self.set_color(TerminalTarget::Both, IcbColor::dos_white()).await?;
-        self.println(TerminalTarget::Both, &"Broadcast:").await?;
+        self.println(TerminalTarget::Both, "Broadcast:").await?;
         self.println(TerminalTarget::Both, &msg).await?;
         self.bell().await?;
 
@@ -3020,11 +2987,11 @@ impl IcyBoardState {
             }
         };
 
-        if self.session.disp_options.grapics_mode == GraphicsMode::Avatar {
-            if let IcbColor::Dos(color) = color {
-                let color_change = format!("\x16\x01{}", color as char);
-                return self.write_chars(target, color_change.chars().collect::<Vec<char>>().as_slice()).await;
-            }
+        if self.session.disp_options.grapics_mode == GraphicsMode::Avatar
+            && let IcbColor::Dos(color) = color
+        {
+            let color_change = format!("\x16\x01{}", color as char);
+            return self.write_chars(target, color_change.chars().collect::<Vec<char>>().as_slice()).await;
         }
 
         let mut color_change = "\x1B[".to_string();
@@ -3143,8 +3110,8 @@ impl IcyBoardState {
         Ok(())
     }
 
-    /// PCBoard counted a line here and nowhere else, so a PPE drawing its own screen with
-    /// PRINT and cursor positioning never ran into a MORE prompt. See newline() in DISPLAY.C.
+    /// `PCBoard` counted a line here and nowhere else, so a PPE drawing its own screen with
+    /// PRINT and cursor positioning never ran into a MORE prompt. See `newline()` in DISPLAY.C.
     pub async fn new_line(&mut self) -> Res<()> {
         self.write_chars(TerminalTarget::Both, &['\r', '\n']).await?;
         self.next_line().await
@@ -3170,7 +3137,7 @@ impl IcyBoardState {
         Ok(new_pwd.len() >= self.board.lock().await.config.limits.min_pwd_length as usize)
     }
 
-    /// Takes a password on behalf of PPL's `NEWPWD`, which PCBoard put through
+    /// Takes a password on behalf of PPL's `NEWPWD`, which `PCBoard` put through
     /// the same rules as the `W` command.
     pub async fn change_password(&mut self, new_pwd: &str) -> Res<bool> {
         let min_len = self.get_board().await.config.limits.min_pwd_length;
@@ -3178,7 +3145,7 @@ impl IcyBoardState {
         let Some(user) = &self.session.current_user else {
             return Ok(false);
         };
-        if user.password.check_new_password(&user.get_name(), new_pwd, min_len) != PasswordVerdict::Ok {
+        if user.password.check_new_password(user.get_name(), new_pwd, min_len) != PasswordVerdict::Ok {
             return Ok(false);
         }
         let password = self.create_password(new_pwd.to_string()).await;
@@ -3194,11 +3161,11 @@ impl IcyBoardState {
         if let Some(some) = self.file_bases.get(dir) {
             return Ok(some.clone());
         }
-        match FileBase::open(&dir, metadata_path) {
+        match FileBase::open(dir, metadata_path) {
             Ok(new_base) => {
                 let arc: Arc<Mutex<FileBase>> = Arc::new(Mutex::new(new_base));
                 self.file_bases.insert(dir.clone(), arc.clone());
-                return Ok(arc);
+                Ok(arc)
             }
             Err(err) => {
                 log::error!("Could not open file base ({}) : {} ", dir.display(), err);
@@ -3268,17 +3235,17 @@ pub mod control_codes {
 
 fn convert_cmd(cmd_type: CommandType) -> Option<Command> {
     Some(Command {
-        keyword: "".to_string(),
-        display: "".to_string(),
-        lighbar_display: "".to_string(),
-        help: "".to_string(),
+        keyword: String::new(),
+        display: String::new(),
+        lighbar_display: String::new(),
+        help: String::new(),
         auto_run: AutoRun::Disabled,
         autorun_time: 0,
-        position: Default::default(),
+        position: crate::icy_board::commands::Position::default(),
         actions: vec![CommandAction {
             command_type: cmd_type,
-            parameter: "".to_string(),
-            trigger: Default::default(),
+            parameter: String::new(),
+            trigger: crate::icy_board::commands::ActionTrigger::default(),
         }],
         security: SecurityExpression::from_req_security(0),
     })

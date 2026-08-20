@@ -37,7 +37,7 @@ pub fn scan_do_while(visitor: &SemanticVisitor, statements: &mut Vec<Statement>,
             continue;
         };
         // search "loop" goto
-        let Some(matching_goto) = super::scan_loop_back_edge(&statements, i + 2, while_continue_label.get_label(), break_goto.get_label()) else {
+        let Some(matching_goto) = super::scan_loop_back_edge(statements, i + 2, while_continue_label.get_label(), break_goto.get_label()) else {
             i += 1;
             continue;
         };
@@ -57,10 +57,10 @@ pub fn scan_do_while(visitor: &SemanticVisitor, statements: &mut Vec<Statement>,
         }
 
         // reconstruct while…do block
-        let mut while_block = statements.drain((i + 2)..matching_goto as usize).collect();
+        let mut while_block = statements.drain((i + 2)..matching_goto).collect();
         statements.drain(i + 1..i + 3);
 
-        let continue_label = super::get_last_label(&statements[i..i + 1]);
+        let continue_label = super::get_last_label(&statements[i..=i]);
         super::handle_break_continue(break_label, continue_label, &mut while_block);
         optimize_block(visitor, &mut while_block, lang_version);
 
@@ -126,7 +126,7 @@ fn scan_do_while_case2(visitor: &SemanticVisitor, statements: &mut Vec<Statement
             continue;
         }
         // search "loop" goto
-        let Some(matching_goto) = scan_goto(&statements, i + 4, &while_continue_label) else {
+        let Some(matching_goto) = scan_goto(statements, i + 4, &while_continue_label) else {
             i += 1;
             continue;
         };
@@ -144,7 +144,7 @@ fn scan_do_while_case2(visitor: &SemanticVisitor, statements: &mut Vec<Statement
             continue;
         }
         // reconstruct while…do block
-        let mut while_block: Vec<Statement> = statements.drain((i + 4)..matching_goto as usize).collect();
+        let mut while_block: Vec<Statement> = statements.drain((i + 4)..matching_goto).collect();
         let continue_label = super::get_last_label(&while_block);
         statements.remove(i + 4);
         statements.drain(i + 1..i + 3);

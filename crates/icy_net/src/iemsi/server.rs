@@ -75,14 +75,14 @@ pub async fn try_iemsi(
                 match decode_ici(&ici_buf[..packet_len]) {
                     Ok(ici) => {
                         let isi = EmsiISI {
-                            id: format!("IcyBoard,{}", crate::VERSION.to_string()),
-                            name: name.into(),
-                            location: location.into(),
-                            operator: operator.into(),
+                            id: format!("IcyBoard,{}", *crate::VERSION),
+                            name,
+                            location,
+                            operator,
                             localtime: format!("{:x}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs()),
-                            notice: notice.into(),
+                            notice,
                             wait: "".to_string(),
-                            capabilities: capabilities.into(),
+                            capabilities,
                         };
 
                         // Send ISI packet (server info) to client

@@ -1,6 +1,7 @@
 use crate::{executable::OpCode, formatting::FormattingOptions};
 
 use super::{FunctionDefinition, PPEExpr, PPEScript, PPEVisitor, StatementDefinition};
+use std::fmt::Write as _;
 
 #[derive(Default)]
 pub struct PPEOutputVisitor {
@@ -23,7 +24,7 @@ impl PPEOutputVisitor {
     }
 
     fn output_function(&mut self, id: usize) {
-        self.output.push_str(format!("#{:04X}", id).as_str());
+        self.output.push_str(format!("#{id:04X}").as_str());
     }
 
     fn output_op_code(&mut self, end: OpCode) {
@@ -46,13 +47,13 @@ impl PPEVisitor<()> for PPEOutputVisitor {
         if id == 0 {
             self.output.push_str("INVALID");
         } else {
-            self.output.push_str(format!("[{:04X}]", id).as_str());
-        };
+            self.output.push_str(format!("[{id:04X}]").as_str());
+        }
     }
     fn visit_record_literal(&mut self, type_id: u8, fields: &[(usize, PPEExpr)]) {
-        self.output.push_str(&format!("TYPE{type_id} {{ "));
+        let _ = write!(self.output, "TYPE{type_id} {{ ");
         for (index, (field_id, value)) in fields.iter().enumerate() {
-            self.output.push_str(&format!("FIELD{field_id} = "));
+            let _ = write!(self.output, "FIELD{field_id} = ");
             value.visit(self);
             if index + 1 < fields.len() {
                 self.output.push_str(", ");
@@ -61,29 +62,29 @@ impl PPEVisitor<()> for PPEOutputVisitor {
         self.output.push_str(" }");
     }
 
-    fn visit_member(&mut self, expr: &PPEExpr, id: usize) -> () {
+    fn visit_member(&mut self, expr: &PPEExpr, id: usize) {
         expr.visit(self);
-        self.output.push_str(format!(".[{:03X}]", id).as_str());
+        self.output.push_str(format!(".[{id:03X}]").as_str());
     }
 
     fn visit_proc_call(&mut self, id: usize, args: &[PPEExpr]) {
         self.output_function(id);
-        self.output.push_str("(");
+        self.output.push('(');
         self.print_arguments(args);
-        self.output.push_str(")");
+        self.output.push(')');
     }
 
     fn visit_function_call(&mut self, id: usize, arguments: &[PPEExpr]) {
         self.output_function(id);
-        self.output.push_str("(");
+        self.output.push('(');
         self.print_arguments(arguments);
-        self.output.push_str(")");
+        self.output.push(')');
     }
     fn visit_member_function_call(&mut self, expr: &PPEExpr, arguments: &[PPEExpr], _id: usize) {
         expr.visit(self);
-        self.output.push_str("(");
+        self.output.push('(');
         self.print_arguments(arguments);
-        self.output.push_str(")");
+        self.output.push(')');
     }
 
     fn visit_unary_expression(&mut self, op: crate::ast::UnaryOp, expr: &PPEExpr) {
@@ -104,50 +105,50 @@ impl PPEVisitor<()> for PPEOutputVisitor {
     }
 
     fn visit_dim_expression(&mut self, id: usize, dim: &[PPEExpr]) {
-        self.output.push_str(format!("[{:04X}, ", id).as_str());
+        self.output.push_str(format!("[{id:04X}, ").as_str());
         self.print_arguments(dim);
         print!("]");
     }
 
     fn visit_predefined_function_call(&mut self, def: &FunctionDefinition, arguments: &[PPEExpr]) {
-        self.output_keyword(&def.name);
-        self.output.push_str("(");
+        self.output_keyword(def.name);
+        self.output.push('(');
         if !arguments.is_empty() {
             self.print_arguments(arguments);
         }
-        self.output.push_str(")");
+        self.output.push(')');
     }
 
     fn visit_end(&mut self) {
-        self.output_keyword(&"END");
+        self.output_keyword("END");
     }
 
     fn visit_return(&mut self) {
-        self.output_keyword(&"RETURN");
+        self.output_keyword("RETURN");
     }
 
     fn visit_if(&mut self, cond: &PPEExpr, label: &usize) {
-        self.output_keyword(&"IF (");
+        self.output_keyword("IF (");
         cond.visit(self);
-        self.output.push_str(")");
-        self.output_keyword(&" GOTO ");
+        self.output.push(')');
+        self.output_keyword(" GOTO ");
         self.output_function(*label);
     }
 
     fn visit_predefined_call(&mut self, def: &StatementDefinition, args: &[PPEExpr]) {
-        self.output_keyword(&def.name);
-        self.output.push_str("(");
+        self.output_keyword(def.name);
+        self.output.push('(');
         self.print_arguments(args);
-        self.output.push_str(")");
+        self.output.push(')');
     }
 
     fn visit_goto(&mut self, label: &usize) {
-        self.output_keyword(&"GOTO ");
+        self.output_keyword("GOTO ");
         self.output_function(*label);
     }
 
     fn visit_gosub(&mut self, label: &usize) {
-        self.output_keyword(&"GOSUB ");
+        self.output_keyword("GOSUB ");
         self.output_function(*label);
     }
 
@@ -164,7 +165,7 @@ impl PPEVisitor<()> for PPEOutputVisitor {
     }
 
     fn visit_let(&mut self, target: &PPEExpr, value: &PPEExpr) {
-        self.output_keyword(&"LET ");
+        self.output_keyword("LET ");
         target.visit(self);
         self.output.push_str(" = ");
         value.visit(self);

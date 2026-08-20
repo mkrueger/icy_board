@@ -256,9 +256,7 @@ impl PPECommand {
             PPECommand::IfNot(expr, _) => 1 + expr.get_size() + 2,
             PPECommand::ProcedureCall(_, args) => 3 + PPEExpr::count_size(args) + args.len(),
             PPECommand::PredefinedCall(def, args) => match def.sig {
-                super::StatementSignature::ArgumentsWithVariable(var_index, _) => {
-                    1 + PPEExpr::count_size(args) + args.len() - if var_index > 0 { 1 } else { 0 }
-                }
+                super::StatementSignature::ArgumentsWithVariable(var_index, _) => 1 + PPEExpr::count_size(args) + args.len() - usize::from(var_index > 0),
                 super::StatementSignature::VariableArguments(var_index, _, _) => {
                     1 + 1 + PPEExpr::count_size(args) + args.len() - if var_index > 0 { 2 } else { 0 }
                 }
@@ -409,8 +407,7 @@ impl PPEExpr {
     pub fn get_size(&self) -> usize {
         match self {
             PPEExpr::Invalid => 0,
-            PPEExpr::Value(_) => 2,
-            PPEExpr::RoutineReference(_) => 2,
+            PPEExpr::Value(_) | PPEExpr::RoutineReference(_) => 2,
             PPEExpr::RecordLiteral(_, fields) => fields.iter().map(|(_, value)| value.get_size()).sum::<usize>() + 3 + fields.len(),
             PPEExpr::Member(expr, _) => expr.get_size() + 2,
             PPEExpr::Dim(_, args) => 2 + Self::count_size(args) + args.len(),
@@ -423,8 +420,7 @@ impl PPEExpr {
     }
 
     pub fn count_size(args: &[PPEExpr]) -> usize {
-        let r = args.iter().map(PPEExpr::get_size).sum();
-        r
+        args.iter().map(PPEExpr::get_size).sum()
     }
 
     pub fn get_id(&self) -> Option<usize> {
@@ -575,7 +571,7 @@ pub enum PPEError {
     RecordLiteralIsNotConstant,
 }
 
-impl<'a> PPEVisitor<Result<VariableValue, PPEError>> for PPEConstantValueVisitor<'a> {
+impl PPEVisitor<Result<VariableValue, PPEError>> for PPEConstantValueVisitor<'_> {
     fn visit_value(&mut self, id: usize) -> Result<VariableValue, PPEError> {
         Ok(self.executable.variable_table.get_value(id).clone())
     }

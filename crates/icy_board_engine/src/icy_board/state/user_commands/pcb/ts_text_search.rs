@@ -82,12 +82,16 @@ impl IcyBoardState {
                 self.session.disp_options.no_change();
                 // let r = self.session.search_pattern.as_ref().unwrap().clone();
 
+                // TODO: this only opens the first area and doesn't actually search
+                // for `search_pattern` yet - tracked as a known limitation, not a
+                // clippy-driven behavior change.
+                #[allow(clippy::never_loop)]
                 for (num, desc, path, _) in area_numbers.numbers {
                     self.display_text(IceText::ScanningArea, display_flags::DEFAULT).await?;
-                    self.print(TerminalTarget::Both, &format!(" {}", num)).await?;
+                    self.print(TerminalTarget::Both, &format!(" {num}")).await?;
                     if !desc.is_empty() {
                         self.set_color(TerminalTarget::Both, IcbColor::dos_light_green()).await?;
-                        self.print(TerminalTarget::Both, &format!(" ({})", desc)).await?;
+                        self.print(TerminalTarget::Both, &format!(" ({desc})")).await?;
                     }
                     self.new_line().await?;
                     self.reset_color(TerminalTarget::Both).await?;

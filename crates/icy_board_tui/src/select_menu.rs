@@ -165,7 +165,7 @@ impl<T> SelectMenu<T> {
             }
             KeyCode::Char(ch) => {
                 for item in &self.items {
-                    if ch.to_ascii_uppercase() == item.char.to_ascii_uppercase() {
+                    if ch.eq_ignore_ascii_case(&item.char) {
                         return Some(&item.id);
                     }
                 }

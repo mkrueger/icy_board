@@ -113,7 +113,8 @@ impl PPEDeserializer {
         }
 
         let op: OpCode = unsafe { transmute(cur_stmt) };
-        let res = match op {
+
+        match op {
             OpCode::END => Ok(Some(PPECommand::End)),
             OpCode::RETURN => Ok(Some(PPECommand::Return)),
             OpCode::FEND => Ok(Some(PPECommand::EndFunc)),
@@ -258,10 +259,9 @@ impl PPEDeserializer {
                     };
                     arguments.push(expr);
                 }
-                return Ok(Some(PPECommand::PredefinedCall(def, arguments)));
+                Ok(Some(PPECommand::PredefinedCall(def, arguments)))
             }
-        };
-        res
+        }
     }
 
     /// .
@@ -285,15 +285,12 @@ impl PPEDeserializer {
             if id > 0 {
                 let id = id as usize;
                 let Some(val) = executable.variable_table.try_get_value(id) else {
-                    log::warn!(
-                        "Potential error in expression deserialization: No variable table entry for {:02X}, skipping.",
-                        id
-                    );
+                    log::warn!("Potential error in expression deserialization: No variable table entry for {id:02X}, skipping.");
                     self.offset += 1;
                     break;
                 };
-                match val.vtype {
-                    VariableType::Function => unsafe {
+                if val.vtype == VariableType::Function {
+                    unsafe {
                         self.offset += 2;
                         let parameters = executable.variable_table.get_value(id).data.function_value.parameters;
                         let mut arguments = Vec::new();
@@ -304,8 +301,7 @@ impl PPEDeserializer {
                         }
                         self.push_expr(PPEExpr::FunctionCall(id, arguments));
                         continue;
-                    },
-                    _ => {}
+                    }
                 }
 
                 if let Some(var_expr) = self.read_variable_expression(executable) {

@@ -83,7 +83,7 @@ fn test_a_field_can_be_read_and_written_in_the_same_expression() {
     assert_eq!(
         "11",
         run_ppl(
-            r#"
+            r"
 TYPE Rec
    INTEGER a
 ENDTYPE
@@ -91,7 +91,7 @@ Rec r
 r.a = 5
 r.a = r.a + 6
 PRINT r.a
-"#
+"
         )
     );
 }
@@ -101,7 +101,7 @@ fn test_a_field_takes_a_compound_assignment() {
     assert_eq!(
         "15",
         run_ppl(
-            r#"
+            r"
 TYPE Rec
    INTEGER a
 ENDTYPE
@@ -109,7 +109,7 @@ Rec r
 r.a = 5
 r.a += 10
 PRINT r.a
-"#
+"
         )
     );
 }
@@ -182,7 +182,7 @@ fn test_a_record_local_to_a_procedure_has_its_fields() {
     assert_eq!(
         "4",
         run_ppl(
-            r#"
+            r"
 TYPE Rec
    INTEGER a
 ENDTYPE
@@ -192,7 +192,7 @@ PROCEDURE Go()
   local.a = 4
   PRINT local.a
 ENDPROC
-"#
+"
         )
     );
 }
@@ -223,7 +223,7 @@ fn test_a_record_travels_into_a_procedure() {
     assert_eq!(
         "5",
         run_ppl(
-            r#"
+            r"
 TYPE Rec
    INTEGER a
 ENDTYPE
@@ -233,7 +233,7 @@ Show(x)
 PROCEDURE Show(Rec r)
   PRINT r.a
 ENDPROC
-"#
+"
         )
     );
 }
@@ -243,7 +243,7 @@ fn test_a_var_record_parameter_writes_back() {
     assert_eq!(
         "99",
         run_ppl(
-            r#"
+            r"
 TYPE Rec
    INTEGER a
 ENDTYPE
@@ -254,7 +254,7 @@ PRINT x.a
 PROCEDURE Bump(VAR Rec r)
   r.a = 99
 ENDPROC
-"#
+"
         )
     );
 }
@@ -264,7 +264,7 @@ fn test_a_record_parameter_of_a_value_kind_does_not_write_back() {
     assert_eq!(
         "5",
         run_ppl(
-            r#"
+            r"
 TYPE Rec
    INTEGER a
 ENDTYPE
@@ -275,7 +275,7 @@ PRINT x.a
 PROCEDURE Bump(Rec r)
   r.a = 99
 ENDPROC
-"#
+"
         )
     );
 }
@@ -285,7 +285,7 @@ fn test_a_record_travels_into_a_function_and_back_out() {
     assert_eq!(
         "8",
         run_ppl(
-            r#"
+            r"
 TYPE Rec
    INTEGER a
 ENDTYPE
@@ -296,7 +296,7 @@ PRINT Take(x)
 FUNCTION Take(Rec r) INTEGER
   RETURN r.a
 ENDFUNC
-"#
+"
         )
     );
 }
@@ -306,7 +306,7 @@ fn test_a_function_can_answer_a_record() {
     assert_eq!(
         "7",
         run_ppl(
-            r#"
+            r"
 TYPE Rec
    INTEGER a
 ENDTYPE
@@ -319,7 +319,7 @@ FUNCTION Make() Rec
   tmp.a = 7
   RETURN tmp
 ENDFUNC
-"#
+"
         )
     );
 }
@@ -382,14 +382,14 @@ fn test_parenthesis_indexing_can_reach_a_record_field() {
     assert_eq!(
         "5",
         run_ppl(
-            r#"
+            r"
 TYPE Rec
   INTEGER v
 ENDTYPE
 Rec items(1)
 items(0).v = 5
 PRINT items(0).v
-"#
+"
         )
     );
 }
@@ -399,14 +399,14 @@ fn test_a_three_dimensional_array_can_hold_records() {
     assert_eq!(
         "9",
         run_ppl(
-            r#"
+            r"
 TYPE Rec
   INTEGER v
 ENDTYPE
 Rec items(1, 1, 1)
 items[1, 0, 1].v = 9
 PRINT items[1, 0, 1].v
-"#
+"
         )
     );
 }
@@ -416,7 +416,7 @@ fn test_a_whole_record_can_be_assigned_to_an_array_element() {
     assert_eq!(
         "6",
         run_ppl(
-            r#"
+            r"
 TYPE Rec
   INTEGER v
 ENDTYPE
@@ -425,7 +425,7 @@ Rec items(1)
 source.v = 6
 items[0] = source
 PRINT items[0].v
-"#
+"
         )
     );
 }
@@ -475,7 +475,7 @@ fn test_a_var_parameter_can_write_back_to_a_record_array_element() {
     assert_eq!(
         "8",
         run_ppl(
-            r#"
+            r"
 TYPE Rec
     INTEGER v
 ENDTYPE
@@ -486,7 +486,7 @@ PRINT items[0].v
 PROCEDURE Change(VAR Rec value)
     value.v = 8
 ENDPROC
-"#
+"
         )
     );
 }

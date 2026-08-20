@@ -13,7 +13,7 @@ pub struct PcbSysopInfo {
     pub sysop: String,
     /// Sysop local password
     pub password: String,
-    ///  Require Local Password to drop PCBoard to DOS (v15.0)
+    ///  Require Local Password to drop `PCBoard` to DOS (v15.0)
     pub require_pwrd_to_exit: bool,
     /// Use sysop real name instead of 'SYSOP'
     pub use_real_name: bool,
@@ -35,7 +35,7 @@ pub struct PcbSubscriptionMode {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct PcbBoardData {
-    /// PCBoard version
+    /// `PCBoard` version
     pub version: String,
 
     pub sysop_info: PcbSysopInfo,
@@ -205,7 +205,7 @@ pub struct PcbBoardData {
     pub no_batch_up: bool,
     ///  force comments to main board (v15.0)
     pub force_main: bool,
-    ///  LineSeparator and tilde changes (v15.0)
+    ///  `LineSeparator` and tilde changes (v15.0)
     pub foreign: bool,
     ///  watch for incompleted connections (v15.0)
     pub monitor_modem: bool,
@@ -308,7 +308,7 @@ pub struct PcbBoardData {
     pub acc_show_currency: bool,
     ///  TRUE if charges run concurrently (v15.2)
     pub acc_concurrent_tracking: bool,
-    ///  TRUE if the DropSecLevel should not be used (v15.2)
+    ///  TRUE if the `DropSecLevel` should not be used (v15.2)
     pub acc_ignore_drop_sec_level: bool,
     ///  Start of peak usage hours (v15.2)
     pub peak_start: String,
@@ -380,7 +380,7 @@ pub struct PcbBoardData {
     pub fido_loc: String,
     ///  Store msgs to unknown users in secure location (v15.22)
     pub fido_secure: bool,
-    ///  Change sysop to FIDO_SYSOP on import (v15.22)
+    ///  Change sysop to `FIDO_SYSOP` on import (v15.22)
     pub fido_sysop_change: bool,
     ///  Check for dupes using message path (v15.22)
     pub fido_check_dupe_path: bool,
@@ -679,7 +679,7 @@ pub struct FileLocations {
 pub fn read_line(reader: &mut BufReader<File>, encoding: Encoding) -> Res<String> {
     let mut buf = Vec::new();
     reader.read_until(b'\n', &mut buf)?;
-    while buf.ends_with(&[b'\r']) || buf.ends_with(&[b'\n']) {
+    while buf.ends_with(b"\r") || buf.ends_with(b"\n") {
         buf.pop();
     }
     let res = if encoding == Encoding::CP437 {
@@ -715,7 +715,7 @@ pub fn append_line(writer: &mut Vec<u8>, encoding: Encoding, s: &str) {
         }
     } else {
         writer.extend_from_slice(s.as_bytes());
-    };
+    }
     writer.extend(b"\r\n");
 }
 
@@ -1531,7 +1531,7 @@ impl PcbBoardData {
         append_int(&mut res, encoding, self.priority_fido_out);
 
         append_line(&mut res, encoding, &self.net_copy);
-        append_line(&mut res, encoding, &String::new()); // unknown
+        append_line(&mut res, encoding, ""); // unknown
         append_line(&mut res, encoding, &self.path.chat_actions);
 
         res
@@ -1580,7 +1580,14 @@ mod layout_tests {
         let dir = std::env::temp_dir().join(format!("pcbdat-layout-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("pcboard.dat");
-        let text = (1..=400).map(|line| format!("{}\r\n", line)).collect::<String>();
+        let text = {
+            use std::fmt::Write as _;
+            let mut text = String::new();
+            for line in 1..=400 {
+                let _ = writeln!(text, "{line}\r");
+            }
+            text
+        };
         std::fs::write(&path, text).unwrap();
         let data = PcbBoardData::import_pcboard(&path).unwrap();
         std::fs::remove_dir_all(dir).unwrap();

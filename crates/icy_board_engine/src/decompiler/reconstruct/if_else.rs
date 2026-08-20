@@ -99,19 +99,19 @@ pub fn scan_if_else(visitor: &SemanticVisitor, statements: &mut Vec<Statement>, 
             let Statement::IfThen(else_if_stmt) = &statements[j] else {
                 break;
             };
-            if let Some(Statement::Goto(goto_stmt)) = else_if_stmt.get_statements().last().cloned() {
-                if goto_stmt.get_label() == breakout_goto_stmt.get_label() {
-                    let mut else_if_block = else_if_stmt.get_statements().clone();
-                    else_if_block.pop(); // pop goto
-                    if_stmt
-                        .get_else_if_blocks_mut()
-                        .push(ElseIfBlock::empty(else_if_stmt.get_condition().clone(), else_if_block));
+            if let Some(Statement::Goto(goto_stmt)) = else_if_stmt.get_statements().last().cloned()
+                && goto_stmt.get_label() == breakout_goto_stmt.get_label()
+            {
+                let mut else_if_block = else_if_stmt.get_statements().clone();
+                else_if_block.pop(); // pop goto
+                if_stmt
+                    .get_else_if_blocks_mut()
+                    .push(ElseIfBlock::empty(else_if_stmt.get_condition().clone(), else_if_block));
 
-                    statements.remove(j);
-                    end_label_idx -= 1;
+                statements.remove(j);
+                end_label_idx -= 1;
 
-                    continue;
-                }
+                continue;
             }
             break;
         }

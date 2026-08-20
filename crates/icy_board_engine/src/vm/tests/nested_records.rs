@@ -5,7 +5,7 @@ fn test_a_field_of_a_field_keeps_what_was_assigned_to_it() {
     assert_eq!(
         "5",
         run_ppl(
-            r#"
+            r"
 TYPE Inner
   INTEGER v
 ENDTYPE
@@ -15,7 +15,7 @@ ENDTYPE
 Outer o
 o.i.v = 5
 PRINT o.i.v
-"#
+"
         )
     );
 }
@@ -45,7 +45,7 @@ fn test_three_levels_deep() {
     assert_eq!(
         "7",
         run_ppl(
-            r#"
+            r"
 TYPE Level1
   INTEGER v
 ENDTYPE
@@ -58,7 +58,7 @@ ENDTYPE
 Level3 deep
 deep.two.one.v = 7
 PRINT deep.two.one.v
-"#
+"
         )
     );
 }
@@ -67,13 +67,13 @@ PRINT deep.two.one.v
 fn test_a_variable_may_not_take_the_name_of_a_type() {
     // Names are compared without regard to case, so `C c` leaves `c` ambiguous and
     // a statement starting with it reads as a declaration.
-    let source = r#"
+    let source = r"
 TYPE C
   INTEGER v
 ENDTYPE
 C c
 c.v = 1
-"#;
+";
     let errors = crate::vm::tests::compile_errors(source);
     assert!(!errors.is_empty(), "a variable named like its type should be reported");
 }
@@ -81,10 +81,10 @@ c.v = 1
 #[test]
 fn test_what_a_board_object_answers_can_be_asked_again() {
     let output = crate::vm::tests::run_ppl_on(
-        r#"
+        r"
 CONFERENCE conf = CONFINFO(0)
 PRINT conf.GetArea(0).Name
-"#,
+",
         |board| {
             board.conferences.clear();
             board.conferences.push(crate::icy_board::conferences::Conference {
@@ -131,7 +131,7 @@ fn test_a_nested_field_takes_a_compound_assignment() {
     assert_eq!(
         "12",
         run_ppl(
-            r#"
+            r"
 TYPE Inner
   INTEGER v
 ENDTYPE
@@ -142,7 +142,7 @@ Outer o
 o.i.v = 2
 o.i.v += 10
 PRINT o.i.v
-"#
+"
         )
     );
 }
@@ -175,7 +175,7 @@ fn test_a_nested_record_survives_a_routine() {
     assert_eq!(
         "4",
         run_ppl(
-            r#"
+            r"
 TYPE Inner
   INTEGER v
 ENDTYPE
@@ -188,7 +188,7 @@ PROCEDURE Go()
   local.i.v = 4
   PRINT local.i.v
 ENDPROC
-"#
+"
         )
     );
 }
@@ -198,7 +198,7 @@ fn test_an_inner_record_can_be_assigned_on_its_own() {
     assert_eq!(
         "6",
         run_ppl(
-            r#"
+            r"
 TYPE Inner
   INTEGER v
 ENDTYPE
@@ -210,7 +210,7 @@ Inner free
 free.v = 6
 o.i = free
 PRINT o.i.v
-"#
+"
         )
     );
 }
@@ -220,7 +220,7 @@ fn test_a_nested_var_parameter_writes_back() {
     assert_eq!(
         "11",
         run_ppl(
-            r#"
+            r"
 TYPE Inner
   INTEGER v
 ENDTYPE
@@ -234,7 +234,7 @@ PRINT wrapper.value.v
 PROCEDURE Change(VAR Outer item)
   item.value.v = 11
 ENDPROC
-"#
+"
         )
     );
 }
@@ -244,7 +244,7 @@ fn test_a_nested_value_parameter_does_not_write_back() {
     assert_eq!(
         "3",
         run_ppl(
-            r#"
+            r"
 TYPE Inner
   INTEGER v
 ENDTYPE
@@ -258,7 +258,7 @@ PRINT wrapper.value.v
 PROCEDURE Change(Outer item)
   item.value.v = 11
 ENDPROC
-"#
+"
         )
     );
 }
@@ -268,7 +268,7 @@ fn test_a_function_can_answer_a_nested_record() {
     assert_eq!(
         "13",
         run_ppl(
-            r#"
+            r"
 TYPE Inner
   INTEGER v
 ENDTYPE
@@ -283,7 +283,7 @@ FUNCTION Make() Outer
   made.value.v = 13
   RETURN made
 ENDFUNC
-"#
+"
         )
     );
 }

@@ -103,7 +103,7 @@ impl Default for FtnLink {
 }
 
 /// The decisions the tosser and the mailer would otherwise make on their own.
-/// PCBoard kept the same set in the fido block of `PCBOARD.DAT`.
+/// `PCBoard` kept the same set in the fido block of `PCBOARD.DAT`.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct FtnOptions {
@@ -318,15 +318,19 @@ mod tests {
 
     #[test]
     fn test_a_link_is_greeted_with_the_address_from_its_own_network() {
-        let mut config = FtnConfig::default();
-        config.akas = vec![aka("21:1/100", "fsxnet"), aka("618:500/20", "micronet")];
+        let config = FtnConfig {
+            akas: vec![aka("21:1/100", "fsxnet"), aka("618:500/20", "micronet")],
+            ..Default::default()
+        };
         assert_eq!(config.aka_for(&link("618:500/1", "micronet")).unwrap().address.to_string(), "618:500/20");
     }
 
     #[test]
     fn test_a_link_of_an_unknown_network_falls_back_to_the_first_address() {
-        let mut config = FtnConfig::default();
-        config.akas = vec![aka("21:1/100", "fsxnet"), aka("618:500/20", "micronet")];
+        let config = FtnConfig {
+            akas: vec![aka("21:1/100", "fsxnet"), aka("618:500/20", "micronet")],
+            ..Default::default()
+        };
         assert_eq!(config.aka_for(&link("1:123/456", "fidonet")).unwrap().address.to_string(), "21:1/100");
     }
 

@@ -28,7 +28,7 @@ impl IcyBoardState {
                 self.session.tokens.clear();
                 return Ok(false);
             }
-            log::warn!("Command not found: '{}'", command);
+            log::warn!("Command not found: '{command}'");
             self.display_text(
                 IceText::InvalidEntry,
                 display_flags::NEWLINE | display_flags::LFAFTER | display_flags::LFBEFORE | display_flags::BELL,
@@ -102,15 +102,13 @@ impl IcyBoardState {
                 command = self.saved_cmd.clone();
             }
             if command.len() >= 5 {
-                self.saved_cmd = command.clone();
+                self.saved_cmd.clone_from(&command);
             }
-            if command.is_empty() {
-                if !mnu.commands[current_item].lighbar_display.is_empty() {
-                    self.session.last_new_line_y = self.display_screen().buffer.caret.y;
-                    self.session.disp_options.no_change();
-                    self.dispatch_command(&command, &mnu.commands[current_item]).await?;
-                    continue;
-                }
+            if command.is_empty() && !mnu.commands[current_item].lighbar_display.is_empty() {
+                self.session.last_new_line_y = self.display_screen().buffer.caret.y;
+                self.session.disp_options.no_change();
+                self.dispatch_command(&command, &mnu.commands[current_item]).await?;
+                continue;
             }
             self.session.push_tokens(&command);
             if let Some(command_str) = self.session.tokens.pop_front() {
@@ -118,7 +116,7 @@ impl IcyBoardState {
                 if let Some(cmd) = cmd {
                     self.session.last_new_line_y = self.display_screen().buffer.caret.y;
                     self.session.disp_options.no_change();
-                    self.dispatch_command(&command_str, &cmd).await?;
+                    self.dispatch_command(&command_str, cmd).await?;
                     self.session.tokens.clear();
                     continue;
                 }
@@ -796,7 +794,7 @@ impl IcyBoardState {
                         self.autorun_commands(mnu, AutoRun::Loop, Instant::now().duration_since(*start_time).as_secs()).await?;
                     }
                 }
-                _ = sleep(std::time::Duration::from_millis(500)) => {
+                () = sleep(std::time::Duration::from_millis(500)) => {
                     self.autorun_commands(mnu, AutoRun::Loop, Instant::now().duration_since(*start_time).as_secs()).await?;
                 }
 

@@ -172,10 +172,10 @@ fn decompiled_source_settles_after_one_pass() {
             }
         }
 
-        if let Some(previous) = previous {
-            if previous != text {
-                failures.push(format!("{name}: still moving on the third pass"));
-            }
+        if let Some(previous) = previous
+            && previous != text
+        {
+            failures.push(format!("{name}: still moving on the third pass"));
         }
         checked += 1;
     }

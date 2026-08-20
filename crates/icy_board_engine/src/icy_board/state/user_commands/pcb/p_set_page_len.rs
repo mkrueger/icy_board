@@ -28,13 +28,13 @@ impl IcyBoardState {
         if !page_len.is_empty() {
             let page_len = page_len.parse::<u16>().unwrap_or_default();
             self.session.page_len = page_len;
-            if let Some(user) = &mut self.session.current_user {
-                if user.page_len != page_len {
-                    user.page_len = page_len;
-                    self.session.op_text = page_len.to_string();
-                    self.session.disp_options.no_change();
-                    self.display_text(IceText::PageLengthSetTo, display_flags::NEWLINE).await?;
-                }
+            if let Some(user) = &mut self.session.current_user
+                && user.page_len != page_len
+            {
+                user.page_len = page_len;
+                self.session.op_text = page_len.to_string();
+                self.session.disp_options.no_change();
+                self.display_text(IceText::PageLengthSetTo, display_flags::NEWLINE).await?;
             }
         }
         Ok(())

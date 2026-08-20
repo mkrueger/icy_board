@@ -119,12 +119,10 @@ impl ComboBox {
                     }
                 }
             }
-            KeyCode::Char('j') | KeyCode::Down => {
-                if self.selected_item < self.values.len().saturating_sub(1) {
-                    self.selected_item = self.selected_item + 1;
-                    if self.selected_item >= self.first_item + 4 {
-                        self.first_item = self.selected_item - 3;
-                    }
+            KeyCode::Char('j') | KeyCode::Down if self.selected_item < self.values.len().saturating_sub(1) => {
+                self.selected_item += 1;
+                if self.selected_item >= self.first_item + 4 {
+                    self.first_item = self.selected_item - 3;
                 }
             }
             _ => {}
@@ -240,7 +238,7 @@ pub struct ListItem<T> {
     pub value: ListValue,
     pub help: String,
 
-    pub update_value: Option<Box<dyn Fn(&T, &ListValue) -> ()>>,
+    pub update_value: Option<Box<dyn Fn(&T, &ListValue)>>,
     need_update: bool,
 
     pub path_editor: Option<Box<dyn Fn(T, PathBuf) -> PageMessage>>,
@@ -249,7 +247,7 @@ pub struct ListItem<T> {
 impl<T> ListItem<T> {
     pub fn new(title: String, value: ListValue) -> Self {
         Self {
-            status: format!("{}", title),
+            status: title.to_string(),
             text_field_state: TextfieldState::default(),
             label_width: title.len() as u16,
             label_alignment: Alignment::Left,
@@ -319,7 +317,7 @@ impl<T> ListItem<T> {
         self
     }
 
-    pub fn with_update_value(mut self, update_value: Box<dyn Fn(&T, &ListValue) -> ()>) -> Self {
+    pub fn with_update_value(mut self, update_value: Box<dyn Fn(&T, &ListValue)>) -> Self {
         self.update_value = Some(update_value);
         self
     }
@@ -334,8 +332,8 @@ impl<T> ListItem<T> {
         self
     }
 
-    pub fn with_update_text_value(mut self, update_value: &'static dyn Fn(&T, String) -> ()) -> Self {
-        let b: Box<dyn Fn(&T, &ListValue) -> ()> = Box::new(move |val: &T, value: &ListValue| {
+    pub fn with_update_text_value(mut self, update_value: &'static dyn Fn(&T, String)) -> Self {
+        let b: Box<dyn Fn(&T, &ListValue)> = Box::new(move |val: &T, value: &ListValue| {
             let ListValue::Text(_, _, text) = value else {
                 return;
             };
@@ -345,8 +343,8 @@ impl<T> ListItem<T> {
         self
     }
 
-    pub fn with_update_combobox_value(mut self, update_value: &'static dyn Fn(&T, &ComboBox) -> ()) -> Self {
-        let b: Box<dyn Fn(&T, &ListValue) -> ()> = Box::new(move |val: &T, value: &ListValue| {
+    pub fn with_update_combobox_value(mut self, update_value: &'static dyn Fn(&T, &ComboBox)) -> Self {
+        let b: Box<dyn Fn(&T, &ListValue)> = Box::new(move |val: &T, value: &ListValue| {
             let ListValue::ComboBox(b) = value else {
                 return;
             };
@@ -356,8 +354,8 @@ impl<T> ListItem<T> {
         self
     }
 
-    pub fn with_update_bool_value(mut self, update_value: &'static dyn Fn(&T, bool) -> ()) -> Self {
-        let b: Box<dyn Fn(&T, &ListValue) -> ()> = Box::new(move |val: &T, value: &ListValue| {
+    pub fn with_update_bool_value(mut self, update_value: &'static dyn Fn(&T, bool)) -> Self {
+        let b: Box<dyn Fn(&T, &ListValue)> = Box::new(move |val: &T, value: &ListValue| {
             let ListValue::Bool(b) = value else {
                 return;
             };
@@ -367,8 +365,8 @@ impl<T> ListItem<T> {
         self
     }
 
-    pub fn with_update_u32_value(mut self, update_value: &'static dyn Fn(&T, u32) -> ()) -> Self {
-        let b: Box<dyn Fn(&T, &ListValue) -> ()> = Box::new(move |val: &T, value: &ListValue| {
+    pub fn with_update_u32_value(mut self, update_value: &'static dyn Fn(&T, u32)) -> Self {
+        let b: Box<dyn Fn(&T, &ListValue)> = Box::new(move |val: &T, value: &ListValue| {
             let ListValue::U32(b, _, _) = value else {
                 return;
             };
@@ -378,8 +376,8 @@ impl<T> ListItem<T> {
         self
     }
 
-    pub fn with_update_path_value(mut self, update_value: &'static dyn Fn(&T, PathBuf) -> ()) -> Self {
-        let b: Box<dyn Fn(&T, &ListValue) -> ()> = Box::new(move |val: &T, value: &ListValue| {
+    pub fn with_update_path_value(mut self, update_value: &'static dyn Fn(&T, PathBuf)) -> Self {
+        let b: Box<dyn Fn(&T, &ListValue)> = Box::new(move |val: &T, value: &ListValue| {
             let ListValue::Path(b) = value else {
                 return;
             };
@@ -389,8 +387,8 @@ impl<T> ListItem<T> {
         self
     }
 
-    pub fn with_update_float_value(mut self, update_value: &'static dyn Fn(&T, f64) -> ()) -> Self {
-        let b: Box<dyn Fn(&T, &ListValue) -> ()> = Box::new(move |val: &T, value: &ListValue| {
+    pub fn with_update_float_value(mut self, update_value: &'static dyn Fn(&T, f64)) -> Self {
+        let b: Box<dyn Fn(&T, &ListValue)> = Box::new(move |val: &T, value: &ListValue| {
             let ListValue::Float(f, _str) = value else {
                 return;
             };
@@ -400,8 +398,8 @@ impl<T> ListItem<T> {
         self
     }
 
-    pub fn with_update_sec_value(mut self, update_value: &'static dyn Fn(&T, SecurityExpression) -> ()) -> Self {
-        let b: Box<dyn Fn(&T, &ListValue) -> ()> = Box::new(move |val: &T, value: &ListValue| {
+    pub fn with_update_sec_value(mut self, update_value: &'static dyn Fn(&T, SecurityExpression)) -> Self {
+        let b: Box<dyn Fn(&T, &ListValue)> = Box::new(move |val: &T, value: &ListValue| {
             let ListValue::Security(b, _) = value else {
                 return;
             };
@@ -411,19 +409,19 @@ impl<T> ListItem<T> {
         self
     }
 
-    pub fn with_update_date_value(mut self, update_value: &'static dyn Fn(&T, DateTime<Utc>) -> ()) -> Self {
-        let b: Box<dyn Fn(&T, &ListValue) -> ()> = Box::new(move |val: &T, value: &ListValue| {
+    pub fn with_update_date_value(mut self, update_value: &'static dyn Fn(&T, DateTime<Utc>)) -> Self {
+        let b: Box<dyn Fn(&T, &ListValue)> = Box::new(move |val: &T, value: &ListValue| {
             let ListValue::Date(b, _) = value else {
                 return;
             };
-            update_value(val, b.clone());
+            update_value(val, *b);
         });
         self.update_value = Some(b);
         self
     }
 
-    pub fn with_update_time_value(mut self, update_value: &'static dyn Fn(&T, IcbTime) -> ()) -> Self {
-        let b: Box<dyn Fn(&T, &ListValue) -> ()> = Box::new(move |val: &T, value: &ListValue| {
+    pub fn with_update_time_value(mut self, update_value: &'static dyn Fn(&T, IcbTime)) -> Self {
+        let b: Box<dyn Fn(&T, &ListValue)> = Box::new(move |val: &T, value: &ListValue| {
             let ListValue::Time(b, _) = value else {
                 return;
             };
@@ -659,7 +657,7 @@ impl<T> ListItem<T> {
 
                     let mut x = area.x;
                     for (i, (part, is_selected)) in [
-                        (parts.get(0).unwrap_or(&"??"), state.cursor_field == DateField::Month),
+                        (parts.first().unwrap_or(&"??"), state.cursor_field == DateField::Month),
                         (parts.get(1).unwrap_or(&"??"), state.cursor_field == DateField::Day),
                         (parts.get(2).unwrap_or(&"??"), state.cursor_field == DateField::Year),
                     ]
@@ -811,26 +809,23 @@ impl<T> ListItem<T> {
                 return false;
             }
         }
-        if self.need_update {
-            if let Some(update) = self.update_value.as_ref() {
-                update(val, &self.value);
-                self.need_update = false;
-            }
+        if self.need_update
+            && let Some(update) = self.update_value.as_ref()
+        {
+            update(val, &self.value);
+            self.need_update = false;
         }
         true
     }
 
     fn handle_key_press(&mut self, key: KeyEvent, _state: &mut ConfigMenuState) -> ResultState {
-        match key {
-            KeyEvent { code: KeyCode::F(1), .. } => {
-                if !self.help.is_empty() {
-                    return ResultState {
-                        edit_msg: EditMessage::DisplayHelp(self.help.clone()),
-                        status_line: self.status.clone(),
-                    };
-                }
-            }
-            _ => {}
+        if let KeyEvent { code: KeyCode::F(1), .. } = key
+            && !self.help.is_empty()
+        {
+            return ResultState {
+                edit_msg: EditMessage::DisplayHelp(self.help.clone()),
+                status_line: self.status.clone(),
+            };
         }
 
         if !matches!(self.value, ListValue::ComboBox(_)) {
@@ -1029,7 +1024,7 @@ impl<T> ListItem<T> {
                 self.need_update = true;
             }
         }
-        return ResultState::status_line(self.status.clone());
+        ResultState::status_line(self.status.clone())
     }
     /*
     fn request_edit_mode(&mut self, _state: &mut ConfigMenuState) -> ResultState {
@@ -1062,11 +1057,8 @@ impl<T> ConfigEntry<T> {
     }
 
     pub fn with_editable(mut self, editable: bool) -> Self {
-        match &mut self {
-            ConfigEntry::Item(item) => {
-                item.editable = editable;
-            }
-            _ => {}
+        if let ConfigEntry::Item(item) = &mut self {
+            item.editable = editable;
         }
         self
     }
@@ -1083,7 +1075,7 @@ impl<T> ConfigEntry<T> {
             ConfigEntry::Item(item) => item.measure_value(area) as u16,
             ConfigEntry::Group(_, items) => items.iter().map(|item| item.measure_value(area)).max().unwrap_or(0),
             ConfigEntry::Table(_, items) => items.iter().map(|item| item.measure_value(area)).max().unwrap_or(0),
-            ConfigEntry::Label(_) | ConfigEntry::Separator => 01,
+            ConfigEntry::Label(_) | ConfigEntry::Separator => 0o1,
         }
     }
 }
@@ -1163,7 +1155,7 @@ impl<T> ConfigMenu<T> {
         Self::get_item_internal(&self.entry, &mut len, i)
     }
 
-    pub fn get_item_internal<'a>(items: &'a Vec<ConfigEntry<T>>, len: &mut usize, i: usize) -> Option<&'a ListItem<T>> {
+    pub fn get_item_internal<'a>(items: &'a [ConfigEntry<T>], len: &mut usize, i: usize) -> Option<&'a ListItem<T>> {
         for item in items.iter() {
             match item {
                 ConfigEntry::Item(item) => {
@@ -1196,7 +1188,7 @@ impl<T> ConfigMenu<T> {
         Self::get_item_internal_mut(&mut self.entry, &mut len, i)
     }
 
-    pub fn get_item_internal_mut<'a>(items: &'a mut Vec<ConfigEntry<T>>, len: &mut usize, i: usize) -> Option<&'a mut ListItem<T>> {
+    pub fn get_item_internal_mut<'a>(items: &'a mut [ConfigEntry<T>], len: &mut usize, i: usize) -> Option<&'a mut ListItem<T>> {
         for item in items.iter_mut() {
             match item {
                 ConfigEntry::Item(item) => {
@@ -1224,7 +1216,7 @@ impl<T> ConfigMenu<T> {
         None
     }
 
-    fn count_items(&self, items: &Vec<ConfigEntry<T>>, len: &mut usize) {
+    fn count_items(&self, items: &[ConfigEntry<T>], len: &mut usize) {
         for item in items.iter() {
             match item {
                 ConfigEntry::Item(_) => {
@@ -1244,7 +1236,7 @@ impl<T> ConfigMenu<T> {
     fn display_table(
         val: &T,
         i: &mut usize,
-        items: &mut Vec<ConfigEntry<T>>,
+        items: &mut [ConfigEntry<T>],
         area: Rect,
         y: &mut u16,
         x: &mut u16,
@@ -1262,7 +1254,7 @@ impl<T> ConfigMenu<T> {
         let mut col_widths: Vec<u16> = vec![0; cols];
         for (idx, item) in items.iter().enumerate() {
             let col = idx % cols;
-            let item_width = item.measure_value(area) as u16;
+            let item_width = item.measure_value(area);
             col_widths[col] = col_widths[col].max(item_width);
         }
 
@@ -1276,8 +1268,8 @@ impl<T> ConfigMenu<T> {
 
             // Calculate x position for this column
             let mut col_x = start_x;
-            for c in 0..col {
-                col_x += col_widths[c] + 1; // +1 for spacing between columns
+            for w in &col_widths[..col] {
+                col_x += w + 1; // +1 for spacing between columns
             }
 
             // Calculate y position for this row
@@ -1349,7 +1341,7 @@ impl<T> ConfigMenu<T> {
         }
 
         // Update y to point after the table
-        let total_rows = (items.len() + cols - 1) / cols;
+        let total_rows = items.len().div_ceil(cols);
         *y = start_y + total_rows as u16;
         *x = start_x;
 
@@ -1359,7 +1351,7 @@ impl<T> ConfigMenu<T> {
     pub fn display_list(
         val: &T,
         i: &mut usize,
-        items: &mut Vec<ConfigEntry<T>>,
+        items: &mut [ConfigEntry<T>],
         area: Rect,
         y: &mut u16,
         x: &mut u16,
@@ -1398,10 +1390,8 @@ impl<T> ConfigMenu<T> {
                             height: 1,
                         };
                         if *i == state.selected && item.editable {
-                            if display_editor {
-                                if !item.render_editor(val, right_area, frame) {
-                                    return false;
-                                }
+                            if display_editor && !item.render_editor(val, right_area, frame) {
+                                return false;
                             }
                         } else if !display_editor {
                             item.render_value(right_area, frame);
@@ -1417,19 +1407,17 @@ impl<T> ConfigMenu<T> {
                 }
                 ConfigEntry::Group(title, items) => {
                     if !title.is_empty() {
-                        if !display_editor {
-                            if *y >= state.first_row && *y < area.height + state.first_row {
-                                let left_area = Rect {
-                                    x: area.x + *x,
-                                    y: area.y + y.saturating_sub(state.first_row),
-                                    width: area.width.saturating_sub(*x + 1),
-                                    height: 1,
-                                };
-                                Text::from(format!(" {}", title.clone()))
-                                    .alignment(ratatui::layout::Alignment::Left)
-                                    .style(get_tui_theme().group_title)
-                                    .render(left_area, frame.buffer_mut());
-                            }
+                        if !display_editor && *y >= state.first_row && *y < area.height + state.first_row {
+                            let left_area = Rect {
+                                x: area.x + *x,
+                                y: area.y + y.saturating_sub(state.first_row),
+                                width: area.width.saturating_sub(*x + 1),
+                                height: 1,
+                            };
+                            Text::from(format!(" {}", title.clone()))
+                                .alignment(ratatui::layout::Alignment::Left)
+                                .style(get_tui_theme().group_title)
+                                .render(left_area, frame.buffer_mut());
                         }
                         *y += 1;
                     }
@@ -1575,9 +1563,7 @@ impl<'a, T> Iterator for ConfigMenuIter<'a, T> {
     type Item = &'a ListItem<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let Some(mut l) = self.iter.pop() else {
-            return None;
-        };
+        let mut l = self.iter.pop()?;
         match l.next() {
             Some(a) => match a {
                 ConfigEntry::Item(item) => {
@@ -1683,8 +1669,10 @@ mod tests {
     #[test]
     fn navigation_wraps_past_inactive_entries_at_the_end() {
         let menu = menu(&[3, 4]);
-        let mut state = ConfigMenuState::default();
-        state.selected = 2;
+        let mut state = ConfigMenuState {
+            selected: 2,
+            ..Default::default()
+        };
 
         move_down(&menu, &mut state);
         assert_eq!(state.selected, 0, "wrapping stopped on a greyed out entry");

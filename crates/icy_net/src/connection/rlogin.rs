@@ -108,10 +108,10 @@ impl RloginConnection {
     /// - Connect with timeout.
     /// - Set `TCP_NODELAY` (interactive responsiveness).
     /// - Construct handshake in the selected order:
-    ///     Initial NUL
-    ///     (password OR username depending on `swapped`) + NUL
-    ///     (username OR password) + NUL
-    ///     terminal string + NUL
+    ///   Initial NUL
+    ///   (password OR username depending on `swapped`) + NUL
+    ///   (username OR password) + NUL
+    ///   terminal string + NUL
     /// - Send handshake.
     ///
     /// Returns a ready `RloginConnection`. Does not validate remote response;
@@ -164,6 +164,7 @@ impl RloginConnection {
     /// Server-side wrapper accept. A real server would:
     /// - Read until four NUL-delimited fields are received.
     /// - Parse order (potentially auto-detect swapped variant).
+    ///
     /// This implementation leaves parsing to future enhancements.
     pub async fn accept(stream: TcpStream, cfg: RloginConfig) -> crate::Result<Self> {
         Ok(Self {
@@ -211,10 +212,10 @@ impl RloginConnection {
     /// If matched, we trigger a local shutdown. This is *not* protocol-level
     /// semantics—pure convenience for embedding a session abort.
     fn check_escape(&mut self, buf: &[u8]) -> bool {
-        if let Some(seq) = &self.cfg.escape_sequence {
-            if buf == seq {
-                return true;
-            }
+        if let Some(seq) = &self.cfg.escape_sequence
+            && buf == seq
+        {
+            return true;
         }
         false
     }

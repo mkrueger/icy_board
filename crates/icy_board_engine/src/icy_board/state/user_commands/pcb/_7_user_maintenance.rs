@@ -151,7 +151,7 @@ impl IcyBoardState {
                             display_flags::NEWLINE | display_flags::LFBEFORE,
                         )
                         .await?;
-                    let digits = date.chars().filter(|ch| ch.is_ascii_digit()).collect::<String>();
+                    let digits = date.chars().filter(char::is_ascii_digit).collect::<String>();
                     let expiration_date = if date.trim().is_empty() || (!digits.is_empty() && digits.chars().all(|ch| ch == '0')) {
                         chrono::DateTime::<chrono::Utc>::default()
                     } else {
@@ -188,7 +188,7 @@ impl IcyBoardState {
                     .await?;
             }
             Err(err) => {
-                log::error!("Could not save the user file: {}", err);
+                log::error!("Could not save the user file: {err}");
                 self.display_text(
                     IceText::ErrorInUsersFile,
                     display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::BELL,

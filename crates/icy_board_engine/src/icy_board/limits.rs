@@ -1,4 +1,4 @@
-//! The transfer limits PCBoard applied to a download.
+//! The transfer limits `PCBoard` applied to a download.
 //!
 //! Faithful to `checkdlfiles`, `checkratio` and `checklimit` in the original source: each
 //! file is judged on its own against everything already accepted into the batch, and a
@@ -10,7 +10,7 @@ use crate::icy_board::sec_levels::SecurityLevel;
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct TransferLimits {
     /// The whole day's allowance from the level, before anything was spent against it.
-    /// `None` is PCBoard's -1, an unlimited allowance.
+    /// `None` is `PCBoard`'s -1, an unlimited allowance.
     pub daily_allowance: Option<i64>,
     /// What is left of it today.
     pub bytes_remaining: Option<i64>,
@@ -88,7 +88,7 @@ impl TransferLimits {
         }
     }
 
-    /// Takes off what the caller has already used today, the way PCBoard does at logon.
+    /// Takes off what the caller has already used today, the way `PCBoard` does at logon.
     pub fn charge_todays_usage(&mut self, used_today: i64) {
         if let Some(remaining) = self.bytes_remaining {
             self.bytes_remaining = Some(remaining.saturating_sub(used_today).max(0));
@@ -101,17 +101,17 @@ impl TransferLimits {
             .map(|remaining| (remaining as i128 - so_far.bytes as i128).clamp(i64::MIN as i128, i64::MAX as i128) as i64)
     }
 
-    /// Judges one more file. `free` files bypass every limit, which is how PCBoard treats
+    /// Judges one more file. `free` files bypass every limit, which is how `PCBoard` treats
     /// a download the FSEC file marked free.
     pub fn check_file(&self, history: &TransferHistory, so_far: BatchSoFar, size: u64, free: bool) -> LimitVerdict {
         if free {
             return LimitVerdict::Allowed;
         }
 
-        if let Some(bytes_left) = self.bytes_left(so_far) {
-            if size as i128 > bytes_left as i128 {
-                return LimitVerdict::DailyBytes { bytes_left };
-            }
+        if let Some(bytes_left) = self.bytes_left(so_far)
+            && size as i128 > bytes_left as i128
+        {
+            return LimitVerdict::DailyBytes { bytes_left };
         }
 
         if let Some(verdict) = check_ratio(
@@ -186,7 +186,7 @@ impl TransferLimits {
     }
 }
 
-/// The caller's standing as PCBoard prints it: always anchored on 1, so a caller who has
+/// The caller's standing as `PCBoard` prints it: always anchored on 1, so a caller who has
 /// taken more than they gave reads "5.0:1" and one who gave more reads "1:5.0".
 pub fn format_ratio(down: u64, up: u64) -> String {
     fn part(a: u64, b: u64) -> String {
@@ -196,16 +196,20 @@ pub fn format_ratio(down: u64, up: u64) -> String {
             format!("{:.1}", a as f64 / b as f64)
         }
     }
-    if down > up {
-        format!("{}{}", part(down, up), if up == 0 { ":0" } else { ":1" })
-    } else if down == up {
-        if up == 0 { "0:0".to_string() } else { "1:1".to_string() }
-    } else {
-        format!("{}{}", if down == 0 { "0:" } else { "1:" }, part(up, down))
+    match down.cmp(&up) {
+        std::cmp::Ordering::Greater => format!("{}{}", part(down, up), if up == 0 { ":0" } else { ":1" }),
+        std::cmp::Ordering::Equal => {
+            if up == 0 {
+                "0:0".to_string()
+            } else {
+                "1:1".to_string()
+            }
+        }
+        std::cmp::Ordering::Less => format!("{}{}", if down == 0 { "0:" } else { "1:" }, part(up, down)),
     }
 }
 
-/// PCBoard's daily allowance: 32767 K means unlimited, and the figure is scaled by how
+/// `PCBoard`'s daily allowance: 32767 K means unlimited, and the figure is scaled by how
 /// far the caller's speed is from the level's base baud rate.
 fn daily_allowance(level: &SecurityLevel, bps: u32) -> Option<i64> {
     const UNLIMITED_KB: u64 = 32767;
@@ -217,8 +221,8 @@ fn daily_allowance(level: &SecurityLevel, bps: u32) -> Option<i64> {
     if base != 0 {
         if bps >= base {
             bytes = bytes.saturating_mul((bps / base) as i64);
-        } else if bps != 0 {
-            bytes /= (base / bps) as i64;
+        } else if let Some(ratio) = base.checked_div(bps) {
+            bytes /= i64::from(ratio);
         }
     }
     Some(bytes)
@@ -244,7 +248,7 @@ fn exceeds_limit(limit: u64, downloaded: u64, new: u64) -> bool {
     limit != 0 && downloaded.saturating_add(new) > limit
 }
 
-/// Seconds PCBoard reckons a transfer needs: the raw time at the caller's speed, seven
+/// Seconds `PCBoard` reckons a transfer needs: the raw time at the caller's speed, seven
 /// percent for protocol overhead, and ten seconds so every transfer costs something.
 pub fn seconds_for_transfer(size: u64, bps: u32) -> i64 {
     let cps = (bps / 10).max(1) as u64;
@@ -256,7 +260,7 @@ pub fn seconds_for_transfer(size: u64, bps: u32) -> i64 {
 ///
 /// Never returns zero, which elsewhere means an unlimited session: a caller who has
 /// already used the day up is given a minute and then hung up on, which is close to what
-/// PCBoard does with its own one minute of slack.
+/// `PCBoard` does with its own one minute of slack.
 pub fn session_time_limit(time_per_day: u32, minutes_used_today: u16, enforce_daily: bool) -> i32 {
     if time_per_day == 0 {
         return 0;
@@ -282,7 +286,7 @@ pub fn adjust_bytes_remaining(bytes_remaining: &mut i64, adjustment: i64) {
     *bytes_remaining = bytes_remaining.saturating_sub(adjustment).max(0);
 }
 
-/// The ceiling PCBoard reports for a day's downloading, in kilobytes: the tighter of the
+/// The ceiling `PCBoard` reports for a day's downloading, in kilobytes: the tighter of the
 /// day's allowance and the total limit, or `None` when neither applies.
 pub fn kilobyte_limit(daily_allowance: Option<i64>, total_byte_limit: u64) -> Option<i64> {
     let total_kb = (total_byte_limit / 1024).min(i64::MAX as u64) as i64;
@@ -353,7 +357,7 @@ mod tests {
         assert_eq!(limits.bytes_remaining, Some(40 * 1024));
     }
 
-    /// Uploading earns credit, which PCBoard records as a negative daily figure.
+    /// Uploading earns credit, which `PCBoard` records as a negative daily figure.
     #[test]
     fn upload_credit_raises_the_allowance() {
         let mut limits = TransferLimits::from_security_level(&level(100, 0), 2400);
@@ -473,7 +477,7 @@ mod tests {
         );
     }
 
-    /// Without the substitution a caller who never uploaded would divide by zero; PCBoard
+    /// Without the substitution a caller who never uploaded would divide by zero; `PCBoard`
     /// counts them as having uploaded one.
     #[test]
     fn a_caller_who_never_uploaded_still_gets_the_ratios_worth() {

@@ -74,7 +74,7 @@ impl Ry {
                     let variant_str = format!("{:?}", self.configuration.variant);
                     transfer_state
                         .recieve_state
-                        .log_info(&format!("Starting {} receive with {} verification", variant_str, mode_str));
+                        .log_info(format!("Starting {} receive with {} verification", variant_str, mode_str));
                 }
 
                 let start = match timeout(READ_TIMEOUT, com.read_u8()).await {
@@ -85,7 +85,7 @@ impl Ry {
                     Err(_) => {
                         transfer_state
                             .recieve_state
-                            .log_warning(&format!("Timeout waiting for start byte (retry {})", retries));
+                            .log_warning(format!("Timeout waiting for start byte (retry {})", retries));
                         if retries >= MAX_RETRIES {
                             transfer_state.recieve_state.log_error("Too many timeouts waiting for start");
                             self.cancel(com).await?;
@@ -122,7 +122,7 @@ impl Ry {
                 } else {
                     transfer_state
                         .recieve_state
-                        .log_warning(&format!("Invalid start byte: 0x{:02X} (retry {})", start, retries));
+                        .log_warning(format!("Invalid start byte: 0x{:02X} (retry {})", start, retries));
                     if retries < 3 {
                         self.await_data(com).await?;
                     } else if retries == 4 {
@@ -145,7 +145,7 @@ impl Ry {
                 if retries > 0 {
                     transfer_state
                         .recieve_state
-                        .log_warning(&format!("Retrying YModem header read (attempt {})", retries + 1));
+                        .log_warning(format!("Retrying YModem header read (attempt {})", retries + 1));
                 }
 
                 let chksum_size = if let Checksum::CRC16 = self.configuration.checksum_mode { 2 } else { 1 };
@@ -155,7 +155,7 @@ impl Ry {
                 if block[0] != block[1] ^ 0xFF {
                     transfer_state
                         .recieve_state
-                        .log_error(&format!("Block number check failed: {:02X} != {:02X}^FF", block[0], block[1]));
+                        .log_error(format!("Block number check failed: {:02X} != {:02X}^FF", block[0], block[1]));
                     com.send(&[NAK]).await?;
                     self.errors += 1;
                     self.recv_state = RecvState::StartReceive(0);
@@ -183,13 +183,13 @@ impl Ry {
                 let file_size = if let Ok(file_size) = num.parse::<u64>() {
                     file_size
                 } else {
-                    transfer_state.recieve_state.log_warning(&format!("Could not parse file size: '{}'", num));
+                    transfer_state.recieve_state.log_warning(format!("Could not parse file size: '{}'", num));
                     0
                 };
 
                 transfer_state
                     .recieve_state
-                    .log_info(&format!("Receiving file '{}' ({} bytes)", file_name, file_size));
+                    .log_info(format!("Receiving file '{}' ({} bytes)", file_name, file_size));
                 transfer_state.recieve_state.file_name = file_name;
                 transfer_state.recieve_state.file_size = file_size;
                 self.cur_out_file = Some(NamedTempFile::new()?);
@@ -213,7 +213,7 @@ impl Ry {
                         Err(_) => {
                             transfer_state
                                 .recieve_state
-                                .log_warning(&format!("Timeout waiting for block start (retry {})", retries));
+                                .log_warning(format!("Timeout waiting for block start (retry {})", retries));
                             if retries >= MAX_RETRIES {
                                 transfer_state.recieve_state.log_error("Too many timeouts waiting for block");
                                 self.cancel(com).await?;
@@ -245,7 +245,7 @@ impl Ry {
                             } else {
                                 format!("{} bytes", transfer_state.recieve_state.cur_bytes_transfered)
                             };
-                            transfer_state.recieve_state.log_info(&format!("File transfer complete: {}", file_info));
+                            transfer_state.recieve_state.log_info(format!("File transfer complete: {}", file_info));
                             transfer_state.recieve_state.finish_file(path.clone());
                         } else {
                             transfer_state.recieve_state.log_error("No file open when EOT received");
@@ -265,7 +265,7 @@ impl Ry {
                     } else {
                         transfer_state
                             .recieve_state
-                            .log_warning(&format!("Invalid block start byte: 0x{:02X} (retry {})", start, retries));
+                            .log_warning(format!("Invalid block start byte: 0x{:02X} (retry {})", start, retries));
                         if retries < 5 {
                             com.send(&[NAK]).await?;
                         } else {
@@ -294,7 +294,7 @@ impl Ry {
                     if eot != EOT {
                         transfer_state
                             .recieve_state
-                            .log_warning(&format!("Expected second EOT but received: 0x{:02X}", eot));
+                            .log_warning(format!("Expected second EOT but received: 0x{:02X}", eot));
                         self.recv_state = RecvState::None;
                         return Ok(());
                     }
@@ -315,7 +315,7 @@ impl Ry {
                 if retries > 0 {
                     transfer_state
                         .recieve_state
-                        .log_warning(&format!("Retrying block read (attempt {}, {} bytes)", retries + 1, len));
+                        .log_warning(format!("Retrying block read (attempt {}, {} bytes)", retries + 1, len));
                 }
 
                 let chksum_size = if let Checksum::CRC16 = self.configuration.checksum_mode { 2 } else { 1 };
@@ -326,7 +326,7 @@ impl Ry {
                 let block_num_inv = block[1];
 
                 if block_num != block_num_inv ^ 0xFF {
-                    transfer_state.recieve_state.log_error(&format!(
+                    transfer_state.recieve_state.log_error(format!(
                         "Block number verification failed: {:02X} != {:02X}^FF (block {})",
                         block_num, block_num_inv, block_num
                     ));
@@ -356,7 +356,7 @@ impl Ry {
 
                 let block = &block[2..];
                 if !self.check_crc(block) {
-                    transfer_state.recieve_state.log_error(&format!(
+                    transfer_state.recieve_state.log_error(format!(
                         "CRC/checksum verification failed for block {} (error count: {})",
                         block_num,
                         self.errors + 1
@@ -399,9 +399,9 @@ impl Ry {
 
     async fn await_data(&mut self, com: &mut dyn Connection) -> crate::Result<usize> {
         if self.configuration.is_streaming() {
-            com.send(&[b'G']).await?;
+            com.send(b"G").await?;
         } else if self.configuration.use_crc() {
-            com.send(&[b'C']).await?;
+            com.send(b"C").await?;
         } else {
             com.send(&[NAK]).await?;
         }

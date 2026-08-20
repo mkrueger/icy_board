@@ -27,7 +27,7 @@ fn enough_upload_space(available_bytes: u64, minimum_kib: u32) -> bool {
 
 impl IcyBoardState {
     /// An upload throws the flag list
-    /// away, so PCBoard asks first - and this is the very first prompt of the
+    /// away, so `PCBoard` asks first - and this is the very first prompt of the
     /// U command, ahead of the file name.
     pub async fn proceed_with_upload(&mut self) -> Res<bool> {
         if self.session.flagged_files.is_empty() {
@@ -52,7 +52,7 @@ impl IcyBoardState {
         Ok(true)
     }
 
-    /// PCBoard has the caller describe the file before anything is transferred, and an
+    /// `PCBoard` has the caller describe the file before anything is transferred, and an
     /// empty first line abandons an upload that has not started. A leading `/` on the
     /// first line asks for the upload to be screened.
     pub async fn ask_upload_description(&mut self, file_name: &str) -> Res<Option<(Vec<String>, bool)>> {
@@ -101,12 +101,12 @@ impl IcyBoardState {
     }
 
     pub async fn upload_file(&mut self) -> Res<()> {
-        if let Some(window) = self.event_window().await {
-            if window.uploads_blocked(&chrono::Local::now()) {
-                self.display_text(IceText::UploadsDisabled, display_flags::NEWLINE | display_flags::LFBEFORE)
-                    .await?;
-                return Ok(());
-            }
+        if let Some(window) = self.event_window().await
+            && window.uploads_blocked(&chrono::Local::now())
+        {
+            self.display_text(IceText::UploadsDisabled, display_flags::NEWLINE | display_flags::LFBEFORE)
+                .await?;
+            return Ok(());
         }
         if !self.proceed_with_upload().await? {
             return Ok(());
@@ -206,35 +206,36 @@ impl IcyBoardState {
 
         let mut goodbye_after_upload = false;
 
-        while batch_upload {
-            let input = self
-                .input_field(
-                    IceText::GoodbyeAfterUpload,
-                    1,
-                    &"AGP",
-                    "",
-                    None,
-                    display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::UPCASE | display_flags::FIELDLEN,
-                )
-                .await?;
+        if batch_upload {
+            loop {
+                let input = self
+                    .input_field(
+                        IceText::GoodbyeAfterUpload,
+                        1,
+                        "AGP",
+                        "",
+                        None,
+                        display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::UPCASE | display_flags::FIELDLEN,
+                    )
+                    .await?;
 
-            match input.as_str() {
-                "A" => {
-                    return Ok(());
+                match input.as_str() {
+                    "A" => {
+                        return Ok(());
+                    }
+                    "G" => {
+                        goodbye_after_upload = true;
+                        break;
+                    }
+                    "P" => {
+                        self.set_transfer_protocol().await?;
+                        protocol_str = self.session.current_user.as_ref().unwrap().protocol.clone();
+                    }
+                    "" => {
+                        break;
+                    }
+                    _ => {}
                 }
-                "G" => {
-                    goodbye_after_upload = true;
-                    break;
-                }
-                "P" => {
-                    self.set_transfer_protocol().await?;
-                    protocol_str = self.session.current_user.as_ref().unwrap().protocol.clone();
-                    continue;
-                }
-                "" => {
-                    break;
-                }
-                _ => {}
             }
         }
 
@@ -252,7 +253,7 @@ impl IcyBoardState {
                     let started = Instant::now();
                     while !state.is_finished {
                         if let Err(e) = prot.update_transfer(&mut *self.connection, &mut state).await {
-                            log::error!("Error while updating file transfer with {:?} : {}", protocol, e);
+                            log::error!("Error while updating file transfer with {protocol:?} : {e}");
                             self.display_text(IceText::TransferAborted, display_flags::NEWLINE).await?;
                             break;
                         }
@@ -303,8 +304,8 @@ impl IcyBoardState {
                     }
                 }
                 Err(e) => {
-                    log::error!("Error while initiating file transfer with {:?} : {}", protocol, e);
-                    self.println(TerminalTarget::Both, &format!("Error: {}", e)).await?;
+                    log::error!("Error while initiating file transfer with {protocol:?} : {e}");
+                    self.println(TerminalTarget::Both, &format!("Error: {e}")).await?;
                 }
             }
         }
@@ -333,7 +334,7 @@ impl IcyBoardState {
             .any(|p| p.is_enabled && p.is_batch && p.char_code == protocol_str)
     }
 
-    /// PCBoard promotes a transfer to a batch only when nothing was stacked on the
+    /// `PCBoard` promotes a transfer to a batch only when nothing was stacked on the
     /// command line, the caller's protocol is a batch one and the sysop allows it.
     pub async fn promotes_to_batch(&mut self, had_token: bool) -> bool {
         if had_token || !self.get_board().await.config.file_transfer.promote_to_batch_transfers {
@@ -356,8 +357,7 @@ pub fn create_protocol(protocol: &TransferProtocolType) -> Option<Box<dyn Protoc
         TransferProtocolType::XModemCRC => Some(Box::new(XYmodem::new(XYModemVariant::XModemCRC))),
         TransferProtocolType::XModem1k => Some(Box::new(XYmodem::new(XYModemVariant::XModem1k))),
         TransferProtocolType::XModem1kG => Some(Box::new(XYmodem::new(XYModemVariant::XModem1kG))),
-        TransferProtocolType::YModem => Some(Box::new(XYmodem::new(XYModemVariant::YModem))),
-        TransferProtocolType::YModemG => Some(Box::new(XYmodem::new(XYModemVariant::YModem))),
+        TransferProtocolType::YModem | TransferProtocolType::YModemG => Some(Box::new(XYmodem::new(XYModemVariant::YModem))),
         TransferProtocolType::ZModem => Some(Box::new(Zmodem::new(1024))),
         TransferProtocolType::ZModem8k => Some(Box::new(Zmodem::new(8 * 1024))),
     }

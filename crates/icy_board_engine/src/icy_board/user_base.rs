@@ -119,7 +119,7 @@ impl Password {
 impl std::fmt::Display for Password {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Password::PlainText(s) => write!(f, "{}", s),
+            Password::PlainText(s) => write!(f, "{s}"),
             Password::Argon2(_) | Password::BCrypt(_) | Password::Protected(_) => write!(f, "******"),
         }
     }
@@ -128,15 +128,12 @@ impl std::fmt::Display for Password {
 impl Password {
     pub fn is_empty(&self) -> bool {
         match self {
-            Password::PlainText(s) => s.is_empty(),
-            Password::Argon2(s) => s.is_empty(),
-            Password::BCrypt(s) => s.is_empty(),
-            Password::Protected(s) => s.is_empty(),
+            Password::PlainText(s) | Password::Argon2(s) | Password::BCrypt(s) | Password::Protected(s) => s.is_empty(),
         }
     }
 
     pub fn is_valid(&self, pwd: &str) -> bool {
-        self == &Password::PlainText(pwd.to_lowercase().to_string())
+        self == &Password::PlainText(pwd.to_lowercase().clone())
     }
 }
 
@@ -151,13 +148,11 @@ impl<'de> Deserialize<'de> for Password {
             }
             if p.starts_with("$argon2") {
                 Password::Argon2(p)
+            } else if p.len() >= 2 && p.starts_with('"') && p.ends_with('"') {
+                Password::PlainText(p[1..p.len() - 1].to_string())
             } else {
-                if p.len() >= 2 && p.starts_with('"') && p.ends_with('"') {
-                    Password::PlainText(p[1..p.len() - 1].to_string())
-                } else {
-                    // Plain text password without quotes (legacy)
-                    Password::PlainText(p)
-                }
+                // Plain text password without quotes (legacy)
+                Password::PlainText(p)
             }
         })
     }
@@ -204,7 +199,7 @@ pub struct PasswordInfo {
     pub expire_date: DateTime<Utc>,
 }
 
-/// What PCBoard's `checkpassword` makes of a password the caller wants to take.
+/// What `PCBoard`'s `checkpassword` makes of a password the caller wants to take.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PasswordVerdict {
     Ok,
@@ -215,7 +210,7 @@ pub enum PasswordVerdict {
     PreviouslyUsed,
 }
 
-/// PCBoard never let a password be longer than this, so a longer minimum is
+/// `PCBoard` never let a password be longer than this, so a longer minimum is
 /// one nobody could ever satisfy.
 const MAX_PASSWORD_LEN: usize = 12;
 
@@ -223,7 +218,7 @@ const MAX_PASSWORD_LEN: usize = 12;
 pub const PASSWORD_HISTORY_LEN: usize = 3;
 
 impl PasswordInfo {
-    /// The rules PCBoard's `checkpassword` applied: long enough, not a piece of
+    /// The rules `PCBoard`'s `checkpassword` applied: long enough, not a piece of
     /// the caller's own name and not one of the last three.
     ///
     /// The original also refused a password sharing the first `min_len - 2`
@@ -257,7 +252,7 @@ impl PasswordInfo {
 
     /// Takes the new password on, pushing the old one onto the history.
     ///
-    /// PCBoard rotated the history at most once a day so that changing the
+    /// `PCBoard` rotated the history at most once a day so that changing the
     /// password repeatedly could not flush out what came before.
     pub fn accept_new_password(&mut self, password: Password, now: DateTime<Utc>, expire_days: u16) {
         if self.last_change.date_naive() != now.date_naive() {
@@ -398,7 +393,7 @@ impl FSEMode {
         match self {
             FSEMode::Yes => 'Y',
             FSEMode::No => 'N',
-            _ => 'A',
+            FSEMode::Ask => 'A',
         }
     }
 }
@@ -421,7 +416,7 @@ impl ChatStatus {
     pub fn to_char(&self) -> char {
         match self {
             ChatStatus::Unavailable => 'U',
-            _ => 'A',
+            ChatStatus::Available => 'A',
         }
     }
 }
@@ -693,6 +688,7 @@ impl Default for LastReadStatus {
 
 mod lastread_ptr_flags {
     use std::collections::HashMap;
+    use std::fmt::Write as _;
 
     use serde::{self, Deserialize, Deserializer, Serializer};
 
@@ -705,14 +701,7 @@ mod lastread_ptr_flags {
         let mut s = String::new();
         for ((conf, area), v) in date {
             // Only these flags get stored in PCBoard - rest is for use at runtime.
-            s.push_str(&format!(
-                "{},{},{},{},{};",
-                conf,
-                area,
-                v.last_read,
-                v.highest_msg_read,
-                if v.include_qwk { 1 } else { 0 }
-            ));
+            let _ = write!(s, "{},{},{},{},{};", conf, area, v.last_read, v.highest_msg_read, i32::from(v.include_qwk));
         }
         serializer.serialize_str(&s)
     }
@@ -728,23 +717,23 @@ mod lastread_ptr_flags {
                 return;
             }
             let mut iter = item.split(',');
-            if let (Some(c), Some(a), Some(lr), Some(hr), Some(flags)) = (iter.next(), iter.next(), iter.next(), iter.next(), iter.next()) {
-                if let (Ok(c), Ok(a), Ok(lr), Ok(hr), Ok(flags)) = (
+            if let (Some(c), Some(a), Some(lr), Some(hr), Some(flags)) = (iter.next(), iter.next(), iter.next(), iter.next(), iter.next())
+                && let (Ok(c), Ok(a), Ok(lr), Ok(hr), Ok(flags)) = (
                     c.parse::<usize>(),
                     a.parse::<usize>(),
                     lr.parse::<usize>(),
                     hr.parse::<usize>(),
                     flags.parse::<usize>(),
-                ) {
-                    map.insert(
-                        (c, a),
-                        LastReadStatus {
-                            last_read: lr,
-                            highest_msg_read: hr,
-                            include_qwk: flags == 1,
-                        },
-                    );
-                }
+                )
+            {
+                map.insert(
+                    (c, a),
+                    LastReadStatus {
+                        last_read: lr,
+                        highest_msg_read: hr,
+                        include_qwk: flags == 1,
+                    },
+                );
             }
         });
         Ok(map)
@@ -753,6 +742,7 @@ mod lastread_ptr_flags {
 
 mod conference_flags_format {
     use std::collections::HashMap;
+    use std::fmt::Write as _;
 
     use serde::{self, Deserialize, Deserializer, Serializer};
 
@@ -769,7 +759,7 @@ mod conference_flags_format {
             }
             // Only these flags get stored in PCBoard - rest is for use at runtime.
             let v = *v & (ConferenceFlags::Selected | ConferenceFlags::Registered | ConferenceFlags::Expired);
-            s.push_str(&format!("{}:{};", k, v.bits()));
+            let _ = write!(s, "{}:{};", k, v.bits());
         }
         serializer.serialize_str(&s)
     }
@@ -785,10 +775,10 @@ mod conference_flags_format {
                 return;
             }
             let mut iter = item.split(':');
-            if let (Some(k), Some(v)) = (iter.next(), iter.next()) {
-                if let (Ok(k), Ok(v)) = (k.parse::<usize>(), v.parse::<u8>()) {
-                    map.insert(k, ConferenceFlags::from_bits_truncate(v));
-                }
+            if let (Some(k), Some(v)) = (iter.next(), iter.next())
+                && let (Ok(k), Ok(v)) = (k.parse::<usize>(), v.parse::<u8>())
+            {
+                map.insert(k, ConferenceFlags::from_bits_truncate(v));
             }
         });
         Ok(map)
@@ -947,12 +937,12 @@ impl User {
         let mut custom_comment5 = String::new();
 
         if let Some(notes) = &u.inf.notes {
-            custom_comment1 = notes.notes.get(0).unwrap_or(&String::new()).clone();
-            custom_comment2 = notes.notes.get(1).unwrap_or(&String::new()).clone();
-            custom_comment3 = notes.notes.get(2).unwrap_or(&String::new()).clone();
-            custom_comment4 = notes.notes.get(3).unwrap_or(&String::new()).clone();
-            custom_comment5 = notes.notes.get(4).unwrap_or(&String::new()).clone();
-        };
+            custom_comment1.clone_from(notes.notes.first().unwrap_or(&String::new()));
+            custom_comment2.clone_from(notes.notes.get(1).unwrap_or(&String::new()));
+            custom_comment3.clone_from(notes.notes.get(2).unwrap_or(&String::new()));
+            custom_comment4.clone_from(notes.notes.get(3).unwrap_or(&String::new()));
+            custom_comment5.clone_from(notes.notes.get(4).unwrap_or(&String::new()));
+        }
 
         let qwk_config = u.inf.qwk_config.clone();
         let account = u.inf.account.clone();
@@ -1044,9 +1034,9 @@ impl User {
             home_voice_phone: u.user.home_voice_phone.clone(),
             user_comment: u.user.user_comment.clone(),
             sysop_comment: u.user.sysop_comment.clone(),
-            security_level: u.user.security_level as u8,
+            security_level: u.user.security_level,
             expiration_date: u.user.exp_date.to_utc_date_time(),
-            exp_security_level: u.user.exp_security_level as u8,
+            exp_security_level: u.user.exp_security_level,
             flags: UserFlags {
                 expert_mode: u.user.expert_mode,
                 is_dirty: u.user.is_dirty,
@@ -1054,8 +1044,10 @@ impl User {
                 has_mail: u.user.has_mail,
                 fse_mode: if u.user.use_fsedefault {
                     FSEMode::Yes
+                } else if u.user.dont_ask_fse {
+                    FSEMode::No
                 } else {
-                    if u.user.dont_ask_fse { FSEMode::No } else { FSEMode::Ask }
+                    FSEMode::Ask
                 },
                 scroll_msg_body: u.user.scroll_msg_body,
                 use_short_filedescr: u.user.short_file_descr,
@@ -1135,9 +1127,9 @@ impl User {
             home_voice_phone: self.home_voice_phone.clone(),
             user_comment: self.user_comment.clone(),
             sysop_comment: self.sysop_comment.clone(),
-            security_level: self.security_level as u8,
+            security_level: self.security_level,
             exp_date: IcbDate::from_utc(&self.expiration_date),
-            exp_security_level: self.exp_security_level as u8,
+            exp_security_level: self.exp_security_level,
             expert_mode: self.flags.expert_mode,
             is_dirty: self.flags.is_dirty,
             msg_clear: self.flags.msg_clear,
@@ -1295,9 +1287,9 @@ impl User {
         }
 
         // Direct passthrough optional sections
-        inf.qwk_config = self.qwk_config.clone();
-        inf.account = self.account.clone();
-        inf.bank = self.bank.clone();
+        inf.qwk_config.clone_from(&self.qwk_config);
+        inf.account.clone_from(&self.account);
+        inf.bank.clone_from(&self.bank);
 
         PcbUser { user: rec, inf }
     }
@@ -1353,7 +1345,7 @@ impl UserBase {
             pcb.user.rec_num = idx as u32;
 
             // Also set the name in the inf structure
-            pcb.inf.name = pcb.user.name.clone();
+            pcb.inf.name.clone_from(&pcb.user.name);
             pcb.inf.messages_read = user.stats.messages_read as usize;
             pcb.inf.messages_left = user.stats.messages_left as usize;
 
@@ -1452,7 +1444,7 @@ mod password_tests {
         assert_eq!(info("old", &[]).check_new_password("JOHN DOE", "abc", 6), PasswordVerdict::TooShort);
     }
 
-    /// PCBoard capped the minimum at the 12 characters a password could hold,
+    /// `PCBoard` capped the minimum at the 12 characters a password could hold,
     /// so a larger setting cannot lock everyone out.
     #[test]
     fn the_minimum_cannot_exceed_the_field() {

@@ -175,8 +175,6 @@ impl<'a> App<'a> {
                         self.edit_state.handle_input(key, &mut self.edit_entry.text);
                     }
                 };
-
-                return;
             }
             Mode::Filter => {
                 match key.code {
@@ -187,7 +185,6 @@ impl<'a> App<'a> {
                         self.record_tab.set_filter(&self.filter);
                     }
                 };
-                return;
             }
 
             Mode::Jump => {
@@ -195,12 +192,12 @@ impl<'a> App<'a> {
                     Esc => self.mode = Mode::Command,
 
                     Enter => {
-                        if let Some(number) = self.edit_entry.text.parse::<usize>().ok() {
-                            if number > 0 {
-                                self.record_tab.set_filter("");
-                                self.record_tab.jump(number - 1);
-                                self.update_state();
-                            }
+                        if let Ok(number) = self.edit_entry.text.parse::<usize>()
+                            && number > 0
+                        {
+                            self.record_tab.set_filter("");
+                            self.record_tab.jump(number - 1);
+                            self.update_state();
                         }
                         self.mode = Mode::Command;
                     }
@@ -209,7 +206,6 @@ impl<'a> App<'a> {
                         self.edit_state.handle_input(key, &mut self.edit_entry.text);
                     }
                 };
-                return;
             }
             Mode::RequestQuit => {
                 match key.code {
@@ -222,8 +218,6 @@ impl<'a> App<'a> {
                     }
                     _ => {}
                 };
-
-                return;
             }
             _ => {
                 if self.get_tab().grab_focus() {
@@ -249,10 +243,10 @@ impl<'a> App<'a> {
                         self.mode = Mode::Jump;
                     }
                     F(4) => {
-                        if let Some(orig_entry) = self.record_tab.get_original_entry().cloned() {
-                            if let Some(entry) = self.record_tab.get_selected_entry_mut() {
-                                *entry = orig_entry;
-                            }
+                        if let Some(orig_entry) = self.record_tab.get_original_entry().cloned()
+                            && let Some(entry) = self.record_tab.get_selected_entry_mut()
+                        {
+                            *entry = orig_entry;
                         }
                     }
                     Char('d') | Enter => {

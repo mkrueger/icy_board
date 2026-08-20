@@ -7,33 +7,34 @@ use crate::{
         state::{GraphicsMode, IcyBoardState},
     },
 };
+use std::fmt::Write as _;
 
-/// TriBBS doorfile format
+/// `TriBBS` doorfile format
 pub async fn create_tribbs_sys(state: &IcyBoardState, path: &std::path::Path) -> Res<()> {
     let mut contents = String::new();
-    contents.push_str(&format!("{}\r\n", state.session.cur_user_id));
-    contents.push_str(&format!("{}\r\n", state.session.user_name));
-    contents.push_str(&format!("{}\r\n", state.door_user_password().await));
-    contents.push_str(&format!("{}\r\n", state.session.cur_security));
-    contents.push_str(&format!("{}\r\n", if state.session.expert_mode() { "Y" } else { "N" }));
+    let _ = write!(contents, "{}\r\n", state.session.cur_user_id);
+    let _ = write!(contents, "{}\r\n", state.session.user_name);
+    let _ = write!(contents, "{}\r\n", state.door_user_password().await);
+    let _ = write!(contents, "{}\r\n", state.session.cur_security);
+    let _ = write!(contents, "{}\r\n", if state.session.expert_mode() { "Y" } else { "N" });
     let ansi = match state.session.disp_options.grapics_mode {
         GraphicsMode::Ctty => "N",
         _ => "Y",
     };
-    contents.push_str(&format!("{}\r\n", ansi));
-    contents.push_str(&format!("{}\r\n", state.session.minutes_left()));
-    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().home_voice_phone));
-    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().city_or_state));
-    contents.push_str(&format!("{}\r\n", state.node));
-    contents.push_str(&format!("{}\r\n", DOOR_COM_PORT));
-    contents.push_str(&format!("{}\r\n", DOOR_BPS_RATE));
-    contents.push_str(&format!("{}\r\n", DOOR_BPS_RATE));
+    let _ = write!(contents, "{ansi}\r\n");
+    let _ = write!(contents, "{}\r\n", state.session.minutes_left());
+    let _ = write!(contents, "{}\r\n", state.session.current_user.as_ref().unwrap().home_voice_phone);
+    let _ = write!(contents, "{}\r\n", state.session.current_user.as_ref().unwrap().city_or_state);
+    let _ = write!(contents, "{}\r\n", state.node);
+    let _ = write!(contents, "{DOOR_COM_PORT}\r\n");
+    let _ = write!(contents, "{DOOR_BPS_RATE}\r\n");
+    let _ = write!(contents, "{DOOR_BPS_RATE}\r\n");
     contents.push_str("Y\r\n"); // ?
     contents.push_str("Y\r\n"); // Error correcting connection
     let board = state.get_board().await;
-    contents.push_str(&format!("{}\r\n", board.config.board.name));
-    contents.push_str(&format!("{}\r\n", board.config.sysop.name));
-    contents.push_str(&format!("{}\r\n", state.session.alias_name));
+    let _ = write!(contents, "{}\r\n", board.config.board.name);
+    let _ = write!(contents, "{}\r\n", board.config.sysop.name);
+    let _ = write!(contents, "{}\r\n", state.session.alias_name);
     let path = path.join("TRIBBS.SYS");
     log::info!("create TRIBBS.SYS: {}", path.display());
     fs::write(path, contents)?;

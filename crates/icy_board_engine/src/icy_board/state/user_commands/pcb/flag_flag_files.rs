@@ -13,7 +13,7 @@ use crate::{
 };
 
 impl IcyBoardState {
-    /// Answers `true` when a name was given, so the download command can ask again like PCBoard does.
+    /// Answers `true` when a name was given, so the download command can ask again like `PCBoard` does.
     pub async fn flag_files_cmd(&mut self, show_flagged: bool) -> Res<bool> {
         // flag
         let input = if let Some(token) = self.session.tokens.pop_front() {
@@ -27,7 +27,7 @@ impl IcyBoardState {
                 },
                 60,
                 &MASK_ASCII,
-                &CommandType::FlagFiles.get_help(),
+                CommandType::FlagFiles.get_help(),
                 None,
                 display_flags::NEWLINE | display_flags::UPCASE | display_flags::LFAFTER | display_flags::LFBEFORE | display_flags::HIGHASCII,
             )
@@ -44,7 +44,7 @@ impl IcyBoardState {
                 options.case_sensitive = false;
                 if let Ok(pattern) = Pattern::new(&input) {
                     for f in files.lock().await.iter() {
-                        if pattern.matches_with(&f.name(), &options) {
+                        if pattern.matches_with(f.name(), &options) {
                             let size = f.size();
                             flagged.push((dir.path.join(f.name.clone()), size));
                         }
@@ -53,7 +53,7 @@ impl IcyBoardState {
             }
 
             if flagged.is_empty() {
-                self.session.op_text = input.clone();
+                self.session.op_text.clone_from(&input);
                 self.display_text(IceText::NotFoundOnDisk, display_flags::NEWLINE | display_flags::LFBEFORE)
                     .await?;
                 self.session.disp_options.in_file_list = saved_list;
@@ -100,12 +100,9 @@ impl IcyBoardState {
 
         let count = self.session.flagged_files.len();
         self.set_color(TerminalTarget::Both, IcbColor::dos_light_green()).await?;
-        let nr: String = format!("({})", count);
-        self.println(
-            TerminalTarget::Both,
-            &format!("{:<6}{:<12} {}", nr, name, humanize_bytes_decimal!(size).to_string()),
-        )
-        .await?;
+        let nr: String = format!("({count})");
+        self.println(TerminalTarget::Both, &format!("{:<6}{:<12} {}", nr, name, humanize_bytes_decimal!(size)))
+            .await?;
         self.reset_color(TerminalTarget::Both).await?;
 
         Ok(())

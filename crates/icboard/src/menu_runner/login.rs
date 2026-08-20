@@ -44,7 +44,7 @@ impl PcbBoardCommand {
         self.state.println(TerminalTarget::Both, &board_name).await?;
         let node_number = self.state.node;
         self.state
-            .println(TerminalTarget::Both, &format!("IcyBoard v{} - Node {}", VERSION.to_string(), node_number))
+            .println(TerminalTarget::Both, &format!("IcyBoard v{} - Node {}", *VERSION, node_number))
             .await?;
 
         let welcome_screen = self.state.get_board().await.config.paths.welcome.clone();
@@ -53,12 +53,12 @@ impl PcbBoardCommand {
         self.state.new_line().await?;
 
         // An event is about to take the board down - nobody gets in any more.
-        if let Some(window) = self.state.event_window().await {
-            if window.is_suspended(&chrono::Local::now()) {
-                self.state.display_text(IceText::DeniedAccessForEvent, display_flags::NEWLINE).await?;
-                self.state.hangup().await?;
-                return Ok(false);
-            }
+        if let Some(window) = self.state.event_window().await
+            && window.is_suspended(&chrono::Local::now())
+        {
+            self.state.display_text(IceText::DeniedAccessForEvent, display_flags::NEWLINE).await?;
+            self.state.hangup().await?;
+            return Ok(false);
         }
         self.state.limit_time_for_event().await;
 
@@ -183,7 +183,7 @@ impl PcbBoardCommand {
                 .input_field(
                     IceText::ReEnterName,
                     1,
-                    &"RC",
+                    "RC",
                     "",
                     Some("C".to_string()),
                     display_flags::UPCASE | display_flags::NEWLINE | display_flags::FIELDLEN,
@@ -366,7 +366,7 @@ impl PcbBoardCommand {
                     .input_field(
                         IceText::CLSBetweenMessages,
                         1,
-                        &"",
+                        "",
                         "",
                         Some(self.state.session.yes_char.to_uppercase().to_string()),
                         display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::YESNO,
@@ -589,7 +589,7 @@ impl PcbBoardCommand {
         self.state.display_news(false).await?;
         self.logon_questions().await?;
 
-        return Ok(true);
+        Ok(true)
     }
 
     /// PCBoard's AutoRegConf - a new caller starts out registered in every public
@@ -616,7 +616,7 @@ impl PcbBoardCommand {
         drop(board);
 
         self.state.new_line().await?;
-        self.state.println(TerminalTarget::Both, &user.get_name()).await?;
+        self.state.println(TerminalTarget::Both, user.get_name()).await?;
         if !user.city_or_state.is_empty() {
             self.state.println(TerminalTarget::Both, &user.city_or_state).await?;
         }
@@ -654,11 +654,12 @@ impl PcbBoardCommand {
                 required_security: SecurityExpression::default(),
             }
         };
-        Ok(if !self.state.session.is_sysop && survey.survey_file.exists() {
+        let _: () = if !self.state.session.is_sysop && survey.survey_file.exists() {
             // skip the survey question.
             self.state.session.tokens.push_front(self.state.session.yes_char.to_string());
             self.state.start_survey(&survey).await?;
-        })
+        };
+        Ok(())
     }
 
     async fn logon_questions(&mut self) -> Res<()> {
@@ -671,11 +672,12 @@ impl PcbBoardCommand {
             }
         };
 
-        Ok(if survey.survey_file.exists() {
+        let _: () = if survey.survey_file.exists() {
             // skip the survey question.
             self.state.session.tokens.push_front(self.state.session.yes_char.to_string());
             self.state.start_survey(&survey).await?;
-        })
+        };
+        Ok(())
     }
 
     async fn login_user(&mut self) -> Res<bool> {
@@ -689,10 +691,10 @@ impl PcbBoardCommand {
             let pw = user.password.password.clone();
 
             let mut emsi_pw = false;
-            if let Some(emsi) = &self.state.session.emsi {
-                if emsi.user.password.eq_ignore_ascii_case(pw.to_string().as_str()) {
-                    emsi_pw = true;
-                }
+            if let Some(emsi) = &self.state.session.emsi
+                && emsi.user.password.eq_ignore_ascii_case(pw.to_string().as_str())
+            {
+                emsi_pw = true;
             }
 
             emsi_pw
@@ -736,27 +738,27 @@ impl PcbBoardCommand {
             }
         }
 
-        if let Some(user) = &self.state.session.current_user {
-            if !user.password.expire_date.year() > 0 {
-                let today = Utc::now();
-                if user.password.expire_date > today {
-                    self.state
-                        .display_text(IceText::PasswordExpired, display_flags::NEWLINE | display_flags::LFBEFORE)
-                        .await?;
-                    self.change_password().await?;
-                    return Ok(false);
-                }
+        if let Some(user) = &self.state.session.current_user
+            && !user.password.expire_date.year() > 0
+        {
+            let today = Utc::now();
+            if user.password.expire_date > today {
+                self.state
+                    .display_text(IceText::PasswordExpired, display_flags::NEWLINE | display_flags::LFBEFORE)
+                    .await?;
+                self.change_password().await?;
+                return Ok(false);
+            }
 
-                let days = self.state.get_board().await.config.limits.password_expire_warn_days as i64;
+            let days = self.state.get_board().await.config.limits.password_expire_warn_days as i64;
 
-                if days > 0 && user.password.expire_date + chrono::Duration::days(days) > today {
-                    self.state.session.op_text = (user.password.expire_date + chrono::Duration::days(days) - today).num_days().to_string();
-                    self.state
-                        .display_text(IceText::PasswordWillExpired, display_flags::NEWLINE | display_flags::LFBEFORE)
-                        .await?;
-                    self.state.press_enter().await?;
-                    return Ok(false);
-                }
+            if days > 0 && user.password.expire_date + chrono::Duration::days(days) > today {
+                self.state.session.op_text = (user.password.expire_date + chrono::Duration::days(days) - today).num_days().to_string();
+                self.state
+                    .display_text(IceText::PasswordWillExpired, display_flags::NEWLINE | display_flags::LFBEFORE)
+                    .await?;
+                self.state.press_enter().await?;
+                return Ok(false);
             }
         }
 
@@ -770,7 +772,7 @@ impl PcbBoardCommand {
         self.state.join_conference(last_conference, false, false).await?;
 
         self.logon_questions().await?;
-        return Ok(true);
+        Ok(true)
     }
 
     async fn input_required(&mut self, txt: IceText, mask: &str, len: i32, flags: i32) -> Res<Option<String>> {

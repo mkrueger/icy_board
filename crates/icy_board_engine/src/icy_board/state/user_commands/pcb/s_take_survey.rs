@@ -67,19 +67,18 @@ impl IcyBoardState {
             if text.is_empty() {
                 break;
             }
-            if let Ok(number) = text.parse::<usize>() {
-                if number > 0 {
-                    if let Some(survey) = surveys.get(number - 1) {
-                        self.start_survey(&survey).await?;
-                        break;
-                    } else {
-                        self.display_text(
-                            IceText::InvalidSelection,
-                            display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER,
-                        )
-                        .await?;
-                    }
+            if let Ok(number) = text.parse::<usize>()
+                && number > 0
+            {
+                if let Some(survey) = surveys.get(number - 1) {
+                    self.start_survey(survey).await?;
+                    break;
                 }
+                self.display_text(
+                    IceText::InvalidSelection,
+                    display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER,
+                )
+                .await?;
             }
         }
         Ok(())
@@ -99,54 +98,48 @@ impl IcyBoardState {
         output.push("**************************************************************".to_string());
         if let Some(user) = &self.session.current_user {
             output.push(format!(
-                "From: {}, {} Sec {} Exp {}",
+                "From: {}, {} {} Sec {} Exp {}",
                 user.get_name(),
-                format!(
-                    "{} {}",
-                    Local::now().format(&self.get_board().await.config.board.date_format),
-                    Local::now().format("(%H:%M)")
-                ),
+                Local::now().format(&self.get_board().await.config.board.date_format),
+                Local::now().format("(%H:%M)"),
                 self.session.cur_security,
                 user.expiration_date
             ));
         } else {
             output.push(format!(
-                "From: {}, {} Sec {}",
+                "From: {}, {} {} Sec {}",
                 self.session.user_name,
-                format!(
-                    "{} {}",
-                    Local::now().format(&self.get_board().await.config.board.date_format),
-                    Local::now().format("(%H:%M)")
-                ),
+                Local::now().format(&self.get_board().await.config.board.date_format),
+                Local::now().format("(%H:%M)"),
                 self.session.cur_security,
             ));
         }
 
-        if let Some(ext) = question.extension() {
-            if ext == "ppe" {
-                let answer = answer_file.to_string_lossy().to_string();
-                if !answer.is_empty() {
-                    self.session.tokens.push_back(answer);
-                }
-                let t = temp_file::empty();
-                if !self.run_ppe(&question, Some(t.path())).await? {
-                    return Ok(());
-                }
-                output.push(fs::read_to_string(t.path())?);
-
-                match OpenOptions::new().create(true).append(true).open(&answer_file) {
-                    Ok(mut file) => {
-                        for line in output {
-                            writeln!(file, "{}", line)?;
-                        }
-                    }
-                    Err(err) => {
-                        log::error!("Error opening answer file {} : {}", answer_file.display(), err);
-                        return Err(err.into());
-                    }
-                }
+        if let Some(ext) = question.extension()
+            && ext == "ppe"
+        {
+            let answer = answer_file.to_string_lossy().to_string();
+            if !answer.is_empty() {
+                self.session.tokens.push_back(answer);
+            }
+            let t = temp_file::empty();
+            if !self.run_ppe(&question, Some(t.path())).await? {
                 return Ok(());
             }
+            output.push(fs::read_to_string(t.path())?);
+
+            match OpenOptions::new().create(true).append(true).open(answer_file) {
+                Ok(mut file) => {
+                    for line in output {
+                        writeln!(file, "{line}")?;
+                    }
+                }
+                Err(err) => {
+                    log::error!("Error opening answer file {} : {}", answer_file.display(), err);
+                    return Err(err.into());
+                }
+            }
+            return Ok(());
         }
 
         match read_with_encoding_detection(&question) {
@@ -192,13 +185,13 @@ impl IcyBoardState {
                                 display_flags::FIELDLEN | display_flags::NEWLINE | display_flags::GUIDE | display_flags::LFAFTER,
                             )
                             .await?;
-                        output.push(format!("Q: {}", question));
-                        output.push(format!("A: {}", answer));
+                        output.push(format!("Q: {question}"));
+                        output.push(format!("A: {answer}"));
                     }
-                    match OpenOptions::new().create(true).append(true).open(&answer_file) {
+                    match OpenOptions::new().create(true).append(true).open(answer_file) {
                         Ok(mut file) => {
                             for line in output {
-                                writeln!(file, "{}", line)?;
+                                writeln!(file, "{line}")?;
                             }
                         }
                         Err(err) => {

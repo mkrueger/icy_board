@@ -31,18 +31,18 @@ impl IcyBoardState {
 
             let mut txt = String::new();
             for protocol in self.get_board().await.protocols.iter() {
-                if &protocol.char_code == &selected_protocol {
+                if protocol.char_code == selected_protocol {
                     txt.clone_from(&protocol.description);
                     break;
                 }
             }
-            if let Some(user) = &mut self.session.current_user {
-                if user.protocol != selected_protocol {
-                    user.protocol = selected_protocol;
-                    self.display_text(IceText::DefaultProtocol, display_flags::LFBEFORE).await?;
-                    self.set_color(TerminalTarget::Both, IcbColor::dos_light_cyan()).await?;
-                    self.println(TerminalTarget::Both, &txt).await?;
-                }
+            if let Some(user) = &mut self.session.current_user
+                && user.protocol != selected_protocol
+            {
+                user.protocol = selected_protocol;
+                self.display_text(IceText::DefaultProtocol, display_flags::LFBEFORE).await?;
+                self.set_color(TerminalTarget::Both, IcbColor::dos_light_cyan()).await?;
+                self.println(TerminalTarget::Both, &txt).await?;
             }
         }
         Ok(())
@@ -52,7 +52,7 @@ impl IcyBoardState {
         self.ask_protocol_with(cur_protocol, IceText::DesiredProtocol).await
     }
 
-    /// PCBoard asks this one when a transfer is about to start and the caller has
+    /// `PCBoard` asks this one when a transfer is about to start and the caller has
     /// no usable protocol set, and it uses its own prompt rather than the T command's.
     pub async fn ask_transfer_protocol(&mut self, cur_protocol: &str) -> Res<String> {
         self.ask_protocol_with(cur_protocol, IceText::ProtocolForTransfer).await

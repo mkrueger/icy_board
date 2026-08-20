@@ -61,8 +61,8 @@ impl<'a> ProtocolEditor<'a> {
                     return Line::from("".to_string());
                 }
                 match j {
-                    0 => Line::from(format!("{}", cmd2.lock().unwrap()[*i].char_code)),
-                    1 => Line::from(format!("{}", cmd2.lock().unwrap()[*i].description)),
+                    0 => Line::from(cmd2.lock().unwrap()[*i].char_code.to_string()),
+                    1 => Line::from(cmd2.lock().unwrap()[*i].description.to_string()),
                     _ => Line::from("".to_string()),
                 }
             }),
@@ -86,22 +86,22 @@ impl<'a> ProtocolEditor<'a> {
     }
 
     fn move_up(&mut self) {
-        if let Some(selected) = self.insert_table.table_state.selected() {
-            if selected > 0 {
-                let mut levels = self.protocols.lock().unwrap();
-                levels.swap(selected, selected - 1);
-                self.insert_table.table_state.select(Some(selected - 1));
-            }
+        if let Some(selected) = self.insert_table.table_state.selected()
+            && selected > 0
+        {
+            let mut levels = self.protocols.lock().unwrap();
+            levels.swap(selected, selected - 1);
+            self.insert_table.table_state.select(Some(selected - 1));
         }
     }
 
     fn move_down(&mut self) {
-        if let Some(selected) = self.insert_table.table_state.selected() {
-            if selected + 1 < self.protocols.lock().unwrap().len() {
-                let mut levels = self.protocols.lock().unwrap();
-                levels.swap(selected, selected + 1);
-                self.insert_table.table_state.select(Some(selected + 1));
-            }
+        if let Some(selected) = self.insert_table.table_state.selected()
+            && selected + 1 < self.protocols.lock().unwrap().len()
+        {
+            let mut levels = self.protocols.lock().unwrap();
+            levels.swap(selected, selected + 1);
+            self.insert_table.table_state.select(Some(selected + 1));
         }
     }
 }
@@ -200,11 +200,11 @@ impl<'a> Page for ProtocolEditor<'a> {
                     self.insert_table.content_length += 1;
                 }
                 KeyCode::Delete => {
-                    if let Some(selected_item) = self.insert_table.table_state.selected() {
-                        if selected_item < self.protocols.lock().unwrap().len() {
-                            self.protocols.lock().unwrap().remove(selected_item);
-                            self.insert_table.content_length -= 1;
-                        }
+                    if let Some(selected_item) = self.insert_table.table_state.selected()
+                        && selected_item < self.protocols.lock().unwrap().len()
+                    {
+                        self.protocols.lock().unwrap().remove(selected_item);
+                        self.insert_table.content_length -= 1;
                     }
                 }
 

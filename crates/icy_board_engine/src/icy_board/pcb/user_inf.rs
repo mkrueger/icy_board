@@ -162,7 +162,7 @@ impl PcbUserInf {
                         user.bank = Some(BankUserInf::read(data)?);
                     }
                     unkown => {
-                        log::error!("Unknown user.inf app: {}", unkown);
+                        log::error!("Unknown user.inf app: {unkown}");
                     }
                 }
             }
@@ -491,7 +491,7 @@ impl PasswordUserInf {
 
         // Write 3 previous passwords
         for i in 0..3 {
-            let pwd = self.prev_pwd.get(i).map(|s| s.as_str()).unwrap_or("");
+            let pwd = self.prev_pwd.get(i).map_or("", std::string::String::as_str);
             writer.write_all(&export_cp437_string(pwd, Self::PWD_LEN, b' '))?;
         }
 
@@ -641,7 +641,7 @@ impl NotesUserInf {
         use crate::tables::export_cp437_string;
 
         for i in 0..Self::NOTE_COUNT {
-            let note = self.notes.get(i).map(|s| s.as_str()).unwrap_or("");
+            let note = self.notes.get(i).map_or("", std::string::String::as_str);
             writer.write_all(&export_cp437_string(note, Self::NOTE_SIZE, b' '))?;
         }
         Ok(())
@@ -694,7 +694,7 @@ impl QwkConfigUserInf {
         writer.write_i16::<LittleEndian>(self.personal_attach_limit as i16)?;
         writer.write_i16::<LittleEndian>(self.public_attach_limit as i16)?;
         writer.write_i16::<LittleEndian>(self.new_blt_limit as i16)?;
-        writer.write_u8(if self.new_files { 1 } else { 0 })?;
+        writer.write_u8(u8::from(self.new_files))?;
 
         // Pad to REC_SIZE (30 bytes total, we've written 11 bytes)
         writer.write_all(&[0u8; 19])?;

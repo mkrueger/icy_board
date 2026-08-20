@@ -7,22 +7,23 @@ use crate::{
         state::{GraphicsMode, IcyBoardState},
     },
 };
+use std::fmt::Write as _;
 
 /// 2AM BBS
 pub async fn create_jumper_dat(state: &IcyBoardState, path: &std::path::Path) -> Res<()> {
     let mut contents = String::new();
 
     let board = state.get_board().await;
-    contents.push_str(&format!("{}\r\n", board.config.board.name));
-    contents.push_str(&format!("{}\r\n", board.config.sysop.name));
-    contents.push_str(&format!("{}\r\n", state.session.user_name));
-    contents.push_str(&format!("{}\r\n", state.session.cur_user_id));
-    contents.push_str(&format!("{}\r\n", state.session.get_first_name()));
-    contents.push_str(&format!("{}\r\n", state.session.get_last_name()));
-    contents.push_str(&format!("{}\r\n", state.session.current_user.as_ref().unwrap().city_or_state));
-    contents.push_str(&format!("{}\r\n", state.session.minutes_left()));
-    contents.push_str(&format!("{}\r\n", DOOR_COM_PORT));
-    contents.push_str(&format!("{}\r\n", DOOR_BPS_RATE));
+    let _ = write!(contents, "{}\r\n", board.config.board.name);
+    let _ = write!(contents, "{}\r\n", board.config.sysop.name);
+    let _ = write!(contents, "{}\r\n", state.session.user_name);
+    let _ = write!(contents, "{}\r\n", state.session.cur_user_id);
+    let _ = write!(contents, "{}\r\n", state.session.get_first_name());
+    let _ = write!(contents, "{}\r\n", state.session.get_last_name());
+    let _ = write!(contents, "{}\r\n", state.session.current_user.as_ref().unwrap().city_or_state);
+    let _ = write!(contents, "{}\r\n", state.session.minutes_left());
+    let _ = write!(contents, "{DOOR_COM_PORT}\r\n");
+    let _ = write!(contents, "{DOOR_BPS_RATE}\r\n");
     contents.push_str("0\r\n"); // Number of nulls needed
     contents.push_str("FALSE\r\n"); // Linefeeds
     contents.push_str("FALSE\r\n"); // Upper Case only
@@ -32,7 +33,7 @@ pub async fn create_jumper_dat(state: &IcyBoardState, path: &std::path::Path) ->
         GraphicsMode::Ctty => "FALSE",
         _ => "TRUE",
     };
-    contents.push_str(&format!("{}\r\n", graphics_mode));
+    let _ = write!(contents, "{graphics_mode}\r\n");
     contents.push_str("FALSE\r\n"); // System bell
 
     let path = path.join("JUMPER.DAT");

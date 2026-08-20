@@ -107,10 +107,11 @@ impl Executable {
 
     fn validate_variable_types(variable_table: &VariableTable, user_types: &[Vec<VariableType>]) -> Result<(), ExecutableError> {
         for entry in variable_table.get_entries() {
-            if let VariableType::UserData(type_id) = entry.header.variable_type {
-                if is_user_declared_type(type_id) && type_id as usize - FIRST_USER_TYPE_ID >= user_types.len() {
-                    return Err(ExecutableError::MissingTypeDefinition(type_id));
-                }
+            if let VariableType::UserData(type_id) = entry.header.variable_type
+                && is_user_declared_type(type_id)
+                && type_id as usize - FIRST_USER_TYPE_ID >= user_types.len()
+            {
+                return Err(ExecutableError::MissingTypeDefinition(type_id));
             }
         }
         Ok(())
@@ -217,7 +218,7 @@ impl Executable {
             let use_rle = real_size != code_size;
             decrypt_chunks(code_data, version, use_rle);
             if use_rle {
-                decrypted_data = decode_rle(&code_data);
+                decrypted_data = decode_rle(code_data);
                 &decrypted_data
             } else {
                 code_data

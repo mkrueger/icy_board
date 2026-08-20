@@ -238,10 +238,10 @@ impl Serial {
 
         // Set RTS (Request To Send) - enables communication
         // Only set if not using hardware flow control (RTS/CTS)
-        if self.flow_control != FlowControl::RtsCts {
-            if let Err(e) = port.set_rts(true) {
-                log::warn!("Failed to set RTS: {}", e);
-            }
+        if self.flow_control != FlowControl::RtsCts
+            && let Err(e) = port.set_rts(true)
+        {
+            log::warn!("Failed to set RTS: {}", e);
         }
 
         // Discard any garbage in the buffers

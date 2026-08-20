@@ -109,9 +109,9 @@ impl TabPage for GeneralTab {
     }
 
     fn render(&mut self, frame: &mut Frame, area: Rect) {
-        let width = (2 + 50 + 2).min(area.width) as u16;
+        let width = (2 + 50 + 2).min(area.width);
 
-        let lines = (7).min(area.height) as u16;
+        let lines = (7).min(area.height);
         let area = Rect::new(area.x + (area.width - width) / 2, (area.y + area.height - lines) / 2, width + 2, lines);
 
         Clear.render(area, frame.buffer_mut());
@@ -129,18 +129,13 @@ impl TabPage for GeneralTab {
     }
 
     fn handle_key_press(&mut self, key: KeyEvent) -> ResultState {
-        let res = self.config.handle_key_press(key, &mut self.state);
-        res
+        self.config.handle_key_press(key, &mut self.state)
     }
 
     fn request_status(&self) -> ResultState {
-        return ResultState {
+        ResultState {
             edit_msg: EditMessage::None,
-            status_line: if self.state.selected < self.config.entry.len() {
-                "".to_string()
-            } else {
-                "".to_string()
-            },
-        };
+            status_line: String::new(),
+        }
     }
 }
