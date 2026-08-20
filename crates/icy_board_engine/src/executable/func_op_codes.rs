@@ -314,9 +314,15 @@ pub enum FuncOpCode {
     BASE64DEC = -300,
     SHA256 = -301,
     GfxBackend = -302,
+    MousePoll = -303,
+    MouseX = -304,
+    MouseY = -305,
+    MouseButton = -306,
+    MouseModifiers = -307,
+    MousePixels = -308,
 }
 
-pub const LAST_FUNC: i16 = -302;
+pub const LAST_FUNC: i16 = -308;
 
 impl FuncOpCode {
     pub fn get_definition(self) -> &'static FunctionDefinition {
@@ -383,7 +389,7 @@ impl FunctionDefinition {
         }
     }
 }
-pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 314]> = std::sync::LazyLock::new(|| {
+pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 320]> = std::sync::LazyLock::new(|| {
     [
         FunctionDefinition {
             name: "END",
@@ -2974,6 +2980,54 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 314]> 
             version: 400,
             opcode: FuncOpCode::GfxBackend,
             return_type: VariableType::Integer,
+            args: None,
+            signature: FunctionSignature::FixedParameters(0),
+        },
+        FunctionDefinition {
+            name: "MousePoll",
+            version: 400,
+            opcode: FuncOpCode::MousePoll,
+            return_type: VariableType::Integer,
+            args: None,
+            signature: FunctionSignature::FixedParameters(0),
+        },
+        FunctionDefinition {
+            name: "MouseX",
+            version: 400,
+            opcode: FuncOpCode::MouseX,
+            return_type: VariableType::Integer,
+            args: None,
+            signature: FunctionSignature::FixedParameters(0),
+        },
+        FunctionDefinition {
+            name: "MouseY",
+            version: 400,
+            opcode: FuncOpCode::MouseY,
+            return_type: VariableType::Integer,
+            args: None,
+            signature: FunctionSignature::FixedParameters(0),
+        },
+        FunctionDefinition {
+            name: "MouseButton",
+            version: 400,
+            opcode: FuncOpCode::MouseButton,
+            return_type: VariableType::Integer,
+            args: None,
+            signature: FunctionSignature::FixedParameters(0),
+        },
+        FunctionDefinition {
+            name: "MouseModifiers",
+            version: 400,
+            opcode: FuncOpCode::MouseModifiers,
+            return_type: VariableType::Integer,
+            args: None,
+            signature: FunctionSignature::FixedParameters(0),
+        },
+        FunctionDefinition {
+            name: "MousePixels",
+            version: 400,
+            opcode: FuncOpCode::MousePixels,
+            return_type: VariableType::Boolean,
             args: None,
             signature: FunctionSignature::FixedParameters(0),
         },

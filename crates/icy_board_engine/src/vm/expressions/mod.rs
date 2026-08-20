@@ -293,6 +293,12 @@ pub async fn run_function(opcode: FuncOpCode, arg: &mut VirtualMachine<'_>, argu
         FuncOpCode::BASE64DEC => predefined_functions::base64dec(arg, arguments).await,
         FuncOpCode::SHA256 => predefined_functions::sha256(arg, arguments).await,
         FuncOpCode::GfxBackend => predefined_functions::gfxbackend(arg, arguments).await,
+        FuncOpCode::MousePoll => predefined_functions::mousepoll(arg, arguments).await,
+        FuncOpCode::MouseX => predefined_functions::mousex(arg, arguments).await,
+        FuncOpCode::MouseY => predefined_functions::mousey(arg, arguments).await,
+        FuncOpCode::MouseButton => predefined_functions::mousebutton(arg, arguments).await,
+        FuncOpCode::MouseModifiers => predefined_functions::mousemodifiers(arg, arguments).await,
+        FuncOpCode::MousePixels => predefined_functions::mousepixels(arg, arguments).await,
         FuncOpCode::END
         | FuncOpCode::CPAR
         | FuncOpCode::UPLUS

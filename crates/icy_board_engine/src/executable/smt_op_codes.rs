@@ -288,8 +288,10 @@ pub enum OpCode {
     GfxFree = 246,
     GfxShutdown = 247,
     GfxPresentAt = 248,
+    MouseOn = 249,
+    MouseOff = 250,
 }
-pub const LAST_STMT: i16 = OpCode::GfxPresentAt as i16;
+pub const LAST_STMT: i16 = OpCode::MouseOff as i16;
 
 impl OpCode {
     pub fn get_definition(self) -> &'static StatementDefinition {
@@ -611,7 +613,7 @@ pub fn format_argument_type_last(arg: &ArgumentDefinition) -> String {
 // "WAIT FOR" == "WAITFOR"
 // "GO SUB"
 // " GO TO"
-pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 254]> = std::sync::LazyLock::new(|| {
+pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 256]> = std::sync::LazyLock::new(|| {
     [
         StatementDefinition {
             // helps to map opcode to array index.
@@ -2769,6 +2771,20 @@ pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 254]
                 ArgumentDefinition::new("Row", VariableType::Integer),
             ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 3),
+        },
+        StatementDefinition {
+            name: "MouseOn",
+            version: 400,
+            opcode: OpCode::MouseOn,
+            args: Some(vec![ArgumentDefinition::new("Mode", VariableType::Integer)]),
+            sig: StatementSignature::ArgumentsWithVariable(0, 1),
+        },
+        StatementDefinition {
+            name: "MouseOff",
+            version: 400,
+            opcode: OpCode::MouseOff,
+            args: None,
+            sig: StatementSignature::ArgumentsWithVariable(0, 0),
         },
         // Alias section
         // Moving to the end, so that the opcode <--> index mapping is not broken

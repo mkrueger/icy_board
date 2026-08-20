@@ -3100,3 +3100,18 @@ pub async fn gfxshutdown(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<
         Ok(())
     }
 }
+
+pub async fn mouseon(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let mode = vm.eval_expr(&args[0]).await?.as_int();
+    if !vm.icy_board_state.ppl_mouse.enable(mode) {
+        log::warn!("MOUSEON rejected unsupported mode {mode}");
+        return Ok(());
+    }
+    let sequence = vm.icy_board_state.ppl_mouse.enable_sequence();
+    vm.icy_board_state.connection.send(&sequence).await
+}
+
+pub async fn mouseoff(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
+    vm.icy_board_state.ppl_mouse.disable();
+    vm.icy_board_state.connection.send(crate::icy_board::state::ppl_mouse::MOUSE_OFF_SEQUENCE).await
+}

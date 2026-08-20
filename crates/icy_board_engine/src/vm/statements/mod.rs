@@ -265,5 +265,7 @@ pub async fn run_predefined_statement(opcode: OpCode, arg: &mut VirtualMachine<'
         OpCode::GfxFree => predefined_procedures::gfxfree(arg, arguments).await,
         OpCode::GfxShutdown => predefined_procedures::gfxshutdown(arg, arguments).await,
         OpCode::GfxPresentAt => predefined_procedures::gfxpresentat(arg, arguments).await,
+        OpCode::MouseOn => predefined_procedures::mouseon(arg, arguments).await,
+        OpCode::MouseOff => predefined_procedures::mouseoff(arg, arguments).await,
     }
 }

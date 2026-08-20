@@ -2746,6 +2746,30 @@ pub async fn gfxbackend(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<V
     Ok(VariableValue::new_int(backend))
 }
 
+pub async fn mousepoll(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
+    Ok(VariableValue::new_int(vm.icy_board_state.poll_ppl_mouse_event().await?))
+}
+
+pub async fn mousex(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
+    Ok(VariableValue::new_int(vm.icy_board_state.ppl_mouse.current().x))
+}
+
+pub async fn mousey(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
+    Ok(VariableValue::new_int(vm.icy_board_state.ppl_mouse.current().y))
+}
+
+pub async fn mousebutton(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
+    Ok(VariableValue::new_int(vm.icy_board_state.ppl_mouse.current().button))
+}
+
+pub async fn mousemodifiers(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
+    Ok(VariableValue::new_int(vm.icy_board_state.ppl_mouse.current().modifiers))
+}
+
+pub async fn mousepixels(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
+    Ok(VariableValue::new_bool(vm.icy_board_state.ppl_mouse.pixels()))
+}
+
 /// A request the caller's node waits on, so it needs an end: a host that never
 /// answers would hold the node until the caller gives up. A failed request is
 /// logged and answered empty rather than stopping the PPE, the way the rest of

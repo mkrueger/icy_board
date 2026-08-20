@@ -1,0 +1,248 @@
+;$LANGVERSION 400
+
+CONST INTEGER SCREEN_W = 640
+CONST INTEGER SCREEN_H = 400
+CONST INTEGER CANVAS_X = 20
+CONST INTEGER CANVAS_Y = 76
+CONST INTEGER CANVAS_W = 600
+CONST INTEGER CANVAS_H = 304
+CONST INTEGER SWATCH_X = 144
+CONST INTEGER SWATCH_Y = 25
+CONST INTEGER SWATCH_STEP = 34
+CONST INTEGER SWATCH_SIZE = 26
+CONST INTEGER COLOR_COUNT = 8
+
+CONST INTEGER MOUSE_NONE = 0
+CONST INTEGER MOUSE_PRESS = 1
+CONST INTEGER MOUSE_RELEASE = 2
+CONST INTEGER MOUSE_MOTION = 3
+CONST INTEGER MOUSE_WHEEL = 4
+
+CONST UNSIGNED C_CANVAS = 4294967295
+CONST UNSIGNED C_INK = 16909311
+CONST UNSIGNED C_FRAME = 588911615
+
+UNSIGNED colors(7)
+INTEGER selected, brushSize
+INTEGER event, mx, my, btn
+INTEGER lastX, lastY, dragButton
+INTEGER tries
+BOOLEAN running, dragging, dirty, pendingEvent
+STRING key
+
+InitColors()
+CLS
+PRINTLN "Starting PPE Paint..."
+
+GfxInit 0
+IF GfxBackend() < 0 THEN
+    CLS
+    PRINTLN "PPE Paint requires a Sixel-capable terminal."
+    EXIT
+ENDIF
+GfxCreate 0, SCREEN_W, SCREEN_H
+GfxLoad 1, "./paint_ui.png"
+GfxBlit 0, 1, 0, 0
+
+selected = 0
+brushSize = 7
+dragging = FALSE
+dirty = FALSE
+RenderToolbar()
+
+MouseOn 1
+tries = 0
+WHILE !MousePixels() & tries < 30 DO
+    event = MousePoll()
+    GfxWaitFrame 20
+    tries += 1
+ENDWHILE
+IF !MousePixels() THEN
+    MouseOff
+    GfxShutdown
+    CLS
+    PRINTLN "PPE Paint requires pixel mouse reporting (DEC mode 1016)."
+    EXIT
+ENDIF
+pendingEvent = event <> MOUSE_NONE
+
+running = TRUE
+WHILE running DO
+    dirty = FALSE
+    IF pendingEvent THEN
+        pendingEvent = FALSE
+    ELSE
+        event = MousePoll()
+    ENDIF
+    WHILE event <> MOUSE_NONE DO
+        mx = MouseX()
+        my = MouseY()
+        btn = MouseButton()
+
+        IF event = MOUSE_PRESS THEN
+            IF my < CANVAS_Y THEN
+                HandleToolbar(mx, my)
+            ELSEIF (InsideCanvas(mx, my)) THEN
+                IF btn = 0 | btn = 2 THEN
+                    dragging = TRUE
+                    dragButton = btn
+                    lastX = mx
+                    lastY = my
+                    DrawStroke(lastX, lastY, mx, my, StrokeColor(btn))
+                ENDIF
+            ENDIF
+        ELSEIF (event = MOUSE_MOTION) THEN
+            IF dragging & btn = dragButton & InsideCanvas(mx, my) THEN
+                DrawStroke(lastX, lastY, mx, my, StrokeColor(btn))
+                lastX = mx
+                lastY = my
+            ENDIF
+        ELSEIF (event = MOUSE_RELEASE) THEN
+            dragging = FALSE
+        ELSEIF (event = MOUSE_WHEEL) THEN
+            IF btn = 3 THEN
+                ChangeBrush(1)
+            ELSEIF (btn = 4) THEN
+                ChangeBrush(-1)
+            ENDIF
+        ENDIF
+        event = MousePoll()
+    ENDWHILE
+    IF dirty PresentDirty()
+
+    key = Upper(InKey())
+    IF key = "Q" | key = Chr(27) THEN
+        running = FALSE
+    ELSEIF (key = "C") THEN
+        ClearCanvas()
+    ELSEIF (key = "+" | key = "=") THEN
+        ChangeBrush(1)
+    ELSEIF (key = "-") THEN
+        ChangeBrush(-1)
+    ENDIF
+    GfxWaitFrame 30
+ENDWHILE
+
+MouseOff
+GfxFree 1
+GfxFree 0
+GfxShutdown
+CLS
+
+PROCEDURE InitColors()
+    colors[0] = 572727039
+    colors[1] = 4033308671
+    colors[2] = 4120529663
+    colors[3] = 4124395519
+    colors[4] = 1691773951
+    colors[5] = 1121577215
+    colors[6] = 1536162303
+    colors[7] = 2809004031
+ENDPROC
+
+FUNCTION InsideCanvas(INTEGER x, INTEGER y) BOOLEAN
+    InsideCanvas = x >= CANVAS_X & x < CANVAS_X + CANVAS_W & y >= CANVAS_Y & y < CANVAS_Y + CANVAS_H
+ENDFUNC
+
+FUNCTION StrokeColor(INTEGER whichButton) UNSIGNED
+    IF whichButton = 2 THEN
+        StrokeColor = C_CANVAS
+    ELSE
+        StrokeColor = colors[selected]
+    ENDIF
+ENDFUNC
+
+PROCEDURE RenderToolbar()
+    INTEGER i, x
+    ; Restore the original toolbar, then draw state indicators.
+    GfxBlitRect 0, 1, 0, 0, SCREEN_W, CANVAS_Y, 0, 0
+    i = 0
+    WHILE i < COLOR_COUNT DO
+        x = SWATCH_X + i * SWATCH_STEP
+        GfxFillRect 0, x, SWATCH_Y, SWATCH_SIZE, SWATCH_SIZE, colors[i]
+        GfxRect 0, x, SWATCH_Y, SWATCH_SIZE, SWATCH_SIZE, C_INK
+        IF i = selected GfxRect 0, x - 3, SWATCH_Y - 3, SWATCH_SIZE + 6, SWATCH_SIZE + 6, C_CANVAS
+        i += 1
+    ENDWHILE
+    ; Brush preview.
+    GfxFillRect 0, 432, 25, 36, 28, C_CANVAS
+    GfxRect 0, 432, 25, 36, 28, C_FRAME
+    GfxFillRect 0, 450 - brushSize / 2, 39 - brushSize / 2, brushSize, brushSize, colors[selected]
+    GfxPresent 0
+ENDPROC
+
+PROCEDURE HandleToolbar(INTEGER x, INTEGER y)
+    INTEGER index
+    IF x >= SWATCH_X & x < SWATCH_X + COLOR_COUNT * SWATCH_STEP & y >= SWATCH_Y & y < SWATCH_Y + SWATCH_SIZE THEN
+        index = (x - SWATCH_X) / SWATCH_STEP
+        IF index >= 0 & index < COLOR_COUNT THEN
+            selected = index
+            RenderToolbar()
+            RETURN
+        ENDIF
+    ENDIF
+    IF x >= 480 & x < 510 & y >= 25 & y < 53 THEN
+        ChangeBrush(-1)
+    ELSEIF (x >= 518 & x < 548 & y >= 25 & y < 53) THEN
+        ChangeBrush(1)
+    ELSEIF (x >= 556 & x < 624 & y >= 25 & y < 53) THEN
+        ClearCanvas()
+    ENDIF
+ENDPROC
+
+PROCEDURE ChangeBrush(INTEGER amount)
+    brushSize += amount * 2
+    IF brushSize < 1 brushSize = 1
+    IF brushSize > 31 brushSize = 31
+    RenderToolbar()
+ENDPROC
+
+PROCEDURE ClearCanvas()
+    GfxFillRect 0, CANVAS_X, CANVAS_Y, CANVAS_W, CANVAS_H, C_CANVAS
+    GfxRect 0, CANVAS_X, CANVAS_Y, CANVAS_W, CANVAS_H, C_FRAME
+    GfxPresent 0
+ENDPROC
+
+PROCEDURE Dab(INTEGER x, INTEGER y, UNSIGNED color)
+    INTEGER half, drawLeft, drawTop
+    half = brushSize / 2
+    drawLeft = x - half
+    drawTop = y - half
+    IF drawLeft < CANVAS_X drawLeft = CANVAS_X
+    IF drawTop < CANVAS_Y drawTop = CANVAS_Y
+    GfxFillRect 0, drawLeft, drawTop, brushSize, brushSize, color
+ENDPROC
+
+PROCEDURE DrawStroke(INTEGER x0, INTEGER y0, INTEGER x1, INTEGER y1, UNSIGNED color)
+    INTEGER dx, dy, sx, sy, err, e2
+    dx = Abs(x1 - x0)
+    dy = 0 - Abs(y1 - y0)
+    sx = -1
+    IF x0 < x1 sx = 1
+    sy = -1
+    IF y0 < y1 sy = 1
+    err = dx + dy
+
+    LOOP
+        Dab(x0, y0, color)
+        IF x0 = x1 & y0 = y1 BREAK
+        e2 = err * 2
+        IF e2 >= dy THEN
+            err += dy
+            x0 += sx
+        ENDIF
+        IF e2 <= dx THEN
+            err += dx
+            y0 += sy
+        ENDIF
+    ENDLOOP
+
+    dirty = TRUE
+ENDPROC
+
+PROCEDURE PresentDirty()
+    ; Sixel terminals do not consistently preserve previous images under
+    ; transparent partial updates. The event batch still limits this to one
+    ; complete image per frame.
+    GfxPresent 0
+ENDPROC

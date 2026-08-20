@@ -4733,6 +4733,14 @@
           {
             "type": "PATTERN",
             "value": "[gG][fF][xX][sS][hH][uU][tT][dD][oO][wW][nN]"
+          },
+          {
+            "type": "PATTERN",
+            "value": "[mM][oO][uU][sS][eE][oO][nN]"
+          },
+          {
+            "type": "PATTERN",
+            "value": "[mM][oO][uU][sS][eE][oO][fF][fF]"
           }
         ]
       }

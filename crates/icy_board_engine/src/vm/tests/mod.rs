@@ -17,6 +17,7 @@ mod forward_calls;
 mod graphics;
 mod masks;
 mod message_base;
+mod mouse;
 mod nested_records;
 mod ppe_paths;
 mod record_literals;
@@ -111,21 +112,29 @@ pub fn run_ppl_in_ppe_dir(source: &str, ppe_dir: &str, files: &[(&str, &[u8])]) 
     run_ppl_seeded_in(source, |_| {}, files, Some(ppe_dir))
 }
 
+pub fn run_ppl_with_input(source: &str, input: &[u8]) -> String {
+    run_ppl_collecting(source, |_| {}, &[], None, input).1
+}
+
+pub fn run_ppl_with_files_and_input(source: &str, files: &[(&str, &[u8])], input: &[u8]) -> String {
+    run_ppl_collecting(source, |_| {}, files, None, input).1
+}
+
 fn run_ppl_seeded<P: Fn(&mut IcyBoard)>(source: &str, init_fn: P, files: &[(&str, &[u8])]) -> String {
     run_ppl_seeded_in(source, init_fn, files, None)
 }
 
 fn run_ppl_seeded_in<P: Fn(&mut IcyBoard)>(source: &str, init_fn: P, files: &[(&str, &[u8])], ppe_dir: Option<&str>) -> String {
-    run_ppl_collecting(source, init_fn, files, ppe_dir).1
+    run_ppl_collecting(source, init_fn, files, ppe_dir, &[]).1
 }
 
 /// True when the program ran to its end rather than giving up with STOP, which is what
 /// decides whether a script questionnaire keeps the answers it collected.
 pub fn ppl_keeps_script_answers(source: &str) -> bool {
-    run_ppl_collecting(source, |_| {}, &[], None).0
+    run_ppl_collecting(source, |_| {}, &[], None, &[]).0
 }
 
-fn run_ppl_collecting<P: Fn(&mut IcyBoard)>(source: &str, init_fn: P, files: &[(&str, &[u8])], ppe_dir: Option<&str>) -> (bool, String) {
+fn run_ppl_collecting<P: Fn(&mut IcyBoard)>(source: &str, init_fn: P, files: &[(&str, &[u8])], ppe_dir: Option<&str>, input: &[u8]) -> (bool, String) {
     let executable = compile(source);
     let work_dir = scratch_dir("run");
     for (name, bytes) in files {
@@ -163,6 +172,9 @@ fn run_ppl_collecting<P: Fn(&mut IcyBoard)>(source: &str, init_fn: P, files: &[(
         let node = bbs.lock().await.create_new_node(ConnectionType::Channel).await;
         let node_state = bbs.lock().await.open_connections.clone();
         let (mut peer, connection) = ChannelConnection::create_pair();
+        if !input.is_empty() {
+            peer.send(input).await.unwrap();
+        }
 
         let mut state = IcyBoardState::new(bbs, Arc::new(tokio::sync::Mutex::new(board)), node_state, node, Box::new(connection)).await;
         let sysop = state.get_board().await.users[0].clone();

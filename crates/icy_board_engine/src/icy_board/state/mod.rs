@@ -35,6 +35,7 @@ use crate::{
 pub mod functions;
 pub mod menu_runner;
 pub mod ppl_graphics;
+pub mod ppl_mouse;
 pub mod user_commands;
 pub mod virtual_screen;
 use self::functions::display_flags;
@@ -644,6 +645,7 @@ pub struct IcyBoardState {
     pub sound_volume: [i32; 16],
 
     pub ppl_graphics: Option<ppl_graphics::PplGraphicsState>,
+    pub ppl_mouse: ppl_mouse::PplMouseState,
 }
 
 impl IcyBoardState {
@@ -699,6 +701,7 @@ impl IcyBoardState {
             sound_cache: HashSet::new(),
             sound_volume: [100; 16],
             ppl_graphics: None,
+            ppl_mouse: ppl_mouse::PplMouseState::default(),
         }
     }
     async fn update_language(&mut self) {
@@ -1070,6 +1073,10 @@ impl IcyBoardState {
         self.ppe_nesting += 1;
         let result = run(&canonicalized_path, &executable, &mut io, self).await;
         self.ppe_nesting -= 1;
+        if self.ppe_nesting == 0 && self.ppl_mouse.is_enabled() {
+            self.ppl_mouse.disable();
+            let _ = self.connection.send(ppl_mouse::MOUSE_OFF_SEQUENCE).await;
+        }
         match result {
             Ok(keep_answers) => Ok(keep_answers),
             Err(err) => {
@@ -2691,6 +2698,10 @@ impl IcyBoardState {
 
     /// # Errors
     pub async fn get_char(&mut self, target: TerminalTarget) -> Res<Option<KeyChar>> {
+        let stale = self.ppl_mouse.take_stale_keyboard();
+        for byte in stale.into_iter().rev() {
+            self.char_buffer.push_front(KeyChar::new(KeySource::User, byte as char));
+        }
         if let Some(ch) = self.char_buffer.pop_front() {
             match target {
                 TerminalTarget::Both => {
@@ -2793,11 +2804,17 @@ impl IcyBoardState {
                             state.sysop_connection = Some(sysop_connection);
                             state.bbs_channel = Some(bbs_channel);
                         }
+                        let mut keys = self.process_user_input_byte(user_key_data[0]).into_iter();
+                        let key = keys.next();
                         if target == TerminalTarget::Sysop {
-                            self.char_buffer.push_back(KeyChar::new(KeySource::User, user_key_data[0] as char));
+                            if let Some(key) = key {
+                                self.char_buffer.push_back(key);
+                            }
+                            self.char_buffer.extend(keys);
                             return Ok(None);
                         }
-                        return Ok(Some(KeyChar::new(KeySource::User, user_key_data[0] as char)));
+                        self.char_buffer.extend(keys);
+                        return Ok(key);
                     }
                 }
                 () = sleep(Duration::from_millis(100)) => {
@@ -2838,11 +2855,18 @@ impl IcyBoardState {
                         if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
                             state.bbs_channel = Some(bbs_channel);
                         }
+                        let mut keys = self.process_user_input_byte(user_key_data[0]).into_iter();
+                        let key = keys.next();
                         if target == TerminalTarget::Sysop {
                             // No sysop, only user
+                            if let Some(key) = key {
+                                self.char_buffer.push_back(key);
+                            }
+                            self.char_buffer.extend(keys);
                             return Ok(None);
                         }
-                        return Ok(Some(KeyChar::new(KeySource::User, user_key_data[0] as char)));
+                        self.char_buffer.extend(keys);
+                        return Ok(key);
                     }
                 }
                 () = sleep(Duration::from_millis(100)) => {
@@ -2857,6 +2881,32 @@ impl IcyBoardState {
 
         thread::sleep(Duration::from_millis(100));
         Ok(None)
+    }
+
+    fn process_user_input_byte(&mut self, byte: u8) -> Vec<KeyChar> {
+        self.ppl_mouse
+            .feed(byte)
+            .into_iter()
+            .map(|byte| KeyChar::new(KeySource::User, byte as char))
+            .collect()
+    }
+
+    pub async fn poll_ppl_mouse_event(&mut self) -> Res<i32> {
+        if !self.ppl_mouse.is_enabled() {
+            return Ok(ppl_mouse::MOUSE_EVENT_NONE);
+        }
+        while !self.ppl_mouse.has_events() {
+            let mut input = [0u8; 64];
+            let read = self.connection.try_read(&mut input).await?;
+            if read == 0 {
+                break;
+            }
+            for byte in &input[..read] {
+                let keys = self.process_user_input_byte(*byte);
+                self.char_buffer.extend(keys);
+            }
+        }
+        Ok(self.ppl_mouse.poll())
     }
 
     pub async fn get_char_edit(&mut self) -> Res<Option<KeyChar>> {
