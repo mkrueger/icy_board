@@ -154,6 +154,17 @@ pub struct PCBoardImporter {
     unresolved: RefCell<BTreeSet<String>>,
 }
 
+fn read_mapped_source_directory(parent: &Path, configured_path: &str, resolved_path: &Path) -> Res<fs::ReadDir> {
+    fs::read_dir(parent).map_err(|err| {
+        Box::new(IcyBoardError::Error(format!(
+            "Can't read the PCBoard source directory '{}' while resolving '{}' to '{}': {err}. Verify that --map points to the existing PCBoard installation, for example --map 'D:\\PCB=/path/to/pcb'.",
+            parent.display(),
+            configured_path,
+            resolved_path.display()
+        ))) as _
+    })
+}
+
 impl PCBoardImporter {
     pub fn new(file_name: &Path, output: Box<dyn OutputLogger>, output_directory: PathBuf, mappings: &[(String, String)]) -> Res<Self> {
         let file_name = locate_pcboard_dat(file_name)?;
@@ -975,7 +986,7 @@ impl PCBoardImporter {
         let resolved_file = self.resolve_file(pcb_text_file);
 
         if let Some(parent) = resolved_file.parent() {
-            for entry in fs::read_dir(parent)?.flatten() {
+            for entry in read_mapped_source_directory(parent, pcb_text_file, &resolved_file)?.flatten() {
                 if entry.path().is_dir() {
                     continue;
                 }
@@ -1966,5 +1977,23 @@ impl PCBoardImporter {
             list.save(&destination)?;
         }
         Ok(PathBuf::from(new_rel_name))
+    }
+}
+
+#[cfg(test)]
+mod import_error_tests {
+    use super::*;
+
+    #[test]
+    fn missing_mapped_source_directory_explains_the_mapping() {
+        let parent = std::env::temp_dir().join(format!("icbsetup-missing-map-{}", std::process::id()));
+        let resolved = parent.join("GEN/PCBTEXT");
+
+        let error = read_mapped_source_directory(&parent.join("GEN"), r"D:\PCB\GEN\PCBTEXT", &resolved).unwrap_err();
+        let message = error.to_string();
+
+        assert!(message.contains(r"D:\PCB\GEN\PCBTEXT"));
+        assert!(message.contains(&resolved.display().to_string()));
+        assert!(message.contains("Verify that --map points to the existing PCBoard installation"));
     }
 }
