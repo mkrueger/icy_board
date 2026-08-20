@@ -1,0 +1,35 @@
+;$LANGVERSION 400
+
+STRING key
+
+CLS
+
+; FALSE keeps normal text mode: no clear, hidden cursor, or wrap changes.
+GfxInit 0, FALSE
+IF GfxBackend() >= 0 THEN
+    GfxLoad 1, "./banner.png"
+    ; Coordinates are normal 1-based text columns and rows.
+    GfxPresentAt 1, 18, 2
+    GfxFree 1
+ENDIF
+GfxShutdown
+
+; Continue with ordinary text below the image.
+AnsiPos 24, 9
+PrintLn "@X0F[ @X0BM A I N   M E N U@X0F ]"
+AnsiPos 27, 12
+PrintLn "@X0A(L)@X07 Log in"
+AnsiPos 27, 14
+PrintLn "@X0E(B)@X07 Browse messages"
+AnsiPos 27, 16
+PrintLn "@X0C(G)@X07 Goodbye"
+AnsiPos 24, 19
+Print "@X08Inline Sixel + normal PPL text"
+
+key = ""
+WHILE key = "" DO
+    key = InKey()
+    Delay 1
+ENDWHILE
+
+AnsiPos 1, 22

@@ -115,19 +115,21 @@ impl GfxSurface {
 
 pub struct PplGraphicsState {
     pub backend: i32,
+    pub fullscreen: bool,
     pub surfaces: HashMap<i32, GfxSurface>,
     frame_rate: u32,
     next_frame: Option<Instant>,
 }
 
 impl PplGraphicsState {
-    pub fn new(requested_backend: i32) -> Option<Self> {
+    pub fn new(requested_backend: i32, fullscreen: bool) -> Option<Self> {
         let backend = match requested_backend {
             GFX_BACKEND_AUTO | GFX_BACKEND_SIXEL => GFX_BACKEND_SIXEL,
             _ => GFX_BACKEND_NONE,
         };
         (backend != GFX_BACKEND_NONE).then(|| Self {
             backend,
+            fullscreen,
             surfaces: HashMap::new(),
             frame_rate: 0,
             next_frame: None,

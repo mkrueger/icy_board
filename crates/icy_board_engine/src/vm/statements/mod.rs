@@ -264,5 +264,6 @@ pub async fn run_predefined_statement(opcode: OpCode, arg: &mut VirtualMachine<'
         OpCode::GfxWaitFrame => predefined_procedures::gfxwaitframe(arg, arguments).await,
         OpCode::GfxFree => predefined_procedures::gfxfree(arg, arguments).await,
         OpCode::GfxShutdown => predefined_procedures::gfxshutdown(arg, arguments).await,
+        OpCode::GfxPresentAt => predefined_procedures::gfxpresentat(arg, arguments).await,
     }
 }

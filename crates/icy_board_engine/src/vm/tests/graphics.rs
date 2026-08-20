@@ -52,6 +52,29 @@ fn creates_blits_and_presents_in_memory_surfaces() {
 }
 
 #[test]
+fn inline_graphics_preserve_the_text_screen_and_cursor() {
+    let output = run_ppl(
+        r#"
+        PrintLn "before"
+        GfxInit 0, FALSE
+        GfxCreate 1, 2, 2
+        GfxClear 1, 4278190335
+        GfxPresentAt 1, 10, 3
+        GfxFree 1
+        GfxShutdown
+        PrintLn "after"
+        "#,
+    );
+
+    assert!(output.starts_with("before\n"));
+    assert!(output.contains("\x1b7\x1b[3;10H\x1bP"));
+    assert!(output.contains("\x1b\\\x1b8after\n"));
+    assert!(!output.contains("\x1b[2J"));
+    assert!(!output.contains("\x1b[?25l"));
+    assert!(!output.contains("\x1b[?25h"));
+}
+
+#[test]
 fn tetris_initializes_and_renders_without_leaking_call_frames() {
     let source = include_str!("../../../../../ppe/tetris/src/tetris.pps").replace("running = TRUE", "running = FALSE");
     let output = super::run_ppl_with_files(

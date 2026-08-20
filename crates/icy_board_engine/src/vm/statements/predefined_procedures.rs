@@ -2848,14 +2848,22 @@ pub async fn gfxinit(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
         Some(expr) => vm.eval_expr(expr).await?.as_int(),
         None => GFX_BACKEND_AUTO,
     };
-    let Some(graphics) = PplGraphicsState::new(backend) else {
+    let fullscreen = match args.get(1) {
+        Some(expr) => vm.eval_expr(expr).await?.as_bool(),
+        None => true,
+    };
+    let Some(graphics) = PplGraphicsState::new(backend, fullscreen) else {
         log::warn!("GFXINIT rejected unsupported backend {backend}");
         vm.icy_board_state.ppl_graphics = None;
         return Ok(());
     };
 
     vm.icy_board_state.ppl_graphics = Some(graphics);
-    vm.icy_board_state.connection.send(b"\x1b[2J\x1b[H\x1b[?25l\x1b[?7l\x1b[?80l\x1b[?1070l").await
+    if fullscreen {
+        vm.icy_board_state.connection.send(b"\x1b[2J\x1b[H\x1b[?25l\x1b[?7l\x1b[?80l\x1b[?1070l").await
+    } else {
+        Ok(())
+    }
 }
 
 pub async fn gfxcreate(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
@@ -3039,6 +3047,27 @@ pub async fn gfxpresentrect(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Re
     vm.icy_board_state.connection.send(&output).await
 }
 
+pub async fn gfxpresentat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let slot = vm.eval_expr(&args[0]).await?.as_int();
+    let column = vm.eval_expr(&args[1]).await?.as_int().max(1);
+    let row = vm.eval_expr(&args[2]).await?.as_int().max(1);
+    let encoded = vm
+        .icy_board_state
+        .ppl_graphics
+        .as_ref()
+        .and_then(|graphics| graphics.surfaces.get(&slot))
+        .and_then(|surface| icy_sixel::sixel_encode(&surface.pixels, surface.width, surface.height, &icy_sixel::EncodeOptions::default()).ok());
+    let Some(encoded) = encoded else {
+        return Ok(());
+    };
+    let mut output = Vec::with_capacity(encoded.len() + 24);
+    output.extend_from_slice(b"\x1b7");
+    output.extend_from_slice(format!("\x1b[{row};{column}H").as_bytes());
+    output.extend_from_slice(encoded.as_bytes());
+    output.extend_from_slice(b"\x1b8");
+    vm.icy_board_state.connection.send(&output).await
+}
+
 pub async fn gfxwaitframe(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let frame_rate = vm.eval_expr(&args[0]).await?.as_int();
     let deadline = vm
@@ -3063,6 +3092,11 @@ pub async fn gfxfree(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 }
 
 pub async fn gfxshutdown(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
+    let fullscreen = vm.icy_board_state.ppl_graphics.as_ref().is_some_and(|graphics| graphics.fullscreen);
     vm.icy_board_state.ppl_graphics = None;
-    vm.icy_board_state.connection.send(b"\x1b[?1070h\x1b[?7h\x1b[?25h").await
+    if fullscreen {
+        vm.icy_board_state.connection.send(b"\x1b[?1070h\x1b[?7h\x1b[?25h").await
+    } else {
+        Ok(())
+    }
 }

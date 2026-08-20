@@ -4661,6 +4661,78 @@
           {
             "type": "PATTERN",
             "value": "[wW][eE][bB][rR][eE][qQ][uU][eE][sS][tT]"
+          },
+          {
+            "type": "PATTERN",
+            "value": "[sS][nN][dD][pP][lL][aA][yY]"
+          },
+          {
+            "type": "PATTERN",
+            "value": "[sS][nN][dD][sS][tT][oO][pP]"
+          },
+          {
+            "type": "PATTERN",
+            "value": "[sS][nN][dD][vV][oO][lL][uU][mM][eE]"
+          },
+          {
+            "type": "PATTERN",
+            "value": "[sS][nN][dD][pP][rR][eE][lL][oO][aA][dD]"
+          },
+          {
+            "type": "PATTERN",
+            "value": "[gG][fF][xX][iI][nN][iI][tT]"
+          },
+          {
+            "type": "PATTERN",
+            "value": "[gG][fF][xX][cC][rR][eE][aA][tT][eE]"
+          },
+          {
+            "type": "PATTERN",
+            "value": "[gG][fF][xX][lL][oO][aA][dD]"
+          },
+          {
+            "type": "PATTERN",
+            "value": "[gG][fF][xX][cC][lL][eE][aA][rR]"
+          },
+          {
+            "type": "PATTERN",
+            "value": "[gG][fF][xX][fF][iI][lL][lL][rR][eE][cC][tT]"
+          },
+          {
+            "type": "PATTERN",
+            "value": "[gG][fF][xX][rR][eE][cC][tT]"
+          },
+          {
+            "type": "PATTERN",
+            "value": "[gG][fF][xX][bB][lL][iI][tT]"
+          },
+          {
+            "type": "PATTERN",
+            "value": "[gG][fF][xX][bB][lL][iI][tT][rR][eE][cC][tT]"
+          },
+          {
+            "type": "PATTERN",
+            "value": "[gG][fF][xX][pP][rR][eE][sS][eE][nN][tT]"
+          },
+          {
+            "type": "PATTERN",
+            "value": "[gG][fF][xX][pP][rR][eE][sS][eE][nN][tT][rR][eE][cC][tT]"
+          },
+          {
+            "type": "PATTERN",
+            "value": "[gG][fF][xX][pP][rR][eE][sS][eE][nN][tT][aA][tT]"
+          },
+          {
+            "type": "PATTERN",
+            "value": "[gG][fF][xX][wW][aA][iI][tT][fF][rR][aA][mM][eE]"
+          },
+          {
+            "type": "PATTERN",
+            "value": "[gG][fF][xX][fF][rR][eE][eE]"
+          },
+          {
+            "type": "PATTERN",
+            "value": "[gG][fF][xX][sS][hH][uU][tT][dD][oO][wW][nN]"
           }
         ]
       }
