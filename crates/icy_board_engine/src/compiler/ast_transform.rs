@@ -128,22 +128,24 @@ impl AstTransformationVisitor {
 
 impl AstVisitorMut for AstTransformationVisitor {
     fn visit_unary_expression(&mut self, unary: &crate::ast::UnaryExpression) -> Expression {
+        let transformed = crate::ast::UnaryExpression::empty(unary.get_op(), unary.get_expression().visit_mut(self));
         if self.optimize_output {
-            ConstantFolder::default().visit_unary_expression(unary)
+            ConstantFolder::default().visit_unary_expression(&transformed)
         } else {
-            Expression::Unary(crate::ast::UnaryExpression::empty(unary.get_op(), unary.get_expression().visit_mut(self)))
+            Expression::Unary(transformed)
         }
     }
 
     fn visit_binary_expression(&mut self, binary: &BinaryExpression) -> Expression {
+        let transformed = BinaryExpression::empty(
+            binary.get_left_expression().visit_mut(self),
+            binary.get_op(),
+            binary.get_right_expression().visit_mut(self),
+        );
         if self.optimize_output {
-            ConstantFolder::default().visit_binary_expression(binary)
+            ConstantFolder::default().visit_binary_expression(&transformed)
         } else {
-            Expression::Binary(BinaryExpression::empty(
-                binary.get_left_expression().visit_mut(self),
-                binary.get_op(),
-                binary.get_right_expression().visit_mut(self),
-            ))
+            Expression::Binary(transformed)
         }
     }
 

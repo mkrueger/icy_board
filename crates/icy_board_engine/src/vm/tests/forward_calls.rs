@@ -84,6 +84,53 @@ ENDFUNC
 }
 
 #[test]
+fn repeated_nested_function_calls_release_the_call_stack() {
+    assert_eq!(
+        "200",
+        run_ppl(
+            r"
+INTEGER count = 0
+INTEGER i = 0
+WHILE i < 200 DO
+    IF Outer(i) count += 1
+    i += 1
+ENDWHILE
+PRINT count
+FUNCTION Outer(INTEGER n) BOOLEAN
+    RETURN Inner(n)
+ENDFUNC
+FUNCTION Inner(INTEGER n) BOOLEAN
+    RETURN n >= 0
+ENDFUNC
+"
+        )
+    );
+}
+
+#[test]
+fn routine_loops_resolve_global_constants_before_folding() {
+    assert_eq!(
+        "20",
+        run_ppl(
+            r"
+CONST INTEGER LIMIT = 20
+INTEGER result
+Count(result)
+PRINT result
+PROCEDURE Count(VAR INTEGER value)
+    INTEGER i = 0
+    value = 0
+    WHILE i < LIMIT DO
+        value += 1
+        i += 1
+    ENDWHILE
+ENDPROC
+"
+        )
+    );
+}
+
+#[test]
 fn test_a_function_defined_before_its_use_still_works() {
     assert_eq!(
         "4",
