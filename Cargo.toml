@@ -33,6 +33,7 @@ icy_board_tui = { path = "crates/icy_board_tui" }
 icy_net = { path = "crates/icy_net" }
 icy_board_engine = { path = "crates/icy_board_engine" }
 icy_engine = { git = "https://github.com/mkrueger/icy_tools" }
+icy_engine_gui = { git = "https://github.com/mkrueger/icy_tools" }
 icy_parser_core = { git = "https://github.com/mkrueger/icy_tools" }
 icy_sixel = "0.5.0"
 image = "0.25.10"
@@ -44,9 +45,12 @@ thiserror = "2.0.20"
 argh = "0.1.19"
 crossterm = "0.29.0"
 ratatui = "0.30.2"
+ratatui-image = { version = "11.0.6", default-features = false, features = ["crossterm", "image-defaults"] }
+rodio = { version = "0.22.2", features = ["tracing"] }
 log = "0.4.33"
 chrono = { version = "0.4.45", features = ["serde"] }
 bstr = "1.13.1"
+base64 = "0.22.1"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 tokio = { version = "1.53.1", features = ["full"] }

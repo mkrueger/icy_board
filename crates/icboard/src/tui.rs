@@ -14,7 +14,8 @@ use chrono::Utc;
 use crossterm::{
     ExecutableCommand,
     cursor::MoveTo,
-    event::{self, Event, KeyCode, KeyEventKind, KeyModifiers},
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind, KeyModifiers, MouseEvent as CrosstermMouseEvent, MouseEventKind},
+    execute,
     terminal::Clear,
 };
 use icy_board_engine::icy_board::{
@@ -26,9 +27,10 @@ use icy_board_tui::{
     get_text_args,
     theme::{DOS_BLACK, DOS_BLUE, DOS_LIGHT_GRAY, DOS_LIGHT_GREEN, DOS_RED, DOS_WHITE, DOS_YELLOW},
 };
-use icy_engine::{BufferType, EditableScreen, Screen, TextPane, TextScreen};
+use icy_engine::{BufferType, EditableScreen, ExtMouseMode, MouseMode, Screen, Sixel, TextPane, TextScreen};
 use icy_net::{ConnectionType, channel::ChannelConnection};
 use ratatui::{prelude::*, widgets::Paragraph};
+use ratatui_image::{Image as RatatuiImage, Resize, picker::Picker, protocol::Protocol};
 use tokio::sync::{Mutex, mpsc};
 
 pub struct Tui {
@@ -39,6 +41,19 @@ pub struct Tui {
     handle: Arc<Mutex<Vec<Option<NodeState>>>>,
     node: usize,
     node_state: Arc<Mutex<Vec<Option<NodeState>>>>,
+    rendered_sixels: Vec<Sixel>,
+    image_picker: Option<Picker>,
+    rendered_images: Vec<RenderedImage>,
+    rendered_image_context: Option<(ratatui::layout::Size, bool)>,
+    host_mouse_capture: bool,
+    host_pixel_mouse: bool,
+}
+
+struct RenderedImage {
+    position: icy_engine::Position,
+    protocol: Protocol,
+    source_size: (u32, u32),
+    scaled_to_viewport: bool,
 }
 
 impl Tui {
@@ -83,6 +98,12 @@ impl Tui {
             node,
             node_state,
             handle: bbs.lock().await.get_open_connections().clone(),
+            rendered_sixels: Vec::new(),
+            image_picker: None,
+            rendered_images: Vec::new(),
+            rendered_image_context: None,
+            host_mouse_capture: false,
+            host_pixel_mouse: false,
         })
     }
 
@@ -116,6 +137,12 @@ impl Tui {
             node,
             node_state,
             handle: bbs.get_open_connections().clone(),
+            rendered_sixels: Vec::new(),
+            image_picker: None,
+            rendered_images: Vec::new(),
+            rendered_image_context: None,
+            host_mouse_capture: false,
+            host_pixel_mouse: false,
         })
     }
 
@@ -124,6 +151,11 @@ impl Tui {
         let mut last_tick = Instant::now();
         let tick_rate = Duration::from_millis(20);
         terminal.clear()?;
+        let _mouse_capture = MouseCaptureGuard;
+        self.image_picker = Some(Picker::from_query_stdio().unwrap_or_else(|err| {
+            log::warn!("Terminal image capability query failed, using half-block rendering: {err}");
+            Picker::halfblocks()
+        }));
         //   let mut redraw = true;
         loop {
             if let Some(Some(node_state)) = self.handle.lock().await.get_mut(self.node) {
@@ -145,64 +177,75 @@ impl Tui {
             //if redraw
             {
                 //  redraw = false;
+                if !self.rendered_sixels.is_empty() && self.current_sixels().is_empty() {
+                    terminal.clear()?;
+                    self.rendered_sixels.clear();
+                    self.rendered_images.clear();
+                    self.rendered_image_context = None;
+                }
+                self.refresh_images(terminal.size()?)?;
                 let status_bar_info = StatusBarInfo::get_info(board, &self.node_state, self.node).await;
                 let _ = terminal.draw(|frame| {
                     self.ui(frame, status_bar_info);
                 });
             }
             let timeout = tick_rate.saturating_sub(last_tick.elapsed());
-            if event::poll(timeout)?
-                && let Event::Key(key) = event::read()?
-                && key.kind == KeyEventKind::Press
-            {
-                if key.modifiers.contains(KeyModifiers::ALT) {
-                    match key.code {
-                        KeyCode::Char('h') => {
-                            self.status_bar = (self.status_bar + 1) % 4;
-                            //redraw = true;
-                        }
-                        KeyCode::Char('x') => {
-                            self.logoff_sysop(bbs).await?;
-                            return Ok(());
-                        }
-                        _ => {}
-                    }
-                } else if key.modifiers.contains(KeyModifiers::CONTROL) {
-                    match key.code {
-                        KeyCode::Char(c) => {
-                            if c == 'x' || c == 'c' {
-                                self.logoff_sysop(bbs).await?;
-                                return Ok(());
+            self.sync_host_mouse_mode()?;
+            if event::poll(timeout)? {
+                match event::read()? {
+                    Event::Key(key) if key.kind == KeyEventKind::Press => {
+                        if key.modifiers.contains(KeyModifiers::ALT) {
+                            match key.code {
+                                KeyCode::Char('h') => {
+                                    self.status_bar = (self.status_bar + 1) % 4;
+                                    //redraw = true;
+                                }
+                                KeyCode::Char('x') => {
+                                    self.logoff_sysop(bbs).await?;
+                                    return Ok(());
+                                }
+                                _ => {}
                             }
-                            if c.is_ascii_lowercase() {
-                                self.add_input(((c as u8 - b'a' + 1) as char).to_string().chars()).await?;
-                            }
-                        }
+                        } else if key.modifiers.contains(KeyModifiers::CONTROL) {
+                            match key.code {
+                                KeyCode::Char(c) => {
+                                    if c == 'x' || c == 'c' {
+                                        self.logoff_sysop(bbs).await?;
+                                        return Ok(());
+                                    }
+                                    if c.is_ascii_lowercase() {
+                                        self.add_input(((c as u8 - b'a' + 1) as char).to_string().chars()).await?;
+                                    }
+                                }
 
-                        KeyCode::Left => self.add_input("\x01".chars()).await?,
-                        KeyCode::Right => self.add_input("\x06".chars()).await?,
-                        KeyCode::End => self.add_input("\x0B".chars()).await?,
-                        _ => {}
+                                KeyCode::Left => self.add_input("\x01".chars()).await?,
+                                KeyCode::Right => self.add_input("\x06".chars()).await?,
+                                KeyCode::End => self.add_input("\x0B".chars()).await?,
+                                _ => {}
+                            }
+                        } else {
+                            match key.code {
+                                KeyCode::Char(c) => self.add_input(c.to_string().chars()).await?,
+                                KeyCode::Enter => self.add_input("\r".chars()).await?,
+                                KeyCode::Backspace => self.add_input("\x08".chars()).await?,
+                                KeyCode::Esc => self.add_input("\x1B".chars()).await?,
+                                KeyCode::Tab => self.add_input("\x09".chars()).await?,
+                                KeyCode::Delete => self.add_input("\x7F".chars()).await?,
+                                KeyCode::Insert => self.add_input("\x1B[2~".chars()).await?,
+                                KeyCode::Home => self.add_input("\x1B[H".chars()).await?,
+                                KeyCode::End => self.add_input("\x1B[F".chars()).await?,
+                                KeyCode::Up => self.add_input("\x1B[A".chars()).await?,
+                                KeyCode::Down => self.add_input("\x1B[B".chars()).await?,
+                                KeyCode::Right => self.add_input("\x1B[C".chars()).await?,
+                                KeyCode::Left => self.add_input("\x1B[D".chars()).await?,
+                                KeyCode::PageUp => self.add_input("\x1B[V".chars()).await?,
+                                KeyCode::PageDown => self.add_input("\x1B[U".chars()).await?,
+                                _ => {}
+                            }
+                        }
                     }
-                } else {
-                    match key.code {
-                        KeyCode::Char(c) => self.add_input(c.to_string().chars()).await?,
-                        KeyCode::Enter => self.add_input("\r".chars()).await?,
-                        KeyCode::Backspace => self.add_input("\x08".chars()).await?,
-                        KeyCode::Esc => self.add_input("\x1B".chars()).await?,
-                        KeyCode::Tab => self.add_input("\x09".chars()).await?,
-                        KeyCode::Delete => self.add_input("\x7F".chars()).await?,
-                        KeyCode::Insert => self.add_input("\x1B[2~".chars()).await?,
-                        KeyCode::Home => self.add_input("\x1B[H".chars()).await?,
-                        KeyCode::End => self.add_input("\x1B[F".chars()).await?,
-                        KeyCode::Up => self.add_input("\x1B[A".chars()).await?,
-                        KeyCode::Down => self.add_input("\x1B[B".chars()).await?,
-                        KeyCode::Right => self.add_input("\x1B[C".chars()).await?,
-                        KeyCode::Left => self.add_input("\x1B[D".chars()).await?,
-                        KeyCode::PageUp => self.add_input("\x1B[V".chars()).await?,
-                        KeyCode::PageDown => self.add_input("\x1B[U".chars()).await?,
-                        _ => {}
-                    }
+                    Event::Mouse(mouse) => self.add_mouse_input(mouse, terminal.size()?).await?,
+                    _ => {}
                 }
             }
 
@@ -247,6 +290,68 @@ impl Tui {
         }
         let pos: icy_engine::Position = screen.caret.position();
         frame.set_cursor_position((area.x + pos.x as u16, y + pos.y as u16 - screen.first_visible_line() as u16));
+
+        for image in &self.rendered_images {
+            let image_y = i32::from(y) + image.position.y - screen.first_visible_line();
+            if image_y < i32::from(y) || image.position.x < 0 {
+                continue;
+            }
+            let size = image.protocol.size();
+            let image_area = Rect::new(
+                area.x.saturating_add(image.position.x as u16),
+                image_y as u16,
+                size.width.min(frame.area().width.saturating_sub(area.x)),
+                size.height.min(frame.area().height.saturating_sub(image_y as u16)),
+            );
+            frame.render_widget(RatatuiImage::new(&image.protocol).allow_clipping(true), image_area);
+        }
+    }
+
+    fn refresh_images(&mut self, terminal_area: ratatui::layout::Size) -> Res<()> {
+        let screen = self.screen.lock().unwrap();
+        let sixels = current_sixels(&screen);
+        let fullscreen = screen.buffer.terminal_state.sixel_shared_palette;
+        let viewport_size = ratatui::layout::Size::new(
+            terminal_area.width.min(screen.buffer.terminal_state.width().max(0) as u16),
+            terminal_area.height.min(screen.buffer.terminal_state.height().max(0) as u16),
+        );
+        let render_context = (viewport_size, fullscreen);
+        if sixels == self.rendered_sixels && self.rendered_image_context == Some(render_context) {
+            return Ok(());
+        }
+        drop(screen);
+
+        let Some(picker) = &self.image_picker else {
+            return Ok(());
+        };
+        let font = picker.font_size();
+        let mut rendered = Vec::with_capacity(sixels.len());
+        for sixel in &sixels {
+            let Some(rgba) = image::RgbaImage::from_raw(sixel.width() as u32, sixel.height() as u32, sixel.picture_data.clone()) else {
+                continue;
+            };
+            let scale_to_viewport = fullscreen && sixel.position == icy_engine::Position::default();
+            let target_size = image_target_size(sixel.width(), sixel.height(), font, viewport_size, scale_to_viewport);
+            if target_size.width == 0 || target_size.height == 0 {
+                continue;
+            }
+            let resize = if scale_to_viewport { Resize::Scale(None) } else { Resize::Fit(None) };
+            let protocol = picker.new_protocol(image::DynamicImage::ImageRgba8(rgba), target_size, resize)?;
+            rendered.push(RenderedImage {
+                position: sixel.position,
+                protocol,
+                source_size: (sixel.width() as u32, sixel.height() as u32),
+                scaled_to_viewport: scale_to_viewport,
+            });
+        }
+        self.rendered_images = rendered;
+        self.rendered_sixels = sixels;
+        self.rendered_image_context = Some(render_context);
+        Ok(())
+    }
+
+    fn current_sixels(&self) -> Vec<Sixel> {
+        current_sixels(&self.screen.lock().unwrap())
     }
 
     fn draw_statusbar(&self, frame: &mut Frame, area: Rect, status_bar_info: StatusBarInfo) {
@@ -412,6 +517,197 @@ impl Tui {
         }
         let _res = self.tx.send(SendData::Data(s)).await;
         Ok(())
+    }
+
+    fn sync_host_mouse_mode(&mut self) -> io::Result<()> {
+        let (enabled, pixel) = {
+            let screen = self.screen.lock().unwrap();
+            let mouse = &screen.buffer.terminal_state.mouse_state;
+            (mouse.mouse_mode != MouseMode::OFF, mouse.extended_mode == ExtMouseMode::PixelPosition)
+        };
+        if enabled != self.host_mouse_capture {
+            if enabled {
+                execute!(stdout(), EnableMouseCapture)?;
+            } else {
+                execute!(stdout(), DisableMouseCapture)?;
+            }
+            self.host_mouse_capture = enabled;
+        }
+        if pixel != self.host_pixel_mouse {
+            if pixel {
+                execute!(stdout(), crossterm::style::Print("\x1b[?1016h"))?;
+            } else {
+                execute!(stdout(), crossterm::style::Print("\x1b[?1016l"))?;
+            }
+            self.host_pixel_mouse = pixel;
+        }
+        Ok(())
+    }
+
+    async fn add_mouse_input(&mut self, event: CrosstermMouseEvent, terminal_size: ratatui::layout::Size) -> Res<()> {
+        let (state, origin_x, origin_y) = {
+            let screen = self.screen.lock().unwrap();
+            let state = screen.buffer.terminal_state.mouse_state.clone();
+            let view_width = terminal_size.width.min(80);
+            let view_height = terminal_size.height.min(screen.buffer.terminal_state.height().max(0) as u16);
+            (state, (terminal_size.width - view_width) / 2, (terminal_size.height - view_height) / 2)
+        };
+        if state.mouse_mode == MouseMode::OFF {
+            return Ok(());
+        }
+        let (x, y) = if state.extended_mode == ExtMouseMode::PixelPosition {
+            let font = self.image_picker.as_ref().map_or((10, 20), |picker| {
+                let font = picker.font_size();
+                (font.width, font.height)
+            });
+            let local_x = i32::from(event.column).saturating_sub(i32::from(origin_x) * i32::from(font.0));
+            let local_y = i32::from(event.row).saturating_sub(i32::from(origin_y) * i32::from(font.1));
+            if let Some(image) = self
+                .rendered_images
+                .iter()
+                .rev()
+                .find(|image| image.scaled_to_viewport && image.position == icy_engine::Position::default())
+            {
+                let display_size = image.protocol.size();
+                (
+                    scale_mouse_coordinate(local_x, display_size.width, font.0, image.source_size.0),
+                    scale_mouse_coordinate(local_y, display_size.height, font.1, image.source_size.1),
+                )
+            } else {
+                (local_x, local_y)
+            }
+        } else {
+            (i32::from(event.column.saturating_sub(origin_x)), i32::from(event.row.saturating_sub(origin_y)))
+        };
+        let sequence = sgr_mouse_report(event, x, y);
+        let _ = self.tx.send(SendData::Data(sequence.into_bytes())).await;
+        Ok(())
+    }
+}
+
+fn sgr_mouse_report(event: CrosstermMouseEvent, x: i32, y: i32) -> String {
+    let mut code = match event.kind {
+        MouseEventKind::Down(button) | MouseEventKind::Up(button) | MouseEventKind::Drag(button) => match button {
+            event::MouseButton::Left => 0,
+            event::MouseButton::Middle => 1,
+            event::MouseButton::Right => 2,
+        },
+        MouseEventKind::ScrollUp => 64,
+        MouseEventKind::ScrollDown => 65,
+        MouseEventKind::ScrollLeft => 66,
+        MouseEventKind::ScrollRight => 67,
+        MouseEventKind::Moved => 3,
+    };
+    if matches!(event.kind, MouseEventKind::Drag(_) | MouseEventKind::Moved) {
+        code |= 32;
+    }
+    if event.modifiers.contains(KeyModifiers::SHIFT) {
+        code |= 4;
+    }
+    if event.modifiers.intersects(KeyModifiers::ALT | KeyModifiers::META) {
+        code |= 8;
+    }
+    if event.modifiers.contains(KeyModifiers::CONTROL) {
+        code |= 16;
+    }
+    let final_byte = if matches!(event.kind, MouseEventKind::Up(_)) { 'm' } else { 'M' };
+    format!("\x1b[<{code};{};{}{final_byte}", x.max(0) + 1, y.max(0) + 1)
+}
+
+struct MouseCaptureGuard;
+
+impl Drop for MouseCaptureGuard {
+    fn drop(&mut self) {
+        let _ = execute!(stdout(), crossterm::style::Print("\x1b[?1016l"), DisableMouseCapture);
+    }
+}
+
+fn current_sixels(screen: &TextScreen) -> Vec<Sixel> {
+    screen.buffer.layers.iter().flat_map(|layer| layer.sixels.iter().cloned()).collect()
+}
+
+fn image_target_size(
+    pixel_width: i32,
+    pixel_height: i32,
+    font: ratatui_image::FontSize,
+    viewport: ratatui::layout::Size,
+    scale_to_viewport: bool,
+) -> ratatui::layout::Size {
+    if scale_to_viewport {
+        return viewport;
+    }
+    ratatui::layout::Size::new(
+        (pixel_width as u32).div_ceil(u32::from(font.width)).min(u32::from(viewport.width)) as u16,
+        (pixel_height as u32).div_ceil(u32::from(font.height)).min(u32::from(viewport.height)) as u16,
+    )
+}
+
+fn scale_mouse_coordinate(coordinate: i32, display_cells: u16, cell_pixels: u16, source_pixels: u32) -> i32 {
+    let display_pixels = u64::from(display_cells) * u64::from(cell_pixels);
+    if display_pixels == 0 {
+        return coordinate;
+    }
+    ((u64::try_from(coordinate.max(0)).unwrap_or(0) * u64::from(source_pixels)) / display_pixels) as i32
+}
+
+#[cfg(test)]
+mod sixel_tests {
+    use super::*;
+    use crossterm::event::{KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+    use icy_parser_core::{AnsiParser, CommandParser};
+
+    #[test]
+    fn parsed_sixel_is_available_to_the_local_renderer() {
+        let encoded = icy_sixel::sixel_encode(&[255, 0, 0, 255], 1, 1, &icy_sixel::EncodeOptions::default()).unwrap();
+        let mut screen = TextScreen::new((80, 25));
+        AnsiParser::default().parse(encoded.as_bytes(), &mut icy_engine::ScreenSink::new(&mut screen));
+
+        let sixels = current_sixels(&screen);
+        assert_eq!(sixels.len(), 1);
+        assert_eq!(sixels[0].position, icy_engine::Position::default());
+        assert_eq!(sixels[0].width(), 1);
+        assert!(sixels[0].height() >= 1);
+        assert_eq!(sixels[0].picture_data.len(), (sixels[0].width() * sixels[0].height() * 4) as usize);
+    }
+
+    #[test]
+    fn fullscreen_image_targets_the_complete_terminal_viewport() {
+        let viewport = ratatui::layout::Size::new(80, 25);
+
+        assert_eq!(image_target_size(640, 400, ratatui_image::FontSize::new(8, 16), viewport, true), viewport);
+    }
+
+    #[test]
+    fn inline_image_keeps_its_natural_cell_size() {
+        assert_eq!(
+            image_target_size(320, 200, ratatui_image::FontSize::new(10, 20), ratatui::layout::Size::new(80, 25), false,),
+            ratatui::layout::Size::new(32, 10)
+        );
+    }
+
+    #[test]
+    fn fullscreen_mouse_coordinates_map_back_to_source_pixels() {
+        assert_eq!(scale_mouse_coordinate(480, 80, 12, 640), 320);
+        assert_eq!(scale_mouse_coordinate(325, 25, 26, 400), 200);
+    }
+
+    #[test]
+    fn local_mouse_events_are_forwarded_as_sgr() {
+        let press = MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column: 10,
+            row: 5,
+            modifiers: KeyModifiers::CONTROL,
+        };
+        assert_eq!(sgr_mouse_report(press, 10, 5), "\x1b[<16;11;6M");
+
+        let wheel = MouseEvent {
+            kind: MouseEventKind::ScrollDown,
+            column: 3,
+            row: 2,
+            modifiers: KeyModifiers::NONE,
+        };
+        assert_eq!(sgr_mouse_report(wheel, 3, 2), "\x1b[<65;4;3M");
     }
 }
 
