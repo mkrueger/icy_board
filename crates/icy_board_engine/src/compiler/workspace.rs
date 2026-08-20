@@ -38,6 +38,7 @@ impl Package {
 pub struct PackageData {
     pub text_files: Option<Vec<String>>,
     pub art_files: Option<Vec<String>>,
+    pub binary_files: Option<Vec<String>>,
 }
 
 #[derive(Default, Debug, Deserialize, Serialize)]

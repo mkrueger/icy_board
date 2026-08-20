@@ -2737,6 +2737,15 @@ pub async fn web_request(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<V
     }
 }
 
+pub async fn gfxbackend(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
+    let backend = vm
+        .icy_board_state
+        .ppl_graphics
+        .as_ref()
+        .map_or(crate::icy_board::state::ppl_graphics::GFX_BACKEND_NONE, |graphics| graphics.backend);
+    Ok(VariableValue::new_int(backend))
+}
+
 /// A request the caller's node waits on, so it needs an end: a host that never
 /// answers would hold the node until the caller gives up. A failed request is
 /// logged and answered empty rather than stopping the PPE, the way the rest of

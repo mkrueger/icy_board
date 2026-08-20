@@ -10,6 +10,9 @@ edition.workspace = true
 icy_engine = { workspace = true }
 icy_net = { workspace = true }
 icy_parser_core =  { workspace = true }
+icy_sixel = { workspace = true }
+image = { workspace = true }
+jxl-oxide = { workspace = true }
 codepages = { workspace = true }
 
 lazy_static = { workspace = true }

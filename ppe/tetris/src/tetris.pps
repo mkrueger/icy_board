@@ -1,0 +1,637 @@
+;$LANGVERSION 400
+
+CONST INTEGER BOARD_W = 10
+CONST INTEGER BOARD_H = 20
+CONST INTEGER CELL = 12
+CONST INTEGER BOARD_X = 18
+CONST INTEGER BOARD_Y = 24
+CONST INTEGER SCREEN_W = 640
+CONST INTEGER SCREEN_H = 400
+CONST INTEGER GAME_W = 320
+CONST INTEGER GAME_H = 288
+CONST INTEGER GAME_X = 160
+CONST INTEGER GAME_Y = 56
+CONST INTEGER GAME_SURFACE = 2
+
+; Classic Game Boy DMG 4-shade green palette (0xRRGGBBAA).
+CONST UNSIGNED GB_LIGHTEST = 3774402815
+CONST UNSIGNED GB_LIGHT = 2294313215
+CONST UNSIGNED GB_DARK = 879253247
+CONST UNSIGNED GB_DARKEST = 135799039
+
+CONST INTEGER BOX_X = 164
+CONST INTEGER BOX_W = 96
+
+INTEGER board(9, 19)
+INTEGER boardGroup(9, 19)
+INTEGER clearRow(19)
+STRING shapes(27)
+UNSIGNED pieceColor(6)
+UNSIGNED pieceAccent(6)
+INTEGER pieceType, nextType, pieceX, pieceY, pieceRot
+INTEGER score, level, lines, frame, dropFrames, pieceSerial
+BOOLEAN gameOver, running, changed
+STRING key
+
+CLS
+PRINTLN "Loading assets..."
+SndPreload "./tetris_music.ogg"
+SndPreload "./rotate.wav"
+SndPreload "./lock.wav"
+SndPreload "./line.wav"
+SndPreload "./gameover.wav"
+
+GfxInit 0
+IF GfxBackend() < 0 THEN
+    CLS
+    PRINTLN "Tetris requires a graphics-capable terminal."
+    EXIT
+ENDIF
+
+GfxCreate 0, SCREEN_W, SCREEN_H
+GfxCreate GAME_SURFACE, GAME_W, GAME_H
+GfxLoad 1, "./ui.png"
+InitShapes()
+InitColors()
+ClearBoard()
+
+SndVolume 0, 100
+SndVolume 1, 70
+SndVolume 2, 80
+SndVolume 3, 80
+SndVolume 4, 75
+SndPlay 0, "./tetris_music.ogg", TRUE
+
+score = 0
+level = 0
+lines = 0
+frame = 0
+pieceSerial = 0
+gameOver = FALSE
+running = TRUE
+nextType = Random(7)
+SpawnPiece()
+RenderGame()
+KeyFlush
+
+WHILE running DO
+    IF gameOver BREAK
+    changed = FALSE
+    key = Upper(InKey())
+    IF key = "LEFT" THEN
+        IF CanPlace(pieceX - 1, pieceY, pieceRot) THEN
+            pieceX -= 1
+            changed = TRUE
+        ENDIF
+    ELSEIF (key = "RIGHT") THEN
+        IF CanPlace(pieceX + 1, pieceY, pieceRot) THEN
+            pieceX += 1
+            changed = TRUE
+        ENDIF
+    ELSEIF (key = "UP") THEN
+        changed = RotatePiece()
+    ELSEIF (key = "DOWN") THEN
+        IF CanPlace(pieceX, pieceY + 1, pieceRot) THEN
+            pieceY += 1
+            score += 1
+        ELSE
+            LockPiece()
+        ENDIF
+        frame = 0
+        changed = TRUE
+    ELSEIF (key = " ") THEN
+        WHILE CanPlace(pieceX, pieceY + 1, pieceRot) DO
+            pieceY += 1
+            score += 2
+        ENDWHILE
+        LockPiece()
+        frame = 0
+        changed = TRUE
+    ELSEIF (key = "Q") THEN
+        running = FALSE
+    ENDIF
+
+    frame += 1
+    dropFrames = 12 - level
+    IF dropFrames < 2 dropFrames = 2
+    IF !gameOver THEN
+        IF frame >= dropFrames THEN
+            IF CanPlace(pieceX, pieceY + 1, pieceRot) THEN
+                pieceY += 1
+            ELSE
+                LockPiece()
+            ENDIF
+            frame = 0
+            changed = TRUE
+        ENDIF
+    ENDIF
+    IF changed RenderGame()
+    GfxWaitFrame 18
+ENDWHILE
+
+IF gameOver THEN
+    RenderGame()
+    key = ""
+    WHILE key = "" DO
+        key = InKey()
+        GfxWaitFrame 18
+    ENDWHILE
+ENDIF
+
+SndStop 0
+GfxFree 1
+GfxFree GAME_SURFACE
+GfxFree 0
+GfxShutdown
+CLS
+
+PROCEDURE InitShapes()
+    shapes[0] = "0000111100000000"
+    shapes[1] = "0010001000100010"
+    shapes[2] = "0000000011110000"
+    shapes[3] = "0100010001000100"
+    shapes[4] = "0110011000000000"
+    shapes[5] = shapes[4]
+    shapes[6] = shapes[4]
+    shapes[7] = shapes[4]
+    shapes[8] = "0100111000000000"
+    shapes[9] = "0100011001000000"
+    shapes[10] = "0000111001000000"
+    shapes[11] = "0100110001000000"
+    shapes[12] = "0110110000000000"
+    shapes[13] = "1000110001000000"
+    shapes[14] = shapes[12]
+    shapes[15] = shapes[13]
+    shapes[16] = "1100011000000000"
+    shapes[17] = "0100110010000000"
+    shapes[18] = shapes[16]
+    shapes[19] = shapes[17]
+    shapes[20] = "1000111000000000"
+    shapes[21] = "0110010001000000"
+    shapes[22] = "0000111000100000"
+    shapes[23] = "0100010011000000"
+    shapes[24] = "0010111000000000"
+    shapes[25] = "0100010001100000"
+    shapes[26] = "0000111010000000"
+    shapes[27] = "1100010001000000"
+ENDPROC
+
+PROCEDURE InitColors()
+    ; I, O, T, S, Z, J, L
+    pieceColor[0] = 1121577215
+    pieceAccent[0] = 343904255
+    pieceColor[1] = 4124395519
+    pieceAccent[1] = 2827229183
+    pieceColor[2] = 2809004031
+    pieceAccent[2] = 1698084351
+    pieceColor[3] = 1691773951
+    pieceAccent[3] = 663436031
+    pieceColor[4] = 4033308671
+    pieceAccent[4] = 2788113151
+    pieceColor[5] = 1536162303
+    pieceAccent[5] = 676636927
+    pieceColor[6] = 4120529663
+    pieceAccent[6] = 2840993791
+ENDPROC
+
+PROCEDURE ClearBoard()
+    INTEGER x, y
+    y = 0
+    WHILE y < BOARD_H DO
+        x = 0
+        WHILE x < BOARD_W DO
+            board[x, y] = 0
+            boardGroup[x, y] = 0
+            x += 1
+        ENDWHILE
+        y += 1
+    ENDWHILE
+ENDPROC
+
+FUNCTION ShapeCell(INTEGER kind, INTEGER rotation, INTEGER x, INTEGER y) BOOLEAN
+    INTEGER index
+    index = kind * 4 + rotation
+    ShapeCell = Mid(shapes[index], y * 4 + x + 1, 1) = "1"
+ENDFUNC
+
+FUNCTION CanPlace(INTEGER x, INTEGER y, INTEGER rotation) BOOLEAN
+    INTEGER px, py, bx, by
+    CanPlace = TRUE
+    py = 0
+    WHILE py < 4 DO
+        px = 0
+        WHILE px < 4 DO
+            IF ShapeCell(pieceType, rotation, px, py) THEN
+                bx = x + px
+                by = y + py
+                IF bx < 0 THEN
+                    CanPlace = FALSE
+                    RETURN
+                ENDIF
+                IF bx >= BOARD_W THEN
+                    CanPlace = FALSE
+                    RETURN
+                ENDIF
+                IF by >= BOARD_H THEN
+                    CanPlace = FALSE
+                    RETURN
+                ENDIF
+                IF by >= 0 THEN
+                    IF board[bx, by] <> 0 THEN
+                        CanPlace = FALSE
+                        RETURN
+                    ENDIF
+                ENDIF
+            ENDIF
+            px += 1
+        ENDWHILE
+        py += 1
+    ENDWHILE
+ENDFUNC
+
+PROCEDURE SpawnPiece()
+    pieceType = nextType
+    nextType = Random(7)
+    pieceX = 3
+    pieceY = -1
+    pieceRot = 0
+    IF !CanPlace(pieceX, pieceY, pieceRot) THEN
+        gameOver = TRUE
+        SndPlay 4, "./gameover.wav"
+    ENDIF
+ENDPROC
+
+FUNCTION RotatePiece() BOOLEAN
+    INTEGER rotation
+    RotatePiece = TRUE
+    rotation = (pieceRot + 1) % 4
+    IF CanPlace(pieceX, pieceY, rotation) THEN
+        pieceRot = rotation
+    ELSEIF (CanPlace(pieceX - 1, pieceY, rotation)) THEN
+        pieceX -= 1
+        pieceRot = rotation
+    ELSEIF (CanPlace(pieceX + 1, pieceY, rotation)) THEN
+        pieceX += 1
+        pieceRot = rotation
+    ELSEIF (CanPlace(pieceX - 2, pieceY, rotation)) THEN
+        pieceX -= 2
+        pieceRot = rotation
+    ELSEIF (CanPlace(pieceX + 2, pieceY, rotation)) THEN
+        pieceX += 2
+        pieceRot = rotation
+    ELSE
+        RotatePiece = FALSE
+        RETURN
+    ENDIF
+    SndPlay 1, "./rotate.wav"
+ENDFUNC
+
+PROCEDURE LockPiece()
+    INTEGER px, py, bx, by, cleared
+    BOOLEAN overflow
+    overflow = FALSE
+    pieceSerial += 1
+    py = 0
+    WHILE py < 4 DO
+        px = 0
+        WHILE px < 4 DO
+            IF ShapeCell(pieceType, pieceRot, px, py) THEN
+                bx = pieceX + px
+                by = pieceY + py
+                IF by < 0 THEN
+                    overflow = TRUE
+                ELSE
+                    board[bx, by] = pieceType + 1
+                    boardGroup[bx, by] = pieceSerial
+                ENDIF
+            ENDIF
+            px += 1
+        ENDWHILE
+        py += 1
+    ENDWHILE
+    IF overflow THEN
+        gameOver = TRUE
+        SndPlay 4, "./gameover.wav"
+        RETURN
+    ENDIF
+    cleared = ClearLines()
+    IF cleared > 0 THEN
+        IF cleared = 1 score += 40 * (level + 1)
+        IF cleared = 2 score += 100 * (level + 1)
+        IF cleared = 3 score += 300 * (level + 1)
+        IF cleared = 4 score += 1200 * (level + 1)
+        lines += cleared
+        level = lines / 10
+        SndPlay 3, "./line.wav"
+    ELSE
+        SndPlay 2, "./lock.wav"
+    ENDIF
+    SpawnPiece()
+ENDPROC
+
+FUNCTION ClearLines() INTEGER
+    INTEGER row, x, sourceRow, targetRow, cleared
+    BOOLEAN full
+    cleared = 0
+    row = 0
+    WHILE row < BOARD_H DO
+        full = TRUE
+        x = 0
+        WHILE x < BOARD_W DO
+            IF board[x, row] = 0 full = FALSE
+            x += 1
+        ENDWHILE
+        IF full THEN
+            clearRow[row] = 1
+            cleared += 1
+        ELSE
+            clearRow[row] = 0
+        ENDIF
+        row += 1
+    ENDWHILE
+
+    IF cleared > 0 THEN
+        AnimateClear()
+        targetRow = BOARD_H - 1
+        sourceRow = BOARD_H - 1
+        WHILE sourceRow >= 0 DO
+            IF clearRow[sourceRow] = 0 THEN
+                x = 0
+                WHILE x < BOARD_W DO
+                    board[x, targetRow] = board[x, sourceRow]
+                    boardGroup[x, targetRow] = boardGroup[x, sourceRow]
+                    x += 1
+                ENDWHILE
+                targetRow -= 1
+            ENDIF
+            sourceRow -= 1
+        ENDWHILE
+        WHILE targetRow >= 0 DO
+            x = 0
+            WHILE x < BOARD_W DO
+                board[x, targetRow] = 0
+                boardGroup[x, targetRow] = 0
+                x += 1
+            ENDWHILE
+            targetRow -= 1
+        ENDWHILE
+    ENDIF
+    ClearLines = cleared
+ENDFUNC
+
+PROCEDURE AnimateClear()
+    INTEGER flash, row
+    flash = 0
+    WHILE flash < 4 DO
+        row = 0
+        WHILE row < BOARD_H DO
+            IF clearRow[row] = 1 THEN
+                IF flash % 2 = 0 THEN
+                    GfxFillRect GAME_SURFACE, BOARD_X, BOARD_Y + row * CELL, BOARD_W * CELL, CELL, GB_DARKEST
+                ELSE
+                    GfxFillRect GAME_SURFACE, BOARD_X, BOARD_Y + row * CELL, BOARD_W * CELL, CELL, GB_LIGHTEST
+                ENDIF
+            ENDIF
+            row += 1
+        ENDWHILE
+        PresentGame()
+        GfxWaitFrame 8
+        flash += 1
+    ENDWHILE
+ENDPROC
+
+PROCEDURE DrawSandFill(INTEGER x, INTEGER y, INTEGER width, INTEGER height)
+    INTEGER dx, dy
+    GfxFillRect GAME_SURFACE, x, y, width, height, pieceColor[0]
+    dy = 2
+    WHILE dy < height - 1 DO
+        dx = 2 + ((x + y + dy) % 4)
+        WHILE dx < width - 1 DO
+            GfxFillRect GAME_SURFACE, x + dx, y + dy, 1, 1, pieceAccent[0]
+            dx += 5
+        ENDWHILE
+        dy += 3
+    ENDWHILE
+
+ENDPROC
+
+PROCEDURE DrawSandRect(INTEGER x, INTEGER y, INTEGER width, INTEGER height)
+    DrawSandFill(x, y, width, height)
+    GfxRect GAME_SURFACE, x, y, width, height, GB_DARKEST
+ENDPROC
+
+; Each piece type gets its own Game Boy-style fill motif, so pieces stay
+; distinguishable without relying on colour alone.
+PROCEDURE DrawCell(INTEGER x, INTEGER y, INTEGER kind, INTEGER size)
+    IF kind = 0 THEN
+        DrawSandRect(x, y, size, size)
+        RETURN
+    ENDIF
+    GfxFillRect GAME_SURFACE, x, y, size - 1, size - 1, pieceColor[kind]
+    GfxRect GAME_SURFACE, x, y, size - 1, size - 1, GB_DARKEST
+    IF kind = 1 THEN
+        GfxFillRect GAME_SURFACE, x + 2, y + 2, size - 5, size - 5, pieceAccent[kind]
+        GfxFillRect GAME_SURFACE, x + 4, y + 4, size - 9, size - 9, GB_LIGHTEST
+    ELSEIF (kind = 2) THEN
+        GfxFillRect GAME_SURFACE, x + 2, y + 2, size - 5, size - 5, pieceAccent[kind]
+        GfxFillRect GAME_SURFACE, x + 3, y + 3, 2, 2, GB_LIGHT
+    ELSEIF (kind = 3) THEN
+        GfxFillRect GAME_SURFACE, x + 2, y + 2, size - 5, 2, pieceAccent[kind]
+        GfxFillRect GAME_SURFACE, x + 2, y + 5, size - 5, 2, pieceAccent[kind]
+    ELSEIF (kind = 4) THEN
+        ; centered square used by the original Z/S-piece pattern
+        GfxFillRect GAME_SURFACE, x + size / 2 - 2, y + size / 2 - 2, 3, 3, pieceAccent[kind]
+    ELSEIF (kind = 5) THEN
+        ; concentric ring used by the original J/L-piece pattern
+        GfxFillRect GAME_SURFACE, x + 2, y + 2, size - 5, size - 5, pieceAccent[kind]
+        GfxFillRect GAME_SURFACE, x + 3, y + 3, size - 7, size - 7, GB_LIGHTEST
+        GfxFillRect GAME_SURFACE, x + size / 2 - 1, y + size / 2 - 1, 2, 2, GB_DARKEST
+    ELSE
+        GfxRect GAME_SURFACE, x + 2, y + 2, size - 5, size - 5, pieceAccent[kind]
+        GfxFillRect GAME_SURFACE, x + size / 2 - 1, y + size / 2 - 1, 2, 2, pieceAccent[kind]
+    ENDIF
+ENDPROC
+
+PROCEDURE DrawLockedCell(INTEGER bx, INTEGER by, INTEGER kind)
+    INTEGER x, y, group
+    x = BOARD_X + bx * CELL
+    y = BOARD_Y + by * CELL
+    IF kind <> 0 THEN
+        DrawCell(x, y, kind, CELL)
+        RETURN
+    ENDIF
+    group = boardGroup[bx, by]
+    DrawSandFill(x, y, CELL, CELL)
+    IF bx = 0 THEN
+        GfxFillRect GAME_SURFACE, x, y, 1, CELL, GB_DARKEST
+    ELSEIF (boardGroup[bx - 1, by] <> group) THEN
+        GfxFillRect GAME_SURFACE, x, y, 1, CELL, GB_DARKEST
+    ENDIF
+    IF bx = BOARD_W - 1 THEN
+        GfxFillRect GAME_SURFACE, x + CELL - 1, y, 1, CELL, GB_DARKEST
+    ELSEIF (boardGroup[bx + 1, by] <> group) THEN
+        GfxFillRect GAME_SURFACE, x + CELL - 1, y, 1, CELL, GB_DARKEST
+    ENDIF
+    IF by = 0 THEN
+        GfxFillRect GAME_SURFACE, x, y, CELL, 1, GB_DARKEST
+    ELSEIF (boardGroup[bx, by - 1] <> group) THEN
+        GfxFillRect GAME_SURFACE, x, y, CELL, 1, GB_DARKEST
+    ENDIF
+    IF by = BOARD_H - 1 THEN
+        GfxFillRect GAME_SURFACE, x, y + CELL - 1, CELL, 1, GB_DARKEST
+    ELSEIF (boardGroup[bx, by + 1] <> group) THEN
+        GfxFillRect GAME_SURFACE, x, y + CELL - 1, CELL, 1, GB_DARKEST
+    ENDIF
+ENDPROC
+
+PROCEDURE DrawActivePiece()
+    INTEGER px, py, by, drawX, drawY
+    IF pieceType = 0 THEN
+        IF pieceRot = 0 THEN
+            drawX = BOARD_X + pieceX * CELL
+            drawY = BOARD_Y + (pieceY + 1) * CELL
+            DrawSandRect(drawX, drawY, CELL * 4, CELL)
+        ELSEIF (pieceRot = 2) THEN
+            drawX = BOARD_X + pieceX * CELL
+            drawY = BOARD_Y + (pieceY + 2) * CELL
+            DrawSandRect(drawX, drawY, CELL * 4, CELL)
+        ELSEIF (pieceRot = 1) THEN
+            drawX = BOARD_X + (pieceX + 2) * CELL
+            drawY = BOARD_Y + pieceY * CELL
+            DrawSandRect(drawX, drawY, CELL, CELL * 4)
+        ELSE
+            drawX = BOARD_X + (pieceX + 1) * CELL
+            drawY = BOARD_Y + pieceY * CELL
+            DrawSandRect(drawX, drawY, CELL, CELL * 4)
+        ENDIF
+        RETURN
+    ENDIF
+    py = 0
+    WHILE py < 4 DO
+        px = 0
+        WHILE px < 4 DO
+            by = pieceY + py
+            IF by >= 0 THEN
+                IF ShapeCell(pieceType, pieceRot, px, py) THEN
+                    DrawCell(BOARD_X + (pieceX + px) * CELL, BOARD_Y + by * CELL, pieceType, CELL)
+                ENDIF
+            ENDIF
+            px += 1
+        ENDWHILE
+        py += 1
+    ENDWHILE
+ENDPROC
+
+; Textured brick pillar flanking the playfield, like the DMG original.
+PROCEDURE DrawWall(INTEGER wx, INTEGER wy, INTEGER ww, INTEGER wh)
+    INTEGER yy, row, offset
+    GfxFillRect GAME_SURFACE, wx, wy, ww, wh, GB_DARK
+    GfxRect GAME_SURFACE, wx, wy, ww, wh, GB_DARKEST
+    yy = wy
+    row = 0
+    WHILE yy < wy + wh DO
+        GfxFillRect GAME_SURFACE, wx, yy, ww, 1, GB_DARKEST
+        offset = 0
+        IF row % 2 = 1 offset = ww / 2
+        GfxFillRect GAME_SURFACE, wx + offset, yy, 1, 8, GB_DARKEST
+        yy += 8
+        row += 1
+    ENDWHILE
+ENDPROC
+
+PROCEDURE DrawBox(INTEGER bx, INTEGER by, INTEGER bw, INTEGER bh)
+    GfxFillRect GAME_SURFACE, bx, by, bw, bh, GB_LIGHTEST
+    GfxRect GAME_SURFACE, bx, by, bw, bh, GB_DARKEST
+    GfxRect GAME_SURFACE, bx + 2, by + 2, bw - 4, bh - 4, GB_DARK
+ENDPROC
+
+PROCEDURE DrawNumber(INTEGER value, INTEGER x, INTEGER y, INTEGER digits)
+    INTEGER i, divisor, digit
+    divisor = 1
+    i = 2
+    WHILE i <= digits DO
+        divisor *= 10
+        i += 1
+    ENDWHILE
+    i = 1
+    WHILE i <= digits DO
+        digit = (value / divisor) % 10
+        GfxBlitRect GAME_SURFACE, 1, digit * 8, 73, 8, 9, x, y
+        x += 8
+        divisor /= 10
+        IF divisor = 0 divisor = 1
+        i += 1
+    ENDWHILE
+ENDPROC
+
+PROCEDURE DrawPanel()
+    DrawBox(BOX_X, 20, BOX_W, 34)
+    GfxBlitRect GAME_SURFACE, 1, 0, 0, 30, 7, BOX_X + 33, 25
+    DrawNumber(score, BOX_X + 24, 38, 6)
+
+    DrawBox(BOX_X, 60, BOX_W, 34)
+    GfxBlitRect GAME_SURFACE, 1, 0, 12, 30, 7, BOX_X + 33, 65
+    DrawNumber(level, BOX_X + 36, 78, 3)
+
+    DrawBox(BOX_X, 100, BOX_W, 34)
+    GfxBlitRect GAME_SURFACE, 1, 0, 24, 30, 7, BOX_X + 33, 105
+    DrawNumber(lines, BOX_X + 32, 118, 4)
+
+    DrawBox(BOX_X, 140, BOX_W, 72)
+    GfxBlitRect GAME_SURFACE, 1, 0, 36, 24, 7, BOX_X + 36, 145
+ENDPROC
+
+PROCEDURE DrawNext()
+    INTEGER px, py
+    IF nextType = 0 THEN
+        DrawSandRect(BOX_X + 28, 174, 40, 10)
+        RETURN
+    ENDIF
+    py = 0
+    WHILE py < 4 DO
+        px = 0
+        WHILE px < 4 DO
+            IF ShapeCell(nextType, 0, px, py) THEN
+                DrawCell(BOX_X + 28 + px * 10, 162 + py * 10, nextType, 10)
+            ENDIF
+            px += 1
+        ENDWHILE
+        py += 1
+    ENDWHILE
+ENDPROC
+
+PROCEDURE RenderGame()
+    INTEGER x, y
+    GfxClear GAME_SURFACE, GB_DARKEST
+    DrawWall(6, 20, 10, 248)
+    DrawWall(140, 20, 10, 248)
+    GfxFillRect GAME_SURFACE, BOARD_X, BOARD_Y, BOARD_W * CELL, BOARD_H * CELL, GB_LIGHTEST
+    GfxRect GAME_SURFACE, BOARD_X - 2, BOARD_Y - 2, BOARD_W * CELL + 4, BOARD_H * CELL + 4, GB_DARKEST
+    y = 0
+    WHILE y < BOARD_H DO
+        x = 0
+        WHILE x < BOARD_W DO
+            IF board[x, y] <> 0 THEN
+                DrawLockedCell(x, y, board[x, y] - 1)
+            ENDIF
+            x += 1
+        ENDWHILE
+        y += 1
+    ENDWHILE
+    IF !gameOver DrawActivePiece()
+    DrawPanel()
+    DrawNext()
+    IF gameOver THEN
+        GfxFillRect GAME_SURFACE, 20, 120, 116, 36, GB_LIGHTEST
+        GfxRect GAME_SURFACE, 20, 120, 116, 36, GB_DARKEST
+        GfxRect GAME_SURFACE, 22, 122, 112, 32, GB_DARK
+        GfxBlitRect GAME_SURFACE, 1, 0, 48, 54, 7, 51, 134
+    ENDIF
+    PresentGame()
+ENDPROC
+
+PROCEDURE PresentGame()
+    GfxClear 0, GB_DARKEST
+    GfxBlit 0, GAME_SURFACE, GAME_X, GAME_Y
+    GfxPresentRect 0, 0, 0, SCREEN_W, SCREEN_H
+ENDPROC

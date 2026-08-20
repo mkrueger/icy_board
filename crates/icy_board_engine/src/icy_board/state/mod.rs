@@ -34,6 +34,7 @@ use crate::{
 };
 pub mod functions;
 pub mod menu_runner;
+pub mod ppl_graphics;
 pub mod user_commands;
 pub mod virtual_screen;
 use self::functions::display_flags;
@@ -631,6 +632,18 @@ pub struct IcyBoardState {
 
     /// Where `OPENCAP` is teeing everything the caller sees, until `CLOSECAP`.
     capture_file: Option<std::fs::File>,
+
+    /// Content hashes of sound files already pushed to the client's disk cache
+    /// this connection, so repeat plays only need a cheap `Load` instead of
+    /// resending the whole file through `LoadBlob`.
+    pub sound_cache: HashSet<String>,
+
+    /// Last `SNDVOLUME` percent requested per channel (0-15), defaulting to
+    /// 100 so music/fx start at full loudness instead of the client's quiet
+    /// default headroom.
+    pub sound_volume: [i32; 16],
+
+    pub ppl_graphics: Option<ppl_graphics::PplGraphicsState>,
 }
 
 impl IcyBoardState {
@@ -683,6 +696,9 @@ impl IcyBoardState {
             displayed_files: Vec::new(),
             ppe_nesting: 0,
             capture_file: None,
+            sound_cache: HashSet::new(),
+            sound_volume: [100; 16],
+            ppl_graphics: None,
         }
     }
     async fn update_language(&mut self) {

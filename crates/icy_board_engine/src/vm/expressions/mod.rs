@@ -292,6 +292,7 @@ pub async fn run_function(opcode: FuncOpCode, arg: &mut VirtualMachine<'_>, argu
         FuncOpCode::BASE64ENC => predefined_functions::base64enc(arg, arguments).await,
         FuncOpCode::BASE64DEC => predefined_functions::base64dec(arg, arguments).await,
         FuncOpCode::SHA256 => predefined_functions::sha256(arg, arguments).await,
+        FuncOpCode::GfxBackend => predefined_functions::gfxbackend(arg, arguments).await,
         FuncOpCode::END
         | FuncOpCode::CPAR
         | FuncOpCode::UPLUS

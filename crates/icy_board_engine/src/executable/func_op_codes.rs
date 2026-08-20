@@ -313,9 +313,10 @@ pub enum FuncOpCode {
     BASE64ENC = -299,
     BASE64DEC = -300,
     SHA256 = -301,
+    GfxBackend = -302,
 }
 
-pub const LAST_FUNC: i16 = -301;
+pub const LAST_FUNC: i16 = -302;
 
 impl FuncOpCode {
     pub fn get_definition(self) -> &'static FunctionDefinition {
@@ -382,7 +383,7 @@ impl FunctionDefinition {
         }
     }
 }
-pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 313]> = std::sync::LazyLock::new(|| {
+pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 314]> = std::sync::LazyLock::new(|| {
     [
         FunctionDefinition {
             name: "END",
@@ -2967,6 +2968,14 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 313]> 
             return_type: VariableType::String,
             args: Some(vec![ArgumentDefinition::new("value", VariableType::BigStr)]),
             signature: FunctionSignature::FixedParameters(1),
+        },
+        FunctionDefinition {
+            name: "GfxBackend",
+            version: 400,
+            opcode: FuncOpCode::GfxBackend,
+            return_type: VariableType::Integer,
+            args: None,
+            signature: FunctionSignature::FixedParameters(0),
         },
         // ALIASES (need to be last in the list)
         FunctionDefinition {

@@ -399,6 +399,7 @@ struct CompilerConfigReport {
     defines: Vec<String>,
     text_files: usize,
     art_files: usize,
+    binary_files: usize,
 }
 
 fn environment_candidate() -> Option<String> {
@@ -475,6 +476,7 @@ fn resolve_config(workspace: &Workspace, arguments: &Cli, encoding: Encoding, pr
         defines,
         text_files: workspace.data.as_ref().and_then(|data| data.text_files.as_ref()).map_or(0, Vec::len),
         art_files: workspace.data.as_ref().and_then(|data| data.art_files.as_ref()).map_or(0, Vec::len),
+        binary_files: workspace.data.as_ref().and_then(|data| data.binary_files.as_ref()).map_or(0, Vec::len),
     })
 }
 
@@ -519,6 +521,7 @@ fn print_report(report: &CompilerConfigReport, json: bool) -> Res<()> {
     if report.package.is_some() {
         println!("Text files             {}", report.text_files);
         println!("Art files              {}", report.art_files);
+        println!("Binary files           {}", report.binary_files);
     }
     Ok(())
 }
@@ -613,6 +616,14 @@ fn compile_toml(file_name: &PathBuf, arguments: &Cli) -> Res<()> {
                 } else {
                     write_atomic(&out_file, &encode_utf8(&txt))?;
                 }
+            }
+        }
+        if let Some(binary_files) = &data.binary_files {
+            for file in binary_files {
+                let src_file = base_path.join(file);
+                let out_file = target_path.join(file);
+                fs::create_dir_all(out_file.parent().unwrap())?;
+                write_atomic(out_file, &fs::read(src_file)?)?;
             }
         }
     }

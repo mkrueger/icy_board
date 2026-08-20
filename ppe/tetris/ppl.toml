@@ -1,0 +1,23 @@
+[package]
+name = "tetris"
+version = "0.1.0"
+authors = ["Mike Krüger <mkrueger@posteo.de>"]
+
+[compiler]
+language_version = 400
+
+[data]
+text_files = [
+]
+
+art_files = [
+]
+
+binary_files = [
+	"ui.png",
+	"tetris_music.ogg",
+	"rotate.wav",
+	"lock.wav",
+	"line.wav",
+	"gameover.wav",
+]

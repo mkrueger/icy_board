@@ -2709,3 +2709,360 @@ pub async fn web_request(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<(
     }
     Ok(())
 }
+
+// Digitized sound (WAV/OGG) via the SyncTERM audio APC extension
+// (`ESC _ SyncTERM:A;<verb>;... ESC \`). Unsupported terminals ignore the
+// sequence per the ANSI APC spec, so no capability check is required.
+//
+// Callers pick their own channel (0-15); slot == channel, since each channel
+// only ever plays one file at a time and 16 resident slots is plenty for
+// overlapping music/fx.
+
+/// Base64-inflated APC payloads are capped client-side at 32 MB; stay well under that.
+const MAX_SOUND_FILE_BYTES: u64 = 16 * 1024 * 1024;
+
+/// Cancels the client's fixed per-channel headroom (`AUDIO_APC_BASE_DB` = -12dB
+/// in `icy_engine_gui`'s `audio_apc.rs`), so a PPL volume of 100 means "as loud
+/// as the source allows" rather than a permanently quartered -12dB ceiling.
+const SND_HEADROOM_COMPENSATION_DB: f32 = 12.0;
+/// Matches the client's floor for a linear volume of 0%.
+const SND_MIN_DB: f32 = -60.0;
+
+/// Converts a 0-100 PPL volume percentage to the dB argument sent to the
+/// client, compensating for its fixed headroom (see `SND_HEADROOM_COMPENSATION_DB`).
+#[allow(clippy::cast_precision_loss)] // percent is clamped to 0..=100, so the cast is exact
+fn snd_volume_db(percent: i32) -> f32 {
+    let percent = percent.clamp(0, 100);
+    if percent == 0 {
+        return SND_MIN_DB;
+    }
+    SND_HEADROOM_COMPENSATION_DB + 20.0 * (percent as f32 / 100.0).log10()
+}
+
+async fn send_apc(vm: &mut VirtualMachine<'_>, body: &str) -> Res<()> {
+    let mut seq = Vec::with_capacity(body.len() + 16);
+    seq.extend_from_slice(b"\x1b_");
+    seq.extend_from_slice(body.as_bytes());
+    seq.extend_from_slice(b"\x1b\\");
+    vm.icy_board_state.connection.send(&seq).await
+}
+
+async fn send_audio_apc(vm: &mut VirtualMachine<'_>, body: &str) -> Res<()> {
+    send_apc(vm, &format!("SyncTERM:A;{body}")).await
+}
+
+/// Uploads a file into the client's on-disk media cache (shared with the
+/// image APC extension) under a content hash, unless this connection has
+/// already pushed that exact content - so replaying a music/fx file only
+/// resends the bytes once instead of on every trigger. Returns the cache
+/// name the file is stored under, or `None` if the file could not be read.
+async fn sndcache_store(vm: &mut VirtualMachine<'_>, file_name: &str) -> Res<Option<String>> {
+    use base64::{Engine as _, engine::general_purpose};
+    use sha2::{Digest, Sha256};
+
+    let path = vm.resolve_file(&file_name).await;
+
+    let data = match fs::metadata(&path).and_then(|meta| {
+        if meta.len() > MAX_SOUND_FILE_BYTES {
+            Err(std::io::Error::other("file too large"))
+        } else {
+            fs::read(&path)
+        }
+    }) {
+        Ok(data) => data,
+        Err(err) => {
+            log::warn!("Can't load sound file {}: {err}", path.display());
+            return Ok(None);
+        }
+    };
+
+    let hash = format!("{:x}", Sha256::digest(&data));
+    let extension = path.extension().and_then(|ext| ext.to_str()).unwrap_or("bin");
+    let cache_name = format!("snd/{}.{extension}", &hash[..32]);
+
+    if vm.icy_board_state.sound_cache.insert(cache_name.clone()) {
+        let encoded = general_purpose::STANDARD.encode(&data);
+        send_apc(vm, &format!("SyncTERM:C;S;{cache_name};{encoded}")).await?;
+    }
+    Ok(Some(cache_name))
+}
+
+async fn sndload_and_queue(vm: &mut VirtualMachine<'_>, file_name: &str, channel: u8, looping: bool) -> Res<()> {
+    let Some(cache_name) = sndcache_store(vm, file_name).await? else {
+        return Ok(());
+    };
+
+    // slot == channel: each channel plays one file at a time, so this keeps
+    // overlapping music/fx on distinct channels simple with no slot bookkeeping.
+    let slot = channel;
+    send_audio_apc(vm, &format!("Load;S={slot};{cache_name}")).await?;
+    // Reassert the channel's saved volume (100 by default) every play, since
+    // it otherwise sits at the client's quiet default until SNDVOLUME is called.
+    let volume = vm.icy_board_state.sound_volume[channel as usize];
+    send_audio_apc(vm, &format!("Volume;C={channel};V={:.2}dB", snd_volume_db(volume))).await?;
+    if looping {
+        send_audio_apc(vm, &format!("Queue;C={channel};S={slot};L")).await
+    } else {
+        send_audio_apc(vm, &format!("Queue;C={channel};S={slot}")).await
+    }
+}
+
+/// `SNDPLAY channel, filename$ [, loop]` - loads and plays a WAV/OGG file on
+/// the given channel, looping if the third argument is present and true.
+pub async fn sndplay(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let channel = vm.eval_expr(&args[0]).await?.as_int().clamp(0, 15) as u8;
+    let file_name = vm.eval_expr(&args[1]).await?.as_string();
+    let looping = match args.get(2) {
+        Some(expr) => vm.eval_expr(expr).await?.as_bool(),
+        None => false,
+    };
+    sndload_and_queue(vm, &file_name, channel, looping).await
+}
+
+/// `SNDSTOP channel` - stops whatever is playing on the given mixer channel (0-15).
+pub async fn sndstop(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let channel = vm.eval_expr(&args[0]).await?.as_int().clamp(0, 15);
+    send_audio_apc(vm, &format!("Flush;C={channel};O=0")).await
+}
+
+/// `SNDVOLUME channel, volume` - sets a mixer channel's volume (0-100).
+pub async fn sndvolume(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let channel = vm.eval_expr(&args[0]).await?.as_int().clamp(0, 15);
+    let volume = vm.eval_expr(&args[1]).await?.as_int().clamp(0, 100);
+    vm.icy_board_state.sound_volume[channel as usize] = volume;
+    send_audio_apc(vm, &format!("Volume;C={channel};V={:.2}dB", snd_volume_db(volume))).await
+}
+
+/// `SNDPRELOAD filename$` - pushes a file to the client's cache ahead of time,
+/// so the first `SNDPLAYMUSIC`/`SNDPLAYFX` for it does not stall on the upload.
+pub async fn sndpreload(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let file_name = vm.eval_expr(&args[0]).await?.as_string();
+    sndcache_store(vm, &file_name).await?;
+    Ok(())
+}
+
+pub async fn gfxinit(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    use crate::icy_board::state::ppl_graphics::{GFX_BACKEND_AUTO, PplGraphicsState};
+
+    let backend = match args.first() {
+        Some(expr) => vm.eval_expr(expr).await?.as_int(),
+        None => GFX_BACKEND_AUTO,
+    };
+    let Some(graphics) = PplGraphicsState::new(backend) else {
+        log::warn!("GFXINIT rejected unsupported backend {backend}");
+        vm.icy_board_state.ppl_graphics = None;
+        return Ok(());
+    };
+
+    vm.icy_board_state.ppl_graphics = Some(graphics);
+    vm.icy_board_state.connection.send(b"\x1b[2J\x1b[H\x1b[?25l\x1b[?7l\x1b[?80l\x1b[?1070l").await
+}
+
+pub async fn gfxcreate(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let slot = vm.eval_expr(&args[0]).await?.as_int();
+    let width = vm.eval_expr(&args[1]).await?.as_int();
+    let height = vm.eval_expr(&args[2]).await?.as_int();
+    let (Ok(width), Ok(height)) = (usize::try_from(width), usize::try_from(height)) else {
+        log::warn!("GFXCREATE requires positive dimensions");
+        return Ok(());
+    };
+    let Some(surface) = crate::icy_board::state::ppl_graphics::GfxSurface::new(width, height) else {
+        log::warn!("GFXCREATE rejected surface {slot}: {width}x{height}");
+        return Ok(());
+    };
+    if let Some(graphics) = &mut vm.icy_board_state.ppl_graphics
+        && !graphics.insert_surface(slot, surface)
+    {
+        log::warn!("GFXCREATE graphics memory budget exhausted");
+    }
+    Ok(())
+}
+
+pub async fn gfxload(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let slot = vm.eval_expr(&args[0]).await?.as_int();
+    let file_name = vm.eval_expr(&args[1]).await?.as_string();
+    let path = vm.resolve_file(&file_name).await;
+    let bytes = match fs::read(&path) {
+        Ok(bytes) => bytes,
+        Err(err) => {
+            log::warn!("GFXLOAD can't read {}: {err}", path.display());
+            return Ok(());
+        }
+    };
+    let is_jxl = path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("jxl"));
+    let image = if is_jxl {
+        jxl_oxide::integration::JxlDecoder::new(std::io::Cursor::new(bytes))
+            .ok()
+            .and_then(|decoder| image::DynamicImage::from_decoder(decoder).ok())
+    } else {
+        image::load_from_memory(&bytes).ok()
+    };
+    let Some(image) = image else {
+        log::warn!("GFXLOAD can't decode {}", path.display());
+        return Ok(());
+    };
+    let image = image.to_rgba8();
+    let Some(surface) = crate::icy_board::state::ppl_graphics::GfxSurface::from_rgba(image.width() as usize, image.height() as usize, image.into_raw()) else {
+        log::warn!("GFXLOAD rejected image dimensions for {}", path.display());
+        return Ok(());
+    };
+    if let Some(graphics) = &mut vm.icy_board_state.ppl_graphics
+        && !graphics.insert_surface(slot, surface)
+    {
+        log::warn!("GFXLOAD graphics memory budget exhausted for {}", path.display());
+    }
+    Ok(())
+}
+
+pub async fn gfxclear(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let slot = vm.eval_expr(&args[0]).await?.as_int();
+    let color = vm.eval_expr(&args[1]).await?.as_unsigned() as u32;
+    if let Some(graphics) = &mut vm.icy_board_state.ppl_graphics
+        && let Some(surface) = graphics.surfaces.get_mut(&slot)
+    {
+        surface.clear(color);
+    }
+    Ok(())
+}
+
+pub async fn gfxfillrect(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let slot = vm.eval_expr(&args[0]).await?.as_int();
+    let x = vm.eval_expr(&args[1]).await?.as_int();
+    let y = vm.eval_expr(&args[2]).await?.as_int();
+    let width = vm.eval_expr(&args[3]).await?.as_int();
+    let height = vm.eval_expr(&args[4]).await?.as_int();
+    let color = vm.eval_expr(&args[5]).await?.as_unsigned() as u32;
+    if let Some(graphics) = &mut vm.icy_board_state.ppl_graphics
+        && let Some(surface) = graphics.surfaces.get_mut(&slot)
+    {
+        surface.fill_rect(x, y, width, height, color);
+    }
+    Ok(())
+}
+
+pub async fn gfxrect(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let slot = vm.eval_expr(&args[0]).await?.as_int();
+    let x = vm.eval_expr(&args[1]).await?.as_int();
+    let y = vm.eval_expr(&args[2]).await?.as_int();
+    let width = vm.eval_expr(&args[3]).await?.as_int();
+    let height = vm.eval_expr(&args[4]).await?.as_int();
+    let color = vm.eval_expr(&args[5]).await?.as_unsigned() as u32;
+    if let Some(graphics) = &mut vm.icy_board_state.ppl_graphics
+        && let Some(surface) = graphics.surfaces.get_mut(&slot)
+    {
+        surface.rect(x, y, width, height, color);
+    }
+    Ok(())
+}
+
+pub async fn gfxblit(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let destination = vm.eval_expr(&args[0]).await?.as_int();
+    let source = vm.eval_expr(&args[1]).await?.as_int();
+    let x = vm.eval_expr(&args[2]).await?.as_int();
+    let y = vm.eval_expr(&args[3]).await?.as_int();
+    if let Some(graphics) = &mut vm.icy_board_state.ppl_graphics
+        && let Some(source_surface) = graphics.surfaces.get(&source).cloned()
+        && let Some(destination_surface) = graphics.surfaces.get_mut(&destination)
+    {
+        destination_surface.blit(&source_surface, (0, 0, source_surface.width as i32, source_surface.height as i32), (x, y));
+    }
+    Ok(())
+}
+
+pub async fn gfxblitrect(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let destination = vm.eval_expr(&args[0]).await?.as_int();
+    let source = vm.eval_expr(&args[1]).await?.as_int();
+    let source_x = vm.eval_expr(&args[2]).await?.as_int();
+    let source_y = vm.eval_expr(&args[3]).await?.as_int();
+    let source_width = vm.eval_expr(&args[4]).await?.as_int();
+    let source_height = vm.eval_expr(&args[5]).await?.as_int();
+    let x = vm.eval_expr(&args[6]).await?.as_int();
+    let y = vm.eval_expr(&args[7]).await?.as_int();
+    if let Some(graphics) = &mut vm.icy_board_state.ppl_graphics
+        && let Some(source_surface) = graphics.surfaces.get(&source).cloned()
+        && let Some(destination_surface) = graphics.surfaces.get_mut(&destination)
+    {
+        destination_surface.blit(&source_surface, (source_x, source_y, source_width, source_height), (x, y));
+    }
+    Ok(())
+}
+
+fn gfx_sixel_output(surface: &crate::icy_board::state::ppl_graphics::GfxSurface) -> Option<Vec<u8>> {
+    let options = icy_sixel::EncodeOptions::default();
+    let encoded = match icy_sixel::sixel_encode(&surface.pixels, surface.width, surface.height, &options) {
+        Ok(encoded) => encoded,
+        Err(err) => {
+            log::warn!("GFXPRESENT sixel encode failed: {err}");
+            return None;
+        }
+    };
+    let mut output = Vec::with_capacity(encoded.len() + 3);
+    output.extend_from_slice(b"\x1b[H");
+    output.extend_from_slice(encoded.as_bytes());
+    Some(output)
+}
+
+pub async fn gfxpresent(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let slot = vm.eval_expr(&args[0]).await?.as_int();
+    let output = vm
+        .icy_board_state
+        .ppl_graphics
+        .as_ref()
+        .and_then(|graphics| graphics.surfaces.get(&slot))
+        .and_then(gfx_sixel_output);
+    let Some(output) = output else {
+        return Ok(());
+    };
+    vm.icy_board_state.connection.send(&output).await
+}
+
+pub async fn gfxpresentrect(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let slot = vm.eval_expr(&args[0]).await?.as_int();
+    let x = vm.eval_expr(&args[1]).await?.as_int();
+    let y = vm.eval_expr(&args[2]).await?.as_int();
+    let width = vm.eval_expr(&args[3]).await?.as_int();
+    let height = vm.eval_expr(&args[4]).await?.as_int();
+    let output = vm
+        .icy_board_state
+        .ppl_graphics
+        .as_ref()
+        .and_then(|graphics| graphics.surfaces.get(&slot))
+        .and_then(|surface| surface.region_from_origin(x, y, width, height))
+        .as_ref()
+        .and_then(gfx_sixel_output);
+    let Some(output) = output else {
+        return Ok(());
+    };
+    vm.icy_board_state.connection.send(&output).await
+}
+
+pub async fn gfxwaitframe(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let frame_rate = vm.eval_expr(&args[0]).await?.as_int();
+    let deadline = vm
+        .icy_board_state
+        .ppl_graphics
+        .as_mut()
+        .and_then(|graphics| graphics.next_frame_deadline(frame_rate));
+    if let Some(deadline) = deadline
+        && deadline > std::time::Instant::now()
+    {
+        tokio::time::sleep_until(deadline.into()).await;
+    }
+    Ok(())
+}
+
+pub async fn gfxfree(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let slot = vm.eval_expr(&args[0]).await?.as_int();
+    if let Some(graphics) = &mut vm.icy_board_state.ppl_graphics {
+        graphics.surfaces.remove(&slot);
+    }
+    Ok(())
+}
+
+pub async fn gfxshutdown(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
+    vm.icy_board_state.ppl_graphics = None;
+    vm.icy_board_state.connection.send(b"\x1b[?1070h\x1b[?7h\x1b[?25h").await
+}
