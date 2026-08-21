@@ -19,6 +19,10 @@ tracks the larger remaining directions; it is not a release-date promise.
 ## After the first beta
 
 - Implement the PPL web statements and functions.
+- Add compile-time PPL modules and namespaces for qualified built-in APIs and
+  user declarations, with imports and visibility rules. Modules should lower
+  to existing globals, routines, types and opcodes rather than become runtime
+  objects or require a new PPE representation.
 - Improve FTN operation where real networks need it: per-user netmail, an
   ICBSetup editor for AKAs and links, and AreaFix if required.
 - Add a self-service password-reset flow without weakening password storage.
