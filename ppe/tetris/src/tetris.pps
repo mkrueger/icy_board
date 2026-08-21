@@ -31,6 +31,7 @@ INTEGER pieceType, nextType, pieceX, pieceY, pieceRot
 INTEGER score, level, lines, frame, dropFrames, pieceSerial
 BOOLEAN gameOver, running, changed
 STRING key
+EVENT inputEvent
 SURFACE screen, game, ui
 
 CLS
@@ -77,7 +78,8 @@ KeyFlush
 WHILE running DO
     IF gameOver BREAK
     changed = FALSE
-    key = Upper(InKey())
+    inputEvent = EventPoll()
+    key = Upper(inputEvent.Text)
     IF key = "LEFT" THEN
         IF CanPlace(pieceX - 1, pieceY, pieceRot) THEN
             pieceX -= 1
@@ -133,7 +135,8 @@ IF gameOver THEN
     RenderGame()
     key = ""
     WHILE key = "" DO
-        key = InKey()
+        inputEvent = EventPoll()
+        key = inputEvent.Text
         GfxWaitFrame 18
     ENDWHILE
 ENDIF
