@@ -220,6 +220,17 @@ impl GfxProbe {
                     return false;
                 };
                 let numbers: Vec<&str> = values.split(';').collect();
+                // Icy Term names itself instead of CTerm. It carries the inline blob
+                // verbs from 0.8.4, which is what the revision stands in for here.
+                if numbers.len() >= 10 && numbers[..7] == ["73", "99", "121", "84", "101", "114", "109"] {
+                    let (Ok(major), Ok(minor), Ok(patch)) = (numbers[7].parse::<u32>(), numbers[8].parse::<u32>(), numbers[9].parse::<u32>()) else {
+                        return false;
+                    };
+                    if (major, minor, patch) >= (0, 8, 4) {
+                        self.capabilities.cterm_revision = Some(CTERM_INLINE_BLOB_REVISION);
+                    }
+                    return true;
+                }
                 if numbers.len() < 7 || numbers[..5] != ["67", "84", "101", "114", "109"] {
                     return false;
                 }
@@ -641,6 +652,38 @@ mod tests {
         assert!(probe.jxl_answered());
         assert_eq!(probe.capabilities().resolve_backend(GFX_BACKEND_AUTO), GFX_BACKEND_NONE);
         assert_eq!(probe.capabilities().resolve_backend(GFX_BACKEND_JXL), GFX_BACKEND_NONE);
+    }
+
+    /// What Icy Term answers: it names itself rather than a `CTerm` revision, and from
+    /// 0.8.4 it carries the inline blob verbs that keep frames out of the disk cache.
+    #[test]
+    fn icy_term_is_served_jpeg_xl_and_inline_blobs_from_0_8_4() {
+        let probe_icy_term = |identity: &[u8]| {
+            let mut probe = GfxProbe::default();
+            probe.start();
+            let mut typed = Vec::new();
+            for byte in identity {
+                typed.extend(probe.feed(*byte));
+            }
+            for byte in b"\x1b[<1;2;3;4;5;6;7c\x1b[6;16;8t\x1b[4;400;640t\x1b[=1;1-n" {
+                typed.extend(probe.feed(*byte));
+            }
+            let (capabilities, _, _) = probe.finish();
+            (capabilities, typed)
+        };
+
+        let (capabilities, typed) = probe_icy_term(b"\x1b[=73;99;121;84;101;114;109;0;8;4c");
+        assert_eq!(capabilities.resolve_backend(GFX_BACKEND_AUTO), GFX_BACKEND_JXL);
+        assert!(capabilities.sixel);
+        assert!(capabilities.inline_blobs());
+        assert_eq!((capabilities.cell_width, capabilities.cell_height), (8, 16));
+        // The identity is an answer now, so it no longer reaches the keyboard.
+        assert!(typed.is_empty());
+
+        let (older, typed) = probe_icy_term(b"\x1b[=73;99;121;84;101;114;109;0;8;3c");
+        assert_eq!(older.resolve_backend(GFX_BACKEND_AUTO), GFX_BACKEND_JXL);
+        assert!(!older.inline_blobs());
+        assert!(typed.is_empty());
     }
 
     #[test]
