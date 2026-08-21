@@ -19,15 +19,7 @@ use super::{IcyBoardState, functions::MASK_COMMAND, user_commands::pcb::select_c
 impl IcyBoardState {
     #[async_recursion(?Send)]
     pub async fn run_single_command(&mut self, via_cmd_list: bool) -> Res<bool> {
-        if let Some(mut command) = self.session.tokens.pop_front() {
-            if !via_cmd_list
-                && command.len() > 1
-                && command.starts_with(|ch: char| ch.eq_ignore_ascii_case(&'J'))
-                && command[1..].chars().all(|ch| ch.is_ascii_digit())
-            {
-                self.session.tokens.push_front(command[1..].to_string());
-                command.truncate(1);
-            }
+        if let Some(command) = self.session.tokens.pop_front() {
             if let Some(action) = self.try_find_command(&command, via_cmd_list).await {
                 return self.dispatch_command(&command, &action).await;
             }

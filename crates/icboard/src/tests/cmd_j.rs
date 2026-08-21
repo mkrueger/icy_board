@@ -2,8 +2,8 @@ use crate::tests::{compile_test_ppe, setup_conference, test_output, test_user_ou
 use icy_board_engine::icy_board::commands::{Command, CommandAction, CommandType};
 
 #[test]
-fn a_mapped_ppe_can_stuff_the_builtin_join_command() {
-    let ppe = compile_test_ppe("KBDSTUFF \"J1^M\"");
+fn a_mapped_ppe_can_stuff_a_complete_builtin_join_command() {
+    let ppe = compile_test_ppe("KBDSTUFF \"J;1^M\"");
     let output = test_user_output("J\n".to_string(), |board| {
         setup_conference(board);
         board.commands.push(Command {
@@ -15,6 +15,18 @@ fn a_mapped_ppe_can_stuff_the_builtin_join_command() {
             }],
             ..Default::default()
         });
+    });
+
+    assert!(output.contains("TESTCONF (1) Joined"), "{output}");
+}
+
+#[test]
+fn a_cnfn_ppe_can_stuff_only_the_selected_conference() {
+    let ppe = compile_test_ppe("KBDSTUFF \"1^M\"");
+    let menu = ppe.with_extension("");
+    let output = test_output("J\n".to_string(), |board| {
+        setup_conference(board);
+        board.config.paths.conf_join_menu = menu.clone();
     });
 
     assert!(output.contains("TESTCONF (1) Joined"), "{output}");
