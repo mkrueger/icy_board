@@ -468,6 +468,16 @@ fn the_fractal_demo_asks_the_terminal_to_scale_its_small_surface() {
     assert!(output.contains("surfaces, per-pixel drawing"), "{output:?}");
 }
 
+#[test]
+fn the_fractal_demo_checks_for_input_between_mandelbrot_bands() {
+    let source = fractal_source("GFX_AUTO").replace("CONST INTEGER BAND = 10", "CONST INTEGER BAND = 2");
+    let output = super::run_ppl_with_input(&source, &[JXL_TERMINAL, b"q"].concat());
+
+    // One HUD and the first fractal band are presented before the queued key stops the frame.
+    assert_eq!(output.matches("SyncTERM:C;DrawJXLBlob;").count(), 2, "{output:?}");
+    assert!(output.contains("surfaces, per-pixel drawing"), "{output:?}");
+}
+
 /// The demo skips the two parts of the set whose outline is known, which is only worth
 /// doing if the picture is the same as iterating every pixel would give.
 #[test]

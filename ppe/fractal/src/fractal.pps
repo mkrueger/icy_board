@@ -37,6 +37,7 @@ SURFACE frac, hud
 
 INTEGER frame, step, keyIndex, nextIndex, maxIter
 DOUBLE scale, cx, cy, u
+BOOLEAN interrupted
 
 BuildPalette()
 BuildJuliaTour()
@@ -78,8 +79,8 @@ FOR frame = 0 TO ZOOM_FRAMES - 1
     maxIter = 48 + frame * 8
     DrawHud(frame + 1, ZOOM_FRAMES)
     RenderMandel(TARGET_X, TARGET_Y, scale, maxIter)
+    IF interrupted GOTO Finished
     scale = scale * 0.62
-    IF InKey() <> "" GOTO Finished
 NEXT frame
 
 ; Then tour a few Julia constants, interpolating between them.
@@ -149,11 +150,18 @@ PROCEDURE RenderMandel(DOUBLE centerX, DOUBLE centerY, DOUBLE half, INTEGER maxI
         ; finished instead of after the whole image.
         IF pending = BAND THEN
             PresentBand(bandTop, pending)
+            IF InKey() <> "" THEN
+                interrupted = TRUE
+                RETURN
+            ENDIF
             bandTop = py + 1
             pending = 0
         ENDIF
     NEXT py
-    IF pending > 0 PresentBand(bandTop, pending)
+    IF pending > 0 THEN
+        PresentBand(bandTop, pending)
+        IF InKey() <> "" interrupted = TRUE
+    ENDIF
 ENDPROC
 
 PROCEDURE RenderJulia(DOUBLE constX, DOUBLE constY, INTEGER maxIter)
