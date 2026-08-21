@@ -6,7 +6,7 @@ import { binary, findManifest, locate, locateBoardConfig, reportMissing, reportM
 
 /// What the board is called with, with the places a path goes filled in.
 function runArguments(replacements: Record<string, string>): string[] {
-  const configured = vscode.workspace.getConfiguration("icyboardPpl").get<string[]>("runArguments");
+  const configured = vscode.workspace.getConfiguration("ppl").get<string[]>("runArguments");
   const template = configured?.length ? configured : ["--ppe", "${ppe}"];
   return template.map((argument) => argument.replace(/\$\{(\w+)\}/g, (whole, name) => replacements[name] ?? whole));
 }
@@ -107,7 +107,7 @@ async function stopPreviousRun(name: string): Promise<void> {
 export async function runPpe(output: vscode.OutputChannel, options: { singleFile?: boolean } = {}): Promise<void> {
   const document = vscode.window.activeTextEditor?.document;
   if (!document || document.uri.scheme !== "file" || !document.fileName.toLowerCase().endsWith(".pps")) {
-    vscode.window.showErrorMessage("IcyBoard PPL: open the .pps you want to run.");
+    vscode.window.showErrorMessage("PPL: open the .pps you want to run.");
     return;
   }
   if (!(await document.save())) {
@@ -137,7 +137,7 @@ export async function runPpe(output: vscode.OutputChannel, options: { singleFile
   const report = async (reason: unknown, what: string) => {
     output.appendLine(`${reason}`);
     const showOutput = "Show output";
-    const answer = await vscode.window.showErrorMessage(`IcyBoard PPL: ${what}`, showOutput);
+    const answer = await vscode.window.showErrorMessage(`PPL: ${what}`, showOutput);
     if (answer === showOutput) {
       output.show(true);
     }
@@ -165,7 +165,7 @@ export async function runPpe(output: vscode.OutputChannel, options: { singleFile
   }
 
   const from = workspaceFolder?.fsPath ?? path.dirname(source);
-  const configured = vscode.workspace.getConfiguration("icyboardPpl").get<string>("boardConfig")?.trim();
+  const configured = vscode.workspace.getConfiguration("ppl").get<string>("boardConfig")?.trim();
   const boardConfig = locateBoardConfig(configured || undefined, from);
   if (!boardConfig) {
     await reportMissingBoard();
@@ -182,7 +182,7 @@ export async function runPpe(output: vscode.OutputChannel, options: { singleFile
     boardConfig,
   ];
 
-  const name = "IcyBoard PPL";
+  const name = "PPL";
   await stopPreviousRun(name);
 
   output.appendLine(`Running ${commandLine(parts)}`);

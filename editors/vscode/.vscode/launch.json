@@ -14,7 +14,7 @@
         "${workspaceRoot}/client/out/**/*.js"
       ],
       "env": {
-        "SERVER_PATH": "${workspaceRoot}/../../target/debug/icyboard-ppl"
+        "SERVER_PATH": "${workspaceRoot}/../../target/debug/ppl-lsp"
       }
     },
     // {

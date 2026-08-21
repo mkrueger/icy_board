@@ -3,7 +3,7 @@ import * as fs from "fs";
 import * as path from "path";
 
 function binaryDirectory(): string | undefined {
-  const value = vscode.workspace.getConfiguration("icyboardPpl").get<string>("binPath")?.trim();
+  const value = vscode.workspace.getConfiguration("ppl").get<string>("binPath")?.trim();
   return value ? value : undefined;
 }
 
@@ -39,11 +39,11 @@ export async function reportMissing(command: string, whatItIs: string): Promise<
   const openSettings = "Open settings";
   const where = binaryDirectory() ? `'${command}' is not there` : `'${command}' is not on your PATH`;
   const answer = await vscode.window.showErrorMessage(
-    `IcyBoard PPL: ${where}. Point icyboardPpl.binPath at the directory holding ${whatItIs}.`,
+    `PPL: ${where}. Point ppl.binPath at the directory holding ${whatItIs}.`,
     openSettings,
   );
   if (answer === openSettings) {
-    await vscode.commands.executeCommand("workbench.action.openSettings", "icyboardPpl.binPath");
+    await vscode.commands.executeCommand("workbench.action.openSettings", "ppl.binPath");
   }
 }
 
@@ -83,11 +83,11 @@ export function locateBoardConfig(configured: string | undefined, from: string):
 export async function reportMissingBoard(): Promise<void> {
   const openSettings = "Open settings";
   const answer = await vscode.window.showErrorMessage(
-    `IcyBoard PPL: no board to run the PPE on. Point icyboardPpl.boardConfig at an ${BOARD_FILE}, or at the directory holding one.`,
+    `PPL: no board to run the PPE on. Point ppl.boardConfig at an ${BOARD_FILE}, or at the directory holding one.`,
     openSettings,
   );
   if (answer === openSettings) {
-    await vscode.commands.executeCommand("workbench.action.openSettings", "icyboardPpl.boardConfig");
+    await vscode.commands.executeCommand("workbench.action.openSettings", "ppl.boardConfig");
   }
 }
 

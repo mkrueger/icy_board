@@ -188,7 +188,7 @@ completion, hover and navigation come from the `ppl-lsp` language server.
 
 | Editor | How it is installed |
 | :--- | :--- |
-| [VS Code](editors/vscode) | `code --install-extension icyboard-ppl-<version>-<platform>.vsix`, taken from a [release](https://github.com/mkrueger/icy_board/releases). The platform packages carry the server. |
+| [VS Code](editors/vscode) | `code --install-extension ppl-vscode-<version>-<platform>.vsix`, taken from a [release](https://github.com/mkrueger/icy_board/releases). The platform packages carry the server. |
 | [Zed](https://github.com/mkrueger/zed-ppl) | Clone the extension and run `zed: install dev extension` on the clone. It fetches the server from the newest release by itself. |
 | Helix, Neovim | `tools/setup-editor.sh` from a source checkout builds the grammar and the server and writes the configuration. |
 | Anything else with LSP | Point it at `ppl-lsp` for `.pps`; it talks over stdio and takes no arguments. |

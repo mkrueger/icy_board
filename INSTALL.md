@@ -106,7 +106,7 @@ Download the `.vsix` for your platform from the
 [releases](https://github.com/mkrueger/icy_board/releases) and install it:
 
 ```sh
-code --install-extension icyboard-ppl-<version>-<platform>.vsix
+code --install-extension ppl-vscode-<version>-<platform>.vsix
 ```
 
 The Extensions view does the same through *Install from VSIX...* in its `...`

@@ -1,6 +1,6 @@
 {
-	"name": "icyboard-ppl",
-	"displayName": "IcyBoard PPL",
+	"name": "ppl-vscode",
+	"displayName": "PPL Language Support",
 	"description": "Language support for the PCBoard Programming Language",
 	"license": "MIT",
 	"version": "0.2.0",
@@ -26,9 +26,9 @@
 			"supported": "limited",
 			"description": "The extension starts the language server, and Run PPE starts a compiler and a board, so a workspace it does not trust may not say which programs those are.",
 			"restrictedConfigurations": [
-				"icyboardPpl.binPath",
-				"icyboardPpl.boardConfig",
-				"icyboardPpl.runArguments"
+				"ppl.binPath",
+				"ppl.boardConfig",
+				"ppl.runArguments"
 			]
 		}
 	},
@@ -47,15 +47,15 @@
 		],
 		"configuration": {
 			"type": "object",
-			"title": "IcyBoard PPL",
+			"title": "PPL",
 			"properties": {
-				"icyboardPpl.binPath": {
+				"ppl.binPath": {
 					"type": "string",
 					"scope": "machine-overridable",
 					"default": "",
 					"markdownDescription": "The directory holding the IcyBoard programs - `ppl-lsp`, `pplc` and `icboard`. Leave empty for the server that ships with the extension and the rest from your PATH."
 				},
-				"icyboard-ppl.trace.server": {
+				"ppl.trace.server": {
 					"type": "string",
 					"scope": "window",
 					"enum": [
@@ -71,13 +71,13 @@
 					"default": "off",
 					"description": "Traces the communication between VS Code and the language server."
 				},
-				"icyboardPpl.boardConfig": {
+				"ppl.boardConfig": {
 					"type": "string",
 					"scope": "machine-overridable",
 					"default": "",
 					"markdownDescription": "The `icboard.toml` a PPE is run against, or the directory holding it. Leave empty to look in the workspace folder and in `ICB_PATH`."
 				},
-				"icyboardPpl.runArguments": {
+				"ppl.runArguments": {
 					"type": "array",
 					"items": {
 						"type": "string"
@@ -117,15 +117,15 @@
 		],
 		"commands": [
 			{
-				"command": "icyboard-ppl.run",
-				"category": "IcyBoard PPL",
+				"command": "ppl.run",
+				"category": "PPL",
 				"title": "Run PPE",
 				"icon": "$(play)",
 				"enablement": "editorLangId == ppl"
 			},
 			{
-				"command": "icyboard-ppl.runFile",
-				"category": "IcyBoard PPL",
+				"command": "ppl.runFile",
+				"category": "PPL",
 				"title": "Run PPE (This File Only)",
 				"enablement": "editorLangId == ppl"
 			}
@@ -133,7 +133,7 @@
 		"menus": {
 			"editor/title/run": [
 				{
-					"command": "icyboard-ppl.run",
+					"command": "ppl.run",
 					"when": "resourceExtname == .pps",
 					"group": "navigation"
 				}
@@ -141,7 +141,7 @@
 		},
 		"keybindings": [
 			{
-				"command": "icyboard-ppl.run",
+				"command": "ppl.run",
 				"key": "ctrl+f5",
 				"mac": "cmd+f5",
 				"when": "editorTextFocus && editorLangId == ppl"

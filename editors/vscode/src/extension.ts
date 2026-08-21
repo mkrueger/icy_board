@@ -35,12 +35,12 @@ function serverCommand(context: vscode.ExtensionContext): string {
 }
 
 export async function activate(context: vscode.ExtensionContext) {
-  const output = vscode.window.createOutputChannel("IcyBoard PPL");
+  const output = vscode.window.createOutputChannel("PPL");
   const traceOutputChannel = vscode.window.createOutputChannel("PPL Language Server trace");
   context.subscriptions.push(output, traceOutputChannel);
-  context.subscriptions.push(vscode.commands.registerCommand("ppl-lsp.run", () => runPpe(output)));
+  context.subscriptions.push(vscode.commands.registerCommand("ppl.run", () => runPpe(output)));
   context.subscriptions.push(
-    vscode.commands.registerCommand("ppl-lsp.runFile", () => runPpe(output, { singleFile: true })),
+    vscode.commands.registerCommand("ppl.runFile", () => runPpe(output, { singleFile: true })),
   );
 
   const command = serverCommand(context);
@@ -51,7 +51,7 @@ export async function activate(context: vscode.ExtensionContext) {
     traceOutputChannel,
   };
 
-  client = new LanguageClient("ppl-lsp", "IcyBoard PPL language server", serverOptions, clientOptions);
+  client = new LanguageClient("ppl", "PPL language server", serverOptions, clientOptions);
   context.subscriptions.push(client);
 
   try {
@@ -60,18 +60,18 @@ export async function activate(context: vscode.ExtensionContext) {
     output.appendLine(`${error}`);
     const openSettings = "Open settings";
     const answer = await vscode.window.showErrorMessage(
-      `IcyBoard PPL: could not start '${command}'. Install a build for your platform, or point icyboardPpl.binPath at the directory holding the IcyBoard programs.`,
+      `PPL: could not start '${command}'. Install a build for your platform, or point ppl.binPath at the directory holding the IcyBoard programs.`,
       openSettings,
     );
     if (answer === openSettings) {
-      await vscode.commands.executeCommand("workbench.action.openSettings", "icyboardPpl.binPath");
+      await vscode.commands.executeCommand("workbench.action.openSettings", "ppl.binPath");
     }
     return;
   }
 
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration(async (event) => {
-      if (!event.affectsConfiguration("icyboardPpl.binPath")) {
+      if (!event.affectsConfiguration("ppl.binPath")) {
         return;
       }
       const reload = "Reload window";

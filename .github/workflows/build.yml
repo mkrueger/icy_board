@@ -229,7 +229,7 @@ jobs:
    - name: 'Upload zip'
      uses: actions/upload-artifact@v4
      with:
-       name: icyboard-ppl-${{ env.VERSION }}-vsix
+       name: ppl-vscode-${{ env.VERSION }}-vsix
        path: editors/vscode/*.vsix
        if-no-files-found: error
 
