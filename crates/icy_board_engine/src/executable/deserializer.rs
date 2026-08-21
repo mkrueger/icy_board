@@ -130,6 +130,12 @@ impl PPEDeserializer {
 
                 Ok(Some(PPECommand::Let(Box::new(target), Box::new(value))))
             }
+            OpCode::MemberCall => {
+                let Some(expr) = self.deserialize_expression(executable)? else {
+                    return Err(DeserializationErrorType::LetValueInvalid(self.offset));
+                };
+                Ok(Some(PPECommand::MemberCall(Box::new(expr))))
+            }
             OpCode::IFNOT => {
                 let Some(expr) = self.deserialize_expression(executable)? else {
                     return Err(DeserializationErrorType::IfConditionInvalid(self.offset));

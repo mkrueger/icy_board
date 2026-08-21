@@ -275,32 +275,25 @@ pub enum OpCode {
     SndPreload = 234,
 
     GfxInit = 235,
-    GfxCreate = 236,
-    GfxLoad = 237,
-    GfxClear = 238,
-    GfxFillRect = 239,
-    GfxRect = 240,
-    GfxBlit = 241,
-    GfxBlitRect = 242,
-    GfxPresent = 243,
-    GfxPresentRect = 244,
-    GfxWaitFrame = 245,
-    GfxFree = 246,
-    GfxShutdown = 247,
-    GfxPresentAt = 248,
-    MouseOn = 249,
-    MouseOff = 250,
-    GfxPin = 251,
-    GfxSetPacing = 252,
-    SndFade = 253,
-    SndStopAll = 254,
-    KeyEvents = 255,
+    GfxWaitFrame = 236,
+    GfxShutdown = 237,
+    MouseOn = 238,
+    MouseOff = 239,
+    GfxSetPacing = 240,
+    SndFade = 241,
+    SndStopAll = 242,
+    KeyEvents = 243,
+    MemberCall = 244,
 }
-pub const LAST_STMT: i16 = OpCode::KeyEvents as i16;
+pub const LAST_STMT: i16 = OpCode::MemberCall as i16;
 
 impl OpCode {
     pub fn get_definition(self) -> &'static StatementDefinition {
         &STATEMENT_DEFINITIONS[self as usize]
+    }
+
+    pub fn minimum_runtime(self) -> u16 {
+        if (self as i16) >= OpCode::SndPlay as i16 { 402 } else { 100 }
     }
 }
 
@@ -618,7 +611,7 @@ pub fn format_argument_type_last(arg: &ArgumentDefinition) -> String {
 // "WAIT FOR" == "WAITFOR"
 // "GO SUB"
 // " GO TO"
-pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 261]> = std::sync::LazyLock::new(|| {
+pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 250]> = std::sync::LazyLock::new(|| {
     [
         StatementDefinition {
             // helps to map opcode to array index.
@@ -2639,124 +2632,10 @@ pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 261]
             sig: StatementSignature::VariableArguments(0, 0, 2),
         },
         StatementDefinition {
-            name: "GfxCreate",
-            version: 400,
-            opcode: OpCode::GfxCreate,
-            args: Some(vec![
-                ArgumentDefinition::new("Slot", VariableType::Integer),
-                ArgumentDefinition::new("Width", VariableType::Integer),
-                ArgumentDefinition::new("Height", VariableType::Integer),
-            ]),
-            sig: StatementSignature::ArgumentsWithVariable(0, 3),
-        },
-        StatementDefinition {
-            name: "GfxLoad",
-            version: 400,
-            opcode: OpCode::GfxLoad,
-            args: Some(vec![
-                ArgumentDefinition::new("Slot", VariableType::Integer),
-                ArgumentDefinition::new("FileName", VariableType::String),
-            ]),
-            sig: StatementSignature::ArgumentsWithVariable(0, 2),
-        },
-        StatementDefinition {
-            name: "GfxClear",
-            version: 400,
-            opcode: OpCode::GfxClear,
-            args: Some(vec![
-                ArgumentDefinition::new("Slot", VariableType::Integer),
-                ArgumentDefinition::new("Color", VariableType::Unsigned),
-            ]),
-            sig: StatementSignature::ArgumentsWithVariable(0, 2),
-        },
-        StatementDefinition {
-            name: "GfxFillRect",
-            version: 400,
-            opcode: OpCode::GfxFillRect,
-            args: Some(vec![
-                ArgumentDefinition::new("Slot", VariableType::Integer),
-                ArgumentDefinition::new("X", VariableType::Integer),
-                ArgumentDefinition::new("Y", VariableType::Integer),
-                ArgumentDefinition::new("Width", VariableType::Integer),
-                ArgumentDefinition::new("Height", VariableType::Integer),
-                ArgumentDefinition::new("Color", VariableType::Unsigned),
-            ]),
-            sig: StatementSignature::ArgumentsWithVariable(0, 6),
-        },
-        StatementDefinition {
-            name: "GfxRect",
-            version: 400,
-            opcode: OpCode::GfxRect,
-            args: Some(vec![
-                ArgumentDefinition::new("Slot", VariableType::Integer),
-                ArgumentDefinition::new("X", VariableType::Integer),
-                ArgumentDefinition::new("Y", VariableType::Integer),
-                ArgumentDefinition::new("Width", VariableType::Integer),
-                ArgumentDefinition::new("Height", VariableType::Integer),
-                ArgumentDefinition::new("Color", VariableType::Unsigned),
-            ]),
-            sig: StatementSignature::ArgumentsWithVariable(0, 6),
-        },
-        StatementDefinition {
-            name: "GfxBlit",
-            version: 400,
-            opcode: OpCode::GfxBlit,
-            args: Some(vec![
-                ArgumentDefinition::new("Destination", VariableType::Integer),
-                ArgumentDefinition::new("Source", VariableType::Integer),
-                ArgumentDefinition::new("X", VariableType::Integer),
-                ArgumentDefinition::new("Y", VariableType::Integer),
-            ]),
-            sig: StatementSignature::ArgumentsWithVariable(0, 4),
-        },
-        StatementDefinition {
-            name: "GfxBlitRect",
-            version: 400,
-            opcode: OpCode::GfxBlitRect,
-            args: Some(vec![
-                ArgumentDefinition::new("Destination", VariableType::Integer),
-                ArgumentDefinition::new("Source", VariableType::Integer),
-                ArgumentDefinition::new("SourceX", VariableType::Integer),
-                ArgumentDefinition::new("SourceY", VariableType::Integer),
-                ArgumentDefinition::new("SourceWidth", VariableType::Integer),
-                ArgumentDefinition::new("SourceHeight", VariableType::Integer),
-                ArgumentDefinition::new("X", VariableType::Integer),
-                ArgumentDefinition::new("Y", VariableType::Integer),
-            ]),
-            sig: StatementSignature::ArgumentsWithVariable(0, 8),
-        },
-        StatementDefinition {
-            name: "GfxPresent",
-            version: 400,
-            opcode: OpCode::GfxPresent,
-            args: Some(vec![ArgumentDefinition::new("Slot", VariableType::Integer)]),
-            sig: StatementSignature::ArgumentsWithVariable(0, 1),
-        },
-        StatementDefinition {
-            name: "GfxPresentRect",
-            version: 400,
-            opcode: OpCode::GfxPresentRect,
-            args: Some(vec![
-                ArgumentDefinition::new("Slot", VariableType::Integer),
-                ArgumentDefinition::new("X", VariableType::Integer),
-                ArgumentDefinition::new("Y", VariableType::Integer),
-                ArgumentDefinition::new("Width", VariableType::Integer),
-                ArgumentDefinition::new("Height", VariableType::Integer),
-            ]),
-            sig: StatementSignature::VariableArguments(0, 5, 7),
-        },
-        StatementDefinition {
             name: "GfxWaitFrame",
             version: 400,
             opcode: OpCode::GfxWaitFrame,
             args: Some(vec![ArgumentDefinition::new("FramesPerSecond", VariableType::Integer)]),
-            sig: StatementSignature::ArgumentsWithVariable(0, 1),
-        },
-        StatementDefinition {
-            name: "GfxFree",
-            version: 400,
-            opcode: OpCode::GfxFree,
-            args: Some(vec![ArgumentDefinition::new("Slot", VariableType::Integer)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
@@ -2765,17 +2644,6 @@ pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 261]
             opcode: OpCode::GfxShutdown,
             args: None,
             sig: StatementSignature::ArgumentsWithVariable(0, 0),
-        },
-        StatementDefinition {
-            name: "GfxPresentAt",
-            version: 400,
-            opcode: OpCode::GfxPresentAt,
-            args: Some(vec![
-                ArgumentDefinition::new("Slot", VariableType::Integer),
-                ArgumentDefinition::new("Column", VariableType::Integer),
-                ArgumentDefinition::new("Row", VariableType::Integer),
-            ]),
-            sig: StatementSignature::ArgumentsWithVariable(0, 3),
         },
         StatementDefinition {
             name: "MouseOn",
@@ -2793,16 +2661,6 @@ pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 261]
             opcode: OpCode::MouseOff,
             args: None,
             sig: StatementSignature::ArgumentsWithVariable(0, 0),
-        },
-        StatementDefinition {
-            name: "GfxPin",
-            version: 400,
-            opcode: OpCode::GfxPin,
-            args: Some(vec![
-                ArgumentDefinition::new("Slot", VariableType::Integer),
-                ArgumentDefinition::new("Enabled", VariableType::Boolean),
-            ]),
-            sig: StatementSignature::VariableArguments(0, 1, 2),
         },
         StatementDefinition {
             name: "GfxSetPacing",
@@ -2835,6 +2693,14 @@ pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 261]
             opcode: OpCode::KeyEvents,
             args: Some(vec![ArgumentDefinition::new("Mode", VariableType::Integer)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
+        },
+        StatementDefinition {
+            // Spelled as `object.Member(...)`, so it has no name of its own.
+            name: "MemberCall",
+            version: 400,
+            opcode: OpCode::MemberCall,
+            args: None,
+            sig: StatementSignature::Invalid,
         },
         // Alias section
         // Moving to the end, so that the opcode <--> index mapping is not broken

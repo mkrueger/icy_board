@@ -1,6 +1,20 @@
 use crate::vm::tests::run_ppl;
 
 #[test]
+fn a_member_call_can_stand_on_its_own_as_a_statement() {
+    assert_eq!(
+        "ok",
+        run_ppl(
+            r#"
+CONFERENCE conf = ConfInfo(0)
+conf.HasAccess()
+PRINT "ok"
+"#
+        )
+    );
+}
+
+#[test]
 fn test_a_field_of_a_field_keeps_what_was_assigned_to_it() {
     assert_eq!(
         "5",

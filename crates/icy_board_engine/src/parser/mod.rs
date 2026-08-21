@@ -266,7 +266,7 @@ impl UserTypeDefinition {
 #[derive(Default)]
 pub struct UserTypeRegistry {
     pub registered_types: HashMap<unicase::Ascii<String>, VariableType>,
-    pub types: Vec<UserDataRegistry>,
+    pub types: HashMap<u8, UserDataRegistry>,
     built_in_records: HashMap<u8, UserTypeDefinition>,
     /// Records the compiled program declares. Shared across every file of a
     /// compilation so a type declared in one is visible in the next.
@@ -280,6 +280,7 @@ pub const MESSAGE_AREA_ID: usize = 31;
 pub const FILE_DIRECTORY_ID: usize = 32;
 pub const DOOR_ID: usize = 33;
 pub const CONTACT_ID: usize = 34;
+pub const SURFACE_ID: usize = 35;
 
 /// The board objects are ours, so no `PCBoard` language knows their names.
 pub const FIRST_BOARD_OBJECT_LANGUAGE_VERSION: u16 = 400;
@@ -302,10 +303,10 @@ pub fn is_user_declared_type(id: u8) -> bool {
 impl UserTypeRegistry {
     pub fn icy_board_registry() -> Self {
         let mut reg = UserTypeRegistry::default();
-        reg.register::<Conference>();
-        reg.register::<MessageArea>();
-        reg.register::<FileDirectory>();
-        reg.register::<Door>();
+        reg.register::<Conference>(CONFERENCE_ID);
+        reg.register::<MessageArea>(MESSAGE_AREA_ID);
+        reg.register::<FileDirectory>(FILE_DIRECTORY_ID);
+        reg.register::<Door>(DOOR_ID);
         reg.register_record(
             CONTACT_ID,
             "CONTACT",
@@ -314,6 +315,7 @@ impl UserTypeRegistry {
                 (unicase::Ascii::new("Account".to_string()), VariableType::String),
             ],
         );
+        reg.register::<crate::icy_board::state::ppl_surface::PplSurface>(SURFACE_ID);
 
         reg
     }
@@ -406,16 +408,29 @@ impl UserTypeRegistry {
         Some(id)
     }
 
-    pub fn register<T: UserData>(&mut self) {
+    /// Every PPE stores the type id, so an id that is taken can never move.
+    fn claim_id(&self, id: usize, name: &str) {
+        assert!(
+            (FIRST_ID..FIRST_USER_TYPE_ID).contains(&id),
+            "board object '{name}' wants id {id}, which is outside the board object range"
+        );
+        assert!(
+            !self.types.contains_key(&(id as u8)) && !self.built_in_records.contains_key(&(id as u8)),
+            "board object '{name}' wants id {id}, which is already taken"
+        );
+    }
+
+    pub fn register<T: UserData>(&mut self, id: usize) {
+        self.claim_id(id, T::TYPE_NAME);
         let mut registry = UserDataRegistry::default();
         T::register_members(&mut registry);
-        let id = self.types.len();
         self.registered_types
-            .insert(unicase::Ascii::new(T::TYPE_NAME.to_string()), VariableType::UserData((FIRST_ID + id) as u8));
-        self.types.push(registry);
+            .insert(unicase::Ascii::new(T::TYPE_NAME.to_string()), VariableType::UserData(id as u8));
+        self.types.insert(id as u8, registry);
     }
 
     fn register_record(&mut self, id: usize, name: &str, fields: Vec<(unicase::Ascii<String>, VariableType)>) {
+        self.claim_id(id, name);
         self.registered_types
             .insert(unicase::Ascii::new(name.to_string()), VariableType::UserData(id as u8));
         self.built_in_records.insert(
@@ -429,12 +444,7 @@ impl UserTypeRegistry {
     }
 
     pub fn get_type_from_id(&self, d: u8) -> Option<&UserDataRegistry> {
-        let d = d as usize;
-        if d < FIRST_ID || d >= self.types.len() + FIRST_ID {
-            log::error!("Invalid user type id: {d}");
-            return None;
-        }
-        Some(&self.types[d - FIRST_ID])
+        self.types.get(&d)
     }
 }
 

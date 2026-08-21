@@ -4,10 +4,10 @@ use super::{
     ArrayInitializerExpression, Ast, AstNode, BinaryExpression, BlockStatement, BreakStatement, CaseBlock, CaseSpecifier, CommentAstNode,
     ConstDeclarationStatement, ConstantExpression, ContinueStatement, ElseBlock, ElseIfBlock, EnumDeclarationAstNode, Expression, ForStatement,
     FunctionCallExpression, FunctionDeclarationAstNode, FunctionImplementation, GosubStatement, GotoStatement, IdentifierExpression, IfStatement,
-    IfThenStatement, IndexerExpression, LabelStatement, LetStatement, LoopStatement, MemberReferenceExpression, ParameterSpecifier, ParensExpression,
-    PredefinedCallStatement, ProcedureCallStatement, ProcedureDeclarationAstNode, ProcedureImplementation, RecordLiteralExpression, RepeatUntilStatement,
-    ReturnStatement, SelectStatement, Statement, TypeDeclarationAstNode, UnaryExpression, VariableDeclarationStatement, VariableSpecifier, WhileDoStatement,
-    WhileStatement,
+    IfThenStatement, IndexerExpression, LabelStatement, LetStatement, LoopStatement, MemberCallStatement, MemberReferenceExpression, ParameterSpecifier,
+    ParensExpression, PredefinedCallStatement, ProcedureCallStatement, ProcedureDeclarationAstNode, ProcedureImplementation, RecordLiteralExpression,
+    RepeatUntilStatement, ReturnStatement, SelectStatement, Statement, TypeDeclarationAstNode, UnaryExpression, VariableDeclarationStatement,
+    VariableSpecifier, WhileDoStatement, WhileStatement,
 };
 
 #[allow(unused_variables)]
@@ -132,6 +132,9 @@ pub trait AstVisitor<T: Default>: Sized {
     fn visit_predefined_call_statement(&mut self, call: &PredefinedCallStatement) -> T {
         walk_predefined_call_statement(self, call);
         T::default()
+    }
+    fn visit_member_call_statement(&mut self, call: &MemberCallStatement) -> T {
+        call.get_expression().visit(self)
     }
 
     // visit declarations
@@ -617,6 +620,9 @@ pub trait AstVisitorMut: Sized {
             call.get_func(),
             call.get_arguments().iter().map(|arg| arg.visit_mut(self)).collect(),
         ))
+    }
+    fn visit_member_call_statement(&mut self, call: &MemberCallStatement) -> Statement {
+        Statement::MemberCall(MemberCallStatement::new(call.get_expression().visit_mut(self)))
     }
 
     // visit declarations

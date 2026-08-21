@@ -552,6 +552,10 @@ impl AstVisitor<()> for OutputVisitor {
         self.output.push(')');
     }
 
+    fn visit_member_call_statement(&mut self, call: &super::MemberCallStatement) {
+        call.get_expression().visit(self);
+    }
+
     fn visit_predefined_call_statement(&mut self, call: &super::PredefinedCallStatement) {
         // 400 turned END into the block terminator, so the statement is spelled EXIT there.
         if self.version >= 400 && call.get_func().opcode == crate::executable::OpCode::END {

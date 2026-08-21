@@ -11,7 +11,6 @@ CONST INTEGER GAME_W = 320
 CONST INTEGER GAME_H = 288
 CONST INTEGER GAME_X = 160
 CONST INTEGER GAME_Y = 56
-CONST INTEGER GAME_SURFACE = 2
 
 ; Classic Game Boy DMG 4-shade green palette (0xRRGGBBAA).
 CONST UNSIGNED GB_LIGHTEST = Rgb(224, 248, 208)
@@ -32,6 +31,7 @@ INTEGER pieceType, nextType, pieceX, pieceY, pieceRot
 INTEGER score, level, lines, frame, dropFrames, pieceSerial
 BOOLEAN gameOver, running, changed
 STRING key
+SURFACE screen, game, ui
 
 CLS
 PRINTLN "Loading assets..."
@@ -48,9 +48,9 @@ IF GfxBackend() < 0 THEN
     EXIT
 ENDIF
 
-GfxCreate 0, SCREEN_W, SCREEN_H
-GfxCreate GAME_SURFACE, GAME_W, GAME_H
-GfxLoad 1, "./ui.png"
+screen = NewSurface(SCREEN_W, SCREEN_H)
+game = NewSurface(GAME_W, GAME_H)
+ui = LoadSurface("./ui.png")
 InitShapes()
 InitColors()
 ClearBoard()
@@ -139,9 +139,9 @@ IF gameOver THEN
 ENDIF
 
 SndStop 0
-GfxFree 1
-GfxFree GAME_SURFACE
-GfxFree 0
+ui.Free()
+game.Free()
+screen.Free()
 GfxShutdown
 CLS
 
@@ -387,9 +387,9 @@ PROCEDURE AnimateClear()
         WHILE row < BOARD_H DO
             IF clearRow[row] = 1 THEN
                 IF flash % 2 = 0 THEN
-                    GfxFillRect GAME_SURFACE, BOARD_X, BOARD_Y + row * CELL, BOARD_W * CELL, CELL, GB_DARKEST
+                    game.FillRect(BOARD_X, BOARD_Y + row * CELL, BOARD_W * CELL, CELL, GB_DARKEST)
                 ELSE
-                    GfxFillRect GAME_SURFACE, BOARD_X, BOARD_Y + row * CELL, BOARD_W * CELL, CELL, GB_LIGHTEST
+                    game.FillRect(BOARD_X, BOARD_Y + row * CELL, BOARD_W * CELL, CELL, GB_LIGHTEST)
                 ENDIF
             ENDIF
             row += 1
@@ -402,12 +402,12 @@ ENDPROC
 
 PROCEDURE DrawSandFill(INTEGER x, INTEGER y, INTEGER width, INTEGER height)
     INTEGER dx, dy
-    GfxFillRect GAME_SURFACE, x, y, width, height, pieceColor[0]
+    game.FillRect(x, y, width, height, pieceColor[0])
     dy = 2
     WHILE dy < height - 1 DO
         dx = 2 + ((x + y + dy) % 4)
         WHILE dx < width - 1 DO
-            GfxFillRect GAME_SURFACE, x + dx, y + dy, 1, 1, pieceAccent[0]
+            game.FillRect(x + dx, y + dy, 1, 1, pieceAccent[0])
             dx += 5
         ENDWHILE
         dy += 3
@@ -417,7 +417,7 @@ ENDPROC
 
 PROCEDURE DrawSandRect(INTEGER x, INTEGER y, INTEGER width, INTEGER height)
     DrawSandFill(x, y, width, height)
-    GfxRect GAME_SURFACE, x, y, width, height, GB_DARKEST
+    game.Rect(x, y, width, height, GB_DARKEST)
 ENDPROC
 
 ; Each piece type gets its own Game Boy-style fill motif, so pieces stay
@@ -427,28 +427,28 @@ PROCEDURE DrawCell(INTEGER x, INTEGER y, INTEGER kind, INTEGER size)
         DrawSandRect(x, y, size, size)
         RETURN
     ENDIF
-    GfxFillRect GAME_SURFACE, x, y, size - 1, size - 1, pieceColor[kind]
-    GfxRect GAME_SURFACE, x, y, size - 1, size - 1, GB_DARKEST
+    game.FillRect(x, y, size - 1, size - 1, pieceColor[kind])
+    game.Rect(x, y, size - 1, size - 1, GB_DARKEST)
     IF kind = 1 THEN
-        GfxFillRect GAME_SURFACE, x + 2, y + 2, size - 5, size - 5, pieceAccent[kind]
-        GfxFillRect GAME_SURFACE, x + 4, y + 4, size - 9, size - 9, GB_LIGHTEST
+        game.FillRect(x + 2, y + 2, size - 5, size - 5, pieceAccent[kind])
+        game.FillRect(x + 4, y + 4, size - 9, size - 9, GB_LIGHTEST)
     ELSEIF (kind = 2) THEN
-        GfxFillRect GAME_SURFACE, x + 2, y + 2, size - 5, size - 5, pieceAccent[kind]
-        GfxFillRect GAME_SURFACE, x + 3, y + 3, 2, 2, GB_LIGHT
+        game.FillRect(x + 2, y + 2, size - 5, size - 5, pieceAccent[kind])
+        game.FillRect(x + 3, y + 3, 2, 2, GB_LIGHT)
     ELSEIF (kind = 3) THEN
-        GfxFillRect GAME_SURFACE, x + 2, y + 2, size - 5, 2, pieceAccent[kind]
-        GfxFillRect GAME_SURFACE, x + 2, y + 5, size - 5, 2, pieceAccent[kind]
+        game.FillRect(x + 2, y + 2, size - 5, 2, pieceAccent[kind])
+        game.FillRect(x + 2, y + 5, size - 5, 2, pieceAccent[kind])
     ELSEIF (kind = 4) THEN
         ; centered square used by the original Z/S-piece pattern
-        GfxFillRect GAME_SURFACE, x + size / 2 - 2, y + size / 2 - 2, 3, 3, pieceAccent[kind]
+        game.FillRect(x + size / 2 - 2, y + size / 2 - 2, 3, 3, pieceAccent[kind])
     ELSEIF (kind = 5) THEN
         ; concentric ring used by the original J/L-piece pattern
-        GfxFillRect GAME_SURFACE, x + 2, y + 2, size - 5, size - 5, pieceAccent[kind]
-        GfxFillRect GAME_SURFACE, x + 3, y + 3, size - 7, size - 7, GB_LIGHTEST
-        GfxFillRect GAME_SURFACE, x + size / 2 - 1, y + size / 2 - 1, 2, 2, GB_DARKEST
+        game.FillRect(x + 2, y + 2, size - 5, size - 5, pieceAccent[kind])
+        game.FillRect(x + 3, y + 3, size - 7, size - 7, GB_LIGHTEST)
+        game.FillRect(x + size / 2 - 1, y + size / 2 - 1, 2, 2, GB_DARKEST)
     ELSE
-        GfxRect GAME_SURFACE, x + 2, y + 2, size - 5, size - 5, pieceAccent[kind]
-        GfxFillRect GAME_SURFACE, x + size / 2 - 1, y + size / 2 - 1, 2, 2, pieceAccent[kind]
+        game.Rect(x + 2, y + 2, size - 5, size - 5, pieceAccent[kind])
+        game.FillRect(x + size / 2 - 1, y + size / 2 - 1, 2, 2, pieceAccent[kind])
     ENDIF
 ENDPROC
 
@@ -463,24 +463,24 @@ PROCEDURE DrawLockedCell(INTEGER bx, INTEGER by, INTEGER kind)
     group = boardGroup[bx, by]
     DrawSandFill(x, y, CELL, CELL)
     IF bx = 0 THEN
-        GfxFillRect GAME_SURFACE, x, y, 1, CELL, GB_DARKEST
+        game.FillRect(x, y, 1, CELL, GB_DARKEST)
     ELSEIF (boardGroup[bx - 1, by] <> group) THEN
-        GfxFillRect GAME_SURFACE, x, y, 1, CELL, GB_DARKEST
+        game.FillRect(x, y, 1, CELL, GB_DARKEST)
     ENDIF
     IF bx = BOARD_W - 1 THEN
-        GfxFillRect GAME_SURFACE, x + CELL - 1, y, 1, CELL, GB_DARKEST
+        game.FillRect(x + CELL - 1, y, 1, CELL, GB_DARKEST)
     ELSEIF (boardGroup[bx + 1, by] <> group) THEN
-        GfxFillRect GAME_SURFACE, x + CELL - 1, y, 1, CELL, GB_DARKEST
+        game.FillRect(x + CELL - 1, y, 1, CELL, GB_DARKEST)
     ENDIF
     IF by = 0 THEN
-        GfxFillRect GAME_SURFACE, x, y, CELL, 1, GB_DARKEST
+        game.FillRect(x, y, CELL, 1, GB_DARKEST)
     ELSEIF (boardGroup[bx, by - 1] <> group) THEN
-        GfxFillRect GAME_SURFACE, x, y, CELL, 1, GB_DARKEST
+        game.FillRect(x, y, CELL, 1, GB_DARKEST)
     ENDIF
     IF by = BOARD_H - 1 THEN
-        GfxFillRect GAME_SURFACE, x, y + CELL - 1, CELL, 1, GB_DARKEST
+        game.FillRect(x, y + CELL - 1, CELL, 1, GB_DARKEST)
     ELSEIF (boardGroup[bx, by + 1] <> group) THEN
-        GfxFillRect GAME_SURFACE, x, y + CELL - 1, CELL, 1, GB_DARKEST
+        game.FillRect(x, y + CELL - 1, CELL, 1, GB_DARKEST)
     ENDIF
 ENDPROC
 
@@ -525,24 +525,24 @@ ENDPROC
 ; Textured brick pillar flanking the playfield, like the DMG original.
 PROCEDURE DrawWall(INTEGER wx, INTEGER wy, INTEGER ww, INTEGER wh)
     INTEGER yy, row, offset
-    GfxFillRect GAME_SURFACE, wx, wy, ww, wh, GB_DARK
-    GfxRect GAME_SURFACE, wx, wy, ww, wh, GB_DARKEST
+    game.FillRect(wx, wy, ww, wh, GB_DARK)
+    game.Rect(wx, wy, ww, wh, GB_DARKEST)
     yy = wy
     row = 0
     WHILE yy < wy + wh DO
-        GfxFillRect GAME_SURFACE, wx, yy, ww, 1, GB_DARKEST
+        game.FillRect(wx, yy, ww, 1, GB_DARKEST)
         offset = 0
         IF row % 2 = 1 offset = ww / 2
-        GfxFillRect GAME_SURFACE, wx + offset, yy, 1, 8, GB_DARKEST
+        game.FillRect(wx + offset, yy, 1, 8, GB_DARKEST)
         yy += 8
         row += 1
     ENDWHILE
 ENDPROC
 
 PROCEDURE DrawBox(INTEGER bx, INTEGER by, INTEGER bw, INTEGER bh)
-    GfxFillRect GAME_SURFACE, bx, by, bw, bh, GB_LIGHTEST
-    GfxRect GAME_SURFACE, bx, by, bw, bh, GB_DARKEST
-    GfxRect GAME_SURFACE, bx + 2, by + 2, bw - 4, bh - 4, GB_DARK
+    game.FillRect(bx, by, bw, bh, GB_LIGHTEST)
+    game.Rect(bx, by, bw, bh, GB_DARKEST)
+    game.Rect(bx + 2, by + 2, bw - 4, bh - 4, GB_DARK)
 ENDPROC
 
 PROCEDURE DrawNumber(INTEGER value, INTEGER x, INTEGER y, INTEGER digits)
@@ -556,7 +556,7 @@ PROCEDURE DrawNumber(INTEGER value, INTEGER x, INTEGER y, INTEGER digits)
     i = 1
     WHILE i <= digits DO
         digit = (value / divisor) % 10
-        GfxBlitRect GAME_SURFACE, 1, digit * 8, 73, 8, 9, x, y
+        game.BlitRect(ui, digit * 8, 73, 8, 9, x, y)
         x += 8
         divisor /= 10
         IF divisor = 0 divisor = 1
@@ -566,19 +566,19 @@ ENDPROC
 
 PROCEDURE DrawPanel()
     DrawBox(BOX_X, 20, BOX_W, 34)
-    GfxBlitRect GAME_SURFACE, 1, 0, 0, 30, 7, BOX_X + 33, 25
+    game.BlitRect(ui, 0, 0, 30, 7, BOX_X + 33, 25)
     DrawNumber(score, BOX_X + 24, 38, 6)
 
     DrawBox(BOX_X, 60, BOX_W, 34)
-    GfxBlitRect GAME_SURFACE, 1, 0, 12, 30, 7, BOX_X + 33, 65
+    game.BlitRect(ui, 0, 12, 30, 7, BOX_X + 33, 65)
     DrawNumber(level, BOX_X + 36, 78, 3)
 
     DrawBox(BOX_X, 100, BOX_W, 34)
-    GfxBlitRect GAME_SURFACE, 1, 0, 24, 30, 7, BOX_X + 33, 105
+    game.BlitRect(ui, 0, 24, 30, 7, BOX_X + 33, 105)
     DrawNumber(lines, BOX_X + 32, 118, 4)
 
     DrawBox(BOX_X, 140, BOX_W, 72)
-    GfxBlitRect GAME_SURFACE, 1, 0, 36, 24, 7, BOX_X + 36, 145
+    game.BlitRect(ui, 0, 36, 24, 7, BOX_X + 36, 145)
 ENDPROC
 
 PROCEDURE DrawNext()
@@ -602,11 +602,11 @@ ENDPROC
 
 PROCEDURE RenderGame()
     INTEGER x, y
-    GfxClear GAME_SURFACE, GB_DARKEST
+    game.Clear(GB_DARKEST)
     DrawWall(6, 20, 10, 248)
     DrawWall(140, 20, 10, 248)
-    GfxFillRect GAME_SURFACE, BOARD_X, BOARD_Y, BOARD_W * CELL, BOARD_H * CELL, GB_LIGHTEST
-    GfxRect GAME_SURFACE, BOARD_X - 2, BOARD_Y - 2, BOARD_W * CELL + 4, BOARD_H * CELL + 4, GB_DARKEST
+    game.FillRect(BOARD_X, BOARD_Y, BOARD_W * CELL, BOARD_H * CELL, GB_LIGHTEST)
+    game.Rect(BOARD_X - 2, BOARD_Y - 2, BOARD_W * CELL + 4, BOARD_H * CELL + 4, GB_DARKEST)
     y = 0
     WHILE y < BOARD_H DO
         x = 0
@@ -622,16 +622,16 @@ PROCEDURE RenderGame()
     DrawPanel()
     DrawNext()
     IF gameOver THEN
-        GfxFillRect GAME_SURFACE, 20, 120, 116, 36, GB_LIGHTEST
-        GfxRect GAME_SURFACE, 20, 120, 116, 36, GB_DARKEST
-        GfxRect GAME_SURFACE, 22, 122, 112, 32, GB_DARK
-        GfxBlitRect GAME_SURFACE, 1, 0, 48, 54, 7, 51, 134
+        game.FillRect(20, 120, 116, 36, GB_LIGHTEST)
+        game.Rect(20, 120, 116, 36, GB_DARKEST)
+        game.Rect(22, 122, 112, 32, GB_DARK)
+        game.BlitRect(ui, 0, 48, 54, 7, 51, 134)
     ENDIF
     PresentGame()
 ENDPROC
 
 PROCEDURE PresentGame()
-    GfxClear 0, GB_DARKEST
-    GfxBlit 0, GAME_SURFACE, GAME_X, GAME_Y
-    GfxPresentRect 0, 0, 0, SCREEN_W, SCREEN_H
+    screen.Clear(GB_DARKEST)
+    screen.Blit(game, GAME_X, GAME_Y)
+    screen.PresentRect(0, 0, SCREEN_W, SCREEN_H)
 ENDPROC

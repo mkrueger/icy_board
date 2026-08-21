@@ -126,6 +126,7 @@ pub enum PPECommand {
     EndProc,
     Stop,
     Let(Box<PPEExpr>, Box<PPEExpr>),
+    MemberCall(Box<PPEExpr>),
 }
 
 impl PPECommand {
@@ -240,6 +241,11 @@ impl PPECommand {
                 value.serialize(vec);
                 vec.push(0);
             }
+            PPECommand::MemberCall(expr) => {
+                vec.push(OpCode::MemberCall as i16);
+                expr.serialize(vec);
+                vec.push(0);
+            }
         }
     }
 
@@ -272,6 +278,7 @@ impl PPECommand {
                 }
             },
             PPECommand::Let(target, value) => 2 + target.get_size() + value.get_size(),
+            PPECommand::MemberCall(expr) => 2 + expr.get_size(),
         }
     }
     pub fn visit<T, V: PPEVisitor<T>>(&self, visitor: &mut V) -> T {
@@ -287,6 +294,7 @@ impl PPECommand {
             PPECommand::EndProc => visitor.visit_end_proc(),
             PPECommand::Stop => visitor.visit_stop(),
             PPECommand::Let(target, value) => visitor.visit_let(target, value),
+            PPECommand::MemberCall(expr) => expr.visit(visitor),
         }
     }
 }

@@ -45,3 +45,63 @@ fn unsupported_sound_is_not_uploaded() {
 
     assert!(!output.contains("SyncTERM:C;S;"), "{output:?}");
 }
+
+#[test]
+fn an_invalid_channel_is_reported_instead_of_redirected() {
+    let output = super::run_ppl(
+        r"
+        SndStop 14
+        PrintLn SndError()
+        PrintLn SndPlaying(-1)
+        PrintLn SndError()
+        ",
+    );
+
+    assert_eq!(output, "2\n0\n2\n");
+}
+
+#[test]
+fn sound_failures_are_reported_through_snderror() {
+    let unavailable = run_ppl_with_files_and_input(
+        r#"
+        SndPlay 0, "tone.wav"
+        PrintLn SndError()
+        "#,
+        &[("tone.wav", b"RIFFxxxxWAVEfmt ")],
+        b"\x1b[=7;100;0n",
+    );
+    assert!(unavailable.ends_with("1\n"), "{unavailable:?}");
+
+    let unsupported = run_ppl_with_files_and_input(
+        r#"
+        SndPlay 0, "tone.wav"
+        PrintLn SndError()
+        "#,
+        &[("tone.wav", b"RIFFxxxxWAVEfmt ")],
+        b"\x1b[=7;100;1n\x1b[=7;101;1;0;0n",
+    );
+    assert!(unsupported.ends_with("4\n"), "{unsupported:?}");
+
+    let missing = run_ppl_with_input(
+        r#"
+        SndPlay 0, "nope.wav"
+        PrintLn SndError()
+        "#,
+        b"\x1b[=7;100;1n\x1b[=7;101;1;0;1n",
+    );
+    assert!(missing.ends_with("3\n"), "{missing:?}");
+}
+
+#[test]
+fn a_missing_channel_state_reply_does_not_report_stale_playback() {
+    let output = run_ppl_with_files_and_input(
+        r#"
+        SndPlay 0, "tone.wav"
+        PrintLn SndPlaying(0)
+        "#,
+        &[("tone.wav", b"RIFFxxxxWAVEfmt ")],
+        b"\x1b[=7;100;1n\x1b[=7;101;1;0;1n",
+    );
+
+    assert!(output.ends_with("0\n"), "{output:?}");
+}

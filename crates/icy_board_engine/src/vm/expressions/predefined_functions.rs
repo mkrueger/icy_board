@@ -2774,6 +2774,10 @@ pub async fn gfxerror(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<Var
     Ok(VariableValue::new_int(vm.icy_board_state.gfx_error))
 }
 
+pub async fn snderror(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
+    Ok(VariableValue::new_int(vm.icy_board_state.snd_error))
+}
+
 async fn gfx_surface_dimension(vm: &mut VirtualMachine<'_>, args: &[PPEExpr], width: bool) -> Res<VariableValue> {
     let slot = vm.eval_expr(&args[0]).await?.as_int();
     let value = vm
@@ -2848,8 +2852,13 @@ pub async fn sndsupports(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<V
 }
 
 pub async fn sndplaying(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let logical_channel = vm.eval_expr(&args[0]).await?.as_int().clamp(0, 13) as usize;
-    let channel = logical_channel + 2;
+    use crate::vm::statements::predefined_procedures::{SND_ERR_INVALID_CHANNEL, SND_OK, resolve_sound_channel};
+
+    let requested = vm.eval_expr(&args[0]).await?.as_int();
+    let Some((logical_channel, channel)) = resolve_sound_channel(requested) else {
+        vm.icy_board_state.snd_error = SND_ERR_INVALID_CHANNEL;
+        return Ok(VariableValue::new_bool(false));
+    };
     let query = format!("\x1b[=7;{channel}n");
     let prefix = format!("\x1b[=7;{channel};");
     let playing = vm
@@ -2859,8 +2868,9 @@ pub async fn sndplaying(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Va
             Some(state == "1")
         })
         .await?
-        .unwrap_or(vm.icy_board_state.sound_active[logical_channel]);
+        .unwrap_or(false);
     vm.icy_board_state.sound_active[logical_channel] = playing;
+    vm.icy_board_state.snd_error = SND_OK;
     Ok(VariableValue::new_bool(playing))
 }
 

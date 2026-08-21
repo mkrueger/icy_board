@@ -18,6 +18,7 @@ const STATEMENTS_NOT_IN_GRAMMAR: &[&str] = &[
     "GOTO",
     "IF",
     "LET",
+    "MEMBERCALL",
     "PCALL",
     "PLACEHOLDER",
     "PROCEDURE",

@@ -1,9 +1,9 @@
 use crate::{
     ast::{
         BlockStatement, BreakStatement, CaseBlock, CaseSpecifier, CommentAstNode, ConstDeclarationStatement, Constant, ContinueStatement, ElseBlock,
-        ElseIfBlock, ForStatement, GosubStatement, GotoStatement, IdentifierExpression, IfStatement, IfThenStatement, LabelStatement, LetStatement,
-        LoopStatement, PredefinedCallStatement, ProcedureCallStatement, RepeatUntilStatement, ReturnStatement, SelectStatement, Statement,
-        VariableDeclarationStatement, WhileDoStatement, WhileStatement,
+        ElseIfBlock, Expression, ForStatement, FunctionCallExpression, GosubStatement, GotoStatement, IdentifierExpression, IfStatement, IfThenStatement,
+        LabelStatement, LetStatement, LoopStatement, MemberCallStatement, MemberReferenceExpression, PredefinedCallStatement, ProcedureCallStatement,
+        RepeatUntilStatement, ReturnStatement, SelectStatement, Statement, VariableDeclarationStatement, WhileDoStatement, WhileStatement,
     },
     executable::{OpCode, StatementDefinition},
     parser::ParserErrorType,
@@ -818,7 +818,9 @@ impl Parser<'_> {
 
         if self.get_cur_token() == Some(Token::Dot) {
             let mut members = Vec::new();
+            let mut dots = Vec::new();
             while self.get_cur_token() == Some(Token::Dot) {
+                dots.push(self.save_spanned_token());
                 self.next_token();
                 let Some(Token::Identifier(_)) = self.get_cur_token() else {
                     self.report_error(self.save_token_span(), ParserErrorType::IdentifierExpected(self.save_token()));
@@ -826,6 +828,37 @@ impl Parser<'_> {
                 };
                 members.push(self.save_spanned_token());
                 self.next_token();
+            }
+            if self.get_cur_token() == Some(Token::LPar) {
+                let lpar_token = self.save_spanned_token();
+                self.next_token();
+                let mut arguments = Vec::new();
+                while self.get_cur_token() != Some(Token::RPar) {
+                    let Some(argument) = self.parse_expression() else {
+                        self.report_error(self.lex.span(), ParserErrorType::ExpressionExpected(self.save_token()));
+                        return None;
+                    };
+                    arguments.push(argument);
+                    if self.get_cur_token() == Some(Token::Comma) {
+                        self.next_token();
+                    } else {
+                        break;
+                    }
+                }
+                if self.get_cur_token() != Some(Token::RPar) {
+                    self.report_error(self.save_token_span(), ParserErrorType::MissingCloseParens(self.save_token()));
+                    return None;
+                }
+                let rpar_token = self.save_spanned_token();
+                self.next_token();
+
+                let mut expression = Expression::Identifier(IdentifierExpression::new(id_token));
+                for (dot_token, member) in dots.into_iter().zip(members) {
+                    expression = Expression::MemberReference(MemberReferenceExpression::new(expression, dot_token, member));
+                }
+                return Some(Statement::MemberCall(MemberCallStatement::new(Expression::FunctionCall(
+                    FunctionCallExpression::new(expression, lpar_token, arguments, rpar_token),
+                ))));
             }
             if !is_assign_token(self.get_cur_token()) {
                 self.report_error(self.save_token_span(), ParserErrorType::InvalidToken(self.save_token()));

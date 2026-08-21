@@ -82,9 +82,8 @@ const BUILTIN_STATEMENTS = [
   'TPAPUT', 'TPAREAD', 'TPAWRITE', 'TOKENIZE', 'USELMRS', 'VARADDR', 'VAROFF', 'VARSEG', 'WRUSYS',
   'WRUNET', 'WRUSYSDOOR', 'WAIT', 'WAITFOR', 'WEBREQUEST',
   'SNDPLAY', 'SNDSTOP', 'SNDVOLUME', 'SNDPRELOAD', 'SNDFADE', 'SNDSTOPALL',
-  'GFXINIT', 'GFXCREATE', 'GFXLOAD', 'GFXCLEAR', 'GFXFILLRECT', 'GFXRECT', 'GFXBLIT', 'GFXBLITRECT',
-  'GFXPRESENT', 'GFXPRESENTRECT', 'GFXPRESENTAT', 'GFXWAITFRAME', 'GFXFREE', 'GFXSHUTDOWN',
-  'GFXPIN', 'GFXSETPACING', 'MOUSEON', 'MOUSEOFF', 'KEYEVENTS',
+  'GFXINIT', 'GFXWAITFRAME', 'GFXSHUTDOWN',
+  'GFXSETPACING', 'MOUSEON', 'MOUSEOFF', 'KEYEVENTS',
 ];
 
 // Types that may be written in a declaration, plus the read-only board objects.
@@ -121,6 +120,9 @@ const BUILTIN_CONSTANTS = [
   'MOUSE_SHIFT', 'MOUSE_ALT', 'MOUSE_CTRL', 'MOUSE_TRACK_BUTTONS', 'MOUSE_TRACK_DRAG', 'MOUSE_TRACK_ALL',
   'KEY_EVENTS_OFF', 'KEY_EVENTS_ON', 'KEY_EVENTS_SUPPRESS', 'SND_FMT_WAV', 'SND_FMT_AIFF',
   'SND_FMT_FLAC', 'SND_FMT_OGG_VORBIS', 'SND_FMT_OGG_OPUS',
+  'SND_CHANNELS', 'SND_OK', 'SND_ERR_UNAVAILABLE', 'SND_ERR_INVALID_CHANNEL',
+  'SND_ERR_IO', 'SND_ERR_FORMAT', 'SND_ERR_LIMIT',
+  'GFX_FLIP_NONE', 'GFX_FLIP_X', 'GFX_FLIP_Y',
 ];
 
 const PREC = {
@@ -148,6 +150,7 @@ module.exports = grammar({
     [$.predefined_call],
     [$.return_statement],
     [$.procedure_call, $._expression],
+    [$.member_call, $._expression],
   ],
 
   supertypes: $ => [$._statement, $._expression],
@@ -318,6 +321,7 @@ module.exports = grammar({
       $.label,
       $.predefined_call,
       $.procedure_call,
+      $.member_call,
       $._preprocessor_directive,
     ),
 
@@ -489,6 +493,11 @@ module.exports = grammar({
 
     procedure_call: $ => seq(
       field('name', $.identifier),
+      $.argument_list,
+    ),
+
+    member_call: $ => seq(
+      field('member', $.member_access),
       $.argument_list,
     ),
 

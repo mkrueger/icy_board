@@ -438,19 +438,18 @@ pub fn get_function_hover(func: &FunctionDefinition) -> Option<Hover> {
         FuncOpCode::SHA256 => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-sha256")),
         FuncOpCode::GfxBackend
         | FuncOpCode::GfxCaps
-        | FuncOpCode::GfxValid
-        | FuncOpCode::GfxWidth
-        | FuncOpCode::GfxHeight
         | FuncOpCode::GfxCellWidth
         | FuncOpCode::GfxCellHeight
         | FuncOpCode::GfxScreenWidth
         | FuncOpCode::GfxScreenHeight
-        | FuncOpCode::GfxError => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-gfx-api")),
+        | FuncOpCode::GfxError
+        | FuncOpCode::NewSurface
+        | FuncOpCode::LoadSurface => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-gfx-api")),
         FuncOpCode::MousePoll | FuncOpCode::MouseX | FuncOpCode::MouseY | FuncOpCode::MouseButton | FuncOpCode::MouseModifiers | FuncOpCode::MousePixels => {
             get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-mouse-api"))
         }
         FuncOpCode::Rgb | FuncOpCode::RgbAlpha => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-rgb")),
-        FuncOpCode::SndAvailable | FuncOpCode::SndSupports | FuncOpCode::SndPlaying => {
+        FuncOpCode::SndAvailable | FuncOpCode::SndSupports | FuncOpCode::SndPlaying | FuncOpCode::SndError => {
             get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-sound-api"))
         }
         FuncOpCode::KeyPoll | FuncOpCode::KeyCode | FuncOpCode::KeyPressed => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-key-api")),
@@ -684,22 +683,9 @@ pub fn get_statement_hover(stmt: &StatementDefinition) -> Option<Hover> {
         OpCode::SndPlay | OpCode::SndStop | OpCode::SndVolume | OpCode::SndPreload | OpCode::SndFade | OpCode::SndStopAll => {
             get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-sound-api"))
         }
-        OpCode::GfxInit
-        | OpCode::GfxCreate
-        | OpCode::GfxLoad
-        | OpCode::GfxClear
-        | OpCode::GfxFillRect
-        | OpCode::GfxRect
-        | OpCode::GfxBlit
-        | OpCode::GfxBlitRect
-        | OpCode::GfxPresent
-        | OpCode::GfxPresentRect
-        | OpCode::GfxWaitFrame
-        | OpCode::GfxFree
-        | OpCode::GfxShutdown
-        | OpCode::GfxPresentAt
-        | OpCode::GfxPin
-        | OpCode::GfxSetPacing => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-gfx-api")),
+        OpCode::GfxInit | OpCode::GfxWaitFrame | OpCode::GfxShutdown | OpCode::GfxSetPacing => {
+            get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-gfx-api"))
+        }
         OpCode::MouseOn | OpCode::MouseOff => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-mouse-api")),
         OpCode::KeyEvents => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-key-api")),
         _ => None,

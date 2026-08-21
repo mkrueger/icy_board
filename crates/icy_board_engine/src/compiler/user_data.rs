@@ -12,8 +12,19 @@ pub trait UserDataMemberRegistry {
 
     fn add_property(&mut self, name: unicase::Ascii<String>, var_type: VariableType, has_setter: bool);
 
-    fn add_procedure(&mut self, name: unicase::Ascii<String>, parameters: Vec<VariableType>);
-    fn add_function(&mut self, name: unicase::Ascii<String>, parameters: Vec<VariableType>, return_type: VariableType);
+    /// `required` is how many leading parameters a caller may not leave out.
+    fn add_procedure_with(&mut self, name: unicase::Ascii<String>, parameters: Vec<VariableType>, required: usize);
+    fn add_function_with(&mut self, name: unicase::Ascii<String>, parameters: Vec<VariableType>, required: usize, return_type: VariableType);
+
+    fn add_procedure(&mut self, name: unicase::Ascii<String>, parameters: Vec<VariableType>) {
+        let required = parameters.len();
+        self.add_procedure_with(name, parameters, required);
+    }
+
+    fn add_function(&mut self, name: unicase::Ascii<String>, parameters: Vec<VariableType>, return_type: VariableType) {
+        let required = parameters.len();
+        self.add_function_with(name, parameters, required, return_type);
+    }
 }
 
 pub trait UserData: Sized + UserDataValue {
@@ -54,14 +65,25 @@ pub enum UserDataEntry {
     Function(unicase::Ascii<String>),
 }
 
+pub struct MemberFunction {
+    pub parameters: Vec<VariableType>,
+    pub required: usize,
+    pub return_type: VariableType,
+}
+
+pub struct MemberProcedure {
+    pub parameters: Vec<VariableType>,
+    pub required: usize,
+}
+
 #[derive(Default)]
 pub struct UserDataRegistry {
     pub id_table: Vec<UserDataEntry>,
     pub member_id_lookup: HashMap<unicase::Ascii<String>, usize>,
 
     pub fields: HashMap<unicase::Ascii<String>, VariableType>,
-    pub procedures: HashMap<unicase::Ascii<String>, Vec<VariableType>>,
-    pub functions: HashMap<unicase::Ascii<String>, (Vec<VariableType>, VariableType)>,
+    pub procedures: HashMap<unicase::Ascii<String>, MemberProcedure>,
+    pub functions: HashMap<unicase::Ascii<String>, MemberFunction>,
 }
 
 impl UserDataMemberRegistry for UserDataRegistry {
@@ -79,15 +101,22 @@ impl UserDataMemberRegistry for UserDataRegistry {
         self.fields.insert(name, var_type);
     }
 
-    fn add_procedure(&mut self, name: unicase::Ascii<String>, parameters: Vec<VariableType>) {
+    fn add_procedure_with(&mut self, name: unicase::Ascii<String>, parameters: Vec<VariableType>, required: usize) {
         self.member_id_lookup.insert(name.clone(), self.id_table.len());
         self.id_table.push(UserDataEntry::Procedure(name.clone()));
-        self.procedures.insert(name, parameters);
+        self.procedures.insert(name, MemberProcedure { parameters, required });
     }
 
-    fn add_function(&mut self, name: unicase::Ascii<String>, parameters: Vec<VariableType>, return_type: VariableType) {
+    fn add_function_with(&mut self, name: unicase::Ascii<String>, parameters: Vec<VariableType>, required: usize, return_type: VariableType) {
         self.member_id_lookup.insert(name.clone(), self.id_table.len());
         self.id_table.push(UserDataEntry::Function(name.clone()));
-        self.functions.insert(name, (parameters, return_type));
+        self.functions.insert(
+            name,
+            MemberFunction {
+                parameters,
+                required,
+                return_type,
+            },
+        );
     }
 }

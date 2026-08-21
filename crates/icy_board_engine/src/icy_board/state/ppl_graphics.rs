@@ -11,6 +11,7 @@ pub const GFX_BACKEND_JXL: i32 = 3;
 
 const MAX_DIMENSION: usize = 2048;
 const MAX_RESIDENT_BYTES: usize = 64 * 1024 * 1024;
+const MAX_SURFACES: usize = 256;
 
 fn color_component(value: i32) -> u32 {
     value.clamp(0, 255) as u32
@@ -327,6 +328,18 @@ impl GfxSurface {
         }
     }
 
+    pub fn set_pixel(&mut self, x: i32, y: i32, color: u32) {
+        let (Ok(x), Ok(y)) = (usize::try_from(x), usize::try_from(y)) else {
+            return;
+        };
+        if x >= self.width || y >= self.height {
+            return;
+        }
+        self.cacheable = false;
+        let start = (y * self.width + x) * 4;
+        self.pixels[start..start + 4].copy_from_slice(&color.to_be_bytes());
+    }
+
     pub fn fill_rect(&mut self, x: i32, y: i32, width: i32, height: i32, color: u32) {
         self.cacheable = false;
         let Some((x, y, width, height)) = clipped_rect(x, y, width, height, self.width, self.height) else {
@@ -437,6 +450,8 @@ pub struct PplGraphicsState {
     pub surfaces: HashMap<i32, GfxSurface>,
     pub pinned: HashMap<i32, u8>,
     pub pacing: bool,
+    resident_bytes: usize,
+    next_handle: i32,
     frame_rate: u32,
     next_frame: Option<Instant>,
 }
@@ -451,23 +466,40 @@ impl PplGraphicsState {
             surfaces: HashMap::new(),
             pinned: HashMap::new(),
             pacing: false,
+            resident_bytes: 0,
+            next_handle: 0,
             frame_rate: 0,
             next_frame: None,
         })
     }
 
+    /// A name only the engine hands out, so two callers can never pick the same one.
+    pub fn allocate_handle(&mut self) -> i32 {
+        self.next_handle -= 1;
+        self.next_handle
+    }
+
     pub fn insert_surface(&mut self, slot: i32, surface: GfxSurface) -> bool {
-        self.pinned.remove(&slot);
-        let resident = self
-            .surfaces
-            .iter()
-            .filter(|(existing_slot, _)| **existing_slot != slot)
-            .map(|(_, existing)| existing.pixels.len())
-            .sum::<usize>();
-        if resident.saturating_add(surface.pixels.len()) > MAX_RESIDENT_BYTES {
+        let replaced_bytes = self.surfaces.get(&slot).map_or(0, |existing| existing.pixels.len());
+        if replaced_bytes == 0 && self.surfaces.len() >= MAX_SURFACES {
             return false;
         }
+        let resident_bytes = self.resident_bytes.saturating_sub(replaced_bytes).saturating_add(surface.pixels.len());
+        if resident_bytes > MAX_RESIDENT_BYTES {
+            return false;
+        }
+        self.pinned.remove(&slot);
+        self.resident_bytes = resident_bytes;
         self.surfaces.insert(slot, surface);
+        true
+    }
+
+    pub fn remove_surface(&mut self, slot: i32) -> bool {
+        self.pinned.remove(&slot);
+        let Some(surface) = self.surfaces.remove(&slot) else {
+            return false;
+        };
+        self.resident_bytes = self.resident_bytes.saturating_sub(surface.pixels.len());
         true
     }
 

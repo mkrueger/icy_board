@@ -134,6 +134,10 @@
         "named": true
       },
       {
+        "type": "member_call",
+        "named": true
+      },
+      {
         "type": "predefined_call",
         "named": true
       },
@@ -1182,6 +1186,32 @@
           }
         ]
       }
+    }
+  },
+  {
+    "type": "member_call",
+    "named": true,
+    "fields": {
+      "member": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "member_access",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "argument_list",
+          "named": true
+        }
+      ]
     }
   },
   {

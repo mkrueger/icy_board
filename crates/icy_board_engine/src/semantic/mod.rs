@@ -1148,6 +1148,21 @@ impl SemanticVisitor {
         }
     }
 
+    fn check_expr_arg_range(&self, required: usize, maximum: usize, arg_count: usize, expr: &Expression) {
+        if arg_count < required {
+            self.errors
+                .lock()
+                .unwrap()
+                .report_error(expr.get_span(), ParserErrorType::TooFewArguments(expr.to_string(), arg_count, required as i8));
+        }
+        if arg_count > maximum {
+            self.errors
+                .lock()
+                .unwrap()
+                .report_error(expr.get_span(), ParserErrorType::TooManyArguments(expr.to_string(), arg_count, maximum as i8));
+        }
+    }
+
     fn check_expr_arg_count(&self, arg_count_expected: usize, arg_count: usize, expr: &Expression) {
         if arg_count < arg_count_expected {
             self.errors.lock().unwrap().report_error(
@@ -1540,10 +1555,10 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                         return *t;
                     }
                 }
-                for (name, (_args, t)) in &t.functions {
+                for (name, function) in &t.functions {
                     if name == member_reference_expression.get_identifier() {
                         self.user_type_lookup.insert(member_reference_expression.get_identifier_token().span.start, d);
-                        return *t;
+                        return function.return_type;
                     }
                 }
                 for name in t.procedures.keys() {
@@ -1595,6 +1610,14 @@ impl AstVisitor<VariableType> for SemanticVisitor {
     fn visit_predefined_call_statement(&mut self, call_stmt: &PredefinedCallStatement) -> VariableType {
         let def = call_stmt.get_func();
         walk_predefined_call_statement(self, call_stmt);
+
+        let minimum_runtime = def.opcode.minimum_runtime();
+        if self.runtime < minimum_runtime {
+            self.errors.lock().unwrap().report_error(
+                call_stmt.get_identifier_token().span.clone(),
+                CompilationErrorType::BuiltinNeedsRuntime(def.name.to_string(), minimum_runtime),
+            );
+        }
 
         match def.sig {
             crate::executable::StatementSignature::Invalid => panic!("Invalid signature"),
@@ -1716,12 +1739,12 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 if let Expression::MemberReference(member) = call.get_expression() {
                     if let Some(user_type) = self.user_type_lookup.get(&member.get_identifier_token().span.start) {
                         if let Some(registry) = self.type_registry.get_type_from_id(*user_type) {
-                            for (name, (pars, t)) in &registry.functions {
+                            for (name, function) in &registry.functions {
                                 if name == member.get_identifier() {
-                                    self.check_expr_arg_count(pars.len(), call.get_arguments().len(), call.get_expression());
+                                    self.check_expr_arg_range(function.required, function.parameters.len(), call.get_arguments().len(), call.get_expression());
                                     if let Some(member) = registry.get_member_id(name) {
                                         self.function_type_lookup.insert(call.id, SemanticInfo::MemberFunctionCall(member));
-                                        return *t;
+                                        return function.return_type;
                                     }
                                     self.errors.lock().unwrap().report_error(
                                         member.get_identifier_token().span.clone(),
@@ -1763,6 +1786,14 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                             self.errors.lock().unwrap().report_error(
                                 call.get_expression().get_span(),
                                 ParserErrorType::FunctionVersionNotSupported(def.opcode, def.version, self.lang_version),
+                            );
+                            return res;
+                        }
+                        let minimum_runtime = def.opcode.minimum_runtime();
+                        if self.runtime < minimum_runtime {
+                            self.errors.lock().unwrap().report_error(
+                                call.get_expression().get_span(),
+                                CompilationErrorType::BuiltinNeedsRuntime(def.name.to_string(), minimum_runtime),
                             );
                             return res;
                         }

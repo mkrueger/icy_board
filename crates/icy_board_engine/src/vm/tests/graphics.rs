@@ -1,6 +1,19 @@
 use std::fmt::Write as _;
 
-use super::run_ppl;
+use super::{compile_errors_with_runtime, run_ppl};
+
+#[test]
+fn multimedia_apis_require_runtime_402() {
+    for runtime in [400, 401] {
+        let errors = compile_errors_with_runtime("GfxInit GFX_SIXEL\nPRINTLN GfxBackend()", runtime);
+        assert!(errors.iter().any(|error| error == "GfxInit needs runtime 402"), "runtime {runtime}: {errors:?}");
+        assert!(
+            errors.iter().any(|error| error == "GfxBackend needs runtime 402"),
+            "runtime {runtime}: {errors:?}"
+        );
+    }
+    assert!(compile_errors_with_runtime("GfxInit GFX_SIXEL\nPRINTLN GfxBackend()", 402).is_empty());
+}
 
 #[test]
 fn rgb_colors_pack_channels_and_clamp_components() {
@@ -36,18 +49,119 @@ fn surface_status_reports_dimensions_and_errors() {
     let output = run_ppl(
         r#"
         GfxInit GFX_SIXEL, FALSE
-        GfxCreate 4, 12, 7
-        PrintLn GfxValid(4)
-        PrintLn GfxWidth(4)
-        PrintLn GfxHeight(4)
+        SURFACE s = NewSurface(12, 7)
+        PrintLn s.Valid
+        PrintLn s.Width
+        PrintLn s.Height
         PrintLn GfxError()
-        GfxLoad 5, "missing.png"
+        SURFACE missing = LoadSurface("missing.png")
         PrintLn GfxError()
         GfxShutdown
         "#,
     );
 
     assert_eq!(output, "1\n12\n7\n0\n3\n");
+}
+
+#[test]
+fn drawing_and_pinning_report_specific_errors() {
+    let output = run_ppl(
+        r"
+        GfxInit GFX_SIXEL, FALSE
+        SURFACE s = NewSurface(2, 2)
+        s.Free()
+        s.Clear(0)
+        PrintLn GfxError()
+        s.Pin()
+        PrintLn GfxError()
+        s.Free()
+        PrintLn GfxError()
+        ",
+    );
+
+    assert_eq!(output, "2\n6\n2\n");
+}
+
+#[test]
+fn surface_count_is_bounded_and_freed_surfaces_can_be_reused() {
+    let mut source = String::from("GfxInit GFX_SIXEL, FALSE\nSURFACE first, extra\nfirst = NewSurface(1, 1)\n");
+    for _ in 1..256 {
+        let _ = writeln!(source, "extra = NewSurface(1, 1)");
+    }
+    source.push_str("extra = NewSurface(1, 1)\nPRINTLN GfxError()\nfirst.Free()\nextra = NewSurface(1, 1)\nPRINTLN GfxError()\n");
+
+    assert_eq!(run_ppl(&source), "5\n0\n");
+}
+
+#[test]
+fn a_scaled_and_flipped_present_is_left_to_the_client() {
+    let output = super::run_ppl_with_input(
+        r"
+        GfxInit GFX_AUTO, FALSE
+        SURFACE s = NewSurface(8, 8)
+        s.Clear(4278190335)
+        s.PresentRect(0, 0, 8, 8, 10, 20, 64, 32, GFX_FLIP_X)
+        GfxShutdown
+        ",
+        JXL_TERMINAL,
+    );
+
+    assert!(output.contains("SyncTERM:C;DrawJXLBlob;DX=10;DY=20;DW=64;DH=32;FX;"), "{output:?}");
+}
+
+#[test]
+fn sixel_cannot_scale_and_says_so() {
+    let output = run_ppl(
+        r"
+        GfxInit GFX_SIXEL, FALSE
+        SURFACE s = NewSurface(8, 8)
+        s.PresentRect(0, 0, 8, 8, 0, 0, 32, 32)
+        PrintLn GfxError()
+        GfxShutdown
+        ",
+    );
+
+    assert_eq!(output, "6\n");
+}
+
+#[test]
+fn a_surface_object_draws_and_reports_its_own_size() {
+    let output = run_ppl(
+        r#"
+        GfxInit GFX_SIXEL, FALSE
+        SURFACE s = NewSurface(4, 4)
+        PrintLn s.Valid
+        PrintLn s.Width, ",", s.Height
+        s.Clear(Rgb(0, 0, 0))
+        s.SetPixel(1, 1, Rgb(255, 0, 0))
+        s.FillRect(0, 0, 2, 2, Rgb(0, 255, 0))
+        s.Present()
+        PrintLn GfxError()
+        s.Free()
+        PrintLn s.Valid
+        GfxShutdown
+        "#,
+    );
+
+    assert!(output.starts_with("1\n4,4\n"), "{output:?}");
+    assert!(output.ends_with("0\n0\n"), "{output:?}");
+}
+
+#[test]
+fn a_surface_can_be_blitted_onto_another() {
+    let output = run_ppl(
+        r"
+        GfxInit GFX_SIXEL, FALSE
+        SURFACE back = NewSurface(8, 8)
+        SURFACE sprite = NewSurface(2, 2)
+        sprite.Clear(Rgb(255, 0, 0))
+        back.Blit(sprite, 3, 3)
+        PrintLn GfxError()
+        GfxShutdown
+        ",
+    );
+
+    assert_eq!(output, "0\n");
 }
 
 #[test]
@@ -71,9 +185,9 @@ fn pacing_requests_an_acknowledgement_after_presenting() {
     let output = super::run_ppl_with_input(
         r"
         GfxInit GFX_SIXEL, FALSE
-        GfxCreate 0, 2, 2
+        SURFACE s = NewSurface(2, 2)
         GfxSetPacing 1
-        GfxPresent 0
+        s.Present()
         GfxShutdown
         ",
         b"\x1b[1;1R",
@@ -140,17 +254,17 @@ fn creates_blits_and_presents_in_memory_surfaces() {
     let output = run_ppl(
         r"
         GfxInit GFX_SIXEL
-        GfxCreate 0, 4, 4
-        GfxCreate 1, 2, 2
-        GfxClear 0, 255
-        GfxClear 1, 4278190335
-        GfxRect 1, 0, 0, 2, 2, 16711935
-        GfxBlit 0, 1, 1, 1
-        GfxPresent 0
-        GfxFillRect 0, 2, 2, 1, 1, 16711935
-        GfxPresentRect 0, 2, 2, 1, 1
+        SURFACE back = NewSurface(4, 4)
+        SURFACE sprite = NewSurface(2, 2)
+        back.Clear(255)
+        sprite.Clear(4278190335)
+        sprite.Rect(0, 0, 2, 2, 16711935)
+        back.Blit(sprite, 1, 1)
+        back.Present()
+        back.FillRect(2, 2, 1, 1, 16711935)
+        back.PresentRect(2, 2, 1, 1)
         GfxWaitFrame 240
-        GfxFree 1
+        sprite.Free()
         GfxShutdown
         ",
     );
@@ -166,10 +280,10 @@ fn inline_graphics_preserve_the_text_screen_and_cursor() {
         r#"
         PrintLn "before"
         GfxInit GFX_SIXEL, FALSE
-        GfxCreate 1, 2, 2
-        GfxClear 1, 4278190335
-        GfxPresentAt 1, 10, 3
-        GfxFree 1
+        SURFACE s = NewSurface(2, 2)
+        s.Clear(4278190335)
+        s.PresentAt(10, 3)
+        s.Free()
         GfxShutdown
         PrintLn "after"
         "#,
@@ -198,9 +312,9 @@ fn a_loaded_image_is_cached_once_and_drawn_by_name() {
         r#"
         GfxInit GFX_AUTO, FALSE
         PrintLn GfxBackend()
-        GfxLoad 1, "./banner.png"
-        GfxPresentAt 1, 1, 1
-        GfxPresentAt 1, 11, 3
+        SURFACE banner = LoadSurface("./banner.png")
+        banner.PresentAt(1, 1)
+        banner.PresentAt(11, 3)
         GfxShutdown
         "#,
         &[("banner.png", BANNER)],
@@ -222,10 +336,10 @@ fn a_pinned_image_uses_the_client_pixel_buffer_for_partial_blits() {
     let output = super::run_ppl_with_files_and_input(
         r#"
         GfxInit GFX_AUTO, FALSE
-        GfxLoad 1, "./banner.png"
-        GfxPin 1
-        GfxPresentRect 1, 2, 3, 4, 5, 20, 30
-        GfxPin 1, FALSE
+        SURFACE banner = LoadSurface("./banner.png")
+        banner.Pin()
+        banner.PresentRect(2, 3, 4, 5, 20, 30)
+        banner.Unpin()
         GfxShutdown
         "#,
         &[("banner.png", BANNER)],
@@ -241,10 +355,10 @@ fn drawing_on_a_pinned_surface_returns_to_normal_presentation() {
     let output = super::run_ppl_with_files_and_input(
         r#"
         GfxInit GFX_AUTO, FALSE
-        GfxLoad 1, "./banner.png"
-        GfxPin 1
-        GfxFillRect 1, 0, 0, 1, 1, Rgb(255, 0, 0)
-        GfxPresent 1
+        SURFACE banner = LoadSurface("./banner.png")
+        banner.Pin()
+        banner.FillRect(0, 0, 1, 1, Rgb(255, 0, 0))
+        banner.Present()
         GfxShutdown
         "#,
         &[("banner.png", BANNER)],
@@ -261,11 +375,11 @@ fn a_composed_frame_goes_inline_instead_of_into_the_cache() {
     let output = super::run_ppl_with_input(
         r"
         GfxInit GFX_AUTO, FALSE
-        GfxCreate 0, 8, 8
-        GfxClear 0, 4278190335
-        GfxPresent 0
-        GfxFillRect 0, 2, 2, 2, 2, 16711935
-        GfxPresentRect 0, 2, 2, 2, 2
+        SURFACE s = NewSurface(8, 8)
+        s.Clear(4278190335)
+        s.Present()
+        s.FillRect(2, 2, 2, 2, 16711935)
+        s.PresentRect(2, 2, 2, 2)
         GfxShutdown
         ",
         JXL_TERMINAL,
@@ -282,19 +396,19 @@ fn a_terminal_without_inline_blobs_reuses_one_cache_name_per_surface() {
     let output = super::run_ppl_with_input(
         r"
         GfxInit GFX_AUTO, FALSE
-        GfxCreate 3, 8, 8
-        GfxClear 3, 4278190335
-        GfxPresent 3
-        GfxClear 3, 16711935
-        GfxPresent 3
+        SURFACE s = NewSurface(8, 8)
+        s.Clear(4278190335)
+        s.Present()
+        s.Clear(16711935)
+        s.Present()
         GfxShutdown
         ",
         OLD_JXL_TERMINAL,
     );
 
     assert!(!output.contains("DrawJXLBlob"), "{output:?}");
-    assert_eq!(output.matches("SyncTERM:C;S;gfx/n0s3.jxl;").count(), 2, "{output:?}");
-    assert_eq!(output.matches("SyncTERM:C;DrawJXL;DX=0;DY=0;gfx/n0s3.jxl").count(), 2, "{output:?}");
+    assert_eq!(output.matches("SyncTERM:C;S;gfx/n0s1.jxl;").count(), 2, "{output:?}");
+    assert_eq!(output.matches("SyncTERM:C;DrawJXL;DX=0;DY=0;gfx/n0s1.jxl").count(), 2, "{output:?}");
 }
 
 #[test]
@@ -306,8 +420,8 @@ fn an_image_the_caller_already_cached_is_not_sent_again() {
     let output = super::run_ppl_with_files_and_input(
         r#"
         GfxInit GFX_AUTO, FALSE
-        GfxLoad 1, "./banner.png"
-        GfxPresent 1
+        SURFACE banner = LoadSurface("./banner.png")
+        banner.Present()
         GfxShutdown
         "#,
         &[("banner.png", BANNER)],

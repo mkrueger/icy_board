@@ -27,6 +27,7 @@ pub async fn run_predefined_statement(opcode: OpCode, arg: &mut VirtualMachine<'
         | OpCode::IFNOT
         | OpCode::GOSUB
         | OpCode::RETURN
+        | OpCode::MemberCall
         | OpCode::DECLARE
         | OpCode::FUNCTION
         | OpCode::PROCEDURE
@@ -252,22 +253,10 @@ pub async fn run_predefined_statement(opcode: OpCode, arg: &mut VirtualMachine<'
         OpCode::SndVolume => predefined_procedures::sndvolume(arg, arguments).await,
         OpCode::SndPreload => predefined_procedures::sndpreload(arg, arguments).await,
         OpCode::GfxInit => predefined_procedures::gfxinit(arg, arguments).await,
-        OpCode::GfxCreate => predefined_procedures::gfxcreate(arg, arguments).await,
-        OpCode::GfxLoad => predefined_procedures::gfxload(arg, arguments).await,
-        OpCode::GfxClear => predefined_procedures::gfxclear(arg, arguments).await,
-        OpCode::GfxFillRect => predefined_procedures::gfxfillrect(arg, arguments).await,
-        OpCode::GfxRect => predefined_procedures::gfxrect(arg, arguments).await,
-        OpCode::GfxBlit => predefined_procedures::gfxblit(arg, arguments).await,
-        OpCode::GfxBlitRect => predefined_procedures::gfxblitrect(arg, arguments).await,
-        OpCode::GfxPresent => predefined_procedures::gfxpresent(arg, arguments).await,
-        OpCode::GfxPresentRect => predefined_procedures::gfxpresentrect(arg, arguments).await,
         OpCode::GfxWaitFrame => predefined_procedures::gfxwaitframe(arg, arguments).await,
-        OpCode::GfxFree => predefined_procedures::gfxfree(arg, arguments).await,
         OpCode::GfxShutdown => predefined_procedures::gfxshutdown(arg, arguments).await,
-        OpCode::GfxPresentAt => predefined_procedures::gfxpresentat(arg, arguments).await,
         OpCode::MouseOn => predefined_procedures::mouseon(arg, arguments).await,
         OpCode::MouseOff => predefined_procedures::mouseoff(arg, arguments).await,
-        OpCode::GfxPin => predefined_procedures::gfxpin(arg, arguments).await,
         OpCode::GfxSetPacing => predefined_procedures::gfxsetpacing(arg, arguments).await,
         OpCode::SndFade => predefined_procedures::sndfade(arg, arguments).await,
         OpCode::SndStopAll => predefined_procedures::sndstopall(arg, arguments).await,

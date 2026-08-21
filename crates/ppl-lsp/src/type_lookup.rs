@@ -83,7 +83,7 @@ pub fn type_of_member(registry: &UserTypeRegistry, var_type: VariableType, membe
     if let Some(field) = object.fields.get(&member) {
         return Some(*field);
     }
-    object.functions.get(&member).map(|(_, return_type)| *return_type)
+    object.functions.get(&member).map(|function| function.return_type)
 }
 
 /// Walks a member chain such as `members[0].Home` and answers the type it ends in.
@@ -128,17 +128,21 @@ pub fn members_of(registry: &UserTypeRegistry, var_type: VariableType) -> Vec<Me
             kind: MemberKind::Field,
         });
     }
-    for (name, (parameters, return_type)) in &object.functions {
+    for (name, function) in &object.functions {
         members.push(Member {
             name: name.to_string(),
-            detail: format!("({}) {}", parameter_types(registry, parameters), type_name(registry, *return_type)),
+            detail: format!(
+                "({}) {}",
+                parameter_types(registry, &function.parameters),
+                type_name(registry, function.return_type)
+            ),
             kind: MemberKind::Method,
         });
     }
-    for (name, parameters) in &object.procedures {
+    for (name, procedure) in &object.procedures {
         members.push(Member {
             name: name.to_string(),
-            detail: format!("({})", parameter_types(registry, parameters)),
+            detail: format!("({})", parameter_types(registry, &procedure.parameters)),
             kind: MemberKind::Method,
         });
     }

@@ -37,6 +37,7 @@ pub mod menu_runner;
 pub mod ppl_graphics;
 pub mod ppl_keys;
 pub mod ppl_mouse;
+pub mod ppl_surface;
 pub mod user_commands;
 pub mod virtual_screen;
 use self::functions::display_flags;
@@ -643,6 +644,9 @@ pub struct IcyBoardState {
     /// resending the whole file through `LoadBlob`.
     pub sound_cache: HashSet<String>,
 
+    /// Raw media bytes uploaded to the terminal cache during this connection.
+    media_upload_bytes: usize,
+
     /// Last `SNDVOLUME` percent requested per logical channel (0-13), defaulting to
     /// 100 so music/fx start at full loudness instead of the client's quiet
     /// default headroom.
@@ -653,6 +657,8 @@ pub struct IcyBoardState {
     pub sound_available: Option<bool>,
 
     pub sound_formats: HashMap<i32, bool>,
+
+    pub snd_error: i32,
 
     /// What the caller's terminal answered when it was asked what it can draw.
     /// Kept past `GFXSHUTDOWN`, because a terminal does not change mid call.
@@ -677,6 +683,18 @@ pub struct IcyBoardState {
 }
 
 impl IcyBoardState {
+    pub fn reserve_media_upload(&mut self, bytes: usize) -> bool {
+        const MAX_MEDIA_UPLOAD_BYTES: usize = 256 * 1024 * 1024;
+        let Some(total) = self.media_upload_bytes.checked_add(bytes) else {
+            return false;
+        };
+        if total > MAX_MEDIA_UPLOAD_BYTES {
+            return false;
+        }
+        self.media_upload_bytes = total;
+        true
+    }
+
     pub fn display_screen(&self) -> &VirtualScreen {
         if self.session.is_sysop || self.session.cur_user_id < 0 {
             &self.sysop_screen
@@ -727,10 +745,12 @@ impl IcyBoardState {
             ppe_nesting: 0,
             capture_file: None,
             sound_cache: HashSet::new(),
+            media_upload_bytes: 0,
             sound_volume: [100; 14],
             sound_active: [false; 14],
             sound_available: None,
             sound_formats: HashMap::new(),
+            snd_error: 0,
             gfx_capabilities: None,
             gfx_error: 0,
             gfx_cache: HashSet::new(),
@@ -1145,6 +1165,10 @@ impl IcyBoardState {
                 self.sound_active[logical_channel] = false;
             }
         }
+        self.sound_active.fill(false);
+        self.sound_volume.fill(100);
+        self.snd_error = 0;
+        self.gfx_error = 0;
     }
 
     pub fn stuff_keyboard_buffer(&mut self, value: &str, is_visible: bool) -> Res<()> {

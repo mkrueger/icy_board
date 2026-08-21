@@ -106,6 +106,9 @@ fn collect_statement_hits(stmt: &icy_board_engine::executable::PPEStatement, hit
             collect_expr_hits(target, hits, span_start);
             collect_expr_hits(value, hits, span_start);
         }
+        PPECommand::MemberCall(expr) => {
+            collect_expr_hits(expr, hits, span_start);
+        }
         PPECommand::Return | PPECommand::End | PPECommand::Goto(_) | PPECommand::Gosub(_) | PPECommand::EndFunc | PPECommand::EndProc | PPECommand::Stop => {}
     }
 }

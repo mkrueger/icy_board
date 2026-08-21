@@ -301,9 +301,6 @@ pub async fn run_function(opcode: FuncOpCode, arg: &mut VirtualMachine<'_>, argu
         FuncOpCode::MousePixels => predefined_functions::mousepixels(arg, arguments).await,
         FuncOpCode::Rgb | FuncOpCode::RgbAlpha => predefined_functions::rgb(arg, arguments).await,
         FuncOpCode::GfxCaps => predefined_functions::gfxcaps(arg, arguments).await,
-        FuncOpCode::GfxValid => predefined_functions::gfxvalid(arg, arguments).await,
-        FuncOpCode::GfxWidth => predefined_functions::gfxwidth(arg, arguments).await,
-        FuncOpCode::GfxHeight => predefined_functions::gfxheight(arg, arguments).await,
         FuncOpCode::GfxCellWidth => predefined_functions::gfxcellwidth(arg, arguments).await,
         FuncOpCode::GfxCellHeight => predefined_functions::gfxcellheight(arg, arguments).await,
         FuncOpCode::SndAvailable => predefined_functions::sndavailable(arg, arguments).await,
@@ -315,6 +312,9 @@ pub async fn run_function(opcode: FuncOpCode, arg: &mut VirtualMachine<'_>, argu
         FuncOpCode::GfxScreenWidth => predefined_functions::gfxscreenwidth(arg, arguments).await,
         FuncOpCode::GfxScreenHeight => predefined_functions::gfxscreenheight(arg, arguments).await,
         FuncOpCode::GfxError => predefined_functions::gfxerror(arg, arguments).await,
+        FuncOpCode::SndError => predefined_functions::snderror(arg, arguments).await,
+        FuncOpCode::NewSurface => crate::vm::statements::predefined_procedures::new_surface(arg, arguments).await,
+        FuncOpCode::LoadSurface => crate::vm::statements::predefined_procedures::load_surface(arg, arguments).await,
         FuncOpCode::END
         | FuncOpCode::CPAR
         | FuncOpCode::UPLUS

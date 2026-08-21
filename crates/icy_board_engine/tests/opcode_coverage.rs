@@ -9,9 +9,26 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use icy_board_engine::executable::{
-    FUNCTION_DEFINITIONS, ImplStatus, PARTIAL_FUNCTIONS, PARTIAL_STATEMENTS, STATEMENT_DEFINITIONS, UNIMPLEMENTED_FUNCTIONS, UNIMPLEMENTED_STATEMENTS,
-    UNSUPPORTED_FUNCTIONS, UNSUPPORTED_STATEMENTS,
+    FUNCTION_DEFINITIONS, ImplStatus, LAST_FUNC, LAST_STMT, PARTIAL_FUNCTIONS, PARTIAL_STATEMENTS, STATEMENT_DEFINITIONS, UNIMPLEMENTED_FUNCTIONS,
+    UNIMPLEMENTED_STATEMENTS, UNSUPPORTED_FUNCTIONS, UNSUPPORTED_STATEMENTS,
 };
+
+/// Both tables are addressed by opcode value, so a definition that moves silently
+/// relabels every opcode after it. Aliases live past the opcode range on purpose.
+#[test]
+fn definition_tables_are_indexed_by_opcode() {
+    for (index, definition) in STATEMENT_DEFINITIONS.iter().enumerate().take(LAST_STMT as usize + 1).skip(1) {
+        assert_eq!(definition.opcode as usize, index, "statement '{}' sits at index {index}", definition.name);
+    }
+    for (index, definition) in FUNCTION_DEFINITIONS.iter().enumerate().take(LAST_FUNC.unsigned_abs() as usize + 1) {
+        assert_eq!(
+            (definition.opcode as i16).unsigned_abs() as usize,
+            index,
+            "function '{}' sits at index {index}",
+            definition.name
+        );
+    }
+}
 
 fn engine_src(rel: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("src").join(rel)

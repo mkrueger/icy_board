@@ -183,6 +183,34 @@ fn test_function() {
     assert_eq!(1, prg.function_implementations.len());
 }*/
 
+/// The id of a board object is stored in every PPE that names its type, so the
+/// list may only ever grow at the end.
+#[test]
+fn board_object_type_ids_are_frozen() {
+    let registry = UserTypeRegistry::icy_board_registry();
+    let expected = [
+        ("CONFERENCE", 30),
+        ("AREA", 31),
+        ("DIRECTORY", 32),
+        ("DOOR", 33),
+        ("CONTACT", 34),
+        ("SURFACE", 35),
+    ];
+
+    for (name, id) in expected {
+        assert_eq!(
+            registry.get_type(&unicase::Ascii::new(name.to_string())),
+            Some(VariableType::UserData(id)),
+            "{name} moved"
+        );
+    }
+    assert_eq!(
+        registry.registered_types.len(),
+        expected.len(),
+        "a board object was added without freezing its id"
+    );
+}
+
 fn parse_types(input: &str) -> (Vec<AstNode>, UserTypeRegistry, Arc<Mutex<ErrorReporter>>) {
     let reg = UserTypeRegistry::icy_board_registry();
     let errors = Arc::new(Mutex::new(ErrorReporter::default()));

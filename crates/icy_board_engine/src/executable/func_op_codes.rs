@@ -323,20 +323,20 @@ pub enum FuncOpCode {
     Rgb = -309,
     RgbAlpha = -310,
     GfxCaps = -311,
-    GfxValid = -312,
-    GfxWidth = -313,
-    GfxHeight = -314,
-    GfxCellWidth = -315,
-    GfxCellHeight = -316,
-    SndAvailable = -317,
-    SndSupports = -318,
-    SndPlaying = -319,
-    KeyPoll = -320,
-    KeyCode = -321,
-    KeyPressed = -322,
-    GfxScreenWidth = -323,
-    GfxScreenHeight = -324,
-    GfxError = -325,
+    GfxCellWidth = -312,
+    GfxCellHeight = -313,
+    SndAvailable = -314,
+    SndSupports = -315,
+    SndPlaying = -316,
+    KeyPoll = -317,
+    KeyCode = -318,
+    KeyPressed = -319,
+    GfxScreenWidth = -320,
+    GfxScreenHeight = -321,
+    GfxError = -322,
+    SndError = -323,
+    NewSurface = -324,
+    LoadSurface = -325,
 }
 
 pub const LAST_FUNC: i16 = -325;
@@ -345,6 +345,10 @@ impl FuncOpCode {
     pub fn get_definition(self) -> &'static FunctionDefinition {
         let i = -(self as i16);
         &FUNCTION_DEFINITIONS[i as usize]
+    }
+
+    pub fn minimum_runtime(self) -> u16 {
+        if (self as i16) <= FuncOpCode::GfxBackend as i16 { 402 } else { 100 }
     }
 }
 
@@ -3082,30 +3086,6 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 337]> 
             signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
-            name: "GfxValid",
-            version: 400,
-            opcode: FuncOpCode::GfxValid,
-            return_type: VariableType::Boolean,
-            args: Some(vec![ArgumentDefinition::new("Slot", VariableType::Integer)]),
-            signature: FunctionSignature::FixedParameters(1),
-        },
-        FunctionDefinition {
-            name: "GfxWidth",
-            version: 400,
-            opcode: FuncOpCode::GfxWidth,
-            return_type: VariableType::Integer,
-            args: Some(vec![ArgumentDefinition::new("Slot", VariableType::Integer)]),
-            signature: FunctionSignature::FixedParameters(1),
-        },
-        FunctionDefinition {
-            name: "GfxHeight",
-            version: 400,
-            opcode: FuncOpCode::GfxHeight,
-            return_type: VariableType::Integer,
-            args: Some(vec![ArgumentDefinition::new("Slot", VariableType::Integer)]),
-            signature: FunctionSignature::FixedParameters(1),
-        },
-        FunctionDefinition {
             name: "GfxCellWidth",
             version: 400,
             opcode: FuncOpCode::GfxCellWidth,
@@ -3192,6 +3172,33 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 337]> 
             return_type: VariableType::Integer,
             args: None,
             signature: FunctionSignature::FixedParameters(0),
+        },
+        FunctionDefinition {
+            name: "SndError",
+            version: 400,
+            opcode: FuncOpCode::SndError,
+            return_type: VariableType::Integer,
+            args: None,
+            signature: FunctionSignature::FixedParameters(0),
+        },
+        FunctionDefinition {
+            name: "NewSurface",
+            version: 400,
+            opcode: FuncOpCode::NewSurface,
+            return_type: VariableType::UserData(35),
+            args: Some(vec![
+                ArgumentDefinition::new("Width", VariableType::Integer),
+                ArgumentDefinition::new("Height", VariableType::Integer),
+            ]),
+            signature: FunctionSignature::FixedParameters(2),
+        },
+        FunctionDefinition {
+            name: "LoadSurface",
+            version: 400,
+            opcode: FuncOpCode::LoadSurface,
+            return_type: VariableType::UserData(35),
+            args: Some(vec![ArgumentDefinition::new("FileName", VariableType::String)]),
+            signature: FunctionSignature::FixedParameters(1),
         },
         // ALIASES (need to be last in the list)
         FunctionDefinition {

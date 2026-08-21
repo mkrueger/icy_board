@@ -162,16 +162,17 @@ below.
 Graphics use an in-memory RGBA surface model and select Sixel or SyncTERM JPEG
 XL at presentation time. `GFX_AUTO` probes the terminal and returns `GFX_NONE`
 when neither backend is advertised; `GFX_SIXEL` explicitly selects Sixel for
-terminals that cannot report capabilities.
+terminals that cannot report capabilities. These APIs use PPL language 4.00
+syntax but require PPE runtime 4.02.
 
 ```PPL
 GfxInit GFX_AUTO
 IF GfxBackend() = GFX_NONE EXIT
 
-GfxCreate 0, 640, 400
-GfxClear 0, Rgb(20, 24, 32)
-GfxFillRect 0, 20, 20, 100, 40, Rgb(255, 80, 40, 192)
-GfxPresent 0
+SURFACE screen = NewSurface(640, 400)
+screen.Clear(Rgb(20, 24, 32))
+screen.FillRect(20, 20, 100, 40, Rgb(255, 80, 40, 192))
+screen.Present()
 GfxShutdown
 ```
 
@@ -180,30 +181,68 @@ to 0 through 255 and alpha defaults to 255. It is a constant expression, so it
 can be used in `CONST` declarations. Large hexadecimal literals such as
 `0FF0000FFh` are also `UNSIGNED` and retain hexadecimal formatting.
 
-The surface API is:
+A surface is a `SURFACE` object created by one of two functions:
+
+| Function | Purpose |
+| :--- | :--- |
+| `NewSurface(width, height)` | Create a transparent surface |
+| `LoadSurface(file)` | Load PNG, JPEG XL or another supported image |
+
+Both return an invalid surface on failure, so check `GfxError()` or the `Valid`
+property. Everything else is a member of the surface itself:
+
+| Member | Purpose |
+| :--- | :--- |
+| `Width`, `Height`, `Valid` | Read-only status properties |
+| `Clear(color)` | Fill the whole surface |
+| `SetPixel(x, y, color)` | Set a single pixel |
+| `FillRect(x, y, w, h, color)`, `Rect(x, y, w, h, color)` | Draw packed RGBA colors |
+| `Blit(source, x, y)`, `BlitRect(source, sx, sy, w, h, x, y)` | Alpha-compose surfaces in memory |
+| `Present()` | Present the complete surface |
+| `PresentRect(sx, sy, w, h[, dx, dy[, dw, dh[, flip]]])` | Present a source rectangle at a pixel destination |
+| `PresentAt(column, row)` | Present at a text-cell position |
+| `Pin()`, `Unpin()` | Load/unload an immutable JXL surface in a SyncTERM client buffer |
+| `Free()` | Release the surface |
+
+The drawing and presentation members return a `BOOLEAN` that is `FALSE` when the
+operation failed, and they can also be used as bare statements. The remaining
+global statements control the session rather than a surface:
 
 | API | Purpose |
 | :--- | :--- |
-| `GfxCreate slot, width, height` | Create a transparent surface |
-| `GfxLoad slot, file` | Load PNG, JPEG XL or another supported image |
-| `GfxClear`, `GfxFillRect`, `GfxRect` | Draw packed RGBA colors |
-| `GfxBlit`, `GfxBlitRect` | Alpha-compose surfaces in memory |
-| `GfxPresent slot` | Present a complete surface |
-| `GfxPresentRect slot, sx, sy, w, h[, dx, dy]` | Present a source rectangle at a pixel destination |
-| `GfxPresentAt slot, column, row` | Present at a text-cell position |
-| `GfxPin slot[, enabled]` | Load/unload an immutable JXL surface in a SyncTERM client buffer |
 | `GfxSetPacing frames` | Enable DSR-acknowledged presentation when positive |
 | `GfxWaitFrame fps` | Rate-limit a rendering loop |
-| `GfxFree`, `GfxShutdown` | Release resources and restore terminal modes |
+| `GfxShutdown` | Release resources and restore terminal modes |
 
-`GfxValid`, `GfxWidth`, `GfxHeight` and `GfxError` report surface status.
-`GfxCaps` is a bitmask of `GFX_CAP_*` constants. `GfxCellWidth`,
-`GfxCellHeight`, `GfxScreenWidth` and `GfxScreenHeight` report probed pixel
-geometry. `GfxPin` uses at most the two client pixel buffers; drawing onto a
-pinned surface automatically invalidates its client copy.
+`GfxError` reports the status of the last operation. `GfxCaps` is a bitmask of
+`GFX_CAP_*` constants. `GfxCellWidth`, `GfxCellHeight`, `GfxScreenWidth` and
+`GfxScreenHeight` report probed pixel geometry. `Pin` uses at most the two
+client pixel buffers; drawing onto a pinned surface automatically invalidates
+its client copy.
 
-Sound channels are logical channels 0 through 13, mapped to SyncTERM APC
-channels 2 through 15 because CTerm reserves channels 0 and 1. Playback probes
+Surfaces are limited to 2048 by 2048 pixels, 256 simultaneous surfaces and 64 MiB
+of resident RGBA pixels. Source image files are limited to 32 MiB and raster
+decoders receive the same dimension and allocation limits before decoding.
+Graphics and sound together may add at most 256 MiB of uniquely named persistent
+media during one connection. Changing frames that overwrite a surface cache
+entry do not consume that budget. `GfxError` returns the named `GFX_ERR_*`
+constants; every graphics operation updates it.
+
+`PresentRect` can hand the scaling and mirroring to the terminal: `dw` and
+`dh` give the destination size and `flip` combines `GFX_FLIP_X` and
+`GFX_FLIP_Y`. The frame still travels at its source size, so drawing a small
+surface enlarged costs the bandwidth of the small one. Both are options of the
+image APC, so they need the JPEG XL backend and report
+`GFX_ERR_UNSUPPORTED` on Sixel.
+
+```PPL
+; A 160x100 surface fills a 640x400 area without sending 640x400 pixels.
+screen.PresentRect(0, 0, 160, 100, 0, 0, 640, 400)
+```
+
+Sound channels are logical channels 0 through `SND_CHANNELS` - 1, mapped to
+SyncTERM APC channels 2 through 15 because CTerm reserves channels 0 and 1. A
+channel outside that range is rejected rather than redirected. Playback probes
 the exact container/codec before uploading it.
 
 ```PPL
@@ -216,6 +255,9 @@ ENDIF
 `SndAvailable`, `SndSupports` and `SndPlaying` query terminal state.
 `SndPreload`, `SndPlay`, `SndStop`, `SndVolume`, `SndFade` and `SndStopAll`
 control playback. Uploaded files use the caller's per-board SyncTERM cache.
+`SndError` returns the named `SND_ERR_*` constants and mirrors `GfxError`: it
+tells a failed `SndPlay` apart from one the terminal simply finished, which
+`SndPlaying` cannot.
 
 Mouse modes and event values have named `MOUSE_*` constants. The optional
 second `MouseOn` argument selects button-only, drag or all-motion tracking:

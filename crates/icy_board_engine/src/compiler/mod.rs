@@ -117,6 +117,9 @@ pub enum CompilationErrorType {
     #[error("Passing a FUNCTION/PROCEDURE needs runtime {0}")]
     RoutineReferenceNeedsRuntime(u16),
 
+    #[error("{0} needs runtime {1}")]
+    BuiltinNeedsRuntime(String, u16),
+
     #[error("Indexer called on function or procedure ({0})")]
     IndexerCalledOnFunction(String),
 
@@ -392,6 +395,7 @@ impl PPECompiler {
 
                 Some(PPECommand::Let(Box::new(variable), Box::new(value)))
             }
+            Statement::MemberCall(call_stmt) => Some(PPECommand::MemberCall(Box::new(self.comp_expr(call_stmt.get_expression())))),
             Statement::PredifinedCall(call_stmt) => {
                 let def = call_stmt.get_func();
                 let mut arguments = Vec::new();

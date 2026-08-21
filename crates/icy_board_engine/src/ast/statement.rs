@@ -36,6 +36,7 @@ pub enum Statement {
     Label(LabelStatement),
     Call(ProcedureCallStatement),
     PredifinedCall(PredefinedCallStatement),
+    MemberCall(MemberCallStatement),
 
     VariableDeclaration(VariableDeclarationStatement),
     ConstDeclaration(ConstDeclarationStatement),
@@ -64,6 +65,7 @@ impl Statement {
             Statement::Label(l) => l.get_label_token().span.clone(),
             Statement::Call(c) => c.get_identifier_token().span.clone(),
             Statement::PredifinedCall(p) => p.identifier_token.span.clone(),
+            Statement::MemberCall(c) => c.get_expression().get_span(),
             Statement::VariableDeclaration(v) => v.get_type_token().span.clone(),
             Statement::ConstDeclaration(c) => c.get_const_token().span.start..c.get_value().get_span().end,
         }
@@ -92,6 +94,7 @@ impl Statement {
             Statement::Label(s) => visitor.visit_label_statement(s),
             Statement::Call(s) => visitor.visit_procedure_call_statement(s),
             Statement::PredifinedCall(s) => visitor.visit_predefined_call_statement(s),
+            Statement::MemberCall(s) => visitor.visit_member_call_statement(s),
             Statement::VariableDeclaration(s) => visitor.visit_variable_declaration_statement(s),
             Statement::ConstDeclaration(s) => visitor.visit_const_declaration_statement(s),
         }
@@ -120,6 +123,7 @@ impl Statement {
             Statement::Label(s) => visitor.visit_label_statement(s),
             Statement::Call(s) => visitor.visit_procedure_call_statement(s),
             Statement::PredifinedCall(s) => visitor.visit_predefined_call_statement(s),
+            Statement::MemberCall(s) => visitor.visit_member_call_statement(s),
             Statement::VariableDeclaration(s) => visitor.visit_variable_declaration_statement(s),
             Statement::ConstDeclaration(s) => visitor.visit_const_declaration_statement(s),
         }
@@ -1581,6 +1585,26 @@ impl ProcedureCallStatement {
 
     pub fn create_empty_statement(identifier: unicase::Ascii<String>, arguments: Vec<Expression>) -> Statement {
         Statement::Call(ProcedureCallStatement::empty(identifier, arguments))
+    }
+}
+
+/// A member call used for its effect, such as `surface.Clear(color)`.
+#[derive(Debug, PartialEq, Clone)]
+pub struct MemberCallStatement {
+    expression: Expression,
+}
+
+impl MemberCallStatement {
+    pub fn new(expression: Expression) -> Self {
+        Self { expression }
+    }
+
+    pub fn get_expression(&self) -> &Expression {
+        &self.expression
+    }
+
+    pub fn create_empty_statement(expression: Expression) -> Statement {
+        Statement::MemberCall(MemberCallStatement::new(expression))
     }
 }
 

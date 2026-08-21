@@ -502,9 +502,11 @@ impl VirtualMachine<'_> {
                 let crate::compiler::user_data::UserDataEntry::Function(name) = member else {
                     return Err(VMError::InvalidMemberFunction(type_id, *id).into());
                 };
-                let expected_arguments = registry.functions.get(name).map_or(0, |(parameters, _)| parameters.len());
-                if arguments.len() != expected_arguments {
-                    return Err(VMError::InvalidMemberArgumentCount(type_id, *id, expected_arguments, arguments.len()).into());
+                let Some(function) = registry.functions.get(name) else {
+                    return Err(VMError::InvalidMemberFunction(type_id, *id).into());
+                };
+                if arguments.len() < function.required || arguments.len() > function.parameters.len() {
+                    return Err(VMError::InvalidMemberArgumentCount(type_id, *id, function.parameters.len(), arguments.len()).into());
                 }
 
                 let mut args = Vec::new();
@@ -690,6 +692,10 @@ impl VirtualMachine<'_> {
             PPECommand::Stop => {
                 self.aborted = true;
                 self.is_running = false;
+            }
+
+            PPECommand::MemberCall(expr) => {
+                self.eval_expr(expr).await?;
             }
 
             PPECommand::EndFunc | PPECommand::EndProc | PPECommand::Return => {

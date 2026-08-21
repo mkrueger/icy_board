@@ -10,9 +10,9 @@ use crate::{
     ast::{
         Ast, AstNode, BinOp, BinaryExpression, BlockStatement, CommentAstNode, Constant, ConstantExpression, Expression, FunctionCallExpression,
         FunctionDeclarationAstNode, FunctionImplementation, GosubStatement, GotoStatement, IdentifierExpression, IfStatement, IndexerExpression,
-        LabelStatement, LetStatement, MemberReferenceExpression, ParameterSpecifier, ParensExpression, PredefinedCallStatement, ProcedureCallStatement,
-        ProcedureDeclarationAstNode, ProcedureImplementation, Statement, TypeDeclarationAstNode, TypeFieldSpecifier, UnaryExpression, UnaryOp,
-        VariableDeclarationStatement, VariableParameterSpecifier, VariableSpecifier, constant::NumberFormat,
+        LabelStatement, LetStatement, MemberCallStatement, MemberReferenceExpression, ParameterSpecifier, ParensExpression, PredefinedCallStatement,
+        ProcedureCallStatement, ProcedureDeclarationAstNode, ProcedureImplementation, Statement, TypeDeclarationAstNode, TypeFieldSpecifier, UnaryExpression,
+        UnaryOp, VariableDeclarationStatement, VariableParameterSpecifier, VariableSpecifier, constant::NumberFormat,
     },
     compiler::{user_data::UserDataEntry, workspace::Workspace},
     executable::{
@@ -278,7 +278,7 @@ impl Decompiler {
         let registry = self.type_registry.get_type_from_id(type_id)?;
         match registry.id_table.get(id)? {
             UserDataEntry::Field(name) | UserDataEntry::Getter(name) => Some((name.clone(), *registry.fields.get(name)?)),
-            UserDataEntry::Function(name) => Some((name.clone(), registry.functions.get(name)?.1)),
+            UserDataEntry::Function(name) => Some((name.clone(), registry.functions.get(name)?.return_type)),
             UserDataEntry::Procedure(name) => Some((name.clone(), VariableType::None)),
         }
     }
@@ -485,6 +485,7 @@ impl Decompiler {
             PPECommand::ProcedureCall(p, args) => {
                 ProcedureCallStatement::create_empty_statement(self.get_variable_name(*p), args.iter().map(|e| self.decompile_expression(e)).collect())
             }
+            PPECommand::MemberCall(expr) => MemberCallStatement::create_empty_statement(self.decompile_expression(expr)),
             PPECommand::PredefinedCall(p, args) => PredefinedCallStatement::create_empty_statement(
                 p,
                 args.iter()

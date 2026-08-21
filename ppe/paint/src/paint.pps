@@ -23,6 +23,7 @@ INTEGER lastX, lastY, dragButton
 INTEGER tries
 BOOLEAN running, dragging, dirty, pendingEvent
 STRING key
+SURFACE screen, ui
 
 InitColors()
 CLS
@@ -34,9 +35,9 @@ IF GfxBackend() < 0 THEN
     PRINTLN "PPE Paint requires a graphics-capable terminal."
     EXIT
 ENDIF
-GfxCreate 0, SCREEN_W, SCREEN_H
-GfxLoad 1, "./paint_ui.png"
-GfxBlit 0, 1, 0, 0
+screen = NewSurface(SCREEN_W, SCREEN_H)
+ui = LoadSurface("./paint_ui.png")
+screen.Blit(ui, 0, 0)
 
 selected = 0
 brushSize = 7
@@ -118,8 +119,8 @@ WHILE running DO
 ENDWHILE
 
 MouseOff
-GfxFree 1
-GfxFree 0
+ui.Free()
+screen.Free()
 GfxShutdown
 CLS
 
@@ -149,20 +150,20 @@ ENDFUNC
 PROCEDURE RenderToolbar()
     INTEGER i, x
     ; Restore the original toolbar, then draw state indicators.
-    GfxBlitRect 0, 1, 0, 0, SCREEN_W, CANVAS_Y, 0, 0
+    screen.BlitRect(ui, 0, 0, SCREEN_W, CANVAS_Y, 0, 0)
     i = 0
     WHILE i < COLOR_COUNT DO
         x = SWATCH_X + i * SWATCH_STEP
-        GfxFillRect 0, x, SWATCH_Y, SWATCH_SIZE, SWATCH_SIZE, colors[i]
-        GfxRect 0, x, SWATCH_Y, SWATCH_SIZE, SWATCH_SIZE, C_INK
-        IF i = selected GfxRect 0, x - 3, SWATCH_Y - 3, SWATCH_SIZE + 6, SWATCH_SIZE + 6, C_CANVAS
+        screen.FillRect(x, SWATCH_Y, SWATCH_SIZE, SWATCH_SIZE, colors[i])
+        screen.Rect(x, SWATCH_Y, SWATCH_SIZE, SWATCH_SIZE, C_INK)
+        IF i = selected screen.Rect(x - 3, SWATCH_Y - 3, SWATCH_SIZE + 6, SWATCH_SIZE + 6, C_CANVAS)
         i += 1
     ENDWHILE
     ; Brush preview.
-    GfxFillRect 0, 432, 25, 36, 28, C_CANVAS
-    GfxRect 0, 432, 25, 36, 28, C_FRAME
-    GfxFillRect 0, 450 - brushSize / 2, 39 - brushSize / 2, brushSize, brushSize, colors[selected]
-    GfxPresent 0
+    screen.FillRect(432, 25, 36, 28, C_CANVAS)
+    screen.Rect(432, 25, 36, 28, C_FRAME)
+    screen.FillRect(450 - brushSize / 2, 39 - brushSize / 2, brushSize, brushSize, colors[selected])
+    screen.Present()
 ENDPROC
 
 PROCEDURE HandleToolbar(INTEGER x, INTEGER y)
@@ -192,9 +193,9 @@ PROCEDURE ChangeBrush(INTEGER amount)
 ENDPROC
 
 PROCEDURE ClearCanvas()
-    GfxFillRect 0, CANVAS_X, CANVAS_Y, CANVAS_W, CANVAS_H, C_CANVAS
-    GfxRect 0, CANVAS_X, CANVAS_Y, CANVAS_W, CANVAS_H, C_FRAME
-    GfxPresent 0
+    screen.FillRect(CANVAS_X, CANVAS_Y, CANVAS_W, CANVAS_H, C_CANVAS)
+    screen.Rect(CANVAS_X, CANVAS_Y, CANVAS_W, CANVAS_H, C_FRAME)
+    screen.Present()
 ENDPROC
 
 PROCEDURE Dab(INTEGER x, INTEGER y, UNSIGNED color)
@@ -204,7 +205,7 @@ PROCEDURE Dab(INTEGER x, INTEGER y, UNSIGNED color)
     drawTop = y - half
     IF drawLeft < CANVAS_X drawLeft = CANVAS_X
     IF drawTop < CANVAS_Y drawTop = CANVAS_Y
-    GfxFillRect 0, drawLeft, drawTop, brushSize, brushSize, color
+    screen.FillRect(drawLeft, drawTop, brushSize, brushSize, color)
 ENDPROC
 
 PROCEDURE DrawStroke(INTEGER x0, INTEGER y0, INTEGER x1, INTEGER y1, UNSIGNED color)
@@ -238,5 +239,5 @@ PROCEDURE PresentDirty()
     ; Sixel terminals do not consistently preserve previous images under
     ; transparent partial updates. The event batch still limits this to one
     ; complete image per frame.
-    GfxPresent 0
+    screen.Present()
 ENDPROC
