@@ -1146,8 +1146,7 @@ pub async fn defcolor(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
     }
 }
 pub async fn abs(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let val = vm.eval_expr(&args[0]).await?.as_int();
-    Ok(VariableValue::new_int(val.abs()))
+    Ok(vm.eval_expr(&args[0]).await?.abs())
 }
 
 pub async fn grafmode(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {

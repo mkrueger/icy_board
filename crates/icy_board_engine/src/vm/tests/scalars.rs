@@ -8,6 +8,27 @@ fn test_toddate_reads_a_ccyymmdd_string() {
     assert_eq!(run_ppl("PRINT TODDATE(\"19940527\")"), "19940527");
 }
 
+/// `ABS` answers in the type it was given rather than truncating to a whole number,
+/// the way `cVARVAL::abs` does; only the unsigned and date family folds to an integer.
+#[test]
+fn test_abs_keeps_the_type_of_its_argument() {
+    let output = run_ppl(
+        r#"
+        DOUBLE d
+        SWORD w
+        d = 0.0 - 2.5
+        w = 0 - 300
+        PRINTLN Abs(d)
+        PRINTLN Abs(0.0 - 1.75)
+        PRINTLN Abs(0 - 3)
+        PRINTLN Abs(w)
+        PRINTLN Abs(3)
+        "#,
+    );
+
+    assert_eq!(output, "2.5\n1.75\n3\n300\n3\n");
+}
+
 /// PCBACCSTAT field 0 answers 0 when accounting is off and 2 when it is on;
 /// `icy_board` has no separate tracking mode, so an enabled system is fully on.
 #[test]
