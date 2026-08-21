@@ -482,7 +482,7 @@ fn promote_to(l: VariableType, r: VariableType) -> VariableType {
     if l == r {
         return l;
     }
-    if l == VariableType::String || l == VariableType::BigStr || r == VariableType::String || r == VariableType::BigStr {
+    if matches!(l, VariableType::String | VariableType::BigStr) && matches!(r, VariableType::String | VariableType::BigStr) {
         return VariableType::BigStr;
     }
     if l == VariableType::Float || l == VariableType::Double || r == VariableType::Float || r == VariableType::Double {
@@ -561,8 +561,8 @@ impl Sub<VariableValue> for VariableValue {
                 dest_type = VariableType::Integer;
             }
             VariableType::String | VariableType::BigStr => {
-                let l = self.as_string().parse::<i32>().unwrap_or_default();
-                let r = other.as_string().parse::<i32>().unwrap_or_default();
+                let l = self.as_int();
+                let r = other.as_int();
                 return Self {
                     vtype: VariableType::Integer,
                     data: VariableData::from_int(l.wrapping_sub(r)),
@@ -684,11 +684,11 @@ impl Div<VariableValue> for VariableValue {
                 dest_type = VariableType::Integer;
             }
             VariableType::String | VariableType::BigStr => {
-                let l = self.as_string().parse::<i32>().unwrap_or_default();
-                let r = other.as_string().parse::<i32>().unwrap_or_default();
+                let l = self.as_int();
+                let r = other.as_int();
                 return Self {
                     vtype: VariableType::Integer,
-                    data: VariableData::from_int(l.wrapping_div(r)),
+                    data: VariableData::from_int(if r == 0 { 0 } else { l.wrapping_div(r) }),
                     generic_data: GenericVariableData::None,
                 };
             }
@@ -699,28 +699,40 @@ impl Div<VariableValue> for VariableValue {
         unsafe {
             match dest_type {
                 VariableType::Unsigned => {
-                    data.unsigned_value = self.data.unsigned_value.wrapping_div(other.data.unsigned_value);
+                    data.unsigned_value = if other.data.unsigned_value == 0 {
+                        0
+                    } else {
+                        self.data.unsigned_value.wrapping_div(other.data.unsigned_value)
+                    };
                 }
                 VariableType::Integer => {
-                    data.int_value = self.as_int().wrapping_div(other.as_int());
+                    let divisor = other.as_int();
+                    data.int_value = if divisor == 0 { 0 } else { self.as_int().wrapping_div(divisor) };
                 }
                 VariableType::Float => {
-                    data.float_value = self.convert_to(VariableType::Float).data.float_value / other.convert_to(VariableType::Float).data.float_value;
+                    let dividend = self.convert_to(VariableType::Float).data.float_value;
+                    let divisor = other.convert_to(VariableType::Float).data.float_value;
+                    data.float_value = if divisor == 0.0 { 0.0 } else { dividend / divisor };
                 }
                 VariableType::Double => {
-                    data.double_value = self.as_double() / other.as_double();
+                    let divisor = other.as_double();
+                    data.double_value = if divisor == 0.0 { 0.0 } else { self.as_double() / divisor };
                 }
                 VariableType::Byte => {
-                    data.byte_value = self.as_byte().wrapping_div(other.as_byte());
+                    let divisor = other.as_byte();
+                    data.byte_value = if divisor == 0 { 0 } else { self.as_byte().wrapping_div(divisor) };
                 }
                 VariableType::SByte => {
-                    data.sbyte_value = self.as_sbyte().wrapping_div(other.as_sbyte());
+                    let divisor = other.as_sbyte();
+                    data.sbyte_value = if divisor == 0 { 0 } else { self.as_sbyte().wrapping_div(divisor) };
                 }
                 VariableType::Word => {
-                    data.word_value = self.as_word().wrapping_div(other.as_word());
+                    let divisor = other.as_word();
+                    data.word_value = if divisor == 0 { 0 } else { self.as_word().wrapping_div(divisor) };
                 }
                 VariableType::SWord => {
-                    data.sword_value = self.as_sword().wrapping_div(other.as_sword());
+                    let divisor = other.as_sword();
+                    data.sword_value = if divisor == 0 { 0 } else { self.as_sword().wrapping_div(divisor) };
                 }
                 _ => {
                     panic!("unsupported lvalue for add {self:?}");
@@ -753,11 +765,11 @@ impl Rem<VariableValue> for VariableValue {
             }
 
             VariableType::String | VariableType::BigStr => {
-                let l = self.as_string().parse::<i32>().unwrap_or_default();
-                let r = other.as_string().parse::<i32>().unwrap_or_default();
+                let l = self.as_int();
+                let r = other.as_int();
                 return Self {
                     vtype: VariableType::Integer,
-                    data: VariableData::from_int(l.wrapping_rem(r)),
+                    data: VariableData::from_int(if r == 0 { 0 } else { l.wrapping_rem(r) }),
                     generic_data: GenericVariableData::None,
                 };
             }
@@ -768,22 +780,31 @@ impl Rem<VariableValue> for VariableValue {
         unsafe {
             match dest_type {
                 VariableType::Unsigned => {
-                    data.unsigned_value = self.data.unsigned_value.wrapping_rem(other.data.unsigned_value);
+                    data.unsigned_value = if other.data.unsigned_value == 0 {
+                        0
+                    } else {
+                        self.data.unsigned_value.wrapping_rem(other.data.unsigned_value)
+                    };
                 }
                 VariableType::Integer => {
-                    data.int_value = self.as_int().wrapping_rem(other.as_int());
+                    let divisor = other.as_int();
+                    data.int_value = if divisor == 0 { 0 } else { self.as_int().wrapping_rem(divisor) };
                 }
                 VariableType::Byte => {
-                    data.byte_value = self.as_byte().wrapping_rem(other.as_byte());
+                    let divisor = other.as_byte();
+                    data.byte_value = if divisor == 0 { 0 } else { self.as_byte().wrapping_rem(divisor) };
                 }
                 VariableType::SByte => {
-                    data.sbyte_value = self.as_sbyte().wrapping_rem(other.as_sbyte());
+                    let divisor = other.as_sbyte();
+                    data.sbyte_value = if divisor == 0 { 0 } else { self.as_sbyte().wrapping_rem(divisor) };
                 }
                 VariableType::Word => {
-                    data.word_value = self.as_word().wrapping_rem(other.as_word());
+                    let divisor = other.as_word();
+                    data.word_value = if divisor == 0 { 0 } else { self.as_word().wrapping_rem(divisor) };
                 }
                 VariableType::SWord => {
-                    data.sword_value = self.as_sword().wrapping_rem(other.as_sword());
+                    let divisor = other.as_sword();
+                    data.sword_value = if divisor == 0 { 0 } else { self.as_sword().wrapping_rem(divisor) };
                 }
                 _ => {
                     panic!("unsupported lvalue for add {self:?}");
@@ -820,8 +841,10 @@ impl PartialOrd for VariableValue {
                 VariableType::Time => Some(self.data.time_value.cmp(&other.data.time_value)),
                 VariableType::Float => self.as_float().partial_cmp(&other.as_float()),
                 VariableType::Double => self.as_double().partial_cmp(&other.as_double()),
-                VariableType::Byte | VariableType::SByte => Some(self.as_byte().cmp(&other.as_byte())),
-                VariableType::Word | VariableType::SWord => Some(self.as_word().cmp(&other.as_word())),
+                VariableType::Byte => Some(self.as_byte().cmp(&other.as_byte())),
+                VariableType::SByte => Some(self.as_sbyte().cmp(&other.as_sbyte())),
+                VariableType::Word => Some(self.as_word().cmp(&other.as_word())),
+                VariableType::SWord => Some(self.as_sword().cmp(&other.as_sword())),
 
                 VariableType::Password => {
                     // Passwords can only be equal or not equal, no ordering
@@ -876,10 +899,10 @@ impl Neg for VariableValue {
                 dest_type = VariableType::Integer;
             }
             VariableType::String | VariableType::BigStr => {
-                let l = self.as_string().parse::<i32>().unwrap_or_default();
+                let l = self.as_int();
                 return Self {
                     vtype: VariableType::Integer,
-                    data: VariableData::from_int(-l),
+                    data: VariableData::from_int(l.wrapping_neg()),
                     generic_data: GenericVariableData::None,
                 };
             }
@@ -1106,8 +1129,8 @@ impl VariableValue {
                 dest_type = VariableType::Integer;
             }
             VariableType::String | VariableType::BigStr => {
-                let l = self.as_string().parse::<i32>().unwrap_or_default();
-                let r = other.as_string().parse::<i32>().unwrap_or_default();
+                let l = self.as_int();
+                let r = other.as_int();
                 return Self {
                     vtype: VariableType::Integer,
                     data: VariableData::from_int(l.wrapping_pow(r as u32)),
@@ -1184,10 +1207,10 @@ impl VariableValue {
                 dest_type = VariableType::Integer;
             }
             VariableType::String | VariableType::BigStr => {
-                let l = self.as_string().parse::<i32>().unwrap_or_default();
+                let l = self.as_int();
                 return Self {
                     vtype: VariableType::Integer,
-                    data: VariableData::from_int(l.abs()),
+                    data: VariableData::from_int(l.wrapping_abs()),
                     generic_data: GenericVariableData::None,
                 };
             }

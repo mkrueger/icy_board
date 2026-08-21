@@ -61,6 +61,57 @@ fn test_expressions_mixing_arithmetic_and_calls_evaluate_the_same() {
 }
 
 #[test]
+fn test_mixed_strings_and_numbers_promote_to_integer() {
+    let output = run_ppl(
+        r#"
+STRING value
+value = "2"
+PRINTLN value + 1
+PRINTLN 1 + value
+PRINTLN value + value
+PRINTLN value - 1
+PRINTLN value * 3
+PRINTLN value / 2
+PRINTLN value % 2
+PRINTLN value = 2
+PRINTLN value < 10
+INC value
+PRINTLN value
+DEC value
+PRINTLN value
+PRINTLN " 7x" - "2x"
+PRINTLN " 7x" / "2x"
+PRINTLN " 7x" % "2x"
+PRINTLN -" 7x"
+PRINTLN ABS(" -7x")
+"#,
+    );
+
+    assert_eq!(output, "3\n3\n22\n1\n6\n1\n0\n1\n1\n3\n2\n5\n3\n1\n-7\n7\n");
+}
+
+#[test]
+fn test_division_and_modulo_by_zero_answer_zero() {
+    assert_eq!(run_ppl("PRINTLN 7 / 0\nPRINTLN 7 % 0\nPRINTLN \"7\" / \"0\""), "0\n0\n0\n");
+}
+
+#[test]
+fn test_signed_small_integers_compare_as_signed() {
+    let output = run_ppl(
+        r#"
+SBYTE byte_value
+SWORD word_value
+byte_value = -1
+word_value = -1
+PRINTLN byte_value < 1
+PRINTLN word_value < 1
+"#,
+    );
+
+    assert_eq!(output, "1\n1\n");
+}
+
+#[test]
 fn test_function_name_assignment_returns_a_value_in_classic_languages() {
     for language_version in [300, 310, 320, 330, 340] {
         let source = format!(
