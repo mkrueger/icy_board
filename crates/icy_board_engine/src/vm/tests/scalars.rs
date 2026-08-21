@@ -60,6 +60,23 @@ fn test_expressions_mixing_arithmetic_and_calls_evaluate_the_same() {
     assert_eq!(output, "10\n35\n14\n2\n1\n2\n");
 }
 
+#[test]
+fn test_function_name_assignment_returns_a_value_in_classic_languages() {
+    for language_version in [300, 310, 320, 330, 340] {
+        let source = format!(
+            ";$LANGVERSION {language_version}\n\
+             DECLARE FUNCTION LegacyAddOne(INTEGER value) INTEGER\n\
+             PRINT LegacyAddOne(41)\n\
+             END\n\
+             FUNCTION LegacyAddOne(INTEGER value) INTEGER\n\
+               LegacyAddOne = value + 1\n\
+             ENDFUNC\n"
+        );
+
+        assert_eq!(run_ppl(&source), "42", "language version {language_version}");
+    }
+}
+
 /// PCBACCSTAT field 0 answers 0 when accounting is off and 2 when it is on;
 /// `icy_board` has no separate tracking mode, so an enabled system is fully on.
 #[test]
