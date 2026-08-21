@@ -183,6 +183,7 @@ key_desc_edit=Edit
 icb_setup_key_main_help=↑ Up  ↓ Down  F1 Help  ␛ Quit
 icb_setup_key_menu_help=↑ Up  ↓ Down  F1 Help  ␛ Back
 icb_setup_key_menu_edit_help=↑ Up  ↓ Down  F1 Help  F2 Edit this file  ␛ Back
+icb_setup_key_menu_create_help=↑ Up  ↓ Down  F1 Help  F3 Create file  ␛ Back
 icb_setup_key_conf_list_help=↑ Up  ↓ Down  INS New  ␡ Delete  PgUp/Dn Move ␛ Back
 
 icb_setup_main_title=Main Menu

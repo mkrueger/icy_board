@@ -44,7 +44,13 @@ impl ICBConfigMenuUI {
         {
             let path = self.menu.obj.lock().unwrap().resolve_file(path);
             if !path.as_os_str().is_empty() && !path.is_dir() && item.editable() {
-                bottom_text = get_text("icb_setup_key_menu_edit_help");
+                bottom_text = if path.is_file() {
+                    get_text("icb_setup_key_menu_edit_help")
+                } else if can_create_file(&path) {
+                    get_text("icb_setup_key_menu_create_help")
+                } else {
+                    bottom_text
+                };
             }
         }
 
@@ -95,22 +101,27 @@ impl ICBConfigMenuUI {
     pub fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
         if let Some(item) = self.menu.get_item(self.state.selected)
             && let ListValue::Path(path) = &item.value
-            && key.code == crossterm::event::KeyCode::F(2)
             && item.editable()
+            && matches!(key.code, crossterm::event::KeyCode::F(2) | crossterm::event::KeyCode::F(3))
         {
             let path = self.menu.obj.lock().unwrap().resolve_file(path);
             if path.as_os_str().is_empty() {
                 return PageMessage::InfoBox(InfoState::Warning, get_text("no_file_name_given"));
             }
+            if key.code == crossterm::event::KeyCode::F(3) && !path.exists() && can_create_file(&path) {
+                return match create_empty_file(&path) {
+                    Ok(()) => PageMessage::ResultState(self.request_status()),
+                    Err(e) => {
+                        log::error!("Error creating {}: {}", path.display(), e);
+                        PageMessage::InfoBox(InfoState::Error, format!("{}\n\n{}", path.display(), e))
+                    }
+                };
+            }
+            if key.code != crossterm::event::KeyCode::F(2) || !path.is_file() {
+                return PageMessage::ResultState(self.request_status());
+            }
             if let Some(editor) = &item.path_editor {
                 return editor(self.menu.obj.clone(), path);
-            }
-            // A file that is only named in the configuration is created on demand.
-            if !path.exists()
-                && let Err(e) = create_empty_file(&path)
-            {
-                log::error!("Error creating {}: {}", path.display(), e);
-                return PageMessage::InfoBox(InfoState::Error, format!("{}\n\n{}", path.display(), e));
             }
 
             let editor: &String = &self.menu.obj.lock().unwrap().config.sysop.external_editor;
@@ -139,10 +150,44 @@ impl ICBConfigMenuUI {
     }
 }
 
+fn can_create_file(path: &std::path::Path) -> bool {
+    !path.as_os_str().is_empty() && !path.exists() && path.parent().is_some_and(std::path::Path::is_dir)
+}
+
 fn create_empty_file(path: &std::path::Path) -> std::io::Result<()> {
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-    std::fs::File::create(path)?;
+    std::fs::OpenOptions::new().write(true).create_new(true).open(path)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::can_create_file;
+
+    fn test_dir() -> std::path::PathBuf {
+        static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        let id = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let dir = std::env::temp_dir().join(format!("icy-board-tui-file-create-{}-{id}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn a_missing_file_with_an_existing_parent_can_be_created() {
+        let dir = test_dir();
+        assert!(can_create_file(&dir.join("new.txt")));
+    }
+
+    #[test]
+    fn a_file_with_a_missing_parent_cannot_be_created() {
+        let dir = test_dir();
+        assert!(!can_create_file(&dir.join("missing/new.txt")));
+    }
+
+    #[test]
+    fn an_existing_file_is_for_editing_not_creation() {
+        let file = test_dir().join("existing.txt");
+        std::fs::File::create(&file).unwrap();
+        assert!(!can_create_file(&file));
+    }
 }
