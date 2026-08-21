@@ -1,0 +1,252 @@
+;$LANGVERSION 400
+;
+; Escape-time fractals drawn a pixel at a time into a SURFACE.
+;
+; The interesting part is not the mathematics but where the pixels are: the
+; fractal lives on a small surface that the terminal stretches to full size on
+; presentation, so a 160x80 image covers 640x320 of screen without ever sending
+; 640x320 pixels. That upscale is an option of the image APC, so it needs the
+; JPEG XL backend; on Sixel the demo renders at native size instead.
+
+CONST INTEGER VIEW_W = 640
+CONST INTEGER VIEW_H = 320
+CONST INTEGER HUD_H = 56
+CONST INTEGER BAND = 10
+CONST INTEGER PAL_SIZE = 256
+
+CONST INTEGER ZOOM_FRAMES = 10
+CONST INTEGER JULIA_KEYS = 8
+CONST INTEGER JULIA_STEPS = 12
+
+; Seahorse valley, the classic place to zoom into.
+CONST DOUBLE TARGET_X = -0.743643887
+CONST DOUBLE TARGET_Y = 0.131825904
+
+CONST UNSIGNED C_INSIDE = Rgb(6, 4, 18)
+CONST UNSIGNED C_HUD = Rgb(18, 16, 28)
+CONST UNSIGNED C_HUD_EDGE = Rgb(70, 66, 92)
+CONST UNSIGNED C_BAR = Rgb(240, 180, 60)
+
+UNSIGNED palette(255)
+DOUBLE jcx(7), jcy(7)
+
+; Chosen at startup: a scaling terminal gets a small surface, everything else
+; pays for the pixels it shows.
+INTEGER fracW, fracH, zoom, hudY
+SURFACE frac, hud
+
+INTEGER frame, step, keyIndex, nextIndex, maxIter
+DOUBLE scale, cx, cy, u
+
+BuildPalette()
+BuildJuliaTour()
+
+CLS
+PRINTLN "Starting PPE Fractal..."
+
+GfxInit GFX_AUTO
+IF GfxBackend() = GFX_NONE THEN
+    CLS
+    PRINTLN "PPE Fractal requires a graphics-capable terminal."
+    EXIT
+ENDIF
+
+IF GfxBackend() = GFX_JXL THEN
+    fracW = 160
+    fracH = 80
+    zoom = 4
+ELSE
+    ; Sixel cannot scale on presentation, so the surface is the display size.
+    fracW = 320
+    fracH = 160
+    zoom = 1
+ENDIF
+hudY = fracH * zoom + 8
+
+frac = NewSurface(fracW, fracH)
+hud = NewSurface(VIEW_W, HUD_H)
+IF !frac.Valid | !hud.Valid THEN
+    GfxShutdown
+    CLS
+    PRINTLN "Could not allocate the drawing surfaces."
+    EXIT
+ENDIF
+
+; Zoom into the Mandelbrot set, sharpening as the view narrows.
+scale = 1.25
+FOR frame = 0 TO ZOOM_FRAMES - 1
+    maxIter = 48 + frame * 8
+    DrawHud(frame + 1, ZOOM_FRAMES)
+    RenderMandel(TARGET_X, TARGET_Y, scale, maxIter)
+    scale = scale * 0.62
+    IF InKey() <> "" GOTO Finished
+NEXT frame
+
+; Then tour a few Julia constants, interpolating between them.
+keyIndex = 0
+WHILE TRUE DO
+    nextIndex = keyIndex + 1
+    IF nextIndex >= JULIA_KEYS nextIndex = 0
+    FOR step = 0 TO JULIA_STEPS - 1
+        u = step * 1.0 / JULIA_STEPS
+        cx = jcx[keyIndex] + (jcx[nextIndex] - jcx[keyIndex]) * u
+        cy = jcy[keyIndex] + (jcy[nextIndex] - jcy[keyIndex]) * u
+        DrawHud(step + 1, JULIA_STEPS)
+        RenderJulia(cx, cy, 40)
+        GfxWaitFrame 12
+        IF InKey() <> "" GOTO Finished
+    NEXT step
+    keyIndex = nextIndex
+ENDWHILE
+
+:Finished
+frac.Free()
+hud.Free()
+GfxShutdown
+CLS
+PRINTLN "@X0BPPE Fractal@X07 - surfaces, per-pixel drawing and scaled presentation."
+
+; --------------------------------------------------------------------------
+
+PROCEDURE RenderMandel(DOUBLE centerX, DOUBLE centerY, DOUBLE half, INTEGER maxIter)
+    INTEGER px, py, i, bandTop, pending
+    DOUBLE zx, zy, ax, ay, t, stepSize, minX, minY
+
+    ; The viewport is twice as wide as it is tall, so one step serves both axes.
+    stepSize = half * 2.0 / fracH
+    minX = centerX - half * 2.0
+    minY = centerY - half
+
+    bandTop = 0
+    pending = 0
+    FOR py = 0 TO fracH - 1
+        ay = minY + py * stepSize
+        FOR px = 0 TO fracW - 1
+            ax = minX + px * stepSize
+            zx = 0.0
+            zy = 0.0
+            i = 0
+            WHILE i < maxIter & zx * zx + zy * zy < 4.0 DO
+                t = zx * zx - zy * zy + ax
+                zy = 2.0 * zx * zy + ay
+                zx = t
+                i += 1
+            ENDWHILE
+            PlotEscape(px, py, i, maxIter)
+        NEXT px
+        pending += 1
+        ; A slow frame is worth watching arrive, so each band goes out as it is
+        ; finished instead of after the whole image.
+        IF pending = BAND THEN
+            PresentBand(bandTop, pending)
+            bandTop = py + 1
+            pending = 0
+        ENDIF
+    NEXT py
+    IF pending > 0 PresentBand(bandTop, pending)
+ENDPROC
+
+PROCEDURE RenderJulia(DOUBLE constX, DOUBLE constY, INTEGER maxIter)
+    INTEGER px, py, i
+    DOUBLE zx, zy, t, stepSize, minX, minY
+
+    stepSize = 1.3 * 2.0 / fracH
+    minX = 0.0 - 1.3 * 2.0
+    minY = 0.0 - 1.3
+
+    FOR py = 0 TO fracH - 1
+        FOR px = 0 TO fracW - 1
+            zx = minX + px * stepSize
+            zy = minY + py * stepSize
+            i = 0
+            WHILE i < maxIter & zx * zx + zy * zy < 4.0 DO
+                t = zx * zx - zy * zy + constX
+                zy = 2.0 * zx * zy + constY
+                zx = t
+                i += 1
+            ENDWHILE
+            PlotEscape(px, py, i, maxIter)
+        NEXT px
+    NEXT py
+    PresentBand(0, fracH)
+ENDPROC
+
+PROCEDURE PlotEscape(INTEGER px, INTEGER py, INTEGER i, INTEGER maxIter)
+    IF i >= maxIter THEN
+        frac.SetPixel(px, py, C_INSIDE)
+    ELSE
+        frac.SetPixel(px, py, palette[i * (PAL_SIZE - 1) / maxIter])
+    ENDIF
+ENDPROC
+
+; Sends rows y0..y0+h-1, stretched by `zoom` if the terminal can do it for us.
+PROCEDURE PresentBand(INTEGER y0, INTEGER h)
+    IF zoom = 1 THEN
+        frac.PresentRect(0, y0, fracW, h, 0, y0)
+    ELSE
+        frac.PresentRect(0, y0, fracW, h, 0, y0 * zoom, fracW * zoom, h * zoom)
+    ENDIF
+ENDPROC
+
+PROCEDURE DrawHud(INTEGER done, INTEGER total)
+    INTEGER i, x, w, barW
+    hud.Clear(C_HUD)
+    hud.Rect(0, 0, VIEW_W, HUD_H, C_HUD_EDGE)
+
+    ; The palette itself, so the colouring is part of the picture.
+    FOR i = 0 TO PAL_SIZE - 1
+        x = i * (VIEW_W - 32) / PAL_SIZE + 16
+        hud.FillRect(x, 12, 4, 16, palette[i])
+    NEXT i
+
+    barW = VIEW_W - 32
+    hud.Rect(16, 36, barW, 10, C_HUD_EDGE)
+    w = done * (barW - 2) / total
+    IF w > 0 hud.FillRect(17, 37, w, 8, C_BAR)
+    hud.PresentRect(0, 0, VIEW_W, HUD_H, 0, hudY)
+ENDPROC
+
+PROCEDURE BuildPalette()
+    INTEGER i, r, g, b, t
+    FOR i = 0 TO PAL_SIZE - 1
+        IF i < 96 THEN
+            ; Night blue climbing out of black.
+            t = i * 255 / 95
+            r = t * 60 / 255
+            g = t * 90 / 255
+            b = 40 + t * 200 / 255
+        ELSEIF (i < 176) THEN
+            ; Blue burning through to orange.
+            t = (i - 96) * 255 / 79
+            r = 60 + t * 195 / 255
+            g = 90 + t * 75 / 255
+            b = 240 - t * 190 / 255
+        ELSE
+            ; Orange bleaching to white.
+            t = (i - 176) * 255 / 79
+            r = 255
+            g = 165 + t * 90 / 255
+            b = 50 + t * 205 / 255
+        ENDIF
+        palette[i] = Rgb(r, g, b)
+    NEXT i
+ENDPROC
+
+PROCEDURE BuildJuliaTour()
+    jcx[0] = -0.4
+    jcy[0] = 0.6
+    jcx[1] = 0.285
+    jcy[1] = 0.01
+    jcx[2] = -0.8
+    jcy[2] = 0.156
+    jcx[3] = -0.7269
+    jcy[3] = 0.1889
+    jcx[4] = 0.35
+    jcy[4] = 0.35
+    jcx[5] = -0.235125
+    jcy[5] = 0.827215
+    jcx[6] = -0.70176
+    jcy[6] = -0.3842
+    jcx[7] = 0.0
+    jcy[7] = 0.8
+ENDPROC

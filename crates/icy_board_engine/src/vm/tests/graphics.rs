@@ -448,6 +448,38 @@ fn gfx_cache_name(png: &[u8]) -> String {
     format!("gfx/{}.jxl", &format!("{:x}", Sha256::digest(&encoded))[..32])
 }
 
+/// Shrunk to one zoom frame at a coarse resolution: the point is that the demo
+/// runs, not that it looks like anything at this size.
+fn fractal_source(backend: &str) -> String {
+    include_str!("../../../../../ppe/fractal/src/fractal.pps")
+        .replace("GfxInit GFX_AUTO", &format!("GfxInit {backend}"))
+        .replace("CONST INTEGER ZOOM_FRAMES = 10", "CONST INTEGER ZOOM_FRAMES = 1")
+        .replace("    fracW = 160\n    fracH = 80", "    fracW = 16\n    fracH = 8")
+        .replace("    fracW = 320\n    fracH = 160", "    fracW = 16\n    fracH = 8")
+        .replace("WHILE TRUE DO", "WHILE FALSE DO")
+}
+
+#[test]
+fn the_fractal_demo_asks_the_terminal_to_scale_its_small_surface() {
+    let output = super::run_ppl_with_input(&fractal_source("GFX_AUTO"), JXL_TERMINAL);
+
+    // 16x8 pixels of fractal covering the 64x32 the viewport scales it to.
+    assert!(output.contains("SyncTERM:C;DrawJXLBlob;DX=0;DY=0;DW=64;DH=32;"), "{output:?}");
+    assert!(output.contains("surfaces, per-pixel drawing"), "{output:?}");
+}
+
+#[test]
+fn the_fractal_demo_renders_at_native_size_when_the_terminal_cannot_scale() {
+    let output = run_ppl(&fractal_source("GFX_AUTO"));
+
+    // No backend at all: the demo says so instead of drawing.
+    assert!(output.contains("requires a graphics-capable terminal"), "{output:?}");
+
+    let output = run_ppl(&fractal_source("GFX_SIXEL"));
+    assert!(output.contains("\x1bP"), "{output:?}");
+    assert!(output.contains("surfaces, per-pixel drawing"), "{output:?}");
+}
+
 #[test]
 fn tetris_initializes_and_renders_without_leaking_call_frames() {
     let source = include_str!("../../../../../ppe/tetris/src/tetris.pps")
