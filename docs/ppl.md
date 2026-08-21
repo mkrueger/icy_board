@@ -9,7 +9,7 @@ toolchain that was missing from the original ecosystem:
 | Icy Board runtime | Runs existing PPEs against the board APIs callers and scripts expect. |
 | `pplc` | Compiles a `.pps` source or a `ppl.toml` project to PPE. |
 | `ppld` | Decompiles and disassembles PPEs, including old anti-decompiler patterns. |
-| `icyboard-ppl` | Diagnostics, completion, hover, signatures, navigation, references and formatting over LSP. |
+| `ppl-lsp` | Diagnostics, completion, hover, signatures, navigation, references and formatting over LSP. |
 | `tree-sitter-ppl` | Highlighting, locals, folding, indentation and syntax trees for editors. |
 
 Existing PPEs that use documented PPL and PCBoard APIs are expected to run. A

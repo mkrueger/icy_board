@@ -9,7 +9,7 @@ use icy_board_engine::{
     parser::{Encoding, ErrorReporter, UserTypeRegistry, parse_ast},
     semantic::SemanticVisitor,
 };
-use icyboard_ppl::semantic_tokens::get_semantic_tokens;
+use ppl_lsp::semantic_tokens::get_semantic_tokens;
 use ropey::Rope;
 
 const KEYWORD: u32 = 0;

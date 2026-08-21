@@ -1,5 +1,5 @@
 [package]
-name = "icyboard-ppl"
+name = "ppl-lsp"
 version = '0.2.0'
 edition = "2024"
 

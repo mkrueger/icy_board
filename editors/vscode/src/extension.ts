@@ -11,14 +11,14 @@ let client: LanguageClient | undefined;
 /// The server is looked for where the user said, then in the environment, then
 /// in the extension itself, then on the PATH.
 function serverCommand(context: vscode.ExtensionContext): string {
-  const configured = binary("icyboard-ppl");
-  if (configured !== "icyboard-ppl") {
+  const configured = binary("ppl-lsp");
+  if (configured !== "ppl-lsp") {
     return configured;
   }
   if (process.env.SERVER_PATH) {
     return process.env.SERVER_PATH;
   }
-  const name = process.platform === "win32" ? "icyboard-ppl.exe" : "icyboard-ppl";
+  const name = process.platform === "win32" ? "ppl-lsp.exe" : "ppl-lsp";
   const bundled = vscode.Uri.joinPath(context.extensionUri, "server", name).fsPath;
   if (fs.existsSync(bundled)) {
     // A vsix is a zip, and not every unpacker keeps the executable bit.
@@ -31,16 +31,16 @@ function serverCommand(context: vscode.ExtensionContext): string {
     }
     return bundled;
   }
-  return "icyboard-ppl";
+  return "ppl-lsp";
 }
 
 export async function activate(context: vscode.ExtensionContext) {
   const output = vscode.window.createOutputChannel("IcyBoard PPL");
   const traceOutputChannel = vscode.window.createOutputChannel("PPL Language Server trace");
   context.subscriptions.push(output, traceOutputChannel);
-  context.subscriptions.push(vscode.commands.registerCommand("icyboard-ppl.run", () => runPpe(output)));
+  context.subscriptions.push(vscode.commands.registerCommand("ppl-lsp.run", () => runPpe(output)));
   context.subscriptions.push(
-    vscode.commands.registerCommand("icyboard-ppl.runFile", () => runPpe(output, { singleFile: true })),
+    vscode.commands.registerCommand("ppl-lsp.runFile", () => runPpe(output, { singleFile: true })),
   );
 
   const command = serverCommand(context);
@@ -51,7 +51,7 @@ export async function activate(context: vscode.ExtensionContext) {
     traceOutputChannel,
   };
 
-  client = new LanguageClient("icyboard-ppl", "IcyBoard PPL language server", serverOptions, clientOptions);
+  client = new LanguageClient("ppl-lsp", "IcyBoard PPL language server", serverOptions, clientOptions);
   context.subscriptions.push(client);
 
   try {

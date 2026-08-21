@@ -164,14 +164,14 @@ Program            Purpose
 ``icbmailer``       FTN mail scanning, polling and tossing
 ``pplc``            PPL compiler, package builder and formatter
 ``ppld``            PPE decompiler and compatibility checker
-``icyboard-ppl``    PPL language server for editors
+``ppl-lsp``    PPL language server for editors
 =================  ============================================================
 
 PPL editor support
 ------------------
 
 Editor support consists of a grammar for highlighting, folding and indentation,
-plus the ``icyboard-ppl`` language server for diagnostics, completion, hover,
+plus the ``ppl-lsp`` language server for diagnostics, completion, hover,
 signature help, definitions and references.
 
 * **VS Code:** install the platform-specific ``.vsix`` from the IcyBoard release.
@@ -180,5 +180,5 @@ signature help, definitions and references.
   https://github.com/mkrueger/zed-ppl as a development extension.
 * **Helix and Neovim:** from a source checkout, run
   ``tools/setup-editor.sh helix`` or ``tools/setup-editor.sh neovim``.
-* **Other LSP editors:** run ``icyboard-ppl`` over standard input/output for
+* **Other LSP editors:** run ``ppl-lsp`` over standard input/output for
   ``.pps`` files. The server takes no arguments.

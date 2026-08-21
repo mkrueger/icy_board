@@ -131,7 +131,7 @@ Icy Board includes a comprehensive suite of tools for BBS management and develop
 * ``icbsm`` - System manager utility (user/group editor)
 * ``icbfile`` - File-base maintenance and import
 * ``icbmailer`` - FTN mail scanning, polling and tossing
-* ``icyboard-ppl`` - PPL language server for editors
+* ``ppl-lsp`` - PPL language server for editors
 
 Directory Layout
 ~~~~~~~~~~~~~~~~

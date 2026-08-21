@@ -22,7 +22,7 @@ From a checkout of the repository:
 
    tools/setup-editor.sh
 
-That builds and installs ``icyboard-ppl``, and sets up every editor it
+That builds and installs ``ppl-lsp``, and sets up every editor it
 finds: the parser and the queries land where Helix and Neovim look for them, and
 the configuration is written unless there already is one. Run it again after
 pulling; it leaves anything you changed alone.
@@ -69,7 +69,7 @@ Download the ``icyboard-ppl-X.X.X.vsix`` for your platform from
 drag it onto the VS Code window, or open it from ``Extensions: Install from
 VSIX``.
 
-The platform packages already contain the ``icyboard-ppl`` binary. The package
+The platform packages already contain the ``ppl-lsp`` binary. The package
 without a platform in its name needs it on the PATH -
 ``tools/setup-editor.sh server`` does that - or in the
 ``icyboardPpl.serverPath`` setting. If it cannot be found, the extension says so
@@ -98,8 +98,8 @@ Add to ``~/.config/helix/languages.toml``:
 
 .. code-block:: toml
 
-   [language-server.icyboard-ppl]
-   command = "icyboard-ppl"
+   [language-server.ppl-lsp]
+   command = "ppl-lsp"
 
    [[language]]
    name = "ppl"
@@ -108,7 +108,7 @@ Add to ``~/.config/helix/languages.toml``:
    file-types = ["pps"]
    comment-token = ";"
    indent = { tab-width = 4, unit = "    " }
-   language-servers = ["icyboard-ppl"]
+   language-servers = ["ppl-lsp"]
    roots = ["ppl.toml"]
 
 **Step 3: check**
@@ -122,7 +122,7 @@ which should answer:
 .. code-block:: text
 
    Configured language servers:
-   ✓ icyboard-ppl: /home/you/.cargo/bin/icyboard-ppl
+   ✓ ppl-lsp: /home/you/.cargo/bin/ppl-lsp
    Tree-sitter parser: ✓
    Highlight queries: ✓
    Textobject queries: ✓
@@ -148,8 +148,8 @@ writes two small files, unless you already have them:
    vim.treesitter.start()
    vim.bo.commentstring = "; %s"
    vim.lsp.start({
-      name = "icyboard-ppl",
-      cmd = { "icyboard-ppl" },
+      name = "ppl-lsp",
+      cmd = { "ppl-lsp" },
        root_dir = vim.fs.root(0, { "ppl.toml", ".git" }),
    })
 

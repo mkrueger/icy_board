@@ -53,7 +53,7 @@
 					"type": "string",
 					"scope": "machine-overridable",
 					"default": "",
-					"markdownDescription": "The directory holding the IcyBoard programs - `icyboard-ppl`, `pplc` and `icboard`. Leave empty for the server that ships with the extension and the rest from your PATH."
+					"markdownDescription": "The directory holding the IcyBoard programs - `ppl-lsp`, `pplc` and `icboard`. Leave empty for the server that ships with the extension and the rest from your PATH."
 				},
 				"icyboard-ppl.trace.server": {
 					"type": "string",

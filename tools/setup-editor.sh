@@ -29,11 +29,11 @@ fail() {
 install_server() {
     command -v cargo >/dev/null 2>&1 || fail "cargo is needed to build the language server - see https://rustup.rs"
 
-    say "Building and installing icyboard-ppl ..."
+    say "Building and installing ppl-lsp ..."
     cargo install --path "$root/crates/ppl-lsp" --quiet
-    say "Installed icyboard-ppl in ${CARGO_HOME:-$HOME/.cargo}/bin"
+    say "Installed ppl-lsp in ${CARGO_HOME:-$HOME/.cargo}/bin"
 
-    if ! command -v icyboard-ppl >/dev/null 2>&1; then
+    if ! command -v ppl-lsp >/dev/null 2>&1; then
         note "That directory is not in your PATH yet. Add it, or point your editor at the binary."
     fi
     say ""
@@ -78,8 +78,8 @@ install_helix() {
         [ -f "$languages" ] && cp "$languages" "$languages.backup"
         cat >>"$languages" <<'TOML'
 
-[language-server.icyboard-ppl]
-command = "icyboard-ppl"
+[language-server.ppl-lsp]
+command = "ppl-lsp"
 
 [[language]]
 name = "ppl"
@@ -88,7 +88,7 @@ injection-regex = "^ppl$"
 file-types = ["pps"]
 comment-token = ";"
 indent = { tab-width = 4, unit = "    " }
-language-servers = ["icyboard-ppl"]
+language-servers = ["ppl-lsp"]
 roots = ["ppl.toml"]
 TOML
         note "wrote  $languages"
@@ -133,8 +133,8 @@ LUA
 vim.treesitter.start()
 vim.bo.commentstring = "; %s"
 vim.lsp.start({
-    name = "icyboard-ppl",
-    cmd = { "icyboard-ppl" },
+    name = "ppl-lsp",
+    cmd = { "ppl-lsp" },
     root_dir = vim.fs.root(0, { "ppl.toml", ".git" }),
 })
 LUA

@@ -30,7 +30,7 @@ pub struct Server {
 
 impl Server {
     pub fn start() -> Self {
-        let mut child = Command::new(env!("CARGO_BIN_EXE_icyboard-ppl"))
+        let mut child = Command::new(env!("CARGO_BIN_EXE_ppl-lsp"))
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())

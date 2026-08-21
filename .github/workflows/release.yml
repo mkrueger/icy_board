@@ -76,34 +76,34 @@ jobs:
           case "$TARGET" in *windows*) suffix=".exe";; esac
 
           mkdir -p bin
-          for tool in icboard icbsetup icbsm icbfile icbmailer mkicbmnu mkicbtxt pplc ppld icyboard-ppl; do
+          for tool in icboard icbsetup icbsm icbfile icbmailer mkicbmnu mkicbtxt pplc ppld ppl-lsp; do
             cp "target/$TARGET/release/$tool$suffix" bin/
           done
           sed "s/#VERSION/$TAG/g" data/file_id.diz > file_id.diz
 
           echo "ARCHIVE=${{ matrix.archive }}_$TAG.zip" >> "$GITHUB_ENV"
-          echo "SERVER=target/$TARGET/release/icyboard-ppl$suffix" >> "$GITHUB_ENV"
+          echo "SERVER=target/$TARGET/release/ppl-lsp$suffix" >> "$GITHUB_ENV"
 
       - name: Pack it
         if: matrix.os != 'windows-latest'
         shell: bash
         run: |
           zip -r "$ARCHIVE" bin file_id.diz INSTALL.md LICENSE
-          tar -czf "icyboard-ppl-${{ matrix.target }}.tar.gz" -C "target/${{ matrix.target }}/release" icyboard-ppl
+          tar -czf "ppl-lsp-${{ matrix.target }}.tar.gz" -C "target/${{ matrix.target }}/release" ppl-lsp
 
       - name: Pack it
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
           Compress-Archive -Path bin, file_id.diz, INSTALL.md, LICENSE -DestinationPath "$env:ARCHIVE"
-          Compress-Archive -Path "target\${{ matrix.target }}\release\icyboard-ppl.exe" -DestinationPath "icyboard-ppl-${{ matrix.target }}.zip"
+          Compress-Archive -Path "target\${{ matrix.target }}\release\ppl-lsp.exe" -DestinationPath "ppl-lsp-${{ matrix.target }}.zip"
 
       - name: Attach it to the release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
-        run: gh release upload "$TAG" "$ARCHIVE" icyboard-ppl-${{ matrix.target }}.* --repo "$REPO" --clobber
+        run: gh release upload "$TAG" "$ARCHIVE" ppl-lsp-${{ matrix.target }}.* --repo "$REPO" --clobber
 
       # The VS Code packages carry the server that belongs to their platform.
       - uses: actions/upload-artifact@v4
@@ -149,10 +149,10 @@ jobs:
             chmod +x server/*
             pnpm exec vsce package --no-dependencies --target "$1"
           }
-          package linux-x64    x86_64-unknown-linux-gnu icyboard-ppl
-          package win32-x64    x86_64-pc-windows-msvc   icyboard-ppl.exe
-          package darwin-arm64 aarch64-apple-darwin     icyboard-ppl
-          package darwin-x64   x86_64-apple-darwin      icyboard-ppl
+          package linux-x64    x86_64-unknown-linux-gnu ppl-lsp
+          package win32-x64    x86_64-pc-windows-msvc   ppl-lsp.exe
+          package darwin-arm64 aarch64-apple-darwin     ppl-lsp
+          package darwin-x64   x86_64-apple-darwin      ppl-lsp
 
           # And one for everyone else, which asks for a server on the PATH.
           rm -rf server

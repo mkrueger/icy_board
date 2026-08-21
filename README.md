@@ -158,7 +158,7 @@ Icy Board is a small suite rather than one oversized executable:
 | `mkicbtxt`, `mkicbmnu` | System-text and menu editors |
 | `icbfile` | Import and maintain file areas |
 | `icbmailer` | FTN scan, poll and toss |
-| `pplc`, `ppld`, `icyboard-ppl` | PPL compiler, decompiler and language server |
+| `pplc`, `ppld`, `ppl-lsp` | PPL compiler, decompiler and language server |
 
 ## Documentation
 
@@ -184,14 +184,14 @@ compatibility references and PPL/tooling material. Common starting points:
 
 PPL has editor support for VS Code, Zed, Helix and Neovim. Highlighting comes
 from the [tree-sitter grammar](crates/tree-sitter-ppl), while diagnostics,
-completion, hover and navigation come from the `icyboard-ppl` language server.
+completion, hover and navigation come from the `ppl-lsp` language server.
 
 | Editor | How it is installed |
 | :--- | :--- |
 | [VS Code](editors/vscode) | `code --install-extension icyboard-ppl-<version>-<platform>.vsix`, taken from a [release](https://github.com/mkrueger/icy_board/releases). The platform packages carry the server. |
 | [Zed](https://github.com/mkrueger/zed-ppl) | Clone the extension and run `zed: install dev extension` on the clone. It fetches the server from the newest release by itself. |
 | Helix, Neovim | `tools/setup-editor.sh` from a source checkout builds the grammar and the server and writes the configuration. |
-| Anything else with LSP | Point it at `icyboard-ppl` for `.pps`; it talks over stdio and takes no arguments. |
+| Anything else with LSP | Point it at `ppl-lsp` for `.pps`; it talks over stdio and takes no arguments. |
 
 [Editor installation](INSTALL.md#ppl-in-your-editor) has the details, and the
 [PPL editor overview](docs/ppl.md#editors) shows the same project in VS Code,

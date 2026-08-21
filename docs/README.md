@@ -40,7 +40,7 @@ under DOSBox as an oracle; see [`compat/README.md`](../compat/README.md).
 | [PPE format](ppe_format.md) | Binary format reference for tooling authors. |
 
 PPL editor support consists of the tree-sitter grammar for syntax and the
-`icyboard-ppl` language server for diagnostics, completion, hover, navigation,
+`ppl-lsp` language server for diagnostics, completion, hover, navigation,
 references and formatting. [Installation](../INSTALL.md#ppl-in-your-editor)
 contains the setup for VS Code, Zed, Helix and Neovim.
 

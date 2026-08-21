@@ -18,16 +18,16 @@ use icy_board_engine::parser::{
     Encoding, ErrorReporter, ParserErrorType, ParserWarningType, UserTypeRegistry, parse_ast_with_predeclared_types, preparse_type_declarations,
 };
 use icy_board_engine::semantic::{FunctionDeclaration, ReferenceType, SemanticVisitor};
-use icyboard_ppl::completion::get_completion;
-use icyboard_ppl::document_symbol::get_document_symbols;
-use icyboard_ppl::documentation::{get_const_hover, get_function_hover, get_statement_hover, get_type_hover};
-use icyboard_ppl::formatting::VSCodeFormattingBackend;
-use icyboard_ppl::hover::get_user_hover;
-use icyboard_ppl::jump_definition::get_definition;
-use icyboard_ppl::reference::get_reference;
-use icyboard_ppl::semantic_tokens::{get_semantic_tokens, legend_modifiers, legend_types};
-use icyboard_ppl::signature_help::get_signature_help;
-use icyboard_ppl::{line_before_cursor, offset_to_position, position_to_offset};
+use ppl_lsp::completion::get_completion;
+use ppl_lsp::document_symbol::get_document_symbols;
+use ppl_lsp::documentation::{get_const_hover, get_function_hover, get_statement_hover, get_type_hover};
+use ppl_lsp::formatting::VSCodeFormattingBackend;
+use ppl_lsp::hover::get_user_hover;
+use ppl_lsp::jump_definition::get_definition;
+use ppl_lsp::reference::get_reference;
+use ppl_lsp::semantic_tokens::{get_semantic_tokens, legend_modifiers, legend_types};
+use ppl_lsp::signature_help::get_signature_help;
+use ppl_lsp::{line_before_cursor, offset_to_position, position_to_offset};
 use ropey::Rope;
 use serde_json::Value;
 use tower_lsp::jsonrpc::Result;

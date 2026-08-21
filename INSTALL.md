@@ -79,7 +79,7 @@ about.
 | `icbfile` | Brings a file base into shape - see [icbfile](docs/icbfile.md). |
 | `icbmailer` | FTN mail: scan, poll and toss. |
 | `pplc`, `ppld` | PPL compiler and decompiler - see [PPL](docs/ppl.md). |
-| `icyboard-ppl` | The PPL language server, for the editor support below. |
+| `ppl-lsp` | The PPL language server, for the editor support below. |
 
 ## PPL in your editor
 
@@ -87,7 +87,7 @@ Editor support is two separate pieces, and most editors want both:
 
 - a **tree-sitter grammar** for syntax highlighting, folding, indentation and
   the outline
-- the **language server** `icyboard-ppl` for diagnostics, completion, hover,
+- the **language server** `ppl-lsp` for diagnostics, completion, hover,
   signature help, go to definition and references
 
 `.pps` is the source extension. Which piece an editor needs, and how it gets it,
@@ -98,7 +98,7 @@ differs:
 | VS Code | in the extension | in the extension, or from `PATH` |
 | Zed | built by the editor | downloaded by the extension |
 | Helix, Neovim | built once, locally | configured by hand or by the script |
-| Anything else with LSP | not available | run `icyboard-ppl` over stdio |
+| Anything else with LSP | not available | run `ppl-lsp` over stdio |
 
 ### VS Code
 
@@ -111,7 +111,7 @@ code --install-extension icyboard-ppl-<version>-<platform>.vsix
 
 The Extensions view does the same through *Install from VSIX...* in its `...`
 menu. The platform packages carry the server; the package without a platform in
-its name expects `icyboard-ppl` on your `PATH`.
+its name expects `ppl-lsp` on your `PATH`.
 
 [![A PPL project in VS Code](assets/editor_vscode.png)](assets/editor_vscode.png)
 
@@ -134,7 +134,7 @@ has to be there; the first build takes a few seconds.
 
 Open a `.pps` file afterwards. The grammar highlights it, and the language server
 is fetched from the newest IcyBoard release when it is first needed. An
-`icyboard-ppl` on your `PATH` is taken instead, so a local build wins over the
+`ppl-lsp` on your `PATH` is taken instead, so a local build wins over the
 downloaded one.
 
 [![PPL diagnostics in Zed](assets/editor_zed.png)](assets/editor_zed.png)
@@ -159,13 +159,13 @@ to, for anyone who would rather do it by hand.
 
 [![PPL completion in Helix](assets/editor_helix.png)](assets/editor_helix.png)
 
-Helix shows completion details from `icyboard-ppl` while its tree-sitter grammar
+Helix shows completion details from `ppl-lsp` while its tree-sitter grammar
 handles highlighting, indentation, folding and text objects.
 
 ### Other editors
 
 Anything that speaks LSP can use the server directly. It talks over stdio and
-takes no arguments, so an entry naming the `icyboard-ppl` binary for `.pps`
+takes no arguments, so an entry naming the `ppl-lsp` binary for `.pps`
 files is all it needs.
 
 ## Where to read on

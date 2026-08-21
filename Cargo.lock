@@ -4343,27 +4343,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "icyboard-ppl"
-version = "0.2.0"
-dependencies = [
- "dashmap 6.2.1",
- "env_logger",
- "i18n-embed",
- "i18n-embed-fl",
- "icy_board_engine",
- "log",
- "once_cell",
- "ropey",
- "rust-embed",
- "serde",
- "serde_json",
- "thiserror 2.0.20",
- "tokio",
- "tower-lsp",
- "unicase",
-]
-
-[[package]]
 name = "ident_case"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7139,6 +7118,27 @@ name = "powerfmt"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "439ee305def115ba05938db6eb1644ff94165c5ab5e9420d1c1bcedbba909391"
+
+[[package]]
+name = "ppl-lsp"
+version = "0.2.0"
+dependencies = [
+ "dashmap 6.2.1",
+ "env_logger",
+ "i18n-embed",
+ "i18n-embed-fl",
+ "icy_board_engine",
+ "log",
+ "once_cell",
+ "ropey",
+ "rust-embed",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "tokio",
+ "tower-lsp",
+ "unicase",
+]
 
 [[package]]
 name = "pplc"

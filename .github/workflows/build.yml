@@ -33,7 +33,7 @@ jobs:
        mv target/release/mkicbtxt bin
        mv target/release/pplc bin
        mv target/release/ppld bin
-       mv target/release/icyboard-ppl bin
+       mv target/release/ppl-lsp bin
    - name: 'Upload zip'
      uses: actions/upload-artifact@v4
      with:
@@ -48,7 +48,7 @@ jobs:
          bin/mkicbtxt
          bin/pplc
          bin/ppld
-         bin/icyboard-ppl
+         bin/ppl-lsp
          file_id.diz
          INSTALL.md
   build_windows:
@@ -77,7 +77,7 @@ jobs:
        move target/release/mkicbtxt.exe bin
        move target/release/pplc.exe bin
        move target/release/ppld.exe bin
-       move target/release/icyboard-ppl.exe bin
+       move target/release/ppl-lsp.exe bin
    - name: 'Upload zip'
      uses: actions/upload-artifact@v4
      with:
@@ -92,7 +92,7 @@ jobs:
          bin/mkicbtxt.exe
          bin/pplc.exe
          bin/ppld.exe
-         bin/icyboard-ppl.exe
+         bin/ppl-lsp.exe
          file_id.diz
          INSTALL.md
   build_mac:
@@ -126,7 +126,7 @@ jobs:
         mv target/aarch64-apple-darwin/release/mkicbtxt aarch64-apple-darwin/bin
         mv target/aarch64-apple-darwin/release/pplc aarch64-apple-darwin/bin
         mv target/aarch64-apple-darwin/release/ppld aarch64-apple-darwin/bin
-        mv target/aarch64-apple-darwin/release/icyboard-ppl aarch64-apple-darwin/bin
+        mv target/aarch64-apple-darwin/release/ppl-lsp aarch64-apple-darwin/bin
 
        mkdir -p x86_64-apple-darwin/bin
         mv target/x86_64-apple-darwin/release/icboard x86_64-apple-darwin/bin
@@ -138,7 +138,7 @@ jobs:
         mv target/x86_64-apple-darwin/release/mkicbtxt x86_64-apple-darwin/bin
         mv target/x86_64-apple-darwin/release/pplc x86_64-apple-darwin/bin
         mv target/x86_64-apple-darwin/release/ppld x86_64-apple-darwin/bin
-        mv target/x86_64-apple-darwin/release/icyboard-ppl x86_64-apple-darwin/bin
+        mv target/x86_64-apple-darwin/release/ppl-lsp x86_64-apple-darwin/bin
 
    - name: 'Upload zip'
      uses: actions/upload-artifact@v4
@@ -154,7 +154,7 @@ jobs:
          aarch64-apple-darwin/bin/mkicbtxt
          aarch64-apple-darwin/bin/pplc
          aarch64-apple-darwin/bin/ppld
-         aarch64-apple-darwin/bin/icyboard-ppl
+         aarch64-apple-darwin/bin/ppl-lsp
          file_id.diz
          INSTALL.md
    - name: 'Upload zip'
@@ -171,7 +171,7 @@ jobs:
          x86_64-apple-darwin/bin/mkicbtxt
          x86_64-apple-darwin/bin/pplc
          x86_64-apple-darwin/bin/ppld
-         x86_64-apple-darwin/bin/icyboard-ppl
+         x86_64-apple-darwin/bin/ppl-lsp
          file_id.diz
          INSTALL.md
   build_vs_extension:
@@ -218,10 +218,10 @@ jobs:
          chmod +x server/*
          pnpm exec vsce package --no-dependencies --target "$1"
        }
-       package linux-x64    '*icy_board_linux_*/bin/icyboard-ppl'
-       package win32-x64    '*icy_board_windows_*/bin/icyboard-ppl.exe'
-       package darwin-arm64 '*aarch64-apple-darwin/bin/icyboard-ppl'
-       package darwin-x64   '*x86_64-apple-darwin/bin/icyboard-ppl'
+       package linux-x64    '*icy_board_linux_*/bin/ppl-lsp'
+       package win32-x64    '*icy_board_windows_*/bin/ppl-lsp.exe'
+       package darwin-arm64 '*aarch64-apple-darwin/bin/ppl-lsp'
+       package darwin-x64   '*x86_64-apple-darwin/bin/ppl-lsp'
 
        # And one for everyone else, which asks for a server on the PATH.
        rm -rf server

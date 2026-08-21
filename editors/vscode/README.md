@@ -21,7 +21,7 @@ code --install-extension icyboard-ppl-<version>-<platform>.vsix
 
 ## Requirements
 
-None, if you took the package for your platform: the `icyboard-ppl`
+None, if you took the package for your platform: the `ppl-lsp`
 binary comes with it. The package without a platform in its name does not carry
 a server, so it needs one on your `PATH`.
 
