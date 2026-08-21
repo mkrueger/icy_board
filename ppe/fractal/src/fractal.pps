@@ -110,7 +110,7 @@ PRINTLN "@X0BPPE Fractal@X07 - surfaces, per-pixel drawing and scaled presentati
 
 PROCEDURE RenderMandel(DOUBLE centerX, DOUBLE centerY, DOUBLE half, INTEGER maxIter)
     INTEGER px, py, i, bandTop, pending
-    DOUBLE zx, zy, ax, ay, t, stepSize, minX, minY
+    DOUBLE zx, zy, ax, ay, t, stepSize, minX, minY, q
 
     ; The viewport is twice as wide as it is tall, so one step serves both axes.
     stepSize = half * 2.0 / fracH
@@ -126,12 +126,22 @@ PROCEDURE RenderMandel(DOUBLE centerX, DOUBLE centerY, DOUBLE half, INTEGER maxI
             zx = 0.0
             zy = 0.0
             i = 0
-            WHILE i < maxIter & zx * zx + zy * zy < 4.0 DO
-                t = zx * zx - zy * zy + ax
-                zy = 2.0 * zx * zy + ay
-                zx = t
-                i += 1
-            ENDWHILE
+            ; The main cardioid and the period-2 bulb are the two parts of the set
+            ; whose outline is known, so their points cost one test instead of the
+            ; whole iteration budget - and this zoom aims straight between them.
+            q = (ax - 0.25) * (ax - 0.25) + ay * ay
+            IF q * (q + ax - 0.25) <= 0.25 * ay * ay THEN
+                i = maxIter
+            ELSEIF ((ax + 1.0) * (ax + 1.0) + ay * ay <= 0.0625) THEN
+                i = maxIter
+            ELSE
+                WHILE i < maxIter & zx * zx + zy * zy < 4.0 DO
+                    t = zx * zx - zy * zy + ax
+                    zy = 2.0 * zx * zy + ay
+                    zx = t
+                    i += 1
+                ENDWHILE
+            ENDIF
             PlotEscape(px, py, i, maxIter)
         NEXT px
         pending += 1

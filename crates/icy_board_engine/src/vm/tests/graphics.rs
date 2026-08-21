@@ -468,6 +468,22 @@ fn the_fractal_demo_asks_the_terminal_to_scale_its_small_surface() {
     assert!(output.contains("surfaces, per-pixel drawing"), "{output:?}");
 }
 
+/// The demo skips the two parts of the set whose outline is known, which is only worth
+/// doing if the picture is the same as iterating every pixel would give.
+#[test]
+fn the_mandelbrot_shortcuts_answer_what_iterating_every_pixel_would() {
+    let escape = "WHILE i < maxIter & zx * zx + zy * zy < 4.0 DO\nt = zx * zx - zy * zy + ax\nzy = 2.0 * zx * zy + ay\nzx = t\ni += 1\nENDWHILE";
+    let shortcut = "q = (ax - 0.25) * (ax - 0.25) + ay * ay\nIF q * (q + ax - 0.25) <= 0.25 * ay * ay THEN\nj = maxIter\nELSEIF ((ax + 1.0) * (ax + 1.0) + ay * ay <= 0.0625) THEN\nj = maxIter\nELSE\nWHILE j < maxIter & zx * zx + zy * zy < 4.0 DO\nt = zx * zx - zy * zy + ax\nzy = 2.0 * zx * zy + ay\nzx = t\nj += 1\nENDWHILE\nENDIF";
+
+    // Deep in seahorse valley, where the interior points the shortcuts answer for are
+    // the ones that would otherwise cost the whole budget.
+    let source = format!(
+        "INTEGER maxIter, px, py, i, j, differences\nDOUBLE scale, stepSize, minX, minY, ax, ay, zx, zy, t, q\nmaxIter = 120\nscale = 0.016935\nstepSize = scale * 2.0 / 30\nminX = -0.743643887 - scale * 2.0\nminY = 0.131825904 - scale\nFOR py = 0 TO 29\nay = minY + py * stepSize\nFOR px = 0 TO 59\nax = minX + px * stepSize\nzx = 0.0\nzy = 0.0\ni = 0\n{escape}\nzx = 0.0\nzy = 0.0\nj = 0\n{shortcut}\nIF i <> j differences = differences + 1\nNEXT px\nNEXT py\nPRINT differences\n"
+    );
+
+    assert_eq!(run_ppl(&source), "0");
+}
+
 #[test]
 fn the_fractal_demo_renders_at_native_size_when_the_terminal_cannot_scale() {
     let output = run_ppl(&fractal_source("GFX_AUTO"));
