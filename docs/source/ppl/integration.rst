@@ -64,13 +64,13 @@ file is known in the next.
 Visual Studio Code
 ~~~~~~~~~~~~~~~~~~
 
-Download the ``ppl-vscode-X.X.X.vsix`` for your platform from
+Download the ``ppl-vscode-<version>-<platform>.vsix`` for your platform from
 `the release page <https://github.com/mkrueger/icy_board/releases/latest>`_ and
 drag it onto the VS Code window, or open it from ``Extensions: Install from
 VSIX``.
 
-The platform packages already contain the ``ppl-lsp`` binary. The package
-without a platform in its name needs it on the PATH -
+The platform packages already contain the ``ppl-lsp`` binary. Only
+``ppl-vscode-<version>-no-server.vsix`` needs it on the PATH -
 ``tools/setup-editor.sh server`` does that - or in the
 ``ppl.binPath`` setting. If it cannot be found, the extension says so
 and offers to open the setting.

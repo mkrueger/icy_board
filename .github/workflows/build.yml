@@ -37,7 +37,7 @@ jobs:
    - name: 'Upload zip'
      uses: actions/upload-artifact@v4
      with:
-       name: icy_board_linux_${{ env.VERSION }}
+       name: icyboard-${{ env.VERSION }}-linux-x64
        path: |
          bin/icboard
          bin/icbsetup
@@ -81,7 +81,7 @@ jobs:
    - name: 'Upload zip'
      uses: actions/upload-artifact@v4
      with:
-       name: icy_board_windows_${{ env.VERSION }}
+       name: icyboard-${{ env.VERSION }}-windows-x64
        path: |
          bin/icboard.exe
          bin/icbsetup.exe
@@ -143,7 +143,7 @@ jobs:
    - name: 'Upload zip'
      uses: actions/upload-artifact@v4
      with:
-       name: icy_board_osx_aarch64-apple-darwin_${{ env.VERSION }}
+       name: icyboard-${{ env.VERSION }}-macos-arm64
        path: |
          aarch64-apple-darwin/bin/icboard
          aarch64-apple-darwin/bin/icbsetup
@@ -160,7 +160,7 @@ jobs:
    - name: 'Upload zip'
      uses: actions/upload-artifact@v4
      with:
-       name: icy_board_osx_x86_64-apple-darwin_${{ env.VERSION }}
+       name: icyboard-${{ env.VERSION }}-macos-x64
        path: |
          x86_64-apple-darwin/bin/icboard
          x86_64-apple-darwin/bin/icbsetup
@@ -209,23 +209,23 @@ jobs:
        package() {
          found=$(find "$GITHUB_WORKSPACE/servers" -path "$2" | head -1)
          if [ -z "$found" ]; then
-           echo "no server for $1 below servers/ (looked for $2)"
+           echo "no server for $3 below servers/ (looked for $2)"
            exit 1
          fi
          rm -rf server
          mkdir server
          cp "$found" "server/$(basename "$found")"
          chmod +x server/*
-         pnpm exec vsce package --no-dependencies --target "$1"
+         pnpm exec vsce package --no-dependencies --target "$1" -o "ppl-vscode-$VERSION-$3.vsix"
        }
-       package linux-x64    '*icy_board_linux_*/bin/ppl-lsp'
-       package win32-x64    '*icy_board_windows_*/bin/ppl-lsp.exe'
-       package darwin-arm64 '*aarch64-apple-darwin/bin/ppl-lsp'
-       package darwin-x64   '*x86_64-apple-darwin/bin/ppl-lsp'
+       package linux-x64    '*-linux-x64/bin/ppl-lsp'          linux-x64
+       package win32-x64    '*-windows-x64/bin/ppl-lsp.exe'     windows-x64
+       package darwin-arm64 '*aarch64-apple-darwin/bin/ppl-lsp' macos-arm64
+       package darwin-x64   '*x86_64-apple-darwin/bin/ppl-lsp'  macos-x64
 
        # And one for everyone else, which asks for a server on the PATH.
        rm -rf server
-       pnpm run package
+       pnpm exec vsce package --no-dependencies -o "ppl-vscode-$VERSION-no-server.vsix"
    - name: 'Upload zip'
      uses: actions/upload-artifact@v4
      with:
@@ -275,10 +275,10 @@ jobs:
         cd build/latex
         make
         # Copy PDF to a better location
-        cp *.pdf ../../../icy_board_documentation_${{ env.VERSION }}.pdf
+        cp *.pdf ../../../icyboard-manual-${{ env.VERSION }}.pdf
     
     - name: Upload PDF documentation
       uses: actions/upload-artifact@v4
       with:
-        name: icy_board_documentation_${{ env.VERSION }}
-        path: icy_board_documentation_${{ env.VERSION }}.pdf
+        name: icyboard-manual-${{ env.VERSION }}
+        path: icyboard-manual-${{ env.VERSION }}.pdf

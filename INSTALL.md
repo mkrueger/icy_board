@@ -22,10 +22,10 @@ Download the archive for your system from the
 
 | File | For |
 | :--- | :--- |
-| `icy_board_linux_<version>.zip` | Linux x86_64 |
-| `icy_board_windows_<version>.zip` | Windows x86_64 |
-| `icy_board_osx_aarch64-apple-darwin_<version>.zip` | macOS, Apple Silicon |
-| `icy_board_osx_x86_64-apple-darwin_<version>.zip` | macOS, Intel |
+| `icyboard-<version>-linux-x64.zip` | Linux x86_64 |
+| `icyboard-<version>-windows-x64.zip` | Windows x86_64 |
+| `icyboard-<version>-macos-arm64.zip` | macOS, Apple Silicon |
+| `icyboard-<version>-macos-x64.zip` | macOS, Intel |
 
 The archive holds a `bin/` directory with every program. Unpack it wherever you
 like and put `bin/` on your `PATH`, so the tools find each other and you can call
@@ -110,8 +110,9 @@ code --install-extension ppl-vscode-<version>-<platform>.vsix
 ```
 
 The Extensions view does the same through *Install from VSIX...* in its `...`
-menu. The platform packages carry the server; the package without a platform in
-its name expects `ppl-lsp` on your `PATH`.
+menu. The platform packages carry the server, so nothing else is needed;
+`ppl-vscode-<version>-no-server.vsix` is only for platforms that have no package
+of their own and expects `ppl-lsp` on your `PATH`.
 
 [![A PPL project in VS Code](assets/editor_vscode.png)](assets/editor_vscode.png)
 

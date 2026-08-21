@@ -24,6 +24,10 @@ jobs:
   open_release:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref_name }}
+
       - name: Open the release unless it is already there
         env:
           GH_TOKEN: ${{ github.token }}
@@ -36,6 +40,21 @@ jobs:
             echo "opened a draft release for $TAG - review it and press publish"
           fi
 
+      # A release page is a list of file names, and the beta showed that the list
+      # alone does not say which one to take.
+      - name: Put the download guide above the notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          guide=$(sed "s/#TAG/$TAG/g" .github/release-guide.md)
+          notes=$(gh release view "$TAG" --repo "$REPO" --json body -q .body)
+          # Drop the guide an earlier run wrote, so re-running does not stack them up.
+          if printf '%s\n' "$notes" | grep -qF '<!-- /download-guide -->'; then
+            notes=$(printf '%s\n' "$notes" | sed '1,/<!-- \/download-guide -->/d')
+          fi
+          printf '%s\n%s\n' "$guide" "$notes" | gh release edit "$TAG" --repo "$REPO" --notes-file -
+
   board:
     needs: open_release
     strategy:
@@ -44,16 +63,16 @@ jobs:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            archive: icy_board_linux
+            platform: linux-x64
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            archive: icy_board_windows
+            platform: windows-x64
           - os: macos-latest
             target: aarch64-apple-darwin
-            archive: icy_board_osx_aarch64-apple-darwin
+            platform: macos-arm64
           - os: macos-latest
             target: x86_64-apple-darwin
-            archive: icy_board_osx_x86_64-apple-darwin
+            platform: macos-x64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -81,7 +100,7 @@ jobs:
           done
           sed "s/#VERSION/$TAG/g" data/file_id.diz > file_id.diz
 
-          echo "ARCHIVE=${{ matrix.archive }}_$TAG.zip" >> "$GITHUB_ENV"
+          echo "ARCHIVE=icyboard-$TAG-${{ matrix.platform }}.zip" >> "$GITHUB_ENV"
           echo "SERVER=target/$TARGET/release/ppl-lsp$suffix" >> "$GITHUB_ENV"
 
       - name: Pack it
@@ -89,26 +108,26 @@ jobs:
         shell: bash
         run: |
           zip -r "$ARCHIVE" bin file_id.diz INSTALL.md LICENSE
-          tar -czf "ppl-lsp-${{ matrix.target }}.tar.gz" -C "target/${{ matrix.target }}/release" ppl-lsp
+          tar -czf "ppl-lsp-$TAG-${{ matrix.platform }}.tar.gz" -C "target/${{ matrix.target }}/release" ppl-lsp
 
       - name: Pack it
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
           Compress-Archive -Path bin, file_id.diz, INSTALL.md, LICENSE -DestinationPath "$env:ARCHIVE"
-          Compress-Archive -Path "target\${{ matrix.target }}\release\ppl-lsp.exe" -DestinationPath "ppl-lsp-${{ matrix.target }}.zip"
+          Compress-Archive -Path "target\${{ matrix.target }}\release\ppl-lsp.exe" -DestinationPath "ppl-lsp-${env:TAG}-${{ matrix.platform }}.zip"
 
       - name: Attach it to the release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
-        run: gh release upload "$TAG" "$ARCHIVE" ppl-lsp-${{ matrix.target }}.* --repo "$REPO" --clobber
+        run: gh release upload "$TAG" "$ARCHIVE" "ppl-lsp-$TAG-${{ matrix.platform }}".* --repo "$REPO" --clobber
 
       # The VS Code packages carry the server that belongs to their platform.
       - uses: actions/upload-artifact@v4
         with:
-          name: server-${{ matrix.target }}
+          name: server-${{ matrix.platform }}
           path: ${{ env.SERVER }}
           if-no-files-found: error
 
@@ -140,23 +159,26 @@ jobs:
           package() {
             server="$GITHUB_WORKSPACE/servers/server-$2/$3"
             if [ ! -f "$server" ]; then
-              echo "no server for $1 at $server"
+              echo "no server for $2 at $server"
               exit 1
             fi
             rm -rf server
             mkdir server
             cp "$server" server/
             chmod +x server/*
-            pnpm exec vsce package --no-dependencies --target "$1"
+            # --target is the id VS Code matches on install; the file name follows
+            # the release scheme, and carries the tag rather than package.json's
+            # version, which cannot hold a pre-release suffix.
+            pnpm exec vsce package --no-dependencies --target "$1" -o "ppl-vscode-$TAG-$2.vsix"
           }
-          package linux-x64    x86_64-unknown-linux-gnu ppl-lsp
-          package win32-x64    x86_64-pc-windows-msvc   ppl-lsp.exe
-          package darwin-arm64 aarch64-apple-darwin     ppl-lsp
-          package darwin-x64   x86_64-apple-darwin      ppl-lsp
+          package linux-x64    linux-x64   ppl-lsp
+          package win32-x64    windows-x64 ppl-lsp.exe
+          package darwin-arm64 macos-arm64 ppl-lsp
+          package darwin-x64   macos-x64   ppl-lsp
 
           # And one for everyone else, which asks for a server on the PATH.
           rm -rf server
-          pnpm run package
+          pnpm exec vsce package --no-dependencies -o "ppl-vscode-$TAG-no-server.vsix"
 
       - name: Attach every package to the release
         shell: bash
@@ -195,10 +217,10 @@ jobs:
         run: |
           make -C docs latex
           make -C docs/build/latex
-          cp docs/build/latex/*.pdf "icy_board_documentation_$TAG.pdf"
+          cp docs/build/latex/*.pdf "icyboard-manual-$TAG.pdf"
 
       - name: Attach it to the release
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
-        run: gh release upload "$TAG" "icy_board_documentation_$TAG.pdf" --repo "$REPO" --clobber
+        run: gh release upload "$TAG" "icyboard-manual-$TAG.pdf" --repo "$REPO" --clobber

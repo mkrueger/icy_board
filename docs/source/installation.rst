@@ -29,10 +29,10 @@ called from a board directory.
    :header: "Release file", "System"
    :widths: 65, 35
 
-   "``icy_board_linux_<version>.zip``", "Linux x86_64"
-   "``icy_board_windows_<version>.zip``", "Windows x86_64"
-   "``icy_board_osx_aarch64-apple-darwin_<version>.zip``", "macOS, Apple Silicon"
-   "``icy_board_osx_x86_64-apple-darwin_<version>.zip``", "macOS, Intel"
+   "``icyboard-<version>-linux-x64.zip``", "Linux x86_64"
+   "``icyboard-<version>-windows-x64.zip``", "Windows x86_64"
+   "``icyboard-<version>-macos-arm64.zip``", "macOS, Apple Silicon"
+   "``icyboard-<version>-macos-x64.zip``", "macOS, Intel"
 
 .. _IcyBoard releases: https://github.com/mkrueger/icy_board/releases
 

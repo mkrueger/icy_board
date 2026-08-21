@@ -22,7 +22,7 @@ code --install-extension ppl-vscode-<version>-<platform>.vsix
 ## Requirements
 
 None, if you took the package for your platform: the `ppl-lsp`
-binary comes with it. The package without a platform in its name does not carry
+binary comes with it. Only `ppl-vscode-<version>-no-server.vsix` does not carry
 a server, so it needs one on your `PATH`.
 
 `ppl.binPath` points at the directory holding the IcyBoard programs -
