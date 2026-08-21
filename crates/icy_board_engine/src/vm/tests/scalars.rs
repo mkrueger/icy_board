@@ -29,6 +29,37 @@ fn test_abs_keeps_the_type_of_its_argument() {
     assert_eq!(output, "2.5\n1.75\n3\n300\n3\n");
 }
 
+/// Arithmetic is evaluated without the async walk, so an expression that mixes it with a
+/// call has to fall back and still answer the same. `&` and `|` evaluate both sides either
+/// way, which a counting function makes visible.
+#[test]
+fn test_expressions_mixing_arithmetic_and_calls_evaluate_the_same() {
+    let output = run_ppl(
+        r#"
+        INTEGER calls, values(3)
+        values[0] = 10
+        values[1] = 20
+        values[2] = 30
+        values[3] = 40
+        PRINTLN 2 * 3 + 4
+        PRINTLN values[1 + 1] + 5
+        PRINTLN Bump(1) * 2 + values[Bump(0) - 1]
+        PRINTLN calls
+        calls = 0
+        PRINTLN (Bump(1) > 0) | (Bump(1) > 0)
+        PRINTLN calls
+        EXIT
+
+        FUNCTION Bump(INTEGER add) INTEGER
+            calls = calls + 1
+            Bump = add + 1
+        ENDFUNC
+        "#,
+    );
+
+    assert_eq!(output, "10\n35\n14\n2\n1\n2\n");
+}
+
 /// PCBACCSTAT field 0 answers 0 when accounting is off and 2 when it is on;
 /// `icy_board` has no separate tracking mode, so an enabled system is fully on.
 #[test]

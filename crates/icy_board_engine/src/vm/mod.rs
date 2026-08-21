@@ -424,8 +424,76 @@ impl VirtualMachine<'_> {
         }
     }
 
+    /// The expression nodes that can never await, walked without the boxed future the
+    /// async path needs for every single node.
+    ///
+    /// `None` means the tree holds a call, so the caller runs the whole expression again
+    /// asynchronously. Repeating it is safe because every node handled here is a pure
+    /// read or an arithmetic operation - the nodes that could have a side effect are
+    /// exactly the ones this refuses.
+    fn eval_expr_sync(&mut self, expr: &PPEExpr) -> Option<VariableValue> {
+        match expr {
+            PPEExpr::Value(id) | PPEExpr::RoutineReference(id) => Some(self.variable_table.get_value(*id).clone()),
+            PPEExpr::UnaryExpression(op, expr) => {
+                let value = self.eval_expr_sync(expr)?;
+                Some(Self::apply_unary_op(*op, value))
+            }
+            PPEExpr::BinaryExpression(op, left, right) => {
+                let left_value = self.eval_expr_sync(left)?;
+                let right_value = self.eval_expr_sync(right)?;
+                Some(Self::apply_bin_op(*op, left_value, right_value))
+            }
+            PPEExpr::Dim(id, dims) => {
+                let dim_1 = self.eval_expr_sync(&dims[0])?.as_int() as usize;
+                let dim_2 = if dims.len() >= 2 {
+                    self.eval_expr_sync(&dims[1])?.as_int() as usize
+                } else {
+                    0
+                };
+                let dim_3 = if dims.len() >= 3 {
+                    self.eval_expr_sync(&dims[2])?.as_int() as usize
+                } else {
+                    0
+                };
+                Some(self.variable_table.get_value(*id).get_array_value(dim_1, dim_2, dim_3))
+            }
+            _ => None,
+        }
+    }
+
+    fn apply_unary_op(op: UnaryOp, value: VariableValue) -> VariableValue {
+        match op {
+            UnaryOp::Not => value.not(),
+            UnaryOp::Minus => -value,
+            UnaryOp::Plus => value,
+        }
+    }
+
+    fn apply_bin_op(op: BinOp, left: VariableValue, right: VariableValue) -> VariableValue {
+        match op {
+            BinOp::Add => left + right,
+            BinOp::Sub => left - right,
+            BinOp::Mul => left * right,
+            BinOp::Div => left / right,
+            BinOp::Mod => left % right,
+            BinOp::PoW => left.pow(right),
+            BinOp::Eq => VariableValue::new_bool(left == right),
+            BinOp::NotEq => VariableValue::new_bool(left != right),
+            // Both sides are evaluated before this runs, so these do not short-circuit.
+            BinOp::Or => VariableValue::new_bool(left.as_bool() || right.as_bool()),
+            BinOp::And => VariableValue::new_bool(left.as_bool() && right.as_bool()),
+            BinOp::Lower => VariableValue::new_bool(left < right),
+            BinOp::LowerEq => VariableValue::new_bool(left <= right),
+            BinOp::Greater => VariableValue::new_bool(left > right),
+            BinOp::GreaterEq => VariableValue::new_bool(left >= right),
+        }
+    }
+
     #[async_recursion(?Send)]
     pub async fn eval_expr(&mut self, expr: &PPEExpr) -> Res<VariableValue> {
+        if let Some(value) = self.eval_expr_sync(expr) {
+            return Ok(value);
+        }
         match expr {
             PPEExpr::Invalid => Err(VMError::InternalVMError.into()),
             PPEExpr::Value(id) | PPEExpr::RoutineReference(id) => Ok(self.variable_table.get_value(*id).clone()),
@@ -518,32 +586,13 @@ impl VirtualMachine<'_> {
             }
 
             PPEExpr::UnaryExpression(op, expr) => {
-                let val = self.eval_expr(expr).await?;
-                match op {
-                    UnaryOp::Not => Ok(val.not()),
-                    UnaryOp::Minus => Ok(-val),
-                    UnaryOp::Plus => Ok(val),
-                }
+                let value = self.eval_expr(expr).await?;
+                Ok(Self::apply_unary_op(*op, value))
             }
             PPEExpr::BinaryExpression(op, left, right) => {
                 let left_value = self.eval_expr(left).await?;
                 let right_value = self.eval_expr(right).await?;
-                match op {
-                    BinOp::Add => Ok(left_value + right_value),
-                    BinOp::Sub => Ok(left_value - right_value),
-                    BinOp::Mul => Ok(left_value * right_value),
-                    BinOp::Div => Ok(left_value / right_value),
-                    BinOp::Mod => Ok(left_value % right_value),
-                    BinOp::PoW => Ok(left_value.pow(right_value)),
-                    BinOp::Eq => Ok(VariableValue::new_bool(left_value == right_value)),
-                    BinOp::NotEq => Ok(VariableValue::new_bool(left_value != right_value)),
-                    BinOp::Or => Ok(VariableValue::new_bool(left_value.as_bool() || right_value.as_bool())),
-                    BinOp::And => Ok(VariableValue::new_bool(left_value.as_bool() && right_value.as_bool())),
-                    BinOp::Lower => Ok(VariableValue::new_bool(left_value < right_value)),
-                    BinOp::LowerEq => Ok(VariableValue::new_bool(left_value <= right_value)),
-                    BinOp::Greater => Ok(VariableValue::new_bool(left_value > right_value)),
-                    BinOp::GreaterEq => Ok(VariableValue::new_bool(left_value >= right_value)),
-                }
+                Ok(Self::apply_bin_op(*op, left_value, right_value))
             }
             PPEExpr::Dim(id, dims) => {
                 let dim_1 = self.eval_expr(&dims[0]).await?.as_int() as usize;
@@ -775,8 +824,11 @@ impl VirtualMachine<'_> {
             }
 
             PPECommand::IfNot(expr, label) => {
-                let value = self.eval_expr(expr).await?.as_bool();
-                if !value {
+                let value = match self.eval_expr_sync(expr) {
+                    Some(value) => value,
+                    None => self.eval_expr(expr).await?,
+                };
+                if !value.as_bool() {
                     self.goto(*label)?;
                 }
             }
@@ -816,7 +868,10 @@ impl VirtualMachine<'_> {
                 }
             }
             PPECommand::Let(variable, expr) => {
-                let val = self.eval_expr(expr).await?;
+                let val = match self.eval_expr_sync(expr) {
+                    Some(value) => value,
+                    None => self.eval_expr(expr).await?,
+                };
                 self.set_variable(variable, val).await?;
             }
         }
