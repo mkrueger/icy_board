@@ -77,6 +77,29 @@ fn test_function_name_assignment_returns_a_value_in_classic_languages() {
     }
 }
 
+#[test]
+fn test_a_function_can_read_and_rewrite_its_return_value() {
+    let source = r#"
+DECLARE FUNCTION NumberResult(INTEGER value) INTEGER
+DECLARE FUNCTION StringResult(STRING value) STRING
+PRINTLN NumberResult(1)
+PRINTLN StringResult("ABCDEFGHIJKLMNOPQRST")
+EXIT
+
+FUNCTION NumberResult(INTEGER value) INTEGER
+    NumberResult = value
+    IF (NumberResult = 1) NumberResult = NumberResult + 4
+ENDFUNC
+
+FUNCTION StringResult(STRING value) STRING
+    StringResult = value
+    IF (LEN(StringResult) > 17) StringResult = LEFT(StringResult, 17)
+ENDFUNC
+"#;
+
+    assert_eq!(run_ppl(source), "5\nABCDEFGHIJKLMNOPQ\n");
+}
+
 /// PCBACCSTAT field 0 answers 0 when accounting is off and 2 when it is on;
 /// `icy_board` has no separate tracking mode, so an enabled system is fully on.
 #[test]

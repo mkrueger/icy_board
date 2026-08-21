@@ -109,6 +109,21 @@ ENDPROC
 }
 
 #[test]
+fn a_function_name_is_not_its_return_value_outside_that_function() {
+    let errors = compile_errors(
+        r"
+PRINT Work
+
+FUNCTION Work() INTEGER
+    Work = 1
+ENDFUNC
+EXIT
+",
+    );
+    assert!(errors.iter().any(|error| error == "Function used as variable (Work)"), "{errors:?}");
+}
+
+#[test]
 fn passing_a_routine_needs_runtime_401() {
     let errors = compile_errors_with_runtime(
         r"

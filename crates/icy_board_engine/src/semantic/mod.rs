@@ -234,6 +234,7 @@ pub struct SemanticVisitor {
     pub require_user_variables: bool,
     allow_routine_reference: bool,
     allowed_routine_reference_spans: HashSet<usize>,
+    function_return_value_spans: HashSet<usize>,
 
     // labels
     label_count: usize,
@@ -256,7 +257,7 @@ pub struct SemanticVisitor {
     // constants
     pub function_containers: Vec<FunctionContainer>,
 
-    cur_func_impl: usize,
+    cur_func_impl: Option<usize>,
     cur_func_call: u64,
 
     last_lookup_index: usize,
@@ -445,6 +446,10 @@ impl SemanticVisitor {
         self.allowed_routine_reference_spans.contains(&span_start)
     }
 
+    pub fn is_function_return_value(&self, span_start: usize) -> bool {
+        self.function_return_value_spans.contains(&span_start)
+    }
+
     pub fn new(workspace: &Workspace, errors: Arc<Mutex<ErrorReporter>>, type_registry: UserTypeRegistry) -> Self {
         let mut result = Self {
             lang_version: workspace.language_version(),
@@ -466,8 +471,9 @@ impl SemanticVisitor {
             require_user_variables: false,
             allow_routine_reference: false,
             allowed_routine_reference_spans: HashSet::new(),
+            function_return_value_spans: HashSet::new(),
             cur_func_call: 0,
-            cur_func_impl: 0,
+            cur_func_impl: None,
             function_containers: Vec::new(),
             last_lookup_index: 0,
         };
@@ -1478,6 +1484,14 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             }
             def.return_type
         } else if let Some(idx) = self.lookup_variable(identifier.get_identifier()) {
+            if self.cur_func_call == 0
+                && self.cur_func_impl == Some(idx)
+                && let ReferenceType::Function(container_idx) = self.references[idx].0
+                && let FunctionDeclaration::Function(function) = &self.function_containers[container_idx].functions
+            {
+                self.function_return_value_spans.insert(identifier.get_identifier_token().span.start);
+                return function.get_return_type();
+            }
             let (rt, r) = &mut self.references[idx];
             let identifier = identifier.get_identifier_token();
             if self.cur_func_call > 0 {
@@ -2217,7 +2231,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             }
 
             let identifier = function.get_identifier_token();
-            self.cur_func_impl = idx;
+            self.cur_func_impl = Some(idx);
             self.references[idx].1.implementation = Some((
                 self.errors.lock().unwrap().file_name().to_path_buf(),
                 Spanned::new(identifier.token.to_string(), identifier.span.clone()),
@@ -2260,7 +2274,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             );
         } else {
             let id = self.add_declaration(VariableType::Function, function.get_identifier_token());
-            self.cur_func_impl = id;
+            self.cur_func_impl = Some(id);
             self.global_lookup.variable_lookup.insert(function.get_identifier().clone(), id);
 
             self.function_containers.push(FunctionContainer {
@@ -2287,6 +2301,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
         walk_function_implementation(self, function);
         let end_locals = self.references.len();
         let lookup = self.end_parse_function_body().unwrap();
+        self.cur_func_impl = None;
 
         for f in &mut self.function_containers {
             if f.name == function.get_identifier() {

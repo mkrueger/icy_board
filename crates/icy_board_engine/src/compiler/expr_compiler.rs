@@ -32,6 +32,14 @@ impl AstVisitor<PPEExpr> for ExpressionCompiler<'_> {
 
     fn visit_identifier_expression(&mut self, identifier: &crate::ast::IdentifierExpression) -> PPEExpr {
         if let Some(decl) = self.compiler.lookup_table.lookup_variable(identifier.get_identifier()) {
+            if decl.header.variable_type == VariableType::Function
+                && self
+                    .compiler
+                    .semantic_visitor
+                    .is_function_return_value(identifier.get_identifier_token().span.start)
+            {
+                return PPEExpr::Value(unsafe { decl.value.data.function_value.return_var as usize });
+            }
             if self
                 .compiler
                 .semantic_visitor
