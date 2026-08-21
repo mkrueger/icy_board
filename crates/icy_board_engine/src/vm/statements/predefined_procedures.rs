@@ -2816,7 +2816,11 @@ async fn sndcache_store(vm: &mut VirtualMachine<'_>, file_name: &str) -> Res<Opt
 
     let hash = format!("{:x}", Sha256::digest(&data));
     let extension = path.extension().and_then(|ext| ext.to_str()).unwrap_or("bin");
-    let cache_name = format!("snd/{}.{extension}", &hash[..32]);
+    let cache_name = format!(
+        "{}{}.{extension}",
+        crate::icy_board::state::ppl_graphics::SOUND_CACHE_PREFIX,
+        &hash[..32]
+    );
 
     if vm.icy_board_state.sound_cache.insert(cache_name.clone()) {
         if !vm.icy_board_state.reserve_media_upload(data.len()) {
@@ -2839,37 +2843,26 @@ async fn sound_file_supported(vm: &mut VirtualMachine<'_>, file_name: &str) -> R
         .unwrap_or(0);
     let head = &head[..head_len];
     let extension = path.extension().and_then(|extension| extension.to_str()).unwrap_or_default();
-    let (format, major, subtype) = if extension.eq_ignore_ascii_case("wav") {
-        (1, 1, 0)
+    let format = if extension.eq_ignore_ascii_case("wav") {
+        1
     } else if extension.eq_ignore_ascii_case("aiff") || extension.eq_ignore_ascii_case("aif") {
-        (2, 2, 0)
+        2
     } else if extension.eq_ignore_ascii_case("flac") {
-        (3, 23, 0)
+        3
     } else if extension.eq_ignore_ascii_case("ogg") || extension.eq_ignore_ascii_case("opus") {
-        if head.windows(8).any(|window| window == b"OpusHead") {
-            (5, 32, 100)
-        } else {
-            (4, 32, 96)
-        }
+        if head.windows(8).any(|window| window == b"OpusHead") { 5 } else { 4 }
     } else {
         return Ok(false);
     };
-    vm.icy_board_state.query_sound_format(format, major, subtype).await
-}
-
-async fn sndload_and_queue(vm: &mut VirtualMachine<'_>, file_name: &str, channel: u8, logical_channel: usize, looping: bool) -> Res<bool> {
-    if !vm.icy_board_state.query_sound_available().await? {
-        vm.icy_board_state.snd_error = SND_ERR_UNAVAILABLE;
-        return Ok(false);
-    }
-    if !sound_file_supported(vm, file_name).await? {
-        vm.icy_board_state.snd_error = SND_ERR_FORMAT;
-        return Ok(false);
-    }
-    let Some(cache_name) = sndcache_store(vm, file_name).await? else {
+    let Some((_, major, subtype)) = crate::icy_board::state::SOUND_FORMATS.iter().find(|(known, _, _)| *known == format) else {
         return Ok(false);
     };
+    vm.icy_board_state.query_sound_format(format, *major, *subtype).await
+}
 
+
+/// Plays what the caller's cache already holds, which is all a `SOUND` has to do.
+async fn queue_cached_sound(vm: &mut VirtualMachine<'_>, cache_name: &str, channel: u8, logical_channel: usize, looping: bool) -> Res<()> {
     // slot == channel: each channel plays one file at a time, so this keeps
     // overlapping music/fx on distinct channels simple with no slot bookkeeping.
     let slot = channel;
@@ -2882,96 +2875,91 @@ async fn sndload_and_queue(vm: &mut VirtualMachine<'_>, file_name: &str, channel
         send_audio_apc(vm, &format!("Queue;C={channel};S={slot};L")).await?;
     } else {
         send_audio_apc(vm, &format!("Queue;C={channel};S={slot}")).await?;
-    }
-    vm.icy_board_state.snd_error = SND_OK;
-    Ok(true)
-}
-
-/// `SNDPLAY channel, filename$ [, loop]` - loads and plays a WAV/OGG file on
-/// the given channel, looping if the third argument is present and true.
-pub async fn sndplay(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let requested = vm.eval_expr(&args[0]).await?.as_int();
-    let file_name = vm.eval_expr(&args[1]).await?.as_string();
-    let looping = match args.get(2) {
-        Some(expr) => vm.eval_expr(expr).await?.as_bool(),
-        None => false,
-    };
-    let Some((logical_channel, channel)) = resolve_sound_channel(requested) else {
-        vm.icy_board_state.snd_error = SND_ERR_INVALID_CHANNEL;
-        return Ok(());
-    };
-    if sndload_and_queue(vm, &file_name, channel, logical_channel, looping).await? {
-        vm.icy_board_state.sound_active[logical_channel] = true;
-    }
-    Ok(())
-}
-
-/// `SNDSTOP channel` - stops whatever is playing on the given mixer channel.
-pub async fn sndstop(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let requested = vm.eval_expr(&args[0]).await?.as_int();
-    let Some((logical_channel, channel)) = resolve_sound_channel(requested) else {
-        vm.icy_board_state.snd_error = SND_ERR_INVALID_CHANNEL;
-        return Ok(());
-    };
-    vm.icy_board_state.sound_active[logical_channel] = false;
-    vm.icy_board_state.snd_error = SND_OK;
-    send_audio_apc(vm, &format!("Flush;C={channel};O=0")).await
-}
-
-/// `SNDVOLUME channel, volume` - sets a mixer channel's volume (0-100).
-pub async fn sndvolume(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let requested = vm.eval_expr(&args[0]).await?.as_int();
-    let volume = vm.eval_expr(&args[1]).await?.as_int().clamp(0, 100);
-    let Some((logical_channel, channel)) = resolve_sound_channel(requested) else {
-        vm.icy_board_state.snd_error = SND_ERR_INVALID_CHANNEL;
-        return Ok(());
-    };
-    vm.icy_board_state.sound_volume[logical_channel] = volume;
-    vm.icy_board_state.snd_error = SND_OK;
-    send_audio_apc(vm, &format!("Volume;C={channel};V={:.2}dB", snd_volume_db(volume))).await
-}
-
-pub async fn sndfade(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let requested = vm.eval_expr(&args[0]).await?.as_int();
-    let volume = vm.eval_expr(&args[1]).await?.as_int().clamp(0, 100);
-    let milliseconds = vm.eval_expr(&args[2]).await?.as_int().max(0);
-    let Some((logical_channel, channel)) = resolve_sound_channel(requested) else {
-        vm.icy_board_state.snd_error = SND_ERR_INVALID_CHANNEL;
-        return Ok(());
-    };
-    vm.icy_board_state.sound_volume[logical_channel] = volume;
-    vm.icy_board_state.snd_error = SND_OK;
-    send_audio_apc(vm, &format!("Volume;C={channel};V={:.2}dB;T={milliseconds}", snd_volume_db(volume))).await
-}
-
-pub async fn sndstopall(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
-    for logical_channel in 0..vm.icy_board_state.sound_active.len() {
-        if vm.icy_board_state.sound_active[logical_channel] {
-            let channel = logical_channel + 2;
-            send_audio_apc(vm, &format!("Flush;C={channel};O=0")).await?;
-            vm.icy_board_state.sound_active[logical_channel] = false;
-        }
+        // A track that ends reports it, so a PPE can answer without polling for it.
+        send_audio_apc(vm, &format!("Update;C={channel}")).await?;
     }
     vm.icy_board_state.snd_error = SND_OK;
     Ok(())
 }
 
-/// `SNDPRELOAD filename$` - pushes a file to the client's cache ahead of time,
-/// so the first `SNDPLAY` for it does not stall on the upload.
-pub async fn sndpreload(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+
+
+
+
+
+
+/// `LOADAUDIO file$` - takes a channel for a file and answers the `AUDIO` holding it.
+pub async fn load_audio(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    use crate::icy_board::state::ppl_sound::PplSound;
+
     let file_name = vm.eval_expr(&args[0]).await?.as_string();
     if !vm.icy_board_state.query_sound_available().await? {
         vm.icy_board_state.snd_error = SND_ERR_UNAVAILABLE;
-        return Ok(());
+        return Ok(PplSound::invalid());
     }
     if !sound_file_supported(vm, &file_name).await? {
         vm.icy_board_state.snd_error = SND_ERR_FORMAT;
-        return Ok(());
+        return Ok(PplSound::invalid());
     }
-    if sndcache_store(vm, &file_name).await?.is_some() {
+    let Some(cache_name) = sndcache_store(vm, &file_name).await? else {
+        return Ok(PplSound::invalid());
+    };
+    let Some(channel) = vm.icy_board_state.take_ppl_sound(cache_name) else {
+        vm.icy_board_state.snd_error = SND_ERR_INVALID_CHANNEL;
+        return Ok(PplSound::invalid());
+    };
+    vm.icy_board_state.snd_error = SND_OK;
+    Ok(PplSound::value(channel))
+}
+
+/// Runs one `AUDIO` member. Answers whether it could be carried out.
+pub(crate) async fn sound_member(vm: &mut VirtualMachine<'_>, logical_channel: i32, name: &unicase::Ascii<String>, arguments: &[VariableValue]) -> Res<bool> {
+    use crate::icy_board::state::ppl_sound::{FADE, FREE, PLAY, SET_VOLUME, STOP};
+
+    let Some(file) = vm.icy_board_state.ppl_sound_file(logical_channel).cloned() else {
+        vm.icy_board_state.snd_error = SND_ERR_INVALID_CHANNEL;
+        return Ok(false);
+    };
+    let Some((logical, channel)) = resolve_sound_channel(logical_channel) else {
+        vm.icy_board_state.snd_error = SND_ERR_INVALID_CHANNEL;
+        return Ok(false);
+    };
+    let integer = |index: usize| arguments.get(index).map_or(0, VariableValue::as_int);
+
+    if *name == *PLAY {
+        let looping = arguments.first().is_some_and(VariableValue::as_bool);
+        queue_cached_sound(vm, &file, channel, logical, looping).await?;
+        vm.icy_board_state.sound_active[logical] = true;
+        return Ok(true);
+    }
+    if *name == *STOP {
+        vm.icy_board_state.sound_active[logical] = false;
         vm.icy_board_state.snd_error = SND_OK;
+        send_audio_apc(vm, &format!("Flush;C={channel};O=0")).await?;
+        return Ok(true);
     }
-    Ok(())
+    if *name == *SET_VOLUME || *name == *FADE {
+        let volume = integer(0).clamp(0, 100);
+        let milliseconds = if *name == *FADE { integer(1).max(0) } else { 0 };
+        vm.icy_board_state.sound_volume[logical] = volume;
+        vm.icy_board_state.snd_error = SND_OK;
+        let body = if milliseconds > 0 {
+            format!("Volume;C={channel};V={:.2}dB;T={milliseconds}", snd_volume_db(volume))
+        } else {
+            format!("Volume;C={channel};V={:.2}dB", snd_volume_db(volume))
+        };
+        send_audio_apc(vm, &body).await?;
+        return Ok(true);
+    }
+    if *name == *FREE {
+        vm.icy_board_state.sound_active[logical] = false;
+        vm.icy_board_state.release_ppl_sound(logical_channel);
+        vm.icy_board_state.snd_error = SND_OK;
+        send_audio_apc(vm, &format!("Flush;C={channel};O=0")).await?;
+        return Ok(true);
+    }
+    log::error!("Unknown Audio member {name}");
+    Ok(false)
 }
 
 /// Runs one `SURFACE` member. Answers whether it could be carried out.

@@ -320,19 +320,18 @@ pub enum FuncOpCode {
     GfxCellWidth = -306,
     GfxCellHeight = -307,
     SndAvailable = -308,
-    SndSupports = -309,
-    SndPlaying = -310,
-    GfxScreenWidth = -311,
-    GfxScreenHeight = -312,
-    GfxError = -313,
-    SndError = -314,
-    NewSurface = -315,
-    LoadSurface = -316,
-    EventPoll = -317,
-    EventWait = -318,
+    GfxScreenWidth = -309,
+    GfxScreenHeight = -310,
+    GfxError = -311,
+    SndError = -312,
+    NewSurface = -313,
+    LoadSurface = -314,
+    EventPoll = -315,
+    EventWait = -316,
+    LoadAudio = -317,
 }
 
-pub const LAST_FUNC: i16 = -318;
+pub const LAST_FUNC: i16 = -317;
 
 impl FuncOpCode {
     pub fn get_definition(self) -> &'static FunctionDefinition {
@@ -403,7 +402,7 @@ impl FunctionDefinition {
         }
     }
 }
-pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 330]> = std::sync::LazyLock::new(|| {
+pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 329]> = std::sync::LazyLock::new(|| {
     [
         FunctionDefinition {
             name: "END",
@@ -3055,22 +3054,6 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 330]> 
             signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
-            name: "SndSupports",
-            version: 400,
-            opcode: FuncOpCode::SndSupports,
-            return_type: VariableType::Boolean,
-            args: Some(vec![ArgumentDefinition::new("Format", VariableType::Integer)]),
-            signature: FunctionSignature::FixedParameters(1),
-        },
-        FunctionDefinition {
-            name: "SndPlaying",
-            version: 400,
-            opcode: FuncOpCode::SndPlaying,
-            return_type: VariableType::Boolean,
-            args: Some(vec![ArgumentDefinition::new("Channel", VariableType::Integer)]),
-            signature: FunctionSignature::FixedParameters(1),
-        },
-        FunctionDefinition {
             name: "GfxScreenWidth",
             version: 400,
             opcode: FuncOpCode::GfxScreenWidth,
@@ -3135,6 +3118,14 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 330]> 
             opcode: FuncOpCode::EventWait,
             return_type: VariableType::UserData(36),
             args: Some(vec![ArgumentDefinition::new("Milliseconds", VariableType::Integer)]),
+            signature: FunctionSignature::FixedParameters(1),
+        },
+        FunctionDefinition {
+            name: "LoadAudio",
+            version: 400,
+            opcode: FuncOpCode::LoadAudio,
+            return_type: VariableType::UserData(37),
+            args: Some(vec![ArgumentDefinition::new("FileName", VariableType::String)]),
             signature: FunctionSignature::FixedParameters(1),
         },
         // ALIASES (need to be last in the list)

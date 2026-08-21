@@ -2830,48 +2830,8 @@ pub async fn sndavailable(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res
     Ok(VariableValue::new_bool(vm.icy_board_state.query_sound_available().await?))
 }
 
-fn sound_format(format: i32) -> Option<(u32, u32)> {
-    match format {
-        1 => Some((1, 0)),
-        2 => Some((2, 0)),
-        3 => Some((23, 0)),
-        4 => Some((32, 96)),
-        5 => Some((32, 100)),
-        _ => None,
-    }
-}
 
-pub async fn sndsupports(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let format = vm.eval_expr(&args[0]).await?.as_int();
-    let Some((major, subtype)) = sound_format(format) else {
-        return Ok(VariableValue::new_bool(false));
-    };
-    let supported = vm.icy_board_state.query_sound_format(format, major, subtype).await?;
-    Ok(VariableValue::new_bool(supported))
-}
 
-pub async fn sndplaying(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    use crate::vm::statements::predefined_procedures::{SND_ERR_INVALID_CHANNEL, SND_OK, resolve_sound_channel};
-
-    let requested = vm.eval_expr(&args[0]).await?.as_int();
-    let Some((logical_channel, channel)) = resolve_sound_channel(requested) else {
-        vm.icy_board_state.snd_error = SND_ERR_INVALID_CHANNEL;
-        return Ok(VariableValue::new_bool(false));
-    };
-    let query = format!("\x1b[=7;{channel}n");
-    let prefix = format!("\x1b[=7;{channel};");
-    let playing = vm
-        .icy_board_state
-        .query_terminal_csi(query.as_bytes(), |reply| {
-            let state = reply.strip_prefix(&prefix)?.strip_suffix('n')?;
-            Some(state == "1")
-        })
-        .await?
-        .unwrap_or(false);
-    vm.icy_board_state.sound_active[logical_channel] = playing;
-    vm.icy_board_state.snd_error = SND_OK;
-    Ok(VariableValue::new_bool(playing))
-}
 
 pub async fn rgb(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let red = vm.eval_expr(&args[0]).await?.as_int();

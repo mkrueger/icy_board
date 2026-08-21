@@ -196,6 +196,7 @@ fn board_object_type_ids_are_frozen() {
         ("CONTACT", 34),
         ("SURFACE", 35),
         ("EVENT", 36),
+        ("AUDIO", 37),
     ];
 
     for (name, id) in expected {

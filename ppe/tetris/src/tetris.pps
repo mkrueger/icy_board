@@ -32,15 +32,16 @@ INTEGER score, level, lines, frame, dropFrames, pieceSerial
 BOOLEAN gameOver, running, changed
 STRING key
 EVENT inputEvent
+AUDIO music, rotateSound, lockSound, lineSound, gameOverSound
 SURFACE screen, game, ui
 
 CLS
 PRINTLN "Loading assets..."
-SndPreload "./tetris_music.ogg"
-SndPreload "./rotate.wav"
-SndPreload "./lock.wav"
-SndPreload "./line.wav"
-SndPreload "./gameover.wav"
+music = LoadAudio("./tetris_music.ogg")
+rotateSound = LoadAudio("./rotate.wav")
+lockSound = LoadAudio("./lock.wav")
+lineSound = LoadAudio("./line.wav")
+gameOverSound = LoadAudio("./gameover.wav")
 
 GfxInit GFX_AUTO
 IF GfxBackend() < 0 THEN
@@ -56,12 +57,12 @@ InitShapes()
 InitColors()
 ClearBoard()
 
-SndVolume 0, 100
-SndVolume 1, 70
-SndVolume 2, 80
-SndVolume 3, 80
-SndVolume 4, 75
-SndPlay 0, "./tetris_music.ogg", TRUE
+music.SetVolume(100)
+rotateSound.SetVolume(70)
+lockSound.SetVolume(80)
+lineSound.SetVolume(80)
+gameOverSound.SetVolume(75)
+music.Play(TRUE)
 
 score = 0
 level = 0
@@ -141,7 +142,7 @@ IF gameOver THEN
     ENDWHILE
 ENDIF
 
-SndStop 0
+music.Stop()
 ui.Free()
 game.Free()
 screen.Free()
@@ -260,7 +261,7 @@ PROCEDURE SpawnPiece()
     pieceRot = 0
     IF !CanPlace(pieceX, pieceY, pieceRot) THEN
         gameOver = TRUE
-        SndPlay 4, "./gameover.wav"
+        gameOverSound.Play()
     ENDIF
 ENDPROC
 
@@ -286,7 +287,7 @@ FUNCTION RotatePiece() BOOLEAN
         RotatePiece = FALSE
         RETURN
     ENDIF
-    SndPlay 1, "./rotate.wav"
+    rotateSound.Play()
 ENDFUNC
 
 PROCEDURE LockPiece()
@@ -314,7 +315,7 @@ PROCEDURE LockPiece()
     ENDWHILE
     IF overflow THEN
         gameOver = TRUE
-        SndPlay 4, "./gameover.wav"
+        gameOverSound.Play()
         RETURN
     ENDIF
     cleared = ClearLines()
@@ -325,9 +326,9 @@ PROCEDURE LockPiece()
         IF cleared = 4 score += 1200 * (level + 1)
         lines += cleared
         level = lines / 10
-        SndPlay 3, "./line.wav"
+        lineSound.Play()
     ELSE
-        SndPlay 2, "./lock.wav"
+        lockSound.Play()
     ENDIF
     SpawnPiece()
 ENDPROC

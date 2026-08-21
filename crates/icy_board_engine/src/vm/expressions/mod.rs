@@ -298,8 +298,6 @@ pub async fn run_function(opcode: FuncOpCode, arg: &mut VirtualMachine<'_>, argu
         FuncOpCode::GfxCellWidth => predefined_functions::gfxcellwidth(arg, arguments).await,
         FuncOpCode::GfxCellHeight => predefined_functions::gfxcellheight(arg, arguments).await,
         FuncOpCode::SndAvailable => predefined_functions::sndavailable(arg, arguments).await,
-        FuncOpCode::SndSupports => predefined_functions::sndsupports(arg, arguments).await,
-        FuncOpCode::SndPlaying => predefined_functions::sndplaying(arg, arguments).await,
         FuncOpCode::GfxScreenWidth => predefined_functions::gfxscreenwidth(arg, arguments).await,
         FuncOpCode::GfxScreenHeight => predefined_functions::gfxscreenheight(arg, arguments).await,
         FuncOpCode::GfxError => predefined_functions::gfxerror(arg, arguments).await,
@@ -308,6 +306,7 @@ pub async fn run_function(opcode: FuncOpCode, arg: &mut VirtualMachine<'_>, argu
         FuncOpCode::LoadSurface => crate::vm::statements::predefined_procedures::load_surface(arg, arguments).await,
         FuncOpCode::EventPoll => predefined_functions::eventpoll(arg, arguments).await,
         FuncOpCode::EventWait => predefined_functions::eventwait(arg, arguments).await,
+        FuncOpCode::LoadAudio => crate::vm::statements::predefined_procedures::load_audio(arg, arguments).await,
         FuncOpCode::END
         | FuncOpCode::CPAR
         | FuncOpCode::UPLUS

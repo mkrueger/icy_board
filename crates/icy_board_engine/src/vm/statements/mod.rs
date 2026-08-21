@@ -248,18 +248,12 @@ pub async fn run_predefined_statement(opcode: OpCode, arg: &mut VirtualMachine<'
         OpCode::MoveMsg => predefined_procedures::move_msg(arg, arguments).await,
         OpCode::SetBankBal => predefined_procedures::set_bank_bal(arg, arguments).await,
         OpCode::WebRequest => predefined_procedures::web_request(arg, arguments).await,
-        OpCode::SndPlay => predefined_procedures::sndplay(arg, arguments).await,
-        OpCode::SndStop => predefined_procedures::sndstop(arg, arguments).await,
-        OpCode::SndVolume => predefined_procedures::sndvolume(arg, arguments).await,
-        OpCode::SndPreload => predefined_procedures::sndpreload(arg, arguments).await,
         OpCode::GfxInit => predefined_procedures::gfxinit(arg, arguments).await,
         OpCode::GfxWaitFrame => predefined_procedures::gfxwaitframe(arg, arguments).await,
         OpCode::GfxShutdown => predefined_procedures::gfxshutdown(arg, arguments).await,
         OpCode::MouseOn => predefined_procedures::mouseon(arg, arguments).await,
         OpCode::MouseOff => predefined_procedures::mouseoff(arg, arguments).await,
         OpCode::GfxSetPacing => predefined_procedures::gfxsetpacing(arg, arguments).await,
-        OpCode::SndFade => predefined_procedures::sndfade(arg, arguments).await,
-        OpCode::SndStopAll => predefined_procedures::sndstopall(arg, arguments).await,
         OpCode::KeyEvents => predefined_procedures::keyevents(arg, arguments).await,
     }
 }

@@ -43,7 +43,7 @@ impl BuiltinConst {
 }
 
 pub const STACK_LIMIT: i32 = 6022 + 1024;
-pub const BUILTIN_CONSTS: [BuiltinConst; 186] = [
+pub const BUILTIN_CONSTS: [BuiltinConst; 182] = [
     BuiltinConst { name: "TRUE", value: 0x01 },
     BuiltinConst { name: "FALSE", value: 0x00 },
     BuiltinConst {
@@ -426,23 +426,6 @@ pub const BUILTIN_CONSTS: [BuiltinConst; 186] = [
         name: "MOUSE_TRACK_ALL",
         value: 2,
     },
-    BuiltinConst { name: "SND_FMT_WAV", value: 1 },
-    BuiltinConst {
-        name: "SND_FMT_AIFF",
-        value: 2,
-    },
-    BuiltinConst {
-        name: "SND_FMT_FLAC",
-        value: 3,
-    },
-    BuiltinConst {
-        name: "SND_FMT_OGG_VORBIS",
-        value: 4,
-    },
-    BuiltinConst {
-        name: "SND_FMT_OGG_OPUS",
-        value: 5,
-    },
     BuiltinConst {
         name: "SND_CHANNELS",
         value: 14,
@@ -482,6 +465,7 @@ pub const BUILTIN_CONSTS: [BuiltinConst; 186] = [
         name: "EVENT_OVERFLOW",
         value: 4,
     },
+    BuiltinConst { name: "EVENT_SOUND", value: 5 },
     BuiltinConst { name: "KEY_ESCAPE", value: 27 },
     BuiltinConst { name: "KEY_ENTER", value: 13 },
     BuiltinConst { name: "KEY_TAB", value: 9 },

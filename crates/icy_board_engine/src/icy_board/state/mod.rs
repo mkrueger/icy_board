@@ -38,6 +38,7 @@ pub mod ppl_events;
 pub mod ppl_graphics;
 pub mod ppl_keys;
 pub mod ppl_mouse;
+pub mod ppl_sound;
 pub mod ppl_surface;
 pub mod user_commands;
 pub mod virtual_screen;
@@ -45,6 +46,10 @@ use self::functions::display_flags;
 
 /// How long a graphics capability query waits before the terminal counts as silent.
 const GFX_PROBE_TIMEOUT: Duration = Duration::from_millis(500);
+
+/// The libsndfile formats PPL can name, as `(PPL format, major, subtype)`. They are
+/// probed together so no answer has to arrive from behind an upload.
+pub(crate) const SOUND_FORMATS: &[(i32, u32, u32)] = &[(1, 1, 0), (2, 2, 0), (3, 23, 0), (4, 32, 96), (5, 32, 100)];
 
 fn keyboard_timeout_elapsed(is_local: bool, enabled: bool, minutes: u16, elapsed: Duration) -> bool {
     !is_local && enabled && minutes > 0 && elapsed >= Duration::from_secs(u64::from(minutes) * 60)
@@ -655,6 +660,9 @@ pub struct IcyBoardState {
 
     pub sound_active: [bool; 14],
 
+    /// The file each `SOUND` channel was loaded from, indexed by logical channel.
+    ppl_sounds: [Option<String>; 14],
+
     pub sound_available: Option<bool>,
 
     pub sound_formats: HashMap<i32, bool>,
@@ -680,6 +688,7 @@ pub struct IcyBoardState {
 
     pub ppl_graphics: Option<ppl_graphics::PplGraphicsState>,
     ppl_event_keys: ppl_events::LogicalKeyState,
+    ppl_sound_notify: ppl_events::SoundNotifyState,
     pub ppl_keys: ppl_keys::PplKeyState,
     pub ppl_mouse: ppl_mouse::PplMouseState,
 }
@@ -750,6 +759,7 @@ impl IcyBoardState {
             media_upload_bytes: 0,
             sound_volume: [100; 14],
             sound_active: [false; 14],
+            ppl_sounds: std::array::from_fn(|_| None),
             sound_available: None,
             sound_formats: HashMap::new(),
             snd_error: 0,
@@ -760,6 +770,7 @@ impl IcyBoardState {
             raw_input: VecDeque::new(),
             ppl_graphics: None,
             ppl_event_keys: ppl_events::LogicalKeyState::default(),
+            ppl_sound_notify: ppl_events::SoundNotifyState::default(),
             ppl_keys: ppl_keys::PplKeyState::default(),
             ppl_mouse: ppl_mouse::PplMouseState::default(),
         }
@@ -2977,7 +2988,9 @@ impl IcyBoardState {
         for byte in self.ppl_mouse.feed(byte) {
             for byte in self.ppl_keys.feed(byte) {
                 for byte in self.gfx_probe.feed(byte) {
-                    keys.push(KeyChar::new(KeySource::User, byte as char));
+                    for byte in self.ppl_sound_notify.feed(byte) {
+                        keys.push(KeyChar::new(KeySource::User, byte as char));
+                    }
                 }
             }
         }
@@ -3001,19 +3014,57 @@ impl IcyBoardState {
         self.connection.send(ppl_graphics::JXL_QUERY).await?;
         self.collect_gfx_replies(ppl_graphics::GfxProbe::jxl_answered).await?;
 
-        // Only a terminal that draws JPEG XL keeps a cache worth asking about.
-        if self.gfx_probe.capabilities().jxl {
+        // The cache carries sound as well as frames, so either one makes it worth asking.
+        if self.gfx_probe.capabilities().jxl || self.sound_available == Some(true) {
             self.connection.send(ppl_graphics::CACHE_LIST_QUERY).await?;
             self.collect_gfx_replies(ppl_graphics::GfxProbe::cache_listed).await?;
         }
 
         let (capabilities, listing, leftover) = self.gfx_probe.finish();
         self.raw_input.extend(leftover);
-        if let Some(listing) = listing {
-            self.gfx_cache.extend(listing);
+        for name in listing.into_iter().flatten() {
+            if name.starts_with(ppl_graphics::SOUND_CACHE_PREFIX) {
+                self.sound_cache.insert(name);
+            } else if name.starts_with(ppl_graphics::CACHE_PREFIX) {
+                self.gfx_cache.insert(name);
+            }
         }
         self.gfx_capabilities = Some(capabilities);
         Ok(capabilities)
+    }
+
+    /// Learns everything about the caller's terminal in one go, before a PPE can queue    /// Learns everything about the caller's terminal in one go, before a PPE can queue
+    /// an upload in front of an answer. Sound comes first, so the cache listing it
+    /// wants is fetched together with the one for frames.
+    pub async fn probe_terminal_media(&mut self) -> Res<()> {
+        if self.query_sound_available().await? {
+            for (format, major, subtype) in SOUND_FORMATS {
+                self.query_sound_format(*format, *major, *subtype).await?;
+            }
+        }
+        self.query_gfx_capabilities().await?;
+        Ok(())
+    }
+
+    /// The file a `SOUND` channel was loaded from, if it still holds one.
+    pub fn ppl_sound_file(&self, channel: i32) -> Option<&String> {
+        self.ppl_sounds.get(usize::try_from(channel).ok()?)?.as_ref()
+    }
+
+    /// Takes the next free `SOUND` channel for `file`, or nothing when all are in use.
+    pub fn take_ppl_sound(&mut self, file: String) -> Option<i32> {
+        let channel = self.ppl_sounds.iter().position(Option::is_none)?;
+        self.ppl_sounds[channel] = Some(file);
+        Some(channel as i32)
+    }
+
+    /// Gives a `SOUND` channel back, so a long call can load more than it can hold.
+    pub fn release_ppl_sound(&mut self, channel: i32) {
+        if let Ok(channel) = usize::try_from(channel)
+            && let Some(slot) = self.ppl_sounds.get_mut(channel)
+        {
+            *slot = None;
+        }
     }
 
     async fn collect_gfx_replies(&mut self, answered: impl Fn(&ppl_graphics::GfxProbe) -> bool) -> Res<()> {
@@ -3132,6 +3183,12 @@ impl IcyBoardState {
         }
         if let Some(event) = self.ppl_event_keys.poll() {
             return Some(self.ppl_event_with_mode(event));
+        }
+        if let Some(channel) = self.ppl_sound_notify.poll() {
+            if let Some(active) = self.sound_active.get_mut(channel as usize) {
+                *active = false;
+            }
+            return Some(self.ppl_event_with_mode(ppl_events::PplEvent::sound(channel)));
         }
         while let Some(key) = self.char_buffer.pop_front() {
             self.ppl_event_keys.feed(key);

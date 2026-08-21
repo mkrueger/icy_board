@@ -446,7 +446,7 @@ pub fn get_function_hover(func: &FunctionDefinition) -> Option<Hover> {
         | FuncOpCode::NewSurface
         | FuncOpCode::LoadSurface => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-gfx-api")),
         FuncOpCode::Rgb | FuncOpCode::RgbAlpha => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-rgb")),
-        FuncOpCode::SndAvailable | FuncOpCode::SndSupports | FuncOpCode::SndPlaying | FuncOpCode::SndError => {
+        FuncOpCode::SndAvailable | FuncOpCode::SndError | FuncOpCode::LoadAudio => {
             get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-sound-api"))
         }
         FuncOpCode::EventPoll | FuncOpCode::EventWait => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-event-api")),
@@ -677,9 +677,6 @@ pub fn get_statement_hover(stmt: &StatementDefinition) -> Option<Hover> {
         OpCode::MoveMsg => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-movemsg")),
         OpCode::SetBankBal => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-setbankbal")),
         OpCode::WebRequest => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-webrequest")),
-        OpCode::SndPlay | OpCode::SndStop | OpCode::SndVolume | OpCode::SndPreload | OpCode::SndFade | OpCode::SndStopAll => {
-            get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-sound-api"))
-        }
         OpCode::GfxInit | OpCode::GfxWaitFrame | OpCode::GfxShutdown | OpCode::GfxSetPacing => {
             get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-gfx-api"))
         }

@@ -268,22 +268,14 @@ pub enum OpCode {
     SetBankBal = 229,
     WebRequest = 230,
 
-    // Digitized-sound API (WAV/OGG via the SyncTERM audio APC extension).
-    SndPlay = 231,
-    SndStop = 232,
-    SndVolume = 233,
-    SndPreload = 234,
-
-    GfxInit = 235,
-    GfxWaitFrame = 236,
-    GfxShutdown = 237,
-    MouseOn = 238,
-    MouseOff = 239,
-    GfxSetPacing = 240,
-    SndFade = 241,
-    SndStopAll = 242,
-    KeyEvents = 243,
-    MemberCall = 244,
+    GfxInit = 231,
+    GfxWaitFrame = 232,
+    GfxShutdown = 233,
+    MouseOn = 234,
+    MouseOff = 235,
+    GfxSetPacing = 236,
+    KeyEvents = 237,
+    MemberCall = 238,
 }
 pub const LAST_STMT: i16 = OpCode::MemberCall as i16;
 
@@ -293,7 +285,7 @@ impl OpCode {
     }
 
     pub fn minimum_runtime(self) -> u16 {
-        if (self as i16) >= OpCode::SndPlay as i16 { 402 } else { 100 }
+        if (self as i16) >= OpCode::GfxInit as i16 { 402 } else { 100 }
     }
 }
 
@@ -611,7 +603,7 @@ pub fn format_argument_type_last(arg: &ArgumentDefinition) -> String {
 // "WAIT FOR" == "WAITFOR"
 // "GO SUB"
 // " GO TO"
-pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 250]> = std::sync::LazyLock::new(|| {
+pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 244]> = std::sync::LazyLock::new(|| {
     [
         StatementDefinition {
             // helps to map opcode to array index.
@@ -2587,41 +2579,6 @@ pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 250]
             sig: StatementSignature::ArgumentsWithVariable(0, 2),
         },
         StatementDefinition {
-            name: "SndPlay",
-            version: 400,
-            opcode: OpCode::SndPlay,
-            args: Some(vec![
-                ArgumentDefinition::new("Channel", VariableType::Integer),
-                ArgumentDefinition::new("FileName", VariableType::String),
-                ArgumentDefinition::new("Loop", VariableType::Boolean),
-            ]),
-            sig: StatementSignature::VariableArguments(0, 2, 3),
-        },
-        StatementDefinition {
-            name: "SndStop",
-            version: 400,
-            opcode: OpCode::SndStop,
-            args: Some(vec![ArgumentDefinition::new("Channel", VariableType::Integer)]),
-            sig: StatementSignature::ArgumentsWithVariable(0, 1),
-        },
-        StatementDefinition {
-            name: "SndVolume",
-            version: 400,
-            opcode: OpCode::SndVolume,
-            args: Some(vec![
-                ArgumentDefinition::new("Channel", VariableType::Integer),
-                ArgumentDefinition::new("Volume", VariableType::Integer),
-            ]),
-            sig: StatementSignature::ArgumentsWithVariable(0, 2),
-        },
-        StatementDefinition {
-            name: "SndPreload",
-            version: 400,
-            opcode: OpCode::SndPreload,
-            args: Some(vec![ArgumentDefinition::new("FileName", VariableType::String)]),
-            sig: StatementSignature::ArgumentsWithVariable(0, 1),
-        },
-        StatementDefinition {
             name: "GfxInit",
             version: 400,
             opcode: OpCode::GfxInit,
@@ -2668,24 +2625,6 @@ pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 250]
             opcode: OpCode::GfxSetPacing,
             args: Some(vec![ArgumentDefinition::new("FramesInFlight", VariableType::Integer)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
-        },
-        StatementDefinition {
-            name: "SndFade",
-            version: 400,
-            opcode: OpCode::SndFade,
-            args: Some(vec![
-                ArgumentDefinition::new("Channel", VariableType::Integer),
-                ArgumentDefinition::new("Volume", VariableType::Integer),
-                ArgumentDefinition::new("Milliseconds", VariableType::Integer),
-            ]),
-            sig: StatementSignature::ArgumentsWithVariable(0, 3),
-        },
-        StatementDefinition {
-            name: "SndStopAll",
-            version: 400,
-            opcode: OpCode::SndStopAll,
-            args: None,
-            sig: StatementSignature::ArgumentsWithVariable(0, 0),
         },
         StatementDefinition {
             name: "KeyEvents",

@@ -29,10 +29,13 @@ pub const CTERM_ATTRIBUTES_QUERY: &[u8] = b"\x1b[<0c";
 pub const CELL_SIZE_QUERY: &[u8] = b"\x1b[16t";
 pub const PIXEL_SIZE_QUERY: &[u8] = b"\x1b[14t";
 pub const JXL_QUERY: &[u8] = b"\x1b_SyncTERM:Q;JXL\x1b\\";
-pub const CACHE_LIST_QUERY: &[u8] = b"\x1b_SyncTERM:C;L;gfx/*\x1b\\";
+pub const CACHE_LIST_QUERY: &[u8] = b"\x1b_SyncTERM:C;L;*\x1b\\";
 
 /// Everything below this directory in the caller's per board cache belongs to PPL graphics.
 pub const CACHE_PREFIX: &str = "gfx/";
+
+/// Where the sound a caller has already been sent lives in the same cache.
+pub const SOUND_CACHE_PREFIX: &str = "snd/";
 
 /// `CTerm` revision that introduced the inline `*Blob` verbs, which draw a changing
 /// frame without writing it to the caller's disk cache first.

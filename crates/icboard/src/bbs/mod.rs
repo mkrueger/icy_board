@@ -233,6 +233,13 @@ pub async fn internal_handle_client(mut state: IcyBoardState, login_options: Opt
     } else {
         TerminalCaps::detect(&mut *cmd.state.connection).await?
     };
+    // A terminal that named itself answers the media queries, so everything a PPE
+    // asks about later is settled here rather than between two uploads.
+    if !matches!(cmd.state.session.term_caps.program, icy_net::termcap_detect::TerminalProgram::Unknown) {
+        if let Err(err) = cmd.state.probe_terminal_media().await {
+            log::warn!("Terminal media probe failed: {err}");
+        }
+    }
 
     if let Some(login_options) = &login_options
         && let Some(ppe) = &login_options.ppe

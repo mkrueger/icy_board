@@ -240,24 +240,32 @@ image APC, so they need the JPEG XL backend and report
 screen.PresentRect(0, 0, 160, 100, 0, 0, 640, 400)
 ```
 
-Sound channels are logical channels 0 through `SND_CHANNELS` - 1, mapped to
-SyncTERM APC channels 2 through 15 because CTerm reserves channels 0 and 1. A
-channel outside that range is rejected rather than redirected. Playback probes
-the exact container/codec before uploading it.
+Sound is an `AUDIO` object. `LoadAudio(file)` probes the container/codec, uploads
+the file to the caller's per-board SyncTERM cache and takes one of the
+`SND_CHANNELS` channels for it. A file the caller already holds is not sent
+again, and the object gives its channel back when it is freed.
 
 ```PPL
-IF SndSupports(SND_FMT_OGG_OPUS) THEN
-	SndPlay 0, "music.opus", TRUE
-	SndFade 0, 50, 500
+AUDIO music = LoadAudio("music.opus")
+IF music.Valid THEN
+	music.SetVolume(50)
+	music.Play(TRUE)
 ENDIF
 ```
 
-`SndAvailable`, `SndSupports` and `SndPlaying` query terminal state.
-`SndPreload`, `SndPlay`, `SndStop`, `SndVolume`, `SndFade` and `SndStopAll`
-control playback. Uploaded files use the caller's per-board SyncTERM cache.
-`SndError` returns the named `SND_ERR_*` constants and mirrors `GfxError`: it
-tells a failed `SndPlay` apart from one the terminal simply finished, which
-`SndPlaying` cannot.
+| Member | Purpose |
+| :--- | :--- |
+| `Valid`, `Playing`, `Volume`, `Channel` | Read-only status properties |
+| `Play([loop])` | Start the sound, looping when told to |
+| `Stop()` | Stop it and free the channel's mixer slot |
+| `SetVolume(percent)` | Set the volume, 0 through 100 |
+| `Fade(percent, milliseconds)` | Ride the volume to `percent` |
+| `Free()` | Give the channel back |
+
+`SndAvailable` answers whether the terminal plays sound at all, and `SndError`
+returns the named `SND_ERR_*` constants the way `GfxError` does. A sound that
+ends reports itself as an `EVENT_SOUND` event naming its channel, so a program
+waits for it rather than polling.
 
 `EventPoll` and `EventWait(milliseconds)` provide one ordered input stream.
 Both return an immutable `EVENT` object. Its `Kind` is one of `EVENT_NONE`,
@@ -303,8 +311,8 @@ Ordinary translated characters are always available. `EVENT_KEY_EDGE` requires
 `KeyEvents KEY_EVENTS_ON`, or `KEY_EVENTS_SUPPRESS` to suppress translated
 characters. `KEY_EVENTS_OFF` restores ordinary input. `EVENT_MOUSE` requires
 `MouseOn`; its optional second argument selects button-only, drag or all-motion
-tracking. Waiting performs no implicit sound or capability queries;
-`SndPlaying` remains explicit.
+tracking. `EVENT_SOUND` needs nothing turned on: a sound that ends reports its
+channel in `Code`.
 
 ANSI cursor and navigation sequences are returned as one `EVENT_KEY`, with
 `Text` such as `"UP"`, `"HOME"` or `"PGDN"` and a named `KEY_*` value in

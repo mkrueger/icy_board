@@ -16,6 +16,7 @@ pub const EVENT_KEY: i32 = 1;
 pub const EVENT_KEY_EDGE: i32 = 2;
 pub const EVENT_MOUSE: i32 = 3;
 pub const EVENT_OVERFLOW: i32 = 4;
+pub const EVENT_SOUND: i32 = 5;
 
 pub const KEY_UP: i32 = 0x11_0001;
 pub const KEY_DOWN: i32 = 0x11_0002;
@@ -104,6 +105,15 @@ impl PplEvent {
         Self {
             event_type: EVENT_OVERFLOW,
             code: dropped.min(i32::MAX as usize) as i32,
+            ..Default::default()
+        }
+    }
+
+    /// A channel the terminal reports as drained, named the way `SNDPLAY` named it.
+    pub fn sound(channel: i32) -> Self {
+        Self {
+            event_type: EVENT_SOUND,
+            code: channel,
             ..Default::default()
         }
     }
@@ -197,6 +207,66 @@ impl UserDataValue for PplEvent {
 }
 
 const ESCAPE_TIMEOUT: Duration = Duration::from_millis(50);
+
+/// Longest reply the channel watch is willing to collect before giving it back.
+const MAX_NOTIFY_SEQUENCE: usize = 64;
+
+/// Catches the `CSI = 7 ; channel ; 0 n` a terminal sends once a channel it was asked
+/// to watch has drained. Everything else is handed back untouched.
+#[derive(Default)]
+pub struct SoundNotifyState {
+    pending: Vec<u8>,
+    drained: VecDeque<i32>,
+}
+
+impl SoundNotifyState {
+    pub fn feed(&mut self, byte: u8) -> Vec<u8> {
+        if self.pending.is_empty() {
+            if byte == 0x1b {
+                self.pending.push(byte);
+                return Vec::new();
+            }
+            return vec![byte];
+        }
+        self.pending.push(byte);
+        if self.pending.len() == 2 && byte != b'[' {
+            return std::mem::take(&mut self.pending);
+        }
+        if self.pending.len() == 3 && byte != b'=' {
+            return std::mem::take(&mut self.pending);
+        }
+        if self.pending.len() > MAX_NOTIFY_SEQUENCE {
+            return std::mem::take(&mut self.pending);
+        }
+        if self.pending.len() < 4 || !(0x40..=0x7e).contains(&byte) {
+            return Vec::new();
+        }
+        let sequence = std::mem::take(&mut self.pending);
+        match drained_channel(&sequence) {
+            Some(channel) => {
+                self.drained.push_back(channel);
+                Vec::new()
+            }
+            None => sequence,
+        }
+    }
+
+    pub fn poll(&mut self) -> Option<i32> {
+        self.drained.pop_front()
+    }
+}
+
+/// The logical channel a drain report names, or nothing when the reply is another answer.
+fn drained_channel(sequence: &[u8]) -> Option<i32> {
+    let body = std::str::from_utf8(sequence).ok()?.strip_prefix("\x1b[=")?.strip_suffix('n')?;
+    let parts: Vec<&str> = body.split(';').collect();
+    if parts.len() != 3 || parts[0] != "7" || parts[2] != "0" {
+        return None;
+    }
+    let channel = parts[1].parse::<i32>().ok()?;
+    // The board hands out APC channels from two, because CTerm keeps the first two.
+    (2..16).contains(&channel).then_some(channel - 2)
+}
 
 pub struct LogicalKeyState {
     started: Instant,
