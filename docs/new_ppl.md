@@ -259,21 +259,67 @@ control playback. Uploaded files use the caller's per-board SyncTERM cache.
 tells a failed `SndPlay` apart from one the terminal simply finished, which
 `SndPlaying` cannot.
 
-Mouse modes and event values have named `MOUSE_*` constants. The optional
-second `MouseOn` argument selects button-only, drag or all-motion tracking:
+`EventPoll` and `EventWait(milliseconds)` provide one ordered input stream.
+Both return an immutable `EVENT` object. Its `Kind` is one of `EVENT_NONE`,
+`EVENT_KEY`, `EVENT_KEY_EDGE`, `EVENT_MOUSE` or `EVENT_OVERFLOW`; `EventWait`
+blocks only until an event arrives or its timeout expires, while `EventPoll` never blocks.
+`EventWait(0)` is equivalent to a poll; a negative timeout waits indefinitely
+while still servicing the session.
 
 ```PPL
+EVENT event
+
 MouseOn MOUSE_PIXELS, MOUSE_TRACK_DRAG
-WHILE MousePoll() <> MOUSE_NONE
-	PRINTLN MouseX(), ",", MouseY()
-ENDWHILE
-MouseOff
+KeyEvents KEY_EVENTS_ON
+
+event = EventWait(16)
+IF event.Kind = EVENT_KEY THEN
+	IF event.Text = "q" EXIT
+ELSEIF event.Kind = EVENT_KEY_EDGE THEN
+	PRINTLN event.Code, " ", event.Pressed
+ELSEIF event.Kind = EVENT_MOUSE THEN
+	PRINTLN event.Code, " ", event.X, ",", event.Y
+ENDIF
 ```
 
-CTerm physical key edges are enabled with `KeyEvents KEY_EVENTS_ON`, or
-`KEY_EVENTS_SUPPRESS` to suppress translated characters. `KeyPoll`, `KeyCode`
-and `KeyPressed` report one press/release edge at a time. `KEY_EVENTS_OFF`
-restores ordinary input.
+The read-only fields describe that value:
+
+| Field | Meaning |
+| :--- | :--- |
+| `Kind` | One of the `EVENT_*` constants |
+| `Code` | Unicode value for `EVENT_KEY`, physical code for `EVENT_KEY_EDGE`, or `MOUSE_*` event kind for `EVENT_MOUSE` |
+| `Text` | The translated character for `EVENT_KEY`; empty for other event kinds |
+| `Pressed` | `TRUE` for a translated character, or the press/release state of a physical key edge |
+| `Repeated` | For physical edges, whether another press arrived before release; translated keys report `FALSE` |
+| `X`, `Y` | Mouse coordinates, in cells or pixels according to `MouseOn` |
+| `Button` | Mouse button or wheel direction |
+| `Buttons` | Held-button mask using `MOUSE_BUTTON_LEFT`, `MOUSE_BUTTON_MIDDLE` and `MOUSE_BUTTON_RIGHT` |
+| `WheelX`, `WheelY` | Wheel movement; positive `WheelY` is up and negative is down |
+| `Modifiers` | Combined `EVENT_SHIFT`, `EVENT_ALT`, `EVENT_CTRL` and `EVENT_META` bits; the first three alias the mouse modifier values |
+| `Pixels` | Whether DEC 1016 pixel-coordinate mode was accepted; available even on `EVENT_NONE` |
+| `Time` | Monotonic milliseconds since the connection's event input state was created, sampled when the event is selected |
+
+Ordinary translated characters are always available. `EVENT_KEY_EDGE` requires
+`KeyEvents KEY_EVENTS_ON`, or `KEY_EVENTS_SUPPRESS` to suppress translated
+characters. `KEY_EVENTS_OFF` restores ordinary input. `EVENT_MOUSE` requires
+`MouseOn`; its optional second argument selects button-only, drag or all-motion
+tracking. Waiting performs no implicit sound or capability queries;
+`SndPlaying` remains explicit.
+
+ANSI cursor and navigation sequences are returned as one `EVENT_KEY`, with
+`Text` such as `"UP"`, `"HOME"` or `"PGDN"` and a named `KEY_*` value in
+`Code`. Printable input uses its Unicode value. `KEY_ESCAPE`, `KEY_ENTER`,
+`KEY_TAB`, `KEY_BACKSPACE` and `KEY_DELETE` name the common control values.
+Parameterized xterm sequences such as Ctrl+Up also populate `Modifiers`.
+Physical CTerm edges remain `EVENT_KEY_EDGE`, because their scan codes and
+press/release semantics are distinct from translated keys.
+
+Consecutive unconsumed mouse-motion reports are coalesced to the newest
+position. Press, release, wheel and key events remain ordered. If a bounded
+physical-key or mouse queue still overflows, the next event is
+`EVENT_OVERFLOW` and its `Code` is the number of discarded events.
+Horizontal wheel reports use `MOUSE_WHEEL_LEFT` and `MOUSE_WHEEL_RIGHT` in
+`Button` and a signed delta in `WheelX`.
 
 The outermost PPE always disables mouse/key modes, stops sound it started,
 releases graphics and restores cursor, wrapping, palette and Sixel scrolling

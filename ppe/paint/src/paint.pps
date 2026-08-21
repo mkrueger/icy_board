@@ -18,12 +18,13 @@ CONST UNSIGNED C_FRAME = Rgb(35, 26, 19)
 
 UNSIGNED colors(7)
 INTEGER selected, brushSize
-INTEGER event, mx, my, btn
+INTEGER mouseKind, mx, my, btn
 INTEGER lastX, lastY, dragButton
 INTEGER tries
-BOOLEAN running, dragging, dirty, pendingEvent
+BOOLEAN running, dragging, dirty, pendingInput
 STRING key
 SURFACE screen, ui
+EVENT inputEvent
 
 InitColors()
 CLS
@@ -47,74 +48,78 @@ RenderToolbar()
 
 MouseOn MOUSE_PIXELS, MOUSE_TRACK_ALL
 tries = 0
-WHILE !MousePixels() & tries < 30 DO
-    event = MousePoll()
+inputEvent = EventPoll()
+WHILE !inputEvent.Pixels & tries < 30 DO
     GfxWaitFrame 20
+    inputEvent = EventPoll()
     tries += 1
 ENDWHILE
-IF !MousePixels() THEN
+IF !inputEvent.Pixels THEN
     MouseOff
     GfxShutdown
     CLS
     PRINTLN "PPE Paint requires pixel mouse reporting (DEC mode 1016)."
     EXIT
 ENDIF
-pendingEvent = event <> MOUSE_NONE
+pendingInput = inputEvent.Kind <> EVENT_NONE
 
 running = TRUE
 WHILE running DO
     dirty = FALSE
-    IF pendingEvent THEN
-        pendingEvent = FALSE
+    IF pendingInput THEN
+        pendingInput = FALSE
     ELSE
-        event = MousePoll()
+        inputEvent = EventPoll()
     ENDIF
-    WHILE event <> MOUSE_NONE DO
-        mx = MouseX()
-        my = MouseY()
-        btn = MouseButton()
+    WHILE inputEvent.Kind <> EVENT_NONE DO
+        IF inputEvent.Kind = EVENT_MOUSE THEN
+            mouseKind = inputEvent.Code
+            mx = inputEvent.X
+            my = inputEvent.Y
+            btn = inputEvent.Button
 
-        IF event = MOUSE_PRESS THEN
-            IF my < CANVAS_Y THEN
-                HandleToolbar(mx, my)
-            ELSEIF (InsideCanvas(mx, my)) THEN
-                IF btn = 0 | btn = 2 THEN
-                    dragging = TRUE
-                    dragButton = btn
+            IF mouseKind = MOUSE_PRESS THEN
+                IF my < CANVAS_Y THEN
+                    HandleToolbar(mx, my)
+                ELSEIF (InsideCanvas(mx, my)) THEN
+                    IF btn = 0 | btn = 2 THEN
+                        dragging = TRUE
+                        dragButton = btn
+                        lastX = mx
+                        lastY = my
+                        DrawStroke(lastX, lastY, mx, my, StrokeColor(btn))
+                    ENDIF
+                ENDIF
+            ELSEIF (mouseKind = MOUSE_MOTION) THEN
+                IF dragging & btn = dragButton & InsideCanvas(mx, my) THEN
+                    DrawStroke(lastX, lastY, mx, my, StrokeColor(btn))
                     lastX = mx
                     lastY = my
-                    DrawStroke(lastX, lastY, mx, my, StrokeColor(btn))
+                ENDIF
+            ELSEIF (mouseKind = MOUSE_RELEASE) THEN
+                dragging = FALSE
+            ELSEIF (mouseKind = MOUSE_WHEEL) THEN
+                IF btn = 3 THEN
+                    ChangeBrush(1)
+                ELSEIF (btn = 4) THEN
+                    ChangeBrush(-1)
                 ENDIF
             ENDIF
-        ELSEIF (event = MOUSE_MOTION) THEN
-            IF dragging & btn = dragButton & InsideCanvas(mx, my) THEN
-                DrawStroke(lastX, lastY, mx, my, StrokeColor(btn))
-                lastX = mx
-                lastY = my
-            ENDIF
-        ELSEIF (event = MOUSE_RELEASE) THEN
-            dragging = FALSE
-        ELSEIF (event = MOUSE_WHEEL) THEN
-            IF btn = 3 THEN
+        ELSEIF (inputEvent.Kind = EVENT_KEY) THEN
+            key = Upper(inputEvent.Text)
+            IF key = "Q" | key = Chr(27) THEN
+                running = FALSE
+            ELSEIF (key = "C") THEN
+                ClearCanvas()
+            ELSEIF (key = "+" | key = "=") THEN
                 ChangeBrush(1)
-            ELSEIF (btn = 4) THEN
+            ELSEIF (key = "-") THEN
                 ChangeBrush(-1)
             ENDIF
         ENDIF
-        event = MousePoll()
+        inputEvent = EventPoll()
     ENDWHILE
     IF dirty PresentDirty()
-
-    key = Upper(InKey())
-    IF key = "Q" | key = Chr(27) THEN
-        running = FALSE
-    ELSEIF (key = "C") THEN
-        ClearCanvas()
-    ELSEIF (key = "+" | key = "=") THEN
-        ChangeBrush(1)
-    ELSEIF (key = "-") THEN
-        ChangeBrush(-1)
-    ENDIF
     GfxWaitFrame 30
 ENDWHILE
 

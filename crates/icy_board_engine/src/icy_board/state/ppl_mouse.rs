@@ -25,6 +25,9 @@ pub struct PplMouseEvent {
     pub y: i32,
     pub button: i32,
     pub modifiers: i32,
+    pub buttons: i32,
+    pub wheel_x: i32,
+    pub wheel_y: i32,
 }
 
 #[derive(Default)]
@@ -36,6 +39,8 @@ pub struct PplMouseState {
     pending_since: Option<Instant>,
     events: VecDeque<PplMouseEvent>,
     current: PplMouseEvent,
+    buttons: i32,
+    dropped: usize,
 }
 
 impl PplMouseState {
@@ -53,6 +58,8 @@ impl PplMouseState {
         self.pending_since = None;
         self.events.clear();
         self.current = PplMouseEvent::default();
+        self.buttons = 0;
+        self.dropped = 0;
         true
     }
 
@@ -64,6 +71,8 @@ impl PplMouseState {
         self.pending_since = None;
         self.events.clear();
         self.current = PplMouseEvent::default();
+        self.buttons = 0;
+        self.dropped = 0;
     }
 
     pub fn is_graphics_mode(&self) -> bool {
@@ -72,10 +81,6 @@ impl PplMouseState {
 
     pub fn is_enabled(&self) -> bool {
         self.enabled
-    }
-
-    pub fn has_events(&self) -> bool {
-        !self.events.is_empty()
     }
 
     pub fn pixels(&self) -> bool {
@@ -126,11 +131,9 @@ impl PplMouseState {
         if byte == b'M' || byte == b'm' {
             let sequence = std::mem::take(&mut self.pending);
             self.pending_since = None;
-            if let Some(event) = parse_sgr_event(&sequence) {
-                if self.events.len() == MAX_EVENTS {
-                    self.events.pop_front();
-                }
-                self.events.push_back(event);
+            if let Some(mut event) = parse_sgr_event(&sequence) {
+                self.update_buttons(&mut event);
+                self.push_event(event);
                 return Vec::new();
             }
             return sequence;
@@ -161,6 +164,10 @@ impl PplMouseState {
         self.current
     }
 
+    pub fn take_dropped(&mut self) -> usize {
+        std::mem::take(&mut self.dropped)
+    }
+
     pub fn enable_sequence(&self, tracking: i32) -> Vec<u8> {
         let mut sequence = b"\x1b[?1000l\x1b[?1002l\x1b[?1003l".to_vec();
         sequence.extend_from_slice(match tracking {
@@ -180,6 +187,31 @@ impl PplMouseState {
     fn take_pending(&mut self) -> Vec<u8> {
         self.pending_since = None;
         std::mem::take(&mut self.pending)
+    }
+
+    fn update_buttons(&mut self, event: &mut PplMouseEvent) {
+        if (0..=2).contains(&event.button) {
+            let bit = 1 << event.button;
+            match event.event_type {
+                MOUSE_EVENT_PRESS | MOUSE_EVENT_MOTION => self.buttons |= bit,
+                MOUSE_EVENT_RELEASE => self.buttons &= !bit,
+                _ => {}
+            }
+        }
+        event.buttons = self.buttons;
+    }
+
+    fn push_event(&mut self, event: PplMouseEvent) {
+        if event.event_type == MOUSE_EVENT_MOTION && self.events.back().is_some_and(|pending| pending.event_type == MOUSE_EVENT_MOTION) {
+            self.events.pop_back();
+            self.events.push_back(event);
+            return;
+        }
+        if self.events.len() == MAX_EVENTS {
+            self.events.pop_front();
+            self.dropped = self.dropped.saturating_add(1);
+        }
+        self.events.push_back(event);
     }
 }
 
@@ -205,14 +237,19 @@ fn parse_sgr_event(sequence: &[u8]) -> Option<PplMouseEvent> {
     let wheel = code & 64 != 0;
     let motion = code & 32 != 0;
     let base_button = i32::from(code & 3);
-    let (event_type, button) = if motion {
-        (MOUSE_EVENT_MOTION, if base_button == 3 { -1 } else { base_button })
+    let (event_type, button, wheel_x, wheel_y) = if motion {
+        (MOUSE_EVENT_MOTION, if base_button == 3 { -1 } else { base_button }, 0, 0)
     } else if wheel {
-        (MOUSE_EVENT_WHEEL, if code & 1 == 0 { 3 } else { 4 })
+        match code & 3 {
+            0 => (MOUSE_EVENT_WHEEL, 3, 0, 1),
+            1 => (MOUSE_EVENT_WHEEL, 4, 0, -1),
+            2 => (MOUSE_EVENT_WHEEL, 5, -1, 0),
+            _ => (MOUSE_EVENT_WHEEL, 6, 1, 0),
+        }
     } else if final_byte == b'm' {
-        (MOUSE_EVENT_RELEASE, if base_button == 3 { -1 } else { base_button })
+        (MOUSE_EVENT_RELEASE, if base_button == 3 { -1 } else { base_button }, 0, 0)
     } else {
-        (MOUSE_EVENT_PRESS, if base_button == 3 { -1 } else { base_button })
+        (MOUSE_EVENT_PRESS, if base_button == 3 { -1 } else { base_button }, 0, 0)
     };
     Some(PplMouseEvent {
         event_type,
@@ -220,6 +257,9 @@ fn parse_sgr_event(sequence: &[u8]) -> Option<PplMouseEvent> {
         y,
         button,
         modifiers,
+        wheel_x,
+        wheel_y,
+        ..Default::default()
     })
 }
 
@@ -243,14 +283,19 @@ mod tests {
                 x: 10,
                 y: 5,
                 button: 0,
-                modifiers: 0
+                modifiers: 0,
+                buttons: 1,
+                ..Default::default()
             }
         );
         assert_eq!(mouse.poll(), MOUSE_EVENT_MOTION);
         assert_eq!(mouse.current().modifiers, 1);
+        assert_eq!(mouse.current().buttons, 1);
         assert_eq!(mouse.poll(), MOUSE_EVENT_RELEASE);
+        assert_eq!(mouse.current().buttons, 0);
         assert_eq!(mouse.poll(), MOUSE_EVENT_WHEEL);
         assert_eq!(mouse.current().button, 4);
+        assert_eq!(mouse.current().wheel_y, -1);
         assert_eq!(mouse.poll(), MOUSE_EVENT_NONE);
     }
 
@@ -266,7 +311,7 @@ mod tests {
     }
 
     #[test]
-    fn legacy_syncterm_96_and_97_are_motion_not_wheel() {
+    fn consecutive_motion_events_are_coalesced() {
         let mut mouse = PplMouseState::default();
         assert!(mouse.enable(MOUSE_MODE_TEXT, 2));
         for byte in b"\x1b[<96;11;6M\x1b[<97;12;7M" {
@@ -274,7 +319,7 @@ mod tests {
         }
 
         assert_eq!(mouse.poll(), MOUSE_EVENT_MOTION);
-        assert_eq!(mouse.poll(), MOUSE_EVENT_MOTION);
+        assert_eq!((mouse.current().x, mouse.current().y), (11, 6));
         assert_eq!(mouse.poll(), MOUSE_EVENT_NONE);
     }
 
@@ -299,5 +344,17 @@ mod tests {
         assert!(mouse.pixels());
         assert_eq!(mouse.poll(), MOUSE_EVENT_PRESS);
         assert_eq!((mouse.current().x, mouse.current().y), (100, 50));
+    }
+
+    #[test]
+    fn reports_events_dropped_when_the_queue_is_full() {
+        let mut mouse = PplMouseState::default();
+        assert!(mouse.enable(MOUSE_MODE_TEXT, 0));
+        for _ in 0..MAX_EVENTS + 5 {
+            for byte in b"\x1b[<0;1;1M" {
+                mouse.feed(*byte);
+            }
+        }
+        assert_eq!(mouse.take_dropped(), 5);
     }
 }

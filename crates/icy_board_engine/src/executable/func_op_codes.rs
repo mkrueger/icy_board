@@ -314,32 +314,25 @@ pub enum FuncOpCode {
     BASE64DEC = -300,
     SHA256 = -301,
     GfxBackend = -302,
-    MousePoll = -303,
-    MouseX = -304,
-    MouseY = -305,
-    MouseButton = -306,
-    MouseModifiers = -307,
-    MousePixels = -308,
-    Rgb = -309,
-    RgbAlpha = -310,
-    GfxCaps = -311,
-    GfxCellWidth = -312,
-    GfxCellHeight = -313,
-    SndAvailable = -314,
-    SndSupports = -315,
-    SndPlaying = -316,
-    KeyPoll = -317,
-    KeyCode = -318,
-    KeyPressed = -319,
-    GfxScreenWidth = -320,
-    GfxScreenHeight = -321,
-    GfxError = -322,
-    SndError = -323,
-    NewSurface = -324,
-    LoadSurface = -325,
+    Rgb = -303,
+    RgbAlpha = -304,
+    GfxCaps = -305,
+    GfxCellWidth = -306,
+    GfxCellHeight = -307,
+    SndAvailable = -308,
+    SndSupports = -309,
+    SndPlaying = -310,
+    GfxScreenWidth = -311,
+    GfxScreenHeight = -312,
+    GfxError = -313,
+    SndError = -314,
+    NewSurface = -315,
+    LoadSurface = -316,
+    EventPoll = -317,
+    EventWait = -318,
 }
 
-pub const LAST_FUNC: i16 = -325;
+pub const LAST_FUNC: i16 = -318;
 
 impl FuncOpCode {
     pub fn get_definition(self) -> &'static FunctionDefinition {
@@ -410,7 +403,7 @@ impl FunctionDefinition {
         }
     }
 }
-pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 337]> = std::sync::LazyLock::new(|| {
+pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 330]> = std::sync::LazyLock::new(|| {
     [
         FunctionDefinition {
             name: "END",
@@ -3005,54 +2998,6 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 337]> 
             signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
-            name: "MousePoll",
-            version: 400,
-            opcode: FuncOpCode::MousePoll,
-            return_type: VariableType::Integer,
-            args: None,
-            signature: FunctionSignature::FixedParameters(0),
-        },
-        FunctionDefinition {
-            name: "MouseX",
-            version: 400,
-            opcode: FuncOpCode::MouseX,
-            return_type: VariableType::Integer,
-            args: None,
-            signature: FunctionSignature::FixedParameters(0),
-        },
-        FunctionDefinition {
-            name: "MouseY",
-            version: 400,
-            opcode: FuncOpCode::MouseY,
-            return_type: VariableType::Integer,
-            args: None,
-            signature: FunctionSignature::FixedParameters(0),
-        },
-        FunctionDefinition {
-            name: "MouseButton",
-            version: 400,
-            opcode: FuncOpCode::MouseButton,
-            return_type: VariableType::Integer,
-            args: None,
-            signature: FunctionSignature::FixedParameters(0),
-        },
-        FunctionDefinition {
-            name: "MouseModifiers",
-            version: 400,
-            opcode: FuncOpCode::MouseModifiers,
-            return_type: VariableType::Integer,
-            args: None,
-            signature: FunctionSignature::FixedParameters(0),
-        },
-        FunctionDefinition {
-            name: "MousePixels",
-            version: 400,
-            opcode: FuncOpCode::MousePixels,
-            return_type: VariableType::Boolean,
-            args: None,
-            signature: FunctionSignature::FixedParameters(0),
-        },
-        FunctionDefinition {
             name: "Rgb",
             version: 400,
             opcode: FuncOpCode::Rgb,
@@ -3126,30 +3071,6 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 337]> 
             signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
-            name: "KeyPoll",
-            version: 400,
-            opcode: FuncOpCode::KeyPoll,
-            return_type: VariableType::Boolean,
-            args: None,
-            signature: FunctionSignature::FixedParameters(0),
-        },
-        FunctionDefinition {
-            name: "KeyCode",
-            version: 400,
-            opcode: FuncOpCode::KeyCode,
-            return_type: VariableType::Integer,
-            args: None,
-            signature: FunctionSignature::FixedParameters(0),
-        },
-        FunctionDefinition {
-            name: "KeyPressed",
-            version: 400,
-            opcode: FuncOpCode::KeyPressed,
-            return_type: VariableType::Boolean,
-            args: None,
-            signature: FunctionSignature::FixedParameters(0),
-        },
-        FunctionDefinition {
             name: "GfxScreenWidth",
             version: 400,
             opcode: FuncOpCode::GfxScreenWidth,
@@ -3198,6 +3119,22 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 337]> 
             opcode: FuncOpCode::LoadSurface,
             return_type: VariableType::UserData(35),
             args: Some(vec![ArgumentDefinition::new("FileName", VariableType::String)]),
+            signature: FunctionSignature::FixedParameters(1),
+        },
+        FunctionDefinition {
+            name: "EventPoll",
+            version: 400,
+            opcode: FuncOpCode::EventPoll,
+            return_type: VariableType::UserData(36),
+            args: None,
+            signature: FunctionSignature::FixedParameters(0),
+        },
+        FunctionDefinition {
+            name: "EventWait",
+            version: 400,
+            opcode: FuncOpCode::EventWait,
+            return_type: VariableType::UserData(36),
+            args: Some(vec![ArgumentDefinition::new("Milliseconds", VariableType::Integer)]),
             signature: FunctionSignature::FixedParameters(1),
         },
         // ALIASES (need to be last in the list)

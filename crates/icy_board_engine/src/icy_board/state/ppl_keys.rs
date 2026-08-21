@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::collections::{HashSet, VecDeque};
 
 const MAX_EVENTS: usize = 256;
 const MAX_SEQUENCE: usize = 256;
@@ -7,6 +7,7 @@ const MAX_SEQUENCE: usize = 256;
 pub struct PplKeyEvent {
     pub code: i32,
     pub pressed: bool,
+    pub repeated: bool,
 }
 
 #[derive(Default)]
@@ -15,6 +16,8 @@ pub struct PplKeyState {
     pending: Vec<u8>,
     events: VecDeque<PplKeyEvent>,
     current: PplKeyEvent,
+    dropped: usize,
+    held: HashSet<i32>,
 }
 
 impl PplKeyState {
@@ -23,6 +26,8 @@ impl PplKeyState {
         self.pending.clear();
         self.events.clear();
         self.current = PplKeyEvent::default();
+        self.dropped = 0;
+        self.held.clear();
     }
 
     pub fn disable(&mut self) {
@@ -30,14 +35,12 @@ impl PplKeyState {
         self.pending.clear();
         self.events.clear();
         self.current = PplKeyEvent::default();
+        self.dropped = 0;
+        self.held.clear();
     }
 
     pub fn is_enabled(&self) -> bool {
         self.enabled
-    }
-
-    pub fn has_events(&self) -> bool {
-        !self.events.is_empty()
     }
 
     pub fn current(&self) -> PplKeyEvent {
@@ -101,10 +104,21 @@ impl PplKeyState {
         for code in codes {
             if self.events.len() == MAX_EVENTS {
                 self.events.pop_front();
+                self.dropped = self.dropped.saturating_add(1);
             }
-            self.events.push_back(PplKeyEvent { code, pressed });
+            let repeated = if pressed {
+                !self.held.insert(code)
+            } else {
+                self.held.remove(&code);
+                false
+            };
+            self.events.push_back(PplKeyEvent { code, pressed, repeated });
         }
         Vec::new()
+    }
+
+    pub fn take_dropped(&mut self) -> usize {
+        std::mem::take(&mut self.dropped)
     }
 }
 
@@ -122,11 +136,32 @@ mod tests {
         }
         assert_eq!(passed, b"a");
         assert!(keys.poll());
-        assert_eq!(keys.current(), PplKeyEvent { code: 30, pressed: true });
+        assert_eq!(
+            keys.current(),
+            PplKeyEvent {
+                code: 30,
+                pressed: true,
+                repeated: false
+            }
+        );
         assert!(keys.poll());
-        assert_eq!(keys.current(), PplKeyEvent { code: 31, pressed: true });
+        assert_eq!(
+            keys.current(),
+            PplKeyEvent {
+                code: 31,
+                pressed: true,
+                repeated: false
+            }
+        );
         assert!(keys.poll());
-        assert_eq!(keys.current(), PplKeyEvent { code: 30, pressed: false });
+        assert_eq!(
+            keys.current(),
+            PplKeyEvent {
+                code: 30,
+                pressed: false,
+                repeated: false
+            }
+        );
     }
 
     #[test]
@@ -139,5 +174,33 @@ mod tests {
         }
         assert_eq!(passed, b"\x1b[=7;2;1n");
         assert!(!keys.poll());
+    }
+
+    #[test]
+    fn reports_edges_dropped_when_the_queue_is_full() {
+        let mut keys = PplKeyState::default();
+        keys.enable();
+        for _ in 0..MAX_EVENTS + 7 {
+            for byte in b"\x1b[=30K" {
+                keys.feed(*byte);
+            }
+        }
+        assert_eq!(keys.take_dropped(), 7);
+        assert_eq!(keys.take_dropped(), 0);
+    }
+
+    #[test]
+    fn a_second_press_before_release_is_a_repeat() {
+        let mut keys = PplKeyState::default();
+        keys.enable();
+        for byte in b"\x1b[=30K\x1b[=30K\x1b[=30k" {
+            keys.feed(*byte);
+        }
+        assert!(keys.poll());
+        assert!(!keys.current().repeated);
+        assert!(keys.poll());
+        assert!(keys.current().repeated);
+        assert!(keys.poll());
+        assert!(!keys.current().repeated);
     }
 }

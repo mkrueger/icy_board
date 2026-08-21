@@ -1,73 +1,24 @@
 use super::run_ppl_with_input;
 
 #[test]
-fn mouse_accessors_have_empty_defaults() {
-    let output = super::run_ppl(
-        r"
-        PrintLn MouseX()
-        PrintLn MouseY()
-        PrintLn MouseButton()
-        PrintLn MouseModifiers()
-        ",
-    );
-    assert_eq!(output, "0\n0\n0\n0\n");
-}
-
-#[test]
-fn mouse_modifiers_report_shift_and_ctrl_bits() {
-    let output = run_ppl_with_input(
-        r"
-        MouseOn 0
-        PrintLn MousePoll()
-        PrintLn MouseModifiers()
-        MouseOff
-        ",
-        b"\x1b[<20;11;6M",
-    );
-    assert!(output.contains("1\n5\n"), "{output:?}");
-}
-
-#[test]
-fn text_mouse_reports_cells_wheel_modifiers_and_preserves_keys() {
-    let output = run_ppl_with_input(
-        r"
-        MouseOn 0
-        PrintLn MousePoll()
-        PrintLn MouseX()
-        PrintLn MouseY()
-        PrintLn MouseButton()
-        PrintLn MouseModifiers()
-        PrintLn MousePoll()
-        PrintLn MouseX()
-        PrintLn MouseY()
-        PrintLn MouseButton()
-        PrintLn InKey()
-        MouseOff
-        ",
-        b"\x1b[<20;11;6M\x1b[<65;12;7M\x1b[D",
-    );
-
-    assert!(output.starts_with("\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1003h\x1b[?1006h\x1b[?1016l"));
-    assert!(output.contains("1\n10\n5\n0\n5\n4\n11\n6\n4\nLEFT\n"), "{output:?}");
-    assert!(output.ends_with("\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l\x1b[?1016l"));
-}
-
-#[test]
 fn graphics_mouse_reports_pixels() {
     let output = run_ppl_with_input(
-        r"
+        r#"
+        EVENT e
         MouseOn 1
-        PrintLn MousePoll()
-        PrintLn MouseX()
-        PrintLn MouseY()
-        PrintLn MousePixels()
+        e = EventPoll()
+        PrintLn e.Kind
+        PrintLn e.Code
+        PrintLn e.X
+        PrintLn e.Y
+        PrintLn e.Pixels
         MouseOff
-        ",
+        "#,
         b"\x1b[?1016;1$y\x1b[<0;101;51M",
     );
 
     assert!(output.starts_with("\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1003h\x1b[?1006h\x1b[?1016h\x1b[?1016$p"));
-    assert!(output.contains("1\n100\n50\n1\n"), "{output:?}");
+    assert!(output.contains("3\n1\n100\n50\n1\n"), "{output:?}");
 }
 
 #[test]

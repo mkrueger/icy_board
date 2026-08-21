@@ -43,7 +43,7 @@ impl BuiltinConst {
 }
 
 pub const STACK_LIMIT: i32 = 6022 + 1024;
-pub const BUILTIN_CONSTS: [BuiltinConst; 158] = [
+pub const BUILTIN_CONSTS: [BuiltinConst; 186] = [
     BuiltinConst { name: "TRUE", value: 0x01 },
     BuiltinConst { name: "FALSE", value: 0x00 },
     BuiltinConst {
@@ -471,6 +471,88 @@ pub const BUILTIN_CONSTS: [BuiltinConst; 158] = [
     },
     BuiltinConst { name: "GFX_FLIP_X", value: 1 },
     BuiltinConst { name: "GFX_FLIP_Y", value: 2 },
+    BuiltinConst { name: "EVENT_NONE", value: 0 },
+    BuiltinConst { name: "EVENT_KEY", value: 1 },
+    BuiltinConst {
+        name: "EVENT_KEY_EDGE",
+        value: 2,
+    },
+    BuiltinConst { name: "EVENT_MOUSE", value: 3 },
+    BuiltinConst {
+        name: "EVENT_OVERFLOW",
+        value: 4,
+    },
+    BuiltinConst { name: "KEY_ESCAPE", value: 27 },
+    BuiltinConst { name: "KEY_ENTER", value: 13 },
+    BuiltinConst { name: "KEY_TAB", value: 9 },
+    BuiltinConst {
+        name: "KEY_BACKSPACE",
+        value: 8,
+    },
+    BuiltinConst {
+        name: "KEY_DELETE",
+        value: 127,
+    },
+    BuiltinConst {
+        name: "KEY_UP",
+        value: 0x11_0001,
+    },
+    BuiltinConst {
+        name: "KEY_DOWN",
+        value: 0x11_0002,
+    },
+    BuiltinConst {
+        name: "KEY_RIGHT",
+        value: 0x11_0003,
+    },
+    BuiltinConst {
+        name: "KEY_LEFT",
+        value: 0x11_0004,
+    },
+    BuiltinConst {
+        name: "KEY_HOME",
+        value: 0x11_0005,
+    },
+    BuiltinConst {
+        name: "KEY_END",
+        value: 0x11_0006,
+    },
+    BuiltinConst {
+        name: "KEY_PAGE_UP",
+        value: 0x11_0007,
+    },
+    BuiltinConst {
+        name: "KEY_PAGE_DOWN",
+        value: 0x11_0008,
+    },
+    BuiltinConst {
+        name: "KEY_INSERT",
+        value: 0x11_0009,
+    },
+    BuiltinConst { name: "EVENT_SHIFT", value: 1 },
+    BuiltinConst { name: "EVENT_ALT", value: 2 },
+    BuiltinConst { name: "EVENT_CTRL", value: 4 },
+    BuiltinConst { name: "EVENT_META", value: 8 },
+    BuiltinConst {
+        name: "MOUSE_BUTTON_LEFT",
+        value: 1,
+    },
+    BuiltinConst {
+        name: "MOUSE_BUTTON_MIDDLE",
+        value: 2,
+    },
+    BuiltinConst {
+        name: "MOUSE_BUTTON_RIGHT",
+        value: 4,
+    },
+    BuiltinConst {
+        name: "MOUSE_WHEEL_LEFT",
+        value: 5,
+    },
+    BuiltinConst {
+        name: "MOUSE_WHEEL_RIGHT",
+        value: 6,
+    },
 ];
 
 impl Constant {

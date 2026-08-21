@@ -2873,18 +2873,6 @@ pub async fn sndplaying(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Va
     Ok(VariableValue::new_bool(playing))
 }
 
-pub async fn keypoll(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_bool(vm.icy_board_state.poll_ppl_key_event().await?))
-}
-
-pub async fn keycode(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_int(vm.icy_board_state.ppl_keys.current().code))
-}
-
-pub async fn keypressed(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_bool(vm.icy_board_state.ppl_keys.current().pressed))
-}
-
 pub async fn rgb(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let red = vm.eval_expr(&args[0]).await?.as_int();
     let green = vm.eval_expr(&args[1]).await?.as_int();
@@ -2898,28 +2886,14 @@ pub async fn rgb(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableV
     ))))
 }
 
-pub async fn mousepoll(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_int(vm.icy_board_state.poll_ppl_mouse_event().await?))
+pub async fn eventpoll(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
+    Ok(vm.icy_board_state.poll_ppl_event().await?.value())
 }
 
-pub async fn mousex(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_int(vm.icy_board_state.ppl_mouse.current().x))
-}
-
-pub async fn mousey(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_int(vm.icy_board_state.ppl_mouse.current().y))
-}
-
-pub async fn mousebutton(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_int(vm.icy_board_state.ppl_mouse.current().button))
-}
-
-pub async fn mousemodifiers(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_int(vm.icy_board_state.ppl_mouse.current().modifiers))
-}
-
-pub async fn mousepixels(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_bool(vm.icy_board_state.ppl_mouse.pixels()))
+pub async fn eventwait(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let milliseconds = vm.eval_expr(&args[0]).await?.as_int();
+    let timeout = (milliseconds >= 0).then(|| std::time::Duration::from_millis(milliseconds as u64));
+    Ok(vm.icy_board_state.wait_ppl_event(timeout).await?.value())
 }
 
 /// A request the caller's node waits on, so it needs an end: a host that never

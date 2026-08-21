@@ -445,14 +445,11 @@ pub fn get_function_hover(func: &FunctionDefinition) -> Option<Hover> {
         | FuncOpCode::GfxError
         | FuncOpCode::NewSurface
         | FuncOpCode::LoadSurface => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-gfx-api")),
-        FuncOpCode::MousePoll | FuncOpCode::MouseX | FuncOpCode::MouseY | FuncOpCode::MouseButton | FuncOpCode::MouseModifiers | FuncOpCode::MousePixels => {
-            get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-mouse-api"))
-        }
         FuncOpCode::Rgb | FuncOpCode::RgbAlpha => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-rgb")),
         FuncOpCode::SndAvailable | FuncOpCode::SndSupports | FuncOpCode::SndPlaying | FuncOpCode::SndError => {
             get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-sound-api"))
         }
-        FuncOpCode::KeyPoll | FuncOpCode::KeyCode | FuncOpCode::KeyPressed => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-key-api")),
+        FuncOpCode::EventPoll | FuncOpCode::EventWait => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-event-api")),
         _ => None,
     }
 }

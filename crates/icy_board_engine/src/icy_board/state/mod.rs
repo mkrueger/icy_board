@@ -34,6 +34,7 @@ use crate::{
 };
 pub mod functions;
 pub mod menu_runner;
+pub mod ppl_events;
 pub mod ppl_graphics;
 pub mod ppl_keys;
 pub mod ppl_mouse;
@@ -678,6 +679,7 @@ pub struct IcyBoardState {
     raw_input: VecDeque<u8>,
 
     pub ppl_graphics: Option<ppl_graphics::PplGraphicsState>,
+    ppl_event_keys: ppl_events::LogicalKeyState,
     pub ppl_keys: ppl_keys::PplKeyState,
     pub ppl_mouse: ppl_mouse::PplMouseState,
 }
@@ -757,6 +759,7 @@ impl IcyBoardState {
             gfx_probe: ppl_graphics::GfxProbe::default(),
             raw_input: VecDeque::new(),
             ppl_graphics: None,
+            ppl_event_keys: ppl_events::LogicalKeyState::default(),
             ppl_keys: ppl_keys::PplKeyState::default(),
             ppl_mouse: ppl_mouse::PplMouseState::default(),
         }
@@ -3118,42 +3121,98 @@ impl IcyBoardState {
         }
     }
 
-    pub async fn poll_ppl_mouse_event(&mut self) -> Res<i32> {
-        if !self.ppl_mouse.is_enabled() {
-            return Ok(ppl_mouse::MOUSE_EVENT_NONE);
+    fn take_pending_ppl_event(&mut self) -> Option<ppl_events::PplEvent> {
+        let dropped = self.ppl_keys.take_dropped().saturating_add(self.ppl_mouse.take_dropped());
+        if dropped > 0 {
+            return Some(self.ppl_event_with_mode(ppl_events::PplEvent::overflow(dropped)));
         }
-        self.drain_raw_input();
-        while !self.ppl_mouse.has_events() {
-            let mut input = [0u8; 64];
-            let read = self.connection.try_read(&mut input).await?;
-            if read == 0 {
-                break;
-            }
-            for byte in &input[..read] {
-                let keys = self.process_user_input_byte(*byte);
-                self.char_buffer.extend(keys);
+        if let Some(event) = self.ppl_event_keys.poll() {
+            return Some(self.ppl_event_with_mode(event));
+        }
+        while let Some(key) = self.char_buffer.pop_front() {
+            self.ppl_event_keys.feed(key);
+            if let Some(event) = self.ppl_event_keys.poll() {
+                return Some(self.ppl_event_with_mode(event));
             }
         }
-        Ok(self.ppl_mouse.poll())
+        if self.ppl_keys.poll() {
+            return Some(self.ppl_event_with_mode(ppl_events::PplEvent::key_edge(self.ppl_keys.current())));
+        }
+        let event_type = self.ppl_mouse.poll();
+        (event_type != ppl_mouse::MOUSE_EVENT_NONE).then(|| self.ppl_event_with_mode(ppl_events::PplEvent::mouse(self.ppl_mouse.current())))
     }
 
-    pub async fn poll_ppl_key_event(&mut self) -> Res<bool> {
-        if !self.ppl_keys.is_enabled() {
-            return Ok(false);
+    fn process_ppl_event_byte(&mut self, byte: u8) -> Option<ppl_events::PplEvent> {
+        let keys = self.process_user_input_byte(byte);
+        self.char_buffer.extend(keys);
+        self.take_pending_ppl_event()
+    }
+
+    fn empty_ppl_event(&self) -> ppl_events::PplEvent {
+        ppl_events::PplEvent {
+            pixels: self.ppl_mouse.pixels(),
+            ..Default::default()
         }
-        self.drain_raw_input();
-        while !self.ppl_keys.has_events() {
+    }
+
+    fn ppl_event_with_mode(&self, mut event: ppl_events::PplEvent) -> ppl_events::PplEvent {
+        event.pixels = self.ppl_mouse.pixels();
+        event.time = self.ppl_event_keys.elapsed_ms();
+        event
+    }
+
+    pub async fn poll_ppl_event(&mut self) -> Res<ppl_events::PplEvent> {
+        if let Some(event) = self.take_pending_ppl_event() {
+            return Ok(event);
+        }
+        while let Some(byte) = self.raw_input.pop_front() {
+            if let Some(event) = self.process_ppl_event_byte(byte) {
+                return Ok(event);
+            }
+        }
+
+        loop {
             let mut input = [0u8; 64];
             let read = self.connection.try_read(&mut input).await?;
             if read == 0 {
-                break;
+                return Ok(self.empty_ppl_event());
             }
-            for byte in &input[..read] {
-                let keys = self.process_user_input_byte(*byte);
-                self.char_buffer.extend(keys);
+            for (index, byte) in input[..read].iter().enumerate() {
+                if let Some(event) = self.process_ppl_event_byte(*byte) {
+                    self.raw_input.extend(&input[index + 1..read]);
+                    return Ok(event);
+                }
             }
         }
-        Ok(self.ppl_keys.poll())
+    }
+
+    pub async fn wait_ppl_event(&mut self, timeout: Option<Duration>) -> Res<ppl_events::PplEvent> {
+        let event = self.poll_ppl_event().await?;
+        if event.event_type != ppl_events::EVENT_NONE || timeout.is_some_and(|timeout| timeout.is_zero()) {
+            return Ok(event);
+        }
+
+        let deadline = timeout.map(|timeout| Instant::now() + timeout);
+        loop {
+            let result = if let Some(deadline) = deadline {
+                let remaining = deadline.saturating_duration_since(Instant::now());
+                if remaining.is_zero() {
+                    return Ok(self.empty_ppl_event());
+                }
+                match tokio::time::timeout(remaining, self.get_char(TerminalTarget::Both)).await {
+                    Ok(result) => result,
+                    Err(_) => return Ok(self.empty_ppl_event()),
+                }
+            } else {
+                self.get_char(TerminalTarget::Both).await
+            };
+            if let Some(key) = result? {
+                self.ppl_event_keys.feed(key);
+            }
+            if let Some(event) = self.take_pending_ppl_event() {
+                return Ok(event);
+            }
+        }
     }
 
     pub async fn get_char_edit(&mut self) -> Res<Option<KeyChar>> {

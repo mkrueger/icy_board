@@ -191,18 +191,22 @@ fn test_message_areas() -> AreaList {
 }
 
 pub fn test_output<P: Fn(&mut IcyBoard)>(cmd: String, init_fn: P) -> String {
-    test_session_output(cmd, init_fn, true, None)
+    test_session_output(cmd, init_fn, true, None, true)
+}
+
+pub fn test_user_output<P: Fn(&mut IcyBoard)>(cmd: String, init_fn: P) -> String {
+    test_session_output(cmd, init_fn, true, None, false)
 }
 
 pub fn test_login_output<P: Fn(&mut IcyBoard)>(cmd: String, init_fn: P) -> String {
-    test_session_output(cmd, init_fn, false, None)
+    test_session_output(cmd, init_fn, false, None, true)
 }
 
 pub fn test_ppe_output<P: Fn(&mut IcyBoard)>(source: &str, init_fn: P) -> String {
     test_ppe_output_with_input(source, "", init_fn)
 }
 
-pub fn test_ppe_output_with_input<P: Fn(&mut IcyBoard)>(source: &str, input: &str, init_fn: P) -> String {
+pub fn compile_test_ppe(source: &str) -> PathBuf {
     let dir = test_dir();
     let source_file = dir.join("direct.pps");
     let ppe_file = source_file.with_extension("ppe");
@@ -217,6 +221,11 @@ pub fn test_ppe_output_with_input<P: Fn(&mut IcyBoard)>(source: &str, input: &st
     compiler.compile(&[&ast]);
     assert!(!errors.lock().unwrap().has_errors());
     std::fs::write(&ppe_file, compiler.create_executable().unwrap().to_buffer().unwrap()).unwrap();
+    ppe_file
+}
+
+pub fn test_ppe_output_with_input<P: Fn(&mut IcyBoard)>(source: &str, input: &str, init_fn: P) -> String {
+    let ppe_file = compile_test_ppe(source);
 
     test_session_output(
         input.to_string(),
@@ -228,10 +237,11 @@ pub fn test_ppe_output_with_input<P: Fn(&mut IcyBoard)>(source: &str, input: &st
             password: None,
             args: Vec::new(),
         }),
+        true,
     )
 }
 
-fn test_session_output<P: Fn(&mut IcyBoard)>(cmd: String, init_fn: P, login_sysop: bool, ppe: Option<PPEExecute>) -> String {
+fn test_session_output<P: Fn(&mut IcyBoard)>(cmd: String, init_fn: P, login_sysop: bool, ppe: Option<PPEExecute>, stuff_input: bool) -> String {
     let result = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
         let bbs: Arc<tokio::sync::Mutex<BBS>> = Arc::new(tokio::sync::Mutex::new(BBS::new(1)));
         let mut icy_board = icy_board_engine::icy_board::IcyBoard::new();
@@ -281,8 +291,12 @@ fn test_session_output<P: Fn(&mut IcyBoard)>(cmd: String, init_fn: P, login_syso
         let result = Arc::new(tokio::sync::Mutex::new(Vec::new()));
 
         let res = result.clone();
+        let user_input = (!stuff_input).then_some(cmd.clone());
         let _ = std::thread::Builder::new().name("Terminal update".to_string()).spawn(move || {
             tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
+                if let Some(input) = user_input {
+                    ui_connection.send(input.as_bytes()).await.unwrap();
+                }
                 let mut buffer = [0; 1024];
                 let mut exit_sent = false;
                 loop {
@@ -311,7 +325,8 @@ fn test_session_output<P: Fn(&mut IcyBoard)>(cmd: String, init_fn: P, login_syso
                 tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
                     let options = LoginOptions { login_sysop, ppe, local: true };
 
-                    if let Err(err) = internal_handle_client(state, Some(options), &cmd).await {
+                    let stuffed_chars = if stuff_input { cmd.as_str() } else { "" };
+                    if let Err(err) = internal_handle_client(state, Some(options), stuffed_chars).await {
                         log::error!("Error running background client: {}", err);
                     }
                 });
