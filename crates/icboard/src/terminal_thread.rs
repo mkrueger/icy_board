@@ -204,7 +204,7 @@ pub fn start_update_thread(com: Box<dyn Connection>, screen: Arc<Mutex<TextScree
                                                                     )
                                                                     .await;
                                                                 } else {
-                                                                    std::thread::sleep(std::time::Duration::from_millis(20));
+                                                                    break;
                                                                 }
                                                             }
                                                         }
@@ -394,7 +394,33 @@ pub enum SendData {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
+    use icy_net::connection::channel::ChannelConnection;
+
     use super::*;
+
+    #[tokio::test]
+    async fn local_terminal_forwards_keyboard_input_to_the_board() {
+        let (ui_connection, mut board_connection) = ChannelConnection::create_pair();
+        let screen = Arc::new(Mutex::new(TextScreen::new((80, 25))));
+        let (handle, tx) = start_update_thread(Box::new(ui_connection), screen);
+
+        tx.send(SendData::Data(b"q".to_vec())).await.unwrap();
+        let mut input = [0; 1];
+        assert_eq!(
+            tokio::time::timeout(Duration::from_secs(1), board_connection.read(&mut input))
+                .await
+                .unwrap()
+                .unwrap(),
+            1
+        );
+        assert_eq!(input, [b'q']);
+
+        drop(tx);
+        drop(board_connection);
+        handle.join().unwrap();
+    }
 
     #[test]
     fn cached_media_paths_allow_namespaces_but_not_traversal() {

@@ -174,21 +174,6 @@ impl Tui {
                     return Ok(());
                 }
             }
-            //if redraw
-            {
-                //  redraw = false;
-                if !self.rendered_sixels.is_empty() && self.current_sixels().is_empty() {
-                    terminal.clear()?;
-                    self.rendered_sixels.clear();
-                    self.rendered_images.clear();
-                    self.rendered_image_context = None;
-                }
-                self.refresh_images(terminal.size()?)?;
-                let status_bar_info = StatusBarInfo::get_info(board, &self.node_state, self.node).await;
-                let _ = terminal.draw(|frame| {
-                    self.ui(frame, status_bar_info);
-                });
-            }
             let timeout = tick_rate.saturating_sub(last_tick.elapsed());
             self.sync_host_mouse_mode()?;
             if event::poll(timeout)? {
@@ -248,6 +233,19 @@ impl Tui {
                     _ => {}
                 }
             }
+
+            // Progressive image updates can be expensive; input must be serviced first.
+            if !self.rendered_sixels.is_empty() && self.current_sixels().is_empty() {
+                terminal.clear()?;
+                self.rendered_sixels.clear();
+                self.rendered_images.clear();
+                self.rendered_image_context = None;
+            }
+            self.refresh_images(terminal.size()?)?;
+            let status_bar_info = StatusBarInfo::get_info(board, &self.node_state, self.node).await;
+            let _ = terminal.draw(|frame| {
+                self.ui(frame, status_bar_info);
+            });
 
             if last_tick.elapsed() >= tick_rate {
                 last_tick = Instant::now();
