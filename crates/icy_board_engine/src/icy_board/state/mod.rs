@@ -2841,6 +2841,7 @@ impl IcyBoardState {
             tokio::select! {
                 msg = bbs_channel.recv() => {
                     if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
+                        state.sysop_connection = Some(sysop_connection);
                         state.bbs_channel = Some(bbs_channel);
                     }
                     match msg {
@@ -2867,11 +2868,13 @@ impl IcyBoardState {
                     return Ok(None);
                 }
                 size = sysop_connection.read(&mut sysop_key_data) => {
+                    // Both were taken out of the node, so a read that brought nothing has to
+                    // hand them back too - otherwise this node never reads input again.
+                    if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
+                        state.sysop_connection = Some(sysop_connection);
+                        state.bbs_channel = Some(bbs_channel);
+                    }
                     if let Ok(1) = size {
-                        if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
-                            state.sysop_connection = Some(sysop_connection);
-                            state.bbs_channel = Some(bbs_channel);
-                        }
                         if target == TerminalTarget::User {
                             self.char_buffer.push_back(KeyChar::new(KeySource::Sysop, sysop_key_data[0] as char));
                             return Ok(None);
@@ -2881,12 +2884,12 @@ impl IcyBoardState {
                     }
                 }
                 size2 = self.connection.read(&mut user_key_data) => {
+                    if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
+                        state.sysop_connection = Some(sysop_connection);
+                        state.bbs_channel = Some(bbs_channel);
+                    }
                     if let Ok(1) = size2 {
                         self.session.keyboard_timer_started = Instant::now();
-                        if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
-                            state.sysop_connection = Some(sysop_connection);
-                            state.bbs_channel = Some(bbs_channel);
-                        }
                         let mut keys = self.process_user_input_byte(user_key_data[0]).into_iter();
                         let key = keys.next();
                         if target == TerminalTarget::Sysop {
@@ -2933,11 +2936,11 @@ impl IcyBoardState {
 
                 }
                 size2 = self.connection.read(&mut user_key_data) => {
+                    if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
+                        state.bbs_channel = Some(bbs_channel);
+                    }
                     if let Ok(1) = size2 {
                         self.session.keyboard_timer_started = Instant::now();
-                        if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
-                            state.bbs_channel = Some(bbs_channel);
-                        }
                         let mut keys = self.process_user_input_byte(user_key_data[0]).into_iter();
                         let key = keys.next();
                         if target == TerminalTarget::Sysop {
@@ -2962,7 +2965,7 @@ impl IcyBoardState {
             }
         }
 
-        thread::sleep(Duration::from_millis(100));
+        sleep(Duration::from_millis(100)).await;
         Ok(None)
     }
 
