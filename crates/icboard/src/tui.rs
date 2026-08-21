@@ -44,7 +44,7 @@ pub struct Tui {
     rendered_sixels: Vec<Sixel>,
     image_picker: Option<Picker>,
     rendered_images: Vec<RenderedImage>,
-    rendered_image_context: Option<(ratatui::layout::Size, bool)>,
+    rendered_image_context: Option<(ratatui::layout::Size, bool, icy_engine::Size)>,
     host_mouse_capture: bool,
     host_pixel_mouse: bool,
 }
@@ -311,11 +311,14 @@ impl Tui {
         let screen = self.screen.lock().unwrap();
         let sixels = current_sixels(&screen);
         let fullscreen = screen.buffer.terminal_state.sixel_shared_palette;
+        // The parser placed these images using the screen's font, so the same one has to
+        // undo that placement - the local terminal's cell size is a different metric.
+        let font = screen.font_dimensions();
         let viewport_size = ratatui::layout::Size::new(
             terminal_area.width.min(screen.buffer.terminal_state.width().max(0) as u16),
             terminal_area.height.min(screen.buffer.terminal_state.height().max(0) as u16),
         );
-        let render_context = (viewport_size, fullscreen);
+        let render_context = (viewport_size, fullscreen, font);
         if sixels == self.rendered_sixels && self.rendered_image_context == Some(render_context) {
             return Ok(());
         }
@@ -324,23 +327,22 @@ impl Tui {
         let Some(picker) = &self.image_picker else {
             return Ok(());
         };
-        let font = picker.font_size();
-        let mut rendered = Vec::with_capacity(sixels.len());
-        for sixel in &sixels {
-            let Some(rgba) = image::RgbaImage::from_raw(sixel.width() as u32, sixel.height() as u32, sixel.picture_data.clone()) else {
-                continue;
-            };
-            let scale_to_viewport = fullscreen && sixel.position == icy_engine::Position::default();
-            let target_size = image_target_size(sixel.width(), sixel.height(), font, viewport_size, scale_to_viewport);
+        let composited = composite_sixels(&sixels, font);
+        let mut rendered = Vec::with_capacity(composited.len());
+        for (position, rgba) in composited {
+            let scale_to_viewport = fullscreen && position == icy_engine::Position::default();
+            let target_size = image_target_size(rgba.width() as i32, rgba.height() as i32, font, viewport_size, scale_to_viewport);
             if target_size.width == 0 || target_size.height == 0 {
                 continue;
             }
-            let resize = if scale_to_viewport { Resize::Scale(None) } else { Resize::Fit(None) };
-            let protocol = picker.new_protocol(image::DynamicImage::ImageRgba8(rgba), target_size, resize)?;
+            let source_size = rgba.dimensions();
+            // The cell rect is the area the image covers on the BBS screen, so it gets filled:
+            // fitting it would letterbox the image and reopen the gaps between updates.
+            let protocol = picker.new_protocol(image::DynamicImage::ImageRgba8(rgba), target_size, Resize::Scale(None))?;
             rendered.push(RenderedImage {
-                position: sixel.position,
+                position,
                 protocol,
-                source_size: (sixel.width() as u32, sixel.height() as u32),
+                source_size,
                 scaled_to_viewport: scale_to_viewport,
             });
         }
@@ -626,10 +628,69 @@ fn current_sixels(screen: &TextScreen) -> Vec<Sixel> {
     screen.buffer.layers.iter().flat_map(|layer| layer.sixels.iter().cloned()).collect()
 }
 
+struct CompositedImage {
+    x: i32,
+    y: i32,
+    rgba: image::RgbaImage,
+}
+
+fn composite_sixels(sixels: &[Sixel], font: icy_engine::Size) -> Vec<(icy_engine::Position, image::RgbaImage)> {
+    let font_width = font.width.max(1);
+    let font_height = font.height.max(1);
+    let mut composited: Vec<CompositedImage> = Vec::new();
+    for sixel in sixels {
+        let Some(update) = image::RgbaImage::from_raw(sixel.width() as u32, sixel.height() as u32, sixel.picture_data.clone()) else {
+            continue;
+        };
+        let x = sixel.position.x * font_width + sixel.pixel_offset.x;
+        let y = sixel.position.y * font_height + sixel.pixel_offset.y;
+        let Some(canvas) = composited.iter_mut().find(|canvas| images_touch(canvas, x, y, &update)) else {
+            composited.push(CompositedImage { x, y, rgba: update });
+            continue;
+        };
+        overlay_image(canvas, x, y, &update);
+    }
+    composited
+        .into_iter()
+        .map(|image| {
+            let position = icy_engine::Position::new(image.x / font_width, image.y / font_height);
+            let offset_x = (image.x % font_width) as u32;
+            let offset_y = (image.y % font_height) as u32;
+            if offset_x == 0 && offset_y == 0 {
+                return (position, image.rgba);
+            }
+            let mut aligned = image::RgbaImage::new(offset_x + image.rgba.width(), offset_y + image.rgba.height());
+            image::imageops::overlay(&mut aligned, &image.rgba, i64::from(offset_x), i64::from(offset_y));
+            (position, aligned)
+        })
+        .collect()
+}
+
+fn images_touch(canvas: &CompositedImage, x: i32, y: i32, update: &image::RgbaImage) -> bool {
+    let canvas_right = canvas.x + canvas.rgba.width() as i32;
+    let canvas_bottom = canvas.y + canvas.rgba.height() as i32;
+    let update_right = x + update.width() as i32;
+    let update_bottom = y + update.height() as i32;
+    canvas.x <= update_right && x <= canvas_right && canvas.y <= update_bottom && y <= canvas_bottom
+}
+
+fn overlay_image(canvas: &mut CompositedImage, x: i32, y: i32, update: &image::RgbaImage) {
+    let left = canvas.x.min(x);
+    let top = canvas.y.min(y);
+    let right = (canvas.x + canvas.rgba.width() as i32).max(x + update.width() as i32);
+    let bottom = (canvas.y + canvas.rgba.height() as i32).max(y + update.height() as i32);
+    let mut expanded = image::RgbaImage::new((right - left) as u32, (bottom - top) as u32);
+    image::imageops::overlay(&mut expanded, &canvas.rgba, i64::from(canvas.x - left), i64::from(canvas.y - top));
+    image::imageops::overlay(&mut expanded, update, i64::from(x - left), i64::from(y - top));
+    canvas.x = left;
+    canvas.y = top;
+    canvas.rgba = expanded;
+}
+
 fn image_target_size(
     pixel_width: i32,
     pixel_height: i32,
-    font: ratatui_image::FontSize,
+    font: icy_engine::Size,
     viewport: ratatui::layout::Size,
     scale_to_viewport: bool,
 ) -> ratatui::layout::Size {
@@ -637,8 +698,8 @@ fn image_target_size(
         return viewport;
     }
     ratatui::layout::Size::new(
-        (pixel_width as u32).div_ceil(u32::from(font.width)).min(u32::from(viewport.width)) as u16,
-        (pixel_height as u32).div_ceil(u32::from(font.height)).min(u32::from(viewport.height)) as u16,
+        (pixel_width.max(0) as u32).div_ceil(font.width.max(1) as u32).min(u32::from(viewport.width)) as u16,
+        (pixel_height.max(0) as u32).div_ceil(font.height.max(1) as u32).min(u32::from(viewport.height)) as u16,
     )
 }
 
@@ -671,16 +732,55 @@ mod sixel_tests {
     }
 
     #[test]
+    fn touching_pixel_offset_bands_are_composited_without_gaps() {
+        let first = Sixel::from_data((1, 10), 1, 1, vec![255, 0, 0, 255].repeat(10));
+        let mut second = Sixel::from_data((1, 10), 1, 1, vec![0, 255, 0, 255].repeat(10));
+        second.pixel_offset.y = 10;
+
+        let composited = composite_sixels(&[first, second], icy_engine::Size::new(8, 20));
+        assert_eq!(composited.len(), 1);
+        assert_eq!(composited[0].1.dimensions(), (1, 20));
+        assert_eq!(composited[0].1.get_pixel(0, 9).0, [255, 0, 0, 255]);
+        assert_eq!(composited[0].1.get_pixel(0, 10).0, [0, 255, 0, 255]);
+    }
+
+    /// The screen font splits a band into a cell position plus a pixel offset, so the
+    /// renderer has to rebuild it with that same font to land where the band belongs.
+    #[test]
+    fn bands_are_placed_with_the_screen_font_not_the_terminal_cell_size() {
+        let font = icy_engine::Size::new(8, 16);
+        let mut bands = Vec::new();
+        for index in 0..4 {
+            let mut band = Sixel::from_data((640, 40), 1, 1, vec![0, 0, 255, 255].repeat(640 * 40));
+            let top = index * 40;
+            band.position = icy_engine::Position::new(0, top / font.height);
+            band.pixel_offset = icy_engine::Position::new(0, top % font.height);
+            bands.push(band);
+        }
+
+        let composited = composite_sixels(&bands, font);
+        assert_eq!(composited.len(), 1);
+        assert_eq!(composited[0].0, icy_engine::Position::default());
+        assert_eq!(composited[0].1.dimensions(), (640, 160));
+
+        // 640x160 screen pixels is the full 80 columns and 10 rows it covers on the board.
+        assert_eq!(
+            image_target_size(640, 160, font, ratatui::layout::Size::new(80, 25), false),
+            ratatui::layout::Size::new(80, 10)
+        );
+    }
+
+    #[test]
     fn fullscreen_image_targets_the_complete_terminal_viewport() {
         let viewport = ratatui::layout::Size::new(80, 25);
 
-        assert_eq!(image_target_size(640, 400, ratatui_image::FontSize::new(8, 16), viewport, true), viewport);
+        assert_eq!(image_target_size(640, 400, icy_engine::Size::new(8, 16), viewport, true), viewport);
     }
 
     #[test]
     fn inline_image_keeps_its_natural_cell_size() {
         assert_eq!(
-            image_target_size(320, 200, ratatui_image::FontSize::new(10, 20), ratatui::layout::Size::new(80, 25), false,),
+            image_target_size(320, 200, icy_engine::Size::new(10, 20), ratatui::layout::Size::new(80, 25), false,),
             ratatui::layout::Size::new(32, 10)
         );
     }
