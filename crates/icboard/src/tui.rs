@@ -1,7 +1,10 @@
 use std::{
     collections::HashMap,
     io::{self, Stdout, stdout},
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    },
     time::{Duration, Instant},
 };
 
@@ -37,6 +40,7 @@ pub struct Tui {
     sysop_mode: bool,
     screen: Arc<std::sync::Mutex<TextScreen>>,
     tx: mpsc::Sender<SendData>,
+    screen_generation: Arc<AtomicU64>,
     status_bar: usize,
     handle: Arc<Mutex<Vec<Option<NodeState>>>>,
     node: usize,
@@ -88,12 +92,14 @@ impl Tui {
             })
             .unwrap();
         bbs.lock().await.get_open_connections().as_ref().lock().await[node].as_mut().unwrap().handle = Some(handle);
-        let (_handle2, tx) = crate::terminal_thread::start_update_thread(Box::new(ui_connection), screen.clone());
+        let screen_generation = Arc::new(AtomicU64::new(0));
+        let (_handle2, tx) = crate::terminal_thread::start_update_thread(Box::new(ui_connection), screen.clone(), screen_generation.clone());
 
         Ok(Self {
             sysop_mode: false,
             screen,
             tx,
+            screen_generation,
             status_bar: 0,
             node,
             node_state,
@@ -127,12 +133,14 @@ impl Tui {
 
         let screen = Arc::new(std::sync::Mutex::new(TextScreen::new((80, 25))));
         log::info!("Run terminal thread");
-        let (_handle2, tx) = crate::terminal_thread::start_update_thread(Box::new(ui_connection), screen.clone());
+        let screen_generation = Arc::new(AtomicU64::new(0));
+        let (_handle2, tx) = crate::terminal_thread::start_update_thread(Box::new(ui_connection), screen.clone(), screen_generation.clone());
 
         Ok(Self {
             sysop_mode: true,
             screen,
             tx,
+            screen_generation,
             status_bar: 0,
             node,
             node_state,
@@ -149,7 +157,12 @@ impl Tui {
     pub async fn run(&mut self, bbs: &mut Arc<Mutex<BBS>>, board: &Arc<tokio::sync::Mutex<IcyBoard>>) -> Res<()> {
         let mut terminal = init_terminal()?;
         let mut last_tick = Instant::now();
+        let mut last_status = Instant::now();
         let tick_rate = Duration::from_millis(20);
+        let status_rate = Duration::from_secs(1);
+        let screen_session = std::env::var_os("STY").is_some();
+        let mut rendered_generation = u64::MAX;
+        let mut redraw = true;
         terminal.clear()?;
         let _mouse_capture = MouseCaptureGuard;
         self.image_picker = Some(Picker::from_query_stdio().unwrap_or_else(|err| {
@@ -177,6 +190,7 @@ impl Tui {
             let timeout = tick_rate.saturating_sub(last_tick.elapsed());
             self.sync_host_mouse_mode()?;
             if event::poll(timeout)? {
+                redraw = true;
                 match event::read()? {
                     Event::Key(key) if key.kind == KeyEventKind::Press => {
                         if key.modifiers.contains(KeyModifiers::ALT) {
@@ -240,12 +254,19 @@ impl Tui {
                 self.rendered_sixels.clear();
                 self.rendered_images.clear();
                 self.rendered_image_context = None;
+                redraw = true;
             }
-            self.refresh_images(terminal.size()?)?;
-            let status_bar_info = StatusBarInfo::get_info(board, &self.node_state, self.node).await;
-            let _ = terminal.draw(|frame| {
-                self.ui(frame, status_bar_info);
-            });
+            let generation = self.screen_generation.load(Ordering::Acquire);
+            if !screen_session || redraw || generation != rendered_generation || last_status.elapsed() >= status_rate {
+                self.refresh_images(terminal.size()?)?;
+                let status_bar_info = StatusBarInfo::get_info(board, &self.node_state, self.node).await;
+                let _ = terminal.draw(|frame| {
+                    self.ui(frame, status_bar_info);
+                });
+                rendered_generation = generation;
+                redraw = false;
+                last_status = Instant::now();
+            }
 
             if last_tick.elapsed() >= tick_rate {
                 last_tick = Instant::now();

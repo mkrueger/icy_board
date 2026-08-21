@@ -49,6 +49,7 @@ pub static LANGUAGE_LOADER: Lazy<FluentLanguageLoader> = Lazy::new(|| {
     let loader = fluent_language_loader!();
     let requested_languages = DesktopLanguageRequester::requested_languages();
     let _result = i18n_embed::select(&loader, &Localizations, &requested_languages);
+    loader.set_use_isolating(false);
     loader
 });
 
@@ -160,9 +161,18 @@ pub static BORDER_SET: border::Set = border::Set {
 
 #[cfg(test)]
 mod help_tests {
-    use super::get_text;
+    use std::collections::HashMap;
+
+    use super::{get_text, get_text_args};
 
     const ENGLISH_FTL: &str = include_str!("../i18n/en/icy_board_tui.ftl");
+
+    #[test]
+    fn interpolated_terminal_text_has_no_bidi_isolates() {
+        let text = get_text_args("icb_setup_main_use_label", HashMap::from([("version".to_string(), "0.2.0".to_string())]));
+
+        assert!(!text.contains(['\u{2068}', '\u{2069}']));
+    }
 
     #[test]
     fn every_declared_help_entry_resolves_without_a_placeholder() {

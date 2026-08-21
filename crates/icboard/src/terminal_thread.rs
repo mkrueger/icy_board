@@ -9,7 +9,10 @@ use icy_net::Connection;
 use icy_parser_core::{AnsiParser, CommandParser};
 use std::{
     path::{Path, PathBuf},
-    sync::{Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicU64, Ordering},
+    },
     thread,
 };
 use tokio::sync::mpsc;
@@ -147,7 +150,11 @@ fn safe_cache_path(directory: &Path, name: &str) -> Option<PathBuf> {
 }
 
 const EMSI_IRQ: &[u8; 15] = b"**EMSI_IRQ8E08\r";
-pub fn start_update_thread(com: Box<dyn Connection>, screen: Arc<Mutex<TextScreen>>) -> (thread::JoinHandle<()>, mpsc::Sender<SendData>) {
+pub fn start_update_thread(
+    com: Box<dyn Connection>,
+    screen: Arc<Mutex<TextScreen>>,
+    generation: Arc<AtomicU64>,
+) -> (thread::JoinHandle<()>, mpsc::Sender<SendData>) {
     let (tx, rx) = mpsc::channel(32);
     (
         std::thread::Builder::new()
@@ -203,6 +210,7 @@ pub fn start_update_thread(com: Box<dyn Connection>, screen: Arc<Mutex<TextScree
                                                                         &data[..size],
                                                                     )
                                                                     .await;
+                                                                    generation.fetch_add(1, Ordering::Release);
                                                                 } else {
                                                                     break;
                                                                 }
@@ -404,7 +412,8 @@ mod tests {
     async fn local_terminal_forwards_keyboard_input_to_the_board() {
         let (ui_connection, mut board_connection) = ChannelConnection::create_pair();
         let screen = Arc::new(Mutex::new(TextScreen::new((80, 25))));
-        let (handle, tx) = start_update_thread(Box::new(ui_connection), screen);
+        let generation = Arc::new(AtomicU64::new(0));
+        let (handle, tx) = start_update_thread(Box::new(ui_connection), screen, generation.clone());
 
         tx.send(SendData::Data(b"q".to_vec())).await.unwrap();
         let mut input = [0; 1];
@@ -416,6 +425,16 @@ mod tests {
             1
         );
         assert_eq!(input, [b'q']);
+        assert_eq!(generation.load(Ordering::Acquire), 0);
+
+        board_connection.send(b"hello").await.unwrap();
+        tokio::time::timeout(Duration::from_secs(1), async {
+            while generation.load(Ordering::Acquire) == 0 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
 
         drop(tx);
         drop(board_connection);

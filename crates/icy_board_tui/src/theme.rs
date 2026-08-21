@@ -162,24 +162,52 @@ pub static DEFAULT_THEME: Theme = Theme {
     swatch: true,
 };
 
-// const DARK_BLUE: Color = Color::Rgb(16, 24, 48);
-const LIGHT_GRAY: Color = Color::Rgb(188, 188, 188);
-const WHITE: Color = Color::Rgb(238, 238, 238); // not really white, often #eeeeee
+const LIGHT_GRAY: Color = Color::Indexed(7);
+const WHITE: Color = Color::Indexed(15);
 
-pub const DOS_BLACK: Color = Color::Rgb(0, 0, 0);
-pub const DOS_BLUE: Color = Color::Rgb(0, 0, 0xAA);
-pub const DOS_GREEN: Color = Color::Rgb(0, 0xAA, 0);
-pub const DOS_CYAN: Color = Color::Rgb(0, 0xAA, 0xAA);
-pub const DOS_RED: Color = Color::Rgb(0xAA, 0, 0);
-pub const DOS_MAGENTA: Color = Color::Rgb(0xAA, 0, 0xAA);
-pub const DOS_BROWN: Color = Color::Rgb(0xAA, 0x55, 0);
-pub const DOS_LIGHT_GRAY: Color = Color::Rgb(0xAA, 0xAA, 0xAA);
+pub const DOS_BLACK: Color = Color::Indexed(0);
+pub const DOS_BLUE: Color = Color::Indexed(4);
+pub const DOS_GREEN: Color = Color::Indexed(2);
+pub const DOS_CYAN: Color = Color::Indexed(6);
+pub const DOS_RED: Color = Color::Indexed(1);
+pub const DOS_MAGENTA: Color = Color::Indexed(5);
+pub const DOS_BROWN: Color = Color::Indexed(3);
+pub const DOS_LIGHT_GRAY: Color = Color::Indexed(7);
 
-pub const DOS_DARK_GRAY: Color = Color::Rgb(0x55, 0x55, 0x55);
-pub const DOS_LIGHT_BLUE: Color = Color::Rgb(0x55, 0x55, 0xFF);
-pub const DOS_LIGHT_GREEN: Color = Color::Rgb(0x55, 0xFF, 0x55);
-pub const DOS_LIGHT_CYAN: Color = Color::Rgb(0x55, 0xFF, 0xFF);
-pub const DOS_LIGHT_RED: Color = Color::Rgb(0xFF, 0x55, 0x55);
-pub const DOS_LIGHT_MAGENTA: Color = Color::Rgb(0xFF, 0x55, 0xFF);
-pub const DOS_YELLOW: Color = Color::Rgb(0xFF, 0xFF, 0x55);
-pub const DOS_WHITE: Color = Color::Rgb(0xFF, 0xFF, 0xFF);
+pub const DOS_DARK_GRAY: Color = Color::Indexed(8);
+pub const DOS_LIGHT_BLUE: Color = Color::Indexed(12);
+pub const DOS_LIGHT_GREEN: Color = Color::Indexed(10);
+pub const DOS_LIGHT_CYAN: Color = Color::Indexed(14);
+pub const DOS_LIGHT_RED: Color = Color::Indexed(9);
+pub const DOS_LIGHT_MAGENTA: Color = Color::Indexed(13);
+pub const DOS_YELLOW: Color = Color::Indexed(11);
+pub const DOS_WHITE: Color = Color::Indexed(15);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dos_palette_uses_screen_compatible_ansi_colors() {
+        let colors = [
+            DOS_BLACK,
+            DOS_BLUE,
+            DOS_GREEN,
+            DOS_CYAN,
+            DOS_RED,
+            DOS_MAGENTA,
+            DOS_BROWN,
+            DOS_LIGHT_GRAY,
+            DOS_DARK_GRAY,
+            DOS_LIGHT_BLUE,
+            DOS_LIGHT_GREEN,
+            DOS_LIGHT_CYAN,
+            DOS_LIGHT_RED,
+            DOS_LIGHT_MAGENTA,
+            DOS_YELLOW,
+            DOS_WHITE,
+        ];
+
+        assert!(colors.into_iter().all(|color| matches!(color, Color::Indexed(0..=15))));
+    }
+}
