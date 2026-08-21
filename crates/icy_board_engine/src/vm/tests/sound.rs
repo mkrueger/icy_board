@@ -47,6 +47,39 @@ fn unsupported_sound_is_not_uploaded() {
 }
 
 #[test]
+fn a_second_format_is_probed_and_uploaded_after_the_first() {
+    let output = run_ppl_with_files_and_input(
+        r#"
+        SndPreload "music.ogg"
+        SndPreload "rotate.wav"
+        PrintLn SndError()
+        "#,
+        &[("music.ogg", b"OggS\x00\x02\x01\x13OpusHead"), ("rotate.wav", b"RIFFxxxxWAVEfmt ")],
+        b"\x1b[=7;100;1n\x1b[=7;101;32;100;1n\x1b[=7;101;1;0;1n",
+    );
+
+    assert!(output.contains("SyncTERM:Q;libsndfileFormat;32;100"), "{output:?}");
+    assert!(output.contains("SyncTERM:Q;libsndfileFormat;1;0"), "{output:?}");
+    assert_eq!(output.matches("SyncTERM:C;S;").count(), 2, "{output:?}");
+}
+
+#[test]
+fn a_format_probe_that_goes_unanswered_does_not_mute_the_channel() {
+    let output = run_ppl_with_files_and_input(
+        r#"
+        SndPlay 0, "tone.wav"
+        PrintLn SndError()
+        "#,
+        &[("tone.wav", b"RIFFxxxxWAVEfmt ")],
+        b"\x1b[=7;100;1n",
+    );
+
+    assert!(output.contains("SyncTERM:C;S;"), "{output:?}");
+    assert!(output.contains("Queue;C=2;S=2"), "{output:?}");
+    assert!(output.ends_with("0\n"), "{output:?}");
+}
+
+#[test]
 fn an_invalid_channel_is_reported_instead_of_redirected() {
     let output = super::run_ppl(
         r"

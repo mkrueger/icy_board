@@ -3102,13 +3102,17 @@ impl IcyBoardState {
         }
         let query = format!("\x1b_SyncTERM:Q;libsndfileFormat;{major};{subtype}\x1b\\");
         let prefix = format!("\x1b[=7;101;{major};{subtype};");
+        // A terminal that reported libsndfile but let this probe run out is taken at its
+        // word: an APC it cannot use is ignored anyway, while a remembered "no" would
+        // leave the format silent for the rest of the call. A large upload ahead of the
+        // probe is enough to push the answer past the deadline.
         let supported = self
             .query_terminal_csi(query.as_bytes(), |reply| {
                 let value = reply.strip_prefix(&prefix)?.strip_suffix('n')?;
                 Some(value == "1")
             })
             .await?
-            .unwrap_or(false);
+            .unwrap_or(true);
         self.sound_formats.insert(format, supported);
         Ok(supported)
     }
