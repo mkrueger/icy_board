@@ -269,13 +269,12 @@ pub enum OpCode {
     WebRequest = 230,
 
     GfxInit = 231,
-    GfxWaitFrame = 232,
-    GfxShutdown = 233,
-    MouseOn = 234,
-    MouseOff = 235,
-    GfxSetPacing = 236,
-    KeyEvents = 237,
-    MemberCall = 238,
+    GfxShutdown = 232,
+    MouseOn = 233,
+    MouseOff = 234,
+    GfxSetPacing = 235,
+    KeyEvents = 236,
+    MemberCall = 237,
 }
 pub const LAST_STMT: i16 = OpCode::MemberCall as i16;
 
@@ -603,7 +602,7 @@ pub fn format_argument_type_last(arg: &ArgumentDefinition) -> String {
 // "WAIT FOR" == "WAITFOR"
 // "GO SUB"
 // " GO TO"
-pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 244]> = std::sync::LazyLock::new(|| {
+pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 243]> = std::sync::LazyLock::new(|| {
     [
         StatementDefinition {
             // helps to map opcode to array index.
@@ -2587,13 +2586,6 @@ pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 244]
                 ArgumentDefinition::new("Fullscreen", VariableType::Boolean),
             ]),
             sig: StatementSignature::VariableArguments(0, 0, 2),
-        },
-        StatementDefinition {
-            name: "GfxWaitFrame",
-            version: 400,
-            opcode: OpCode::GfxWaitFrame,
-            args: Some(vec![ArgumentDefinition::new("FramesPerSecond", VariableType::Integer)]),
-            sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {
             name: "GfxShutdown",

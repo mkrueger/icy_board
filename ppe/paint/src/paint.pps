@@ -12,6 +12,9 @@ CONST INTEGER SWATCH_STEP = 34
 CONST INTEGER SWATCH_SIZE = 26
 CONST INTEGER COLOR_COUNT = 8
 
+; The canvas is presented once per frame; input is answered as it arrives.
+CONST INTEGER FRAME_MS = 33
+
 CONST UNSIGNED C_CANVAS = Rgb(255, 255, 255)
 CONST UNSIGNED C_INK = Rgb(1, 2, 3)
 CONST UNSIGNED C_FRAME = Rgb(35, 26, 19)
@@ -21,6 +24,7 @@ INTEGER selected, brushSize
 INTEGER mouseKind, mx, my, btn
 INTEGER lastX, lastY, dragButton
 INTEGER tries
+UNSIGNED nextFrame
 BOOLEAN running, dragging, dirty, pendingInput
 STRING key
 SURFACE screen, ui
@@ -50,7 +54,7 @@ MouseOn MOUSE_PIXELS, MOUSE_TRACK_ALL
 tries = 0
 inputEvent = EventPoll()
 WHILE !inputEvent.Pixels & tries < 30 DO
-    GfxWaitFrame 20
+    DELAY 1
     inputEvent = EventPoll()
     tries += 1
 ENDWHILE
@@ -62,6 +66,7 @@ IF !inputEvent.Pixels THEN
     EXIT
 ENDIF
 pendingInput = inputEvent.Kind <> EVENT_NONE
+nextFrame = inputEvent.Time + FRAME_MS
 
 running = TRUE
 WHILE running DO
@@ -120,7 +125,11 @@ WHILE running DO
         inputEvent = EventPoll()
     ENDWHILE
     IF dirty PresentDirty()
-    GfxWaitFrame 30
+    IF inputEvent.Time < nextFrame THEN
+        inputEvent = EventWait(nextFrame - inputEvent.Time)
+        pendingInput = inputEvent.Kind <> EVENT_NONE
+    ENDIF
+    IF inputEvent.Time >= nextFrame nextFrame = inputEvent.Time + FRAME_MS
 ENDWHILE
 
 MouseOff

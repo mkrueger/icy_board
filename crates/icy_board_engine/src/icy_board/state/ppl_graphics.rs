@@ -1,7 +1,4 @@
-use std::{
-    collections::{HashMap, HashSet},
-    time::{Duration, Instant},
-};
+use std::collections::{HashMap, HashSet};
 
 pub const GFX_BACKEND_NONE: i32 = -1;
 pub const GFX_BACKEND_AUTO: i32 = 0;
@@ -471,8 +468,6 @@ pub struct PplGraphicsState {
     pub pacing: bool,
     resident_bytes: usize,
     next_handle: i32,
-    frame_rate: u32,
-    next_frame: Option<Instant>,
 }
 
 impl PplGraphicsState {
@@ -487,8 +482,6 @@ impl PplGraphicsState {
             pacing: false,
             resident_bytes: 0,
             next_handle: 0,
-            frame_rate: 0,
-            next_frame: None,
         })
     }
 
@@ -531,25 +524,6 @@ impl PplGraphicsState {
         Some(buffer)
     }
 
-    pub fn next_frame_deadline(&mut self, requested_rate: i32) -> Option<Instant> {
-        if requested_rate <= 0 {
-            self.frame_rate = 0;
-            self.next_frame = None;
-            return None;
-        }
-        let frame_rate = requested_rate.clamp(1, 240) as u32;
-        let interval = Duration::from_secs_f64(1.0 / f64::from(frame_rate));
-        let now = Instant::now();
-        let deadline = if self.frame_rate == frame_rate {
-            self.next_frame.unwrap_or(now + interval)
-        } else {
-            now + interval
-        };
-        let following = deadline + interval;
-        self.frame_rate = frame_rate;
-        self.next_frame = Some(if following <= now { now + interval } else { following });
-        Some(deadline)
-    }
 }
 
 fn clipped_rect(x: i32, y: i32, width: i32, height: i32, target_width: usize, target_height: usize) -> Option<(usize, usize, usize, usize)> {

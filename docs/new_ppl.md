@@ -211,7 +211,6 @@ global statements control the session rather than a surface:
 | API | Purpose |
 | :--- | :--- |
 | `GfxSetPacing frames` | Enable DSR-acknowledged presentation when positive |
-| `GfxWaitFrame fps` | Rate-limit a rendering loop |
 | `GfxShutdown` | Release resources and restore terminal modes |
 
 `GfxError` reports the status of the last operation. `GfxCaps` is a bitmask of
@@ -304,7 +303,7 @@ The read-only fields describe that value:
 | `WheelX`, `WheelY` | Wheel movement; positive `WheelY` is up and negative is down |
 | `Modifiers` | Combined `EVENT_SHIFT`, `EVENT_ALT`, `EVENT_CTRL` and `EVENT_META` bits; the first three alias the mouse modifier values |
 | `Pixels` | Whether DEC 1016 pixel-coordinate mode was accepted; available even on `EVENT_NONE` |
-| `Time` | Monotonic milliseconds since the connection's event input state was created, sampled when the event is selected |
+| `Time` | Monotonic milliseconds since the connection's event input state was created, sampled when the event is selected; an `EVENT_NONE` carries it too, so a poll that came back empty still reads the clock |
 
 Ordinary translated characters are always available. `EVENT_KEY_EDGE` requires
 `KeyEvents KEY_EVENTS_ON`, or `KEY_EVENTS_SUPPRESS` to suppress translated
@@ -327,6 +326,31 @@ physical-key or mouse queue still overflows, the next event is
 `EVENT_OVERFLOW` and its `Code` is the number of discarded events.
 Horizontal wheel reports use `MOUSE_WHEEL_LEFT` and `MOUSE_WHEEL_RIGHT` in
 `Button` and a signed delta in `WheelX`.
+
+A frame-paced program needs no separate pacing statement: poll first so queued
+input is handled at once, then let `EventWait` be the one place the program
+blocks, with the time left in the frame as its timeout.
+
+```PPL
+UNSIGNED nextFrame
+EVENT e = EventPoll()
+nextFrame = e.Time + FRAME_MS
+
+WHILE running DO
+	e = EventPoll()
+	IF e.Kind = EVENT_NONE & e.Time < nextFrame THEN
+		e = EventWait(nextFrame - e.Time)
+	ENDIF
+	IF e.Kind <> EVENT_NONE Handle(e)
+	IF e.Time >= nextFrame THEN
+		nextFrame = e.Time + FRAME_MS
+		Advance()
+	ENDIF
+ENDWHILE
+```
+
+Input is answered as soon as it arrives rather than once per frame, and a fixed
+pause that should not end early is still `DELAY`.
 
 The outermost PPE always disables mouse/key modes, stops sound it started,
 releases graphics and restores cursor, wrapping, palette and Sixel scrolling

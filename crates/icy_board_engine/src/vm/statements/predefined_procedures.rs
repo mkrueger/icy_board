@@ -3829,22 +3829,6 @@ pub async fn gfxpresentat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<
     gfx_present_surface(vm, surface, slot, destination, GfxTransform::default()).await
 }
 
-pub async fn gfxwaitframe(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let frame_rate = vm.eval_expr(&args[0]).await?.as_int();
-    let Some(graphics) = vm.icy_board_state.ppl_graphics.as_mut() else {
-        vm.icy_board_state.gfx_error = 1;
-        return Ok(());
-    };
-    let deadline = graphics.next_frame_deadline(frame_rate);
-    if let Some(deadline) = deadline
-        && deadline > std::time::Instant::now()
-    {
-        tokio::time::sleep_until(deadline.into()).await;
-    }
-    vm.icy_board_state.gfx_error = 0;
-    Ok(())
-}
-
 pub async fn gfxfree(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let slot = vm.eval_expr(&args[0]).await?.as_int();
     vm.icy_board_state.gfx_error = match &mut vm.icy_board_state.ppl_graphics {

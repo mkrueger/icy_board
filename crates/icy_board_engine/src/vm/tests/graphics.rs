@@ -263,7 +263,6 @@ fn creates_blits_and_presents_in_memory_surfaces() {
         back.Present()
         back.FillRect(2, 2, 1, 1, 16711935)
         back.PresentRect(2, 2, 1, 1)
-        GfxWaitFrame 240
         sprite.Free()
         GfxShutdown
         ",

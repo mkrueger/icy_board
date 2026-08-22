@@ -94,7 +94,7 @@ WHILE TRUE DO
         cy = jcy[keyIndex] + (jcy[nextIndex] - jcy[keyIndex]) * u
         DrawHud(step + 1, JULIA_STEPS)
         RenderJulia(cx, cy, 40)
-        GfxWaitFrame 12
+        DELAY 2
         IF InKey() <> "" GOTO Finished
     NEXT step
     keyIndex = nextIndex

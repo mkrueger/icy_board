@@ -21,6 +21,10 @@ CONST UNSIGNED GB_DARKEST = Rgb(8, 24, 32)
 CONST INTEGER BOX_X = 164
 CONST INTEGER BOX_W = 96
 
+; The game advances once per frame; input is answered the moment it arrives.
+CONST INTEGER FRAME_MS = 55
+CONST INTEGER FLASH_TICKS = 2
+
 INTEGER board(9, 19)
 INTEGER boardGroup(9, 19)
 INTEGER clearRow(19)
@@ -32,6 +36,7 @@ INTEGER score, level, lines, frame, dropFrames, pieceSerial
 BOOLEAN gameOver, running, changed
 STRING key
 EVENT inputEvent
+UNSIGNED nextFrame
 AUDIO music, rotateSound, lockSound, lineSound, gameOverSound
 SURFACE screen, game, ui
 
@@ -75,11 +80,16 @@ nextType = Random(7)
 SpawnPiece()
 RenderGame()
 KeyFlush
+inputEvent = EventPoll()
+nextFrame = inputEvent.Time + FRAME_MS
 
 WHILE running DO
     IF gameOver BREAK
     changed = FALSE
     inputEvent = EventPoll()
+    IF inputEvent.Kind = EVENT_NONE & inputEvent.Time < nextFrame THEN
+        inputEvent = EventWait(nextFrame - inputEvent.Time)
+    ENDIF
     key = Upper(inputEvent.Text)
     IF key = "LEFT" THEN
         IF CanPlace(pieceX - 1, pieceY, pieceRot) THEN
@@ -114,31 +124,32 @@ WHILE running DO
         running = FALSE
     ENDIF
 
-    frame += 1
-    dropFrames = 12 - level
-    IF dropFrames < 2 dropFrames = 2
-    IF !gameOver THEN
-        IF frame >= dropFrames THEN
-            IF CanPlace(pieceX, pieceY + 1, pieceRot) THEN
-                pieceY += 1
-            ELSE
-                LockPiece()
+    IF inputEvent.Time >= nextFrame THEN
+        nextFrame = inputEvent.Time + FRAME_MS
+        frame += 1
+        dropFrames = 12 - level
+        IF dropFrames < 2 dropFrames = 2
+        IF !gameOver THEN
+            IF frame >= dropFrames THEN
+                IF CanPlace(pieceX, pieceY + 1, pieceRot) THEN
+                    pieceY += 1
+                ELSE
+                    LockPiece()
+                ENDIF
+                frame = 0
+                changed = TRUE
             ENDIF
-            frame = 0
-            changed = TRUE
         ENDIF
     ENDIF
     IF changed RenderGame()
-    GfxWaitFrame 18
 ENDWHILE
 
 IF gameOver THEN
     RenderGame()
     key = ""
     WHILE key = "" DO
-        inputEvent = EventPoll()
+        inputEvent = EventWait(-1)
         key = inputEvent.Text
-        GfxWaitFrame 18
     ENDWHILE
 ENDIF
 
@@ -399,7 +410,7 @@ PROCEDURE AnimateClear()
             row += 1
         ENDWHILE
         PresentGame()
-        GfxWaitFrame 8
+        DELAY FLASH_TICKS
         flash += 1
     ENDWHILE
 ENDPROC

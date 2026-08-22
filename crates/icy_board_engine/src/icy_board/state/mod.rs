@@ -3215,11 +3215,10 @@ impl IcyBoardState {
         self.take_pending_ppl_event()
     }
 
+    /// Nothing happened, timed like any other event so a program can read the clock
+    /// from a poll that came back empty.
     fn empty_ppl_event(&self) -> ppl_events::PplEvent {
-        ppl_events::PplEvent {
-            pixels: self.ppl_mouse.pixels(),
-            ..Default::default()
-        }
+        self.ppl_event_with_mode(ppl_events::PplEvent::default())
     }
 
     fn ppl_event_with_mode(&self, mut event: ppl_events::PplEvent) -> ppl_events::PplEvent {
