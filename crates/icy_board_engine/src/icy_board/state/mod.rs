@@ -2813,6 +2813,7 @@ impl IcyBoardState {
     /// # Errors
     pub async fn get_char(&mut self, target: TerminalTarget) -> Res<Option<KeyChar>> {
         self.drain_raw_input();
+        self.drain_stale_protocol_input();
         let stale = self.ppl_mouse.take_stale_keyboard();
         for byte in stale.into_iter().rev() {
             self.char_buffer.push_front(KeyChar::new(KeySource::User, byte as char));
@@ -2940,6 +2941,7 @@ impl IcyBoardState {
                         state.sysop_connection = Some(sysop_connection);
                         state.bbs_channel = Some(bbs_channel);
                     }
+                    self.drain_stale_protocol_input();
                     return Ok(None);
                 }
             }
@@ -2991,6 +2993,7 @@ impl IcyBoardState {
                     if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
                         state.bbs_channel = Some(bbs_channel);
                     }
+                    self.drain_stale_protocol_input();
                     return Ok(None);
                 }
 
@@ -3013,6 +3016,15 @@ impl IcyBoardState {
             }
         }
         keys
+    }
+
+    fn drain_stale_protocol_input(&mut self) {
+        for byte in self.ppl_keys.take_stale_keyboard() {
+            self.char_buffer.push_back(KeyChar::new(KeySource::User, byte as char));
+        }
+        for byte in self.ppl_audio_notify.take_stale_keyboard() {
+            self.char_buffer.push_back(KeyChar::new(KeySource::User, byte as char));
+        }
     }
 
     /// Asks the caller's terminal what it is and what it can do, once per call.
@@ -3309,10 +3321,14 @@ impl IcyBoardState {
                 ch.ch = control_codes::DEL;
             }
             '\x1B' => {
-                if let Some(key_char) = self.get_char(TerminalTarget::Both).await?
-                    && key_char.ch == '['
-                    && let Some(key_char) = self.get_char(TerminalTarget::Both).await?
-                {
+                if let Some(key_char) = self.get_edit_sequence_char(ch.source).await? {
+                    if key_char.ch != '[' {
+                        self.char_buffer.push_front(key_char);
+                        return Ok(Some(ch));
+                    }
+                    let Some(key_char) = self.get_edit_sequence_char(ch.source).await? else {
+                        return Ok(Some(ch));
+                    };
                     match key_char.ch {
                         'A' => ch.ch = control_codes::UP,
                         'B' => ch.ch = control_codes::DOWN,
@@ -3325,16 +3341,16 @@ impl IcyBoardState {
                         'V' => ch.ch = control_codes::PG_UP,
                         'U' => ch.ch = control_codes::PG_DN,
                         '@' | '2' => {
-                            self.get_char(TerminalTarget::Both).await?;
+                            self.get_edit_sequence_char(ch.source).await?;
                             ch.ch = control_codes::INS;
                         }
 
                         '6' => {
-                            self.get_char(TerminalTarget::Both).await?;
+                            self.get_edit_sequence_char(ch.source).await?;
                             ch.ch = control_codes::PG_UP;
                         }
                         '5' => {
-                            self.get_char(TerminalTarget::Both).await?;
+                            self.get_edit_sequence_char(ch.source).await?;
                             ch.ch = control_codes::PG_DN;
                         }
                         _ => {
@@ -3348,6 +3364,14 @@ impl IcyBoardState {
         }
 
         Ok(Some(ch))
+    }
+
+    async fn get_edit_sequence_char(&mut self, source: KeySource) -> Res<Option<KeyChar>> {
+        if source == KeySource::Sysop {
+            self.get_char(TerminalTarget::Both).await
+        } else {
+            Ok(self.char_buffer.pop_front())
+        }
     }
 
     /// Says goodbye and drops the line - the caller gets no say in it.

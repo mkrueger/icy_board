@@ -216,6 +216,7 @@ const MAX_NOTIFY_SEQUENCE: usize = 64;
 #[derive(Default)]
 pub struct AudioNotifyState {
     pending: Vec<u8>,
+    pending_since: Option<Instant>,
     drained: VecDeque<i32>,
 }
 
@@ -224,24 +225,25 @@ impl AudioNotifyState {
         if self.pending.is_empty() {
             if byte == 0x1b {
                 self.pending.push(byte);
+                self.pending_since = Some(Instant::now());
                 return Vec::new();
             }
             return vec![byte];
         }
         self.pending.push(byte);
         if self.pending.len() == 2 && byte != b'[' {
-            return std::mem::take(&mut self.pending);
+            return self.take_pending();
         }
         if self.pending.len() == 3 && byte != b'=' {
-            return std::mem::take(&mut self.pending);
+            return self.take_pending();
         }
         if self.pending.len() > MAX_NOTIFY_SEQUENCE {
-            return std::mem::take(&mut self.pending);
+            return self.take_pending();
         }
         if self.pending.len() < 4 || !(0x40..=0x7e).contains(&byte) {
             return Vec::new();
         }
-        let sequence = std::mem::take(&mut self.pending);
+        let sequence = self.take_pending();
         match drained_channel(&sequence) {
             Some(channel) => {
                 self.drained.push_back(channel);
@@ -253,6 +255,19 @@ impl AudioNotifyState {
 
     pub fn poll(&mut self) -> Option<i32> {
         self.drained.pop_front()
+    }
+
+    pub fn take_stale_keyboard(&mut self) -> Vec<u8> {
+        if self.pending_since.is_some_and(|started| started.elapsed() >= ESCAPE_TIMEOUT) {
+            self.take_pending()
+        } else {
+            Vec::new()
+        }
+    }
+
+    fn take_pending(&mut self) -> Vec<u8> {
+        self.pending_since = None;
+        std::mem::take(&mut self.pending)
     }
 }
 
@@ -431,5 +446,16 @@ mod tests {
         assert_eq!((up.code, up.modifiers), (KEY_UP, 4));
         let insert = keys.poll().unwrap();
         assert_eq!((insert.code, insert.text.as_str()), (KEY_INSERT, "INS"));
+    }
+
+    #[test]
+    fn audio_notify_releases_a_lone_escape_after_sequence_timeout() {
+        let mut notify = AudioNotifyState::default();
+        assert!(notify.feed(0x1b).is_empty());
+
+        std::thread::sleep(ESCAPE_TIMEOUT);
+
+        assert_eq!(notify.take_stale_keyboard(), vec![0x1b]);
+        assert!(notify.take_stale_keyboard().is_empty());
     }
 }

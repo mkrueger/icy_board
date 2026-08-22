@@ -1,7 +1,11 @@
-use std::collections::{HashSet, VecDeque};
+use std::{
+    collections::{HashSet, VecDeque},
+    time::{Duration, Instant},
+};
 
 const MAX_EVENTS: usize = 256;
 const MAX_SEQUENCE: usize = 256;
+const ESCAPE_TIMEOUT: Duration = Duration::from_millis(50);
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct PplKeyEvent {
@@ -14,6 +18,7 @@ pub struct PplKeyEvent {
 pub struct PplKeyState {
     enabled: bool,
     pending: Vec<u8>,
+    pending_since: Option<Instant>,
     events: VecDeque<PplKeyEvent>,
     current: PplKeyEvent,
     dropped: usize,
@@ -24,6 +29,7 @@ impl PplKeyState {
     pub fn enable(&mut self) {
         self.enabled = true;
         self.pending.clear();
+        self.pending_since = None;
         self.events.clear();
         self.current = PplKeyEvent::default();
         self.dropped = 0;
@@ -33,6 +39,7 @@ impl PplKeyState {
     pub fn disable(&mut self) {
         self.enabled = false;
         self.pending.clear();
+        self.pending_since = None;
         self.events.clear();
         self.current = PplKeyEvent::default();
         self.dropped = 0;
@@ -62,6 +69,7 @@ impl PplKeyState {
         if self.pending.is_empty() {
             if byte == 0x1b {
                 self.pending.push(byte);
+                self.pending_since = Some(Instant::now());
                 return Vec::new();
             }
             return vec![byte];
@@ -69,27 +77,27 @@ impl PplKeyState {
         self.pending.push(byte);
         if self.pending.len() == 2 {
             if byte != b'[' {
-                return std::mem::take(&mut self.pending);
+                return self.take_pending();
             }
             return Vec::new();
         }
         if self.pending.len() == 3 {
             if byte != b'=' {
-                return std::mem::take(&mut self.pending);
+                return self.take_pending();
             }
             return Vec::new();
         }
         if self.pending.len() > MAX_SEQUENCE {
-            return std::mem::take(&mut self.pending);
+            return self.take_pending();
         }
         if byte != b'K' && byte != b'k' {
             if (0x40..=0x7e).contains(&byte) {
-                return std::mem::take(&mut self.pending);
+                return self.take_pending();
             }
             return Vec::new();
         }
 
-        let sequence = std::mem::take(&mut self.pending);
+        let sequence = self.take_pending();
         let Some(body) = sequence.strip_prefix(b"\x1b[=").and_then(|body| body.get(..body.len().saturating_sub(1))) else {
             return sequence;
         };
@@ -115,6 +123,19 @@ impl PplKeyState {
             self.events.push_back(PplKeyEvent { code, pressed, repeated });
         }
         Vec::new()
+    }
+
+    pub fn take_stale_keyboard(&mut self) -> Vec<u8> {
+        if self.pending_since.is_some_and(|started| started.elapsed() >= ESCAPE_TIMEOUT) {
+            self.take_pending()
+        } else {
+            Vec::new()
+        }
+    }
+
+    fn take_pending(&mut self) -> Vec<u8> {
+        self.pending_since = None;
+        std::mem::take(&mut self.pending)
     }
 
     pub fn take_dropped(&mut self) -> usize {
@@ -202,5 +223,17 @@ mod tests {
         assert!(keys.current().repeated);
         assert!(keys.poll());
         assert!(!keys.current().repeated);
+    }
+
+    #[test]
+    fn lone_escape_returns_to_keyboard_input_after_sequence_timeout() {
+        let mut keys = PplKeyState::default();
+        keys.enable();
+        assert!(keys.feed(0x1b).is_empty());
+
+        std::thread::sleep(ESCAPE_TIMEOUT);
+
+        assert_eq!(keys.take_stale_keyboard(), vec![0x1b]);
+        assert!(keys.take_stale_keyboard().is_empty());
     }
 }
