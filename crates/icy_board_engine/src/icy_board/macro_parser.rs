@@ -357,8 +357,11 @@ pub enum MacroCommand {
     /// Displays the total number of files that the user has uploaded to the BBS. Example output: 352
     UpFiles,
 
-    /// Opens an OSC 8 hyperlink when a URI is present, or closes it otherwise.
-    Url(Option<String>),
+    /// Shows `label` as an OSC 8 hyperlink pointing at `uri`.
+    Url {
+        label: String,
+        uri: String,
+    },
 
     /// This macro will display the full user name of the caller in all uppercase letters.
     /// You can also use this macro in the TO: field of a message. If you do, your single generic message will appear to
@@ -515,8 +518,6 @@ pub enum PcbToken {
     #[token("TOTALTIME", |_| MacroCommand::TotalTime, ignore(case))]
     #[token("UPBYTES", |_| MacroCommand::UpBytes, ignore(case))]
     #[token("UPFILES", |_| MacroCommand::UpFiles, ignore(case))]
-    #[token("URL", |_| MacroCommand::Url(None), ignore(case))]
-    #[regex("URL:[^\\x00-\\x20]+", |lex| MacroCommand::Url(Some(lex.slice()[4..].to_owned())), ignore(case))]
     #[token("USER", |_| MacroCommand::User, ignore(case))]
     #[token("VERSION", |_| MacroCommand::Version, ignore(case))]
     #[token("WAIT", |_| MacroCommand::Wait, ignore(case))]
@@ -565,6 +566,37 @@ fn get_macrohex_color(hex_color: &str) -> u8 {
     u8::from_str_radix(&hex_color[1..], 16).unwrap_or(0)
 }
 
+/// Splits `Label(uri)` at the parenthesis matching the trailing one, so parentheses
+/// may appear in either part as long as they are balanced.
+fn parse_url(body: &str) -> Result<MacroCommand, Box<dyn Error + Send + Sync>> {
+    let body = body.strip_suffix(')').ok_or("URL macro needs a (uri)")?;
+    let mut depth = 0usize;
+    let mut open = None;
+    for (index, character) in body.char_indices().rev() {
+        match character {
+            ')' => depth += 1,
+            '(' if depth == 0 => {
+                open = Some(index);
+                break;
+            }
+            '(' => depth -= 1,
+            _ => {}
+        }
+    }
+    let open = open.ok_or("URL macro needs a (uri)")?;
+
+    let uri = &body[open + 1..];
+    if uri.is_empty() || uri.chars().any(|character| character.is_control() || character.is_whitespace()) {
+        return Err("URL macro has an invalid uri".into());
+    }
+
+    let label = &body[..open];
+    Ok(MacroCommand::Url {
+        label: if label.is_empty() { uri.to_string() } else { label.to_string() },
+        uri: uri.to_string(),
+    })
+}
+
 pub struct Macro {
     pub command: MacroCommand,
     pub justification: MacroJustification,
@@ -599,35 +631,30 @@ impl FromStr for Macro {
     type Err = Box<dyn Error + Send + Sync>;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // The link text holds spaces and parentheses, which the macro lexer does not allow.
+        if let Some(body) = s.get(..4).filter(|prefix| prefix.eq_ignore_ascii_case("URL:")).and(s.get(4..)) {
+            return Ok(Macro {
+                command: parse_url(body)?,
+                justification: MacroJustification::LeftJustify,
+                length: 0,
+                truncate: false,
+            });
+        }
+
         let mut lexer = PcbToken::lexer(s);
 
         let Some(Ok(PcbToken::Macro(command))) = lexer.next() else {
             return Err("Invalid macro format".into());
         };
-        let is_url = matches!(command, MacroCommand::Url(_));
-        if let MacroCommand::Url(Some(uri)) = &command
-            && uri.chars().any(|character| character.is_control() || character.is_whitespace())
-        {
-            return Err("Invalid URL macro".into());
-        }
 
         let mut justification = MacroJustification::LeftJustify;
         let mut length = 0;
         let mut truncate = false;
 
-        match lexer.next() {
-            Some(Ok(PcbToken::Format((len, trunc, just)))) => {
-                length = len;
-                truncate = trunc;
-                justification = just;
-            }
-            Some(_) if is_url => return Err("Invalid macro format".into()),
-            Some(_) => {}
-            None => {}
-        }
-
-        if is_url && lexer.next().is_some() {
-            return Err("Invalid macro format".into());
+        if let Some(Ok(PcbToken::Format((len, trunc, just)))) = lexer.next() {
+            length = len;
+            truncate = trunc;
+            justification = just;
         }
 
         Ok(Macro {
@@ -703,19 +730,57 @@ mod tests {
     }
 
     #[test]
-    fn parses_url_hyperlink_boundaries() {
-        let open: Macro = "URL:https://example.com/a:b?x=1".parse().unwrap();
-        assert_eq!(open.command, MacroCommand::Url(Some("https://example.com/a:b?x=1".to_string())));
-
-        let close: Macro = "URL".parse().unwrap();
-        assert_eq!(close.command, MacroCommand::Url(None));
+    fn parses_url_label_and_uri() {
+        let parsed: Macro = "URL:IcyBoard documentation(https://example.com/a:b?x=1)".parse().unwrap();
+        assert_eq!(
+            parsed.command,
+            MacroCommand::Url {
+                label: "IcyBoard documentation".to_string(),
+                uri: "https://example.com/a:b?x=1".to_string(),
+            }
+        );
     }
 
     #[test]
-    fn url_rejects_whitespace_and_control_characters() {
-        assert!("URL:https://example.com/a b".parse::<Macro>().is_err());
-        assert!("URL:https://example.com/\x1b\\payload".parse::<Macro>().is_err());
-        assert!("URL:https://example.com/\u{009c}payload".parse::<Macro>().is_err());
+    fn a_url_splits_on_the_parenthesis_that_matches_the_last_one() {
+        let in_label: Macro = "URL:Downloads (new)(https://example.com/a)".parse().unwrap();
+        assert_eq!(
+            in_label.command,
+            MacroCommand::Url {
+                label: "Downloads (new)".to_string(),
+                uri: "https://example.com/a".to_string(),
+            }
+        );
+
+        let in_uri: Macro = "URL:Wiki(https://en.wikipedia.org/wiki/Foo_(bar))".parse().unwrap();
+        assert_eq!(
+            in_uri.command,
+            MacroCommand::Url {
+                label: "Wiki".to_string(),
+                uri: "https://en.wikipedia.org/wiki/Foo_(bar)".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn a_url_without_a_label_shows_the_uri() {
+        let parsed: Macro = "URL:(https://example.com)".parse().unwrap();
+        assert_eq!(
+            parsed.command,
+            MacroCommand::Url {
+                label: "https://example.com".to_string(),
+                uri: "https://example.com".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn url_rejects_a_missing_uri_or_whitespace_and_control_characters() {
+        assert!("URL:no parentheses here".parse::<Macro>().is_err());
+        assert!("URL:label()".parse::<Macro>().is_err());
+        assert!("URL:label(https://example.com/a b)".parse::<Macro>().is_err());
+        assert!("URL:label(https://example.com/\x1b\\payload)".parse::<Macro>().is_err());
+        assert!("URL:label(https://example.com/\u{009c}payload)".parse::<Macro>().is_err());
     }
 
     #[test]

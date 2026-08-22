@@ -2258,7 +2258,9 @@ impl IcyBoardState {
                         }
                     }
                     PcbState::ReadAtSequence(s) => {
-                        if c.is_whitespace() {
+                        // Only a URL macro carries link text, so only there does a space stay inside.
+                        let keeps_space = *c == ' ' && s.get(..4).is_some_and(|prefix| prefix.eq_ignore_ascii_case("URL:"));
+                        if c.is_whitespace() && !keeps_space {
                             self.write_chars(target, &['@']).await?;
                             self.write_chars(target, s.chars().collect::<Vec<char>>().as_slice()).await?;
                             state = PcbState::Default;
@@ -2732,8 +2734,8 @@ impl IcyBoardState {
                     result = user.stats.num_uploads.to_string();
                 }
             }
-            MacroCommand::Url(uri) => {
-                result = format!("\x1b]8;;{}\x1b\\", uri.as_deref().unwrap_or_default());
+            MacroCommand::Url { label, uri } => {
+                result = format!("\x1b]8;;{uri}\x1b\\{label}\x1b]8;;\x1b\\");
             }
             MacroCommand::User => {
                 if let Some(user) = &self.session.current_user {

@@ -356,8 +356,8 @@ Alphabetical List of @ Macros
      - Total bytes uploaded by caller
    * - ``@UPFILES@``
      - Total files uploaded by caller
-   * - ``@URL:uri@`` / ``@URL@``
-     - **[IcyBoard]** Open an OSC 8 hyperlink for subsequent text / close the hyperlink
+   * - ``@URL:text(uri)@``
+     - **[IcyBoard]** Show text as an OSC 8 hyperlink pointing at uri
    * - ``@USER@``
      - Full username in uppercase (e.g., ``EDWARD B. SMITH``)
    * - ``@VERSION@``
@@ -373,20 +373,19 @@ Alphabetical List of @ Macros
 OSC 8 Hyperlinks
 ~~~~~~~~~~~~~~~~
 
-Use the paired ``URL`` macros to make text clickable in terminals that support OSC 8:
+The ``URL`` macro makes text clickable in terminals that support OSC 8:
 
 .. code-block:: text
 
-  @URL:https://example.com/docs@IcyBoard documentation@URL@
+   @URL:IcyBoard documentation(https://example.com/docs)@
 
-The opening macro emits the OSC 8 sequence without displaying the URI. The closing
-``@URL@`` ends the hyperlink. Terminals without OSC 8 support normally display the
-link text without making it clickable.
+The link text comes first and the target follows in parentheses. Leave the text empty
+to show the URI itself, as in ``@URL:(https://example.com)@``. Terminals without OSC 8
+support normally display the link text without making it clickable.
 
-The URI cannot contain spaces, control characters, or a literal ``@`` because ``@``
-delimits macros. Percent-encode those characters when needed, for example ``%40``
-for ``@``. Always include the closing macro so later terminal output does not remain
-part of the link.
+Parentheses may appear in the text or the URI as long as they are balanced. The URI
+cannot contain spaces, control characters, or a literal ``@`` because ``@`` ends the
+macro, so percent-encode those characters: ``%20`` for a space and ``%40`` for ``@``.
 
 Format
 ~~~~~~
