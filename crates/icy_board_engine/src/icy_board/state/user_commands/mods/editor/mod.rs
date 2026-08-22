@@ -44,6 +44,19 @@ pub enum EditResult {
 
 impl EditState {
     const HEADER_SIZE: i32 = 3;
+    const MAX_VISIBLE_LINES: usize = 20;
+
+    fn visible_line_count(page_len: u16) -> usize {
+        if page_len == 0 || page_len >= 22 {
+            Self::MAX_VISIBLE_LINES
+        } else {
+            (page_len as usize).saturating_sub(2)
+        }
+    }
+
+    fn footer_row(page_len: u16) -> i32 {
+        Self::HEADER_SIZE + Self::visible_line_count(page_len) as i32
+    }
 
     pub(crate) async fn edit_message(&mut self, state: &mut IcyBoardState) -> Res<EditResult> {
         if !self.use_fse {
@@ -237,7 +250,7 @@ impl EditState {
                     return Ok(());
                 }
                 control_codes::PG_UP => {
-                    let pg_len = state.session.page_len as usize - Self::HEADER_SIZE as usize;
+                    let pg_len = Self::visible_line_count(state.session.page_len);
                     if self.top_line > pg_len {
                         self.top_line -= pg_len;
                     } else {
@@ -247,7 +260,7 @@ impl EditState {
                     self.print_line_number(state).await?;
                 }
                 control_codes::PG_DN => {
-                    let pg_len = state.session.page_len as usize - Self::HEADER_SIZE as usize;
+                    let pg_len = Self::visible_line_count(state.session.page_len);
                     self.top_line += pg_len;
                     self.redraw_fse(state).await?;
                     self.print_line_number(state).await?;
@@ -287,6 +300,14 @@ impl EditState {
                 }
                 control_codes::CTRL_L => {
                     self.redraw_fse(state).await?;
+                }
+
+                control_codes::CTRL_N => {
+                    if self.cursor.y < self.max_lines.saturating_sub(1) as i32 {
+                        let update = self.force_new_line();
+                        self.update_screen(state, update).await?;
+                        self.print_line_number(state).await?;
+                    }
                 }
 
                 control_codes::CTRL_Y => {
@@ -345,7 +366,7 @@ impl EditState {
                         state.up(1).await?;
                         self.print_line_number(state).await?;
                     } else if self.top_line > 0 {
-                        let y = state.session.page_len as i32 - Self::HEADER_SIZE - 1;
+                        let y = Self::visible_line_count(state.session.page_len) as i32;
                         self.top_line = ((self.top_line as i32) - y).max(0) as usize;
                         self.redraw_fse(state).await?;
                     }
@@ -353,12 +374,13 @@ impl EditState {
 
                 control_codes::DOWN => {
                     if (self.cursor.y + self.top_line as i32) < self.max_lines.saturating_sub(1) as i32 {
-                        if (self.cursor.y - self.top_line as i32) < state.session.page_len as i32 - Self::HEADER_SIZE - 1 {
+                        let visible_lines = Self::visible_line_count(state.session.page_len) as i32;
+                        if (self.cursor.y - self.top_line as i32) < visible_lines - 1 {
                             self.cursor.y += 1;
                             state.down(1).await?;
                         } else {
                             self.cursor.y += 1;
-                            self.top_line += (state.session.page_len as i32 - Self::HEADER_SIZE - 1).max(1) as usize;
+                            self.top_line += visible_lines.max(1) as usize;
                             self.redraw_fse(state).await?;
                         }
                         self.print_line_number(state).await?;
@@ -395,10 +417,11 @@ impl EditState {
                 }
 
                 '\r' => {
-                    if (self.cursor.y + self.top_line as i32) < self.max_lines.saturating_sub(1) as i32 {
+                    if self.cursor.y < self.max_lines.saturating_sub(1) as i32 {
                         let update = self.press_enter();
-                        if (self.cursor.y - self.top_line as i32) >= state.session.page_len as i32 - Self::HEADER_SIZE - 1 {
-                            self.top_line += (state.session.page_len as i32 - Self::HEADER_SIZE - 1).max(1) as usize;
+                        let visible_lines = Self::visible_line_count(state.session.page_len) as i32;
+                        if (self.cursor.y - self.top_line as i32) >= visible_lines {
+                            self.top_line += visible_lines.max(1) as usize;
                             self.redraw_fse(state).await?;
                         } else {
                             self.update_screen(state, update).await?;
@@ -439,17 +462,16 @@ impl EditState {
 
     async fn redraw_fse_from(&mut self, state: &mut IcyBoardState, y: usize) -> Res<()> {
         state.reset_color(TerminalTarget::Both).await?;
-        state
-            .gotoxy(TerminalTarget::Both, 1, y as i32 - self.top_line as i32 + Self::HEADER_SIZE)
-            .await?;
-        for i in y..(state.session.page_len as usize).saturating_sub(Self::HEADER_SIZE as usize) {
-            let cur_line = i + self.top_line;
+        let visible_lines = Self::visible_line_count(state.session.page_len);
+        for screen_line in y.saturating_sub(self.top_line)..visible_lines {
+            let cur_line = screen_line + self.top_line;
+            state.gotoxy(TerminalTarget::Both, 1, Self::HEADER_SIZE + screen_line as i32).await?;
             if cur_line < self.msg.len() {
                 state.print(TerminalTarget::Both, &self.msg[cur_line]).await?;
             }
             state.clear_eol(TerminalTarget::Both).await?;
-            state.new_line().await?;
         }
+        self.display_fse_footer(state).await?;
         Ok(())
     }
 
@@ -458,15 +480,21 @@ impl EditState {
         state.session.disp_options.force_non_stop();
         self.msg_header(state).await?;
         state.reset_color(TerminalTarget::Both).await?;
-        state.gotoxy(TerminalTarget::Both, 1, Self::HEADER_SIZE).await?;
-        for i in 0..(state.session.page_len as usize).saturating_sub(Self::HEADER_SIZE as usize) {
+        for i in 0..Self::visible_line_count(state.session.page_len) {
             let cur_line = i + self.top_line;
+            state.gotoxy(TerminalTarget::Both, 1, Self::HEADER_SIZE + i as i32).await?;
             if cur_line < self.msg.len() {
                 state.print(TerminalTarget::Both, &self.msg[cur_line]).await?;
             }
             state.clear_eol(TerminalTarget::Both).await?;
-            state.new_line().await?;
         }
+        self.display_fse_footer(state).await?;
+        Ok(())
+    }
+
+    async fn display_fse_footer(&self, state: &mut IcyBoardState) -> Res<()> {
+        state.gotoxy(TerminalTarget::Both, 1, Self::footer_row(state.session.page_len)).await?;
+        state.clear_eol(TerminalTarget::Both).await?;
         state.display_text(IceText::EscToExit, 0).await?;
         self.print_line_number(state).await?;
         self.display_insert_mode(state).await?;
@@ -474,7 +502,7 @@ impl EditState {
     }
 
     async fn display_insert_mode(&self, state: &mut IcyBoardState) -> Res<()> {
-        state.gotoxy(TerminalTarget::Both, 48, state.session.page_len as i32).await?;
+        state.gotoxy(TerminalTarget::Both, 48, Self::footer_row(state.session.page_len)).await?;
         if self.insert_mode {
             state.display_text(IceText::INSForOverwrite, 0).await?;
         } else {
@@ -725,6 +753,18 @@ impl EditState {
     }
 
     fn press_enter(&mut self) -> EditUpdate {
+        if !self.insert_mode {
+            if let Some(line) = self.msg.get_mut(self.cursor.y as usize) {
+                line.truncate(line.trim_end().len());
+            }
+            self.cursor.y += 1;
+            self.cursor.x = 0;
+            return EditUpdate::UpdateLinesFrom(self.cursor.y as usize);
+        }
+        self.force_new_line()
+    }
+
+    fn force_new_line(&mut self) -> EditUpdate {
         if self.msg.len() >= self.max_lines {
             return EditUpdate::None;
         }

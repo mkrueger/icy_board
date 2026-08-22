@@ -1,4 +1,13 @@
 use crate::tests::{setup_conference, test_output};
+use icy_engine::{TextPane, TextScreen};
+use icy_parser_core::{AnsiParser, CommandParser};
+
+fn rendered_lines(output: &str) -> Vec<String> {
+    let mut screen = TextScreen::new((80, 25));
+    let mut parser = AnsiParser::default();
+    parser.parse(output.as_bytes(), &mut icy_engine::ScreenSink::new(&mut screen));
+    (0..25).map(|y| (0..80).map(|x| screen.char_at((x, y).into()).ch).collect::<String>()).collect()
+}
 
 /// PCBoard joins the command arguments into the recipient field but still asks
 /// the question, with the name pre-filled. If the
@@ -61,4 +70,29 @@ fn test_cmd_e_sc_saves_without_carbon_copies_when_disabled() {
         board.users[0].flags.fse_mode = icy_board_engine::icy_board::user_base::FSEMode::No;
     });
     assert!(!output.contains("Carbon Copy To"), "the carbon-copy prompt was offered:\n{output}");
+}
+
+#[test]
+fn full_screen_enter_keeps_message_lines_above_the_help_footer() {
+    let output = test_output("E\nALL\nSubject\nY\nfirst oracle line\rsecond oracle line".to_string(), |board| {
+        setup_conference(board);
+        board.users[0].flags.use_graphics = true;
+    });
+
+    let lines = rendered_lines(&output);
+    assert!(
+        lines[2].starts_with("first oracle line"),
+        "first line is not on the first editor row: {:?}",
+        lines.iter().enumerate().filter(|(_, line)| !line.trim().is_empty()).collect::<Vec<_>>()
+    );
+    assert!(
+        lines[3].starts_with("second oracle line"),
+        "second line disappeared after Enter: {:?}",
+        lines[3]
+    );
+    assert!(
+        lines[22].contains("Press (Esc) to Exit"),
+        "the editor help footer was overwritten: {:?}",
+        lines[22]
+    );
 }

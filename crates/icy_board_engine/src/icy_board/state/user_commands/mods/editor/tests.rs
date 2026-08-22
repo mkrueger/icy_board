@@ -4,6 +4,7 @@ use super::EditState;
 
 fn create_state(text: &str) -> EditState {
     let mut state = EditState {
+        insert_mode: true,
         max_line_length: 79,
         max_lines: 100,
         ..Default::default()
@@ -18,6 +19,14 @@ fn create_state(text: &str) -> EditState {
         state.msg.push(line);
     }
     state
+}
+
+#[test]
+fn full_screen_viewport_reserves_the_pcboard_footer() {
+    assert_eq!(20, EditState::visible_line_count(0));
+    assert_eq!(23, EditState::footer_row(0));
+    assert_eq!(20, EditState::visible_line_count(24));
+    assert_eq!(23, EditState::footer_row(24));
 }
 
 #[test]
@@ -70,6 +79,32 @@ fn test_fse_enter_after_eol() {
     assert_eq!(2, state.msg.len());
     assert_eq!("FooBar", state.msg[0]);
     assert_eq!("", state.msg[1]);
+    assert_eq!(1, state.cursor.y);
+}
+
+#[test]
+fn overwrite_enter_advances_without_inserting_a_line() {
+    let mut state = create_state("One  |\nTwo");
+    state.insert_mode = false;
+
+    let update = state.press_enter();
+
+    assert_eq!(EditUpdate::UpdateLinesFrom(1), update);
+    assert_eq!(vec!["One", "Two"], state.msg);
+    assert_eq!(0, state.cursor.x);
+    assert_eq!(1, state.cursor.y);
+}
+
+#[test]
+fn forced_newline_splits_even_in_overwrite_mode() {
+    let mut state = create_state("One|Two");
+    state.insert_mode = false;
+
+    let update = state.force_new_line();
+
+    assert_eq!(EditUpdate::UpdateLinesFrom(0), update);
+    assert_eq!(vec!["One", "Two"], state.msg);
+    assert_eq!(0, state.cursor.x);
     assert_eq!(1, state.cursor.y);
 }
 
