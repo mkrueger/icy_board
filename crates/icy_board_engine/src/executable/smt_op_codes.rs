@@ -275,8 +275,13 @@ pub enum OpCode {
     GfxSetPacing = 235,
     KeyEvents = 236,
     MemberCall = 237,
+    SetVMargins = 238,
+    SetHMargins = 239,
+    ResetVMargins = 240,
+    ResetHMargins = 241,
+    ResetMargins = 242,
 }
-pub const LAST_STMT: i16 = OpCode::MemberCall as i16;
+pub const LAST_STMT: i16 = OpCode::ResetMargins as i16;
 
 impl OpCode {
     pub fn get_definition(self) -> &'static StatementDefinition {
@@ -602,7 +607,7 @@ pub fn format_argument_type_last(arg: &ArgumentDefinition) -> String {
 // "WAIT FOR" == "WAITFOR"
 // "GO SUB"
 // " GO TO"
-pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 243]> = std::sync::LazyLock::new(|| {
+pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 248]> = std::sync::LazyLock::new(|| {
     [
         StatementDefinition {
             // helps to map opcode to array index.
@@ -2632,6 +2637,47 @@ pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 243]
             opcode: OpCode::MemberCall,
             args: None,
             sig: StatementSignature::Invalid,
+        },
+        StatementDefinition {
+            name: "SetVMargins",
+            version: 400,
+            opcode: OpCode::SetVMargins,
+            args: Some(vec![
+                ArgumentDefinition::new("Top", VariableType::Integer),
+                ArgumentDefinition::new("Bottom", VariableType::Integer),
+            ]),
+            sig: StatementSignature::ArgumentsWithVariable(0, 2),
+        },
+        StatementDefinition {
+            name: "SetHMargins",
+            version: 400,
+            opcode: OpCode::SetHMargins,
+            args: Some(vec![
+                ArgumentDefinition::new("Left", VariableType::Integer),
+                ArgumentDefinition::new("Right", VariableType::Integer),
+            ]),
+            sig: StatementSignature::ArgumentsWithVariable(0, 2),
+        },
+        StatementDefinition {
+            name: "ResetVMargins",
+            version: 400,
+            opcode: OpCode::ResetVMargins,
+            args: None,
+            sig: StatementSignature::ArgumentsWithVariable(0, 0),
+        },
+        StatementDefinition {
+            name: "ResetHMargins",
+            version: 400,
+            opcode: OpCode::ResetHMargins,
+            args: None,
+            sig: StatementSignature::ArgumentsWithVariable(0, 0),
+        },
+        StatementDefinition {
+            name: "ResetMargins",
+            version: 400,
+            opcode: OpCode::ResetMargins,
+            args: None,
+            sig: StatementSignature::ArgumentsWithVariable(0, 0),
         },
         // Alias section
         // Moving to the end, so that the opcode <--> index mapping is not broken

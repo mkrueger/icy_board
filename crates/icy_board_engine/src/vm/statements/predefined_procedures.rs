@@ -972,6 +972,49 @@ pub async fn ansipos(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     vm.icy_board_state.gotoxy(TerminalTarget::Both, x, y).await
 }
 
+/// Margins are a VT feature: AVATAR and plain ASCII callers have no equivalent, so
+/// they must not receive the escape sequence as literal text.
+async fn write_margins(vm: &mut VirtualMachine<'_>, sequence: &str) -> Res<()> {
+    match vm.icy_board_state.session.disp_options.grapics_mode {
+        GraphicsMode::Ansi | GraphicsMode::Graphics | GraphicsMode::Rip => vm.icy_board_state.print(TerminalTarget::Both, sequence).await,
+        GraphicsMode::Ctty | GraphicsMode::Avatar => Ok(()),
+    }
+}
+
+pub async fn set_v_margins(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let top = vm.eval_expr(&args[0]).await?.as_int();
+    let bottom = vm.eval_expr(&args[1]).await?.as_int();
+    // A terminal ignores an empty or out of range region; sending it would only risk a
+    // malformed sequence, so the statement stops here instead.
+    if top < 1 || bottom <= top {
+        log::warn!("SETVMARGINS ignored: invalid region {top};{bottom}");
+        return Ok(());
+    }
+    write_margins(vm, &format!("\x1B[{top};{bottom}r")).await
+}
+
+pub async fn set_h_margins(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let left = vm.eval_expr(&args[0]).await?.as_int();
+    let right = vm.eval_expr(&args[1]).await?.as_int();
+    if left < 1 || right <= left {
+        log::warn!("SETHMARGINS ignored: invalid region {left};{right}");
+        return Ok(());
+    }
+    write_margins(vm, &format!("\x1B[?69h\x1B[{left};{right}s")).await
+}
+
+pub async fn reset_v_margins(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
+    write_margins(vm, "\x1B[r").await
+}
+
+pub async fn reset_h_margins(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
+    write_margins(vm, "\x1B[?69l").await
+}
+
+pub async fn reset_margins(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
+    write_margins(vm, "\x1B[r\x1B[?69l").await
+}
+
 pub async fn backup(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let numcols = vm.eval_expr(&args[0]).await?.as_int();
     if vm.icy_board_state.use_ansi() {

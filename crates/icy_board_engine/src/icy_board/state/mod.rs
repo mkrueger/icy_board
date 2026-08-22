@@ -40,6 +40,7 @@ pub mod ppl_graphics;
 pub mod ppl_keys;
 pub mod ppl_mouse;
 pub mod ppl_surface;
+pub mod ppl_terminal_state;
 pub mod user_commands;
 pub mod virtual_screen;
 use self::functions::display_flags;
@@ -1154,6 +1155,13 @@ impl IcyBoardState {
     }
 
     async fn cleanup_ppl_media(&mut self) {
+        let margins_active = {
+            let terminal = &self.display_screen().buffer.buffer.terminal_state;
+            terminal.margins_top_bottom().is_some() || terminal.margins_left_right().is_some()
+        };
+        if margins_active {
+            let _ = self.print(TerminalTarget::Both, "\x1b[r\x1b[?69l").await;
+        }
         if self.ppl_mouse.is_enabled() {
             self.ppl_mouse.disable();
             let _ = self.connection.send(ppl_mouse::MOUSE_OFF_SEQUENCE).await;

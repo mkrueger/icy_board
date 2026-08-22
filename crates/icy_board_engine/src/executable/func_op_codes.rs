@@ -327,9 +327,10 @@ pub enum FuncOpCode {
     EventPoll = -313,
     EventWait = -314,
     LoadAudio = -315,
+    TermState = -316,
 }
 
-pub const LAST_FUNC: i16 = -315;
+pub const LAST_FUNC: i16 = -316;
 
 impl FuncOpCode {
     pub fn get_definition(self) -> &'static FunctionDefinition {
@@ -400,7 +401,7 @@ impl FunctionDefinition {
         }
     }
 }
-pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 327]> = std::sync::LazyLock::new(|| {
+pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 328]> = std::sync::LazyLock::new(|| {
     [
         FunctionDefinition {
             name: "END",
@@ -3109,6 +3110,14 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 327]> 
             return_type: VariableType::UserData(37),
             args: Some(vec![ArgumentDefinition::new("FileName", VariableType::String)]),
             signature: FunctionSignature::FixedParameters(1),
+        },
+        FunctionDefinition {
+            name: "TermState",
+            version: 400,
+            opcode: FuncOpCode::TermState,
+            return_type: VariableType::UserData(38),
+            args: None,
+            signature: FunctionSignature::FixedParameters(0),
         },
         // ALIASES (need to be last in the list)
         FunctionDefinition {

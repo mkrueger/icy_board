@@ -357,6 +357,37 @@ The outermost PPE always disables mouse/key modes, stops sound it started,
 releases graphics and restores cursor, wrapping, palette and Sixel scrolling
 state, including after `STOP` or an execution error.
 
+### Text margins
+
+Text margins expose ANSI's independent vertical and horizontal scrolling
+regions. Coordinates are 1-based and inclusive, like `ANSIPOS`.
+
+```PPL
+SetVMargins 5, 18
+SetHMargins 18, 63
+
+TERMSTATE state = TermState()
+IF state.VerticalMargins PRINTLN state.MarginTop, "-", state.MarginBottom
+IF state.HorizontalMargins PRINTLN state.MarginLeft, "-", state.MarginRight
+
+ResetVMargins
+ResetHMargins
+; ResetMargins resets both axes at once.
+```
+
+`TermState()` returns an immutable snapshot with `MarginTop`, `MarginBottom`,
+`MarginLeft`, `MarginRight`, `VerticalMargins` and `HorizontalMargins`. An
+inactive axis reports zero bounds and a `FALSE` flag. The flags describe the
+margins this session asked for, not a capability the terminal confirmed, so a
+client that ignores `DECLRMM` still reports `HorizontalMargins` as `TRUE`.
+
+Bounds are 1-based and the low bound must be smaller than the high one; an
+empty or out-of-range region is ignored. Sessions without ANSI, including
+AVATAR and plain ASCII, ignore all five statements rather than printing the
+escape sequence as text. The
+[`margins` PPE](../ppe/margins/src/margins.pps) demonstrates a bordered list
+that uses the region for efficient keyboard, click and mouse-wheel scrolling.
+
 ## Runtime 4.01
 
 Runtime 4.01 is a PPE-format extension, not another source language. It adds:

@@ -1,0 +1,212 @@
+;$LANGVERSION 400
+
+CONST INTEGER LIST_LEFT = 17
+CONST INTEGER LIST_RIGHT = 64
+CONST INTEGER LIST_TOP = 4
+CONST INTEGER LIST_BOTTOM = 19
+CONST INTEGER VIEW_LEFT = LIST_LEFT + 1
+CONST INTEGER VIEW_RIGHT = LIST_RIGHT - 1
+CONST INTEGER VIEW_TOP = LIST_TOP + 1
+CONST INTEGER VIEW_BOTTOM = LIST_BOTTOM - 1
+CONST INTEGER VIEW_ROWS = VIEW_BOTTOM - VIEW_TOP + 1
+CONST INTEGER VIEW_WIDTH = VIEW_RIGHT - VIEW_LEFT + 1
+CONST INTEGER ITEM_COUNT = 30
+
+STRING items = {
+    "Amber terminal", "Archive browser", "Batch transfer", "Caller history",
+    "Conference list", "Door launcher", "File search", "Message reader",
+    "Network status", "Node monitor", "Online users", "Page the sysop",
+    "Protocol setup", "Quick scan", "Recent uploads", "Search messages",
+    "Session statistics", "System news", "Text editor", "Transfer queue",
+    "User directory", "User settings", "View bulletin", "Weather service",
+    "Who's online", "Write message", "X/Y/Z modem", "Yesterday's mail",
+    "Zippy search", "Log off"
+}
+
+INTEGER selected, firstVisible
+INTEGER oldSelected, clicked, amount
+INTEGER eventKind, eventCode, mouseButton, mouseX, mouseY, wheelY
+BOOLEAN running
+STRING key
+EVENT inputEvent
+
+selected = 0
+firstVisible = 0
+running = TRUE
+
+CLS
+DrawFrame()
+SetVMargins VIEW_TOP, VIEW_BOTTOM
+SetHMargins VIEW_LEFT, VIEW_RIGHT
+DrawVisible()
+MouseOn MOUSE_TEXT, MOUSE_TRACK_BUTTONS
+
+WHILE (running) DO
+    inputEvent = EventWait(-1)
+    eventKind = inputEvent.Kind
+    eventCode = inputEvent.Code
+    IF (eventKind = EVENT_KEY) THEN
+        key = Upper(inputEvent.Text)
+        IF (key = "Q" | eventCode = KEY_ESCAPE) THEN
+            running = FALSE
+        ELSEIF (eventCode = KEY_UP) THEN
+            MoveSelection(-1)
+        ELSEIF (eventCode = KEY_DOWN) THEN
+            MoveSelection(1)
+        ELSEIF (eventCode = KEY_PAGE_UP) THEN
+            MoveSelection(-VIEW_ROWS)
+        ELSEIF (eventCode = KEY_PAGE_DOWN) THEN
+            MoveSelection(VIEW_ROWS)
+        ELSEIF (eventCode = KEY_HOME) THEN
+            MoveSelection(-ITEM_COUNT)
+        ELSEIF (eventCode = KEY_END) THEN
+            MoveSelection(ITEM_COUNT)
+        ELSEIF (eventCode = KEY_ENTER) THEN
+            running = FALSE
+        ENDIF
+    ELSEIF (eventKind = EVENT_MOUSE) THEN
+        mouseButton = inputEvent.Button
+        mouseX = inputEvent.X
+        mouseY = inputEvent.Y
+        wheelY = inputEvent.WheelY
+        IF (eventCode = MOUSE_WHEEL) THEN
+            IF (MouseInsideList(mouseX, mouseY)) THEN
+                amount = wheelY
+                WHILE (amount > 0) DO
+                    MoveSelection(-1)
+                    amount -= 1
+                ENDWHILE
+                WHILE (amount < 0) DO
+                    MoveSelection(1)
+                    amount += 1
+                ENDWHILE
+            ENDIF
+        ELSEIF (eventCode = MOUSE_PRESS & mouseButton = MOUSE_LEFT) THEN
+            IF (MouseInsideList(mouseX, mouseY)) THEN
+                clicked = firstVisible + mouseY - (VIEW_TOP - 1)
+                IF (clicked < ITEM_COUNT) SelectVisible(clicked)
+            ENDIF
+        ENDIF
+    ENDIF
+ENDWHILE
+
+MouseOff
+ResetMargins
+COLOR @X07
+CLS
+PRINTLN "Selected: ", items[selected]
+
+PROCEDURE DrawFrame()
+    INTEGER row, column
+
+    COLOR @X0B
+    ANSIPOS LIST_LEFT, LIST_TOP
+    PRINT "+"
+    FOR column = LIST_LEFT + 1 TO LIST_RIGHT - 1
+        PRINT "-"
+    NEXT
+    PRINT "+"
+    FOR row = LIST_TOP + 1 TO LIST_BOTTOM - 1
+        ANSIPOS LIST_LEFT, row
+        PRINT "|"
+        ANSIPOS LIST_RIGHT, row
+        PRINT "|"
+    NEXT
+    ANSIPOS LIST_LEFT, LIST_BOTTOM
+    PRINT "+"
+    FOR column = LIST_LEFT + 1 TO LIST_RIGHT - 1
+        PRINT "-"
+    NEXT
+    PRINT "+"
+
+    COLOR @X0F
+    ANSIPOS LIST_LEFT + 2, LIST_TOP
+    PRINT " Margin list "
+    COLOR @X07
+    ANSIPOS LIST_LEFT, LIST_BOTTOM + 2
+    PRINT "Up/Down/PgUp/PgDn, mouse wheel or click. Enter selects; Q exits."
+ENDPROC
+
+PROCEDURE DrawVisible()
+    INTEGER row, item
+
+    FOR row = 0 TO VIEW_ROWS - 1
+        item = firstVisible + row
+        IF (item < ITEM_COUNT) THEN
+            DrawRow(item, VIEW_TOP + row)
+        ELSE
+            ClearRow(VIEW_TOP + row)
+        ENDIF
+    NEXT
+ENDPROC
+
+PROCEDURE DrawRow(INTEGER item, INTEGER row)
+    STRING label
+
+    label = " " + items[item]
+    IF (Len(label) < VIEW_WIDTH) label += Space(VIEW_WIDTH - Len(label))
+    IF (Len(label) > VIEW_WIDTH) label = Left(label, VIEW_WIDTH)
+
+    ANSIPOS VIEW_LEFT, row
+    IF (item = selected) THEN
+        COLOR @X70
+    ELSE
+        COLOR @X07
+    ENDIF
+    PRINT label
+ENDPROC
+
+PROCEDURE ClearRow(INTEGER row)
+    ANSIPOS VIEW_LEFT, row
+    COLOR @X07
+    PRINT Space(VIEW_WIDTH)
+ENDPROC
+
+PROCEDURE MoveSelection(INTEGER delta)
+    INTEGER target, oldFirst
+
+    target = selected + delta
+    IF (target < 0) target = 0
+    IF (target >= ITEM_COUNT) target = ITEM_COUNT - 1
+    IF (target = selected) RETURN
+
+    oldSelected = selected
+    oldFirst = firstVisible
+    selected = target
+
+    IF (selected < firstVisible) THEN
+        firstVisible = selected
+    ELSEIF (selected >= firstVisible + VIEW_ROWS) THEN
+        firstVisible = selected - VIEW_ROWS + 1
+    ENDIF
+
+    IF (firstVisible = oldFirst) THEN
+        DrawRow(oldSelected, VIEW_TOP + oldSelected - firstVisible)
+        DrawRow(selected, VIEW_TOP + selected - firstVisible)
+    ELSEIF (firstVisible = oldFirst + 1) THEN
+        DrawRow(oldSelected, VIEW_TOP + oldSelected - oldFirst)
+        ANSIPOS VIEW_LEFT, VIEW_TOP
+        PRINT Chr(27), "[1S"
+        DrawRow(selected, VIEW_BOTTOM)
+    ELSEIF (firstVisible = oldFirst - 1) THEN
+        DrawRow(oldSelected, VIEW_TOP + oldSelected - oldFirst)
+        ANSIPOS VIEW_LEFT, VIEW_TOP
+        PRINT Chr(27), "[1T"
+        DrawRow(selected, VIEW_TOP)
+    ELSE
+        DrawVisible()
+    ENDIF
+ENDPROC
+
+PROCEDURE SelectVisible(INTEGER item)
+    oldSelected = selected
+    selected = item
+    IF (oldSelected <> selected) THEN
+        DrawRow(oldSelected, VIEW_TOP + oldSelected - firstVisible)
+        DrawRow(selected, VIEW_TOP + selected - firstVisible)
+    ENDIF
+ENDPROC
+
+FUNCTION MouseInsideList(INTEGER x, INTEGER y) BOOLEAN
+    MouseInsideList = x >= VIEW_LEFT - 1 & x <= VIEW_RIGHT - 1 & y >= VIEW_TOP - 1 & y <= VIEW_BOTTOM - 1
+ENDFUNC

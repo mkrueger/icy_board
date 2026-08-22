@@ -2845,6 +2845,21 @@ pub async fn eventwait(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Var
     Ok(vm.icy_board_state.wait_ppl_event(timeout).await?.value())
 }
 
+pub async fn termstate(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
+    let terminal = &vm.icy_board_state.display_screen().buffer.buffer.terminal_state;
+    let vertical = terminal.margins_top_bottom();
+    let horizontal = terminal.margins_left_right();
+    Ok(crate::icy_board::state::ppl_terminal_state::PplTerminalState {
+        margin_top: vertical.map_or(0, |(top, _)| top + 1),
+        margin_bottom: vertical.map_or(0, |(_, bottom)| bottom + 1),
+        margin_left: horizontal.map_or(0, |(left, _)| left + 1),
+        margin_right: horizontal.map_or(0, |(_, right)| right + 1),
+        horizontal_margins: horizontal.is_some(),
+        vertical_margins: vertical.is_some(),
+    }
+    .value())
+}
+
 /// A request the caller's node waits on, so it needs an end: a host that never
 /// answers would hold the node until the caller gives up. A failed request is
 /// logged and answered empty rather than stopping the PPE, the way the rest of

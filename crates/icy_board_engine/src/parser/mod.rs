@@ -283,6 +283,7 @@ pub const CONTACT_ID: usize = 34;
 pub const SURFACE_ID: usize = 35;
 pub const EVENT_ID: usize = 36;
 pub const AUDIO_ID: usize = 37;
+pub const TERM_STATE_ID: usize = 38;
 
 /// The board objects are ours, so no `PCBoard` language knows their names.
 pub const FIRST_BOARD_OBJECT_LANGUAGE_VERSION: u16 = 400;
@@ -320,6 +321,7 @@ impl UserTypeRegistry {
         reg.register::<crate::icy_board::state::ppl_surface::PplSurface>(SURFACE_ID);
         reg.register::<crate::icy_board::state::ppl_events::PplEvent>(EVENT_ID);
         reg.register::<crate::icy_board::state::ppl_audio::PplAudio>(AUDIO_ID);
+        reg.register::<crate::icy_board::state::ppl_terminal_state::PplTerminalState>(TERM_STATE_ID);
 
         reg
     }

@@ -254,5 +254,10 @@ pub async fn run_predefined_statement(opcode: OpCode, arg: &mut VirtualMachine<'
         OpCode::MouseOff => predefined_procedures::mouseoff(arg, arguments).await,
         OpCode::GfxSetPacing => predefined_procedures::gfxsetpacing(arg, arguments).await,
         OpCode::KeyEvents => predefined_procedures::keyevents(arg, arguments).await,
+        OpCode::SetVMargins => predefined_procedures::set_v_margins(arg, arguments).await,
+        OpCode::SetHMargins => predefined_procedures::set_h_margins(arg, arguments).await,
+        OpCode::ResetVMargins => predefined_procedures::reset_v_margins(arg, arguments).await,
+        OpCode::ResetHMargins => predefined_procedures::reset_h_margins(arg, arguments).await,
+        OpCode::ResetMargins => predefined_procedures::reset_margins(arg, arguments).await,
     }
 }

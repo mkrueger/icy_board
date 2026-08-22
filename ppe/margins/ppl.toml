@@ -1,0 +1,7 @@
+[package]
+name = "margins"
+version = "0.1.0"
+authors = ["Mike Krüger <mkrueger@posteo.de>"]
+
+[compiler]
+language_version = 400

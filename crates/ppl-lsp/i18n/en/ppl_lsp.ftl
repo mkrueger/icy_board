@@ -1109,9 +1109,11 @@ hint-function-gfx-api=Queries graphics backend, capability, surface, geometry or
 hint-function-rgb=Packs red, green, blue and optional alpha components into an RGBA color.
 hint-function-sound-api=Queries SyncTERM audio capability, format support or channel state.
 hint-function-event-api=Returns the next translated key, physical key edge or mouse event as an EVENT object.
+hint-function-term-state=Returns an immutable TERMSTATE snapshot of the active text margins.
 hint-statement-gfx-api=Creates, draws, presents or controls Sixel/JPEG XL graphics surfaces.
 hint-statement-sound-api=Preloads, plays, fades, stops or changes SyncTERM audio.
 hint-statement-mouse-api=Enables or disables cell/pixel mouse event reporting.
+hint-statement-margin-api=Sets or resets the terminal's independent vertical and horizontal text margins.
 hint-statement-key-api=Enables, suppresses translated input for, or disables physical key events.
 hint-function-fdordaka=
     Returns the address this board answers to, as zone:net/node with the point

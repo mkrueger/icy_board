@@ -305,6 +305,7 @@ pub async fn run_function(opcode: FuncOpCode, arg: &mut VirtualMachine<'_>, argu
         FuncOpCode::EventPoll => predefined_functions::eventpoll(arg, arguments).await,
         FuncOpCode::EventWait => predefined_functions::eventwait(arg, arguments).await,
         FuncOpCode::LoadAudio => crate::vm::statements::predefined_procedures::load_audio(arg, arguments).await,
+        FuncOpCode::TermState => predefined_functions::termstate(arg, arguments).await,
         FuncOpCode::END
         | FuncOpCode::CPAR
         | FuncOpCode::UPLUS
