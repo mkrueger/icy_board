@@ -11,6 +11,7 @@ lazy_static = { workspace = true }
 thiserror = { workspace = true }
 crossterm = { workspace = true }
 ratatui = { workspace = true }
+terminfo = { workspace = true }
 semver = { workspace = true }
 log = { workspace = true }
 chrono = { workspace = true }

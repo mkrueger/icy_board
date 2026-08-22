@@ -68,9 +68,10 @@ pub fn set_tui_theme(colors: &PcbScreenColors) {
     *TUI_THEME.write().unwrap() = Theme::from_pcboard(colors);
 }
 
+pub(crate) const DOS_ANSI_INDEX: [u8; 16] = [0, 4, 2, 6, 1, 5, 3, 7, 8, 12, 10, 14, 9, 13, 11, 15];
+
 fn dos_color(index: u8) -> Color {
-    const ANSI_INDEX: [u8; 16] = [0, 4, 2, 6, 1, 5, 3, 7, 8, 12, 10, 14, 9, 13, 11, 15];
-    Color::Indexed(ANSI_INDEX[usize::from(index & 0x0F)])
+    Color::Indexed(DOS_ANSI_INDEX[usize::from(index & 0x0F)])
 }
 
 pub fn dos_attribute_style(attribute: u8) -> Style {

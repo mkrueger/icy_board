@@ -508,17 +508,15 @@ where
         }
         CallWaitMessage::SystemManager => {
             let path = std::env::current_exe()?.with_file_name("icbsm");
-            Command::new(&path)
-                .arg(board.lock().await.file_name.as_os_str())
-                .status()
+            let board_file = board.lock().await.file_name.clone();
+            icy_board_tui::term::with_terminal(|| Command::new(&path).arg(board_file.as_os_str()).status())
                 .map_err(|err| format!("Can't run {}: {err}", path.display()))?;
             return Ok(true);
         }
         CallWaitMessage::Setup => {
             let path = std::env::current_exe()?.with_file_name("icbsetup");
-            Command::new(&path)
-                .arg(board.lock().await.file_name.as_os_str())
-                .status()
+            let board_file = board.lock().await.file_name.clone();
+            icy_board_tui::term::with_terminal(|| Command::new(&path).arg(board_file.as_os_str()).status())
                 .map_err(|err| format!("Can't run {}: {err}", path.display()))?;
             return Ok(true);
         }
@@ -527,9 +525,7 @@ where
             let icbtxt_path = board.lock().await.resolve_file(&icbtxt_path);
 
             let path = std::env::current_exe()?.with_file_name("mkicbtxt");
-            Command::new(&path)
-                .arg(icbtxt_path.as_os_str())
-                .status()
+            icy_board_tui::term::with_terminal(|| Command::new(&path).arg(icbtxt_path.as_os_str()).status())
                 .map_err(|err| format!("Can't run {}: {err}", path.display()))?;
             return Ok(true);
         }
@@ -561,11 +557,14 @@ where
 
 fn init_terminal() -> Res<ratatui::DefaultTerminal> {
     color_eyre::install()?;
-    Ok(ratatui::init())
+    let terminal = ratatui::init();
+    icy_board_tui::term::apply_dos_palette()?;
+    Ok(terminal)
 }
 
 pub fn restore_terminal() -> Res<()> {
     ratatui::restore();
+    icy_board_tui::term::restore_palette()?;
     Ok(())
 }
 
