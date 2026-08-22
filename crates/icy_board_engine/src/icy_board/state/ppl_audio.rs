@@ -14,7 +14,6 @@ use crate::{
 #[derive(Clone, Copy)]
 pub struct PplAudio {
     pub channel: i32,
-    pub error: i32,
 }
 
 impl PplAudio {
@@ -22,16 +21,17 @@ impl PplAudio {
         VariableValue {
             vtype: VariableType::UserData(AUDIO_ID as u8),
             data: VariableData::from_int(channel),
-            generic_data: GenericVariableData::UserData(std::sync::Arc::new(PplAudio { channel, error: 0 })),
+            generic_data: GenericVariableData::UserData(std::sync::Arc::new(PplAudio { channel })),
         }
     }
 
     /// An answer for audio that could not be loaded, so its members stay callable.
-    pub fn invalid(error: i32) -> VariableValue {
+    /// Why it failed is `ERR()`'s to tell.
+    pub fn invalid() -> VariableValue {
         VariableValue {
             vtype: VariableType::UserData(AUDIO_ID as u8),
             data: VariableData::from_int(-1),
-            generic_data: GenericVariableData::UserData(std::sync::Arc::new(PplAudio { channel: -1, error })),
+            generic_data: GenericVariableData::UserData(std::sync::Arc::new(PplAudio { channel: -1 })),
         }
     }
 }
@@ -40,7 +40,6 @@ pub static VALID: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyL
 pub static PLAYING: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Playing".to_string()));
 pub static VOLUME: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Volume".to_string()));
 pub static CHANNEL: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Channel".to_string()));
-pub static ERROR: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Error".to_string()));
 pub static PLAY: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Play".to_string()));
 pub static STOP: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Stop".to_string()));
 pub static SET_VOLUME: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("SetVolume".to_string()));
@@ -55,7 +54,6 @@ impl UserData for PplAudio {
         registry.add_property(PLAYING.clone(), VariableType::Boolean, false);
         registry.add_property(VOLUME.clone(), VariableType::Integer, false);
         registry.add_property(CHANNEL.clone(), VariableType::Integer, false);
-        registry.add_property(ERROR.clone(), VariableType::Integer, false);
 
         // Looping is the only thing a play has to be told, and it may be left out.
         registry.add_function_with(PLAY.clone(), vec![VariableType::Boolean], 0, VariableType::Boolean);
@@ -75,9 +73,6 @@ impl UserDataValue for PplAudio {
         }
         if *name == *CHANNEL {
             return Ok(VariableValue::new_int(self.channel));
-        }
-        if *name == *ERROR {
-            return Ok(VariableValue::new_int(self.error));
         }
         if *name == *PLAYING {
             let playing = loaded

@@ -35,6 +35,7 @@ use crate::{
 pub mod functions;
 pub mod menu_runner;
 pub mod ppl_audio;
+pub mod ppl_error;
 pub mod ppl_events;
 pub mod ppl_graphics;
 pub mod ppl_keys;
@@ -670,9 +671,9 @@ pub struct IcyBoardState {
     /// because a terminal does not change mid call.
     media_probed: bool,
 
+    /// What the last graphics operation reported, or `-1` when it has not run yet.
+    /// The VM empties this into its own last error once the statement is over.
     pub gfx_error: i32,
-
-    pub font_error: i32,
 
     /// Names below `gfx/` that this caller's cache is known to hold already,
     /// seeded from the terminal's own listing and extended as uploads happen.
@@ -769,8 +770,7 @@ impl IcyBoardState {
             ppl_audio: std::array::from_fn(|_| None),
             sound_formats: HashMap::new(),
             media_probed: false,
-            gfx_error: 0,
-            font_error: 0,
+            gfx_error: -1,
             gfx_cache: HashSet::new(),
             gfx_probe: termcap_detect::TerminalProbe::default(),
             raw_input: VecDeque::new(),
@@ -1195,7 +1195,7 @@ impl IcyBoardState {
         self.sound_active.fill(false);
         self.ppl_audio.fill(None);
         self.sound_volume.fill(100);
-        self.gfx_error = 0;
+        self.gfx_error = -1;
     }
 
     pub fn stuff_keyboard_buffer(&mut self, value: &str, is_visible: bool) -> Res<()> {

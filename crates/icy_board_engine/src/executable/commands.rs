@@ -127,6 +127,53 @@ pub enum PPECommand {
     Stop,
     Let(Box<PPEExpr>, Box<PPEExpr>),
     MemberCall(Box<PPEExpr>),
+    OnError(OnErrorTarget),
+}
+
+/// Where `ON ERROR` sends the program. The label is patched like a `GOTO` label is,
+/// the procedure names its variable table entry.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum OnErrorTarget {
+    Off,
+    Goto(usize),
+    Gosub(usize),
+    Procedure(usize),
+}
+
+impl OnErrorTarget {
+    /// The two words it is stored as.
+    pub fn encode(self) -> (i16, i16) {
+        match self {
+            OnErrorTarget::Off => (0, 0),
+            OnErrorTarget::Goto(label) => (1, label as i16),
+            OnErrorTarget::Gosub(label) => (2, label as i16),
+            OnErrorTarget::Procedure(id) => (3, id as i16),
+        }
+    }
+
+    pub fn decode(mode: i16, target: usize) -> OnErrorTarget {
+        match mode {
+            1 => OnErrorTarget::Goto(target),
+            2 => OnErrorTarget::Gosub(target),
+            3 => OnErrorTarget::Procedure(target),
+            _ => OnErrorTarget::Off,
+        }
+    }
+
+    /// The label to patch, for the two forms that jump to one.
+    pub fn label_mut(&mut self) -> Option<&mut usize> {
+        match self {
+            OnErrorTarget::Goto(label) | OnErrorTarget::Gosub(label) => Some(label),
+            OnErrorTarget::Off | OnErrorTarget::Procedure(_) => None,
+        }
+    }
+
+    pub fn label(self) -> Option<usize> {
+        match self {
+            OnErrorTarget::Goto(label) | OnErrorTarget::Gosub(label) => Some(label),
+            OnErrorTarget::Off | OnErrorTarget::Procedure(_) => None,
+        }
+    }
 }
 
 impl PPECommand {
@@ -150,6 +197,12 @@ impl PPECommand {
             PPECommand::Gosub(pos) => {
                 vec.push(OpCode::GOSUB as i16);
                 vec.push(*pos as i16);
+            }
+            PPECommand::OnError(target) => {
+                let (mode, value) = target.encode();
+                vec.push(OpCode::OnError as i16);
+                vec.push(mode);
+                vec.push(value);
             }
             PPECommand::IfNot(expr, label) => {
                 vec.push(OpCode::IFNOT as i16);
@@ -259,6 +312,7 @@ impl PPECommand {
             PPECommand::End | PPECommand::Return | PPECommand::EndFunc | PPECommand::EndProc | PPECommand::Stop => 1,
 
             PPECommand::Goto(_) | PPECommand::Gosub(_) => 2,
+            PPECommand::OnError(_) => 3,
             PPECommand::IfNot(expr, _) => 1 + expr.get_size() + 2,
             PPECommand::ProcedureCall(_, args) => 3 + PPEExpr::count_size(args) + args.len(),
             PPECommand::PredefinedCall(def, args) => match def.sig {
@@ -290,6 +344,7 @@ impl PPECommand {
             PPECommand::PredefinedCall(def, args) => visitor.visit_predefined_call(def, args),
             PPECommand::Goto(label) => visitor.visit_goto(label),
             PPECommand::Gosub(label) => visitor.visit_gosub(label),
+            PPECommand::OnError(target) => visitor.visit_on_error(target),
             PPECommand::EndFunc => visitor.visit_end_func(),
             PPECommand::EndProc => visitor.visit_end_proc(),
             PPECommand::Stop => visitor.visit_stop(),
@@ -517,6 +572,7 @@ pub trait PPEVisitor<T>: Sized {
     fn visit_predefined_call(&mut self, def: &StatementDefinition, arguments: &[PPEExpr]) -> T;
     fn visit_goto(&mut self, label: &usize) -> T;
     fn visit_gosub(&mut self, label: &usize) -> T;
+    fn visit_on_error(&mut self, target: &OnErrorTarget) -> T;
     fn visit_end_func(&mut self) -> T;
     fn visit_end_proc(&mut self) -> T;
     fn visit_stop(&mut self) -> T;
@@ -706,6 +762,10 @@ impl PPEVisitor<Result<VariableValue, PPEError>> for PPEConstantValueVisitor<'_>
     }
 
     fn visit_gosub(&mut self, _label: &usize) -> Result<VariableValue, PPEError> {
+        todo!()
+    }
+
+    fn visit_on_error(&mut self, _target: &OnErrorTarget) -> Result<VariableValue, PPEError> {
         todo!()
     }
 

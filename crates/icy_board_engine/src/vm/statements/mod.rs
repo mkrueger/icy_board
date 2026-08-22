@@ -35,7 +35,9 @@ pub async fn run_predefined_statement(opcode: OpCode, arg: &mut VirtualMachine<'
         | OpCode::FPCLR
         | OpCode::BEGIN
         | OpCode::FEND
+        | OpCode::OnError
         | OpCode::STATIC => predefined_procedures::invalid(arg, arguments).await,
+        OpCode::ErrClr => predefined_procedures::errclr(arg, arguments).await,
         OpCode::PRINT => predefined_procedures::print(arg, arguments).await,
         OpCode::PRINTLN => predefined_procedures::println(arg, arguments).await,
         OpCode::CONFFLAG => predefined_procedures::confflag(arg, arguments).await,

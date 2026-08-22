@@ -188,7 +188,7 @@ A surface is a `SURFACE` object created by one of two functions:
 | `NewSurface(width, height)` | Create a transparent surface |
 | `LoadSurface(file)` | Load PNG, JPEG XL or another supported image |
 
-Both return an invalid surface on failure, so check `GfxError()` or the `Valid`
+Both return an invalid surface on failure, so check [`ERR()`](#errors) or the `Valid`
 property. Everything else is a member of the surface itself:
 
 | Member | Purpose |
@@ -214,7 +214,7 @@ global statements control the session rather than a surface:
 | `GfxSetPacing frames` | Enable DSR-acknowledged presentation when positive |
 | `GfxShutdown` | Release resources and restore terminal modes |
 
-`GfxError` reports the status of the last operation. `GfxCaps` is a bitmask of
+`GfxCaps` is a bitmask of
 `GFX_CAP_*` constants. `GfxCellWidth`, `GfxCellHeight`, `GfxScreenWidth` and
 `GfxScreenHeight` report probed pixel geometry. `Pin` uses at most the two
 client pixel buffers; drawing onto a pinned surface automatically invalidates
@@ -225,15 +225,15 @@ of resident RGBA pixels. Source image files are limited to 32 MiB and raster
 decoders receive the same dimension and allocation limits before decoding.
 Graphics and sound together may add at most 256 MiB of uniquely named persistent
 media during one connection. Changing frames that overwrite a surface cache
-entry do not consume that budget. `GfxError` returns the named `GFX_ERR_*`
-constants; every graphics operation updates it.
+entry do not consume that budget. Every graphics operation updates
+[`ERR()`](#errors), which reports the rest of the board the same way.
 
 `PresentRect` can hand the scaling and mirroring to the terminal: `dw` and
 `dh` give the destination size and `flip` combines `GFX_FLIP_X` and
 `GFX_FLIP_Y`. The frame still travels at its source size, so drawing a small
 surface enlarged costs the bandwidth of the small one. Both are options of the
 image APC, so they need the JPEG XL backend and report
-`GFX_ERR_UNSUPPORTED` on Sixel.
+`ERR_UNSUPPORTED` on Sixel.
 
 ```PPL
 ; A 160x100 surface fills a 640x400 area without sending 640x400 pixels.
@@ -255,16 +255,16 @@ ENDIF
 
 | Member | Purpose |
 | :--- | :--- |
-| `Valid`, `Playing`, `Volume`, `Channel`, `Error` | Read-only status properties |
+| `Valid`, `Playing`, `Volume`, `Channel` | Read-only status properties |
 | `Play([loop])` | Start the sound, looping when told to |
 | `Stop()` | Stop it and free the channel's mixer slot |
 | `SetVolume(percent)` | Set the volume, 0 through 100 |
 | `Fade(percent, milliseconds)` | Ride the volume to `percent` |
 | `Free()` | Give the channel back |
 
-`Error` is zero for a loaded object and describes why an invalid object could not
-be loaded. A sound that ends reports itself as an `EVENT_SOUND` event naming its
-channel, so a program waits for it rather than polling.
+An object that could not be loaded is `Valid = FALSE` and stays callable; why it
+failed is [`ERR()`](#errors)'s to tell. A sound that ends reports itself as an
+`EVENT_SOUND` event naming its channel, so a program waits for it rather than polling.
 
 `EventPoll` and `EventWait(milliseconds)` provide one ordered input stream.
 Both return an immutable `EVENT` object. Its `Kind` is one of `EVENT_NONE`,
@@ -395,11 +395,11 @@ that uses the region for efficient keyboard, click and mouse-wheel scrolling.
 ```PPL
 SetFont 0, 5                    ; font 5 wherever the normal attribute applies
 LoadFont 43, "topaz.psf"
-IF (FontError() = FONT_OK) SetFont 0, 43
+IF (ERR().OK) SetFont 0, 43
 ```
 
 Font numbers 0 to 42 are the terminal's built-in fonts and are read-only:
-`LoadFont` accepts 43 to 255 and answers `FONT_ERR_INVALID_SLOT` below that,
+`LoadFont` accepts 43 to 255 and answers `ERR_INVALID` below that,
 rather than sending an upload the terminal would silently discard. `SetFont`
 selects any font, built-in or uploaded. `LoadFont` reads PSF1, PSF2, YAFF and
 raw files, and a raw file is recognised by its size alone: 256 glyphs of equal
@@ -409,10 +409,79 @@ The slot is one of the four attribute classes a terminal keeps a font for,
 numbered 0 to 3. Four fonts can therefore be on screen at once, picked per
 character by its attribute.
 
-`FontError()` returns `FONT_OK`, `FONT_ERR_INVALID_SLOT`, `FONT_ERR_IO`,
-`FONT_ERR_FORMAT` or `FONT_ERR_LIMIT` for the last font operation. Sessions
-without ANSI ignore both statements. A font a PPE selects stays selected after
+Both statements report through [`ERR()`](#errors). Sessions
+without ANSI ignore them. A font a PPE selects stays selected after
 the PPE ends, since changing the board font may be the point of running it.
+
+### Errors
+
+`ERR()` answers with an `ERROR` describing the last operation that could fail.
+It reads the same whichever part of the board failed, so one piece of code can
+handle a file, a font, a sound or a picture going wrong.
+
+```PPL
+LoadFont 43, "topaz.psf"
+IF (!ERR().OK) THEN
+	PrintLn "Sorry: ", ERR().Message
+ENDIF
+```
+
+| Member | Purpose |
+| :--- | :--- |
+| `OK` | `TRUE` while nothing has gone wrong |
+| `Kind` | Which part of the board failed, an `ERR_KIND_*` constant |
+| `Code` | What went wrong, an `ERR_*` constant |
+| `Message` | A line of English, meant for a log |
+| `Channel` | The file, dBase or sound channel, `-1` when the error has none |
+
+`Kind` is one of `ERR_KIND_NONE`, `ERR_KIND_FILE`, `ERR_KIND_DBASE`,
+`ERR_KIND_STACK`, `ERR_KIND_GFX`, `ERR_KIND_FONT` or `ERR_KIND_SOUND`. `Code` is
+one of `ERR_OK`, `ERR_UNAVAILABLE`, `ERR_INVALID`, `ERR_IO`, `ERR_FORMAT`,
+`ERR_LIMIT`, `ERR_UNSUPPORTED` or `ERR_STACK`.
+
+An operation that works clears the error, so `ERR()` always answers for the last
+thing that was tried rather than for the last thing that failed. `ERRCLR` forgets
+it as well. The value is a copy, so a PPE can keep one while it carries on:
+
+```PPL
+ERROR failed = ERR()
+```
+
+`FERR` and `DERR` are unchanged, including that `FERR` clears itself when read
+and that reading a file to its end raises it. Reaching the end of a file is not
+an error, so it leaves `ERR().OK` true and never reaches an `ON ERROR` handler.
+
+### ON ERROR
+
+`ON ERROR` says where a failed operation sends the program. It may be written as
+one word, `ONERROR`. The handler is chosen once and stays until it is changed.
+
+| Form | What it does |
+| :--- | :--- |
+| `ON ERROR GOTO label` | Jumps, and stays there - for cleaning up and ending |
+| `ON ERROR GOSUB label` | Calls, and `RETURN` carries on after the failed statement |
+| `ON ERROR Handler` | Calls a `PROCEDURE`, then carries on the same way |
+| `ON ERROR OFF` | Back to checking `ERR()` by hand |
+
+```PPL
+DECLARE PROCEDURE Complain(ERROR e)
+
+ON ERROR Complain
+LoadFont 43, "topaz.psf"
+PrintLn "still running"
+
+PROCEDURE Complain(ERROR e)
+	PrintLn "Sorry: ", e.Message
+ENDPROC
+```
+
+A handler procedure takes the error or takes nothing at all; a `VAR` parameter is
+refused, because there is no variable behind an error to write back to. A
+failure inside the handler is recorded but does not call the handler again.
+
+The handler runs once the failing statement is over, so the statement always
+finishes first. `ON ERROR` also catches running out of call stack, which lets a
+runaway recursion apologise instead of disappearing.
 
 > **Note:** icy_term does not read the slot argument yet, so a font it accepts
 > applies regardless of which slot was named. SyncTERM uses the slot as written.

@@ -321,17 +321,16 @@ pub enum FuncOpCode {
     GfxCellHeight = -307,
     GfxScreenWidth = -308,
     GfxScreenHeight = -309,
-    GfxError = -310,
-    NewSurface = -311,
-    LoadSurface = -312,
-    EventPoll = -313,
-    EventWait = -314,
-    LoadAudio = -315,
-    TermState = -316,
-    FontError = -317,
+    NewSurface = -310,
+    LoadSurface = -311,
+    EventPoll = -312,
+    EventWait = -313,
+    LoadAudio = -314,
+    TermState = -315,
+    Err = -316,
 }
 
-pub const LAST_FUNC: i16 = -317;
+pub const LAST_FUNC: i16 = -316;
 
 impl FuncOpCode {
     pub fn get_definition(self) -> &'static FunctionDefinition {
@@ -402,7 +401,7 @@ impl FunctionDefinition {
         }
     }
 }
-pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 329]> = std::sync::LazyLock::new(|| {
+pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 328]> = std::sync::LazyLock::new(|| {
     [
         FunctionDefinition {
             name: "END",
@@ -3062,14 +3061,6 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 329]> 
             signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
-            name: "GfxError",
-            version: 400,
-            opcode: FuncOpCode::GfxError,
-            return_type: VariableType::Integer,
-            args: None,
-            signature: FunctionSignature::FixedParameters(0),
-        },
-        FunctionDefinition {
             name: "NewSurface",
             version: 400,
             opcode: FuncOpCode::NewSurface,
@@ -3121,10 +3112,10 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 329]> 
             signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
-            name: "FontError",
+            name: "Err",
             version: 400,
-            opcode: FuncOpCode::FontError,
-            return_type: VariableType::Integer,
+            opcode: FuncOpCode::Err,
+            return_type: VariableType::UserData(39),
             args: None,
             signature: FunctionSignature::FixedParameters(0),
         },

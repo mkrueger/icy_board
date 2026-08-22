@@ -341,6 +341,17 @@ impl PPEVisitor<()> for DisassembleVisitor<'_> {
         );
     }
 
+    fn visit_on_error(&mut self, target: &crate::executable::OnErrorTarget) {
+        Self::output_op_code(OpCode::OnError);
+        let (mode, value) = target.encode();
+        let _ = execute!(
+            stdout(),
+            SetForegroundColor(Color::Cyan),
+            Print(format!(" {mode} {{{value:04X}}}")),
+            SetAttribute(Attribute::Reset),
+        );
+    }
+
     fn visit_end_func(&mut self) {
         Self::output_op_code(OpCode::FEND);
     }

@@ -8,10 +8,10 @@ use std::{
 use crate::{
     ast::{
         AstVisitor, CommentAstNode, ConstDeclarationStatement, Constant, ConstantExpression, EnumDeclarationAstNode, Expression, FunctionCallExpression,
-        FunctionDeclarationAstNode, FunctionImplementation, GosubStatement, GotoStatement, IdentifierExpression, LabelStatement, LetStatement,
-        ParameterSpecifier, PredefinedCallStatement, ProcedureCallStatement, ProcedureDeclarationAstNode, ProcedureImplementation, TypeDeclarationAstNode,
-        VariableDeclarationStatement, VariableParameterSpecifier, const_value_with_members, walk_function_implementation, walk_indexer_expression,
-        walk_predefined_call_statement, walk_procedure_call_statement, walk_procedure_implementation,
+        FunctionDeclarationAstNode, FunctionImplementation, GosubStatement, GotoStatement, IdentifierExpression, LabelStatement, LetStatement, OnErrorMode,
+        OnErrorStatement, ParameterSpecifier, PredefinedCallStatement, ProcedureCallStatement, ProcedureDeclarationAstNode, ProcedureImplementation,
+        TypeDeclarationAstNode, VariableDeclarationStatement, VariableParameterSpecifier, const_value_with_members, walk_function_implementation,
+        walk_indexer_expression, walk_predefined_call_statement, walk_procedure_call_statement, walk_procedure_implementation,
     },
     compiler::{CompilationErrorType, CompilationWarningType, user_data::UserDataMemberRegistry, workspace::Workspace},
     executable::{
@@ -1904,6 +1904,57 @@ impl AstVisitor<VariableType> for SemanticVisitor {
 
     fn visit_gosub_statement(&mut self, gosub: &GosubStatement) -> VariableType {
         self.add_label_usage(gosub.get_label_token());
+        VariableType::None
+    }
+
+    fn visit_on_error_statement(&mut self, on_error: &OnErrorStatement) -> VariableType {
+        match on_error.get_mode() {
+            OnErrorMode::Off => {}
+            OnErrorMode::Goto | OnErrorMode::Gosub => self.add_label_usage(on_error.get_target_token()),
+            OnErrorMode::Procedure => {
+                let Some(name) = on_error.get_target() else {
+                    return VariableType::None;
+                };
+                let Some(idx) = self.lookup_variable(name) else {
+                    self.errors.lock().unwrap().report_error(
+                        on_error.get_target_token().span.clone(),
+                        CompilationErrorType::ProcedureNotFound(name.to_string()),
+                    );
+                    return VariableType::None;
+                };
+                if !matches!(self.references[idx].0, ReferenceType::Procedure(_)) {
+                    self.errors
+                        .lock()
+                        .unwrap()
+                        .report_error(on_error.get_target_token().span.clone(), CompilationErrorType::ProcedureExpected);
+                    return VariableType::None;
+                }
+                if let Some(container) = self.function_containers.iter().find(|p| p.name == *name)
+                    && let FunctionDeclaration::Procedure(procedure) = &container.functions.clone()
+                {
+                    let parameters = procedure.get_parameters();
+                    // The handler is called from wherever the failure happened, so there is no
+                    // argument expression a VAR parameter could be written back to.
+                    let takes_the_error = match parameters.len() {
+                        0 => true,
+                        1 => match &parameters[0] {
+                            ParameterSpecifier::Variable(var) => {
+                                !var.is_var() && var.get_variable_type() == VariableType::UserData(crate::parser::ERROR_ID as u8)
+                            }
+                            ParameterSpecifier::Function(_) | ParameterSpecifier::Procedure(_) => false,
+                        },
+                        _ => false,
+                    };
+                    if !takes_the_error {
+                        self.errors.lock().unwrap().report_error(
+                            on_error.get_target_token().span.clone(),
+                            CompilationErrorType::InvalidErrorHandler(name.to_string()),
+                        );
+                    }
+                }
+                self.add_reference_to(on_error.get_target_token(), idx);
+            }
+        }
         VariableType::None
     }
 

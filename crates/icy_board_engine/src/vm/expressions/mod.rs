@@ -299,14 +299,13 @@ pub async fn run_function(opcode: FuncOpCode, arg: &mut VirtualMachine<'_>, argu
         FuncOpCode::GfxCellHeight => predefined_functions::gfxcellheight(arg, arguments).await,
         FuncOpCode::GfxScreenWidth => predefined_functions::gfxscreenwidth(arg, arguments).await,
         FuncOpCode::GfxScreenHeight => predefined_functions::gfxscreenheight(arg, arguments).await,
-        FuncOpCode::GfxError => predefined_functions::gfxerror(arg, arguments).await,
         FuncOpCode::NewSurface => crate::vm::statements::predefined_procedures::new_surface(arg, arguments).await,
         FuncOpCode::LoadSurface => crate::vm::statements::predefined_procedures::load_surface(arg, arguments).await,
         FuncOpCode::EventPoll => predefined_functions::eventpoll(arg, arguments).await,
         FuncOpCode::EventWait => predefined_functions::eventwait(arg, arguments).await,
         FuncOpCode::LoadAudio => crate::vm::statements::predefined_procedures::load_audio(arg, arguments).await,
         FuncOpCode::TermState => predefined_functions::termstate(arg, arguments).await,
-        FuncOpCode::FontError => predefined_functions::fonterror(arg, arguments).await,
+        FuncOpCode::Err => predefined_functions::err(arg, arguments).await,
         FuncOpCode::END
         | FuncOpCode::CPAR
         | FuncOpCode::UPLUS

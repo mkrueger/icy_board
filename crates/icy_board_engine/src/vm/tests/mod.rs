@@ -11,6 +11,7 @@ mod contacts;
 mod control_flow;
 mod dbase;
 mod display_pause;
+mod errors;
 mod events;
 mod file_channels;
 mod file_names;

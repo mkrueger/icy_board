@@ -6,6 +6,7 @@ use crate::ast::constant::STACK_LIMIT;
 use crate::datetime::IcbDate;
 use crate::executable::Executable;
 use crate::executable::GenericVariableData;
+use crate::executable::OnErrorTarget;
 use crate::executable::PPECommand;
 use crate::executable::PPEExpr;
 use crate::executable::PPEScript;
@@ -14,6 +15,10 @@ use crate::executable::VariableType;
 use crate::executable::VariableValue;
 use crate::icy_board::lookup_case_insensitive;
 use crate::icy_board::state::NodeState;
+use crate::icy_board::state::ppl_error::{
+    ERR_FORMAT, ERR_INVALID, ERR_IO, ERR_KIND_DBASE, ERR_KIND_FILE, ERR_KIND_GFX, ERR_KIND_STACK, ERR_LIMIT, ERR_STACK, ERR_UNAVAILABLE, ERR_UNSUPPORTED,
+    PplError,
+};
 use crate::icy_board::user_base::FSEMode;
 use crate::parser::UserTypeRegistry;
 use crate::vm::expressions::to_base_36;
@@ -112,6 +117,31 @@ pub struct StackFrame {
     pub label_table: HashMap<unicase::Ascii<String>, usize>,
 }
 
+/// Where `ON ERROR` sends a program when an operation fails.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum ErrorHandler {
+    #[default]
+    Off,
+    /// Jumps for good; the handler ends the program rather than coming back.
+    Goto(usize),
+    Gosub(usize),
+    /// Calls the procedure with the id of its variable table entry.
+    Procedure(usize),
+}
+
+/// What the graphics codes mean, so `ERR().Message` reads like the other subsystems'.
+fn gfx_error_message(code: i32) -> &'static str {
+    match code {
+        ERR_UNAVAILABLE => "graphics are not initialized",
+        ERR_INVALID => "invalid surface",
+        ERR_IO => "graphics I/O failed",
+        ERR_FORMAT => "the image could not be decoded",
+        ERR_LIMIT => "a graphics limit was reached",
+        ERR_UNSUPPORTED => "the terminal does not support this",
+        _ => "graphics operation failed",
+    }
+}
+
 pub fn calc_stmt_table(blk: &[Statement]) -> HashMap<unicase::Ascii<String>, usize> {
     let mut res = HashMap::new();
     for (i, stmt) in blk.iter().enumerate() {
@@ -188,6 +218,21 @@ pub struct VirtualMachine<'a> {
     /// What `STACKABORT` last asked for. Aborting is the default; a PPE has to
     /// opt into limping on after it has blown the stack.
     pub abort_on_stack_error: bool,
+
+    /// What the last operation that can fail did, which is what `ERR()` hands out.
+    pub last_error: PplError,
+
+    /// Set when an operation failed, and cleared once the statement it failed in is over.
+    pub error_pending: bool,
+
+    pub error_handler: ErrorHandler,
+
+    /// Whether the handler is running, so that a failure inside it is recorded
+    /// rather than sending the program back into the handler again.
+    pub in_handler: bool,
+
+    /// The call depth the handler returns to, or `None` for a `GOTO` handler that never does.
+    pub handler_depth: Option<usize>,
 
     pub dbase: dbase::DbaseState,
 }
@@ -653,6 +698,116 @@ impl VirtualMachine<'_> {
             let c = self.script.statements[p].command.clone();
             // log::info!("{p}: {c}");
             self.execute_statement(&c).await?;
+            self.check_error_trap()?;
+        }
+        Ok(())
+    }
+
+    /// Records what an operation failed with. `ON ERROR` acts on it once the statement is over,
+    /// so the operation itself always runs to its end first.
+    pub fn set_error(&mut self, error: PplError) {
+        self.error_pending = !error.is_ok();
+        self.last_error = error;
+    }
+
+    /// What an operation that worked reports, so a later `ERR()` does not answer for an older one.
+    pub fn clear_error(&mut self) {
+        self.error_pending = false;
+        self.last_error = PplError::default();
+    }
+
+    /// Takes what the graphics code left behind. It writes a plain code rather than
+    /// reaching for the VM, so this is where that becomes an error like any other.
+    fn publish_gfx_error(&mut self) {
+        match std::mem::replace(&mut self.icy_board_state.gfx_error, -1) {
+            -1 => {}
+            0 => self.clear_error(),
+            code => self.set_error(PplError::new(ERR_KIND_GFX, code, gfx_error_message(code))),
+        }
+    }
+
+    /// The same for the file and dBase channels, which keep their own `FERR`/`DERR` flags.
+    fn publish_io_error(&mut self) {
+        if let Some((channel, message)) = self.io.take_failure() {
+            self.set_error(PplError::new(ERR_KIND_FILE, ERR_IO, message).on_channel(channel));
+        }
+        if let Some((channel, message)) = self.dbase.take_failure() {
+            self.set_error(PplError::new(ERR_KIND_DBASE, ERR_IO, message).on_channel(channel));
+        }
+    }
+
+    /// Hands the program to its `ON ERROR` handler, if it has one and is not already in it.
+    fn check_error_trap(&mut self) -> Res<()> {
+        self.publish_gfx_error();
+        self.publish_io_error();
+        if self.in_handler
+            && let Some(depth) = self.handler_depth
+            && self.return_addresses.len() <= depth
+        {
+            self.in_handler = false;
+            self.handler_depth = None;
+        }
+
+        if !self.error_pending {
+            return Ok(());
+        }
+        self.error_pending = false;
+        if self.in_handler {
+            return Ok(());
+        }
+
+        match self.error_handler {
+            ErrorHandler::Off => {}
+            ErrorHandler::Goto(label) => {
+                self.in_handler = true;
+                self.handler_depth = None;
+                self.goto(label)?;
+            }
+            ErrorHandler::Gosub(label) => {
+                let depth = self.return_addresses.len();
+                self.in_handler = true;
+                self.handler_depth = Some(depth);
+                if self.push_return_address(ReturnAddress::gosub(self.cur_ptr))? {
+                    self.goto(label)?;
+                } else {
+                    self.in_handler = false;
+                    self.handler_depth = None;
+                }
+            }
+            ErrorHandler::Procedure(proc_id) => {
+                self.call_error_handler(proc_id)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Calls the `ON ERROR` procedure, handing it the error when it takes one.
+    fn call_error_handler(&mut self, proc_id: usize) -> Res<()> {
+        let proc_offset;
+        let locals;
+        let parameters;
+        let first;
+
+        unsafe {
+            let proc = &self.variable_table.get_var_entry(proc_id);
+            proc_offset = proc.value.data.procedure_value.start_offset as usize;
+            first = (proc.value.data.procedure_value.first_var_id + 1) as usize;
+            locals = proc.value.data.procedure_value.local_variables as usize;
+            parameters = proc.value.data.procedure_value.parameters as usize;
+        }
+
+        // The handler takes the error itself or none at all, so there is never a value to write back.
+        let arguments = if parameters == 0 { Vec::new() } else { vec![self.last_error.clone().value()] };
+        self.prepare_call_with_values(locals, parameters, first, arguments);
+
+        let depth = self.return_addresses.len();
+        self.in_handler = true;
+        self.handler_depth = Some(depth);
+        if self.push_return_address(ReturnAddress::func_call(self.cur_ptr, proc_id))? {
+            self.goto(proc_offset)?;
+        } else {
+            self.in_handler = false;
+            self.handler_depth = None;
         }
         Ok(())
     }
@@ -867,6 +1022,14 @@ impl VirtualMachine<'_> {
                     self.goto(*label)?;
                 }
             }
+            PPECommand::OnError(target) => {
+                self.error_handler = match target {
+                    OnErrorTarget::Off => ErrorHandler::Off,
+                    OnErrorTarget::Goto(label) => ErrorHandler::Goto(*label),
+                    OnErrorTarget::Gosub(label) => ErrorHandler::Gosub(*label),
+                    OnErrorTarget::Procedure(id) => ErrorHandler::Procedure(*id),
+                };
+            }
             PPECommand::Let(variable, expr) => {
                 let val = match self.eval_expr_sync(expr) {
                     Some(value) => value,
@@ -881,14 +1044,7 @@ impl VirtualMachine<'_> {
 
     #[allow(clippy::needless_range_loop)]
     async fn prepare_call(&mut self, locals: usize, parameters: usize, first: usize, arguments: &[PPEExpr], pass_flags: u16) -> Res<()> {
-        // store locals + parameters
-        for i in 0..(locals + parameters) {
-            let id = first + i;
-            if self.variable_table.get_var_entry(id).header.flags & 0x1 == 0x0 {
-                let val = self.variable_table.get_value(id).clone();
-                self.call_local_value_stack.push(val);
-            }
-        }
+        self.save_call_frame(locals, parameters, first);
         for i in 0..parameters {
             let id = first + i;
             let value = self.eval_expr(&arguments[i]).await?;
@@ -898,6 +1054,31 @@ impl VirtualMachine<'_> {
                 self.write_back_stack.push(arguments[i].clone());
             }
         }
+        self.init_call_locals(locals, parameters, first);
+
+        Ok(())
+    }
+
+    /// The same, for a call the VM makes itself and so has the arguments of already.
+    fn prepare_call_with_values(&mut self, locals: usize, parameters: usize, first: usize, arguments: Vec<VariableValue>) {
+        self.save_call_frame(locals, parameters, first);
+        for (i, value) in arguments.into_iter().take(parameters).enumerate() {
+            self.variable_table.set_value(first + i, value);
+        }
+        self.init_call_locals(locals, parameters, first);
+    }
+
+    fn save_call_frame(&mut self, locals: usize, parameters: usize, first: usize) {
+        for i in 0..(locals + parameters) {
+            let id = first + i;
+            if self.variable_table.get_var_entry(id).header.flags & 0x1 == 0x0 {
+                let val = self.variable_table.get_value(id).clone();
+                self.call_local_value_stack.push(val);
+            }
+        }
+    }
+
+    fn init_call_locals(&mut self, locals: usize, parameters: usize, first: usize) {
         for i in 0..locals {
             let id = first + parameters + i;
             let (flags, vtype) = {
@@ -918,8 +1099,6 @@ impl VirtualMachine<'_> {
                 self.variable_table.set_value(id, val);
             }
         }
-
-        Ok(())
     }
 
     fn goto(&mut self, label: usize) -> Result<(), VMError> {
@@ -997,9 +1176,14 @@ impl VirtualMachine<'_> {
     /// Once it is exhausted the PPE either ends here or, if it turned
     /// `STACKABORT` off, skips the call and carries on with the next statement.
     /// That is as far as "continue after a stack error" can sensibly go.
-    fn has_stack_room(&self) -> Res<bool> {
+    fn has_stack_room(&mut self) -> Res<bool> {
         if (self.return_addresses.len() as i32) < STACK_LIMIT {
             return Ok(true);
+        }
+        // A handler is given the chance to clean up, which aborting would take away.
+        if self.error_handler != ErrorHandler::Off && !self.in_handler {
+            self.set_error(PplError::new(ERR_KIND_STACK, ERR_STACK, "PPE call stack exhausted"));
+            return Ok(false);
         }
         if self.abort_on_stack_error {
             return Err(Box::new(VMError::StackOverflow));
@@ -1101,6 +1285,11 @@ pub async fn run<P: AsRef<Path>>(file_name: &P, prg: &Executable, io: &mut dyn P
                 use_lmrs: true,
                 cached_msg_header: None,
                 abort_on_stack_error: true,
+                last_error: PplError::default(),
+                error_pending: false,
+                error_handler: ErrorHandler::Off,
+                in_handler: false,
+                handler_depth: None,
                 dbase: dbase::DbaseState::default(),
             };
 

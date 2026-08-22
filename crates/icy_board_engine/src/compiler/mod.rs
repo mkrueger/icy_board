@@ -12,8 +12,8 @@ use std::{
 use thiserror::Error;
 
 use crate::{
-    ast::{Ast, AstNode, Expression, Statement},
-    executable::{Executable, ExpressionNegator, OpCode, PPECommand, PPEExpr, PPEScript, VariableType},
+    ast::{Ast, AstNode, Expression, OnErrorMode, Statement},
+    executable::{Executable, ExpressionNegator, OnErrorTarget, OpCode, PPECommand, PPEExpr, PPEScript, VariableType},
     parser::{
         ErrorReporter, UserTypeRegistry,
         lexer::{Spanned, Token},
@@ -44,6 +44,9 @@ pub enum CompilationErrorType {
 
     #[error("Procedure not found ({0})")]
     ProcedureNotFound(String),
+
+    #[error("ON ERROR handler '{0}' takes no parameters or a single ERROR value passed by value")]
+    InvalidErrorHandler(String),
 
     #[error("Function not found ({0})")]
     FunctionNotFound(String),
@@ -315,6 +318,22 @@ impl PPECompiler {
             Statement::Return(_) => Some(PPECommand::Return),
             Statement::Gosub(gosub_stmt) => Some(PPECommand::Gosub(self.get_label_index(gosub_stmt.get_label_token()))),
             Statement::Goto(goto_stmt) => Some(PPECommand::Goto(self.get_label_index(goto_stmt.get_label_token()))),
+            Statement::OnError(on_error_stmt) => {
+                let target = match on_error_stmt.get_mode() {
+                    OnErrorMode::Off => OnErrorTarget::Off,
+                    OnErrorMode::Goto => OnErrorTarget::Goto(self.get_label_index(on_error_stmt.get_target_token())),
+                    OnErrorMode::Gosub => OnErrorTarget::Gosub(self.get_label_index(on_error_stmt.get_target_token())),
+                    OnErrorMode::Procedure => {
+                        let name = on_error_stmt.get_target()?;
+                        let Some(decl_idx) = self.lookup_variable_index(name) else {
+                            log::error!("Error handler procedure not found: {name}");
+                            return None;
+                        };
+                        OnErrorTarget::Procedure(decl_idx)
+                    }
+                };
+                Some(PPECommand::OnError(target))
+            }
             Statement::Label(label) => {
                 self.set_label_offset(label.get_label_token());
                 None
@@ -562,6 +581,19 @@ impl PPECompiler {
                         }
                     } else {
                         panic!("Label {idx} not found only {} labels defined.", self.label_table.len());
+                    }
+                }
+                PPECommand::OnError(target) => {
+                    if let Some(idx) = target.label_mut() {
+                        if let Some(label_descr) = self.label_table.get(*idx) {
+                            if let Some(offset) = label_descr.offset {
+                                *idx = offset * 2;
+                            } else {
+                                *idx = last;
+                            }
+                        } else {
+                            panic!("Label {idx} not found only {} labels defined.", self.label_table.len());
+                        }
                     }
                 }
                 _ => {}

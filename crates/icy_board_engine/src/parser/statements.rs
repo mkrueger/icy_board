@@ -2,8 +2,9 @@ use crate::{
     ast::{
         BlockStatement, BreakStatement, CaseBlock, CaseSpecifier, CommentAstNode, ConstDeclarationStatement, Constant, ContinueStatement, ElseBlock,
         ElseIfBlock, Expression, ForStatement, FunctionCallExpression, GosubStatement, GotoStatement, IdentifierExpression, IfStatement, IfThenStatement,
-        LabelStatement, LetStatement, LoopStatement, MemberCallStatement, MemberReferenceExpression, PredefinedCallStatement, ProcedureCallStatement,
-        RepeatUntilStatement, ReturnStatement, SelectStatement, Statement, VariableDeclarationStatement, WhileDoStatement, WhileStatement,
+        LabelStatement, LetStatement, LoopStatement, MemberCallStatement, MemberReferenceExpression, OnErrorMode, OnErrorStatement, PredefinedCallStatement,
+        ProcedureCallStatement, RepeatUntilStatement, ReturnStatement, SelectStatement, Statement, VariableDeclarationStatement, WhileDoStatement,
+        WhileStatement,
     },
     executable::{OpCode, StatementDefinition},
     parser::ParserErrorType,
@@ -752,6 +753,41 @@ impl Parser<'_> {
                         return Some(Statement::Goto(GotoStatement::new(goto_token, id_token)));
                     }
                     self.next_token();
+                }
+                self.report_error(self.lex.span(), ParserErrorType::LabelExpected(self.save_token()));
+                self.next_token();
+                None
+            }
+            Some(Token::OnError) => {
+                let on_error_token = self.save_spanned_token();
+                self.next_token();
+                let mode = match self.get_cur_token() {
+                    Some(Token::Goto) => OnErrorMode::Goto,
+                    Some(Token::Gosub) => OnErrorMode::Gosub,
+                    Some(Token::Identifier(id)) if id == unicase::Ascii::new("OFF") => {
+                        let off_token = self.save_spanned_token();
+                        self.next_token();
+                        return Some(Statement::OnError(OnErrorStatement::new(on_error_token, OnErrorMode::Off, off_token)));
+                    }
+                    // Anything else names the procedure that handles the error.
+                    Some(token) if token.token_can_be_identifier() => {
+                        let id_token = self.save_spanned_token();
+                        self.next_token();
+                        return Some(Statement::OnError(OnErrorStatement::new(on_error_token, OnErrorMode::Procedure, id_token)));
+                    }
+                    _ => {
+                        self.report_error(self.lex.span(), ParserErrorType::LabelExpected(self.save_token()));
+                        self.next_token();
+                        return None;
+                    }
+                };
+                self.next_token();
+                if let Some(token) = self.get_cur_token()
+                    && token.token_can_be_identifier()
+                {
+                    let id_token = self.save_spanned_token();
+                    self.next_token();
+                    return Some(Statement::OnError(OnErrorStatement::new(on_error_token, mode, id_token)));
                 }
                 self.report_error(self.lex.span(), ParserErrorType::LabelExpected(self.save_token()));
                 self.next_token();

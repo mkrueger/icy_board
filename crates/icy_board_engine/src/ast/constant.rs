@@ -43,7 +43,7 @@ impl BuiltinConst {
 }
 
 pub const STACK_LIMIT: i32 = 6022 + 1024;
-pub const BUILTIN_CONSTS: [BuiltinConst; 180] = [
+pub const BUILTIN_CONSTS: [BuiltinConst; 183] = [
     BuiltinConst { name: "TRUE", value: 0x01 },
     BuiltinConst { name: "FALSE", value: 0x00 },
     BuiltinConst {
@@ -359,28 +359,6 @@ pub const BUILTIN_CONSTS: [BuiltinConst; 180] = [
         name: "KEY_EVENTS_SUPPRESS",
         value: 2,
     },
-    BuiltinConst { name: "GFX_OK", value: 0 },
-    BuiltinConst {
-        name: "GFX_ERR_NOT_INITIALIZED",
-        value: 1,
-    },
-    BuiltinConst {
-        name: "GFX_ERR_INVALID_SLOT",
-        value: 2,
-    },
-    BuiltinConst { name: "GFX_ERR_IO", value: 3 },
-    BuiltinConst {
-        name: "GFX_ERR_DECODE",
-        value: 4,
-    },
-    BuiltinConst {
-        name: "GFX_ERR_LIMIT",
-        value: 5,
-    },
-    BuiltinConst {
-        name: "GFX_ERR_UNSUPPORTED",
-        value: 6,
-    },
     BuiltinConst { name: "MOUSE_TEXT", value: 0 },
     BuiltinConst {
         name: "MOUSE_PIXELS",
@@ -515,19 +493,47 @@ pub const BUILTIN_CONSTS: [BuiltinConst; 180] = [
         name: "MOUSE_WHEEL_RIGHT",
         value: 6,
     },
-    BuiltinConst { name: "FONT_OK", value: 0 },
+    BuiltinConst { name: "ERR_OK", value: 0 },
     BuiltinConst {
-        name: "FONT_ERR_INVALID_SLOT",
+        name: "ERR_UNAVAILABLE",
         value: 1,
     },
-    BuiltinConst { name: "FONT_ERR_IO", value: 2 },
+    BuiltinConst { name: "ERR_INVALID", value: 2 },
+    BuiltinConst { name: "ERR_IO", value: 3 },
+    BuiltinConst { name: "ERR_FORMAT", value: 4 },
+    BuiltinConst { name: "ERR_LIMIT", value: 5 },
     BuiltinConst {
-        name: "FONT_ERR_FORMAT",
+        name: "ERR_UNSUPPORTED",
+        value: 6,
+    },
+    BuiltinConst { name: "ERR_STACK", value: 7 },
+    BuiltinConst {
+        name: "ERR_KIND_NONE",
+        value: 0,
+    },
+    BuiltinConst {
+        name: "ERR_KIND_FILE",
+        value: 1,
+    },
+    BuiltinConst {
+        name: "ERR_KIND_DBASE",
+        value: 2,
+    },
+    BuiltinConst {
+        name: "ERR_KIND_STACK",
         value: 3,
     },
     BuiltinConst {
-        name: "FONT_ERR_LIMIT",
+        name: "ERR_KIND_GFX",
         value: 4,
+    },
+    BuiltinConst {
+        name: "ERR_KIND_FONT",
+        value: 5,
+    },
+    BuiltinConst {
+        name: "ERR_KIND_SOUND",
+        value: 6,
     },
 ];
 

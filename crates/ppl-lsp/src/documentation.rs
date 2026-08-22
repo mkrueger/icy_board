@@ -442,14 +442,13 @@ pub fn get_function_hover(func: &FunctionDefinition) -> Option<Hover> {
         | FuncOpCode::GfxCellHeight
         | FuncOpCode::GfxScreenWidth
         | FuncOpCode::GfxScreenHeight
-        | FuncOpCode::GfxError
         | FuncOpCode::NewSurface
         | FuncOpCode::LoadSurface => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-gfx-api")),
         FuncOpCode::Rgb | FuncOpCode::RgbAlpha => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-rgb")),
         FuncOpCode::LoadAudio => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-sound-api")),
         FuncOpCode::EventPoll | FuncOpCode::EventWait => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-event-api")),
         FuncOpCode::TermState => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-term-state")),
-        FuncOpCode::FontError => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-font-error")),
+        FuncOpCode::Err => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-err")),
         _ => None,
     }
 }
@@ -684,6 +683,8 @@ pub fn get_statement_hover(stmt: &StatementDefinition) -> Option<Hover> {
             get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-margin-api"))
         }
         OpCode::SetFont | OpCode::LoadFont => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-font-api")),
+        OpCode::ErrClr => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-errclr")),
+        OpCode::OnError => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-on-error")),
         _ => None,
     }
 }

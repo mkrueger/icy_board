@@ -152,6 +152,22 @@ impl PPEVisitor<()> for PPEOutputVisitor {
         self.output_function(*label);
     }
 
+    fn visit_on_error(&mut self, target: &crate::executable::OnErrorTarget) {
+        self.output_keyword("ON ERROR ");
+        match target {
+            crate::executable::OnErrorTarget::Off => self.output_keyword("OFF"),
+            crate::executable::OnErrorTarget::Goto(label) => {
+                self.output_keyword("GOTO ");
+                self.output_function(*label);
+            }
+            crate::executable::OnErrorTarget::Gosub(label) => {
+                self.output_keyword("GOSUB ");
+                self.output_function(*label);
+            }
+            crate::executable::OnErrorTarget::Procedure(id) => self.output_function(*id),
+        }
+    }
+
     fn visit_end_func(&mut self) {
         self.output_op_code(OpCode::FPCLR);
     }

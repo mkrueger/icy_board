@@ -4,10 +4,10 @@ use super::{
     ArrayInitializerExpression, Ast, AstNode, BinaryExpression, BlockStatement, BreakStatement, CaseBlock, CaseSpecifier, CommentAstNode,
     ConstDeclarationStatement, ConstantExpression, ContinueStatement, ElseBlock, ElseIfBlock, EnumDeclarationAstNode, Expression, ForStatement,
     FunctionCallExpression, FunctionDeclarationAstNode, FunctionImplementation, GosubStatement, GotoStatement, IdentifierExpression, IfStatement,
-    IfThenStatement, IndexerExpression, LabelStatement, LetStatement, LoopStatement, MemberCallStatement, MemberReferenceExpression, ParameterSpecifier,
-    ParensExpression, PredefinedCallStatement, ProcedureCallStatement, ProcedureDeclarationAstNode, ProcedureImplementation, RecordLiteralExpression,
-    RepeatUntilStatement, ReturnStatement, SelectStatement, Statement, TypeDeclarationAstNode, UnaryExpression, VariableDeclarationStatement,
-    VariableSpecifier, WhileDoStatement, WhileStatement,
+    IfThenStatement, IndexerExpression, LabelStatement, LetStatement, LoopStatement, MemberCallStatement, MemberReferenceExpression, OnErrorStatement,
+    ParameterSpecifier, ParensExpression, PredefinedCallStatement, ProcedureCallStatement, ProcedureDeclarationAstNode, ProcedureImplementation,
+    RecordLiteralExpression, RepeatUntilStatement, ReturnStatement, SelectStatement, Statement, TypeDeclarationAstNode, UnaryExpression,
+    VariableDeclarationStatement, VariableSpecifier, WhileDoStatement, WhileStatement,
 };
 
 #[allow(unused_variables)]
@@ -120,6 +120,9 @@ pub trait AstVisitor<T: Default>: Sized {
         T::default()
     }
     fn visit_goto_statement(&mut self, goto: &GotoStatement) -> T {
+        T::default()
+    }
+    fn visit_on_error_statement(&mut self, on_error: &OnErrorStatement) -> T {
         T::default()
     }
     fn visit_label_statement(&mut self, label: &LabelStatement) -> T {
@@ -600,6 +603,9 @@ pub trait AstVisitorMut: Sized {
 
     fn visit_goto_statement(&mut self, goto: &GotoStatement) -> Statement {
         Statement::Goto(goto.clone())
+    }
+    fn visit_on_error_statement(&mut self, on_error: &OnErrorStatement) -> Statement {
+        Statement::OnError(on_error.clone())
     }
     fn visit_label_statement(&mut self, label: &LabelStatement) -> Statement {
         Statement::Label(label.clone())

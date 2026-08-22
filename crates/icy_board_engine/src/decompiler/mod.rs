@@ -10,9 +10,9 @@ use crate::{
     ast::{
         Ast, AstNode, BinOp, BinaryExpression, BlockStatement, CommentAstNode, Constant, ConstantExpression, Expression, FunctionCallExpression,
         FunctionDeclarationAstNode, FunctionImplementation, GosubStatement, GotoStatement, IdentifierExpression, IfStatement, IndexerExpression,
-        LabelStatement, LetStatement, MemberCallStatement, MemberReferenceExpression, ParameterSpecifier, ParensExpression, PredefinedCallStatement,
-        ProcedureCallStatement, ProcedureDeclarationAstNode, ProcedureImplementation, Statement, TypeDeclarationAstNode, TypeFieldSpecifier, UnaryExpression,
-        UnaryOp, VariableDeclarationStatement, VariableParameterSpecifier, VariableSpecifier, constant::NumberFormat,
+        LabelStatement, LetStatement, MemberCallStatement, MemberReferenceExpression, OnErrorMode, OnErrorStatement, ParameterSpecifier, ParensExpression,
+        PredefinedCallStatement, ProcedureCallStatement, ProcedureDeclarationAstNode, ProcedureImplementation, Statement, TypeDeclarationAstNode,
+        TypeFieldSpecifier, UnaryExpression, UnaryOp, VariableDeclarationStatement, VariableParameterSpecifier, VariableSpecifier, constant::NumberFormat,
     },
     compiler::{user_data::UserDataEntry, workspace::Workspace},
     executable::{
@@ -108,6 +108,11 @@ impl Decompiler {
             match statement.command {
                 PPECommand::Goto(label) | PPECommand::Gosub(label) | PPECommand::IfNot(_, label) => {
                     labels.insert(label);
+                }
+                PPECommand::OnError(target) => {
+                    if let Some(label) = target.label() {
+                        labels.insert(label);
+                    }
                 }
                 _ => {}
             }
@@ -476,6 +481,14 @@ impl Decompiler {
             PPECommand::Stop => PredefinedCallStatement::create_empty_statement(OpCode::STOP.get_definition(), Vec::new()),
             PPECommand::Goto(label) => GotoStatement::create_empty_statement(self.get_label_name(*label)),
             PPECommand::Gosub(label) => GosubStatement::create_empty_statement(self.get_label_name(*label)),
+            PPECommand::OnError(target) => match target {
+                crate::executable::OnErrorTarget::Off => OnErrorStatement::create_empty_statement(OnErrorMode::Off, unicase::Ascii::new("OFF".to_string())),
+                crate::executable::OnErrorTarget::Goto(label) => OnErrorStatement::create_empty_statement(OnErrorMode::Goto, self.get_label_name(*label)),
+                crate::executable::OnErrorTarget::Gosub(label) => OnErrorStatement::create_empty_statement(OnErrorMode::Gosub, self.get_label_name(*label)),
+                crate::executable::OnErrorTarget::Procedure(id) => {
+                    OnErrorStatement::create_empty_statement(OnErrorMode::Procedure, self.get_variable_name(*id))
+                }
+            },
 
             PPECommand::IfNot(expr, label) => {
                 let expr = self.decompile_expression(expr);
@@ -844,6 +857,7 @@ impl PPEVisitor<()> for VariableConstantVisitor<'_> {
     }
     fn visit_goto(&mut self, _label: &usize) {}
     fn visit_gosub(&mut self, _label: &usize) {}
+    fn visit_on_error(&mut self, _target: &crate::executable::OnErrorTarget) {}
     fn visit_end_func(&mut self) {}
     fn visit_end_proc(&mut self) {}
     fn visit_stop(&mut self) {}

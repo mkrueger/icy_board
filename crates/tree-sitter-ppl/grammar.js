@@ -84,7 +84,7 @@ const BUILTIN_STATEMENTS = [
     'GFXINIT', 'GFXSHUTDOWN',
   'GFXSETPACING', 'MOUSEON', 'MOUSEOFF', 'KEYEVENTS',
   'SETVMARGINS', 'SETHMARGINS', 'RESETVMARGINS', 'RESETHMARGINS', 'RESETMARGINS',
-  'SETFONT', 'LOADFONT',
+  'SETFONT', 'LOADFONT', 'ERRCLR',
 ];
 
 // Types that may be written in a declaration, plus the read-only board objects.
@@ -92,7 +92,7 @@ const BUILTIN_TYPES = [
   'BIGSTR', 'BOOLEAN', 'BYTE', 'DATE', 'DDATE', 'DOUBLE', 'DREAL', 'DWORD', 'EDATE', 'FLOAT',
   'INTEGER', 'INT', 'LONG', 'MONEY', 'MSGAREAID', 'REAL', 'SBYTE', 'SDWORD', 'SHORT', 'STRING',
   'SWORD', 'TIME', 'UBYTE', 'UDWORD', 'UNSIGNED', 'UWORD', 'WORD',
-  'AREA', 'CONFERENCE', 'CONTACT', 'DIRECTORY', 'DOOR', 'EVENT', 'PASSWORD', 'TERMSTATE',
+  'AREA', 'CONFERENCE', 'CONTACT', 'DIRECTORY', 'DOOR', 'ERROR', 'EVENT', 'PASSWORD', 'TERMSTATE',
 ];
 
 // Built-in constants, taken from BUILTIN_CONSTS. TRUE and FALSE are literals of
@@ -107,9 +107,10 @@ const BUILTIN_CONSTANTS = [
   'DEB_TIME', 'DEB_TPU', 'DEFS', 'ECHODOTS', 'ERASELINE', 'FCL', 'FIELDLEN', 'FNS', 'F_EXP',
   'F_MW', 'F_NET', 'F_REG', 'F_SEL', 'F_SYS', 'GFX_AUTO', 'GFX_JXL', 'GFX_NONE', 'GFX_SIXEL',
   'GFX_CAP_SIXEL', 'GFX_CAP_JXL', 'GFX_CAP_JXL_BLOB', 'GFX_CAP_PIXEL_MOUSE', 'GFX_CAP_CLIENT_BLIT',
-  'GFX_CAP_PHYSICAL_KEYS', 'GFX_CAP_AUDIO', 'GFX_OK', 'GFX_ERR_NOT_INITIALIZED',
-  'GFX_ERR_INVALID_SLOT', 'GFX_ERR_IO', 'GFX_ERR_DECODE', 'GFX_ERR_LIMIT', 'GFX_ERR_UNSUPPORTED',
-  'FONT_OK', 'FONT_ERR_INVALID_SLOT', 'FONT_ERR_IO', 'FONT_ERR_FORMAT', 'FONT_ERR_LIMIT',
+  'GFX_CAP_PHYSICAL_KEYS', 'GFX_CAP_AUDIO',
+  'ERR_OK', 'ERR_UNAVAILABLE', 'ERR_INVALID', 'ERR_IO', 'ERR_FORMAT', 'ERR_LIMIT',
+  'ERR_UNSUPPORTED', 'ERR_STACK', 'ERR_KIND_NONE', 'ERR_KIND_FILE', 'ERR_KIND_DBASE',
+  'ERR_KIND_STACK', 'ERR_KIND_GFX', 'ERR_KIND_FONT', 'ERR_KIND_SOUND',
   'GRAPH', 'GUIDE', 'HDR_ACTIVE', 'HDR_BLOCKS',
   'HDR_DATE', 'HDR_ECHO', 'HDR_FROM', 'HDR_MSGNUM', 'HDR_MSGREF', 'HDR_PWD', 'HDR_REPLY',
   'HDR_RPLYDATE', 'HDR_RPLYTIME', 'HDR_STATUS', 'HDR_SUBJ', 'HDR_TIME', 'HDR_TO', 'HIGHASCII',
@@ -318,6 +319,7 @@ module.exports = grammar({
       $.select_statement,
       $.goto_statement,
       $.gosub_statement,
+      $.on_error_statement,
       $.return_statement,
       $.break_statement,
       $.continue_statement,
@@ -466,6 +468,17 @@ module.exports = grammar({
 
     goto_statement: $ => seq(kw('GOTO'), field('label', $.identifier)),
     gosub_statement: $ => seq(kw('GOSUB'), field('label', $.identifier)),
+
+    // ON ERROR is two words, ONERROR one; both name the same statement.
+    on_error_statement: $ => seq(
+      choice(kw('ONERROR'), seq(kw('ON'), kw('ERROR'))),
+      choice(
+        kw('OFF'),
+        seq(kw('GOTO'), field('label', $.identifier)),
+        seq(kw('GOSUB'), field('label', $.identifier)),
+        field('handler', $.identifier),
+      ),
+    ),
 
     // A value after RETURN needs 3.50. Without one the next line stands on its
     // own, which is what old sources mean.

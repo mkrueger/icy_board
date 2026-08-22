@@ -154,6 +154,12 @@ impl PPEDeserializer {
                 self.offset += 1;
                 Ok(Some(PPECommand::Goto(label)))
             }
+            OpCode::OnError => {
+                let mode = executable.script_buffer[self.offset];
+                let target = executable.script_buffer[self.offset + 1] as usize;
+                self.offset += 2;
+                Ok(Some(PPECommand::OnError(super::commands::OnErrorTarget::decode(mode, target))))
+            }
             OpCode::PCALL => {
                 // TODO: implement read var correctld ?
                 let proc_id = executable.script_buffer[self.offset] as usize;

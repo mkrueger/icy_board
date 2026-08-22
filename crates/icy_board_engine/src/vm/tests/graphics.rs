@@ -53,9 +53,9 @@ fn surface_status_reports_dimensions_and_errors() {
         PrintLn s.Valid
         PrintLn s.Width
         PrintLn s.Height
-        PrintLn GfxError()
+        PrintLn ERR().Code
         SURFACE missing = LoadSurface("missing.png")
-        PrintLn GfxError()
+        PrintLn ERR().Code
         GfxShutdown
         "#,
     );
@@ -71,11 +71,11 @@ fn drawing_and_pinning_report_specific_errors() {
         SURFACE s = NewSurface(2, 2)
         s.Free()
         s.Clear(0)
-        PrintLn GfxError()
+        PrintLn ERR().Code
         s.Pin()
-        PrintLn GfxError()
+        PrintLn ERR().Code
         s.Free()
-        PrintLn GfxError()
+        PrintLn ERR().Code
         ",
     );
 
@@ -88,7 +88,7 @@ fn surface_count_is_bounded_and_freed_surfaces_can_be_reused() {
     for _ in 1..256 {
         let _ = writeln!(source, "extra = NewSurface(1, 1)");
     }
-    source.push_str("extra = NewSurface(1, 1)\nPRINTLN GfxError()\nfirst.Free()\nextra = NewSurface(1, 1)\nPRINTLN GfxError()\n");
+    source.push_str("extra = NewSurface(1, 1)\nPRINTLN ERR().Code\nfirst.Free()\nextra = NewSurface(1, 1)\nPRINTLN ERR().Code\n");
 
     assert_eq!(run_ppl(&source), "5\n0\n");
 }
@@ -116,7 +116,7 @@ fn sixel_cannot_scale_and_says_so() {
         GfxInit GFX_SIXEL, FALSE
         SURFACE s = NewSurface(8, 8)
         s.PresentRect(0, 0, 8, 8, 0, 0, 32, 32)
-        PrintLn GfxError()
+        PrintLn ERR().Code
         GfxShutdown
         ",
     );
@@ -136,7 +136,7 @@ fn a_surface_object_draws_and_reports_its_own_size() {
         s.SetPixel(1, 1, Rgb(255, 0, 0))
         s.FillRect(0, 0, 2, 2, Rgb(0, 255, 0))
         s.Present()
-        PrintLn GfxError()
+        PrintLn ERR().Code
         s.Free()
         PrintLn s.Valid
         GfxShutdown
@@ -174,7 +174,7 @@ fn a_surface_can_be_blitted_onto_another() {
         SURFACE sprite = NewSurface(2, 2)
         sprite.Clear(Rgb(255, 0, 0))
         back.Blit(sprite, 3, 3)
-        PrintLn GfxError()
+        PrintLn ERR().Code
         GfxShutdown
         ",
     );

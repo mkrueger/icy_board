@@ -284,6 +284,7 @@ pub const SURFACE_ID: usize = 35;
 pub const EVENT_ID: usize = 36;
 pub const AUDIO_ID: usize = 37;
 pub const TERM_STATE_ID: usize = 38;
+pub const ERROR_ID: usize = 39;
 
 /// The board objects are ours, so no `PCBoard` language knows their names.
 pub const FIRST_BOARD_OBJECT_LANGUAGE_VERSION: u16 = 400;
@@ -322,6 +323,7 @@ impl UserTypeRegistry {
         reg.register::<crate::icy_board::state::ppl_events::PplEvent>(EVENT_ID);
         reg.register::<crate::icy_board::state::ppl_audio::PplAudio>(AUDIO_ID);
         reg.register::<crate::icy_board::state::ppl_terminal_state::PplTerminalState>(TERM_STATE_ID);
+        reg.register::<crate::icy_board::state::ppl_error::PplError>(ERROR_ID);
 
         reg
     }
@@ -476,6 +478,8 @@ pub struct Parser<'a> {
 }
 static PROC_TOKEN: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("PROC".to_string()));
 static FUNC_TOKEN: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("FUNC".to_string()));
+static ON_TOKEN: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("ON".to_string()));
+static ERROR_TOKEN: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("ERROR".to_string()));
 
 impl<'a> Parser<'a> {
     pub fn new(
@@ -525,9 +529,21 @@ impl<'a> Parser<'a> {
             let is_else = token == Token::Else;
             let is_end = token == Token::Identifier(Ascii::new("END".to_string()));
             let is_case = token == Token::Case;
+            // Neither word is reserved on its own, so `ON` stays usable as a name.
+            let is_on = self.lang_version >= 400 && token == Token::Identifier(ON_TOKEN.clone());
             self.cur_token = Some(Spanned::new(token, self.lex.span()));
 
-            if is_else {
+            if is_on {
+                let start = self.lex.span().start;
+                let end = self.lex.span().end;
+                if let Some(lookahed) = self.lex.next_token() {
+                    if lookahed == Token::Identifier(ERROR_TOKEN.clone()) {
+                        self.cur_token = Some(Spanned::new(Token::OnError, start..self.lex.span().end));
+                    } else {
+                        self.lookahead_token = Some(Spanned::new(lookahed, end..self.lex.span().end));
+                    }
+                }
+            } else if is_else {
                 let start = self.lex.span().start;
                 let end = self.lex.span().end;
                 if let Some(lookahed) = self.lex.next_token() {

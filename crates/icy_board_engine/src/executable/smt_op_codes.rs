@@ -282,8 +282,10 @@ pub enum OpCode {
     ResetMargins = 242,
     SetFont = 243,
     LoadFont = 244,
+    OnError = 245,
+    ErrClr = 246,
 }
-pub const LAST_STMT: i16 = OpCode::LoadFont as i16;
+pub const LAST_STMT: i16 = OpCode::ErrClr as i16;
 
 impl OpCode {
     pub fn get_definition(self) -> &'static StatementDefinition {
@@ -609,7 +611,7 @@ pub fn format_argument_type_last(arg: &ArgumentDefinition) -> String {
 // "WAIT FOR" == "WAITFOR"
 // "GO SUB"
 // " GO TO"
-pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 250]> = std::sync::LazyLock::new(|| {
+pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 252]> = std::sync::LazyLock::new(|| {
     [
         StatementDefinition {
             // helps to map opcode to array index.
@@ -2700,6 +2702,20 @@ pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 250]
                 ArgumentDefinition::new("FileName", VariableType::String),
             ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 2),
+        },
+        StatementDefinition {
+            name: "OnError",
+            version: 400,
+            opcode: OpCode::OnError,
+            args: None,
+            sig: StatementSignature::Invalid,
+        },
+        StatementDefinition {
+            name: "ErrClr",
+            version: 400,
+            opcode: OpCode::ErrClr,
+            args: None,
+            sig: StatementSignature::ArgumentsWithVariable(0, 0),
         },
         // Alias section
         // Moving to the end, so that the opcode <--> index mapping is not broken

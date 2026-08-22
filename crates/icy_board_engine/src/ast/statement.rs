@@ -33,6 +33,7 @@ pub enum Statement {
     Return(ReturnStatement),
     Let(LetStatement),
     Goto(GotoStatement),
+    OnError(OnErrorStatement),
     Label(LabelStatement),
     Call(ProcedureCallStatement),
     PredifinedCall(PredefinedCallStatement),
@@ -62,6 +63,7 @@ impl Statement {
             Statement::Return(r) => r.get_return_token().span.clone(),
             Statement::Let(l) => l.get_identifier_token().span.clone(),
             Statement::Goto(g) => g.get_goto_token().span.clone(),
+            Statement::OnError(o) => o.get_on_error_token().span.clone(),
             Statement::Label(l) => l.get_label_token().span.clone(),
             Statement::Call(c) => c.get_identifier_token().span.clone(),
             Statement::PredifinedCall(p) => p.identifier_token.span.clone(),
@@ -91,6 +93,7 @@ impl Statement {
             Statement::Return(s) => visitor.visit_return_statement(s),
             Statement::Let(s) => visitor.visit_let_statement(s),
             Statement::Goto(s) => visitor.visit_goto_statement(s),
+            Statement::OnError(s) => visitor.visit_on_error_statement(s),
             Statement::Label(s) => visitor.visit_label_statement(s),
             Statement::Call(s) => visitor.visit_procedure_call_statement(s),
             Statement::PredifinedCall(s) => visitor.visit_predefined_call_statement(s),
@@ -120,6 +123,7 @@ impl Statement {
             Statement::Return(s) => visitor.visit_return_statement(s),
             Statement::Let(s) => visitor.visit_let_statement(s),
             Statement::Goto(s) => visitor.visit_goto_statement(s),
+            Statement::OnError(s) => visitor.visit_on_error_statement(s),
             Statement::Label(s) => visitor.visit_label_statement(s),
             Statement::Call(s) => visitor.visit_procedure_call_statement(s),
             Statement::PredifinedCall(s) => visitor.visit_predefined_call_statement(s),
@@ -249,6 +253,7 @@ impl Statement {
                     && l1.get_let_variant() == l2.get_let_variant()
             }
             (Statement::Goto(g1), Statement::Goto(g2)) => g1.get_label() == g2.get_label(),
+            (Statement::OnError(o1), Statement::OnError(o2)) => o1 == o2,
             (Statement::Gosub(g1), Statement::Gosub(g2)) => g1.get_label() == g2.get_label(),
             (Statement::Label(g1), Statement::Label(g2)) => g1.get_label() == g2.get_label(),
             (Statement::Call(c1), Statement::Call(c2)) => {
@@ -1463,6 +1468,77 @@ impl GotoStatement {
 
     pub fn create_empty_statement(label: unicase::Ascii<String>) -> Statement {
         Statement::Goto(GotoStatement::empty(label))
+    }
+}
+
+/// What `ON ERROR` does when an operation fails.
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum OnErrorMode {
+    Off,
+    Goto,
+    Gosub,
+    Procedure,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct OnErrorStatement {
+    on_error_token: Spanned<Token>,
+    mode: OnErrorMode,
+    /// The label or procedure the handler names, empty for `OFF`.
+    target_token: Spanned<Token>,
+}
+
+impl OnErrorStatement {
+    pub fn new(on_error_token: Spanned<Token>, mode: OnErrorMode, mut target_token: Spanned<Token>) -> Self {
+        if mode != OnErrorMode::Off && !matches!(target_token.token, Token::Identifier(_)) {
+            target_token = Spanned {
+                token: Token::Identifier(unicase::Ascii::new(target_token.token.to_string())),
+                span: target_token.span,
+            };
+        }
+        Self {
+            on_error_token,
+            mode,
+            target_token,
+        }
+    }
+
+    pub fn empty(mode: OnErrorMode, target: unicase::Ascii<String>) -> Self {
+        Self {
+            on_error_token: Spanned::create_empty(Token::OnError),
+            mode,
+            target_token: Spanned::create_empty(Token::Identifier(target)),
+        }
+    }
+
+    pub fn get_on_error_token(&self) -> &Spanned<Token> {
+        &self.on_error_token
+    }
+
+    pub fn get_mode(&self) -> OnErrorMode {
+        self.mode
+    }
+
+    pub fn get_target_token(&self) -> &Spanned<Token> {
+        &self.target_token
+    }
+
+    /// The label or procedure name, or `None` for `OFF`.
+    pub fn get_target(&self) -> Option<&unicase::Ascii<String>> {
+        if let Token::Identifier(id) = &self.target_token.token {
+            return Some(id);
+        }
+        None
+    }
+
+    pub fn set_target(&mut self, new_id: unicase::Ascii<String>) {
+        if let Token::Identifier(id) = &mut self.target_token.token {
+            *id = new_id;
+        }
+    }
+
+    pub fn create_empty_statement(mode: OnErrorMode, target: unicase::Ascii<String>) -> Statement {
+        Statement::OnError(OnErrorStatement::empty(mode, target))
     }
 }
 

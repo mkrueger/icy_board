@@ -173,6 +173,7 @@ pub enum Token {
     Return,
     Gosub,
     Goto,
+    OnError,
 
     Select,
     Case,
@@ -307,6 +308,7 @@ impl fmt::Display for Token {
             Token::Return => write!(f, "RETURN"),
             Token::Gosub => write!(f, "GOSUB"),
             Token::Goto => write!(f, "GOTO"),
+            Token::OnError => write!(f, "ON ERROR"),
 
             Token::Select => write!(f, "SELECT"),
             Token::Case => write!(f, "CASE"),
@@ -488,6 +490,7 @@ pub const KEYWORDS: &[Keyword] = &[
     Keyword { name: "type",      token: Token::Type,      since: 400 },
     Keyword { name: "endtype",   token: Token::EndType,   since: 400 },
     Keyword { name: "begin",     token: Token::Begin,     since: 400 },
+    Keyword { name: "onerror",   token: Token::OnError,   since: 400 },
 ];
 
 /// One table per version that reserves a word, in ascending order.

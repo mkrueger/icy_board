@@ -2769,12 +2769,10 @@ pub async fn gfxcaps(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<Vari
     Ok(VariableValue::new_unsigned(flags))
 }
 
-pub async fn gfxerror(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_int(vm.icy_board_state.gfx_error))
-}
-
-pub async fn fonterror(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_int(vm.icy_board_state.font_error))
+/// `ERR()` - what the last operation that can fail did.
+pub async fn err(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
+    vm.publish_gfx_error();
+    Ok(vm.last_error.clone().value())
 }
 
 async fn gfx_surface_dimension(vm: &mut VirtualMachine<'_>, args: &[PPEExpr], width: bool) -> Res<VariableValue> {

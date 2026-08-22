@@ -90,7 +90,7 @@ fn an_unavailable_terminal_is_not_sent_a_sound() {
     let output = run_ppl_with_files_and_input(
         r#"
         AUDIO tone = LoadAudio("tone.wav")
-        PrintLn tone.Valid, ":", tone.Error
+        PrintLn tone.Valid, ":", ERR().Code
         "#,
         &[("tone.wav", TONE)],
         b"\x1b[=7;100;0n",
@@ -101,25 +101,25 @@ fn an_unavailable_terminal_is_not_sent_a_sound() {
 }
 
 #[test]
-fn sound_failures_are_reported_by_the_audio_object() {
+fn sound_failures_are_reported_by_err() {
     let unsupported = run_ppl_with_files_and_input(
         r#"
         AUDIO tone = LoadAudio("tone.wav")
-        PrintLn tone.Error
+        PrintLn ERR().Kind, ":", ERR().Code
         "#,
         &[("tone.wav", TONE)],
         b"\x1b[=7;100;1n\x1b[=7;101;1;0;0n",
     );
-    assert!(unsupported.ends_with("4\n"), "{unsupported:?}");
+    assert!(unsupported.ends_with("6:4\n"), "{unsupported:?}");
 
     let missing = run_ppl_with_input(
         r#"
         AUDIO tone = LoadAudio("nope.wav")
-        PrintLn tone.Error
+        PrintLn ERR().Kind, ":", ERR().Code
         "#,
         b"\x1b[=7;100;1n\x1b[=7;101;1;0;1n",
     );
-    assert!(missing.ends_with("3\n"), "{missing:?}");
+    assert!(missing.ends_with("6:3\n"), "{missing:?}");
 }
 
 #[test]
@@ -129,13 +129,14 @@ fn a_sound_that_cannot_be_loaded_stays_callable() {
         AUDIO missing = LoadAudio("nope.wav")
         PRINTLN missing.Valid, ":", missing.Playing
         PRINTLN missing.Play(FALSE)
-        PRINTLN missing.Error
+        PRINTLN ERR().Code
         "#,
         b"\x1b[=7;100;1n\x1b[=7;101;1;0;1n",
     );
 
     assert!(output.contains("0:0\n0\n"), "{output:?}");
-    assert!(output.ends_with("3\n"), "{output:?}");
+    // Playing a sound that never loaded is its own error, not the one that stopped the load.
+    assert!(output.ends_with("2\n"), "{output:?}");
 }
 
 #[test]
@@ -161,7 +162,7 @@ fn a_format_probe_that_goes_unanswered_does_not_mute_the_channel() {
         r#"
         AUDIO tone = LoadAudio("tone.wav")
         tone.Play()
-        PrintLn tone.Error
+        PrintLn ERR().Code
         "#,
         &[("tone.wav", TONE)],
         b"\x1b[=7;100;1n",

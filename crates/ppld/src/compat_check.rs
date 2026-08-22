@@ -109,7 +109,14 @@ fn collect_statement_hits(stmt: &icy_board_engine::executable::PPEStatement, hit
         PPECommand::MemberCall(expr) => {
             collect_expr_hits(expr, hits, span_start);
         }
-        PPECommand::Return | PPECommand::End | PPECommand::Goto(_) | PPECommand::Gosub(_) | PPECommand::EndFunc | PPECommand::EndProc | PPECommand::Stop => {}
+        PPECommand::Return
+        | PPECommand::End
+        | PPECommand::Goto(_)
+        | PPECommand::Gosub(_)
+        | PPECommand::OnError(_)
+        | PPECommand::EndFunc
+        | PPECommand::EndProc
+        | PPECommand::Stop => {}
     }
 }
 

@@ -33,6 +33,7 @@ use jamjam::jam::{JamMessage, JamMessageBase, attributes as jam_attributes, msg_
 
 use crate::{
     icy_board::icb_text::IceText,
+    icy_board::state::ppl_error::{ERR_FORMAT, ERR_INVALID, ERR_IO, ERR_KIND_FONT, ERR_KIND_SOUND, ERR_LIMIT, ERR_UNAVAILABLE, PplError},
     vm::{TerminalTarget, VMError, VirtualMachine},
 };
 
@@ -1023,15 +1024,10 @@ pub async fn reset_margins(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Re
     write_vt_sequence(vm, "\x1B[r\x1B[?69l").await
 }
 
-pub(crate) const FONT_ERR_INVALID_SLOT: i32 = 1;
-const FONT_ERR_IO: i32 = 2;
-const FONT_ERR_FORMAT: i32 = 3;
-const FONT_ERR_LIMIT: i32 = 4;
-
 /// A font is 256 glyphs of at most 32 rows, so anything larger is not one.
 const MAX_FONT_FILE_BYTES: u64 = 64 * 1024;
 
-/// The attribute classes CTerm binds fonts to: normal, bold, blink, bold+blink.
+/// The attribute classes `CTerm` binds fonts to: normal, bold, blink, bold+blink.
 const FONT_SLOT_COUNT: i32 = 4;
 
 /// CTerm's `CONIO_FIRST_FREE_FONT`: it drops an upload below this silently, so the
@@ -1039,15 +1035,21 @@ const FONT_SLOT_COUNT: i32 = 4;
 const FIRST_FREE_FONT: i32 = 43;
 const LAST_FONT: i32 = 255;
 
+/// `ERRCLR`
+pub async fn errclr(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
+    vm.clear_error();
+    Ok(())
+}
+
 pub async fn set_font(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let slot = vm.eval_expr(&args[0]).await?.as_int();
     let font = vm.eval_expr(&args[1]).await?.as_int();
     if !(0..FONT_SLOT_COUNT).contains(&slot) || !(0..=LAST_FONT).contains(&font) {
         log::warn!("SETFONT ignored: invalid slot {slot} / font {font}");
-        vm.icy_board_state.font_error = FONT_ERR_INVALID_SLOT;
+        vm.set_error(PplError::new(ERR_KIND_FONT, ERR_INVALID, format!("invalid font slot {slot} or font {font}")));
         return Ok(());
     }
-    vm.icy_board_state.font_error = 0;
+    vm.clear_error();
     write_vt_sequence(vm, &format!("\x1B[{slot};{font} D")).await
 }
 
@@ -1057,7 +1059,7 @@ pub async fn load_font(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
 
     if !(FIRST_FREE_FONT..=LAST_FONT).contains(&font) {
         log::warn!("LOADFONT ignored: font {font} is not a free slot");
-        vm.icy_board_state.font_error = FONT_ERR_INVALID_SLOT;
+        vm.set_error(PplError::new(ERR_KIND_FONT, ERR_INVALID, format!("font {font} is not a free slot")));
         return Ok(());
     }
     if !supports_vt_sequences(vm) {
@@ -1075,21 +1077,21 @@ pub async fn load_font(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
         Ok(data) => data,
         Err(err) => {
             log::warn!("Can't load font {}: {err}", path.display());
-            vm.icy_board_state.font_error = FONT_ERR_IO;
+            vm.set_error(PplError::new(ERR_KIND_FONT, ERR_IO, format!("can't read font {file_name}: {err}")));
             return Ok(());
         }
     };
 
     let Ok(bit_font) = icy_engine::BitFont::from_bytes(&file_name, &data) else {
         log::warn!("Unknown font format in {}", path.display());
-        vm.icy_board_state.font_error = FONT_ERR_FORMAT;
+        vm.set_error(PplError::new(ERR_KIND_FONT, ERR_FORMAT, format!("unknown font format in {file_name}")));
         return Ok(());
     };
 
     let sequence = bit_font.encode_as_ansi(font as usize);
     if !vm.icy_board_state.reserve_media_upload(sequence.len()) {
         log::warn!("Font upload budget exhausted");
-        vm.icy_board_state.font_error = FONT_ERR_LIMIT;
+        vm.set_error(PplError::new(ERR_KIND_FONT, ERR_LIMIT, "font upload budget exhausted"));
         return Ok(());
     }
     vm.icy_board_state.connection.send(sequence.as_bytes()).await?;
@@ -1097,7 +1099,7 @@ pub async fn load_font(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
     // The upload bypasses the virtual screen, so it has to be told separately or a later
     // SETFONT finds no such font.
     vm.icy_board_state.display_screen_mut().buffer.buffer.set_font(font as u8, bit_font);
-    vm.icy_board_state.font_error = 0;
+    vm.clear_error();
     Ok(())
 }
 
@@ -2896,12 +2898,6 @@ async fn send_audio_apc(vm: &mut VirtualMachine<'_>, body: &str) -> Res<()> {
 
 pub(crate) const SOUND_CHANNELS: usize = 14;
 
-pub(crate) const SND_ERR_UNAVAILABLE: i32 = 1;
-pub(crate) const SND_ERR_INVALID_CHANNEL: i32 = 2;
-const SND_ERR_IO: i32 = 3;
-const SND_ERR_FORMAT: i32 = 4;
-const SND_ERR_LIMIT: i32 = 5;
-
 /// Logical channels 0-13 map to APC channels 2-15, because `CTerm` reserves 0 and 1.
 pub(crate) fn resolve_sound_channel(channel: i32) -> Option<(usize, u8)> {
     (0..SOUND_CHANNELS as i32).contains(&channel).then(|| (channel as usize, channel as u8 + 2))
@@ -2911,8 +2907,8 @@ pub(crate) fn resolve_sound_channel(channel: i32) -> Option<(usize, u8)> {
 /// image APC extension) under a content hash, unless this connection has
 /// already pushed that exact content - so replaying a music/fx file only
 /// resends the bytes once instead of on every trigger. Returns the cache
-/// name the file is stored under, or `None` if the file could not be read.
-async fn sndcache_store(vm: &mut VirtualMachine<'_>, file_name: &str) -> Res<Result<String, i32>> {
+/// name the file is stored under, or the error that stopped it.
+async fn sndcache_store(vm: &mut VirtualMachine<'_>, file_name: &str) -> Res<Result<String, PplError>> {
     use base64::{Engine as _, engine::general_purpose};
     use sha2::{Digest, Sha256};
 
@@ -2928,7 +2924,7 @@ async fn sndcache_store(vm: &mut VirtualMachine<'_>, file_name: &str) -> Res<Res
         Ok(data) => data,
         Err(err) => {
             log::warn!("Can't load sound file {}: {err}", path.display());
-            return Ok(Err(SND_ERR_IO));
+            return Ok(Err(PplError::new(ERR_KIND_SOUND, ERR_IO, format!("can't read sound {file_name}: {err}"))));
         }
     };
 
@@ -2940,7 +2936,7 @@ async fn sndcache_store(vm: &mut VirtualMachine<'_>, file_name: &str) -> Res<Res
         if !vm.icy_board_state.reserve_media_upload(data.len()) {
             vm.icy_board_state.sound_cache.remove(&cache_name);
             log::warn!("Sound media upload budget exhausted");
-            return Ok(Err(SND_ERR_LIMIT));
+            return Ok(Err(PplError::new(ERR_KIND_SOUND, ERR_LIMIT, "sound upload budget exhausted")));
         }
         let encoded = general_purpose::STANDARD.encode(&data);
         send_apc(vm, &format!("SyncTERM:C;S;{cache_name};{encoded}")).await?;
@@ -2998,20 +2994,29 @@ async fn queue_cached_sound(vm: &mut VirtualMachine<'_>, cache_name: &str, chann
 pub async fn load_audio(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     use crate::icy_board::state::ppl_audio::PplAudio;
 
+    fn failed(vm: &mut VirtualMachine<'_>, error: PplError) -> VariableValue {
+        vm.set_error(error);
+        PplAudio::invalid()
+    }
+
     let file_name = vm.eval_expr(&args[0]).await?.as_string();
     if !vm.icy_board_state.query_sound_available().await? {
-        return Ok(PplAudio::invalid(SND_ERR_UNAVAILABLE));
+        return Ok(failed(vm, PplError::new(ERR_KIND_SOUND, ERR_UNAVAILABLE, "the terminal has no sound")));
     }
     if !sound_file_supported(vm, &file_name).await? {
-        return Ok(PplAudio::invalid(SND_ERR_FORMAT));
+        return Ok(failed(
+            vm,
+            PplError::new(ERR_KIND_SOUND, ERR_FORMAT, format!("unsupported sound format in {file_name}")),
+        ));
     }
     let cache_name = match sndcache_store(vm, &file_name).await? {
         Ok(cache_name) => cache_name,
-        Err(error) => return Ok(PplAudio::invalid(error)),
+        Err(error) => return Ok(failed(vm, error)),
     };
     let Some(channel) = vm.icy_board_state.take_ppl_audio(cache_name) else {
-        return Ok(PplAudio::invalid(SND_ERR_INVALID_CHANNEL));
+        return Ok(failed(vm, PplError::new(ERR_KIND_SOUND, ERR_INVALID, "no sound channel is free")));
     };
+    vm.clear_error();
     Ok(PplAudio::value(channel))
 }
 
@@ -3020,9 +3025,11 @@ pub(crate) async fn sound_member(vm: &mut VirtualMachine<'_>, logical_channel: i
     use crate::icy_board::state::ppl_audio::{FADE, FREE, PLAY, SET_VOLUME, STOP};
 
     let Some(file) = vm.icy_board_state.ppl_audio_file(logical_channel).cloned() else {
+        vm.set_error(PplError::new(ERR_KIND_SOUND, ERR_INVALID, "no sound is loaded").on_channel(logical_channel));
         return Ok(false);
     };
     let Some((logical, channel)) = resolve_sound_channel(logical_channel) else {
+        vm.set_error(PplError::new(ERR_KIND_SOUND, ERR_INVALID, "invalid sound channel").on_channel(logical_channel));
         return Ok(false);
     };
     let integer = |index: usize| arguments.get(index).map_or(0, VariableValue::as_int);
@@ -3031,11 +3038,13 @@ pub(crate) async fn sound_member(vm: &mut VirtualMachine<'_>, logical_channel: i
         let looping = arguments.first().is_some_and(VariableValue::as_bool);
         queue_cached_sound(vm, &file, channel, logical, looping).await?;
         vm.icy_board_state.sound_active[logical] = true;
+        vm.clear_error();
         return Ok(true);
     }
     if *name == *STOP {
         vm.icy_board_state.sound_active[logical] = false;
         send_audio_apc(vm, &format!("Flush;C={channel};O=0")).await?;
+        vm.clear_error();
         return Ok(true);
     }
     if *name == *SET_VOLUME || *name == *FADE {
@@ -3048,12 +3057,14 @@ pub(crate) async fn sound_member(vm: &mut VirtualMachine<'_>, logical_channel: i
             format!("Volume;C={channel};V={:.2}dB", snd_volume_db(volume))
         };
         send_audio_apc(vm, &body).await?;
+        vm.clear_error();
         return Ok(true);
     }
     if *name == *FREE {
         vm.icy_board_state.sound_active[logical] = false;
         vm.icy_board_state.release_ppl_audio(logical_channel);
         send_audio_apc(vm, &format!("Flush;C={channel};O=0")).await?;
+        vm.clear_error();
         return Ok(true);
     }
     log::error!("Unknown Audio member {name}");
@@ -3446,7 +3457,7 @@ pub async fn gfxcreate(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
     Ok(())
 }
 
-/// Reads an image file into a surface, reporting through `GfxError` on the way.
+/// Reads an image file into a surface, reporting through `ERR()` on the way.
 pub(crate) async fn gfx_decode_image(vm: &mut VirtualMachine<'_>, file_name: &str) -> Option<crate::icy_board::state::ppl_graphics::GfxSurface> {
     let path = vm.resolve_file(&file_name).await;
     let bytes = match fs::metadata(&path).and_then(|metadata| {

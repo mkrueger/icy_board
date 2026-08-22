@@ -35,9 +35,14 @@ struct DbaseChannel {
 #[derive(Default)]
 pub struct DbaseState {
     channels: [Option<Box<DbaseChannel>>; MAX_DBASE_CHANNELS],
+    /// What the last failed operation was, for `ERR()`.
+    failure: Option<(i32, String)>,
 }
 
 impl DbaseState {
+    pub fn take_failure(&mut self) -> Option<(i32, String)> {
+        self.failure.take()
+    }
     fn slot(&mut self, channel: i32) -> Option<&mut Box<DbaseChannel>> {
         let index = usize::try_from(channel).ok()?;
         self.channels.get_mut(index)?.as_mut()
@@ -53,6 +58,7 @@ impl DbaseState {
         if let Some(slot) = self.slot(channel) {
             slot.error = true;
         }
+        self.failure = Some((channel, format!("dBase operation failed on channel {channel}")));
         true
     }
 

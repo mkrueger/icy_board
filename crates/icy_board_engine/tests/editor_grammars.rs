@@ -19,6 +19,7 @@ const STATEMENTS_NOT_IN_GRAMMAR: &[&str] = &[
     "IF",
     "LET",
     "MEMBERCALL",
+    "ONERROR",
     "PCALL",
     "PLACEHOLDER",
     "PROCEDURE",
@@ -173,15 +174,18 @@ fn vscode_grammar_knows_every_built_in() {
 
 /// Words a grammar colours as a keyword that the lexer does not reserve: THEN, DO,
 /// TO, STEP and VAR are read as plain names, TRUE and FALSE are constants, END, EXIT
-/// and STOP are statements, and the engine reads END FUNCTION as two tokens rather
-/// than as one word.
+/// and STOP are statements, ON, ERROR and OFF only mean something next to each other
+/// in ON ERROR, and the engine reads END FUNCTION as two tokens rather than as one word.
 const COLOURED_BUT_NOT_RESERVED: &[&str] = &[
     "DO",
     "END",
     "ENDFUNCTION",
     "ENDPROCEDURE",
+    "ERROR",
     "EXIT",
     "FALSE",
+    "OFF",
+    "ON",
     "STEP",
     "STOP",
     "THEN",
