@@ -2751,16 +2751,7 @@ async fn send_apc(vm: &mut VirtualMachine<'_>, body: &str) -> Res<()> {
 async fn finish_gfx_frame(vm: &mut VirtualMachine<'_>) -> Res<()> {
     let pacing = vm.icy_board_state.ppl_graphics.as_ref().is_some_and(|graphics| graphics.pacing);
     if pacing {
-        let _ = vm
-            .icy_board_state
-            .query_terminal_csi(b"\x1b[6n", |reply| {
-                let body = reply.strip_prefix("\x1b[")?.strip_suffix('R')?;
-                let (row, column) = body.split_once(';')?;
-                row.parse::<u16>().ok()?;
-                column.parse::<u16>().ok()?;
-                Some(true)
-            })
-            .await?;
+        vm.icy_board_state.await_terminal_ack().await?;
     }
     Ok(())
 }
@@ -2828,6 +2819,7 @@ async fn sndcache_store(vm: &mut VirtualMachine<'_>, file_name: &str) -> Res<Res
         }
         let encoded = general_purpose::STANDARD.encode(&data);
         send_apc(vm, &format!("SyncTERM:C;S;{cache_name};{encoded}")).await?;
+        vm.icy_board_state.acknowledge_upload(encoded.len()).await?;
     }
     Ok(Ok(cache_name))
 }
@@ -3639,6 +3631,7 @@ async fn gfx_present_surface(
         }
         let payload = general_purpose::STANDARD.encode(&encoded);
         send_apc(vm, &format!("SyncTERM:C;S;{name};{payload}")).await?;
+        vm.icy_board_state.acknowledge_upload(payload.len()).await?;
     }
     send_gfx_apc(vm, &format!("SyncTERM:C;DrawJXL;{placement};{name}")).await?;
     vm.icy_board_state.gfx_error = 0;

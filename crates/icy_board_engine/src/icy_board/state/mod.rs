@@ -667,6 +667,10 @@ pub struct IcyBoardState {
 
     pub sound_formats: HashMap<i32, bool>,
 
+    /// Whether this terminal ever answered a query. A terminal that never does must
+    /// not be waited on, or every acknowledgement would cost the full probe timeout.
+    terminal_answers: bool,
+
     /// What the caller's terminal answered when it was asked what it can draw.
     /// Kept past `GFXSHUTDOWN`, because a terminal does not change mid call.
     pub gfx_capabilities: Option<ppl_graphics::GfxCapabilities>,
@@ -760,6 +764,7 @@ impl IcyBoardState {
             ppl_audio: std::array::from_fn(|_| None),
             sound_available: None,
             sound_formats: HashMap::new(),
+            terminal_answers: false,
             gfx_capabilities: None,
             gfx_error: 0,
             gfx_cache: HashSet::new(),
@@ -3010,6 +3015,7 @@ impl IcyBoardState {
         self.connection.send(ppl_graphics::PIXEL_SIZE_QUERY).await?;
         self.connection.send(ppl_graphics::JXL_QUERY).await?;
         self.collect_gfx_replies(ppl_graphics::GfxProbe::jxl_answered).await?;
+        self.terminal_answers |= self.gfx_probe.jxl_answered();
 
         if self.gfx_probe.capabilities().jxl || self.sound_available == Some(true) {
             self.connection.send(ppl_graphics::GFX_CACHE_LIST_QUERY).await?;
@@ -3090,6 +3096,33 @@ impl IcyBoardState {
         Ok(())
     }
 
+    /// Waits for the terminal to report its cursor position, which it can only do
+    /// once it has worked through everything that was sent before the request.
+    pub async fn await_terminal_ack(&mut self) -> Res<()> {
+        self.query_terminal_csi(b"\x1b[6n", |reply| {
+            let body = reply.strip_prefix("\x1b[")?.strip_suffix('R')?;
+            let (row, column) = body.split_once(';')?;
+            row.parse::<u16>().ok()?;
+            column.parse::<u16>().ok()?;
+            Some(true)
+        })
+        .await?;
+        Ok(())
+    }
+
+    /// Lets the terminal catch up after a media upload big enough that it would still
+    /// be reading those bytes when the next query starts its own clock - which is how
+    /// a probe ends up timing out behind a picture. Terminals that have never answered
+    /// anything are not waited for.
+    pub async fn acknowledge_upload(&mut self, bytes: usize) -> Res<()> {
+        const LARGE_UPLOAD_BYTES: usize = 256 * 1024;
+
+        if bytes < LARGE_UPLOAD_BYTES || !self.terminal_answers {
+            return Ok(());
+        }
+        self.await_terminal_ack().await
+    }
+
     pub async fn query_terminal_csi(&mut self, query: &[u8], matches: impl Fn(&str) -> Option<bool>) -> Res<Option<bool>> {
         self.connection.send(query).await?;
         let deadline = Instant::now() + GFX_PROBE_TIMEOUT;
@@ -3125,6 +3158,7 @@ impl IcyBoardState {
                         && let Some(result) = matches(text)
                     {
                         self.raw_input.extend(&input[index + 1..read]);
+                        self.terminal_answers = true;
                         return Ok(Some(result));
                     }
                     self.raw_input.extend(sequence);

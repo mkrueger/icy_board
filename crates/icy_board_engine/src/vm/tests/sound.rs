@@ -230,3 +230,36 @@ fn snd_cache_name(data: &[u8], extension: &str) -> String {
 
     format!("snd/{}.{extension}", &format!("{:x}", Sha256::digest(data))[..32])
 }
+
+#[test]
+fn a_large_upload_is_acknowledged_before_anything_else_is_sent() {
+    let mut big = TONE.to_vec();
+    big.resize(300 * 1024, 0);
+
+    let output = run_ppl_with_files_and_input(
+        r#"
+        AUDIO tone = LoadAudio("big.wav")
+        PrintLn tone.Valid
+        "#,
+        &[("big.wav", &big)],
+        b"\x1b[=7;100;1n\x1b[=7;101;1;0;1n\x1b[1;1R",
+    );
+
+    let upload = output.find("SyncTERM:C;S;").expect("the sound was uploaded");
+    assert!(output[upload..].contains("\x1b[6n"), "{:?}", &output[upload..upload + 64]);
+    assert!(output.ends_with("1\n"), "{output:?}");
+}
+
+#[test]
+fn a_small_upload_is_not_worth_a_round_trip() {
+    let output = run_ppl_with_files_and_input(
+        r#"
+        AUDIO tone = LoadAudio("tone.wav")
+        PrintLn tone.Valid
+        "#,
+        &[("tone.wav", TONE)],
+        b"\x1b[=7;100;1n\x1b[=7;101;1;0;1n",
+    );
+
+    assert!(!output.contains("\x1b[6n"), "{output:?}");
+}
