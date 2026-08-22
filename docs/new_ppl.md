@@ -241,9 +241,9 @@ screen.PresentRect(0, 0, 160, 100, 0, 0, 640, 400)
 ```
 
 Sound is an `AUDIO` object. `LoadAudio(file)` probes the container/codec, uploads
-the file to the caller's per-board SyncTERM cache and takes one of the
-`SND_CHANNELS` channels for it. A file the caller already holds is not sent
-again, and the object gives its channel back when it is freed.
+the file to the caller's per-board SyncTERM cache and takes an available channel
+for it. A file the caller already holds is not sent again, and the object gives
+its channel back when it is freed.
 
 ```PPL
 AUDIO music = LoadAudio("music.opus")
@@ -255,17 +255,16 @@ ENDIF
 
 | Member | Purpose |
 | :--- | :--- |
-| `Valid`, `Playing`, `Volume`, `Channel` | Read-only status properties |
+| `Valid`, `Playing`, `Volume`, `Channel`, `Error` | Read-only status properties |
 | `Play([loop])` | Start the sound, looping when told to |
 | `Stop()` | Stop it and free the channel's mixer slot |
 | `SetVolume(percent)` | Set the volume, 0 through 100 |
 | `Fade(percent, milliseconds)` | Ride the volume to `percent` |
 | `Free()` | Give the channel back |
 
-`SndAvailable` answers whether the terminal plays sound at all, and `SndError`
-returns the named `SND_ERR_*` constants the way `GfxError` does. A sound that
-ends reports itself as an `EVENT_SOUND` event naming its channel, so a program
-waits for it rather than polling.
+`Error` is zero for a loaded object and describes why an invalid object could not
+be loaded. A sound that ends reports itself as an `EVENT_SOUND` event naming its
+channel, so a program waits for it rather than polling.
 
 `EventPoll` and `EventWait(milliseconds)` provide one ordered input stream.
 Both return an immutable `EVENT` object. Its `Kind` is one of `EVENT_NONE`,

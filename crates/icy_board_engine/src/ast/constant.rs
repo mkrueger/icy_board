@@ -43,7 +43,7 @@ impl BuiltinConst {
 }
 
 pub const STACK_LIMIT: i32 = 6022 + 1024;
-pub const BUILTIN_CONSTS: [BuiltinConst; 182] = [
+pub const BUILTIN_CONSTS: [BuiltinConst; 175] = [
     BuiltinConst { name: "TRUE", value: 0x01 },
     BuiltinConst { name: "FALSE", value: 0x00 },
     BuiltinConst {
@@ -425,28 +425,6 @@ pub const BUILTIN_CONSTS: [BuiltinConst; 182] = [
     BuiltinConst {
         name: "MOUSE_TRACK_ALL",
         value: 2,
-    },
-    BuiltinConst {
-        name: "SND_CHANNELS",
-        value: 14,
-    },
-    BuiltinConst { name: "SND_OK", value: 0 },
-    BuiltinConst {
-        name: "SND_ERR_UNAVAILABLE",
-        value: 1,
-    },
-    BuiltinConst {
-        name: "SND_ERR_INVALID_CHANNEL",
-        value: 2,
-    },
-    BuiltinConst { name: "SND_ERR_IO", value: 3 },
-    BuiltinConst {
-        name: "SND_ERR_FORMAT",
-        value: 4,
-    },
-    BuiltinConst {
-        name: "SND_ERR_LIMIT",
-        value: 5,
     },
     BuiltinConst {
         name: "GFX_FLIP_NONE",

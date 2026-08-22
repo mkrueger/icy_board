@@ -4,16 +4,19 @@ const TONE: &[u8] = b"RIFFxxxxWAVEfmt ";
 
 #[test]
 fn sound_capabilities_are_queried_and_cached() {
-    let output = run_ppl_with_input(
-        r"
-        PrintLn SndAvailable()
-        PrintLn SndAvailable()
-        ",
-        b"\x1b[=7;100;1n",
+    let output = run_ppl_with_files_and_input(
+        r#"
+        AUDIO first = LoadAudio("tone.wav")
+        AUDIO second = LoadAudio("tone.wav")
+        PrintLn first.Valid, second.Valid
+        "#,
+        &[("tone.wav", TONE)],
+        b"\x1b[=7;100;1n\x1b[=7;101;1;0;1n",
     );
 
-    assert_eq!(output.matches("1\n").count(), 2, "{output:?}");
+    assert!(output.ends_with("11\n"), "{output:?}");
     assert_eq!(output.matches("SyncTERM:Q;libsndfile\x1b\\").count(), 1, "{output:?}");
+    assert_eq!(output.matches("SyncTERM:Q;libsndfileFormat;1;0").count(), 1, "{output:?}");
 }
 
 #[test]
@@ -87,7 +90,7 @@ fn an_unavailable_terminal_is_not_sent_a_sound() {
     let output = run_ppl_with_files_and_input(
         r#"
         AUDIO tone = LoadAudio("tone.wav")
-        PrintLn tone.Valid, ":", SndError()
+        PrintLn tone.Valid, ":", tone.Error
         "#,
         &[("tone.wav", TONE)],
         b"\x1b[=7;100;0n",
@@ -98,11 +101,11 @@ fn an_unavailable_terminal_is_not_sent_a_sound() {
 }
 
 #[test]
-fn sound_failures_are_reported_through_snderror() {
+fn sound_failures_are_reported_by_the_audio_object() {
     let unsupported = run_ppl_with_files_and_input(
         r#"
         AUDIO tone = LoadAudio("tone.wav")
-        PrintLn SndError()
+        PrintLn tone.Error
         "#,
         &[("tone.wav", TONE)],
         b"\x1b[=7;100;1n\x1b[=7;101;1;0;0n",
@@ -112,7 +115,7 @@ fn sound_failures_are_reported_through_snderror() {
     let missing = run_ppl_with_input(
         r#"
         AUDIO tone = LoadAudio("nope.wav")
-        PrintLn SndError()
+        PrintLn tone.Error
         "#,
         b"\x1b[=7;100;1n\x1b[=7;101;1;0;1n",
     );
@@ -126,13 +129,13 @@ fn a_sound_that_cannot_be_loaded_stays_callable() {
         AUDIO missing = LoadAudio("nope.wav")
         PRINTLN missing.Valid, ":", missing.Playing
         PRINTLN missing.Play(FALSE)
-        PRINTLN SndError()
+        PRINTLN missing.Error
         "#,
         b"\x1b[=7;100;1n\x1b[=7;101;1;0;1n",
     );
 
     assert!(output.contains("0:0\n0\n"), "{output:?}");
-    assert!(output.ends_with("2\n"), "{output:?}");
+    assert!(output.ends_with("3\n"), "{output:?}");
 }
 
 #[test]
@@ -158,7 +161,7 @@ fn a_format_probe_that_goes_unanswered_does_not_mute_the_channel() {
         r#"
         AUDIO tone = LoadAudio("tone.wav")
         tone.Play()
-        PrintLn SndError()
+        PrintLn tone.Error
         "#,
         &[("tone.wav", TONE)],
         b"\x1b[=7;100;1n",

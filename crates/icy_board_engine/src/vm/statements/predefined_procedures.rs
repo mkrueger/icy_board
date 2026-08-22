@@ -2776,7 +2776,6 @@ async fn send_audio_apc(vm: &mut VirtualMachine<'_>, body: &str) -> Res<()> {
 
 pub(crate) const SOUND_CHANNELS: usize = 14;
 
-pub(crate) const SND_OK: i32 = 0;
 pub(crate) const SND_ERR_UNAVAILABLE: i32 = 1;
 pub(crate) const SND_ERR_INVALID_CHANNEL: i32 = 2;
 const SND_ERR_IO: i32 = 3;
@@ -2793,7 +2792,7 @@ pub(crate) fn resolve_sound_channel(channel: i32) -> Option<(usize, u8)> {
 /// already pushed that exact content - so replaying a music/fx file only
 /// resends the bytes once instead of on every trigger. Returns the cache
 /// name the file is stored under, or `None` if the file could not be read.
-async fn sndcache_store(vm: &mut VirtualMachine<'_>, file_name: &str) -> Res<Option<String>> {
+async fn sndcache_store(vm: &mut VirtualMachine<'_>, file_name: &str) -> Res<Result<String, i32>> {
     use base64::{Engine as _, engine::general_purpose};
     use sha2::{Digest, Sha256};
 
@@ -2808,9 +2807,8 @@ async fn sndcache_store(vm: &mut VirtualMachine<'_>, file_name: &str) -> Res<Opt
     }) {
         Ok(data) => data,
         Err(err) => {
-            vm.icy_board_state.snd_error = SND_ERR_IO;
             log::warn!("Can't load sound file {}: {err}", path.display());
-            return Ok(None);
+            return Ok(Err(SND_ERR_IO));
         }
     };
 
@@ -2825,14 +2823,13 @@ async fn sndcache_store(vm: &mut VirtualMachine<'_>, file_name: &str) -> Res<Opt
     if vm.icy_board_state.sound_cache.insert(cache_name.clone()) {
         if !vm.icy_board_state.reserve_media_upload(data.len()) {
             vm.icy_board_state.sound_cache.remove(&cache_name);
-            vm.icy_board_state.snd_error = SND_ERR_LIMIT;
             log::warn!("Sound media upload budget exhausted");
-            return Ok(None);
+            return Ok(Err(SND_ERR_LIMIT));
         }
         let encoded = general_purpose::STANDARD.encode(&data);
         send_apc(vm, &format!("SyncTERM:C;S;{cache_name};{encoded}")).await?;
     }
-    Ok(Some(cache_name))
+    Ok(Ok(cache_name))
 }
 
 async fn sound_file_supported(vm: &mut VirtualMachine<'_>, file_name: &str) -> Res<bool> {
@@ -2878,7 +2875,6 @@ async fn queue_cached_sound(vm: &mut VirtualMachine<'_>, cache_name: &str, chann
         // A track that ends reports it, so a PPE can answer without polling for it.
         send_audio_apc(vm, &format!("Update;C={channel}")).await?;
     }
-    vm.icy_board_state.snd_error = SND_OK;
     Ok(())
 }
 
@@ -2894,21 +2890,18 @@ pub async fn load_audio(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Va
 
     let file_name = vm.eval_expr(&args[0]).await?.as_string();
     if !vm.icy_board_state.query_sound_available().await? {
-        vm.icy_board_state.snd_error = SND_ERR_UNAVAILABLE;
-        return Ok(PplSound::invalid());
+        return Ok(PplSound::invalid(SND_ERR_UNAVAILABLE));
     }
     if !sound_file_supported(vm, &file_name).await? {
-        vm.icy_board_state.snd_error = SND_ERR_FORMAT;
-        return Ok(PplSound::invalid());
+        return Ok(PplSound::invalid(SND_ERR_FORMAT));
     }
-    let Some(cache_name) = sndcache_store(vm, &file_name).await? else {
-        return Ok(PplSound::invalid());
+    let cache_name = match sndcache_store(vm, &file_name).await? {
+        Ok(cache_name) => cache_name,
+        Err(error) => return Ok(PplSound::invalid(error)),
     };
     let Some(channel) = vm.icy_board_state.take_ppl_sound(cache_name) else {
-        vm.icy_board_state.snd_error = SND_ERR_INVALID_CHANNEL;
-        return Ok(PplSound::invalid());
+        return Ok(PplSound::invalid(SND_ERR_INVALID_CHANNEL));
     };
-    vm.icy_board_state.snd_error = SND_OK;
     Ok(PplSound::value(channel))
 }
 
@@ -2917,11 +2910,9 @@ pub(crate) async fn sound_member(vm: &mut VirtualMachine<'_>, logical_channel: i
     use crate::icy_board::state::ppl_sound::{FADE, FREE, PLAY, SET_VOLUME, STOP};
 
     let Some(file) = vm.icy_board_state.ppl_sound_file(logical_channel).cloned() else {
-        vm.icy_board_state.snd_error = SND_ERR_INVALID_CHANNEL;
         return Ok(false);
     };
     let Some((logical, channel)) = resolve_sound_channel(logical_channel) else {
-        vm.icy_board_state.snd_error = SND_ERR_INVALID_CHANNEL;
         return Ok(false);
     };
     let integer = |index: usize| arguments.get(index).map_or(0, VariableValue::as_int);
@@ -2934,7 +2925,6 @@ pub(crate) async fn sound_member(vm: &mut VirtualMachine<'_>, logical_channel: i
     }
     if *name == *STOP {
         vm.icy_board_state.sound_active[logical] = false;
-        vm.icy_board_state.snd_error = SND_OK;
         send_audio_apc(vm, &format!("Flush;C={channel};O=0")).await?;
         return Ok(true);
     }
@@ -2942,7 +2932,6 @@ pub(crate) async fn sound_member(vm: &mut VirtualMachine<'_>, logical_channel: i
         let volume = integer(0).clamp(0, 100);
         let milliseconds = if *name == *FADE { integer(1).max(0) } else { 0 };
         vm.icy_board_state.sound_volume[logical] = volume;
-        vm.icy_board_state.snd_error = SND_OK;
         let body = if milliseconds > 0 {
             format!("Volume;C={channel};V={:.2}dB;T={milliseconds}", snd_volume_db(volume))
         } else {
@@ -2954,7 +2943,6 @@ pub(crate) async fn sound_member(vm: &mut VirtualMachine<'_>, logical_channel: i
     if *name == *FREE {
         vm.icy_board_state.sound_active[logical] = false;
         vm.icy_board_state.release_ppl_sound(logical_channel);
-        vm.icy_board_state.snd_error = SND_OK;
         send_audio_apc(vm, &format!("Flush;C={channel};O=0")).await?;
         return Ok(true);
     }

@@ -667,8 +667,6 @@ pub struct IcyBoardState {
 
     pub sound_formats: HashMap<i32, bool>,
 
-    pub snd_error: i32,
-
     /// What the caller's terminal answered when it was asked what it can draw.
     /// Kept past `GFXSHUTDOWN`, because a terminal does not change mid call.
     pub gfx_capabilities: Option<ppl_graphics::GfxCapabilities>,
@@ -762,7 +760,6 @@ impl IcyBoardState {
             ppl_sounds: std::array::from_fn(|_| None),
             sound_available: None,
             sound_formats: HashMap::new(),
-            snd_error: 0,
             gfx_capabilities: None,
             gfx_error: 0,
             gfx_cache: HashSet::new(),
@@ -1182,7 +1179,6 @@ impl IcyBoardState {
         self.sound_active.fill(false);
         self.ppl_sounds.fill(None);
         self.sound_volume.fill(100);
-        self.snd_error = 0;
         self.gfx_error = 0;
     }
 

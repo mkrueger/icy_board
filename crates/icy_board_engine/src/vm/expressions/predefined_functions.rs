@@ -2773,10 +2773,6 @@ pub async fn gfxerror(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<Var
     Ok(VariableValue::new_int(vm.icy_board_state.gfx_error))
 }
 
-pub async fn snderror(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_int(vm.icy_board_state.snd_error))
-}
-
 async fn gfx_surface_dimension(vm: &mut VirtualMachine<'_>, args: &[PPEExpr], width: bool) -> Res<VariableValue> {
     let slot = vm.eval_expr(&args[0]).await?.as_int();
     let value = vm
@@ -2825,13 +2821,6 @@ pub async fn gfxscreenheight(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> 
     let capabilities = vm.icy_board_state.query_gfx_capabilities().await?;
     Ok(VariableValue::new_int(capabilities.screen_height))
 }
-
-pub async fn sndavailable(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(VariableValue::new_bool(vm.icy_board_state.query_sound_available().await?))
-}
-
-
-
 
 pub async fn rgb(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let red = vm.eval_expr(&args[0]).await?.as_int();
