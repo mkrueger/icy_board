@@ -357,6 +357,9 @@ pub enum MacroCommand {
     /// Displays the total number of files that the user has uploaded to the BBS. Example output: 352
     UpFiles,
 
+    /// Opens an OSC 8 hyperlink when a URI is present, or closes it otherwise.
+    Url(Option<String>),
+
     /// This macro will display the full user name of the caller in all uppercase letters.
     /// You can also use this macro in the TO: field of a message. If you do, your single generic message will appear to
     /// each user to be addressed personally to them..Example output: EDWARD B. SMITH
@@ -512,6 +515,8 @@ pub enum PcbToken {
     #[token("TOTALTIME", |_| MacroCommand::TotalTime, ignore(case))]
     #[token("UPBYTES", |_| MacroCommand::UpBytes, ignore(case))]
     #[token("UPFILES", |_| MacroCommand::UpFiles, ignore(case))]
+    #[token("URL", |_| MacroCommand::Url(None), ignore(case))]
+    #[regex("URL:[^\\x00-\\x20]+", |lex| MacroCommand::Url(Some(lex.slice()[4..].to_owned())), ignore(case))]
     #[token("USER", |_| MacroCommand::User, ignore(case))]
     #[token("VERSION", |_| MacroCommand::Version, ignore(case))]
     #[token("WAIT", |_| MacroCommand::Wait, ignore(case))]
@@ -599,15 +604,30 @@ impl FromStr for Macro {
         let Some(Ok(PcbToken::Macro(command))) = lexer.next() else {
             return Err("Invalid macro format".into());
         };
+        let is_url = matches!(command, MacroCommand::Url(_));
+        if let MacroCommand::Url(Some(uri)) = &command
+            && uri.chars().any(|character| character.is_control() || character.is_whitespace())
+        {
+            return Err("Invalid URL macro".into());
+        }
 
         let mut justification = MacroJustification::LeftJustify;
         let mut length = 0;
         let mut truncate = false;
 
-        if let Some(Ok(PcbToken::Format((len, trunc, just)))) = lexer.next() {
-            length = len;
-            truncate = trunc;
-            justification = just;
+        match lexer.next() {
+            Some(Ok(PcbToken::Format((len, trunc, just)))) => {
+                length = len;
+                truncate = trunc;
+                justification = just;
+            }
+            Some(_) if is_url => return Err("Invalid macro format".into()),
+            Some(_) => {}
+            None => {}
+        }
+
+        if is_url && lexer.next().is_some() {
+            return Err("Invalid macro format".into());
         }
 
         Ok(Macro {
@@ -680,6 +700,22 @@ mod tests {
         } else {
             panic!("Expected ENV macro");
         }
+    }
+
+    #[test]
+    fn parses_url_hyperlink_boundaries() {
+        let open: Macro = "URL:https://example.com/a:b?x=1".parse().unwrap();
+        assert_eq!(open.command, MacroCommand::Url(Some("https://example.com/a:b?x=1".to_string())));
+
+        let close: Macro = "URL".parse().unwrap();
+        assert_eq!(close.command, MacroCommand::Url(None));
+    }
+
+    #[test]
+    fn url_rejects_whitespace_and_control_characters() {
+        assert!("URL:https://example.com/a b".parse::<Macro>().is_err());
+        assert!("URL:https://example.com/\x1b\\payload".parse::<Macro>().is_err());
+        assert!("URL:https://example.com/\u{009c}payload".parse::<Macro>().is_err());
     }
 
     #[test]

@@ -2740,6 +2740,9 @@ impl IcyBoardState {
                     result = user.stats.num_uploads.to_string();
                 }
             }
+            MacroCommand::Url(uri) => {
+                result = format!("\x1b]8;;{}\x1b\\", uri.as_deref().unwrap_or_default());
+            }
             MacroCommand::User => {
                 if let Some(user) = &self.session.current_user {
                     if self.session.use_alias {

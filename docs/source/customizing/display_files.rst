@@ -356,6 +356,8 @@ Alphabetical List of @ Macros
      - Total bytes uploaded by caller
    * - ``@UPFILES@``
      - Total files uploaded by caller
+   * - ``@URL:uri@`` / ``@URL@``
+     - **[IcyBoard]** Open an OSC 8 hyperlink for subsequent text / close the hyperlink
    * - ``@USER@``
      - Full username in uppercase (e.g., ``EDWARD B. SMITH``)
    * - ``@VERSION@``
@@ -367,6 +369,24 @@ Alphabetical List of @ Macros
 
 .. note::
    Macros marked with **[IcyBoard]** are IcyBoard-specific extensions not found in classic PCBoard.
+
+OSC 8 Hyperlinks
+~~~~~~~~~~~~~~~~
+
+Use the paired ``URL`` macros to make text clickable in terminals that support OSC 8:
+
+.. code-block:: text
+
+  @URL:https://example.com/docs@IcyBoard documentation@URL@
+
+The opening macro emits the OSC 8 sequence without displaying the URI. The closing
+``@URL@`` ends the hyperlink. Terminals without OSC 8 support normally display the
+link text without making it clickable.
+
+The URI cannot contain spaces, control characters, or a literal ``@`` because ``@``
+delimits macros. Percent-encode those characters when needed, for example ``%40``
+for ``@``. Always include the closing macro so later terminal output does not remain
+part of the link.
 
 Format
 ~~~~~~

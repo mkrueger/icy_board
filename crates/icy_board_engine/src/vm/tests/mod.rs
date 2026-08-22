@@ -16,6 +16,7 @@ mod file_channels;
 mod file_names;
 mod forward_calls;
 mod graphics;
+mod hyperlinks;
 mod masks;
 mod message_base;
 mod mouse;
