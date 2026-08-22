@@ -419,6 +419,32 @@ nothing and answer `ERR_UNAVAILABLE`, so the `ERR().OK` guard above skips the
 selects stays selected after the PPE ends, since changing the board font may be
 the point of running it.
 
+### Palette colors
+
+`SetPaletteColor` changes one of the 16 DOS colors used by `COLOR`. It accepts
+either separate RGB components or the packed `UNSIGNED` value returned by
+`Rgb()`. The alpha component of a packed color is ignored.
+
+```PPL
+SetPaletteColor 1, 0, 64, 255
+SetPaletteColor 1, Rgb(0, 64, 255)
+SetPaletteColor 1, Rgb(0, 64, 255, 32) ; alpha is ignored
+
+ResetPaletteColor 1
+ResetPalette
+```
+
+Colors use DOS numbering, so changing color 1 changes the blue selected by
+`COLOR 1`; the runtime maps it to the terminal's ANSI palette slot. Color
+numbers must be 0 through 15 and separate RGB components must be 0 through
+255. `ResetPaletteColor` restores one entry, while `ResetPalette` asks the
+terminal to restore its complete palette.
+
+These statements use OSC 4 and OSC 104. They report `ERR_INVALID` with
+`ERR_KIND_GFX` for invalid values and `ERR_UNAVAILABLE` when ANSI output is not
+available. The [`palette` PPE](../ppe/palette/src/palette.pps) demonstrates a
+fade by changing the palette underneath text that is already on screen.
+
 ### Errors
 
 `ERR()` answers with an `ERROR` describing the last operation that could fail.

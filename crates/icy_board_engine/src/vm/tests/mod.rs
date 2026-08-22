@@ -23,6 +23,7 @@ mod margins;
 mod masks;
 mod message_base;
 mod mouse;
+mod palette;
 mod nested_records;
 mod ppe_paths;
 mod record_literals;

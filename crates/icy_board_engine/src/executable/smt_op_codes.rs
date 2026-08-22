@@ -284,8 +284,12 @@ pub enum OpCode {
     LoadFont = 244,
     OnError = 245,
     ErrClr = 246,
+    SetPaletteColor = 247,
+    SetPaletteColorRgb = 248,
+    ResetPaletteColor = 249,
+    ResetPalette = 250,
 }
-pub const LAST_STMT: i16 = OpCode::ErrClr as i16;
+pub const LAST_STMT: i16 = OpCode::ResetPalette as i16;
 
 impl OpCode {
     pub fn get_definition(self) -> &'static StatementDefinition {
@@ -549,6 +553,16 @@ impl StatementDefinition {
         STATEMENT_DEFINITIONS.iter().find(|def| unicase::Ascii::new(def.name) == identifier)
     }
 
+    pub(crate) fn get_statement_definition_for_arity(
+        identifier: &unicase::Ascii<String>,
+        argument_count: usize,
+    ) -> Option<&'static StatementDefinition> {
+        STATEMENT_DEFINITIONS.iter().find(|def| {
+            unicase::Ascii::new(def.name) == identifier
+                && matches!(def.sig, StatementSignature::ArgumentsWithVariable(_, count) if count == argument_count)
+        })
+    }
+
     pub fn get_signature(&self) -> Signature {
         match self.opcode {
             OpCode::GOTO => Signature::new("GOTO LABEL".to_string()),
@@ -611,7 +625,7 @@ pub fn format_argument_type_last(arg: &ArgumentDefinition) -> String {
 // "WAIT FOR" == "WAITFOR"
 // "GO SUB"
 // " GO TO"
-pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 252]> = std::sync::LazyLock::new(|| {
+pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 256]> = std::sync::LazyLock::new(|| {
     [
         StatementDefinition {
             // helps to map opcode to array index.
@@ -2714,6 +2728,42 @@ pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 252]
             name: "ErrClr",
             version: 400,
             opcode: OpCode::ErrClr,
+            args: None,
+            sig: StatementSignature::ArgumentsWithVariable(0, 0),
+        },
+        StatementDefinition {
+            name: "SetPaletteColor",
+            version: 400,
+            opcode: OpCode::SetPaletteColor,
+            args: Some(vec![
+                ArgumentDefinition::new("Color", VariableType::Integer),
+                ArgumentDefinition::new("Rgb", VariableType::Unsigned),
+            ]),
+            sig: StatementSignature::ArgumentsWithVariable(0, 2),
+        },
+        StatementDefinition {
+            name: "SetPaletteColor",
+            version: 400,
+            opcode: OpCode::SetPaletteColorRgb,
+            args: Some(vec![
+                ArgumentDefinition::new("Color", VariableType::Integer),
+                ArgumentDefinition::new("Red", VariableType::Integer),
+                ArgumentDefinition::new("Green", VariableType::Integer),
+                ArgumentDefinition::new("Blue", VariableType::Integer),
+            ]),
+            sig: StatementSignature::ArgumentsWithVariable(0, 4),
+        },
+        StatementDefinition {
+            name: "ResetPaletteColor",
+            version: 400,
+            opcode: OpCode::ResetPaletteColor,
+            args: Some(vec![ArgumentDefinition::new("Color", VariableType::Integer)]),
+            sig: StatementSignature::ArgumentsWithVariable(0, 1),
+        },
+        StatementDefinition {
+            name: "ResetPalette",
+            version: 400,
+            opcode: OpCode::ResetPalette,
             args: None,
             sig: StatementSignature::ArgumentsWithVariable(0, 0),
         },

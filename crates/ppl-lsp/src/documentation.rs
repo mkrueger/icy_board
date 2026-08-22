@@ -683,6 +683,9 @@ pub fn get_statement_hover(stmt: &StatementDefinition) -> Option<Hover> {
             get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-margin-api"))
         }
         OpCode::SetFont | OpCode::LoadFont => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-font-api")),
+        OpCode::SetPaletteColor | OpCode::SetPaletteColorRgb | OpCode::ResetPaletteColor | OpCode::ResetPalette => {
+            get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-palette-api"))
+        }
         OpCode::ErrClr => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-errclr")),
         OpCode::OnError => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-on-error")),
         _ => None,

@@ -33,7 +33,7 @@ use jamjam::jam::{JamMessage, JamMessageBase, attributes as jam_attributes, msg_
 
 use crate::{
     icy_board::icb_text::IceText,
-    icy_board::state::ppl_error::{ERR_FORMAT, ERR_INVALID, ERR_IO, ERR_KIND_FONT, ERR_KIND_SOUND, ERR_LIMIT, ERR_UNAVAILABLE, PplError},
+    icy_board::state::ppl_error::{ERR_FORMAT, ERR_INVALID, ERR_IO, ERR_KIND_FONT, ERR_KIND_GFX, ERR_KIND_SOUND, ERR_LIMIT, ERR_UNAVAILABLE, PplError},
     vm::{TerminalTarget, VMError, VirtualMachine},
 };
 
@@ -1022,6 +1022,67 @@ pub async fn reset_h_margins(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> 
 
 pub async fn reset_margins(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
     write_vt_sequence(vm, "\x1B[r\x1B[?69l").await
+}
+
+const DOS_TO_ANSI_PALETTE: [u8; 16] = [0, 4, 2, 6, 1, 5, 3, 7, 8, 12, 10, 14, 9, 13, 11, 15];
+
+pub async fn set_palette_color(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let color = vm.eval_expr(&args[0]).await?.as_int();
+    if !(0..16).contains(&color) {
+        vm.set_error(PplError::new(ERR_KIND_GFX, ERR_INVALID, format!("invalid palette color {color}")));
+        return Ok(());
+    }
+    if !supports_vt_sequences(vm) {
+        vm.set_error(PplError::new(ERR_KIND_GFX, ERR_UNAVAILABLE, "the terminal has no palette support"));
+        return Ok(());
+    }
+
+    let (red, green, blue) = if args.len() == 2 {
+        let rgba = vm.eval_expr(&args[1]).await?.as_unsigned() as u32;
+        ((rgba >> 24) as u8, (rgba >> 16) as u8, (rgba >> 8) as u8)
+    } else {
+        let red = vm.eval_expr(&args[1]).await?.as_int();
+        let green = vm.eval_expr(&args[2]).await?.as_int();
+        let blue = vm.eval_expr(&args[3]).await?.as_int();
+        if !(0..=255).contains(&red) || !(0..=255).contains(&green) || !(0..=255).contains(&blue) {
+            vm.set_error(PplError::new(ERR_KIND_GFX, ERR_INVALID, "palette RGB components must be between 0 and 255"));
+            return Ok(());
+        }
+        (red as u8, green as u8, blue as u8)
+    };
+
+    let index = DOS_TO_ANSI_PALETTE[color as usize];
+    write_vt_sequence(vm, &format!("\x1B]4;{index};rgb:{red:02X}/{green:02X}/{blue:02X}\x1B\\")).await?;
+    vm.operation_succeeded();
+    Ok(())
+}
+
+pub async fn reset_palette_color(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let color = vm.eval_expr(&args[0]).await?.as_int();
+    if !(0..16).contains(&color) {
+        vm.set_error(PplError::new(ERR_KIND_GFX, ERR_INVALID, format!("invalid palette color {color}")));
+        return Ok(());
+    }
+    if !supports_vt_sequences(vm) {
+        vm.set_error(PplError::new(ERR_KIND_GFX, ERR_UNAVAILABLE, "the terminal has no palette support"));
+        return Ok(());
+    }
+
+    let index = DOS_TO_ANSI_PALETTE[color as usize];
+    write_vt_sequence(vm, &format!("\x1B]104;{index}\x1B\\")).await?;
+    vm.operation_succeeded();
+    Ok(())
+}
+
+pub async fn reset_palette(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
+    if !supports_vt_sequences(vm) {
+        vm.set_error(PplError::new(ERR_KIND_GFX, ERR_UNAVAILABLE, "the terminal has no palette support"));
+        return Ok(());
+    }
+
+    write_vt_sequence(vm, "\x1B]104\x1B\\").await?;
+    vm.operation_succeeded();
+    Ok(())
 }
 
 /// 256 glyphs of at most 32 rows is 8K, and PSF2 adds a header and a Unicode table.

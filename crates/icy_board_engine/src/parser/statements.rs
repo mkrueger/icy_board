@@ -990,6 +990,8 @@ impl Parser<'_> {
                 }
             }
 
+            let def = StatementDefinition::get_statement_definition_for_arity(identifier, params.len()).unwrap_or(def);
+
             if def.opcode == OpCode::GETUSER
                 || def.opcode == OpCode::PUTUSER
                 || def.opcode == OpCode::GETALTUSER

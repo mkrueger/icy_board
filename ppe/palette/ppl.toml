@@ -1,0 +1,8 @@
+[package]
+name = "palette"
+version = "0.1.0"
+authors = ["Mike Krüger <mkrueger@posteo.de>"]
+runtime = 402
+
+[compiler]
+language_version = 400

@@ -263,5 +263,8 @@ pub async fn run_predefined_statement(opcode: OpCode, arg: &mut VirtualMachine<'
         OpCode::ResetMargins => predefined_procedures::reset_margins(arg, arguments).await,
         OpCode::SetFont => predefined_procedures::set_font(arg, arguments).await,
         OpCode::LoadFont => predefined_procedures::load_font(arg, arguments).await,
+        OpCode::SetPaletteColor | OpCode::SetPaletteColorRgb => predefined_procedures::set_palette_color(arg, arguments).await,
+        OpCode::ResetPaletteColor => predefined_procedures::reset_palette_color(arg, arguments).await,
+        OpCode::ResetPalette => predefined_procedures::reset_palette(arg, arguments).await,
     }
 }
