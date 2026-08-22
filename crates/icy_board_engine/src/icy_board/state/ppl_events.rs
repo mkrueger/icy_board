@@ -214,12 +214,12 @@ const MAX_NOTIFY_SEQUENCE: usize = 64;
 /// Catches the `CSI = 7 ; channel ; 0 n` a terminal sends once a channel it was asked
 /// to watch has drained. Everything else is handed back untouched.
 #[derive(Default)]
-pub struct SoundNotifyState {
+pub struct AudioNotifyState {
     pending: Vec<u8>,
     drained: VecDeque<i32>,
 }
 
-impl SoundNotifyState {
+impl AudioNotifyState {
     pub fn feed(&mut self, byte: u8) -> Vec<u8> {
         if self.pending.is_empty() {
             if byte == 0x1b {

@@ -319,7 +319,7 @@ impl UserTypeRegistry {
         );
         reg.register::<crate::icy_board::state::ppl_surface::PplSurface>(SURFACE_ID);
         reg.register::<crate::icy_board::state::ppl_events::PplEvent>(EVENT_ID);
-        reg.register::<crate::icy_board::state::ppl_sound::PplSound>(AUDIO_ID);
+        reg.register::<crate::icy_board::state::ppl_audio::PplAudio>(AUDIO_ID);
 
         reg
     }

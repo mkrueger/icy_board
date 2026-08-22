@@ -2858,7 +2858,7 @@ async fn sound_file_supported(vm: &mut VirtualMachine<'_>, file_name: &str) -> R
 }
 
 
-/// Plays what the caller's cache already holds, which is all a `SOUND` has to do.
+/// Plays what the caller's cache already holds, which is all an `AUDIO` has to do.
 async fn queue_cached_sound(vm: &mut VirtualMachine<'_>, cache_name: &str, channel: u8, logical_channel: usize, looping: bool) -> Res<()> {
     // slot == channel: each channel plays one file at a time, so this keeps
     // overlapping music/fx on distinct channels simple with no slot bookkeeping.
@@ -2886,30 +2886,30 @@ async fn queue_cached_sound(vm: &mut VirtualMachine<'_>, cache_name: &str, chann
 
 /// `LOADAUDIO file$` - takes a channel for a file and answers the `AUDIO` holding it.
 pub async fn load_audio(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    use crate::icy_board::state::ppl_sound::PplSound;
+    use crate::icy_board::state::ppl_audio::PplAudio;
 
     let file_name = vm.eval_expr(&args[0]).await?.as_string();
     if !vm.icy_board_state.query_sound_available().await? {
-        return Ok(PplSound::invalid(SND_ERR_UNAVAILABLE));
+        return Ok(PplAudio::invalid(SND_ERR_UNAVAILABLE));
     }
     if !sound_file_supported(vm, &file_name).await? {
-        return Ok(PplSound::invalid(SND_ERR_FORMAT));
+        return Ok(PplAudio::invalid(SND_ERR_FORMAT));
     }
     let cache_name = match sndcache_store(vm, &file_name).await? {
         Ok(cache_name) => cache_name,
-        Err(error) => return Ok(PplSound::invalid(error)),
+        Err(error) => return Ok(PplAudio::invalid(error)),
     };
-    let Some(channel) = vm.icy_board_state.take_ppl_sound(cache_name) else {
-        return Ok(PplSound::invalid(SND_ERR_INVALID_CHANNEL));
+    let Some(channel) = vm.icy_board_state.take_ppl_audio(cache_name) else {
+        return Ok(PplAudio::invalid(SND_ERR_INVALID_CHANNEL));
     };
-    Ok(PplSound::value(channel))
+    Ok(PplAudio::value(channel))
 }
 
 /// Runs one `AUDIO` member. Answers whether it could be carried out.
 pub(crate) async fn sound_member(vm: &mut VirtualMachine<'_>, logical_channel: i32, name: &unicase::Ascii<String>, arguments: &[VariableValue]) -> Res<bool> {
-    use crate::icy_board::state::ppl_sound::{FADE, FREE, PLAY, SET_VOLUME, STOP};
+    use crate::icy_board::state::ppl_audio::{FADE, FREE, PLAY, SET_VOLUME, STOP};
 
-    let Some(file) = vm.icy_board_state.ppl_sound_file(logical_channel).cloned() else {
+    let Some(file) = vm.icy_board_state.ppl_audio_file(logical_channel).cloned() else {
         return Ok(false);
     };
     let Some((logical, channel)) = resolve_sound_channel(logical_channel) else {
@@ -2942,7 +2942,7 @@ pub(crate) async fn sound_member(vm: &mut VirtualMachine<'_>, logical_channel: i
     }
     if *name == *FREE {
         vm.icy_board_state.sound_active[logical] = false;
-        vm.icy_board_state.release_ppl_sound(logical_channel);
+        vm.icy_board_state.release_ppl_audio(logical_channel);
         send_audio_apc(vm, &format!("Flush;C={channel};O=0")).await?;
         return Ok(true);
     }

@@ -12,17 +12,17 @@ use crate::{
 };
 
 #[derive(Clone, Copy)]
-pub struct PplSound {
+pub struct PplAudio {
     pub channel: i32,
     pub error: i32,
 }
 
-impl PplSound {
+impl PplAudio {
     pub fn value(channel: i32) -> VariableValue {
         VariableValue {
             vtype: VariableType::UserData(AUDIO_ID as u8),
             data: VariableData::from_int(channel),
-            generic_data: GenericVariableData::UserData(std::sync::Arc::new(PplSound { channel, error: 0 })),
+            generic_data: GenericVariableData::UserData(std::sync::Arc::new(PplAudio { channel, error: 0 })),
         }
     }
 
@@ -31,7 +31,7 @@ impl PplSound {
         VariableValue {
             vtype: VariableType::UserData(AUDIO_ID as u8),
             data: VariableData::from_int(-1),
-            generic_data: GenericVariableData::UserData(std::sync::Arc::new(PplSound { channel: -1, error })),
+            generic_data: GenericVariableData::UserData(std::sync::Arc::new(PplAudio { channel: -1, error })),
         }
     }
 }
@@ -47,7 +47,7 @@ pub static SET_VOLUME: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::
 pub static FADE: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Fade".to_string()));
 pub static FREE: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Free".to_string()));
 
-impl UserData for PplSound {
+impl UserData for PplAudio {
     const TYPE_NAME: &'static str = "Audio";
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
@@ -67,9 +67,9 @@ impl UserData for PplSound {
 }
 
 #[async_trait]
-impl UserDataValue for PplSound {
+impl UserDataValue for PplAudio {
     fn get_property_value(&self, vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
-        let loaded = vm.icy_board_state.ppl_sound_file(self.channel).is_some();
+        let loaded = vm.icy_board_state.ppl_audio_file(self.channel).is_some();
         if *name == *VALID {
             return Ok(VariableValue::new_bool(loaded));
         }

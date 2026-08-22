@@ -38,7 +38,7 @@ pub mod ppl_events;
 pub mod ppl_graphics;
 pub mod ppl_keys;
 pub mod ppl_mouse;
-pub mod ppl_sound;
+pub mod ppl_audio;
 pub mod ppl_surface;
 pub mod user_commands;
 pub mod virtual_screen;
@@ -660,8 +660,8 @@ pub struct IcyBoardState {
 
     pub sound_active: [bool; 14],
 
-    /// The file each `SOUND` channel was loaded from, indexed by logical channel.
-    ppl_sounds: [Option<String>; 14],
+    /// The file each `AUDIO` channel was loaded from, indexed by logical channel.
+    ppl_audio: [Option<String>; 14],
 
     pub sound_available: Option<bool>,
 
@@ -686,7 +686,7 @@ pub struct IcyBoardState {
 
     pub ppl_graphics: Option<ppl_graphics::PplGraphicsState>,
     ppl_event_keys: ppl_events::LogicalKeyState,
-    ppl_sound_notify: ppl_events::SoundNotifyState,
+    ppl_audio_notify: ppl_events::AudioNotifyState,
     pub ppl_keys: ppl_keys::PplKeyState,
     pub ppl_mouse: ppl_mouse::PplMouseState,
 }
@@ -757,7 +757,7 @@ impl IcyBoardState {
             media_upload_bytes: 0,
             sound_volume: [100; 14],
             sound_active: [false; 14],
-            ppl_sounds: std::array::from_fn(|_| None),
+            ppl_audio: std::array::from_fn(|_| None),
             sound_available: None,
             sound_formats: HashMap::new(),
             gfx_capabilities: None,
@@ -767,7 +767,7 @@ impl IcyBoardState {
             raw_input: VecDeque::new(),
             ppl_graphics: None,
             ppl_event_keys: ppl_events::LogicalKeyState::default(),
-            ppl_sound_notify: ppl_events::SoundNotifyState::default(),
+            ppl_audio_notify: ppl_events::AudioNotifyState::default(),
             ppl_keys: ppl_keys::PplKeyState::default(),
             ppl_mouse: ppl_mouse::PplMouseState::default(),
         }
@@ -1177,7 +1177,7 @@ impl IcyBoardState {
             }
         }
         self.sound_active.fill(false);
-        self.ppl_sounds.fill(None);
+        self.ppl_audio.fill(None);
         self.sound_volume.fill(100);
         self.gfx_error = 0;
     }
@@ -2985,7 +2985,7 @@ impl IcyBoardState {
         for byte in self.ppl_mouse.feed(byte) {
             for byte in self.ppl_keys.feed(byte) {
                 for byte in self.gfx_probe.feed(byte) {
-                    for byte in self.ppl_sound_notify.feed(byte) {
+                    for byte in self.ppl_audio_notify.feed(byte) {
                         keys.push(KeyChar::new(KeySource::User, byte as char));
                     }
                 }
@@ -3027,7 +3027,7 @@ impl IcyBoardState {
         Ok(capabilities)
     }
 
-    /// Learns everything about the caller's terminal in one go, before a PPE can queue    /// Learns everything about the caller's terminal in one go, before a PPE can queue
+    /// Learns everything about the caller's terminal in one go, before a PPE can queue
     /// an upload in front of an answer. Sound comes first, so the cache listing it
     /// wants is fetched together with the one for frames.
     pub async fn probe_terminal_media(&mut self) -> Res<()> {
@@ -3040,22 +3040,22 @@ impl IcyBoardState {
         Ok(())
     }
 
-    /// The file a `SOUND` channel was loaded from, if it still holds one.
-    pub fn ppl_sound_file(&self, channel: i32) -> Option<&String> {
-        self.ppl_sounds.get(usize::try_from(channel).ok()?)?.as_ref()
+    /// The file an `AUDIO` channel was loaded from, if it still holds one.
+    pub fn ppl_audio_file(&self, channel: i32) -> Option<&String> {
+        self.ppl_audio.get(usize::try_from(channel).ok()?)?.as_ref()
     }
 
-    /// Takes the next free `SOUND` channel for `file`, or nothing when all are in use.
-    pub fn take_ppl_sound(&mut self, file: String) -> Option<i32> {
-        let channel = self.ppl_sounds.iter().position(Option::is_none)?;
-        self.ppl_sounds[channel] = Some(file);
+    /// Takes the next free `AUDIO` channel for `file`, or nothing when all are in use.
+    pub fn take_ppl_audio(&mut self, file: String) -> Option<i32> {
+        let channel = self.ppl_audio.iter().position(Option::is_none)?;
+        self.ppl_audio[channel] = Some(file);
         Some(channel as i32)
     }
 
-    /// Gives a `SOUND` channel back, so a long call can load more than it can hold.
-    pub fn release_ppl_sound(&mut self, channel: i32) {
+    /// Gives an `AUDIO` channel back, so a long call can load more than it can hold.
+    pub fn release_ppl_audio(&mut self, channel: i32) {
         if let Ok(channel) = usize::try_from(channel)
-            && let Some(slot) = self.ppl_sounds.get_mut(channel)
+            && let Some(slot) = self.ppl_audio.get_mut(channel)
         {
             *slot = None;
         }
@@ -3190,7 +3190,7 @@ impl IcyBoardState {
         if let Some(event) = self.ppl_event_keys.poll() {
             return Some(self.ppl_event_with_mode(event));
         }
-        if let Some(channel) = self.ppl_sound_notify.poll() {
+        if let Some(channel) = self.ppl_audio_notify.poll() {
             if let Some(active) = self.sound_active.get_mut(channel as usize) {
                 *active = false;
             }
