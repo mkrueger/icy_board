@@ -1472,7 +1472,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             return *variable_type;
         }
         let predef = FunctionDefinition::get_function_definitions(identifier.get_identifier());
-        if !predef.is_empty() {
+        if !predef.is_empty() && (self.cur_func_call > 0 || self.lookup_variable(identifier.get_identifier()).is_none()) {
             let def = &FUNCTION_DEFINITIONS[predef[0]];
             if self.cur_func_call > 0 {
                 self.function_type_lookup.insert(self.cur_func_call, SemanticInfo::PredefFunctionGroup(predef));

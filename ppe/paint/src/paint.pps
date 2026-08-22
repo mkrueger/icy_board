@@ -223,25 +223,25 @@ PROCEDURE Dab(INTEGER x, INTEGER y, UNSIGNED color)
 ENDPROC
 
 PROCEDURE DrawStroke(INTEGER x0, INTEGER y0, INTEGER x1, INTEGER y1, UNSIGNED color)
-    INTEGER dx, dy, sx, sy, errTerm, e2
+    INTEGER dx, dy, sx, sy, err, e2
     dx = Abs(x1 - x0)
     dy = 0 - Abs(y1 - y0)
     sx = -1
     IF x0 < x1 sx = 1
     sy = -1
     IF y0 < y1 sy = 1
-    errTerm = dx + dy
+    err = dx + dy
 
     LOOP
         Dab(x0, y0, color)
         IF x0 = x1 & y0 = y1 BREAK
-        e2 = errTerm * 2
+        e2 = err * 2
         IF e2 >= dy THEN
-            errTerm += dy
+            err += dy
             x0 += sx
         ENDIF
         IF e2 <= dx THEN
-            errTerm += dx
+            err += dx
             y0 += sy
         ENDIF
     ENDLOOP

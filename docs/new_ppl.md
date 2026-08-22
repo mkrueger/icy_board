@@ -431,13 +431,16 @@ ENDIF
 | `OK` | `TRUE` while nothing has gone wrong |
 | `Kind` | Which part of the board failed, an `ERR_KIND_*` constant |
 | `Code` | What went wrong, an `ERR_*` constant |
-| `Message` | A line of English, meant for a log |
+| `Message` | Informational English text, meant for a log rather than control flow |
 | `Channel` | The file, dBase or sound channel, `-1` when the error has none |
 
 `Kind` is one of `ERR_KIND_NONE`, `ERR_KIND_FILE`, `ERR_KIND_DBASE`,
 `ERR_KIND_STACK`, `ERR_KIND_GFX`, `ERR_KIND_FONT` or `ERR_KIND_SOUND`. `Code` is
 one of `ERR_OK`, `ERR_UNAVAILABLE`, `ERR_INVALID`, `ERR_IO`, `ERR_FORMAT`,
 `ERR_LIMIT`, `ERR_UNSUPPORTED` or `ERR_STACK`.
+
+Use `Kind` and `Code` when a PPE has to make a decision. `Message` may include
+paths and operating-system text, and its wording may change between releases.
 
 An operation that works clears the error, so `ERR()` always answers for the last
 thing that was tried rather than for the last thing that failed. `ERRCLR` forgets
@@ -448,13 +451,15 @@ ERROR failed = ERR()
 ```
 
 `FERR` and `DERR` are unchanged, including that `FERR` clears itself when read
-and that reading a file to its end raises it. Reaching the end of a file is not
-an error, so it leaves `ERR().OK` true and never reaches an `ON ERROR` handler.
+and that `FGET` or `FREAD` reaching the end of a file raises it. Reaching the end
+is not an error, so it leaves `ERR().OK` true and never reaches an `ON ERROR`
+handler.
 
 ### ON ERROR
 
 `ON ERROR` says where a failed operation sends the program. It may be written as
-one word, `ONERROR`. The handler is chosen once and stays until it is changed.
+one word, `ONERROR`. GOSUB and procedure handlers stay armed; GOTO is disarmed
+before the jump because its cleanup path has no natural return boundary.
 
 | Form | What it does |
 | :--- | :--- |
@@ -478,6 +483,10 @@ ENDPROC
 A handler procedure takes the error or takes nothing at all; a `VAR` parameter is
 refused, because there is no variable behind an error to write back to. A
 failure inside the handler is recorded but does not call the handler again.
+
+`ON ERROR` handles operational failures reported by PPL APIs. A malformed PPE,
+an invalid VM instruction, or a disconnected session is fatal to execution and
+does not enter a handler.
 
 The handler runs once the failing statement is over, so the statement always
 finishes first. `ON ERROR` also catches running out of call stack, which lets a

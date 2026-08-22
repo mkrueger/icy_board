@@ -2771,7 +2771,7 @@ pub async fn gfxcaps(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<Vari
 
 /// `ERR()` - what the last operation that can fail did.
 pub async fn err(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
-    vm.publish_gfx_error();
+    vm.publish_operation_result();
     Ok(vm.last_error.clone().value())
 }
 

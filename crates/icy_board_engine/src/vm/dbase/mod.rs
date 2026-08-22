@@ -35,13 +35,12 @@ struct DbaseChannel {
 #[derive(Default)]
 pub struct DbaseState {
     channels: [Option<Box<DbaseChannel>>; MAX_DBASE_CHANNELS],
-    /// What the last failed operation was, for `ERR()`.
-    failure: Option<(i32, String)>,
+    operation_result: Option<std::result::Result<(), (i32, String)>>,
 }
 
 impl DbaseState {
-    pub fn take_failure(&mut self) -> Option<(i32, String)> {
-        self.failure.take()
+    pub fn take_operation_result(&mut self) -> Option<std::result::Result<(), (i32, String)>> {
+        self.operation_result.take()
     }
     fn slot(&mut self, channel: i32) -> Option<&mut Box<DbaseChannel>> {
         let index = usize::try_from(channel).ok()?;
@@ -58,13 +57,18 @@ impl DbaseState {
         if let Some(slot) = self.slot(channel) {
             slot.error = true;
         }
-        self.failure = Some((channel, format!("dBase operation failed on channel {channel}")));
+        if !matches!(self.operation_result, Some(Err(_))) {
+            self.operation_result = Some(Err((channel, format!("dBase operation failed on channel {channel}"))));
+        }
         true
     }
 
     fn ok(&mut self, channel: i32) -> bool {
         if let Some(slot) = self.slot(channel) {
             slot.error = false;
+        }
+        if !matches!(self.operation_result, Some(Err(_))) {
+            self.operation_result = Some(Ok(()));
         }
         false
     }
@@ -119,10 +123,10 @@ impl DbaseState {
 
     fn install(&mut self, channel: i32, mut db: DbaseFile) -> bool {
         let Ok(index) = usize::try_from(channel) else {
-            return true;
+            return self.fail(channel);
         };
         if index >= MAX_DBASE_CHANNELS {
-            return true;
+            return self.fail(channel);
         }
         // dBase opens a table positioned on its first record.
         let _ = db.goto(1);
@@ -137,20 +141,24 @@ impl DbaseState {
             eof: false,
             pending: false,
         }));
-        false
+        self.ok(channel)
     }
 
     pub fn close(&mut self, channel: i32) -> bool {
         let Ok(index) = usize::try_from(channel) else {
-            return true;
+            return self.fail(channel);
         };
         let Some(slot) = self.channels.get_mut(index) else {
-            return true;
+            return self.fail(channel);
         };
-        let Some(mut channel) = slot.take() else {
-            return true;
+        let Some(mut open_channel) = slot.take() else {
+            return self.fail(channel);
         };
-        channel.db.flush().is_err()
+        if open_channel.db.flush().is_err() {
+            self.fail(channel)
+        } else {
+            self.ok(channel)
+        }
     }
 
     pub fn close_all(&mut self) -> bool {

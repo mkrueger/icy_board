@@ -1049,8 +1049,9 @@ pub async fn set_font(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
         vm.set_error(PplError::new(ERR_KIND_FONT, ERR_INVALID, format!("invalid font slot {slot} or font {font}")));
         return Ok(());
     }
-    vm.clear_error();
-    write_vt_sequence(vm, &format!("\x1B[{slot};{font} D")).await
+    write_vt_sequence(vm, &format!("\x1B[{slot};{font} D")).await?;
+    vm.operation_succeeded();
+    Ok(())
 }
 
 pub async fn load_font(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
@@ -1099,7 +1100,7 @@ pub async fn load_font(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
     // The upload bypasses the virtual screen, so it has to be told separately or a later
     // SETFONT finds no such font.
     vm.icy_board_state.display_screen_mut().buffer.buffer.set_font(font as u8, bit_font);
-    vm.clear_error();
+    vm.operation_succeeded();
     Ok(())
 }
 
@@ -3016,7 +3017,7 @@ pub async fn load_audio(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Va
     let Some(channel) = vm.icy_board_state.take_ppl_audio(cache_name) else {
         return Ok(failed(vm, PplError::new(ERR_KIND_SOUND, ERR_INVALID, "no sound channel is free")));
     };
-    vm.clear_error();
+    vm.operation_succeeded();
     Ok(PplAudio::value(channel))
 }
 
@@ -3038,13 +3039,13 @@ pub(crate) async fn sound_member(vm: &mut VirtualMachine<'_>, logical_channel: i
         let looping = arguments.first().is_some_and(VariableValue::as_bool);
         queue_cached_sound(vm, &file, channel, logical, looping).await?;
         vm.icy_board_state.sound_active[logical] = true;
-        vm.clear_error();
+        vm.operation_succeeded();
         return Ok(true);
     }
     if *name == *STOP {
         vm.icy_board_state.sound_active[logical] = false;
         send_audio_apc(vm, &format!("Flush;C={channel};O=0")).await?;
-        vm.clear_error();
+        vm.operation_succeeded();
         return Ok(true);
     }
     if *name == *SET_VOLUME || *name == *FADE {
@@ -3057,14 +3058,14 @@ pub(crate) async fn sound_member(vm: &mut VirtualMachine<'_>, logical_channel: i
             format!("Volume;C={channel};V={:.2}dB", snd_volume_db(volume))
         };
         send_audio_apc(vm, &body).await?;
-        vm.clear_error();
+        vm.operation_succeeded();
         return Ok(true);
     }
     if *name == *FREE {
         vm.icy_board_state.sound_active[logical] = false;
         vm.icy_board_state.release_ppl_audio(logical_channel);
         send_audio_apc(vm, &format!("Flush;C={channel};O=0")).await?;
-        vm.clear_error();
+        vm.operation_succeeded();
         return Ok(true);
     }
     log::error!("Unknown Audio member {name}");

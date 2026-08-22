@@ -9,7 +9,7 @@ use crate::{
         AstNode, FunctionDeclarationAstNode, ParameterSpecifier, ProcedureDeclarationAstNode, VariableDeclarationStatement, VariableParameterSpecifier,
         VariableSpecifier,
     },
-    compiler::workspace::Workspace,
+    compiler::{user_data::UserDataMemberRegistry, workspace::Workspace},
     executable::VariableType,
 };
 
@@ -213,6 +213,15 @@ fn board_object_type_ids_are_frozen() {
         expected.len(),
         "a board object was added without freezing its id"
     );
+}
+
+#[test]
+fn error_member_ids_are_frozen() {
+    let registry = UserTypeRegistry::icy_board_registry();
+    let error = &registry.types[&(super::ERROR_ID as u8)];
+    for (name, id) in [("OK", 0), ("KIND", 1), ("CODE", 2), ("MESSAGE", 3), ("CHANNEL", 4)] {
+        assert_eq!(error.get_member_id(&unicase::Ascii::new(name.to_string())), Some(id), "ERROR.{name} moved");
+    }
 }
 
 fn parse_types(input: &str) -> (Vec<AstNode>, UserTypeRegistry, Arc<Mutex<ErrorReporter>>) {

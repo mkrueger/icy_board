@@ -125,12 +125,12 @@ fn reading_a_byte_past_the_end_sets_the_error_flag() {
         FREAD 6, b, 1
         PRINTLN "first=", b, " err=", FERR(6)
         FREAD 6, b, 1
-        PRINTLN "second=", b, " err=", FERR(6)
+        PRINTLN "second=", b, " err=", FERR(6), " ok=", ERR().OK
         FCLOSE 6
     "#,
         &[("data.pag", b"A")],
     );
-    assert_eq!(output, "first=65 err=0\nsecond=0 err=1\n");
+    assert_eq!(output, "first=65 err=0\nsecond=0 err=1 ok=1\n");
 }
 
 /// The same for a value that needs more bytes than the file has left.

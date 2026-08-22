@@ -37,6 +37,31 @@ fn reads_a_table_pcboard_wrote() {
 }
 
 #[test]
+fn a_successful_dbase_operation_clears_an_older_error_immediately() {
+    let output = on_fixture(
+        r#"
+        LoadFont 43, "missing.fnt"
+        PRINTLN DOPEN(0, "PCBOARD", 0), ":", ERR().Code
+        DCLOSE 0
+        "#,
+    );
+
+    assert_eq!(output, "0:0\n");
+}
+
+#[test]
+fn the_first_dbase_failure_in_a_statement_wins() {
+    let output = on_fixture(
+        r#"
+        PRINTLN DOPEN(0, "MISSING", 0), ":", DOPEN(1, "PCBOARD", 0), ":", ERR().Kind, ":", ERR().Code, ":", ERR().Channel
+        DCLOSE 1
+        "#,
+    );
+
+    assert_eq!(output, "0:0:2:3:0\n");
+}
+
+#[test]
 fn reports_the_field_layout() {
     let output = on_fixture(
         r#"

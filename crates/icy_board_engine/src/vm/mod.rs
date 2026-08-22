@@ -706,8 +706,18 @@ impl VirtualMachine<'_> {
     /// Records what an operation failed with. `ON ERROR` acts on it once the statement is over,
     /// so the operation itself always runs to its end first.
     pub fn set_error(&mut self, error: PplError) {
+        if self.error_pending {
+            return;
+        }
         self.error_pending = !error.is_ok();
         self.last_error = error;
+    }
+
+    /// A success clears an older statement's error, but never a failure from this statement.
+    pub fn operation_succeeded(&mut self) {
+        if !self.error_pending {
+            self.last_error = PplError::default();
+        }
     }
 
     /// What an operation that worked reports, so a later `ERR()` does not answer for an older one.
@@ -721,25 +731,36 @@ impl VirtualMachine<'_> {
     fn publish_gfx_error(&mut self) {
         match std::mem::replace(&mut self.icy_board_state.gfx_error, -1) {
             -1 => {}
-            0 => self.clear_error(),
+            0 => self.operation_succeeded(),
             code => self.set_error(PplError::new(ERR_KIND_GFX, code, gfx_error_message(code))),
         }
     }
 
     /// The same for the file and dBase channels, which keep their own `FERR`/`DERR` flags.
     fn publish_io_error(&mut self) {
-        if let Some((channel, message)) = self.io.take_failure() {
-            self.set_error(PplError::new(ERR_KIND_FILE, ERR_IO, message).on_channel(channel));
+        if let Some(result) = self.io.take_operation_result() {
+            match result {
+                Ok(()) => self.operation_succeeded(),
+                Err((channel, message)) => self.set_error(PplError::new(ERR_KIND_FILE, ERR_IO, message).on_channel(channel)),
+            }
         }
-        if let Some((channel, message)) = self.dbase.take_failure() {
-            self.set_error(PplError::new(ERR_KIND_DBASE, ERR_IO, message).on_channel(channel));
+        if let Some(result) = self.dbase.take_operation_result() {
+            match result {
+                Ok(()) => self.operation_succeeded(),
+                Err((channel, message)) => self.set_error(PplError::new(ERR_KIND_DBASE, ERR_IO, message).on_channel(channel)),
+            }
         }
+    }
+
+    /// Makes subsystem inboxes visible to `ERR()` and to statement-end trapping.
+    pub fn publish_operation_result(&mut self) {
+        self.publish_gfx_error();
+        self.publish_io_error();
     }
 
     /// Hands the program to its `ON ERROR` handler, if it has one and is not already in it.
     fn check_error_trap(&mut self) -> Res<()> {
-        self.publish_gfx_error();
-        self.publish_io_error();
+        self.publish_operation_result();
         if self.in_handler
             && let Some(depth) = self.handler_depth
             && self.return_addresses.len() <= depth
@@ -759,8 +780,7 @@ impl VirtualMachine<'_> {
         match self.error_handler {
             ErrorHandler::Off => {}
             ErrorHandler::Goto(label) => {
-                self.in_handler = true;
-                self.handler_depth = None;
+                self.error_handler = ErrorHandler::Off;
                 self.goto(label)?;
             }
             ErrorHandler::Gosub(label) => {
@@ -787,6 +807,7 @@ impl VirtualMachine<'_> {
         let locals;
         let parameters;
         let first;
+        let pass_flags;
 
         unsafe {
             let proc = &self.variable_table.get_var_entry(proc_id);
@@ -794,6 +815,14 @@ impl VirtualMachine<'_> {
             first = (proc.value.data.procedure_value.first_var_id + 1) as usize;
             locals = proc.value.data.procedure_value.local_variables as usize;
             parameters = proc.value.data.procedure_value.parameters as usize;
+            pass_flags = proc.value.data.procedure_value.pass_flags;
+        }
+        let valid_parameter = parameters == 0
+            || (parameters == 1
+                && pass_flags == 0
+                && self.variable_table.get_var_entry(first).header.variable_type == VariableType::UserData(crate::parser::ERROR_ID as u8));
+        if !valid_parameter {
+            return Err(VMError::ErrorInFunctionCall("ON ERROR".to_string(), "invalid handler signature".to_string()).into());
         }
 
         // The handler takes the error itself or none at all, so there is never a value to write back.

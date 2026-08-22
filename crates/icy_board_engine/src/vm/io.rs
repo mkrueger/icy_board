@@ -132,9 +132,8 @@ pub trait PCBoardIO: Send {
 
     fn is_open(&self, channel: i32) -> bool;
 
-    /// What the last operation that really failed was, for `ERR()`. Reading to the end
-    /// of a file is not one of those, so it is not reported here.
-    fn take_failure(&mut self) -> Option<(i32, String)> {
+    /// What the last fallible operation did. EOF does not count as an operation result.
+    fn take_operation_result(&mut self) -> Option<std::result::Result<(), (i32, String)>> {
         None
     }
 }
@@ -168,6 +167,8 @@ impl FileChannel {
 pub struct DiskIO {
     _path: String, // use that as
     channels: HashMap<i32, FileChannel>,
+    operation_succeeded: bool,
+    operation_failure: Option<(i32, String)>,
 }
 
 impl DiskIO {
@@ -193,6 +194,8 @@ impl DiskIO {
         DiskIO {
             _path: path.to_string(),
             channels,
+            operation_succeeded: false,
+            operation_failure: None,
         }
     }
 
@@ -226,25 +229,55 @@ impl PCBoardIO for DiskIO {
     }
 
     fn delete(&mut self, file: &str) -> std::io::Result<()> {
-        fs::remove_file(file)
+        match fs::remove_file(file) {
+            Ok(()) => {
+                self.operation_succeeded = true;
+                Ok(())
+            }
+            Err(err) => {
+                self.operation_failure = Some((-1, format!("can't delete {file}: {err}")));
+                Err(err)
+            }
+        }
     }
 
     fn rename(&mut self, old: &str, new: &str) -> std::io::Result<()> {
-        fs::rename(old, new)
+        match fs::rename(old, new) {
+            Ok(()) => {
+                self.operation_succeeded = true;
+                Ok(())
+            }
+            Err(err) => {
+                self.operation_failure = Some((-1, format!("can't rename {old} to {new}: {err}")));
+                Err(err)
+            }
+        }
     }
     fn copy(&mut self, from: &str, to: &str) -> std::io::Result<()> {
-        fs::copy(from, to)?;
-        Ok(())
+        match fs::copy(from, to) {
+            Ok(_) => {
+                self.operation_succeeded = true;
+                Ok(())
+            }
+            Err(err) => {
+                self.operation_failure = Some((-1, format!("can't copy {from} to {to}: {err}")));
+                Err(err)
+            }
+        }
     }
 
     fn is_open(&self, channel: i32) -> bool {
         self.channels.get(&channel).is_some_and(|chan| chan.file.is_some() || chan.reader.is_some())
     }
 
-    fn take_failure(&mut self) -> Option<(i32, String)> {
-        self.channels
-            .iter_mut()
-            .find_map(|(channel, chan)| chan.failure.take().map(|message| (*channel, message)))
+    fn take_operation_result(&mut self) -> Option<std::result::Result<(), (i32, String)>> {
+        let failure = self.operation_failure.take().or_else(|| {
+            self.channels
+                .iter_mut()
+                .find_map(|(channel, chan)| chan.failure.take().map(|message| (*channel, message)))
+        });
+        let succeeded = std::mem::take(&mut self.operation_succeeded);
+        failure.map_or_else(|| succeeded.then_some(Ok(())), |failure| Some(Err(failure)))
     }
 
     fn fopen(&mut self, channel: i32, file_name: &str, mode: i32, _sm: i32) -> Res<()> {
@@ -278,6 +311,7 @@ impl PCBoardIO for DiskIO {
                         failure: None,
                     },
                 );
+                self.operation_succeeded = true;
             }
             Err(err) => {
                 log::error!("error opening file {file_name}: {err}");
@@ -307,19 +341,26 @@ impl PCBoardIO for DiskIO {
             return Ok(());
         };
 
+        let mut succeeded = false;
         if let Some(f) = &mut chan.file {
-            if let Ok(md) = f.metadata()
-                && md.len() == 0
-            {
-                const UTF8_BOM: [u8; 3] = [0xEF, 0xBB, 0xBF];
-                let _ = f.write(&UTF8_BOM);
+            let write_result = (|| {
+                if f.metadata()?.len() == 0 {
+                    const UTF8_BOM: [u8; 3] = [0xEF, 0xBB, 0xBF];
+                    f.write_all(&UTF8_BOM)?;
+                }
+                f.write_all(text.as_bytes())
+            })();
+            if let Err(err) = write_result {
+                chan.fail(format!("can't write channel {channel}: {err}"));
+            } else {
+                chan.err = false;
+                succeeded = true;
             }
-            let _ = f.write(text.as_bytes());
-            chan.err = false;
         } else {
             log::error!("channel {channel} not found");
             chan.fail(format!("no file open on channel {channel}"));
         }
+        self.operation_succeeded |= succeeded;
         Ok(())
     }
 
@@ -330,7 +371,10 @@ impl PCBoardIO for DiskIO {
 
         if let Some(mut f) = chan.file.take() {
             let mut buf = Vec::new();
-            let _ = f.read_to_end(&mut buf);
+            if let Err(err) = f.read_to_end(&mut buf) {
+                chan.fail(format!("can't read channel {channel}: {err}"));
+                return Ok(String::new());
+            }
             match read_data_with_encoding_detection(&buf) {
                 Ok(str) => {
                     chan.reader = Some(Cursor::new(str));
@@ -343,24 +387,26 @@ impl PCBoardIO for DiskIO {
                 }
             }
         }
-        if let Some(reader) = &mut chan.reader {
+        let (result, succeeded) = if let Some(reader) = &mut chan.reader {
             let mut line = String::new();
             match reader.read_line(&mut line) {
                 Ok(size) => {
                     chan.err = size == 0;
-                    Ok(line.trim_end_matches(['\r', '\n']).to_string())
+                    (line.trim_end_matches(['\r', '\n']).to_string(), size > 0)
                 }
                 Err(err) => {
                     log::error!("error reading line: {err}");
                     chan.fail(format!("error reading channel {channel}: {err}"));
-                    Ok(String::new())
+                    (String::new(), false)
                 }
             }
         } else {
             log::error!("no file!");
             chan.fail(format!("no file open on channel {channel}"));
-            Ok(String::new())
-        }
+            (String::new(), false)
+        };
+        self.operation_succeeded |= succeeded;
+        Ok(result)
     }
 
     fn fread(&mut self, channel: i32, size: usize) -> Res<Vec<u8>> {
@@ -376,10 +422,15 @@ impl PCBoardIO for DiskIO {
             chan.fail(format!("no file open on channel {channel}"));
             return Ok(Vec::new());
         };
-        if read.is_err() {
-            chan.fail(format!("can't read {size} bytes from channel {channel}"));
+        if let Err(err) = read {
+            if err.kind() == std::io::ErrorKind::UnexpectedEof {
+                chan.err = true;
+            } else {
+                chan.fail(format!("can't read {size} bytes from channel {channel}: {err}"));
+            }
             return Ok(Vec::new());
         }
+        self.operation_succeeded = true;
         Ok(buf)
     }
     fn fwrite(&mut self, channel: i32, data: &[u8]) -> Res<()> {
@@ -387,13 +438,19 @@ impl PCBoardIO for DiskIO {
             return Ok(());
         };
 
+        let mut succeeded = false;
         if let Some(f) = &mut chan.file {
-            let _ = f.write(data);
-            chan.err = false;
+            if let Err(err) = f.write_all(data) {
+                chan.fail(format!("can't write channel {channel}: {err}"));
+            } else {
+                chan.err = false;
+                succeeded = true;
+            }
         } else {
             log::error!("fwrite channel {channel} not found");
             chan.fail(format!("no file open on channel {channel}"));
         }
+        self.operation_succeeded |= succeeded;
         Ok(())
     }
 
@@ -402,17 +459,25 @@ impl PCBoardIO for DiskIO {
             return Ok(0);
         };
 
-        match &mut chan.file {
-            Some(f) => Ok(f.stream_position().unwrap_or_default()),
+        let result = match &mut chan.file {
+            Some(f) => match f.stream_position() {
+                Ok(position) => Some(position),
+                Err(err) => {
+                    chan.fail(format!("can't tell channel {channel}: {err}"));
+                    None
+                }
+            },
             _ => {
                 if let Some(reader) = &mut chan.reader {
-                    Ok(reader.position())
+                    Some(reader.position())
                 } else {
                     chan.fail(format!("no file open on channel {channel}"));
-                    Ok(0)
+                    None
                 }
             }
-        }
+        };
+        self.operation_succeeded |= result.is_some();
+        Ok(result.unwrap_or_default())
     }
 
     fn fseek(&mut self, channel: i32, pos: i32, seek_pos: i32) -> Res<()> {
@@ -437,8 +502,10 @@ impl PCBoardIO for DiskIO {
                 }
             }
         };
-        if sought.is_err() {
-            chan.fail(format!("can't seek channel {channel}"));
+        if let Err(err) = sought {
+            chan.fail(format!("can't seek channel {channel}: {err}"));
+        } else {
+            self.operation_succeeded = true;
         }
 
         Ok(())
@@ -451,8 +518,10 @@ impl PCBoardIO for DiskIO {
 
         match &mut chan.file {
             Some(f) => {
-                if f.seek(SeekFrom::Start(0)).is_err() {
-                    chan.fail(format!("can't rewind channel {channel}"));
+                if let Err(err) = f.seek(SeekFrom::Start(0)) {
+                    chan.fail(format!("can't rewind channel {channel}: {err}"));
+                } else {
+                    self.operation_succeeded = true;
                 }
             }
             _ => {
@@ -469,8 +538,10 @@ impl PCBoardIO for DiskIO {
 
         match &mut chan.file {
             Some(f) => {
-                if f.flush().is_err() {
-                    chan.fail(format!("can't flush channel {channel}"));
+                if let Err(err) = f.flush() {
+                    chan.fail(format!("can't flush channel {channel}: {err}"));
+                } else {
+                    self.operation_succeeded = true;
                 }
             }
             _ => {
@@ -487,6 +558,7 @@ impl PCBoardIO for DiskIO {
                 chan.file = None;
                 chan.reader = None;
                 chan.err = false;
+                self.operation_succeeded = true;
             }
             _ => self.set_channel_error(channel, format!("channel {channel} was not open")),
         }

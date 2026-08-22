@@ -19,6 +19,18 @@ fn nothing_has_gone_wrong_yet() {
 }
 
 #[test]
+fn err_can_still_be_a_variable_name() {
+    let output = run_ppl(
+        r#"
+        INTEGER err = 42
+        PrintLn err, " ", ERR().OK
+        "#,
+    );
+
+    assert_eq!(output, "42 1\n");
+}
+
+#[test]
 fn a_failed_operation_names_its_subsystem() {
     let output = run_ppl(
         r#"
@@ -113,6 +125,44 @@ fn on_error_goto_jumps_and_stays_there() {
     );
 
     assert_eq!(output, "before\nhandled 3\n");
+}
+
+#[test]
+fn on_error_goto_is_disarmed_before_cleanup() {
+    let output = run_ppl(
+        r#"
+        ON ERROR GOTO Failed
+        LoadFont 43, "first-missing.fnt"
+        EXIT
+        :Failed
+        PrintLn "handled"
+        LoadFont 43, "second-missing.fnt"
+        PrintLn "done"
+        "#,
+    );
+
+    assert_eq!(output, "handled\ndone\n");
+}
+
+#[test]
+fn a_goto_handler_can_arm_another_handler() {
+    let output = run_ppl(
+        r#"
+        ON ERROR GOTO Failed
+        LoadFont 43, "first-missing.fnt"
+        EXIT
+        :Failed
+        ON ERROR GOSUB Report
+        LoadFont 43, "second-missing.fnt"
+        PrintLn "done"
+        EXIT
+        :Report
+        PrintLn "reported"
+        RETURN
+        "#,
+    );
+
+    assert_eq!(output, "reported\ndone\n");
 }
 
 #[test]
@@ -297,6 +347,22 @@ fn a_file_that_is_not_there_is_an_error() {
 
     // ERR_KIND_FILE, ERR_IO, channel 1
     assert_eq!(output, "1 3 1 1\n");
+}
+
+#[test]
+fn a_successful_file_operation_clears_an_older_error() {
+    let output = run_ppl_with_files_and_input(
+        r#"
+        LoadFont 43, "missing.fnt"
+        FOPEN 1, "present.txt", O_RD, S_DN
+        PrintLn ERR().OK
+        FCLOSE 1
+        "#,
+        &[("present.txt", b"present\n")],
+        b"",
+    );
+
+    assert_eq!(output, "1\n");
 }
 
 #[test]
