@@ -145,6 +145,7 @@ fn strip_descriptions_markup(line: &str) -> String {
 pub struct FileFilter {
     accepts: Box<dyn Fn(&FileHeader) -> bool>,
     accepts_described: Option<Box<dyn Fn(&FileHeader, &[MetadataHeader]) -> bool>>,
+    marks_new: Option<Box<dyn Fn(&FileHeader) -> bool>>,
 }
 
 impl FileFilter {
@@ -158,6 +159,15 @@ impl FileFilter {
         Self {
             accepts: Box::new(accepts),
             accepts_described: None,
+            marks_new: None,
+        }
+    }
+
+    pub fn new_files_since(since: chrono::DateTime<chrono::Utc>) -> Self {
+        Self {
+            accepts: Box::new(move |file| file.date() >= since),
+            accepts_described: None,
+            marks_new: Some(Box::new(move |file| file.date() >= since)),
         }
     }
 
@@ -169,6 +179,7 @@ impl FileFilter {
         Self {
             accepts: Box::new(accepts),
             accepts_described: Some(Box::new(accepts_described)),
+            marks_new: None,
         }
     }
 }
@@ -176,6 +187,23 @@ impl FileFilter {
 pub struct FileList {
     pub path: PathBuf,
     pub files: Arc<Mutex<FileBase>>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DateFieldState {
+    Date,
+    Offline,
+    Deleted,
+}
+
+fn date_field_state(deleted: bool, exists: bool) -> DateFieldState {
+    if deleted {
+        DateFieldState::Deleted
+    } else if !exists {
+        DateFieldState::Offline
+    } else {
+        DateFieldState::Date
+    }
 }
 
 impl FileList {
@@ -218,6 +246,7 @@ impl FileList {
             let date = entry.date();
             let size = entry.size();
             let name = entry.name();
+            let exists = full_path.exists();
             cmd.set_color(TerminalTarget::Both, colors.file_name.clone()).await?;
             if cmd.session.search_pattern.is_some() {
                 cmd.print_found_text(TerminalTarget::Both, &format!("{name:<12} ")).await?;
@@ -228,18 +257,26 @@ impl FileList {
                 cmd.new_line().await?;
             }
 
-            if dir.join(entry.name()).exists() {
-                cmd.set_color(TerminalTarget::Both, colors.file_size.clone()).await?;
-                cmd.print(TerminalTarget::Both, &format!("{:>8}  ", humanize_bytes_decimal!(size).to_string()))
-                    .await?;
-            } else {
-                cmd.set_color(TerminalTarget::Both, colors.file_offline.clone()).await?;
-                cmd.print(TerminalTarget::Both, &format!("{:>8}  ", "Offline".to_string())).await?;
+            cmd.set_color(TerminalTarget::Both, colors.file_size.clone()).await?;
+            cmd.print(TerminalTarget::Both, &format!("{:>8}  ", humanize_bytes_decimal!(size).to_string()))
+                .await?;
+
+            match date_field_state(entry.is_deleted(), exists) {
+                DateFieldState::Deleted => {
+                    cmd.set_color(TerminalTarget::Both, colors.file_deleted.clone()).await?;
+                    cmd.print(TerminalTarget::Both, " DELETED").await?;
+                }
+                DateFieldState::Offline => {
+                    cmd.set_color(TerminalTarget::Both, colors.file_offline.clone()).await?;
+                    cmd.print(TerminalTarget::Both, "OFF-LINE").await?;
+                }
+                DateFieldState::Date => {
+                    cmd.set_color(TerminalTarget::Both, colors.file_date.clone()).await?;
+                    cmd.print(TerminalTarget::Both, &format!("{}", date.format("%m/%d/%y"))).await?;
+                }
             }
 
-            cmd.set_color(TerminalTarget::Both, colors.file_date.clone()).await?;
-            cmd.print(TerminalTarget::Both, &format!("{}", date.format("%m/%d/%y"))).await?;
-            if false {
+            if filter.marks_new.as_ref().is_some_and(|marks_new| marks_new(entry)) {
                 cmd.set_color(TerminalTarget::Both, colors.file_new_file.clone()).await?;
                 cmd.print(TerminalTarget::Both, "*").await?;
                 cmd.reset_color(TerminalTarget::Both).await?;
@@ -279,7 +316,7 @@ impl FileList {
                         if short_header {
                             break;
                         }
-                        cmd.set_color(TerminalTarget::Both, colors.file_description_low.clone()).await?;
+                        cmd.set_color(TerminalTarget::Both, colors.file_description.clone()).await?;
                     }
                 }
             }
@@ -317,7 +354,40 @@ impl FileList {
 
 #[cfg(test)]
 mod description_tests {
-    use super::{DESCRIPTION_COLUMN, clamp_to_column};
+    use chrono::{Duration, Utc};
+    use dizbase::file_base::file_header::{FileAttributes, FileHeader};
+
+    use super::{DESCRIPTION_COLUMN, DateFieldState, FileFilter, clamp_to_column, date_field_state};
+
+    #[test]
+    fn deleted_and_offline_states_replace_the_date_in_pcboard_order() {
+        assert_eq!(date_field_state(false, true), DateFieldState::Date);
+        assert_eq!(date_field_state(false, false), DateFieldState::Offline);
+        assert_eq!(date_field_state(true, false), DateFieldState::Deleted);
+    }
+
+    #[test]
+    fn a_new_file_filter_marks_every_file_it_accepts() {
+        let since = Utc::now();
+        let filter = FileFilter::new_files_since(since);
+        let old = FileHeader {
+            id: 0,
+            name: "OLD.ZIP".to_string(),
+            date: since - Duration::days(1),
+            size: 1,
+            dl_counter: 0,
+            attribute: FileAttributes::NONE,
+        };
+        let new = FileHeader {
+            date: since + Duration::seconds(1),
+            name: "NEW.ZIP".to_string(),
+            ..old.clone()
+        };
+
+        assert!(!(filter.accepts)(&old));
+        assert!((filter.accepts)(&new));
+        assert!(filter.marks_new.as_ref().is_some_and(|marks| marks(&new)));
+    }
 
     /// The line that started this: the first line of the `FILE_ID.DIZ` in
     /// 3nt1094.zip walks back 255 columns before writing anything.

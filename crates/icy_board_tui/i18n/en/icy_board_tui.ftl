@@ -1677,12 +1677,12 @@ file_description-help=
     Colour of the first line of a file description, the line that carries the
     short description in a listing.
 
-file_description_low=File DESCR2 Color
-file_description_low-status=Color for File Description
-file_description_low-help=
-    # File DESCR2 Color
+file_duplicate=Duplicate File Color
+file_duplicate-status=Color used when reporting duplicate files
+file_duplicate-help=
+    # Duplicate File Color
 
-    Colour of the further description lines below the first one.
+    Colour used for duplicate-file information in a directory listing.
 
 file_text=File Text Color
 file_text-status=Color for Text in Files
@@ -2602,7 +2602,11 @@ accounting_payback_per_file_bytes-help=
 
 # ICBord System Manager
 
-icb_sysmanager_main_title=User File Maintenance
+icbsm_main_menu_title=Main Menu
+icb_sysmanager_main_title=Users File Maintenance
+icbsm_main_users=Users File Maintenance
+icbsm_main_directory=Directory Maintenance
+icbsm_dir_colors=Customize DIR File Colors
 icb_sysmanager_main_edit_users=Edit Users File
 icb_sysmanager_main_edit_groups=Edit Groups
 

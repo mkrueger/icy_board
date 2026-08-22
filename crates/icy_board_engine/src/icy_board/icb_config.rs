@@ -372,7 +372,8 @@ pub struct ColorConfiguration {
     pub file_description: IcbColor,
     pub file_head: IcbColor,
     pub file_text: IcbColor,
-    pub file_description_low: IcbColor,
+    #[serde(alias = "file_description_low")]
+    pub file_duplicate: IcbColor,
     pub file_deleted: IcbColor,
     pub file_offline: IcbColor,
     pub file_new_file: IcbColor,
@@ -395,7 +396,7 @@ impl Default for ColorConfiguration {
             file_description: IcbColor::Dos(0x0B),
             file_head: IcbColor::Dos(0x06),
             file_text: IcbColor::Dos(0x06),
-            file_description_low: IcbColor::Dos(0x03),
+            file_duplicate: IcbColor::Dos(0x03),
             file_deleted: IcbColor::Dos(0x0F),
             file_offline: IcbColor::Dos(0x05),
             file_new_file: IcbColor::Dos(0x8F),
@@ -1288,7 +1289,16 @@ impl Default for QwkSettings {
 
 #[cfg(test)]
 mod tests {
-    use super::{CommandType, PcbScreenColors, SecurityExpression, SysopInformation, UserCommandLevels};
+    use super::{ColorConfiguration, CommandType, PcbScreenColors, SecurityExpression, SysopInformation, UserCommandLevels};
+
+    #[test]
+    fn old_description_low_color_key_loads_as_pcboard_duplicate_color() {
+        let current = ColorConfiguration::default();
+        let old_toml = toml::to_string(&current).unwrap().replace("file_duplicate", "file_description_low");
+        let loaded: ColorConfiguration = toml::from_str(&old_toml).unwrap();
+
+        assert!(loaded == current);
+    }
 
     #[test]
     fn pcboard_screen_color_presets_keep_the_original_role_order() {

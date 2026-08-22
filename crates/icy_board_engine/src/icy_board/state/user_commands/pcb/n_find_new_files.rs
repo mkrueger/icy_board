@@ -85,8 +85,8 @@ impl IcyBoardState {
                     }
                     self.new_line().await?;
                     self.reset_color(TerminalTarget::Both).await?;
-                    let r = search_date;
-                    self.display_file_area(&path, &metadata, FileFilter::header(move |p| p.date() >= r)).await?;
+                    self.display_file_area(&path, &metadata, FileFilter::new_files_since(search_date.into()))
+                        .await?;
                     if self.session.disp_options.abort_printout {
                         break;
                     }

@@ -136,7 +136,7 @@ impl ServerTab {
                 "file_size" => icy_board.config.color_configuration.file_size = c.clone(),
                 "file_date" => icy_board.config.color_configuration.file_date = c.clone(),
                 "file_description" => icy_board.config.color_configuration.file_description = c.clone(),
-                "file_description_low" => icy_board.config.color_configuration.file_description_low = c.clone(),
+                "file_duplicate" => icy_board.config.color_configuration.file_duplicate = c.clone(),
                 "file_text" => icy_board.config.color_configuration.file_text = c.clone(),
                 "file_deleted" => icy_board.config.color_configuration.file_deleted = c.clone(),
 

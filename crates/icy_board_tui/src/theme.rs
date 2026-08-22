@@ -74,7 +74,12 @@ fn dos_color(index: u8) -> Color {
 }
 
 pub fn dos_attribute_style(attribute: u8) -> Style {
-    Style::new().fg(dos_color(attribute)).bg(dos_color((attribute >> 4) & 0x07))
+    let style = Style::new().fg(dos_color(attribute)).bg(dos_color((attribute >> 4) & 0x07));
+    if attribute & 0x80 != 0 {
+        style.add_modifier(Modifier::SLOW_BLINK)
+    } else {
+        style
+    }
 }
 
 impl Theme {

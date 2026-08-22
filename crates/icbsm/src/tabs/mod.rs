@@ -25,3 +25,6 @@ pub use tables::*;
 
 pub mod preferences;
 pub use preferences::*;
+
+pub mod dir_colors;
+pub use dir_colors::*;

@@ -448,7 +448,7 @@ impl PCBoardImporter {
             color_configuration.file_description = IcbColor::Dos(color_file[start + 6]);
             color_configuration.file_head = IcbColor::Dos(color_file[start + 8]);
             color_configuration.file_text = IcbColor::Dos(color_file[start + 10]);
-            color_configuration.file_description_low = IcbColor::Dos(color_file[start + 12]);
+            color_configuration.file_duplicate = IcbColor::Dos(color_file[start + 12]);
             color_configuration.file_deleted = IcbColor::Dos(color_file[start + 14]);
             color_configuration.file_offline = IcbColor::Dos(color_file[start + 16]);
             color_configuration.file_new_file = IcbColor::Dos(color_file[start + 18]);

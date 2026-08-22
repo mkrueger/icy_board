@@ -33,7 +33,7 @@ impl ColorOptions {
                 cfg_entry_color!("file_size", label_width, color_configuration, file_size, lock),
                 cfg_entry_color!("file_date", label_width, color_configuration, file_date, lock),
                 cfg_entry_color!("file_description", label_width, color_configuration, file_description, lock),
-                cfg_entry_color!("file_description_low", label_width, color_configuration, file_description_low, lock),
+                cfg_entry_color!("file_duplicate", label_width, color_configuration, file_duplicate, lock),
                 cfg_entry_color!("file_text", label_width, color_configuration, file_text, lock),
                 cfg_entry_color!("file_deleted", label_width, color_configuration, file_deleted, lock),
             ];
