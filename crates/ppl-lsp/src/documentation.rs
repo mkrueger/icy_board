@@ -449,6 +449,7 @@ pub fn get_function_hover(func: &FunctionDefinition) -> Option<Hover> {
         FuncOpCode::LoadAudio => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-sound-api")),
         FuncOpCode::EventPoll | FuncOpCode::EventWait => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-event-api")),
         FuncOpCode::TermState => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-term-state")),
+        FuncOpCode::FontError => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-font-error")),
         _ => None,
     }
 }
@@ -682,6 +683,7 @@ pub fn get_statement_hover(stmt: &StatementDefinition) -> Option<Hover> {
         OpCode::SetVMargins | OpCode::SetHMargins | OpCode::ResetVMargins | OpCode::ResetHMargins | OpCode::ResetMargins => {
             get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-margin-api"))
         }
+        OpCode::SetFont | OpCode::LoadFont => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-font-api")),
         _ => None,
     }
 }

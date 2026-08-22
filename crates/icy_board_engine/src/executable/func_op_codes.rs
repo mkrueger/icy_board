@@ -328,9 +328,10 @@ pub enum FuncOpCode {
     EventWait = -314,
     LoadAudio = -315,
     TermState = -316,
+    FontError = -317,
 }
 
-pub const LAST_FUNC: i16 = -316;
+pub const LAST_FUNC: i16 = -317;
 
 impl FuncOpCode {
     pub fn get_definition(self) -> &'static FunctionDefinition {
@@ -401,7 +402,7 @@ impl FunctionDefinition {
         }
     }
 }
-pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 328]> = std::sync::LazyLock::new(|| {
+pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 329]> = std::sync::LazyLock::new(|| {
     [
         FunctionDefinition {
             name: "END",
@@ -3116,6 +3117,14 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 328]> 
             version: 400,
             opcode: FuncOpCode::TermState,
             return_type: VariableType::UserData(38),
+            args: None,
+            signature: FunctionSignature::FixedParameters(0),
+        },
+        FunctionDefinition {
+            name: "FontError",
+            version: 400,
+            opcode: FuncOpCode::FontError,
+            return_type: VariableType::Integer,
             args: None,
             signature: FunctionSignature::FixedParameters(0),
         },

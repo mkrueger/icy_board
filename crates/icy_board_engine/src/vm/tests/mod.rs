@@ -14,6 +14,7 @@ mod display_pause;
 mod events;
 mod file_channels;
 mod file_names;
+mod fonts;
 mod forward_calls;
 mod graphics;
 mod hyperlinks;

@@ -2773,6 +2773,10 @@ pub async fn gfxerror(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<Var
     Ok(VariableValue::new_int(vm.icy_board_state.gfx_error))
 }
 
+pub async fn fonterror(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
+    Ok(VariableValue::new_int(vm.icy_board_state.font_error))
+}
+
 async fn gfx_surface_dimension(vm: &mut VirtualMachine<'_>, args: &[PPEExpr], width: bool) -> Res<VariableValue> {
     let slot = vm.eval_expr(&args[0]).await?.as_int();
     let value = vm

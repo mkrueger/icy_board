@@ -280,8 +280,10 @@ pub enum OpCode {
     ResetVMargins = 240,
     ResetHMargins = 241,
     ResetMargins = 242,
+    SetFont = 243,
+    LoadFont = 244,
 }
-pub const LAST_STMT: i16 = OpCode::ResetMargins as i16;
+pub const LAST_STMT: i16 = OpCode::LoadFont as i16;
 
 impl OpCode {
     pub fn get_definition(self) -> &'static StatementDefinition {
@@ -607,7 +609,7 @@ pub fn format_argument_type_last(arg: &ArgumentDefinition) -> String {
 // "WAIT FOR" == "WAITFOR"
 // "GO SUB"
 // " GO TO"
-pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 248]> = std::sync::LazyLock::new(|| {
+pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 250]> = std::sync::LazyLock::new(|| {
     [
         StatementDefinition {
             // helps to map opcode to array index.
@@ -2678,6 +2680,26 @@ pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 248]
             opcode: OpCode::ResetMargins,
             args: None,
             sig: StatementSignature::ArgumentsWithVariable(0, 0),
+        },
+        StatementDefinition {
+            name: "SetFont",
+            version: 400,
+            opcode: OpCode::SetFont,
+            args: Some(vec![
+                ArgumentDefinition::new("Slot", VariableType::Integer),
+                ArgumentDefinition::new("Font", VariableType::Integer),
+            ]),
+            sig: StatementSignature::ArgumentsWithVariable(0, 2),
+        },
+        StatementDefinition {
+            name: "LoadFont",
+            version: 400,
+            opcode: OpCode::LoadFont,
+            args: Some(vec![
+                ArgumentDefinition::new("Font", VariableType::Integer),
+                ArgumentDefinition::new("FileName", VariableType::String),
+            ]),
+            sig: StatementSignature::ArgumentsWithVariable(0, 2),
         },
         // Alias section
         // Moving to the end, so that the opcode <--> index mapping is not broken

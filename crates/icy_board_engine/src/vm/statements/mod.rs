@@ -259,5 +259,7 @@ pub async fn run_predefined_statement(opcode: OpCode, arg: &mut VirtualMachine<'
         OpCode::ResetVMargins => predefined_procedures::reset_v_margins(arg, arguments).await,
         OpCode::ResetHMargins => predefined_procedures::reset_h_margins(arg, arguments).await,
         OpCode::ResetMargins => predefined_procedures::reset_margins(arg, arguments).await,
+        OpCode::SetFont => predefined_procedures::set_font(arg, arguments).await,
+        OpCode::LoadFont => predefined_procedures::load_font(arg, arguments).await,
     }
 }

@@ -388,6 +388,35 @@ escape sequence as text. The
 [`margins` PPE](../ppe/margins/src/margins.pps) demonstrates a bordered list
 that uses the region for efficient keyboard, click and mouse-wheel scrolling.
 
+### Fonts
+
+`SetFont` picks one of the terminal's fonts, `LoadFont` uploads one of your own.
+
+```PPL
+SetFont 0, 5                    ; font 5 wherever the normal attribute applies
+LoadFont 43, "topaz.psf"
+IF (FontError() = FONT_OK) SetFont 0, 43
+```
+
+Font numbers 0 to 42 are the terminal's built-in fonts and are read-only:
+`LoadFont` accepts 43 to 255 and answers `FONT_ERR_INVALID_SLOT` below that,
+rather than sending an upload the terminal would silently discard. `SetFont`
+selects any font, built-in or uploaded. `LoadFont` reads PSF1, PSF2, YAFF and
+raw files, and a raw file is recognised by its size alone: 256 glyphs of equal
+height.
+
+The slot is one of the four attribute classes a terminal keeps a font for,
+numbered 0 to 3. Four fonts can therefore be on screen at once, picked per
+character by its attribute.
+
+`FontError()` returns `FONT_OK`, `FONT_ERR_INVALID_SLOT`, `FONT_ERR_IO`,
+`FONT_ERR_FORMAT` or `FONT_ERR_LIMIT` for the last font operation. Sessions
+without ANSI ignore both statements. A font a PPE selects stays selected after
+the PPE ends, since changing the board font may be the point of running it.
+
+> **Note:** icy_term does not read the slot argument yet, so a font it accepts
+> applies regardless of which slot was named. SyncTERM uses the slot as written.
+
 ## Runtime 4.01
 
 Runtime 4.01 is a PPE-format extension, not another source language. It adds:

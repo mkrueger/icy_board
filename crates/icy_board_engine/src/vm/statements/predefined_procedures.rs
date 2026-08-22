@@ -972,12 +972,20 @@ pub async fn ansipos(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     vm.icy_board_state.gotoxy(TerminalTarget::Both, x, y).await
 }
 
-/// Margins are a VT feature: AVATAR and plain ASCII callers have no equivalent, so
-/// they must not receive the escape sequence as literal text.
-async fn write_margins(vm: &mut VirtualMachine<'_>, sequence: &str) -> Res<()> {
-    match vm.icy_board_state.session.disp_options.grapics_mode {
-        GraphicsMode::Ansi | GraphicsMode::Graphics | GraphicsMode::Rip => vm.icy_board_state.print(TerminalTarget::Both, sequence).await,
-        GraphicsMode::Ctty | GraphicsMode::Avatar => Ok(()),
+/// Margins and fonts are VT features: AVATAR and plain ASCII callers have no equivalent,
+/// so they must not receive the escape sequence as literal text.
+fn supports_vt_sequences(vm: &VirtualMachine<'_>) -> bool {
+    matches!(
+        vm.icy_board_state.session.disp_options.grapics_mode,
+        GraphicsMode::Ansi | GraphicsMode::Graphics | GraphicsMode::Rip
+    )
+}
+
+async fn write_vt_sequence(vm: &mut VirtualMachine<'_>, sequence: &str) -> Res<()> {
+    if supports_vt_sequences(vm) {
+        vm.icy_board_state.print(TerminalTarget::Both, sequence).await
+    } else {
+        Ok(())
     }
 }
 
@@ -990,7 +998,7 @@ pub async fn set_v_margins(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res
         log::warn!("SETVMARGINS ignored: invalid region {top};{bottom}");
         return Ok(());
     }
-    write_margins(vm, &format!("\x1B[{top};{bottom}r")).await
+    write_vt_sequence(vm, &format!("\x1B[{top};{bottom}r")).await
 }
 
 pub async fn set_h_margins(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
@@ -1000,19 +1008,97 @@ pub async fn set_h_margins(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res
         log::warn!("SETHMARGINS ignored: invalid region {left};{right}");
         return Ok(());
     }
-    write_margins(vm, &format!("\x1B[?69h\x1B[{left};{right}s")).await
+    write_vt_sequence(vm, &format!("\x1B[?69h\x1B[{left};{right}s")).await
 }
 
 pub async fn reset_v_margins(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
-    write_margins(vm, "\x1B[r").await
+    write_vt_sequence(vm, "\x1B[r").await
 }
 
 pub async fn reset_h_margins(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
-    write_margins(vm, "\x1B[?69l").await
+    write_vt_sequence(vm, "\x1B[?69l").await
 }
 
 pub async fn reset_margins(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
-    write_margins(vm, "\x1B[r\x1B[?69l").await
+    write_vt_sequence(vm, "\x1B[r\x1B[?69l").await
+}
+
+pub(crate) const FONT_ERR_INVALID_SLOT: i32 = 1;
+const FONT_ERR_IO: i32 = 2;
+const FONT_ERR_FORMAT: i32 = 3;
+const FONT_ERR_LIMIT: i32 = 4;
+
+/// A font is 256 glyphs of at most 32 rows, so anything larger is not one.
+const MAX_FONT_FILE_BYTES: u64 = 64 * 1024;
+
+/// The attribute classes CTerm binds fonts to: normal, bold, blink, bold+blink.
+const FONT_SLOT_COUNT: i32 = 4;
+
+/// CTerm's `CONIO_FIRST_FREE_FONT`: it drops an upload below this silently, so the
+/// built-in fonts are read-only.
+const FIRST_FREE_FONT: i32 = 43;
+const LAST_FONT: i32 = 255;
+
+pub async fn set_font(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let slot = vm.eval_expr(&args[0]).await?.as_int();
+    let font = vm.eval_expr(&args[1]).await?.as_int();
+    if !(0..FONT_SLOT_COUNT).contains(&slot) || !(0..=LAST_FONT).contains(&font) {
+        log::warn!("SETFONT ignored: invalid slot {slot} / font {font}");
+        vm.icy_board_state.font_error = FONT_ERR_INVALID_SLOT;
+        return Ok(());
+    }
+    vm.icy_board_state.font_error = 0;
+    write_vt_sequence(vm, &format!("\x1B[{slot};{font} D")).await
+}
+
+pub async fn load_font(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let font = vm.eval_expr(&args[0]).await?.as_int();
+    let file_name = vm.eval_expr(&args[1]).await?.as_string();
+
+    if !(FIRST_FREE_FONT..=LAST_FONT).contains(&font) {
+        log::warn!("LOADFONT ignored: font {font} is not a free slot");
+        vm.icy_board_state.font_error = FONT_ERR_INVALID_SLOT;
+        return Ok(());
+    }
+    if !supports_vt_sequences(vm) {
+        return Ok(());
+    }
+
+    let path = vm.resolve_file(&file_name).await;
+    let data = match fs::metadata(&path).and_then(|meta| {
+        if meta.len() > MAX_FONT_FILE_BYTES {
+            Err(std::io::Error::other("file too large"))
+        } else {
+            fs::read(&path)
+        }
+    }) {
+        Ok(data) => data,
+        Err(err) => {
+            log::warn!("Can't load font {}: {err}", path.display());
+            vm.icy_board_state.font_error = FONT_ERR_IO;
+            return Ok(());
+        }
+    };
+
+    let Ok(bit_font) = icy_engine::BitFont::from_bytes(&file_name, &data) else {
+        log::warn!("Unknown font format in {}", path.display());
+        vm.icy_board_state.font_error = FONT_ERR_FORMAT;
+        return Ok(());
+    };
+
+    let sequence = bit_font.encode_as_ansi(font as usize);
+    if !vm.icy_board_state.reserve_media_upload(sequence.len()) {
+        log::warn!("Font upload budget exhausted");
+        vm.icy_board_state.font_error = FONT_ERR_LIMIT;
+        return Ok(());
+    }
+    vm.icy_board_state.connection.send(sequence.as_bytes()).await?;
+    vm.icy_board_state.acknowledge_upload(sequence.len()).await?;
+    // The upload bypasses the virtual screen, so it has to be told separately or a later
+    // SETFONT finds no such font.
+    vm.icy_board_state.display_screen_mut().buffer.buffer.set_font(font as u8, bit_font);
+    vm.icy_board_state.font_error = 0;
+    Ok(())
 }
 
 pub async fn backup(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {

@@ -672,6 +672,8 @@ pub struct IcyBoardState {
 
     pub gfx_error: i32,
 
+    pub font_error: i32,
+
     /// Names below `gfx/` that this caller's cache is known to hold already,
     /// seeded from the terminal's own listing and extended as uploads happen.
     pub gfx_cache: HashSet<String>,
@@ -708,6 +710,14 @@ impl IcyBoardState {
             &self.sysop_screen
         } else {
             &self.user_screen
+        }
+    }
+
+    pub fn display_screen_mut(&mut self) -> &mut VirtualScreen {
+        if self.session.is_sysop || self.session.cur_user_id < 0 {
+            &mut self.sysop_screen
+        } else {
+            &mut self.user_screen
         }
     }
     pub async fn new(
@@ -760,6 +770,7 @@ impl IcyBoardState {
             sound_formats: HashMap::new(),
             media_probed: false,
             gfx_error: 0,
+            font_error: 0,
             gfx_cache: HashSet::new(),
             gfx_probe: termcap_detect::TerminalProbe::default(),
             raw_input: VecDeque::new(),

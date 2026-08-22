@@ -43,7 +43,7 @@ impl BuiltinConst {
 }
 
 pub const STACK_LIMIT: i32 = 6022 + 1024;
-pub const BUILTIN_CONSTS: [BuiltinConst; 175] = [
+pub const BUILTIN_CONSTS: [BuiltinConst; 180] = [
     BuiltinConst { name: "TRUE", value: 0x01 },
     BuiltinConst { name: "FALSE", value: 0x00 },
     BuiltinConst {
@@ -514,6 +514,20 @@ pub const BUILTIN_CONSTS: [BuiltinConst; 175] = [
     BuiltinConst {
         name: "MOUSE_WHEEL_RIGHT",
         value: 6,
+    },
+    BuiltinConst { name: "FONT_OK", value: 0 },
+    BuiltinConst {
+        name: "FONT_ERR_INVALID_SLOT",
+        value: 1,
+    },
+    BuiltinConst { name: "FONT_ERR_IO", value: 2 },
+    BuiltinConst {
+        name: "FONT_ERR_FORMAT",
+        value: 3,
+    },
+    BuiltinConst {
+        name: "FONT_ERR_LIMIT",
+        value: 4,
     },
 ];
 
