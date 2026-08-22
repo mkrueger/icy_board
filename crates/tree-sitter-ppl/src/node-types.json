@@ -138,6 +138,10 @@
         "named": true
       },
       {
+        "type": "on_error_statement",
+        "named": true
+      },
+      {
         "type": "predefined_call",
         "named": true
       },
@@ -1215,6 +1219,32 @@
     }
   },
   {
+    "type": "on_error_statement",
+    "named": true,
+    "fields": {
+      "handler": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "label": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "parameter",
     "named": true,
     "fields": {
@@ -2084,6 +2114,14 @@
     "named": false
   },
   {
+    "type": "ERROR",
+    "named": false
+  },
+  {
+    "type": "EVENT",
+    "named": false
+  },
+  {
     "type": "EXIT",
     "named": false
   },
@@ -2148,6 +2186,18 @@
     "named": false
   },
   {
+    "type": "OFF",
+    "named": false
+  },
+  {
+    "type": "ON",
+    "named": false
+  },
+  {
+    "type": "ONERROR",
+    "named": false
+  },
+  {
     "type": "PASSWORD",
     "named": false
   },
@@ -2193,6 +2243,10 @@
   },
   {
     "type": "SWORD",
+    "named": false
+  },
+  {
+    "type": "TERMSTATE",
     "named": false
   },
   {
