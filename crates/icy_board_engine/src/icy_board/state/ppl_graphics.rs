@@ -108,6 +108,19 @@ impl GfxSurface {
         self.pixels[start..start + 4].copy_from_slice(&color.to_be_bytes());
     }
 
+    /// The color at `x, y`, or transparent black outside the surface - the same bounds
+    /// `set_pixel` clips to, so a caller can read back exactly what it can write.
+    pub fn get_pixel(&self, x: i32, y: i32) -> u32 {
+        let (Ok(x), Ok(y)) = (usize::try_from(x), usize::try_from(y)) else {
+            return 0;
+        };
+        if x >= self.width || y >= self.height {
+            return 0;
+        }
+        let start = (y * self.width + x) * 4;
+        u32::from_be_bytes(self.pixels[start..start + 4].try_into().unwrap())
+    }
+
     pub fn fill_rect(&mut self, x: i32, y: i32, width: i32, height: i32, color: u32) {
         self.cacheable = false;
         let Some((x, y, width, height)) = clipped_rect(x, y, width, height, self.width, self.height) else {

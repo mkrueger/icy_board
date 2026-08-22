@@ -2931,6 +2931,24 @@ pub(crate) async fn sound_member(vm: &mut VirtualMachine<'_>, logical_channel: i
     Ok(false)
 }
 
+/// Reads one pixel back out of a `SURFACE`. Out of bounds and an invalid handle both
+/// answer transparent black, the same as `SetPixel` clips a write silently.
+pub(crate) async fn surface_get_pixel(vm: &mut VirtualMachine<'_>, handle: i32, arguments: &[VariableValue]) -> Res<VariableValue> {
+    let Some(graphics) = vm.icy_board_state.ppl_graphics.as_ref() else {
+        vm.icy_board_state.gfx_error = 1;
+        return Ok(VariableValue::new_unsigned(0));
+    };
+    let Some(surface) = graphics.surfaces.get(&handle) else {
+        vm.icy_board_state.gfx_error = 2;
+        return Ok(VariableValue::new_unsigned(0));
+    };
+    let x = arguments.first().map_or(0, VariableValue::as_int);
+    let y = arguments.get(1).map_or(0, VariableValue::as_int);
+    let color = surface.get_pixel(x, y);
+    vm.icy_board_state.gfx_error = 0;
+    Ok(VariableValue::new_unsigned(color as u64))
+}
+
 /// Runs one `SURFACE` member. Answers whether it could be carried out.
 pub(crate) async fn surface_member(vm: &mut VirtualMachine<'_>, handle: i32, name: &unicase::Ascii<String>, arguments: &[VariableValue]) -> Res<bool> {
     use crate::icy_board::state::ppl_surface::{

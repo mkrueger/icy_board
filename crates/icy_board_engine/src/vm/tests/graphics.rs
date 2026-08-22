@@ -148,6 +148,24 @@ fn a_surface_object_draws_and_reports_its_own_size() {
 }
 
 #[test]
+fn get_pixel_reads_back_what_set_pixel_wrote() {
+    let output = run_ppl(
+        r#"
+        GfxInit GFX_SIXEL, FALSE
+        SURFACE s = NewSurface(4, 4)
+        s.SetPixel(1, 1, Rgb(255, 0, 0))
+        PrintLn s.GetPixel(1, 1) = Rgb(255, 0, 0)
+        PrintLn s.GetPixel(2, 2)
+        PrintLn s.GetPixel(9, 9)
+        s.Free()
+        GfxShutdown
+        "#,
+    );
+
+    assert!(output.starts_with("1\n0\n0\n"), "{output:?}");
+}
+
+#[test]
 fn a_surface_can_be_blitted_onto_another() {
     let output = run_ppl(
         r"

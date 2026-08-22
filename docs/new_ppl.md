@@ -196,6 +196,7 @@ property. Everything else is a member of the surface itself:
 | `Width`, `Height`, `Valid` | Read-only status properties |
 | `Clear(color)` | Fill the whole surface |
 | `SetPixel(x, y, color)` | Set a single pixel |
+| `GetPixel(x, y)` | Read a single pixel back; out of bounds answers `0` |
 | `FillRect(x, y, w, h, color)`, `Rect(x, y, w, h, color)` | Draw packed RGBA colors |
 | `Blit(source, x, y)`, `BlitRect(source, sx, sy, w, h, x, y)` | Alpha-compose surfaces in memory |
 | `Present()` | Present the complete surface |

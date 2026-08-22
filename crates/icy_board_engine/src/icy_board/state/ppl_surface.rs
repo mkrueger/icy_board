@@ -47,6 +47,7 @@ pub static HEIGHT: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::Lazy
 pub static VALID: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Valid".to_string()));
 pub static CLEAR: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Clear".to_string()));
 pub static SET_PIXEL: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("SetPixel".to_string()));
+pub static GET_PIXEL: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("GetPixel".to_string()));
 pub static FILL_RECT: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("FillRect".to_string()));
 pub static RECT: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Rect".to_string()));
 pub static BLIT: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Blit".to_string()));
@@ -74,6 +75,7 @@ impl UserData for PplSurface {
             vec![VariableType::Integer, VariableType::Integer, VariableType::Unsigned],
             VariableType::Boolean,
         );
+        registry.add_function(GET_PIXEL.clone(), vec![VariableType::Integer, VariableType::Integer], VariableType::Unsigned);
         registry.add_function(
             FILL_RECT.clone(),
             vec![
@@ -166,6 +168,9 @@ impl UserDataValue for PplSurface {
         name: &unicase::Ascii<String>,
         arguments: &[VariableValue],
     ) -> crate::Res<VariableValue> {
+        if *name == *GET_PIXEL {
+            return crate::vm::statements::predefined_procedures::surface_get_pixel(vm, self.handle, arguments).await;
+        }
         let handled = crate::vm::statements::predefined_procedures::surface_member(vm, self.handle, name, arguments).await?;
         Ok(VariableValue::new_bool(handled))
     }
