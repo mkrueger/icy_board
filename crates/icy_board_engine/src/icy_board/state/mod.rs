@@ -3011,21 +3011,18 @@ impl IcyBoardState {
         self.connection.send(ppl_graphics::JXL_QUERY).await?;
         self.collect_gfx_replies(ppl_graphics::GfxProbe::jxl_answered).await?;
 
-        // The cache carries sound as well as frames, so either one makes it worth asking.
         if self.gfx_probe.capabilities().jxl || self.sound_available == Some(true) {
-            self.connection.send(ppl_graphics::CACHE_LIST_QUERY).await?;
+            self.connection.send(ppl_graphics::GFX_CACHE_LIST_QUERY).await?;
             self.collect_gfx_replies(ppl_graphics::GfxProbe::cache_listed).await?;
+            self.gfx_cache.extend(self.gfx_probe.take_cache_listing().unwrap_or_default());
+
+            self.connection.send(ppl_graphics::SOUND_CACHE_LIST_QUERY).await?;
+            self.collect_gfx_replies(ppl_graphics::GfxProbe::cache_listed).await?;
+            self.sound_cache.extend(self.gfx_probe.take_cache_listing().unwrap_or_default());
         }
 
-        let (capabilities, listing, leftover) = self.gfx_probe.finish();
+        let (capabilities, _, leftover) = self.gfx_probe.finish();
         self.raw_input.extend(leftover);
-        for name in listing.into_iter().flatten() {
-            if name.starts_with(ppl_graphics::SOUND_CACHE_PREFIX) {
-                self.sound_cache.insert(name);
-            } else if name.starts_with(ppl_graphics::CACHE_PREFIX) {
-                self.gfx_cache.insert(name);
-            }
-        }
         self.gfx_capabilities = Some(capabilities);
         Ok(capabilities)
     }
@@ -3068,14 +3065,26 @@ impl IcyBoardState {
         let deadline = Instant::now() + GFX_PROBE_TIMEOUT;
         while !answered(&self.gfx_probe) && Instant::now() < deadline {
             let mut input = [0u8; 256];
-            let read = self.connection.try_read(&mut input).await?;
+            let read = if self.raw_input.is_empty() {
+                self.connection.try_read(&mut input).await?
+            } else {
+                let read = self.raw_input.len().min(input.len());
+                for byte in &mut input[..read] {
+                    *byte = self.raw_input.pop_front().unwrap();
+                }
+                read
+            };
             if read == 0 {
                 sleep(Duration::from_millis(5)).await;
                 continue;
             }
-            for byte in &input[..read] {
+            for (index, byte) in input[..read].iter().enumerate() {
                 let passed = self.gfx_probe.feed(*byte);
                 self.raw_input.extend(passed);
+                if answered(&self.gfx_probe) {
+                    self.raw_input.extend(&input[index + 1..read]);
+                    return Ok(());
+                }
             }
         }
         Ok(())

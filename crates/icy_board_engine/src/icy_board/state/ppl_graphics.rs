@@ -29,7 +29,8 @@ pub const CTERM_ATTRIBUTES_QUERY: &[u8] = b"\x1b[<0c";
 pub const CELL_SIZE_QUERY: &[u8] = b"\x1b[16t";
 pub const PIXEL_SIZE_QUERY: &[u8] = b"\x1b[14t";
 pub const JXL_QUERY: &[u8] = b"\x1b_SyncTERM:Q;JXL\x1b\\";
-pub const CACHE_LIST_QUERY: &[u8] = b"\x1b_SyncTERM:C;L;*\x1b\\";
+pub const GFX_CACHE_LIST_QUERY: &[u8] = b"\x1b_SyncTERM:C;L;gfx/*\x1b\\";
+pub const SOUND_CACHE_LIST_QUERY: &[u8] = b"\x1b_SyncTERM:C;L;snd/*\x1b\\";
 
 /// Everything below this directory in the caller's per board cache belongs to PPL graphics.
 pub const CACHE_PREFIX: &str = "gfx/";
@@ -41,7 +42,7 @@ pub const SOUND_CACHE_PREFIX: &str = "snd/";
 /// frame without writing it to the caller's disk cache first.
 pub const CTERM_INLINE_BLOB_REVISION: u32 = 1329;
 
-const MAX_REPLY_BYTES: usize = 64 * 1024;
+const MAX_REPLY_BYTES: usize = 1024 * 1024;
 
 /// What the caller's terminal turned out to support.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -136,6 +137,10 @@ impl GfxProbe {
 
     pub fn cache_listed(&self) -> bool {
         self.cache_listing.is_some()
+    }
+
+    pub fn take_cache_listing(&mut self) -> Option<HashSet<String>> {
+        self.cache_listing.take()
     }
 
     /// Ends the probe and reports what was learned, along with any half finished

@@ -174,7 +174,7 @@ fn a_format_probe_that_goes_unanswered_does_not_mute_the_channel() {
 
 #[test]
 fn a_sound_the_caller_already_cached_is_not_sent_again() {
-    let mut terminal = b"\x1b[=7;100;1n\x1b[=7;101;1;0;1n\x1b[6;16;8t\x1b[=1;1-n\x1b_SyncTERM:C;L\n".to_vec();
+    let mut terminal = b"\x1b[=7;100;1n\x1b[=7;101;1;0;1n\x1b[6;16;8t\x1b[=1;1-n\x1b_SyncTERM:C;L\n\x1b\\\x1b_SyncTERM:C;L\n".to_vec();
     terminal.extend_from_slice(snd_cache_name(TONE, "wav").as_bytes());
     terminal.extend_from_slice(b"\td41d8cd98f00b204e9800998ecf8427e\n\x1b\\");
 
