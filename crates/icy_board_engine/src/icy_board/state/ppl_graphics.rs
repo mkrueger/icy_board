@@ -1,4 +1,6 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
+
+use icy_net::termcap_detect::GfxCapabilities;
 
 pub const GFX_BACKEND_NONE: i32 = -1;
 pub const GFX_BACKEND_AUTO: i32 = 0;
@@ -18,285 +20,35 @@ pub fn rgba_value(red: i32, green: i32, blue: i32, alpha: i32) -> u32 {
     (color_component(red) << 24) | (color_component(green) << 16) | (color_component(blue) << 8) | color_component(alpha)
 }
 
-/// Queries the terminal answers before a backend is chosen. `syncterm_extensions.md`
-/// asks for JPEG XL to be probed rather than inferred, and the cell size is what turns
-/// a text coordinate into the pixel destination the image APC wants.
-pub const DEVICE_ATTRIBUTES_QUERY: &[u8] = b"\x1b[c";
-pub const CTERM_ATTRIBUTES_QUERY: &[u8] = b"\x1b[<0c";
-pub const CELL_SIZE_QUERY: &[u8] = b"\x1b[16t";
-pub const PIXEL_SIZE_QUERY: &[u8] = b"\x1b[14t";
-pub const JXL_QUERY: &[u8] = b"\x1b_SyncTERM:Q;JXL\x1b\\";
-pub const GFX_CACHE_LIST_QUERY: &[u8] = b"\x1b_SyncTERM:C;L;gfx/*\x1b\\";
-pub const SOUND_CACHE_LIST_QUERY: &[u8] = b"\x1b_SyncTERM:C;L;snd/*\x1b\\";
-
 /// Everything below this directory in the caller's per board cache belongs to PPL graphics.
 pub const CACHE_PREFIX: &str = "gfx/";
 
 /// Where the sound a caller has already been sent lives in the same cache.
 pub const SOUND_CACHE_PREFIX: &str = "snd/";
 
-/// `CTerm` revision that introduced the inline `*Blob` verbs, which draw a changing
-/// frame without writing it to the caller's disk cache first.
-pub const CTERM_INLINE_BLOB_REVISION: u32 = 1329;
-
-const MAX_REPLY_BYTES: usize = 1024 * 1024;
-
-/// What the caller's terminal turned out to support.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct GfxCapabilities {
-    pub sixel: bool,
-    pub jxl: bool,
-    pub physical_keys: bool,
-    pub cterm_revision: Option<u32>,
-    pub cell_width: i32,
-    pub cell_height: i32,
-    pub screen_width: i32,
-    pub screen_height: i32,
-}
-
-impl Default for GfxCapabilities {
-    fn default() -> Self {
-        Self {
-            sixel: false,
-            jxl: false,
-            physical_keys: false,
-            cterm_revision: None,
-            cell_width: 8,
-            cell_height: 16,
-            screen_width: 0,
-            screen_height: 0,
+/// The graphics backend a `GFXINIT` request resolves to, or `GFX_BACKEND_NONE` when
+/// the caller cannot be served what was asked for.
+pub fn resolve_backend(capabilities: &GfxCapabilities, requested: i32) -> i32 {
+    match requested {
+        GFX_BACKEND_AUTO => {
+            if capabilities.jxl {
+                GFX_BACKEND_JXL
+            } else if capabilities.sixel {
+                GFX_BACKEND_SIXEL
+            } else {
+                GFX_BACKEND_NONE
+            }
         }
-    }
-}
-
-impl GfxCapabilities {
-    /// Inline blobs are only safe once the terminal has named a revision that has them.
-    pub fn inline_blobs(&self) -> bool {
-        self.cterm_revision.is_some_and(|revision| revision >= CTERM_INLINE_BLOB_REVISION)
-    }
-
-    /// The backend a `GFXINIT` request resolves to, or `GFX_BACKEND_NONE` when the
-    /// caller cannot be served what was asked for.
-    pub fn resolve_backend(&self, requested: i32) -> i32 {
-        match requested {
-            GFX_BACKEND_AUTO => {
-                if self.jxl {
-                    GFX_BACKEND_JXL
-                } else if self.sixel {
-                    GFX_BACKEND_SIXEL
-                } else {
-                    GFX_BACKEND_NONE
-                }
+        GFX_BACKEND_SIXEL => GFX_BACKEND_SIXEL,
+        // Never send JPEG XL to a terminal that did not answer the query for it.
+        GFX_BACKEND_JXL => {
+            if capabilities.jxl {
+                GFX_BACKEND_JXL
+            } else {
+                GFX_BACKEND_NONE
             }
-            GFX_BACKEND_SIXEL => GFX_BACKEND_SIXEL,
-            // Never send JPEG XL to a terminal that did not answer the query for it.
-            GFX_BACKEND_JXL => {
-                if self.jxl {
-                    GFX_BACKEND_JXL
-                } else {
-                    GFX_BACKEND_NONE
-                }
-            }
-            _ => GFX_BACKEND_NONE,
         }
-    }
-}
-
-/// Collects the capability answers out of the caller's input while a probe is running.
-///
-/// Replies arrive interleaved with ordinary typing, so anything that is not one of the
-/// answers being waited for is handed back and reaches the keyboard unchanged.
-#[derive(Default)]
-pub struct GfxProbe {
-    active: bool,
-    pending: Vec<u8>,
-    capabilities: GfxCapabilities,
-    jxl_answered: bool,
-    cache_listing: Option<HashSet<String>>,
-}
-
-impl GfxProbe {
-    pub fn start(&mut self) {
-        self.active = true;
-        self.pending.clear();
-        self.capabilities = GfxCapabilities::default();
-        self.jxl_answered = false;
-        self.cache_listing = None;
-    }
-
-    pub fn capabilities(&self) -> GfxCapabilities {
-        self.capabilities
-    }
-
-    pub fn jxl_answered(&self) -> bool {
-        self.jxl_answered
-    }
-
-    pub fn cache_listed(&self) -> bool {
-        self.cache_listing.is_some()
-    }
-
-    pub fn take_cache_listing(&mut self) -> Option<HashSet<String>> {
-        self.cache_listing.take()
-    }
-
-    /// Ends the probe and reports what was learned, along with any half finished
-    /// sequence that turned out not to be an answer.
-    pub fn finish(&mut self) -> (GfxCapabilities, Option<HashSet<String>>, Vec<u8>) {
-        self.active = false;
-        let leftover = std::mem::take(&mut self.pending);
-        (self.capabilities, self.cache_listing.take(), leftover)
-    }
-
-    pub fn feed(&mut self, byte: u8) -> Vec<u8> {
-        if !self.active {
-            return vec![byte];
-        }
-        if self.pending.is_empty() {
-            if byte == 0x1B {
-                self.pending.push(byte);
-                return Vec::new();
-            }
-            return vec![byte];
-        }
-
-        self.pending.push(byte);
-        if self.pending.len() == 2 {
-            if byte != b'[' && byte != b'_' {
-                return std::mem::take(&mut self.pending);
-            }
-            return Vec::new();
-        }
-        if self.pending.len() > MAX_REPLY_BYTES {
-            // A cache listing can be long; replaying one as keystrokes helps nobody.
-            log::warn!("Discarding an overlong terminal reply while probing graphics support");
-            self.pending.clear();
-            return Vec::new();
-        }
-        if self.pending[1] == b'[' {
-            if !(0x40..=0x7E).contains(&byte) {
-                return Vec::new();
-            }
-            let reply = std::mem::take(&mut self.pending);
-            if self.parse_csi(&reply) { Vec::new() } else { reply }
-        } else {
-            if !self.pending.ends_with(b"\x1b\\") {
-                return Vec::new();
-            }
-            let reply = std::mem::take(&mut self.pending);
-            if self.parse_apc(&reply) { Vec::new() } else { reply }
-        }
-    }
-
-    fn parse_csi(&mut self, reply: &[u8]) -> bool {
-        let Ok(text) = std::str::from_utf8(reply) else {
-            return false;
-        };
-        let Some(body) = text.strip_prefix("\x1b[") else {
-            return false;
-        };
-        let (body, final_byte) = body.split_at(body.len() - 1);
-        match final_byte {
-            // CSI = 1 ; <0-or-1> - n answers the JPEG XL query.
-            "n" => {
-                let Some(values) = body.strip_prefix('=') else {
-                    return false;
-                };
-                let mut parts = values.trim_end_matches('-').split(';');
-                if parts.next() != Some("1") {
-                    return false;
-                }
-                let Some(state) = parts.next() else {
-                    return false;
-                };
-                self.capabilities.jxl = state == "1";
-                self.jxl_answered = true;
-                true
-            }
-            // CSI = 67;84;101;114;109;MAJOR;MINOR c spells "CTerm" and its revision.
-            "c" => {
-                if let Some(values) = body.strip_prefix('<') {
-                    let features = values.split(';').filter_map(|value| value.parse::<i32>().ok()).collect::<Vec<_>>();
-                    self.capabilities.sixel = features.contains(&4);
-                    self.capabilities.physical_keys = features.contains(&8);
-                    return true;
-                }
-                let Some(values) = body.strip_prefix('=') else {
-                    return false;
-                };
-                let numbers: Vec<&str> = values.split(';').collect();
-                // Icy Term names itself instead of CTerm. It carries the inline blob
-                // verbs from 0.8.4, which is what the revision stands in for here.
-                if numbers.len() >= 10 && numbers[..7] == ["73", "99", "121", "84", "101", "114", "109"] {
-                    let (Ok(major), Ok(minor), Ok(patch)) = (numbers[7].parse::<u32>(), numbers[8].parse::<u32>(), numbers[9].parse::<u32>()) else {
-                        return false;
-                    };
-                    if (major, minor, patch) >= (0, 8, 4) {
-                        self.capabilities.cterm_revision = Some(CTERM_INLINE_BLOB_REVISION);
-                    }
-                    return true;
-                }
-                if numbers.len() < 7 || numbers[..5] != ["67", "84", "101", "114", "109"] {
-                    return false;
-                }
-                let (Ok(major), Ok(minor)) = (numbers[5].parse::<u32>(), numbers[6].parse::<u32>()) else {
-                    return false;
-                };
-                self.capabilities.cterm_revision = Some(major * 1000 + minor);
-                true
-            }
-            // CSI 6 ; height ; width t answers the cell size request.
-            "t" => {
-                let mut parts = body.split(';');
-                let Some(report) = parts.next() else {
-                    return false;
-                };
-                let (Some(Ok(height)), Some(Ok(width))) = (parts.next().map(str::parse::<i32>), parts.next().map(str::parse::<i32>)) else {
-                    return false;
-                };
-                if height <= 0 || width <= 0 {
-                    return false;
-                }
-                match report {
-                    "4" => {
-                        self.capabilities.screen_height = height;
-                        self.capabilities.screen_width = width;
-                        true
-                    }
-                    "6" => {
-                        self.capabilities.cell_height = height;
-                        self.capabilities.cell_width = width;
-                        true
-                    }
-                    _ => false,
-                }
-            }
-            _ => false,
-        }
-    }
-
-    fn parse_apc(&mut self, reply: &[u8]) -> bool {
-        let Ok(text) = std::str::from_utf8(reply) else {
-            return false;
-        };
-        let Some(payload) = text.strip_prefix("\x1b_").and_then(|rest| rest.strip_suffix("\x1b\\")) else {
-            return false;
-        };
-        let Some(body) = payload.strip_prefix("SyncTERM:C;L") else {
-            return false;
-        };
-        // The header line carries the command back; every line after it is name TAB md5.
-        let entries = body.split_once('\n').map_or("", |(_, rest)| rest);
-        self.cache_listing = Some(
-            entries
-                .lines()
-                .filter_map(|line| line.split('\t').next())
-                .map(str::trim)
-                .filter(|name| !name.is_empty())
-                .map(str::to_string)
-                .collect(),
-        );
-        true
+        _ => GFX_BACKEND_NONE,
     }
 }
 
@@ -523,7 +275,6 @@ impl PplGraphicsState {
         self.pinned.insert(slot, buffer);
         Some(buffer)
     }
-
 }
 
 fn clipped_rect(x: i32, y: i32, width: i32, height: i32, target_width: usize, target_height: usize) -> Option<(usize, usize, usize, usize)> {
@@ -602,97 +353,6 @@ mod tests {
         surface.fill_rect(0, 0, 1, 1, 0xFF00_00FF);
 
         assert!(!surface.cacheable);
-    }
-
-    #[test]
-    fn collects_the_capability_answers_and_passes_typing_through() {
-        let mut probe = GfxProbe::default();
-        probe.start();
-        let mut typed = Vec::new();
-        for byte in b"\x1b[=67;84;101;114;109;1;332c\x1b[6;20;10tA\x1b[=1;1-n" {
-            typed.extend(probe.feed(*byte));
-        }
-
-        assert!(probe.jxl_answered());
-        let (capabilities, _, leftover) = probe.finish();
-        assert_eq!(typed, b"A");
-        assert!(leftover.is_empty());
-        assert!(capabilities.jxl);
-        assert_eq!(capabilities.cterm_revision, Some(1332));
-        assert!(capabilities.inline_blobs());
-        assert_eq!((capabilities.cell_width, capabilities.cell_height), (10, 20));
-    }
-
-    #[test]
-    fn a_denied_answer_keeps_jpeg_xl_off() {
-        let mut probe = GfxProbe::default();
-        probe.start();
-        for byte in b"\x1b[=1;0-n" {
-            assert!(probe.feed(*byte).is_empty());
-        }
-
-        assert!(probe.jxl_answered());
-        assert_eq!(probe.capabilities().resolve_backend(GFX_BACKEND_AUTO), GFX_BACKEND_NONE);
-        assert_eq!(probe.capabilities().resolve_backend(GFX_BACKEND_JXL), GFX_BACKEND_NONE);
-    }
-
-    /// What Icy Term answers: it names itself rather than a `CTerm` revision, and from
-    /// 0.8.4 it carries the inline blob verbs that keep frames out of the disk cache.
-    #[test]
-    fn icy_term_is_served_jpeg_xl_and_inline_blobs_from_0_8_4() {
-        let probe_icy_term = |identity: &[u8]| {
-            let mut probe = GfxProbe::default();
-            probe.start();
-            let mut typed = Vec::new();
-            for byte in identity {
-                typed.extend(probe.feed(*byte));
-            }
-            for byte in b"\x1b[<1;2;3;4;5;6;7c\x1b[6;16;8t\x1b[4;400;640t\x1b[=1;1-n" {
-                typed.extend(probe.feed(*byte));
-            }
-            let (capabilities, _, _) = probe.finish();
-            (capabilities, typed)
-        };
-
-        let (capabilities, typed) = probe_icy_term(b"\x1b[=73;99;121;84;101;114;109;0;8;4c");
-        assert_eq!(capabilities.resolve_backend(GFX_BACKEND_AUTO), GFX_BACKEND_JXL);
-        assert!(capabilities.sixel);
-        assert!(capabilities.inline_blobs());
-        assert_eq!((capabilities.cell_width, capabilities.cell_height), (8, 16));
-        // The identity is an answer now, so it no longer reaches the keyboard.
-        assert!(typed.is_empty());
-
-        let (older, typed) = probe_icy_term(b"\x1b[=73;99;121;84;101;114;109;0;8;3c");
-        assert_eq!(older.resolve_backend(GFX_BACKEND_AUTO), GFX_BACKEND_JXL);
-        assert!(!older.inline_blobs());
-        assert!(typed.is_empty());
-    }
-
-    #[test]
-    fn a_cache_listing_names_what_the_caller_already_holds() {
-        let mut probe = GfxProbe::default();
-        probe.start();
-        for byte in b"\x1b_SyncTERM:C;L\ngfx/abc.jxl\td41d8c\ngfx/def.jxl\t0cc175\n\x1b\\" {
-            assert!(probe.feed(*byte).is_empty());
-        }
-
-        assert!(probe.cache_listed());
-        let (_, listing, _) = probe.finish();
-        let listing = listing.unwrap();
-        assert!(listing.contains("gfx/abc.jxl"));
-        assert!(listing.contains("gfx/def.jxl"));
-    }
-
-    #[test]
-    fn an_unrelated_escape_sequence_reaches_the_keyboard() {
-        let mut probe = GfxProbe::default();
-        probe.start();
-        let mut typed = Vec::new();
-        for byte in b"\x1b[D" {
-            typed.extend(probe.feed(*byte));
-        }
-
-        assert_eq!(typed, b"\x1b[D");
     }
 
     #[test]

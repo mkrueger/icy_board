@@ -2805,11 +2805,7 @@ async fn sndcache_store(vm: &mut VirtualMachine<'_>, file_name: &str) -> Res<Res
 
     let hash = format!("{:x}", Sha256::digest(&data));
     let extension = path.extension().and_then(|ext| ext.to_str()).unwrap_or("bin");
-    let cache_name = format!(
-        "{}{}.{extension}",
-        crate::icy_board::state::ppl_graphics::SOUND_CACHE_PREFIX,
-        &hash[..32]
-    );
+    let cache_name = format!("{}{}.{extension}", crate::icy_board::state::ppl_graphics::SOUND_CACHE_PREFIX, &hash[..32]);
 
     if vm.icy_board_state.sound_cache.insert(cache_name.clone()) {
         if !vm.icy_board_state.reserve_media_upload(data.len()) {
@@ -2849,7 +2845,6 @@ async fn sound_file_supported(vm: &mut VirtualMachine<'_>, file_name: &str) -> R
     vm.icy_board_state.query_sound_format(format, *major, *subtype).await
 }
 
-
 /// Plays what the caller's cache already holds, which is all an `AUDIO` has to do.
 async fn queue_cached_sound(vm: &mut VirtualMachine<'_>, cache_name: &str, channel: u8, logical_channel: usize, looping: bool) -> Res<()> {
     // slot == channel: each channel plays one file at a time, so this keeps
@@ -2869,12 +2864,6 @@ async fn queue_cached_sound(vm: &mut VirtualMachine<'_>, cache_name: &str, chann
     }
     Ok(())
 }
-
-
-
-
-
-
 
 /// `LOADAUDIO file$` - takes a channel for a file and answers the `AUDIO` holding it.
 pub async fn load_audio(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -3257,12 +3246,12 @@ pub async fn gfxinit(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     // Sixel is the one backend with no query of its own, so a plain sixel request
     // does not make the caller wait for answers nobody needs.
     let capabilities = if requested == GFX_BACKEND_SIXEL {
-        vm.icy_board_state.gfx_capabilities.unwrap_or_default()
+        vm.icy_board_state.session.term_caps.gfx
     } else {
         vm.icy_board_state.query_gfx_capabilities().await?
     };
 
-    let backend = capabilities.resolve_backend(requested);
+    let backend = crate::icy_board::state::ppl_graphics::resolve_backend(&capabilities, requested);
     if backend == GFX_BACKEND_NONE {
         vm.icy_board_state.gfx_error = 6;
         log::warn!("GFXINIT cannot serve backend {requested} to this terminal");

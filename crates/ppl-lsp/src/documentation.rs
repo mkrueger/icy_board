@@ -675,9 +675,7 @@ pub fn get_statement_hover(stmt: &StatementDefinition) -> Option<Hover> {
         OpCode::MoveMsg => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-movemsg")),
         OpCode::SetBankBal => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-setbankbal")),
         OpCode::WebRequest => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-webrequest")),
-        OpCode::GfxInit | OpCode::GfxShutdown | OpCode::GfxSetPacing => {
-            get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-gfx-api"))
-        }
+        OpCode::GfxInit | OpCode::GfxShutdown | OpCode::GfxSetPacing => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-gfx-api")),
         OpCode::MouseOn | OpCode::MouseOff => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-mouse-api")),
         OpCode::KeyEvents => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-key-api")),
         _ => None,

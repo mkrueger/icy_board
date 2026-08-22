@@ -89,12 +89,7 @@ impl UserDataValue for PplAudio {
             return Ok(VariableValue::new_bool(playing));
         }
         if *name == *VOLUME {
-            let volume = vm
-                .icy_board_state
-                .sound_volume
-                .get(self.channel.unsigned_abs() as usize)
-                .copied()
-                .unwrap_or(0);
+            let volume = vm.icy_board_state.sound_volume.get(self.channel.unsigned_abs() as usize).copied().unwrap_or(0);
             return Ok(VariableValue::new_int(if loaded { volume } else { 0 }));
         }
         log::error!("Invalid user data call on Audio ({name})");

@@ -23,7 +23,7 @@ use icy_engine::Position;
 use icy_engine::SaveOptions;
 use icy_engine::formats::{CharacterFormatOptions, FileFormat, FormatOptions, ScreenPreperation};
 use icy_engine::{TextAttribute, TextPane};
-use icy_net::{Connection, ConnectionType, channel::ChannelConnection, iemsi::EmsiICI, termcap_detect::TerminalCaps};
+use icy_net::{Connection, ConnectionType, channel::ChannelConnection, iemsi::EmsiICI, termcap_detect, termcap_detect::TerminalCaps};
 use icy_parser_core::ANSI_COLOR_OFFSETS;
 use regex::Regex;
 use tokio::{sync::Mutex, time::sleep};
@@ -34,11 +34,11 @@ use crate::{
 };
 pub mod functions;
 pub mod menu_runner;
+pub mod ppl_audio;
 pub mod ppl_events;
 pub mod ppl_graphics;
 pub mod ppl_keys;
 pub mod ppl_mouse;
-pub mod ppl_audio;
 pub mod ppl_surface;
 pub mod user_commands;
 pub mod virtual_screen;
@@ -663,17 +663,11 @@ pub struct IcyBoardState {
     /// The file each `AUDIO` channel was loaded from, indexed by logical channel.
     ppl_audio: [Option<String>; 14],
 
-    pub sound_available: Option<bool>,
-
     pub sound_formats: HashMap<i32, bool>,
 
-    /// Whether this terminal ever answered a query. A terminal that never does must
-    /// not be waited on, or every acknowledgement would cost the full probe timeout.
-    terminal_answers: bool,
-
-    /// What the caller's terminal answered when it was asked what it can draw.
-    /// Kept past `GFXSHUTDOWN`, because a terminal does not change mid call.
-    pub gfx_capabilities: Option<ppl_graphics::GfxCapabilities>,
+    /// Whether the media queries have gone out yet. They are answered once per call,
+    /// because a terminal does not change mid call.
+    media_probed: bool,
 
     pub gfx_error: i32,
 
@@ -681,7 +675,7 @@ pub struct IcyBoardState {
     /// seeded from the terminal's own listing and extended as uploads happen.
     pub gfx_cache: HashSet<String>,
 
-    gfx_probe: ppl_graphics::GfxProbe,
+    gfx_probe: termcap_detect::TerminalProbe,
 
     /// Bytes read while waiting for a terminal reply that turned out not to be one.
     /// They stay undecoded until something asks for input, because only then is it
@@ -762,13 +756,11 @@ impl IcyBoardState {
             sound_volume: [100; 14],
             sound_active: [false; 14],
             ppl_audio: std::array::from_fn(|_| None),
-            sound_available: None,
             sound_formats: HashMap::new(),
-            terminal_answers: false,
-            gfx_capabilities: None,
+            media_probed: false,
             gfx_error: 0,
             gfx_cache: HashSet::new(),
-            gfx_probe: ppl_graphics::GfxProbe::default(),
+            gfx_probe: termcap_detect::TerminalProbe::default(),
             raw_input: VecDeque::new(),
             ppl_graphics: None,
             ppl_event_keys: ppl_events::LogicalKeyState::default(),
@@ -3002,51 +2994,50 @@ impl IcyBoardState {
         keys
     }
 
-    /// Asks the terminal what it can draw, once per call.
-    ///
-    /// Every query is answered by a terminal that has the feature and ignored by one
-    /// that does not, so the wait is bounded and a silent terminal simply ends up with
-    /// the sixel defaults.
-    pub async fn query_gfx_capabilities(&mut self) -> Res<ppl_graphics::GfxCapabilities> {
-        if let Some(capabilities) = self.gfx_capabilities {
-            return Ok(capabilities);
-        }
-        self.gfx_probe.start();
-        self.connection.send(ppl_graphics::DEVICE_ATTRIBUTES_QUERY).await?;
-        self.connection.send(ppl_graphics::CTERM_ATTRIBUTES_QUERY).await?;
-        self.connection.send(ppl_graphics::CELL_SIZE_QUERY).await?;
-        self.connection.send(ppl_graphics::PIXEL_SIZE_QUERY).await?;
-        self.connection.send(ppl_graphics::JXL_QUERY).await?;
-        self.collect_gfx_replies(ppl_graphics::GfxProbe::jxl_answered).await?;
-        self.terminal_answers |= self.gfx_probe.jxl_answered();
-
-        if self.gfx_probe.capabilities().jxl || self.sound_available == Some(true) {
-            self.connection.send(ppl_graphics::GFX_CACHE_LIST_QUERY).await?;
-            self.collect_gfx_replies(ppl_graphics::GfxProbe::cache_listed).await?;
-            self.gfx_cache.extend(self.gfx_probe.take_cache_listing().unwrap_or_default());
-
-            self.connection.send(ppl_graphics::SOUND_CACHE_LIST_QUERY).await?;
-            self.collect_gfx_replies(ppl_graphics::GfxProbe::cache_listed).await?;
-            self.sound_cache.extend(self.gfx_probe.take_cache_listing().unwrap_or_default());
-        }
-
-        let (capabilities, _, leftover) = self.gfx_probe.finish();
-        self.raw_input.extend(leftover);
-        self.gfx_capabilities = Some(capabilities);
-        Ok(capabilities)
+    /// Asks the caller's terminal what it is and what it can do, once per call.
+    pub async fn detect_terminal(&mut self) -> Res<()> {
+        let (capabilities, probed) = TerminalCaps::detect(&mut *self.connection).await?;
+        self.session.term_caps = capabilities;
+        self.media_probed = true;
+        self.take_probe_result(probed).await
     }
 
-    /// Learns everything about the caller's terminal in one go, before a PPE can queue
-    /// an upload in front of an answer. Sound comes first, so the cache listing it
-    /// wants is fetched together with the one for frames.
+    /// Makes sure the media queries have gone out, for a caller that never went through
+    /// the login probe - the built in terminal is one.
     pub async fn probe_terminal_media(&mut self) -> Res<()> {
-        if self.query_sound_available().await? {
-            for (format, major, subtype) in SOUND_FORMATS {
-                self.query_sound_format(*format, *major, *subtype).await?;
+        if self.media_probed {
+            return Ok(());
+        }
+        self.media_probed = true;
+        let probed = termcap_detect::probe_media(&mut *self.connection, &mut self.gfx_probe).await?;
+        self.session.term_caps.gfx = probed.gfx;
+        self.session.term_caps.sound = probed.sound;
+        self.session.term_caps.answered |= probed.answered;
+        self.take_probe_result(probed).await
+    }
+
+    /// Files the probe's leftovers where they belong: unread bytes back into the input,
+    /// cache names into the caller's caches, and the sound formats worth asking about.
+    async fn take_probe_result(&mut self, probed: termcap_detect::MediaProbeResult) -> Res<()> {
+        self.raw_input.extend(probed.leftover);
+        for name in probed.cache_listing {
+            if name.starts_with(ppl_graphics::SOUND_CACHE_PREFIX) {
+                self.sound_cache.insert(name);
+            } else if name.starts_with(ppl_graphics::CACHE_PREFIX) {
+                self.gfx_cache.insert(name);
             }
         }
-        self.query_gfx_capabilities().await?;
+        if self.session.term_caps.sound {
+            for (format, major, subtype) in SOUND_FORMATS {
+                self.probe_sound_format(*format, *major, *subtype).await?;
+            }
+        }
         Ok(())
+    }
+
+    pub async fn query_gfx_capabilities(&mut self) -> Res<termcap_detect::GfxCapabilities> {
+        self.probe_terminal_media().await?;
+        Ok(self.session.term_caps.gfx)
     }
 
     /// The file an `AUDIO` channel was loaded from, if it still holds one.
@@ -3070,35 +3061,6 @@ impl IcyBoardState {
         }
     }
 
-    async fn collect_gfx_replies(&mut self, answered: impl Fn(&ppl_graphics::GfxProbe) -> bool) -> Res<()> {
-        let deadline = Instant::now() + GFX_PROBE_TIMEOUT;
-        while !answered(&self.gfx_probe) && Instant::now() < deadline {
-            let mut input = [0u8; 256];
-            let read = if self.raw_input.is_empty() {
-                self.connection.try_read(&mut input).await?
-            } else {
-                let read = self.raw_input.len().min(input.len());
-                for byte in &mut input[..read] {
-                    *byte = self.raw_input.pop_front().unwrap();
-                }
-                read
-            };
-            if read == 0 {
-                sleep(Duration::from_millis(5)).await;
-                continue;
-            }
-            for (index, byte) in input[..read].iter().enumerate() {
-                let passed = self.gfx_probe.feed(*byte);
-                self.raw_input.extend(passed);
-                if answered(&self.gfx_probe) {
-                    self.raw_input.extend(&input[index + 1..read]);
-                    return Ok(());
-                }
-            }
-        }
-        Ok(())
-    }
-
     /// Waits for the terminal to report its cursor position, which it can only do
     /// once it has worked through everything that was sent before the request.
     pub async fn await_terminal_ack(&mut self) -> Res<()> {
@@ -3120,7 +3082,7 @@ impl IcyBoardState {
     pub async fn acknowledge_upload(&mut self, bytes: usize) -> Res<()> {
         const LARGE_UPLOAD_BYTES: usize = 256 * 1024;
 
-        if bytes < LARGE_UPLOAD_BYTES || !self.terminal_answers {
+        if bytes < LARGE_UPLOAD_BYTES || !self.session.term_caps.answered {
             return Ok(());
         }
         self.await_terminal_ack().await
@@ -3161,7 +3123,7 @@ impl IcyBoardState {
                         && let Some(result) = matches(text)
                     {
                         self.raw_input.extend(&input[index + 1..read]);
-                        self.terminal_answers = true;
+                        self.session.term_caps.answered = true;
                         return Ok(Some(result));
                     }
                     self.raw_input.extend(sequence);
@@ -3173,18 +3135,8 @@ impl IcyBoardState {
     }
 
     pub async fn query_sound_available(&mut self) -> Res<bool> {
-        if let Some(available) = self.sound_available {
-            return Ok(available);
-        }
-        let available = self
-            .query_terminal_csi(b"\x1b_SyncTERM:Q;libsndfile\x1b\\", |reply| {
-                let values = reply.strip_prefix("\x1b[=7;100;")?.strip_suffix('n')?;
-                Some(values == "1")
-            })
-            .await?
-            .unwrap_or(false);
-        self.sound_available = Some(available);
-        Ok(available)
+        self.probe_terminal_media().await?;
+        Ok(self.session.term_caps.sound)
     }
 
     pub async fn query_sound_format(&mut self, format: i32, major: u32, subtype: u32) -> Res<bool> {
@@ -3193,6 +3145,13 @@ impl IcyBoardState {
         }
         if !self.query_sound_available().await? {
             return Ok(false);
+        }
+        self.probe_sound_format(format, major, subtype).await
+    }
+
+    async fn probe_sound_format(&mut self, format: i32, major: u32, subtype: u32) -> Res<bool> {
+        if let Some(supported) = self.sound_formats.get(&format) {
+            return Ok(*supported);
         }
         let query = format!("\x1b_SyncTERM:Q;libsndfileFormat;{major};{subtype}\x1b\\");
         let prefix = format!("\x1b[=7;101;{major};{subtype};");
