@@ -395,7 +395,7 @@ that uses the region for efficient keyboard, click and mouse-wheel scrolling.
 ```PPL
 SetFont 0, 5                    ; font 5 wherever the normal attribute applies
 LoadFont 43, "topaz.psf"
-IF (ERR().OK) SetFont 0, 43
+IF (ERR().OK) SetFont FONT_ALL, 43
 ```
 
 Font numbers 0 to 42 are the terminal's built-in fonts and are read-only:
@@ -407,11 +407,17 @@ height.
 
 The slot is one of the four attribute classes a terminal keeps a font for,
 numbered 0 to 3. Four fonts can therefore be on screen at once, picked per
-character by its attribute.
+character by its attribute. Slot `FONT_ALL` binds every class at once, which is
+what changing *the* font means: otherwise a colour bright enough to count as
+bold picks a different typeface. The
+[`fonts` PPE](../ppe/fonts/src/fonts.pps) browses the built-in fonts and four
+uploaded ones.
 
-Both statements report through [`ERR()`](#errors). Sessions
-without ANSI ignore them. A font a PPE selects stays selected after
-the PPE ends, since changing the board font may be the point of running it.
+Both statements report through [`ERR()`](#errors). Sessions without ANSI send
+nothing and answer `ERR_UNAVAILABLE`, so the `ERR().OK` guard above skips the
+`SetFont` rather than acting on an older statement's result. A font a PPE
+selects stays selected after the PPE ends, since changing the board font may be
+the point of running it.
 
 ### Errors
 

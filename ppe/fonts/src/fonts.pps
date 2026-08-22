@@ -1,0 +1,135 @@
+;$LANGVERSION 400
+
+CONST INTEGER FIRST_BUILTIN = 0
+CONST INTEGER LAST_BUILTIN = 42
+CONST INTEGER CUSTOM_COUNT = 4
+CONST INTEGER PAGE_BUILTIN = 0
+CONST INTEGER PAGE_CUSTOM = 1
+
+STRING customNames = { "C64", "Atari", "MicroKnight", "Topaz" }
+INTEGER customFonts = { 43, 44, 45, 46 }
+INTEGER page, builtinFont, customIndex
+BOOLEAN running
+EVENT inputEvent
+
+LoadFont 43, "fonts/c64.psf"
+IF (!ERR().OK) ShowLoadError("C64", ERR().Message)
+LoadFont 44, "fonts/atari.psf"
+IF (!ERR().OK) ShowLoadError("Atari", ERR().Message)
+LoadFont 45, "fonts/microknight.psf"
+IF (!ERR().OK) ShowLoadError("MicroKnight", ERR().Message)
+LoadFont 46, "fonts/topaz.psf"
+IF (!ERR().OK) ShowLoadError("Topaz", ERR().Message)
+
+page = PAGE_BUILTIN
+builtinFont = 0
+customIndex = 0
+SetActiveFont(builtinFont)
+running = TRUE
+
+WHILE running DO
+    DrawScreen()
+    inputEvent = EventWait(-1)
+    IF (inputEvent.Kind = EVENT_KEY) THEN
+        IF (Upper(inputEvent.Text) = "Q" | inputEvent.Code = KEY_ESCAPE) THEN
+            running = FALSE
+        ELSEIF (inputEvent.Code = KEY_TAB) THEN
+            IF (page = PAGE_BUILTIN) THEN
+                page = PAGE_CUSTOM
+                SetActiveFont(customFonts[customIndex])
+            ELSE
+                page = PAGE_BUILTIN
+                SetActiveFont(builtinFont)
+            ENDIF
+        ELSEIF (inputEvent.Code = KEY_LEFT) THEN
+            IF (page = PAGE_BUILTIN) THEN
+                builtinFont -= 1
+                IF (builtinFont < FIRST_BUILTIN) builtinFont = LAST_BUILTIN
+                SetActiveFont(builtinFont)
+            ELSE
+                customIndex -= 1
+                IF (customIndex < 0) customIndex = CUSTOM_COUNT - 1
+                SetActiveFont(customFonts[customIndex])
+            ENDIF
+        ELSEIF (inputEvent.Code = KEY_RIGHT) THEN
+            IF (page = PAGE_BUILTIN) THEN
+                builtinFont += 1
+                IF (builtinFont > LAST_BUILTIN) builtinFont = FIRST_BUILTIN
+                SetActiveFont(builtinFont)
+            ELSE
+                customIndex += 1
+                IF (customIndex >= CUSTOM_COUNT) customIndex = 0
+                SetActiveFont(customFonts[customIndex])
+            ENDIF
+        ENDIF
+    ENDIF
+ENDWHILE
+
+RestoreFonts()
+COLOR @X07
+CLS
+
+PROCEDURE DrawScreen()
+    CLS
+    COLOR @X07
+    PRINTLN "                         ICY BOARD FONT LAB"
+    PRINTLN "                         =================="
+    PRINTLN
+
+    IF (page = PAGE_BUILTIN) THEN
+        DrawBuiltinPage()
+    ELSE
+        DrawCustomPage()
+    ENDIF
+ENDPROC
+
+PROCEDURE DrawBuiltinPage()
+    PRINTLN "Built-in fonts                                          Page 1 of 2"
+    PRINTLN
+    PRINTLN "  Terminal font ", builtinFont, " of ", LAST_BUILTIN
+    DrawGlyphSamples()
+    PRINTLN
+    DrawNavigation("browse built-in fonts")
+ENDPROC
+
+PROCEDURE DrawCustomPage()
+    PRINTLN "Uploaded PSF fonts                                      Page 2 of 2"
+    PRINTLN
+    PRINTLN "  ", customNames[customIndex], " (uploaded as font ", customFonts[customIndex], ")"
+    DrawGlyphSamples()
+    PRINTLN
+    DrawNavigation("browse uploaded fonts")
+ENDPROC
+
+PROCEDURE DrawGlyphSamples()
+    PRINTLN
+    PRINTLN "  ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    PRINTLN "  abcdefghijklmnopqrstuvwxyz"
+    PRINTLN "  0123456789  !@#$%^&*()[]{}"
+    PRINTLN "  Box and shade: ", Chr(176), Chr(177), Chr(178), Chr(219), "  Lines: ", Chr(196), Chr(179), Chr(218), Chr(191), Chr(192), Chr(217)
+    PRINTLN "  The quick brown fox jumps over the lazy dog."
+ENDPROC
+
+PROCEDURE DrawNavigation(STRING action)
+    PRINT "  Left/Right"
+    PRINT " ", action, "   "
+    PRINT "Tab"
+    PRINT " change page   "
+    PRINT "Q/Esc"
+    PRINTLN " quit"
+ENDPROC
+
+PROCEDURE SetActiveFont(INTEGER font)
+    SetFont FONT_ALL, font
+ENDPROC
+
+PROCEDURE RestoreFonts()
+    SetFont FONT_ALL, 0
+ENDPROC
+
+PROCEDURE ShowLoadError(STRING fontName, STRING message)
+    COLOR @X07
+    PRINTLN "Could not load ", fontName, ": ", message
+    RestoreFonts()
+    EXIT
+ENDPROC

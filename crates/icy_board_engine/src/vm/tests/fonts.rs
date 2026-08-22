@@ -37,6 +37,13 @@ fn set_font_accepts_numbers_above_the_built_in_range() {
 }
 
 #[test]
+fn set_font_binds_every_slot_at_once() {
+    let output = run_ppl("SetFont FONT_ALL, 43");
+
+    assert_eq!(output, "\x1b[0;43 D\x1b[1;43 D\x1b[2;43 D\x1b[3;43 D");
+}
+
+#[test]
 fn font_statements_are_ignored_without_ansi() {
     let output = run_ppl(
         r#"
@@ -48,12 +55,30 @@ fn font_statements_are_ignored_without_ansi() {
     assert_eq!(output, "");
 }
 
+/// Without ANSI nothing is sent, but `ERR()` still has to answer for this statement
+/// rather than leaving an older one's result in place.
+#[test]
+fn font_statements_report_unavailable_without_ansi() {
+    let output = run_ppl(
+        r#"
+        GRAFMODE 4
+        SetFont 0, 5
+        PrintLn "set=", ERR().Code, " ", ERR().Kind
+        LoadFont 43, "any.psf"
+        PrintLn "load=", ERR().Code, " ", ERR().Kind
+        "#,
+    );
+
+    assert!(output.contains("set=1 5\n"), "{output:?}");
+    assert!(output.contains("load=1 5\n"), "{output:?}");
+}
+
 #[test]
 fn invalid_font_arguments_are_not_sent() {
     let output = run_ppl(
         r#"
         SetFont 4, 5
-        SetFont -1, 5
+        SetFont -2, 5
         SetFont 0, -1
         SetFont 0, 256
         "#,

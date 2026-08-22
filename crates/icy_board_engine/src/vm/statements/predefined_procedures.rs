@@ -1024,13 +1024,16 @@ pub async fn reset_margins(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Re
     write_vt_sequence(vm, "\x1B[r\x1B[?69l").await
 }
 
-/// A font is 256 glyphs of at most 32 rows, so anything larger is not one.
+/// 256 glyphs of at most 32 rows is 8K, and PSF2 adds a header and a Unicode table.
 const MAX_FONT_FILE_BYTES: u64 = 64 * 1024;
 
 /// The attribute classes `CTerm` binds fonts to: normal, bold, blink, bold+blink.
 const FONT_SLOT_COUNT: i32 = 4;
 
-/// CTerm's `CONIO_FIRST_FREE_FONT`: it drops an upload below this silently, so the
+/// `FONT_ALL`: binds every attribute class at once, so colour cannot change the typeface.
+const FONT_ALL_SLOTS: i32 = -1;
+
+/// `CTerm`'s `CONIO_FIRST_FREE_FONT`: it drops an upload below this silently, so the
 /// built-in fonts are read-only.
 const FIRST_FREE_FONT: i32 = 43;
 const LAST_FONT: i32 = 255;
@@ -1044,12 +1047,20 @@ pub async fn errclr(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
 pub async fn set_font(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let slot = vm.eval_expr(&args[0]).await?.as_int();
     let font = vm.eval_expr(&args[1]).await?.as_int();
-    if !(0..FONT_SLOT_COUNT).contains(&slot) || !(0..=LAST_FONT).contains(&font) {
+    let slot_valid = slot == FONT_ALL_SLOTS || (0..FONT_SLOT_COUNT).contains(&slot);
+    if !slot_valid || !(0..=LAST_FONT).contains(&font) {
         log::warn!("SETFONT ignored: invalid slot {slot} / font {font}");
         vm.set_error(PplError::new(ERR_KIND_FONT, ERR_INVALID, format!("invalid font slot {slot} or font {font}")));
         return Ok(());
     }
-    write_vt_sequence(vm, &format!("\x1B[{slot};{font} D")).await?;
+    if !supports_vt_sequences(vm) {
+        vm.set_error(PplError::new(ERR_KIND_FONT, ERR_UNAVAILABLE, "the terminal has no fonts"));
+        return Ok(());
+    }
+    let (first_slot, last_slot) = if slot == FONT_ALL_SLOTS { (0, FONT_SLOT_COUNT - 1) } else { (slot, slot) };
+    for slot in first_slot..=last_slot {
+        write_vt_sequence(vm, &format!("\x1B[{slot};{font} D")).await?;
+    }
     vm.operation_succeeded();
     Ok(())
 }
@@ -1064,6 +1075,7 @@ pub async fn load_font(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
         return Ok(());
     }
     if !supports_vt_sequences(vm) {
+        vm.set_error(PplError::new(ERR_KIND_FONT, ERR_UNAVAILABLE, "the terminal has no fonts"));
         return Ok(());
     }
 
