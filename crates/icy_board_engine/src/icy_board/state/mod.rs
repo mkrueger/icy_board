@@ -1180,6 +1180,7 @@ impl IcyBoardState {
             }
         }
         self.sound_active.fill(false);
+        self.ppl_sounds.fill(None);
         self.sound_volume.fill(100);
         self.snd_error = 0;
         self.gfx_error = 0;
