@@ -17,7 +17,7 @@ use ratatui::{
 use crate::{
     tab_page::PageMessage,
     text_field::{TextField, TextfieldState},
-    theme::get_tui_theme,
+    theme::{dos_attribute_style, get_tui_theme},
 };
 
 #[derive(Default, PartialEq)]
@@ -464,7 +464,7 @@ impl<T> ListItem<T> {
 
                 ListValue::Float(_u, _) => 5,
 
-                ListValue::Color(_color) => 2,
+                ListValue::Color(_color) => 5,
                 ListValue::Bool(_value) => 3,
                 ListValue::Security(_e, _) => 6,
                 ListValue::ValueList(_cur_value, _list) => {
@@ -569,7 +569,19 @@ impl<T> ListItem<T> {
 
             ListValue::Color(color) => match color {
                 IcbColor::None => Text::from("Plain").style(get_tui_theme().value).render(area, frame.buffer_mut()),
-                IcbColor::Dos(u8) => Text::from(format!("{:02X}", *u8)).style(get_tui_theme().value).render(area, frame.buffer_mut()),
+                IcbColor::Dos(value) => {
+                    Text::from(format!("{:02X}", *value))
+                        .style(get_tui_theme().value)
+                        .render(area, frame.buffer_mut());
+                    Text::from(" XX").style(dos_attribute_style(*value)).render(
+                        Rect {
+                            x: area.x + 2,
+                            width: 3,
+                            ..area
+                        },
+                        frame.buffer_mut(),
+                    );
+                }
                 IcbColor::IcyEngine(_) => todo!(),
             },
             ListValue::Bool(value) => {
@@ -743,11 +755,19 @@ impl<T> ListItem<T> {
                     let area = Rect {
                         x: area.x,
                         y: area.y,
-                        width: 2,
+                        width: 5,
                         height: 1,
                     };
                     let field = TextField::new().with_value(format!("{:02X}", value));
-                    frame.render_stateful_widget(field, area, &mut self.text_field_state);
+                    frame.render_stateful_widget(field, Rect { width: 2, ..area }, &mut self.text_field_state);
+                    Text::from(" XX").style(dos_attribute_style(*value)).render(
+                        Rect {
+                            x: area.x + 2,
+                            width: 3,
+                            ..area
+                        },
+                        frame.buffer_mut(),
+                    );
                     self.text_field_state.set_cursor_position(frame);
                 }
             }
@@ -978,6 +998,29 @@ impl<T> ListItem<T> {
 
             ListValue::Color(col) => {
                 if let IcbColor::Dos(u) = col {
+                    match key.code {
+                        KeyCode::Left => {
+                            *u = (*u & 0xF0) | u.wrapping_sub(1) & 0x0F;
+                            self.need_update = true;
+                            return ResultState::default();
+                        }
+                        KeyCode::Right => {
+                            *u = (*u & 0xF0) | u.wrapping_add(1) & 0x0F;
+                            self.need_update = true;
+                            return ResultState::default();
+                        }
+                        KeyCode::PageUp => {
+                            *u = (*u & 0x8F) | (u.wrapping_add(0x10) & 0x70);
+                            self.need_update = true;
+                            return ResultState::default();
+                        }
+                        KeyCode::PageDown => {
+                            *u = (*u & 0x8F) | (u.wrapping_sub(0x10) & 0x70);
+                            self.need_update = true;
+                            return ResultState::default();
+                        }
+                        _ => {}
+                    }
                     let mut text = format!("{:02X}", u);
                     self.need_update |= self.text_field_state.handle_input(key, &mut text);
                     if let Ok(u) = u8::from_str_radix(&text, 16) {

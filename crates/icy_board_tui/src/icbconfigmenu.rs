@@ -124,9 +124,16 @@ impl ICBConfigMenuUI {
                 return editor(self.menu.obj.clone(), path);
             }
 
-            let editor: &String = &self.menu.obj.lock().unwrap().config.sysop.external_editor;
+            let editor = {
+                let board = self.menu.obj.lock().unwrap();
+                if uses_graphics_editor(&path) {
+                    board.config.sysop.graphics_editor.clone()
+                } else {
+                    board.config.sysop.external_editor.clone()
+                }
+            };
             let started = crate::term::with_terminal(|| {
-                std::process::Command::new(editor)
+                std::process::Command::new(&editor)
                     .arg(format!("{}", path.display()))
                     .spawn()
                     .and_then(|mut child| child.wait())
@@ -154,6 +161,12 @@ fn can_create_file(path: &std::path::Path) -> bool {
     !path.as_os_str().is_empty() && !path.exists() && path.parent().is_some_and(std::path::Path::is_dir)
 }
 
+fn uses_graphics_editor(path: &std::path::Path) -> bool {
+    path.extension()
+        .and_then(std::ffi::OsStr::to_str)
+        .is_some_and(|extension| matches!(extension.to_ascii_lowercase().as_str(), "ans" | "ansi" | "icy" | "pcb" | "rip"))
+}
+
 fn create_empty_file(path: &std::path::Path) -> std::io::Result<()> {
     std::fs::OpenOptions::new().write(true).create_new(true).open(path)?;
     Ok(())
@@ -161,7 +174,7 @@ fn create_empty_file(path: &std::path::Path) -> std::io::Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::can_create_file;
+    use super::{can_create_file, uses_graphics_editor};
 
     fn test_dir() -> std::path::PathBuf {
         static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
@@ -189,5 +202,12 @@ mod tests {
         let file = test_dir().join("existing.txt");
         std::fs::File::create(&file).unwrap();
         assert!(!can_create_file(&file));
+    }
+
+    #[test]
+    fn ansi_files_use_the_graphics_editor() {
+        assert!(uses_graphics_editor(std::path::Path::new("welcome.ANS")));
+        assert!(uses_graphics_editor(std::path::Path::new("menu.icy")));
+        assert!(!uses_graphics_editor(std::path::Path::new("welcome.asc")));
     }
 }

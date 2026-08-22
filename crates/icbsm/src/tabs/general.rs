@@ -16,7 +16,7 @@ use ratatui::{Frame, layout::Rect};
 
 use crate::VERSION;
 
-use super::{GroupEditor, MaintenanceOp, MaintenancePage, UndoPage, UserList, security_menu_page, sort_options_page};
+use super::{ColorCustomization, EditorConfiguration, GroupEditor, MaintenanceOp, MaintenancePage, UndoPage, UserList, security_menu_page, sort_options_page};
 
 pub struct GeneralTab {
     pub page: IcbSetupMenuUI,
@@ -40,6 +40,8 @@ impl GeneralTab {
                 MenuItem::new(8, 'I', get_text("icbsm_menu_phones")),
                 MenuItem::new(9, 'J', get_text("icbsm_menu_undo")),
                 MenuItem::new(10, 'K', get_text("icbsm_menu_groups")),
+                MenuItem::new(11, 'L', get_text("icbsm_define_editors")),
+                MenuItem::new(12, 'M', get_text("icbsm_customize_colors")),
             ]))
             .with_center_title(center_title)
             .with_right_title(right_title),
@@ -96,6 +98,14 @@ impl TabPage for GeneralTab {
                 }
                 10 => {
                     let page = GroupEditor::new(self.icy_board.clone());
+                    return self.page.open_sup_page(Box::new(page));
+                }
+                11 => {
+                    let page = EditorConfiguration::new(self.icy_board.clone());
+                    return self.page.open_sup_page(Box::new(page));
+                }
+                12 => {
+                    let page = ColorCustomization::new(self.icy_board.clone());
                     return self.page.open_sup_page(Box::new(page));
                 }
                 _ => return state,

@@ -30,8 +30,8 @@ All ten are used: `name`, `allow_iemsi`, `location`, `operator`, `notice`,
 | Option | Status | Where |
 |---|---|---|
 | `name`, `password`, `require_password_to_exit`, `use_real_name` | ✅ | login, door drop files, sysop functions |
-| `external_editor` | ✅ | ICBSetup only, which is where it belongs |
-| `config_color_theme` | ❌ | the TUI theme is not chosen from it |
+| `external_editor`, `graphics_editor` | ✅ | text and ANSI/graphics editor commands used by the admin tools |
+| `config_color_theme`, `config_color_configuration` | ✅ | select and apply the shared ICBSetup/ICBSM PCBoard-compatible theme |
 
 ## new_user_settings
 

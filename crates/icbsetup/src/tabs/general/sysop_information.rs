@@ -29,7 +29,7 @@ impl SysopInformation {
                 cfg_entry_bool!("use_real_name", label_width, sysop, use_real_name, lock),
                 ConfigEntry::Separator,
                 cfg_entry_text!("sys_info_external_editor", label_width, 30, sysop, external_editor, lock),
-                cfg_entry_text!("sys_info_theme", label_width, 30, sysop, config_color_theme, lock),
+                cfg_entry_text!("sys_info_graphics_editor", label_width, 30, sysop, graphics_editor, lock),
             ];
             ConfigMenu {
                 obj: icy_board.clone(),

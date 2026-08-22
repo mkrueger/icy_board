@@ -461,7 +461,9 @@ impl PCBoardImporter {
                 require_password_to_exit: self.data.sysop_info.require_pwrd_to_exit,
                 use_real_name: self.data.sysop_info.use_real_name,
                 external_editor: "nano".to_string(),
-                config_color_theme: "DEFAULT".to_string(),
+                graphics_editor: "icy_draw".to_string(),
+                config_color_theme: "DEFAULT1".to_string(),
+                config_color_configuration: Default::default(),
             },
             sysop_command_level: SysopCommandLevels {
                 sysop: self.data.sysop_security.sysop as u8,

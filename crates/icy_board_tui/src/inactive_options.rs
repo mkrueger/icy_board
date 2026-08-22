@@ -33,12 +33,6 @@ impl UnreadOption {
 
 pub const UNREAD_OPTIONS: &[UnreadOption] = &[
     UnreadOption {
-        section: "sysop",
-        option: "config_color_theme",
-        kind: Unread::NotReadYet,
-        note: "the TUI theme is not chosen from it",
-    },
-    UnreadOption {
         section: "file_transfer",
         option: "disallow_batch_uploads",
         kind: Unread::NotReadYet,
@@ -270,10 +264,5 @@ mod tests {
         assert!(lookup("subscription_info", "subscription_length").is_none());
         assert!(lookup("sysop_command_level", "sec_4_recover_deleted_msg").is_none());
         assert!(lookup("event", "enabled").is_none());
-    }
-
-    #[test]
-    fn the_note_of_the_audit_is_kept() {
-        assert_eq!(lookup("sysop", "config_color_theme").unwrap().note, "the TUI theme is not chosen from it");
     }
 }

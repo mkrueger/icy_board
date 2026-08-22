@@ -279,7 +279,74 @@ pub struct SysopInformation {
 
     pub external_editor: String,
 
+    #[serde(default = "default_graphics_editor")]
+    pub graphics_editor: String,
+
     pub config_color_theme: String,
+
+    #[serde(default)]
+    pub config_color_configuration: PcbScreenColors,
+}
+
+fn default_graphics_editor() -> String {
+    "icy_draw".to_string()
+}
+
+pub const PCB_SCREEN_COLOR_NAMES: [&str; 23] = [
+    "Outer Box",
+    "Status Information",
+    "Headings and Screen Titles",
+    "Menu Box",
+    "Menu Title",
+    "Menu Selections",
+    "Selected Menu Item",
+    "Menu Descriptions",
+    "Unavailable Menu Item",
+    "Highlighted Unavailable Item",
+    "Questions",
+    "Answers",
+    "Current Input Field",
+    "Display-only Fields",
+    "Special Instructions",
+    "Help Box",
+    "Help Title",
+    "Help Subtitle",
+    "Help Text",
+    "Help Description",
+    "F1 Help Key",
+    "Scroll Bar",
+    "Scroll Position",
+];
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct PcbScreenColors {
+    pub colors: [u8; 23],
+}
+
+impl PcbScreenColors {
+    pub const DEFAULT_1: [u8; 23] = [
+        0x01, 0x03, 0x0C, 0x04, 0x0E, 0x0A, 0x3E, 0x4E, 0x07, 0x30, 0x0A, 0x03, 0x4F, 0x07, 0x60, 0x20, 0x2F, 0x2E, 0x20, 0x4F, 0x0F, 0x70, 0x0F,
+    ];
+    pub const DEFAULT_2: [u8; 23] = [
+        0x13, 0x16, 0x1E, 0x14, 0x1F, 0x1A, 0x3E, 0x4E, 0x17, 0x30, 0x1A, 0x13, 0x4F, 0x17, 0x30, 0x24, 0x2F, 0x2E, 0x20, 0x4E, 0x1F, 0x71, 0x2B,
+    ];
+    pub const BLACK_AND_WHITE: [u8; 23] = [
+        0x07, 0x07, 0x0F, 0x07, 0x0F, 0x07, 0x70, 0x70, 0x08, 0x78, 0x0F, 0x07, 0x70, 0x07, 0x70, 0x70, 0x70, 0x70, 0x70, 0x07, 0x0F, 0x70, 0x7F,
+    ];
+
+    pub fn default_2() -> Self {
+        Self { colors: Self::DEFAULT_2 }
+    }
+
+    pub fn black_and_white() -> Self {
+        Self { colors: Self::BLACK_AND_WHITE }
+    }
+}
+
+impl Default for PcbScreenColors {
+    fn default() -> Self {
+        Self { colors: Self::DEFAULT_1 }
+    }
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
@@ -913,7 +980,9 @@ impl IcbConfig {
                 require_password_to_exit: false,
                 use_real_name: false,
                 external_editor: "nano".to_string(),
-                config_color_theme: "DEFAULT".to_string(),
+                graphics_editor: default_graphics_editor(),
+                config_color_theme: "DEFAULT1".to_string(),
+                config_color_configuration: PcbScreenColors::default(),
             },
             login_server: LoginServer::default(),
             sysop_command_level: SysopCommandLevels {
@@ -1219,7 +1288,36 @@ impl Default for QwkSettings {
 
 #[cfg(test)]
 mod tests {
-    use super::{CommandType, SecurityExpression, UserCommandLevels};
+    use super::{CommandType, PcbScreenColors, SecurityExpression, SysopInformation, UserCommandLevels};
+
+    #[test]
+    fn pcboard_screen_color_presets_keep_the_original_role_order() {
+        assert_eq!(
+            PcbScreenColors::DEFAULT_1,
+            [
+                0x01, 0x03, 0x0C, 0x04, 0x0E, 0x0A, 0x3E, 0x4E, 0x07, 0x30, 0x0A, 0x03, 0x4F, 0x07, 0x60, 0x20, 0x2F, 0x2E, 0x20, 0x4F, 0x0F, 0x70, 0x0F,
+            ]
+        );
+        assert_eq!(PcbScreenColors::DEFAULT_2[0..4], [0x13, 0x16, 0x1E, 0x14]);
+        assert_eq!(PcbScreenColors::BLACK_AND_WHITE[20..23], [0x0F, 0x70, 0x7F]);
+    }
+
+    #[test]
+    fn old_sysop_configuration_gets_editor_and_color_defaults() {
+        let sysop: SysopInformation = toml::from_str(
+            r#"
+name = "SYSOP"
+require_password_to_exit = false
+use_real_name = false
+external_editor = "nano"
+config_color_theme = "DEFAULT"
+"#,
+        )
+        .unwrap();
+
+        assert_eq!(sysop.graphics_editor, "icy_draw");
+        assert_eq!(sysop.config_color_configuration, PcbScreenColors::default());
+    }
 
     #[test]
     fn test_a_built_in_command_answers_to_the_level_it_was_given() {

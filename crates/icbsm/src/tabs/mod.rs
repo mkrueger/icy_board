@@ -22,3 +22,6 @@ pub use sort::*;
 
 pub mod tables;
 pub use tables::*;
+
+pub mod preferences;
+pub use preferences::*;

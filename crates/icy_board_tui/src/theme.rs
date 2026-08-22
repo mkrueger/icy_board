@@ -1,5 +1,9 @@
 use ratatui::style::{Color, Modifier, Style};
+use std::sync::RwLock;
 
+use icy_board_engine::icy_board::icb_config::PcbScreenColors;
+
+#[derive(Clone, Copy)]
 pub struct Theme {
     pub background: Style,
     pub title_bar: Style,
@@ -52,8 +56,69 @@ pub struct Theme {
     pub swatch: bool,
 }
 
-pub fn get_tui_theme() -> &'static Theme {
-    &CLASSIC_THEME
+lazy_static::lazy_static! {
+    static ref TUI_THEME: RwLock<Theme> = RwLock::new(CLASSIC_THEME);
+}
+
+pub fn get_tui_theme() -> Theme {
+    *TUI_THEME.read().unwrap()
+}
+
+pub fn set_tui_theme(colors: &PcbScreenColors) {
+    *TUI_THEME.write().unwrap() = Theme::from_pcboard(colors);
+}
+
+fn dos_color(index: u8) -> Color {
+    const ANSI_INDEX: [u8; 16] = [0, 4, 2, 6, 1, 5, 3, 7, 8, 12, 10, 14, 9, 13, 11, 15];
+    Color::Indexed(ANSI_INDEX[usize::from(index & 0x0F)])
+}
+
+pub fn dos_attribute_style(attribute: u8) -> Style {
+    Style::new().fg(dos_color(attribute)).bg(dos_color((attribute >> 4) & 0x07))
+}
+
+impl Theme {
+    pub fn from_pcboard(palette: &PcbScreenColors) -> Self {
+        let colors = &palette.colors;
+        Self {
+            background: dos_attribute_style(colors[0]),
+            title_bar: dos_attribute_style(colors[0]),
+            app_title: dos_attribute_style(colors[2]).add_modifier(Modifier::BOLD),
+            tabs: dos_attribute_style(colors[1]),
+            tabs_selected: dos_attribute_style(colors[6]).add_modifier(Modifier::BOLD),
+            key_binding: dos_attribute_style(colors[7]),
+            key_binding_description: dos_attribute_style(colors[14]),
+            status_line: dos_attribute_style(colors[1]),
+            status_line_text: dos_attribute_style(colors[20]),
+            menu_title: dos_attribute_style(colors[4]),
+            menu_label: dos_attribute_style(colors[13]),
+            item_separator: dos_attribute_style(colors[13]),
+            item: dos_attribute_style(colors[5]),
+            selected_item: dos_attribute_style(colors[6]),
+            value: dos_attribute_style(colors[11]),
+            true_value: dos_attribute_style(colors[11]),
+            false_value: dos_attribute_style(colors[8]),
+            edit_value: dos_attribute_style(colors[12]),
+            dialog_box: dos_attribute_style(colors[0]),
+            dialog_box_title: dos_attribute_style(colors[2]),
+            dialog_box_scrollbar: dos_attribute_style(colors[21]),
+            menu_box: dos_attribute_style(colors[3]),
+            menu_box_title: dos_attribute_style(colors[4]),
+            config_title: dos_attribute_style(colors[2]),
+            group_title: dos_attribute_style(colors[2]).add_modifier(Modifier::UNDERLINED),
+            filter_text: dos_attribute_style(colors[10]),
+            description_text: dos_attribute_style(colors[14]),
+            text_field_text: dos_attribute_style(colors[12]),
+            text_field_background: dos_attribute_style(colors[12]),
+            text_field_filler_char: ' ',
+            table: dos_attribute_style(colors[5]),
+            table_inactive: dos_attribute_style(colors[8]),
+            table_header: dos_attribute_style(colors[2]),
+            help_box: dos_attribute_style(colors[15]),
+            help_header: dos_attribute_style(colors[16]),
+            swatch: false,
+        }
+    }
 }
 
 pub static CLASSIC_THEME: Theme = Theme {

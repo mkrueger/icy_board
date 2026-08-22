@@ -7,7 +7,7 @@ use icy_board_engine::icy_board::{
     lock::BoardLock,
     user_maintenance::{self, UserSelection},
 };
-use icy_board_tui::{print_error, term};
+use icy_board_tui::{print_error, term, theme::set_tui_theme};
 use semver::Version;
 use std::{
     path::PathBuf,
@@ -139,6 +139,7 @@ fn main() -> Result<()> {
                 }
             }
 
+            set_tui_theme(&icy_board.config.sysop.config_color_configuration);
             let terminal = &mut term::init()?;
             let icy_board = Arc::new(Mutex::new(icy_board));
             new_main_window(icy_board.clone(), arguments.full_screen).run(terminal)?;

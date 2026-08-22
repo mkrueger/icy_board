@@ -250,6 +250,16 @@ icb_setup_main_sec_levels-help=
     up security levels for sysop functions, sysop commands and user
     commands.
 
+icbsm_define_editors=Define Text & Graphics Editors
+icbsm_customize_colors=Customize Colors
+icbsm_text_editor=Text Editor
+icbsm_graphics_editor=Graphics Editor
+icbsm_color_title=Color Customization
+icbsm_color_default_1=Default Color Set #1
+icbsm_color_default_2=Default Color Set #2
+icbsm_color_bw=Default B&W Colors
+icbsm_color_customize=Customize Colors
+
 icb_setup_main_acc_cfg=Accounting Configuration
 icb_setup_main_acc_cfg-help=
     # Accounting Configuration
@@ -650,6 +660,13 @@ sys_info_external_editor-help=
 
     Enter the name of the external editor that the sysop will use
     to edit general text files in `icbsetup`.
+
+sys_info_graphics_editor=Graphics Editor
+sys_info_graphics_editor-status=Editor for ANSI and graphics files.
+sys_info_graphics_editor-help=
+    # Graphics Editor
+
+    Enter the name of the editor used for ANSI and graphics files.
 
 sys_info_theme=Color Theme
 sys_info_theme-status=Color Theme
