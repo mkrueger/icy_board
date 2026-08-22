@@ -357,6 +357,37 @@ The outermost PPE always disables mouse/key modes, stops sound it started,
 releases graphics and restores cursor, wrapping, palette and Sixel scrolling
 state, including after `STOP` or an execution error.
 
+### Terminal information
+
+`TermInfo()` returns an immutable `TERMINFO` snapshot of the terminal facts the
+board has already detected. It uses cached session data and never starts a new
+terminal probe.
+
+```PPL
+TERMINFO term = TermInfo()
+
+PRINTLN term.Program, " ", term.Columns, "x", term.Rows
+IF term.InlineGraphics PRINTLN "Inline graphics available"
+```
+
+| Property | Meaning |
+| :--- | :--- |
+| `Program` | `IcyTerm`, `SyncTerm` or `Unknown` |
+| `DeviceAttrs` | Raw primary device-attributes reply, or an empty string |
+| `Columns`, `Rows` | Detected text dimensions |
+| `Utf8` | Whether UTF-8 cursor movement was detected |
+| `RipVersion` | Reported RIP version, or an empty string |
+| `CTermLevel` | Highest known CTerm-compatible protocol level, or zero |
+| `Sixel`, `Jxl`, `InlineGraphics` | Detected graphics capabilities |
+| `Sound`, `PhysicalKeys` | Detected audio and physical-key capabilities |
+| `CellWidth`, `CellHeight` | Cell dimensions in pixels |
+| `ScreenWidth`, `ScreenHeight` | Screen dimensions in pixels, or zero when unknown |
+
+`CTermLevel` encodes CTerm 1.332 as `1332`. IcyTerm reports the compatible
+level needed by the features it implements. Prefer named capability properties
+over comparing this number unless a PPE is experimenting with a newer protocol
+operation. `DeviceAttrs` is diagnostic data and may contain escape characters.
+
 ### Text margins
 
 Text margins expose ANSI's independent vertical and horizontal scrolling

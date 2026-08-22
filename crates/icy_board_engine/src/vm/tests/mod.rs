@@ -23,14 +23,15 @@ mod margins;
 mod masks;
 mod message_base;
 mod mouse;
-mod palette;
 mod nested_records;
+mod palette;
 mod ppe_paths;
 mod record_literals;
 mod records;
 mod routine_parameters;
 mod scalars;
 mod sound;
+mod terminal_info;
 mod tpa;
 
 use std::path::PathBuf;

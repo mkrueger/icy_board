@@ -306,6 +306,7 @@ pub async fn run_function(opcode: FuncOpCode, arg: &mut VirtualMachine<'_>, argu
         FuncOpCode::LoadAudio => crate::vm::statements::predefined_procedures::load_audio(arg, arguments).await,
         FuncOpCode::TermState => predefined_functions::termstate(arg, arguments).await,
         FuncOpCode::Err => predefined_functions::err(arg, arguments).await,
+        FuncOpCode::TermInfo => predefined_functions::terminfo(arg, arguments).await,
         FuncOpCode::END
         | FuncOpCode::CPAR
         | FuncOpCode::UPLUS

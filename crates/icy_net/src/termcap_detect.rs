@@ -16,6 +16,8 @@ pub enum TerminalProgram {
 #[derive(Clone, Debug, PartialEq)]
 pub struct TerminalCaps {
     pub program: TerminalProgram,
+    /// Raw primary device-attributes reply, retained for diagnostics.
+    pub device_attributes: Option<String>,
     pub term_size: (u16, u16),
     pub is_utf8: bool,
     pub rip_version: Option<String>,
@@ -34,6 +36,7 @@ pub struct TerminalCaps {
 impl TerminalCaps {
     pub const LOCAL: TerminalCaps = TerminalCaps {
         program: TerminalProgram::Unknown,
+        device_attributes: None,
         term_size: (80, 25),
         is_utf8: true,
         rip_version: None,
@@ -109,6 +112,7 @@ impl TerminalCaps {
         Ok((
             Self {
                 program,
+                device_attributes: media.device_attributes.clone(),
                 term_size,
                 is_utf8,
                 rip_version,

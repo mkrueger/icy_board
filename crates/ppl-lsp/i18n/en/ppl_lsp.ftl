@@ -1110,6 +1110,7 @@ hint-function-rgb=Packs red, green, blue and optional alpha components into an R
 hint-function-sound-api=Queries SyncTERM audio capability, format support or channel state.
 hint-function-event-api=Returns the next translated key, physical key edge or mouse event as an EVENT object.
 hint-function-term-state=Returns an immutable TERMSTATE snapshot of the active text margins.
+hint-function-term-info=Returns an immutable TERMINFO snapshot of cached terminal identity, dimensions, encoding and capabilities without starting another probe.
 hint-function-err=Returns an ERROR describing the last operation that could fail: OK, Kind, Code, Message and Channel.
 hint-statement-errclr=Forgets the last error, so ERR().OK is true again.
 hint-statement-on-error=ON ERROR GOTO label | GOSUB label | Procedure | OFF - where a failed operation sends the program.

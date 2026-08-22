@@ -20,6 +20,7 @@ hint-function-gfx-api=Fragt Grafik-Backend, Fähigkeiten, Oberfläche, Geometrie
 hint-function-rgb=Packt Rot, Grün, Blau und optional Alpha in einen RGBA-Farbwert.
 hint-function-sound-api=Fragt SyncTERM-Audiofähigkeit, Formatunterstützung oder Kanalstatus ab.
 hint-function-event-api=Gibt das nächste Zeichen-, physische Tasten- oder Mausereignis als EVENT-Objekt zurück.
+hint-function-term-info=Gibt einen unveränderlichen TERMINFO-Schnappschuss der zwischengespeicherten Terminalkennung, Abmessungen, Kodierung und Fähigkeiten zurück, ohne eine neue Abfrage zu starten.
 hint-statement-gfx-api=Erstellt, zeichnet, präsentiert oder steuert Sixel-/JPEG-XL-Grafikflächen.
 hint-statement-sound-api=Lädt, spielt, blendet, stoppt oder ändert SyncTERM-Audio.
 hint-statement-mouse-api=Aktiviert oder deaktiviert Mausereignisse in Zeichen- oder Pixelkoordinaten.

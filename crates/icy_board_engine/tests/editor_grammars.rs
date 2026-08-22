@@ -146,7 +146,7 @@ fn vscode_grammar_knows_every_built_in() {
         .map(|def| def.name.to_ascii_uppercase())
         .filter(|name| !name.starts_with('<') && !FUNCTIONS_NOT_IN_GRAMMAR.contains(&name.as_str()))
         .collect();
-    let in_grammar = list_from_textmate("builtin-functions");
+    let in_grammar = [list_from_textmate("builtin-functions"), list_from_textmate("terminal-info")].concat();
     assert_eq!(
         missing(&expected, &in_grammar),
         Vec::<String>::new(),
