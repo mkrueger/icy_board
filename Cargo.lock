@@ -3611,7 +3611,7 @@ dependencies = [
 
 [[package]]
 name = "icbadmin"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-trait",
  "axum",
@@ -3629,7 +3629,7 @@ dependencies = [
 
 [[package]]
 name = "icbfile"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "argh",
  "chrono",
@@ -3642,7 +3642,7 @@ dependencies = [
 
 [[package]]
 name = "icbmailer"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "argh",
  "chrono",
@@ -3656,7 +3656,7 @@ dependencies = [
 
 [[package]]
 name = "icboard"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "argh",
  "ariadne",
@@ -3705,7 +3705,7 @@ dependencies = [
 
 [[package]]
 name = "icbsetup"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "argh",
  "ariadne",
@@ -3740,7 +3740,7 @@ dependencies = [
 
 [[package]]
 name = "icbsm"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "argh",
  "ariadne",
@@ -3855,7 +3855,7 @@ dependencies = [
 
 [[package]]
 name = "icy_board_engine"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "argon2 0.5.3",
  "async-recursion",
@@ -4026,7 +4026,7 @@ dependencies = [
 
 [[package]]
 name = "icy_net"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "async-trait",
  "bytes",
@@ -5538,7 +5538,7 @@ dependencies = [
 
 [[package]]
 name = "mkicbmnu"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "argh",
  "ariadne",
@@ -5563,7 +5563,7 @@ dependencies = [
 
 [[package]]
 name = "mkicbtxt"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "argh",
  "ariadne",
@@ -7122,7 +7122,7 @@ checksum = "439ee305def115ba05938db6eb1644ff94165c5ab5e9420d1c1bcedbba909391"
 
 [[package]]
 name = "ppl-lsp"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "dashmap 6.2.1",
  "env_logger",
@@ -7143,7 +7143,7 @@ dependencies = [
 
 [[package]]
 name = "pplc"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "argh",
  "ariadne",
@@ -7165,7 +7165,7 @@ dependencies = [
 
 [[package]]
 name = "ppld"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "argh",
  "codepages 0.1.0",

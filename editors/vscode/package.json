@@ -3,7 +3,7 @@
 	"displayName": "PPL Language Support",
 	"description": "Language support for the PCBoard Programming Language",
 	"license": "MIT",
-	"version": "0.2.0",
+	"version": "0.2.1",
 	"categories": [
 		"Programming Languages"
 	],
