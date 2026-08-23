@@ -13,7 +13,7 @@ use dizbase::{
         scan_file,
     },
 };
-use icy_board_engine::icy_board::{IcyBoardSerializer, file_directory::DirectoryList};
+use icy_board_engine::icy_board::{IcyBoardSerializer, file_directory::DirectoryList, lookup_case_insensitive};
 
 mod listing;
 
@@ -502,7 +502,8 @@ fn import(cmd: &Import) -> Res<()> {
         println!("{}: {} entries", listing.display(), entries.len());
 
         for entry in &entries {
-            let path = base.dir().join(&entry.name);
+            let requested_path = base.dir().join(&entry.name);
+            let path = lookup_case_insensitive(&requested_path);
             if !path.exists() {
                 unknown += 1;
                 if !cmd.keep_missing {
@@ -510,7 +511,7 @@ fn import(cmd: &Import) -> Res<()> {
                     continue;
                 }
                 if !cmd.dry_run {
-                    place_holder(&mut base, &path, entry)?;
+                    place_holder(&mut base, &requested_path, entry)?;
                 }
             }
             if !cmd.overwrite && base.is_authored(&path).unwrap_or(false) {
@@ -560,7 +561,7 @@ fn apply_free(base: &mut FileBase, path: &Path, free: bool) -> Res<()> {
     let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
         return Ok(());
     };
-    if let Some(header) = base.iter_mut().find(|header| header.name == name) {
+    if let Some(header) = base.iter_mut().find(|header| header.name.eq_ignore_ascii_case(name)) {
         header.set_free(true);
     }
     Ok(())
@@ -614,7 +615,7 @@ fn export(mut base: FileBase, output: Option<&Path>) -> Res<()> {
 fn set(cmd: &Set) -> Res<()> {
     let mut base = open(&cmd.target, &cmd.area)?;
     let path = base.dir().join(&cmd.file);
-    if base.iter().all(|header| header.name != cmd.file) {
+    if base.iter().all(|header| !header.name.eq_ignore_ascii_case(&cmd.file)) {
         return Err(format!("{} is not in this area", cmd.file).into());
     }
 
@@ -622,12 +623,12 @@ fn set(cmd: &Set) -> Res<()> {
         base.set_description(&path, description)?;
     }
     if let Some(free) = cmd.free
-        && let Some(header) = base.iter_mut().find(|header| header.name == cmd.file)
+        && let Some(header) = base.iter_mut().find(|header| header.name.eq_ignore_ascii_case(&cmd.file))
     {
         header.set_free(free);
     }
     if let Some(locked) = cmd.locked
-        && let Some(header) = base.iter_mut().find(|header| header.name == cmd.file)
+        && let Some(header) = base.iter_mut().find(|header| header.name.eq_ignore_ascii_case(&cmd.file))
     {
         header.set_locked(locked);
     }

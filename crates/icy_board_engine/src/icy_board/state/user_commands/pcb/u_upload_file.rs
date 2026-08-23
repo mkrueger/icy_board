@@ -1,5 +1,6 @@
 use crate::icy_board::commands::CommandType;
 use crate::icy_board::icb_config::IcbColor;
+use crate::icy_board::lookup_case_insensitive;
 use crate::{Res, icy_board::state::IcyBoardState};
 use crate::{
     icy_board::{
@@ -11,7 +12,10 @@ use crate::{
     },
     vm::TerminalTarget,
 };
-use dizbase::file_base::metadata::{MetadataHeader, MetadataType};
+use dizbase::file_base::{
+    FileBase,
+    metadata::{MetadataHeader, MetadataType},
+};
 use dizbase::file_base_scanner::scan_file;
 use fs4::available_space;
 use icy_net::protocol::{Protocol, TransferProtocolType, XYModemVariant, XYmodem, Zmodem};
@@ -25,7 +29,33 @@ fn enough_upload_space(available_bytes: u64, minimum_kib: u32) -> bool {
     minimum_kib == 0 || available_bytes / 1024 >= u64::from(minimum_kib)
 }
 
+fn upload_name_exists(base: &FileBase, location: &std::path::Path, name: &str) -> bool {
+    base.contains_name(name) || lookup_case_insensitive(&location.join(name)).exists()
+}
+
 impl IcyBoardState {
+    async fn upload_name_exists_on_system(&mut self, name: &str) -> Res<bool> {
+        let conference = self.session.current_conference.clone();
+        for location in [&conference.pub_upload_location, &conference.private_upload_location] {
+            if lookup_case_insensitive(&location.join(name)).exists() {
+                return Ok(true);
+            }
+        }
+        if let Some(directories) = conference.directories {
+            for directory in directories.iter() {
+                let base = self.get_filebase(&directory.path, &directory.metadata_path).await?;
+                let exists = {
+                    let base = base.lock().await;
+                    upload_name_exists(&base, &directory.path, name)
+                };
+                if exists {
+                    return Ok(true);
+                }
+            }
+        }
+        Ok(false)
+    }
+
     /// An upload throws the flag list
     /// away, so `PCBoard` asks first - and this is the very first prompt of the
     /// U command, ahead of the file name.
@@ -144,6 +174,13 @@ impl IcyBoardState {
 
             if file_name.is_empty() {
                 return Ok(());
+            }
+
+            if self.upload_name_exists_on_system(&file_name).await? {
+                self.session.op_text = file_name;
+                self.display_text(IceText::DuplicateFile, display_flags::NEWLINE | display_flags::LFBEFORE)
+                    .await?;
+                continue;
             }
 
             if let Some((description, private_upload)) = self.ask_upload_description(&file_name).await? {
@@ -282,10 +319,21 @@ impl IcyBoardState {
                     self.board.lock().await.save_statistics()?;
 
                     for (x, path) in state.recieve_state.finished_files {
-                        let dest = upload_location.join(x);
+                        let dest = upload_location.join(&x);
+                        let file_base = self.get_filebase(&upload_location, &upload_metadata).await?;
+                        let duplicate = {
+                            let base = file_base.lock().await;
+                            upload_name_exists(&base, &upload_location, &x)
+                        };
+                        if duplicate {
+                            self.session.op_text = x;
+                            self.display_text(IceText::DuplicateFile, display_flags::NEWLINE | display_flags::LFBEFORE)
+                                .await?;
+                            std::fs::remove_file(&path)?;
+                            continue;
+                        }
                         std::fs::copy(&path, &dest)?;
 
-                        let file_base = self.get_filebase(&upload_location, &upload_metadata).await?;
                         let mut metadata = scan_file(&dest)?;
                         metadata.push(MetadataHeader {
                             data: self.session.get_username_or_alias().as_bytes().to_vec(),
@@ -365,12 +413,29 @@ pub fn create_protocol(protocol: &TransferProtocolType) -> Option<Box<dyn Protoc
 
 #[cfg(test)]
 mod option_tests {
-    use super::enough_upload_space;
+    use tempfile::TempDir;
+
+    use super::{FileBase, enough_upload_space, upload_name_exists};
 
     #[test]
     fn upload_space_limit_is_in_kib_and_zero_disables_it() {
         assert!(!enough_upload_space(1023, 1));
         assert!(enough_upload_space(1024, 1));
         assert!(enough_upload_space(0, 0));
+    }
+
+    #[test]
+    fn upload_duplicate_checks_ignore_ascii_case_in_the_index_and_on_disk() {
+        let indexed_dir = TempDir::new().unwrap();
+        let indexed_file = indexed_dir.path().join("Existing.ZIP");
+        std::fs::write(&indexed_file, b"old").unwrap();
+        let indexed = FileBase::open(indexed_dir.path(), indexed_dir.path().join("dir")).unwrap();
+        std::fs::remove_file(indexed_file).unwrap();
+        assert!(upload_name_exists(&indexed, indexed_dir.path(), "EXISTING.ZIP"));
+
+        let disk_dir = TempDir::new().unwrap();
+        let unindexed = FileBase::open(disk_dir.path(), disk_dir.path().join("dir")).unwrap();
+        std::fs::write(disk_dir.path().join("OnDisk.ZIP"), b"old").unwrap();
+        assert!(upload_name_exists(&unindexed, disk_dir.path(), "ondisk.zip"));
     }
 }

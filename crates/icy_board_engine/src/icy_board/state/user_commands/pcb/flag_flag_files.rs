@@ -5,6 +5,7 @@ use humanize_bytes::humanize_bytes_decimal;
 
 use crate::icy_board::commands::CommandType;
 use crate::icy_board::icb_config::IcbColor;
+use crate::icy_board::lookup_case_insensitive;
 use crate::icy_board::state::functions::MASK_ASCII;
 use crate::{Res, icy_board::state::IcyBoardState};
 use crate::{
@@ -46,7 +47,7 @@ impl IcyBoardState {
                     for f in files.lock().await.iter() {
                         if pattern.matches_with(f.name(), &options) {
                             let size = f.size();
-                            flagged.push((dir.path.join(f.name.clone()), size));
+                            flagged.push((lookup_case_insensitive(&dir.path.join(&f.name)), size));
                         }
                     }
                 }

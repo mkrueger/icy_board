@@ -1,6 +1,11 @@
-use icy_board_engine::icy_board::{IcyBoard, conferences::Conference, file_directory::DirectoryList};
+use dizbase::file_base::FileBase;
+use icy_board_engine::icy_board::{
+    IcyBoard,
+    conferences::Conference,
+    file_directory::{DirectoryList, FileDirectory},
+};
 
-use crate::tests::test_output;
+use crate::tests::{test_dir, test_output};
 
 /// No directory to search, so every name comes back as missing - which is all
 /// these tests are about.
@@ -27,4 +32,32 @@ fn test_download_asks_again_after_a_token() {
     let output = test_output("D NOSUCHFILE\n\n".to_string(), setup_empty_file_base);
     assert_eq!(output.matches("Enter the filename to Download").count(), 1, "{output}");
     assert!(output.contains("(NOSUCHFILE) not found on disk!"), "{output}");
+}
+
+#[test]
+fn a_filename_uppercased_by_the_prompt_flags_a_lowercase_file_on_disk() {
+    let root = test_dir();
+    let files = root.join("files");
+    std::fs::create_dir_all(&files).unwrap();
+    std::fs::write(files.join("gw-userstats.zip"), b"data").unwrap();
+    let metadata = root.join("dir1");
+    FileBase::open(&files, &metadata).unwrap();
+
+    let output = test_output("F 1\nF\nGW-USERSTATS.ZIP\n\n".to_string(), |board| {
+        let mut directories = DirectoryList::default();
+        directories.push(FileDirectory {
+            name: "Test Files".to_string(),
+            path: files.clone(),
+            metadata_path: metadata.clone(),
+            ..Default::default()
+        });
+        board.conferences.push(Conference {
+            name: "Main Board".to_string(),
+            directories: Some(directories),
+            ..Default::default()
+        });
+    });
+
+    assert!(!output.contains("not found on disk"), "{output}");
+    assert!(output.contains("gw-userstats.zip"), "the on-disk filename was not flagged: {output}");
 }

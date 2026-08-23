@@ -21,6 +21,10 @@ releases.
 
 - File listings now keep size, date and description in their fixed columns when
   a filename longer than 12 characters wraps onto its own line.
+- File-base lookup, upload duplicate checks, flagging and downloads now treat
+  ASCII filename case like DOS while preserving the real on-disk spelling.
+  This prevents case-variant duplicates and lets uppercase prompts work on
+  case-sensitive filesystems.
 
 ## [0.2.1] - 2026-08-23
 

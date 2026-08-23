@@ -62,6 +62,10 @@ pub struct FileBase {
     file_headers: Vec<FileHeader>,
 }
 
+fn name_key(name: &str) -> String {
+    name.to_ascii_lowercase()
+}
+
 impl Deref for FileBase {
     type Target = Vec<FileHeader>;
     fn deref(&self) -> &Self::Target {
@@ -177,7 +181,7 @@ impl FileBase {
         self.name_map.clear();
         for header in rows {
             let header = header?;
-            self.name_map.insert(header.name.clone(), self.file_headers.len());
+            self.name_map.entry(name_key(&header.name)).or_insert(self.file_headers.len());
             self.file_headers.push(header);
         }
         Ok(())
@@ -194,6 +198,8 @@ impl FileBase {
             return Err(FileBaseError::DirIsNoDir(self.dir.clone()).into());
         }
         let mut new_files = Vec::new();
+        let mut known_names: HashSet<String> = self.name_map.keys().cloned().collect();
+        known_names.extend(self.reserved_names.iter().map(|name| name_key(name)));
         for entry in fs::read_dir(&self.dir)? {
             let path = entry?.path();
             if !path.is_file() {
@@ -203,7 +209,8 @@ impl FileBase {
                 log::warn!("Skipping file with a non utf-8 name: {}", path.display());
                 continue;
             };
-            if self.name_map.contains_key(file_name) || self.reserved_names.contains(file_name) {
+            let key = name_key(file_name);
+            if !known_names.insert(key) {
                 continue;
             }
             let (date, size) = Self::file_stats(&path);
@@ -242,9 +249,13 @@ impl FileBase {
             .and_then(|n| n.to_str())
             .ok_or_else(|| FileBaseError::FileNotFound(path.display().to_string()))?;
         self.name_map
-            .get(file_name)
+            .get(&name_key(file_name))
             .copied()
             .ok_or_else(|| FileBaseError::FileNotFound(file_name.to_string()).into())
+    }
+
+    pub fn contains_name(&self, name: &str) -> bool {
+        self.name_map.contains_key(&name_key(name))
     }
 
     pub fn add_file(&mut self, path: &Path, metadata: Vec<MetadataHeader>) -> crate::Result<()> {
@@ -253,12 +264,17 @@ impl FileBase {
             .and_then(|n| n.to_str())
             .ok_or_else(|| FileBaseError::FileNotFound(path.display().to_string()))?
             .to_string();
-        if self.name_map.contains_key(&file_name) {
+        let transaction = self.connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+        let duplicate: Option<String> = transaction
+            .query_row("SELECT name FROM files WHERE name = ?1 COLLATE NOCASE LIMIT 1", params![file_name], |row| {
+                row.get(0)
+            })
+            .optional()?;
+        if duplicate.is_some() {
             return Err(FileBaseError::FileAlreadyExists(file_name).into());
         }
         let (date, size) = Self::file_stats(path);
 
-        let transaction = self.connection.transaction()?;
         transaction.execute(
             "INSERT INTO files (name, date, size, scanned) VALUES (?1, ?2, ?3, 1)",
             params![file_name, date.timestamp_millis(), size as i64],
@@ -267,7 +283,7 @@ impl FileBase {
         Self::insert_metadata(&transaction, id, &metadata)?;
         transaction.commit()?;
 
-        self.name_map.insert(file_name.clone(), self.file_headers.len());
+        self.name_map.insert(name_key(&file_name), self.file_headers.len());
         self.file_headers.push(FileHeader {
             id,
             name: file_name,
@@ -646,6 +662,20 @@ mod tests {
     }
 
     #[test]
+    fn test_file_names_are_indexed_without_regard_to_ascii_case() {
+        let dir = TempDir::new().unwrap();
+        write(&dir, "lower.zip", b"data");
+        let actual = dir.path().join("lower.zip");
+        let upper = dir.path().join("LOWER.ZIP");
+
+        let mut base = base(&dir);
+        assert!(base.contains_name("LOWER.ZIP"));
+        base.set_description(&upper, "description").unwrap();
+        assert_eq!(base.description(&actual).unwrap().as_deref(), Some("description"));
+        assert!(base.add_file(&upper, Vec::new()).is_err());
+    }
+
+    #[test]
     fn test_an_entry_whose_file_vanished_keeps_its_counter() {
         let dir = TempDir::new().unwrap();
         write(&dir, "ALPHA.TXT", b"alpha");
@@ -686,5 +716,18 @@ mod tests {
 
         assert_eq!(node2.read_metadata(&dir.path().join("ALPHA.TXT")).unwrap()[0].data, b"node1");
         assert_eq!(node1.read_metadata(&dir.path().join("BETA.TXT")).unwrap()[0].data, b"node2");
+    }
+
+    #[test]
+    fn test_a_stale_node_cannot_insert_a_case_variant() {
+        let dir = TempDir::new().unwrap();
+        let mut node1 = base(&dir);
+        let mut node2 = base(&dir);
+        let lower = dir.path().join("lower.zip");
+        write(&dir, "lower.zip", b"data");
+
+        node1.add_file(&lower, Vec::new()).unwrap();
+        assert!(node2.add_file(&dir.path().join("LOWER.ZIP"), Vec::new()).is_err());
+        assert_eq!(base(&dir).len(), 1);
     }
 }

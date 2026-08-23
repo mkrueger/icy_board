@@ -51,3 +51,25 @@ fn test_upload_slash_marks_it_for_screening() {
     let output = test_output("U\nTESTUP.ZIP\n/a private upload\n\n\n".to_string(), setup_upload_directory);
     assert!(output.contains("Screened Before Posting"), "{output}");
 }
+
+#[test]
+fn test_upload_rejects_an_existing_filename_without_regard_to_case() {
+    let upload = test_dir();
+    std::fs::write(upload.join("existing.zip"), b"old").unwrap();
+    let private = test_dir();
+
+    let output = test_output("U\nEXISTING.ZIP\n\n".to_string(), |board| {
+        board.conferences.push(Conference {
+            name: "Main Board".to_string(),
+            pub_upload_location: upload.clone(),
+            private_upload_location: private.clone(),
+            ..Default::default()
+        });
+    });
+
+    assert!(output.contains("already exists on the system"), "{output}");
+    assert!(
+        !output.contains("Before beginning, enter a description"),
+        "a duplicate reached the description prompt: {output}"
+    );
+}
