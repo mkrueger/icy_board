@@ -61,3 +61,44 @@ fn a_filename_uppercased_by_the_prompt_flags_a_lowercase_file_on_disk() {
     assert!(!output.contains("not found on disk"), "{output}");
     assert!(output.contains("gw-userstats.zip"), "the on-disk filename was not flagged: {output}");
 }
+
+#[test]
+fn an_offline_duplicate_does_not_report_missing_when_another_copy_is_on_disk() {
+    let root = test_dir();
+    let offline_dir = root.join("offline");
+    let online_dir = root.join("online");
+    std::fs::create_dir_all(&offline_dir).unwrap();
+    std::fs::create_dir_all(&online_dir).unwrap();
+    let offline_metadata = root.join("offline-dir");
+    let online_metadata = root.join("online-dir");
+
+    let offline_file = offline_dir.join("gw-comment.zip");
+    std::fs::write(&offline_file, b"old").unwrap();
+    FileBase::open(&offline_dir, &offline_metadata).unwrap();
+    std::fs::remove_file(offline_file).unwrap();
+    std::fs::write(online_dir.join("gw-comment.zip"), b"data").unwrap();
+    FileBase::open(&online_dir, &online_metadata).unwrap();
+
+    let output = test_output("F 1\nF\nGW-COMMENT.ZIP\n\n".to_string(), |board| {
+        let mut directories = DirectoryList::default();
+        for (name, path, metadata_path) in [
+            ("Offline", offline_dir.clone(), offline_metadata.clone()),
+            ("Online", online_dir.clone(), online_metadata.clone()),
+        ] {
+            directories.push(FileDirectory {
+                name: name.to_string(),
+                path,
+                metadata_path,
+                ..Default::default()
+            });
+        }
+        board.conferences.push(Conference {
+            name: "Main Board".to_string(),
+            directories: Some(directories),
+            ..Default::default()
+        });
+    });
+
+    assert!(!output.contains("not found on disk"), "{output}");
+    assert!(output.contains("gw-comment.zip"), "the online copy was not flagged: {output}");
+}

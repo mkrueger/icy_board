@@ -37,6 +37,7 @@ impl IcyBoardState {
         if !input.is_empty() {
             let saved_list = self.session.disp_options.in_file_list.take();
             let mut flagged = Vec::new();
+            let mut offline_matches = Vec::new();
             self.display_text(IceText::CheckingFileTransfer, display_flags::NEWLINE).await?;
 
             for dir in self.session.current_conference.directories.as_ref().unwrap().clone().iter() {
@@ -44,16 +45,22 @@ impl IcyBoardState {
                 let mut options = MatchOptions::new();
                 options.case_sensitive = false;
                 if let Ok(pattern) = Pattern::new(&input) {
-                    for f in files.lock().await.iter() {
+                    let files = files.lock().await;
+                    for f in files.iter() {
                         if pattern.matches_with(f.name(), &options) {
                             let size = f.size();
-                            flagged.push((lookup_case_insensitive(&dir.path.join(&f.name)), size));
+                            let path = lookup_case_insensitive(&files.full_path(f));
+                            if path.exists() {
+                                flagged.push((path, size));
+                            } else {
+                                offline_matches.push(path);
+                            }
                         }
                     }
                 }
             }
 
-            if flagged.is_empty() {
+            if flagged.is_empty() && offline_matches.is_empty() {
                 self.session.op_text.clone_from(&input);
                 self.display_text(IceText::NotFoundOnDisk, display_flags::NEWLINE | display_flags::LFBEFORE)
                     .await?;
@@ -61,15 +68,17 @@ impl IcyBoardState {
                 return Ok(true);
             }
 
-            for (file, _size) in flagged {
-                if self.session.disp_options.abort_printout {
-                    break;
-                }
-                if !file.exists() {
+            if flagged.is_empty() {
+                for file in offline_matches {
                     self.session.op_text = file.file_name().unwrap().to_string_lossy().to_string();
                     self.display_text(IceText::NotFoundOnDisk, display_flags::NEWLINE | display_flags::LFBEFORE)
                         .await?;
-                    continue;
+                }
+            }
+
+            for (file, _size) in flagged {
+                if self.session.disp_options.abort_printout {
+                    break;
                 }
                 self.add_flagged_file(file, false, true).await?;
             }
