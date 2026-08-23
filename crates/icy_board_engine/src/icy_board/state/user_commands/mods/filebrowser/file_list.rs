@@ -255,6 +255,7 @@ impl FileList {
             }
             if name.len() > 12 {
                 cmd.new_line().await?;
+                cmd.print(TerminalTarget::Both, &" ".repeat(13)).await?;
             }
 
             cmd.set_color(TerminalTarget::Both, colors.file_size.clone()).await?;
