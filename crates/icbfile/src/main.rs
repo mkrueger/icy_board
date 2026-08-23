@@ -77,12 +77,16 @@ struct List {
 /// derive descriptions from the archives in an area
 struct Scan {
     #[argh(positional)]
-    /// a file directory, or a file_areas.toml together with --area
+    /// a file directory, or a file_areas.toml together with --area or --all
     target: PathBuf,
 
     #[argh(option, short = 'a')]
     /// area name or index when the target is a file_areas.toml
     area: Option<String>,
+
+    #[argh(switch)]
+    /// scan every area in a file_areas.toml
+    all: bool,
 
     #[argh(switch, short = 'f')]
     /// re-derive descriptions that were imported or edited by hand
@@ -275,7 +279,7 @@ fn run(cli: Cli) -> Res<()> {
     match command {
         Command::Areas(cmd) => areas(&cmd.areas),
         Command::List(cmd) => list(open(&cmd.target, &cmd.area)?, cmd.long),
-        Command::Scan(cmd) => scan(open(&cmd.target, &cmd.area)?, cmd.force),
+        Command::Scan(cmd) => scan_command(&cmd),
         Command::Check(cmd) => check(open(&cmd.target, &cmd.area)?, cmd.prune),
         Command::Import(cmd) => import(&cmd),
         Command::Export(cmd) => export(open(&cmd.target, &cmd.area)?, cmd.output.as_deref()),
@@ -303,6 +307,10 @@ fn open(target: &Path, area: &Option<String>) -> Res<FileBase> {
         return Err(format!("{} is an area list, pick one of its areas with --area", target.display()).into());
     };
     let directory = select_area(&list, selector)?;
+    open_area(target, directory)
+}
+
+fn open_area(target: &Path, directory: &icy_board_engine::icy_board::file_directory::FileDirectory) -> Res<FileBase> {
     let base = target.parent().unwrap_or(Path::new("."));
     let path = resolve(base, &directory.path);
     let metadata_path = if directory.metadata_path.as_os_str().is_empty() {
@@ -361,21 +369,82 @@ fn list(mut base: FileBase, long: bool) -> Res<()> {
     Ok(())
 }
 
+fn scan_command(cmd: &Scan) -> Res<()> {
+    if !cmd.all {
+        return scan(open(&cmd.target, &cmd.area)?, cmd.force);
+    }
+    if cmd.area.is_some() {
+        return Err("--all and --area cannot be used together".into());
+    }
+    if cmd.target.is_dir() {
+        return Err("--all only applies when the target is a file_areas.toml".into());
+    }
+    if !cmd.target.is_file() {
+        return Err(format!("{} is neither a directory nor a file", cmd.target.display()).into());
+    }
+
+    let list = DirectoryList::load(&cmd.target).map_err(|err| format!("can't read {}: {}", cmd.target.display(), err))?;
+    let mut failures = 0;
+    for (index, area) in list.iter().enumerate() {
+        println!("\n[{index}] {}", area.name);
+        match open_area(&cmd.target, area).and_then(|base| scan(base, cmd.force)) {
+            Ok(()) => {}
+            Err(err) => {
+                failures += 1;
+                eprintln!("area failed: {err}");
+            }
+        }
+    }
+    if failures > 0 {
+        return Err(format!("{failures} area(s) failed").into());
+    }
+    Ok(())
+}
+
 fn scan(mut base: FileBase, force: bool) -> Res<()> {
+    let report = scan_files(&mut base, force)?;
+    for name in &report.no_description {
+        println!("no description: {name}");
+    }
+    for name in &report.missing {
+        println!("missing, not scanned: {name}");
+    }
+    println!(
+        "scanned {} file(s): {} with descriptions, {} without, {} missing",
+        report.scanned,
+        report.described,
+        report.no_description.len(),
+        report.missing.len()
+    );
+    Ok(())
+}
+
+#[derive(Default)]
+struct ScanReport {
+    scanned: usize,
+    described: usize,
+    no_description: Vec<String>,
+    missing: Vec<String>,
+}
+
+fn scan_files(base: &mut FileBase, force: bool) -> Res<ScanReport> {
     let headers: Vec<FileHeader> = base.to_vec();
-    let mut described = 0;
+    let mut report = ScanReport::default();
     for header in &headers {
         let path = base.full_path(header);
         if !path.exists() {
+            report.missing.push(header.name.clone());
             continue;
         }
+        report.scanned += 1;
         base.rescan(&path, force)?;
         if base.description(&path)?.is_some_and(|d| !d.is_empty()) {
-            described += 1;
+            report.described += 1;
+        } else {
+            report.no_description.push(header.name.clone());
         }
     }
-    println!("scanned {} file(s), {} have a description", headers.len(), described);
-    Ok(())
+    Ok(report)
 }
 
 fn check(mut base: FileBase, prune: bool) -> Res<()> {
@@ -670,4 +739,98 @@ fn fingerprints(cmd: &Fingerprints) -> Res<()> {
     data.save(&cmd.output)?;
     println!("wrote the fingerprints of {} to {}", cmd.input.display(), cmd.output.display());
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{fs::File, io::Write};
+
+    use tempfile::TempDir;
+    use zip::{ZipWriter, write::SimpleFileOptions};
+
+    use super::*;
+
+    fn archive(path: &Path, description: Option<&str>) {
+        let mut zip = ZipWriter::new(File::create(path).unwrap());
+        zip.start_file("payload.txt", SimpleFileOptions::default()).unwrap();
+        zip.write_all(b"payload").unwrap();
+        if let Some(description) = description {
+            zip.start_file("FILE_ID.DIZ", SimpleFileOptions::default()).unwrap();
+            zip.write_all(description.as_bytes()).unwrap();
+        }
+        zip.finish().unwrap();
+    }
+
+    #[test]
+    fn scan_extracts_multiline_descriptions_and_reports_archives_without_one() {
+        let dir = TempDir::new().unwrap();
+        archive(&dir.path().join("DESCRIBED.ZIP"), Some("First line\r\nSecond line\r\n"));
+        archive(&dir.path().join("EMPTY.ZIP"), None);
+
+        let mut base = FileBase::open(dir.path(), dir.path().join("dir")).unwrap();
+        let report = scan_files(&mut base, false).unwrap();
+
+        assert_eq!(report.scanned, 2);
+        assert_eq!(report.described, 1);
+        assert_eq!(report.no_description, ["EMPTY.ZIP"]);
+        assert!(report.missing.is_empty());
+        assert_eq!(
+            base.description(&dir.path().join("DESCRIBED.ZIP")).unwrap().as_deref(),
+            Some("First line\nSecond line")
+        );
+    }
+
+    #[test]
+    fn scan_all_processes_every_area_in_a_list() {
+        let dir = TempDir::new().unwrap();
+        fs::create_dir(dir.path().join("one")).unwrap();
+        fs::create_dir(dir.path().join("two")).unwrap();
+        archive(&dir.path().join("one/ONE.ZIP"), Some("First area"));
+        archive(&dir.path().join("two/TWO.ZIP"), Some("Second area"));
+        let list = dir.path().join("file_areas.toml");
+        fs::write(
+            &list,
+            r#"
+                [[area]]
+                name = "One"
+                path = "one"
+                metadata_path = "one/dir"
+                password = ""
+
+                [[area]]
+                name = "Two"
+                path = "two"
+                metadata_path = "two/dir"
+                password = ""
+            "#,
+        )
+        .unwrap();
+
+        scan_command(&Scan {
+            target: list,
+            area: None,
+            all: true,
+            force: false,
+        })
+        .unwrap();
+
+        for (area, file, expected) in [("one", "ONE.ZIP", "First area"), ("two", "TWO.ZIP", "Second area")] {
+            let path = dir.path().join(area);
+            let mut base = FileBase::open(&path, path.join("dir")).unwrap();
+            assert_eq!(base.description(&path.join(file)).unwrap().as_deref(), Some(expected));
+        }
+    }
+
+    #[test]
+    fn scan_all_cannot_be_combined_with_an_area() {
+        let error = scan_command(&Scan {
+            target: PathBuf::from("file_areas.toml"),
+            area: Some("0".to_string()),
+            all: true,
+            force: false,
+        })
+        .unwrap_err();
+
+        assert_eq!(error.to_string(), "--all and --area cannot be used together");
+    }
 }

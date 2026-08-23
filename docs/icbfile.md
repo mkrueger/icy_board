@@ -118,7 +118,7 @@ $ icbfile areas config/file_areas.toml
 ```
 icbfile areas  <file_areas.toml>
 icbfile list   <target> [-a AREA] [-l]
-icbfile scan   <target> [-a AREA] [--force]
+icbfile scan   <target> [-a AREA | --all] [--force]
 icbfile check  <target> [-a AREA] [--prune]
 icbfile import <target> <listing>... [-a AREA] [-f FORMAT] [-n] [--overwrite] [--keep-missing]
 icbfile export <target> [-a AREA] [-o FILE]
@@ -211,8 +211,53 @@ To force the work to happen now, rather than when the first user lists the area:
 icbfile scan uploads
 ```
 
+The scan names every file for which it could not find a usable description:
+
+```text
+no description: GW-COMMENT.ZIP
+no description: GW-LOG10.ZIP
+scanned 6 file(s): 0 with descriptions, 6 without, 0 missing
+```
+
+That means the archive has no readable `FILE_ID.PCB`, `FILE_ID.ANS`, `FILE_ID.DIZ` or
+`DESC.SDI`, or that the description member is empty. It does not mean the BBS truncated a
+long description. Multiline descriptions are stored in full and continuation lines are
+shown below the first line. A caller who selected short-description mode sees only the
+first line.
+
 `scan` keeps authored descriptions. Use `--force` only when you want to throw away
 everything you imported or edited and go back to what the archives say.
+
+For a live board, target the same area list the conference uses instead of guessing at
+the upload directory. First list its area indices, then scan the affected one:
+
+```sh
+icbfile areas /path/to/board/config/file_areas.toml
+icbfile scan /path/to/board/config/file_areas.toml --area 0
+```
+
+Scan every area in the list with one command:
+
+```sh
+icbfile scan /path/to/board/config/file_areas.toml --all
+```
+
+If descriptions were scanned before the archives received corrected `FILE_ID.DIZ`
+members, re-extract them with:
+
+```sh
+icbfile scan /path/to/board/config/file_areas.toml --area 0 --force
+```
+
+Use `--all --force` to discard and re-extract descriptions in every area:
+
+```sh
+icbfile scan /path/to/board/config/file_areas.toml --all --force
+```
+
+`--force` also discards descriptions entered with `icbfile set` or imported from a DIR
+listing. Use `icbfile import` instead when the descriptions belong to an old PCBoard DIR
+file or `FILES.BBS` rather than to the archives themselves.
 
 ### Editing a single entry
 

@@ -3640,6 +3640,7 @@ dependencies = [
  "icy_board_engine",
  "libc",
  "tempfile",
+ "zip",
 ]
 
 [[package]]
