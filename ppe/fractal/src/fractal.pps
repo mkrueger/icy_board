@@ -62,7 +62,7 @@ ELSE
     fracH = 160
     zoom = 1
 ENDIF
-hudY = fracH * zoom + 8
+hudY = fracH * zoom
 
 frac = NewSurface(fracW, fracH)
 hud = NewSurface(VIEW_W, HUD_H)

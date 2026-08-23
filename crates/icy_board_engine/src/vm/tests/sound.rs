@@ -11,12 +11,12 @@ fn sound_capabilities_are_queried_and_cached() {
         PrintLn first.Valid, second.Valid
         "#,
         &[("tone.wav", TONE)],
-        b"\x1b[=7;100;1n\x1b[=7;101;1;0;1n",
+        b"\x1b[=7;100;1n\x1b[=7;101;1;2;1n",
     );
 
     assert!(output.ends_with("11\n"), "{output:?}");
     assert_eq!(output.matches("SyncTERM:Q;libsndfile\x1b\\").count(), 1, "{output:?}");
-    assert_eq!(output.matches("SyncTERM:Q;libsndfileFormat;1;0").count(), 1, "{output:?}");
+    assert_eq!(output.matches("SyncTERM:Q;libsndfileFormat;1;2").count(), 1, "{output:?}");
 }
 
 #[test]
@@ -29,10 +29,10 @@ fn the_first_sound_takes_the_lowest_apc_channel() {
         tone.Stop()
         "#,
         &[("tone.wav", TONE)],
-        b"\x1b[=7;100;1n\x1b[=7;101;1;0;1n",
+        b"\x1b[=7;100;1n\x1b[=7;101;1;2;1n",
     );
 
-    assert!(output.contains("SyncTERM:Q;libsndfileFormat;1;0"), "{output:?}");
+    assert!(output.contains("SyncTERM:Q;libsndfileFormat;1;2"), "{output:?}");
     assert!(output.contains("Load;S=2;"), "{output:?}");
     assert!(output.contains("Queue;C=2;S=2"), "{output:?}");
     assert!(output.contains("0:1\n"), "{output:?}");
@@ -56,7 +56,7 @@ fn a_sound_object_carries_its_own_channel() {
         PRINTLN music.Valid
         "#,
         &[("tone.wav", TONE)],
-        b"\x1b[=7;100;1n\x1b[=7;101;1;0;1n",
+        b"\x1b[=7;100;1n\x1b[=7;101;1;2;1n",
     );
 
     // One upload is enough, because both objects name the same cached file.
@@ -79,7 +79,7 @@ fn a_freed_sound_gives_its_channel_back() {
         PRINTLN second.Channel
         "#,
         &[("tone.wav", TONE)],
-        b"\x1b[=7;100;1n\x1b[=7;101;1;0;1n",
+        b"\x1b[=7;100;1n\x1b[=7;101;1;2;1n",
     );
 
     assert!(output.ends_with("0\n"), "{output:?}");
@@ -108,7 +108,7 @@ fn sound_failures_are_reported_by_err() {
         PrintLn ERR().Kind, ":", ERR().Code
         "#,
         &[("tone.wav", TONE)],
-        b"\x1b[=7;100;1n\x1b[=7;101;1;0;0n",
+        b"\x1b[=7;100;1n\x1b[=7;101;1;2;0n",
     );
     assert!(unsupported.ends_with("6:4\n"), "{unsupported:?}");
 
@@ -117,7 +117,7 @@ fn sound_failures_are_reported_by_err() {
         AUDIO tone = LoadAudio("nope.wav")
         PrintLn ERR().Kind, ":", ERR().Code
         "#,
-        b"\x1b[=7;100;1n\x1b[=7;101;1;0;1n",
+        b"\x1b[=7;100;1n\x1b[=7;101;1;2;1n",
     );
     assert!(missing.ends_with("6:3\n"), "{missing:?}");
 }
@@ -131,7 +131,7 @@ fn a_sound_that_cannot_be_loaded_stays_callable() {
         PRINTLN missing.Play(FALSE)
         PRINTLN ERR().Code
         "#,
-        b"\x1b[=7;100;1n\x1b[=7;101;1;0;1n",
+        b"\x1b[=7;100;1n\x1b[=7;101;1;2;1n",
     );
 
     assert!(output.contains("0:0\n0\n"), "{output:?}");
@@ -148,11 +148,11 @@ fn a_second_format_is_probed_and_uploaded_after_the_first() {
         PrintLn music.Valid, effect.Valid
         "#,
         &[("music.ogg", b"OggS\x00\x02\x01\x13OpusHead"), ("rotate.wav", TONE)],
-        b"\x1b[=7;100;1n\x1b[=7;101;32;100;1n\x1b[=7;101;1;0;1n",
+        b"\x1b[=7;100;1n\x1b[=7;101;32;100;1n\x1b[=7;101;1;2;1n",
     );
 
     assert!(output.contains("SyncTERM:Q;libsndfileFormat;32;100"), "{output:?}");
-    assert!(output.contains("SyncTERM:Q;libsndfileFormat;1;0"), "{output:?}");
+    assert!(output.contains("SyncTERM:Q;libsndfileFormat;1;2"), "{output:?}");
     assert_eq!(output.matches("SyncTERM:C;S;").count(), 2, "{output:?}");
 }
 
@@ -175,7 +175,7 @@ fn a_format_probe_that_goes_unanswered_does_not_mute_the_channel() {
 
 #[test]
 fn a_sound_the_caller_already_cached_is_not_sent_again() {
-    let mut terminal = b"\x1b[=7;100;1n\x1b[=7;101;1;0;1n\x1b[6;16;8t\x1b[=1;1-n\x1b_SyncTERM:C;L\n\x1b\\\x1b_SyncTERM:C;L\n".to_vec();
+    let mut terminal = b"\x1b[=7;100;1n\x1b[=7;101;1;2;1n\x1b[6;16;8t\x1b[=1;1-n\x1b_SyncTERM:C;L\n\x1b\\\x1b_SyncTERM:C;L\n".to_vec();
     terminal.extend_from_slice(snd_cache_name(TONE, "wav").as_bytes());
     terminal.extend_from_slice(b"\td41d8cd98f00b204e9800998ecf8427e\n\x1b\\");
 
@@ -204,7 +204,7 @@ fn a_finished_sound_arrives_as_an_event() {
         PRINTLN e.Kind, ":", e.Code, ":", tone.Playing
         "#,
         &[("tone.wav", TONE)],
-        b"\x1b[=7;100;1n\x1b[=7;101;1;0;1n\x1b[=7;2;0n",
+        b"\x1b[=7;100;1n\x1b[=7;101;1;2;1n\x1b[=7;2;0n",
     );
 
     assert!(output.contains("Update;C=2"), "{output:?}");
@@ -219,7 +219,7 @@ fn a_looping_sound_is_not_watched_for_its_end() {
         tone.Play(TRUE)
         "#,
         &[("tone.wav", TONE)],
-        b"\x1b[=7;100;1n\x1b[=7;101;1;0;1n",
+        b"\x1b[=7;100;1n\x1b[=7;101;1;2;1n",
     );
 
     assert!(output.contains("Queue;C=2;S=2;L"), "{output:?}");
@@ -244,7 +244,7 @@ fn a_large_upload_is_acknowledged_before_anything_else_is_sent() {
         PrintLn tone.Valid
         "#,
         &[("big.wav", &big)],
-        b"\x1b[=7;100;1n\x1b[=7;101;1;0;1n\x1b[1;1R",
+        b"\x1b[=7;100;1n\x1b[=7;101;1;2;1n\x1b[1;1R",
     );
 
     let upload = output.find("SyncTERM:C;S;").expect("the sound was uploaded");
@@ -260,7 +260,7 @@ fn a_small_upload_is_not_worth_a_round_trip() {
         PrintLn tone.Valid
         "#,
         &[("tone.wav", TONE)],
-        b"\x1b[=7;100;1n\x1b[=7;101;1;0;1n",
+        b"\x1b[=7;100;1n\x1b[=7;101;1;2;1n",
     );
 
     assert!(!output.contains("\x1b[6n"), "{output:?}");

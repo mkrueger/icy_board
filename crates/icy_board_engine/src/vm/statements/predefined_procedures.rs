@@ -3381,19 +3381,26 @@ pub(crate) async fn surface_member(vm: &mut VirtualMachine<'_>, handle: i32, nam
         } else {
             (source.0, source.1)
         };
-        let size = if arguments.len() >= 8 {
-            let (width, height) = (integer(6), integer(7));
-            if width <= 0 || height <= 0 || u64::from(width.unsigned_abs()) * u64::from(height.unsigned_abs()) > MAX_GFX_SCALED_PIXELS {
+        let zoom = if arguments.len() >= 8 {
+            let (dest_width, dest_height) = (integer(6), integer(7));
+            if dest_width <= 0
+                || dest_height <= 0
+                || u64::from(dest_width.unsigned_abs()) * u64::from(dest_height.unsigned_abs()) > MAX_GFX_SCALED_PIXELS
+            {
                 vm.icy_board_state.gfx_error = 5;
                 return Ok(false);
             }
-            Some((width.unsigned_abs(), height.unsigned_abs()))
+            if source.2 <= 0 || source.3 <= 0 || dest_width % source.2 != 0 || dest_height % source.3 != 0 {
+                vm.icy_board_state.gfx_error = 6;
+                return Ok(false);
+            }
+            Some(((dest_width / source.2).unsigned_abs(), (dest_height / source.3).unsigned_abs()))
         } else {
             None
         };
         let flip = if arguments.len() >= 9 { integer(8) } else { 0 };
         let transform = GfxTransform {
-            size,
+            zoom,
             flip_x: flip & 1 != 0,
             flip_y: flip & 2 != 0,
         };
@@ -3867,27 +3874,26 @@ fn gfx_jxl_encode(surface: &crate::icy_board::state::ppl_graphics::GfxSurface) -
     }
 }
 
-/// The client side transforms the image APC applies while drawing: an exact
-/// destination size (`DW`/`DH`) and the mirror flags (`FX`/`FY`). Scaling on the
-/// client keeps the encoded frame at source size, so only the small image travels.
+/// The client side transforms the image APC applies while drawing: integer zoom
+/// (`ZX`/`ZY`) and the mirror flags (`FX`/`FY`).
 #[derive(Default, Clone, Copy)]
 struct GfxTransform {
-    size: Option<(u32, u32)>,
+    zoom: Option<(u32, u32)>,
     flip_x: bool,
     flip_y: bool,
 }
 
 impl GfxTransform {
     fn is_identity(&self) -> bool {
-        self.size.is_none() && !self.flip_x && !self.flip_y
+        self.zoom.is_none() && !self.flip_x && !self.flip_y
     }
 
     fn options(&self) -> String {
         use std::fmt::Write as _;
 
         let mut options = String::new();
-        if let Some((width, height)) = self.size {
-            let _ = write!(options, ";DW={width};DH={height}");
+        if let Some((zoom_x, zoom_y)) = self.zoom {
+            let _ = write!(options, ";ZX={zoom_x};ZY={zoom_y}");
         }
         if self.flip_x {
             options.push_str(";FX");
@@ -4035,18 +4041,28 @@ pub async fn gfxpresentrect(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Re
         Some(flip) => vm.eval_expr(flip).await?.as_int(),
         None => 0,
     };
-    let size = match requested_size {
+    let zoom = match requested_size {
         Some((dest_width, dest_height)) => {
             if dest_width <= 0 || dest_height <= 0 || u64::from(dest_width.unsigned_abs()) * u64::from(dest_height.unsigned_abs()) > MAX_GFX_SCALED_PIXELS {
                 vm.icy_board_state.gfx_error = 5;
                 return Ok(());
             }
-            Some((dest_width.unsigned_abs(), dest_height.unsigned_abs()))
+            if width <= 0 || height <= 0 || dest_width % width != 0 || dest_height % height != 0 {
+                vm.icy_board_state.gfx_error = 6;
+                return Ok(());
+            }
+            let zoom_x = (dest_width / width).unsigned_abs();
+            let zoom_y = (dest_height / height).unsigned_abs();
+            if zoom_x == 0 || zoom_y == 0 {
+                vm.icy_board_state.gfx_error = 6;
+                return Ok(());
+            }
+            Some((zoom_x, zoom_y))
         }
         None => None,
     };
     let transform = GfxTransform {
-        size,
+        zoom,
         flip_x: flip & 1 != 0,
         flip_y: flip & 2 != 0,
     };

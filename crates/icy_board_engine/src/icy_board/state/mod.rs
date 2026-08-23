@@ -54,7 +54,7 @@ const GFX_PROBE_TIMEOUT: Duration = Duration::from_millis(500);
 
 /// The libsndfile formats PPL can name, as `(PPL format, major, subtype)`. They are
 /// probed together so no answer has to arrive from behind an upload.
-pub(crate) const SOUND_FORMATS: &[(i32, u32, u32)] = &[(1, 1, 0), (2, 2, 0), (3, 23, 0), (4, 32, 96), (5, 32, 100)];
+pub(crate) const SOUND_FORMATS: &[(i32, u32, u32)] = &[(1, 1, 2), (2, 2, 2), (3, 23, 2), (4, 32, 96), (5, 32, 100)];
 
 fn keyboard_timeout_elapsed(is_local: bool, enabled: bool, minutes: u16, elapsed: Duration) -> bool {
     !is_local && enabled && minutes > 0 && elapsed >= Duration::from_secs(u64::from(minutes) * 60)

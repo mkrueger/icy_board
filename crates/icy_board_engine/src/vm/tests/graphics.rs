@@ -106,7 +106,24 @@ fn a_scaled_and_flipped_present_is_left_to_the_client() {
         JXL_TERMINAL,
     );
 
-    assert!(output.contains("SyncTERM:C;DrawJXLBlob;DX=10;DY=20;DW=64;DH=32;FX;"), "{output:?}");
+    assert!(output.contains("SyncTERM:C;DrawJXLBlob;DX=10;DY=20;ZX=8;ZY=4;FX;"), "{output:?}");
+}
+
+#[test]
+fn jxl_rejects_non_integer_destination_scaling() {
+    let output = super::run_ppl_with_input(
+        r"
+        GfxInit GFX_AUTO, FALSE
+        SURFACE s = NewSurface(8, 8)
+        s.PresentRect(0, 0, 8, 8, 0, 0, 63, 32)
+        PRINTLN ERR().Code
+        GfxShutdown
+        ",
+        JXL_TERMINAL,
+    );
+
+    assert!(!output.contains("DrawJXLBlob"), "{output:?}");
+    assert!(output.ends_with("6\n"), "{output:?}");
 }
 
 #[test]
@@ -481,7 +498,8 @@ fn the_fractal_demo_asks_the_terminal_to_scale_its_small_surface() {
     let output = super::run_ppl_with_input(&fractal_source("GFX_AUTO"), JXL_TERMINAL);
 
     // 16x8 pixels of fractal covering the 64x32 the viewport scales it to.
-    assert!(output.contains("SyncTERM:C;DrawJXLBlob;DX=0;DY=0;DW=64;DH=32;"), "{output:?}");
+    assert!(output.contains("SyncTERM:C;DrawJXLBlob;DX=0;DY=0;ZX=4;ZY=4;"), "{output:?}");
+    assert!(output.contains("SyncTERM:C;DrawJXLBlob;DX=0;DY=32;"), "{output:?}");
     assert!(!output.contains("\x1b[?2026h"), "{output:?}");
     assert!(!output.contains("\x1b[?2026l"), "{output:?}");
     assert!(output.contains("surfaces, per-pixel drawing"), "{output:?}");

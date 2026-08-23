@@ -5,8 +5,6 @@ CONST INTEGER BOARD_H = 20
 CONST INTEGER CELL = 12
 CONST INTEGER BOARD_X = 18
 CONST INTEGER BOARD_Y = 24
-CONST INTEGER SCREEN_W = 640
-CONST INTEGER SCREEN_H = 400
 CONST INTEGER GAME_W = 320
 CONST INTEGER GAME_H = 288
 CONST INTEGER GAME_X = 160
@@ -39,7 +37,7 @@ EVENT inputEvent
 TERMINPUT input
 UNSIGNED nextFrame
 AUDIO music, rotateSound, lockSound, lineSound, gameOverSound
-SURFACE screen, game, ui
+SURFACE game, ui
 
 CLS
 PRINTLN "Loading assets..."
@@ -56,7 +54,6 @@ IF GfxBackend() < 0 THEN
     EXIT
 ENDIF
 
-screen = NewSurface(SCREEN_W, SCREEN_H)
 game = NewSurface(GAME_W, GAME_H)
 ui = LoadSurface("./ui.png")
 InitShapes()
@@ -64,10 +61,10 @@ InitColors()
 ClearBoard()
 
 music.SetVolume(100)
-rotateSound.SetVolume(70)
-lockSound.SetVolume(80)
-lineSound.SetVolume(80)
-gameOverSound.SetVolume(75)
+rotateSound.SetVolume(100)
+lockSound.SetVolume(100)
+lineSound.SetVolume(100)
+gameOverSound.SetVolume(100)
 music.Play(TRUE)
 
 score = 0
@@ -158,7 +155,6 @@ ENDIF
 music.Stop()
 ui.Free()
 game.Free()
-screen.Free()
 GfxShutdown
 input.Free()
 CLS
@@ -649,7 +645,5 @@ PROCEDURE RenderGame()
 ENDPROC
 
 PROCEDURE PresentGame()
-    screen.Clear(GB_DARKEST)
-    screen.Blit(game, GAME_X, GAME_Y)
-    screen.PresentRect(0, 0, SCREEN_W, SCREEN_H)
+    game.PresentRect(0, 0, GAME_W, GAME_H, GAME_X, GAME_Y)
 ENDPROC
