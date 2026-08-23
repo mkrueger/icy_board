@@ -1,0 +1,141 @@
+# Changelog
+
+All notable user-visible changes to IcyBoard are recorded here.
+
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+IcyBoard is still in beta, so unstable PPL runtime 4.02 APIs may change between
+releases.
+
+## [Unreleased]
+
+### Added
+
+- `icbfile scan` now identifies archives that have no usable description and
+  distinguishes files that are missing from disk.
+- `icbfile scan --all` scans every area in a `file_areas.toml`; it can be
+  combined with `--force` to re-extract descriptions in every area.
+- Added end-to-end coverage for multiline `FILE_ID.DIZ` extraction and
+  all-area scanning.
+
+### Fixed
+
+- File listings now keep size, date and description in their fixed columns when
+  a filename longer than 12 characters wraps onto its own line.
+
+## [0.2.1] - 2026-08-23
+
+Second public beta, containing 69 commits since `0.2.0-beta.1`.
+
+### Added
+
+- Added PPL runtime 4.02 terminal multimedia APIs.
+- Added object-based PPL APIs:
+  - `SURFACE` for RGBA drawing, blitting, Sixel/JPEG XL presentation, caching
+    and terminal-side scaling.
+  - `AUDIO` for SyncTERM audio playback, looping, fading, volume and channel
+    management.
+  - `TERMINPUT` and immutable `EVENT` snapshots for keyboard, physical-key,
+    mouse, overflow and sound events.
+  - `TERMINFO` and `TERMSTATE` for terminal capabilities and text margins.
+  - `ERROR` for consistent operation error reporting through `ERR()`.
+  - Extensible `CONTACT` values for user contact details.
+- Added terminal font loading and selection, palette control, text margins,
+  synchronized output and DEC terminal macro recording/playback.
+- Added OSC 8 hyperlink macros.
+- Added SSH private-key and SSH agent authentication.
+- Added Fractal, Paint, Palette and Tetris PPL demonstrations.
+- Added PCBoard-compatible administration themes and directory color editing.
+- Added file creation from ICBSetup editors.
+- Added `SURFACE.GetPixel()`.
+- Added completion for runtime 4.02 object members in `ppl-lsp`.
+
+### Changed
+
+- Replaced the experimental slot-based graphics API with `SURFACE` objects.
+- Replaced the experimental global sound API with `AUDIO` objects.
+- Replaced the experimental global event API with the singleton `TERMINPUT`
+  object. `Free()` returns input to classic `INPUT` and `InKey` handling.
+- Renamed the language-server executable to `ppl-lsp`.
+- Renamed the VS Code package to `ppl-vscode` and added packages carrying the
+  matching server for Linux, Windows and macOS.
+- Added standalone `ppl-lsp` archives for Zed, Helix, Neovim and other LSP
+  editors.
+- Changed release artifact names to use one platform vocabulary:
+  `linux-x64`, `windows-x64`, `macos-arm64` and `macos-x64`.
+- Graphics and audio resources are now released automatically when a PPE exits.
+- Media uploads use terminal acknowledgements so following output cannot
+  overtake a large upload.
+- Fractal frames are completed before presentation and use terminal-side
+  integer scaling where available.
+- Tetris uses unified event input and transmits only its changing game panel.
+- Updated dependencies, including `icy_sixel` 0.6.
+
+### Fixed
+
+- Fixed SyncTERM JPEG XL scaling by using standard integer `ZX`/`ZY` options.
+- Fixed SyncTERM WAV capability probing and audio playback compatibility.
+- Fixed SyncTERM status-bar flashing during Tetris updates.
+- Fixed keyboard handoff after event polling and timed waits.
+- Fixed delayed Escape input.
+- Fixed local-mode inline image placement and SyncTERM media handling.
+- Fixed full-screen message editor rendering.
+- Fixed GNU Screen TUI rendering.
+- Fixed PCBoard mixed-type promotion, routine return-slot handling, constant
+  folding and expression evaluation that does not need to await.
+- Fixed PCBoard-compatible handling of PPE-backed conference join commands.
+- Improved PCBoard import path errors.
+- Regenerated the tree-sitter parser for the new runtime types, statements and
+  constants.
+
+### Compatibility
+
+- Runtime 4.02 was unstable during this development cycle. PPEs compiled against
+  intermediate graphics, sound or event APIs must be updated and recompiled.
+- Existing classic PPL runtimes and source remain supported.
+
+### Distribution
+
+- Added board archives for Linux x64, Windows x64, macOS ARM64 and macOS x64.
+- Added standalone language-server archives and platform-specific VS Code
+  packages.
+- Added the PDF manual to the release.
+
+## [0.2.0-beta.1] - 2026-08-18
+
+First public beta of IcyBoard 0.2.
+
+### Added
+
+- Added a cross-platform PCBoard-style BBS for local, telnet, SSH and websocket
+  sessions.
+- Added tools for board setup and PCBoard import, user management, file-base
+  maintenance, FTN mail, menu/text editing, and PPL compilation/decompilation.
+- Added support for classic PPL runtimes plus modern language features,
+  diagnostics, formatting and editor integration.
+- Added Linux, Windows and macOS release archives and a PDF manual.
+
+### Known limitations
+
+- No serial, modem or FOSSIL support.
+- PCBoard import remains best effort and PPE-heavy installations require manual
+  review.
+- See [Known limitations](docs/known_limitations.md) for the maintained list.
+
+## [0.2.0-lsp1] - 2026-08-15
+
+### Added
+
+- Added standalone native language-server archives for editor extensions.
+- Let editor integrations download the platform language server automatically,
+  while preferring a configured binary or one already on `PATH`.
+
+## [0.1.7] - 2025-10-15
+
+Last release before the 0.2 beta series. Earlier release history is available
+from the repository tags and GitHub Releases.
+
+[Unreleased]: https://github.com/mkrueger/icy_board/compare/0.2.1...HEAD
+[0.2.1]: https://github.com/mkrueger/icy_board/compare/0.2.0-beta.1...0.2.1
+[0.2.0-beta.1]: https://github.com/mkrueger/icy_board/compare/0.2.0-lsp1...0.2.0-beta.1
+[0.2.0-lsp1]: https://github.com/mkrueger/icy_board/compare/0.1.7...0.2.0-lsp1
+[0.1.7]: https://github.com/mkrueger/icy_board/releases/tag/0.1.7

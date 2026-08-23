@@ -176,6 +176,7 @@ compatibility references and PPL/tooling material. Common starting points:
 | | |
 | :--- | :--- |
 | [Getting started](docs/gettingstarted.md) | Create, configure and test a board |
+| [Change history](CHANGELOG.md) | User-visible changes by release |
 | [Migrating from PCBoard](docs/migration.md) | Dry-run import, drive maps, PPE review and validation |
 | [Differences and improvements](docs/differences.md) | What changed, why, and the compatibility cost |
 | [File areas](docs/icbfile.md) | Importing and maintaining a file base |
