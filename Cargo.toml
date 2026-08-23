@@ -35,7 +35,7 @@ icy_board_engine = { path = "crates/icy_board_engine" }
 icy_engine = { git = "https://github.com/mkrueger/icy_tools" }
 icy_engine_gui = { git = "https://github.com/mkrueger/icy_tools" }
 icy_parser_core = { git = "https://github.com/mkrueger/icy_tools" }
-icy_sixel = "0.5.0"
+icy_sixel = "0.6.0"
 image = "0.25.10"
 jxl-oxide = { version = "0.12.6", features = ["image"] }
 zune-jpegxl = "0.5.2"
