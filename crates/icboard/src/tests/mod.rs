@@ -346,7 +346,7 @@ fn test_session_output<P: Fn(&mut IcyBoard)>(cmd: String, init_fn: P, login_syso
 /// complete once the board has stopped writing. Waiting for that rather than for a
 /// fixed span keeps the tests honest on a busy machine.
 async fn wait_for_the_board_to_go_quiet(output: &Arc<tokio::sync::Mutex<Vec<u8>>>) {
-    const QUIET: std::time::Duration = std::time::Duration::from_millis(150);
+    const QUIET: std::time::Duration = std::time::Duration::from_secs(1);
     const FIRST_BYTE: std::time::Duration = std::time::Duration::from_secs(10);
     const NEVER_LONGER_THAN: std::time::Duration = std::time::Duration::from_secs(60);
 
