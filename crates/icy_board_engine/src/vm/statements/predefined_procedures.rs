@@ -3383,10 +3383,7 @@ pub(crate) async fn surface_member(vm: &mut VirtualMachine<'_>, handle: i32, nam
         };
         let zoom = if arguments.len() >= 8 {
             let (dest_width, dest_height) = (integer(6), integer(7));
-            if dest_width <= 0
-                || dest_height <= 0
-                || u64::from(dest_width.unsigned_abs()) * u64::from(dest_height.unsigned_abs()) > MAX_GFX_SCALED_PIXELS
-            {
+            if dest_width <= 0 || dest_height <= 0 || u64::from(dest_width.unsigned_abs()) * u64::from(dest_height.unsigned_abs()) > MAX_GFX_SCALED_PIXELS {
                 vm.icy_board_state.gfx_error = 5;
                 return Ok(false);
             }

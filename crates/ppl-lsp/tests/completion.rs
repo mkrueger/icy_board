@@ -92,6 +92,24 @@ fn a_function_answering_an_object_offers_its_members() {
 }
 
 #[test]
+fn runtime_402_objects_offer_their_registered_members() {
+    for (source, expected) in [
+        ("SURFACE value\nvalue.", &["Width", "SetPixel", "PresentRect"][..]),
+        ("AUDIO value\nvalue.", &["Valid", "Volume", "Play"][..]),
+        ("EVENT value\nvalue.", &["Kind", "Text", "Code"][..]),
+        ("ERROR value\nvalue.", &["OK", "Message", "Channel"][..]),
+        ("TERMINFO value\nvalue.", &["Program", "Columns", "InlineGraphics"][..]),
+        ("TERMSTATE value\nvalue.", &["MarginTop", "MarginLeft", "HorizontalMargins"][..]),
+        ("TERMINPUT value\nvalue.", &["Valid", "Poll", "KeyboardOn", "Free"][..]),
+    ] {
+        let items = complete(source);
+        for member in expected {
+            assert!(items.contains(&member.to_string()), "{member} missing for {source:?}: {items:?}");
+        }
+    }
+}
+
+#[test]
 fn a_record_literal_offers_the_fields_it_has_not_named() {
     let items = complete(&format!("{RECORD}m = Member {{ "));
     assert_eq!(items, vec!["Name".to_string(), "Age".to_string(), "Home".to_string()]);

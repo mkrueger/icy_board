@@ -557,13 +557,9 @@ impl StatementDefinition {
         STATEMENT_DEFINITIONS.iter().find(|def| unicase::Ascii::new(def.name) == identifier)
     }
 
-    pub(crate) fn get_statement_definition_for_arity(
-        identifier: &unicase::Ascii<String>,
-        argument_count: usize,
-    ) -> Option<&'static StatementDefinition> {
+    pub(crate) fn get_statement_definition_for_arity(identifier: &unicase::Ascii<String>, argument_count: usize) -> Option<&'static StatementDefinition> {
         STATEMENT_DEFINITIONS.iter().find(|def| {
-            unicase::Ascii::new(def.name) == identifier
-                && matches!(def.sig, StatementSignature::ArgumentsWithVariable(_, count) if count == argument_count)
+            unicase::Ascii::new(def.name) == identifier && matches!(def.sig, StatementSignature::ArgumentsWithVariable(_, count) if count == argument_count)
         })
     }
 

@@ -3526,7 +3526,8 @@ impl IcyBoardState {
                 if remaining.is_zero() {
                     return Ok(self.empty_ppl_event());
                 }
-                self.get_char_with_timeout(TerminalTarget::Both, remaining.min(Duration::from_millis(100))).await
+                self.get_char_with_timeout(TerminalTarget::Both, remaining.min(Duration::from_millis(100)))
+                    .await
             } else {
                 self.get_char(TerminalTarget::Both).await
             };

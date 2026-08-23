@@ -37,12 +37,7 @@ impl UserData for PplTerminalInput {
         registry.add_property(VALID.clone(), VariableType::Boolean, false);
         registry.add_function(POLL.clone(), Vec::new(), VariableType::UserData(EVENT_ID as u8));
         registry.add_function(WAIT.clone(), vec![VariableType::Integer], VariableType::UserData(EVENT_ID as u8));
-        registry.add_function_with(
-            MOUSE_ON.clone(),
-            vec![VariableType::Integer, VariableType::Integer],
-            1,
-            VariableType::Boolean,
-        );
+        registry.add_function_with(MOUSE_ON.clone(), vec![VariableType::Integer, VariableType::Integer], 1, VariableType::Boolean);
         registry.add_function(MOUSE_OFF.clone(), Vec::new(), VariableType::Boolean);
         registry.add_function_with(KEYBOARD_ON.clone(), vec![VariableType::Boolean], 0, VariableType::Boolean);
         registry.add_function(KEYBOARD_OFF.clone(), Vec::new(), VariableType::Boolean);
@@ -59,12 +54,7 @@ impl UserDataValue for PplTerminalInput {
         Err("Invalid TERMINPUT property".into())
     }
 
-    fn set_property_value(
-        &mut self,
-        _vm: &mut crate::vm::VirtualMachine<'_>,
-        _name: &unicase::Ascii<String>,
-        _val: VariableValue,
-    ) -> crate::Res<()> {
+    fn set_property_value(&mut self, _vm: &mut crate::vm::VirtualMachine<'_>, _name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
         Err("TERMINPUT properties are read-only".into())
     }
 
@@ -77,12 +67,7 @@ impl UserDataValue for PplTerminalInput {
         vm.icy_board_state.term_input_member(self.handle, name, arguments).await
     }
 
-    async fn call_method(
-        &mut self,
-        _vm: &mut crate::vm::VirtualMachine<'_>,
-        _name: &unicase::Ascii<String>,
-        _arguments: &[VariableValue],
-    ) -> crate::Res<()> {
+    async fn call_method(&mut self, _vm: &mut crate::vm::VirtualMachine<'_>, _name: &unicase::Ascii<String>, _arguments: &[VariableValue]) -> crate::Res<()> {
         Err("TERMINPUT has no procedures".into())
     }
 }

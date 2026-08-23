@@ -24,7 +24,7 @@ ENDWHILE
 
 level = 255
 WHILE (level >= 0) DO
-    SetPaletteColor DEMO_COLOR, 0, level, 255
+    SetPaletteColor DEMO_COLOR, Rgb(0, level, 255)
     DELAY 1
     level -= STEP
 ENDWHILE

@@ -3,10 +3,7 @@ use super::{compile_errors_with_runtime, run_ppl};
 #[test]
 fn palette_api_requires_runtime_402() {
     for runtime in [400, 401] {
-        let errors = compile_errors_with_runtime(
-            "SetPaletteColor 1, Rgb(0, 64, 255)\nResetPaletteColor 1\nResetPalette",
-            runtime,
-        );
+        let errors = compile_errors_with_runtime("SetPaletteColor 1, Rgb(0, 64, 255)\nResetPaletteColor 1\nResetPalette", runtime);
         for needed in [
             "SetPaletteColor needs runtime 402",
             "ResetPaletteColor needs runtime 402",
@@ -15,9 +12,7 @@ fn palette_api_requires_runtime_402() {
             assert!(errors.iter().any(|error| error == needed), "runtime {runtime}: {errors:?}");
         }
     }
-    assert!(
-        compile_errors_with_runtime("SetPaletteColor 1, Rgb(0, 64, 255)\nResetPaletteColor 1\nResetPalette", 402).is_empty()
-    );
+    assert!(compile_errors_with_runtime("SetPaletteColor 1, Rgb(0, 64, 255)\nResetPaletteColor 1\nResetPalette", 402).is_empty());
 }
 
 #[test]
@@ -78,5 +73,8 @@ fn palette_statements_report_unavailable_without_ansi() {
 fn set_palette_color_rejects_three_arguments() {
     let errors = compile_errors_with_runtime("SetPaletteColor 1, 2, 3", 402);
 
-    assert!(errors.iter().any(|error| error == "Too many arguments passed (SetPaletteColor:3:2)"), "{errors:?}");
+    assert!(
+        errors.iter().any(|error| error == "Too many arguments passed (SetPaletteColor:3:2)"),
+        "{errors:?}"
+    );
 }

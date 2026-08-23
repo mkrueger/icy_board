@@ -2246,6 +2246,14 @@
     "named": false
   },
   {
+    "type": "TERMINFO",
+    "named": false
+  },
+  {
+    "type": "TERMINPUT",
+    "named": false
+  },
+  {
     "type": "TERMSTATE",
     "named": false
   },

@@ -1468,6 +1468,30 @@
             "type": "TOKEN",
             "content": {
               "type": "PATTERN",
+              "value": "[tT][eE][rR][mM][iI][nN][fF][oO]"
+            }
+          },
+          "named": false,
+          "value": "TERMINFO"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
+              "value": "[tT][eE][rR][mM][iI][nN][pP][uU][tT]"
+            }
+          },
+          "named": false,
+          "value": "TERMINPUT"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
               "value": "[tT][eE][rR][mM][sS][tT][aA][tT][eE]"
             }
           },
@@ -4863,18 +4887,6 @@
           },
           {
             "type": "PATTERN",
-            "value": "[mM][oO][uU][sS][eE][oO][nN]"
-          },
-          {
-            "type": "PATTERN",
-            "value": "[mM][oO][uU][sS][eE][oO][fF][fF]"
-          },
-          {
-            "type": "PATTERN",
-            "value": "[kK][eE][yY][eE][vV][eE][nN][tT][sS]"
-          },
-          {
-            "type": "PATTERN",
             "value": "[sS][eE][tT][vV][mM][aA][rR][gG][iI][nN][sS]"
           },
           {
@@ -4904,6 +4916,46 @@
           {
             "type": "PATTERN",
             "value": "[eE][rR][rR][cC][lL][rR]"
+          },
+          {
+            "type": "PATTERN",
+            "value": "[sS][eE][tT][pP][aA][lL][eE][tT][tT][eE][cC][oO][lL][oO][rR]"
+          },
+          {
+            "type": "PATTERN",
+            "value": "[rR][eE][sS][eE][tT][pP][aA][lL][eE][tT][tT][eE][cC][oO][lL][oO][rR]"
+          },
+          {
+            "type": "PATTERN",
+            "value": "[rR][eE][sS][eE][tT][pP][aA][lL][eE][tT][tT][eE]"
+          },
+          {
+            "type": "PATTERN",
+            "value": "[bB][eE][gG][iI][nN][tT][eE][rR][mM][iI][nN][aA][lL][uU][pP][dD][aA][tT][eE]"
+          },
+          {
+            "type": "PATTERN",
+            "value": "[eE][nN][dD][tT][eE][rR][mM][iI][nN][aA][lL][uU][pP][dD][aA][tT][eE]"
+          },
+          {
+            "type": "PATTERN",
+            "value": "[rR][eE][cC][oO][rR][dD][mM][aA][cC][rR][oO]"
+          },
+          {
+            "type": "PATTERN",
+            "value": "[eE][nN][dD][mM][aA][cC][rR][oO]"
+          },
+          {
+            "type": "PATTERN",
+            "value": "[pP][lL][aA][yY][mM][aA][cC][rR][oO]"
+          },
+          {
+            "type": "PATTERN",
+            "value": "[dD][eE][lL][eE][tT][eE][mM][aA][cC][rR][oO]"
+          },
+          {
+            "type": "PATTERN",
+            "value": "[cC][lL][eE][aA][rR][mM][aA][cC][rR][oO][sS]"
           }
         ]
       }
@@ -5223,6 +5275,10 @@
           },
           {
             "type": "PATTERN",
+            "value": "[eE][rR][rR]_[kK][iI][nN][dD]_[tT][eE][rR][mM]"
+          },
+          {
+            "type": "PATTERN",
             "value": "[fF][oO][nN][tT]_[aA][lL][lL]"
           },
           {
@@ -5488,18 +5544,6 @@
           {
             "type": "PATTERN",
             "value": "[mM][oO][uU][sS][eE]_[tT][rR][aA][cC][kK]_[aA][lL][lL]"
-          },
-          {
-            "type": "PATTERN",
-            "value": "[kK][eE][yY]_[eE][vV][eE][nN][tT][sS]_[oO][fF][fF]"
-          },
-          {
-            "type": "PATTERN",
-            "value": "[kK][eE][yY]_[eE][vV][eE][nN][tT][sS]_[oO][nN]"
-          },
-          {
-            "type": "PATTERN",
-            "value": "[kK][eE][yY]_[eE][vV][eE][nN][tT][sS]_[sS][uU][pP][pP][rR][eE][sS][sS]"
           },
           {
             "type": "PATTERN",

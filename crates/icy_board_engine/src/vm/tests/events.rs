@@ -4,7 +4,10 @@ use super::{compile_errors_with_runtime, run_ppl, run_ppl_with_input, run_ppl_wi
 fn terminal_input_requires_runtime_402() {
     for runtime in [400, 401] {
         let errors = compile_errors_with_runtime("TERMINPUT input = TermInput()", runtime);
-        assert!(errors.iter().any(|error| error == "TermInput needs runtime 402"), "runtime {runtime}: {errors:?}");
+        assert!(
+            errors.iter().any(|error| error == "TermInput needs runtime 402"),
+            "runtime {runtime}: {errors:?}"
+        );
     }
     assert!(compile_errors_with_runtime("TERMINPUT input = TermInput()", 402).is_empty());
 }

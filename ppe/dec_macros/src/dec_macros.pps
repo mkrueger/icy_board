@@ -10,7 +10,7 @@ RecordMacro DIVIDER
 COLOR @X03
 PRINT "+--------------------------------------------------+"
 EndMacro
-IF !ERR().OK GOTO MacroError
+IF (!ERR().OK) GOTO MacroError
 
 ; A terminal macro can invoke another macro. PANEL stores two DECINVM calls
 ; rather than copying the divider bytes twice.
@@ -24,7 +24,7 @@ PRINT "| Playback sends only a short DECINVM sequence.    |"
 NextMacroRow()
 PlayMacro DIVIDER
 EndMacro
-IF !ERR().OK GOTO MacroError
+IF (!ERR().OK) GOTO MacroError
 
 CLS
 BeginTerminalUpdate
@@ -33,7 +33,9 @@ ANSIPOS 8, 4
 PlayMacro PANEL
 ANSIPOS 8, 11
 PlayMacro PANEL
-IF synchronized EndTerminalUpdate
+IF synchronized THEN
+    EndTerminalUpdate
+ENDIF
 
 COLOR @X07
 ANSIPOS 1, 19
@@ -48,5 +50,5 @@ ClearMacros
 
 PROCEDURE NextMacroRow()
     PRINT Chr(27) + "[B"
-	BACKUP 52
+    BACKUP 52
 ENDPROC
