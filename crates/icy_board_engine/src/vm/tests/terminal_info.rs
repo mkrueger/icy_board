@@ -21,10 +21,10 @@ fn terminal_info_returns_the_cached_local_snapshot() {
         PrintLn info.DeviceAttrs = ""
         PrintLn info.Columns, "x", info.Rows
         PrintLn info.Utf8, " ", info.RipVersion = "", " ", info.CTermLevel
-        PrintLn info.Sixel, " ", info.Jxl, " ", info.InlineGraphics, " ", info.Sound, " ", info.PhysicalKeys
+        PrintLn info.Sixel, " ", info.Jxl, " ", info.InlineGraphics, " ", info.Sound, " ", info.PhysicalKeys, " ", info.SynchronizedOutput, " ", info.TerminalMacros
         PrintLn info.CellWidth, "x", info.CellHeight, " ", info.ScreenWidth, "x", info.ScreenHeight
         "#,
     );
 
-    assert_eq!(output, "Unknown\n1\n80x25\n1 1 0\n0 0 0 0 0\n8x16 0x0\n");
+    assert_eq!(output, "Unknown\n1\n80x25\n1 1 0\n0 0 0 0 0 0 0\n8x16 0x0\n");
 }

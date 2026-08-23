@@ -335,6 +335,12 @@ impl LogicalKeyState {
         self.ready.pop_front()
     }
 
+    pub fn clear(&mut self) {
+        self.pending.clear();
+        self.pending_since = None;
+        self.ready.clear();
+    }
+
     fn named_key(&self, ch: char) -> PplEvent {
         let text = if ch as u32 == 127 { "DEL".to_string() } else { ch.to_string() };
         let mut event = PplEvent {

@@ -123,7 +123,7 @@ fn vscode_grammar_knows_every_built_in() {
         .filter(|def| def.sig != StatementSignature::Invalid)
         .map(|def| def.name.to_ascii_uppercase())
         .collect();
-    let in_grammar = list_from_textmate("builtin-statements");
+    let in_grammar = [list_from_textmate("builtin-statements"), list_from_textmate("terminal-output-statements")].concat();
     // END, LET, RETURN and STOP are keywords there, the rest has to be listed.
     let expected: Vec<String> = statements
         .iter()
@@ -159,7 +159,7 @@ fn vscode_grammar_knows_every_built_in() {
     );
 
     let expected: Vec<String> = BUILTIN_CONSTS.iter().map(|c| c.name.to_ascii_uppercase()).collect();
-    let in_grammar = list_from_textmate("constants");
+    let in_grammar = [list_from_textmate("constants"), list_from_textmate("terminal-output-constants")].concat();
     assert_eq!(
         missing(&expected, &in_grammar),
         Vec::<String>::new(),

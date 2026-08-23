@@ -266,5 +266,12 @@ pub async fn run_predefined_statement(opcode: OpCode, arg: &mut VirtualMachine<'
         OpCode::SetPaletteColor | OpCode::SetPaletteColorRgb => predefined_procedures::set_palette_color(arg, arguments).await,
         OpCode::ResetPaletteColor => predefined_procedures::reset_palette_color(arg, arguments).await,
         OpCode::ResetPalette => predefined_procedures::reset_palette(arg, arguments).await,
+        OpCode::BeginTerminalUpdate => predefined_procedures::begin_terminal_update(arg, arguments).await,
+        OpCode::EndTerminalUpdate => predefined_procedures::end_terminal_update(arg, arguments).await,
+        OpCode::RecordMacro => predefined_procedures::record_macro(arg, arguments).await,
+        OpCode::EndMacro => predefined_procedures::end_macro(arg, arguments).await,
+        OpCode::PlayMacro => predefined_procedures::play_macro(arg, arguments).await,
+        OpCode::DeleteMacro => predefined_procedures::delete_macro(arg, arguments).await,
+        OpCode::ClearMacros => predefined_procedures::clear_macros(arg, arguments).await,
     }
 }

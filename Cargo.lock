@@ -1330,7 +1330,7 @@ dependencies = [
 [[package]]
 name = "codepages"
 version = "0.1.0"
-source = "git+https://github.com/mkrueger/icy_board#e63ca41230c3c249413b8d8a308c6155493bdee0"
+source = "git+https://github.com/mkrueger/icy_board#bdbb0ce8504879d8f9bff021787577718cd86241"
 dependencies = [
  "lazy_static",
 ]
@@ -3939,7 +3939,7 @@ dependencies = [
 [[package]]
 name = "icy_engine"
 version = "0.5.0"
-source = "git+https://github.com/mkrueger/icy_tools#bb56422f8852d6896aae111be1f02812b296fec8"
+source = "git+https://github.com/mkrueger/icy_tools#607c15db21255615c2e04c3aaf9a0e144885f1b1"
 dependencies = [
  "base64 0.23.1",
  "bitflags 2.13.1",
@@ -3978,7 +3978,7 @@ dependencies = [
 [[package]]
 name = "icy_engine_gui"
 version = "0.5.0"
-source = "git+https://github.com/mkrueger/icy_tools#bb56422f8852d6896aae111be1f02812b296fec8"
+source = "git+https://github.com/mkrueger/icy_tools#607c15db21255615c2e04c3aaf9a0e144885f1b1"
 dependencies = [
  "anyhow",
  "base64 0.23.1",
@@ -4017,7 +4017,7 @@ dependencies = [
 [[package]]
 name = "icy_engine_gui_macros"
 version = "0.1.0"
-source = "git+https://github.com/mkrueger/icy_tools#bb56422f8852d6896aae111be1f02812b296fec8"
+source = "git+https://github.com/mkrueger/icy_tools#607c15db21255615c2e04c3aaf9a0e144885f1b1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4057,7 +4057,7 @@ dependencies = [
 [[package]]
 name = "icy_parser_core"
 version = "0.1.0"
-source = "git+https://github.com/mkrueger/icy_tools#bb56422f8852d6896aae111be1f02812b296fec8"
+source = "git+https://github.com/mkrueger/icy_tools#607c15db21255615c2e04c3aaf9a0e144885f1b1"
 dependencies = [
  "base64 0.23.1",
  "bitflags 2.13.1",

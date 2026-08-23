@@ -1120,6 +1120,8 @@ hint-statement-mouse-api=Enables or disables cell/pixel mouse event reporting.
 hint-statement-margin-api=Sets or resets the terminal's independent vertical and horizontal text margins.
 hint-statement-font-api=Selects a terminal font for an attribute slot, or uploads a font file to the terminal.
 hint-statement-palette-api=Changes or restores terminal palette colors. SetPaletteColor accepts separate RGB components or a packed value from Rgb(); packed alpha is ignored.
+hint-statement-terminal-update-api=Begins or ends a nestable DEC synchronized-output update. Only the outer pair emits mode 2026 sequences.
+hint-statement-terminal-macro-api=Records, uploads, invokes, deletes or clears one of 64 terminal-resident DEC macros. Playback sends only DECINVM.
 hint-statement-key-api=Enables, suppresses translated input for, or disables physical key events.
 hint-function-fdordaka=
     Returns the address this board answers to, as zone:net/node with the point

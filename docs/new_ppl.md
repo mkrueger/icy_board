@@ -379,7 +379,7 @@ IF term.InlineGraphics PRINTLN "Inline graphics available"
 | `RipVersion` | Reported RIP version, or an empty string |
 | `CTermLevel` | Highest known CTerm-compatible protocol level, or zero |
 | `Sixel`, `Jxl`, `InlineGraphics` | Detected graphics capabilities |
-| `Sound`, `PhysicalKeys` | Detected audio and physical-key capabilities |
+| `Sound`, `PhysicalKeys`, `SynchronizedOutput`, `TerminalMacros` | Detected audio, input and terminal-output capabilities |
 | `CellWidth`, `CellHeight` | Cell dimensions in pixels |
 | `ScreenWidth`, `ScreenHeight` | Screen dimensions in pixels, or zero when unknown |
 
@@ -387,6 +387,60 @@ IF term.InlineGraphics PRINTLN "Inline graphics available"
 level needed by the features it implements. Prefer named capability properties
 over comparing this number unless a PPE is experimenting with a newer protocol
 operation. `DeviceAttrs` is diagnostic data and may contain escape characters.
+
+### Synchronized output
+
+`BeginTerminalUpdate` and `EndTerminalUpdate` wrap a redraw in DEC synchronized
+output mode 2026. Calls may nest; only the outer pair emits `CSI ? 2026 h` and
+`CSI ? 2026 l`.
+
+```PPL
+BeginTerminalUpdate
+CLS
+DrawScreen()
+EndTerminalUpdate
+```
+
+If the terminal explicitly reports that mode 2026 is unsupported, or the
+session is not using ANSI, `BeginTerminalUpdate` reports `ERR_UNAVAILABLE` with
+`ERR_KIND_TERM`. An unknown terminal is allowed to receive the sequences.
+Ending an inactive update reports `ERR_INVALID`. The outermost PPE always ends
+an update left active by `STOP`, `EXIT` or an execution error.
+
+### Terminal output macros
+
+Terminal macros record expanded PPL display output into one of the terminal's
+64 DEC macro slots. Recorded output is suppressed until `EndMacro` uploads it
+with DECDMAC; `PlayMacro` then sends only the short DECINVM sequence.
+
+```PPL
+RecordMacro 0
+COLOR @X1F
+PRINT "Reusable heading"
+EndMacro
+
+PlayMacro 0
+DeleteMacro 0
+ClearMacros
+```
+
+Slots are numbered 0 through 63. Macro definitions use hex encoding, so they
+can contain arbitrary ANSI, OSC, DCS, UTF-8 and control bytes. Caller and sysop
+definitions are encoded separately, preserving each endpoint's character
+encoding. A macro may invoke another completed macro while being recorded,
+allowing native DEC macros to be composed.
+
+Starting a second recording, ending no recording, playing an empty slot or
+using an invalid slot reports `ERR_INVALID` with `ERR_KIND_TERM`. A definition
+larger than 512 KiB reports `ERR_LIMIT`. If macro support is explicitly denied,
+`RecordMacro` reports `ERR_UNAVAILABLE`; unknown terminals are allowed to
+receive the standard DEC sequences.
+
+An unfinished recording is uploaded and invoked during outermost PPE cleanup
+so output cannot disappear. Icy Board then deletes only the DEC macro slots the
+PPE defined and releases its local slot state. The
+[`dec_macros` PPE](../ppe/dec_macros/src/dec_macros.pps) composes a panel from a
+reusable divider macro and places it twice inside one synchronized update.
 
 ### Text margins
 
@@ -498,7 +552,8 @@ ENDIF
 | `Channel` | The file, dBase or sound channel, `-1` when the error has none |
 
 `Kind` is one of `ERR_KIND_NONE`, `ERR_KIND_FILE`, `ERR_KIND_DBASE`,
-`ERR_KIND_STACK`, `ERR_KIND_GFX`, `ERR_KIND_FONT` or `ERR_KIND_SOUND`. `Code` is
+`ERR_KIND_STACK`, `ERR_KIND_GFX`, `ERR_KIND_FONT`, `ERR_KIND_SOUND` or
+`ERR_KIND_TERM`. `Code` is
 one of `ERR_OK`, `ERR_UNAVAILABLE`, `ERR_INVALID`, `ERR_IO`, `ERR_FORMAT`,
 `ERR_LIMIT`, `ERR_UNSUPPORTED` or `ERR_STACK`.
 

@@ -43,7 +43,7 @@ impl BuiltinConst {
 }
 
 pub const STACK_LIMIT: i32 = 6022 + 1024;
-pub const BUILTIN_CONSTS: [BuiltinConst; 184] = [
+pub const BUILTIN_CONSTS: [BuiltinConst; 185] = [
     BuiltinConst { name: "TRUE", value: 0x01 },
     BuiltinConst { name: "FALSE", value: 0x00 },
     BuiltinConst {
@@ -534,6 +534,10 @@ pub const BUILTIN_CONSTS: [BuiltinConst; 184] = [
     BuiltinConst {
         name: "ERR_KIND_SOUND",
         value: 6,
+    },
+    BuiltinConst {
+        name: "ERR_KIND_TERM",
+        value: 7,
     },
     BuiltinConst { name: "FONT_ALL", value: -1 },
 ];

@@ -33,7 +33,9 @@ use jamjam::jam::{JamMessage, JamMessageBase, attributes as jam_attributes, msg_
 
 use crate::{
     icy_board::icb_text::IceText,
-    icy_board::state::ppl_error::{ERR_FORMAT, ERR_INVALID, ERR_IO, ERR_KIND_FONT, ERR_KIND_GFX, ERR_KIND_SOUND, ERR_LIMIT, ERR_UNAVAILABLE, PplError},
+    icy_board::state::ppl_error::{
+        ERR_FORMAT, ERR_INVALID, ERR_IO, ERR_KIND_FONT, ERR_KIND_GFX, ERR_KIND_SOUND, ERR_KIND_TERM, ERR_LIMIT, ERR_UNAVAILABLE, PplError,
+    },
     vm::{TerminalTarget, VMError, VirtualMachine},
 };
 
@@ -1085,6 +1087,130 @@ pub async fn reset_palette(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Re
     Ok(())
 }
 
+pub async fn begin_terminal_update(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
+    if !supports_vt_sequences(vm) || vm.icy_board_state.session.term_caps.synchronized_output == Some(false) {
+        vm.set_error(PplError::new(
+            ERR_KIND_TERM,
+            ERR_UNAVAILABLE,
+            "the terminal does not support synchronized output",
+        ));
+        return Ok(());
+    }
+    if vm.icy_board_state.ppl_terminal.begin_update() {
+        write_vt_sequence(vm, "\x1B[?2026h").await?;
+    }
+    vm.operation_succeeded();
+    Ok(())
+}
+
+pub async fn end_terminal_update(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
+    let Some(outermost) = vm.icy_board_state.ppl_terminal.end_update() else {
+        vm.set_error(PplError::new(ERR_KIND_TERM, ERR_INVALID, "no terminal update is active"));
+        return Ok(());
+    };
+    if outermost {
+        write_vt_sequence(vm, "\x1B[?2026l").await?;
+    }
+    vm.operation_succeeded();
+    Ok(())
+}
+
+fn macro_slot(vm: &mut VirtualMachine<'_>, slot: i32) -> Option<usize> {
+    if let Ok(slot) = usize::try_from(slot)
+        && slot < crate::icy_board::state::ppl_terminal_control::MACRO_SLOTS
+    {
+        return Some(slot);
+    }
+    vm.set_error(PplError::new(ERR_KIND_TERM, ERR_INVALID, format!("invalid terminal macro slot {slot}")));
+    None
+}
+
+fn terminal_macros_available(vm: &mut VirtualMachine<'_>) -> bool {
+    if supports_vt_sequences(vm) && vm.icy_board_state.session.term_caps.terminal_macros != Some(false) {
+        return true;
+    }
+    vm.set_error(PplError::new(ERR_KIND_TERM, ERR_UNAVAILABLE, "the terminal does not support DEC macros"));
+    false
+}
+
+pub async fn record_macro(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let slot = vm.eval_expr(&args[0]).await?.as_int();
+    let Some(slot) = macro_slot(vm, slot) else {
+        return Ok(());
+    };
+    if !terminal_macros_available(vm) {
+        return Ok(());
+    }
+    if !vm.icy_board_state.ppl_terminal.start_recording(slot) {
+        vm.set_error(PplError::new(ERR_KIND_TERM, ERR_INVALID, "a terminal macro recording is already active"));
+        return Ok(());
+    }
+    vm.operation_succeeded();
+    Ok(())
+}
+
+pub async fn end_macro(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
+    match vm.icy_board_state.finish_ppl_macro().await? {
+        None => {
+            vm.set_error(PplError::new(ERR_KIND_TERM, ERR_INVALID, "no terminal macro recording is active"));
+            return Ok(());
+        }
+        Some(false) => {
+            vm.set_error(PplError::new(ERR_KIND_TERM, ERR_LIMIT, "terminal macro exceeds the 512 KiB limit"));
+            return Ok(());
+        }
+        Some(true) => {}
+    }
+    vm.operation_succeeded();
+    Ok(())
+}
+
+pub async fn play_macro(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let slot = vm.eval_expr(&args[0]).await?.as_int();
+    let Some(slot) = macro_slot(vm, slot) else {
+        return Ok(());
+    };
+    if !terminal_macros_available(vm) {
+        return Ok(());
+    }
+    if !vm.icy_board_state.play_ppl_macro(slot).await? {
+        vm.set_error(PplError::new(ERR_KIND_TERM, ERR_INVALID, format!("terminal macro slot {slot} is empty")));
+        return Ok(());
+    }
+    vm.operation_succeeded();
+    Ok(())
+}
+
+pub async fn delete_macro(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let slot = vm.eval_expr(&args[0]).await?.as_int();
+    let Some(slot) = macro_slot(vm, slot) else {
+        return Ok(());
+    };
+    if !terminal_macros_available(vm) {
+        return Ok(());
+    }
+    if vm.icy_board_state.ppl_terminal.is_recording() {
+        vm.set_error(PplError::new(ERR_KIND_TERM, ERR_INVALID, "cannot delete a terminal macro while recording"));
+        return Ok(());
+    }
+    vm.icy_board_state.delete_ppl_macro(slot).await?;
+    vm.operation_succeeded();
+    Ok(())
+}
+
+pub async fn clear_macros(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
+    if !terminal_macros_available(vm) {
+        return Ok(());
+    }
+    if vm.icy_board_state.ppl_terminal.is_recording() {
+        vm.set_error(PplError::new(ERR_KIND_TERM, ERR_INVALID, "cannot clear terminal macros while recording"));
+        return Ok(());
+    }
+    vm.icy_board_state.clear_ppl_macros().await?;
+    vm.operation_succeeded();
+    Ok(())
+}
+
 /// 256 glyphs of at most 32 rows is 8K, and PSF2 adds a header and a Unicode table.
 const MAX_FONT_FILE_BYTES: u64 = 64 * 1024;
 
@@ -1667,9 +1793,8 @@ pub async fn mdmflush(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
 
 /// # Errors
 /// Errors if the variable is not found.
-pub async fn keyflush(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    // TODO?
-    Ok(())
+pub async fn keyflush(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
+    vm.icy_board_state.flush_keyboard_input().await
 }
 pub async fn lastin(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let conf = vm.eval_expr(&args[0]).await?.as_int();

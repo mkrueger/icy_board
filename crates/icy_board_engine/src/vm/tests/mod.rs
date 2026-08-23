@@ -32,6 +32,7 @@ mod routine_parameters;
 mod scalars;
 mod sound;
 mod terminal_info;
+mod terminal_output;
 mod tpa;
 
 use std::path::PathBuf;
@@ -121,11 +122,11 @@ pub fn run_ppl_in_ppe_dir(source: &str, ppe_dir: &str, files: &[(&str, &[u8])]) 
 }
 
 pub fn run_ppl_with_input(source: &str, input: &[u8]) -> String {
-    run_ppl_collecting(source, |_| {}, &[], None, input).1
+    run_ppl_collecting(source, |_| {}, &[], None, input, false).1
 }
 
 pub fn run_ppl_with_files_and_input(source: &str, files: &[(&str, &[u8])], input: &[u8]) -> String {
-    run_ppl_collecting(source, |_| {}, files, None, input).1
+    run_ppl_collecting(source, |_| {}, files, None, input, false).1
 }
 
 fn run_ppl_seeded<P: Fn(&mut IcyBoard)>(source: &str, init_fn: P, files: &[(&str, &[u8])]) -> String {
@@ -133,16 +134,27 @@ fn run_ppl_seeded<P: Fn(&mut IcyBoard)>(source: &str, init_fn: P, files: &[(&str
 }
 
 fn run_ppl_seeded_in<P: Fn(&mut IcyBoard)>(source: &str, init_fn: P, files: &[(&str, &[u8])], ppe_dir: Option<&str>) -> String {
-    run_ppl_collecting(source, init_fn, files, ppe_dir, &[]).1
+    run_ppl_collecting(source, init_fn, files, ppe_dir, &[], false).1
 }
 
 /// True when the program ran to its end rather than giving up with STOP, which is what
 /// decides whether a script questionnaire keeps the answers it collected.
 pub fn ppl_keeps_script_answers(source: &str) -> bool {
-    run_ppl_collecting(source, |_| {}, &[], None, &[]).0
+    run_ppl_collecting(source, |_| {}, &[], None, &[], false).0
 }
 
-fn run_ppl_collecting<P: Fn(&mut IcyBoard)>(source: &str, init_fn: P, files: &[(&str, &[u8])], ppe_dir: Option<&str>, input: &[u8]) -> (bool, String) {
+pub fn run_ppl_with_cleanup(source: &str) -> String {
+    run_ppl_collecting(source, |_| {}, &[], None, &[], true).1
+}
+
+fn run_ppl_collecting<P: Fn(&mut IcyBoard)>(
+    source: &str,
+    init_fn: P,
+    files: &[(&str, &[u8])],
+    ppe_dir: Option<&str>,
+    input: &[u8],
+    cleanup: bool,
+) -> (bool, String) {
     let executable = compile(source);
     let work_dir = scratch_dir("run");
     for (name, bytes) in files {
@@ -207,6 +219,9 @@ fn run_ppl_collecting<P: Fn(&mut IcyBoard)>(source: &str, init_fn: P, files: &[(
 
         let mut io = DiskIO::new(work_dir.to_str().unwrap(), None);
         let result = run(&ppe_file, &executable, &mut io, &mut state).await;
+        if cleanup {
+            state.cleanup_ppl_media().await;
+        }
 
         // Dropping the board end closes the channel, which is what lets the
         // reader finish instead of blocking on a connection nobody will write to.

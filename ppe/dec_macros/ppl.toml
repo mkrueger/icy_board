@@ -1,5 +1,5 @@
 [package]
-name = "fractal"
+name = "dec_macros"
 version = "0.1.0"
 authors = ["Mike Krüger <mkrueger@posteo.de>"]
 runtime = 402

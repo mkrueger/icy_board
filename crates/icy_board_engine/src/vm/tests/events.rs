@@ -122,6 +122,20 @@ fn negative_event_wait_means_indefinite() {
 }
 
 #[test]
+fn keyflush_discards_input_buffered_after_an_event() {
+    let output = run_ppl_with_input(
+        r#"
+        EVENT e = EventPoll()
+        KeyFlush
+        PRINT "[", InKey(), "]"
+        "#,
+        b"qX",
+    );
+
+    assert_eq!(output, "[]");
+}
+
+#[test]
 fn event_wait_returns_an_empty_event_on_timeout() {
     let output = run_ppl(
         r#"

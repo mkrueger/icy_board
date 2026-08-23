@@ -482,16 +482,18 @@ fn the_fractal_demo_asks_the_terminal_to_scale_its_small_surface() {
 
     // 16x8 pixels of fractal covering the 64x32 the viewport scales it to.
     assert!(output.contains("SyncTERM:C;DrawJXLBlob;DX=0;DY=0;DW=64;DH=32;"), "{output:?}");
+    assert!(!output.contains("\x1b[?2026h"), "{output:?}");
+    assert!(!output.contains("\x1b[?2026l"), "{output:?}");
     assert!(output.contains("surfaces, per-pixel drawing"), "{output:?}");
 }
 
 #[test]
-fn the_fractal_demo_checks_for_input_between_mandelbrot_bands() {
+fn the_fractal_demo_checks_for_input_without_presenting_partial_frames() {
     let source = fractal_source("GFX_AUTO").replace("CONST INTEGER BAND = 10", "CONST INTEGER BAND = 2");
     let output = super::run_ppl_with_input(&source, &[JXL_TERMINAL, b"q"].concat());
 
-    // One HUD and the first fractal band are presented before the queued key stops the frame.
-    assert_eq!(output.matches("SyncTERM:C;DrawJXLBlob;").count(), 2, "{output:?}");
+    // The HUD is visible, but the interrupted Mandelbrot frame is never partially presented.
+    assert_eq!(output.matches("SyncTERM:C;DrawJXLBlob;").count(), 1, "{output:?}");
     assert!(output.contains("surfaces, per-pixel drawing"), "{output:?}");
 }
 

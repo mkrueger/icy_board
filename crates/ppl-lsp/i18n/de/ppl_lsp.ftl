@@ -25,3 +25,5 @@ hint-statement-gfx-api=Erstellt, zeichnet, präsentiert oder steuert Sixel-/JPEG
 hint-statement-sound-api=Lädt, spielt, blendet, stoppt oder ändert SyncTERM-Audio.
 hint-statement-mouse-api=Aktiviert oder deaktiviert Mausereignisse in Zeichen- oder Pixelkoordinaten.
 hint-statement-key-api=Aktiviert, unterdrückt übersetzte Eingaben für oder deaktiviert physische Tastenereignisse.
+hint-statement-terminal-update-api=Beginnt oder beendet eine verschachtelbare synchronisierte DEC-Ausgabe. Nur das äußerste Paar sendet Modus-2026-Sequenzen.
+hint-statement-terminal-macro-api=Zeichnet eines von 64 terminalresidenten DEC-Makros auf, lädt es hoch, ruft es auf, löscht es oder leert alle Makros. Die Wiedergabe sendet nur DECINVM.

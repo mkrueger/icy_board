@@ -41,6 +41,7 @@ pub mod ppl_graphics;
 pub mod ppl_keys;
 pub mod ppl_mouse;
 pub mod ppl_surface;
+pub mod ppl_terminal_control;
 pub mod ppl_terminal_info;
 pub mod ppl_terminal_state;
 pub mod user_commands;
@@ -692,6 +693,7 @@ pub struct IcyBoardState {
     ppl_audio_notify: ppl_events::AudioNotifyState,
     pub ppl_keys: ppl_keys::PplKeyState,
     pub ppl_mouse: ppl_mouse::PplMouseState,
+    pub ppl_terminal: ppl_terminal_control::PplTerminalControl,
 }
 
 impl IcyBoardState {
@@ -780,6 +782,7 @@ impl IcyBoardState {
             ppl_audio_notify: ppl_events::AudioNotifyState::default(),
             ppl_keys: ppl_keys::PplKeyState::default(),
             ppl_mouse: ppl_mouse::PplMouseState::default(),
+            ppl_terminal: ppl_terminal_control::PplTerminalControl::default(),
         }
     }
     async fn update_language(&mut self) {
@@ -1166,7 +1169,20 @@ impl IcyBoardState {
         }
     }
 
-    async fn cleanup_ppl_media(&mut self) {
+    pub(crate) async fn cleanup_ppl_media(&mut self) {
+        if let Some(recording) = self.ppl_terminal.finish_recording()
+            && !recording.overflowed
+        {
+            let slot = recording.slot;
+            let _ = self.define_ppl_macro(recording).await;
+            let _ = self.play_ppl_macro(slot).await;
+        }
+        for slot in self.ppl_terminal.take_defined_slots() {
+            let _ = self.print(TerminalTarget::Both, &dec_macro_definition(slot, &[], false)).await;
+        }
+        if self.ppl_terminal.take_update_depth() > 0 {
+            let _ = self.print(TerminalTarget::Both, "\x1b[?2026l").await;
+        }
         let margins_active = {
             let terminal = &self.display_screen().buffer.buffer.terminal_state;
             terminal.margins_top_bottom().is_some() || terminal.margins_left_right().is_some()
@@ -1197,6 +1213,17 @@ impl IcyBoardState {
         self.ppl_audio.fill(None);
         self.sound_volume.fill(100);
         self.gfx_error = -1;
+    }
+
+    pub async fn flush_keyboard_input(&mut self) -> Res<()> {
+        self.raw_input.clear();
+        self.char_buffer.clear();
+        self.ppl_event_keys.clear();
+        self.ppl_keys.clear();
+
+        let mut input = [0u8; 64];
+        while self.connection.try_read(&mut input).await? > 0 {}
+        Ok(())
     }
 
     pub fn stuff_keyboard_buffer(&mut self, value: &str, is_visible: bool) -> Res<()> {
@@ -2053,6 +2080,19 @@ enum PcbState {
     ReadAtSequence(String),
 }
 
+fn dec_macro_definition(slot: usize, bytes: &[u8], delete_all: bool) -> String {
+    const HEX: &[u8; 16] = b"0123456789ABCDEF";
+    let mut sequence = format!("\x1bP{slot};{};1!z", usize::from(delete_all));
+    sequence.reserve(bytes.len() * 2 + 2);
+    for byte in bytes {
+        sequence.push(HEX[usize::from(byte >> 4)] as char);
+        sequence.push(HEX[usize::from(byte & 0x0F)] as char);
+    }
+    sequence.push('\x1b');
+    sequence.push('\\');
+    sequence
+}
+
 impl IcyBoardState {
     pub fn use_ansi(&self) -> bool {
         true
@@ -2155,6 +2195,15 @@ impl IcyBoardState {
     }
 
     async fn write_chars(&mut self, target: TerminalTarget, data: &[char]) -> Res<()> {
+        if self.ppl_terminal.record(
+            target,
+            data,
+            self.session.term_caps.is_utf8,
+            self.session.is_sysop,
+            self.session.current_user.is_none(),
+        ) {
+            return Ok(());
+        }
         let mut user_bytes = Vec::new();
         let mut sysop_bytes = Vec::new();
         let user_is_utf8 = self.session.term_caps.is_utf8;
@@ -2187,6 +2236,53 @@ impl IcyBoardState {
             }
         }
         self.write_chars_internal(target, &user_bytes, &sysop_bytes).await?;
+        Ok(())
+    }
+
+    pub async fn play_ppl_macro(&mut self, slot: usize) -> Res<bool> {
+        if !self.ppl_terminal.is_defined(slot) {
+            return Ok(false);
+        }
+        self.print(TerminalTarget::Both, &format!("\x1b[{slot}*z")).await?;
+        Ok(true)
+    }
+
+    pub async fn finish_ppl_macro(&mut self) -> Res<Option<bool>> {
+        let Some(recording) = self.ppl_terminal.finish_recording() else {
+            return Ok(None);
+        };
+        if recording.overflowed {
+            return Ok(Some(false));
+        }
+        self.define_ppl_macro(recording).await?;
+        Ok(Some(true))
+    }
+
+    async fn define_ppl_macro(&mut self, recording: ppl_terminal_control::FinishedMacro) -> Res<()> {
+        let slot = recording.slot;
+        if self.session.is_sysop || self.session.current_user.is_none() {
+            self.print(TerminalTarget::Both, &dec_macro_definition(slot, &recording.user_bytes, false))
+                .await?;
+            self.ppl_terminal.mark_defined(slot);
+            return Ok(());
+        }
+        self.print(TerminalTarget::User, &dec_macro_definition(slot, &recording.user_bytes, false))
+            .await?;
+        self.print(TerminalTarget::Sysop, &dec_macro_definition(slot, &recording.sysop_bytes, false))
+            .await?;
+        self.ppl_terminal.mark_defined(slot);
+        Ok(())
+    }
+
+    pub async fn delete_ppl_macro(&mut self, slot: usize) -> Res<()> {
+        self.print(TerminalTarget::Both, &dec_macro_definition(slot, &[], false)).await?;
+        self.ppl_terminal.mark_deleted(slot);
+        Ok(())
+    }
+
+    pub async fn clear_ppl_macros(&mut self) -> Res<()> {
+        self.print(TerminalTarget::Both, &dec_macro_definition(0, &[], true)).await?;
+        self.ppl_terminal.clear_defined();
         Ok(())
     }
 

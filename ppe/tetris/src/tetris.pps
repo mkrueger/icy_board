@@ -158,6 +158,7 @@ ui.Free()
 game.Free()
 screen.Free()
 GfxShutdown
+KeyFlush
 CLS
 
 PROCEDURE InitShapes()

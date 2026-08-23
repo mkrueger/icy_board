@@ -28,6 +28,12 @@ pub struct TerminalCaps {
     /// Whether it can play a sound file.
     pub sound: bool,
 
+    /// `Some` when DECRQM explicitly reported whether synchronized output is supported.
+    pub synchronized_output: Option<bool>,
+
+    /// `Some` when DECMSR explicitly reported whether terminal macro storage is available.
+    pub terminal_macros: Option<bool>,
+
     /// Whether any query at all came back. Nothing may be waited on without this,
     /// or a terminal that answers nothing costs a timeout every time it is asked.
     pub answered: bool,
@@ -42,6 +48,8 @@ impl TerminalCaps {
         rip_version: None,
         gfx: GfxCapabilities::DEFAULT,
         sound: false,
+        synchronized_output: None,
+        terminal_macros: None,
         answered: false,
     };
 
@@ -118,6 +126,8 @@ impl TerminalCaps {
                 rip_version,
                 gfx: media.gfx,
                 sound: media.sound,
+                synchronized_output: media.synchronized_output,
+                terminal_macros: media.terminal_macros,
                 answered: answered || media.answered,
             },
             media,
@@ -129,6 +139,8 @@ impl TerminalCaps {
 pub struct MediaProbeResult {
     pub gfx: GfxCapabilities,
     pub sound: bool,
+    pub synchronized_output: Option<bool>,
+    pub terminal_macros: Option<bool>,
     /// The raw device attributes reply, which also names the terminal program.
     pub device_attributes: Option<String>,
     /// What the caller's media cache already holds, each name carrying its own prefix.
@@ -177,6 +189,8 @@ pub async fn probe_media(com: &mut dyn Connection, probe: &mut TerminalProbe) ->
     com.send(PIXEL_SIZE_QUERY).await?;
     com.send(JXL_QUERY).await?;
     com.send(SOUND_QUERY).await?;
+    com.send(SYNCHRONIZED_OUTPUT_QUERY).await?;
+    com.send(TERMINAL_MACRO_QUERY).await?;
 
     let mut leftover = Vec::new();
     collect_replies(com, probe, &mut leftover, TerminalProbe::media_answered).await?;
@@ -194,6 +208,8 @@ pub async fn probe_media(com: &mut dyn Connection, probe: &mut TerminalProbe) ->
 
     let answered = probe.answered();
     let sound = probe.sound();
+    let synchronized_output = probe.synchronized_output();
+    let terminal_macros = probe.terminal_macros();
     let device_attributes = probe.take_device_attributes();
     let (gfx, listing, pending) = probe.finish();
     cache_listing.extend(listing.unwrap_or_default());
@@ -201,6 +217,8 @@ pub async fn probe_media(com: &mut dyn Connection, probe: &mut TerminalProbe) ->
     Ok(MediaProbeResult {
         gfx,
         sound,
+        synchronized_output,
+        terminal_macros,
         device_attributes,
         cache_listing,
         answered,
@@ -217,6 +235,8 @@ pub const CELL_SIZE_QUERY: &[u8] = b"\x1b[16t";
 pub const PIXEL_SIZE_QUERY: &[u8] = b"\x1b[14t";
 pub const JXL_QUERY: &[u8] = b"\x1b_SyncTERM:Q;JXL\x1b\\";
 pub const SOUND_QUERY: &[u8] = b"\x1b_SyncTERM:Q;libsndfile\x1b\\";
+pub const SYNCHRONIZED_OUTPUT_QUERY: &[u8] = b"\x1b[?2026$p";
+pub const TERMINAL_MACRO_QUERY: &[u8] = b"\x1b[?62n";
 pub const GFX_CACHE_LIST_QUERY: &[u8] = b"\x1b_SyncTERM:C;L;gfx/*\x1b\\";
 pub const SOUND_CACHE_LIST_QUERY: &[u8] = b"\x1b_SyncTERM:C;L;snd/*\x1b\\";
 
@@ -275,6 +295,10 @@ pub struct TerminalProbe {
     jxl_answered: bool,
     sound: bool,
     sound_answered: bool,
+    synchronized_output: Option<bool>,
+    synchronized_output_answered: bool,
+    terminal_macros: Option<bool>,
+    terminal_macros_answered: bool,
     device_attributes: Option<String>,
     cache_listing: Option<HashSet<String>>,
 }
@@ -287,6 +311,10 @@ impl TerminalProbe {
         self.jxl_answered = false;
         self.sound = false;
         self.sound_answered = false;
+        self.synchronized_output = None;
+        self.synchronized_output_answered = false;
+        self.terminal_macros = None;
+        self.terminal_macros_answered = false;
         self.device_attributes = None;
         self.cache_listing = None;
     }
@@ -303,14 +331,22 @@ impl TerminalProbe {
         self.sound
     }
 
+    pub fn synchronized_output(&self) -> Option<bool> {
+        self.synchronized_output
+    }
+
+    pub fn terminal_macros(&self) -> Option<bool> {
+        self.terminal_macros
+    }
+
     /// Both media questions are settled, so there is nothing left to wait for.
     pub fn media_answered(&self) -> bool {
-        self.jxl_answered && self.sound_answered
+        self.jxl_answered && self.sound_answered && self.synchronized_output_answered && self.terminal_macros_answered
     }
 
     /// Whether the terminal said anything at all.
     pub fn answered(&self) -> bool {
-        self.jxl_answered || self.sound_answered || self.device_attributes.is_some()
+        self.jxl_answered || self.sound_answered || self.synchronized_output_answered || self.terminal_macros_answered || self.device_attributes.is_some()
     }
 
     pub fn take_device_attributes(&mut self) -> Option<String> {
@@ -382,6 +418,29 @@ impl TerminalProbe {
         };
         let (body, final_byte) = body.split_at(body.len() - 1);
         match final_byte {
+            "{" => {
+                let Some(space) = body.strip_suffix('*').and_then(|value| value.parse::<u32>().ok()) else {
+                    return false;
+                };
+                self.terminal_macros = Some(space > 0);
+                self.terminal_macros_answered = true;
+                true
+            }
+            "y" => {
+                let Some(values) = body.strip_prefix("?2026;").and_then(|value| value.strip_suffix('$')) else {
+                    return false;
+                };
+                let Ok(status) = values.parse::<u8>() else {
+                    return false;
+                };
+                self.synchronized_output = match status {
+                    0 => Some(false),
+                    1..=4 => Some(true),
+                    _ => return false,
+                };
+                self.synchronized_output_answered = true;
+                true
+            }
             // CSI = 1 ; <0-or-1> - n answers the JPEG XL query, CSI = 7 ; 100 ; <0-or-1> n
             // the one about sound.
             "n" => {
@@ -573,6 +632,38 @@ mod test {
 
         assert!(probe.jxl_answered());
         assert!(!probe.capabilities().jxl);
+    }
+
+    #[test]
+    fn synchronized_output_support_is_tri_state() {
+        let parse = |reply: &[u8]| {
+            let mut probe = TerminalProbe::default();
+            probe.start();
+            for byte in reply {
+                assert!(probe.feed(*byte).is_empty());
+            }
+            probe.synchronized_output()
+        };
+
+        assert_eq!(parse(b"\x1b[?2026;0$y"), Some(false));
+        assert_eq!(parse(b"\x1b[?2026;2$y"), Some(true));
+        assert_eq!(TerminalProbe::default().synchronized_output(), None);
+    }
+
+    #[test]
+    fn terminal_macro_support_is_tri_state() {
+        let parse = |reply: &[u8]| {
+            let mut probe = TerminalProbe::default();
+            probe.start();
+            for byte in reply {
+                assert!(probe.feed(*byte).is_empty());
+            }
+            probe.terminal_macros()
+        };
+
+        assert_eq!(parse(b"\x1b[32767*{"), Some(true));
+        assert_eq!(parse(b"\x1b[0*{"), Some(false));
+        assert_eq!(TerminalProbe::default().terminal_macros(), None);
     }
 
     /// What Icy Term answers: it names itself rather than a `CTerm` revision, and from

@@ -288,8 +288,15 @@ pub enum OpCode {
     SetPaletteColorRgb = 248,
     ResetPaletteColor = 249,
     ResetPalette = 250,
+    BeginTerminalUpdate = 251,
+    EndTerminalUpdate = 252,
+    RecordMacro = 253,
+    EndMacro = 254,
+    PlayMacro = 255,
+    DeleteMacro = 256,
+    ClearMacros = 257,
 }
-pub const LAST_STMT: i16 = OpCode::ResetPalette as i16;
+pub const LAST_STMT: i16 = OpCode::ClearMacros as i16;
 
 impl OpCode {
     pub fn get_definition(self) -> &'static StatementDefinition {
@@ -625,7 +632,7 @@ pub fn format_argument_type_last(arg: &ArgumentDefinition) -> String {
 // "WAIT FOR" == "WAITFOR"
 // "GO SUB"
 // " GO TO"
-pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 256]> = std::sync::LazyLock::new(|| {
+pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 263]> = std::sync::LazyLock::new(|| {
     [
         StatementDefinition {
             // helps to map opcode to array index.
@@ -2764,6 +2771,55 @@ pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 256]
             name: "ResetPalette",
             version: 400,
             opcode: OpCode::ResetPalette,
+            args: None,
+            sig: StatementSignature::ArgumentsWithVariable(0, 0),
+        },
+        StatementDefinition {
+            name: "BeginTerminalUpdate",
+            version: 400,
+            opcode: OpCode::BeginTerminalUpdate,
+            args: None,
+            sig: StatementSignature::ArgumentsWithVariable(0, 0),
+        },
+        StatementDefinition {
+            name: "EndTerminalUpdate",
+            version: 400,
+            opcode: OpCode::EndTerminalUpdate,
+            args: None,
+            sig: StatementSignature::ArgumentsWithVariable(0, 0),
+        },
+        StatementDefinition {
+            name: "RecordMacro",
+            version: 400,
+            opcode: OpCode::RecordMacro,
+            args: Some(vec![ArgumentDefinition::new("Slot", VariableType::Integer)]),
+            sig: StatementSignature::ArgumentsWithVariable(0, 1),
+        },
+        StatementDefinition {
+            name: "EndMacro",
+            version: 400,
+            opcode: OpCode::EndMacro,
+            args: None,
+            sig: StatementSignature::ArgumentsWithVariable(0, 0),
+        },
+        StatementDefinition {
+            name: "PlayMacro",
+            version: 400,
+            opcode: OpCode::PlayMacro,
+            args: Some(vec![ArgumentDefinition::new("Slot", VariableType::Integer)]),
+            sig: StatementSignature::ArgumentsWithVariable(0, 1),
+        },
+        StatementDefinition {
+            name: "DeleteMacro",
+            version: 400,
+            opcode: OpCode::DeleteMacro,
+            args: Some(vec![ArgumentDefinition::new("Slot", VariableType::Integer)]),
+            sig: StatementSignature::ArgumentsWithVariable(0, 1),
+        },
+        StatementDefinition {
+            name: "ClearMacros",
+            version: 400,
+            opcode: OpCode::ClearMacros,
             args: None,
             sig: StatementSignature::ArgumentsWithVariable(0, 0),
         },

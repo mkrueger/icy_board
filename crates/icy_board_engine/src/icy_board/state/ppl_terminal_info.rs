@@ -25,6 +25,8 @@ property_name!(JXL, "Jxl");
 property_name!(INLINE_GRAPHICS, "InlineGraphics");
 property_name!(SOUND, "Sound");
 property_name!(PHYSICAL_KEYS, "PhysicalKeys");
+property_name!(SYNCHRONIZED_OUTPUT, "SynchronizedOutput");
+property_name!(TERMINAL_MACROS, "TerminalMacros");
 property_name!(CELL_WIDTH, "CellWidth");
 property_name!(CELL_HEIGHT, "CellHeight");
 property_name!(SCREEN_WIDTH, "ScreenWidth");
@@ -44,6 +46,8 @@ pub struct PplTerminalInfo {
     inline_graphics: bool,
     sound: bool,
     physical_keys: bool,
+    synchronized_output: bool,
+    terminal_macros: bool,
     cell_width: i32,
     cell_height: i32,
     screen_width: i32,
@@ -70,6 +74,8 @@ impl From<&TerminalCaps> for PplTerminalInfo {
             inline_graphics: caps.gfx.inline_blobs(),
             sound: caps.sound,
             physical_keys: caps.gfx.physical_keys,
+            synchronized_output: caps.synchronized_output == Some(true),
+            terminal_macros: caps.terminal_macros == Some(true),
             cell_width: caps.gfx.cell_width,
             cell_height: caps.gfx.cell_height,
             screen_width: caps.gfx.screen_width,
@@ -94,7 +100,16 @@ impl UserData for PplTerminalInfo {
         for name in [&*COLUMNS, &*ROWS, &*CTERM_LEVEL, &*CELL_WIDTH, &*CELL_HEIGHT, &*SCREEN_WIDTH, &*SCREEN_HEIGHT] {
             registry.add_property(name.clone(), VariableType::Integer, false);
         }
-        for name in [&*UTF8, &*SIXEL, &*JXL, &*INLINE_GRAPHICS, &*SOUND, &*PHYSICAL_KEYS] {
+        for name in [
+            &*UTF8,
+            &*SIXEL,
+            &*JXL,
+            &*INLINE_GRAPHICS,
+            &*SOUND,
+            &*PHYSICAL_KEYS,
+            &*SYNCHRONIZED_OUTPUT,
+            &*TERMINAL_MACROS,
+        ] {
             registry.add_property(name.clone(), VariableType::Boolean, false);
         }
     }
@@ -127,6 +142,10 @@ impl UserDataValue for PplTerminalInfo {
             VariableValue::new_bool(self.sound)
         } else if *name == *PHYSICAL_KEYS {
             VariableValue::new_bool(self.physical_keys)
+        } else if *name == *SYNCHRONIZED_OUTPUT {
+            VariableValue::new_bool(self.synchronized_output)
+        } else if *name == *TERMINAL_MACROS {
+            VariableValue::new_bool(self.terminal_macros)
         } else if *name == *CELL_WIDTH {
             VariableValue::new_int(self.cell_width)
         } else if *name == *CELL_HEIGHT {
@@ -184,6 +203,8 @@ mod tests {
                 screen_height: 774,
             },
             sound: true,
+            synchronized_output: Some(true),
+            terminal_macros: Some(true),
             answered: true,
         };
 
@@ -194,7 +215,9 @@ mod tests {
         assert_eq!((info.columns, info.rows), (132, 43));
         assert_eq!(info.rip_version, "3.0");
         assert_eq!(info.cterm_level, 1332);
-        assert!(info.utf8 && info.sixel && info.jxl && info.inline_graphics && info.sound && info.physical_keys);
+        assert!(
+            info.utf8 && info.sixel && info.jxl && info.inline_graphics && info.sound && info.physical_keys && info.synchronized_output && info.terminal_macros
+        );
         assert_eq!((info.cell_width, info.cell_height), (9, 18));
         assert_eq!((info.screen_width, info.screen_height), (1188, 774));
     }

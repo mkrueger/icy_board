@@ -62,6 +62,15 @@ impl PplKeyState {
         true
     }
 
+    pub fn clear(&mut self) {
+        self.pending.clear();
+        self.pending_since = None;
+        self.events.clear();
+        self.current = PplKeyEvent::default();
+        self.dropped = 0;
+        self.held.clear();
+    }
+
     pub fn feed(&mut self, byte: u8) -> Vec<u8> {
         if !self.enabled {
             return vec![byte];

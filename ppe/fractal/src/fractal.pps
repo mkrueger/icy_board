@@ -110,7 +110,7 @@ PRINTLN "@X0BPPE Fractal@X07 - surfaces, per-pixel drawing and scaled presentati
 ; --------------------------------------------------------------------------
 
 PROCEDURE RenderMandel(DOUBLE centerX, DOUBLE centerY, DOUBLE half, INTEGER maxIter)
-    INTEGER px, py, i, bandTop, pending
+    INTEGER px, py, i, pending
     DOUBLE zx, zy, ax, ay, t, stepSize, minX, minY, q
 
     ; The viewport is twice as wide as it is tall, so one step serves both axes.
@@ -118,7 +118,6 @@ PROCEDURE RenderMandel(DOUBLE centerX, DOUBLE centerY, DOUBLE half, INTEGER maxI
     minX = centerX - half * 2.0
     minY = centerY - half
 
-    bandTop = 0
     pending = 0
     FOR py = 0 TO fracH - 1
         ay = minY + py * stepSize
@@ -146,22 +145,17 @@ PROCEDURE RenderMandel(DOUBLE centerX, DOUBLE centerY, DOUBLE half, INTEGER maxI
             PlotEscape(px, py, i, maxIter)
         NEXT px
         pending += 1
-        ; A slow frame is worth watching arrive, so each band goes out as it is
-        ; finished instead of after the whole image.
+        ; Keep slow frames interruptible without presenting an incomplete image.
         IF pending = BAND THEN
-            PresentBand(bandTop, pending)
             IF InKey() <> "" THEN
                 interrupted = TRUE
                 RETURN
             ENDIF
-            bandTop = py + 1
             pending = 0
         ENDIF
     NEXT py
-    IF pending > 0 THEN
-        PresentBand(bandTop, pending)
-        IF InKey() <> "" interrupted = TRUE
-    ENDIF
+    PresentBand(0, fracH)
+    IF InKey() <> "" interrupted = TRUE
 ENDPROC
 
 PROCEDURE RenderJulia(DOUBLE constX, DOUBLE constY, INTEGER maxIter)
