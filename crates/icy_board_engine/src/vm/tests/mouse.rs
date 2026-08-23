@@ -4,15 +4,16 @@ use super::run_ppl_with_input;
 fn graphics_mouse_reports_pixels() {
     let output = run_ppl_with_input(
         r#"
+        TERMINPUT input = TermInput()
         EVENT e
-        MouseOn 1
-        e = EventPoll()
+        input.MouseOn(1)
+        e = input.Poll()
         PrintLn e.Kind
         PrintLn e.Code
         PrintLn e.X
         PrintLn e.Y
         PrintLn e.Pixels
-        MouseOff
+        input.Free()
         "#,
         b"\x1b[?1016;1$y\x1b[<0;101;51M",
     );

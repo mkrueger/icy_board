@@ -323,15 +323,14 @@ pub enum FuncOpCode {
     GfxScreenHeight = -309,
     NewSurface = -310,
     LoadSurface = -311,
-    EventPoll = -312,
-    EventWait = -313,
-    LoadAudio = -314,
-    TermState = -315,
-    Err = -316,
-    TermInfo = -317,
+    LoadAudio = -312,
+    TermState = -313,
+    Err = -314,
+    TermInfo = -315,
+    TermInput = -316,
 }
 
-pub const LAST_FUNC: i16 = -317;
+pub const LAST_FUNC: i16 = -316;
 
 impl FuncOpCode {
     pub fn get_definition(self) -> &'static FunctionDefinition {
@@ -402,7 +401,7 @@ impl FunctionDefinition {
         }
     }
 }
-pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 329]> = std::sync::LazyLock::new(|| {
+pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 328]> = std::sync::LazyLock::new(|| {
     [
         FunctionDefinition {
             name: "END",
@@ -3081,22 +3080,6 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 329]> 
             signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
-            name: "EventPoll",
-            version: 400,
-            opcode: FuncOpCode::EventPoll,
-            return_type: VariableType::UserData(36),
-            args: None,
-            signature: FunctionSignature::FixedParameters(0),
-        },
-        FunctionDefinition {
-            name: "EventWait",
-            version: 400,
-            opcode: FuncOpCode::EventWait,
-            return_type: VariableType::UserData(36),
-            args: Some(vec![ArgumentDefinition::new("Milliseconds", VariableType::Integer)]),
-            signature: FunctionSignature::FixedParameters(1),
-        },
-        FunctionDefinition {
             name: "LoadAudio",
             version: 400,
             opcode: FuncOpCode::LoadAudio,
@@ -3125,6 +3108,14 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 329]> 
             version: 400,
             opcode: FuncOpCode::TermInfo,
             return_type: VariableType::UserData(40),
+            args: None,
+            signature: FunctionSignature::FixedParameters(0),
+        },
+        FunctionDefinition {
+            name: "TermInput",
+            version: 400,
+            opcode: FuncOpCode::TermInput,
+            return_type: VariableType::UserData(41),
             args: None,
             signature: FunctionSignature::FixedParameters(0),
         },

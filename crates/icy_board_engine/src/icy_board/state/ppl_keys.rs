@@ -142,6 +142,10 @@ impl PplKeyState {
         }
     }
 
+    pub fn take_pending_bytes(&mut self) -> Vec<u8> {
+        self.take_pending()
+    }
+
     fn take_pending(&mut self) -> Vec<u8> {
         self.pending_since = None;
         std::mem::take(&mut self.pending)

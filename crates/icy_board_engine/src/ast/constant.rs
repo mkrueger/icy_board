@@ -43,7 +43,7 @@ impl BuiltinConst {
 }
 
 pub const STACK_LIMIT: i32 = 6022 + 1024;
-pub const BUILTIN_CONSTS: [BuiltinConst; 185] = [
+pub const BUILTIN_CONSTS: [BuiltinConst; 182] = [
     BuiltinConst { name: "TRUE", value: 0x01 },
     BuiltinConst { name: "FALSE", value: 0x00 },
     BuiltinConst {
@@ -346,18 +346,6 @@ pub const BUILTIN_CONSTS: [BuiltinConst; 185] = [
     BuiltinConst {
         name: "GFX_CAP_AUDIO",
         value: 0x40,
-    },
-    BuiltinConst {
-        name: "KEY_EVENTS_OFF",
-        value: 0,
-    },
-    BuiltinConst {
-        name: "KEY_EVENTS_ON",
-        value: 1,
-    },
-    BuiltinConst {
-        name: "KEY_EVENTS_SUPPRESS",
-        value: 2,
     },
     BuiltinConst { name: "MOUSE_TEXT", value: 0 },
     BuiltinConst {

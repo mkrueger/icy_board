@@ -140,7 +140,7 @@ impl UserData for PplEvent {
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl UserDataValue for PplEvent {
     fn get_property_value(&self, _vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
         if *name == *KIND {
@@ -215,15 +215,22 @@ const MAX_NOTIFY_SEQUENCE: usize = 64;
 /// to watch has drained. Everything else is handed back untouched.
 #[derive(Default)]
 pub struct AudioNotifyState {
+    watching: bool,
     pending: Vec<u8>,
     pending_since: Option<Instant>,
     drained: VecDeque<i32>,
 }
 
 impl AudioNotifyState {
+    /// Only a running channel can report a drain, so nothing else may hold back the
+    /// escape a cursor key starts with.
+    pub fn set_watching(&mut self, watching: bool) {
+        self.watching = watching;
+    }
+
     pub fn feed(&mut self, byte: u8) -> Vec<u8> {
         if self.pending.is_empty() {
-            if byte == 0x1b {
+            if byte == 0x1b && self.watching {
                 self.pending.push(byte);
                 self.pending_since = Some(Instant::now());
                 return Vec::new();
@@ -263,6 +270,10 @@ impl AudioNotifyState {
         } else {
             Vec::new()
         }
+    }
+
+    pub fn take_pending_bytes(&mut self) -> Vec<u8> {
+        self.take_pending()
     }
 
     fn take_pending(&mut self) -> Vec<u8> {
@@ -457,11 +468,21 @@ mod tests {
     #[test]
     fn audio_notify_releases_a_lone_escape_after_sequence_timeout() {
         let mut notify = AudioNotifyState::default();
+        notify.set_watching(true);
         assert!(notify.feed(0x1b).is_empty());
 
         std::thread::sleep(ESCAPE_TIMEOUT);
 
         assert_eq!(notify.take_stale_keyboard(), vec![0x1b]);
+        assert!(notify.take_stale_keyboard().is_empty());
+    }
+
+    #[test]
+    fn audio_notify_passes_escapes_on_when_no_channel_is_watched() {
+        let mut notify = AudioNotifyState::default();
+
+        assert_eq!(notify.feed(0x1b), vec![0x1b]);
+        assert_eq!(notify.feed(b'['), vec![b'[']);
         assert!(notify.take_stale_keyboard().is_empty());
     }
 }

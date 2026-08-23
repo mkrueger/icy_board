@@ -93,7 +93,7 @@ impl UserData for PplError {
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl UserDataValue for PplError {
     fn get_property_value(&self, _vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
         if *name == *OK {

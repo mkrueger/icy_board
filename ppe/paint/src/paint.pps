@@ -29,6 +29,7 @@ BOOLEAN running, dragging, dirty, pendingInput
 STRING key
 SURFACE screen, ui
 EVENT inputEvent
+TERMINPUT input
 
 InitColors()
 CLS
@@ -50,16 +51,17 @@ dragging = FALSE
 dirty = FALSE
 RenderToolbar()
 
-MouseOn MOUSE_PIXELS, MOUSE_TRACK_ALL
+input = TermInput()
+input.MouseOn(MOUSE_PIXELS, MOUSE_TRACK_ALL)
 tries = 0
-inputEvent = EventPoll()
+inputEvent = input.Poll()
 WHILE !inputEvent.Pixels & tries < 30 DO
     DELAY 1
-    inputEvent = EventPoll()
+    inputEvent = input.Poll()
     tries += 1
 ENDWHILE
 IF !inputEvent.Pixels THEN
-    MouseOff
+    input.Free()
     GfxShutdown
     CLS
     PRINTLN "PPE Paint requires pixel mouse reporting (DEC mode 1016)."
@@ -74,7 +76,7 @@ WHILE running DO
     IF pendingInput THEN
         pendingInput = FALSE
     ELSE
-        inputEvent = EventPoll()
+        inputEvent = input.Poll()
     ENDIF
     WHILE inputEvent.Kind <> EVENT_NONE DO
         IF inputEvent.Kind = EVENT_MOUSE THEN
@@ -122,17 +124,17 @@ WHILE running DO
                 ChangeBrush(-1)
             ENDIF
         ENDIF
-        inputEvent = EventPoll()
+        inputEvent = input.Poll()
     ENDWHILE
     IF dirty PresentDirty()
     IF inputEvent.Time < nextFrame THEN
-        inputEvent = EventWait(nextFrame - inputEvent.Time)
+        inputEvent = input.Wait(nextFrame - inputEvent.Time)
         pendingInput = inputEvent.Kind <> EVENT_NONE
     ENDIF
     IF inputEvent.Time >= nextFrame nextFrame = inputEvent.Time + FRAME_MS
 ENDWHILE
 
-MouseOff
+input.Free()
 ui.Free()
 screen.Free()
 GfxShutdown

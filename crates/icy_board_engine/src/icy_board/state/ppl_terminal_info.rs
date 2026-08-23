@@ -115,7 +115,7 @@ impl UserData for PplTerminalInfo {
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl UserDataValue for PplTerminalInfo {
     fn get_property_value(&self, _vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
         let value = if *name == *PROGRAM {

@@ -270,31 +270,28 @@ pub enum OpCode {
 
     GfxInit = 231,
     GfxShutdown = 232,
-    MouseOn = 233,
-    MouseOff = 234,
-    GfxSetPacing = 235,
-    KeyEvents = 236,
-    MemberCall = 237,
-    SetVMargins = 238,
-    SetHMargins = 239,
-    ResetVMargins = 240,
-    ResetHMargins = 241,
-    ResetMargins = 242,
-    SetFont = 243,
-    LoadFont = 244,
-    OnError = 245,
-    ErrClr = 246,
-    SetPaletteColor = 247,
-    SetPaletteColorRgb = 248,
-    ResetPaletteColor = 249,
-    ResetPalette = 250,
-    BeginTerminalUpdate = 251,
-    EndTerminalUpdate = 252,
-    RecordMacro = 253,
-    EndMacro = 254,
-    PlayMacro = 255,
-    DeleteMacro = 256,
-    ClearMacros = 257,
+    GfxSetPacing = 233,
+    MemberCall = 234,
+    SetVMargins = 235,
+    SetHMargins = 236,
+    ResetVMargins = 237,
+    ResetHMargins = 238,
+    ResetMargins = 239,
+    SetFont = 240,
+    LoadFont = 241,
+    OnError = 242,
+    ErrClr = 243,
+    SetPaletteColor = 244,
+    SetPaletteColorRgb = 245,
+    ResetPaletteColor = 246,
+    ResetPalette = 247,
+    BeginTerminalUpdate = 248,
+    EndTerminalUpdate = 249,
+    RecordMacro = 250,
+    EndMacro = 251,
+    PlayMacro = 252,
+    DeleteMacro = 253,
+    ClearMacros = 254,
 }
 pub const LAST_STMT: i16 = OpCode::ClearMacros as i16;
 
@@ -632,7 +629,7 @@ pub fn format_argument_type_last(arg: &ArgumentDefinition) -> String {
 // "WAIT FOR" == "WAITFOR"
 // "GO SUB"
 // " GO TO"
-pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 263]> = std::sync::LazyLock::new(|| {
+pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 260]> = std::sync::LazyLock::new(|| {
     [
         StatementDefinition {
             // helps to map opcode to array index.
@@ -2625,34 +2622,10 @@ pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 263]
             sig: StatementSignature::ArgumentsWithVariable(0, 0),
         },
         StatementDefinition {
-            name: "MouseOn",
-            version: 400,
-            opcode: OpCode::MouseOn,
-            args: Some(vec![
-                ArgumentDefinition::new("Mode", VariableType::Integer),
-                ArgumentDefinition::new("Tracking", VariableType::Integer),
-            ]),
-            sig: StatementSignature::VariableArguments(0, 1, 2),
-        },
-        StatementDefinition {
-            name: "MouseOff",
-            version: 400,
-            opcode: OpCode::MouseOff,
-            args: None,
-            sig: StatementSignature::ArgumentsWithVariable(0, 0),
-        },
-        StatementDefinition {
             name: "GfxSetPacing",
             version: 400,
             opcode: OpCode::GfxSetPacing,
             args: Some(vec![ArgumentDefinition::new("FramesInFlight", VariableType::Integer)]),
-            sig: StatementSignature::ArgumentsWithVariable(0, 1),
-        },
-        StatementDefinition {
-            name: "KeyEvents",
-            version: 400,
-            opcode: OpCode::KeyEvents,
-            args: Some(vec![ArgumentDefinition::new("Mode", VariableType::Integer)]),
             sig: StatementSignature::ArgumentsWithVariable(0, 1),
         },
         StatementDefinition {

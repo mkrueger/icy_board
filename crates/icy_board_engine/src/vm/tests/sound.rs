@@ -199,7 +199,8 @@ fn a_finished_sound_arrives_as_an_event() {
         r#"
         AUDIO tone = LoadAudio("tone.wav")
         tone.Play()
-        EVENT e = EventWait(-1)
+        TERMINPUT input = TermInput()
+        EVENT e = input.Wait(-1)
         PRINTLN e.Kind, ":", e.Code, ":", tone.Playing
         "#,
         &[("tone.wav", TONE)],

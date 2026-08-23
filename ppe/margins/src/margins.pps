@@ -29,6 +29,7 @@ INTEGER eventKind, eventCode, mouseButton, mouseX, mouseY, wheelY
 BOOLEAN running
 STRING key
 EVENT inputEvent
+TERMINPUT input
 
 selected = 0
 firstVisible = 0
@@ -39,10 +40,11 @@ DrawFrame()
 SetVMargins VIEW_TOP, VIEW_BOTTOM
 SetHMargins VIEW_LEFT, VIEW_RIGHT
 DrawVisible()
-MouseOn MOUSE_TEXT, MOUSE_TRACK_BUTTONS
+input = TermInput()
+input.MouseOn(MOUSE_TEXT, MOUSE_TRACK_BUTTONS)
 
 WHILE (running) DO
-    inputEvent = EventWait(-1)
+    inputEvent = input.Wait(-1)
     eventKind = inputEvent.Kind
     eventCode = inputEvent.Code
     IF (eventKind = EVENT_KEY) THEN
@@ -90,7 +92,7 @@ WHILE (running) DO
     ENDIF
 ENDWHILE
 
-MouseOff
+input.Free()
 ResetMargins
 COLOR @X07
 CLS

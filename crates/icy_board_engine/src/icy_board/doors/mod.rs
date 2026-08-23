@@ -161,7 +161,7 @@ impl UserData for Door {
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl UserDataValue for Door {
     fn get_property_value(&self, _vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
         if *name == *NAME {

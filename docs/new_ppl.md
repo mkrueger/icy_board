@@ -266,20 +266,22 @@ An object that could not be loaded is `Valid = FALSE` and stays callable; why it
 failed is [`ERR()`](#errors)'s to tell. A sound that ends reports itself as an
 `EVENT_SOUND` event naming its channel, so a program waits for it rather than polling.
 
-`EventPoll` and `EventWait(milliseconds)` provide one ordered input stream.
-Both return an immutable `EVENT` object. Its `Kind` is one of `EVENT_NONE`,
-`EVENT_KEY`, `EVENT_KEY_EDGE`, `EVENT_MOUSE` or `EVENT_OVERFLOW`; `EventWait`
-blocks only until an event arrives or its timeout expires, while `EventPoll` never blocks.
-`EventWait(0)` is equivalent to a poll; a negative timeout waits indefinitely
-while still servicing the session.
+`TermInput()` creates the connection's one `TERMINPUT` event stream. A second
+constructor stays invalid until the live object calls `Free()`. `Poll()` never
+blocks; `Wait(milliseconds)` blocks until an event arrives or its timeout
+expires. `Wait(0)` is equivalent to a poll and a negative timeout waits
+indefinitely while still servicing the session. Both return an immutable
+`EVENT` snapshot whose `Kind` is one of `EVENT_NONE`, `EVENT_KEY`,
+`EVENT_KEY_EDGE`, `EVENT_MOUSE`, `EVENT_OVERFLOW` or `EVENT_SOUND`.
 
 ```PPL
+TERMINPUT input = TermInput()
 EVENT event
 
-MouseOn MOUSE_PIXELS, MOUSE_TRACK_DRAG
-KeyEvents KEY_EVENTS_ON
+input.MouseOn(MOUSE_PIXELS, MOUSE_TRACK_DRAG)
+input.KeyboardOn()
 
-event = EventWait(16)
+event = input.Wait(16)
 IF event.Kind = EVENT_KEY THEN
 	IF event.Text = "q" EXIT
 ELSEIF event.Kind = EVENT_KEY_EDGE THEN
@@ -287,6 +289,8 @@ ELSEIF event.Kind = EVENT_KEY_EDGE THEN
 ELSEIF event.Kind = EVENT_MOUSE THEN
 	PRINTLN event.Code, " ", event.X, ",", event.Y
 ENDIF
+
+input.Free()
 ```
 
 The read-only fields describe that value:
@@ -298,7 +302,7 @@ The read-only fields describe that value:
 | `Text` | The translated character for `EVENT_KEY`; empty for other event kinds |
 | `Pressed` | `TRUE` for a translated character, or the press/release state of a physical key edge |
 | `Repeated` | For physical edges, whether another press arrived before release; translated keys report `FALSE` |
-| `X`, `Y` | Mouse coordinates, in cells or pixels according to `MouseOn` |
+| `X`, `Y` | Mouse coordinates, in cells or pixels according to `input.MouseOn()` |
 | `Button` | Mouse button or wheel direction |
 | `Buttons` | Held-button mask using `MOUSE_BUTTON_LEFT`, `MOUSE_BUTTON_MIDDLE` and `MOUSE_BUTTON_RIGHT` |
 | `WheelX`, `WheelY` | Wheel movement; positive `WheelY` is up and negative is down |
@@ -307,11 +311,14 @@ The read-only fields describe that value:
 | `Time` | Monotonic milliseconds since the connection's event input state was created, sampled when the event is selected; an `EVENT_NONE` carries it too, so a poll that came back empty still reads the clock |
 
 Ordinary translated characters are always available. `EVENT_KEY_EDGE` requires
-`KeyEvents KEY_EVENTS_ON`, or `KEY_EVENTS_SUPPRESS` to suppress translated
-characters. `KEY_EVENTS_OFF` restores ordinary input. `EVENT_MOUSE` requires
-`MouseOn`; its optional second argument selects button-only, drag or all-motion
-tracking. `EVENT_SOUND` needs nothing turned on: a sound that ends reports its
-channel in `Code`.
+`input.KeyboardOn()`; pass `TRUE` to suppress the corresponding translated
+characters. `input.KeyboardOff()` stops physical reports. `EVENT_MOUSE`
+requires `input.MouseOn()`; its optional second argument selects button-only,
+drag or all-motion tracking, and `input.MouseOff()` stops it. `EVENT_SOUND`
+needs nothing turned on: a sound that ends reports its channel in `Code`.
+`Free()` stops mouse and physical-key reporting, drops queued event state and
+returns ownership to classic `INPUT`/`InKey` reads. It does not discard classic
+type-ahead; use `KeyFlush` separately when that is wanted.
 
 ANSI cursor and navigation sequences are returned as one `EVENT_KEY`, with
 `Text` such as `"UP"`, `"HOME"` or `"PGDN"` and a named `KEY_*` value in
@@ -329,18 +336,19 @@ Horizontal wheel reports use `MOUSE_WHEEL_LEFT` and `MOUSE_WHEEL_RIGHT` in
 `Button` and a signed delta in `WheelX`.
 
 A frame-paced program needs no separate pacing statement: poll first so queued
-input is handled at once, then let `EventWait` be the one place the program
+input is handled at once, then let `input.Wait()` be the one place the program
 blocks, with the time left in the frame as its timeout.
 
 ```PPL
 UNSIGNED nextFrame
-EVENT e = EventPoll()
+TERMINPUT input = TermInput()
+EVENT e = input.Poll()
 nextFrame = e.Time + FRAME_MS
 
 WHILE running DO
-	e = EventPoll()
+	e = input.Poll()
 	IF e.Kind = EVENT_NONE & e.Time < nextFrame THEN
-		e = EventWait(nextFrame - e.Time)
+		e = input.Wait(nextFrame - e.Time)
 	ENDIF
 	IF e.Kind <> EVENT_NONE Handle(e)
 	IF e.Time >= nextFrame THEN
@@ -348,6 +356,8 @@ WHILE running DO
 		Advance()
 	ENDIF
 ENDWHILE
+
+input.Free()
 ```
 
 Input is answered as soon as it arrives rather than once per frame, and a fixed

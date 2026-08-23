@@ -118,12 +118,19 @@ fn list_from_textmate(rule: &str) -> Vec<String> {
 
 #[test]
 fn vscode_grammar_knows_every_built_in() {
+    const RETIRED_EVENT_GLOBALS: &[&str] = &["EVENTPOLL", "EVENTWAIT", "MOUSEON", "MOUSEOFF", "KEYEVENTS"];
+    const RETIRED_EVENT_CONSTANTS: &[&str] = &["KEY_EVENTS_OFF", "KEY_EVENTS_ON", "KEY_EVENTS_SUPPRESS"];
+
     let statements: Vec<String> = STATEMENT_DEFINITIONS
         .iter()
         .filter(|def| def.sig != StatementSignature::Invalid)
         .map(|def| def.name.to_ascii_uppercase())
         .collect();
-    let in_grammar = [list_from_textmate("builtin-statements"), list_from_textmate("terminal-output-statements")].concat();
+    let in_grammar: Vec<String> = [list_from_textmate("builtin-statements"), list_from_textmate("terminal-output-statements")]
+        .concat()
+        .into_iter()
+        .filter(|name| !RETIRED_EVENT_GLOBALS.contains(&name.as_str()))
+        .collect();
     // END, LET, RETURN and STOP are keywords there, the rest has to be listed.
     let expected: Vec<String> = statements
         .iter()
@@ -146,7 +153,15 @@ fn vscode_grammar_knows_every_built_in() {
         .map(|def| def.name.to_ascii_uppercase())
         .filter(|name| !name.starts_with('<') && !FUNCTIONS_NOT_IN_GRAMMAR.contains(&name.as_str()))
         .collect();
-    let in_grammar = [list_from_textmate("builtin-functions"), list_from_textmate("terminal-info")].concat();
+    let in_grammar: Vec<String> = [
+        list_from_textmate("builtin-functions"),
+        list_from_textmate("terminal-info"),
+        list_from_textmate("terminal-input"),
+    ]
+    .concat()
+    .into_iter()
+    .filter(|name| !RETIRED_EVENT_GLOBALS.contains(&name.as_str()))
+    .collect();
     assert_eq!(
         missing(&expected, &in_grammar),
         Vec::<String>::new(),
@@ -159,7 +174,11 @@ fn vscode_grammar_knows_every_built_in() {
     );
 
     let expected: Vec<String> = BUILTIN_CONSTS.iter().map(|c| c.name.to_ascii_uppercase()).collect();
-    let in_grammar = [list_from_textmate("constants"), list_from_textmate("terminal-output-constants")].concat();
+    let in_grammar: Vec<String> = [list_from_textmate("constants"), list_from_textmate("terminal-output-constants")]
+        .concat()
+        .into_iter()
+        .filter(|name| !RETIRED_EVENT_CONSTANTS.contains(&name.as_str()))
+        .collect();
     assert_eq!(
         missing(&expected, &in_grammar),
         Vec::<String>::new(),

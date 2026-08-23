@@ -36,6 +36,7 @@ INTEGER score, level, lines, frame, dropFrames, pieceSerial
 BOOLEAN gameOver, running, changed
 STRING key
 EVENT inputEvent
+TERMINPUT input
 UNSIGNED nextFrame
 AUDIO music, rotateSound, lockSound, lineSound, gameOverSound
 SURFACE screen, game, ui
@@ -80,15 +81,16 @@ nextType = Random(7)
 SpawnPiece()
 RenderGame()
 KeyFlush
-inputEvent = EventPoll()
+input = TermInput()
+inputEvent = input.Poll()
 nextFrame = inputEvent.Time + FRAME_MS
 
 WHILE running DO
     IF gameOver BREAK
     changed = FALSE
-    inputEvent = EventPoll()
+    inputEvent = input.Poll()
     IF inputEvent.Kind = EVENT_NONE & inputEvent.Time < nextFrame THEN
-        inputEvent = EventWait(nextFrame - inputEvent.Time)
+        inputEvent = input.Wait(nextFrame - inputEvent.Time)
     ENDIF
     key = Upper(inputEvent.Text)
     IF key = "LEFT" THEN
@@ -148,7 +150,7 @@ IF gameOver THEN
     RenderGame()
     key = ""
     WHILE key = "" DO
-        inputEvent = EventWait(-1)
+        inputEvent = input.Wait(-1)
         key = inputEvent.Text
     ENDWHILE
 ENDIF
@@ -158,8 +160,11 @@ ui.Free()
 game.Free()
 screen.Free()
 GfxShutdown
+input.Free()
 KeyFlush
 CLS
+STRING name
+input "Enter your name:", name
 
 PROCEDURE InitShapes()
     shapes[0] = "0000111100000000"

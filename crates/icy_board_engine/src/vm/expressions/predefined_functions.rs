@@ -2837,14 +2837,17 @@ pub async fn rgb(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableV
     ))))
 }
 
-pub async fn eventpoll(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm.icy_board_state.poll_ppl_event().await?.value())
-}
-
-pub async fn eventwait(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let milliseconds = vm.eval_expr(&args[0]).await?.as_int();
-    let timeout = (milliseconds >= 0).then(|| std::time::Duration::from_millis(milliseconds as u64));
-    Ok(vm.icy_board_state.wait_ppl_event(timeout).await?.value())
+pub async fn terminput(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
+    let Some(handle) = vm.icy_board_state.create_term_input_handle() else {
+        vm.set_error(crate::icy_board::state::ppl_error::PplError::new(
+            crate::icy_board::state::ppl_error::ERR_KIND_TERM,
+            crate::icy_board::state::ppl_error::ERR_INVALID,
+            "terminal input is already active",
+        ));
+        return Ok(crate::icy_board::state::ppl_terminal_input::PplTerminalInput::invalid());
+    };
+    vm.operation_succeeded();
+    Ok(crate::icy_board::state::ppl_terminal_input::PplTerminalInput::value(handle))
 }
 
 pub async fn termstate(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {

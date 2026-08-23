@@ -43,6 +43,7 @@ pub mod ppl_mouse;
 pub mod ppl_surface;
 pub mod ppl_terminal_control;
 pub mod ppl_terminal_info;
+pub mod ppl_terminal_input;
 pub mod ppl_terminal_state;
 pub mod user_commands;
 pub mod virtual_screen;
@@ -694,6 +695,8 @@ pub struct IcyBoardState {
     pub ppl_keys: ppl_keys::PplKeyState,
     pub ppl_mouse: ppl_mouse::PplMouseState,
     pub ppl_terminal: ppl_terminal_control::PplTerminalControl,
+    term_input_handle: Option<u64>,
+    next_term_input_handle: u64,
 }
 
 impl IcyBoardState {
@@ -783,6 +786,8 @@ impl IcyBoardState {
             ppl_keys: ppl_keys::PplKeyState::default(),
             ppl_mouse: ppl_mouse::PplMouseState::default(),
             ppl_terminal: ppl_terminal_control::PplTerminalControl::default(),
+            term_input_handle: None,
+            next_term_input_handle: 1,
         }
     }
     async fn update_language(&mut self) {
@@ -1170,6 +1175,9 @@ impl IcyBoardState {
     }
 
     pub(crate) async fn cleanup_ppl_media(&mut self) {
+        if let Some(handle) = self.term_input_handle {
+            let _ = self.release_term_input(handle).await;
+        }
         if let Some(recording) = self.ppl_terminal.finish_recording()
             && !recording.overflowed
         {
@@ -1210,9 +1218,117 @@ impl IcyBoardState {
             }
         }
         self.sound_active.fill(false);
+        self.ppl_audio_notify.set_watching(false);
+        self.reset_ppl_input_parsers();
         self.ppl_audio.fill(None);
         self.sound_volume.fill(100);
         self.gfx_error = -1;
+    }
+
+    pub fn create_term_input_handle(&mut self) -> Option<u64> {
+        if self.term_input_handle.is_some() {
+            return None;
+        }
+        let handle = self.next_term_input_handle;
+        self.next_term_input_handle = self.next_term_input_handle.saturating_add(1).max(1);
+        self.term_input_handle = Some(handle);
+        Some(handle)
+    }
+
+    pub fn term_input_is_valid(&self, handle: u64) -> bool {
+        handle != 0 && self.term_input_handle == Some(handle)
+    }
+
+    async fn release_term_input(&mut self, handle: u64) -> Res<bool> {
+        if !self.term_input_is_valid(handle) {
+            return Ok(false);
+        }
+        if self.ppl_mouse.is_enabled() {
+            self.ppl_mouse.disable();
+            self.connection.send(ppl_mouse::MOUSE_OFF_SEQUENCE).await?;
+        }
+        if self.ppl_keys.is_enabled() {
+            self.ppl_keys.disable();
+            self.connection.send(b"\x1b[=2l\x1b[=1l").await?;
+        }
+        self.ppl_event_keys.clear();
+        self.term_input_handle = None;
+        Ok(true)
+    }
+
+    pub async fn term_input_member(
+        &mut self,
+        handle: u64,
+        name: &unicase::Ascii<String>,
+        arguments: &[crate::executable::VariableValue],
+    ) -> Res<crate::executable::VariableValue> {
+        use crate::icy_board::state::ppl_terminal_input::{FREE, KEYBOARD_OFF, KEYBOARD_ON, MOUSE_OFF, MOUSE_ON, POLL, WAIT};
+
+        if !self.term_input_is_valid(handle) {
+            return Ok(if *name == *POLL || *name == *WAIT {
+                self.empty_ppl_event().value()
+            } else {
+                crate::executable::VariableValue::new_bool(false)
+            });
+        }
+        if *name == *POLL {
+            return Ok(self.poll_ppl_event().await?.value());
+        }
+        if *name == *WAIT {
+            let milliseconds = arguments[0].as_int();
+            let timeout = (milliseconds >= 0).then(|| Duration::from_millis(milliseconds as u64));
+            return Ok(self.wait_ppl_event(timeout).await?.value());
+        }
+        if *name == *MOUSE_ON {
+            let mode = arguments[0].as_int();
+            let tracking = arguments.get(1).map_or(2, crate::executable::VariableValue::as_int);
+            if !self.ppl_mouse.enable(mode, tracking) {
+                return Ok(crate::executable::VariableValue::new_bool(false));
+            }
+            let sequence = self.ppl_mouse.enable_sequence(tracking);
+            self.connection.send(&sequence).await?;
+            return Ok(crate::executable::VariableValue::new_bool(true));
+        }
+        if *name == *MOUSE_OFF {
+            self.ppl_mouse.disable();
+            self.connection.send(ppl_mouse::MOUSE_OFF_SEQUENCE).await?;
+            return Ok(crate::executable::VariableValue::new_bool(true));
+        }
+        if *name == *KEYBOARD_ON {
+            let suppress = arguments.first().is_some_and(crate::executable::VariableValue::as_bool);
+            self.ppl_keys.enable();
+            let sequence = if suppress {
+                b"\x1b[=1h\x1b[=2h".as_slice()
+            } else {
+                b"\x1b[=2l\x1b[=1h".as_slice()
+            };
+            self.connection.send(sequence).await?;
+            return Ok(crate::executable::VariableValue::new_bool(true));
+        }
+        if *name == *KEYBOARD_OFF {
+            self.ppl_keys.disable();
+            self.connection.send(b"\x1b[=2l\x1b[=1l").await?;
+            return Ok(crate::executable::VariableValue::new_bool(true));
+        }
+        if *name == *FREE {
+            return Ok(crate::executable::VariableValue::new_bool(self.release_term_input(handle).await?));
+        }
+        Err("Invalid TERMINPUT function".into())
+    }
+
+    /// A PPE leaves its own half finished sequences behind; the board reads the keyboard
+    /// next and must not inherit them. Real keystrokes among them are handed back.
+    fn reset_ppl_input_parsers(&mut self) {
+        self.ppl_event_keys.clear();
+        let stale: Vec<u8> = self
+            .ppl_keys
+            .take_pending_bytes()
+            .into_iter()
+            .chain(self.ppl_audio_notify.take_pending_bytes())
+            .collect();
+        for byte in stale {
+            self.char_buffer.push_back(KeyChar::new(KeySource::User, byte as char));
+        }
     }
 
     pub async fn flush_keyboard_input(&mut self) -> Res<()> {
@@ -1220,6 +1336,7 @@ impl IcyBoardState {
         self.char_buffer.clear();
         self.ppl_event_keys.clear();
         self.ppl_keys.clear();
+        let _ = self.ppl_audio_notify.take_pending_bytes();
 
         let mut input = [0u8; 64];
         while self.connection.try_read(&mut input).await? > 0 {}
@@ -3103,6 +3220,7 @@ impl IcyBoardState {
 
     fn process_user_input_byte(&mut self, byte: u8) -> Vec<KeyChar> {
         let mut keys = Vec::new();
+        self.ppl_audio_notify.set_watching(self.sound_active.iter().any(|active| *active));
         for byte in self.ppl_mouse.feed(byte) {
             for byte in self.ppl_keys.feed(byte) {
                 for byte in self.gfx_probe.feed(byte) {
@@ -3120,6 +3238,15 @@ impl IcyBoardState {
             self.char_buffer.push_back(KeyChar::new(KeySource::User, byte as char));
         }
         for byte in self.ppl_audio_notify.take_stale_keyboard() {
+            self.char_buffer.push_back(KeyChar::new(KeySource::User, byte as char));
+        }
+    }
+
+    /// `TERMINPUT.Poll` never reaches `get_char`, so the sequences it parks have to be
+    /// released here or they are held until something else reads the keyboard.
+    fn drain_stale_event_input(&mut self) {
+        self.drain_stale_protocol_input();
+        for byte in self.ppl_mouse.take_stale_keyboard() {
             self.char_buffer.push_back(KeyChar::new(KeySource::User, byte as char));
         }
     }
@@ -3354,6 +3481,7 @@ impl IcyBoardState {
     }
 
     pub async fn poll_ppl_event(&mut self) -> Res<ppl_events::PplEvent> {
+        self.drain_stale_event_input();
         if let Some(event) = self.take_pending_ppl_event() {
             return Ok(event);
         }
@@ -3369,6 +3497,9 @@ impl IcyBoardState {
             if read == 0 {
                 return Ok(self.empty_ppl_event());
             }
+            // Input read here never passes the keyboard timer in `get_char`, and a game
+            // answering only events would look idle until the board hangs it up.
+            self.session.keyboard_timer_started = Instant::now();
             for (index, byte) in input[..read].iter().enumerate() {
                 if let Some(event) = self.process_ppl_event_byte(*byte) {
                     self.raw_input.extend(&input[index + 1..read]);

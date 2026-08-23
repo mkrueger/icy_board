@@ -991,7 +991,6 @@ async fn write_vt_sequence(vm: &mut VirtualMachine<'_>, sequence: &str) -> Res<(
         Ok(())
     }
 }
-
 pub async fn set_v_margins(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let top = vm.eval_expr(&args[0]).await?.as_int();
     let bottom = vm.eval_expr(&args[1]).await?.as_int();
@@ -3628,7 +3627,6 @@ pub async fn gfxinit(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
         Ok(())
     }
 }
-
 pub async fn gfxcreate(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let slot = vm.eval_expr(&args[0]).await?.as_int();
     let width = vm.eval_expr(&args[1]).await?.as_int();
@@ -4244,40 +4242,5 @@ pub async fn gfxshutdown(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<
         vm.icy_board_state.connection.send(b"\x1b[?1070h\x1b[?80h\x1b[?7h\x1b[?25h").await
     } else {
         Ok(())
-    }
-}
-
-pub async fn mouseon(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let mode = vm.eval_expr(&args[0]).await?.as_int();
-    let tracking = match args.get(1) {
-        Some(tracking) => vm.eval_expr(tracking).await?.as_int(),
-        None => 2,
-    };
-    if !vm.icy_board_state.ppl_mouse.enable(mode, tracking) {
-        log::warn!("MOUSEON rejected unsupported mode {mode}");
-        return Ok(());
-    }
-    let sequence = vm.icy_board_state.ppl_mouse.enable_sequence(tracking);
-    vm.icy_board_state.connection.send(&sequence).await
-}
-
-pub async fn mouseoff(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
-    vm.icy_board_state.ppl_mouse.disable();
-    vm.icy_board_state.connection.send(crate::icy_board::state::ppl_mouse::MOUSE_OFF_SEQUENCE).await
-}
-
-pub async fn keyevents(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let mode = vm.eval_expr(&args[0]).await?.as_int().clamp(0, 2);
-    if mode == 0 {
-        vm.icy_board_state.ppl_keys.disable();
-        vm.icy_board_state.connection.send(b"\x1b[=2l\x1b[=1l").await
-    } else {
-        vm.icy_board_state.ppl_keys.enable();
-        let sequence = if mode == 2 {
-            b"\x1b[=1h\x1b[=2h".as_slice()
-        } else {
-            b"\x1b[=2l\x1b[=1h".as_slice()
-        };
-        vm.icy_board_state.connection.send(sequence).await
     }
 }

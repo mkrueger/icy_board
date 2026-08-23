@@ -11,6 +11,7 @@ INTEGER customFonts = { 43, 44, 45, 46 }
 INTEGER page, builtinFont, customIndex
 BOOLEAN running
 EVENT inputEvent
+TERMINPUT input = TermInput()
 
 LoadFont 43, "fonts/c64.psf"
 IF (!ERR().OK) ShowLoadError("C64", ERR().Message)
@@ -29,7 +30,7 @@ running = TRUE
 
 WHILE running DO
     DrawScreen()
-    inputEvent = EventWait(-1)
+    inputEvent = input.Wait(-1)
     IF (inputEvent.Kind = EVENT_KEY) THEN
         IF (Upper(inputEvent.Text) = "Q" | inputEvent.Code = KEY_ESCAPE) THEN
             running = FALSE
@@ -64,6 +65,8 @@ WHILE running DO
         ENDIF
     ENDIF
 ENDWHILE
+
+input.Free()
 
 RestoreFonts()
 COLOR @X07

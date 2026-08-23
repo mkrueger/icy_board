@@ -404,7 +404,7 @@ pub static GET_FILE_AREA: std::sync::LazyLock<unicase::Ascii<String>> = std::syn
 pub static GET_MSG_AREA: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("GetArea".to_string()));
 pub static GET_DOOR: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("GetDoor".to_string()));
 
-#[async_trait]
+#[async_trait(?Send)]
 impl UserDataValue for Conference {
     fn get_property_value(&self, _vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
         if *name == *NAME {

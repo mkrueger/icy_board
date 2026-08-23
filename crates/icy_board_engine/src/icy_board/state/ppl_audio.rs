@@ -64,7 +64,7 @@ impl UserData for PplAudio {
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl UserDataValue for PplAudio {
     fn get_property_value(&self, vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
         let loaded = vm.icy_board_state.ppl_audio_file(self.channel).is_some();

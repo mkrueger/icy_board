@@ -529,7 +529,8 @@ fn the_fractal_demo_renders_at_native_size_when_the_terminal_cannot_scale() {
 fn tetris_initializes_and_renders_without_leaking_call_frames() {
     let source = include_str!("../../../../../ppe/tetris/src/tetris.pps")
         .replace("GfxInit GFX_AUTO", "GfxInit GFX_SIXEL")
-        .replace("running = TRUE", "running = FALSE");
+        .replace("running = TRUE", "running = FALSE")
+        .replace("input \"Enter your name:\", name", "name = \"test\"");
     let output = super::run_ppl_with_files(
         &source,
         &[
@@ -550,7 +551,8 @@ fn tetris_initializes_and_renders_without_leaking_call_frames() {
 fn tetris_flashes_a_completed_line_before_compacting_it() {
     let mut source = include_str!("../../../../../ppe/tetris/src/tetris.pps")
         .replace("GfxInit GFX_AUTO", "GfxInit GFX_SIXEL")
-        .replace("running = TRUE", "running = FALSE");
+        .replace("running = TRUE", "running = FALSE")
+        .replace("input \"Enter your name:\", name", "name = \"test\"");
     let mut completed_row = String::new();
     for column in 0..10 {
         let _ = writeln!(completed_row, "board[{column}, 19] = 1");

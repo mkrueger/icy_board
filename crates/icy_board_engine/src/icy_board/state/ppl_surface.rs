@@ -137,7 +137,7 @@ impl UserData for PplSurface {
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl UserDataValue for PplSurface {
     fn get_property_value(&self, vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
         let surface = vm

@@ -446,7 +446,7 @@ pub fn get_function_hover(func: &FunctionDefinition) -> Option<Hover> {
         | FuncOpCode::LoadSurface => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-gfx-api")),
         FuncOpCode::Rgb | FuncOpCode::RgbAlpha => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-rgb")),
         FuncOpCode::LoadAudio => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-sound-api")),
-        FuncOpCode::EventPoll | FuncOpCode::EventWait => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-event-api")),
+        FuncOpCode::TermInput => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-event-api")),
         FuncOpCode::TermState => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-term-state")),
         FuncOpCode::TermInfo => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-term-info")),
         FuncOpCode::Err => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-err")),
@@ -678,8 +678,6 @@ pub fn get_statement_hover(stmt: &StatementDefinition) -> Option<Hover> {
         OpCode::SetBankBal => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-setbankbal")),
         OpCode::WebRequest => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-webrequest")),
         OpCode::GfxInit | OpCode::GfxShutdown | OpCode::GfxSetPacing => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-gfx-api")),
-        OpCode::MouseOn | OpCode::MouseOff => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-mouse-api")),
-        OpCode::KeyEvents => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-key-api")),
         OpCode::SetVMargins | OpCode::SetHMargins | OpCode::ResetVMargins | OpCode::ResetHMargins | OpCode::ResetMargins => {
             get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-margin-api"))
         }
