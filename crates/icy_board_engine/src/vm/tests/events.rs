@@ -1,4 +1,4 @@
-use super::{compile_errors_with_runtime, run_ppl, run_ppl_with_input};
+use super::{compile_errors_with_runtime, run_ppl, run_ppl_with_input, run_ppl_with_input_after_output};
 
 #[test]
 fn terminal_input_requires_runtime_402() {
@@ -52,6 +52,59 @@ fn terminal_input_polls_translated_keys() {
     );
 
     assert_eq!(output, "1:UP\n");
+}
+
+#[test]
+fn freeing_terminal_input_hands_typeahead_to_classic_input() {
+    let output = run_ppl_with_input(
+        r#"
+        TERMINPUT input = TermInput()
+        EVENT event = input.Poll()
+        input.Free()
+        STRING name
+        INPUT "Name:", name
+        PRINTLN "[", name, "]"
+        "#,
+        b"qMike\r",
+    );
+
+    assert!(output.ends_with("[Mike]\n"), "{output:?}");
+}
+
+#[test]
+fn classic_input_reads_keys_sent_after_terminal_input_is_freed() {
+    let output = run_ppl_with_input_after_output(
+        r#"
+        TERMINPUT input = TermInput()
+        EVENT event = input.Wait(-1)
+        input.Free()
+        STRING name
+        INPUT "Name:", name
+        PRINTLN "[", name, "]"
+        "#,
+        b"Name:",
+        b"Mike\r",
+    );
+
+    assert!(output.ends_with("[Mike]\n"), "{output:?}");
+}
+
+#[test]
+fn timed_event_wait_restores_the_channel_before_classic_input() {
+    let output = run_ppl_with_input_after_output(
+        r#"
+        TERMINPUT input = TermInput()
+        EVENT event = input.Wait(1)
+        input.Free()
+        STRING name
+        INPUT "Name:", name
+        PRINTLN "[", name, "]"
+        "#,
+        b"Name:",
+        b"Mike\r",
+    );
+
+    assert!(output.ends_with("[Mike]\n"), "{output:?}");
 }
 
 #[test]

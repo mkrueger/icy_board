@@ -161,10 +161,7 @@ game.Free()
 screen.Free()
 GfxShutdown
 input.Free()
-KeyFlush
 CLS
-STRING name
-input "Enter your name:", name
 
 PROCEDURE InitShapes()
     shapes[0] = "0000111100000000"
@@ -343,7 +340,6 @@ PROCEDURE LockPiece()
         IF cleared = 4 score += 1200 * (level + 1)
         lines += cleared
         level = lines / 10
-        lineSound.Play()
     ELSE
         lockSound.Play()
     ENDIF
@@ -372,6 +368,7 @@ FUNCTION ClearLines() INTEGER
     ENDWHILE
 
     IF cleared > 0 THEN
+        lineSound.Play()
         AnimateClear()
         targetRow = BOARD_H - 1
         sourceRow = BOARD_H - 1

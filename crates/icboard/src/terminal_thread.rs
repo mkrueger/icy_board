@@ -441,6 +441,43 @@ mod tests {
         handle.join().unwrap();
     }
 
+    #[tokio::test]
+    async fn local_terminal_input_survives_switch_from_polling_to_blocking_reads() {
+        let (ui_connection, mut board_connection) = ChannelConnection::create_pair();
+        let screen = Arc::new(Mutex::new(TextScreen::new((80, 25))));
+        let generation = Arc::new(AtomicU64::new(0));
+        let (handle, tx) = start_update_thread(Box::new(ui_connection), screen, generation);
+
+        tx.send(SendData::Data(b"q".to_vec())).await.unwrap();
+        let mut first = [0; 1];
+        tokio::time::timeout(Duration::from_secs(1), async {
+            loop {
+                if board_connection.try_read(&mut first).await.unwrap() == 1 {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        assert_eq!(first, [b'q']);
+
+        tx.send(SendData::Data(b"Mike\r".to_vec())).await.unwrap();
+        let mut later = [0; 5];
+        assert_eq!(
+            tokio::time::timeout(Duration::from_secs(1), board_connection.read(&mut later))
+                .await
+                .unwrap()
+                .unwrap(),
+            later.len()
+        );
+        assert_eq!(&later, b"Mike\r");
+
+        drop(tx);
+        drop(board_connection);
+        handle.join().unwrap();
+    }
+
     #[test]
     fn cached_media_paths_allow_namespaces_but_not_traversal() {
         let root = Path::new("/tmp/icboard-media-test");

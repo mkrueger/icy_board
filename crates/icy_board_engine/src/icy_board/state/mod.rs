@@ -3026,6 +3026,10 @@ impl IcyBoardState {
 
     /// # Errors
     pub async fn get_char(&mut self, target: TerminalTarget) -> Res<Option<KeyChar>> {
+        self.get_char_with_timeout(target, Duration::from_millis(100)).await
+    }
+
+    async fn get_char_with_timeout(&mut self, target: TerminalTarget, wait: Duration) -> Res<Option<KeyChar>> {
         self.drain_raw_input();
         self.drain_stale_protocol_input();
         let stale = self.ppl_mouse.take_stale_keyboard();
@@ -3150,7 +3154,7 @@ impl IcyBoardState {
                         return Ok(key);
                     }
                 }
-                () = sleep(Duration::from_millis(100)) => {
+                () = sleep(wait) => {
                     if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
                         state.sysop_connection = Some(sysop_connection);
                         state.bbs_channel = Some(bbs_channel);
@@ -3203,7 +3207,7 @@ impl IcyBoardState {
                         return Ok(key);
                     }
                 }
-                () = sleep(Duration::from_millis(100)) => {
+                () = sleep(wait) => {
                     if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
                         state.bbs_channel = Some(bbs_channel);
                     }
@@ -3214,7 +3218,7 @@ impl IcyBoardState {
             }
         }
 
-        sleep(Duration::from_millis(100)).await;
+        sleep(wait).await;
         Ok(None)
     }
 
@@ -3522,10 +3526,7 @@ impl IcyBoardState {
                 if remaining.is_zero() {
                     return Ok(self.empty_ppl_event());
                 }
-                match tokio::time::timeout(remaining, self.get_char(TerminalTarget::Both)).await {
-                    Ok(result) => result,
-                    Err(_) => return Ok(self.empty_ppl_event()),
-                }
+                self.get_char_with_timeout(TerminalTarget::Both, remaining.min(Duration::from_millis(100))).await
             } else {
                 self.get_char(TerminalTarget::Both).await
             };

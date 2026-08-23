@@ -125,6 +125,60 @@ pub fn run_ppl_with_input(source: &str, input: &[u8]) -> String {
     run_ppl_collecting(source, |_| {}, &[], None, input, false).1
 }
 
+pub fn run_ppl_with_input_after_output(source: &str, marker: &[u8], input: &[u8]) -> String {
+    let executable = compile(source);
+    let work_dir = scratch_dir("delayed-input");
+    let output = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
+        let bbs = Arc::new(tokio::sync::Mutex::new(BBS::new(1)));
+        let mut board = IcyBoard::new();
+        board.default_display_text = crate::icy_board::icb_text::DEFAULT_DISPLAY_TEXT.clone();
+        board.root_path = work_dir.clone();
+        board.users.new_user(User {
+            name: "SYSOP".to_string(),
+            security_level: 255,
+            ..Default::default()
+        });
+        let node = bbs.lock().await.create_new_node(ConnectionType::Channel).await;
+        let node_state = bbs.lock().await.open_connections.clone();
+        let (mut peer, connection) = ChannelConnection::create_pair();
+        peer.send(b"q").await.unwrap();
+
+        let mut state = IcyBoardState::new(bbs, Arc::new(tokio::sync::Mutex::new(board)), node_state, node, Box::new(connection)).await;
+        let sysop = state.get_board().await.users[0].clone();
+        state.session.current_user = Some(sysop);
+        state.session.cur_user_id = 0;
+
+        let collected = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let sink = collected.clone();
+        let marker = marker.to_vec();
+        let input = input.to_vec();
+        let reader = std::thread::spawn(move || {
+            tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
+                let mut sent = false;
+                let mut buffer = [0; 1024];
+                while let Ok(size) = peer.read(&mut buffer).await {
+                    if size == 0 {
+                        break;
+                    }
+                    sink.lock().unwrap().extend(&buffer[..size]);
+                    if !sent && sink.lock().unwrap().windows(marker.len()).any(|window| window == marker) {
+                        peer.send(&input).await.unwrap();
+                        sent = true;
+                    }
+                }
+            });
+        });
+
+        let mut io = DiskIO::new(work_dir.to_str().unwrap(), None);
+        run(&PathBuf::from("test.ppe"), &executable, &mut io, &mut state).await.unwrap();
+        drop(state);
+        reader.join().unwrap();
+        collected.lock().unwrap().clone()
+    });
+    let _ = std::fs::remove_dir_all(&work_dir);
+    String::from_utf8(output).unwrap().replace("\r\n", "\n")
+}
+
 pub fn run_ppl_with_files_and_input(source: &str, files: &[(&str, &[u8])], input: &[u8]) -> String {
     run_ppl_collecting(source, |_| {}, files, None, input, false).1
 }
