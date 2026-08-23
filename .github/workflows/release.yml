@@ -82,7 +82,13 @@ jobs:
       - name: Add the target
         run: rustup target add ${{ matrix.target }}
 
+      - name: Install Linux system dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev
+
       - name: Build
+        env:
+          CMAKE_POLICY_VERSION_MINIMUM: "3.5"
         run: cargo build --release --locked --target ${{ matrix.target }}
 
       # The layout INSTALL.md describes: bin/ with every program beside it.
