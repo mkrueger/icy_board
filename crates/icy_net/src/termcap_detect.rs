@@ -418,6 +418,12 @@ impl TerminalProbe {
         };
         let (body, final_byte) = body.split_at(body.len() - 1);
         match final_byte {
+            "R" => {
+                let Some((row, column)) = body.split_once(';') else {
+                    return false;
+                };
+                row.parse::<u16>().is_ok() && column.parse::<u16>().is_ok()
+            }
             "{" => {
                 let Some(space) = body.strip_suffix('*').and_then(|value| value.parse::<u32>().ok()) else {
                     return false;
@@ -623,6 +629,19 @@ mod test {
     }
 
     #[test]
+    fn delayed_cursor_position_replies_are_not_returned_as_typing() {
+        let mut probe = TerminalProbe::default();
+        probe.start();
+        let mut typed = Vec::new();
+
+        for byte in b"\x1b[25;80R\x1b[1;4R" {
+            typed.extend(probe.feed(*byte));
+        }
+
+        assert!(typed.is_empty());
+    }
+
+    #[test]
     fn a_denied_answer_keeps_jpeg_xl_off() {
         let mut probe = TerminalProbe::default();
         probe.start();
@@ -718,10 +737,10 @@ mod test {
         let mut probe = TerminalProbe::default();
         probe.start();
         let mut typed = Vec::new();
-        for byte in b"\x1b[D" {
+        for byte in b"\x1b[D\x1b[not-a-positionR" {
             typed.extend(probe.feed(*byte));
         }
 
-        assert_eq!(typed, b"\x1b[D");
+        assert_eq!(typed, b"\x1b[D\x1b[not-a-positionR");
     }
 }
