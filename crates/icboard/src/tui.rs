@@ -36,6 +36,8 @@ use ratatui::{prelude::*, widgets::Paragraph};
 use ratatui_image::{Image as RatatuiImage, Resize, picker::Picker, protocol::Protocol};
 use tokio::sync::{Mutex, mpsc};
 
+const STATUS_HELP: &str = "ALT-H=Help ALT-X=Exit";
+
 pub struct Tui {
     sysop_mode: bool,
     screen: Arc<std::sync::Mutex<TextScreen>>,
@@ -120,23 +122,33 @@ impl Tui {
         Ok(())
     }
 
-    pub async fn sysop_mode(bbs: &Arc<Mutex<BBS>>, node: usize) -> Res<Self> {
+    pub async fn sysop_mode(bbs: &Arc<Mutex<BBS>>, node: usize) -> Res<Option<Self>> {
         let (ui_connection, connection) = ChannelConnection::create_pair();
         let mut bbs = bbs.lock().await;
         log::info!("Creating sysop mode");
         let node_state = bbs.open_connections.clone();
 
-        if let Some(node_state) = bbs.get_open_connections().lock().await[node].as_mut() {
-            node_state.sysop_connection = Some(connection);
+        let open_connections = bbs.get_open_connections().clone();
+        let mut connections = open_connections.lock().await;
+        let Some(Some(connection_state)) = connections.get_mut(node) else {
+            return Ok(None);
+        };
+        connection_state.sysop_connection = Some(connection);
+        drop(connections);
+
+        let Some(channel) = bbs.bbs_channels.get(node).and_then(Option::as_ref) else {
+            return Ok(None);
+        };
+        if channel.send(BBSMessage::SysopLogin).await.is_err() {
+            return Ok(None);
         }
-        bbs.bbs_channels[node].as_ref().unwrap().send(BBSMessage::SysopLogin).await?;
 
         let screen = Arc::new(std::sync::Mutex::new(TextScreen::new((80, 25))));
         log::info!("Run terminal thread");
         let screen_generation = Arc::new(AtomicU64::new(0));
         let (_handle2, tx) = crate::terminal_thread::start_update_thread(Box::new(ui_connection), screen.clone(), screen_generation.clone());
 
-        Ok(Self {
+        Ok(Some(Self {
             sysop_mode: true,
             screen,
             tx,
@@ -151,7 +163,7 @@ impl Tui {
             rendered_image_context: None,
             host_mouse_capture: false,
             host_pixel_mouse: false,
-        })
+        }))
     }
 
     pub async fn run(&mut self, bbs: &mut Arc<Mutex<BBS>>, board: &Arc<tokio::sync::Mutex<IcyBoard>>) -> Res<()> {
@@ -411,11 +423,13 @@ impl Tui {
                     .style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY)),
                 ]);
                 frame.buffer_mut().set_line(area.x, area.y + 1, &line, area.width);
-                let hlp = "ALT-H=Help".to_string();
-                let len = hlp.len() as u16;
-                frame
-                    .buffer_mut()
-                    .set_span(area.x + 56, area.y, &Span::from(hlp).style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY)), len);
+                let len = STATUS_HELP.len() as u16;
+                frame.buffer_mut().set_span(
+                    area.x + 45,
+                    area.y,
+                    &Span::from(STATUS_HELP).style(Style::new().fg(DOS_BLACK).bg(DOS_LIGHT_GRAY)),
+                    len,
+                );
 
                 let min_on = (Utc::now() - status_bar_info.logon_time).num_minutes();
 
@@ -827,6 +841,21 @@ mod sixel_tests {
             modifiers: KeyModifiers::NONE,
         };
         assert_eq!(sgr_mouse_report(wheel, 3, 2), "\x1b[<65;4;3M");
+    }
+
+    #[test]
+    fn local_status_help_uses_alt_x_and_leaves_escape_to_the_session() {
+        assert!(STATUS_HELP.contains("ALT-X=Exit"));
+        assert!(!STATUS_HELP.contains("ESC"));
+    }
+
+    #[tokio::test]
+    async fn entering_a_disconnected_node_returns_to_the_monitor() {
+        let bbs = Arc::new(Mutex::new(BBS::new(1)));
+
+        let tui = Tui::sysop_mode(&bbs, 0).await.unwrap();
+
+        assert!(tui.is_none());
     }
 }
 

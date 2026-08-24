@@ -477,12 +477,13 @@ where
             match app.run(terminal, board, bbs, full_screen, web_admin.as_ref()).await {
                 Ok(msg) => {
                     if let NodeMonitoringScreenMessage::EnterNode(node) = msg {
-                        let mut tui = Tui::sysop_mode(bbs, node).await?;
-                        if let Err(err) = tui.run(bbs, board).await {
-                            restore_terminal()?;
-                            log::error!("while running board in local mode: {}", err);
-                            println!("Error: {}", err);
-                            process::exit(1);
+                        if let Some(mut tui) = Tui::sysop_mode(bbs, node).await? {
+                            if let Err(err) = tui.run(bbs, board).await {
+                                restore_terminal()?;
+                                log::error!("while running board in local mode: {}", err);
+                                println!("Error: {}", err);
+                                process::exit(1);
+                            }
                         }
                     }
                 }
