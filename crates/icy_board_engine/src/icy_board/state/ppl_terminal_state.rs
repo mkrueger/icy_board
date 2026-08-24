@@ -31,6 +31,7 @@ impl PplTerminalState {
 
 impl UserData for PplTerminalState {
     const TYPE_NAME: &'static str = "TermState";
+    const INSTANCE_PROVIDER: Option<crate::executable::FuncOpCode> = Some(crate::executable::FuncOpCode::TermState);
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         registry.add_property(MARGIN_TOP.clone(), VariableType::Integer, false);

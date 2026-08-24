@@ -150,6 +150,9 @@ pub enum CompilationErrorType {
     #[error("Function used as variable ({0})")]
     FunctionUsedAsVariable(String),
 
+    #[error("'{0}' is a type, and this one has no value of its own to read members from")]
+    TypeUsedAsValue(String),
+
     #[error("Internal error ({0})")]
     InternalError(String),
 

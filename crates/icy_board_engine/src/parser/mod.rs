@@ -434,7 +434,10 @@ impl UserTypeRegistry {
 
     pub fn register<T: UserData>(&mut self, id: usize) {
         self.claim_id(id, T::TYPE_NAME);
-        let mut registry = UserDataRegistry::default();
+        let mut registry = UserDataRegistry {
+            instance_provider: T::INSTANCE_PROVIDER,
+            ..Default::default()
+        };
         T::register_members(&mut registry);
         self.registered_types
             .insert(unicase::Ascii::new(T::TYPE_NAME.to_string()), VariableType::UserData(id as u8));

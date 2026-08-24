@@ -30,6 +30,10 @@ pub trait UserDataMemberRegistry {
 pub trait UserData: Sized + UserDataValue {
     const TYPE_NAME: &'static str;
 
+    /// The zero-argument builtin that hands back the one instance of this object, which is
+    /// what lets the type name stand in for it: `TermInfo.Columns` means `TermInfo().Columns`.
+    const INSTANCE_PROVIDER: Option<crate::executable::FuncOpCode> = None;
+
     /// Adds custom fields specific to this userdata.
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F);
 }
@@ -84,6 +88,8 @@ pub struct UserDataRegistry {
     pub fields: HashMap<unicase::Ascii<String>, VariableType>,
     pub procedures: HashMap<unicase::Ascii<String>, MemberProcedure>,
     pub functions: HashMap<unicase::Ascii<String>, MemberFunction>,
+
+    pub instance_provider: Option<crate::executable::FuncOpCode>,
 }
 
 impl UserDataMemberRegistry for UserDataRegistry {

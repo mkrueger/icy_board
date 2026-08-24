@@ -83,6 +83,7 @@ impl PplError {
 
 impl UserData for PplError {
     const TYPE_NAME: &'static str = "Error";
+    const INSTANCE_PROVIDER: Option<crate::executable::FuncOpCode> = Some(crate::executable::FuncOpCode::Err);
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         registry.add_property(OK.clone(), VariableType::Boolean, false);

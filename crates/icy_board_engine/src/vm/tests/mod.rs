@@ -21,6 +21,7 @@ mod graphics;
 mod hyperlinks;
 mod margins;
 mod masks;
+mod member_calls;
 mod message_base;
 mod mouse;
 mod nested_records;

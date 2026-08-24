@@ -20,7 +20,7 @@ use crate::{
         VariableType, VariableValue,
     },
     parser::{
-        self, ErrorReporter, ParserErrorType, UserTypeRegistry,
+        self, ErrorReporter, FIRST_BOARD_OBJECT_LANGUAGE_VERSION, ParserErrorType, UserTypeRegistry,
         lexer::{Spanned, Token},
     },
 };
@@ -218,6 +218,16 @@ impl VariableLookups {
     }
 }
 
+/// What an expression in receiver position turned out to be.
+enum StaticReceiver {
+    /// A board object's type name standing in for its one instance.
+    Instance(u8),
+    /// Not a type name; the expression has to be visited as a value.
+    NotAType,
+    /// A type name that cannot stand in for a value. The reason is already reported.
+    Rejected,
+}
+
 pub struct SemanticVisitor {
     lang_version: u16,
     runtime: u16,
@@ -228,6 +238,9 @@ pub struct SemanticVisitor {
 
     /// Maps member references -> user type IDs
     pub user_type_lookup: HashMap<usize, u8>,
+
+    /// Maps a type name used as a receiver -> the builtin that hands its instance back.
+    pub instance_provider_lookup: HashMap<usize, FuncOpCode>,
 
     pub function_type_lookup: HashMap<u64, SemanticInfo>,
 
@@ -461,6 +474,7 @@ impl SemanticVisitor {
             label_count: 0,
             label_lookup_table: HashMap::new(),
             user_type_lookup: HashMap::new(),
+            instance_provider_lookup: HashMap::new(),
             function_type_lookup: HashMap::new(),
 
             global_lookup: VariableLookups::default(),
@@ -1139,6 +1153,56 @@ impl SemanticVisitor {
         definition.field_type(index).unwrap_or(VariableType::None)
     }
 
+    /// Looks a callable member up on a board object, as `(member id, required, parameters, return type)`.
+    fn member_function_signature(&self, user_type: u8, name: &unicase::Ascii<String>) -> Option<(usize, usize, usize, VariableType)> {
+        let registry = self.type_registry.get_type_from_id(user_type)?;
+        let function = registry.functions.get(name)?;
+        let member_id = registry.get_member_id(name)?;
+        Some((member_id, function.required, function.parameters.len(), function.return_type))
+    }
+
+    /// A board object's type name standing in for its one instance: `TermInfo.Columns`
+    /// means `TermInfo().Columns`. A variable of the same name shadows the type.
+    fn static_receiver(&mut self, expr: &Expression) -> StaticReceiver {
+        let Expression::Identifier(base) = expr else {
+            return StaticReceiver::NotAType;
+        };
+        let identifier = base.get_identifier();
+        if self.lookup_variable(identifier).is_some() {
+            return StaticReceiver::NotAType;
+        }
+        let Some(VariableType::UserData(type_id)) = self.type_registry.get_board_object(identifier) else {
+            return StaticReceiver::NotAType;
+        };
+        let span = base.get_identifier_token().span.clone();
+
+        let provider = self.type_registry.get_type_from_id(type_id).and_then(|registry| registry.instance_provider);
+        let Some(provider) = provider else {
+            self.errors
+                .lock()
+                .unwrap()
+                .report_error(span, CompilationErrorType::TypeUsedAsValue(identifier.to_string()));
+            return StaticReceiver::Rejected;
+        };
+        if self.lang_version < FIRST_BOARD_OBJECT_LANGUAGE_VERSION {
+            self.errors
+                .lock()
+                .unwrap()
+                .report_error(span, CompilationErrorType::TypeUsedAsValue(identifier.to_string()));
+            return StaticReceiver::Rejected;
+        }
+        let minimum_runtime = provider.minimum_runtime();
+        if self.runtime < minimum_runtime {
+            self.errors.lock().unwrap().report_error(
+                span.clone(),
+                CompilationErrorType::BuiltinNeedsRuntime(provider.get_definition().name.to_string(), minimum_runtime),
+            );
+            return StaticReceiver::Rejected;
+        }
+        self.instance_provider_lookup.insert(span.start, provider);
+        StaticReceiver::Instance(type_id)
+    }
+
     fn check_arg_count(&mut self, arg_count_expected: usize, arg_count: usize, identifier_token: &Spanned<Token>) {
         if arg_count < arg_count_expected {
             self.errors.lock().unwrap().report_error(
@@ -1553,7 +1617,11 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             );
             return VariableType::None;
         }
-        let t = member_reference_expression.get_expression().visit(self);
+        let t = match self.static_receiver(member_reference_expression.get_expression()) {
+            StaticReceiver::Instance(type_id) => VariableType::UserData(type_id),
+            StaticReceiver::NotAType => member_reference_expression.get_expression().visit(self),
+            StaticReceiver::Rejected => return VariableType::None,
+        };
         if let VariableType::UserData(d) = t {
             if self.type_registry.is_record_type(d) {
                 return self.resolve_record_field(
@@ -1726,9 +1794,37 @@ impl AstVisitor<VariableType> for SemanticVisitor {
     fn visit_function_call_expression(&mut self, call: &FunctionCallExpression) -> VariableType {
         let mut res = VariableType::None;
         let is_ident = matches!(call.get_expression(), Expression::Identifier(_));
+        let outer_func_call = self.cur_func_call;
         self.cur_func_call = call.id;
         call.get_expression().visit(self);
-        self.cur_func_call = 0;
+        self.cur_func_call = outer_func_call;
+
+        // A member call is decided by the receiver's type, whatever expression produced it.
+        if let Expression::MemberReference(member) = call.get_expression() {
+            let Some(user_type) = self.user_type_lookup.get(&member.get_identifier_token().span.start).copied() else {
+                // Visiting the member reference already reported why it could not be resolved.
+                for argument in call.get_arguments() {
+                    argument.visit(self);
+                }
+                return VariableType::None;
+            };
+            // A record field indexed like `rec.field(1)` is not a member call; the variable path below takes it.
+            if self.type_registry.get_type_from_id(user_type).is_some() {
+                for argument in call.get_arguments() {
+                    argument.visit(self);
+                }
+                if let Some((member_id, required, parameters, return_type)) = self.member_function_signature(user_type, member.get_identifier()) {
+                    self.check_expr_arg_range(required, parameters, call.get_arguments().len(), call.get_expression());
+                    self.function_type_lookup.insert(call.id, SemanticInfo::MemberFunctionCall(member_id));
+                    return return_type;
+                }
+                self.errors.lock().unwrap().report_error(
+                    member.get_identifier_token().span.clone(),
+                    CompilationErrorType::FunctionNotFound(member.get_identifier().to_string()),
+                );
+                return VariableType::None;
+            }
+        }
 
         match self.function_type_lookup.get(&call.id).cloned() {
             Some(SemanticInfo::FunctionReference(idx)) => {
@@ -1749,34 +1845,6 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             Some(SemanticInfo::VariableReference(idx)) => {
                 for argument in call.get_arguments() {
                     argument.visit(self);
-                }
-                if let Expression::MemberReference(member) = call.get_expression() {
-                    if let Some(user_type) = self.user_type_lookup.get(&member.get_identifier_token().span.start) {
-                        if let Some(registry) = self.type_registry.get_type_from_id(*user_type) {
-                            for (name, function) in &registry.functions {
-                                if name == member.get_identifier() {
-                                    self.check_expr_arg_range(function.required, function.parameters.len(), call.get_arguments().len(), call.get_expression());
-                                    if let Some(member) = registry.get_member_id(name) {
-                                        self.function_type_lookup.insert(call.id, SemanticInfo::MemberFunctionCall(member));
-                                        return function.return_type;
-                                    }
-                                    self.errors.lock().unwrap().report_error(
-                                        member.get_identifier_token().span.clone(),
-                                        CompilationErrorType::FunctionNotFound(member.get_identifier().to_string()),
-                                    );
-                                    return res;
-                                }
-                            }
-                            self.errors.lock().unwrap().report_error(
-                                member.get_identifier_token().span.clone(),
-                                CompilationErrorType::FunctionNotFound(member.get_identifier().to_string()),
-                            );
-                            return res;
-                        }
-                    } else {
-                        // error already reported.
-                        return res;
-                    }
                 }
 
                 let (rt, r) = &mut self.references[idx];

@@ -49,6 +49,15 @@ impl AstVisitor<PPEExpr> for ExpressionCompiler<'_> {
             }
             return PPEExpr::Value(decl.header.id);
         }
+        // A type name used as a receiver lowers to the call that hands its instance back.
+        if let Some(provider) = self
+            .compiler
+            .semantic_visitor
+            .instance_provider_lookup
+            .get(&identifier.get_identifier_token().span.start)
+        {
+            return PPEExpr::PredefinedFunctionCall(provider.get_definition(), Vec::new());
+        }
         log::error!("Variable not found: {}", identifier.get_identifier());
         PPEExpr::Value(0)
     }

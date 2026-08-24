@@ -128,42 +128,7 @@ impl Parser<'_> {
 
         if let Some(expr) = primary {
             if self.get_cur_token() == Some(Token::LPar) {
-                let leftpar_token = self.save_spanned_token();
-
-                self.next_token();
-                let mut arguments = Vec::new();
-
-                while self.get_cur_token() != Some(Token::RPar) {
-                    let Some(value) = self.parse_expression() else {
-                        self.error_reporter
-                            .lock()
-                            .unwrap()
-                            .report_error(self.save_token_span(), ParserErrorType::InvalidToken(self.save_token()));
-                        self.next_token();
-                        return None;
-                    };
-                    arguments.push(value);
-                    if self.get_cur_token() == Some(Token::Comma) {
-                        self.next_token();
-                        continue;
-                    }
-
-                    if self.get_cur_token() != Some(Token::RPar) && self.get_cur_token() != Some(Token::Comma) {
-                        break;
-                    }
-                }
-
-                if self.get_cur_token() != Some(Token::RPar) {
-                    self.error_reporter
-                        .lock()
-                        .unwrap()
-                        .report_error(self.save_token_span(), ParserErrorType::MissingCloseParens(self.save_token()));
-                    return None;
-                }
-                let rightpar_token = self.save_spanned_token();
-                self.next_token();
-
-                let call = Expression::FunctionCall(FunctionCallExpression::new(expr, leftpar_token, arguments, rightpar_token));
+                let call = self.parse_call_suffix(expr)?;
                 return self.parse_member_chain(call);
             }
             Some(expr)
@@ -172,8 +137,49 @@ impl Parser<'_> {
         }
     }
 
+    /// Parses `(arguments)` onto a callee that is already parsed. The current token is the
+    /// opening parenthesis.
+    fn parse_call_suffix(&mut self, expr: Expression) -> Option<Expression> {
+        let leftpar_token = self.save_spanned_token();
+
+        self.next_token();
+        let mut arguments = Vec::new();
+
+        while self.get_cur_token() != Some(Token::RPar) {
+            let Some(value) = self.parse_expression() else {
+                self.error_reporter
+                    .lock()
+                    .unwrap()
+                    .report_error(self.save_token_span(), ParserErrorType::InvalidToken(self.save_token()));
+                self.next_token();
+                return None;
+            };
+            arguments.push(value);
+            if self.get_cur_token() == Some(Token::Comma) {
+                self.next_token();
+                continue;
+            }
+
+            if self.get_cur_token() != Some(Token::RPar) && self.get_cur_token() != Some(Token::Comma) {
+                break;
+            }
+        }
+
+        if self.get_cur_token() != Some(Token::RPar) {
+            self.error_reporter
+                .lock()
+                .unwrap()
+                .report_error(self.save_token_span(), ParserErrorType::MissingCloseParens(self.save_token()));
+            return None;
+        }
+        let rightpar_token = self.save_spanned_token();
+        self.next_token();
+
+        Some(Expression::FunctionCall(FunctionCallExpression::new(expr, leftpar_token, arguments, rightpar_token)))
+    }
+
     /// Follows `.member` as far as it goes, so what a member answers may have members
-    /// of its own.
+    /// of its own, and any member in the chain may be called.
     fn parse_member_chain(&mut self, expr: Expression) -> Option<Expression> {
         let mut expr = expr;
         while self.get_cur_token() == Some(Token::Dot) {
@@ -189,6 +195,9 @@ impl Parser<'_> {
             }
             self.next_token();
             expr = Expression::MemberReference(MemberReferenceExpression::new(expr, dot_token, identifier_token));
+            if self.get_cur_token() == Some(Token::LPar) {
+                expr = self.parse_call_suffix(expr)?;
+            }
         }
         Some(expr)
     }
