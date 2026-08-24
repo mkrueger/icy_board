@@ -62,6 +62,10 @@ icbsetup import ~/dos/PCB migrated-board \
 Read `importlog.txt` and `import_report.txt` before editing anything. They show
 what was converted and which paths still need attention.
 
+Configured source paths that do not exist are retained rather than guessed or
+deleted. The importer warns with both the original value and the location it
+searched, and lists the original path under `Unresolved paths` for manual review.
+
 ## 4. Validate paths
 
 Icy Board is designed around paths relative to `icboard.toml`. Relative paths

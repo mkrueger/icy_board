@@ -76,6 +76,18 @@ fn is_dos_path(file: &str) -> bool {
     !file.is_empty() && file.len() <= 128 && !file.chars().any(|ch| ch.is_control() || matches!(ch, '|' | '<' | '>' | '"' | '*' | '?' | '@'))
 }
 
+fn imported_metadata_path(output: &str, index: usize) -> PathBuf {
+    PathBuf::from(output).join(format!("dir{index:02}"))
+}
+
+fn unresolved_configured_path_warning(file: &str, resolved_file: &Path) -> String {
+    format!(
+        "Can't resolve configured path '{}' (looked for '{}'); keeping the original value.",
+        file,
+        resolved_file.display()
+    )
+}
+
 /// A `X:\…` path starting at `start`, ending where a delimiter or the line does.
 fn dos_path_at(data: &[u8], start: usize) -> Option<usize> {
     if start + 3 > data.len() || !data[start].is_ascii_alphabetic() || data[start + 1] != b':' || data[start + 2] != b'\\' {
@@ -1036,8 +1048,9 @@ impl PCBoardImporter {
                 .log(&format!("Found {:?} in entry {} : {} arguments :{:?}", call.call_type, i, file, call.arguments));
             let resolved_file = self.resolve_file(&file);
             if !resolved_file.exists() {
-                self.output.warning(format!("Can't find file {}", resolved_file.display()));
-                self.logger.log(&format!("Can't find file {}", resolved_file.display()));
+                let warning = unresolved_configured_path_warning(&file, &resolved_file);
+                self.output.warning(warning.clone());
+                self.logger.log(&format!("Warning: {warning}"));
                 return Ok(line.to_string());
             }
             let new_name = self.convert_file(resolved_file)?;
@@ -1068,8 +1081,9 @@ impl PCBoardImporter {
                 .log(&format!("Found {:?} in line {} : {} arguments :{:?}", call.call_type, i, file, call.arguments));
             let resolved_file = self.resolve_file(&file);
             if !resolved_file.exists() {
-                self.output.warning(format!("Can't find file {}", resolved_file.display()));
-                self.logger.log(&format!("Can't find file {}", resolved_file.display()));
+                let warning = unresolved_configured_path_warning(&file, &resolved_file);
+                self.output.warning(warning.clone());
+                self.logger.log(&format!("Warning: {warning}"));
                 return Ok(line.to_string());
             }
             if resolved_file.is_dir() {
@@ -1871,8 +1885,19 @@ impl PCBoardImporter {
         let destination = PathBuf::from(dest_path).join(resolved_file.file_name().unwrap().to_ascii_lowercase());
 
         for (i, entry) in list.iter_mut().enumerate() {
+            let configured_path = entry.path.clone();
             entry.path = self.resolve_file(entry.path.to_str().unwrap());
-            let base_path = PathBuf::from(dest_path).join(format!("dir{:02}", i));
+            if !entry.path.exists() {
+                let warning = format!(
+                    "File area directory '{}' does not exist (looked for '{}'); keeping it for manual correction.",
+                    configured_path.display(),
+                    entry.path.display()
+                );
+                self.output.warning(warning.clone());
+                self.logger.log(&format!("Warning: {warning}"));
+            }
+            entry.metadata_path = imported_metadata_path(output, i);
+            let base_path = self.output_directory.join(&entry.metadata_path);
             self.logger
                 .log(&format!("Create file base for {} : {}", entry.path.display(), base_path.display()));
         }
@@ -1985,6 +2010,21 @@ impl PCBoardImporter {
 #[cfg(test)]
 mod import_error_tests {
     use super::*;
+
+    #[test]
+    fn imported_file_area_metadata_stays_inside_the_board() {
+        assert_eq!(imported_metadata_path("conferences/main", 0), PathBuf::from("conferences/main/dir00"));
+        assert_eq!(imported_metadata_path("conferences/12", 3), PathBuf::from("conferences/12/dir03"));
+    }
+
+    #[test]
+    fn unresolved_configured_path_message_explains_that_the_value_is_retained() {
+        let warning = unresolved_configured_path_warning(r"D:\PCB\PPL\LORD\LORD.PPE", Path::new("/import/pcb/PPL/LORD/LORD.PPE"));
+
+        assert!(warning.contains(r"D:\PCB\PPL\LORD\LORD.PPE"));
+        assert!(warning.contains("/import/pcb/PPL/LORD/LORD.PPE"));
+        assert!(warning.contains("keeping the original value"));
+    }
 
     #[test]
     fn missing_mapped_source_directory_explains_the_mapping() {
