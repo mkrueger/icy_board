@@ -86,3 +86,20 @@ fn a_static_receiver_needs_runtime_402() {
     let errors = compile_errors_with_runtime("PRINTLN TermInfo.Columns", 401);
     assert!(errors.iter().any(|error| error == "TermInfo needs runtime 402"), "{errors:?}");
 }
+
+/// The facade hangs objects off objects, so a property has to be able to answer with one.
+#[test]
+fn a_property_can_answer_with_another_object() {
+    assert!(compile_errors("PRINTLN Terminal.Info.Columns").is_empty());
+
+    let output = run_ppl(
+        r#"
+        PrintLn Terminal.Info.Columns, "x", Terminal.Info.Rows
+        TERMINAL term = Terminal()
+        TERMINFO info = term.Info
+        PrintLn info.Program
+        "#,
+    );
+
+    assert_eq!(output, "80x25\nUnknown\n");
+}

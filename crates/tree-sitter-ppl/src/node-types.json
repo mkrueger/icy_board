@@ -2246,6 +2246,10 @@
     "named": false
   },
   {
+    "type": "TERMINAL",
+    "named": false
+  },
+  {
     "type": "TERMINFO",
     "named": false
   },

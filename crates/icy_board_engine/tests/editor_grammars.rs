@@ -157,6 +157,7 @@ fn vscode_grammar_knows_every_built_in() {
         list_from_textmate("builtin-functions"),
         list_from_textmate("terminal-info"),
         list_from_textmate("terminal-input"),
+        list_from_textmate("terminal-object"),
     ]
     .concat()
     .into_iter()

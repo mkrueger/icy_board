@@ -1111,6 +1111,7 @@ hint-function-sound-api=Queries SyncTERM audio capability, format support or cha
 hint-function-event-api=Creates the singleton TERMINPUT event stream. Poll and Wait return EVENT snapshots; Free restores classic input.
 hint-function-term-state=Returns an immutable TERMSTATE snapshot of the active text margins.
 hint-function-term-info=Returns an immutable TERMINFO snapshot of cached terminal identity, dimensions, encoding and capabilities without starting another probe.
+hint-function-terminal=The caller's terminal, and the way to everything that draws on it. The type name stands in for it, so Terminal.Info reads the same as Terminal().Info.
 hint-function-err=Returns an ERROR describing the last operation that could fail: OK, Kind, Code, Message and Channel.
 hint-statement-errclr=Forgets the last error, so ERR().OK is true again.
 hint-statement-on-error=ON ERROR GOTO label | GOSUB label | Procedure | OFF - where a failed operation sends the program.

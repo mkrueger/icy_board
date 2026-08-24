@@ -201,6 +201,7 @@ fn board_object_type_ids_are_frozen() {
         ("ERROR", 39),
         ("TERMINFO", 40),
         ("TERMINPUT", 41),
+        ("TERMINAL", 42),
     ];
 
     for (name, id) in expected {

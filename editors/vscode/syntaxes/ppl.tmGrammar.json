@@ -10,6 +10,7 @@
 		{ "include": "#keywords" },
 		{ "include": "#terminal-info" },
 		{ "include": "#terminal-input" },
+		{ "include": "#terminal-object" },
 		{ "include": "#terminal-output-constants" },
 		{ "include": "#types" },
 		{ "include": "#constants" },
@@ -140,6 +141,12 @@
 			"patterns": [
 				{ "match": "(?i)\\b(TERMINPUT)\\b(?=\\s*\\()", "name": "support.function.ppl" },
 				{ "match": "(?i)\\b(TERMINPUT)\\b", "name": "storage.type.ppl" }
+			]
+		},
+		"terminal-object": {
+			"patterns": [
+				{ "match": "(?i)\\b(TERMINAL)\\b(?=\\s*\\()", "name": "support.function.ppl" },
+				{ "match": "(?i)\\b(TERMINAL)\\b", "name": "storage.type.ppl" }
 			]
 		},
 		"terminal-output-constants": {

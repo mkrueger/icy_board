@@ -41,6 +41,7 @@ pub mod ppl_graphics;
 pub mod ppl_keys;
 pub mod ppl_mouse;
 pub mod ppl_surface;
+pub mod ppl_terminal;
 pub mod ppl_terminal_control;
 pub mod ppl_terminal_info;
 pub mod ppl_terminal_input;

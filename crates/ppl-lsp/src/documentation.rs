@@ -449,6 +449,7 @@ pub fn get_function_hover(func: &FunctionDefinition) -> Option<Hover> {
         FuncOpCode::TermInput => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-event-api")),
         FuncOpCode::TermState => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-term-state")),
         FuncOpCode::TermInfo => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-term-info")),
+        FuncOpCode::Terminal => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-terminal")),
         FuncOpCode::Err => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-err")),
         _ => None,
     }

@@ -1468,6 +1468,18 @@
             "type": "TOKEN",
             "content": {
               "type": "PATTERN",
+              "value": "[tT][eE][rR][mM][iI][nN][aA][lL]"
+            }
+          },
+          "named": false,
+          "value": "TERMINAL"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
               "value": "[tT][eE][rR][mM][iI][nN][fF][oO]"
             }
           },

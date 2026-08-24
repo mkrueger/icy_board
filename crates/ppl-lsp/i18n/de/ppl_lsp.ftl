@@ -21,6 +21,7 @@ hint-function-rgb=Packt Rot, Grün, Blau und optional Alpha in einen RGBA-Farbwe
 hint-function-sound-api=Fragt SyncTERM-Audiofähigkeit, Formatunterstützung oder Kanalstatus ab.
 hint-function-event-api=Erstellt den einzigen TERMINPUT-Ereignisstrom. Poll und Wait geben EVENT-Schnappschüsse zurück; Free stellt die klassische Eingabe wieder her.
 hint-function-term-info=Gibt einen unveränderlichen TERMINFO-Schnappschuss der zwischengespeicherten Terminalkennung, Abmessungen, Kodierung und Fähigkeiten zurück, ohne eine neue Abfrage zu starten.
+hint-function-terminal=Das Terminal des Anrufers und der Weg zu allem, was darauf zeichnet. Der Typname steht für das Terminal selbst, Terminal.Info liest sich also wie Terminal().Info.
 hint-statement-gfx-api=Erstellt, zeichnet, präsentiert oder steuert Sixel-/JPEG-XL-Grafikflächen.
 hint-statement-sound-api=Lädt, spielt, blendet, stoppt oder ändert SyncTERM-Audio.
 hint-statement-terminal-update-api=Beginnt oder beendet eine verschachtelbare synchronisierte DEC-Ausgabe. Nur das äußerste Paar sendet Modus-2026-Sequenzen.
