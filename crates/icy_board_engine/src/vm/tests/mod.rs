@@ -7,6 +7,7 @@
 
 #![cfg(test)]
 
+mod arrays;
 mod board_session;
 mod builtin_enums;
 mod contacts;

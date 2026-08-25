@@ -1,9 +1,9 @@
 use crate::{
     ast::{
         BlockStatement, BreakStatement, CaseBlock, CaseSpecifier, CommentAstNode, ConstDeclarationStatement, Constant, ContinueStatement, ElseBlock,
-        ElseIfBlock, Expression, ForStatement, GosubStatement, GotoStatement, IdentifierExpression, IfStatement, IfThenStatement, LabelStatement, LetStatement,
-        LoopStatement, MemberCallStatement, OnErrorMode, OnErrorStatement, PredefinedCallStatement, ProcedureCallStatement, RepeatUntilStatement,
-        ReturnStatement, SelectStatement, Statement, VariableDeclarationStatement, WhileDoStatement, WhileStatement,
+        ElseIfBlock, Expression, ForEachStatement, ForStatement, GosubStatement, GotoStatement, IdentifierExpression, IfStatement, IfThenStatement,
+        LabelStatement, LetStatement, LoopStatement, MemberCallStatement, OnErrorMode, OnErrorStatement, PredefinedCallStatement, ProcedureCallStatement,
+        RepeatUntilStatement, ReturnStatement, SelectStatement, Statement, VariableDeclarationStatement, WhileDoStatement, WhileStatement,
     },
     executable::{OpCode, StatementDefinition},
     parser::ParserErrorType,
@@ -316,6 +316,58 @@ impl Parser<'_> {
         )))
     }
 
+    /// `FOREACH value IN array ... ENDFOREACH`
+    ///
+    /// `IN` is matched as an identifier the way `TO` and `STEP` are, so the word stays
+    /// available as a variable name.
+    fn parse_foreach(&mut self) -> Option<Statement> {
+        let foreach_token = self.save_spanned_token();
+        self.next_token();
+
+        let identifier_token = self.save_spanned_token();
+        if !matches!(self.get_cur_token(), Some(Token::Identifier(_))) {
+            self.report_error(self.lex.span(), ParserErrorType::IdentifierExpected(self.save_token()));
+            return None;
+        }
+        self.next_token();
+
+        if self.get_cur_token() != Some(Token::Identifier(unicase::Ascii::new("IN".to_string()))) {
+            self.report_error(self.lex.span(), ParserErrorType::InExpected(self.save_token()));
+            return None;
+        }
+        let in_token = self.save_spanned_token();
+        self.next_token();
+
+        let collection_token = self.save_spanned_token();
+        if !matches!(self.get_cur_token(), Some(Token::Identifier(_))) {
+            self.report_error(self.lex.span(), ParserErrorType::IdentifierExpected(self.save_token()));
+            return None;
+        }
+        self.next_token();
+
+        let mut statements = Vec::new();
+        self.skip_eol();
+        while self.get_cur_token() != Some(Token::Next) {
+            if self.get_cur_token().is_none() {
+                self.report_error(self.lex.span(), ParserErrorType::EndExpected);
+                return None;
+            }
+            statements.push(self.parse_statement());
+            self.skip_eol();
+        }
+        let endforeach_token = self.save_spanned_token();
+        self.next_token();
+
+        Some(Statement::ForEach(ForEachStatement::new(
+            foreach_token,
+            identifier_token,
+            in_token,
+            collection_token,
+            statements.into_iter().flatten().collect(),
+            endforeach_token,
+        )))
+    }
+
     fn parse_if(&mut self) -> Option<Statement> {
         let if_token = self.save_spanned_token();
         self.next_token();
@@ -614,6 +666,7 @@ impl Parser<'_> {
             Some(Token::Select) => self.parse_select(),
             Some(Token::If) => self.parse_if(),
             Some(Token::For) => self.parse_for(),
+            Some(Token::ForEach) => self.parse_foreach(),
             Some(Token::Let) => {
                 let let_token = self.save_spanned_token();
                 self.next_token();

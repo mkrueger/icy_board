@@ -1,9 +1,9 @@
 use crate::ast::{
     ArrayInitializerExpression, Ast, AstNode, AstVisitor, BinaryExpression, BlockStatement, ConstDeclarationStatement, EnumDeclarationAstNode, Expression,
-    ForStatement, FunctionCallExpression, FunctionDeclarationAstNode, FunctionImplementation, IfThenStatement, IndexerExpression, LetStatement, LoopStatement,
-    MemberReferenceExpression, ParameterSpecifier, PredefinedCallStatement, ProcedureCallStatement, ProcedureDeclarationAstNode, ProcedureImplementation,
-    RecordLiteralExpression, RepeatUntilStatement, SelectStatement, Statement, TypeDeclarationAstNode, UnaryExpression, VariableDeclarationStatement,
-    WhileDoStatement, walk_binary_expression,
+    ForEachStatement, ForStatement, FunctionCallExpression, FunctionDeclarationAstNode, FunctionImplementation, IfThenStatement, IndexerExpression,
+    LetStatement, LoopStatement, MemberReferenceExpression, ParameterSpecifier, PredefinedCallStatement, ProcedureCallStatement, ProcedureDeclarationAstNode,
+    ProcedureImplementation, RecordLiteralExpression, RepeatUntilStatement, SelectStatement, Statement, TypeDeclarationAstNode, UnaryExpression,
+    VariableDeclarationStatement, WhileDoStatement, walk_binary_expression,
 };
 
 pub mod options;
@@ -389,6 +389,13 @@ impl AstVisitor<()> for FormattingVisitor<'_> {
         self.format_block(for_stmt.get_statements());
         self.dec_indent();
         self.indent(for_stmt.get_next_token().span.clone());
+    }
+
+    fn visit_foreach_statement(&mut self, foreach_stmt: &ForEachStatement) {
+        self.inc_indent();
+        self.format_block(foreach_stmt.get_statements());
+        self.dec_indent();
+        self.indent(foreach_stmt.get_endforeach_token().span.clone());
     }
 
     fn visit_while_do_statement(&mut self, while_do_stmt: &WhileDoStatement) {

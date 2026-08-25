@@ -758,6 +758,77 @@ For multidimensional arrays, `dim` is zero-based.
 
 `dim`      The dimension to get the length of
 
+## `FOREACH ... ENDFOREACH` Statement (4.00)
+
+### Function
+
+Walks every element of an array, whatever its rank. `FOR` needs one loop per
+dimension and needs to know how many there are; `FOREACH` needs neither.
+
+```PPL
+STRING names(10)
+STRING name
+
+FOREACH name IN names
+    PRINTLN name
+ENDFOREACH
+```
+
+A two- or three-dimensional array walks exactly the same way, row-major, with the
+last index moving fastest:
+
+```PPL
+INTEGER grid(9, 9)
+INTEGER cell
+
+FOREACH cell IN grid
+    total = total + cell
+ENDFOREACH
+```
+
+### Syntax
+
+`FOREACH variable IN array`, the body, then `ENDFOREACH` or `NEXT`.
+
+The loop variable is declared like any other and has to be able to hold an
+element. It is a **copy**: assigning to it inside the loop changes the copy, not
+the array. Write through the array itself when a walk should change it.
+
+`BREAK` and `CONTINUE` work the way they do in every other loop. PPL arrays are
+declared with upper bounds and index from zero, so `STRING names(10)` walks
+eleven elements.
+
+`IN` is not a reserved word. Like `TO` and `STEP` it is only read as part of the
+statement, so it stays available as a variable name.
+
+## `ElementCount()` and `ElementAt()` Functions (4.00)
+
+### Function
+
+The two rank-agnostic array primitives `FOREACH` is built from, useful on their
+own when a walk needs its own index.
+
+`ElementCount(array)` answers how many elements the array holds over all of its
+dimensions. `ElementAt(array, index)` answers the element at a flat index,
+counted row-major. A value that is not an array counts as a single element, so
+neither has to be asked what it is being handed.
+
+```PPL
+INTEGER grid(1, 1)
+INTEGER i
+
+FOR i = 0 TO ElementCount(grid) - 1
+    PRINTLN i, ": ", ElementAt(grid, i)
+NEXT
+```
+
+### Syntax
+
+`ElementCount(array)` returns INTEGER.
+
+`ElementAt(array, index)` returns an element of the array. An index no element
+has answers with an empty value of the array's own type rather than failing.
+
 ## `CONST` Declaration (3.50)
 
 ### Function

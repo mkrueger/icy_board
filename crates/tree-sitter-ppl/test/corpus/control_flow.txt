@@ -184,6 +184,34 @@ NEXT i
     variable_end: (identifier)))
 
 ================================================================================
+FOREACH
+================================================================================
+
+FOREACH value IN names
+    PRINTLN value
+ENDFOREACH
+
+FOREACH value IN names
+    PRINTLN value
+NEXT
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (foreach_statement
+    variable: (identifier)
+    collection: (identifier)
+    body: (predefined_call
+      name: (builtin_statement)
+      argument: (identifier)))
+  (foreach_statement
+    variable: (identifier)
+    collection: (identifier)
+    body: (predefined_call
+      name: (builtin_statement)
+      argument: (identifier))))
+
+================================================================================
 SELECT CASE
 ================================================================================
 

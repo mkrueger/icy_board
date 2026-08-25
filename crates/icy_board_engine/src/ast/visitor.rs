@@ -2,8 +2,8 @@ use crate::parser::lexer::{Spanned, Token};
 
 use super::{
     ArrayInitializerExpression, Ast, AstNode, BinaryExpression, BlockStatement, BreakStatement, CaseBlock, CaseSpecifier, CommentAstNode,
-    ConstDeclarationStatement, ConstantExpression, ContinueStatement, ElseBlock, ElseIfBlock, EnumDeclarationAstNode, Expression, ForStatement,
-    FunctionCallExpression, FunctionDeclarationAstNode, FunctionImplementation, GosubStatement, GotoStatement, IdentifierExpression, IfStatement,
+    ConstDeclarationStatement, ConstantExpression, ContinueStatement, ElseBlock, ElseIfBlock, EnumDeclarationAstNode, Expression, ForEachStatement,
+    ForStatement, FunctionCallExpression, FunctionDeclarationAstNode, FunctionImplementation, GosubStatement, GotoStatement, IdentifierExpression, IfStatement,
     IfThenStatement, IndexerExpression, LabelStatement, LetStatement, LoopStatement, MemberCallStatement, MemberReferenceExpression, OnErrorStatement,
     ParameterSpecifier, ParensExpression, PredefinedCallStatement, ProcedureCallStatement, ProcedureDeclarationAstNode, ProcedureImplementation,
     RecordLiteralExpression, RepeatUntilStatement, ReturnStatement, SelectStatement, Statement, TypeDeclarationAstNode, UnaryExpression,
@@ -100,6 +100,10 @@ pub trait AstVisitor<T: Default>: Sized {
 
     fn visit_for_statement(&mut self, for_stmt: &ForStatement) -> T {
         walk_for_stmt(self, for_stmt);
+        T::default()
+    }
+    fn visit_foreach_statement(&mut self, foreach_stmt: &ForEachStatement) -> T {
+        walk_foreach_stmt(self, foreach_stmt);
         T::default()
     }
     fn visit_break_statement(&mut self, break_stmt: &BreakStatement) -> T {
@@ -284,6 +288,12 @@ pub fn walk_for_stmt<T: Default, V: AstVisitor<T>>(visitor: &mut V, for_stmt: &F
         step.visit(visitor);
     }
     for stmt in for_stmt.get_statements() {
+        stmt.visit(visitor);
+    }
+}
+
+pub fn walk_foreach_stmt<T: Default, V: AstVisitor<T>>(visitor: &mut V, foreach_stmt: &ForEachStatement) {
+    for stmt in foreach_stmt.get_statements() {
         stmt.visit(visitor);
     }
 }
@@ -566,6 +576,23 @@ pub trait AstVisitorMut: Sized {
                 span: ni.span.clone(),
                 token: Token::Identifier(self.visit_identifier(for_stmt.get_next_identifier().unwrap())),
             }),
+        ))
+    }
+
+    fn visit_foreach_statement(&mut self, foreach_stmt: &ForEachStatement) -> Statement {
+        Statement::ForEach(ForEachStatement::new(
+            foreach_stmt.get_foreach_token().clone(),
+            Spanned {
+                span: foreach_stmt.get_identifier_token().span.clone(),
+                token: Token::Identifier(self.visit_identifier(foreach_stmt.get_identifier())),
+            },
+            foreach_stmt.get_in_token().clone(),
+            Spanned {
+                span: foreach_stmt.get_collection_token().span.clone(),
+                token: Token::Identifier(self.visit_identifier(foreach_stmt.get_collection())),
+            },
+            foreach_stmt.get_statements().iter().map(|stmt| stmt.visit_mut(self)).collect(),
+            foreach_stmt.get_endforeach_token().clone(),
         ))
     }
 

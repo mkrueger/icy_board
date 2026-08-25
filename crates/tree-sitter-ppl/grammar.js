@@ -300,6 +300,7 @@ module.exports = grammar({
       $.repeat_statement,
       $.loop_statement,
       $.for_statement,
+      $.foreach_statement,
       $.select_statement,
       $.goto_statement,
       $.gosub_statement,
@@ -423,6 +424,15 @@ module.exports = grammar({
       choice(kw('NEXT'), endKw('FOR')),
       optional(field('variable_end', $.identifier)),
     )),
+
+    foreach_statement: $ => seq(
+      kw('FOREACH'),
+      field('variable', $.identifier),
+      kw('IN'),
+      field('collection', $.identifier),
+      field('body', repeat($._statement)),
+      choice(kw('NEXT'), endKw('FOREACH')),
+    ),
 
     select_statement: $ => seq(
       kw('SELECT'),

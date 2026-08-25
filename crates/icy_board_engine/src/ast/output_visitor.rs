@@ -482,6 +482,25 @@ impl AstVisitor<()> for OutputVisitor {
         self.eol();
     }
 
+    fn visit_foreach_statement(&mut self, foreach_stmt: &super::ForEachStatement) {
+        self.output_keyword("ForEach");
+        self.output.push(' ');
+        self.output(foreach_stmt.get_identifier());
+        self.output.push(' ');
+        self.output_keyword("In");
+        self.output.push(' ');
+        self.output(foreach_stmt.get_collection());
+        self.eol();
+
+        self.indent += 1;
+        self.output_statements(foreach_stmt.get_statements());
+        self.indent -= 1;
+
+        self.indent();
+        self.output_keyword("EndForEach");
+        self.eol();
+    }
+
     fn visit_break_statement(&mut self, _break_stmt: &super::BreakStatement) {
         self.output_keyword("Break");
     }

@@ -102,6 +102,10 @@
         "named": true
       },
       {
+        "type": "foreach_statement",
+        "named": true
+      },
+      {
         "type": "gosub_statement",
         "named": true
       },
@@ -850,6 +854,42 @@
       "variable_end": {
         "multiple": false,
         "required": false,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "foreach_statement",
+    "named": true,
+    "fields": {
+      "body": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "_statement",
+            "named": true
+          }
+        ]
+      },
+      "collection": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "variable": {
+        "multiple": false,
+        "required": true,
         "types": [
           {
             "type": "identifier",
@@ -2090,6 +2130,10 @@
     "named": false
   },
   {
+    "type": "ENDFOREACH",
+    "named": false
+  },
+  {
     "type": "ENDFUNC",
     "named": false
   },
@@ -2170,6 +2214,10 @@
     "named": false
   },
   {
+    "type": "FOREACH",
+    "named": false
+  },
+  {
     "type": "FUNCTION",
     "named": false
   },
@@ -2191,6 +2239,10 @@
   },
   {
     "type": "IF",
+    "named": false
+  },
+  {
+    "type": "IN",
     "named": false
   },
   {

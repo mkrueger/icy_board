@@ -3,9 +3,9 @@ use std::collections::{HashMap, HashSet};
 use crate::{
     ast::{
         Ast, AstNode, AstVisitorMut, BinaryExpression, BlockStatement, CommentAstNode, ConstDeclarationStatement, Constant, ConstantExpression,
-        DimensionSpecifier, Expression, ForStatement, FunctionImplementation, GotoStatement, IdentifierExpression, IfStatement, LabelStatement, LetStatement,
-        MemberReferenceExpression, ParameterSpecifier, ProcedureImplementation, ReturnStatement, SelectStatement, Statement, VariableDeclarationStatement,
-        VariableSpecifier, const_expression, const_value_with_members, constant::NumberFormat,
+        DimensionSpecifier, Expression, ForEachStatement, ForStatement, FunctionCallExpression, FunctionImplementation, GotoStatement, IdentifierExpression,
+        IfStatement, LabelStatement, LetStatement, MemberReferenceExpression, ParameterSpecifier, ProcedureImplementation, ReturnStatement, SelectStatement,
+        Statement, VariableDeclarationStatement, VariableSpecifier, const_expression, const_value_with_members, constant::NumberFormat,
     },
     decompiler::evaluation_visitor::{ConstantFolder, OptimizationVisitor},
     executable::VariableValue,
@@ -417,6 +417,77 @@ impl AstVisitorMut for AstTransformationVisitor {
         ));
 
         // loop & exit;
+        statements.push(GotoStatement::create_empty_statement(loop_label.clone()));
+        statements.push(LabelStatement::create_empty_statement(break_label.clone()));
+        self.continue_break_labels.pop();
+        Statement::Block(BlockStatement::empty(statements))
+    }
+
+    /// `FOREACH value IN array` becomes a counting loop over the array's flat element
+    /// order. Rank never enters into it: `ElementCount` and `ElementAt` answer the same
+    /// way for a vector, a matrix and a cube, which matters because this transformation
+    /// runs before the declarations are known.
+    fn visit_foreach_statement(&mut self, foreach_stmt: &ForEachStatement) -> Statement {
+        let mut statements = Vec::new();
+
+        let loop_label = self.next_label();
+        let continue_label = self.next_label();
+        let break_label = self.next_label();
+
+        // A name the lexer cannot produce, so it can never collide with a user's own.
+        let index = unicase::Ascii::new(format!("*(foreach{})", self.labels));
+        let index_expr = IdentifierExpression::create_empty_expression(index.clone());
+        let collection = Expression::Identifier(IdentifierExpression::new(foreach_stmt.get_collection_token().clone()));
+
+        statements.push(VariableDeclarationStatement::create_empty_statement(
+            crate::executable::VariableType::Integer,
+            vec![VariableSpecifier::empty(index.clone(), Vec::new())],
+        ));
+        statements.push(LetStatement::create_empty_statement(
+            index.clone(),
+            Token::Eq,
+            Vec::new(),
+            ConstantExpression::create_empty_expression(Constant::Integer(0, NumberFormat::Default)),
+        ));
+
+        self.continue_break_labels.push((continue_label.clone(), break_label.clone()));
+        statements.push(LabelStatement::create_empty_statement(loop_label.clone()));
+
+        // IF (index >= ElementCount(collection)) GOTO break
+        let element_count = FunctionCallExpression::create_empty_expression(
+            IdentifierExpression::create_empty_expression(unicase::Ascii::new("ElementCount".to_string())),
+            vec![collection.clone()],
+        );
+        statements.push(IfStatement::create_empty_statement(
+            BinaryExpression::create_empty_expression(crate::ast::BinOp::GreaterEq, index_expr.clone(), element_count),
+            GotoStatement::create_empty_statement(break_label.clone()),
+        ));
+
+        // The loop variable is a copy; writing it does not reach back into the array.
+        statements.push(LetStatement::create_empty_statement(
+            foreach_stmt.get_identifier().clone(),
+            Token::Eq,
+            Vec::new(),
+            FunctionCallExpression::create_empty_expression(
+                IdentifierExpression::create_empty_expression(unicase::Ascii::new("ElementAt".to_string())),
+                vec![collection, index_expr.clone()],
+            ),
+        ));
+
+        statements.extend(foreach_stmt.get_statements().iter().map(|s| s.visit_mut(self)));
+
+        statements.push(LabelStatement::create_empty_statement(continue_label.clone()));
+        statements.push(LetStatement::create_empty_statement(
+            index,
+            Token::Eq,
+            Vec::new(),
+            BinaryExpression::create_empty_expression(
+                crate::ast::BinOp::Add,
+                index_expr,
+                ConstantExpression::create_empty_expression(Constant::Integer(1, NumberFormat::Default)),
+            ),
+        ));
+
         statements.push(GotoStatement::create_empty_statement(loop_label.clone()));
         statements.push(LabelStatement::create_empty_statement(break_label.clone()));
         self.continue_break_labels.pop();

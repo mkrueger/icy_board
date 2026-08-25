@@ -504,6 +504,7 @@ impl PPECompiler {
             Statement::RepeatUntil(_) => panic!("repeat until not allowed in output AST."),
             Statement::Loop(_) => panic!("loop not allowed in output AST."),
             Statement::For(_) => panic!("for not allowed in output AST."),
+            Statement::ForEach(_) => panic!("foreach not allowed in output AST."),
             Statement::Select(_) => panic!("select not allowed in output AST."),
         }
     }

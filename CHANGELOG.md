@@ -10,6 +10,14 @@ releases.
 
 ### Changed
 
+- Added `FOREACH ... ENDFOREACH`, which walks every element of an array whatever
+  its rank. A matrix or a cube walks the same way a vector does, row-major, so a
+  PPE no longer needs one nested `FOR` per dimension nor needs to know how many
+  there are. The loop variable is a copy, `BREAK` and `CONTINUE` work as usual,
+  and `IN` stays available as a variable name the way `TO` and `STEP` do.
+- Added `ElementCount(array)` and `ElementAt(array, index)`, the rank-agnostic
+  primitives `FOREACH` is built from, for walks that need their own index.
+
 - Added `Session.User`, the caller's own record: identity, address, preferences,
   security, statistics and contacts in one object. It gathers what the `U_*`
   variables report, which stay unchanged for PCBoard compatibility.

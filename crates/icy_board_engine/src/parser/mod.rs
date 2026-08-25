@@ -80,6 +80,9 @@ pub enum ParserErrorType {
     #[error("Expected 'TO' ({0})")]
     ToExpected(Token),
 
+    #[error("Expected 'IN' ({0})")]
+    InExpected(Token),
+
     #[error("Expected expression ({0})")]
     ExpressionExpected(Token),
 

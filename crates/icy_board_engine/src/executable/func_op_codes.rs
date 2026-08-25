@@ -319,9 +319,11 @@ pub enum FuncOpCode {
     StaticReceiver = -304,
     Board = -305,
     Session = -306,
+    ElementCount = -307,
+    ElementAt = -308,
 }
 
-pub const LAST_FUNC: i16 = -306;
+pub const LAST_FUNC: i16 = -308;
 
 impl FuncOpCode {
     pub fn get_definition(self) -> &'static FunctionDefinition {
@@ -332,7 +334,14 @@ impl FuncOpCode {
     pub fn minimum_runtime(self) -> u16 {
         if matches!(
             self,
-            FuncOpCode::Rgb | FuncOpCode::RgbAlpha | FuncOpCode::Terminal | FuncOpCode::StaticReceiver | FuncOpCode::Board | FuncOpCode::Session
+            FuncOpCode::Rgb
+                | FuncOpCode::RgbAlpha
+                | FuncOpCode::Terminal
+                | FuncOpCode::StaticReceiver
+                | FuncOpCode::Board
+                | FuncOpCode::Session
+                | FuncOpCode::ElementCount
+                | FuncOpCode::ElementAt
         ) {
             400
         } else {
@@ -399,7 +408,7 @@ impl FunctionDefinition {
         }
     }
 }
-pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 318]> = std::sync::LazyLock::new(|| {
+pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 320]> = std::sync::LazyLock::new(|| {
     [
         FunctionDefinition {
             name: "END",
@@ -3035,6 +3044,25 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 318]> 
             return_type: VariableType::UserData(50),
             args: None,
             signature: FunctionSignature::FixedParameters(0),
+        },
+        FunctionDefinition {
+            name: "ElementCount",
+            version: 400,
+            opcode: FuncOpCode::ElementCount,
+            return_type: VariableType::Integer,
+            args: Some(vec![ArgumentDefinition::new("array", VariableType::None)]),
+            signature: FunctionSignature::FixedParameters(1),
+        },
+        FunctionDefinition {
+            name: "ElementAt",
+            version: 400,
+            opcode: FuncOpCode::ElementAt,
+            return_type: VariableType::None,
+            args: Some(vec![
+                ArgumentDefinition::new("array", VariableType::None),
+                ArgumentDefinition::new("index", VariableType::Integer),
+            ]),
+            signature: FunctionSignature::FixedParameters(2),
         },
         // ALIASES (need to be last in the list)
         FunctionDefinition {

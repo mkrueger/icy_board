@@ -167,6 +167,7 @@ pub enum Token {
     ElseIf,
     EndIf,
     For,
+    ForEach,
     Next,
     Break,
     Continue,
@@ -234,6 +235,7 @@ impl Token {
                 | Token::ElseIf
                 | Token::EndIf
                 | Token::For
+                | Token::ForEach
                 | Token::Next
                 | Token::Break
                 | Token::Continue
@@ -302,6 +304,7 @@ impl fmt::Display for Token {
             Token::EndIf => write!(f, "ENDIF"),
 
             Token::For => write!(f, "FOR"),
+            Token::ForEach => write!(f, "FOREACH"),
             Token::Next => write!(f, "NEXT"),
             Token::Break => write!(f, "BREAK"),
             Token::Continue => write!(f, "CONTINUE"),
@@ -491,6 +494,9 @@ pub const KEYWORDS: &[Keyword] = &[
     Keyword { name: "endtype",   token: Token::EndType,   since: 400 },
     Keyword { name: "begin",     token: Token::Begin,     since: 400 },
     Keyword { name: "onerror",   token: Token::OnError,   since: 400 },
+    // IN stays an identifier the way TO and STEP do, so a common word keeps working as a name.
+    Keyword { name: "foreach",    token: Token::ForEach,  since: 400 },
+    Keyword { name: "endforeach", token: Token::Next,     since: 400 },
 ];
 
 /// One table per version that reserves a word, in ascending order.

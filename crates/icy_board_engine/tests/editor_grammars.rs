@@ -176,9 +176,10 @@ fn vscode_grammar_knows_every_built_in() {
 }
 
 /// Words a grammar colours as a keyword that the lexer does not reserve: THEN, DO,
-/// TO, STEP and VAR are read as plain names, TRUE and FALSE are constants, END, EXIT
-/// and STOP are statements, ON, ERROR and OFF only mean something next to each other
-/// in ON ERROR, and the engine reads END FUNCTION as two tokens rather than as one word.
+/// TO, STEP, IN and VAR are read as plain names, TRUE and FALSE are constants, END,
+/// EXIT and STOP are statements, ON, ERROR and OFF only mean something next to each
+/// other in ON ERROR, and the engine reads END FUNCTION as two tokens rather than as
+/// one word.
 const COLOURED_BUT_NOT_RESERVED: &[&str] = &[
     "DO",
     "END",
@@ -187,6 +188,7 @@ const COLOURED_BUT_NOT_RESERVED: &[&str] = &[
     "ERROR",
     "EXIT",
     "FALSE",
+    "IN",
     "OFF",
     "ON",
     "STEP",

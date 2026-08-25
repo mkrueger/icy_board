@@ -27,6 +27,7 @@ pub enum Statement {
     Loop(LoopStatement),
 
     For(ForStatement),
+    ForEach(ForEachStatement),
     Break(BreakStatement),
     Continue(ContinueStatement),
     Gosub(GosubStatement),
@@ -57,6 +58,7 @@ impl Statement {
             Statement::RepeatUntil(r) => r.get_repeat_token().span.start..r.condition.get_span().end,
             Statement::Loop(l) => l.get_loop_token().span.start..l.get_endloop_token().span.end,
             Statement::For(f) => f.get_for_token().span.clone(),
+            Statement::ForEach(f) => f.get_foreach_token().span.clone(),
             Statement::Break(b) => b.get_break_token().span.clone(),
             Statement::Continue(c) => c.get_continue_token().span.clone(),
             Statement::Gosub(g) => g.get_gosub_token().span.clone(),
@@ -87,6 +89,7 @@ impl Statement {
             Statement::Loop(s) => visitor.visit_loop_statement(s),
 
             Statement::For(s) => visitor.visit_for_statement(s),
+            Statement::ForEach(s) => visitor.visit_foreach_statement(s),
             Statement::Break(s) => visitor.visit_break_statement(s),
             Statement::Continue(s) => visitor.visit_continue_statement(s),
             Statement::Gosub(s) => visitor.visit_gosub_statement(s),
@@ -117,6 +120,7 @@ impl Statement {
             Statement::RepeatUntil(s) => visitor.visit_repeat_until_statement(s),
             Statement::Loop(s) => visitor.visit_loop_statement(s),
             Statement::For(s) => visitor.visit_for_statement(s),
+            Statement::ForEach(s) => visitor.visit_foreach_statement(s),
             Statement::Break(s) => visitor.visit_break_statement(s),
             Statement::Continue(s) => visitor.visit_continue_statement(s),
             Statement::Gosub(s) => visitor.visit_gosub_statement(s),
@@ -1168,6 +1172,98 @@ impl ForStatement {
         statements: Vec<Statement>,
     ) -> Statement {
         Statement::For(ForStatement::empty(variable_name, start_expr, end_expr, step_expr, statements))
+    }
+}
+
+/// `FOREACH value IN array` walks every element of an array, whatever its rank.
+#[derive(Debug, PartialEq, Clone)]
+pub struct ForEachStatement {
+    foreach_token: Spanned<Token>,
+    identifier_token: Spanned<Token>,
+    in_token: Spanned<Token>,
+    collection_token: Spanned<Token>,
+    statements: Vec<Statement>,
+    endforeach_token: Spanned<Token>,
+}
+
+impl ForEachStatement {
+    pub fn new(
+        foreach_token: Spanned<Token>,
+        identifier_token: Spanned<Token>,
+        in_token: Spanned<Token>,
+        collection_token: Spanned<Token>,
+        statements: Vec<Statement>,
+        endforeach_token: Spanned<Token>,
+    ) -> Self {
+        Self {
+            foreach_token,
+            identifier_token,
+            in_token,
+            collection_token,
+            statements,
+            endforeach_token,
+        }
+    }
+
+    pub fn empty(variable_name: unicase::Ascii<String>, collection_name: unicase::Ascii<String>, statements: Vec<Statement>) -> Self {
+        Self {
+            foreach_token: Spanned::create_empty(Token::ForEach),
+            identifier_token: Spanned::create_empty(Token::Identifier(variable_name)),
+            in_token: Spanned::create_empty(Token::Identifier(unicase::Ascii::new("IN".to_string()))),
+            collection_token: Spanned::create_empty(Token::Identifier(collection_name)),
+            statements,
+            endforeach_token: Spanned::create_empty(Token::Next),
+        }
+    }
+
+    pub fn get_foreach_token(&self) -> &Spanned<Token> {
+        &self.foreach_token
+    }
+
+    pub fn get_identifier_token(&self) -> &Spanned<Token> {
+        &self.identifier_token
+    }
+
+    /// # Panics
+    /// Panics if the node was built with a token that is not an identifier.
+    pub fn get_identifier(&self) -> &unicase::Ascii<String> {
+        if let Token::Identifier(id) = &self.identifier_token.token {
+            return id;
+        }
+        panic!("Expected identifier token")
+    }
+
+    pub fn get_in_token(&self) -> &Spanned<Token> {
+        &self.in_token
+    }
+
+    pub fn get_collection_token(&self) -> &Spanned<Token> {
+        &self.collection_token
+    }
+
+    /// # Panics
+    /// Panics if the node was built with a token that is not an identifier.
+    pub fn get_collection(&self) -> &unicase::Ascii<String> {
+        if let Token::Identifier(id) = &self.collection_token.token {
+            return id;
+        }
+        panic!("Expected identifier token")
+    }
+
+    pub fn get_statements(&self) -> &Vec<Statement> {
+        &self.statements
+    }
+
+    pub fn get_statements_mut(&mut self) -> &mut Vec<Statement> {
+        &mut self.statements
+    }
+
+    pub fn get_endforeach_token(&self) -> &Spanned<Token> {
+        &self.endforeach_token
+    }
+
+    pub fn create_empty_statement(variable_name: unicase::Ascii<String>, collection_name: unicase::Ascii<String>, statements: Vec<Statement>) -> Statement {
+        Statement::ForEach(ForEachStatement::empty(variable_name, collection_name, statements))
     }
 }
 

@@ -143,6 +143,55 @@ pub async fn len_dim(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
     Ok(VariableValue::new_int(val as i32))
 }
 
+/// How many elements an array holds over all of its dimensions, so a caller can walk
+/// one without knowing its rank. A value that is not an array counts as one element.
+pub async fn element_count(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let arr = vm.eval_expr(&args[0]).await?;
+    let count = match &arr.generic_data {
+        GenericVariableData::Dim1(items) => items.len(),
+        GenericVariableData::Dim2(items) => items.iter().map(Vec::len).sum(),
+        GenericVariableData::Dim3(items) => items.iter().flatten().map(Vec::len).sum(),
+        _ => 1,
+    };
+    Ok(VariableValue::new_int(count as i32))
+}
+
+/// The element at a flat index, counted row-major, so the rank stays out of the way.
+/// An index no element has answers with an empty value of the array's own type.
+pub async fn element_at(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let arr = vm.eval_expr(&args[0]).await?;
+    let index = vm.eval_expr(&args[1]).await?.as_int();
+    if index < 0 {
+        return Ok(arr.vtype.create_empty_value());
+    }
+    let index = index as usize;
+    let element = match &arr.generic_data {
+        GenericVariableData::Dim1(items) => items.get(index).cloned(),
+        GenericVariableData::Dim2(items) => {
+            let width = items.first().map_or(0, Vec::len);
+            index
+                .checked_div(width)
+                .and_then(|row| items.get(row))
+                .and_then(|row| row.get(index % width))
+                .cloned()
+        }
+        GenericVariableData::Dim3(items) => {
+            let height = items.first().map_or(0, Vec::len);
+            let width = items.first().and_then(|plane| plane.first()).map_or(0, Vec::len);
+            let plane_size = height * width;
+            index
+                .checked_div(plane_size)
+                .and_then(|plane| items.get(plane))
+                .and_then(|plane| plane.get(index % plane_size / width))
+                .and_then(|row| row.get(index % width))
+                .cloned()
+        }
+        _ if index == 0 => Some(arr.clone()),
+        _ => None,
+    };
+    Ok(element.unwrap_or_else(|| arr.vtype.create_empty_value()))
+}
+
 /// Returns the lowercase equivalent of a string
 /// # Arguments
 ///  * `str` - A string value

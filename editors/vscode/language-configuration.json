@@ -23,7 +23,7 @@
 	"folding": {
 		"markers": {
 			"start": "(?i)^\\s*(PROCEDURE\\b|FUNCTION\\b|TYPE\\s+\\w|ENUM\\s+\\w|BEGIN\\s*$|SELECT\\b|FOR\\b|LOOP\\s*$|REPEAT\\s*$|IF\\b.*\\bTHEN\\s*$|WHILE\\b.*\\bDO\\s*$)",
-			"end": "(?i)^\\s*(END\\s*(PROC|PROCEDURE|FUNC|FUNCTION|TYPE|ENUM|SELECT|LOOP|IF|WHILE|FOR)\\b|END\\s*$|NEXT\\b|UNTIL\\b)"
+			"end": "(?i)^\\s*(END\\s*(PROC|PROCEDURE|FUNC|FUNCTION|TYPE|ENUM|SELECT|LOOP|IF|WHILE|FOR|FOREACH)\\b|END\\s*$|NEXT\\b|UNTIL\\b)"
 		}
 	},
 	"wordPattern": "(-?\\d*\\.\\d\\w*)|([^\\`\\~\\!\\@\\#\\%\\^\\&\\*\\(\\)\\-\\=\\+\\[\\{\\]\\}\\\\\\|\\;\\:\\'\\\"\\,\\.\\<\\>\\/\\?\\s]+)",
@@ -33,7 +33,7 @@
 			"flags": "i"
 		},
 		"decreaseIndentPattern": {
-			"pattern": "^\\s*(END\\s*(PROC|PROCEDURE|FUNC|FUNCTION|TYPE|ENUM|SELECT|LOOP|IF|WHILE|FOR)\\b|END\\s*$|NEXT\\b|UNTIL\\b|ELSE\\b|ELSEIF\\b|CASE\\b|DEFAULT\\b)",
+			"pattern": "^\\s*(END\\s*(PROC|PROCEDURE|FUNC|FUNCTION|TYPE|ENUM|SELECT|LOOP|IF|WHILE|FOR|FOREACH)\\b|END\\s*$|NEXT\\b|UNTIL\\b|ELSE\\b|ELSEIF\\b|CASE\\b|DEFAULT\\b)",
 			"flags": "i"
 		}
 	}
