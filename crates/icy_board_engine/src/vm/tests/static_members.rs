@@ -6,7 +6,7 @@ use super::{compile_errors, compile_errors_with_runtime, run_ppl};
 fn a_surface_is_made_by_its_own_type() {
     let output = run_ppl(
         r#"
-        Terminal.Gfx.Init(GFX_SIXEL, FALSE)
+        Terminal.Gfx.Init(GfxBackend.Sixel, FALSE)
         SURFACE s = Surface.New(4, 4)
         PrintLn s.Valid, " ", s.Width, "x", s.Height
         s.Clear(Rgb(0, 0, 0))
@@ -24,9 +24,9 @@ fn a_surface_is_made_by_its_own_type() {
 fn a_static_answers_the_same_as_the_global_it_replaces() {
     let output = run_ppl(
         r"
-        Terminal.Gfx.Init(GFX_SIXEL, FALSE)
+        Terminal.Gfx.Init(GfxBackend.Sixel, FALSE)
         SURFACE a = Surface.New(3, 2)
-        SURFACE b = NewSurface(3, 2)
+        SURFACE b = Surface.New(3, 2)
         PrintLn a.Width, a.Height, b.Width, b.Height
         PrintLn ERR().Code
         Terminal.Gfx.Shutdown()
@@ -40,7 +40,7 @@ fn a_static_answers_the_same_as_the_global_it_replaces() {
 fn a_static_reports_a_failure_the_same_way() {
     let output = run_ppl(
         r#"
-        Terminal.Gfx.Init(GFX_SIXEL, FALSE)
+        Terminal.Gfx.Init(GfxBackend.Sixel, FALSE)
         SURFACE missing = Surface.Load("missing.png")
         PrintLn missing.Valid, " ", ERR().Code
         Terminal.Gfx.Shutdown()
@@ -66,7 +66,7 @@ fn audio_is_loaded_through_its_own_type() {
 fn a_static_may_stand_in_a_chain() {
     let output = run_ppl(
         r"
-        Terminal.Gfx.Init(GFX_SIXEL, FALSE)
+        Terminal.Gfx.Init(GfxBackend.Sixel, FALSE)
         PrintLn Surface.New(6, 3).Width
         Surface.New(2, 2).Free()
         PrintLn ERR().Code
@@ -101,7 +101,7 @@ fn a_static_needs_runtime_402() {
 /// The surface constructors moved to the type, so the graphics session no longer has them.
 #[test]
 fn the_graphics_session_no_longer_makes_surfaces() {
-    let errors = compile_errors("SURFACE s = Terminal.Gfx.NewSurface(4, 4)");
+    let errors = compile_errors("SURFACE s = Terminal.Gfx.Surface.New(4, 4)");
     assert!(errors.iter().any(|error| error == "Member not found"), "{errors:?}");
 }
 
@@ -111,7 +111,7 @@ fn the_graphics_session_no_longer_makes_surfaces() {
 fn a_static_cannot_be_reached_through_a_value() {
     let errors = compile_errors(
         r"
-        Terminal.Gfx.Init(GFX_SIXEL, FALSE)
+        Terminal.Gfx.Init(GfxBackend.Sixel, FALSE)
         SURFACE s = Surface.New(2, 2)
         SURFACE other = s.New(4, 4)
         ",

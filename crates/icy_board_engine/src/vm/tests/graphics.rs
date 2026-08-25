@@ -1,18 +1,17 @@
 use std::fmt::Write as _;
 
-use super::{compile_errors_with_runtime, run_ppl};
+use super::{compile_errors, compile_errors_with_runtime, run_ppl};
 
 #[test]
 fn multimedia_apis_require_runtime_402() {
     for runtime in [400, 401] {
-        let errors = compile_errors_with_runtime("GfxInit GFX_SIXEL\nPRINTLN GfxBackend()", runtime);
-        assert!(errors.iter().any(|error| error == "GfxInit needs runtime 402"), "runtime {runtime}: {errors:?}");
+        let errors = compile_errors_with_runtime("Terminal.Gfx.Init(GfxBackend.Sixel)\nPRINTLN Terminal.Gfx.Backend", runtime);
         assert!(
-            errors.iter().any(|error| error == "GfxBackend needs runtime 402"),
+            errors.iter().any(|error| error.contains("Terminal needs runtime 402")),
             "runtime {runtime}: {errors:?}"
         );
     }
-    assert!(compile_errors_with_runtime("GfxInit GFX_SIXEL\nPRINTLN GfxBackend()", 402).is_empty());
+    assert!(compile_errors_with_runtime("Terminal.Gfx.Init(GfxBackend.Sixel)\nPRINTLN Terminal.Gfx.Backend", 402).is_empty());
 }
 
 #[test]
@@ -32,31 +31,24 @@ fn rgb_colors_pack_channels_and_clamp_components() {
 }
 
 #[test]
-fn reports_an_unavailable_backend_for_text_fallback() {
-    let output = run_ppl(
-        r"
-        PrintLn GfxBackend()
-        GfxInit 99
-        PrintLn GfxBackend()
-        ",
-    );
-
-    assert_eq!(output, "-1\n-1\n");
+fn a_backend_must_be_a_gfx_backend() {
+    let errors = compile_errors("Terminal.Gfx.Init(99)");
+    assert!(!errors.is_empty(), "a raw integer must not select a backend");
 }
 
 #[test]
 fn surface_status_reports_dimensions_and_errors() {
     let output = run_ppl(
         r#"
-        GfxInit GFX_SIXEL, FALSE
-        SURFACE s = NewSurface(12, 7)
+        Terminal.Gfx.Init(GfxBackend.Sixel, FALSE)
+        SURFACE s = Surface.New(12, 7)
         PrintLn s.Valid
         PrintLn s.Width
         PrintLn s.Height
         PrintLn ERR().Code
-        SURFACE missing = LoadSurface("missing.png")
+        SURFACE missing = Surface.Load("missing.png")
         PrintLn ERR().Code
-        GfxShutdown
+        Terminal.Gfx.Shutdown()
         "#,
     );
 
@@ -67,8 +59,8 @@ fn surface_status_reports_dimensions_and_errors() {
 fn drawing_and_pinning_report_specific_errors() {
     let output = run_ppl(
         r"
-        GfxInit GFX_SIXEL, FALSE
-        SURFACE s = NewSurface(2, 2)
+        Terminal.Gfx.Init(GfxBackend.Sixel, FALSE)
+        SURFACE s = Surface.New(2, 2)
         s.Free()
         s.Clear(0)
         PrintLn ERR().Code
@@ -84,11 +76,11 @@ fn drawing_and_pinning_report_specific_errors() {
 
 #[test]
 fn surface_count_is_bounded_and_freed_surfaces_can_be_reused() {
-    let mut source = String::from("GfxInit GFX_SIXEL, FALSE\nSURFACE first, extra\nfirst = NewSurface(1, 1)\n");
+    let mut source = String::from("Terminal.Gfx.Init(GfxBackend.Sixel, FALSE)\nSURFACE first, extra\nfirst = Surface.New(1, 1)\n");
     for _ in 1..256 {
-        let _ = writeln!(source, "extra = NewSurface(1, 1)");
+        let _ = writeln!(source, "extra = Surface.New(1, 1)");
     }
-    source.push_str("extra = NewSurface(1, 1)\nPRINTLN ERR().Code\nfirst.Free()\nextra = NewSurface(1, 1)\nPRINTLN ERR().Code\n");
+    source.push_str("extra = Surface.New(1, 1)\nPRINTLN ERR().Code\nfirst.Free()\nextra = Surface.New(1, 1)\nPRINTLN ERR().Code\n");
 
     assert_eq!(run_ppl(&source), "5\n0\n");
 }
@@ -97,11 +89,11 @@ fn surface_count_is_bounded_and_freed_surfaces_can_be_reused() {
 fn a_scaled_and_flipped_present_is_left_to_the_client() {
     let output = super::run_ppl_with_input(
         r"
-        GfxInit GFX_AUTO, FALSE
-        SURFACE s = NewSurface(8, 8)
+        Terminal.Gfx.Init(GfxBackend.Auto, FALSE)
+        SURFACE s = Surface.New(8, 8)
         s.Clear(4278190335)
         s.PresentRect(0, 0, 8, 8, 10, 20, 64, 32, GFX_FLIP_X)
-        GfxShutdown
+        Terminal.Gfx.Shutdown()
         ",
         JXL_TERMINAL,
     );
@@ -113,11 +105,11 @@ fn a_scaled_and_flipped_present_is_left_to_the_client() {
 fn jxl_rejects_non_integer_destination_scaling() {
     let output = super::run_ppl_with_input(
         r"
-        GfxInit GFX_AUTO, FALSE
-        SURFACE s = NewSurface(8, 8)
+        Terminal.Gfx.Init(GfxBackend.Auto, FALSE)
+        SURFACE s = Surface.New(8, 8)
         s.PresentRect(0, 0, 8, 8, 0, 0, 63, 32)
         PRINTLN ERR().Code
-        GfxShutdown
+        Terminal.Gfx.Shutdown()
         ",
         JXL_TERMINAL,
     );
@@ -130,11 +122,11 @@ fn jxl_rejects_non_integer_destination_scaling() {
 fn sixel_cannot_scale_and_says_so() {
     let output = run_ppl(
         r"
-        GfxInit GFX_SIXEL, FALSE
-        SURFACE s = NewSurface(8, 8)
+        Terminal.Gfx.Init(GfxBackend.Sixel, FALSE)
+        SURFACE s = Surface.New(8, 8)
         s.PresentRect(0, 0, 8, 8, 0, 0, 32, 32)
         PrintLn ERR().Code
-        GfxShutdown
+        Terminal.Gfx.Shutdown()
         ",
     );
 
@@ -145,8 +137,8 @@ fn sixel_cannot_scale_and_says_so() {
 fn a_surface_object_draws_and_reports_its_own_size() {
     let output = run_ppl(
         r#"
-        GfxInit GFX_SIXEL, FALSE
-        SURFACE s = NewSurface(4, 4)
+        Terminal.Gfx.Init(GfxBackend.Sixel, FALSE)
+        SURFACE s = Surface.New(4, 4)
         PrintLn s.Valid
         PrintLn s.Width, ",", s.Height
         s.Clear(Rgb(0, 0, 0))
@@ -156,7 +148,7 @@ fn a_surface_object_draws_and_reports_its_own_size() {
         PrintLn ERR().Code
         s.Free()
         PrintLn s.Valid
-        GfxShutdown
+        Terminal.Gfx.Shutdown()
         "#,
     );
 
@@ -168,14 +160,14 @@ fn a_surface_object_draws_and_reports_its_own_size() {
 fn get_pixel_reads_back_what_set_pixel_wrote() {
     let output = run_ppl(
         r#"
-        GfxInit GFX_SIXEL, FALSE
-        SURFACE s = NewSurface(4, 4)
+        Terminal.Gfx.Init(GfxBackend.Sixel, FALSE)
+        SURFACE s = Surface.New(4, 4)
         s.SetPixel(1, 1, Rgb(255, 0, 0))
         PrintLn s.GetPixel(1, 1) = Rgb(255, 0, 0)
         PrintLn s.GetPixel(2, 2)
         PrintLn s.GetPixel(9, 9)
         s.Free()
-        GfxShutdown
+        Terminal.Gfx.Shutdown()
         "#,
     );
 
@@ -186,13 +178,13 @@ fn get_pixel_reads_back_what_set_pixel_wrote() {
 fn a_surface_can_be_blitted_onto_another() {
     let output = run_ppl(
         r"
-        GfxInit GFX_SIXEL, FALSE
-        SURFACE back = NewSurface(8, 8)
-        SURFACE sprite = NewSurface(2, 2)
+        Terminal.Gfx.Init(GfxBackend.Sixel, FALSE)
+        SURFACE back = Surface.New(8, 8)
+        SURFACE sprite = Surface.New(2, 2)
         sprite.Clear(Rgb(255, 0, 0))
         back.Blit(sprite, 3, 3)
         PrintLn ERR().Code
-        GfxShutdown
+        Terminal.Gfx.Shutdown()
         ",
     );
 
@@ -203,27 +195,28 @@ fn a_surface_can_be_blitted_onto_another() {
 fn capability_and_geometry_queries_report_terminal_answers() {
     let output = super::run_ppl_with_input(
         r"
-        PrintLn GfxCaps()
-        PrintLn GfxCellWidth()
-        PrintLn GfxCellHeight()
-        PrintLn GfxScreenWidth()
-        PrintLn GfxScreenHeight()
+        Terminal.Gfx.Init(GfxBackend.Auto, FALSE)
+        PrintLn Terminal.Info.Sixel, Terminal.Info.Jxl, Terminal.Info.InlineGraphics, Terminal.Info.ClientBlit, Terminal.Info.PhysicalKeys
+        PrintLn Terminal.Info.CellWidth
+        PrintLn Terminal.Info.CellHeight
+        PrintLn Terminal.Info.ScreenWidth
+        PrintLn Terminal.Info.ScreenHeight
         ",
         b"\x1b[<1;4;7;8c\x1b[6;20;10t\x1b[4;600;800t\x1b[=1;1-n\x1b_SyncTERM:C;L\n\x1b\\",
     );
 
-    assert!(output.ends_with("35\n10\n20\n800\n600\n"), "{output:?}");
+    assert!(output.ends_with("11001\n10\n20\n800\n600\n"), "{output:?}");
 }
 
 #[test]
 fn pacing_requests_an_acknowledgement_after_presenting() {
     let output = super::run_ppl_with_input(
         r"
-        GfxInit GFX_SIXEL, FALSE
-        SURFACE s = NewSurface(2, 2)
-        GfxSetPacing 1
+        Terminal.Gfx.Init(GfxBackend.Sixel, FALSE)
+        SURFACE s = Surface.New(2, 2)
+        Terminal.Gfx.Pacing = TRUE
         s.Present()
-        GfxShutdown
+        Terminal.Gfx.Shutdown()
         ",
         b"\x1b[1;1R",
     );
@@ -235,9 +228,9 @@ fn pacing_requests_an_acknowledgement_after_presenting() {
 fn a_silent_terminal_has_no_automatic_graphics_backend() {
     let output = run_ppl(
         r"
-        GfxInit GFX_AUTO
-        PrintLn GfxBackend()
-        GfxShutdown
+        Terminal.Gfx.Init(GfxBackend.Auto)
+        PrintLn Terminal.Gfx.Backend
+        Terminal.Gfx.Shutdown()
         ",
     );
 
@@ -249,8 +242,8 @@ fn a_silent_terminal_has_no_automatic_graphics_backend() {
 fn a_silent_terminal_refuses_an_explicit_jpeg_xl_request() {
     let output = run_ppl(
         r"
-        GfxInit GFX_JXL
-        PrintLn GfxBackend()
+        Terminal.Gfx.Init(GfxBackend.Jxl)
+        PrintLn Terminal.Gfx.Backend
         ",
     );
 
@@ -261,9 +254,9 @@ fn a_silent_terminal_refuses_an_explicit_jpeg_xl_request() {
 fn asking_for_sixel_does_not_query_the_terminal() {
     let output = run_ppl(
         r"
-        GfxInit GFX_SIXEL
-        PrintLn GfxBackend()
-        GfxShutdown
+        Terminal.Gfx.Init(GfxBackend.Sixel)
+        PrintLn Terminal.Gfx.Backend
+        Terminal.Gfx.Shutdown()
         ",
     );
 
@@ -275,9 +268,9 @@ fn asking_for_sixel_does_not_query_the_terminal() {
 fn reports_the_selected_backend_after_initialization() {
     let output = run_ppl(
         r"
-        GfxInit GFX_SIXEL
-        PrintLn GfxBackend()
-        GfxShutdown
+        Terminal.Gfx.Init(GfxBackend.Sixel)
+        PrintLn Terminal.Gfx.Backend
+        Terminal.Gfx.Shutdown()
         ",
     );
 
@@ -288,9 +281,9 @@ fn reports_the_selected_backend_after_initialization() {
 fn creates_blits_and_presents_in_memory_surfaces() {
     let output = run_ppl(
         r"
-        GfxInit GFX_SIXEL
-        SURFACE back = NewSurface(4, 4)
-        SURFACE sprite = NewSurface(2, 2)
+        Terminal.Gfx.Init(GfxBackend.Sixel)
+        SURFACE back = Surface.New(4, 4)
+        SURFACE sprite = Surface.New(2, 2)
         back.Clear(255)
         sprite.Clear(4278190335)
         sprite.Rect(0, 0, 2, 2, 16711935)
@@ -299,7 +292,7 @@ fn creates_blits_and_presents_in_memory_surfaces() {
         back.FillRect(2, 2, 1, 1, 16711935)
         back.PresentRect(2, 2, 1, 1)
         sprite.Free()
-        GfxShutdown
+        Terminal.Gfx.Shutdown()
         ",
     );
 
@@ -313,12 +306,12 @@ fn inline_graphics_preserve_the_text_screen_and_cursor() {
     let output = run_ppl(
         r#"
         PrintLn "before"
-        GfxInit GFX_SIXEL, FALSE
-        SURFACE s = NewSurface(2, 2)
+        Terminal.Gfx.Init(GfxBackend.Sixel, FALSE)
+        SURFACE s = Surface.New(2, 2)
         s.Clear(4278190335)
         s.PresentAt(10, 3)
         s.Free()
-        GfxShutdown
+        Terminal.Gfx.Shutdown()
         PrintLn "after"
         "#,
     );
@@ -344,12 +337,12 @@ const BANNER: &[u8] = include_bytes!("../../../../../ppe/inline_gfx/banner.png")
 fn a_loaded_image_is_cached_once_and_drawn_by_name() {
     let output = super::run_ppl_with_files_and_input(
         r#"
-        GfxInit GFX_AUTO, FALSE
-        PrintLn GfxBackend()
-        SURFACE banner = LoadSurface("./banner.png")
+        Terminal.Gfx.Init(GfxBackend.Auto, FALSE)
+        PrintLn Terminal.Gfx.Backend
+        SURFACE banner = Surface.Load("./banner.png")
         banner.PresentAt(1, 1)
         banner.PresentAt(11, 3)
-        GfxShutdown
+        Terminal.Gfx.Shutdown()
         "#,
         &[("banner.png", BANNER)],
         JXL_TERMINAL,
@@ -369,12 +362,12 @@ fn a_loaded_image_is_cached_once_and_drawn_by_name() {
 fn a_pinned_image_uses_the_client_pixel_buffer_for_partial_blits() {
     let output = super::run_ppl_with_files_and_input(
         r#"
-        GfxInit GFX_AUTO, FALSE
-        SURFACE banner = LoadSurface("./banner.png")
+        Terminal.Gfx.Init(GfxBackend.Auto, FALSE)
+        SURFACE banner = Surface.Load("./banner.png")
         banner.Pin()
         banner.PresentRect(2, 3, 4, 5, 20, 30)
         banner.Unpin()
-        GfxShutdown
+        Terminal.Gfx.Shutdown()
         "#,
         &[("banner.png", BANNER)],
         JXL_TERMINAL,
@@ -388,12 +381,12 @@ fn a_pinned_image_uses_the_client_pixel_buffer_for_partial_blits() {
 fn drawing_on_a_pinned_surface_returns_to_normal_presentation() {
     let output = super::run_ppl_with_files_and_input(
         r#"
-        GfxInit GFX_AUTO, FALSE
-        SURFACE banner = LoadSurface("./banner.png")
+        Terminal.Gfx.Init(GfxBackend.Auto, FALSE)
+        SURFACE banner = Surface.Load("./banner.png")
         banner.Pin()
         banner.FillRect(0, 0, 1, 1, Rgb(255, 0, 0))
         banner.Present()
-        GfxShutdown
+        Terminal.Gfx.Shutdown()
         "#,
         &[("banner.png", BANNER)],
         JXL_TERMINAL,
@@ -408,13 +401,13 @@ fn drawing_on_a_pinned_surface_returns_to_normal_presentation() {
 fn a_composed_frame_goes_inline_instead_of_into_the_cache() {
     let output = super::run_ppl_with_input(
         r"
-        GfxInit GFX_AUTO, FALSE
-        SURFACE s = NewSurface(8, 8)
+        Terminal.Gfx.Init(GfxBackend.Auto, FALSE)
+        SURFACE s = Surface.New(8, 8)
         s.Clear(4278190335)
         s.Present()
         s.FillRect(2, 2, 2, 2, 16711935)
         s.PresentRect(2, 2, 2, 2)
-        GfxShutdown
+        Terminal.Gfx.Shutdown()
         ",
         JXL_TERMINAL,
     );
@@ -429,13 +422,13 @@ fn a_composed_frame_goes_inline_instead_of_into_the_cache() {
 fn a_terminal_without_inline_blobs_reuses_one_cache_name_per_surface() {
     let output = super::run_ppl_with_input(
         r"
-        GfxInit GFX_AUTO, FALSE
-        SURFACE s = NewSurface(8, 8)
+        Terminal.Gfx.Init(GfxBackend.Auto, FALSE)
+        SURFACE s = Surface.New(8, 8)
         s.Clear(4278190335)
         s.Present()
         s.Clear(16711935)
         s.Present()
-        GfxShutdown
+        Terminal.Gfx.Shutdown()
         ",
         OLD_JXL_TERMINAL,
     );
@@ -453,10 +446,10 @@ fn an_image_the_caller_already_cached_is_not_sent_again() {
 
     let output = super::run_ppl_with_files_and_input(
         r#"
-        GfxInit GFX_AUTO, FALSE
-        SURFACE banner = LoadSurface("./banner.png")
+        Terminal.Gfx.Init(GfxBackend.Auto, FALSE)
+        SURFACE banner = Surface.Load("./banner.png")
         banner.Present()
-        GfxShutdown
+        Terminal.Gfx.Shutdown()
         "#,
         &[("banner.png", BANNER)],
         &terminal,
@@ -486,7 +479,7 @@ fn gfx_cache_name(png: &[u8]) -> String {
 /// runs, not that it looks like anything at this size.
 fn fractal_source(backend: &str) -> String {
     include_str!("../../../../../ppe/fractal/src/fractal.pps")
-        .replace("GfxInit GFX_AUTO", &format!("GfxInit {backend}"))
+        .replace("Terminal.Gfx.Init(GfxBackend.Auto)", &format!("Terminal.Gfx.Init(GfxBackend.{backend})"))
         .replace("CONST INTEGER ZOOM_FRAMES = 10", "CONST INTEGER ZOOM_FRAMES = 1")
         .replace("    fracW = 160\n    fracH = 80", "    fracW = 16\n    fracH = 8")
         .replace("    fracW = 320\n    fracH = 160", "    fracW = 16\n    fracH = 8")
@@ -495,7 +488,7 @@ fn fractal_source(backend: &str) -> String {
 
 #[test]
 fn the_fractal_demo_asks_the_terminal_to_scale_its_small_surface() {
-    let output = super::run_ppl_with_input(&fractal_source("GFX_AUTO"), JXL_TERMINAL);
+    let output = super::run_ppl_with_input(&fractal_source("Auto"), JXL_TERMINAL);
 
     // 16x8 pixels of fractal covering the 64x32 the viewport scales it to.
     assert!(output.contains("SyncTERM:C;DrawJXLBlob;DX=0;DY=0;ZX=4;ZY=4;"), "{output:?}");
@@ -507,7 +500,7 @@ fn the_fractal_demo_asks_the_terminal_to_scale_its_small_surface() {
 
 #[test]
 fn the_fractal_demo_checks_for_input_without_presenting_partial_frames() {
-    let source = fractal_source("GFX_AUTO").replace("CONST INTEGER BAND = 10", "CONST INTEGER BAND = 2");
+    let source = fractal_source("Auto").replace("CONST INTEGER BAND = 10", "CONST INTEGER BAND = 2");
     let output = super::run_ppl_with_input(&source, &[JXL_TERMINAL, b"q"].concat());
 
     // The HUD is visible, but the interrupted Mandelbrot frame is never partially presented.
@@ -533,12 +526,12 @@ fn the_mandelbrot_shortcuts_answer_what_iterating_every_pixel_would() {
 
 #[test]
 fn the_fractal_demo_renders_at_native_size_when_the_terminal_cannot_scale() {
-    let output = run_ppl(&fractal_source("GFX_AUTO"));
+    let output = run_ppl(&fractal_source("Auto"));
 
     // No backend at all: the demo says so instead of drawing.
     assert!(output.contains("requires a graphics-capable terminal"), "{output:?}");
 
-    let output = run_ppl(&fractal_source("GFX_SIXEL"));
+    let output = run_ppl(&fractal_source("Sixel"));
     assert!(output.contains("\x1bP"), "{output:?}");
     assert!(output.contains("surfaces, per-pixel drawing"), "{output:?}");
 }
@@ -546,7 +539,7 @@ fn the_fractal_demo_renders_at_native_size_when_the_terminal_cannot_scale() {
 #[test]
 fn tetris_initializes_and_renders_without_leaking_call_frames() {
     let source = include_str!("../../../../../ppe/tetris/src/tetris.pps")
-        .replace("GfxInit GFX_AUTO", "GfxInit GFX_SIXEL")
+        .replace("Terminal.Gfx.Init(GfxBackend.Auto)", "Terminal.Gfx.Init(GfxBackend.Sixel)")
         .replace("running = TRUE", "running = FALSE")
         .replace("input \"Enter your name:\", name", "name = \"test\"");
     let output = super::run_ppl_with_files(
@@ -568,7 +561,7 @@ fn tetris_initializes_and_renders_without_leaking_call_frames() {
 #[test]
 fn tetris_flashes_a_completed_line_before_compacting_it() {
     let mut source = include_str!("../../../../../ppe/tetris/src/tetris.pps")
-        .replace("GfxInit GFX_AUTO", "GfxInit GFX_SIXEL")
+        .replace("Terminal.Gfx.Init(GfxBackend.Auto)", "Terminal.Gfx.Init(GfxBackend.Sixel)")
         .replace("running = TRUE", "running = FALSE")
         .replace("input \"Enter your name:\", name", "name = \"test\"");
     let mut completed_row = String::new();

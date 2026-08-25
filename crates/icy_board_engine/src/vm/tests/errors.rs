@@ -34,7 +34,7 @@ fn err_can_still_be_a_variable_name() {
 fn a_failed_operation_names_its_subsystem() {
     let output = run_ppl(
         r#"
-        LoadFont 43, "nope.fnt"
+        Terminal.Font.Load(43, "nope.fnt")
         PrintLn ERR().OK, " ", ERR().Kind, " ", ERR().Code
         "#,
     );
@@ -47,7 +47,7 @@ fn a_failed_operation_names_its_subsystem() {
 fn constants_name_the_codes() {
     let output = run_ppl(
         r#"
-        LoadFont 43, "nope.fnt"
+        Terminal.Font.Load(43, "nope.fnt")
         IF (ERR().Kind = ErrKind.Font & ERR().Code = ErrCode.Io) PrintLn "matched"
         "#,
     );
@@ -59,9 +59,9 @@ fn constants_name_the_codes() {
 fn a_later_success_clears_the_error() {
     let output = run_ppl(
         r#"
-        LoadFont 43, "nope.fnt"
+        Terminal.Font.Load(43, "nope.fnt")
         PrintLn ERR().OK
-        SetFont 0, 5
+        Terminal.Font.Set(0, 5)
         PrintLn ERR().OK
         "#,
     );
@@ -73,7 +73,7 @@ fn a_later_success_clears_the_error() {
 fn errclr_forgets_the_error() {
     let output = run_ppl(
         r#"
-        LoadFont 43, "nope.fnt"
+        Terminal.Font.Load(43, "nope.fnt")
         PrintLn ERR().OK
         ErrClr
         PrintLn ERR().OK, " ", ERR().Kind
@@ -88,9 +88,9 @@ fn the_error_can_be_kept_while_work_carries_on() {
     let output = run_ppl(
         r#"
         ERROR saved
-        LoadFont 43, "nope.fnt"
+        Terminal.Font.Load(43, "nope.fnt")
         saved = ERR()
-        SetFont 0, 5
+        Terminal.Font.Set(0, 5)
         PrintLn "now=", ERR().Code, " saved=", saved.Code
         "#,
     );
@@ -102,7 +102,7 @@ fn the_error_can_be_kept_while_work_carries_on() {
 fn a_message_describes_what_happened() {
     let output = run_ppl(
         r#"
-        LoadFont 43, "nope.fnt"
+        Terminal.Font.Load(43, "nope.fnt")
         PrintLn ERR().Message <> ""
         "#,
     );
@@ -116,7 +116,7 @@ fn on_error_goto_jumps_and_stays_there() {
         r#"
         ON ERROR GOTO Failed
         PrintLn "before"
-        LoadFont 43, "nope.fnt"
+        Terminal.Font.Load(43, "nope.fnt")
         PrintLn "not reached"
         EXIT
         :Failed
@@ -132,11 +132,11 @@ fn on_error_goto_is_disarmed_before_cleanup() {
     let output = run_ppl(
         r#"
         ON ERROR GOTO Failed
-        LoadFont 43, "first-missing.fnt"
+        Terminal.Font.Load(43, "first-missing.fnt")
         EXIT
         :Failed
         PrintLn "handled"
-        LoadFont 43, "second-missing.fnt"
+        Terminal.Font.Load(43, "second-missing.fnt")
         PrintLn "done"
         "#,
     );
@@ -149,11 +149,11 @@ fn a_goto_handler_can_arm_another_handler() {
     let output = run_ppl(
         r#"
         ON ERROR GOTO Failed
-        LoadFont 43, "first-missing.fnt"
+        Terminal.Font.Load(43, "first-missing.fnt")
         EXIT
         :Failed
         ON ERROR GOSUB Report
-        LoadFont 43, "second-missing.fnt"
+        Terminal.Font.Load(43, "second-missing.fnt")
         PrintLn "done"
         EXIT
         :Report
@@ -170,7 +170,7 @@ fn onerror_is_the_same_as_on_error() {
     let one_word = run_ppl(
         r#"
         ONERROR GOTO Failed
-        LoadFont 43, "nope.fnt"
+        Terminal.Font.Load(43, "nope.fnt")
         EXIT
         :Failed
         PrintLn "handled"
@@ -179,7 +179,7 @@ fn onerror_is_the_same_as_on_error() {
     let two_words = run_ppl(
         r#"
         ON ERROR GOTO Failed
-        LoadFont 43, "nope.fnt"
+        Terminal.Font.Load(43, "nope.fnt")
         EXIT
         :Failed
         PrintLn "handled"
@@ -195,7 +195,7 @@ fn on_error_gosub_comes_back() {
     let output = run_ppl(
         r#"
         ON ERROR GOSUB Failed
-        LoadFont 43, "nope.fnt"
+        Terminal.Font.Load(43, "nope.fnt")
         PrintLn "carried on"
         EXIT
         :Failed
@@ -213,7 +213,7 @@ fn on_error_calls_a_procedure_with_the_error() {
         r#"
         DECLARE PROCEDURE Report(ERROR e)
         ON ERROR Report
-        LoadFont 43, "nope.fnt"
+        Terminal.Font.Load(43, "nope.fnt")
         PrintLn "carried on"
         EXIT
 
@@ -232,7 +232,7 @@ fn a_handler_procedure_may_take_no_arguments() {
         r#"
         DECLARE PROCEDURE Report()
         ON ERROR Report
-        LoadFont 43, "nope.fnt"
+        Terminal.Font.Load(43, "nope.fnt")
         EXIT
 
         PROCEDURE Report()
@@ -264,9 +264,9 @@ fn on_error_off_stops_handling() {
     let output = run_ppl(
         r#"
         ON ERROR GOSUB Failed
-        LoadFont 43, "nope.fnt"
+        Terminal.Font.Load(43, "nope.fnt")
         ON ERROR OFF
-        LoadFont 43, "nope.fnt"
+        Terminal.Font.Load(43, "nope.fnt")
         PrintLn "done"
         EXIT
         :Failed
@@ -283,12 +283,12 @@ fn a_failure_inside_the_handler_does_not_call_it_again() {
     let output = run_ppl(
         r#"
         ON ERROR GOSUB Failed
-        LoadFont 43, "nope.fnt"
+        Terminal.Font.Load(43, "nope.fnt")
         PrintLn "carried on"
         EXIT
         :Failed
         PrintLn "handled"
-        LoadFont 43, "also-missing.fnt"
+        Terminal.Font.Load(43, "also-missing.fnt")
         RETURN
         "#,
     );
@@ -301,8 +301,8 @@ fn the_handler_runs_again_for_a_later_error() {
     let output = run_ppl(
         r#"
         ON ERROR GOSUB Failed
-        LoadFont 43, "nope.fnt"
-        LoadFont 43, "nope.fnt"
+        Terminal.Font.Load(43, "nope.fnt")
+        Terminal.Font.Load(43, "nope.fnt")
         PrintLn "done"
         EXIT
         :Failed
@@ -353,7 +353,7 @@ fn a_file_that_is_not_there_is_an_error() {
 fn a_successful_file_operation_clears_an_older_error() {
     let output = run_ppl_with_files_and_input(
         r#"
-        LoadFont 43, "missing.fnt"
+        Terminal.Font.Load(43, "missing.fnt")
         FOPEN 1, "present.txt", O_RD, S_DN
         PrintLn ERR().OK
         FCLOSE 1

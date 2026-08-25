@@ -342,7 +342,30 @@ impl FuncOpCode {
     }
 
     pub fn minimum_runtime(self) -> u16 {
-        if (self as i16) <= FuncOpCode::GfxBackend as i16 { 402 } else { 100 }
+        if matches!(
+            self,
+            FuncOpCode::GfxBackend
+                | FuncOpCode::Rgb
+                | FuncOpCode::RgbAlpha
+                | FuncOpCode::GfxCaps
+                | FuncOpCode::GfxCellWidth
+                | FuncOpCode::GfxCellHeight
+                | FuncOpCode::GfxScreenWidth
+                | FuncOpCode::GfxScreenHeight
+                | FuncOpCode::NewSurface
+                | FuncOpCode::LoadSurface
+                | FuncOpCode::LoadAudio
+                | FuncOpCode::TermState
+                | FuncOpCode::Err
+                | FuncOpCode::TermInfo
+                | FuncOpCode::TermInput
+                | FuncOpCode::Terminal
+                | FuncOpCode::StaticReceiver
+        ) {
+            402
+        } else {
+            100
+        }
     }
 }
 
@@ -362,6 +385,17 @@ pub struct FunctionDefinition {
     pub return_type: VariableType,
     pub signature: FunctionSignature,
     pub args: Option<Vec<ArgumentDefinition>>,
+}
+
+fn retired_function(opcode: FuncOpCode, parameters: usize) -> FunctionDefinition {
+    FunctionDefinition {
+        name: "<retired terminal function>",
+        version: 400,
+        opcode,
+        return_type: VariableType::None,
+        signature: FunctionSignature::FixedParameters(parameters),
+        args: None,
+    }
 }
 
 impl FunctionDefinition {
@@ -2990,14 +3024,7 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 330]> 
             args: Some(vec![ArgumentDefinition::new("value", VariableType::BigStr)]),
             signature: FunctionSignature::FixedParameters(1),
         },
-        FunctionDefinition {
-            name: "GfxBackend",
-            version: 400,
-            opcode: FuncOpCode::GfxBackend,
-            return_type: VariableType::Integer,
-            args: None,
-            signature: FunctionSignature::FixedParameters(0),
-        },
+        retired_function(FuncOpCode::GfxBackend, 0),
         FunctionDefinition {
             name: "Rgb",
             version: 400,
@@ -3023,81 +3050,15 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 330]> 
             ]),
             signature: FunctionSignature::FixedParameters(4),
         },
-        FunctionDefinition {
-            name: "GfxCaps",
-            version: 400,
-            opcode: FuncOpCode::GfxCaps,
-            return_type: VariableType::Unsigned,
-            args: None,
-            signature: FunctionSignature::FixedParameters(0),
-        },
-        FunctionDefinition {
-            name: "GfxCellWidth",
-            version: 400,
-            opcode: FuncOpCode::GfxCellWidth,
-            return_type: VariableType::Integer,
-            args: None,
-            signature: FunctionSignature::FixedParameters(0),
-        },
-        FunctionDefinition {
-            name: "GfxCellHeight",
-            version: 400,
-            opcode: FuncOpCode::GfxCellHeight,
-            return_type: VariableType::Integer,
-            args: None,
-            signature: FunctionSignature::FixedParameters(0),
-        },
-        FunctionDefinition {
-            name: "GfxScreenWidth",
-            version: 400,
-            opcode: FuncOpCode::GfxScreenWidth,
-            return_type: VariableType::Integer,
-            args: None,
-            signature: FunctionSignature::FixedParameters(0),
-        },
-        FunctionDefinition {
-            name: "GfxScreenHeight",
-            version: 400,
-            opcode: FuncOpCode::GfxScreenHeight,
-            return_type: VariableType::Integer,
-            args: None,
-            signature: FunctionSignature::FixedParameters(0),
-        },
-        FunctionDefinition {
-            name: "NewSurface",
-            version: 400,
-            opcode: FuncOpCode::NewSurface,
-            return_type: VariableType::UserData(35),
-            args: Some(vec![
-                ArgumentDefinition::new("Width", VariableType::Integer),
-                ArgumentDefinition::new("Height", VariableType::Integer),
-            ]),
-            signature: FunctionSignature::FixedParameters(2),
-        },
-        FunctionDefinition {
-            name: "LoadSurface",
-            version: 400,
-            opcode: FuncOpCode::LoadSurface,
-            return_type: VariableType::UserData(35),
-            args: Some(vec![ArgumentDefinition::new("FileName", VariableType::String)]),
-            signature: FunctionSignature::FixedParameters(1),
-        },
-        FunctionDefinition {
-            name: "LoadAudio",
-            version: 400,
-            opcode: FuncOpCode::LoadAudio,
-            return_type: VariableType::UserData(37),
-            args: Some(vec![ArgumentDefinition::new("FileName", VariableType::String)]),
-            signature: FunctionSignature::FixedParameters(1),
-        },
-        FunctionDefinition {
-            name: "TermState",
-            version: 400,
-            opcode: FuncOpCode::TermState,
-            return_type: VariableType::UserData(38),
-            args: None,
-            signature: FunctionSignature::FixedParameters(0),
-        },
+        retired_function(FuncOpCode::GfxCaps, 0),
+        retired_function(FuncOpCode::GfxCellWidth, 0),
+        retired_function(FuncOpCode::GfxCellHeight, 0),
+        retired_function(FuncOpCode::GfxScreenWidth, 0),
+        retired_function(FuncOpCode::GfxScreenHeight, 0),
+        retired_function(FuncOpCode::NewSurface, 2),
+        retired_function(FuncOpCode::LoadSurface, 1),
+        retired_function(FuncOpCode::LoadAudio, 1),
+        retired_function(FuncOpCode::TermState, 0),
         FunctionDefinition {
             name: "Err",
             version: 400,
@@ -3106,22 +3067,8 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 330]> 
             args: None,
             signature: FunctionSignature::FixedParameters(0),
         },
-        FunctionDefinition {
-            name: "TermInfo",
-            version: 400,
-            opcode: FuncOpCode::TermInfo,
-            return_type: VariableType::UserData(40),
-            args: None,
-            signature: FunctionSignature::FixedParameters(0),
-        },
-        FunctionDefinition {
-            name: "TermInput",
-            version: 400,
-            opcode: FuncOpCode::TermInput,
-            return_type: VariableType::UserData(41),
-            args: None,
-            signature: FunctionSignature::FixedParameters(0),
-        },
+        retired_function(FuncOpCode::TermInfo, 0),
+        retired_function(FuncOpCode::TermInput, 0),
         FunctionDefinition {
             name: "Terminal",
             version: 400,

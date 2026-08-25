@@ -44,11 +44,7 @@ impl UserData for PplMargins {
         registry.add_property(HAS_VERTICAL.clone(), VariableType::Boolean, false);
         registry.add_property(HAS_HORIZONTAL.clone(), VariableType::Boolean, false);
 
-        registry.add_function(
-            SET_VERTICAL.clone(),
-            vec![VariableType::Integer, VariableType::Integer],
-            VariableType::Boolean,
-        );
+        registry.add_function(SET_VERTICAL.clone(), vec![VariableType::Integer, VariableType::Integer], VariableType::Boolean);
         registry.add_function(
             SET_HORIZONTAL.clone(),
             vec![VariableType::Integer, VariableType::Integer],
@@ -102,14 +98,10 @@ impl UserDataValue for PplMargins {
 
         let integer = |index: usize| arguments.get(index).map_or(0, VariableValue::as_int);
         if *name == *SET_VERTICAL {
-            return Ok(VariableValue::new_bool(
-                procedures::margins_set_vertical(vm, integer(0), integer(1)).await?,
-            ));
+            return Ok(VariableValue::new_bool(procedures::margins_set_vertical(vm, integer(0), integer(1)).await?));
         }
         if *name == *SET_HORIZONTAL {
-            return Ok(VariableValue::new_bool(
-                procedures::margins_set_horizontal(vm, integer(0), integer(1)).await?,
-            ));
+            return Ok(VariableValue::new_bool(procedures::margins_set_horizontal(vm, integer(0), integer(1)).await?));
         }
         if *name == *RESET_VERTICAL {
             procedures::reset_v_margins(vm, &[]).await?;

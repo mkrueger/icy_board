@@ -292,22 +292,22 @@ pub async fn run_function(opcode: FuncOpCode, arg: &mut VirtualMachine<'_>, argu
         FuncOpCode::BASE64ENC => predefined_functions::base64enc(arg, arguments).await,
         FuncOpCode::BASE64DEC => predefined_functions::base64dec(arg, arguments).await,
         FuncOpCode::SHA256 => predefined_functions::sha256(arg, arguments).await,
-        FuncOpCode::GfxBackend => predefined_functions::gfxbackend(arg, arguments).await,
         FuncOpCode::Rgb | FuncOpCode::RgbAlpha => predefined_functions::rgb(arg, arguments).await,
-        FuncOpCode::GfxCaps => predefined_functions::gfxcaps(arg, arguments).await,
-        FuncOpCode::GfxCellWidth => predefined_functions::gfxcellwidth(arg, arguments).await,
-        FuncOpCode::GfxCellHeight => predefined_functions::gfxcellheight(arg, arguments).await,
-        FuncOpCode::GfxScreenWidth => predefined_functions::gfxscreenwidth(arg, arguments).await,
-        FuncOpCode::GfxScreenHeight => predefined_functions::gfxscreenheight(arg, arguments).await,
-        FuncOpCode::NewSurface => crate::vm::statements::predefined_procedures::new_surface(arg, arguments).await,
-        FuncOpCode::LoadSurface => crate::vm::statements::predefined_procedures::load_surface(arg, arguments).await,
-        FuncOpCode::LoadAudio => crate::vm::statements::predefined_procedures::load_audio(arg, arguments).await,
-        FuncOpCode::TermState => predefined_functions::termstate(arg, arguments).await,
         FuncOpCode::Err => predefined_functions::err(arg, arguments).await,
-        FuncOpCode::TermInfo => predefined_functions::terminfo(arg, arguments).await,
-        FuncOpCode::TermInput => predefined_functions::terminput(arg, arguments).await,
         FuncOpCode::Terminal => predefined_functions::terminal(arg, arguments).await,
         FuncOpCode::StaticReceiver => predefined_functions::static_receiver(arg, arguments).await,
+        FuncOpCode::GfxBackend
+        | FuncOpCode::GfxCaps
+        | FuncOpCode::GfxCellWidth
+        | FuncOpCode::GfxCellHeight
+        | FuncOpCode::GfxScreenWidth
+        | FuncOpCode::GfxScreenHeight
+        | FuncOpCode::NewSurface
+        | FuncOpCode::LoadSurface
+        | FuncOpCode::LoadAudio
+        | FuncOpCode::TermState
+        | FuncOpCode::TermInfo
+        | FuncOpCode::TermInput => Err(format!("terminal function opcode {opcode:?} was retired in runtime 4.02").into()),
         FuncOpCode::END
         | FuncOpCode::CPAR
         | FuncOpCode::UPLUS

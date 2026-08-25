@@ -8,6 +8,21 @@ releases.
 
 ## [Unreleased]
 
+### Changed
+
+- Replaced the experimental runtime 4.02 terminal globals with the `Terminal`
+  facade: `Info`, `Gfx`, `Input`, `Margins`, `Palette`, `Font`, `Macros` and
+  `Sound`, plus synchronized `BeginUpdate()`/`EndUpdate()` calls.
+- Moved resource construction to static type members (`Surface.New`,
+  `Surface.Load`, `Audio.Load`) and made graphics pacing a writable Boolean
+  property.
+- Replaced flat graphics, mouse, event and error constants with typed enums;
+  split overloaded event data into `Action`, `Channel` and `Dropped`, and
+  replaced raw button/modifier masks with Boolean properties.
+- Retired `TERMSTATE` and the draft flat runtime 4.02 statements/functions.
+  Numeric opcode slots remain reserved so older bytecode fails cleanly rather
+  than being interpreted as another operation.
+
 ### Added
 
 - `icbfile scan` now identifies archives that have no usable description and

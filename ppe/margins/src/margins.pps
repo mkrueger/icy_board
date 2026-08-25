@@ -40,8 +40,8 @@ running = TRUE
 
 CLS
 DrawFrame()
-SetVMargins VIEW_TOP, VIEW_BOTTOM
-SetHMargins VIEW_LEFT, VIEW_RIGHT
+Terminal.Margins.SetVertical(VIEW_TOP, VIEW_BOTTOM)
+Terminal.Margins.SetHorizontal(VIEW_LEFT, VIEW_RIGHT)
 DrawVisible()
 input = Terminal.Input
 input.MouseOn(MouseMode.Text, MouseTracking.Buttons)
@@ -97,7 +97,7 @@ WHILE (running) DO
 ENDWHILE
 
 input.Release()
-ResetMargins
+Terminal.Margins.Reset()
 COLOR @X07
 CLS
 PRINTLN "Selected: ", items[selected]

@@ -24,19 +24,17 @@ fn margins_report_the_region_they_were_given() {
     assert!(output.ends_with("00\n"), "{output:?}");
 }
 
-/// The old snapshot only ever held margins, so it is the margins that answer now.
 #[test]
-fn margins_answer_what_the_snapshot_used_to() {
+fn margins_answer_their_current_bounds() {
     let output = run_ppl(
-        r"
+        r#"
         Terminal.Margins.SetVertical(4, 23)
-        TERMSTATE state = TermState()
-        PrintLn state.MarginTop = Terminal.Margins.Top
-        PrintLn state.VerticalMargins = Terminal.Margins.HasVertical
-        ",
+        PrintLn Terminal.Margins.Top, "-", Terminal.Margins.Bottom
+        PrintLn Terminal.Margins.HasVertical
+        "#,
     );
 
-    assert!(output.ends_with("1\n1\n"), "{output:?}");
+    assert!(output.ends_with("4-23\n1\n"), "{output:?}");
 }
 
 #[test]
@@ -59,7 +57,7 @@ fn an_empty_region_is_refused_and_says_so() {
 /// right, so resetting one leaves the other standing.
 #[test]
 fn resetting_the_vertical_axis_keeps_the_horizontal_one() {
-    let through_the_object = run_ppl(
+    let output = run_ppl(
         r"
         Terminal.Margins.SetVertical(4, 23)
         Terminal.Margins.SetHorizontal(10, 70)
@@ -67,18 +65,8 @@ fn resetting_the_vertical_axis_keeps_the_horizontal_one() {
         PrintLn Terminal.Margins.HasVertical, Terminal.Margins.HasHorizontal
         ",
     );
-    let through_the_statements = run_ppl(
-        r"
-        SetVMargins 4, 23
-        SetHMargins 10, 70
-        ResetVMargins
-        TERMSTATE state = TermState()
-        PrintLn state.VerticalMargins, state.HorizontalMargins
-        ",
-    );
 
-    assert!(through_the_object.ends_with("01\n"), "{through_the_object:?}");
-    assert_eq!(through_the_object, through_the_statements);
+    assert!(output.ends_with("01\n"), "{output:?}");
 }
 
 /// Resetting the horizontal axis leaves the vertical one alone, which is what makes the
@@ -105,9 +93,9 @@ fn resetting_the_horizontal_axis_keeps_the_vertical_one() {
 fn a_horizontal_margin_does_not_outlive_the_ppe() {
     let output = run_ppl_with_cleanup(
         r"
-        SetHMargins 10, 70
-        SetVMargins 4, 23
-        ResetVMargins
+        Terminal.Margins.SetHorizontal(10, 70)
+        Terminal.Margins.SetVertical(4, 23)
+        Terminal.Margins.ResetVertical()
         ",
     );
 
@@ -120,9 +108,9 @@ fn a_horizontal_margin_does_not_outlive_the_ppe() {
 fn resetting_both_axes_leaves_nothing_for_cleanup_to_do() {
     let output = run_ppl_with_cleanup(
         r"
-        SetVMargins 4, 23
-        SetHMargins 10, 70
-        ResetMargins
+        Terminal.Margins.SetVertical(4, 23)
+        Terminal.Margins.SetHorizontal(10, 70)
+        Terminal.Margins.Reset()
         ",
     );
 

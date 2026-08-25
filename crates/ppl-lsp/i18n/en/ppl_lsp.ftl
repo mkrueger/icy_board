@@ -1105,23 +1105,11 @@ hint-function-instrr=
 hint-function-base64enc=Encodes the UTF-8 bytes of @1 as base64 text.
 hint-function-base64dec=Decodes base64 text in @1 as UTF-8. Characters outside the base64 alphabet are ignored.
 hint-function-sha256=Returns the lowercase hexadecimal SHA-256 digest of the UTF-8 bytes of @1.
-hint-function-gfx-api=Queries graphics backend, capability, surface, geometry or error state.
 hint-function-rgb=Packs red, green, blue and optional alpha components into an RGBA color.
-hint-function-sound-api=Queries SyncTERM audio capability, format support or channel state.
-hint-function-event-api=Creates the singleton TERMINPUT event stream. Poll and Wait return EVENT snapshots; Free restores classic input.
-hint-function-term-state=Returns an immutable TERMSTATE snapshot of the active text margins.
-hint-function-term-info=Returns an immutable TERMINFO snapshot of cached terminal identity, dimensions, encoding and capabilities without starting another probe.
-hint-function-terminal=The caller's terminal, and the way to everything that draws on it. The type name stands in for it, so Terminal.Info reads the same as Terminal().Info.
+hint-function-terminal=The caller's terminal and the root of graphics, input, margins, palette, fonts, macros, sound and cached capability information.
 hint-function-err=Returns an ERROR describing the last operation that could fail: OK, Kind, Code, Message and Channel.
 hint-statement-errclr=Forgets the last error, so ERR().OK is true again.
 hint-statement-on-error=ON ERROR GOTO label | GOSUB label | Procedure | OFF - where a failed operation sends the program.
-hint-statement-gfx-api=Creates, draws, presents or controls Sixel/JPEG XL graphics surfaces.
-hint-statement-sound-api=Preloads, plays, fades, stops or changes SyncTERM audio.
-hint-statement-margin-api=Sets or resets the terminal's independent vertical and horizontal text margins.
-hint-statement-font-api=Selects a terminal font for an attribute slot, or uploads a font file to the terminal.
-hint-statement-palette-api=Changes or restores terminal palette colors. SetPaletteColor accepts separate RGB components or a packed value from Rgb(); packed alpha is ignored.
-hint-statement-terminal-update-api=Begins or ends a nestable DEC synchronized-output update. Only the outer pair emits mode 2026 sequences.
-hint-statement-terminal-macro-api=Records, uploads, invokes, deletes or clears one of 64 terminal-resident DEC macros. Playback sends only DECINVM.
 hint-function-fdordaka=
     Returns the address this board answers to, as zone:net/node with the point
     appended when there is one, or an empty string when there is no such record

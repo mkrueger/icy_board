@@ -40,7 +40,7 @@ fn reads_a_table_pcboard_wrote() {
 fn a_successful_dbase_operation_clears_an_older_error_immediately() {
     let output = on_fixture(
         r#"
-        LoadFont 43, "missing.fnt"
+        Terminal.Font.Load(43, "missing.fnt")
         PRINTLN DOPEN(0, "PCBOARD", 0), ":", ERR().Code
         DCLOSE 0
         "#,

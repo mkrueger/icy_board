@@ -41,21 +41,21 @@ SURFACE game, ui
 
 CLS
 PRINTLN "Loading assets..."
-music = LoadAudio("./tetris_music.ogg")
-rotateSound = LoadAudio("./rotate.wav")
-lockSound = LoadAudio("./lock.wav")
-lineSound = LoadAudio("./line.wav")
-gameOverSound = LoadAudio("./gameover.wav")
+music = Audio.Load("./tetris_music.ogg")
+rotateSound = Audio.Load("./rotate.wav")
+lockSound = Audio.Load("./lock.wav")
+lineSound = Audio.Load("./line.wav")
+gameOverSound = Audio.Load("./gameover.wav")
 
-GfxInit GFX_AUTO
-IF GfxBackend() < 0 THEN
+Terminal.Gfx.Init(GfxBackend.Auto)
+IF Terminal.Gfx.Backend = GfxBackend.None THEN
     CLS
     PRINTLN "Tetris requires a graphics-capable terminal."
     EXIT
 ENDIF
 
-game = NewSurface(GAME_W, GAME_H)
-ui = LoadSurface("./ui.png")
+game = Surface.New(GAME_W, GAME_H)
+ui = Surface.Load("./ui.png")
 InitShapes()
 InitColors()
 ClearBoard()
@@ -155,7 +155,7 @@ ENDIF
 music.Stop()
 ui.Free()
 game.Free()
-GfxShutdown
+Terminal.Gfx.Shutdown()
 input.Release()
 CLS
 

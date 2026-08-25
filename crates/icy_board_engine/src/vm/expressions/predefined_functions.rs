@@ -2736,92 +2736,10 @@ pub async fn web_request(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<V
     }
 }
 
-pub async fn gfxbackend(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
-    let backend = vm
-        .icy_board_state
-        .ppl_graphics
-        .as_ref()
-        .map_or(crate::icy_board::state::ppl_graphics::GFX_BACKEND_NONE, |graphics| graphics.backend);
-    Ok(VariableValue::new_int(backend))
-}
-
-pub async fn gfxcaps(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
-    let capabilities = vm.icy_board_state.query_gfx_capabilities().await?;
-    let mut flags = u64::from(capabilities.sixel);
-    if capabilities.jxl {
-        flags |= 2;
-    }
-    if capabilities.inline_blobs() {
-        flags |= 4;
-    }
-    if capabilities.cterm_revision.is_some_and(|revision| revision >= 1330) {
-        flags |= 8;
-    }
-    if capabilities.cterm_revision.is_some_and(|revision| revision >= 1318) {
-        flags |= 16;
-    }
-    if capabilities.physical_keys {
-        flags |= 32;
-    }
-    if vm.icy_board_state.query_sound_available().await? {
-        flags |= 64;
-    }
-    Ok(VariableValue::new_unsigned(flags))
-}
-
 /// `ERR()` - what the last operation that can fail did.
 pub async fn err(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
     vm.publish_operation_result();
     Ok(vm.last_error.clone().value())
-}
-
-async fn gfx_surface_dimension(vm: &mut VirtualMachine<'_>, args: &[PPEExpr], width: bool) -> Res<VariableValue> {
-    let slot = vm.eval_expr(&args[0]).await?.as_int();
-    let value = vm
-        .icy_board_state
-        .ppl_graphics
-        .as_ref()
-        .and_then(|graphics| graphics.surfaces.get(&slot))
-        .map_or(0, |surface| if width { surface.width } else { surface.height });
-    Ok(VariableValue::new_int(value as i32))
-}
-
-pub async fn gfxvalid(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let slot = vm.eval_expr(&args[0]).await?.as_int();
-    let valid = vm
-        .icy_board_state
-        .ppl_graphics
-        .as_ref()
-        .is_some_and(|graphics| graphics.surfaces.contains_key(&slot));
-    Ok(VariableValue::new_bool(valid))
-}
-
-pub async fn gfxwidth(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    gfx_surface_dimension(vm, args, true).await
-}
-
-pub async fn gfxheight(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    gfx_surface_dimension(vm, args, false).await
-}
-
-pub async fn gfxcellwidth(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
-    let capabilities = vm.icy_board_state.query_gfx_capabilities().await?;
-    Ok(VariableValue::new_int(capabilities.cell_width))
-}
-
-pub async fn gfxcellheight(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
-    let capabilities = vm.icy_board_state.query_gfx_capabilities().await?;
-    Ok(VariableValue::new_int(capabilities.cell_height))
-}
-
-pub async fn gfxscreenwidth(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
-    let capabilities = vm.icy_board_state.query_gfx_capabilities().await?;
-    Ok(VariableValue::new_int(capabilities.screen_width))
-}
-
-pub async fn gfxscreenheight(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
-    let capabilities = vm.icy_board_state.query_gfx_capabilities().await?;
-    Ok(VariableValue::new_int(capabilities.screen_height))
 }
 
 pub async fn rgb(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -2835,29 +2753,6 @@ pub async fn rgb(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableV
     Ok(VariableValue::new_unsigned(u64::from(crate::icy_board::state::ppl_graphics::rgba_value(
         red, green, blue, alpha,
     ))))
-}
-
-pub async fn terminput(_vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(crate::icy_board::state::ppl_terminal_input::PplTerminalInput::value())
-}
-
-pub async fn termstate(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
-    let terminal = &vm.icy_board_state.display_screen().buffer.buffer.terminal_state;
-    let vertical = terminal.margins_top_bottom();
-    let horizontal = terminal.margins_left_right();
-    Ok(crate::icy_board::state::ppl_terminal_state::PplTerminalState {
-        margin_top: vertical.map_or(0, |(top, _)| top + 1),
-        margin_bottom: vertical.map_or(0, |(_, bottom)| bottom + 1),
-        margin_left: horizontal.map_or(0, |(left, _)| left + 1),
-        margin_right: horizontal.map_or(0, |(_, right)| right + 1),
-        horizontal_margins: horizontal.is_some(),
-        vertical_margins: vertical.is_some(),
-    }
-    .value())
-}
-
-pub async fn terminfo(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(crate::icy_board::state::ppl_terminal_info::PplTerminalInfo::from(&vm.icy_board_state.session.term_caps).value())
 }
 
 pub async fn terminal(_vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {

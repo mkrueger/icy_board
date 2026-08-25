@@ -6,7 +6,7 @@ fn graphics_mouse_reports_pixels() {
         r#"
         TERMINPUT input = Terminal.Input
         EVENT e
-        input.MouseOn(1)
+        input.MouseOn(MouseMode.Pixels)
         e = input.Poll()
         PrintLn e.Kind
         PrintLn e.Code

@@ -41,7 +41,7 @@ pub trait UserData: Sized + UserDataValue {
     const TYPE_NAME: &'static str;
 
     /// The zero-argument builtin that hands back the one instance of this object, which is
-    /// what lets the type name stand in for it: `TermInfo.Columns` means `TermInfo().Columns`.
+    /// what lets `Terminal.Info` start at the caller's one `Terminal` value.
     const INSTANCE_PROVIDER: Option<crate::executable::FuncOpCode> = None;
 
     /// What a static member is called on. It carries no state of its own; it is only

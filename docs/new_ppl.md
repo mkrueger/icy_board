@@ -159,386 +159,258 @@ below.
 
 ### Terminal multimedia
 
-Graphics use an in-memory RGBA surface model and select Sixel or SyncTERM JPEG
-XL at presentation time. `GFX_AUTO` probes the terminal and returns `GFX_NONE`
-when neither backend is advertised; `GFX_SIXEL` explicitly selects Sixel for
-terminals that cannot report capabilities. These APIs use PPL language 4.00
-syntax but require PPE runtime 4.02.
+Runtime 4.02 exposes terminal features through the `Terminal` object. The name
+stands for the caller's one terminal, so parentheses and a temporary variable
+are optional:
 
 ```PPL
-GfxInit GFX_AUTO
-IF GfxBackend() = GFX_NONE EXIT
+PRINTLN Terminal.Info.Program
+Terminal.BeginUpdate()
+DrawScreen()
+Terminal.EndUpdate()
+```
 
-SURFACE screen = NewSurface(640, 400)
+The root groups the session by responsibility:
+
+| Member | Purpose |
+| :--- | :--- |
+| `Info` | Cached identity, dimensions and capabilities |
+| `Gfx` | Graphics-session state and backend selection |
+| `Input` | Keyboard, physical-key and mouse events |
+| `Margins` | Vertical and horizontal scrolling regions |
+| `Palette` | The 16 DOS colours selected by `COLOR` |
+| `Font` | Terminal font selection and uploads |
+| `Macros` | Terminal-resident DEC macro slots |
+| `Sound` | Audio-session controls |
+| `BeginUpdate()`, `EndUpdate()` | Nestable synchronized output |
+
+All operations that can fail update [`ERR()`](#errors). A function returning a
+resource returns an invalid object on failure, so it is safe to inspect its
+`Valid` property before continuing.
+
+#### Graphics
+
+`Terminal.Gfx.Init(backend[, fullscreen])` starts a graphics session. `backend`
+is `GfxBackend.Auto`, `Sixel` or `Jxl`; `Auto` chooses the best capability in
+`Terminal.Info`. Fullscreen defaults to `TRUE`.
+
+```PPL
+IF !Terminal.Gfx.Init(GfxBackend.Auto) EXIT
+IF Terminal.Gfx.Backend = GfxBackend.None EXIT
+
+SURFACE screen = Surface.New(640, 400)
 screen.Clear(Rgb(20, 24, 32))
 screen.FillRect(20, 20, 100, 40, Rgb(255, 80, 40, 192))
 screen.Present()
-GfxShutdown
+Terminal.Gfx.Shutdown()
+```
+
+`Terminal.Gfx.Backend` reports the selected `GfxBackend`. `Pacing` is a writable
+`BOOLEAN`; when true, presentation waits for a terminal acknowledgement before
+sending another frame.
+
+```PPL
+Terminal.Gfx.Pacing = TRUE
 ```
 
 `Rgb(red, green, blue[, alpha])` returns packed `0xRRGGBBAA`; components clamp
-to 0 through 255 and alpha defaults to 255. It is a constant expression, so it
-can be used in `CONST` declarations. Large hexadecimal literals such as
-`0FF0000FFh` are also `UNSIGNED` and retain hexadecimal formatting.
+to 0 through 255 and alpha defaults to 255. It is a constant expression.
 
-A surface is a `SURFACE` object created by one of two functions:
+A surface is created by a static function on its type:
 
-| Function | Purpose |
+| Static function | Purpose |
 | :--- | :--- |
-| `NewSurface(width, height)` | Create a transparent surface |
-| `LoadSurface(file)` | Load PNG, JPEG XL or another supported image |
+| `Surface.New(width, height)` | Create a transparent surface |
+| `Surface.Load(file)` | Decode PNG, JPEG XL or another supported image |
 
-Both return an invalid surface on failure, so check [`ERR()`](#errors) or the `Valid`
-property. Everything else is a member of the surface itself:
+Surface members are:
 
 | Member | Purpose |
 | :--- | :--- |
 | `Width`, `Height`, `Valid` | Read-only status properties |
 | `Clear(color)` | Fill the whole surface |
-| `SetPixel(x, y, color)` | Set a single pixel |
-| `GetPixel(x, y)` | Read a single pixel back; out of bounds answers `0` |
-| `FillRect(x, y, w, h, color)`, `Rect(x, y, w, h, color)` | Draw packed RGBA colors |
-| `Blit(source, x, y)`, `BlitRect(source, sx, sy, w, h, x, y)` | Alpha-compose surfaces in memory |
-| `Present()` | Present the complete surface |
-| `PresentRect(sx, sy, w, h[, dx, dy[, dw, dh[, flip]]])` | Present a source rectangle at a pixel destination |
-| `PresentAt(column, row)` | Present at a text-cell position |
-| `Pin()`, `Unpin()` | Load/unload an immutable JXL surface in a SyncTERM client buffer |
+| `SetPixel(x, y, color)`, `GetPixel(x, y)` | Write or read one pixel |
+| `FillRect(x, y, w, h, color)`, `Rect(x, y, w, h, color)` | Draw packed RGBA colours |
+| `Blit(source, x, y)`, `BlitRect(source, sx, sy, w, h, x, y)` | Alpha-compose surfaces |
+| `Present()`, `PresentAt(column, row)` | Present the surface |
+| `PresentRect(sx, sy, w, h[, dx, dy[, dw, dh[, flip]]])` | Present a source rectangle |
+| `Pin()`, `Unpin()` | Load or release an immutable JXL client buffer |
 | `Free()` | Release the surface |
 
-The drawing and presentation members return a `BOOLEAN` that is `FALSE` when the
-operation failed, and they can also be used as bare statements. The remaining
-global statements control the session rather than a surface:
+`PresentRect` scaling and `GFX_FLIP_X`/`GFX_FLIP_Y` are JPEG XL features. Sixel
+reports `ErrCode.Unsupported` for them.
 
-| API | Purpose |
-| :--- | :--- |
-| `GfxSetPacing frames` | Enable DSR-acknowledged presentation when positive |
-| `GfxShutdown` | Release resources and restore terminal modes |
+Surfaces are limited to 2048 by 2048 pixels, 256 simultaneous surfaces and 64
+MiB of resident RGBA pixels. Source image files are limited to 32 MiB. Graphics
+and sound together may add at most 256 MiB of persistent media per connection.
 
-`GfxCaps` is a bitmask of
-`GFX_CAP_*` constants. `GfxCellWidth`, `GfxCellHeight`, `GfxScreenWidth` and
-`GfxScreenHeight` report probed pixel geometry. `Pin` uses at most the two
-client pixel buffers; drawing onto a pinned surface automatically invalidates
-its client copy.
+#### Sound
 
-Surfaces are limited to 2048 by 2048 pixels, 256 simultaneous surfaces and 64 MiB
-of resident RGBA pixels. Source image files are limited to 32 MiB and raster
-decoders receive the same dimension and allocation limits before decoding.
-Graphics and sound together may add at most 256 MiB of uniquely named persistent
-media during one connection. Changing frames that overwrite a surface cache
-entry do not consume that budget. Every graphics operation updates
-[`ERR()`](#errors), which reports the rest of the board the same way.
-
-`PresentRect` can hand the scaling and mirroring to the terminal: `dw` and
-`dh` give the destination size and `flip` combines `GFX_FLIP_X` and
-`GFX_FLIP_Y`. The frame still travels at its source size, so drawing a small
-surface enlarged costs the bandwidth of the small one. Both are options of the
-image APC, so they need the JPEG XL backend and report
-`ERR_UNSUPPORTED` on Sixel.
+`Audio.Load(file)` probes the format, uploads it to the caller's SyncTERM cache
+and takes an available channel. A cached file is not sent again.
 
 ```PPL
-; A 160x100 surface fills a 640x400 area without sending 640x400 pixels.
-screen.PresentRect(0, 0, 160, 100, 0, 0, 640, 400)
-```
-
-Sound is an `AUDIO` object. `LoadAudio(file)` probes the container/codec, uploads
-the file to the caller's per-board SyncTERM cache and takes an available channel
-for it. A file the caller already holds is not sent again, and the object gives
-its channel back when it is freed.
-
-```PPL
-AUDIO music = LoadAudio("music.opus")
+AUDIO music = Audio.Load("music.opus")
 IF music.Valid THEN
-	music.SetVolume(50)
-	music.Play(TRUE)
+    music.SetVolume(50)
+    music.Play(TRUE)
 ENDIF
 ```
 
 | Member | Purpose |
 | :--- | :--- |
-| `Valid`, `Playing`, `Volume`, `Channel` | Read-only status properties |
-| `Play([loop])` | Start the sound, looping when told to |
-| `Stop()` | Stop it and free the channel's mixer slot |
-| `SetVolume(percent)` | Set the volume, 0 through 100 |
-| `Fade(percent, milliseconds)` | Ride the volume to `percent` |
+| `Valid`, `Playing`, `Volume`, `Channel` | Read-only state |
+| `Play([loop])`, `Stop()` | Start or stop playback |
+| `SetVolume(percent)`, `Fade(percent, milliseconds)` | Change volume |
 | `Free()` | Give the channel back |
 
-An object that could not be loaded is `Valid = FALSE` and stays callable; why it
-failed is [`ERR()`](#errors)'s to tell. A sound that ends reports itself as an
-`EVENT_SOUND` event naming its channel, so a program waits for it rather than polling.
+A sound that ends produces `EventKind.Sound` with its channel in `Event.Channel`.
+`Terminal.Sound.StopAll()` flushes every channel the PPE started.
 
-`TermInput()` creates the connection's one `TERMINPUT` event stream. A second
-constructor stays invalid until the live object calls `Free()`. `Poll()` never
-blocks; `Wait(milliseconds)` blocks until an event arrives or its timeout
-expires. `Wait(0)` is equivalent to a poll and a negative timeout waits
-indefinitely while still servicing the session. Both return an immutable
-`EVENT` snapshot whose `Kind` is one of `EVENT_NONE`, `EVENT_KEY`,
-`EVENT_KEY_EDGE`, `EVENT_MOUSE`, `EVENT_OVERFLOW` or `EVENT_SOUND`.
+#### Input and events
+
+`Terminal.Input` is the caller's keyboard and mouse. Turning mouse or physical
+key reporting on takes that input over from classic `INPUT`/`InKey`; `Release()`
+stops those modes and gives it back. `Poll()` never blocks. `Wait(milliseconds)`
+waits for an event, with zero meaning poll and a negative value meaning no
+timeout.
 
 ```PPL
-TERMINPUT input = TermInput()
 EVENT event
+Terminal.Input.MouseOn(MouseMode.Pixels, MouseTracking.Drag)
+Terminal.Input.KeyboardOn()
 
-input.MouseOn(MOUSE_PIXELS, MOUSE_TRACK_DRAG)
-input.KeyboardOn()
-
-event = input.Wait(16)
-IF event.Kind = EVENT_KEY THEN
-	IF event.Text = "q" EXIT
-ELSEIF event.Kind = EVENT_KEY_EDGE THEN
-	PRINTLN event.Code, " ", event.Pressed
-ELSEIF event.Kind = EVENT_MOUSE THEN
-	PRINTLN event.Code, " ", event.X, ",", event.Y
+event = Terminal.Input.Wait(16)
+IF event.Kind = EventKind.Key THEN
+    IF event.Text = "q" EXIT
+ELSEIF event.Kind = EventKind.KeyEdge THEN
+    PRINTLN event.Code, " ", event.Pressed
+ELSEIF event.Kind = EventKind.Mouse THEN
+    PRINTLN event.Action, " ", event.X, ",", event.Y
 ENDIF
 
-input.Free()
+Terminal.Input.Release()
 ```
 
-The read-only fields describe that value:
+`MouseMode` is `Text` or `Pixels`. `MouseTracking` is `Buttons`, `Drag` or `All`.
+`MouseButton` is `None`, `Left`, `Middle`, `Right`, `WheelUp`, `WheelDown`,
+`WheelLeft` or `WheelRight`. `MouseAction` is `None`, `Press`, `Release`,
+`Motion` or `Wheel`.
+
+`Event.Kind` is an `EventKind`: `None`, `Key`, `KeyEdge`, `Mouse`, `Overflow` or
+`Sound`. Its read-only fields are:
 
 | Field | Meaning |
 | :--- | :--- |
-| `Kind` | One of the `EVENT_*` constants |
-| `Code` | Unicode value for `EVENT_KEY`, physical code for `EVENT_KEY_EDGE`, or `MOUSE_*` event kind for `EVENT_MOUSE` |
-| `Text` | The translated character for `EVENT_KEY`; empty for other event kinds |
-| `Pressed` | `TRUE` for a translated character, or the press/release state of a physical key edge |
-| `Repeated` | For physical edges, whether another press arrived before release; translated keys report `FALSE` |
-| `X`, `Y` | Mouse coordinates, in cells or pixels according to `input.MouseOn()` |
-| `Button` | Mouse button or wheel direction |
-| `Buttons` | Held-button mask using `MOUSE_BUTTON_LEFT`, `MOUSE_BUTTON_MIDDLE` and `MOUSE_BUTTON_RIGHT` |
-| `WheelX`, `WheelY` | Wheel movement; positive `WheelY` is up and negative is down |
-| `Modifiers` | Combined `EVENT_SHIFT`, `EVENT_ALT`, `EVENT_CTRL` and `EVENT_META` bits; the first three alias the mouse modifier values |
-| `Pixels` | Whether DEC 1016 pixel-coordinate mode was accepted; available even on `EVENT_NONE` |
-| `Time` | Monotonic milliseconds since the connection's event input state was created, sampled when the event is selected; an `EVENT_NONE` carries it too, so a poll that came back empty still reads the clock |
+| `Kind` | Event category |
+| `Code` | Unicode/named key code, or physical scan code for `KeyEdge` |
+| `Text` | Translated key text; empty for other kinds |
+| `Pressed`, `Repeated` | Key press/release state |
+| `Action`, `Button` | Typed mouse action and button |
+| `X`, `Y`, `Pixels`, `WheelX`, `WheelY` | Mouse position and wheel movement |
+| `LeftDown`, `MiddleDown`, `RightDown` | Held mouse buttons |
+| `Shift`, `Alt`, `Ctrl`, `Meta` | Active modifiers |
+| `Channel` | Finished sound channel, otherwise `-1` |
+| `Dropped` | Overflow count, otherwise zero |
+| `Time` | Monotonic connection time in milliseconds |
 
-Ordinary translated characters are always available. `EVENT_KEY_EDGE` requires
-`input.KeyboardOn()`; pass `TRUE` to suppress the corresponding translated
-characters. `input.KeyboardOff()` stops physical reports. `EVENT_MOUSE`
-requires `input.MouseOn()`; its optional second argument selects button-only,
-drag or all-motion tracking, and `input.MouseOff()` stops it. `EVENT_SOUND`
-needs nothing turned on: a sound that ends reports its channel in `Code`.
-`Free()` stops mouse and physical-key reporting, drops queued event state and
-returns ownership to classic `INPUT`/`InKey` reads. It does not discard classic
-type-ahead; use `KeyFlush` separately when that is wanted.
-
-ANSI cursor and navigation sequences are returned as one `EVENT_KEY`, with
-`Text` such as `"UP"`, `"HOME"` or `"PGDN"` and a named `KEY_*` value in
-`Code`. Printable input uses its Unicode value. `KEY_ESCAPE`, `KEY_ENTER`,
-`KEY_TAB`, `KEY_BACKSPACE` and `KEY_DELETE` name the common control values.
-Parameterized xterm sequences such as Ctrl+Up also populate `Modifiers`.
-Physical CTerm edges remain `EVENT_KEY_EDGE`, because their scan codes and
-press/release semantics are distinct from translated keys.
-
-Consecutive unconsumed mouse-motion reports are coalesced to the newest
-position. Press, release, wheel and key events remain ordered. If a bounded
-physical-key or mouse queue still overflows, the next event is
-`EVENT_OVERFLOW` and its `Code` is the number of discarded events.
-Horizontal wheel reports use `MOUSE_WHEEL_LEFT` and `MOUSE_WHEEL_RIGHT` in
-`Button` and a signed delta in `WheelX`.
-
-A frame-paced program needs no separate pacing statement: poll first so queued
-input is handled at once, then let `input.Wait()` be the one place the program
-blocks, with the time left in the frame as its timeout.
-
-```PPL
-UNSIGNED nextFrame
-TERMINPUT input = TermInput()
-EVENT e = input.Poll()
-nextFrame = e.Time + FRAME_MS
-
-WHILE running DO
-	e = input.Poll()
-	IF e.Kind = EVENT_NONE & e.Time < nextFrame THEN
-		e = input.Wait(nextFrame - e.Time)
-	ENDIF
-	IF e.Kind <> EVENT_NONE Handle(e)
-	IF e.Time >= nextFrame THEN
-		nextFrame = e.Time + FRAME_MS
-		Advance()
-	ENDIF
-ENDWHILE
-
-input.Free()
-```
-
-Input is answered as soon as it arrives rather than once per frame, and a fixed
-pause that should not end early is still `DELAY`.
-
-The outermost PPE always disables mouse/key modes, stops sound it started,
-releases graphics and restores cursor, wrapping, palette and Sixel scrolling
-state, including after `STOP` or an execution error.
+ANSI navigation keys use `KEY_UP`, `KEY_HOME`, `KEY_PAGE_DOWN` and the other
+`KEY_*` constants in `Code`. Printable input uses its Unicode value.
+Consecutive unconsumed mouse motion reports are coalesced; press, release, wheel
+and key events remain ordered.
 
 ### Terminal information
 
-`TermInfo()` returns an immutable `TERMINFO` snapshot of the terminal facts the
-board has already detected. It uses cached session data and never starts a new
-terminal probe.
+`Terminal.Info` is an immutable snapshot populated during connection setup. It
+never sends a new query when read.
 
 ```PPL
-TERMINFO term = TermInfo()
-
-PRINTLN term.Program, " ", term.Columns, "x", term.Rows
-IF term.InlineGraphics PRINTLN "Inline graphics available"
+PRINTLN Terminal.Info.Program, " ", Terminal.Info.Columns, "x", Terminal.Info.Rows
+IF Terminal.Info.InlineGraphics PRINTLN "Inline JPEG XL available"
 ```
 
 | Property | Meaning |
 | :--- | :--- |
-| `Program` | `IcyTerm`, `SyncTerm` or `Unknown` |
-| `DeviceAttrs` | Raw primary device-attributes reply, or an empty string |
-| `Columns`, `Rows` | Detected text dimensions |
-| `Utf8` | Whether UTF-8 cursor movement was detected |
-| `RipVersion` | Reported RIP version, or an empty string |
-| `CTermLevel` | Highest known CTerm-compatible protocol level, or zero |
-| `Sixel`, `Jxl`, `InlineGraphics` | Detected graphics capabilities |
-| `Sound`, `PhysicalKeys`, `SynchronizedOutput`, `TerminalMacros` | Detected audio, input and terminal-output capabilities |
+| `Program`, `DeviceAttrs`, `RipVersion`, `Utf8` | Terminal identity and encoding |
+| `Columns`, `Rows` | Text dimensions |
 | `CellWidth`, `CellHeight` | Cell dimensions in pixels |
-| `ScreenWidth`, `ScreenHeight` | Screen dimensions in pixels, or zero when unknown |
+| `ScreenWidth`, `ScreenHeight` | Screen dimensions in pixels, or zero |
+| `CTermLevel` | Highest known CTerm-compatible protocol level |
+| `Sixel`, `Jxl`, `InlineGraphics` | Graphics capabilities |
+| `PixelMouse`, `PhysicalKeys`, `ClientBlit` | Input and client-side drawing capabilities |
+| `Sound`, `SynchronizedOutput`, `TerminalMacros` | Output capabilities |
 
-`CTermLevel` encodes CTerm 1.332 as `1332`. IcyTerm reports the compatible
-level needed by the features it implements. Prefer named capability properties
-over comparing this number unless a PPE is experimenting with a newer protocol
-operation. `DeviceAttrs` is diagnostic data and may contain escape characters.
+Capability booleans mean confirmed support. Unknown optional DEC modes are still
+allowed to receive a standards-compliant request when an operation is tried.
 
 ### Synchronized output
 
-`BeginTerminalUpdate` and `EndTerminalUpdate` wrap a redraw in DEC synchronized
-output mode 2026. Calls may nest; only the outer pair emits `CSI ? 2026 h` and
-`CSI ? 2026 l`.
-
-```PPL
-BeginTerminalUpdate
-CLS
-DrawScreen()
-EndTerminalUpdate
-```
-
-If the terminal explicitly reports that mode 2026 is unsupported, or the
-session is not using ANSI, `BeginTerminalUpdate` reports `ERR_UNAVAILABLE` with
-`ERR_KIND_TERM`. An unknown terminal is allowed to receive the sequences.
-Ending an inactive update reports `ERR_INVALID`. The outermost PPE always ends
-an update left active by `STOP`, `EXIT` or an execution error.
+`Terminal.BeginUpdate()` and `Terminal.EndUpdate()` wrap a redraw in DEC mode
+2026. Calls may nest; only the outer pair emits terminal sequences. Ending an
+inactive update reports `ErrCode.Invalid`. Cleanup ends an update left active by
+`STOP`, `EXIT` or an execution error.
 
 ### Terminal output macros
 
-Terminal macros record expanded PPL display output into one of the terminal's
-64 DEC macro slots. Recorded output is suppressed until `EndMacro` uploads it
-with DECDMAC; `PlayMacro` then sends only the short DECINVM sequence.
+`Terminal.Macros` manages 64 DEC macro slots numbered 0 through 63:
 
 ```PPL
-RecordMacro 0
+Terminal.Macros.Record(0)
 COLOR @X1F
 PRINT "Reusable heading"
-EndMacro
-
-PlayMacro 0
-DeleteMacro 0
-ClearMacros
+Terminal.Macros.End()
+Terminal.Macros.Play(0)
+Terminal.Macros.Delete(0)
 ```
 
-Slots are numbered 0 through 63. Macro definitions use hex encoding, so they
-can contain arbitrary ANSI, OSC, DCS, UTF-8 and control bytes. Caller and sysop
-definitions are encoded separately, preserving each endpoint's character
-encoding. A macro may invoke another completed macro while being recorded,
-allowing native DEC macros to be composed.
-
-Starting a second recording, ending no recording, playing an empty slot or
-using an invalid slot reports `ERR_INVALID` with `ERR_KIND_TERM`. A definition
-larger than 512 KiB reports `ERR_LIMIT`. If macro support is explicitly denied,
-`RecordMacro` reports `ERR_UNAVAILABLE`; unknown terminals are allowed to
-receive the standard DEC sequences.
-
-An unfinished recording is uploaded and invoked during outermost PPE cleanup
-so output cannot disappear. Icy Board then deletes only the DEC macro slots the
-PPE defined and releases its local slot state. The
-[`dec_macros` PPE](../ppe/dec_macros/src/dec_macros.pps) composes a panel from a
-reusable divider macro and places it twice inside one synchronized update.
+`Recording` and `Available` are read-only properties. `Clear()` deletes every
+slot this PPE defined. Definitions use hex encoding and may contain arbitrary
+ANSI, OSC, DCS, UTF-8 and control bytes. A completed macro may be played while
+another is recorded. Cleanup finishes an open recording, plays it so output is
+not lost, and removes the PPE's definitions.
 
 ### Text margins
 
-Text margins expose ANSI's independent vertical and horizontal scrolling
-regions. Coordinates are 1-based and inclusive, like `ANSIPOS`.
+`Terminal.Margins` exposes DEC's independent vertical and horizontal regions.
+Coordinates are 1-based and inclusive.
 
 ```PPL
-SetVMargins 5, 18
-SetHMargins 18, 63
-
-TERMSTATE state = TermState()
-IF state.VerticalMargins PRINTLN state.MarginTop, "-", state.MarginBottom
-IF state.HorizontalMargins PRINTLN state.MarginLeft, "-", state.MarginRight
-
-ResetVMargins
-ResetHMargins
-; ResetMargins resets both axes at once.
+Terminal.Margins.SetVertical(5, 18)
+Terminal.Margins.SetHorizontal(18, 63)
+PRINTLN Terminal.Margins.Top, "-", Terminal.Margins.Bottom
+Terminal.Margins.Reset()
 ```
 
-`TermState()` returns an immutable snapshot with `MarginTop`, `MarginBottom`,
-`MarginLeft`, `MarginRight`, `VerticalMargins` and `HorizontalMargins`. An
-inactive axis reports zero bounds and a `FALSE` flag. The flags describe the
-margins this session asked for, not a capability the terminal confirmed, so a
-client that ignores `DECLRMM` still reports `HorizontalMargins` as `TRUE`.
-
-Bounds are 1-based and the low bound must be smaller than the high one; an
-empty or out-of-range region is ignored. Sessions without ANSI, including
-AVATAR and plain ASCII, ignore all five statements rather than printing the
-escape sequence as text. The
-[`margins` PPE](../ppe/margins/src/margins.pps) demonstrates a bordered list
-that uses the region for efficient keyboard, click and mouse-wheel scrolling.
+`Top`, `Bottom`, `Left`, `Right`, `HasVertical` and `HasHorizontal` report the
+current virtual-screen state. `ResetVertical()` and `ResetHorizontal()` reset one
+axis; `Reset()` restores both. PPE cleanup independently remembers whether the
+PPE changed margins, so a caller is restored even if the virtual screen and
+physical terminal disagree.
 
 ### Fonts
 
-`SetFont` picks one of the terminal's fonts, `LoadFont` uploads one of your own.
+`Terminal.Font.Set(slot, font)` selects a font for attribute class 0 through 3.
+`SetAll(font)` selects it for every class. `Load(font, file)` uploads PSF1, PSF2,
+YAFF or size-recognised raw data into writable font numbers 43 through 255.
 
 ```PPL
-SetFont 0, 5                    ; font 5 wherever the normal attribute applies
-LoadFont 43, "topaz.psf"
-IF (ERR().OK) SetFont FONT_ALL, 43
+Terminal.Font.Load(43, "topaz.psf")
+IF ERR().OK Terminal.Font.SetAll(43)
 ```
-
-Font numbers 0 to 42 are the terminal's built-in fonts and are read-only:
-`LoadFont` accepts 43 to 255 and answers `ERR_INVALID` below that,
-rather than sending an upload the terminal would silently discard. `SetFont`
-selects any font, built-in or uploaded. `LoadFont` reads PSF1, PSF2, YAFF and
-raw files, and a raw file is recognised by its size alone: 256 glyphs of equal
-height.
-
-The slot is one of the four attribute classes a terminal keeps a font for,
-numbered 0 to 3. Four fonts can therefore be on screen at once, picked per
-character by its attribute. Slot `FONT_ALL` binds every class at once, which is
-what changing *the* font means: otherwise a colour bright enough to count as
-bold picks a different typeface. The
-[`fonts` PPE](../ppe/fonts/src/fonts.pps) browses the built-in fonts and four
-uploaded ones.
-
-Both statements report through [`ERR()`](#errors). Sessions without ANSI send
-nothing and answer `ERR_UNAVAILABLE`, so the `ERR().OK` guard above skips the
-`SetFont` rather than acting on an older statement's result. A font a PPE
-selects stays selected after the PPE ends, since changing the board font may be
-the point of running it.
 
 ### Palette colors
 
-`SetPaletteColor` changes one of the 16 DOS colors used by `COLOR`. It accepts
-either separate RGB components or the packed `UNSIGNED` value returned by
-`Rgb()`. The alpha component of a packed color is ignored.
+`Terminal.Palette` changes the 16 DOS colours used by `COLOR`:
 
 ```PPL
-SetPaletteColor 1, 0, 64, 255
-SetPaletteColor 1, Rgb(0, 64, 255)
-SetPaletteColor 1, Rgb(0, 64, 255, 32) ; alpha is ignored
-
-ResetPaletteColor 1
-ResetPalette
+Terminal.Palette.Set(1, Rgb(0, 64, 255))
+Terminal.Palette.SetRgb(1, 0, 64, 255)
+Terminal.Palette.Reset(1)
+Terminal.Palette.ResetAll()
 ```
 
-Colors use DOS numbering, so changing color 1 changes the blue selected by
-`COLOR 1`; the runtime maps it to the terminal's ANSI palette slot. Color
-numbers must be 0 through 15 and separate RGB components must be 0 through
-255. `ResetPaletteColor` restores one entry, while `ResetPalette` asks the
-terminal to restore its complete palette.
-
-These statements use OSC 4 and OSC 104. They report `ERR_INVALID` with
-`ERR_KIND_GFX` for invalid values and `ERR_UNAVAILABLE` when ANSI output is not
-available. The [`palette` PPE](../ppe/palette/src/palette.pps) demonstrates a
-fade by changing the palette underneath text that is already on screen.
+Packed alpha is ignored. Invalid colour numbers or components report
+`ErrCode.Invalid`; sessions without ANSI report `ErrCode.Unavailable`.
 
 ### Errors
 
@@ -547,7 +419,7 @@ It reads the same whichever part of the board failed, so one piece of code can
 handle a file, a font, a sound or a picture going wrong.
 
 ```PPL
-LoadFont 43, "topaz.psf"
+Terminal.Font.Load(43, "topaz.psf")
 IF (!ERR().OK) THEN
 	PrintLn "Sorry: ", ERR().Message
 ENDIF
@@ -556,16 +428,14 @@ ENDIF
 | Member | Purpose |
 | :--- | :--- |
 | `OK` | `TRUE` while nothing has gone wrong |
-| `Kind` | Which part of the board failed, an `ERR_KIND_*` constant |
-| `Code` | What went wrong, an `ERR_*` constant |
+| `Kind` | Which part failed, as an `ErrKind` |
+| `Code` | What went wrong, as an `ErrCode` |
 | `Message` | Informational English text, meant for a log rather than control flow |
 | `Channel` | The file, dBase or sound channel, `-1` when the error has none |
 
-`Kind` is one of `ERR_KIND_NONE`, `ERR_KIND_FILE`, `ERR_KIND_DBASE`,
-`ERR_KIND_STACK`, `ERR_KIND_GFX`, `ERR_KIND_FONT`, `ERR_KIND_SOUND` or
-`ERR_KIND_TERM`. `Code` is
-one of `ERR_OK`, `ERR_UNAVAILABLE`, `ERR_INVALID`, `ERR_IO`, `ERR_FORMAT`,
-`ERR_LIMIT`, `ERR_UNSUPPORTED` or `ERR_STACK`.
+`ErrKind` is `None`, `File`, `DBase`, `Stack`, `Gfx`, `Font`, `Sound` or
+`Term`. `ErrCode` is `Ok`, `Unavailable`, `Invalid`, `Io`, `Format`, `Limit`,
+`Unsupported` or `Stack`.
 
 Use `Kind` and `Code` when a PPE has to make a decision. `Message` may include
 paths and operating-system text, and its wording may change between releases.
@@ -600,7 +470,7 @@ before the jump because its cleanup path has no natural return boundary.
 DECLARE PROCEDURE Complain(ERROR e)
 
 ON ERROR Complain
-LoadFont 43, "topaz.psf"
+Terminal.Font.Load(43, "topaz.psf")
 PrintLn "still running"
 
 PROCEDURE Complain(ERROR e)

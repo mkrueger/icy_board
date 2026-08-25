@@ -283,7 +283,6 @@ pub const CONTACT_ID: usize = 34;
 pub const SURFACE_ID: usize = 35;
 pub const EVENT_ID: usize = 36;
 pub const AUDIO_ID: usize = 37;
-pub const TERM_STATE_ID: usize = 38;
 pub const ERROR_ID: usize = 39;
 pub const TERM_INFO_ID: usize = 40;
 pub const TERM_INPUT_ID: usize = 41;
@@ -348,7 +347,6 @@ impl UserTypeRegistry {
         reg.register::<crate::icy_board::state::ppl_surface::PplSurface>(SURFACE_ID);
         reg.register::<crate::icy_board::state::ppl_events::PplEvent>(EVENT_ID);
         reg.register::<crate::icy_board::state::ppl_audio::PplAudio>(AUDIO_ID);
-        reg.register::<crate::icy_board::state::ppl_terminal_state::PplTerminalState>(TERM_STATE_ID);
         reg.register::<crate::icy_board::state::ppl_error::PplError>(ERROR_ID);
         reg.register::<crate::icy_board::state::ppl_terminal_info::PplTerminalInfo>(TERM_INFO_ID);
         reg.register::<crate::icy_board::state::ppl_terminal_input::PplTerminalInput>(TERM_INPUT_ID);
@@ -481,16 +479,8 @@ impl UserTypeRegistry {
             ],
         );
         self.register_enum(MOUSE_MODE_ENUM_ID, "MouseMode", &[("Text", 0), ("Pixels", 1)]);
-        self.register_enum(
-            MOUSE_TRACKING_ENUM_ID,
-            "MouseTracking",
-            &[("Buttons", 0), ("Drag", 1), ("All", 2)],
-        );
-        self.register_enum(
-            GFX_BACKEND_ENUM_ID,
-            "GfxBackend",
-            &[("None", -1), ("Auto", 0), ("Sixel", 2), ("Jxl", 3)],
-        );
+        self.register_enum(MOUSE_TRACKING_ENUM_ID, "MouseTracking", &[("Buttons", 0), ("Drag", 1), ("All", 2)]);
+        self.register_enum(GFX_BACKEND_ENUM_ID, "GfxBackend", &[("None", -1), ("Auto", 0), ("Sixel", 2), ("Jxl", 3)]);
         self.register_enum(
             ERR_KIND_ENUM_ID,
             "ErrKind",

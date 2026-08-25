@@ -16,9 +16,8 @@ use crate::{
     compiler::{CompilationErrorType, CompilationWarningType, user_data::UserDataMemberRegistry, workspace::Workspace},
     executable::{
         EntryType, FIRST_RECORD_LITERAL_RUNTIME, FIRST_ROUTINE_REFERENCE_RUNTIME, FIRST_STATIC_MEMBER_RUNTIME, FIRST_TYPE_TABLE_RUNTIME, FUNCTION_DEFINITIONS,
-        FuncOpCode,
-        FunctionDefinition, FunctionValue, GenericVariableData, OpCode, ProcedureValue, TableEntry, USER_VARIABLES, VarHeader, VariableData, VariableTable,
-        VariableType, VariableValue,
+        FuncOpCode, FunctionDefinition, FunctionValue, GenericVariableData, OpCode, ProcedureValue, TableEntry, USER_VARIABLES, VarHeader, VariableData,
+        VariableTable, VariableType, VariableValue,
     },
     parser::{
         self, ErrorReporter, FIRST_BOARD_OBJECT_LANGUAGE_VERSION, ParserErrorType, UserTypeRegistry,
@@ -1160,12 +1159,27 @@ impl SemanticVisitor {
         definition.field_type(index).unwrap_or(VariableType::None)
     }
 
-    /// Looks a callable member up on a board object, as `(member id, required, parameters, return type)`.
-    fn member_function_signature(&self, user_type: u8, name: &unicase::Ascii<String>) -> Option<(usize, usize, usize, VariableType)> {
+    /// Looks a callable member up on a board object.
+    fn member_function_signature(&self, user_type: u8, name: &unicase::Ascii<String>) -> Option<(usize, usize, Vec<VariableType>, VariableType)> {
         let registry = self.type_registry.get_type_from_id(user_type)?;
         let function = registry.functions.get(name)?;
         let member_id = registry.get_member_id(name)?;
-        Some((member_id, function.required, function.parameters.len(), function.return_type))
+        Some((member_id, function.required, function.parameters.clone(), function.return_type))
+    }
+
+    fn check_member_arg_types(&mut self, expected: &[VariableType], arguments: &[Expression]) {
+        for (index, (argument, expected)) in arguments.iter().zip(expected).enumerate() {
+            let actual = argument.visit(self);
+            if *expected != actual && (matches!(expected, VariableType::UserData(_)) || matches!(actual, VariableType::UserData(_))) {
+                self.errors.lock().unwrap().report_error(
+                    argument.get_span(),
+                    CompilationErrorType::ArgumentTypeMismatch(index + 1, self.source_type_name(*expected), self.source_type_name(actual)),
+                );
+            }
+        }
+        for argument in arguments.iter().skip(expected.len()) {
+            argument.visit(self);
+        }
     }
 
     /// A board object's type name standing in for something with members: the type's own
@@ -1845,13 +1859,14 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             };
             // A record field indexed like `rec.field(1)` is not a member call; the variable path below takes it.
             if self.type_registry.get_type_from_id(user_type).is_some() {
-                for argument in call.get_arguments() {
-                    argument.visit(self);
-                }
                 if let Some((member_id, required, parameters, return_type)) = self.member_function_signature(user_type, member.get_identifier()) {
-                    self.check_expr_arg_range(required, parameters, call.get_arguments().len(), call.get_expression());
+                    self.check_expr_arg_range(required, parameters.len(), call.get_arguments().len(), call.get_expression());
+                    self.check_member_arg_types(&parameters, call.get_arguments());
                     self.function_type_lookup.insert(call.id, SemanticInfo::MemberFunctionCall(member_id));
                     return return_type;
+                }
+                for argument in call.get_arguments() {
+                    argument.visit(self);
                 }
                 self.errors.lock().unwrap().report_error(
                     member.get_identifier_token().span.clone(),
@@ -2118,16 +2133,25 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                                 break;
                             };
                             let Some(registry) = self.type_registry.get_type_from_id(type_id) else {
-                                self.errors.lock().unwrap().report_error(member_token.span.clone(), CompilationErrorType::InvalidLetVariable);
+                                self.errors
+                                    .lock()
+                                    .unwrap()
+                                    .report_error(member_token.span.clone(), CompilationErrorType::InvalidLetVariable);
                                 break;
                             };
                             let Some(member_id) = registry.get_member_id(member) else {
-                                self.errors.lock().unwrap().report_error(member_token.span.clone(), CompilationErrorType::InvalidLetVariable);
+                                self.errors
+                                    .lock()
+                                    .unwrap()
+                                    .report_error(member_token.span.clone(), CompilationErrorType::InvalidLetVariable);
                                 break;
                             };
                             let is_last = position + 1 == let_stmt.get_members().len();
                             if is_last && !matches!(registry.id_table.get(member_id), Some(crate::compiler::user_data::UserDataEntry::Field(_))) {
-                                self.errors.lock().unwrap().report_error(member_token.span.clone(), CompilationErrorType::InvalidLetVariable);
+                                self.errors
+                                    .lock()
+                                    .unwrap()
+                                    .report_error(member_token.span.clone(), CompilationErrorType::InvalidLetVariable);
                                 break;
                             }
                             self.user_type_lookup.insert(member_token.span.start, type_id);
@@ -2154,7 +2178,10 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 return VariableType::None;
             };
             let Some(provider) = self.type_registry.get_type_from_id(type_id).and_then(|registry| registry.instance_provider) else {
-                self.errors.lock().unwrap().report_error(let_stmt.get_identifier_token().span.clone(), CompilationErrorType::InvalidLetVariable);
+                self.errors
+                    .lock()
+                    .unwrap()
+                    .report_error(let_stmt.get_identifier_token().span.clone(), CompilationErrorType::InvalidLetVariable);
                 return VariableType::None;
             };
             self.instance_provider_lookup.insert(let_stmt.get_identifier_token().span.start, provider);
@@ -2163,16 +2190,25 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                     return VariableType::None;
                 };
                 let Some(registry) = self.type_registry.get_type_from_id(type_id) else {
-                    self.errors.lock().unwrap().report_error(member_token.span.clone(), CompilationErrorType::InvalidLetVariable);
+                    self.errors
+                        .lock()
+                        .unwrap()
+                        .report_error(member_token.span.clone(), CompilationErrorType::InvalidLetVariable);
                     return VariableType::None;
                 };
                 let Some(member_id) = registry.get_member_id(member) else {
-                    self.errors.lock().unwrap().report_error(member_token.span.clone(), CompilationErrorType::InvalidLetVariable);
+                    self.errors
+                        .lock()
+                        .unwrap()
+                        .report_error(member_token.span.clone(), CompilationErrorType::InvalidLetVariable);
                     return VariableType::None;
                 };
                 let is_last = position + 1 == let_stmt.get_members().len();
                 if is_last && !matches!(registry.id_table.get(member_id), Some(crate::compiler::user_data::UserDataEntry::Field(_))) {
-                    self.errors.lock().unwrap().report_error(member_token.span.clone(), CompilationErrorType::InvalidLetVariable);
+                    self.errors
+                        .lock()
+                        .unwrap()
+                        .report_error(member_token.span.clone(), CompilationErrorType::InvalidLetVariable);
                     return VariableType::None;
                 }
                 self.user_type_lookup.insert(member_token.span.start, type_id);

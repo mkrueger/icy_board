@@ -3,20 +3,20 @@ use super::{compile_errors_with_runtime, run_ppl};
 #[test]
 fn terminal_info_requires_runtime_402() {
     for runtime in [400, 401] {
-        let errors = compile_errors_with_runtime("TERMINFO info = TermInfo()", runtime);
+        let errors = compile_errors_with_runtime("TERMINFO info = Terminal.Info", runtime);
         assert!(
-            errors.iter().any(|error| error == "TermInfo needs runtime 402"),
+            errors.iter().any(|error| error.contains("Terminal needs runtime 402")),
             "runtime {runtime}: {errors:?}"
         );
     }
-    assert!(compile_errors_with_runtime("TERMINFO info = TermInfo()", 402).is_empty());
+    assert!(compile_errors_with_runtime("TERMINFO info = Terminal.Info", 402).is_empty());
 }
 
 #[test]
 fn terminal_info_returns_the_cached_local_snapshot() {
     let output = run_ppl(
         r#"
-        TERMINFO info = TermInfo()
+        TERMINFO info = Terminal.Info
         PrintLn info.Program
         PrintLn info.DeviceAttrs = ""
         PrintLn info.Columns, "x", info.Rows

@@ -379,11 +379,7 @@ impl PPECompiler {
                     let PPEExpr::Member(base, member_id) = variable else {
                         return None;
                     };
-                    return Some(PPECommand::MemberCall(Box::new(PPEExpr::MemberFunctionCall(
-                        base,
-                        vec![value],
-                        member_id,
-                    ))));
+                    return Some(PPECommand::MemberCall(Box::new(PPEExpr::MemberFunctionCall(base, vec![value], member_id))));
                 }
                 let Some(decl_idx) = self.lookup_variable_index(var_name) else {
                     log::error!("Variable not found: {var_name}");

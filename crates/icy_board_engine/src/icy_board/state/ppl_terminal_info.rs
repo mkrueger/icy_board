@@ -98,8 +98,6 @@ impl PplTerminalInfo {
 
 impl UserData for PplTerminalInfo {
     const TYPE_NAME: &'static str = "TermInfo";
-    const INSTANCE_PROVIDER: Option<crate::executable::FuncOpCode> = Some(crate::executable::FuncOpCode::TermInfo);
-
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         for name in [&*PROGRAM, &*DEVICE_ATTRS, &*RIP_VERSION] {
             registry.add_property(name.clone(), VariableType::String, false);

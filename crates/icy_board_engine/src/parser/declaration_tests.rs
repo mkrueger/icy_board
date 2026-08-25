@@ -186,7 +186,8 @@ fn test_function() {
 /// The id of a board object is stored in every PPE that names its type, so the
 /// list may only ever grow at the end.
 #[test]
-fn board_object_type_ids_are_frozen() {    let registry = UserTypeRegistry::icy_board_registry();
+fn board_object_type_ids_are_frozen() {
+    let registry = UserTypeRegistry::icy_board_registry();
     let expected = [
         ("CONFERENCE", 30),
         ("AREA", 31),
@@ -196,7 +197,6 @@ fn board_object_type_ids_are_frozen() {    let registry = UserTypeRegistry::icy_
         ("SURFACE", 35),
         ("EVENT", 36),
         ("AUDIO", 37),
-        ("TERMSTATE", 38),
         ("ERROR", 39),
         ("TERMINFO", 40),
         ("TERMINPUT", 41),

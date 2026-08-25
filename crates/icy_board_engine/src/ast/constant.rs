@@ -43,7 +43,7 @@ impl BuiltinConst {
 }
 
 pub const STACK_LIMIT: i32 = 6022 + 1024;
-pub const BUILTIN_CONSTS: [BuiltinConst; 182] = [
+pub const BUILTIN_CONSTS: [BuiltinConst; 121] = [
     BuiltinConst { name: "TRUE", value: 0x01 },
     BuiltinConst { name: "FALSE", value: 0x00 },
     BuiltinConst {
@@ -310,106 +310,13 @@ pub const BUILTIN_CONSTS: [BuiltinConst; 182] = [
     BuiltinConst { name: "S_DN", value: 0x00 },
     BuiltinConst { name: "S_DR", value: 0x01 },
     BuiltinConst { name: "S_DW", value: 0x02 },
-    // GFXINIT backends. New names go at the end; the index of a constant is part of the
-    // statement argument tables.
-    BuiltinConst { name: "GFX_NONE", value: -1 },
-    BuiltinConst { name: "GFX_AUTO", value: 0x00 },
-    BuiltinConst {
-        name: "GFX_SIXEL",
-        value: 0x02,
-    },
-    BuiltinConst { name: "GFX_JXL", value: 0x03 },
-    BuiltinConst {
-        name: "GFX_CAP_SIXEL",
-        value: 0x01,
-    },
-    BuiltinConst {
-        name: "GFX_CAP_JXL",
-        value: 0x02,
-    },
-    BuiltinConst {
-        name: "GFX_CAP_JXL_BLOB",
-        value: 0x04,
-    },
-    BuiltinConst {
-        name: "GFX_CAP_PIXEL_MOUSE",
-        value: 0x08,
-    },
-    BuiltinConst {
-        name: "GFX_CAP_CLIENT_BLIT",
-        value: 0x10,
-    },
-    BuiltinConst {
-        name: "GFX_CAP_PHYSICAL_KEYS",
-        value: 0x20,
-    },
-    BuiltinConst {
-        name: "GFX_CAP_AUDIO",
-        value: 0x40,
-    },
-    BuiltinConst { name: "MOUSE_TEXT", value: 0 },
-    BuiltinConst {
-        name: "MOUSE_PIXELS",
-        value: 1,
-    },
-    BuiltinConst { name: "MOUSE_NONE", value: 0 },
-    BuiltinConst { name: "MOUSE_PRESS", value: 1 },
-    BuiltinConst {
-        name: "MOUSE_RELEASE",
-        value: 2,
-    },
-    BuiltinConst {
-        name: "MOUSE_MOTION",
-        value: 3,
-    },
-    BuiltinConst { name: "MOUSE_WHEEL", value: 4 },
-    BuiltinConst { name: "MOUSE_LEFT", value: 0 },
-    BuiltinConst {
-        name: "MOUSE_MIDDLE",
-        value: 1,
-    },
-    BuiltinConst { name: "MOUSE_RIGHT", value: 2 },
-    BuiltinConst {
-        name: "MOUSE_WHEEL_UP",
-        value: 3,
-    },
-    BuiltinConst {
-        name: "MOUSE_WHEEL_DOWN",
-        value: 4,
-    },
-    BuiltinConst { name: "MOUSE_SHIFT", value: 1 },
-    BuiltinConst { name: "MOUSE_ALT", value: 2 },
-    BuiltinConst { name: "MOUSE_CTRL", value: 4 },
-    BuiltinConst {
-        name: "MOUSE_TRACK_BUTTONS",
-        value: 0,
-    },
-    BuiltinConst {
-        name: "MOUSE_TRACK_DRAG",
-        value: 1,
-    },
-    BuiltinConst {
-        name: "MOUSE_TRACK_ALL",
-        value: 2,
-    },
+    // `PresentRect` combines these flags; they remain a mask rather than an enum.
     BuiltinConst {
         name: "GFX_FLIP_NONE",
         value: 0,
     },
     BuiltinConst { name: "GFX_FLIP_X", value: 1 },
     BuiltinConst { name: "GFX_FLIP_Y", value: 2 },
-    BuiltinConst { name: "EVENT_NONE", value: 0 },
-    BuiltinConst { name: "EVENT_KEY", value: 1 },
-    BuiltinConst {
-        name: "EVENT_KEY_EDGE",
-        value: 2,
-    },
-    BuiltinConst { name: "EVENT_MOUSE", value: 3 },
-    BuiltinConst {
-        name: "EVENT_OVERFLOW",
-        value: 4,
-    },
-    BuiltinConst { name: "EVENT_SOUND", value: 5 },
     BuiltinConst { name: "KEY_ESCAPE", value: 27 },
     BuiltinConst { name: "KEY_ENTER", value: 13 },
     BuiltinConst { name: "KEY_TAB", value: 9 },
@@ -457,77 +364,6 @@ pub const BUILTIN_CONSTS: [BuiltinConst; 182] = [
         name: "KEY_INSERT",
         value: 0x11_0009,
     },
-    BuiltinConst { name: "EVENT_SHIFT", value: 1 },
-    BuiltinConst { name: "EVENT_ALT", value: 2 },
-    BuiltinConst { name: "EVENT_CTRL", value: 4 },
-    BuiltinConst { name: "EVENT_META", value: 8 },
-    BuiltinConst {
-        name: "MOUSE_BUTTON_LEFT",
-        value: 1,
-    },
-    BuiltinConst {
-        name: "MOUSE_BUTTON_MIDDLE",
-        value: 2,
-    },
-    BuiltinConst {
-        name: "MOUSE_BUTTON_RIGHT",
-        value: 4,
-    },
-    BuiltinConst {
-        name: "MOUSE_WHEEL_LEFT",
-        value: 5,
-    },
-    BuiltinConst {
-        name: "MOUSE_WHEEL_RIGHT",
-        value: 6,
-    },
-    BuiltinConst { name: "ERR_OK", value: 0 },
-    BuiltinConst {
-        name: "ERR_UNAVAILABLE",
-        value: 1,
-    },
-    BuiltinConst { name: "ERR_INVALID", value: 2 },
-    BuiltinConst { name: "ERR_IO", value: 3 },
-    BuiltinConst { name: "ERR_FORMAT", value: 4 },
-    BuiltinConst { name: "ERR_LIMIT", value: 5 },
-    BuiltinConst {
-        name: "ERR_UNSUPPORTED",
-        value: 6,
-    },
-    BuiltinConst { name: "ERR_STACK", value: 7 },
-    BuiltinConst {
-        name: "ERR_KIND_NONE",
-        value: 0,
-    },
-    BuiltinConst {
-        name: "ERR_KIND_FILE",
-        value: 1,
-    },
-    BuiltinConst {
-        name: "ERR_KIND_DBASE",
-        value: 2,
-    },
-    BuiltinConst {
-        name: "ERR_KIND_STACK",
-        value: 3,
-    },
-    BuiltinConst {
-        name: "ERR_KIND_GFX",
-        value: 4,
-    },
-    BuiltinConst {
-        name: "ERR_KIND_FONT",
-        value: 5,
-    },
-    BuiltinConst {
-        name: "ERR_KIND_SOUND",
-        value: 6,
-    },
-    BuiltinConst {
-        name: "ERR_KIND_TERM",
-        value: 7,
-    },
-    BuiltinConst { name: "FONT_ALL", value: -1 },
 ];
 
 impl Constant {

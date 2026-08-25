@@ -436,19 +436,7 @@ pub fn get_function_hover(func: &FunctionDefinition) -> Option<Hover> {
         FuncOpCode::BASE64ENC => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-base64enc")),
         FuncOpCode::BASE64DEC => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-base64dec")),
         FuncOpCode::SHA256 => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-sha256")),
-        FuncOpCode::GfxBackend
-        | FuncOpCode::GfxCaps
-        | FuncOpCode::GfxCellWidth
-        | FuncOpCode::GfxCellHeight
-        | FuncOpCode::GfxScreenWidth
-        | FuncOpCode::GfxScreenHeight
-        | FuncOpCode::NewSurface
-        | FuncOpCode::LoadSurface => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-gfx-api")),
         FuncOpCode::Rgb | FuncOpCode::RgbAlpha => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-rgb")),
-        FuncOpCode::LoadAudio => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-sound-api")),
-        FuncOpCode::TermInput => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-event-api")),
-        FuncOpCode::TermState => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-term-state")),
-        FuncOpCode::TermInfo => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-term-info")),
         FuncOpCode::Terminal => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-terminal")),
         FuncOpCode::Err => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-err")),
         _ => None,
@@ -678,18 +666,6 @@ pub fn get_statement_hover(stmt: &StatementDefinition) -> Option<Hover> {
         OpCode::MoveMsg => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-movemsg")),
         OpCode::SetBankBal => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-setbankbal")),
         OpCode::WebRequest => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-webrequest")),
-        OpCode::GfxInit | OpCode::GfxShutdown | OpCode::GfxSetPacing => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-gfx-api")),
-        OpCode::SetVMargins | OpCode::SetHMargins | OpCode::ResetVMargins | OpCode::ResetHMargins | OpCode::ResetMargins => {
-            get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-margin-api"))
-        }
-        OpCode::SetFont | OpCode::LoadFont => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-font-api")),
-        OpCode::SetPaletteColor | OpCode::SetPaletteColorRgb | OpCode::ResetPaletteColor | OpCode::ResetPalette => {
-            get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-palette-api"))
-        }
-        OpCode::BeginTerminalUpdate | OpCode::EndTerminalUpdate => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-terminal-update-api")),
-        OpCode::RecordMacro | OpCode::EndMacro | OpCode::PlayMacro | OpCode::DeleteMacro | OpCode::ClearMacros => {
-            get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-terminal-macro-api"))
-        }
         OpCode::ErrClr => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-errclr")),
         OpCode::OnError => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-on-error")),
         _ => None,

@@ -2322,10 +2322,6 @@
     "named": false
   },
   {
-    "type": "TERMSTATE",
-    "named": false
-  },
-  {
     "type": "THEN",
     "named": false
   },

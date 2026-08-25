@@ -30,6 +30,7 @@ mod palette;
 mod ppe_paths;
 mod record_literals;
 mod records;
+mod retired_terminal_api;
 mod routine_parameters;
 mod scalars;
 mod sound;

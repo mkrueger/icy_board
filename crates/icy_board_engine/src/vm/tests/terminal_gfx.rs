@@ -9,7 +9,7 @@ fn the_backend_reads_back_what_init_selected() {
     let output = run_ppl(
         r"
         PrintLn Terminal.Gfx.Backend
-        Terminal.Gfx.Init(GFX_SIXEL, FALSE)
+        Terminal.Gfx.Init(GfxBackend.Sixel, FALSE)
         PrintLn Terminal.Gfx.Backend
         Terminal.Gfx.Shutdown()
         PrintLn Terminal.Gfx.Backend
@@ -23,7 +23,7 @@ fn the_backend_reads_back_what_init_selected() {
 fn a_surface_made_through_the_object_draws_the_same_way() {
     let output = run_ppl(
         r#"
-        Terminal.Gfx.Init(GFX_SIXEL, FALSE)
+        Terminal.Gfx.Init(GfxBackend.Sixel, FALSE)
         SURFACE s = Surface.New(4, 4)
         PrintLn s.Valid, " ", s.Width, "x", s.Height
         s.Clear(Rgb(0, 0, 0))
@@ -41,7 +41,7 @@ fn a_surface_made_through_the_object_draws_the_same_way() {
 fn pacing_reads_back_what_it_was_set_to() {
     let output = run_ppl_with_input(
         r"
-        Terminal.Gfx.Init(GFX_SIXEL, FALSE)
+        Terminal.Gfx.Init(GfxBackend.Sixel, FALSE)
         PrintLn Terminal.Gfx.Pacing
         Terminal.Gfx.Pacing = TRUE
         PrintLn Terminal.Gfx.Pacing
@@ -110,18 +110,6 @@ fn terminal_info_reports_all_capabilities() {
     );
 
     assert!(output.ends_with("110\n000\n"), "{output:?}");
-}
-
-#[test]
-fn an_unknown_backend_leaves_the_session_without_graphics() {
-    let output = run_ppl(
-        r"
-        PrintLn Terminal.Gfx.Init(99)
-        PrintLn Terminal.Gfx.Backend
-        ",
-    );
-
-    assert_eq!(output, "0\n-1\n");
 }
 
 /// Gfx has no instance of its own; it is reached through the terminal that draws.

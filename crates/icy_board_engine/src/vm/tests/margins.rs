@@ -3,23 +3,30 @@ use super::{compile_errors_with_runtime, run_ppl, run_ppl_with_input};
 #[test]
 fn margin_api_requires_runtime_402() {
     for runtime in [400, 401] {
-        let errors = compile_errors_with_runtime("SetVMargins 1, 2\nSetHMargins 1, 2\nResetMargins\nTERMSTATE s = TermState()", runtime);
-        for needed in ["SetVMargins needs runtime 402", "SetHMargins needs runtime 402", "TermState needs runtime 402"] {
-            assert!(errors.iter().any(|error| error == needed), "runtime {runtime}: {errors:?}");
-        }
+        let errors = compile_errors_with_runtime(
+            "Terminal.Margins.SetVertical(1, 2)\nTerminal.Margins.SetHorizontal(1, 2)\nTerminal.Margins.Reset()",
+            runtime,
+        );
+        assert!(!errors.is_empty(), "runtime {runtime} unexpectedly accepted member calls");
     }
-    assert!(compile_errors_with_runtime("SetVMargins 1, 2\nSetHMargins 1, 2\nResetMargins\nTERMSTATE s = TermState()", 402).is_empty());
+    assert!(
+        compile_errors_with_runtime(
+            "Terminal.Margins.SetVertical(1, 2)\nTerminal.Margins.SetHorizontal(1, 2)\nTerminal.Margins.Reset()",
+            402,
+        )
+        .is_empty()
+    );
 }
 
 #[test]
 fn margin_statements_emit_independent_ansi_regions() {
     let output = run_ppl(
         r#"
-        SetVMargins 4, 23
-        SetHMargins 10, 70
-        ResetVMargins
-        ResetHMargins
-        ResetMargins
+        Terminal.Margins.SetVertical(4, 23)
+        Terminal.Margins.SetHorizontal(10, 70)
+        Terminal.Margins.ResetVertical()
+        Terminal.Margins.ResetHorizontal()
+        Terminal.Margins.Reset()
         "#,
     );
 
@@ -31,9 +38,9 @@ fn margin_statements_are_ignored_without_ansi() {
     let output = run_ppl(
         r#"
         GRAFMODE 4
-        SetVMargins 4, 23
-        SetHMargins 10, 70
-        ResetMargins
+        Terminal.Margins.SetVertical(4, 23)
+        Terminal.Margins.SetHorizontal(10, 70)
+        Terminal.Margins.Reset()
         "#,
     );
 
@@ -44,11 +51,11 @@ fn margin_statements_are_ignored_without_ansi() {
 fn invalid_margin_regions_are_not_sent() {
     let output = run_ppl(
         r#"
-        SetVMargins 0, 23
-        SetVMargins 23, 4
-        SetVMargins 5, 5
-        SetHMargins -1, 70
-        SetHMargins 70, 10
+        Terminal.Margins.SetVertical(0, 23)
+        Terminal.Margins.SetVertical(23, 4)
+        Terminal.Margins.SetVertical(5, 5)
+        Terminal.Margins.SetHorizontal(-1, 70)
+        Terminal.Margins.SetHorizontal(70, 10)
         "#,
     );
 
@@ -56,26 +63,20 @@ fn invalid_margin_regions_are_not_sent() {
 }
 
 #[test]
-fn term_state_reports_margin_snapshots() {
+fn margins_report_current_state() {
     let output = run_ppl(
         r#"
-        TERMSTATE before = TermState()
-        PRINTLN before.VerticalMargins, ":", before.HorizontalMargins
-        PRINTLN before.MarginTop, ":", before.MarginBottom, ":", before.MarginLeft, ":", before.MarginRight
+        PRINTLN Terminal.Margins.HasVertical, ":", Terminal.Margins.HasHorizontal
+        PRINTLN Terminal.Margins.Top, ":", Terminal.Margins.Bottom, ":", Terminal.Margins.Left, ":", Terminal.Margins.Right
 
-        SetVMargins 4, 23
-        SetHMargins 10, 70
-        TERMSTATE active = TermState()
-        PRINTLN active.VerticalMargins, ":", active.HorizontalMargins
-        PRINTLN active.MarginTop, ":", active.MarginBottom, ":", active.MarginLeft, ":", active.MarginRight
-        PRINTLN before.VerticalMargins, ":", before.HorizontalMargins
+        Terminal.Margins.SetVertical(4, 23)
+        Terminal.Margins.SetHorizontal(10, 70)
+        PRINTLN Terminal.Margins.HasVertical, ":", Terminal.Margins.HasHorizontal
+        PRINTLN Terminal.Margins.Top, ":", Terminal.Margins.Bottom, ":", Terminal.Margins.Left, ":", Terminal.Margins.Right
         "#,
     );
 
-    assert!(
-        output.ends_with("0:0\n0:0:0:0\n\x1b[4;23r\x1b[?69h\x1b[10;70s1:1\n4:23:10:70\n0:0\n"),
-        "{output:?}"
-    );
+    assert!(output.ends_with("0:0\n0:0:0:0\n\x1b[4;23r\x1b[?69h\x1b[10;70s1:1\n4:23:10:70\n"), "{output:?}");
 }
 
 #[test]

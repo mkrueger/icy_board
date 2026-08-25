@@ -11,25 +11,25 @@ PRINTLN
 PRINTLN "                    ICY BOARD PALETTE FADE"
 PRINTLN
 
-SetPaletteColor DEMO_COLOR, Rgb(0, 0, 0)
+Terminal.Palette.Set(DEMO_COLOR, Rgb(0, 0, 0))
 COLOR DEMO_COLOR
 PRINTLN "              This text is recolored in place."
 
 level = 0
 WHILE (level <= 255) DO
-    SetPaletteColor DEMO_COLOR, Rgb(0, level, 255, level)
+    Terminal.Palette.Set(DEMO_COLOR, Rgb(0, level, 255, level))
     DELAY 1
     level += STEP
 ENDWHILE
 
 level = 255
 WHILE (level >= 0) DO
-    SetPaletteColor DEMO_COLOR, Rgb(0, level, 255)
+    Terminal.Palette.Set(DEMO_COLOR, Rgb(0, level, 255))
     DELAY 1
     level -= STEP
 ENDWHILE
 
-ResetPaletteColor DEMO_COLOR
+Terminal.Palette.Reset(DEMO_COLOR)
 COLOR @X07
 PRINTLN
 PRINTLN "                    Palette color restored."

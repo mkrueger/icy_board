@@ -250,25 +250,26 @@ pub async fn run_predefined_statement(opcode: OpCode, arg: &mut VirtualMachine<'
         OpCode::MoveMsg => predefined_procedures::move_msg(arg, arguments).await,
         OpCode::SetBankBal => predefined_procedures::set_bank_bal(arg, arguments).await,
         OpCode::WebRequest => predefined_procedures::web_request(arg, arguments).await,
-        OpCode::GfxInit => predefined_procedures::gfxinit(arg, arguments).await,
-        OpCode::GfxShutdown => predefined_procedures::gfxshutdown(arg, arguments).await,
-        OpCode::GfxSetPacing => predefined_procedures::gfxsetpacing(arg, arguments).await,
-        OpCode::SetVMargins => predefined_procedures::set_v_margins(arg, arguments).await,
-        OpCode::SetHMargins => predefined_procedures::set_h_margins(arg, arguments).await,
-        OpCode::ResetVMargins => predefined_procedures::reset_v_margins(arg, arguments).await,
-        OpCode::ResetHMargins => predefined_procedures::reset_h_margins(arg, arguments).await,
-        OpCode::ResetMargins => predefined_procedures::reset_margins(arg, arguments).await,
-        OpCode::SetFont => predefined_procedures::set_font(arg, arguments).await,
-        OpCode::LoadFont => predefined_procedures::load_font(arg, arguments).await,
-        OpCode::SetPaletteColor | OpCode::SetPaletteColorRgb => predefined_procedures::set_palette_color(arg, arguments).await,
-        OpCode::ResetPaletteColor => predefined_procedures::reset_palette_color(arg, arguments).await,
-        OpCode::ResetPalette => predefined_procedures::reset_palette(arg, arguments).await,
-        OpCode::BeginTerminalUpdate => predefined_procedures::begin_terminal_update(arg, arguments).await,
-        OpCode::EndTerminalUpdate => predefined_procedures::end_terminal_update(arg, arguments).await,
-        OpCode::RecordMacro => predefined_procedures::record_macro(arg, arguments).await,
-        OpCode::EndMacro => predefined_procedures::end_macro(arg, arguments).await,
-        OpCode::PlayMacro => predefined_procedures::play_macro(arg, arguments).await,
-        OpCode::DeleteMacro => predefined_procedures::delete_macro(arg, arguments).await,
-        OpCode::ClearMacros => predefined_procedures::clear_macros(arg, arguments).await,
+        OpCode::GfxInit
+        | OpCode::GfxShutdown
+        | OpCode::GfxSetPacing
+        | OpCode::SetVMargins
+        | OpCode::SetHMargins
+        | OpCode::ResetVMargins
+        | OpCode::ResetHMargins
+        | OpCode::ResetMargins
+        | OpCode::SetFont
+        | OpCode::LoadFont
+        | OpCode::SetPaletteColor
+        | OpCode::SetPaletteColorRgb
+        | OpCode::ResetPaletteColor
+        | OpCode::ResetPalette
+        | OpCode::BeginTerminalUpdate
+        | OpCode::EndTerminalUpdate
+        | OpCode::RecordMacro
+        | OpCode::EndMacro
+        | OpCode::PlayMacro
+        | OpCode::DeleteMacro
+        | OpCode::ClearMacros => Err(format!("terminal statement opcode {opcode:?} was retired in runtime 4.02").into()),
     }
 }

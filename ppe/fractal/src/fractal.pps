@@ -45,14 +45,14 @@ BuildJuliaTour()
 CLS
 PRINTLN "Starting PPE Fractal..."
 
-GfxInit GFX_AUTO
-IF GfxBackend() = GFX_NONE THEN
+Terminal.Gfx.Init(GfxBackend.Auto)
+IF Terminal.Gfx.Backend = GfxBackend.None THEN
     CLS
     PRINTLN "PPE Fractal requires a graphics-capable terminal."
     EXIT
 ENDIF
 
-IF GfxBackend() = GFX_JXL THEN
+IF Terminal.Gfx.Backend = GfxBackend.Jxl THEN
     fracW = 160
     fracH = 80
     zoom = 4
@@ -64,10 +64,10 @@ ELSE
 ENDIF
 hudY = fracH * zoom
 
-frac = NewSurface(fracW, fracH)
-hud = NewSurface(VIEW_W, HUD_H)
+frac = Surface.New(fracW, fracH)
+hud = Surface.New(VIEW_W, HUD_H)
 IF !frac.Valid | !hud.Valid THEN
-    GfxShutdown
+    Terminal.Gfx.Shutdown()
     CLS
     PRINTLN "Could not allocate the drawing surfaces."
     EXIT
@@ -103,7 +103,7 @@ ENDWHILE
 :Finished
 frac.Free()
 hud.Free()
-GfxShutdown
+Terminal.Gfx.Shutdown()
 CLS
 PRINTLN "@X0BPPE Fractal@X07 - surfaces, per-pixel drawing and scaled presentation."
 

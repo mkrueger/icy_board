@@ -38,14 +38,14 @@ InitColors()
 CLS
 PRINTLN "Starting PPE Paint..."
 
-GfxInit GFX_AUTO
-IF GfxBackend() < 0 THEN
+Terminal.Gfx.Init(GfxBackend.Auto)
+IF Terminal.Gfx.Backend = GfxBackend.None THEN
     CLS
     PRINTLN "PPE Paint requires a graphics-capable terminal."
     EXIT
 ENDIF
-screen = NewSurface(SCREEN_W, SCREEN_H)
-ui = LoadSurface("./paint_ui.png")
+screen = Surface.New(SCREEN_W, SCREEN_H)
+ui = Surface.Load("./paint_ui.png")
 screen.Blit(ui, 0, 0)
 
 selected = 0
@@ -65,7 +65,7 @@ WHILE !inputEvent.Pixels & tries < 30 DO
 ENDWHILE
 IF !inputEvent.Pixels THEN
     input.Release()
-    GfxShutdown
+    Terminal.Gfx.Shutdown()
     CLS
     PRINTLN "PPE Paint requires pixel mouse reporting (DEC mode 1016)."
     EXIT
@@ -140,7 +140,7 @@ ENDWHILE
 input.Release()
 ui.Free()
 screen.Free()
-GfxShutdown
+Terminal.Gfx.Shutdown()
 CLS
 
 PROCEDURE InitColors()

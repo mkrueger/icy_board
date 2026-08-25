@@ -13,13 +13,13 @@ BOOLEAN running
 EVENT inputEvent
 TERMINPUT input = Terminal.Input
 
-LoadFont 43, "fonts/c64.psf"
+Terminal.Font.Load(43, "fonts/c64.psf")
 IF (!ERR().OK) ShowLoadError("C64", ERR().Message)
-LoadFont 44, "fonts/atari.psf"
+Terminal.Font.Load(44, "fonts/atari.psf")
 IF (!ERR().OK) ShowLoadError("Atari", ERR().Message)
-LoadFont 45, "fonts/microknight.psf"
+Terminal.Font.Load(45, "fonts/microknight.psf")
 IF (!ERR().OK) ShowLoadError("MicroKnight", ERR().Message)
-LoadFont 46, "fonts/topaz.psf"
+Terminal.Font.Load(46, "fonts/topaz.psf")
 IF (!ERR().OK) ShowLoadError("Topaz", ERR().Message)
 
 page = PAGE_BUILTIN
@@ -123,11 +123,11 @@ PROCEDURE DrawNavigation(STRING action)
 ENDPROC
 
 PROCEDURE SetActiveFont(INTEGER font)
-    SetFont FONT_ALL, font
+    Terminal.Font.SetAll(font)
 ENDPROC
 
 PROCEDURE RestoreFonts()
-    SetFont FONT_ALL, 0
+    Terminal.Font.SetAll(0)
 ENDPROC
 
 PROCEDURE ShowLoadError(STRING fontName, STRING message)

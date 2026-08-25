@@ -6,8 +6,8 @@ const TONE: &[u8] = b"RIFFxxxxWAVEfmt ";
 fn sound_capabilities_are_queried_and_cached() {
     let output = run_ppl_with_files_and_input(
         r#"
-        AUDIO first = LoadAudio("tone.wav")
-        AUDIO second = LoadAudio("tone.wav")
+        AUDIO first = Audio.Load("tone.wav")
+        AUDIO second = Audio.Load("tone.wav")
         PrintLn first.Valid, second.Valid
         "#,
         &[("tone.wav", TONE)],
@@ -23,7 +23,7 @@ fn sound_capabilities_are_queried_and_cached() {
 fn the_first_sound_takes_the_lowest_apc_channel() {
     let output = run_ppl_with_files_and_input(
         r#"
-        AUDIO tone = LoadAudio("tone.wav")
+        AUDIO tone = Audio.Load("tone.wav")
         tone.Play()
         PrintLn tone.Channel, ":", tone.Playing
         tone.Stop()
@@ -43,8 +43,8 @@ fn the_first_sound_takes_the_lowest_apc_channel() {
 fn a_sound_object_carries_its_own_channel() {
     let output = run_ppl_with_files_and_input(
         r#"
-        AUDIO music = LoadAudio("tone.wav")
-        AUDIO effect = LoadAudio("tone.wav")
+        AUDIO music = Audio.Load("tone.wav")
+        AUDIO effect = Audio.Load("tone.wav")
         PRINTLN music.Valid, ":", music.Channel, ":", effect.Channel
         music.SetVolume(70)
         music.Play(TRUE)
@@ -73,9 +73,9 @@ fn a_sound_object_carries_its_own_channel() {
 fn a_freed_sound_gives_its_channel_back() {
     let output = run_ppl_with_files_and_input(
         r#"
-        AUDIO first = LoadAudio("tone.wav")
+        AUDIO first = Audio.Load("tone.wav")
         first.Free()
-        AUDIO second = LoadAudio("tone.wav")
+        AUDIO second = Audio.Load("tone.wav")
         PRINTLN second.Channel
         "#,
         &[("tone.wav", TONE)],
@@ -89,7 +89,7 @@ fn a_freed_sound_gives_its_channel_back() {
 fn an_unavailable_terminal_is_not_sent_a_sound() {
     let output = run_ppl_with_files_and_input(
         r#"
-        AUDIO tone = LoadAudio("tone.wav")
+        AUDIO tone = Audio.Load("tone.wav")
         PrintLn tone.Valid, ":", ERR().Code
         "#,
         &[("tone.wav", TONE)],
@@ -104,7 +104,7 @@ fn an_unavailable_terminal_is_not_sent_a_sound() {
 fn sound_failures_are_reported_by_err() {
     let unsupported = run_ppl_with_files_and_input(
         r#"
-        AUDIO tone = LoadAudio("tone.wav")
+        AUDIO tone = Audio.Load("tone.wav")
         PrintLn ERR().Kind, ":", ERR().Code
         "#,
         &[("tone.wav", TONE)],
@@ -114,7 +114,7 @@ fn sound_failures_are_reported_by_err() {
 
     let missing = run_ppl_with_input(
         r#"
-        AUDIO tone = LoadAudio("nope.wav")
+        AUDIO tone = Audio.Load("nope.wav")
         PrintLn ERR().Kind, ":", ERR().Code
         "#,
         b"\x1b[=7;100;1n\x1b[=7;101;1;2;1n",
@@ -126,7 +126,7 @@ fn sound_failures_are_reported_by_err() {
 fn a_sound_that_cannot_be_loaded_stays_callable() {
     let output = run_ppl_with_input(
         r#"
-        AUDIO missing = LoadAudio("nope.wav")
+        AUDIO missing = Audio.Load("nope.wav")
         PRINTLN missing.Valid, ":", missing.Playing
         PRINTLN missing.Play(FALSE)
         PRINTLN ERR().Code
@@ -143,8 +143,8 @@ fn a_sound_that_cannot_be_loaded_stays_callable() {
 fn a_second_format_is_probed_and_uploaded_after_the_first() {
     let output = run_ppl_with_files_and_input(
         r#"
-        AUDIO music = LoadAudio("music.ogg")
-        AUDIO effect = LoadAudio("rotate.wav")
+        AUDIO music = Audio.Load("music.ogg")
+        AUDIO effect = Audio.Load("rotate.wav")
         PrintLn music.Valid, effect.Valid
         "#,
         &[("music.ogg", b"OggS\x00\x02\x01\x13OpusHead"), ("rotate.wav", TONE)],
@@ -160,7 +160,7 @@ fn a_second_format_is_probed_and_uploaded_after_the_first() {
 fn a_format_probe_that_goes_unanswered_does_not_mute_the_channel() {
     let output = run_ppl_with_files_and_input(
         r#"
-        AUDIO tone = LoadAudio("tone.wav")
+        AUDIO tone = Audio.Load("tone.wav")
         tone.Play()
         PrintLn ERR().Code
         "#,
@@ -181,8 +181,7 @@ fn a_sound_the_caller_already_cached_is_not_sent_again() {
 
     let output = run_ppl_with_files_and_input(
         r#"
-        PrintLn GfxCaps()
-        AUDIO tone = LoadAudio("tone.wav")
+        AUDIO tone = Audio.Load("tone.wav")
         tone.Play()
         "#,
         &[("tone.wav", TONE)],
@@ -197,9 +196,9 @@ fn a_sound_the_caller_already_cached_is_not_sent_again() {
 fn a_finished_sound_arrives_as_an_event() {
     let output = run_ppl_with_files_and_input(
         r#"
-        AUDIO tone = LoadAudio("tone.wav")
+        AUDIO tone = Audio.Load("tone.wav")
         tone.Play()
-        TERMINPUT input = TermInput()
+        TERMINPUT input = Terminal.Input
         EVENT e = input.Wait(-1)
         PRINTLN e.Kind, ":", e.Code, ":", tone.Playing
         "#,
@@ -215,7 +214,7 @@ fn a_finished_sound_arrives_as_an_event() {
 fn a_looping_sound_is_not_watched_for_its_end() {
     let output = run_ppl_with_files_and_input(
         r#"
-        AUDIO tone = LoadAudio("tone.wav")
+        AUDIO tone = Audio.Load("tone.wav")
         tone.Play(TRUE)
         "#,
         &[("tone.wav", TONE)],
@@ -240,7 +239,7 @@ fn a_large_upload_is_acknowledged_before_anything_else_is_sent() {
 
     let output = run_ppl_with_files_and_input(
         r#"
-        AUDIO tone = LoadAudio("big.wav")
+        AUDIO tone = Audio.Load("big.wav")
         PrintLn tone.Valid
         "#,
         &[("big.wav", &big)],
@@ -256,7 +255,7 @@ fn a_large_upload_is_acknowledged_before_anything_else_is_sent() {
 fn a_small_upload_is_not_worth_a_round_trip() {
     let output = run_ppl_with_files_and_input(
         r#"
-        AUDIO tone = LoadAudio("tone.wav")
+        AUDIO tone = Audio.Load("tone.wav")
         PrintLn tone.Valid
         "#,
         &[("tone.wav", TONE)],

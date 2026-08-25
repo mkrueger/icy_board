@@ -3,30 +3,20 @@ use super::{compile_errors_with_runtime, run_ppl, run_ppl_with_cleanup};
 #[test]
 fn terminal_output_api_requires_runtime_402() {
     let source = r#"
-        BeginTerminalUpdate
-        EndTerminalUpdate
-        RecordMacro 0
-        EndMacro
-        PlayMacro 0
-        DeleteMacro 0
-        ClearMacros
+        Terminal.BeginUpdate()
+        Terminal.EndUpdate()
+        Terminal.Macros.Record(0)
+        Terminal.Macros.End()
+        Terminal.Macros.Play(0)
+        Terminal.Macros.Delete(0)
+        Terminal.Macros.Clear()
     "#;
     for runtime in [400, 401] {
         let errors = compile_errors_with_runtime(source, runtime);
-        for name in [
-            "BeginTerminalUpdate",
-            "EndTerminalUpdate",
-            "RecordMacro",
-            "EndMacro",
-            "PlayMacro",
-            "DeleteMacro",
-            "ClearMacros",
-        ] {
-            assert!(
-                errors.iter().any(|error| error == &format!("{name} needs runtime 402")),
-                "runtime {runtime}: {errors:?}"
-            );
-        }
+        assert!(
+            errors.iter().any(|error| error.contains("Terminal needs runtime 402")),
+            "runtime {runtime}: {errors:?}"
+        );
     }
     assert!(compile_errors_with_runtime(source, 402).is_empty());
 }
@@ -35,11 +25,11 @@ fn terminal_output_api_requires_runtime_402() {
 fn synchronized_updates_only_emit_the_outer_pair() {
     let output = run_ppl(
         r#"
-        BeginTerminalUpdate
-        BeginTerminalUpdate
+        Terminal.BeginUpdate()
+        Terminal.BeginUpdate()
         Print "frame"
-        EndTerminalUpdate
-        EndTerminalUpdate
+        Terminal.EndUpdate()
+        Terminal.EndUpdate()
         "#,
     );
 
@@ -50,7 +40,7 @@ fn synchronized_updates_only_emit_the_outer_pair() {
 fn ending_an_inactive_update_reports_an_error() {
     let output = run_ppl(
         r#"
-        EndTerminalUpdate
+        Terminal.EndUpdate()
         PrintLn ERR().Code, " ", ERR().Kind
         "#,
     );
@@ -63,7 +53,7 @@ fn synchronized_output_reports_unavailable_without_ansi() {
     let output = run_ppl(
         r#"
         GrafMode 4
-        BeginTerminalUpdate
+        Terminal.BeginUpdate()
         PrintLn ERR().Code, " ", ERR().Kind
         "#,
     );
@@ -76,7 +66,7 @@ fn terminal_macros_report_unavailable_without_ansi() {
     let output = run_ppl(
         r#"
         GrafMode 4
-        RecordMacro 0
+        Terminal.Macros.Record(0)
         PrintLn ERR().Code, " ", ERR().Kind
         "#,
     );
@@ -88,8 +78,8 @@ fn terminal_macros_report_unavailable_without_ansi() {
 fn outer_cleanup_flushes_recording_before_ending_synchronization() {
     let output = run_ppl_with_cleanup(
         r#"
-        BeginTerminalUpdate
-        RecordMacro 4
+        Terminal.BeginUpdate()
+        Terminal.Macros.Record(4)
         Print "last frame"
         "#,
     );
@@ -101,12 +91,12 @@ fn outer_cleanup_flushes_recording_before_ending_synchronization() {
 fn macros_hide_recorded_output_until_playback() {
     let output = run_ppl(
         r#"
-        RecordMacro 3
+        Terminal.Macros.Record(3)
         Print "hidden"
-        EndMacro
+        Terminal.Macros.End()
         Print "before:"
-        PlayMacro 3
-        PlayMacro 3
+        Terminal.Macros.Play(3)
+        Terminal.Macros.Play(3)
         "#,
     );
 
@@ -117,15 +107,15 @@ fn macros_hide_recorded_output_until_playback() {
 fn macros_can_compose_other_macros() {
     let output = run_ppl(
         r#"
-        RecordMacro 1
+        Terminal.Macros.Record(1)
         Print "A"
-        EndMacro
-        RecordMacro 2
+        Terminal.Macros.End()
+        Terminal.Macros.Record(2)
         Print "["
-        PlayMacro 1
+        Terminal.Macros.Play(1)
         Print "]"
-        EndMacro
-        PlayMacro 2
+        Terminal.Macros.End()
+        Terminal.Macros.Play(2)
         "#,
     );
 
@@ -136,13 +126,13 @@ fn macros_can_compose_other_macros() {
 fn deleted_and_invalid_macros_report_errors() {
     let output = run_ppl(
         r#"
-        RecordMacro 1
+        Terminal.Macros.Record(1)
         Print "gone"
-        EndMacro
-        DeleteMacro 1
-        PlayMacro 1
+        Terminal.Macros.End()
+        Terminal.Macros.Delete(1)
+        Terminal.Macros.Play(1)
         PrintLn ERR().Code, " ", ERR().Kind
-        RecordMacro 64
+        Terminal.Macros.Record(64)
         PrintLn ERR().Code, " ", ERR().Kind
         "#,
     );
@@ -154,11 +144,11 @@ fn deleted_and_invalid_macros_report_errors() {
 fn clear_macros_emits_decdmac_delete_all() {
     let output = run_ppl(
         r#"
-        RecordMacro 0
+        Terminal.Macros.Record(0)
         Print "A"
-        EndMacro
-        ClearMacros
-        PlayMacro 0
+        Terminal.Macros.End()
+        Terminal.Macros.Clear()
+        Terminal.Macros.Play(0)
         PrintLn ERR().Code, " ", ERR().Kind
         "#,
     );
@@ -170,11 +160,11 @@ fn clear_macros_emits_decdmac_delete_all() {
 fn a_second_recording_cannot_start_before_the_first_ends() {
     let output = run_ppl(
         r#"
-        RecordMacro 1
-        RecordMacro 2
+        Terminal.Macros.Record(1)
+        Terminal.Macros.Record(2)
         PrintLn ERR().Code, " ", ERR().Kind
-        EndMacro
-        PlayMacro 1
+        Terminal.Macros.End()
+        Terminal.Macros.Play(1)
         "#,
     );
 

@@ -3,13 +3,13 @@ use super::{compile_errors_with_runtime, run_ppl, run_ppl_with_input, run_ppl_wi
 #[test]
 fn terminal_input_requires_runtime_402() {
     for runtime in [400, 401] {
-        let errors = compile_errors_with_runtime("TERMINPUT input = TermInput()", runtime);
+        let errors = compile_errors_with_runtime("TERMINPUT input = Terminal.Input", runtime);
         assert!(
-            errors.iter().any(|error| error == "TermInput needs runtime 402"),
+            errors.iter().any(|error| error.contains("Terminal needs runtime 402")),
             "runtime {runtime}: {errors:?}"
         );
     }
-    assert!(compile_errors_with_runtime("TERMINPUT input = TermInput()", 402).is_empty());
+    assert!(compile_errors_with_runtime("TERMINPUT input = Terminal.Input", 402).is_empty());
 }
 
 #[test]
@@ -47,7 +47,7 @@ fn terminal_input_is_the_terminals_own() {
 fn terminal_input_polls_translated_keys() {
     let output = run_ppl_with_input(
         r#"
-        TERMINPUT input = TermInput()
+        TERMINPUT input = Terminal.Input
         EVENT event = input.Poll()
         PRINTLN event.Kind, ":", event.Text
         input.Release()
@@ -79,7 +79,7 @@ fn freeing_terminal_input_hands_typeahead_to_classic_input() {
 fn classic_input_reads_keys_sent_after_terminal_input_is_freed() {
     let output = run_ppl_with_input_after_output(
         r#"
-        TERMINPUT input = TermInput()
+        TERMINPUT input = Terminal.Input
         EVENT event = input.Wait(-1)
         input.Release()
         STRING name
@@ -97,7 +97,7 @@ fn classic_input_reads_keys_sent_after_terminal_input_is_freed() {
 fn timed_event_wait_restores_the_channel_before_classic_input() {
     let output = run_ppl_with_input_after_output(
         r#"
-        TERMINPUT input = TermInput()
+        TERMINPUT input = Terminal.Input
         EVENT event = input.Wait(1)
         input.Release()
         STRING name
@@ -115,10 +115,10 @@ fn timed_event_wait_restores_the_channel_before_classic_input() {
 fn unified_events_consume_character_key_edge_and_mouse_input() {
     let output = run_ppl_with_input(
         r#"
-        TERMINPUT input = TermInput()
+        TERMINPUT input = Terminal.Input
         EVENT e
         input.KeyboardOn()
-        input.MouseOn(MOUSE_TEXT)
+        input.MouseOn(MouseMode.Text)
 
         e = input.Poll()
         PRINTLN e.Kind, ":", e.Code, ":", e.Text, ":", e.Pressed
@@ -141,10 +141,10 @@ fn unified_events_consume_character_key_edge_and_mouse_input() {
 fn unified_events_preserve_wire_order_between_sources() {
     let output = run_ppl_with_input(
         r#"
-        TERMINPUT input = TermInput()
+        TERMINPUT input = Terminal.Input
         EVENT e
         input.KeyboardOn()
-        input.MouseOn(MOUSE_TEXT)
+        input.MouseOn(MouseMode.Text)
         e = input.Poll()
         PRINTLN e.Kind, ":", e.Code
         e = input.Poll()
@@ -163,7 +163,7 @@ fn unified_events_preserve_wire_order_between_sources() {
 fn event_objects_keep_independent_snapshots() {
     let output = run_ppl_with_input(
         r#"
-        TERMINPUT input = TermInput()
+        TERMINPUT input = Terminal.Input
         EVENT first = input.Poll()
         EVENT second = input.Poll()
         PRINTLN first.Text, second.Text, first.Code, second.Code
@@ -178,7 +178,7 @@ fn event_objects_keep_independent_snapshots() {
 fn logical_ansi_keys_are_one_event() {
     let output = run_ppl_with_input(
         r#"
-        TERMINPUT input = TermInput()
+        TERMINPUT input = Terminal.Input
         EVENT e = input.Poll()
         PRINTLN e.Kind, ":", e.Code, ":", e.Text, ":", e.Repeated, ":", e.Shift, e.Alt, e.Ctrl, e.Meta
         "#,
@@ -191,9 +191,9 @@ fn logical_ansi_keys_are_one_event() {
 fn mouse_events_report_held_buttons_and_wheel_deltas() {
     let output = run_ppl_with_input(
         r#"
-        TERMINPUT input = TermInput()
+        TERMINPUT input = Terminal.Input
         EVENT e
-        input.MouseOn(MOUSE_TEXT)
+        input.MouseOn(MouseMode.Text)
         e = input.Poll()
         PRINTLN e.LeftDown, e.MiddleDown, e.RightDown, ":", e.WheelX, ":", e.WheelY
         e = input.Poll()
@@ -211,7 +211,7 @@ fn mouse_events_report_held_buttons_and_wheel_deltas() {
 fn negative_event_wait_means_indefinite() {
     let output = run_ppl_with_input(
         r#"
-        TERMINPUT input = TermInput()
+        TERMINPUT input = Terminal.Input
         EVENT e = input.Wait(-1)
         PRINT e.Text
         "#,
@@ -224,7 +224,7 @@ fn negative_event_wait_means_indefinite() {
 fn keyflush_discards_input_buffered_after_an_event() {
     let output = run_ppl_with_input(
         r#"
-        TERMINPUT input = TermInput()
+        TERMINPUT input = Terminal.Input
         EVENT e = input.Poll()
         KeyFlush
         PRINT "[", InKey(), "]"
@@ -239,7 +239,7 @@ fn keyflush_discards_input_buffered_after_an_event() {
 fn event_wait_returns_an_empty_event_on_timeout() {
     let output = run_ppl(
         r#"
-        TERMINPUT input = TermInput()
+        TERMINPUT input = Terminal.Input
         EVENT e = input.Wait(1)
         PRINTLN e.Kind
         PRINTLN e.Code

@@ -301,7 +301,37 @@ impl OpCode {
     }
 
     pub fn minimum_runtime(self) -> u16 {
-        if (self as i16) >= OpCode::GfxInit as i16 { 402 } else { 100 }
+        if matches!(
+            self,
+            OpCode::GfxInit
+                | OpCode::GfxShutdown
+                | OpCode::GfxSetPacing
+                | OpCode::MemberCall
+                | OpCode::SetVMargins
+                | OpCode::SetHMargins
+                | OpCode::ResetVMargins
+                | OpCode::ResetHMargins
+                | OpCode::ResetMargins
+                | OpCode::SetFont
+                | OpCode::LoadFont
+                | OpCode::OnError
+                | OpCode::ErrClr
+                | OpCode::SetPaletteColor
+                | OpCode::SetPaletteColorRgb
+                | OpCode::ResetPaletteColor
+                | OpCode::ResetPalette
+                | OpCode::BeginTerminalUpdate
+                | OpCode::EndTerminalUpdate
+                | OpCode::RecordMacro
+                | OpCode::EndMacro
+                | OpCode::PlayMacro
+                | OpCode::DeleteMacro
+                | OpCode::ClearMacros
+        ) {
+            402
+        } else {
+            100
+        }
     }
 }
 
@@ -536,6 +566,16 @@ pub struct StatementDefinition {
     pub opcode: OpCode,
     pub sig: StatementSignature,
     pub args: Option<Vec<ArgumentDefinition>>,
+}
+
+fn retired_statement(opcode: OpCode) -> StatementDefinition {
+    StatementDefinition {
+        name: "<retired terminal statement>",
+        version: 400,
+        opcode,
+        sig: StatementSignature::Invalid,
+        args: None,
+    }
 }
 
 pub struct Signature {
@@ -2600,30 +2640,9 @@ pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 260]
             ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 2),
         },
-        StatementDefinition {
-            name: "GfxInit",
-            version: 400,
-            opcode: OpCode::GfxInit,
-            args: Some(vec![
-                ArgumentDefinition::new("Backend", VariableType::Integer),
-                ArgumentDefinition::new("Fullscreen", VariableType::Boolean),
-            ]),
-            sig: StatementSignature::VariableArguments(0, 0, 2),
-        },
-        StatementDefinition {
-            name: "GfxShutdown",
-            version: 400,
-            opcode: OpCode::GfxShutdown,
-            args: None,
-            sig: StatementSignature::ArgumentsWithVariable(0, 0),
-        },
-        StatementDefinition {
-            name: "GfxSetPacing",
-            version: 400,
-            opcode: OpCode::GfxSetPacing,
-            args: Some(vec![ArgumentDefinition::new("FramesInFlight", VariableType::Integer)]),
-            sig: StatementSignature::ArgumentsWithVariable(0, 1),
-        },
+        retired_statement(OpCode::GfxInit),
+        retired_statement(OpCode::GfxShutdown),
+        retired_statement(OpCode::GfxSetPacing),
         StatementDefinition {
             // Spelled as `object.Member(...)`, so it has no name of its own.
             name: "MemberCall",
@@ -2632,67 +2651,13 @@ pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 260]
             args: None,
             sig: StatementSignature::Invalid,
         },
-        StatementDefinition {
-            name: "SetVMargins",
-            version: 400,
-            opcode: OpCode::SetVMargins,
-            args: Some(vec![
-                ArgumentDefinition::new("Top", VariableType::Integer),
-                ArgumentDefinition::new("Bottom", VariableType::Integer),
-            ]),
-            sig: StatementSignature::ArgumentsWithVariable(0, 2),
-        },
-        StatementDefinition {
-            name: "SetHMargins",
-            version: 400,
-            opcode: OpCode::SetHMargins,
-            args: Some(vec![
-                ArgumentDefinition::new("Left", VariableType::Integer),
-                ArgumentDefinition::new("Right", VariableType::Integer),
-            ]),
-            sig: StatementSignature::ArgumentsWithVariable(0, 2),
-        },
-        StatementDefinition {
-            name: "ResetVMargins",
-            version: 400,
-            opcode: OpCode::ResetVMargins,
-            args: None,
-            sig: StatementSignature::ArgumentsWithVariable(0, 0),
-        },
-        StatementDefinition {
-            name: "ResetHMargins",
-            version: 400,
-            opcode: OpCode::ResetHMargins,
-            args: None,
-            sig: StatementSignature::ArgumentsWithVariable(0, 0),
-        },
-        StatementDefinition {
-            name: "ResetMargins",
-            version: 400,
-            opcode: OpCode::ResetMargins,
-            args: None,
-            sig: StatementSignature::ArgumentsWithVariable(0, 0),
-        },
-        StatementDefinition {
-            name: "SetFont",
-            version: 400,
-            opcode: OpCode::SetFont,
-            args: Some(vec![
-                ArgumentDefinition::new("Slot", VariableType::Integer),
-                ArgumentDefinition::new("Font", VariableType::Integer),
-            ]),
-            sig: StatementSignature::ArgumentsWithVariable(0, 2),
-        },
-        StatementDefinition {
-            name: "LoadFont",
-            version: 400,
-            opcode: OpCode::LoadFont,
-            args: Some(vec![
-                ArgumentDefinition::new("Font", VariableType::Integer),
-                ArgumentDefinition::new("FileName", VariableType::String),
-            ]),
-            sig: StatementSignature::ArgumentsWithVariable(0, 2),
-        },
+        retired_statement(OpCode::SetVMargins),
+        retired_statement(OpCode::SetHMargins),
+        retired_statement(OpCode::ResetVMargins),
+        retired_statement(OpCode::ResetHMargins),
+        retired_statement(OpCode::ResetMargins),
+        retired_statement(OpCode::SetFont),
+        retired_statement(OpCode::LoadFont),
         StatementDefinition {
             name: "OnError",
             version: 400,
@@ -2707,91 +2672,17 @@ pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 260]
             args: None,
             sig: StatementSignature::ArgumentsWithVariable(0, 0),
         },
-        StatementDefinition {
-            name: "SetPaletteColor",
-            version: 400,
-            opcode: OpCode::SetPaletteColor,
-            args: Some(vec![
-                ArgumentDefinition::new("Color", VariableType::Integer),
-                ArgumentDefinition::new("Rgb", VariableType::Unsigned),
-            ]),
-            sig: StatementSignature::ArgumentsWithVariable(0, 2),
-        },
-        StatementDefinition {
-            name: "SetPaletteColor",
-            version: 400,
-            opcode: OpCode::SetPaletteColorRgb,
-            args: Some(vec![
-                ArgumentDefinition::new("Color", VariableType::Integer),
-                ArgumentDefinition::new("Red", VariableType::Integer),
-                ArgumentDefinition::new("Green", VariableType::Integer),
-                ArgumentDefinition::new("Blue", VariableType::Integer),
-            ]),
-            sig: StatementSignature::ArgumentsWithVariable(0, 4),
-        },
-        StatementDefinition {
-            name: "ResetPaletteColor",
-            version: 400,
-            opcode: OpCode::ResetPaletteColor,
-            args: Some(vec![ArgumentDefinition::new("Color", VariableType::Integer)]),
-            sig: StatementSignature::ArgumentsWithVariable(0, 1),
-        },
-        StatementDefinition {
-            name: "ResetPalette",
-            version: 400,
-            opcode: OpCode::ResetPalette,
-            args: None,
-            sig: StatementSignature::ArgumentsWithVariable(0, 0),
-        },
-        StatementDefinition {
-            name: "BeginTerminalUpdate",
-            version: 400,
-            opcode: OpCode::BeginTerminalUpdate,
-            args: None,
-            sig: StatementSignature::ArgumentsWithVariable(0, 0),
-        },
-        StatementDefinition {
-            name: "EndTerminalUpdate",
-            version: 400,
-            opcode: OpCode::EndTerminalUpdate,
-            args: None,
-            sig: StatementSignature::ArgumentsWithVariable(0, 0),
-        },
-        StatementDefinition {
-            name: "RecordMacro",
-            version: 400,
-            opcode: OpCode::RecordMacro,
-            args: Some(vec![ArgumentDefinition::new("Slot", VariableType::Integer)]),
-            sig: StatementSignature::ArgumentsWithVariable(0, 1),
-        },
-        StatementDefinition {
-            name: "EndMacro",
-            version: 400,
-            opcode: OpCode::EndMacro,
-            args: None,
-            sig: StatementSignature::ArgumentsWithVariable(0, 0),
-        },
-        StatementDefinition {
-            name: "PlayMacro",
-            version: 400,
-            opcode: OpCode::PlayMacro,
-            args: Some(vec![ArgumentDefinition::new("Slot", VariableType::Integer)]),
-            sig: StatementSignature::ArgumentsWithVariable(0, 1),
-        },
-        StatementDefinition {
-            name: "DeleteMacro",
-            version: 400,
-            opcode: OpCode::DeleteMacro,
-            args: Some(vec![ArgumentDefinition::new("Slot", VariableType::Integer)]),
-            sig: StatementSignature::ArgumentsWithVariable(0, 1),
-        },
-        StatementDefinition {
-            name: "ClearMacros",
-            version: 400,
-            opcode: OpCode::ClearMacros,
-            args: None,
-            sig: StatementSignature::ArgumentsWithVariable(0, 0),
-        },
+        retired_statement(OpCode::SetPaletteColor),
+        retired_statement(OpCode::SetPaletteColorRgb),
+        retired_statement(OpCode::ResetPaletteColor),
+        retired_statement(OpCode::ResetPalette),
+        retired_statement(OpCode::BeginTerminalUpdate),
+        retired_statement(OpCode::EndTerminalUpdate),
+        retired_statement(OpCode::RecordMacro),
+        retired_statement(OpCode::EndMacro),
+        retired_statement(OpCode::PlayMacro),
+        retired_statement(OpCode::DeleteMacro),
+        retired_statement(OpCode::ClearMacros),
         // Alias section
         // Moving to the end, so that the opcode <--> index mapping is not broken
         StatementDefinition {

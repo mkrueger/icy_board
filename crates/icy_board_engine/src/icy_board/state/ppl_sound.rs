@@ -43,9 +43,7 @@ impl UserDataValue for PplSound {
         _arguments: &[VariableValue],
     ) -> crate::Res<VariableValue> {
         if *name == *STOP_ALL {
-            return Ok(VariableValue::new_bool(
-                crate::vm::statements::predefined_procedures::sound_stop_all(vm).await?,
-            ));
+            return Ok(VariableValue::new_bool(crate::vm::statements::predefined_procedures::sound_stop_all(vm).await?));
         }
         Err(format!("Unknown SOUND function {name}").into())
     }

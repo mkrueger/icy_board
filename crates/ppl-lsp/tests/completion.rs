@@ -98,8 +98,10 @@ fn runtime_402_objects_offer_their_registered_members() {
         ("AUDIO value\nvalue.", &["Valid", "Volume", "Play"][..]),
         ("EVENT value\nvalue.", &["Kind", "Action", "LeftDown", "Ctrl"][..]),
         ("ERROR value\nvalue.", &["OK", "Message", "Channel"][..]),
-        ("TERMINFO value\nvalue.", &["Program", "Columns", "InlineGraphics", "PixelMouse", "ClientBlit"][..]),
-        ("TERMSTATE value\nvalue.", &["MarginTop", "MarginLeft", "HorizontalMargins"][..]),
+        (
+            "TERMINFO value\nvalue.",
+            &["Program", "Columns", "InlineGraphics", "PixelMouse", "ClientBlit"][..],
+        ),
         ("TERMINPUT value\nvalue.", &["Poll", "Wait", "KeyboardOn", "Release"][..]),
         ("TERMINAL value\nvalue.", &["Info", "Gfx", "Input"][..]),
         ("GFX value\nvalue.", &["Init", "Backend", "Pacing"][..]),

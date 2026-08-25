@@ -4,11 +4,11 @@ use super::{compile_errors, compile_errors_with_runtime, run_ppl};
 
 #[test]
 fn a_method_can_be_called_on_a_function_result() {
-    assert!(compile_errors("PRINTLN TermInfo().Columns").is_empty());
+    assert!(compile_errors("PRINTLN Terminal.Info.Columns").is_empty());
 
     let output = run_ppl(
         r"
-        TERMINPUT input = TermInput()
+        TERMINPUT input = Terminal.Input
         PrintLn input.Wait(0).Kind
         ",
     );
@@ -18,47 +18,13 @@ fn a_method_can_be_called_on_a_function_result() {
 
 #[test]
 fn a_method_call_on_a_call_result_no_longer_reports_a_missing_function() {
-    assert!(compile_errors("PRINTLN TermInput().Poll().Kind").is_empty());
-}
-
-/// `TermInfo` names both a type and a function, and the type used to win and drop the member.
-#[test]
-fn a_member_of_a_type_named_like_a_function_is_not_dropped() {
-    let errors = compile_errors("PRINTLN TermInput.Poll().Kind");
-    assert!(!errors.iter().any(|error| error.contains("Poll")), "{errors:?}");
+    assert!(compile_errors("PRINTLN Terminal.Input.Poll().Kind").is_empty());
 }
 
 #[test]
 fn an_unknown_member_is_still_reported() {
-    let errors = compile_errors("PRINTLN TermInfo().NoSuchMember()");
+    let errors = compile_errors("PRINTLN Terminal.Info.NoSuchMember()");
     assert_eq!(errors, vec!["Member not found"]);
-}
-
-#[test]
-fn a_type_name_stands_in_for_its_one_instance() {
-    assert!(compile_errors("PRINTLN TermInfo.Columns").is_empty());
-
-    let output = run_ppl(
-        r#"
-        PrintLn TermInfo.Columns, "x", TermInfo.Rows
-        PrintLn TermState.VerticalMargins
-        PrintLn Error.OK
-        "#,
-    );
-
-    assert_eq!(output, "80x25\n0\n1\n");
-}
-
-#[test]
-fn a_static_receiver_reads_the_same_state_as_the_call() {
-    let output = run_ppl(
-        r#"
-        SetVMargins 4, 23
-        PrintLn TermState.MarginTop, " ", TermState().MarginTop
-        "#,
-    );
-
-    assert!(output.ends_with("4 4\n"), "{output:?}");
 }
 
 /// A variable is the nearer meaning of the name, so it keeps winning over the type.
@@ -66,7 +32,7 @@ fn a_static_receiver_reads_the_same_state_as_the_call() {
 fn a_variable_shadows_a_type_of_the_same_name() {
     let output = run_ppl(
         r"
-        TERMINFO TermInfo = TermInfo()
+        TERMINFO TermInfo = Terminal.Info
         PrintLn TermInfo.Rows
         ",
     );
@@ -83,8 +49,8 @@ fn a_type_without_an_instance_is_rejected() {
 
 #[test]
 fn a_static_receiver_needs_runtime_402() {
-    let errors = compile_errors_with_runtime("PRINTLN TermInfo.Columns", 401);
-    assert!(errors.iter().any(|error| error == "TermInfo needs runtime 402"), "{errors:?}");
+    let errors = compile_errors_with_runtime("PRINTLN Terminal.Info.Columns", 401);
+    assert!(errors.iter().any(|error| error.contains("Terminal needs runtime 402")), "{errors:?}");
 }
 
 /// The facade hangs objects off objects, so a property has to be able to answer with one.
@@ -110,7 +76,7 @@ fn a_property_can_answer_with_another_object() {
 fn a_statement_may_call_in_the_middle_of_a_chain() {
     let output = run_ppl(
         r"
-        Terminal.Gfx.Init(GFX_SIXEL, FALSE)
+        Terminal.Gfx.Init(GfxBackend.Sixel, FALSE)
         Surface.New(2, 2).Free()
         PrintLn ERR().Code
         Terminal.Gfx.Shutdown()
@@ -123,7 +89,7 @@ fn a_statement_may_call_in_the_middle_of_a_chain() {
 #[test]
 fn a_static_call_is_a_statement_of_its_own() {
     assert!(compile_errors("Terminal.Gfx.Shutdown()").is_empty());
-    assert!(compile_errors("Terminal.Gfx.Init(GFX_SIXEL, FALSE)").is_empty());
+    assert!(compile_errors("Terminal.Gfx.Init(GfxBackend.Sixel, FALSE)").is_empty());
 }
 
 /// What a call answers is a copy, so there is nothing behind it to assign to.

@@ -175,7 +175,12 @@ impl Parser<'_> {
         let rightpar_token = self.save_spanned_token();
         self.next_token();
 
-        Some(Expression::FunctionCall(FunctionCallExpression::new(expr, leftpar_token, arguments, rightpar_token)))
+        Some(Expression::FunctionCall(FunctionCallExpression::new(
+            expr,
+            leftpar_token,
+            arguments,
+            rightpar_token,
+        )))
     }
 
     /// Follows `.member` as far as it goes, so what a member answers may have members
