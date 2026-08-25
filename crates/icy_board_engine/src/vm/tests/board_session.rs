@@ -45,7 +45,7 @@ fn board_reports_what_the_board_is_configured_to_be() {
         PrintLn Board.Location
         PrintLn Board.Operator
         PrintLn Board.SysopName
-        PrintLn Board.Nodes, " ", Board.Conferences
+        PrintLn Board.Nodes, " ", Board.ConferenceCount
         "#,
         seed_board,
     );
@@ -60,7 +60,7 @@ fn every_conference_can_be_reached_by_number() {
     let output = run_ppl_on(
         r#"
         INTEGER i
-        FOR i = 0 TO Board.Conferences - 1
+        FOR i = 0 TO Board.ConferenceCount - 1
             CONFERENCE conf = Board.GetConference(i)
             PrintLn i, ": ", conf.Name, " ", conf.HasAccess()
         NEXT
@@ -90,7 +90,7 @@ fn a_board_value_can_be_kept_in_a_variable() {
     let output = run_ppl_on(
         r#"
         BOARD board = Board()
-        PrintLn board.Name, " ", board.Conferences
+        PrintLn board.Name, " ", board.ConferenceCount
         "#,
         seed_board,
     );
@@ -103,7 +103,7 @@ fn session_reports_the_call_it_is_running_in() {
     let output = run_ppl(
         r#"
         PrintLn Session.Node
-        PrintLn Session.ConferenceNumber, " ", Session.MessageArea, " ", Session.FileDirectory
+        PrintLn Session.ConferenceNumber, " ", Session.AreaNumber, " ", Session.DirectoryNumber
         PrintLn Session.SecurityLevel, " ", Session.PageLength
         PrintLn Session.IsLocal, " ", Session.IsSysop
         PrintLn "[", Session.UserName, "] [", Session.AliasName, "] [", Session.Language, "]"
@@ -123,6 +123,48 @@ fn session_hands_out_the_conference_the_caller_is_in() {
     );
 
     assert_eq!(output, "[] 1\n");
+}
+
+/// The current area and directory are objects too. The scratch session has not
+/// joined a conference, so both are the empty object rather than a seeded one.
+#[test]
+fn session_hands_out_the_current_area_and_directory() {
+    let output = run_ppl(
+        r#"
+        PrintLn "[", Session.Area.Name, "] ", Session.Area.Number
+        PrintLn "[", Session.Directory.Name, "] ", Session.Directory.Number
+        "#,
+    );
+
+    assert_eq!(output, "[] 0\n[] 0\n");
+}
+
+/// Every board object reports where it sits, so a listing can name the number
+/// a caller has to type.
+#[test]
+fn board_objects_know_their_own_number() {
+    let output = run_ppl_on(
+        r#"
+        CONFERENCE conf = Board.GetConference(1)
+        PrintLn conf.Number, " ", conf.Name
+        PrintLn conf.GetArea(1).Number, " ", conf.GetArea(1).Name
+        "#,
+        |board| {
+            seed_board(board);
+            board.conferences[1].areas = Some(crate::icy_board::message_area::AreaList::new(vec![
+                crate::icy_board::message_area::MessageArea {
+                    name: "First".to_string(),
+                    ..Default::default()
+                },
+                crate::icy_board::message_area::MessageArea {
+                    name: "Second".to_string(),
+                    ..Default::default()
+                },
+            ]));
+        },
+    );
+
+    assert_eq!(output, "1 Second\n1 Second\n");
 }
 
 /// `Session` is read live rather than snapshotted, so a value kept in a

@@ -88,7 +88,7 @@ fn a_board_object_offers_fields_and_methods() {
 #[test]
 fn a_function_answering_an_object_offers_its_members() {
     let items = complete("Board.GetConference(CurConf()).");
-    assert!(items.contains(&"Areas".to_string()), "{items:?}");
+    assert!(items.contains(&"AreaCount".to_string()), "{items:?}");
 }
 
 #[test]
@@ -105,8 +105,8 @@ fn runtime_402_objects_offer_their_registered_members() {
         ("TERMINPUT value\nvalue.", &["Poll", "Wait", "KeyboardOn", "Release"][..]),
         ("TERMINAL value\nvalue.", &["Info", "Gfx", "Input"][..]),
         ("GFX value\nvalue.", &["Init", "Backend", "Pacing"][..]),
-        ("BOARD value\nvalue.", &["Name", "SysopName", "Conferences", "GetConference"][..]),
-        ("SESSION value\nvalue.", &["Conference", "Node", "MinutesLeft", "IsSysop"][..]),
+        ("BOARD value\nvalue.", &["Name", "SysopName", "ConferenceCount", "GetConference"][..]),
+        ("SESSION value\nvalue.", &["Conference", "Area", "Directory", "Node", "MinutesLeft"][..]),
     ] {
         let items = complete(source);
         for member in expected {

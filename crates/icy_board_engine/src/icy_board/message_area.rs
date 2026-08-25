@@ -21,6 +21,10 @@ use super::{IcyBoardSerializer, security_expr::SecurityExpression};
 pub struct MessageArea {
     pub name: String,
 
+    /// Set when the area is handed to a PPE, so the object can report where it sits.
+    #[serde(skip)]
+    pub number: usize,
+
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
     pub qwk_name: String,
@@ -94,11 +98,13 @@ impl UserData for MessageArea {
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         registry.add_property(NAME.clone(), VariableType::String, false);
+        registry.add_property(NUMBER.clone(), VariableType::Integer, false);
         registry.add_function(HAS_ACCESS.clone(), Vec::new(), VariableType::Boolean);
     }
 }
 
 pub static NAME: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Name".to_string()));
+pub static NUMBER: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Number".to_string()));
 pub static HAS_ACCESS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("HasAccess".to_string()));
 
 #[async_trait(?Send)]
@@ -106,6 +112,9 @@ impl UserDataValue for MessageArea {
     fn get_property_value(&self, _vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
         if *name == *NAME {
             return Ok(VariableValue::new_string(self.name.clone()));
+        }
+        if *name == *NUMBER {
+            return Ok(VariableValue::new_int(self.number as i32));
         }
         log::error!("Invalid user data call on MessageArea ({name})");
         Ok(VariableValue::new_int(-1))

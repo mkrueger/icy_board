@@ -375,12 +375,13 @@ still be read.
 | Member | Type | Description |
 | :--- | :--- | :--- |
 | `Name` | `STRING` | Conference name |
+| `Number` | `INTEGER` | The number the conference was fetched under |
 | `IsPublic` | `BOOLEAN` | Whether the conference is configured as public |
-| `Directories` | `INTEGER` | Number of file directories |
-| `Areas` | `INTEGER` | Number of message areas |
-| `Doors` | `INTEGER` | Number of doors |
+| `DirectoryCount` | `INTEGER` | Number of file directories |
+| `AreaCount` | `INTEGER` | Number of message areas |
+| `DoorCount` | `INTEGER` | Number of doors |
 | `HasAccess()` | `BOOLEAN` | Whether the current caller can access the conference |
-| `GetDir(index)` | `DIRECTORY` | File directory at the zero-based index |
+| `GetDirectory(index)` | `DIRECTORY` | File directory at the zero-based index |
 | `GetArea(index)` | `AREA` | Message area at the zero-based index |
 | `GetDoor(index)` | `DOOR` | Door at the zero-based index |
 
@@ -389,6 +390,7 @@ still be read.
 | Member | Type | Description |
 | :--- | :--- | :--- |
 | `Name` | `STRING` | Directory / area name |
+| `Number` | `INTEGER` | The number it was fetched under |
 | `HasAccess()` | `BOOLEAN` | Whether the current caller can access it |
 
 **`DOOR`**
@@ -396,6 +398,7 @@ still be read.
 | Member | Type | Description |
 | :--- | :--- | :--- |
 | `Name` | `STRING` | Door name |
+| `Number` | `INTEGER` | The number it was fetched under |
 | `Description` | `STRING` | Door description |
 | `Password` | `PASSWORD` | The door's password |
 | `HasAccess()` | `BOOLEAN` | Whether the current caller can access the door |
@@ -403,10 +406,10 @@ still be read.
 Walking a conference:
 
 ```PPL
-CONFERENCE conf = CONFINFO(CURCONF())
+CONFERENCE conf = Session.Conference
 INTEGER i
 
-FOR i = 0 TO conf.Doors - 1
+FOR i = 0 TO conf.DoorCount - 1
     DOOR item = conf.GetDoor(i)
     IF item.HasAccess() PRINTLN item.Name
 NEXT

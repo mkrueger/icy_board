@@ -117,6 +117,10 @@ pub struct Door {
     pub description: String,
     pub password: String,
 
+    /// Set when the door is handed to a PPE, so the object can report where it sits.
+    #[serde(skip)]
+    pub number: usize,
+
     #[serde(default)]
     #[serde(skip_serializing_if = "SecurityExpression::is_empty")]
     #[serde_as(as = "DisplayFromStr")]
@@ -155,6 +159,7 @@ impl UserData for Door {
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         registry.add_property(NAME.clone(), VariableType::String, false);
+        registry.add_property(NUMBER.clone(), VariableType::Integer, false);
         registry.add_property(DESCRIPTION.clone(), VariableType::String, false);
         registry.add_property(PASSWORD.clone(), VariableType::Password, false);
         registry.add_function(HAS_ACCESS.clone(), Vec::new(), VariableType::Boolean);
@@ -166,6 +171,9 @@ impl UserDataValue for Door {
     fn get_property_value(&self, _vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
         if *name == *NAME {
             return Ok(VariableValue::new_string(self.name.clone()));
+        }
+        if *name == *NUMBER {
+            return Ok(VariableValue::new_int(self.number as i32));
         }
         if *name == *DESCRIPTION {
             return Ok(VariableValue::new_string(self.description.clone()));
@@ -205,6 +213,7 @@ impl UserDataValue for Door {
 }
 
 pub static NAME: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Name".to_string()));
+pub static NUMBER: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Number".to_string()));
 pub static DESCRIPTION: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Description".to_string()));
 pub static PASSWORD: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Password".to_string()));
 pub static HAS_ACCESS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("HasAccess".to_string()));
@@ -242,6 +251,7 @@ impl DoorList {
             // let os_2= split[10] != "0";
 
             let door = Door {
+                number: 0,
                 name: file.to_string(),
                 description: file.to_string(),
                 password: password.to_string(),

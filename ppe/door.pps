@@ -9,7 +9,7 @@ BEGIN
   
   CONFERENCE CONF = Session.Conference
   
-  FOR i = 1 to CONF.Doors
+  FOR i = 1 to CONF.DoorCount
     Door a = CONF.GetDoor(i - 1)
     
     IF !a.HasAccess() CONTINUE

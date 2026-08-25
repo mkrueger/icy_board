@@ -18,7 +18,7 @@ member_name!(LOCATION, "Location");
 member_name!(OPERATOR, "Operator");
 member_name!(SYSOP_NAME, "SysopName");
 member_name!(NODES, "Nodes");
-member_name!(CONFERENCES, "Conferences");
+member_name!(CONFERENCES, "ConferenceCount");
 member_name!(GET_CONFERENCE, "GetConference");
 
 /// What the board is configured to be, apart from any one call.
@@ -101,7 +101,9 @@ impl UserDataValue for PplBoard {
             if number >= 0
                 && let Some(conference) = vm.icy_board_state.get_board().await.conferences.get(number as usize)
             {
-                return Ok(user_data_value(conference.clone(), CONFERENCE_ID));
+                let mut conference = conference.clone();
+                conference.number = number as usize;
+                return Ok(user_data_value(conference, CONFERENCE_ID));
             }
             log::error!("PPL: Can't get conference {number} (Board.GetConference)");
             return Ok(user_data_value(Conference::default(), CONFERENCE_ID));

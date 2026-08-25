@@ -298,9 +298,10 @@ has to parse the board's config files to find out what is on it.
 
     IF conf.HasAccess() PRINTLN conf.Name
 
-``ConfInfo(conf)`` returns a read-only ``CONFERENCE`` snapshot. An invalid
-conference number returns an empty conference rather than failing, so its
-properties can still be read.
+``Board.GetConference(index)`` returns a read-only ``CONFERENCE`` snapshot, and
+``Session.Conference`` the one the caller is in. An index no conference has
+returns an empty conference rather than failing, so its properties can still be
+read.
 
 **CONFERENCE**
 
@@ -308,27 +309,29 @@ properties can still be read.
 Member            Type             Description
 ================  ===============  ==================================================
 ``Name``          ``STRING``       Conference name
+``Number``        ``INTEGER``      The number it was fetched under
 ``IsPublic``      ``BOOLEAN``      Whether the conference is configured as public
-``Directories``   ``INTEGER``      Number of file directories
-``Areas``         ``INTEGER``      Number of message areas
-``Doors``         ``INTEGER``      Number of doors
+``DirectoryCount``  ``INTEGER``    Number of file directories
+``AreaCount``     ``INTEGER``      Number of message areas
+``DoorCount``     ``INTEGER``      Number of doors
 ``HasAccess()``   ``BOOLEAN``      Whether the current caller can access it
-``GetDir(i)``     ``DIRECTORY``    File directory at the zero based index
+``GetDirectory(i)``  ``DIRECTORY`` File directory at the zero based index
 ``GetArea(i)``    ``AREA``         Message area at the zero based index
 ``GetDoor(i)``    ``DOOR``         Door at the zero based index
 ================  ===============  ==================================================
 
-**DIRECTORY** and **AREA** provide ``Name`` and ``HasAccess()``. **DOOR**
-provides ``Name``, ``Description``, ``Password`` and ``HasAccess()``.
+**DIRECTORY** and **AREA** provide ``Name``, ``Number`` and ``HasAccess()``.
+**DOOR** provides ``Name``, ``Number``, ``Description``, ``Password`` and
+``HasAccess()``.
 
 Walking a conference:
 
 .. code-block:: PPL
 
-    CONFERENCE conf = ConfInfo(CurConf())
+    CONFERENCE conf = Session.Conference
     INTEGER i
 
-    FOR i = 0 TO conf.Doors - 1
+    FOR i = 0 TO conf.DoorCount - 1
         DOOR item = conf.GetDoor(i)
         IF item.HasAccess() PRINTLN item.Name
     NEXT

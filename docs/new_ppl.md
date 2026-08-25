@@ -539,17 +539,20 @@ an empty conference object, so its properties can still be read.
 | Conference member | Type | Description |
 | :--- | :--- | :--- |
 | `Name` | `STRING` | Conference name |
+| `Number` | `INTEGER` | The number the conference was fetched under |
 | `IsPublic` | `BOOLEAN` | Whether the conference is configured as public |
-| `Directories` | `INTEGER` | Number of file directories |
-| `Areas` | `INTEGER` | Number of message areas |
-| `Doors` | `INTEGER` | Number of doors |
+| `DirectoryCount` | `INTEGER` | Number of file directories |
+| `AreaCount` | `INTEGER` | Number of message areas |
+| `DoorCount` | `INTEGER` | Number of doors |
 | `HasAccess()` | `BOOLEAN` | Whether the current caller can access the conference |
-| `GetDir(index)` | `DIRECTORY` | File directory at the zero-based index |
+| `GetDirectory(index)` | `DIRECTORY` | File directory at the zero-based index |
 | `GetArea(index)` | `AREA` | Message area at the zero-based index |
 | `GetDoor(index)` | `DOOR` | Door at the zero-based index |
 
-`DIRECTORY` and `AREA` provide `Name` and `HasAccess()`. `DOOR` provides
-`Name`, `Description`, `Password` and `HasAccess()`. A door password has the
+`DIRECTORY` and `AREA` provide `Name`, `Number` and `HasAccess()`. `DOOR` provides
+`Name`, `Number`, `Description`, `Password` and `HasAccess()`. Every board object
+reports the number it was fetched under, so a listing can name what a caller has
+to type. A door password has the
 runtime-only `PASSWORD` type: it can be compared with a string, but converting
 or printing it produces `******` rather than the secret.
 
@@ -557,7 +560,7 @@ or printing it produces `******` rather than the secret.
 CONFERENCE conf = Session.Conference
 INTEGER i
 
-FOR i = 0 TO conf.Doors - 1
+FOR i = 0 TO conf.DoorCount - 1
 	DOOR item = conf.GetDoor(i)
 	IF item.HasAccess() PRINTLN item.Name
 NEXT
@@ -578,17 +581,17 @@ one call *is doing*.
 | `Operator` | `STRING` | Operator named for `EMSI` |
 | `SysopName` | `STRING` | The sysop's display name |
 | `Nodes` | `INTEGER` | Number of configured nodes |
-| `Conferences` | `INTEGER` | Number of conferences |
+| `ConferenceCount` | `INTEGER` | Number of conferences |
 | `GetConference(index)` | `CONFERENCE` | Conference at the zero-based index |
 
-`Conferences` and `GetConference()` are what let a PPE walk the board without
+`ConferenceCount` and `GetConference()` are what let a PPE walk the board without
 `HIGHCONFNUM()`. An index no conference has answers with an empty conference.
 Listing conferences says nothing about who may enter
 one, so check `HasAccess()` before showing a name:
 
 ```PPL
 INTEGER i
-FOR i = 0 TO Board.Conferences - 1
+FOR i = 0 TO Board.ConferenceCount - 1
 	CONFERENCE conf = Board.GetConference(i)
 	IF conf.HasAccess() PRINTLN i, " ", conf.Name
 NEXT
@@ -600,8 +603,8 @@ kept in a variable still answers with what the session became:
 | Member | Type | Description |
 | :--- | :--- | :--- |
 | `Conference` | `CONFERENCE` | The conference the caller is in |
-| `ConferenceNumber` | `INTEGER` | Its number |
-| `MessageArea`, `FileDirectory` | `INTEGER` | The current area and directory |
+| `Area`, `Directory` | `AREA`, `DIRECTORY` | The message area and file directory in use |
+| `ConferenceNumber`, `AreaNumber`, `DirectoryNumber` | `INTEGER` | Their numbers |
 | `UserName`, `AliasName` | `STRING` | Who is calling |
 | `SecurityLevel` | `INTEGER` | The caller's current security level |
 | `Node` | `INTEGER` | Node number, as `PCBNODE()` reports it |

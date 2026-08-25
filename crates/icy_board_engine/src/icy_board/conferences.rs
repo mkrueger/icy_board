@@ -68,6 +68,10 @@ impl ConferenceType {
 pub struct Conference {
     pub name: String,
 
+    /// Set when the conference is handed to a PPE, so the object can report its number.
+    #[serde(skip)]
+    pub number: usize,
+
     #[serde(default)]
     #[serde(skip_serializing_if = "is_false")]
     pub is_public: bool,
@@ -264,6 +268,7 @@ impl ConferenceBase {
         for (i, c) in conferences.iter().enumerate() {
             let d = &add_conferences[i];
             let general_area: MessageArea = MessageArea {
+                number: 0,
                 name: "General".to_string(),
                 path: PathBuf::from(&c.message_file),
                 qwk_name: "General".to_string(),
@@ -283,6 +288,7 @@ impl ConferenceBase {
             areas.save(&destination.join("area.toml")).unwrap();
 
             let new = Conference {
+                number: 0,
                 name: c.name.clone(),
                 is_public: c.public_conference,
                 is_read_only: d.read_only,
@@ -378,6 +384,7 @@ impl UserData for Conference {
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         registry.add_property(NAME.clone(), VariableType::String, false);
+        registry.add_property(NUMBER.clone(), VariableType::Integer, false);
         registry.add_property(ISPUBLIC.clone(), VariableType::Boolean, false);
         registry.add_property(FILE_AREAS.clone(), VariableType::Integer, false);
         registry.add_property(MESSAGE_AREAS.clone(), VariableType::Integer, false);
@@ -395,12 +402,13 @@ impl UserData for Conference {
 }
 
 pub static NAME: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Name".to_string()));
+pub static NUMBER: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Number".to_string()));
 pub static ISPUBLIC: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("IsPublic".to_string()));
-pub static FILE_AREAS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Directories".to_string()));
-pub static DOORS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Doors".to_string()));
-pub static MESSAGE_AREAS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Areas".to_string()));
+pub static FILE_AREAS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("DirectoryCount".to_string()));
+pub static DOORS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("DoorCount".to_string()));
+pub static MESSAGE_AREAS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("AreaCount".to_string()));
 pub static HAS_ACCESS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("HasAccess".to_string()));
-pub static GET_FILE_AREA: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("GetDir".to_string()));
+pub static GET_FILE_AREA: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("GetDirectory".to_string()));
 pub static GET_MSG_AREA: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("GetArea".to_string()));
 pub static GET_DOOR: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("GetDoor".to_string()));
 
@@ -409,6 +417,9 @@ impl UserDataValue for Conference {
     fn get_property_value(&self, _vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
         if *name == *NAME {
             return Ok(VariableValue::new_string(self.name.clone()));
+        }
+        if *name == *NUMBER {
+            return Ok(VariableValue::new_int(self.number as i32));
         }
         if *name == *ISPUBLIC {
             return Ok(VariableValue::new_bool(self.is_public));
@@ -455,7 +466,9 @@ impl UserDataValue for Conference {
             if let Some(dir) = &self.directories {
                 let area = arguments[0].as_int();
                 if let Some(res) = dir.get(area as usize) {
-                    return Ok(user_data_value((*res).clone(), FILE_DIRECTORY_ID));
+                    let mut res = (*res).clone();
+                    res.number = area as usize;
+                    return Ok(user_data_value(res, FILE_DIRECTORY_ID));
                 }
                 log::error!("PPL: File area not found ({area})");
             }
@@ -466,7 +479,9 @@ impl UserDataValue for Conference {
             let area = arguments[0].as_int();
             if let Some(areas) = &self.areas {
                 if let Some(res) = areas.get(area as usize) {
-                    return Ok(user_data_value((*res).clone(), MESSAGE_AREA_ID));
+                    let mut res = (*res).clone();
+                    res.number = area as usize;
+                    return Ok(user_data_value(res, MESSAGE_AREA_ID));
                 }
                 log::error!("PPL: Message area not found ({area})");
             }
@@ -478,7 +493,9 @@ impl UserDataValue for Conference {
             let door = arguments[0].as_int();
             if let Some(doors) = &self.doors {
                 if let Some(res) = doors.get(door as usize) {
-                    return Ok(user_data_value((*res).clone(), DOOR_ID));
+                    let mut res = (*res).clone();
+                    res.number = door as usize;
+                    return Ok(user_data_value(res, DOOR_ID));
                 }
                 log::error!("PPL: Door not found ({door})");
             }

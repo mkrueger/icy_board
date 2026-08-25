@@ -3,7 +3,8 @@ use async_trait::async_trait;
 use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue, user_data_value},
     executable::{VariableType, VariableValue},
-    parser::{CONFERENCE_ID, SESSION_ID},
+    icy_board::{file_directory::FileDirectory, message_area::MessageArea},
+    parser::{CONFERENCE_ID, FILE_DIRECTORY_ID, MESSAGE_AREA_ID, SESSION_ID},
 };
 
 macro_rules! member_name {
@@ -14,8 +15,10 @@ macro_rules! member_name {
 
 member_name!(CONFERENCE, "Conference");
 member_name!(CONFERENCE_NUMBER, "ConferenceNumber");
-member_name!(MESSAGE_AREA, "MessageArea");
-member_name!(FILE_DIRECTORY, "FileDirectory");
+member_name!(AREA, "Area");
+member_name!(AREA_NUMBER, "AreaNumber");
+member_name!(DIRECTORY, "Directory");
+member_name!(DIRECTORY_NUMBER, "DirectoryNumber");
 member_name!(USER_NAME, "UserName");
 member_name!(ALIAS_NAME, "AliasName");
 member_name!(SECURITY_LEVEL, "SecurityLevel");
@@ -43,13 +46,15 @@ impl UserData for PplSession {
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         registry.add_property(CONFERENCE.clone(), VariableType::UserData(CONFERENCE_ID as u8), false);
+        registry.add_property(AREA.clone(), VariableType::UserData(MESSAGE_AREA_ID as u8), false);
+        registry.add_property(DIRECTORY.clone(), VariableType::UserData(FILE_DIRECTORY_ID as u8), false);
         for name in [&*USER_NAME, &*ALIAS_NAME, &*LANGUAGE] {
             registry.add_property(name.clone(), VariableType::String, false);
         }
         for name in [
             &*CONFERENCE_NUMBER,
-            &*MESSAGE_AREA,
-            &*FILE_DIRECTORY,
+            &*AREA_NUMBER,
+            &*DIRECTORY_NUMBER,
             &*SECURITY_LEVEL,
             &*NODE,
             &*MINUTES_LEFT,
@@ -68,12 +73,32 @@ impl UserDataValue for PplSession {
     fn get_property_value(&self, vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
         let session = &vm.icy_board_state.session;
         let value = if *name == *CONFERENCE {
-            user_data_value(session.current_conference.clone(), CONFERENCE_ID)
+            let mut conference = session.current_conference.clone();
+            conference.number = session.current_conference_number as usize;
+            user_data_value(conference, CONFERENCE_ID)
+        } else if *name == *AREA {
+            let area = session
+                .current_conference
+                .areas
+                .as_ref()
+                .and_then(|areas| areas.get(session.current_message_area).cloned());
+            let mut area = area.unwrap_or_else(MessageArea::default);
+            area.number = session.current_message_area;
+            user_data_value(area, MESSAGE_AREA_ID)
+        } else if *name == *DIRECTORY {
+            let directory = session
+                .current_conference
+                .directories
+                .as_ref()
+                .and_then(|directories| directories.get(session.current_file_directory).cloned());
+            let mut directory = directory.unwrap_or_else(FileDirectory::default);
+            directory.number = session.current_file_directory;
+            user_data_value(directory, FILE_DIRECTORY_ID)
         } else if *name == *CONFERENCE_NUMBER {
             VariableValue::new_int(i32::from(session.current_conference_number))
-        } else if *name == *MESSAGE_AREA {
+        } else if *name == *AREA_NUMBER {
             VariableValue::new_int(session.current_message_area as i32)
-        } else if *name == *FILE_DIRECTORY {
+        } else if *name == *DIRECTORY_NUMBER {
             VariableValue::new_int(session.current_file_directory as i32)
         } else if *name == *USER_NAME {
             VariableValue::new_string(session.user_name.clone())

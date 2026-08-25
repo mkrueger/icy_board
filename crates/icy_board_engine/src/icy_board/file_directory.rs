@@ -61,6 +61,10 @@ pub enum SortDirection {
 pub struct FileDirectory {
     pub name: String,
     pub path: PathBuf,
+
+    /// Set when the directory is handed to a PPE, so the object can report where it sits.
+    #[serde(skip)]
+    pub number: usize,
     #[serde(default)]
     pub metadata_path: PathBuf,
 
@@ -172,6 +176,7 @@ impl PCBoardRecordImporter<FileDirectory> for DirectoryList {
         };
         let metadata_path = path.join("dir");
         Ok(FileDirectory {
+            number: 0,
             name,
             path,
             metadata_path,
@@ -196,12 +201,14 @@ impl UserData for FileDirectory {
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         registry.add_property(NAME.clone(), VariableType::String, false);
+        registry.add_property(NUMBER.clone(), VariableType::Integer, false);
 
         registry.add_function(HAS_ACCESS.clone(), Vec::new(), VariableType::Boolean);
     }
 }
 
 pub static NAME: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Name".to_string()));
+pub static NUMBER: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Number".to_string()));
 pub static HAS_ACCESS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("HasAccess".to_string()));
 
 #[async_trait(?Send)]
@@ -209,6 +216,9 @@ impl UserDataValue for FileDirectory {
     fn get_property_value(&self, _vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
         if *name == *NAME {
             return Ok(VariableValue::new_string(self.name.clone()));
+        }
+        if *name == *NUMBER {
+            return Ok(VariableValue::new_int(self.number as i32));
         }
         log::error!("Invalid user data call on FileDirectory ({name})");
         Ok(VariableValue::new_int(-1))

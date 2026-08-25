@@ -266,6 +266,7 @@ impl<'a> Page for DoorEditor<'a> {
                         if let Ok(lock) = &mut self.door_list.lock() {
                             lock.push(Door {
                                 name,
+                                number: 0,
                                 description: "".to_string(),
                                 password: "".to_string(),
                                 securiy_level: SecurityExpression::default(),

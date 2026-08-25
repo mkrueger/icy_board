@@ -9,10 +9,10 @@ BEGIN
 
   CONFERENCE CONF = Session.Conference
   
-  FOR i = 1 to CONF.Directories
+  FOR i = 1 to CONF.DirectoryCount
     IF GetX() > 45
       PRINTLN
-    Directory dir = CONF.GetDir(i - 1)
+    Directory dir = CONF.GetDirectory(i - 1)
     
     IF !dir.HasAccess() CONTINUE
 
