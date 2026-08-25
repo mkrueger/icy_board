@@ -76,7 +76,7 @@ impl UserDataValue for PplTerminal {
         Err(format!("Unknown TERMINAL property {name}").into())
     }
 
-    fn set_property_value(&mut self, _vm: &mut crate::vm::VirtualMachine<'_>, _name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
+    fn set_property_value(&self, _vm: &mut crate::vm::VirtualMachine<'_>, _name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
         Err("TERMINAL properties are read-only".into())
     }
 

@@ -2105,7 +2105,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 self.add_reference_to(let_stmt.get_identifier_token(), idx);
 
                 let mut variable_type = target_type;
-                for member_token in let_stmt.get_members() {
+                for (position, member_token) in let_stmt.get_members().iter().enumerate() {
                     match variable_type {
                         VariableType::UserData(type_id) if self.type_registry.is_record_type(type_id) => {
                             let Token::Identifier(member) = &member_token.token else {
@@ -2113,7 +2113,26 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                             };
                             variable_type = self.resolve_record_field(type_id, member, &member_token.span);
                         }
-                        // Board objects hand out copies, so writing to one would go nowhere.
+                        VariableType::UserData(type_id) => {
+                            let Token::Identifier(member) = &member_token.token else {
+                                break;
+                            };
+                            let Some(registry) = self.type_registry.get_type_from_id(type_id) else {
+                                self.errors.lock().unwrap().report_error(member_token.span.clone(), CompilationErrorType::InvalidLetVariable);
+                                break;
+                            };
+                            let Some(member_id) = registry.get_member_id(member) else {
+                                self.errors.lock().unwrap().report_error(member_token.span.clone(), CompilationErrorType::InvalidLetVariable);
+                                break;
+                            };
+                            let is_last = position + 1 == let_stmt.get_members().len();
+                            if is_last && !matches!(registry.id_table.get(member_id), Some(crate::compiler::user_data::UserDataEntry::Field(_))) {
+                                self.errors.lock().unwrap().report_error(member_token.span.clone(), CompilationErrorType::InvalidLetVariable);
+                                break;
+                            }
+                            self.user_type_lookup.insert(member_token.span.start, type_id);
+                            variable_type = registry.fields.get(member).copied().unwrap_or(VariableType::None);
+                        }
                         _ => {
                             self.errors
                                 .lock()
@@ -2126,10 +2145,42 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 target_type = variable_type;
             }
         } else {
-            self.errors.lock().unwrap().report_error(
-                let_stmt.get_identifier_token().span.clone(),
-                CompilationErrorType::VariableNotFound(let_stmt.get_identifier().to_string()),
-            );
+            let root = let_stmt.get_identifier();
+            let Some(VariableType::UserData(mut type_id)) = self.type_registry.get_board_object(root) else {
+                self.errors.lock().unwrap().report_error(
+                    let_stmt.get_identifier_token().span.clone(),
+                    CompilationErrorType::VariableNotFound(root.to_string()),
+                );
+                return VariableType::None;
+            };
+            let Some(provider) = self.type_registry.get_type_from_id(type_id).and_then(|registry| registry.instance_provider) else {
+                self.errors.lock().unwrap().report_error(let_stmt.get_identifier_token().span.clone(), CompilationErrorType::InvalidLetVariable);
+                return VariableType::None;
+            };
+            self.instance_provider_lookup.insert(let_stmt.get_identifier_token().span.start, provider);
+            for (position, member_token) in let_stmt.get_members().iter().enumerate() {
+                let Token::Identifier(member) = &member_token.token else {
+                    return VariableType::None;
+                };
+                let Some(registry) = self.type_registry.get_type_from_id(type_id) else {
+                    self.errors.lock().unwrap().report_error(member_token.span.clone(), CompilationErrorType::InvalidLetVariable);
+                    return VariableType::None;
+                };
+                let Some(member_id) = registry.get_member_id(member) else {
+                    self.errors.lock().unwrap().report_error(member_token.span.clone(), CompilationErrorType::InvalidLetVariable);
+                    return VariableType::None;
+                };
+                let is_last = position + 1 == let_stmt.get_members().len();
+                if is_last && !matches!(registry.id_table.get(member_id), Some(crate::compiler::user_data::UserDataEntry::Field(_))) {
+                    self.errors.lock().unwrap().report_error(member_token.span.clone(), CompilationErrorType::InvalidLetVariable);
+                    return VariableType::None;
+                }
+                self.user_type_lookup.insert(member_token.span.start, type_id);
+                target_type = registry.fields.get(member).copied().unwrap_or(VariableType::None);
+                if let VariableType::UserData(next) = target_type {
+                    type_id = next;
+                }
+            }
         }
         for arg in let_stmt.get_arguments() {
             arg.visit(self);

@@ -96,13 +96,13 @@ fn runtime_402_objects_offer_their_registered_members() {
     for (source, expected) in [
         ("SURFACE value\nvalue.", &["Width", "SetPixel", "PresentRect"][..]),
         ("AUDIO value\nvalue.", &["Valid", "Volume", "Play"][..]),
-        ("EVENT value\nvalue.", &["Kind", "Text", "Code"][..]),
+        ("EVENT value\nvalue.", &["Kind", "Action", "LeftDown", "Ctrl"][..]),
         ("ERROR value\nvalue.", &["OK", "Message", "Channel"][..]),
-        ("TERMINFO value\nvalue.", &["Program", "Columns", "InlineGraphics"][..]),
+        ("TERMINFO value\nvalue.", &["Program", "Columns", "InlineGraphics", "PixelMouse", "ClientBlit"][..]),
         ("TERMSTATE value\nvalue.", &["MarginTop", "MarginLeft", "HorizontalMargins"][..]),
         ("TERMINPUT value\nvalue.", &["Poll", "Wait", "KeyboardOn", "Release"][..]),
         ("TERMINAL value\nvalue.", &["Info", "Gfx", "Input"][..]),
-        ("GFX value\nvalue.", &["Init", "Backend", "CellWidth"][..]),
+        ("GFX value\nvalue.", &["Init", "Backend", "Pacing"][..]),
     ] {
         let items = complete(source);
         for member in expected {
@@ -116,6 +116,22 @@ fn runtime_402_objects_offer_their_registered_members() {
 fn an_object_offers_only_its_own_members() {
     let items = complete("TERMINPUT value\nvalue.");
     assert_eq!(items, vec!["KeyboardOff", "KeyboardOn", "MouseOff", "MouseOn", "Poll", "Release", "Wait"]);
+}
+
+#[test]
+fn graphics_only_offers_session_control() {
+    let items = complete("GFX value\nvalue.");
+    assert_eq!(items, vec!["Backend", "Init", "Pacing", "Shutdown"]);
+}
+
+#[test]
+fn event_does_not_offer_raw_masks() {
+    let items = complete("EVENT value\nvalue.");
+    assert!(!items.contains(&"Buttons".to_string()), "{items:?}");
+    assert!(!items.contains(&"Modifiers".to_string()), "{items:?}");
+    for name in ["LeftDown", "MiddleDown", "RightDown", "Shift", "Alt", "Ctrl", "Meta"] {
+        assert!(items.contains(&name.to_string()), "{name} missing: {items:?}");
+    }
 }
 
 #[test]

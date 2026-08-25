@@ -67,7 +67,7 @@ impl UserDataValue for PplTerminalState {
         Err(format!("Unknown TERMSTATE property {name}").into())
     }
 
-    fn set_property_value(&mut self, _vm: &mut crate::vm::VirtualMachine<'_>, _name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
+    fn set_property_value(&self, _vm: &mut crate::vm::VirtualMachine<'_>, _name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
         Ok(())
     }
 

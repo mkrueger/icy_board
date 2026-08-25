@@ -111,12 +111,8 @@ impl UserDataValue for MessageArea {
         Ok(VariableValue::new_int(-1))
     }
 
-    fn set_property_value(&mut self, _vm: &mut crate::vm::VirtualMachine, name: &unicase::Ascii<String>, val: VariableValue) -> crate::Res<()> {
-        if *name == *NAME {
-            self.name = val.as_string();
-            return Ok(());
-        }
-        Ok(())
+    fn set_property_value(&self, _vm: &mut crate::vm::VirtualMachine, _name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
+        Err("AREA properties are read-only".into())
     }
 
     async fn call_function(

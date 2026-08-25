@@ -142,10 +142,8 @@ impl UserData for PplEvent {
         registry.add_property(X.clone(), VariableType::Integer, false);
         registry.add_property(Y.clone(), VariableType::Integer, false);
         registry.add_property(BUTTON.clone(), VariableType::UserData(MOUSE_BUTTON_ENUM_ID), false);
-        registry.add_property(MODIFIERS.clone(), VariableType::Integer, false);
         registry.add_property(PIXELS.clone(), VariableType::Boolean, false);
         registry.add_property(REPEATED.clone(), VariableType::Boolean, false);
-        registry.add_property(BUTTONS.clone(), VariableType::Integer, false);
         registry.add_property(WHEEL_X.clone(), VariableType::Integer, false);
         registry.add_property(WHEEL_Y.clone(), VariableType::Integer, false);
         registry.add_property(TIME.clone(), VariableType::Unsigned, false);
@@ -188,17 +186,11 @@ impl UserDataValue for PplEvent {
         if *name == *BUTTON {
             return Ok(VariableValue::new_int(self.button));
         }
-        if *name == *MODIFIERS {
-            return Ok(VariableValue::new_int(self.modifiers));
-        }
         if *name == *PIXELS {
             return Ok(VariableValue::new_bool(self.pixels));
         }
         if *name == *REPEATED {
             return Ok(VariableValue::new_bool(self.repeated));
-        }
-        if *name == *BUTTONS {
-            return Ok(VariableValue::new_int(self.buttons));
         }
         if *name == *WHEEL_X {
             return Ok(VariableValue::new_int(self.wheel_x));
@@ -247,7 +239,7 @@ impl UserDataValue for PplEvent {
         Err("Invalid EVENT property".into())
     }
 
-    fn set_property_value(&mut self, _vm: &mut crate::vm::VirtualMachine<'_>, _name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
+    fn set_property_value(&self, _vm: &mut crate::vm::VirtualMachine<'_>, _name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
         Err("EVENT properties are read-only".into())
     }
 

@@ -359,6 +359,32 @@ impl PPECompiler {
             Statement::Let(let_smt) => {
                 let var_name = let_smt.get_identifier();
                 assert!(let_smt.get_let_variant() == &Token::Eq, "Let variants allowed in output AST.");
+                if self
+                    .semantic_visitor
+                    .instance_provider_lookup
+                    .contains_key(&let_smt.get_identifier_token().span.start)
+                {
+                    let base = crate::ast::Expression::Identifier(crate::ast::IdentifierExpression::new(let_smt.get_identifier_token().clone()));
+                    let mut variable = base.visit(&mut crate::compiler::expr_compiler::ExpressionCompiler { compiler: self });
+                    for member_token in let_smt.get_members() {
+                        let Token::Identifier(member) = &member_token.token else {
+                            return None;
+                        };
+                        let type_id = self.semantic_visitor.user_type_lookup.get(&member_token.span.start)?;
+                        let registry = self.semantic_visitor.type_registry.get_type_from_id(*type_id)?;
+                        let member_id = registry.member_id_lookup.get(member).copied()?;
+                        variable = PPEExpr::Member(Box::new(variable), member_id);
+                    }
+                    let value = self.comp_expr(let_smt.get_value_expression());
+                    let PPEExpr::Member(base, member_id) = variable else {
+                        return None;
+                    };
+                    return Some(PPECommand::MemberCall(Box::new(PPEExpr::MemberFunctionCall(
+                        base,
+                        vec![value],
+                        member_id,
+                    ))));
+                }
                 let Some(decl_idx) = self.lookup_variable_index(var_name) else {
                     log::error!("Variable not found: {var_name}");
                     return None;
@@ -405,16 +431,19 @@ impl PPECompiler {
                         log::error!("Not a record: {var_name}");
                         return None;
                     };
-                    let Some(definition) = self.semantic_visitor.type_registry.get_record_type_from_id(type_id) else {
-                        log::error!("Not a record: {var_name}");
-                        return None;
-                    };
-                    let Some(field) = definition.field_index(member) else {
-                        log::error!("Field not found: {var_name}.{member}");
-                        return None;
-                    };
-                    member_type = definition.field_type(field).unwrap_or(VariableType::None);
-                    variable = PPEExpr::Member(Box::new(variable), field);
+                    if let Some(definition) = self.semantic_visitor.type_registry.get_record_type_from_id(type_id) {
+                        let Some(field) = definition.field_index(member) else {
+                            log::error!("Field not found: {var_name}.{member}");
+                            return None;
+                        };
+                        member_type = definition.field_type(field).unwrap_or(VariableType::None);
+                        variable = PPEExpr::Member(Box::new(variable), field);
+                    } else {
+                        let registry = self.semantic_visitor.type_registry.get_type_from_id(type_id)?;
+                        let field = registry.member_id_lookup.get(member).copied()?;
+                        member_type = registry.fields.get(member).copied().unwrap_or(VariableType::None);
+                        variable = PPEExpr::Member(Box::new(variable), field);
+                    }
                 }
                 let value = self.comp_expr(let_smt.get_value_expression());
 

@@ -125,7 +125,7 @@ fn unified_events_consume_character_key_edge_and_mouse_input() {
         e = input.Poll()
         PRINTLN e.Kind, ":", e.Code, ":", e.Text, ":", e.Pressed
         e = input.Poll()
-        PRINTLN e.Kind, ":", e.Code, ":", e.X, ":", e.Y, ":", e.Button, ":", e.Modifiers, ":", e.Pixels
+        PRINTLN e.Kind, ":", e.Code, ":", e.X, ":", e.Y, ":", e.Button, ":", e.Shift, e.Alt, e.Ctrl, e.Meta, ":", e.Pixels
         e = input.Poll()
         PRINTLN e.Kind, ":", e.Code, ":", e.Text, ":", e.Pressed, ":", e.X, ":", e.Y
 
@@ -134,7 +134,7 @@ fn unified_events_consume_character_key_edge_and_mouse_input() {
         b"x\x1b[=30K\x1b[<20;11;6M",
     );
 
-    assert!(output.contains("1:120:x:1\n2:30::1\n3:1:10:5:0:5:0\n0:0::0:0:0\n"), "{output:?}");
+    assert!(output.contains("1:120:x:1\n2:30::1\n3:1:10:5:0:1010:0\n0:0::0:0:0\n"), "{output:?}");
 }
 
 #[test]
@@ -180,11 +180,11 @@ fn logical_ansi_keys_are_one_event() {
         r#"
         TERMINPUT input = TermInput()
         EVENT e = input.Poll()
-        PRINTLN e.Kind, ":", e.Code, ":", e.Text, ":", e.Repeated, ":", e.Modifiers
+        PRINTLN e.Kind, ":", e.Code, ":", e.Text, ":", e.Repeated, ":", e.Shift, e.Alt, e.Ctrl, e.Meta
         "#,
         b"\x1b[1;5A",
     );
-    assert_eq!(output, format!("1:{key}:UP:0:4\n", key = 0x11_0001));
+    assert_eq!(output, format!("1:{key}:UP:0:0010\n", key = 0x11_0001));
 }
 
 #[test]
@@ -195,16 +195,16 @@ fn mouse_events_report_held_buttons_and_wheel_deltas() {
         EVENT e
         input.MouseOn(MOUSE_TEXT)
         e = input.Poll()
-        PRINTLN e.Buttons, ":", e.WheelX, ":", e.WheelY
+        PRINTLN e.LeftDown, e.MiddleDown, e.RightDown, ":", e.WheelX, ":", e.WheelY
         e = input.Poll()
-        PRINTLN e.Buttons, ":", e.Button, ":", e.WheelX, ":", e.WheelY
+        PRINTLN e.LeftDown, e.MiddleDown, e.RightDown, ":", e.Button, ":", e.WheelX, ":", e.WheelY
         e = input.Poll()
-        PRINTLN e.Buttons
+        PRINTLN e.LeftDown, e.MiddleDown, e.RightDown
         input.Release()
         "#,
         b"\x1b[<0;1;1M\x1b[<66;1;1M\x1b[<0;1;1m",
     );
-    assert!(output.contains("1:0:0\n1:5:-1:0\n0\n"), "{output:?}");
+    assert!(output.contains("100:0:0\n100:5:-1:0\n000\n"), "{output:?}");
 }
 
 #[test]

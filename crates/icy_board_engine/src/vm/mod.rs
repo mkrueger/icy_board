@@ -612,6 +612,14 @@ impl VirtualMachine<'_> {
                 let Some(member) = registry.id_table.get(*id) else {
                     return Err(VMError::InvalidMemberId(type_id, *id).into());
                 };
+                if let crate::compiler::user_data::UserDataEntry::Field(name) = member {
+                    if arguments.len() != 1 {
+                        return Err(VMError::InvalidMemberArgumentCount(type_id, *id, 1, arguments.len()).into());
+                    }
+                    let value = self.eval_expr(&arguments[0]).await?;
+                    object.set_property_value(self, name, value)?;
+                    return Ok(VariableValue::new_bool(true));
+                }
                 let crate::compiler::user_data::UserDataEntry::Function(name) = member else {
                     return Err(VMError::InvalidMemberFunction(type_id, *id).into());
                 };
@@ -861,6 +869,18 @@ impl VirtualMachine<'_> {
                 self.variable_table.get_var_entry_mut(*id).value.set_array_value(dim_1, dim_2, dim_3, value)?;
             }
             PPEExpr::Member(_, _) => {
+                if let PPEExpr::Member(base, member_id) = variable {
+                    let base_value = self.eval_expr(base).await?;
+                    if let VariableType::UserData(type_id) = base_value.get_type()
+                        && let GenericVariableData::UserData(object) = base_value.generic_data
+                    {
+                        let registry = self.type_registry.get_type_from_id(type_id).ok_or(VMError::TypeNotFoundInRegistry(type_id))?;
+                        let Some(crate::compiler::user_data::UserDataEntry::Field(name)) = registry.id_table.get(*member_id) else {
+                            return Err(VMError::InvalidMemberId(type_id, *member_id).into());
+                        };
+                        return object.set_property_value(self, name, value);
+                    }
+                }
                 // The base has to be reached as a place, not as the copy eval_expr hands out,
                 // so the slot it lives in is resolved first and then walked into.
                 let mut path = Vec::new();

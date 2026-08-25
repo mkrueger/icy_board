@@ -16,18 +16,8 @@ member_name!(INIT, "Init");
 member_name!(SHUTDOWN, "Shutdown");
 member_name!(BACKEND, "Backend");
 member_name!(PACING, "Pacing");
-member_name!(SET_PACING, "SetPacing");
-member_name!(CELL_WIDTH, "CellWidth");
-member_name!(CELL_HEIGHT, "CellHeight");
-member_name!(SCREEN_WIDTH, "ScreenWidth");
-member_name!(SCREEN_HEIGHT, "ScreenHeight");
-member_name!(SIXEL, "Sixel");
-member_name!(JXL, "Jxl");
-member_name!(JXL_BLOB, "JxlBlob");
-member_name!(PIXEL_MOUSE, "PixelMouse");
-member_name!(CLIENT_BLIT, "ClientBlit");
 
-/// What the session draws with: the backend, the surfaces and what the terminal can do.
+/// What the session draws with. What the terminal is able to draw is `Terminal.Info`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct PplGfx;
 
@@ -43,20 +33,10 @@ impl UserData for PplGfx {
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         let backend = VariableType::UserData(crate::parser::GFX_BACKEND_ENUM_ID);
         registry.add_property(BACKEND.clone(), backend, false);
-        registry.add_property(PACING.clone(), VariableType::Integer, false);
+        registry.add_property(PACING.clone(), VariableType::Integer, true);
 
         registry.add_function_with(INIT.clone(), vec![backend, VariableType::Boolean], 0, VariableType::Boolean);
         registry.add_function(SHUTDOWN.clone(), Vec::new(), VariableType::Boolean);
-        registry.add_function(SET_PACING.clone(), vec![VariableType::Integer], VariableType::Boolean);
-
-        // These ask the terminal when it has not been asked yet, so they are calls
-        // rather than properties. `Terminal.Info` answers the same from the cache.
-        for name in [&*CELL_WIDTH, &*CELL_HEIGHT, &*SCREEN_WIDTH, &*SCREEN_HEIGHT] {
-            registry.add_function(name.clone(), Vec::new(), VariableType::Integer);
-        }
-        for name in [&*SIXEL, &*JXL, &*JXL_BLOB, &*PIXEL_MOUSE, &*CLIENT_BLIT] {
-            registry.add_function(name.clone(), Vec::new(), VariableType::Boolean);
-        }
     }
 }
 
@@ -78,8 +58,12 @@ impl UserDataValue for PplGfx {
         Err(format!("Unknown GFX property {name}").into())
     }
 
-    fn set_property_value(&mut self, _vm: &mut crate::vm::VirtualMachine<'_>, _name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
-        Err("GFX properties are read-only".into())
+    fn set_property_value(&self, vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, val: VariableValue) -> crate::Res<()> {
+        if *name == *PACING {
+            crate::vm::statements::predefined_procedures::gfx_set_pacing(vm, val.as_int());
+            return Ok(());
+        }
+        Err(format!("GFX property {name} is read-only").into())
     }
 
     async fn call_function(

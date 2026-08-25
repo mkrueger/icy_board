@@ -43,7 +43,7 @@ fn pacing_reads_back_what_it_was_set_to() {
         r"
         Terminal.Gfx.Init(GFX_SIXEL, FALSE)
         PrintLn Terminal.Gfx.Pacing
-        Terminal.Gfx.SetPacing(1)
+        Terminal.Gfx.Pacing = 1
         PrintLn Terminal.Gfx.Pacing
         SURFACE s = Surface.New(2, 2)
         s.Present()
@@ -57,11 +57,39 @@ fn pacing_reads_back_what_it_was_set_to() {
 }
 
 #[test]
-fn the_geometry_calls_report_what_the_terminal_answered() {
+fn a_writable_property_may_be_set_through_a_stored_object() {
+    let output = run_ppl(
+        r"
+        Terminal.Gfx.Init(GfxBackend.Sixel, FALSE)
+        GFX graphics = Terminal.Gfx
+        graphics.Pacing = 2
+        PrintLn graphics.Pacing
+        Terminal.Gfx.Shutdown()
+        ",
+    );
+
+    assert_eq!(output, "1\n");
+}
+
+#[test]
+fn a_read_only_property_cannot_be_assigned() {
+    let errors = compile_errors("Terminal.Gfx.Backend = GfxBackend.Sixel");
+    assert!(!errors.is_empty(), "a read-only property must stay read-only");
+}
+
+#[test]
+fn a_writable_property_checks_the_value_type() {
+    let errors = compile_errors("Terminal.Gfx.Pacing = GfxBackend.Sixel");
+    assert!(!errors.is_empty(), "an enum must not be assigned to an integer property");
+}
+
+#[test]
+fn terminal_info_reports_the_geometry_the_terminal_answered() {
     let output = run_ppl_with_input(
         r#"
-        PrintLn Terminal.Gfx.CellWidth(), "x", Terminal.Gfx.CellHeight()
-        PrintLn Terminal.Gfx.ScreenWidth(), "x", Terminal.Gfx.ScreenHeight()
+        Terminal.Gfx.Init(GfxBackend.Auto, FALSE)
+        PrintLn Terminal.Info.CellWidth, "x", Terminal.Info.CellHeight
+        PrintLn Terminal.Info.ScreenWidth, "x", Terminal.Info.ScreenHeight
         "#,
         JXL_TERMINAL,
     );
@@ -69,19 +97,19 @@ fn the_geometry_calls_report_what_the_terminal_answered() {
     assert!(output.ends_with("10x20\n800x600\n"), "{output:?}");
 }
 
-/// The capability calls replace the `GfxCaps()` bitmask, so they have to agree with it.
+/// The terminal's capabilities all live in one cached snapshot.
 #[test]
-fn the_capability_calls_agree_with_the_bitmask() {
+fn terminal_info_reports_all_capabilities() {
     let output = run_ppl_with_input(
         r"
-        PrintLn Terminal.Gfx.Sixel(), Terminal.Gfx.Jxl(), Terminal.Gfx.JxlBlob()
-        PrintLn Terminal.Gfx.PixelMouse(), Terminal.Gfx.ClientBlit(), Terminal.Sound.Available()
-        PrintLn GfxCaps()
+        Terminal.Gfx.Init(GfxBackend.Auto, FALSE)
+        PrintLn Terminal.Info.Sixel, Terminal.Info.Jxl, Terminal.Info.InlineGraphics
+        PrintLn Terminal.Info.PixelMouse, Terminal.Info.ClientBlit, Terminal.Info.Sound
         ",
         JXL_TERMINAL,
     );
 
-    assert!(output.ends_with("110\n000\n35\n"), "{output:?}");
+    assert!(output.ends_with("110\n000\n"), "{output:?}");
 }
 
 #[test]

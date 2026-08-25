@@ -25,6 +25,8 @@ property_name!(JXL, "Jxl");
 property_name!(INLINE_GRAPHICS, "InlineGraphics");
 property_name!(SOUND, "Sound");
 property_name!(PHYSICAL_KEYS, "PhysicalKeys");
+property_name!(PIXEL_MOUSE, "PixelMouse");
+property_name!(CLIENT_BLIT, "ClientBlit");
 property_name!(SYNCHRONIZED_OUTPUT, "SynchronizedOutput");
 property_name!(TERMINAL_MACROS, "TerminalMacros");
 property_name!(CELL_WIDTH, "CellWidth");
@@ -46,6 +48,8 @@ pub struct PplTerminalInfo {
     inline_graphics: bool,
     sound: bool,
     physical_keys: bool,
+    pixel_mouse: bool,
+    client_blit: bool,
     synchronized_output: bool,
     terminal_macros: bool,
     cell_width: i32,
@@ -74,6 +78,8 @@ impl From<&TerminalCaps> for PplTerminalInfo {
             inline_graphics: caps.gfx.inline_blobs(),
             sound: caps.sound,
             physical_keys: caps.gfx.physical_keys,
+            pixel_mouse: caps.gfx.cterm_revision.is_some_and(|revision| revision >= 1330),
+            client_blit: caps.gfx.cterm_revision.is_some_and(|revision| revision >= 1318),
             synchronized_output: caps.synchronized_output == Some(true),
             terminal_macros: caps.terminal_macros == Some(true),
             cell_width: caps.gfx.cell_width,
@@ -108,6 +114,8 @@ impl UserData for PplTerminalInfo {
             &*INLINE_GRAPHICS,
             &*SOUND,
             &*PHYSICAL_KEYS,
+            &*PIXEL_MOUSE,
+            &*CLIENT_BLIT,
             &*SYNCHRONIZED_OUTPUT,
             &*TERMINAL_MACROS,
         ] {
@@ -143,6 +151,10 @@ impl UserDataValue for PplTerminalInfo {
             VariableValue::new_bool(self.sound)
         } else if *name == *PHYSICAL_KEYS {
             VariableValue::new_bool(self.physical_keys)
+        } else if *name == *PIXEL_MOUSE {
+            VariableValue::new_bool(self.pixel_mouse)
+        } else if *name == *CLIENT_BLIT {
+            VariableValue::new_bool(self.client_blit)
         } else if *name == *SYNCHRONIZED_OUTPUT {
             VariableValue::new_bool(self.synchronized_output)
         } else if *name == *TERMINAL_MACROS {
@@ -161,7 +173,7 @@ impl UserDataValue for PplTerminalInfo {
         Ok(value)
     }
 
-    fn set_property_value(&mut self, _vm: &mut crate::vm::VirtualMachine<'_>, _name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
+    fn set_property_value(&self, _vm: &mut crate::vm::VirtualMachine<'_>, _name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
         Ok(())
     }
 

@@ -4389,9 +4389,7 @@ pub(crate) async fn gfx_shutdown(vm: &mut VirtualMachine<'_>) -> Res<()> {
 
 /// Runs one `GFX` member.
 pub(crate) async fn gfx_member(vm: &mut VirtualMachine<'_>, name: &unicase::Ascii<String>, arguments: &[VariableValue]) -> Res<VariableValue> {
-    use crate::icy_board::state::ppl_gfx::{
-        CELL_HEIGHT, CELL_WIDTH, CLIENT_BLIT, INIT, JXL, JXL_BLOB, PIXEL_MOUSE, SCREEN_HEIGHT, SCREEN_WIDTH, SET_PACING, SHUTDOWN, SIXEL,
-    };
+    use crate::icy_board::state::ppl_gfx::{INIT, SHUTDOWN};
 
     if *name == *INIT {
         let requested = arguments
@@ -4404,39 +4402,6 @@ pub(crate) async fn gfx_member(vm: &mut VirtualMachine<'_>, name: &unicase::Asci
     if *name == *SHUTDOWN {
         gfx_shutdown(vm).await?;
         return Ok(VariableValue::new_bool(true));
-    }
-    if *name == *SET_PACING {
-        gfx_set_pacing(vm, arguments.first().map_or(0, VariableValue::as_int));
-        return Ok(VariableValue::new_bool(vm.icy_board_state.gfx_error == 0));
-    }
-
-    let capabilities = vm.icy_board_state.query_gfx_capabilities().await?;
-    if *name == *CELL_WIDTH {
-        return Ok(VariableValue::new_int(capabilities.cell_width));
-    }
-    if *name == *CELL_HEIGHT {
-        return Ok(VariableValue::new_int(capabilities.cell_height));
-    }
-    if *name == *SCREEN_WIDTH {
-        return Ok(VariableValue::new_int(capabilities.screen_width));
-    }
-    if *name == *SCREEN_HEIGHT {
-        return Ok(VariableValue::new_int(capabilities.screen_height));
-    }
-    if *name == *SIXEL {
-        return Ok(VariableValue::new_bool(capabilities.sixel));
-    }
-    if *name == *JXL {
-        return Ok(VariableValue::new_bool(capabilities.jxl));
-    }
-    if *name == *JXL_BLOB {
-        return Ok(VariableValue::new_bool(capabilities.inline_blobs()));
-    }
-    if *name == *PIXEL_MOUSE {
-        return Ok(VariableValue::new_bool(capabilities.cterm_revision.is_some_and(|revision| revision >= 1330)));
-    }
-    if *name == *CLIENT_BLIT {
-        return Ok(VariableValue::new_bool(capabilities.cterm_revision.is_some_and(|revision| revision >= 1318)));
     }
     Err(format!("Unknown GFX function {name}").into())
 }
