@@ -86,7 +86,7 @@ WHILE running DO
     IF gameOver BREAK
     changed = FALSE
     inputEvent = input.Poll()
-    IF inputEvent.Kind = EVENT_NONE & inputEvent.Time < nextFrame THEN
+    IF inputEvent.Kind = EventKind.None & inputEvent.Time < nextFrame THEN
         inputEvent = input.Wait(nextFrame - inputEvent.Time)
     ENDIF
     key = Upper(inputEvent.Text)

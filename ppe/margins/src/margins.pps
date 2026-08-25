@@ -25,7 +25,10 @@ STRING items = {
 
 INTEGER selected, firstVisible
 INTEGER oldSelected, clicked, amount
-INTEGER eventKind, eventCode, mouseButton, mouseX, mouseY, wheelY
+INTEGER eventCode, mouseX, mouseY, wheelY
+EVENTKIND eventKind
+MOUSEACTION mouseAction
+MOUSEBUTTON mouseButton
 BOOLEAN running
 STRING key
 EVENT inputEvent
@@ -41,13 +44,14 @@ SetVMargins VIEW_TOP, VIEW_BOTTOM
 SetHMargins VIEW_LEFT, VIEW_RIGHT
 DrawVisible()
 input = Terminal.Input
-input.MouseOn(MOUSE_TEXT, MOUSE_TRACK_BUTTONS)
+input.MouseOn(MouseMode.Text, MouseTracking.Buttons)
 
 WHILE (running) DO
     inputEvent = input.Wait(-1)
     eventKind = inputEvent.Kind
     eventCode = inputEvent.Code
-    IF (eventKind = EVENT_KEY) THEN
+    mouseAction = inputEvent.Action
+    IF (eventKind = EventKind.Key) THEN
         key = Upper(inputEvent.Text)
         IF (key = "Q" | eventCode = KEY_ESCAPE) THEN
             running = FALSE
@@ -66,12 +70,12 @@ WHILE (running) DO
         ELSEIF (eventCode = KEY_ENTER) THEN
             running = FALSE
         ENDIF
-    ELSEIF (eventKind = EVENT_MOUSE) THEN
+    ELSEIF (eventKind = EventKind.Mouse) THEN
         mouseButton = inputEvent.Button
         mouseX = inputEvent.X
         mouseY = inputEvent.Y
         wheelY = inputEvent.WheelY
-        IF (eventCode = MOUSE_WHEEL) THEN
+        IF (mouseAction = MouseAction.Wheel) THEN
             IF (MouseInsideList(mouseX, mouseY)) THEN
                 amount = wheelY
                 WHILE (amount > 0) DO
@@ -83,7 +87,7 @@ WHILE (running) DO
                     amount += 1
                 ENDWHILE
             ENDIF
-        ELSEIF (eventCode = MOUSE_PRESS & mouseButton = MOUSE_LEFT) THEN
+        ELSEIF (mouseAction = MouseAction.Press & mouseButton = MouseButton.Left) THEN
             IF (MouseInsideList(mouseX, mouseY)) THEN
                 clicked = firstVisible + mouseY - (VIEW_TOP - 1)
                 IF (clicked < ITEM_COUNT) SelectVisible(clicked)

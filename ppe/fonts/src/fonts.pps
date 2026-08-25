@@ -31,7 +31,7 @@ running = TRUE
 WHILE running DO
     DrawScreen()
     inputEvent = input.Wait(-1)
-    IF (inputEvent.Kind = EVENT_KEY) THEN
+    IF (inputEvent.Kind = EventKind.Key) THEN
         IF (Upper(inputEvent.Text) = "Q" | inputEvent.Code = KEY_ESCAPE) THEN
             running = FALSE
         ELSEIF (inputEvent.Code = KEY_TAB) THEN

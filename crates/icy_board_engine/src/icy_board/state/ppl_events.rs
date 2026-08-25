@@ -42,6 +42,16 @@ pub static BUTTONS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::Laz
 pub static WHEEL_X: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("WheelX".to_string()));
 pub static WHEEL_Y: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("WheelY".to_string()));
 pub static TIME: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Time".to_string()));
+pub static ACTION: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Action".to_string()));
+pub static CHANNEL: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Channel".to_string()));
+pub static DROPPED: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Dropped".to_string()));
+pub static LEFT_DOWN: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("LeftDown".to_string()));
+pub static MIDDLE_DOWN: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("MiddleDown".to_string()));
+pub static RIGHT_DOWN: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("RightDown".to_string()));
+pub static SHIFT: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Shift".to_string()));
+pub static ALT: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Alt".to_string()));
+pub static CTRL: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Ctrl".to_string()));
+pub static META: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Meta".to_string()));
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct PplEvent {
@@ -123,13 +133,15 @@ impl UserData for PplEvent {
     const TYPE_NAME: &'static str = "Event";
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
-        registry.add_property(KIND.clone(), VariableType::Integer, false);
+        use crate::parser::{EVENT_KIND_ENUM_ID, MOUSE_ACTION_ENUM_ID, MOUSE_BUTTON_ENUM_ID};
+
+        registry.add_property(KIND.clone(), VariableType::UserData(EVENT_KIND_ENUM_ID), false);
         registry.add_property(CODE.clone(), VariableType::Integer, false);
         registry.add_property(TEXT.clone(), VariableType::String, false);
         registry.add_property(PRESSED.clone(), VariableType::Boolean, false);
         registry.add_property(X.clone(), VariableType::Integer, false);
         registry.add_property(Y.clone(), VariableType::Integer, false);
-        registry.add_property(BUTTON.clone(), VariableType::Integer, false);
+        registry.add_property(BUTTON.clone(), VariableType::UserData(MOUSE_BUTTON_ENUM_ID), false);
         registry.add_property(MODIFIERS.clone(), VariableType::Integer, false);
         registry.add_property(PIXELS.clone(), VariableType::Boolean, false);
         registry.add_property(REPEATED.clone(), VariableType::Boolean, false);
@@ -137,6 +149,18 @@ impl UserData for PplEvent {
         registry.add_property(WHEEL_X.clone(), VariableType::Integer, false);
         registry.add_property(WHEEL_Y.clone(), VariableType::Integer, false);
         registry.add_property(TIME.clone(), VariableType::Unsigned, false);
+
+        // What Code used to stand for depends on the kind, so each meaning says its own name.
+        registry.add_property(ACTION.clone(), VariableType::UserData(MOUSE_ACTION_ENUM_ID), false);
+        registry.add_property(CHANNEL.clone(), VariableType::Integer, false);
+        registry.add_property(DROPPED.clone(), VariableType::Integer, false);
+        registry.add_property(LEFT_DOWN.clone(), VariableType::Boolean, false);
+        registry.add_property(MIDDLE_DOWN.clone(), VariableType::Boolean, false);
+        registry.add_property(RIGHT_DOWN.clone(), VariableType::Boolean, false);
+        registry.add_property(SHIFT.clone(), VariableType::Boolean, false);
+        registry.add_property(ALT.clone(), VariableType::Boolean, false);
+        registry.add_property(CTRL.clone(), VariableType::Boolean, false);
+        registry.add_property(META.clone(), VariableType::Boolean, false);
     }
 }
 
@@ -184,6 +208,41 @@ impl UserDataValue for PplEvent {
         }
         if *name == *TIME {
             return Ok(VariableValue::new_unsigned(self.time));
+        }
+        if *name == *ACTION {
+            // Only a mouse event acts; anything else reports no action rather than a number
+            // that would read as one.
+            let action = if self.event_type == EVENT_MOUSE { self.code } else { 0 };
+            return Ok(VariableValue::new_int(action));
+        }
+        if *name == *CHANNEL {
+            let channel = if self.event_type == EVENT_SOUND { self.code } else { -1 };
+            return Ok(VariableValue::new_int(channel));
+        }
+        if *name == *DROPPED {
+            let dropped = if self.event_type == EVENT_OVERFLOW { self.code } else { 0 };
+            return Ok(VariableValue::new_int(dropped));
+        }
+        if *name == *LEFT_DOWN {
+            return Ok(VariableValue::new_bool(self.buttons & 1 != 0));
+        }
+        if *name == *MIDDLE_DOWN {
+            return Ok(VariableValue::new_bool(self.buttons & 2 != 0));
+        }
+        if *name == *RIGHT_DOWN {
+            return Ok(VariableValue::new_bool(self.buttons & 4 != 0));
+        }
+        if *name == *SHIFT {
+            return Ok(VariableValue::new_bool(self.modifiers & 1 != 0));
+        }
+        if *name == *ALT {
+            return Ok(VariableValue::new_bool(self.modifiers & 2 != 0));
+        }
+        if *name == *CTRL {
+            return Ok(VariableValue::new_bool(self.modifiers & 4 != 0));
+        }
+        if *name == *META {
+            return Ok(VariableValue::new_bool(self.modifiers & 8 != 0));
         }
         Err("Invalid EVENT property".into())
     }

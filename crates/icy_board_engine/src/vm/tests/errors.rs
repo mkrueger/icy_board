@@ -48,7 +48,7 @@ fn constants_name_the_codes() {
     let output = run_ppl(
         r#"
         LoadFont 43, "nope.fnt"
-        IF (ERR().Kind = ERR_KIND_FONT & ERR().Code = ERR_IO) PrintLn "matched"
+        IF (ERR().Kind = ErrKind.Font & ERR().Code = ErrCode.Io) PrintLn "matched"
         "#,
     );
 

@@ -86,9 +86,11 @@ impl UserData for PplError {
     const INSTANCE_PROVIDER: Option<crate::executable::FuncOpCode> = Some(crate::executable::FuncOpCode::Err);
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
+        use crate::parser::{ERR_CODE_ENUM_ID, ERR_KIND_ENUM_ID};
+
         registry.add_property(OK.clone(), VariableType::Boolean, false);
-        registry.add_property(KIND.clone(), VariableType::Integer, false);
-        registry.add_property(CODE.clone(), VariableType::Integer, false);
+        registry.add_property(KIND.clone(), VariableType::UserData(ERR_KIND_ENUM_ID), false);
+        registry.add_property(CODE.clone(), VariableType::UserData(ERR_CODE_ENUM_ID), false);
         registry.add_property(MESSAGE.clone(), VariableType::String, false);
         registry.add_property(CHANNEL.clone(), VariableType::Integer, false);
     }

@@ -21,8 +21,11 @@ CONST UNSIGNED C_FRAME = Rgb(35, 26, 19)
 
 UNSIGNED colors(7)
 INTEGER selected, brushSize
-INTEGER mouseKind, mx, my, btn
-INTEGER lastX, lastY, dragButton
+INTEGER mx, my
+MOUSEBUTTON btn
+INTEGER lastX, lastY
+MOUSEACTION mouseKind
+MOUSEBUTTON dragButton
 INTEGER tries
 UNSIGNED nextFrame
 BOOLEAN running, dragging, dirty, pendingInput
@@ -52,7 +55,7 @@ dirty = FALSE
 RenderToolbar()
 
 input = Terminal.Input
-input.MouseOn(MOUSE_PIXELS, MOUSE_TRACK_ALL)
+input.MouseOn(MouseMode.Pixels, MouseTracking.All)
 tries = 0
 inputEvent = input.Poll()
 WHILE !inputEvent.Pixels & tries < 30 DO
@@ -67,7 +70,7 @@ IF !inputEvent.Pixels THEN
     PRINTLN "PPE Paint requires pixel mouse reporting (DEC mode 1016)."
     EXIT
 ENDIF
-pendingInput = inputEvent.Kind <> EVENT_NONE
+pendingInput = inputEvent.Kind <> EventKind.None
 nextFrame = inputEvent.Time + FRAME_MS
 
 running = TRUE
@@ -78,18 +81,18 @@ WHILE running DO
     ELSE
         inputEvent = input.Poll()
     ENDIF
-    WHILE inputEvent.Kind <> EVENT_NONE DO
-        IF inputEvent.Kind = EVENT_MOUSE THEN
-            mouseKind = inputEvent.Code
+    WHILE inputEvent.Kind <> EventKind.None DO
+        IF inputEvent.Kind = EventKind.Mouse THEN
+            mouseKind = inputEvent.Action
             mx = inputEvent.X
             my = inputEvent.Y
             btn = inputEvent.Button
 
-            IF mouseKind = MOUSE_PRESS THEN
+            IF mouseKind = MouseAction.Press THEN
                 IF my < CANVAS_Y THEN
                     HandleToolbar(mx, my)
                 ELSEIF (InsideCanvas(mx, my)) THEN
-                    IF btn = 0 | btn = 2 THEN
+                    IF btn = MouseButton.Left | btn = MouseButton.Right THEN
                         dragging = TRUE
                         dragButton = btn
                         lastX = mx
@@ -97,22 +100,22 @@ WHILE running DO
                         DrawStroke(lastX, lastY, mx, my, StrokeColor(btn))
                     ENDIF
                 ENDIF
-            ELSEIF (mouseKind = MOUSE_MOTION) THEN
+            ELSEIF (mouseKind = MouseAction.Motion) THEN
                 IF dragging & btn = dragButton & InsideCanvas(mx, my) THEN
                     DrawStroke(lastX, lastY, mx, my, StrokeColor(btn))
                     lastX = mx
                     lastY = my
                 ENDIF
-            ELSEIF (mouseKind = MOUSE_RELEASE) THEN
+            ELSEIF (mouseKind = MouseAction.Release) THEN
                 dragging = FALSE
-            ELSEIF (mouseKind = MOUSE_WHEEL) THEN
-                IF btn = 3 THEN
+            ELSEIF (mouseKind = MouseAction.Wheel) THEN
+                IF btn = MouseButton.WheelUp THEN
                     ChangeBrush(1)
-                ELSEIF (btn = 4) THEN
+                ELSEIF (btn = MouseButton.WheelDown) THEN
                     ChangeBrush(-1)
                 ENDIF
             ENDIF
-        ELSEIF (inputEvent.Kind = EVENT_KEY) THEN
+        ELSEIF (inputEvent.Kind = EventKind.Key) THEN
             key = Upper(inputEvent.Text)
             IF key = "Q" | key = Chr(27) THEN
                 running = FALSE
@@ -129,7 +132,7 @@ WHILE running DO
     IF dirty PresentDirty()
     IF inputEvent.Time < nextFrame THEN
         inputEvent = input.Wait(nextFrame - inputEvent.Time)
-        pendingInput = inputEvent.Kind <> EVENT_NONE
+        pendingInput = inputEvent.Kind <> EventKind.None
     ENDIF
     IF inputEvent.Time >= nextFrame nextFrame = inputEvent.Time + FRAME_MS
 ENDWHILE
@@ -155,8 +158,8 @@ FUNCTION InsideCanvas(INTEGER x, INTEGER y) BOOLEAN
     InsideCanvas = x >= CANVAS_X & x < CANVAS_X + CANVAS_W & y >= CANVAS_Y & y < CANVAS_Y + CANVAS_H
 ENDFUNC
 
-FUNCTION StrokeColor(INTEGER whichButton) UNSIGNED
-    IF whichButton = 2 THEN
+FUNCTION StrokeColor(MOUSEBUTTON whichButton) UNSIGNED
+    IF whichButton = MouseButton.Right THEN
         StrokeColor = C_CANVAS
     ELSE
         StrokeColor = colors[selected]

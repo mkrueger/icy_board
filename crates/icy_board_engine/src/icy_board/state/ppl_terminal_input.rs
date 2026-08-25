@@ -29,9 +29,16 @@ impl UserData for PplTerminalInput {
     const TYPE_NAME: &'static str = "TermInput";
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
+        use crate::parser::{MOUSE_MODE_ENUM_ID, MOUSE_TRACKING_ENUM_ID};
+
         registry.add_function(POLL.clone(), Vec::new(), VariableType::UserData(EVENT_ID as u8));
         registry.add_function(WAIT.clone(), vec![VariableType::Integer], VariableType::UserData(EVENT_ID as u8));
-        registry.add_function_with(MOUSE_ON.clone(), vec![VariableType::Integer, VariableType::Integer], 1, VariableType::Boolean);
+        registry.add_function_with(
+            MOUSE_ON.clone(),
+            vec![VariableType::UserData(MOUSE_MODE_ENUM_ID), VariableType::UserData(MOUSE_TRACKING_ENUM_ID)],
+            1,
+            VariableType::Boolean,
+        );
         registry.add_function(MOUSE_OFF.clone(), Vec::new(), VariableType::Boolean);
         registry.add_function_with(KEYBOARD_ON.clone(), vec![VariableType::Boolean], 0, VariableType::Boolean);
         registry.add_function(KEYBOARD_OFF.clone(), Vec::new(), VariableType::Boolean);

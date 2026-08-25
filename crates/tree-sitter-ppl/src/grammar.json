@@ -1581,6 +1581,102 @@
           },
           "named": false,
           "value": "TERMSTATE"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
+              "value": "[eE][rR][rR][cC][oO][dD][eE]"
+            }
+          },
+          "named": false,
+          "value": "ERRCODE"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
+              "value": "[eE][rR][rR][kK][iI][nN][dD]"
+            }
+          },
+          "named": false,
+          "value": "ERRKIND"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
+              "value": "[eE][vV][eE][nN][tT][kK][iI][nN][dD]"
+            }
+          },
+          "named": false,
+          "value": "EVENTKIND"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
+              "value": "[gG][fF][xX][bB][aA][cC][kK][eE][nN][dD]"
+            }
+          },
+          "named": false,
+          "value": "GFXBACKEND"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
+              "value": "[mM][oO][uU][sS][eE][aA][cC][tT][iI][oO][nN]"
+            }
+          },
+          "named": false,
+          "value": "MOUSEACTION"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
+              "value": "[mM][oO][uU][sS][eE][bB][uU][tT][tT][oO][nN]"
+            }
+          },
+          "named": false,
+          "value": "MOUSEBUTTON"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
+              "value": "[mM][oO][uU][sS][eE][mM][oO][dD][eE]"
+            }
+          },
+          "named": false,
+          "value": "MOUSEMODE"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
+              "value": "[mM][oO][uU][sS][eE][tT][rR][aA][cC][kK][iI][nN][gG]"
+            }
+          },
+          "named": false,
+          "value": "MOUSETRACKING"
         }
       ]
     },
@@ -2022,6 +2118,15 @@
           "content": {
             "type": "SYMBOL",
             "name": "builtin_constant"
+          },
+          "named": true,
+          "value": "identifier"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "SYMBOL",
+            "name": "builtin_type"
           },
           "named": true,
           "value": "identifier"
@@ -3957,8 +4062,17 @@
             "type": "FIELD",
             "name": "object",
             "content": {
-              "type": "SYMBOL",
-              "name": "_expression"
+              "type": "CHOICE",
+              "members": [
+                {
+                  "type": "SYMBOL",
+                  "name": "_expression"
+                },
+                {
+                  "type": "SYMBOL",
+                  "name": "builtin_type"
+                }
+              ]
             }
           },
           {
@@ -3969,8 +4083,17 @@
             "type": "FIELD",
             "name": "member",
             "content": {
-              "type": "SYMBOL",
-              "name": "identifier"
+              "type": "CHOICE",
+              "members": [
+                {
+                  "type": "SYMBOL",
+                  "name": "identifier"
+                },
+                {
+                  "type": "SYMBOL",
+                  "name": "builtin_constant"
+                }
+              ]
             }
           }
         ]

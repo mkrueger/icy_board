@@ -41,10 +41,11 @@ impl UserData for PplGfx {
     const TYPE_NAME: &'static str = "Gfx";
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
-        registry.add_property(BACKEND.clone(), VariableType::Integer, false);
+        let backend = VariableType::UserData(crate::parser::GFX_BACKEND_ENUM_ID);
+        registry.add_property(BACKEND.clone(), backend, false);
         registry.add_property(PACING.clone(), VariableType::Integer, false);
 
-        registry.add_function_with(INIT.clone(), vec![VariableType::Integer, VariableType::Boolean], 0, VariableType::Boolean);
+        registry.add_function_with(INIT.clone(), vec![backend, VariableType::Boolean], 0, VariableType::Boolean);
         registry.add_function(SHUTDOWN.clone(), Vec::new(), VariableType::Boolean);
         registry.add_function(SET_PACING.clone(), vec![VariableType::Integer], VariableType::Boolean);
 

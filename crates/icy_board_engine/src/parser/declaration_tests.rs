@@ -186,8 +186,7 @@ fn test_function() {
 /// The id of a board object is stored in every PPE that names its type, so the
 /// list may only ever grow at the end.
 #[test]
-fn board_object_type_ids_are_frozen() {
-    let registry = UserTypeRegistry::icy_board_registry();
+fn board_object_type_ids_are_frozen() {    let registry = UserTypeRegistry::icy_board_registry();
     let expected = [
         ("CONFERENCE", 30),
         ("AREA", 31),
@@ -231,6 +230,42 @@ fn error_member_ids_are_frozen() {
     for (name, id) in [("OK", 0), ("KIND", 1), ("CODE", 2), ("MESSAGE", 3), ("CHANNEL", 4)] {
         assert_eq!(error.get_member_id(&unicase::Ascii::new(name.to_string())), Some(id), "ERROR.{name} moved");
     }
+}
+
+/// A builtin enum takes a fixed id at the top of the space and a program's own enums
+/// grow down from below them, so adding one in the middle would move every id after it.
+#[test]
+fn builtin_enum_ids_are_frozen() {
+    let registry = UserTypeRegistry::icy_board_registry();
+    let expected = [
+        ("EventKind", 255),
+        ("MouseAction", 254),
+        ("MouseButton", 253),
+        ("MouseMode", 252),
+        ("MouseTracking", 251),
+        ("GfxBackend", 250),
+        ("ErrKind", 249),
+        ("ErrCode", 248),
+    ];
+
+    for (name, id) in expected {
+        let definition = registry
+            .get_enum(&unicase::Ascii::new(name.to_string()))
+            .unwrap_or_else(|| panic!("{name} is not registered"));
+        assert_eq!(definition.id, id, "{name} moved");
+    }
+    assert_eq!(registry.enums().len(), expected.len(), "a builtin enum was added without freezing its id");
+}
+
+/// A program keeps naming its own enums, below the board's.
+#[test]
+fn a_program_enum_starts_below_the_builtin_ones() {
+    let registry = UserTypeRegistry::icy_board_registry();
+    let id = registry
+        .declare_enum(unicase::Ascii::new("Mine".to_string()), vec![(unicase::Ascii::new("One".to_string()), 1)])
+        .expect("a program enum should still fit");
+
+    assert_eq!(id, 247);
 }
 
 fn parse_types(input: &str) -> (Vec<AstNode>, UserTypeRegistry, Arc<Mutex<ErrorReporter>>) {
@@ -358,8 +393,11 @@ fn test_all_reserved_custom_type_ids_are_available() {
     assert!(errors.lock().unwrap().errors.is_empty());
     assert_eq!(super::MAX_USER_TYPES, nodes.len());
     assert_eq!(
-        u8::MAX as usize,
-        registry.get_user_type(&unicase::Ascii::new("Type155".to_string())).unwrap().id,
+        u8::MAX as usize - super::BUILTIN_ENUM_COUNT,
+        registry
+            .get_user_type(&unicase::Ascii::new(format!("Type{:03}", super::MAX_USER_TYPES - 1)))
+            .unwrap()
+            .id,
     );
 }
 

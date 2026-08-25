@@ -185,14 +185,22 @@ impl Parser<'_> {
         while self.get_cur_token() == Some(Token::Dot) {
             let dot_token: super::lexer::Spanned<Token> = self.save_spanned_token();
             self.next_token();
-            let identifier_token = self.save_spanned_token();
-            if !matches!(identifier_token.token, Token::Identifier(_)) {
-                self.error_reporter
-                    .lock()
-                    .unwrap()
-                    .report_error(self.save_token_span(), ParserErrorType::IdentifierExpected(self.save_token()));
-                return None;
-            }
+            let token = self.save_spanned_token();
+            // After a dot a name is a member, so one that also names a built-in constant
+            // is read as the member it is written as.
+            let identifier_token = match &token.token {
+                Token::Identifier(_) => token,
+                Token::Const(crate::ast::Constant::Builtin(constant)) => {
+                    super::lexer::Spanned::new(Token::Identifier(unicase::Ascii::new(constant.name.to_string())), token.span.clone())
+                }
+                _ => {
+                    self.error_reporter
+                        .lock()
+                        .unwrap()
+                        .report_error(self.save_token_span(), ParserErrorType::IdentifierExpected(self.save_token()));
+                    return None;
+                }
+            };
             self.next_token();
             expr = Expression::MemberReference(MemberReferenceExpression::new(expr, dot_token, identifier_token));
             if self.get_cur_token() == Some(Token::LPar) {

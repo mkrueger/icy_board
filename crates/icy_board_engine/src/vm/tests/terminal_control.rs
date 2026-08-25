@@ -87,16 +87,16 @@ fn a_second_recording_is_refused_while_one_is_active() {
     let output = run_ppl(
         r"
         BOOLEAN second
-        INTEGER code
+        ERRCODE code
         Terminal.Macros.Record(1)
         second = Terminal.Macros.Record(2)
         code = ERR().Code
         Terminal.Macros.End()
-        PrintLn second, code
+        PrintLn second, code = ErrCode.Invalid
         ",
     );
 
-    assert!(output.ends_with("02\n"), "{output:?}");
+    assert!(output.ends_with("01\n"), "{output:?}");
 }
 
 #[test]

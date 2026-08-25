@@ -295,6 +295,17 @@ pub const FONT_ID: usize = 46;
 pub const MACROS_ID: usize = 47;
 pub const SOUND_ID: usize = 48;
 
+/// Builtin enums take the top of the id space and a program's own enums grow down from
+/// below them, so the order here is what a PPE stores and may only be appended to.
+pub const EVENT_KIND_ENUM_ID: u8 = 255;
+pub const MOUSE_ACTION_ENUM_ID: u8 = 254;
+pub const MOUSE_BUTTON_ENUM_ID: u8 = 253;
+pub const MOUSE_MODE_ENUM_ID: u8 = 252;
+pub const MOUSE_TRACKING_ENUM_ID: u8 = 251;
+pub const GFX_BACKEND_ENUM_ID: u8 = 250;
+pub const ERR_KIND_ENUM_ID: u8 = 249;
+pub const ERR_CODE_ENUM_ID: u8 = 248;
+
 /// The board objects are ours, so no `PCBoard` language knows their names.
 pub const FIRST_BOARD_OBJECT_LANGUAGE_VERSION: u16 = 400;
 
@@ -303,7 +314,12 @@ pub const FIRST_BOARD_OBJECT_LANGUAGE_VERSION: u16 = 400;
 pub const FIRST_USER_TYPE_ID: usize = 100;
 
 /// How many records one program may declare, ids 100..=255.
-pub const MAX_USER_TYPES: usize = u8::MAX as usize - FIRST_USER_TYPE_ID + 1;
+/// How many enums the board provides. They sit at the top of the id space, so a program
+/// declares that many fewer records of its own.
+pub const BUILTIN_ENUM_COUNT: usize = 8;
+
+/// How many records one program may declare, ids 100..=255 less the builtin enums.
+pub const MAX_USER_TYPES: usize = u8::MAX as usize - FIRST_USER_TYPE_ID + 1 - BUILTIN_ENUM_COUNT;
 
 /// How many fields one record may hold - the PPE stores the count in a byte.
 pub const MAX_TYPE_FIELDS: usize = u8::MAX as usize;
@@ -316,6 +332,7 @@ pub fn is_user_declared_type(id: u8) -> bool {
 impl UserTypeRegistry {
     pub fn icy_board_registry() -> Self {
         let mut reg = UserTypeRegistry::default();
+        reg.register_builtin_enums();
         reg.register::<Conference>(CONFERENCE_ID);
         reg.register::<MessageArea>(MESSAGE_AREA_ID);
         reg.register::<FileDirectory>(FILE_DIRECTORY_ID);
@@ -414,6 +431,94 @@ impl UserTypeRegistry {
         }
         enums.push(EnumDefinition { id: id as u8, name, variants });
         Some(id as u8)
+    }
+
+    /// Claims one of the fixed ids at the top of the space for an enum the board provides.
+    fn register_enum(&self, id: u8, name: &str, variants: &[(&str, i32)]) {
+        let mut enums = self.enums.write().unwrap();
+        assert_eq!(
+            id as usize,
+            u8::MAX as usize - enums.len(),
+            "builtin enum '{name}' wants id {id}, which is not the next one free"
+        );
+        enums.push(EnumDefinition {
+            id,
+            name: unicase::Ascii::new(name.to_string()),
+            variants: variants
+                .iter()
+                .map(|(variant, value)| (unicase::Ascii::new((*variant).to_string()), *value))
+                .collect(),
+        });
+    }
+
+    /// The enums the board provides. Values match what the runtime already reports, so
+    /// naming one is a way of writing the number rather than a change of meaning.
+    fn register_builtin_enums(&self) {
+        self.register_enum(
+            EVENT_KIND_ENUM_ID,
+            "EventKind",
+            &[("None", 0), ("Key", 1), ("KeyEdge", 2), ("Mouse", 3), ("Overflow", 4), ("Sound", 5)],
+        );
+        self.register_enum(
+            MOUSE_ACTION_ENUM_ID,
+            "MouseAction",
+            &[("None", 0), ("Press", 1), ("Release", 2), ("Motion", 3), ("Wheel", 4)],
+        );
+        // A button names itself; the buttons a caller is holding are separate booleans,
+        // because a set of them cannot be one of these.
+        self.register_enum(
+            MOUSE_BUTTON_ENUM_ID,
+            "MouseButton",
+            &[
+                ("None", -1),
+                ("Left", 0),
+                ("Middle", 1),
+                ("Right", 2),
+                ("WheelUp", 3),
+                ("WheelDown", 4),
+                ("WheelLeft", 5),
+                ("WheelRight", 6),
+            ],
+        );
+        self.register_enum(MOUSE_MODE_ENUM_ID, "MouseMode", &[("Text", 0), ("Pixels", 1)]);
+        self.register_enum(
+            MOUSE_TRACKING_ENUM_ID,
+            "MouseTracking",
+            &[("Buttons", 0), ("Drag", 1), ("All", 2)],
+        );
+        self.register_enum(
+            GFX_BACKEND_ENUM_ID,
+            "GfxBackend",
+            &[("None", -1), ("Auto", 0), ("Sixel", 2), ("Jxl", 3)],
+        );
+        self.register_enum(
+            ERR_KIND_ENUM_ID,
+            "ErrKind",
+            &[
+                ("None", 0),
+                ("File", 1),
+                ("DBase", 2),
+                ("Stack", 3),
+                ("Gfx", 4),
+                ("Font", 5),
+                ("Sound", 6),
+                ("Term", 7),
+            ],
+        );
+        self.register_enum(
+            ERR_CODE_ENUM_ID,
+            "ErrCode",
+            &[
+                ("Ok", 0),
+                ("Unavailable", 1),
+                ("Invalid", 2),
+                ("Io", 3),
+                ("Format", 4),
+                ("Limit", 5),
+                ("Unsupported", 6),
+                ("Stack", 7),
+            ],
+        );
     }
 
     /// The position of a field inside a record, which doubles

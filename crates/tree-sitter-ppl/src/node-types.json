@@ -1175,6 +1175,10 @@
         "required": true,
         "types": [
           {
+            "type": "builtin_constant",
+            "named": true
+          },
+          {
             "type": "identifier",
             "named": true
           }
@@ -1186,6 +1190,10 @@
         "types": [
           {
             "type": "_expression",
+            "named": true
+          },
+          {
+            "type": "builtin_type",
             "named": true
           }
         ]
@@ -2114,11 +2122,23 @@
     "named": false
   },
   {
+    "type": "ERRCODE",
+    "named": false
+  },
+  {
+    "type": "ERRKIND",
+    "named": false
+  },
+  {
     "type": "ERROR",
     "named": false
   },
   {
     "type": "EVENT",
+    "named": false
+  },
+  {
+    "type": "EVENTKIND",
     "named": false
   },
   {
@@ -2147,6 +2167,10 @@
   },
   {
     "type": "GFX",
+    "named": false
+  },
+  {
+    "type": "GFXBACKEND",
     "named": false
   },
   {
@@ -2191,6 +2215,22 @@
   },
   {
     "type": "MONEY",
+    "named": false
+  },
+  {
+    "type": "MOUSEACTION",
+    "named": false
+  },
+  {
+    "type": "MOUSEBUTTON",
+    "named": false
+  },
+  {
+    "type": "MOUSEMODE",
+    "named": false
+  },
+  {
+    "type": "MOUSETRACKING",
     "named": false
   },
   {

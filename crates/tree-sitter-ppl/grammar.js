@@ -94,6 +94,7 @@ const BUILTIN_TYPES = [
   'INTEGER', 'INT', 'LONG', 'MONEY', 'MSGAREAID', 'REAL', 'SBYTE', 'SDWORD', 'SHORT', 'STRING',
   'SWORD', 'TIME', 'UBYTE', 'UDWORD', 'UNSIGNED', 'UWORD', 'WORD',
   'AREA', 'CONFERENCE', 'CONTACT', 'DIRECTORY', 'DOOR', 'ERROR', 'EVENT', 'FONT', 'GFX', 'MACROS', 'MARGINS', 'PALETTE', 'PASSWORD', 'SOUND', 'TERMINAL', 'TERMINFO', 'TERMINPUT', 'TERMSTATE',
+  'ERRCODE', 'ERRKIND', 'EVENTKIND', 'GFXBACKEND', 'MOUSEACTION', 'MOUSEBUTTON', 'MOUSEMODE', 'MOUSETRACKING',
 ];
 
 // Built-in constants, taken from BUILTIN_CONSTS. TRUE and FALSE are literals of
@@ -364,12 +365,13 @@ module.exports = grammar({
       field('right', $._expression),
     ),
 
-    // A variable may carry the name of a built-in statement, so that spelling
-    // has to be accepted on the left of an assignment as well.
+    // A variable may carry the name of a built-in statement, constant or type, so those
+    // spellings have to be accepted on the left of an assignment as well.
     _assignment_target: $ => choice(
       $.identifier,
       alias($.builtin_statement, $.identifier),
       alias($.builtin_constant, $.identifier),
+      alias($.builtin_type, $.identifier),
       $.member_access,
       $.index_expression,
       $.call_expression,
@@ -591,10 +593,12 @@ module.exports = grammar({
       ']',
     )),
 
+    // A type name may stand in expression position, naming an enum member or the one
+    // value a board object has, so it is an object here as well as a declaration type.
     member_access: $ => prec(PREC.MEMBER, seq(
-      field('object', $._expression),
+      field('object', choice($._expression, $.builtin_type)),
       '.',
-      field('member', $.identifier),
+      field('member', choice($.identifier, $.builtin_constant)),
     )),
 
     // `Point { X = 1, Y = 2 }` builds a record without temporary assignments.

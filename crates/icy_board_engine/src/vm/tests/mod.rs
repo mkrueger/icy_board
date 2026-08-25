@@ -7,6 +7,7 @@
 
 #![cfg(test)]
 
+mod builtin_enums;
 mod contacts;
 mod control_flow;
 mod dbase;
