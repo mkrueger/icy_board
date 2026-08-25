@@ -38,6 +38,7 @@ under DOSBox as an oracle; see [`compat/README.md`](../compat/README.md).
 | [New in PPL 3.50 and 4.x](new_ppl.md) | Version matrix for loops, initializers, constants, enums, routine parameters, records and board objects. |
 | [New `@` macros](new_macros.md) | Macros beyond PCBoard's set. |
 | [PPE format](ppe_format.md) | Binary format reference for tooling authors. |
+| [PPL 4.00 API review](ppl400_api_review.md) | Why the 4.00 object API looks the way it does, and what is still open. |
 
 PPL editor support consists of the tree-sitter grammar for syntax and the
 `ppl-lsp` language server for diagnostics, completion, hover, navigation,
