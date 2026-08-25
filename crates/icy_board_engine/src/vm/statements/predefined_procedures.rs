@@ -4359,13 +4359,13 @@ pub async fn gfxpin(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 
 pub async fn gfxsetpacing(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let frames = vm.eval_expr(&args[0]).await?.as_int();
-    gfx_set_pacing(vm, frames);
+    gfx_set_pacing(vm, frames > 0);
     Ok(())
 }
 
-pub(crate) fn gfx_set_pacing(vm: &mut VirtualMachine<'_>, frames: i32) {
+pub(crate) fn gfx_set_pacing(vm: &mut VirtualMachine<'_>, enabled: bool) {
     if let Some(graphics) = &mut vm.icy_board_state.ppl_graphics {
-        graphics.pacing = frames > 0;
+        graphics.pacing = enabled;
         vm.icy_board_state.gfx_error = 0;
     } else {
         vm.icy_board_state.gfx_error = 1;

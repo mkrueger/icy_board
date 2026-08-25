@@ -43,7 +43,7 @@ fn pacing_reads_back_what_it_was_set_to() {
         r"
         Terminal.Gfx.Init(GFX_SIXEL, FALSE)
         PrintLn Terminal.Gfx.Pacing
-        Terminal.Gfx.Pacing = 1
+        Terminal.Gfx.Pacing = TRUE
         PrintLn Terminal.Gfx.Pacing
         SURFACE s = Surface.New(2, 2)
         s.Present()
@@ -62,7 +62,7 @@ fn a_writable_property_may_be_set_through_a_stored_object() {
         r"
         Terminal.Gfx.Init(GfxBackend.Sixel, FALSE)
         GFX graphics = Terminal.Gfx
-        graphics.Pacing = 2
+        graphics.Pacing = TRUE
         PrintLn graphics.Pacing
         Terminal.Gfx.Shutdown()
         ",
@@ -80,7 +80,7 @@ fn a_read_only_property_cannot_be_assigned() {
 #[test]
 fn a_writable_property_checks_the_value_type() {
     let errors = compile_errors("Terminal.Gfx.Pacing = GfxBackend.Sixel");
-    assert!(!errors.is_empty(), "an enum must not be assigned to an integer property");
+    assert!(!errors.is_empty(), "an enum must not be assigned to a boolean property");
 }
 
 #[test]

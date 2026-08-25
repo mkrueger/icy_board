@@ -33,7 +33,7 @@ impl UserData for PplGfx {
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         let backend = VariableType::UserData(crate::parser::GFX_BACKEND_ENUM_ID);
         registry.add_property(BACKEND.clone(), backend, false);
-        registry.add_property(PACING.clone(), VariableType::Integer, true);
+        registry.add_property(PACING.clone(), VariableType::Boolean, true);
 
         registry.add_function_with(INIT.clone(), vec![backend, VariableType::Boolean], 0, VariableType::Boolean);
         registry.add_function(SHUTDOWN.clone(), Vec::new(), VariableType::Boolean);
@@ -53,14 +53,14 @@ impl UserDataValue for PplGfx {
         }
         if *name == *PACING {
             let pacing = vm.icy_board_state.ppl_graphics.as_ref().is_some_and(|graphics| graphics.pacing);
-            return Ok(VariableValue::new_int(i32::from(pacing)));
+            return Ok(VariableValue::new_bool(pacing));
         }
         Err(format!("Unknown GFX property {name}").into())
     }
 
     fn set_property_value(&self, vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, val: VariableValue) -> crate::Res<()> {
         if *name == *PACING {
-            crate::vm::statements::predefined_procedures::gfx_set_pacing(vm, val.as_int());
+            crate::vm::statements::predefined_procedures::gfx_set_pacing(vm, val.as_bool());
             return Ok(());
         }
         Err(format!("GFX property {name} is read-only").into())
