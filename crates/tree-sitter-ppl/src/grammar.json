@@ -1689,6 +1689,18 @@
           },
           "named": false,
           "value": "MOUSETRACKING"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
+              "value": "[eE][dD][iI][tT][oO][rR][mM][oO][dD][eE]"
+            }
+          },
+          "named": false,
+          "value": "EDITORMODE"
         }
       ]
     },

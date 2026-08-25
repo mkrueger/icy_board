@@ -5,7 +5,7 @@ use crate::{
     datetime::IcbDate,
     executable::{VariableType, VariableValue},
     icy_board::user_base::{FSEMode, User, UserContact},
-    parser::{CONTACT_ID, USER_ID},
+    parser::{CONTACT_ID, EDITOR_MODE_ENUM_ID, USER_ID},
 };
 
 macro_rules! member_name {
@@ -38,8 +38,7 @@ member_name!(NOTE_COUNT, "NoteCount");
 member_name!(GET_NOTE, "GetNote");
 
 member_name!(EXPERT_MODE, "ExpertMode");
-member_name!(FULL_SCREEN_EDITOR, "FullScreenEditor");
-member_name!(ASK_FOR_EDITOR, "AskForEditor");
+member_name!(EDITOR_MODE, "EditorMode");
 member_name!(CLEAR_SCREEN, "ClearScreen");
 member_name!(SCROLL_MESSAGE_BODY, "ScrollMessageBody");
 member_name!(SHORT_DESCRIPTIONS, "ShortDescriptions");
@@ -55,6 +54,9 @@ member_name!(DATE_FORMAT, "DateFormat");
 member_name!(SECURITY_LEVEL, "SecurityLevel");
 member_name!(EXPIRED_SECURITY_LEVEL, "ExpiredSecurityLevel");
 member_name!(EXPIRATION_DATE, "ExpirationDate");
+member_name!(PASSWORD_EXPIRES, "PasswordExpires");
+member_name!(SET_PASSWORD, "SetPassword");
+member_name!(SET_NOTE, "SetNote");
 
 member_name!(TIMES_ON, "TimesOn");
 member_name!(FIRST_DATE_ON, "FirstDateOn");
@@ -106,12 +108,31 @@ fn normalize_service(service: &str) -> String {
     service.trim().to_ascii_lowercase()
 }
 
+/// The `EditorMode` enum values, which follow `FSEMode`'s own order.
+fn editor_mode_to_int(mode: &FSEMode) -> i32 {
+    match mode {
+        FSEMode::Yes => 0,
+        FSEMode::No => 1,
+        FSEMode::Ask => 2,
+    }
+}
+
+fn editor_mode_from_int(value: i32) -> FSEMode {
+    match value {
+        1 => FSEMode::No,
+        2 => FSEMode::Ask,
+        _ => FSEMode::Yes,
+    }
+}
+
 impl UserData for PplUser {
     const TYPE_NAME: &'static str = "User";
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
+        // What `PUTUSER` used to write is writable here, so the object replaces the
+        // GETUSER/PUTUSER round trip rather than sitting beside it. The caller's name
+        // and the board's own accounting stay read-only.
         for name in [
-            &*NAME,
             &*ALIAS,
             &*VERIFY_ANSWER,
             &*STREET1,
@@ -128,19 +149,23 @@ impl UserData for PplUser {
             &*COMMENT,
             &*SYSOP_COMMENT,
             &*PROTOCOL,
-            &*LANGUAGE,
-            &*DATE_FORMAT,
         ] {
+            registry.add_property(name.clone(), VariableType::String, true);
+        }
+        for name in [&*NAME, &*LANGUAGE, &*DATE_FORMAT] {
             registry.add_property(name.clone(), VariableType::String, false);
         }
-        for name in [&*BIRTH_DATE, &*EXPIRATION_DATE, &*FIRST_DATE_ON, &*LAST_DATE_ON, &*LAST_DIR_READ] {
+        for name in [&*BIRTH_DATE, &*EXPIRATION_DATE, &*PASSWORD_EXPIRES] {
+            registry.add_property(name.clone(), VariableType::Date, true);
+        }
+        for name in [&*FIRST_DATE_ON, &*LAST_DATE_ON, &*LAST_DIR_READ] {
             registry.add_property(name.clone(), VariableType::Date, false);
+        }
+        for name in [&*PAGE_LENGTH, &*SECURITY_LEVEL, &*EXPIRED_SECURITY_LEVEL] {
+            registry.add_property(name.clone(), VariableType::Integer, true);
         }
         for name in [
             &*NOTE_COUNT,
-            &*PAGE_LENGTH,
-            &*SECURITY_LEVEL,
-            &*EXPIRED_SECURITY_LEVEL,
             &*TIMES_ON,
             &*MESSAGES_READ,
             &*MESSAGES_LEFT,
@@ -156,20 +181,22 @@ impl UserData for PplUser {
         }
         for name in [
             &*EXPERT_MODE,
-            &*FULL_SCREEN_EDITOR,
-            &*ASK_FOR_EDITOR,
             &*CLEAR_SCREEN,
             &*SCROLL_MESSAGE_BODY,
             &*SHORT_DESCRIPTIONS,
             &*LONG_HEADER,
             &*WIDE_EDITOR,
-            &*USE_GRAPHICS,
-            &*USE_ALIAS,
         ] {
+            registry.add_property(name.clone(), VariableType::Boolean, true);
+        }
+        for name in [&*USE_GRAPHICS, &*USE_ALIAS] {
             registry.add_property(name.clone(), VariableType::Boolean, false);
         }
+        registry.add_property(EDITOR_MODE.clone(), VariableType::UserData(EDITOR_MODE_ENUM_ID), true);
 
         registry.add_function(GET_NOTE.clone(), vec![VariableType::Integer], VariableType::String);
+        registry.add_function(SET_NOTE.clone(), vec![VariableType::Integer, VariableType::String], VariableType::Boolean);
+        registry.add_function(SET_PASSWORD.clone(), vec![VariableType::String], VariableType::Boolean);
         registry.add_function(GET_CONTACT.clone(), vec![VariableType::Integer], VariableType::UserData(CONTACT_ID as u8));
         registry.add_function(SET_CONTACT.clone(), vec![VariableType::String, VariableType::String], VariableType::Boolean);
         registry.add_function(DELETE_CONTACT.clone(), vec![VariableType::String], VariableType::Boolean);
@@ -233,6 +260,8 @@ impl UserDataValue for PplUser {
             date(&user.birth_date)
         } else if *name == *EXPIRATION_DATE {
             date(&user.expiration_date)
+        } else if *name == *PASSWORD_EXPIRES {
+            date(&user.password.expire_date)
         } else if *name == *FIRST_DATE_ON {
             date(&user.stats.first_date_on)
         } else if *name == *LAST_DATE_ON {
@@ -269,10 +298,8 @@ impl UserDataValue for PplUser {
             VariableValue::new_unsigned(user.stats.today_dnld_bytes.max(0) as u64)
         } else if *name == *EXPERT_MODE {
             VariableValue::new_bool(user.flags.expert_mode)
-        } else if *name == *FULL_SCREEN_EDITOR {
-            VariableValue::new_bool(user.flags.fse_mode == FSEMode::Yes)
-        } else if *name == *ASK_FOR_EDITOR {
-            VariableValue::new_bool(user.flags.fse_mode == FSEMode::Ask)
+        } else if *name == *EDITOR_MODE {
+            VariableValue::new_int(editor_mode_to_int(&user.flags.fse_mode))
         } else if *name == *CLEAR_SCREEN {
             VariableValue::new_bool(user.flags.msg_clear)
         } else if *name == *SCROLL_MESSAGE_BODY {
@@ -293,8 +320,76 @@ impl UserDataValue for PplUser {
         Ok(value)
     }
 
-    async fn set_property_value(&self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
-        Err(format!("USER property {name} is read-only").into())
+    async fn set_property_value(&self, vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, val: VariableValue) -> crate::Res<()> {
+        let Some(user) = vm.icy_board_state.session.current_user.as_mut() else {
+            return Ok(());
+        };
+        let text = || val.as_string();
+        let date = || IcbDate::from_pcboard(val.as_int() as u32).to_utc_date_time();
+
+        if *name == *ALIAS {
+            user.alias = text();
+        } else if *name == *VERIFY_ANSWER {
+            user.verify_answer = text();
+        } else if *name == *STREET1 {
+            user.street1 = text();
+        } else if *name == *STREET2 {
+            user.street2 = text();
+        } else if *name == *CITY {
+            user.city_or_state = text();
+        } else if *name == *STATE {
+            user.state = text();
+        } else if *name == *ZIP {
+            user.zip = text();
+        } else if *name == *COUNTRY {
+            user.country = text();
+        } else if *name == *BUSINESS_PHONE {
+            user.bus_data_phone = text();
+        } else if *name == *HOME_PHONE {
+            user.home_voice_phone = text();
+        } else if *name == *EMAIL {
+            user.email = text();
+        } else if *name == *WEB {
+            user.web = text();
+        } else if *name == *GENDER {
+            user.gender = text();
+        } else if *name == *COMMENT {
+            user.user_comment = text();
+        } else if *name == *SYSOP_COMMENT {
+            user.sysop_comment = text();
+        } else if *name == *PROTOCOL {
+            user.protocol = text();
+        } else if *name == *BIRTH_DATE {
+            user.birth_date = date();
+        } else if *name == *EXPIRATION_DATE {
+            user.expiration_date = date();
+        } else if *name == *PASSWORD_EXPIRES {
+            user.password.expire_date = date();
+        } else if *name == *PAGE_LENGTH {
+            user.page_len = val.as_int() as u16;
+        } else if *name == *SECURITY_LEVEL {
+            user.security_level = val.as_int() as u8;
+        } else if *name == *EXPIRED_SECURITY_LEVEL {
+            user.exp_security_level = val.as_int() as u8;
+        } else if *name == *EXPERT_MODE {
+            user.flags.expert_mode = val.as_bool();
+        } else if *name == *EDITOR_MODE {
+            user.flags.fse_mode = editor_mode_from_int(val.as_int());
+        } else if *name == *CLEAR_SCREEN {
+            user.flags.msg_clear = val.as_bool();
+        } else if *name == *SCROLL_MESSAGE_BODY {
+            user.flags.scroll_msg_body = val.as_bool();
+        } else if *name == *SHORT_DESCRIPTIONS {
+            user.flags.use_short_filedescr = val.as_bool();
+        } else if *name == *LONG_HEADER {
+            user.flags.long_msg_header = val.as_bool();
+        } else if *name == *WIDE_EDITOR {
+            user.flags.wide_editor = val.as_bool();
+        } else {
+            return Err(format!("USER property {name} is read-only").into());
+        }
+        user.flags.is_dirty = true;
+        Ok(())
     }
 
     async fn call_function(
@@ -317,6 +412,39 @@ impl UserDataValue for PplUser {
                 _ => return Ok(VariableValue::new_string(String::new())),
             };
             return Ok(VariableValue::new_string(note.clone()));
+        }
+        if *name == *SET_NOTE {
+            let index = arguments[0].as_int();
+            let text = arguments[1].as_string();
+            let Some(user) = vm.icy_board_state.session.current_user.as_mut() else {
+                return Ok(VariableValue::new_bool(false));
+            };
+            let note = match index {
+                0 => &mut user.custom_comment1,
+                1 => &mut user.custom_comment2,
+                2 => &mut user.custom_comment3,
+                3 => &mut user.custom_comment4,
+                4 => &mut user.custom_comment5,
+                _ => return Ok(VariableValue::new_bool(false)),
+            };
+            *note = text;
+            user.flags.is_dirty = true;
+            return Ok(VariableValue::new_bool(true));
+        }
+        if *name == *SET_PASSWORD {
+            let plain = arguments[0].as_string();
+            if plain.is_empty() {
+                return Ok(VariableValue::new_bool(false));
+            }
+            // Hashing depends on board configuration, so ask the board rather than
+            // storing whatever the PPE handed us.
+            let password = vm.icy_board_state.create_password(plain).await;
+            let Some(user) = vm.icy_board_state.session.current_user.as_mut() else {
+                return Ok(VariableValue::new_bool(false));
+            };
+            user.password.password = password;
+            user.flags.is_dirty = true;
+            return Ok(VariableValue::new_bool(true));
         }
         if *name == *GET_CONTACT {
             let index = arguments[0].as_int();

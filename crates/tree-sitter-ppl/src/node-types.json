@@ -2066,6 +2066,10 @@
     "named": false
   },
   {
+    "type": "EDITORMODE",
+    "named": false
+  },
+  {
     "type": "ELSE",
     "named": false
   },

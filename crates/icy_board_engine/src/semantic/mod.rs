@@ -2151,7 +2151,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                                 self.errors
                                     .lock()
                                     .unwrap()
-                                    .report_error(member_token.span.clone(), CompilationErrorType::InvalidLetVariable);
+                                    .report_error(member_token.span.clone(), CompilationErrorType::MemberIsReadOnly(member.to_string()));
                                 break;
                             }
                             self.user_type_lookup.insert(member_token.span.start, type_id);
@@ -2208,7 +2208,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                     self.errors
                         .lock()
                         .unwrap()
-                        .report_error(member_token.span.clone(), CompilationErrorType::InvalidLetVariable);
+                        .report_error(member_token.span.clone(), CompilationErrorType::MemberIsReadOnly(member.to_string()));
                     return VariableType::None;
                 }
                 self.user_type_lookup.insert(member_token.span.start, type_id);

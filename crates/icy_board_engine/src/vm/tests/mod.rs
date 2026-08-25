@@ -42,6 +42,7 @@ mod terminal_info;
 mod terminal_output;
 mod terminal_screen;
 mod tpa;
+mod user_object;
 
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};

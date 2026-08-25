@@ -628,28 +628,41 @@ Both are read-only. The classic `CURCONF()`, `PCBNODE()`, `MINLEFT()` and the
 
 ## The caller (4.00)
 
-`Session.User` is the caller's own record, read live. It gathers what the `U_*`
-variables report, so a 4.00 PPE does not have to remember which predefined name
-holds which detail:
+`Session.User` is the caller's own record, read live and written through. It
+gathers what the `U_*` variables report, so a 4.00 PPE does not have to remember
+which predefined name holds which detail, nor bracket its work in
+`GETUSER`/`PUTUSER`:
 
 ```PPL
 PRINTLN Session.User.Name, " from ", Session.User.City
 PRINTLN Session.User.SecurityLevel, " until ", Session.User.ExpirationDate
+
+Session.User.City = "Berlin"
 ```
 
-| Group | Members |
-| :--- | :--- |
-| Identity | `Name`, `Alias`, `VerifyAnswer` |
-| Address | `Street1`, `Street2`, `City`, `State`, `Zip`, `Country` |
-| Reaching them | `BusinessPhone`, `HomePhone`, `Email`, `Web`, `Gender`, `BirthDate` |
-| Sysop text | `Comment`, `SysopComment`, `NoteCount`, `GetNote(index)` |
-| Preferences | `ExpertMode`, `FullScreenEditor`, `AskForEditor`, `ClearScreen`, `ScrollMessageBody`, `ShortDescriptions`, `LongHeader`, `WideEditor`, `UseGraphics`, `UseAlias`, `PageLength`, `Protocol`, `Language`, `DateFormat` |
-| Security | `SecurityLevel`, `ExpiredSecurityLevel`, `ExpirationDate` |
-| Statistics | `TimesOn`, `FirstDateOn`, `LastDateOn`, `LastDirRead`, `MessagesRead`, `MessagesLeft`, `Uploads`, `Downloads`, `UploadBytes`, `DownloadBytes`, `DownloadBytesToday`, `MinutesToday` |
-| Contacts | `ContactCount`, `GetContact(index)`, `SetContact(service, account)`, `DeleteContact(service)` |
+| Group | Members | Writable |
+| :--- | :--- | :--- |
+| Identity | `Name`, `Alias`, `VerifyAnswer` | all but `Name` |
+| Address | `Street1`, `Street2`, `City`, `State`, `Zip`, `Country` | yes |
+| Reaching them | `BusinessPhone`, `HomePhone`, `Email`, `Web`, `Gender`, `BirthDate` | yes |
+| Sysop text | `Comment`, `SysopComment`, `NoteCount`, `GetNote(index)`, `SetNote(index, text)` | yes |
+| Preferences | `ExpertMode`, `EditorMode`, `ClearScreen`, `ScrollMessageBody`, `ShortDescriptions`, `LongHeader`, `WideEditor`, `PageLength`, `Protocol` | yes |
+| Preferences the session owns | `UseGraphics`, `UseAlias`, `Language`, `DateFormat` | no |
+| Security | `SecurityLevel`, `ExpiredSecurityLevel`, `ExpirationDate`, `PasswordExpires`, `SetPassword(text)` | yes |
+| Statistics | `TimesOn`, `FirstDateOn`, `LastDateOn`, `LastDirRead`, `MessagesRead`, `MessagesLeft`, `Uploads`, `Downloads`, `UploadBytes`, `DownloadBytes`, `DownloadBytesToday`, `MinutesToday` | no |
+| Contacts | `ContactCount`, `GetContact(index)`, `SetContact(service, account)`, `DeleteContact(service)` | yes |
 
-Everything except the contact functions is read-only. Nobody logged in reads as
-an empty user rather than failing, so a member is always safe to read.
+Whatever `PUTUSER` could write is writable here and lands at once, so the object
+replaces the old round trip rather than sitting beside it. The caller's `Name`
+identifies them and the board's own accounting is the board's to keep, so both
+stay read-only; writing one is a compile error. Nobody logged in reads as an
+empty user rather than failing, so a member is always safe to read.
+
+`EditorMode` is one `EDITORMODE` value — `Yes`, `No` or `Ask` — rather than the
+two overlapping flags `PCBoard` kept. `SetNote()` takes an index from 0 to 4 and
+answers whether the note existed. `SetPassword()` hashes the text the way the
+board is configured to, so the plain text is never stored; an empty password is
+refused. Both answer `FALSE` rather than failing.
 
 ### Contacts
 

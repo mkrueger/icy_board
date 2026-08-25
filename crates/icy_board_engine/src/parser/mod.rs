@@ -307,6 +307,7 @@ pub const MOUSE_TRACKING_ENUM_ID: u8 = 251;
 pub const GFX_BACKEND_ENUM_ID: u8 = 250;
 pub const ERR_KIND_ENUM_ID: u8 = 249;
 pub const ERR_CODE_ENUM_ID: u8 = 248;
+pub const EDITOR_MODE_ENUM_ID: u8 = 247;
 
 /// The board objects are ours, so no `PCBoard` language knows their names.
 pub const FIRST_BOARD_OBJECT_LANGUAGE_VERSION: u16 = 400;
@@ -318,7 +319,7 @@ pub const FIRST_USER_TYPE_ID: usize = 100;
 /// How many records one program may declare, ids 100..=255.
 /// How many enums the board provides. They sit at the top of the id space, so a program
 /// declares that many fewer records of its own.
-pub const BUILTIN_ENUM_COUNT: usize = 8;
+pub const BUILTIN_ENUM_COUNT: usize = 9;
 
 /// How many records one program may declare, ids 100..=255 less the builtin enums.
 pub const MAX_USER_TYPES: usize = u8::MAX as usize - FIRST_USER_TYPE_ID + 1 - BUILTIN_ENUM_COUNT;
@@ -514,6 +515,8 @@ impl UserTypeRegistry {
                 ("Stack", 7),
             ],
         );
+        // Whether the caller edits with the full screen editor, asks each time, or never.
+        self.register_enum(EDITOR_MODE_ENUM_ID, "EditorMode", &[("Yes", 0), ("No", 1), ("Ask", 2)]);
     }
 
     /// The position of a field inside a record, which doubles

@@ -60,6 +60,9 @@ pub enum CompilationErrorType {
     #[error("Can't assign value to.")]
     InvalidLetVariable,
 
+    #[error("'{0}' can only be read")]
+    MemberIsReadOnly(String),
+
     #[error("'{0}' is a constant, it can only be read")]
     CannotAssignToConstant(String),
 

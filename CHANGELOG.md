@@ -13,6 +13,14 @@ releases.
 - Added `Session.User`, the caller's own record: identity, address, preferences,
   security, statistics and contacts in one object. It gathers what the `U_*`
   variables report, which stay unchanged for PCBoard compatibility.
+- Made `Session.User` writable wherever `PUTUSER` used to write, so the object
+  replaces the `GETUSER`/`PUTUSER` round trip instead of sitting beside it. A
+  write lands at once. The caller's `Name` and the board's own accounting stay
+  read-only, and writing one now names the member in the error. `SetNote()` and
+  `SetPassword()` join the object, the latter hashing the way the board is
+  configured to. The overlapping `FullScreenEditor`/`AskForEditor` flags became
+  one `EditorMode` value of `Yes`, `No` or `Ask`, and `PasswordExpires` is
+  reachable for the first time.
 - Retired `U_CONTACT`. Contacts are reached through `Session.User` with
   `ContactCount`, `GetContact()`, `SetContact()` and `DeleteContact()`, and no
   longer need a `GETUSER`/`PUTUSER` round trip. Runtime 4.00 therefore adds no
