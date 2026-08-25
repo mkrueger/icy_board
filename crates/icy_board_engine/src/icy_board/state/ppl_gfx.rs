@@ -26,7 +26,6 @@ member_name!(JXL, "Jxl");
 member_name!(JXL_BLOB, "JxlBlob");
 member_name!(PIXEL_MOUSE, "PixelMouse");
 member_name!(CLIENT_BLIT, "ClientBlit");
-member_name!(AUDIO, "Audio");
 
 /// What the session draws with: the backend, the surfaces and what the terminal can do.
 #[derive(Clone, Copy, Debug, Default)]
@@ -54,7 +53,7 @@ impl UserData for PplGfx {
         for name in [&*CELL_WIDTH, &*CELL_HEIGHT, &*SCREEN_WIDTH, &*SCREEN_HEIGHT] {
             registry.add_function(name.clone(), Vec::new(), VariableType::Integer);
         }
-        for name in [&*SIXEL, &*JXL, &*JXL_BLOB, &*PIXEL_MOUSE, &*CLIENT_BLIT, &*AUDIO] {
+        for name in [&*SIXEL, &*JXL, &*JXL_BLOB, &*PIXEL_MOUSE, &*CLIENT_BLIT] {
             registry.add_function(name.clone(), Vec::new(), VariableType::Boolean);
         }
     }

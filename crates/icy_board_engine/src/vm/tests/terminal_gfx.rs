@@ -75,7 +75,7 @@ fn the_capability_calls_agree_with_the_bitmask() {
     let output = run_ppl_with_input(
         r"
         PrintLn Terminal.Gfx.Sixel(), Terminal.Gfx.Jxl(), Terminal.Gfx.JxlBlob()
-        PrintLn Terminal.Gfx.PixelMouse(), Terminal.Gfx.ClientBlit(), Terminal.Gfx.Audio()
+        PrintLn Terminal.Gfx.PixelMouse(), Terminal.Gfx.ClientBlit(), Terminal.Sound.Available()
         PrintLn GfxCaps()
         ",
         JXL_TERMINAL,

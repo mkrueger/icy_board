@@ -1480,6 +1480,18 @@
             "type": "TOKEN",
             "content": {
               "type": "PATTERN",
+              "value": "[mM][aA][cC][rR][oO][sS]"
+            }
+          },
+          "named": false,
+          "value": "MACROS"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
               "value": "[mM][aA][rR][gG][iI][nN][sS]"
             }
           },
@@ -1509,6 +1521,18 @@
           },
           "named": false,
           "value": "PASSWORD"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
+              "value": "[sS][oO][uU][nN][dD]"
+            }
+          },
+          "named": false,
+          "value": "SOUND"
         },
         {
           "type": "ALIAS",

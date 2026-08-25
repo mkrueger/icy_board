@@ -33,6 +33,7 @@ mod routine_parameters;
 mod scalars;
 mod sound;
 mod static_members;
+mod terminal_control;
 mod terminal_gfx;
 mod terminal_info;
 mod terminal_output;

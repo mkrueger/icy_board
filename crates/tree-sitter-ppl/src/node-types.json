@@ -2182,6 +2182,10 @@
     "named": false
   },
   {
+    "type": "MACROS",
+    "named": false
+  },
+  {
     "type": "MARGINS",
     "named": false
   },
@@ -2247,6 +2251,10 @@
   },
   {
     "type": "SHORT",
+    "named": false
+  },
+  {
+    "type": "SOUND",
     "named": false
   },
   {

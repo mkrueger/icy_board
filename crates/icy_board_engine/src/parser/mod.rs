@@ -292,6 +292,8 @@ pub const GFX_ID: usize = 43;
 pub const MARGINS_ID: usize = 44;
 pub const PALETTE_ID: usize = 45;
 pub const FONT_ID: usize = 46;
+pub const MACROS_ID: usize = 47;
+pub const SOUND_ID: usize = 48;
 
 /// The board objects are ours, so no `PCBoard` language knows their names.
 pub const FIRST_BOARD_OBJECT_LANGUAGE_VERSION: u16 = 400;
@@ -338,6 +340,8 @@ impl UserTypeRegistry {
         reg.register::<crate::icy_board::state::ppl_margins::PplMargins>(MARGINS_ID);
         reg.register::<crate::icy_board::state::ppl_palette::PplPalette>(PALETTE_ID);
         reg.register::<crate::icy_board::state::ppl_font::PplFont>(FONT_ID);
+        reg.register::<crate::icy_board::state::ppl_macros::PplMacros>(MACROS_ID);
+        reg.register::<crate::icy_board::state::ppl_sound::PplSound>(SOUND_ID);
 
         reg
     }
