@@ -1,15 +1,15 @@
 use super::{compile_errors_with_runtime, run_ppl};
 
 #[test]
-fn terminal_info_requires_runtime_402() {
-    for runtime in [400, 401] {
+fn terminal_info_requires_runtime_400() {
+    for runtime in [330, 340] {
         let errors = compile_errors_with_runtime("TERMINFO info = Terminal.Info", runtime);
         assert!(
-            errors.iter().any(|error| error.contains("Terminal needs runtime 402")),
+            errors.iter().any(|error| error.contains("Terminal needs runtime 400")),
             "runtime {runtime}: {errors:?}"
         );
     }
-    assert!(compile_errors_with_runtime("TERMINFO info = Terminal.Info", 402).is_empty());
+    assert!(compile_errors_with_runtime("TERMINFO info = Terminal.Info", 400).is_empty());
 }
 
 #[test]

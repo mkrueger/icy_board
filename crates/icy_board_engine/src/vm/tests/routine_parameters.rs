@@ -124,7 +124,7 @@ EXIT
 }
 
 #[test]
-fn passing_a_routine_needs_runtime_401() {
+fn passing_a_routine_needs_runtime_400() {
     let errors = compile_errors_with_runtime(
         r"
 Apply(Work)
@@ -135,10 +135,10 @@ ENDPROC
 PROCEDURE Work()
 ENDPROC
 ",
-        400,
+        340,
     );
     assert!(
-        errors.iter().any(|error| error == "Passing a FUNCTION/PROCEDURE needs runtime 401"),
+        errors.iter().any(|error| error == "Passing a FUNCTION/PROCEDURE needs runtime 400"),
         "{errors:?}"
     );
 }

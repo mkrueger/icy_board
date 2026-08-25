@@ -7,6 +7,7 @@
 
 #![cfg(test)]
 
+mod board_session;
 mod builtin_enums;
 mod contacts;
 mod control_flow;
@@ -69,6 +70,9 @@ pub fn compile_errors_with_runtime(source: &str, runtime: u16) -> Vec<String> {
     let mut workspace = Workspace::default();
     workspace.hard_coded_files = Some(vec![PathBuf::from("test.pps")]);
     workspace.package.runtime = Some(runtime);
+    // These gates are about what the PPE can store, so the language stays at 4.00
+    // instead of following the runtime down and hiding the names being tested.
+    workspace.set_default_language_version(Some(crate::executable::LAST_PPL_LANGUAGE_VERSION));
 
     let ast = parse_ast(PathBuf::from("test.pps"), errors.clone(), source, &reg, Encoding::Utf8, &workspace);
     let mut compiler = PPECompiler::new(&workspace, reg, errors.clone());

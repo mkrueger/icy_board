@@ -2,7 +2,7 @@
 name = "fractal"
 version = "0.1.0"
 authors = ["Mike Krüger <mkrueger@posteo.de>"]
-runtime = 402
+runtime = 400
 
 [compiler]
 language_version = 400

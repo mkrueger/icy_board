@@ -207,6 +207,8 @@ fn board_object_type_ids_are_frozen() {
         ("FONT", 46),
         ("MACROS", 47),
         ("SOUND", 48),
+        ("BOARD", 49),
+        ("SESSION", 50),
     ];
 
     for (name, id) in expected {

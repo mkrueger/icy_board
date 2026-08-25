@@ -6,8 +6,8 @@ available as `pplc --lang-version`, `[compiler] language_version` in `ppl.toml`
 and the `PPL_LANG_VERSION` environment default.
 
 The *runtime version* is separate. It controls the PPE format written to disk.
-There is no language version 401: runtime 4.01 adds storage needed by some 4.00
-language features.
+Icy Board writes one runtime of its own, 4.00. Every lower number is a PCBoard
+format, so 4.00 is what a PPE targets whenever it uses anything below.
 
 | Feature | Language | Minimum runtime | What it adds |
 | :--- | :---: | :---: | :--- |
@@ -19,17 +19,18 @@ language features.
 | Optional parentheses | 350 | any compatible runtime | `IF condition THEN`, `WHILE condition ...` |
 | Typed constants | 350 | any compatible runtime | `CONST`, erased to its value during compilation |
 | Nominal integer enums | 350 | any compatible runtime | `ENUM ... ENDENUM`, scoped members such as `Color.Red` |
-| Routine parameters | 350 | 401 | Pass a matching function or procedure as a checked callable value |
+| Routine parameters | 350 | 400 | Pass a matching function or procedure as a checked callable value |
 | Main-program block | 400 | 400 | Real `BEGIN ... END`; `EXIT` replaces the old terminating use of `END` |
-| Board objects and member calls | 400 | 400 | `CONFERENCE`, `DIRECTORY`, `AREA`, `DOOR`, `PASSWORD`, `ConfInfo()` |
+| Board objects and member calls | 400 | 400 | `CONFERENCE`, `DIRECTORY`, `AREA`, `DOOR`, `PASSWORD`, `Board`, `Session` |
 | Message-area identifiers | 400 | 400 | `MSGAREAID` and `AreaId(conf, area)` |
-| Overloaded built-ins | 400 | 400 | Argument-count overloads such as `ConfInfo(conf)` and `Len(array, dim)` |
+| Overloaded built-ins | 400 | 400 | Argument-count overloads such as `Len(array, dim)` |
 | Web requests | 400 | 400 | String-returning function and file-writing statement forms |
 | UTF-8 encoding and digest functions | 400 | 400 | `BASE64ENC`, `BASE64DEC` and `SHA256` |
-| Extensible user contacts | 400 | 402 | Mutable `CONTACT` records in `U_CONTACT` |
-| User-defined records | 400 | 401 | `TYPE ... ENDTYPE`, nested fields, arrays of records and nominal type checking |
-| Named record literals | 400 | 401 | `Point { X = 1, Y = 2 }` with checked and optional fields |
+| Extensible user contacts | 400 | 400 | Mutable `CONTACT` records in `U_CONTACT` |
+| User-defined records | 400 | 400 | `TYPE ... ENDTYPE`, nested fields, arrays of records and nominal type checking |
+| Named record literals | 400 | 400 | `Point { X = 1, Y = 2 }` with checked and optional fields |
 | Terminal multimedia | 400 | 400 | Sixel/JXL graphics, SyncTERM audio, mouse and physical key events |
+| Board and session objects | 400 | 400 | `Board` for the configured board, `Session` for the call in progress |
 
 Several compiler improvements are deliberately **not** tied to 3.50. The
 compiler collects routine signatures before generating code, so `DECLARE` is
@@ -41,7 +42,7 @@ old instructions; declarations that disagree with implementations are errors.
 
 3.50 is mostly syntax that lowers to classic PPE instructions, so constants,
 enums, loops, initializers, brackets and compound assignments can target an old
-runtime. Passing a routine is the exception because only runtime 4.01 can mark
+runtime. Passing a routine is the exception because only runtime 4.00 can mark
 a routine reference as a value.
 
 ### Initializers and indexing
@@ -102,12 +103,12 @@ ENDPROC
 
 The compiler checks routine kind, parameter types and dimensions, `VAR` flags
 and function return type. A routine parameter is callable and can be passed on
-to another routine. The callable reference needs runtime 4.01.
+to another routine. The callable reference needs runtime 4.00.
 
 ## Language version 4.00
 
-4.00 adds syntax and board APIs that do not exist on PCBoard. A runtime 4.00 or
-4.01 PPE therefore targets Icy Board rather than the original board.
+4.00 adds syntax and board APIs that do not exist on PCBoard. A runtime 4.00 PPE
+therefore targets Icy Board rather than the original board.
 
 ### Blocks and program exit
 
@@ -148,18 +149,19 @@ defined between individual records of the same type; arithmetic and ordering
 are not. Record fields cannot currently be arrays.
 
 The PPE must store each record layout, so any use of `TYPE` requires runtime
-4.01. Field and type names are not stored; a decompiler invents names for them.
+4.00. Field and type names are not stored; a decompiler invents names for them.
 
 ### Board objects
 
 Board objects are read-only snapshots rather than custom records. They expose
 the configured conferences, message areas, file directories and doors without
-making a PPE parse Icy Board's TOML files. The detailed member table follows
-below.
+making a PPE parse Icy Board's TOML files. `Board` and `Session` are the way in:
+one for what the board is configured to be, one for the call in progress. The
+detailed member table follows below.
 
 ### Terminal multimedia
 
-Runtime 4.02 exposes terminal features through the `Terminal` object. The name
+Runtime 4.00 exposes terminal features through the `Terminal` object. The name
 stands for the caller's one terminal, so parentheses and a temporary variable
 are optional:
 
@@ -493,17 +495,18 @@ runaway recursion apologise instead of disappearing.
 > **Note:** icy_term does not read the slot argument yet, so a font it accepts
 > applies regardless of which slot was named. SyncTERM uses the slot as written.
 
-## Runtime 4.01
+## Runtime 4.00
 
-Runtime 4.01 is a PPE-format extension, not another source language. It adds:
+Runtime 4.00 is the PPE format Icy Board writes. Next to the PCBoard formats it
+adds:
 
 - a type table for `TYPE ... ENDTYPE` layouts
 - a routine-reference marker for functions and procedures passed as values
 - a record-literal opcode carrying type and field identifiers
+- `U_CONTACT` at the end of the predefined user-variable prefix
 
-Use language 400 with runtime 401 for the complete feature set. A language 350
-source also needs runtime 401 when it passes routines; all its other additions
-can lower to an older compatible runtime.
+A language 350 source needs runtime 400 when it passes routines; all its other
+additions can lower to an older compatible runtime.
 
 For the full rules, limits, diagnostics and compatibility breaks, see
 [PPL](ppl.md#the-ppl-40-language). The sections below are the library and
@@ -529,8 +532,9 @@ message area just works in icy board. But with icy board it's possible to specif
 
 ## Board objects (4.00)
 
-`ConfInfo(conf)` returns a read-only `CONFERENCE` snapshot. An invalid conference
-number returns an empty conference object, so its properties can still be read.
+`Board.GetConference(index)` returns a read-only `CONFERENCE` snapshot, and
+`Session.Conference` the one the caller is in. An index no conference has returns
+an empty conference object, so its properties can still be read.
 
 | Conference member | Type | Description |
 | :--- | :--- | :--- |
@@ -550,7 +554,7 @@ runtime-only `PASSWORD` type: it can be compared with a string, but converting
 or printing it produces `******` rather than the secret.
 
 ```PPL
-CONFERENCE conf = CONFINFO(CURCONF())
+CONFERENCE conf = Session.Conference
 INTEGER i
 
 FOR i = 0 TO conf.Doors - 1
@@ -559,10 +563,65 @@ FOR i = 0 TO conf.Doors - 1
 NEXT
 ```
 
+## Board and session (4.00)
+
+`Board` and `Session` are the two other objects that stand for themselves, so
+they need no parentheses either. They split what the board *is* from what this
+one call *is doing*.
+
+`Board` is a snapshot of the configuration, taken when it is read:
+
+| Member | Type | Description |
+| :--- | :--- | :--- |
+| `Name` | `STRING` | Board name |
+| `Location` | `STRING` | Where the board says it is |
+| `Operator` | `STRING` | Operator named for `EMSI` |
+| `SysopName` | `STRING` | The sysop's display name |
+| `Nodes` | `INTEGER` | Number of configured nodes |
+| `Conferences` | `INTEGER` | Number of conferences |
+| `GetConference(index)` | `CONFERENCE` | Conference at the zero-based index |
+
+`Conferences` and `GetConference()` are what let a PPE walk the board without
+`HIGHCONFNUM()`. An index no conference has answers with an empty conference.
+Listing conferences says nothing about who may enter
+one, so check `HasAccess()` before showing a name:
+
+```PPL
+INTEGER i
+FOR i = 0 TO Board.Conferences - 1
+	CONFERENCE conf = Board.GetConference(i)
+	IF conf.HasAccess() PRINTLN i, " ", conf.Name
+NEXT
+```
+
+`Session` is the call in progress. Unlike `Board` it is read live, so a value
+kept in a variable still answers with what the session became:
+
+| Member | Type | Description |
+| :--- | :--- | :--- |
+| `Conference` | `CONFERENCE` | The conference the caller is in |
+| `ConferenceNumber` | `INTEGER` | Its number |
+| `MessageArea`, `FileDirectory` | `INTEGER` | The current area and directory |
+| `UserName`, `AliasName` | `STRING` | Who is calling |
+| `SecurityLevel` | `INTEGER` | The caller's current security level |
+| `Node` | `INTEGER` | Node number, as `PCBNODE()` reports it |
+| `MinutesLeft` | `INTEGER` | Minutes left in this call |
+| `PageLength` | `INTEGER` | Lines before a `MORE` prompt |
+| `Language` | `STRING` | Selected language |
+| `IsLocal`, `IsSysop` | `BOOLEAN` | How the caller got on |
+
+```PPL
+PRINTLN "Node ", Session.Node, ", ", Session.MinutesLeft, " minutes left"
+PRINTLN "In ", Session.Conference.Name, " on ", Board.Name
+```
+
+Both are read-only. The classic `CURCONF()`, `PCBNODE()`, `MINLEFT()` and the
+`U_*` variables keep working unchanged.
+
 ## User contacts (4.00)
 
 `U_CONTACT` is a mutable array of built-in `CONTACT` records and requires
-runtime 4.02 because it extends the predefined user-variable prefix. Each record has
+runtime 4.00 because it extends the predefined user-variable prefix. Each record has
 two `STRING` fields: `Service` and `Account`. Service names are open strings,
 so a PPE can store new services without a language or user-schema change.
 

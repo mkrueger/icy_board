@@ -1,8 +1,8 @@
 use super::{compile_errors_with_runtime, run_ppl};
 
 #[test]
-fn palette_api_requires_runtime_402() {
-    for runtime in [400, 401] {
+fn palette_api_requires_runtime_400() {
+    for runtime in [330, 340] {
         let errors = compile_errors_with_runtime(
             "Terminal.Palette.Set(1, Rgb(0, 64, 255))\nTerminal.Palette.Reset(1)\nTerminal.Palette.ResetAll()",
             runtime,
@@ -12,7 +12,7 @@ fn palette_api_requires_runtime_402() {
     assert!(
         compile_errors_with_runtime(
             "Terminal.Palette.Set(1, Rgb(0, 64, 255))\nTerminal.Palette.Reset(1)\nTerminal.Palette.ResetAll()",
-            402,
+            400,
         )
         .is_empty()
     );
@@ -74,6 +74,6 @@ fn palette_statements_report_unavailable_without_ansi() {
 
 #[test]
 fn set_palette_color_rejects_three_arguments() {
-    let errors = compile_errors_with_runtime("Terminal.Palette.Set(1, 2, 3)", 402);
+    let errors = compile_errors_with_runtime("Terminal.Palette.Set(1, 2, 3)", 400);
     assert!(!errors.is_empty(), "{errors:?}");
 }

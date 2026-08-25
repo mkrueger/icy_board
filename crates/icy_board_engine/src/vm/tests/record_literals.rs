@@ -96,7 +96,7 @@ Holder holder = Holder { Value = Second { Value = 1 } }
 }
 
 #[test]
-fn a_record_literal_needs_runtime_401() {
-    let errors = compile_errors_with_runtime("TYPE Point\n INTEGER X\nENDTYPE\nPoint value = Point { X = 1 }\n", 400);
-    assert!(errors.iter().any(|error| error == "Record literals need runtime 401"), "{errors:?}");
+fn a_record_literal_needs_runtime_400() {
+    let errors = compile_errors_with_runtime("TYPE Point\n INTEGER X\nENDTYPE\nPoint value = Point { X = 1 }\n", 340);
+    assert!(errors.iter().any(|error| error == "Record literals need runtime 400"), "{errors:?}");
 }

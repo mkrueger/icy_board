@@ -19,7 +19,7 @@ for encryption and packing.
 +--------------------------------------+
 | variable table             variable  |
 +--------------------------------------+
-| type table   (runtime 401 only)      |
+| type table   (runtime 400 only)      |
 +--------------------------------------+
 | code size                   2 bytes  |
 +--------------------------------------+
@@ -162,9 +162,9 @@ carry nothing and are only kept so old boards still read the file.
 
 ## Type table
 
-Runtime 401 and above only. Nothing is written for older runtimes, and nothing is
-read. 4.00 shipped before records existed and has no type table at all, which is
-why the section is tied to 401 rather than to 400.
+Runtime 400 and above only. Nothing is written for the PCBoard runtimes, and
+nothing is read - they shipped before records existed and have no type table at
+all.
 
 ```text
 u8                  number of types
@@ -250,7 +250,7 @@ chunking rule for unpacked data, whatever the code section does.
 2. Read the version out of the header digits.
 3. Skip to offset 48.
 4. Read the variable table entry count, then that many entries, highest id first.
-5. For runtime 401, read the type table and give every record variable its fields.
+5. For runtime 400, read the type table and give every record variable its fields.
 6. Read the code size.
 7. Whatever is left is the code. If its length differs from the code size, it is packed.
 8. Decrypt, then unpack, then read the result as `i16`.

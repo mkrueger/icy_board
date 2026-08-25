@@ -8,10 +8,9 @@ use std::{env, fs};
 
 use crate::Res;
 use crate::ast::constant::STACK_LIMIT;
-use crate::compiler::user_data::user_data_value;
 use crate::datetime::{IcbDate, IcbTime};
 use crate::executable::{GenericVariableData, PPEExpr, VariableData, VariableType, VariableValue};
-use crate::icy_board::conferences::{Conference, ConferenceType};
+use crate::icy_board::conferences::ConferenceType;
 use crate::icy_board::ftn::queue;
 use crate::icy_board::macro_parser::Macro;
 use crate::icy_board::read_with_encoding_detection;
@@ -20,7 +19,6 @@ use crate::icy_board::state::GraphicsMode;
 use crate::icy_board::state::functions::{MASK_ALNUM, MASK_ALPHA, MASK_ASCII, MASK_FILE, MASK_MESSAGE, MASK_NUM, MASK_PATH, MASK_PWD};
 use crate::icy_board::user_base::{ConferenceFlags, Password};
 use crate::icy_board::user_inf::{BankUserInf, QwkConfigUserInf};
-use crate::parser::CONFERENCE_ID;
 use crate::vm::{TerminalTarget, VirtualMachine, dbase, get_file_channel};
 use base64::{Engine as _, engine::general_purpose};
 use bstr::BString;
@@ -2107,17 +2105,6 @@ pub async fn uselmrs(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
     Ok(VariableValue::new_bool(vm.use_lmrs))
 }
 
-pub async fn new_confinfo(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let conf_num = vm.eval_expr(&args[0]).await?.as_int() as usize;
-    let conference = if let Some(conference) = &vm.icy_board_state.get_board().await.conferences.get(conf_num) {
-        (*conference).clone()
-    } else {
-        log::error!("PPL: Can't get conference {conf_num} (CONFINFO)");
-        Conference::default()
-    };
-    Ok(user_data_value(conference, CONFERENCE_ID))
-}
-
 pub async fn confinfo(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let conf_num = vm.eval_expr(&args[0]).await?.as_int() as usize;
     let conf_field = vm.eval_expr(&args[1]).await?.as_int();
@@ -2757,6 +2744,14 @@ pub async fn rgb(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableV
 
 pub async fn terminal(_vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(crate::icy_board::state::ppl_terminal::PplTerminal::value())
+}
+
+pub async fn board(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
+    Ok(crate::icy_board::state::ppl_board::PplBoard::snapshot(&vm.icy_board_state).await.value())
+}
+
+pub async fn session(_vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
+    Ok(crate::icy_board::state::ppl_session::PplSession::value())
 }
 
 /// What `Type.Member(...)` is called on. The type id rides in the argument, so a new

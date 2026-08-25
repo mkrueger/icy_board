@@ -429,7 +429,6 @@ pub fn get_function_hover(func: &FunctionDefinition) -> Option<Hover> {
         FuncOpCode::GetBankBal => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-getbankbal")),
         FuncOpCode::GetMsgHdr => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-getmsghdr")),
         FuncOpCode::SetMsgHdr => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-setmsghdr")),
-        FuncOpCode::NewConfInfo => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-newconfinfo")),
         FuncOpCode::AreaId => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-areaid")),
         FuncOpCode::WebRequest => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-webrequest")),
         FuncOpCode::Len_Dim => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-len_dim")),
@@ -438,6 +437,8 @@ pub fn get_function_hover(func: &FunctionDefinition) -> Option<Hover> {
         FuncOpCode::SHA256 => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-sha256")),
         FuncOpCode::Rgb | FuncOpCode::RgbAlpha => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-rgb")),
         FuncOpCode::Terminal => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-terminal")),
+        FuncOpCode::Board => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-board")),
+        FuncOpCode::Session => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-session")),
         FuncOpCode::Err => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-err")),
         _ => None,
     }

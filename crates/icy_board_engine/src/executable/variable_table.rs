@@ -1149,7 +1149,7 @@ pub static USER_VARIABLES: std::sync::LazyLock<[UserVariable; 30]> = std::sync::
         },
         UserVariable {
             name: "U_CONTACT",
-            runtime_version: 402,
+            runtime_version: 400,
             value: VariableValue::new_vector(
                 VariableType::UserData(crate::parser::CONTACT_ID as u8),
                 vec![create_record_value(crate::parser::CONTACT_ID as u8, &[]).unwrap()],

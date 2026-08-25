@@ -41,6 +41,9 @@ fn compile_diagnostics(source: &str, runtime: u16) -> Vec<String> {
     let errors = Arc::new(Mutex::new(ErrorReporter::default()));
     let mut workspace = Workspace::default();
     workspace.package.runtime = Some(runtime);
+    // The gate under test is about storage, so the language stays at 4.00 rather
+    // than following the runtime down and hiding TYPE itself.
+    workspace.set_default_language_version(Some(icy_board_engine::executable::LAST_PPL_LANGUAGE_VERSION));
     let ast = parse_ast(PathBuf::from("record.pps"), errors.clone(), source, &registry, Encoding::Utf8, &workspace);
     let mut compiler = PPECompiler::new(&workspace, registry, errors.clone());
     compiler.compile(&[&ast]);
@@ -91,7 +94,7 @@ fn loading_a_ppe_rebuilds_nested_record_defaults() {
 }
 
 #[test]
-fn a_runtime_before_401_does_not_gain_a_custom_type_section() {
+fn a_pcboard_runtime_does_not_gain_a_custom_type_section() {
     let executable = Executable {
         runtime: 340,
         ..Executable::default()
@@ -101,11 +104,11 @@ fn a_runtime_before_401_does_not_gain_a_custom_type_section() {
     assert!(loaded.user_types.is_empty());
 }
 
-/// 4.00 understands the syntax but has no type table, so the layout would be
-/// dropped on the way out and every field access would read nothing.
+/// A `PCBoard` runtime understands none of this and has no type table, so the layout
+/// would be dropped on the way out and every field access would read nothing.
 #[test]
 fn a_type_is_rejected_on_a_runtime_that_cannot_store_it() {
-    let errors = compile_diagnostics("TYPE Point\n  INTEGER X\nENDTYPE\nPoint Pt\n", 400);
+    let errors = compile_diagnostics("TYPE Point\n  INTEGER X\nENDTYPE\nPoint Pt\n", 340);
     assert_eq!(
         vec![format!(
             "'TYPE' needs runtime {FIRST_TYPE_TABLE_RUNTIME}, an older PPE has nowhere to store the layout"
@@ -120,12 +123,12 @@ fn a_type_passes_on_the_runtime_that_stores_it() {
     assert!(errors.is_empty(), "{errors:?}");
 }
 
-/// 4.00 shipped without a type table, so nothing may be written or expected there
+/// `PCBoard` shipped without a type table, so nothing may be written or expected there
 /// - reading one byte too many would shift the code size and take the file apart.
 #[test]
-fn runtime_400_carries_no_type_table() {
+fn a_pcboard_runtime_carries_no_type_table() {
     let executable = Executable {
-        runtime: 400,
+        runtime: 340,
         script_buffer: vec![1, 2, 3],
         ..Executable::default()
     };
@@ -169,9 +172,9 @@ fn a_record_past_the_byte_limit_is_rejected() {
 }
 
 #[test]
-fn the_serializer_rejects_custom_types_before_runtime_401() {
+fn the_serializer_rejects_custom_types_on_a_pcboard_runtime() {
     let executable = Executable {
-        runtime: 400,
+        runtime: 340,
         user_types: vec![vec![VariableType::Integer]],
         ..Executable::default()
     };

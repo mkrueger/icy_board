@@ -285,7 +285,7 @@ pub async fn run_function(opcode: FuncOpCode, arg: &mut VirtualMachine<'_>, argu
         FuncOpCode::GetBankBal => predefined_functions::getbankbal(arg, arguments).await,
         FuncOpCode::GetMsgHdr => predefined_functions::getmsghdr(arg, arguments).await,
         FuncOpCode::SetMsgHdr => predefined_functions::setmsghdr(arg, arguments).await,
-        FuncOpCode::NewConfInfo => predefined_functions::new_confinfo(arg, arguments).await,
+
         FuncOpCode::AreaId => predefined_functions::area_id(arg, arguments).await,
         FuncOpCode::WebRequest => predefined_functions::web_request(arg, arguments).await,
         FuncOpCode::Len_Dim => predefined_functions::len_dim(arg, arguments).await,
@@ -295,19 +295,9 @@ pub async fn run_function(opcode: FuncOpCode, arg: &mut VirtualMachine<'_>, argu
         FuncOpCode::Rgb | FuncOpCode::RgbAlpha => predefined_functions::rgb(arg, arguments).await,
         FuncOpCode::Err => predefined_functions::err(arg, arguments).await,
         FuncOpCode::Terminal => predefined_functions::terminal(arg, arguments).await,
+        FuncOpCode::Board => predefined_functions::board(arg, arguments).await,
+        FuncOpCode::Session => predefined_functions::session(arg, arguments).await,
         FuncOpCode::StaticReceiver => predefined_functions::static_receiver(arg, arguments).await,
-        FuncOpCode::GfxBackend
-        | FuncOpCode::GfxCaps
-        | FuncOpCode::GfxCellWidth
-        | FuncOpCode::GfxCellHeight
-        | FuncOpCode::GfxScreenWidth
-        | FuncOpCode::GfxScreenHeight
-        | FuncOpCode::NewSurface
-        | FuncOpCode::LoadSurface
-        | FuncOpCode::LoadAudio
-        | FuncOpCode::TermState
-        | FuncOpCode::TermInfo
-        | FuncOpCode::TermInput => Err(format!("terminal function opcode {opcode:?} was retired in runtime 4.02").into()),
         FuncOpCode::END
         | FuncOpCode::CPAR
         | FuncOpCode::UPLUS

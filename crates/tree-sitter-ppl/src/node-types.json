@@ -1986,6 +1986,10 @@
     "named": false
   },
   {
+    "type": "BOARD",
+    "named": false
+  },
+  {
     "type": "BOOLEAN",
     "named": false
   },
@@ -2287,6 +2291,10 @@
   },
   {
     "type": "SELECT",
+    "named": false
+  },
+  {
+    "type": "SESSION",
     "named": false
   },
   {

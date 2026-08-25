@@ -778,7 +778,7 @@ fn project(manifest: &str, source: &str) -> (PathBuf, String, String) {
 
 #[test]
 fn a_required_runtime_can_be_set_in_the_manifest() {
-    let manifest = "[package]\nname = \"runtime-action\"\nversion = \"0.1.0\"\nruntime = 400\n";
+    let manifest = "[package]\nname = \"runtime-action\"\nversion = \"0.1.0\"\nruntime = 340\n[compiler]\nlanguage_version = 400\n";
     let source = "TYPE Point\n INTEGER X\nENDTYPE\nPoint value\nvalue = Point { X = 1 }\n";
     let (root, root_uri, uri) = project(manifest, source);
     let (mut server, _) = Server::ready_at(&root_uri);
@@ -793,21 +793,24 @@ fn a_required_runtime_can_be_set_in_the_manifest() {
         .find(|action| action["diagnostics"][0]["code"] == "ppl.runtime-too-old")
         .unwrap();
     let manifest_uri = format!("file://{}", root.join("ppl.toml").display());
-    assert_eq!(action["edit"]["changes"][&manifest_uri][0]["newText"], "401");
-    assert_eq!(action["title"], "Set project version to 401");
+    assert_eq!(action["edit"]["changes"][&manifest_uri][0]["newText"], "400");
+    assert_eq!(action["title"], "Set project version to 400");
     fs::remove_dir_all(root).unwrap();
 }
 
 #[test]
 fn an_open_manifest_is_measured_as_the_editor_holds_it() {
-    let manifest = "[package]\nname = \"buffered\"\nversion = \"0.1.0\"\nruntime = 400\n";
+    let manifest = "[package]\nname = \"buffered\"\nversion = \"0.1.0\"\nruntime = 340\n[compiler]\nlanguage_version = 400\n";
     let source = "TYPE Point\n INTEGER X\nENDTYPE\nPoint value\nvalue = Point { X = 1 }\n";
     let (root, root_uri, uri) = project(manifest, source);
     let (mut server, _) = Server::ready_at(&root_uri);
 
     // The same manifest with the key further down, as an unsaved edit would leave it.
     let manifest_uri = format!("file://{}", root.join("ppl.toml").display());
-    server.open(&manifest_uri, "[package]\nname = \"buffered\"\nversion = \"0.1.0\"\n\n\nruntime = 400\n");
+    server.open(
+        &manifest_uri,
+        "[package]\nname = \"buffered\"\nversion = \"0.1.0\"\n\n\nruntime = 340\n[compiler]\nlanguage_version = 400\n",
+    );
     server.open(&uri, source);
     let diagnostics = server.diagnostics(&uri);
     let actions = actions(&mut server, &uri, diagnostics.clone());
@@ -817,7 +820,7 @@ fn an_open_manifest_is_measured_as_the_editor_holds_it() {
         .and_then(|actions| actions.iter().find(|action| action["diagnostics"][0]["code"] == "ppl.runtime-too-old"))
         .unwrap_or_else(|| panic!("diagnostics={diagnostics}, actions={actions}"));
     let edit = &action["edit"]["changes"][&manifest_uri][0];
-    assert_eq!(edit["newText"], "401");
+    assert_eq!(edit["newText"], "400");
     assert_eq!(edit["range"]["start"]["line"], 5, "the buffer holds it on another line: {edit}");
     fs::remove_dir_all(root).unwrap();
 }

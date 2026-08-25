@@ -250,26 +250,5 @@ pub async fn run_predefined_statement(opcode: OpCode, arg: &mut VirtualMachine<'
         OpCode::MoveMsg => predefined_procedures::move_msg(arg, arguments).await,
         OpCode::SetBankBal => predefined_procedures::set_bank_bal(arg, arguments).await,
         OpCode::WebRequest => predefined_procedures::web_request(arg, arguments).await,
-        OpCode::GfxInit
-        | OpCode::GfxShutdown
-        | OpCode::GfxSetPacing
-        | OpCode::SetVMargins
-        | OpCode::SetHMargins
-        | OpCode::ResetVMargins
-        | OpCode::ResetHMargins
-        | OpCode::ResetMargins
-        | OpCode::SetFont
-        | OpCode::LoadFont
-        | OpCode::SetPaletteColor
-        | OpCode::SetPaletteColorRgb
-        | OpCode::ResetPaletteColor
-        | OpCode::ResetPalette
-        | OpCode::BeginTerminalUpdate
-        | OpCode::EndTerminalUpdate
-        | OpCode::RecordMacro
-        | OpCode::EndMacro
-        | OpCode::PlayMacro
-        | OpCode::DeleteMacro
-        | OpCode::ClearMacros => Err(format!("terminal statement opcode {opcode:?} was retired in runtime 4.02").into()),
     }
 }

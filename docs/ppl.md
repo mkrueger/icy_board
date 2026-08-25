@@ -84,8 +84,8 @@ reconstructed source cannot express an unusual instruction sequence exactly.
 
 ## Compiler
 
-`pplc` supports PCBoard runtime formats from 1.00 through 3.40 and Icy Board
-formats 4.00 and 4.01. Runtime and language versions are separate: the runtime
+`pplc` supports PCBoard runtime formats from 1.00 through 3.40 and the Icy Board
+format 4.00. Runtime and language versions are separate: the runtime
 version controls which board can load the PPE, while the language version
 controls which syntax, statements, types and board objects the source may name.
 
@@ -150,7 +150,7 @@ routine being called. Editors that highlight with tree-sitter - Neovim, Helix,
 Zed, Emacs - read the grammar in
 [crates/tree-sitter-ppl](../crates/tree-sitter-ppl/README.md) instead. It parses
 the whole language through language 4.00 and the syntax whose PPE representation
-needs runtime 4.01, including `TYPE`, record literals and routine parameters. It
+needs runtime 4.00, including `TYPE`, record literals and routine parameters. It
 ships highlight, locals, fold and indent queries. Its README has
 the setup for Neovim and Helix; the grammar is checked against every `.pps` in
 this repository, so what the compiler reads is what an editor colours.
@@ -171,11 +171,11 @@ are two different wishes.
 
 | | Command line | `ppl.toml` | Environment | What it controls |
 | :--- | :--- | :--- | :--- | :--- |
-| Runtime | `--runtime` | `[package] runtime` | | The PPE format written to disk. Valid: 100, 200, 300, 310, 320, 330, 340, 400, 401. |
+| Runtime | `--runtime` | `[package] runtime` | | The PPE format written to disk. Valid: 100, 200, 300, 310, 320, 330, 340, 400. |
 | Language | `--lang-version` | `[compiler] language_version` | `PPL_LANG_VERSION` | Which syntax and which built-ins the compiler accepts. Valid: 100, 200, 300, 310, 320, 330, 340, 350, 400. |
 
-The runtime defaults to 401. The language defaults to the runtime version up to
-400, so the default pair is runtime 401 and language 400. A format-only runtime
+The runtime defaults to 400. The language defaults to the runtime version up to
+400, so the default pair is runtime 400 and language 400. A format-only runtime
 bump therefore does not invent a new language version. A source directive wins
 over the command line, the command line wins over `ppl.toml`, and the manifest
 wins over `PPL_LANG_VERSION`. The environment is a personal default for loose
@@ -313,7 +313,7 @@ complete signature: routine kind, argument types and dimensions, `VAR` flags and
 the return type of a function. A routine parameter can be passed on to another
 routine. Outside such an argument position a bare routine name is still an error.
 
-Routine references need runtime 401 because 4.01 adds the bytecode marker that
+Routine references need runtime 400 because 4.00 adds the bytecode marker that
 distinguishes a routine value from a call to that routine.
 
 #### CONST and ENUM
@@ -336,10 +336,10 @@ See the language reference for the full rules.
 ### Language version 400
 
 400 is where the language stops being bound by what PCBoard 15.4 could express.
-A PPE built at runtime 400 or 401 will not load on an original PCBoard.
+A PPE built at runtime 400 will not load on an original PCBoard.
 
-Runtime 400 introduced the IcyBoard-only format. Runtime 401 adds the type table
-needed by custom types while keeping 4.00 files readable.
+Runtime 400 is the IcyBoard-only format. It carries the type table custom types
+need, the routine-reference marker and the `U_CONTACT` variable slot.
 
 #### Parentheses, brackets and braces
 
@@ -528,7 +528,7 @@ RETURN Point { X = source.X + 1, Y = source.Y }
 ```
 
 Unknown and duplicate fields are errors. A field holding another record requires
-the exact nominal type. Record literals need runtime 401; the PPE stores type and
+the exact nominal type. Record literals need runtime 400; the PPE stores type and
 field ids rather than their source names.
 
 The reverse shape - an array as one field of a record - is not supported yet.
@@ -567,7 +567,8 @@ read-only snapshots, so `conf.Name = "x"` is rejected.
 may still have a variable called `type`.
 
 The record layout is written into the PPE, which is why a program using `TYPE`
-needs runtime 401. 4.00 has no type table - it was fixed before records existed.
+needs runtime 400. The PCBoard runtimes have no type table - they were fixed
+before records existed.
 
 Only the field types are written, not their names — the same as for variables,
 routines and labels, none of which keep a name either. A shipped PPE therefore
@@ -626,7 +627,7 @@ back at the column its `BEGIN` starts on.
 
 #### What 400 breaks
 
-* Runtime 400 and 401 PPEs do not load on an original PCBoard.
+* Runtime 400 PPEs do not load on an original PCBoard.
 * `[` and `]` are index operators.
 * `BEGIN` is a keyword, so a 3.50 source may still have a variable called
   `begin` while a 4.00 source may not.
@@ -725,7 +726,7 @@ Would print:
 
 ```text
 Version:0.1.0
-Runtime:401
+Runtime:400
 Language:400
 ```
 

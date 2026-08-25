@@ -6,12 +6,12 @@ fn raw_font() -> Vec<u8> {
 }
 
 #[test]
-fn font_api_requires_runtime_402() {
-    for runtime in [400, 401] {
+fn font_api_requires_runtime_400() {
+    for runtime in [330, 340] {
         let errors = compile_errors_with_runtime("Terminal.Font.Set(0, 5)\nTerminal.Font.Load(43, \"f.psf\")", runtime);
         assert!(!errors.is_empty(), "runtime {runtime} unexpectedly accepted member calls");
     }
-    assert!(compile_errors_with_runtime("Terminal.Font.Set(0, 5)\nTerminal.Font.Load(43, \"f.psf\")", 402).is_empty());
+    assert!(compile_errors_with_runtime("Terminal.Font.Set(0, 5)\nTerminal.Font.Load(43, \"f.psf\")", 400).is_empty());
 }
 
 #[test]

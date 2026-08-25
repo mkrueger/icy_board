@@ -53,7 +53,7 @@ struct Cli {
     #[argh(switch)]
     mono: bool,
 
-    /// version number for the compiled PPE, valid: 100, 200, 300, 310, 320, 330, 340, 400, 401, 402 (default)
+    /// version number for the compiled PPE, valid: 100, 200, 300, 310, 320, 330, 340, 400 (default)
     #[argh(option)]
     runtime: Option<u16>,
 

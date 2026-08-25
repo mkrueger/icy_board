@@ -10,6 +10,15 @@ releases.
 
 ### Changed
 
+- Collapsed the beta PPE runtimes 4.00, 4.01 and 4.02 into a single runtime
+  4.00, which now carries the type table, the routine-reference marker and
+  `U_CONTACT`. PPEs compiled by an earlier beta must be rebuilt from source;
+  the PCBoard runtimes 1.00 through 3.40 are unchanged.
+- Retired the object form of `ConfInfo(conf)`. `Board.GetConference(index)` and
+  `Session.Conference` answer with the same `CONFERENCE` snapshot. The PCBoard
+  `ConfInfo(conf, field)` function and statement are untouched. Its opcode slot
+  was reclaimed rather than reserved, so every function opcode below it moved up
+  by one and beta PPEs must be rebuilt from source.
 - Replaced the experimental runtime 4.02 terminal globals with the `Terminal`
   facade: `Info`, `Gfx`, `Input`, `Margins`, `Palette`, `Font`, `Macros` and
   `Sound`, plus synchronized `BeginUpdate()`/`EndUpdate()` calls.
@@ -20,11 +29,15 @@ releases.
   split overloaded event data into `Action`, `Channel` and `Dropped`, and
   replaced raw button/modifier masks with Boolean properties.
 - Retired `TERMSTATE` and the draft flat runtime 4.02 statements/functions.
-  Numeric opcode slots remain reserved so older bytecode fails cleanly rather
-  than being interpreted as another operation.
+  Their opcode slots were reclaimed rather than reserved, so the numbering has
+  no beta holes left and PPEs built by an earlier beta must be rebuilt.
 
 ### Added
 
+- Added the runtime 4.02 `Board` and `Session` objects. `Board` is a snapshot of
+  the configured board and can walk its conferences without `HIGHCONFNUM()`;
+  `Session` reads the call in progress live. Both are read-only and leave the
+  classic `CURCONF()`, `PCBNODE()` and `U_*` surface untouched.
 - `icbfile scan` now identifies archives that have no usable description and
   distinguishes files that are missing from disk.
 - `icbfile scan --all` scans every area in a `file_areas.toml`; it can be

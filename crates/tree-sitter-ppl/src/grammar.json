@@ -1384,6 +1384,18 @@
             "type": "TOKEN",
             "content": {
               "type": "PATTERN",
+              "value": "[bB][oO][aA][rR][dD]"
+            }
+          },
+          "named": false,
+          "value": "BOARD"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
               "value": "[cC][oO][nN][fF][eE][rR][eE][nN][cC][eE]"
             }
           },
@@ -1521,6 +1533,18 @@
           },
           "named": false,
           "value": "PASSWORD"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
+              "value": "[sS][eE][sS][sS][iI][oO][nN]"
+            }
+          },
+          "named": false,
+          "value": "SESSION"
         },
         {
           "type": "ALIAS",

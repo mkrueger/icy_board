@@ -3,15 +3,15 @@ use std::fmt::Write as _;
 use super::{compile_errors, compile_errors_with_runtime, run_ppl};
 
 #[test]
-fn multimedia_apis_require_runtime_402() {
-    for runtime in [400, 401] {
+fn multimedia_apis_require_runtime_400() {
+    for runtime in [330, 340] {
         let errors = compile_errors_with_runtime("Terminal.Gfx.Init(GfxBackend.Sixel)\nPRINTLN Terminal.Gfx.Backend", runtime);
         assert!(
-            errors.iter().any(|error| error.contains("Terminal needs runtime 402")),
+            errors.iter().any(|error| error.contains("Terminal needs runtime 400")),
             "runtime {runtime}: {errors:?}"
         );
     }
-    assert!(compile_errors_with_runtime("Terminal.Gfx.Init(GfxBackend.Sixel)\nPRINTLN Terminal.Gfx.Backend", 402).is_empty());
+    assert!(compile_errors_with_runtime("Terminal.Gfx.Init(GfxBackend.Sixel)\nPRINTLN Terminal.Gfx.Backend", 400).is_empty());
 }
 
 #[test]

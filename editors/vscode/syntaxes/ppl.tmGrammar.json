@@ -10,7 +10,7 @@
 		{ "include": "#keywords" },
 		{ "include": "#terminal-info" },
 		{ "include": "#terminal-input" },
-		{ "include": "#terminal-object" },
+		{ "include": "#instance-objects" },
 		{ "include": "#types" },
 		{ "include": "#constants" },
 		{ "include": "#builtin-functions" },
@@ -137,10 +137,10 @@
 			"match": "(?i)\\b(TERMINPUT)\\b",
 			"name": "storage.type.ppl"
 		},
-		"terminal-object": {
+		"instance-objects": {
 			"patterns": [
-				{ "match": "(?i)\\b(TERMINAL)\\b(?=\\s*\\()", "name": "support.function.ppl" },
-				{ "match": "(?i)\\b(TERMINAL)\\b", "name": "storage.type.ppl" }
+				{ "match": "(?i)\\b(TERMINAL|BOARD|SESSION)\\b(?=\\s*\\()", "name": "support.function.ppl" },
+				{ "match": "(?i)\\b(TERMINAL|BOARD|SESSION)\\b", "name": "storage.type.ppl" }
 			]
 		},
 		"builtin-statements": {

@@ -7,7 +7,7 @@ BEGIN
   PRINTLN "╘═════════════════════════════════════════════════════════════════════════════╛"
   PRINTLN
 
-  CONFERENCE CONF = CONFINFO(CURCONF())
+  CONFERENCE CONF = Session.Conference
   
   FOR i = 1 to CONF.Directories
     IF GetX() > 45

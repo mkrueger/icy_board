@@ -18,3 +18,5 @@ hint-type-sByte=1-Byte signed Integer Bereich: -128 - 127
 hint-type-sword=2-Byte signed Integer Bereich: -32,768 - 32,767
 hint-function-rgb=Packt Rot, Grün, Blau und optional Alpha in einen RGBA-Farbwert.
 hint-function-terminal=Das Terminal des Anrufers und die Wurzel für Grafik, Eingabe, Ränder, Palette, Schriften, Makros, Audio und zwischengespeicherte Fähigkeiten.
+hint-function-board=Eine Momentaufnahme des konfigurierten Boards: Name, Ort, Betreiber, Sysop-Name, Knotenzahl und seine Konferenzen.
+hint-function-session=Der laufende Anruf, live gelesen: Konferenz, Bereiche, Anrufer, Sicherheitsstufe, Knoten, verbleibende Minuten und Sprache.

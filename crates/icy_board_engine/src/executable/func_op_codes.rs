@@ -304,36 +304,25 @@ pub enum FuncOpCode {
     SetMsgHdr = -290,
     MemberReference = -291,
     MemberCall = -292,
-    NewConfInfo = -293,
-    AreaId = -294,
-    WebRequest = -295,
-    Len_Dim = -296,
-    RoutineReference = -297,
-    RecordLiteral = -298,
-    BASE64ENC = -299,
-    BASE64DEC = -300,
-    SHA256 = -301,
-    GfxBackend = -302,
-    Rgb = -303,
-    RgbAlpha = -304,
-    GfxCaps = -305,
-    GfxCellWidth = -306,
-    GfxCellHeight = -307,
-    GfxScreenWidth = -308,
-    GfxScreenHeight = -309,
-    NewSurface = -310,
-    LoadSurface = -311,
-    LoadAudio = -312,
-    TermState = -313,
-    Err = -314,
-    TermInfo = -315,
-    TermInput = -316,
-    Terminal = -317,
+    AreaId = -293,
+    WebRequest = -294,
+    Len_Dim = -295,
+    RoutineReference = -296,
+    RecordLiteral = -297,
+    BASE64ENC = -298,
+    BASE64DEC = -299,
+    SHA256 = -300,
+    Rgb = -301,
+    RgbAlpha = -302,
+    Err = -303,
+    Terminal = -304,
     /// Compiler generated: hands back what a static member is called on.
-    StaticReceiver = -318,
+    StaticReceiver = -305,
+    Board = -306,
+    Session = -307,
 }
 
-pub const LAST_FUNC: i16 = -318;
+pub const LAST_FUNC: i16 = -307;
 
 impl FuncOpCode {
     pub fn get_definition(self) -> &'static FunctionDefinition {
@@ -344,25 +333,15 @@ impl FuncOpCode {
     pub fn minimum_runtime(self) -> u16 {
         if matches!(
             self,
-            FuncOpCode::GfxBackend
-                | FuncOpCode::Rgb
+            FuncOpCode::Rgb
                 | FuncOpCode::RgbAlpha
-                | FuncOpCode::GfxCaps
-                | FuncOpCode::GfxCellWidth
-                | FuncOpCode::GfxCellHeight
-                | FuncOpCode::GfxScreenWidth
-                | FuncOpCode::GfxScreenHeight
-                | FuncOpCode::NewSurface
-                | FuncOpCode::LoadSurface
-                | FuncOpCode::LoadAudio
-                | FuncOpCode::TermState
                 | FuncOpCode::Err
-                | FuncOpCode::TermInfo
-                | FuncOpCode::TermInput
                 | FuncOpCode::Terminal
                 | FuncOpCode::StaticReceiver
+                | FuncOpCode::Board
+                | FuncOpCode::Session
         ) {
-            402
+            400
         } else {
             100
         }
@@ -385,17 +364,6 @@ pub struct FunctionDefinition {
     pub return_type: VariableType,
     pub signature: FunctionSignature,
     pub args: Option<Vec<ArgumentDefinition>>,
-}
-
-fn retired_function(opcode: FuncOpCode, parameters: usize) -> FunctionDefinition {
-    FunctionDefinition {
-        name: "<retired terminal function>",
-        version: 400,
-        opcode,
-        return_type: VariableType::None,
-        signature: FunctionSignature::FixedParameters(parameters),
-        args: None,
-    }
 }
 
 impl FunctionDefinition {
@@ -438,7 +406,7 @@ impl FunctionDefinition {
         }
     }
 }
-pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 330]> = std::sync::LazyLock::new(|| {
+pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 319]> = std::sync::LazyLock::new(|| {
     [
         FunctionDefinition {
             name: "END",
@@ -2947,14 +2915,6 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 330]> 
             signature: FunctionSignature::Invalid,
         },
         FunctionDefinition {
-            name: "ConfInfo",
-            version: 400,
-            opcode: FuncOpCode::NewConfInfo,
-            return_type: VariableType::UserData(30),
-            args: None,
-            signature: FunctionSignature::FixedParameters(1),
-        },
-        FunctionDefinition {
             name: "AreaId",
             version: 400,
             opcode: FuncOpCode::AreaId,
@@ -2986,7 +2946,7 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 330]> 
         },
         FunctionDefinition {
             name: "<routine reference>",
-            version: 401,
+            version: 400,
             opcode: FuncOpCode::RoutineReference,
             return_type: VariableType::None,
             args: None,
@@ -2994,7 +2954,7 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 330]> 
         },
         FunctionDefinition {
             name: "<record literal>",
-            version: 401,
+            version: 400,
             opcode: FuncOpCode::RecordLiteral,
             return_type: VariableType::None,
             args: None,
@@ -3024,7 +2984,6 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 330]> 
             args: Some(vec![ArgumentDefinition::new("value", VariableType::BigStr)]),
             signature: FunctionSignature::FixedParameters(1),
         },
-        retired_function(FuncOpCode::GfxBackend, 0),
         FunctionDefinition {
             name: "Rgb",
             version: 400,
@@ -3050,15 +3009,6 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 330]> 
             ]),
             signature: FunctionSignature::FixedParameters(4),
         },
-        retired_function(FuncOpCode::GfxCaps, 0),
-        retired_function(FuncOpCode::GfxCellWidth, 0),
-        retired_function(FuncOpCode::GfxCellHeight, 0),
-        retired_function(FuncOpCode::GfxScreenWidth, 0),
-        retired_function(FuncOpCode::GfxScreenHeight, 0),
-        retired_function(FuncOpCode::NewSurface, 2),
-        retired_function(FuncOpCode::LoadSurface, 1),
-        retired_function(FuncOpCode::LoadAudio, 1),
-        retired_function(FuncOpCode::TermState, 0),
         FunctionDefinition {
             name: "Err",
             version: 400,
@@ -3067,8 +3017,6 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 330]> 
             args: None,
             signature: FunctionSignature::FixedParameters(0),
         },
-        retired_function(FuncOpCode::TermInfo, 0),
-        retired_function(FuncOpCode::TermInput, 0),
         FunctionDefinition {
             name: "Terminal",
             version: 400,
@@ -3086,6 +3034,22 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 330]> 
             // The type id is a real argument: `Invalid` would leave the reader with nothing
             // to consume and it would never move past this opcode.
             signature: FunctionSignature::FixedParameters(1),
+        },
+        FunctionDefinition {
+            name: "Board",
+            version: 400,
+            opcode: FuncOpCode::Board,
+            return_type: VariableType::UserData(49),
+            args: None,
+            signature: FunctionSignature::FixedParameters(0),
+        },
+        FunctionDefinition {
+            name: "Session",
+            version: 400,
+            opcode: FuncOpCode::Session,
+            return_type: VariableType::UserData(50),
+            args: None,
+            signature: FunctionSignature::FixedParameters(0),
         },
         // ALIASES (need to be last in the list)
         FunctionDefinition {

@@ -35,6 +35,7 @@ use crate::{
 pub mod functions;
 pub mod menu_runner;
 pub mod ppl_audio;
+pub mod ppl_board;
 pub mod ppl_error;
 pub mod ppl_events;
 pub mod ppl_font;
@@ -45,6 +46,7 @@ pub mod ppl_macros;
 pub mod ppl_margins;
 pub mod ppl_mouse;
 pub mod ppl_palette;
+pub mod ppl_session;
 pub mod ppl_sound;
 pub mod ppl_surface;
 pub mod ppl_terminal;

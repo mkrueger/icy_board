@@ -1107,6 +1107,8 @@ hint-function-base64dec=Decodes base64 text in @1 as UTF-8. Characters outside t
 hint-function-sha256=Returns the lowercase hexadecimal SHA-256 digest of the UTF-8 bytes of @1.
 hint-function-rgb=Packs red, green, blue and optional alpha components into an RGBA color.
 hint-function-terminal=The caller's terminal and the root of graphics, input, margins, palette, fonts, macros, sound and cached capability information.
+hint-function-board=A snapshot of the configured board: name, location, operator, sysop name, node count and its conferences.
+hint-function-session=The call in progress, read live: conference, areas, caller, security level, node, minutes left and language.
 hint-function-err=Returns an ERROR describing the last operation that could fail: OK, Kind, Code, Message and Channel.
 hint-statement-errclr=Forgets the last error, so ERR().OK is true again.
 hint-statement-on-error=ON ERROR GOTO label | GOSUB label | Procedure | OFF - where a failed operation sends the program.
@@ -1231,7 +1233,6 @@ hint-function-setmsghdr=
     If modefied header change will not fit in the original message
     header then it will insert the message to the end of the message
     base.
-hint-function-newconfinfo=todo
 hint-function-areaid=Generates a tuple conference/area to identify a message base.
 hint-function-webrequest=Gets data from a web server and returns it as a string.
     ### Parameters

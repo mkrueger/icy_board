@@ -1,14 +1,14 @@
 use super::{compile_errors_with_runtime, run_ppl, run_ppl_with_files_and_input};
 
 #[test]
-fn the_error_api_requires_runtime_402() {
-    for runtime in [400, 401] {
+fn the_error_api_requires_runtime_400() {
+    for runtime in [330, 340] {
         let errors = compile_errors_with_runtime("PrintLn ERR().Code\nErrClr", runtime);
-        for needed in ["Err needs runtime 402", "ErrClr needs runtime 402"] {
+        for needed in ["Err needs runtime 400", "ErrClr needs runtime 400"] {
             assert!(errors.iter().any(|error| error == needed), "runtime {runtime}: {errors:?}");
         }
     }
-    assert!(compile_errors_with_runtime("PrintLn ERR().Code\nErrClr", 402).is_empty());
+    assert!(compile_errors_with_runtime("PrintLn ERR().Code\nErrClr", 400).is_empty());
 }
 
 #[test]
@@ -253,7 +253,7 @@ fn a_handler_procedure_cannot_take_a_var_parameter() {
         PROCEDURE Report(VAR ERROR e)
         ENDPROC
         ",
-        402,
+        400,
     );
 
     assert!(errors.iter().any(|error| error.contains("ON ERROR handler")), "{errors:?}");

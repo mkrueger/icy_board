@@ -20,7 +20,7 @@ BEGIN
       PRINT "@X0E", LEFT(TOSTRING(i), 3)," - ", "@X0F", LEFT(name,30)
       CONTINUE
     ENDIF
-    IF Abort() END
+    IF Abort() EXIT
   NEXT
 
   PRINTLN CHR(13)

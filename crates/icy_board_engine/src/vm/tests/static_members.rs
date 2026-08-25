@@ -93,8 +93,8 @@ fn an_unknown_static_is_reported() {
 }
 
 #[test]
-fn a_static_needs_runtime_402() {
-    let errors = compile_errors_with_runtime("SURFACE s = Surface.New(4, 4)", 401);
+fn a_static_needs_runtime_400() {
+    let errors = compile_errors_with_runtime("SURFACE s = Surface.New(4, 4)", 340);
     assert!(errors.iter().any(|error| error.contains("Surface.New")), "{errors:?}");
 }
 

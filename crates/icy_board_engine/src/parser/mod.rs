@@ -293,6 +293,8 @@ pub const PALETTE_ID: usize = 45;
 pub const FONT_ID: usize = 46;
 pub const MACROS_ID: usize = 47;
 pub const SOUND_ID: usize = 48;
+pub const BOARD_ID: usize = 49;
+pub const SESSION_ID: usize = 50;
 
 /// Builtin enums take the top of the id space and a program's own enums grow down from
 /// below them, so the order here is what a PPE stores and may only be appended to.
@@ -357,6 +359,8 @@ impl UserTypeRegistry {
         reg.register::<crate::icy_board::state::ppl_font::PplFont>(FONT_ID);
         reg.register::<crate::icy_board::state::ppl_macros::PplMacros>(MACROS_ID);
         reg.register::<crate::icy_board::state::ppl_sound::PplSound>(SOUND_ID);
+        reg.register::<crate::icy_board::state::ppl_board::PplBoard>(BOARD_ID);
+        reg.register::<crate::icy_board::state::ppl_session::PplSession>(SESSION_ID);
 
         reg
     }

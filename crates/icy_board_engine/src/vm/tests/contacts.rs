@@ -4,10 +4,10 @@ use crate::{
 };
 
 #[test]
-fn u_contact_requires_runtime_402() {
-    let errors = compile_errors_with_runtime("PRINT U_CONTACT[0].Service", 401);
+fn u_contact_requires_runtime_400() {
+    let errors = compile_errors_with_runtime("PRINT U_CONTACT[0].Service", 340);
 
-    assert!(!errors.is_empty(), "U_CONTACT unexpectedly compiled for runtime 401");
+    assert!(!errors.is_empty(), "U_CONTACT unexpectedly compiled for runtime 340");
 }
 
 #[test]

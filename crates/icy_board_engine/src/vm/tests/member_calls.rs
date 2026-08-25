@@ -48,9 +48,9 @@ fn a_type_without_an_instance_is_rejected() {
 }
 
 #[test]
-fn a_static_receiver_needs_runtime_402() {
-    let errors = compile_errors_with_runtime("PRINTLN Terminal.Info.Columns", 401);
-    assert!(errors.iter().any(|error| error.contains("Terminal needs runtime 402")), "{errors:?}");
+fn a_static_receiver_needs_runtime_400() {
+    let errors = compile_errors_with_runtime("PRINTLN Terminal.Info.Columns", 340);
+    assert!(errors.iter().any(|error| error.contains("Terminal needs runtime 400")), "{errors:?}");
 }
 
 /// The facade hangs objects off objects, so a property has to be able to answer with one.

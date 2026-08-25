@@ -19,7 +19,7 @@ Options:
   --mono            write plain text, without the ansi escapes that colour the
                     output
   --runtime         version number for the compiled PPE, valid: 100, 200, 300,
-                    310, 320, 330, 340, 400, 401 (default)
+                    310, 320, 330, 340, 400 (default)
   --lang-version    language version (defaults to the manifest,
                     PPL_LANG_VERSION, then runtime capped at 400)
   --cp437           specify the encoding of the file (cp437 = true, utf8 =
@@ -66,7 +66,7 @@ Language version       350
        Manifest             not set
        Environment          350
 
-Runtime version        401
+Runtime version        400
        From                 default
 
 Output                 /home/mike/doors/hello.ppe

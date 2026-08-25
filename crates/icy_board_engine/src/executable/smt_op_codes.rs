@@ -268,32 +268,11 @@ pub enum OpCode {
     SetBankBal = 229,
     WebRequest = 230,
 
-    GfxInit = 231,
-    GfxShutdown = 232,
-    GfxSetPacing = 233,
-    MemberCall = 234,
-    SetVMargins = 235,
-    SetHMargins = 236,
-    ResetVMargins = 237,
-    ResetHMargins = 238,
-    ResetMargins = 239,
-    SetFont = 240,
-    LoadFont = 241,
-    OnError = 242,
-    ErrClr = 243,
-    SetPaletteColor = 244,
-    SetPaletteColorRgb = 245,
-    ResetPaletteColor = 246,
-    ResetPalette = 247,
-    BeginTerminalUpdate = 248,
-    EndTerminalUpdate = 249,
-    RecordMacro = 250,
-    EndMacro = 251,
-    PlayMacro = 252,
-    DeleteMacro = 253,
-    ClearMacros = 254,
+    MemberCall = 231,
+    OnError = 232,
+    ErrClr = 233,
 }
-pub const LAST_STMT: i16 = OpCode::ClearMacros as i16;
+pub const LAST_STMT: i16 = OpCode::ErrClr as i16;
 
 impl OpCode {
     pub fn get_definition(self) -> &'static StatementDefinition {
@@ -301,34 +280,8 @@ impl OpCode {
     }
 
     pub fn minimum_runtime(self) -> u16 {
-        if matches!(
-            self,
-            OpCode::GfxInit
-                | OpCode::GfxShutdown
-                | OpCode::GfxSetPacing
-                | OpCode::MemberCall
-                | OpCode::SetVMargins
-                | OpCode::SetHMargins
-                | OpCode::ResetVMargins
-                | OpCode::ResetHMargins
-                | OpCode::ResetMargins
-                | OpCode::SetFont
-                | OpCode::LoadFont
-                | OpCode::OnError
-                | OpCode::ErrClr
-                | OpCode::SetPaletteColor
-                | OpCode::SetPaletteColorRgb
-                | OpCode::ResetPaletteColor
-                | OpCode::ResetPalette
-                | OpCode::BeginTerminalUpdate
-                | OpCode::EndTerminalUpdate
-                | OpCode::RecordMacro
-                | OpCode::EndMacro
-                | OpCode::PlayMacro
-                | OpCode::DeleteMacro
-                | OpCode::ClearMacros
-        ) {
-            402
+        if matches!(self, OpCode::MemberCall | OpCode::OnError | OpCode::ErrClr) {
+            400
         } else {
             100
         }
@@ -568,16 +521,6 @@ pub struct StatementDefinition {
     pub args: Option<Vec<ArgumentDefinition>>,
 }
 
-fn retired_statement(opcode: OpCode) -> StatementDefinition {
-    StatementDefinition {
-        name: "<retired terminal statement>",
-        version: 400,
-        opcode,
-        sig: StatementSignature::Invalid,
-        args: None,
-    }
-}
-
 pub struct Signature {
     pub signature: String,
     pub args: Vec<String>,
@@ -665,7 +608,7 @@ pub fn format_argument_type_last(arg: &ArgumentDefinition) -> String {
 // "WAIT FOR" == "WAITFOR"
 // "GO SUB"
 // " GO TO"
-pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 260]> = std::sync::LazyLock::new(|| {
+pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 239]> = std::sync::LazyLock::new(|| {
     [
         StatementDefinition {
             // helps to map opcode to array index.
@@ -2640,9 +2583,6 @@ pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 260]
             ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 2),
         },
-        retired_statement(OpCode::GfxInit),
-        retired_statement(OpCode::GfxShutdown),
-        retired_statement(OpCode::GfxSetPacing),
         StatementDefinition {
             // Spelled as `object.Member(...)`, so it has no name of its own.
             name: "MemberCall",
@@ -2651,13 +2591,6 @@ pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 260]
             args: None,
             sig: StatementSignature::Invalid,
         },
-        retired_statement(OpCode::SetVMargins),
-        retired_statement(OpCode::SetHMargins),
-        retired_statement(OpCode::ResetVMargins),
-        retired_statement(OpCode::ResetHMargins),
-        retired_statement(OpCode::ResetMargins),
-        retired_statement(OpCode::SetFont),
-        retired_statement(OpCode::LoadFont),
         StatementDefinition {
             name: "OnError",
             version: 400,
@@ -2672,17 +2605,6 @@ pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 260]
             args: None,
             sig: StatementSignature::ArgumentsWithVariable(0, 0),
         },
-        retired_statement(OpCode::SetPaletteColor),
-        retired_statement(OpCode::SetPaletteColorRgb),
-        retired_statement(OpCode::ResetPaletteColor),
-        retired_statement(OpCode::ResetPalette),
-        retired_statement(OpCode::BeginTerminalUpdate),
-        retired_statement(OpCode::EndTerminalUpdate),
-        retired_statement(OpCode::RecordMacro),
-        retired_statement(OpCode::EndMacro),
-        retired_statement(OpCode::PlayMacro),
-        retired_statement(OpCode::DeleteMacro),
-        retired_statement(OpCode::ClearMacros),
         // Alias section
         // Moving to the end, so that the opcode <--> index mapping is not broken
         StatementDefinition {

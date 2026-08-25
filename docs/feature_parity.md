@@ -25,7 +25,7 @@ If something is missing just let me know.
 | Importing PCBoard installations | 60%  | I need test cases - simple ones work | 
 | Creating new installations | 💯 |  PCBoard did it during install - icy board with icbsetup | 
 | PPLC  | 💯 | PCBoard language plus versioned 3.50/4.00 syntax: modern loops and initializers, constants, enums, routine parameters, records, board objects and source/runtime version checks |
-| PPLD  | 💯 | Reconstructs classic and Icy Board PPEs, writes the language directive, understands the runtime 4.01 type table and can target older source syntax |
+| PPLD  | 💯 | Reconstructs classic and Icy Board PPEs, writes the language directive, understands the runtime 4.00 type table and can target older source syntax |
 | MKPCBTXT  | 💯 | Much better |
 | ICBSM      | 75% | User and group editor plus the bulk maintenance; no reports or index files |
 | MKPCBMNU  | 💯 | MKICBMNU can do much more |

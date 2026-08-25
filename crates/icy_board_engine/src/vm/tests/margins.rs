@@ -1,8 +1,8 @@
 use super::{compile_errors_with_runtime, run_ppl, run_ppl_with_input};
 
 #[test]
-fn margin_api_requires_runtime_402() {
-    for runtime in [400, 401] {
+fn margin_api_requires_runtime_400() {
+    for runtime in [330, 340] {
         let errors = compile_errors_with_runtime(
             "Terminal.Margins.SetVertical(1, 2)\nTerminal.Margins.SetHorizontal(1, 2)\nTerminal.Margins.Reset()",
             runtime,
@@ -12,7 +12,7 @@ fn margin_api_requires_runtime_402() {
     assert!(
         compile_errors_with_runtime(
             "Terminal.Margins.SetVertical(1, 2)\nTerminal.Margins.SetHorizontal(1, 2)\nTerminal.Margins.Reset()",
-            402,
+            400,
         )
         .is_empty()
     );
