@@ -1192,11 +1192,9 @@ impl IcyBoardState {
         if self.ppl_terminal.take_update_depth() > 0 {
             let _ = self.print(TerminalTarget::Both, "\x1b[?2026l").await;
         }
-        let margins_active = {
-            let terminal = &self.display_screen().buffer.buffer.terminal_state;
-            terminal.margins_top_bottom().is_some() || terminal.margins_left_right().is_some()
-        };
-        if margins_active {
+        // The screen model can be talked out of a margin the terminal still has, so what
+        // this PPE did is what decides whether the caller needs it undone.
+        if self.ppl_terminal.take_margins_changed() {
             let _ = self.print(TerminalTarget::Both, "\x1b[r\x1b[?69l").await;
         }
         if self.ppl_mouse.is_enabled() {

@@ -23,6 +23,7 @@ pub struct PplTerminalControl {
     update_depth: usize,
     recording: Option<MacroRecording>,
     defined_macros: [bool; MACRO_SLOTS],
+    margins_changed: bool,
 }
 
 impl Default for PplTerminalControl {
@@ -31,11 +32,25 @@ impl Default for PplTerminalControl {
             update_depth: 0,
             recording: None,
             defined_macros: [false; MACRO_SLOTS],
+            margins_changed: false,
         }
     }
 }
 
 impl PplTerminalControl {
+    /// Remembers that the caller's terminal may still be holding a margin this PPE set.
+    pub fn mark_margins_changed(&mut self) {
+        self.margins_changed = true;
+    }
+
+    /// Only resetting both axes puts the terminal provably back, so only that forgets.
+    pub fn forget_margins(&mut self) {
+        self.margins_changed = false;
+    }
+
+    pub fn take_margins_changed(&mut self) -> bool {
+        std::mem::take(&mut self.margins_changed)
+    }
     pub fn begin_update(&mut self) -> bool {
         let outermost = self.update_depth == 0;
         self.update_depth = self.update_depth.saturating_add(1);

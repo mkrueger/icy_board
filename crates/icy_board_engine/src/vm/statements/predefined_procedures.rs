@@ -1006,6 +1006,7 @@ pub(crate) async fn margins_set_vertical(vm: &mut VirtualMachine<'_>, top: i32, 
         return Ok(false);
     }
     write_vt_sequence(vm, &format!("\x1B[{top};{bottom}r")).await?;
+    vm.icy_board_state.ppl_terminal.mark_margins_changed();
     Ok(true)
 }
 
@@ -1022,10 +1023,12 @@ pub(crate) async fn margins_set_horizontal(vm: &mut VirtualMachine<'_>, left: i3
         return Ok(false);
     }
     write_vt_sequence(vm, &format!("\x1B[?69h\x1B[{left};{right}s")).await?;
+    vm.icy_board_state.ppl_terminal.mark_margins_changed();
     Ok(true)
 }
 
 pub async fn reset_v_margins(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
+    // DECSTBM leaves DECLRMM alone on the wire, so a horizontal margin may still stand.
     write_vt_sequence(vm, "\x1B[r").await
 }
 
@@ -1034,7 +1037,9 @@ pub async fn reset_h_margins(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> 
 }
 
 pub async fn reset_margins(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
-    write_vt_sequence(vm, "\x1B[r\x1B[?69l").await
+    write_vt_sequence(vm, "\x1B[r\x1B[?69l").await?;
+    vm.icy_board_state.ppl_terminal.forget_margins();
+    Ok(())
 }
 
 const DOS_TO_ANSI_PALETTE: [u8; 16] = [0, 4, 2, 6, 1, 5, 3, 7, 8, 12, 10, 14, 9, 13, 11, 15];

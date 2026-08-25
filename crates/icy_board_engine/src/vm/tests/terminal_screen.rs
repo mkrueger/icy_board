@@ -1,6 +1,6 @@
 //! Margins, palette and fonts, reached from the terminal they change.
 
-use super::{compile_errors, run_ppl};
+use super::{compile_errors, run_ppl, run_ppl_with_cleanup};
 
 #[test]
 fn margins_report_the_region_they_were_given() {
@@ -80,6 +80,54 @@ fn resetting_one_axis_clears_both_flags() {
 
     assert!(through_the_object.ends_with("00\n"), "{through_the_object:?}");
     assert_eq!(through_the_object, through_the_statements);
+}
+
+/// Resetting the horizontal axis leaves the vertical one alone, which is what makes the
+/// vertical case above stand out rather than being a rule about both.
+#[test]
+fn resetting_the_horizontal_axis_keeps_the_vertical_one() {
+    let output = run_ppl(
+        r#"
+        Terminal.Margins.SetVertical(4, 23)
+        Terminal.Margins.SetHorizontal(10, 70)
+        Terminal.Margins.ResetHorizontal()
+        PrintLn Terminal.Margins.HasVertical, Terminal.Margins.HasHorizontal
+        PrintLn Terminal.Margins.Top, "-", Terminal.Margins.Bottom
+        "#,
+    );
+
+    assert!(output.ends_with("10\n4-23\n"), "{output:?}");
+}
+
+/// Resetting only the vertical axis leaves DECLRMM enabled on the wire, and the screen
+/// model cannot be trusted to remember that, so the PPE's own record of having set a
+/// margin is what gets the caller's terminal put back.
+#[test]
+fn a_horizontal_margin_does_not_outlive_the_ppe() {
+    let output = run_ppl_with_cleanup(
+        r"
+        SetHMargins 10, 70
+        SetVMargins 4, 23
+        ResetVMargins
+        ",
+    );
+
+    assert!(output.contains("\x1b[?69h"), "the horizontal margin was turned on: {output:?}");
+    assert!(output.ends_with("\x1b[r\x1b[?69l"), "the caller must not keep it: {output:?}");
+}
+
+/// Resetting both axes puts the terminal provably back, so there is nothing left to undo.
+#[test]
+fn resetting_both_axes_leaves_nothing_for_cleanup_to_do() {
+    let output = run_ppl_with_cleanup(
+        r"
+        SetVMargins 4, 23
+        SetHMargins 10, 70
+        ResetMargins
+        ",
+    );
+
+    assert_eq!(output, "\x1b[4;23r\x1b[?69h\x1b[10;70s\x1b[r\x1b[?69l");
 }
 
 #[test]
