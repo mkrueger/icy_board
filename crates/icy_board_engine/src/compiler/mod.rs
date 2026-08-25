@@ -153,6 +153,9 @@ pub enum CompilationErrorType {
     #[error("'{0}' is a type, and this one has no value of its own to read members from")]
     TypeUsedAsValue(String),
 
+    #[error("'{0}' belongs to the type itself, so it cannot be reached through a value")]
+    StaticMemberOnValue(String),
+
     #[error("Internal error ({0})")]
     InternalError(String),
 

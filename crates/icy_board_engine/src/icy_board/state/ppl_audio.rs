@@ -45,9 +45,11 @@ pub static STOP: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLo
 pub static SET_VOLUME: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("SetVolume".to_string()));
 pub static FADE: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Fade".to_string()));
 pub static FREE: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Free".to_string()));
+pub static LOAD: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Load".to_string()));
 
 impl UserData for PplAudio {
     const TYPE_NAME: &'static str = "Audio";
+    const STATIC_RECEIVER: Option<fn() -> VariableValue> = Some(PplAudio::invalid);
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         registry.add_property(VALID.clone(), VariableType::Boolean, false);
@@ -61,6 +63,8 @@ impl UserData for PplAudio {
         registry.add_function(SET_VOLUME.clone(), vec![VariableType::Integer], VariableType::Boolean);
         registry.add_function(FADE.clone(), vec![VariableType::Integer, VariableType::Integer], VariableType::Boolean);
         registry.add_function(FREE.clone(), Vec::new(), VariableType::Boolean);
+
+        registry.add_static_function(LOAD.clone(), vec![VariableType::String], VariableType::UserData(AUDIO_ID as u8));
     }
 }
 
@@ -101,6 +105,10 @@ impl UserDataValue for PplAudio {
         name: &unicase::Ascii<String>,
         arguments: &[VariableValue],
     ) -> crate::Res<VariableValue> {
+        if *name == *LOAD {
+            let file_name = arguments.first().map(VariableValue::as_string).unwrap_or_default();
+            return crate::vm::statements::predefined_procedures::audio_load(vm, &file_name).await;
+        }
         let handled = crate::vm::statements::predefined_procedures::sound_member(vm, self.channel, name, arguments).await?;
         Ok(VariableValue::new_bool(handled))
     }

@@ -703,6 +703,10 @@ mod test {
     #[test]
     fn test_function_translations() {
         for f in FUNCTION_DEFINITIONS.iter() {
+            // Names in angle brackets are the compiler's own; they cannot be written.
+            if f.name.starts_with('<') {
+                continue;
+            }
             if let FunctionSignature::FixedParameters(_) = f.signature {
                 assert!(super::get_function_hover(f).is_some(), "Function {:?} failed", f.opcode);
             }

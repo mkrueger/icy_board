@@ -1,6 +1,6 @@
 use crate::{
     ast::AstVisitor,
-    executable::{PPEExpr, VariableType},
+    executable::{FuncOpCode, PPEExpr, VariableType},
     semantic::SemanticInfo,
 };
 
@@ -57,6 +57,19 @@ impl AstVisitor<PPEExpr> for ExpressionCompiler<'_> {
             .get(&identifier.get_identifier_token().span.start)
         {
             return PPEExpr::PredefinedFunctionCall(provider.get_definition(), Vec::new());
+        }
+        // A type a static member was called on lowers to the receiver that member dispatches from.
+        if let Some(type_id) = self
+            .compiler
+            .semantic_visitor
+            .static_receiver_lookup
+            .get(&identifier.get_identifier_token().span.start)
+        {
+            let type_id = self
+                .compiler
+                .lookup_table
+                .lookup_constant(&crate::ast::Constant::Integer(i32::from(*type_id), crate::ast::constant::NumberFormat::Default));
+            return PPEExpr::PredefinedFunctionCall(FuncOpCode::StaticReceiver.get_definition(), vec![PPEExpr::Value(type_id)]);
         }
         log::error!("Variable not found: {}", identifier.get_identifier());
         PPEExpr::Value(0)

@@ -238,6 +238,10 @@ impl CompletionVisitor {
         }
 
         for func in FUNCTION_DEFINITIONS.iter() {
+            // Names in angle brackets are the compiler's own; they cannot be written.
+            if func.name.starts_with('<') {
+                continue;
+            }
             let content = if let Some(hover) = get_function_hover(func) {
                 if let HoverContents::Markup(content) = hover.contents {
                     Some(Documentation::MarkupContent(content))

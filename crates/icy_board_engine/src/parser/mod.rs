@@ -440,6 +440,7 @@ impl UserTypeRegistry {
         self.claim_id(id, T::TYPE_NAME);
         let mut registry = UserDataRegistry {
             instance_provider: T::INSTANCE_PROVIDER,
+            static_receiver: T::STATIC_RECEIVER,
             ..Default::default()
         };
         T::register_members(&mut registry);

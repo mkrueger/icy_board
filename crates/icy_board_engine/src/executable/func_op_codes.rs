@@ -329,9 +329,11 @@ pub enum FuncOpCode {
     TermInfo = -315,
     TermInput = -316,
     Terminal = -317,
+    /// Compiler generated: hands back what a static member is called on.
+    StaticReceiver = -318,
 }
 
-pub const LAST_FUNC: i16 = -317;
+pub const LAST_FUNC: i16 = -318;
 
 impl FuncOpCode {
     pub fn get_definition(self) -> &'static FunctionDefinition {
@@ -402,7 +404,7 @@ impl FunctionDefinition {
         }
     }
 }
-pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 329]> = std::sync::LazyLock::new(|| {
+pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 330]> = std::sync::LazyLock::new(|| {
     [
         FunctionDefinition {
             name: "END",
@@ -3127,6 +3129,16 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 329]> 
             return_type: VariableType::UserData(42),
             args: None,
             signature: FunctionSignature::FixedParameters(0),
+        },
+        FunctionDefinition {
+            name: "<static receiver>",
+            version: 400,
+            opcode: FuncOpCode::StaticReceiver,
+            return_type: VariableType::None,
+            args: None,
+            // The type id is a real argument: `Invalid` would leave the reader with nothing
+            // to consume and it would never move past this opcode.
+            signature: FunctionSignature::FixedParameters(1),
         },
         // ALIASES (need to be last in the list)
         FunctionDefinition {

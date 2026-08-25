@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue, user_data_value},
     executable::{VariableType, VariableValue},
-    parser::{GFX_ID, SURFACE_ID},
+    parser::GFX_ID,
 };
 
 macro_rules! member_name {
@@ -17,8 +17,6 @@ member_name!(SHUTDOWN, "Shutdown");
 member_name!(BACKEND, "Backend");
 member_name!(PACING, "Pacing");
 member_name!(SET_PACING, "SetPacing");
-member_name!(NEW_SURFACE, "NewSurface");
-member_name!(LOAD_SURFACE, "LoadSurface");
 member_name!(CELL_WIDTH, "CellWidth");
 member_name!(CELL_HEIGHT, "CellHeight");
 member_name!(SCREEN_WIDTH, "ScreenWidth");
@@ -50,12 +48,6 @@ impl UserData for PplGfx {
         registry.add_function_with(INIT.clone(), vec![VariableType::Integer, VariableType::Boolean], 0, VariableType::Boolean);
         registry.add_function(SHUTDOWN.clone(), Vec::new(), VariableType::Boolean);
         registry.add_function(SET_PACING.clone(), vec![VariableType::Integer], VariableType::Boolean);
-        registry.add_function(
-            NEW_SURFACE.clone(),
-            vec![VariableType::Integer, VariableType::Integer],
-            VariableType::UserData(SURFACE_ID as u8),
-        );
-        registry.add_function(LOAD_SURFACE.clone(), vec![VariableType::String], VariableType::UserData(SURFACE_ID as u8));
 
         // These ask the terminal when it has not been asked yet, so they are calls
         // rather than properties. `Terminal.Info` answers the same from the cache.

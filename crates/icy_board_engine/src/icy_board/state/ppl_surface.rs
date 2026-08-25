@@ -58,9 +58,12 @@ pub static PRESENT_RECT: std::sync::LazyLock<unicase::Ascii<String>> = std::sync
 pub static PIN: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Pin".to_string()));
 pub static UNPIN: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Unpin".to_string()));
 pub static FREE: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Free".to_string()));
+pub static NEW: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("New".to_string()));
+pub static LOAD: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Load".to_string()));
 
 impl UserData for PplSurface {
     const TYPE_NAME: &'static str = "Surface";
+    const STATIC_RECEIVER: Option<fn() -> VariableValue> = Some(PplSurface::invalid);
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         let surface = VariableType::UserData(SURFACE_ID as u8);
@@ -134,6 +137,9 @@ impl UserData for PplSurface {
         registry.add_function(PIN.clone(), Vec::new(), VariableType::Boolean);
         registry.add_function(UNPIN.clone(), Vec::new(), VariableType::Boolean);
         registry.add_function(FREE.clone(), Vec::new(), VariableType::Boolean);
+
+        registry.add_static_function(NEW.clone(), vec![VariableType::Integer, VariableType::Integer], surface);
+        registry.add_static_function(LOAD.clone(), vec![VariableType::String], surface);
     }
 }
 
@@ -168,6 +174,15 @@ impl UserDataValue for PplSurface {
         name: &unicase::Ascii<String>,
         arguments: &[VariableValue],
     ) -> crate::Res<VariableValue> {
+        if *name == *NEW {
+            let width = arguments.first().map_or(0, VariableValue::as_int);
+            let height = arguments.get(1).map_or(0, VariableValue::as_int);
+            return crate::vm::statements::predefined_procedures::gfx_new_surface(vm, width, height);
+        }
+        if *name == *LOAD {
+            let file_name = arguments.first().map(VariableValue::as_string).unwrap_or_default();
+            return crate::vm::statements::predefined_procedures::gfx_load_surface(vm, &file_name).await;
+        }
         if *name == *GET_PIXEL {
             return crate::vm::statements::predefined_procedures::surface_get_pixel(vm, self.handle, arguments).await;
         }

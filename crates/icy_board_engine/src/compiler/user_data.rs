@@ -16,6 +16,11 @@ pub trait UserDataMemberRegistry {
     fn add_procedure_with(&mut self, name: unicase::Ascii<String>, parameters: Vec<VariableType>, required: usize);
     fn add_function_with(&mut self, name: unicase::Ascii<String>, parameters: Vec<VariableType>, required: usize, return_type: VariableType);
 
+    /// A function called on the type rather than on one of its values, such as
+    /// `Surface.New`. It is an ordinary member otherwise, so adding one needs
+    /// nothing from the runtime.
+    fn add_static_function_with(&mut self, name: unicase::Ascii<String>, parameters: Vec<VariableType>, required: usize, return_type: VariableType);
+
     fn add_procedure(&mut self, name: unicase::Ascii<String>, parameters: Vec<VariableType>) {
         let required = parameters.len();
         self.add_procedure_with(name, parameters, required);
@@ -25,6 +30,11 @@ pub trait UserDataMemberRegistry {
         let required = parameters.len();
         self.add_function_with(name, parameters, required, return_type);
     }
+
+    fn add_static_function(&mut self, name: unicase::Ascii<String>, parameters: Vec<VariableType>, return_type: VariableType) {
+        let required = parameters.len();
+        self.add_static_function_with(name, parameters, required, return_type);
+    }
 }
 
 pub trait UserData: Sized + UserDataValue {
@@ -33,6 +43,10 @@ pub trait UserData: Sized + UserDataValue {
     /// The zero-argument builtin that hands back the one instance of this object, which is
     /// what lets the type name stand in for it: `TermInfo.Columns` means `TermInfo().Columns`.
     const INSTANCE_PROVIDER: Option<crate::executable::FuncOpCode> = None;
+
+    /// What a static member is called on. It carries no state of its own; it is only
+    /// what gives the call somewhere to dispatch from.
+    const STATIC_RECEIVER: Option<fn() -> VariableValue> = None;
 
     /// Adds custom fields specific to this userdata.
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F);
@@ -89,7 +103,11 @@ pub struct UserDataRegistry {
     pub procedures: HashMap<unicase::Ascii<String>, MemberProcedure>,
     pub functions: HashMap<unicase::Ascii<String>, MemberFunction>,
 
+    /// The members that belong to the type rather than to one of its values.
+    pub statics: std::collections::HashSet<unicase::Ascii<String>>,
+
     pub instance_provider: Option<crate::executable::FuncOpCode>,
+    pub static_receiver: Option<fn() -> VariableValue>,
 }
 
 impl UserDataMemberRegistry for UserDataRegistry {
@@ -124,5 +142,10 @@ impl UserDataMemberRegistry for UserDataRegistry {
                 return_type,
             },
         );
+    }
+
+    fn add_static_function_with(&mut self, name: unicase::Ascii<String>, parameters: Vec<VariableType>, required: usize, return_type: VariableType) {
+        self.statics.insert(name.clone());
+        self.add_function_with(name, parameters, required, return_type);
     }
 }

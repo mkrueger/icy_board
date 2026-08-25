@@ -24,7 +24,7 @@ fn a_surface_made_through_the_object_draws_the_same_way() {
     let output = run_ppl(
         r#"
         Terminal.Gfx.Init(GFX_SIXEL, FALSE)
-        SURFACE s = Terminal.Gfx.NewSurface(4, 4)
+        SURFACE s = Surface.New(4, 4)
         PrintLn s.Valid, " ", s.Width, "x", s.Height
         s.Clear(Rgb(0, 0, 0))
         s.SetPixel(1, 1, Rgb(255, 0, 0))
@@ -45,7 +45,7 @@ fn pacing_reads_back_what_it_was_set_to() {
         PrintLn Terminal.Gfx.Pacing
         Terminal.Gfx.SetPacing(1)
         PrintLn Terminal.Gfx.Pacing
-        SURFACE s = Terminal.Gfx.NewSurface(2, 2)
+        SURFACE s = Surface.New(2, 2)
         s.Present()
         Terminal.Gfx.Shutdown()
         ",

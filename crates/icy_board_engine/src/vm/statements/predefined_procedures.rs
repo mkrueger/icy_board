@@ -3190,6 +3190,11 @@ async fn queue_cached_sound(vm: &mut VirtualMachine<'_>, cache_name: &str, chann
 
 /// `LOADAUDIO file$` - takes a channel for a file and answers the `AUDIO` holding it.
 pub async fn load_audio(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let file_name = vm.eval_expr(&args[0]).await?.as_string();
+    audio_load(vm, &file_name).await
+}
+
+pub(crate) async fn audio_load(vm: &mut VirtualMachine<'_>, file_name: &str) -> Res<VariableValue> {
     use crate::icy_board::state::ppl_audio::PplAudio;
 
     fn failed(vm: &mut VirtualMachine<'_>, error: PplError) -> VariableValue {
@@ -3197,7 +3202,7 @@ pub async fn load_audio(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Va
         PplAudio::invalid()
     }
 
-    let file_name = vm.eval_expr(&args[0]).await?.as_string();
+    let file_name = file_name.to_string();
     if !vm.icy_board_state.query_sound_available().await? {
         return Ok(failed(vm, PplError::new(ERR_KIND_SOUND, ERR_UNAVAILABLE, "the terminal has no sound")));
     }
@@ -4283,8 +4288,7 @@ pub(crate) async fn gfx_shutdown(vm: &mut VirtualMachine<'_>) -> Res<()> {
 /// Runs one `GFX` member.
 pub(crate) async fn gfx_member(vm: &mut VirtualMachine<'_>, name: &unicase::Ascii<String>, arguments: &[VariableValue]) -> Res<VariableValue> {
     use crate::icy_board::state::ppl_gfx::{
-        AUDIO, CELL_HEIGHT, CELL_WIDTH, CLIENT_BLIT, INIT, JXL, JXL_BLOB, LOAD_SURFACE, NEW_SURFACE, PIXEL_MOUSE, SCREEN_HEIGHT, SCREEN_WIDTH, SET_PACING,
-        SHUTDOWN, SIXEL,
+        AUDIO, CELL_HEIGHT, CELL_WIDTH, CLIENT_BLIT, INIT, JXL, JXL_BLOB, PIXEL_MOUSE, SCREEN_HEIGHT, SCREEN_WIDTH, SET_PACING, SHUTDOWN, SIXEL,
     };
 
     if *name == *INIT {
@@ -4302,15 +4306,6 @@ pub(crate) async fn gfx_member(vm: &mut VirtualMachine<'_>, name: &unicase::Asci
     if *name == *SET_PACING {
         gfx_set_pacing(vm, arguments.first().map_or(0, VariableValue::as_int));
         return Ok(VariableValue::new_bool(vm.icy_board_state.gfx_error == 0));
-    }
-    if *name == *NEW_SURFACE {
-        let width = arguments.first().map_or(0, VariableValue::as_int);
-        let height = arguments.get(1).map_or(0, VariableValue::as_int);
-        return gfx_new_surface(vm, width, height);
-    }
-    if *name == *LOAD_SURFACE {
-        let file_name = arguments.first().map(VariableValue::as_string).unwrap_or_default();
-        return gfx_load_surface(vm, &file_name).await;
     }
 
     let capabilities = vm.icy_board_state.query_gfx_capabilities().await?;

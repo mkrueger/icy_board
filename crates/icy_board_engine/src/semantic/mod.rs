@@ -15,7 +15,8 @@ use crate::{
     },
     compiler::{CompilationErrorType, CompilationWarningType, user_data::UserDataMemberRegistry, workspace::Workspace},
     executable::{
-        EntryType, FIRST_RECORD_LITERAL_RUNTIME, FIRST_ROUTINE_REFERENCE_RUNTIME, FIRST_TYPE_TABLE_RUNTIME, FUNCTION_DEFINITIONS, FuncOpCode,
+        EntryType, FIRST_RECORD_LITERAL_RUNTIME, FIRST_ROUTINE_REFERENCE_RUNTIME, FIRST_STATIC_MEMBER_RUNTIME, FIRST_TYPE_TABLE_RUNTIME, FUNCTION_DEFINITIONS,
+        FuncOpCode,
         FunctionDefinition, FunctionValue, GenericVariableData, OpCode, ProcedureValue, TableEntry, USER_VARIABLES, VarHeader, VariableData, VariableTable,
         VariableType, VariableValue,
     },
@@ -222,6 +223,8 @@ impl VariableLookups {
 enum StaticReceiver {
     /// A board object's type name standing in for its one instance.
     Instance(u8),
+    /// A board object's type name standing in for the type itself.
+    StaticMember(u8),
     /// Not a type name; the expression has to be visited as a value.
     NotAType,
     /// A type name that cannot stand in for a value. The reason is already reported.
@@ -241,6 +244,9 @@ pub struct SemanticVisitor {
 
     /// Maps a type name used as a receiver -> the builtin that hands its instance back.
     pub instance_provider_lookup: HashMap<usize, FuncOpCode>,
+
+    /// Maps a type name a static member was called on -> that type's id.
+    pub static_receiver_lookup: HashMap<usize, u8>,
 
     pub function_type_lookup: HashMap<u64, SemanticInfo>,
 
@@ -475,6 +481,7 @@ impl SemanticVisitor {
             label_lookup_table: HashMap::new(),
             user_type_lookup: HashMap::new(),
             instance_provider_lookup: HashMap::new(),
+            static_receiver_lookup: HashMap::new(),
             function_type_lookup: HashMap::new(),
 
             global_lookup: VariableLookups::default(),
@@ -1161,9 +1168,9 @@ impl SemanticVisitor {
         Some((member_id, function.required, function.parameters.len(), function.return_type))
     }
 
-    /// A board object's type name standing in for its one instance: `TermInfo.Columns`
-    /// means `TermInfo().Columns`. A variable of the same name shadows the type.
-    fn static_receiver(&mut self, expr: &Expression) -> StaticReceiver {
+    /// A board object's type name standing in for something with members: the type's own
+    /// static members, or its one instance. A variable of the same name shadows the type.
+    fn static_receiver(&mut self, expr: &Expression, member: &unicase::Ascii<String>) -> StaticReceiver {
         let Expression::Identifier(base) = expr else {
             return StaticReceiver::NotAType;
         };
@@ -1176,6 +1183,32 @@ impl SemanticVisitor {
         };
         let span = base.get_identifier_token().span.clone();
 
+        if self.lang_version < FIRST_BOARD_OBJECT_LANGUAGE_VERSION {
+            self.errors
+                .lock()
+                .unwrap()
+                .report_error(span, CompilationErrorType::TypeUsedAsValue(identifier.to_string()));
+            return StaticReceiver::Rejected;
+        }
+
+        // A static member belongs to the type, so it needs no instance behind it.
+        if self
+            .type_registry
+            .get_type_from_id(type_id)
+            .is_some_and(|registry| registry.statics.contains(member))
+        {
+            if self.runtime < FIRST_STATIC_MEMBER_RUNTIME {
+                self.errors.lock().unwrap().report_error(
+                    span,
+                    CompilationErrorType::BuiltinNeedsRuntime(format!("{identifier}.{member}"), FIRST_STATIC_MEMBER_RUNTIME),
+                );
+                return StaticReceiver::Rejected;
+            }
+            self.add_constant(&Constant::Integer(i32::from(type_id), crate::ast::constant::NumberFormat::Default));
+            self.static_receiver_lookup.insert(span.start, type_id);
+            return StaticReceiver::StaticMember(type_id);
+        }
+
         let provider = self.type_registry.get_type_from_id(type_id).and_then(|registry| registry.instance_provider);
         let Some(provider) = provider else {
             self.errors
@@ -1184,13 +1217,6 @@ impl SemanticVisitor {
                 .report_error(span, CompilationErrorType::TypeUsedAsValue(identifier.to_string()));
             return StaticReceiver::Rejected;
         };
-        if self.lang_version < FIRST_BOARD_OBJECT_LANGUAGE_VERSION {
-            self.errors
-                .lock()
-                .unwrap()
-                .report_error(span, CompilationErrorType::TypeUsedAsValue(identifier.to_string()));
-            return StaticReceiver::Rejected;
-        }
         let minimum_runtime = provider.minimum_runtime();
         if self.runtime < minimum_runtime {
             self.errors.lock().unwrap().report_error(
@@ -1617,8 +1643,10 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             );
             return VariableType::None;
         }
-        let t = match self.static_receiver(member_reference_expression.get_expression()) {
-            StaticReceiver::Instance(type_id) => VariableType::UserData(type_id),
+        let receiver = self.static_receiver(member_reference_expression.get_expression(), member_reference_expression.get_identifier());
+        let called_on_the_type = matches!(receiver, StaticReceiver::StaticMember(_));
+        let t = match receiver {
+            StaticReceiver::Instance(type_id) | StaticReceiver::StaticMember(type_id) => VariableType::UserData(type_id),
             StaticReceiver::NotAType => member_reference_expression.get_expression().visit(self),
             StaticReceiver::Rejected => return VariableType::None,
         };
@@ -1639,6 +1667,13 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 }
                 for (name, function) in &t.functions {
                     if name == member_reference_expression.get_identifier() {
+                        if t.statics.contains(name) && !called_on_the_type {
+                            self.errors.lock().unwrap().report_error(
+                                member_reference_expression.get_identifier_token().span.clone(),
+                                CompilationErrorType::StaticMemberOnValue(name.to_string()),
+                            );
+                            return VariableType::None;
+                        }
                         self.user_type_lookup.insert(member_reference_expression.get_identifier_token().span.start, d);
                         return function.return_type;
                     }

@@ -67,6 +67,9 @@ pub const FIRST_ROUTINE_REFERENCE_RUNTIME: u16 = 401;
 
 pub const FIRST_RECORD_LITERAL_RUNTIME: u16 = 401;
 
+/// The first runtime that can call a member on a type rather than on a value.
+pub const FIRST_STATIC_MEMBER_RUNTIME: u16 = 402;
+
 #[derive(Clone, Debug, Default)]
 pub struct VariableNameGenerator {
     _version: u16,

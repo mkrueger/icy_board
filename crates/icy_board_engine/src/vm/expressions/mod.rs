@@ -307,6 +307,7 @@ pub async fn run_function(opcode: FuncOpCode, arg: &mut VirtualMachine<'_>, argu
         FuncOpCode::TermInfo => predefined_functions::terminfo(arg, arguments).await,
         FuncOpCode::TermInput => predefined_functions::terminput(arg, arguments).await,
         FuncOpCode::Terminal => predefined_functions::terminal(arg, arguments).await,
+        FuncOpCode::StaticReceiver => predefined_functions::static_receiver(arg, arguments).await,
         FuncOpCode::END
         | FuncOpCode::CPAR
         | FuncOpCode::UPLUS
