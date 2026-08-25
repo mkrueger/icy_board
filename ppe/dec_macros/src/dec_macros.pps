@@ -10,7 +10,7 @@ Terminal.Macros.StartRecord(DIVIDER)
 COLOR @X03
 PRINT "+--------------------------------------------------+"
 Terminal.Macros.StopRecord()
-IF (!ERR().OK) GOTO MacroError
+IF (!Error.Last().OK) GOTO MacroError
 
 ; A terminal macro can invoke another macro. PANEL stores two DECINVM calls
 ; rather than copying the divider bytes twice.
@@ -24,11 +24,11 @@ PRINT "| Playback sends only a short DECINVM sequence.    |"
 NextMacroRow()
 Terminal.Macros.Play(DIVIDER)
 Terminal.Macros.StopRecord()
-IF (!ERR().OK) GOTO MacroError
+IF (!Error.Last().OK) GOTO MacroError
 
 CLS
 Terminal.BeginUpdate()
-synchronized = ERR().OK
+synchronized = Error.Last().OK
 ANSIPOS 8, 4
 Terminal.Macros.Play(PANEL)
 ANSIPOS 8, 11
@@ -45,7 +45,7 @@ EXIT
 
 :MacroError
 COLOR @X07
-PRINTLN "Terminal macros are unavailable: ", ERR().Message
+PRINTLN "Terminal macros are unavailable: ", Error.Last().Message
 Terminal.Macros.DeleteAll()
 
 PROCEDURE NextMacroRow()

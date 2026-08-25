@@ -2723,12 +2723,6 @@ pub async fn web_request(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<V
     }
 }
 
-/// `ERR()` - what the last operation that can fail did.
-pub async fn err(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
-    vm.publish_operation_result();
-    Ok(vm.last_error.clone().value())
-}
-
 pub async fn rgb(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let red = vm.eval_expr(&args[0]).await?.as_int();
     let green = vm.eval_expr(&args[1]).await?.as_int();

@@ -129,7 +129,7 @@ pub enum ErrorHandler {
     Procedure(usize),
 }
 
-/// What the graphics codes mean, so `ERR().Message` reads like the other subsystems'.
+/// What the graphics codes mean, so `Error.Last().Message` reads like the other subsystems'.
 fn gfx_error_message(code: i32) -> &'static str {
     match code {
         ERR_UNAVAILABLE => "graphics are not initialized",
@@ -219,7 +219,7 @@ pub struct VirtualMachine<'a> {
     /// opt into limping on after it has blown the stack.
     pub abort_on_stack_error: bool,
 
-    /// What the last operation that can fail did, which is what `ERR()` hands out.
+    /// What the last operation that can fail did, which is what `Error.Last()` hands out.
     pub last_error: PplError,
 
     /// Set when an operation failed, and cleared once the statement it failed in is over.
@@ -728,7 +728,7 @@ impl VirtualMachine<'_> {
         }
     }
 
-    /// What an operation that worked reports, so a later `ERR()` does not answer for an older one.
+    /// What an operation that worked reports, so a later `Error.Last()` does not answer for an older one.
     pub fn clear_error(&mut self) {
         self.error_pending = false;
         self.last_error = PplError::default();
@@ -760,7 +760,7 @@ impl VirtualMachine<'_> {
         }
     }
 
-    /// Makes subsystem inboxes visible to `ERR()` and to statement-end trapping.
+    /// Makes subsystem inboxes visible to `Error.Last()` and to statement-end trapping.
     pub fn publish_operation_result(&mut self) {
         self.publish_gfx_error();
         self.publish_io_error();

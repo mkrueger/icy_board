@@ -270,9 +270,8 @@ pub enum OpCode {
 
     MemberCall = 231,
     OnError = 232,
-    ErrClr = 233,
 }
-pub const LAST_STMT: i16 = OpCode::ErrClr as i16;
+pub const LAST_STMT: i16 = OpCode::OnError as i16;
 
 impl OpCode {
     pub fn get_definition(self) -> &'static StatementDefinition {
@@ -280,11 +279,7 @@ impl OpCode {
     }
 
     pub fn minimum_runtime(self) -> u16 {
-        if matches!(self, OpCode::MemberCall | OpCode::OnError | OpCode::ErrClr) {
-            400
-        } else {
-            100
-        }
+        if matches!(self, OpCode::MemberCall | OpCode::OnError) { 400 } else { 100 }
     }
 }
 
@@ -608,7 +603,7 @@ pub fn format_argument_type_last(arg: &ArgumentDefinition) -> String {
 // "WAIT FOR" == "WAITFOR"
 // "GO SUB"
 // " GO TO"
-pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 239]> = std::sync::LazyLock::new(|| {
+pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 238]> = std::sync::LazyLock::new(|| {
     [
         StatementDefinition {
             // helps to map opcode to array index.
@@ -2597,13 +2592,6 @@ pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 239]
             opcode: OpCode::OnError,
             args: None,
             sig: StatementSignature::Invalid,
-        },
-        StatementDefinition {
-            name: "ErrClr",
-            version: 400,
-            opcode: OpCode::ErrClr,
-            args: None,
-            sig: StatementSignature::ArgumentsWithVariable(0, 0),
         },
         // Alias section
         // Moving to the end, so that the opcode <--> index mapping is not broken

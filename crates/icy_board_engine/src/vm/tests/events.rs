@@ -33,7 +33,7 @@ fn terminal_input_is_the_terminals_own() {
         r"
         TERMINPUT first = Terminal.Input
         TERMINPUT duplicate = Terminal.Input
-        PRINTLN ERR().Code
+        PRINTLN Error.Last().Code
         PRINTLN first.Poll().Text, duplicate.Poll().Text
         first.Release()
         ",

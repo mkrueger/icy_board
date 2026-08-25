@@ -41,7 +41,7 @@ fn a_successful_dbase_operation_clears_an_older_error_immediately() {
     let output = on_fixture(
         r#"
         Terminal.Font.Load(43, "missing.fnt")
-        PRINTLN DOPEN(0, "PCBOARD", 0), ":", ERR().Code
+        PRINTLN DOPEN(0, "PCBOARD", 0), ":", Error.Last().Code
         DCLOSE 0
         "#,
     );
@@ -53,7 +53,7 @@ fn a_successful_dbase_operation_clears_an_older_error_immediately() {
 fn the_first_dbase_failure_in_a_statement_wins() {
     let output = on_fixture(
         r#"
-        PRINTLN DOPEN(0, "MISSING", 0), ":", DOPEN(1, "PCBOARD", 0), ":", ERR().Kind, ":", ERR().Code, ":", ERR().Channel
+        PRINTLN DOPEN(0, "MISSING", 0), ":", DOPEN(1, "PCBOARD", 0), ":", Error.Last().Kind, ":", Error.Last().Code, ":", Error.Last().Channel
         DCLOSE 1
         "#,
     );

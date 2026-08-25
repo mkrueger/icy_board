@@ -125,7 +125,7 @@ fn reading_a_byte_past_the_end_sets_the_error_flag() {
         FREAD 6, b, 1
         PRINTLN "first=", b, " err=", FERR(6)
         FREAD 6, b, 1
-        PRINTLN "second=", b, " err=", FERR(6), " ok=", ERR().OK
+        PRINTLN "second=", b, " err=", FERR(6), " ok=", Error.Last().OK
         FCLOSE 6
     "#,
         &[("data.pag", b"A")],

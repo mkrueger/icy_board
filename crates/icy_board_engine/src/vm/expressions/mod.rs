@@ -293,7 +293,6 @@ pub async fn run_function(opcode: FuncOpCode, arg: &mut VirtualMachine<'_>, argu
         FuncOpCode::BASE64DEC => predefined_functions::base64dec(arg, arguments).await,
         FuncOpCode::SHA256 => predefined_functions::sha256(arg, arguments).await,
         FuncOpCode::Rgb | FuncOpCode::RgbAlpha => predefined_functions::rgb(arg, arguments).await,
-        FuncOpCode::Err => predefined_functions::err(arg, arguments).await,
         FuncOpCode::Terminal => predefined_functions::terminal(arg, arguments).await,
         FuncOpCode::Board => predefined_functions::board(arg, arguments).await,
         FuncOpCode::Session => predefined_functions::session(arg, arguments).await,

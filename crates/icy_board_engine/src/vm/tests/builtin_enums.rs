@@ -126,9 +126,9 @@ fn an_error_names_its_kind_and_code() {
     let output = run_ppl(
         r"
         Terminal.Palette.Set(16, Rgb(0, 0, 0))
-        PrintLn ERR().Kind = ErrKind.Gfx
-        PrintLn ERR().Code = ErrCode.Invalid
-        PrintLn ERR().OK
+        PrintLn Error.Last().Kind = ErrKind.Gfx
+        PrintLn Error.Last().Code = ErrCode.Invalid
+        PrintLn Error.Last().OK
         ",
     );
 

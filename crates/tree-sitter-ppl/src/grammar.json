@@ -5079,10 +5079,6 @@
           {
             "type": "PATTERN",
             "value": "[wW][eE][bB][rR][eE][qQ][uU][eE][sS][tT]"
-          },
-          {
-            "type": "PATTERN",
-            "value": "[eE][rR][rR][cC][lL][rR]"
           }
         ]
       }

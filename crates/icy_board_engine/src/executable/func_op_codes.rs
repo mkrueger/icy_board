@@ -314,15 +314,14 @@ pub enum FuncOpCode {
     SHA256 = -300,
     Rgb = -301,
     RgbAlpha = -302,
-    Err = -303,
-    Terminal = -304,
+    Terminal = -303,
     /// Compiler generated: hands back what a static member is called on.
-    StaticReceiver = -305,
-    Board = -306,
-    Session = -307,
+    StaticReceiver = -304,
+    Board = -305,
+    Session = -306,
 }
 
-pub const LAST_FUNC: i16 = -307;
+pub const LAST_FUNC: i16 = -306;
 
 impl FuncOpCode {
     pub fn get_definition(self) -> &'static FunctionDefinition {
@@ -333,13 +332,7 @@ impl FuncOpCode {
     pub fn minimum_runtime(self) -> u16 {
         if matches!(
             self,
-            FuncOpCode::Rgb
-                | FuncOpCode::RgbAlpha
-                | FuncOpCode::Err
-                | FuncOpCode::Terminal
-                | FuncOpCode::StaticReceiver
-                | FuncOpCode::Board
-                | FuncOpCode::Session
+            FuncOpCode::Rgb | FuncOpCode::RgbAlpha | FuncOpCode::Terminal | FuncOpCode::StaticReceiver | FuncOpCode::Board | FuncOpCode::Session
         ) {
             400
         } else {
@@ -406,7 +399,7 @@ impl FunctionDefinition {
         }
     }
 }
-pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 319]> = std::sync::LazyLock::new(|| {
+pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 318]> = std::sync::LazyLock::new(|| {
     [
         FunctionDefinition {
             name: "END",
@@ -3008,14 +3001,6 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 319]> 
                 ArgumentDefinition::new("Alpha", VariableType::Integer),
             ]),
             signature: FunctionSignature::FixedParameters(4),
-        },
-        FunctionDefinition {
-            name: "Err",
-            version: 400,
-            opcode: FuncOpCode::Err,
-            return_type: VariableType::UserData(39),
-            args: None,
-            signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
             name: "Terminal",

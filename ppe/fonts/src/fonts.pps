@@ -14,13 +14,13 @@ EVENT inputEvent
 TERMINPUT input = Terminal.Input
 
 Terminal.Font.Load(43, "fonts/c64.psf")
-IF (!ERR().OK) ShowLoadError("C64", ERR().Message)
+IF (!Error.Last().OK) ShowLoadError("C64", Error.Last().Message)
 Terminal.Font.Load(44, "fonts/atari.psf")
-IF (!ERR().OK) ShowLoadError("Atari", ERR().Message)
+IF (!Error.Last().OK) ShowLoadError("Atari", Error.Last().Message)
 Terminal.Font.Load(45, "fonts/microknight.psf")
-IF (!ERR().OK) ShowLoadError("MicroKnight", ERR().Message)
+IF (!Error.Last().OK) ShowLoadError("MicroKnight", Error.Last().Message)
 Terminal.Font.Load(46, "fonts/topaz.psf")
-IF (!ERR().OK) ShowLoadError("Topaz", ERR().Message)
+IF (!Error.Last().OK) ShowLoadError("Topaz", Error.Last().Message)
 
 page = PAGE_BUILTIN
 builtinFont = 0

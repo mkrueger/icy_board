@@ -34,9 +34,11 @@ pub static KIND: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLo
 pub static CODE: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Code".to_string()));
 pub static MESSAGE: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Message".to_string()));
 pub static CHANNEL: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Channel".to_string()));
+pub static LAST: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Last".to_string()));
+pub static CLEAR: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Clear".to_string()));
 
-/// What the last operation that can fail did. `ERR()` hands a copy of it out, so a
-/// PPE can keep one around while it carries on working.
+/// What the last operation that can fail did. `Error.Last()` hands a copy of it out,
+/// so a PPE can keep one around while it carries on working.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PplError {
     pub kind: i32,
@@ -79,11 +81,16 @@ impl PplError {
     pub fn value(self) -> VariableValue {
         user_data_value(self, ERROR_ID)
     }
+
+    /// What a static member is called on. It carries no error of its own.
+    pub fn static_receiver() -> VariableValue {
+        Self::default().value()
+    }
 }
 
 impl UserData for PplError {
     const TYPE_NAME: &'static str = "Error";
-    const INSTANCE_PROVIDER: Option<crate::executable::FuncOpCode> = Some(crate::executable::FuncOpCode::Err);
+    const STATIC_RECEIVER: Option<fn() -> VariableValue> = Some(PplError::static_receiver);
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         use crate::parser::{ERR_CODE_ENUM_ID, ERR_KIND_ENUM_ID};
@@ -93,6 +100,9 @@ impl UserData for PplError {
         registry.add_property(CODE.clone(), VariableType::UserData(ERR_CODE_ENUM_ID), false);
         registry.add_property(MESSAGE.clone(), VariableType::String, false);
         registry.add_property(CHANNEL.clone(), VariableType::Integer, false);
+
+        registry.add_static_function(LAST.clone(), Vec::new(), VariableType::UserData(ERROR_ID as u8));
+        registry.add_static_function(CLEAR.clone(), Vec::new(), VariableType::Boolean);
     }
 }
 
@@ -123,10 +133,18 @@ impl UserDataValue for PplError {
 
     async fn call_function(
         &self,
-        _vm: &mut crate::vm::VirtualMachine<'_>,
+        vm: &mut crate::vm::VirtualMachine<'_>,
         name: &unicase::Ascii<String>,
         _arguments: &[VariableValue],
     ) -> crate::Res<VariableValue> {
+        if *name == *LAST {
+            vm.publish_operation_result();
+            return Ok(vm.last_error.clone().value());
+        }
+        if *name == *CLEAR {
+            vm.clear_error();
+            return Ok(VariableValue::new_bool(true));
+        }
         Err(format!("Unknown ERROR function {name}").into())
     }
 

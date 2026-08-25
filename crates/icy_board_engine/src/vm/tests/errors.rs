@@ -3,17 +3,19 @@ use super::{compile_errors_with_runtime, run_ppl, run_ppl_with_files_and_input};
 #[test]
 fn the_error_api_requires_runtime_400() {
     for runtime in [330, 340] {
-        let errors = compile_errors_with_runtime("PrintLn ERR().Code\nErrClr", runtime);
-        for needed in ["Err needs runtime 400", "ErrClr needs runtime 400"] {
-            assert!(errors.iter().any(|error| error == needed), "runtime {runtime}: {errors:?}");
-        }
+        let errors = compile_errors_with_runtime("PrintLn Error.Last().Code\nError.Clear()", runtime);
+        assert!(
+            errors.iter().any(|error| error.contains("Error.Last needs runtime 400")),
+            "runtime {runtime}: {errors:?}"
+        );
     }
-    assert!(compile_errors_with_runtime("PrintLn ERR().Code\nErrClr", 400).is_empty());
+    assert!(compile_errors_with_runtime("PrintLn Error.Last().Code\nError.Clear()", 400).is_empty());
 }
 
 #[test]
 fn nothing_has_gone_wrong_yet() {
-    let output = run_ppl(r#"PrintLn ERR().OK, " ", ERR().Kind, " ", ERR().Code, " ", ERR().Channel, " [", ERR().Message, "]""#);
+    let output =
+        run_ppl(r#"PrintLn Error.Last().OK, " ", Error.Last().Kind, " ", Error.Last().Code, " ", Error.Last().Channel, " [", Error.Last().Message, "]""#);
 
     assert_eq!(output, "1 0 0 -1 []\n");
 }
@@ -23,7 +25,7 @@ fn err_can_still_be_a_variable_name() {
     let output = run_ppl(
         r#"
         INTEGER err = 42
-        PrintLn err, " ", ERR().OK
+        PrintLn err, " ", Error.Last().OK
         "#,
     );
 
@@ -35,7 +37,7 @@ fn a_failed_operation_names_its_subsystem() {
     let output = run_ppl(
         r#"
         Terminal.Font.Load(43, "nope.fnt")
-        PrintLn ERR().OK, " ", ERR().Kind, " ", ERR().Code
+        PrintLn Error.Last().OK, " ", Error.Last().Kind, " ", Error.Last().Code
         "#,
     );
 
@@ -48,7 +50,7 @@ fn constants_name_the_codes() {
     let output = run_ppl(
         r#"
         Terminal.Font.Load(43, "nope.fnt")
-        IF (ERR().Kind = ErrKind.Font & ERR().Code = ErrCode.Io) PrintLn "matched"
+        IF (Error.Last().Kind = ErrKind.Font & Error.Last().Code = ErrCode.Io) PrintLn "matched"
         "#,
     );
 
@@ -60,9 +62,9 @@ fn a_later_success_clears_the_error() {
     let output = run_ppl(
         r#"
         Terminal.Font.Load(43, "nope.fnt")
-        PrintLn ERR().OK
+        PrintLn Error.Last().OK
         Terminal.Font.Set(0, 5)
-        PrintLn ERR().OK
+        PrintLn Error.Last().OK
         "#,
     );
 
@@ -70,13 +72,13 @@ fn a_later_success_clears_the_error() {
 }
 
 #[test]
-fn errclr_forgets_the_error() {
+fn clearing_forgets_the_error() {
     let output = run_ppl(
         r#"
         Terminal.Font.Load(43, "nope.fnt")
-        PrintLn ERR().OK
-        ErrClr
-        PrintLn ERR().OK, " ", ERR().Kind
+        PrintLn Error.Last().OK
+        Error.Clear()
+        PrintLn Error.Last().OK, " ", Error.Last().Kind
         "#,
     );
 
@@ -89,9 +91,9 @@ fn the_error_can_be_kept_while_work_carries_on() {
         r#"
         ERROR saved
         Terminal.Font.Load(43, "nope.fnt")
-        saved = ERR()
+        saved = Error.Last()
         Terminal.Font.Set(0, 5)
-        PrintLn "now=", ERR().Code, " saved=", saved.Code
+        PrintLn "now=", Error.Last().Code, " saved=", saved.Code
         "#,
     );
 
@@ -103,7 +105,7 @@ fn a_message_describes_what_happened() {
     let output = run_ppl(
         r#"
         Terminal.Font.Load(43, "nope.fnt")
-        PrintLn ERR().Message <> ""
+        PrintLn Error.Last().Message <> ""
         "#,
     );
 
@@ -120,7 +122,7 @@ fn on_error_goto_jumps_and_stays_there() {
         PrintLn "not reached"
         EXIT
         :Failed
-        PrintLn "handled ", ERR().Code
+        PrintLn "handled ", Error.Last().Code
         "#,
     );
 
@@ -199,7 +201,7 @@ fn on_error_gosub_comes_back() {
         PrintLn "carried on"
         EXIT
         :Failed
-        PrintLn "handled ", ERR().Code
+        PrintLn "handled ", Error.Last().Code
         RETURN
         "#,
     );
@@ -236,7 +238,7 @@ fn a_handler_procedure_may_take_no_arguments() {
         EXIT
 
         PROCEDURE Report()
-            PrintLn "handled ", ERR().Code
+            PrintLn "handled ", Error.Last().Code
         ENDPROC
         "#,
     );
@@ -323,7 +325,7 @@ fn reading_a_file_to_its_end_is_not_an_error() {
         FOPEN 1, "data.txt", O_RD, S_DN
         FGET 1, s
         FGET 1, s
-        PrintLn "eof=", FERR(1), " ok=", ERR().OK
+        PrintLn "eof=", FERR(1), " ok=", Error.Last().OK
         FCLOSE 1
         EXIT
         :Failed
@@ -341,7 +343,7 @@ fn a_file_that_is_not_there_is_an_error() {
     let output = run_ppl(
         r#"
         FOPEN 1, "nope.txt", O_RD, S_DN
-        PrintLn ERR().Kind, " ", ERR().Code, " ", ERR().Channel, " ", FERR(1)
+        PrintLn Error.Last().Kind, " ", Error.Last().Code, " ", Error.Last().Channel, " ", FERR(1)
         "#,
     );
 
@@ -355,7 +357,7 @@ fn a_successful_file_operation_clears_an_older_error() {
         r#"
         Terminal.Font.Load(43, "missing.fnt")
         FOPEN 1, "present.txt", O_RD, S_DN
-        PrintLn ERR().OK
+        PrintLn Error.Last().OK
         FCLOSE 1
         "#,
         &[("present.txt", b"present\n")],
@@ -370,7 +372,7 @@ fn ferr_clears_itself_but_leaves_the_error() {
     let output = run_ppl(
         r#"
         FOPEN 1, "nope.txt", O_RD, S_DN
-        PrintLn FERR(1), " ", FERR(1), " ", ERR().Code
+        PrintLn FERR(1), " ", FERR(1), " ", Error.Last().Code
         "#,
     );
 
@@ -382,7 +384,7 @@ fn a_dbase_failure_names_its_channel() {
     let output = run_ppl(
         r#"
         DOPEN 0, "nope", 0
-        PrintLn ERR().Kind, " ", ERR().Channel, " ", DERR(0)
+        PrintLn Error.Last().Kind, " ", Error.Last().Channel, " ", DERR(0)
         "#,
     );
 

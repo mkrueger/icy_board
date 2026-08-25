@@ -28,7 +28,7 @@ fn a_static_answers_the_same_as_the_global_it_replaces() {
         SURFACE a = Surface.New(3, 2)
         SURFACE b = Surface.New(3, 2)
         PrintLn a.Width, a.Height, b.Width, b.Height
-        PrintLn ERR().Code
+        PrintLn Error.Last().Code
         Terminal.Gfx.Shutdown()
         ",
     );
@@ -42,7 +42,7 @@ fn a_static_reports_a_failure_the_same_way() {
         r#"
         Terminal.Gfx.Init(GfxBackend.Sixel, FALSE)
         SURFACE missing = Surface.Load("missing.png")
-        PrintLn missing.Valid, " ", ERR().Code
+        PrintLn missing.Valid, " ", Error.Last().Code
         Terminal.Gfx.Shutdown()
         "#,
     );
@@ -69,7 +69,7 @@ fn a_static_may_stand_in_a_chain() {
         Terminal.Gfx.Init(GfxBackend.Sixel, FALSE)
         PrintLn Surface.New(6, 3).Width
         Surface.New(2, 2).Free()
-        PrintLn ERR().Code
+        PrintLn Error.Last().Code
         Terminal.Gfx.Shutdown()
         ",
     );

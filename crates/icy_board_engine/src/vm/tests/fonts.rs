@@ -53,7 +53,7 @@ fn font_statements_are_ignored_without_ansi() {
     assert_eq!(output, "");
 }
 
-/// Without ANSI nothing is sent, but `ERR()` still has to answer for this statement
+/// Without ANSI nothing is sent, but `Error.Last()` still has to answer for this statement
 /// rather than leaving an older one's result in place.
 #[test]
 fn font_statements_report_unavailable_without_ansi() {
@@ -61,9 +61,9 @@ fn font_statements_report_unavailable_without_ansi() {
         r#"
         GRAFMODE 4
         Terminal.Font.Set(0, 5)
-        PrintLn "set=", ERR().Code, " ", ERR().Kind
+        PrintLn "set=", Error.Last().Code, " ", Error.Last().Kind
         Terminal.Font.Load(43, "any.psf")
-        PrintLn "load=", ERR().Code, " ", ERR().Kind
+        PrintLn "load=", Error.Last().Code, " ", Error.Last().Kind
         "#,
     );
 
@@ -90,9 +90,9 @@ fn set_font_reports_an_invalid_slot() {
     let output = run_ppl(
         r#"
         Terminal.Font.Set(0, 5)
-        PrintLn ERR().Code
+        PrintLn Error.Last().Code
         Terminal.Font.Set(9, 5)
-        PrintLn ERR().Code, " ", ERR().Kind
+        PrintLn Error.Last().Code, " ", Error.Last().Kind
         "#,
     );
 
@@ -105,7 +105,7 @@ fn load_font_uploads_the_glyph_data() {
     let output = run_ppl_with_files_and_input(
         r#"
         Terminal.Font.Load(43, "custom.fnt")
-        PrintLn "ok=", ERR().OK
+        PrintLn "ok=", Error.Last().OK
         "#,
         &[("custom.fnt", &font)],
         b"",
@@ -121,7 +121,7 @@ fn load_font_rejects_the_built_in_range() {
     let output = run_ppl_with_files_and_input(
         r#"
         Terminal.Font.Load(5, "custom.fnt")
-        PrintLn "err=", ERR().Code
+        PrintLn "err=", Error.Last().Code
         "#,
         &[("custom.fnt", &font)],
         b"",
@@ -136,7 +136,7 @@ fn load_font_reports_a_missing_file() {
     let output = run_ppl(
         r#"
         Terminal.Font.Load(43, "nope.fnt")
-        PrintLn "err=", ERR().Code
+        PrintLn "err=", Error.Last().Code
         "#,
     );
 
@@ -149,7 +149,7 @@ fn load_font_reports_an_unknown_format() {
     let output = run_ppl_with_files_and_input(
         r#"
         Terminal.Font.Load(43, "broken.fnt")
-        PrintLn "err=", ERR().Code
+        PrintLn "err=", Error.Last().Code
         "#,
         &[("broken.fnt", b"not a font")],
         b"",

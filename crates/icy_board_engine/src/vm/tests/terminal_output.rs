@@ -41,7 +41,7 @@ fn ending_an_inactive_update_reports_an_error() {
     let output = run_ppl(
         r#"
         Terminal.EndUpdate()
-        PrintLn ERR().Code, " ", ERR().Kind
+        PrintLn Error.Last().Code, " ", Error.Last().Kind
         "#,
     );
 
@@ -54,7 +54,7 @@ fn synchronized_output_reports_unavailable_without_ansi() {
         r#"
         GrafMode 4
         Terminal.BeginUpdate()
-        PrintLn ERR().Code, " ", ERR().Kind
+        PrintLn Error.Last().Code, " ", Error.Last().Kind
         "#,
     );
 
@@ -67,7 +67,7 @@ fn terminal_macros_report_unavailable_without_ansi() {
         r#"
         GrafMode 4
         Terminal.Macros.StartRecord(0)
-        PrintLn ERR().Code, " ", ERR().Kind
+        PrintLn Error.Last().Code, " ", Error.Last().Kind
         "#,
     );
 
@@ -131,9 +131,9 @@ fn deleted_and_invalid_macros_report_errors() {
         Terminal.Macros.StopRecord()
         Terminal.Macros.Delete(1)
         Terminal.Macros.Play(1)
-        PrintLn ERR().Code, " ", ERR().Kind
+        PrintLn Error.Last().Code, " ", Error.Last().Kind
         Terminal.Macros.StartRecord(64)
-        PrintLn ERR().Code, " ", ERR().Kind
+        PrintLn Error.Last().Code, " ", Error.Last().Kind
         "#,
     );
 
@@ -149,7 +149,7 @@ fn clear_macros_emits_decdmac_delete_all() {
         Terminal.Macros.StopRecord()
         Terminal.Macros.DeleteAll()
         Terminal.Macros.Play(0)
-        PrintLn ERR().Code, " ", ERR().Kind
+        PrintLn Error.Last().Code, " ", Error.Last().Kind
         "#,
     );
 
@@ -162,7 +162,7 @@ fn a_second_recording_cannot_start_before_the_first_ends() {
         r#"
         Terminal.Macros.StartRecord(1)
         Terminal.Macros.StartRecord(2)
-        PrintLn ERR().Code, " ", ERR().Kind
+        PrintLn Error.Last().Code, " ", Error.Last().Kind
         Terminal.Macros.StopRecord()
         Terminal.Macros.Play(1)
         "#,

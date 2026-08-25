@@ -37,7 +37,7 @@ fn ending_an_update_that_never_began_says_so() {
     let output = run_ppl(
         r"
         PrintLn Terminal.EndUpdate()
-        PrintLn ERR().Code
+        PrintLn Error.Last().Code
         ",
     );
 
@@ -73,9 +73,9 @@ fn a_slot_outside_the_sixty_four_is_refused() {
     let output = run_ppl(
         r"
         PrintLn Terminal.Macros.StartRecord(64)
-        PrintLn ERR().Code
+        PrintLn Error.Last().Code
         PrintLn Terminal.Macros.StartRecord(-1)
-        PrintLn ERR().Code
+        PrintLn Error.Last().Code
         ",
     );
 
@@ -90,7 +90,7 @@ fn a_second_recording_is_refused_while_one_is_active() {
         ERRCODE code
         Terminal.Macros.StartRecord(1)
         second = Terminal.Macros.StartRecord(2)
-        code = ERR().Code
+        code = Error.Last().Code
         Terminal.Macros.StopRecord()
         PrintLn second, code = ErrCode.Invalid
         ",
@@ -104,7 +104,7 @@ fn playing_an_empty_slot_says_so() {
     let output = run_ppl(
         r"
         PrintLn Terminal.Macros.Play(7)
-        PrintLn ERR().Code
+        PrintLn Error.Last().Code
         ",
     );
 

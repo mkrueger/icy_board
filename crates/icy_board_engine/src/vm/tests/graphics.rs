@@ -45,9 +45,9 @@ fn surface_status_reports_dimensions_and_errors() {
         PrintLn s.Valid
         PrintLn s.Width
         PrintLn s.Height
-        PrintLn ERR().Code
+        PrintLn Error.Last().Code
         SURFACE missing = Surface.Load("missing.png")
-        PrintLn ERR().Code
+        PrintLn Error.Last().Code
         Terminal.Gfx.Shutdown()
         "#,
     );
@@ -63,11 +63,11 @@ fn drawing_and_pinning_report_specific_errors() {
         SURFACE s = Surface.New(2, 2)
         s.Free()
         s.Clear(0)
-        PrintLn ERR().Code
+        PrintLn Error.Last().Code
         s.Pin()
-        PrintLn ERR().Code
+        PrintLn Error.Last().Code
         s.Free()
-        PrintLn ERR().Code
+        PrintLn Error.Last().Code
         ",
     );
 
@@ -80,7 +80,7 @@ fn surface_count_is_bounded_and_freed_surfaces_can_be_reused() {
     for _ in 1..256 {
         let _ = writeln!(source, "extra = Surface.New(1, 1)");
     }
-    source.push_str("extra = Surface.New(1, 1)\nPRINTLN ERR().Code\nfirst.Free()\nextra = Surface.New(1, 1)\nPRINTLN ERR().Code\n");
+    source.push_str("extra = Surface.New(1, 1)\nPRINTLN Error.Last().Code\nfirst.Free()\nextra = Surface.New(1, 1)\nPRINTLN Error.Last().Code\n");
 
     assert_eq!(run_ppl(&source), "5\n0\n");
 }
@@ -108,7 +108,7 @@ fn jxl_rejects_non_integer_destination_scaling() {
         Terminal.Gfx.Init(GfxBackend.Auto, FALSE)
         SURFACE s = Surface.New(8, 8)
         s.PresentRect(0, 0, 8, 8, 0, 0, 63, 32)
-        PRINTLN ERR().Code
+        PRINTLN Error.Last().Code
         Terminal.Gfx.Shutdown()
         ",
         JXL_TERMINAL,
@@ -125,7 +125,7 @@ fn sixel_cannot_scale_and_says_so() {
         Terminal.Gfx.Init(GfxBackend.Sixel, FALSE)
         SURFACE s = Surface.New(8, 8)
         s.PresentRect(0, 0, 8, 8, 0, 0, 32, 32)
-        PrintLn ERR().Code
+        PrintLn Error.Last().Code
         Terminal.Gfx.Shutdown()
         ",
     );
@@ -145,7 +145,7 @@ fn a_surface_object_draws_and_reports_its_own_size() {
         s.SetPixel(1, 1, Rgb(255, 0, 0))
         s.FillRect(0, 0, 2, 2, Rgb(0, 255, 0))
         s.Present()
-        PrintLn ERR().Code
+        PrintLn Error.Last().Code
         s.Free()
         PrintLn s.Valid
         Terminal.Gfx.Shutdown()
@@ -183,7 +183,7 @@ fn a_surface_can_be_blitted_onto_another() {
         SURFACE sprite = Surface.New(2, 2)
         sprite.Clear(Rgb(255, 0, 0))
         back.Blit(sprite, 3, 3)
-        PrintLn ERR().Code
+        PrintLn Error.Last().Code
         Terminal.Gfx.Shutdown()
         ",
     );

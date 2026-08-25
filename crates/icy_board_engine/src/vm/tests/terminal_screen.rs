@@ -139,9 +139,9 @@ fn a_palette_colour_outside_the_sixteen_is_refused() {
     let output = run_ppl(
         r"
         PrintLn Terminal.Palette.Set(16, Rgb(0, 0, 0))
-        PrintLn ERR().Code
+        PrintLn Error.Last().Code
         PrintLn Terminal.Palette.Set(-1, Rgb(0, 0, 0))
-        PrintLn ERR().Code
+        PrintLn Error.Last().Code
         ",
     );
 
@@ -166,7 +166,7 @@ fn a_built_in_font_slot_cannot_be_uploaded_over() {
     let output = run_ppl(
         r#"
         PrintLn Terminal.Font.Load(42, "topaz.psf")
-        PrintLn ERR().Code
+        PrintLn Error.Last().Code
         "#,
     );
 

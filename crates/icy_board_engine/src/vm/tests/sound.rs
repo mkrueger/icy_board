@@ -90,7 +90,7 @@ fn an_unavailable_terminal_is_not_sent_a_sound() {
     let output = run_ppl_with_files_and_input(
         r#"
         AUDIO tone = Audio.Load("tone.wav")
-        PrintLn tone.Valid, ":", ERR().Code
+        PrintLn tone.Valid, ":", Error.Last().Code
         "#,
         &[("tone.wav", TONE)],
         b"\x1b[=7;100;0n",
@@ -105,7 +105,7 @@ fn sound_failures_are_reported_by_err() {
     let unsupported = run_ppl_with_files_and_input(
         r#"
         AUDIO tone = Audio.Load("tone.wav")
-        PrintLn ERR().Kind, ":", ERR().Code
+        PrintLn Error.Last().Kind, ":", Error.Last().Code
         "#,
         &[("tone.wav", TONE)],
         b"\x1b[=7;100;1n\x1b[=7;101;1;2;0n",
@@ -115,7 +115,7 @@ fn sound_failures_are_reported_by_err() {
     let missing = run_ppl_with_input(
         r#"
         AUDIO tone = Audio.Load("nope.wav")
-        PrintLn ERR().Kind, ":", ERR().Code
+        PrintLn Error.Last().Kind, ":", Error.Last().Code
         "#,
         b"\x1b[=7;100;1n\x1b[=7;101;1;2;1n",
     );
@@ -129,7 +129,7 @@ fn a_sound_that_cannot_be_loaded_stays_callable() {
         AUDIO missing = Audio.Load("nope.wav")
         PRINTLN missing.Valid, ":", missing.Playing
         PRINTLN missing.Play(FALSE)
-        PRINTLN ERR().Code
+        PRINTLN Error.Last().Code
         "#,
         b"\x1b[=7;100;1n\x1b[=7;101;1;2;1n",
     );
@@ -162,7 +162,7 @@ fn a_format_probe_that_goes_unanswered_does_not_mute_the_channel() {
         r#"
         AUDIO tone = Audio.Load("tone.wav")
         tone.Play()
-        PrintLn ERR().Code
+        PrintLn Error.Last().Code
         "#,
         &[("tone.wav", TONE)],
         b"\x1b[=7;100;1n",

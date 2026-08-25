@@ -78,7 +78,7 @@ fn a_statement_may_call_in_the_middle_of_a_chain() {
         r"
         Terminal.Gfx.Init(GfxBackend.Sixel, FALSE)
         Surface.New(2, 2).Free()
-        PrintLn ERR().Code
+        PrintLn Error.Last().Code
         Terminal.Gfx.Shutdown()
         ",
     );

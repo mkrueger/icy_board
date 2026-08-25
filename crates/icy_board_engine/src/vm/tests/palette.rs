@@ -44,11 +44,11 @@ fn invalid_palette_values_are_not_sent() {
     let output = run_ppl(
         r#"
         Terminal.Palette.Set(16, Rgb(0, 0, 0))
-        PrintLn ERR().Code, " ", ERR().Kind
+        PrintLn Error.Last().Code, " ", Error.Last().Kind
         Terminal.Palette.Set(-1, Rgb(0, 0, 0))
-        PrintLn ERR().Code, " ", ERR().Kind
+        PrintLn Error.Last().Code, " ", Error.Last().Kind
         Terminal.Palette.Reset(-1)
-        PrintLn ERR().Code, " ", ERR().Kind
+        PrintLn Error.Last().Code, " ", Error.Last().Kind
         "#,
     );
 
@@ -58,7 +58,7 @@ fn invalid_palette_values_are_not_sent() {
 /// A component cannot be out of range: `Rgb()` clamps before the palette sees it.
 #[test]
 fn out_of_range_components_are_clamped_rather_than_refused() {
-    let output = run_ppl("PrintLn Terminal.Palette.Set(1, Rgb(-1, 300, 0))\nPrintLn ERR().Code");
+    let output = run_ppl("PrintLn Terminal.Palette.Set(1, Rgb(-1, 300, 0))\nPrintLn Error.Last().Code");
 
     assert!(output.ends_with("1\n0\n"), "{output:?}");
 }
@@ -69,11 +69,11 @@ fn palette_statements_report_unavailable_without_ansi() {
         r#"
         GRAFMODE 4
         Terminal.Palette.Set(1, Rgb(0, 64, 255))
-        PrintLn ERR().Code, " ", ERR().Kind
+        PrintLn Error.Last().Code, " ", Error.Last().Kind
         Terminal.Palette.Reset(1)
-        PrintLn ERR().Code, " ", ERR().Kind
+        PrintLn Error.Last().Code, " ", Error.Last().Kind
         Terminal.Palette.ResetAll()
-        PrintLn ERR().Code, " ", ERR().Kind
+        PrintLn Error.Last().Code, " ", Error.Last().Kind
         "#,
     );
 

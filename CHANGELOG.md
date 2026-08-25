@@ -10,6 +10,10 @@ releases.
 
 ### Changed
 
+- Replaced the `ERR()` function and the `ERRCLR` statement with static members
+  on the `ERROR` type: `Error.Last()` and `Error.Clear()`. Every 4.00 concept is
+  now reached through an object; `ON ERROR` stays a statement because it is
+  control flow, and `FERR`/`DERR` are unchanged.
 - Finished the PPL 4.00 API review: board objects expose `Valid`, `Board` keeps
   its conference snapshot, `Nodes` is `NodeCount`, multimedia capabilities and
   event/error kinds consistently say `Audio`, and terminal macro capability is

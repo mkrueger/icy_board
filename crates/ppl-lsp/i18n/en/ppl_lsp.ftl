@@ -1109,8 +1109,6 @@ hint-function-rgb=Packs red, green, blue and optional alpha components into an R
 hint-function-terminal=The caller's terminal and the root of graphics, input, margins, palette, fonts, macros, audio and cached capability information.
 hint-function-board=A snapshot of the configured board: name, location, operator, sysop name, node count and its conferences.
 hint-function-session=The call in progress, read live: conference, areas, caller, security level, node, minutes left and language.
-hint-function-err=Returns an ERROR describing the last operation that could fail: OK, Kind, Code, Message and Channel.
-hint-statement-errclr=Forgets the last error, so ERR().OK is true again.
 hint-statement-on-error=ON ERROR GOTO label | GOSUB label | Procedure | OFF - where a failed operation sends the program.
 hint-function-fdordaka=
     Returns the address this board answers to, as zone:net/node with the point

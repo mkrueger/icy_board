@@ -1317,12 +1317,6 @@ const FONT_ALL_SLOTS: i32 = -1;
 const FIRST_FREE_FONT: i32 = 43;
 const LAST_FONT: i32 = 255;
 
-/// `ERRCLR`
-pub async fn errclr(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
-    vm.clear_error();
-    Ok(())
-}
-
 pub async fn set_font(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let slot = vm.eval_expr(&args[0]).await?.as_int();
     let font = vm.eval_expr(&args[1]).await?.as_int();
@@ -3792,7 +3786,7 @@ pub async fn gfxcreate(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
     Ok(())
 }
 
-/// Reads an image file into a surface, reporting through `ERR()` on the way.
+/// Reads an image file into a surface, reporting through `Error.Last()` on the way.
 pub(crate) async fn gfx_decode_image(vm: &mut VirtualMachine<'_>, file_name: &str) -> Option<crate::icy_board::state::ppl_graphics::GfxSurface> {
     let path = vm.resolve_file(&file_name).await;
     let bytes = match fs::metadata(&path).and_then(|metadata| {

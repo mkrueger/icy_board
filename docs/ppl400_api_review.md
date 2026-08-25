@@ -18,7 +18,7 @@ statements were added to the whole language.
 | :--- | :--- |
 | Object model | Consistent. One root per concept, no duplicated paths |
 | Naming | Consistent after the review round; counts, resets and record verbs agree |
-| Error handling | One model (`ERR()`), applied everywhere, with three signalling styles |
+| Error handling | One model (`Error.Last()`), applied everywhere, with three signalling styles |
 | Capabilities | Single source of truth in `Terminal.Info` |
 | Runtime versioning | One runtime, 4.00, with no beta holes |
 | Legacy overlap | Deliberate and documented for session data |
@@ -119,30 +119,30 @@ These are the only remaining flat constants in the object APIs.
 | :--- | :--- |
 | `BOOLEAN` return | Operations |
 | `Valid` property | Constructors |
-| `ERR()` | Everything, with kind, code, message and channel |
+| `Error.Last()` | Everything, with kind, code, message and channel |
 
 Three is a lot, but each answers a different question: did this call work, is
-this object usable, and what exactly went wrong. `ERR()` is the one that always
-applies.
+this object usable, and what exactly went wrong. `Error.Last()` is the one that
+always applies.
 
-### Property assignment reports only through `ERR()`
+### Property assignment reports only through `Error.Last()`
 
 `Terminal.Gfx.Pacing` and `Audio.Volume` are writable properties. An assignment
 is not an expression, so a failed assignment cannot answer `FALSE`:
 
 ```PPL
 Audio.Volume = 70
-IF !ERR().OK PRINTLN ERR().Message
+IF !Error.Last().OK PRINTLN Error.Last().Message
 ```
 
-This is consistent with the rest of the API, where `ERR()` is authoritative
-either way.
+This is consistent with the rest of the API, where `Error.Last()` is
+authoritative either way.
 
 ### Unknown capabilities are attempted
 
 A capability boolean in `Terminal.Info` means confirmed support. An unknown
 optional DEC mode still receives a standards-compliant request when an operation
-is tried, and reports through `ERR()` if the terminal rejects it.
+is tried, and reports through `Error.Last()` if the terminal rejects it.
 
 This is why capability state lives in exactly one place. A second property that
 answered "available" for an unknown terminal would contradict `Terminal.Info`
@@ -166,7 +166,7 @@ This is a deliberate trade. The classic functions can never be removed, so the
 overlap is permanent; in exchange a 4.00 PPE can read the whole session from one
 discoverable root instead of remembering seven unrelated names.
 
-## Open decisions
+## Decisions taken and still open
 
 Nothing here blocks a freeze. Each is a judgement call that is cheaper to make
 now than after the format is published.
@@ -184,21 +184,24 @@ The obvious fix is worse than the problem: `Info` and `Input` are far too
 generic as global type names. Recommended action is to accept this and say so in
 the reference.
 
-### `ERR()` is a function while the other singletons are not
+### `ERR()` was a function while the other singletons were not — resolved
 
-`Terminal`, `Board` and `Session` need no parentheses; `ERR()` does, and
-`ERRCLR` is a statement. The error API is therefore the last part of 4.00 that
-spreads one concept over a function, a statement and a type.
+`Terminal`, `Board` and `Session` need no parentheses, but `ERR()` did and
+`ERRCLR` was a statement. The error API was the last part of 4.00 that spread one
+concept over a function, a statement and a type.
 
-An object would be uniform:
+Both are gone. `ERROR` now carries the two static members itself:
 
 ```PPL
 ERROR failed = Error.Last()
 Error.Clear()
 ```
 
-`ON ERROR` would stay a statement, since it is control flow. This is worth
-deciding before the surface is frozen, because both spellings cannot survive.
+`ON ERROR` stays a statement, because it is control flow rather than a value.
+The `Err` function opcode and the `ErrClr` statement opcode were reclaimed rather
+than reserved, so a beta PPE using them has to be rebuilt.
+
+`FERR` and `DERR` are untouched: they are PCBoard's and keep their own behaviour.
 
 ### Counts and accessors instead of collections
 
@@ -244,5 +247,6 @@ The object model is sound and the naming is now self-consistent. The parts that
 still look uneven are either forced by the wire format, forced by PCBoard
 compatibility, or a documented trade.
 
-Before freezing 4.00 the one decision worth making is whether the error API
-becomes an object like everything else. The rest can ship as it stands.
+With the error API folded into the `ERROR` type, every 4.00 concept is reached
+through an object. What remains open is a matter of taste rather than shape, so
+the surface can be frozen as it stands.

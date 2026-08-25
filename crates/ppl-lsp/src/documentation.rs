@@ -439,7 +439,6 @@ pub fn get_function_hover(func: &FunctionDefinition) -> Option<Hover> {
         FuncOpCode::Terminal => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-terminal")),
         FuncOpCode::Board => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-board")),
         FuncOpCode::Session => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-session")),
-        FuncOpCode::Err => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-err")),
         _ => None,
     }
 }
@@ -667,7 +666,6 @@ pub fn get_statement_hover(stmt: &StatementDefinition) -> Option<Hover> {
         OpCode::MoveMsg => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-movemsg")),
         OpCode::SetBankBal => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-setbankbal")),
         OpCode::WebRequest => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-webrequest")),
-        OpCode::ErrClr => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-errclr")),
         OpCode::OnError => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-on-error")),
         _ => None,
     }

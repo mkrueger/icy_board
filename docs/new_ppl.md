@@ -184,7 +184,7 @@ The root groups the session by responsibility:
 | `Macros` | Terminal-resident DEC macro slots |
 | `BeginUpdate()`, `EndUpdate()` | Nestable synchronized output |
 
-All operations that can fail update [`ERR()`](#errors). A function returning a
+All operations that can fail update [`Error.Last()`](#errors). A function returning a
 resource returns an invalid object on failure, so it is safe to inspect its
 `Valid` property before continuing.
 
@@ -398,7 +398,7 @@ YAFF or size-recognised raw data into writable font numbers 43 through 255.
 
 ```PPL
 Terminal.Font.Load(43, "topaz.psf")
-IF ERR().OK Terminal.Font.SetAll(43)
+IF Error.Last().OK Terminal.Font.SetAll(43)
 ```
 
 ### Palette colors
@@ -417,14 +417,14 @@ colour number reports `ErrCode.Invalid`; sessions without ANSI report
 
 ### Errors
 
-`ERR()` answers with an `ERROR` describing the last operation that could fail.
+`Error.Last()` answers with an `ERROR` describing the last operation that could fail.
 It reads the same whichever part of the board failed, so one piece of code can
 handle a file, a font, a sound or a picture going wrong.
 
 ```PPL
 Terminal.Font.Load(43, "topaz.psf")
-IF (!ERR().OK) THEN
-	PrintLn "Sorry: ", ERR().Message
+IF (!Error.Last().OK) THEN
+	PrintLn "Sorry: ", Error.Last().Message
 ENDIF
 ```
 
@@ -443,18 +443,19 @@ ENDIF
 Use `Kind` and `Code` when a PPE has to make a decision. `Message` may include
 paths and operating-system text, and its wording may change between releases.
 
-An operation that works clears the error, so `ERR()` always answers for the last
-thing that was tried rather than for the last thing that failed. `ERRCLR` forgets
-it as well. The value is a copy, so a PPE can keep one while it carries on:
+An operation that works clears the error, so `Error.Last()` always answers for
+the last thing that was tried rather than for the last thing that failed.
+`Error.Clear()` forgets it as well. The value is a copy, so a PPE can keep one
+while it carries on:
 
 ```PPL
-ERROR failed = ERR()
+ERROR failed = Error.Last()
 ```
 
 `FERR` and `DERR` are unchanged, including that `FERR` clears itself when read
 and that `FGET` or `FREAD` reaching the end of a file raises it. Reaching the end
-is not an error, so it leaves `ERR().OK` true and never reaches an `ON ERROR`
-handler.
+is not an error, so it leaves `Error.Last().OK` true and never reaches an
+`ON ERROR` handler.
 
 ### ON ERROR
 
@@ -467,7 +468,7 @@ before the jump because its cleanup path has no natural return boundary.
 | `ON ERROR GOTO label` | Jumps, and stays there - for cleaning up and ending |
 | `ON ERROR GOSUB label` | Calls, and `RETURN` carries on after the failed statement |
 | `ON ERROR Handler` | Calls a `PROCEDURE`, then carries on the same way |
-| `ON ERROR OFF` | Back to checking `ERR()` by hand |
+| `ON ERROR OFF` | Back to checking `Error.Last()` by hand |
 
 ```PPL
 DECLARE PROCEDURE Complain(ERROR e)

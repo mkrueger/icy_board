@@ -26,7 +26,7 @@ impl PplAudio {
     }
 
     /// An answer for audio that could not be loaded, so its members stay callable.
-    /// Why it failed is `ERR()`'s to tell.
+    /// Why it failed is `Error.Last()`'s to tell.
     pub fn invalid() -> VariableValue {
         VariableValue {
             vtype: VariableType::UserData(AUDIO_ID as u8),
