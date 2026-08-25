@@ -30,7 +30,6 @@ format, so 4.00 is what a PPE targets whenever it uses anything below.
 | User-defined records | 400 | 400 | `TYPE ... ENDTYPE`, nested fields, arrays of records and nominal type checking |
 | Named record literals | 400 | 400 | `Point { X = 1, Y = 2 }` with checked and optional fields |
 | Terminal multimedia | 400 | 400 | Sixel/JXL graphics, SyncTERM audio, mouse and physical key events |
-| Board and session objects | 400 | 400 | `Board` for the configured board, `Session` for the call in progress |
 
 Several compiler improvements are deliberately **not** tied to 3.50. The
 compiler collects routine signatures before generating code, so `DECLARE` is
@@ -245,7 +244,7 @@ Surfaces are limited to 2048 by 2048 pixels, 256 simultaneous surfaces and 64
 MiB of resident RGBA pixels. Source image files are limited to 32 MiB. Graphics
 and sound together may add at most 256 MiB of persistent media per connection.
 
-#### Sound
+#### Audio
 
 `Audio.Load(file)` probes the format, uploads it to the caller's SyncTERM cache
 and takes an available channel. A cached file is not sent again.
@@ -266,9 +265,9 @@ ENDIF
 | `Fade(percent, milliseconds)` | Change volume over time |
 | `Free()` | Give the channel back |
 
-A sound that ends produces `EventKind.Sound` with its channel in `Event.Channel`.
+Audio that ends produces `EventKind.Audio` with its channel in `Event.Channel`.
 `Audio.StopAll()` flushes every channel the PPE started, and
-`Terminal.Info.Sound` says whether the terminal can play anything at all.
+`Terminal.Info.Audio` says whether the terminal can play anything at all.
 
 #### Input and events
 
@@ -301,7 +300,7 @@ Terminal.Input.Release()
 `Motion` or `Wheel`.
 
 `Event.Kind` is an `EventKind`: `None`, `Key`, `KeyEdge`, `Mouse`, `Overflow` or
-`Sound`. Its read-only fields are:
+`Audio`. Its read-only fields are:
 
 | Field | Meaning |
 | :--- | :--- |
@@ -342,7 +341,7 @@ IF Terminal.Info.InlineGraphics PRINTLN "Inline JPEG XL available"
 | `CTermLevel` | Highest known CTerm-compatible protocol level |
 | `Sixel`, `Jxl`, `InlineGraphics` | Graphics capabilities |
 | `PixelMouse`, `PhysicalKeys`, `ClientBlit` | Input and client-side drawing capabilities |
-| `Sound`, `SynchronizedOutput`, `TerminalMacros` | Output capabilities |
+| `Audio`, `SynchronizedOutput`, `TerminalMacros` | Output capabilities |
 
 Capability booleans mean confirmed support. Unknown optional DEC modes are still
 allowed to receive a standards-compliant request when an operation is tried.
@@ -367,8 +366,8 @@ Terminal.Macros.Play(0)
 Terminal.Macros.Delete(0)
 ```
 
-`Recording` and `Available` are read-only properties. `DeleteAll()` deletes every
-slot this PPE defined. Definitions use hex encoding and may contain arbitrary
+`Recording` is read-only. `DeleteAll()` deletes every slot this PPE defined.
+Definitions use hex encoding and may contain arbitrary
 ANSI, OSC, DCS, UTF-8 and control bytes. A completed macro may be played while
 another is recorded. Cleanup finishes an open recording, plays it so output is
 not lost, and removes the PPE's definitions.
@@ -437,7 +436,7 @@ ENDIF
 | `Message` | Informational English text, meant for a log rather than control flow |
 | `Channel` | The file, dBase or sound channel, `-1` when the error has none |
 
-`ErrKind` is `None`, `File`, `DBase`, `Stack`, `Gfx`, `Font`, `Sound` or
+`ErrKind` is `None`, `File`, `DBase`, `Stack`, `Gfx`, `Font`, `Audio` or
 `Term`. `ErrCode` is `Ok`, `Unavailable`, `Invalid`, `Io`, `Format`, `Limit`,
 `Unsupported` or `Stack`.
 
@@ -542,6 +541,7 @@ an empty conference object, so its properties can still be read.
 | :--- | :--- | :--- |
 | `Name` | `STRING` | Conference name |
 | `Number` | `INTEGER` | The number the conference was fetched under |
+| `Valid` | `BOOLEAN` | Whether the requested conference exists |
 | `IsPublic` | `BOOLEAN` | Whether the conference is configured as public |
 | `DirectoryCount` | `INTEGER` | Number of file directories |
 | `AreaCount` | `INTEGER` | Number of message areas |
@@ -551,8 +551,9 @@ an empty conference object, so its properties can still be read.
 | `GetArea(index)` | `AREA` | Message area at the zero-based index |
 | `GetDoor(index)` | `DOOR` | Door at the zero-based index |
 
-`DIRECTORY` and `AREA` provide `Name`, `Number` and `HasAccess()`. `DOOR` provides
-`Name`, `Number`, `Description`, `Password` and `HasAccess()`. Every board object
+`DIRECTORY` and `AREA` provide `Name`, `Number`, `Valid` and `HasAccess()`.
+`DOOR` provides `Name`, `Number`, `Valid`, `Description`, `Password` and
+`HasAccess()`. Every board object
 reports the number it was fetched under, so a listing can name what a caller has
 to type. A door password has the
 runtime-only `PASSWORD` type: it can be compared with a string, but converting
@@ -574,7 +575,7 @@ NEXT
 they need no parentheses either. They split what the board *is* from what this
 one call *is doing*.
 
-`Board` is a snapshot of the configuration, taken when it is read:
+`Board` is a snapshot of the configuration and its conferences, taken when it is read:
 
 | Member | Type | Description |
 | :--- | :--- | :--- |
@@ -582,12 +583,13 @@ one call *is doing*.
 | `Location` | `STRING` | Where the board says it is |
 | `Operator` | `STRING` | Operator named for `EMSI` |
 | `SysopName` | `STRING` | The sysop's display name |
-| `Nodes` | `INTEGER` | Number of configured nodes |
+| `NodeCount` | `INTEGER` | Number of configured nodes |
 | `ConferenceCount` | `INTEGER` | Number of conferences |
 | `GetConference(index)` | `CONFERENCE` | Conference at the zero-based index |
 
 `ConferenceCount` and `GetConference()` are what let a PPE walk the board without
-`HIGHCONFNUM()`. An index no conference has answers with an empty conference.
+`HIGHCONFNUM()`. An index no conference has answers with an object whose `Valid`
+property is false.
 Listing conferences says nothing about who may enter
 one, so check `HasAccess()` before showing a name:
 

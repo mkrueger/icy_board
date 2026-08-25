@@ -1045,7 +1045,9 @@ impl IcyBoardState {
             return Ok(false);
         }
         self.session.current_conference_number = conference;
-        let c = self.get_board().await.conferences[conference as usize].clone();
+        let mut c = self.get_board().await.conferences[conference as usize].clone();
+        c.number = conference as usize;
+        c.valid = true;
         self.session.current_conference = c;
         self.session.current_message_area = 0;
         if let Some(state) = self.node_state.lock().await[self.node].as_mut() {

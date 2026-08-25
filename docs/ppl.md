@@ -376,6 +376,7 @@ still be read.
 | :--- | :--- | :--- |
 | `Name` | `STRING` | Conference name |
 | `Number` | `INTEGER` | The number the conference was fetched under |
+| `Valid` | `BOOLEAN` | Whether the requested conference exists |
 | `IsPublic` | `BOOLEAN` | Whether the conference is configured as public |
 | `DirectoryCount` | `INTEGER` | Number of file directories |
 | `AreaCount` | `INTEGER` | Number of message areas |
@@ -391,6 +392,7 @@ still be read.
 | :--- | :--- | :--- |
 | `Name` | `STRING` | Directory / area name |
 | `Number` | `INTEGER` | The number it was fetched under |
+| `Valid` | `BOOLEAN` | Whether the requested object exists |
 | `HasAccess()` | `BOOLEAN` | Whether the current caller can access it |
 
 **`DOOR`**
@@ -398,6 +400,7 @@ still be read.
 | Member | Type | Description |
 | :--- | :--- | :--- |
 | `Name` | `STRING` | Door name |
+| `Valid` | `BOOLEAN` | Whether the requested door exists |
 | `Number` | `INTEGER` | The number it was fetched under |
 | `Description` | `STRING` | Door description |
 | `Password` | `PASSWORD` | The door's password |

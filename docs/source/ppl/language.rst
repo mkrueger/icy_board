@@ -310,6 +310,7 @@ Member            Type             Description
 ================  ===============  ==================================================
 ``Name``          ``STRING``       Conference name
 ``Number``        ``INTEGER``      The number it was fetched under
+``Valid``         ``BOOLEAN``      Whether the requested conference exists
 ``IsPublic``      ``BOOLEAN``      Whether the conference is configured as public
 ``DirectoryCount``  ``INTEGER``    Number of file directories
 ``AreaCount``     ``INTEGER``      Number of message areas
@@ -320,8 +321,9 @@ Member            Type             Description
 ``GetDoor(i)``    ``DOOR``         Door at the zero based index
 ================  ===============  ==================================================
 
-**DIRECTORY** and **AREA** provide ``Name``, ``Number`` and ``HasAccess()``.
-**DOOR** provides ``Name``, ``Number``, ``Description``, ``Password`` and
+**DIRECTORY** and **AREA** provide ``Name``, ``Number``, ``Valid`` and
+``HasAccess()``. **DOOR** provides ``Name``, ``Number``, ``Valid``,
+``Description``, ``Password`` and
 ``HasAccess()``.
 
 Walking a conference:

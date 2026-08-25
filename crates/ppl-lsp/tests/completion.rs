@@ -100,12 +100,15 @@ fn runtime_402_objects_offer_their_registered_members() {
         ("ERROR value\nvalue.", &["OK", "Message", "Channel"][..]),
         (
             "TERMINFO value\nvalue.",
-            &["Program", "Columns", "InlineGraphics", "PixelMouse", "ClientBlit"][..],
+            &["Program", "Columns", "InlineGraphics", "PixelMouse", "ClientBlit", "Audio"][..],
         ),
         ("TERMINPUT value\nvalue.", &["Poll", "Wait", "KeyboardOn", "Release"][..]),
         ("TERMINAL value\nvalue.", &["Info", "Gfx", "Input"][..]),
         ("GFX value\nvalue.", &["Init", "Backend", "Pacing"][..]),
-        ("BOARD value\nvalue.", &["Name", "SysopName", "ConferenceCount", "GetConference"][..]),
+        (
+            "BOARD value\nvalue.",
+            &["Name", "SysopName", "NodeCount", "ConferenceCount", "GetConference"][..],
+        ),
         ("SESSION value\nvalue.", &["Conference", "Area", "Directory", "Node", "MinutesLeft"][..]),
     ] {
         let items = complete(source);

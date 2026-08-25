@@ -72,6 +72,9 @@ pub struct Conference {
     #[serde(skip)]
     pub number: usize,
 
+    #[serde(skip)]
+    pub valid: bool,
+
     #[serde(default)]
     #[serde(skip_serializing_if = "is_false")]
     pub is_public: bool,
@@ -269,6 +272,7 @@ impl ConferenceBase {
             let d = &add_conferences[i];
             let general_area: MessageArea = MessageArea {
                 number: 0,
+                valid: false,
                 name: "General".to_string(),
                 path: PathBuf::from(&c.message_file),
                 qwk_name: "General".to_string(),
@@ -289,6 +293,7 @@ impl ConferenceBase {
 
             let new = Conference {
                 number: 0,
+                valid: false,
                 name: c.name.clone(),
                 is_public: c.public_conference,
                 is_read_only: d.read_only,
@@ -385,6 +390,7 @@ impl UserData for Conference {
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         registry.add_property(NAME.clone(), VariableType::String, false);
         registry.add_property(NUMBER.clone(), VariableType::Integer, false);
+        registry.add_property(VALID.clone(), VariableType::Boolean, false);
         registry.add_property(ISPUBLIC.clone(), VariableType::Boolean, false);
         registry.add_property(FILE_AREAS.clone(), VariableType::Integer, false);
         registry.add_property(MESSAGE_AREAS.clone(), VariableType::Integer, false);
@@ -403,6 +409,7 @@ impl UserData for Conference {
 
 pub static NAME: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Name".to_string()));
 pub static NUMBER: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Number".to_string()));
+pub static VALID: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Valid".to_string()));
 pub static ISPUBLIC: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("IsPublic".to_string()));
 pub static FILE_AREAS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("DirectoryCount".to_string()));
 pub static DOORS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("DoorCount".to_string()));
@@ -420,6 +427,9 @@ impl UserDataValue for Conference {
         }
         if *name == *NUMBER {
             return Ok(VariableValue::new_int(self.number as i32));
+        }
+        if *name == *VALID {
+            return Ok(VariableValue::new_bool(self.valid));
         }
         if *name == *ISPUBLIC {
             return Ok(VariableValue::new_bool(self.is_public));
@@ -468,6 +478,7 @@ impl UserDataValue for Conference {
                 if let Some(res) = dir.get(area as usize) {
                     let mut res = (*res).clone();
                     res.number = area as usize;
+                    res.valid = true;
                     return Ok(user_data_value(res, FILE_DIRECTORY_ID));
                 }
                 log::error!("PPL: File area not found ({area})");
@@ -481,6 +492,7 @@ impl UserDataValue for Conference {
                 if let Some(res) = areas.get(area as usize) {
                     let mut res = (*res).clone();
                     res.number = area as usize;
+                    res.valid = true;
                     return Ok(user_data_value(res, MESSAGE_AREA_ID));
                 }
                 log::error!("PPL: Message area not found ({area})");
@@ -495,6 +507,7 @@ impl UserDataValue for Conference {
                 if let Some(res) = doors.get(door as usize) {
                     let mut res = (*res).clone();
                     res.number = door as usize;
+                    res.valid = true;
                     return Ok(user_data_value(res, DOOR_ID));
                 }
                 log::error!("PPL: Door not found ({door})");

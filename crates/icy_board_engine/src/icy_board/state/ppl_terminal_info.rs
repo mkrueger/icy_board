@@ -23,7 +23,7 @@ property_name!(CTERM_LEVEL, "CTermLevel");
 property_name!(SIXEL, "Sixel");
 property_name!(JXL, "Jxl");
 property_name!(INLINE_GRAPHICS, "InlineGraphics");
-property_name!(SOUND, "Sound");
+property_name!(AUDIO, "Audio");
 property_name!(PHYSICAL_KEYS, "PhysicalKeys");
 property_name!(PIXEL_MOUSE, "PixelMouse");
 property_name!(CLIENT_BLIT, "ClientBlit");
@@ -110,7 +110,7 @@ impl UserData for PplTerminalInfo {
             &*SIXEL,
             &*JXL,
             &*INLINE_GRAPHICS,
-            &*SOUND,
+            &*AUDIO,
             &*PHYSICAL_KEYS,
             &*PIXEL_MOUSE,
             &*CLIENT_BLIT,
@@ -145,7 +145,7 @@ impl UserDataValue for PplTerminalInfo {
             VariableValue::new_bool(self.jxl)
         } else if *name == *INLINE_GRAPHICS {
             VariableValue::new_bool(self.inline_graphics)
-        } else if *name == *SOUND {
+        } else if *name == *AUDIO {
             VariableValue::new_bool(self.sound)
         } else if *name == *PHYSICAL_KEYS {
             VariableValue::new_bool(self.physical_keys)

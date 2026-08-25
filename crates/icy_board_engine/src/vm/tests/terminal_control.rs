@@ -111,13 +111,6 @@ fn playing_an_empty_slot_says_so() {
     assert_eq!(output, "0\n2\n");
 }
 
-/// An unknown terminal is given the try; only an explicit denial rules macros out.
-#[test]
-fn macros_are_offered_until_the_terminal_denies_them() {
-    let output = run_ppl("PrintLn Terminal.Macros.Available");
-    assert_eq!(output, "1\n");
-}
-
 #[test]
 fn stopping_every_sound_flushes_the_channels_that_were_playing() {
     let output = run_ppl(
@@ -136,4 +129,10 @@ fn the_terminal_objects_have_no_value_of_their_own() {
         let errors = compile_errors(source);
         assert!(errors.iter().any(|error| error.contains("is a type")), "{source}: {errors:?}");
     }
+}
+
+#[test]
+fn macro_capabilities_live_only_in_terminal_info() {
+    let errors = compile_errors("PRINTLN Terminal.Macros.Available");
+    assert!(errors.iter().any(|error| error.contains("Member not found")), "{errors:?}");
 }

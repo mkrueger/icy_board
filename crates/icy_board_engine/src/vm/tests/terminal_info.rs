@@ -21,7 +21,7 @@ fn terminal_info_returns_the_cached_local_snapshot() {
         PrintLn info.DeviceAttrs = ""
         PrintLn info.Columns, "x", info.Rows
         PrintLn info.Utf8, " ", info.RipVersion = "", " ", info.CTermLevel
-        PrintLn info.Sixel, " ", info.Jxl, " ", info.InlineGraphics, " ", info.Sound, " ", info.PhysicalKeys, " ", info.SynchronizedOutput, " ", info.TerminalMacros
+        PrintLn info.Sixel, " ", info.Jxl, " ", info.InlineGraphics, " ", info.Audio, " ", info.PhysicalKeys, " ", info.SynchronizedOutput, " ", info.TerminalMacros
         PrintLn info.CellWidth, "x", info.CellHeight, " ", info.ScreenWidth, "x", info.ScreenHeight
         "#,
     );

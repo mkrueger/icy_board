@@ -12,7 +12,6 @@ pub static PLAY: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLo
 pub static DELETE: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Delete".to_string()));
 pub static CLEAR: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("DeleteAll".to_string()));
 pub static RECORDING: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Recording".to_string()));
-pub static AVAILABLE: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Available".to_string()));
 
 /// The terminal's own macro slots, which hold display output it can replay for itself.
 #[derive(Clone, Copy, Debug, Default)]
@@ -29,7 +28,6 @@ impl UserData for PplMacros {
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         registry.add_property(RECORDING.clone(), VariableType::Boolean, false);
-        registry.add_property(AVAILABLE.clone(), VariableType::Boolean, false);
 
         registry.add_function(RECORD.clone(), vec![VariableType::Integer], VariableType::Boolean);
         registry.add_function(END.clone(), Vec::new(), VariableType::Boolean);
@@ -44,10 +42,6 @@ impl UserDataValue for PplMacros {
     fn get_property_value(&self, vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
         if *name == *RECORDING {
             return Ok(VariableValue::new_bool(vm.icy_board_state.ppl_terminal.is_recording()));
-        }
-        if *name == *AVAILABLE {
-            // Only an explicit denial rules them out; an unknown terminal is given the try.
-            return Ok(VariableValue::new_bool(vm.icy_board_state.session.term_caps.terminal_macros != Some(false)));
         }
         Err(format!("Unknown MACROS property {name}").into())
     }

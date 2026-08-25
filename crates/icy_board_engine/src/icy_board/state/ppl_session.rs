@@ -84,6 +84,11 @@ impl UserDataValue for PplSession {
                 .and_then(|areas| areas.get(session.current_message_area).cloned());
             let mut area = area.unwrap_or_else(MessageArea::default);
             area.number = session.current_message_area;
+            area.valid = session
+                .current_conference
+                .areas
+                .as_ref()
+                .is_some_and(|areas| areas.get(session.current_message_area).is_some());
             user_data_value(area, MESSAGE_AREA_ID)
         } else if *name == *DIRECTORY {
             let directory = session
@@ -93,6 +98,11 @@ impl UserDataValue for PplSession {
                 .and_then(|directories| directories.get(session.current_file_directory).cloned());
             let mut directory = directory.unwrap_or_else(FileDirectory::default);
             directory.number = session.current_file_directory;
+            directory.valid = session
+                .current_conference
+                .directories
+                .as_ref()
+                .is_some_and(|directories| directories.get(session.current_file_directory).is_some());
             user_data_value(directory, FILE_DIRECTORY_ID)
         } else if *name == *CONFERENCE_NUMBER {
             VariableValue::new_int(i32::from(session.current_conference_number))

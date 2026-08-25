@@ -17,19 +17,19 @@ member_name!(NAME, "Name");
 member_name!(LOCATION, "Location");
 member_name!(OPERATOR, "Operator");
 member_name!(SYSOP_NAME, "SysopName");
-member_name!(NODES, "Nodes");
+member_name!(NODES, "NodeCount");
 member_name!(CONFERENCES, "ConferenceCount");
 member_name!(GET_CONFERENCE, "GetConference");
 
 /// What the board is configured to be, apart from any one call.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Default)]
 pub struct PplBoard {
     name: String,
     location: String,
     operator: String,
     sysop_name: String,
     nodes: i32,
-    conferences: i32,
+    conferences: Vec<Conference>,
 }
 
 impl PplBoard {
@@ -41,7 +41,7 @@ impl PplBoard {
             operator: board.config.board.operator.clone(),
             sysop_name: board.config.sysop.name.clone(),
             nodes: i32::from(board.config.board.num_nodes),
-            conferences: board.conferences.len() as i32,
+            conferences: board.conferences.iter().cloned().collect(),
         }
     }
 
@@ -79,7 +79,7 @@ impl UserDataValue for PplBoard {
         } else if *name == *NODES {
             VariableValue::new_int(self.nodes)
         } else if *name == *CONFERENCES {
-            VariableValue::new_int(self.conferences)
+            VariableValue::new_int(self.conferences.len() as i32)
         } else {
             return Err(format!("Unknown BOARD property {name}").into());
         };
@@ -92,17 +92,18 @@ impl UserDataValue for PplBoard {
 
     async fn call_function(
         &self,
-        vm: &mut crate::vm::VirtualMachine<'_>,
+        _vm: &mut crate::vm::VirtualMachine<'_>,
         name: &unicase::Ascii<String>,
         arguments: &[VariableValue],
     ) -> crate::Res<VariableValue> {
         if *name == *GET_CONFERENCE {
             let number = arguments[0].as_int();
             if number >= 0
-                && let Some(conference) = vm.icy_board_state.get_board().await.conferences.get(number as usize)
+                && let Some(conference) = self.conferences.get(number as usize)
             {
                 let mut conference = conference.clone();
                 conference.number = number as usize;
+                conference.valid = true;
                 return Ok(user_data_value(conference, CONFERENCE_ID));
             }
             log::error!("PPL: Can't get conference {number} (Board.GetConference)");

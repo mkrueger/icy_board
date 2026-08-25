@@ -104,7 +104,7 @@ fn terminal_info_reports_all_capabilities() {
         r"
         Terminal.Gfx.Init(GfxBackend.Auto, FALSE)
         PrintLn Terminal.Info.Sixel, Terminal.Info.Jxl, Terminal.Info.InlineGraphics
-        PrintLn Terminal.Info.PixelMouse, Terminal.Info.ClientBlit, Terminal.Info.Sound
+        PrintLn Terminal.Info.PixelMouse, Terminal.Info.ClientBlit, Terminal.Info.Audio
         ",
         JXL_TERMINAL,
     );

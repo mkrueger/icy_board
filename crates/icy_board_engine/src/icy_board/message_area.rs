@@ -25,6 +25,9 @@ pub struct MessageArea {
     #[serde(skip)]
     pub number: usize,
 
+    #[serde(skip)]
+    pub valid: bool,
+
     #[serde(default)]
     #[serde(skip_serializing_if = "String::is_empty")]
     pub qwk_name: String,
@@ -99,12 +102,14 @@ impl UserData for MessageArea {
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         registry.add_property(NAME.clone(), VariableType::String, false);
         registry.add_property(NUMBER.clone(), VariableType::Integer, false);
+        registry.add_property(VALID.clone(), VariableType::Boolean, false);
         registry.add_function(HAS_ACCESS.clone(), Vec::new(), VariableType::Boolean);
     }
 }
 
 pub static NAME: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Name".to_string()));
 pub static NUMBER: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Number".to_string()));
+pub static VALID: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Valid".to_string()));
 pub static HAS_ACCESS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("HasAccess".to_string()));
 
 #[async_trait(?Send)]
@@ -115,6 +120,9 @@ impl UserDataValue for MessageArea {
         }
         if *name == *NUMBER {
             return Ok(VariableValue::new_int(self.number as i32));
+        }
+        if *name == *VALID {
+            return Ok(VariableValue::new_bool(self.valid));
         }
         log::error!("Invalid user data call on MessageArea ({name})");
         Ok(VariableValue::new_int(-1))

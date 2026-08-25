@@ -10,6 +10,10 @@ releases.
 
 ### Changed
 
+- Finished the PPL 4.00 API review: board objects expose `Valid`, `Board` keeps
+  its conference snapshot, `Nodes` is `NodeCount`, multimedia capabilities and
+  event/error kinds consistently say `Audio`, and terminal macro capability is
+  exposed only by `Terminal.Info.TerminalMacros`.
 - Reworked the runtime 4.00 object API after review. Board objects report the
   `Number` they were fetched under, counts are spelled `DoorCount`, `AreaCount`,
   `DirectoryCount` and `ConferenceCount`, `GetDir` is `GetDirectory`, and
@@ -20,7 +24,7 @@ releases.
   `Macros.StartRecord`/`StopRecord` replace `Record`/`End`, `Surface.DrawRect`
   replaces `Rect`, and `Event.ScanCode` splits the physical key out of `Code`.
 - Removed the `Terminal.Sound` slot. `Audio.StopAll()` stops every channel and
-  `Terminal.Info.Sound` reports whether the terminal can play at all.
+  `Terminal.Info.Audio` reports whether the terminal can play at all.
 - Collapsed the beta PPE runtimes 4.00, 4.01 and 4.02 into a single runtime
   4.00, which now carries the type table, the routine-reference marker and
   `U_CONTACT`. PPEs compiled by an earlier beta must be rebuilt from source;

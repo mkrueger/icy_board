@@ -45,7 +45,7 @@ fn board_reports_what_the_board_is_configured_to_be() {
         PrintLn Board.Location
         PrintLn Board.Operator
         PrintLn Board.SysopName
-        PrintLn Board.Nodes, " ", Board.ConferenceCount
+        PrintLn Board.NodeCount, " ", Board.ConferenceCount
         "#,
         seed_board,
     );
@@ -71,18 +71,18 @@ fn every_conference_can_be_reached_by_number() {
     assert_eq!(output, "0: Main Board 1\n1: Second 1\n");
 }
 
-/// The same empty answer `ConfInfo()` gives, so a bad number stays readable.
+/// A bad number stays readable but cannot be mistaken for conference zero.
 #[test]
 fn an_unknown_conference_number_answers_an_empty_conference() {
     let output = run_ppl_on(
         r#"
-        PrintLn "[", Board.GetConference(99).Name, "]"
-        PrintLn "[", Board.GetConference(-1).Name, "]"
+        PrintLn "[", Board.GetConference(99).Name, "] ", Board.GetConference(99).Valid
+        PrintLn "[", Board.GetConference(-1).Name, "] ", Board.GetConference(-1).Valid
         "#,
         seed_board,
     );
 
-    assert_eq!(output, "[]\n[]\n");
+    assert_eq!(output, "[] 0\n[] 0\n");
 }
 
 #[test]
@@ -118,11 +118,11 @@ fn session_reports_the_call_it_is_running_in() {
 fn session_hands_out_the_conference_the_caller_is_in() {
     let output = run_ppl(
         r#"
-        PrintLn "[", Session.Conference.Name, "] ", Session.Conference.HasAccess()
+        PrintLn "[", Session.Conference.Name, "] ", Session.Conference.Valid
         "#,
     );
 
-    assert_eq!(output, "[] 1\n");
+    assert_eq!(output, "[] 0\n");
 }
 
 /// The current area and directory are objects too. The scratch session has not
@@ -131,12 +131,12 @@ fn session_hands_out_the_conference_the_caller_is_in() {
 fn session_hands_out_the_current_area_and_directory() {
     let output = run_ppl(
         r#"
-        PrintLn "[", Session.Area.Name, "] ", Session.Area.Number
-        PrintLn "[", Session.Directory.Name, "] ", Session.Directory.Number
+        PrintLn "[", Session.Area.Name, "] ", Session.Area.Number, " ", Session.Area.Valid
+        PrintLn "[", Session.Directory.Name, "] ", Session.Directory.Number, " ", Session.Directory.Valid
         "#,
     );
 
-    assert_eq!(output, "[] 0\n[] 0\n");
+    assert_eq!(output, "[] 0 0\n[] 0 0\n");
 }
 
 /// Every board object reports where it sits, so a listing can name the number
@@ -146,8 +146,8 @@ fn board_objects_know_their_own_number() {
     let output = run_ppl_on(
         r#"
         CONFERENCE conf = Board.GetConference(1)
-        PrintLn conf.Number, " ", conf.Name
-        PrintLn conf.GetArea(1).Number, " ", conf.GetArea(1).Name
+        PrintLn conf.Number, " ", conf.Name, " ", conf.Valid
+        PrintLn conf.GetArea(1).Number, " ", conf.GetArea(1).Name, " ", conf.GetArea(1).Valid
         "#,
         |board| {
             seed_board(board);
@@ -164,7 +164,7 @@ fn board_objects_know_their_own_number() {
         },
     );
 
-    assert_eq!(output, "1 Second\n1 Second\n");
+    assert_eq!(output, "1 Second 1\n1 Second 1\n");
 }
 
 /// `Session` is read live rather than snapshotted, so a value kept in a
