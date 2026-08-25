@@ -78,18 +78,20 @@ PRINT deep.two.one.v
 }
 
 #[test]
-fn test_a_variable_may_not_take_the_name_of_a_type() {
-    // Names are compared without regard to case, so `C c` leaves `c` ambiguous and
-    // a statement starting with it reads as a declaration.
+fn test_a_variable_may_take_the_name_of_its_type() {
+    // Names are compared without regard to case, so `C c` leaves `c` reading like the
+    // type it was declared from. A member cannot start a declaration, so it is the
+    // variable that is meant.
     let source = r"
 TYPE C
   INTEGER v
 ENDTYPE
 C c
 c.v = 1
+PRINTLN c.v
 ";
-    let errors = crate::vm::tests::compile_errors(source);
-    assert!(!errors.is_empty(), "a variable named like its type should be reported");
+    assert!(crate::vm::tests::compile_errors(source).is_empty());
+    assert_eq!(crate::vm::tests::run_ppl(source), "1\n");
 }
 
 #[test]

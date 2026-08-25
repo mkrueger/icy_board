@@ -2142,6 +2142,10 @@
     "named": false
   },
   {
+    "type": "GFX",
+    "named": false
+  },
+  {
     "type": "GOSUB",
     "named": false
   },

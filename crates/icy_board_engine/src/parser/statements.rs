@@ -802,9 +802,14 @@ impl Parser<'_> {
             }
 
             Some(Token::Identifier(id)) => {
-                if let Some(var_type) = self.get_variable_type() {
-                    let type_token = self.save_spanned_token();
-                    self.next_token();
+                let var_type = self.get_variable_type();
+                let id_token = self.save_spanned_token();
+                self.next_token();
+
+                // A type name carries on into a member, so only a name on its own declares.
+                if let Some(var_type) = var_type
+                    && self.get_cur_token() != Some(Token::Dot)
+                {
                     let mut vars = Vec::new();
                     if let Some(v) = self.parse_var_info(false) {
                         vars.push(v);
@@ -819,10 +824,10 @@ impl Parser<'_> {
                             return None;
                         }
                     }
-                    return Some(Statement::VariableDeclaration(VariableDeclarationStatement::new(type_token, var_type, vars)));
+                    return Some(Statement::VariableDeclaration(VariableDeclarationStatement::new(id_token, var_type, vars)));
                 }
 
-                if let Some(value) = self.parse_call(&id) {
+                if let Some(value) = self.parse_call_after_identifier(&id, id_token) {
                     return Some(value);
                 }
                 self.next_token();
@@ -851,7 +856,10 @@ impl Parser<'_> {
     fn parse_call(&mut self, identifier: &unicase::Ascii<String>) -> Option<Statement> {
         let id_token = self.save_spanned_token();
         self.next_token();
+        self.parse_call_after_identifier(identifier, id_token)
+    }
 
+    fn parse_call_after_identifier(&mut self, identifier: &unicase::Ascii<String>, id_token: Spanned<Token>) -> Option<Statement> {
         if self.get_cur_token() == Some(Token::Dot) {
             let mut members = Vec::new();
             let mut dots = Vec::new();

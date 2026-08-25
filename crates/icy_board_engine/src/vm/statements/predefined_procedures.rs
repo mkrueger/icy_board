@@ -3538,10 +3538,14 @@ async fn gfx_present_handle(vm: &mut VirtualMachine<'_>, handle: i32, target: Pr
 
 /// `NewSurface(width, height)` - a blank surface the caller owns until `Free`.
 pub async fn new_surface(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    use crate::icy_board::state::ppl_surface::PplSurface;
-
     let width = vm.eval_expr(&args[0]).await?.as_int();
     let height = vm.eval_expr(&args[1]).await?.as_int();
+    gfx_new_surface(vm, width, height)
+}
+
+pub(crate) fn gfx_new_surface(vm: &mut VirtualMachine<'_>, width: i32, height: i32) -> Res<VariableValue> {
+    use crate::icy_board::state::ppl_surface::PplSurface;
+
     let (Ok(width), Ok(height)) = (usize::try_from(width), usize::try_from(height)) else {
         vm.icy_board_state.gfx_error = 5;
         return Ok(PplSurface::invalid());
@@ -3565,10 +3569,14 @@ pub async fn new_surface(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<V
 
 /// `LoadSurface(file)` - a surface holding what the image file decoded to.
 pub async fn load_surface(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let file_name = vm.eval_expr(&args[0]).await?.as_string();
+    gfx_load_surface(vm, &file_name).await
+}
+
+pub(crate) async fn gfx_load_surface(vm: &mut VirtualMachine<'_>, file_name: &str) -> Res<VariableValue> {
     use crate::icy_board::state::ppl_surface::PplSurface;
 
-    let file_name = vm.eval_expr(&args[0]).await?.as_string();
-    let Some(mut surface) = gfx_decode_image(vm, &file_name).await else {
+    let Some(mut surface) = gfx_decode_image(vm, file_name).await else {
         return Ok(PplSurface::invalid());
     };
     surface.cacheable = true;
@@ -3586,7 +3594,7 @@ pub async fn load_surface(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<
 }
 
 pub async fn gfxinit(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    use crate::icy_board::state::ppl_graphics::{GFX_BACKEND_AUTO, GFX_BACKEND_JXL, GFX_BACKEND_NONE, GFX_BACKEND_SIXEL, PplGraphicsState};
+    use crate::icy_board::state::ppl_graphics::GFX_BACKEND_AUTO;
 
     let requested = match args.first() {
         Some(expr) => vm.eval_expr(expr).await?.as_int(),
@@ -3596,6 +3604,12 @@ pub async fn gfxinit(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
         Some(expr) => vm.eval_expr(expr).await?.as_bool(),
         None => true,
     };
+    gfx_init(vm, requested, fullscreen).await
+}
+
+pub(crate) async fn gfx_init(vm: &mut VirtualMachine<'_>, requested: i32, fullscreen: bool) -> Res<()> {
+    use crate::icy_board::state::ppl_graphics::{GFX_BACKEND_AUTO, GFX_BACKEND_JXL, GFX_BACKEND_NONE, GFX_BACKEND_SIXEL, PplGraphicsState};
+
     if !matches!(requested, GFX_BACKEND_AUTO | GFX_BACKEND_SIXEL | GFX_BACKEND_JXL) {
         vm.icy_board_state.gfx_error = 6;
         log::warn!("GFXINIT rejected unknown backend {requested}");
@@ -4238,16 +4252,24 @@ pub async fn gfxpin(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 
 pub async fn gfxsetpacing(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let frames = vm.eval_expr(&args[0]).await?.as_int();
+    gfx_set_pacing(vm, frames);
+    Ok(())
+}
+
+pub(crate) fn gfx_set_pacing(vm: &mut VirtualMachine<'_>, frames: i32) {
     if let Some(graphics) = &mut vm.icy_board_state.ppl_graphics {
         graphics.pacing = frames > 0;
         vm.icy_board_state.gfx_error = 0;
     } else {
         vm.icy_board_state.gfx_error = 1;
     }
-    Ok(())
 }
 
 pub async fn gfxshutdown(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
+    gfx_shutdown(vm).await
+}
+
+pub(crate) async fn gfx_shutdown(vm: &mut VirtualMachine<'_>) -> Res<()> {
     let fullscreen = vm.icy_board_state.ppl_graphics.as_ref().is_some_and(|graphics| graphics.fullscreen);
     vm.icy_board_state.ppl_graphics = None;
     vm.icy_board_state.gfx_error = 0;
@@ -4256,4 +4278,71 @@ pub async fn gfxshutdown(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<
     } else {
         Ok(())
     }
+}
+
+/// Runs one `GFX` member.
+pub(crate) async fn gfx_member(vm: &mut VirtualMachine<'_>, name: &unicase::Ascii<String>, arguments: &[VariableValue]) -> Res<VariableValue> {
+    use crate::icy_board::state::ppl_gfx::{
+        AUDIO, CELL_HEIGHT, CELL_WIDTH, CLIENT_BLIT, INIT, JXL, JXL_BLOB, LOAD_SURFACE, NEW_SURFACE, PIXEL_MOUSE, SCREEN_HEIGHT, SCREEN_WIDTH, SET_PACING,
+        SHUTDOWN, SIXEL,
+    };
+
+    if *name == *INIT {
+        let requested = arguments
+            .first()
+            .map_or(crate::icy_board::state::ppl_graphics::GFX_BACKEND_AUTO, VariableValue::as_int);
+        let fullscreen = arguments.get(1).is_none_or(VariableValue::as_bool);
+        gfx_init(vm, requested, fullscreen).await?;
+        return Ok(VariableValue::new_bool(vm.icy_board_state.gfx_error == 0));
+    }
+    if *name == *SHUTDOWN {
+        gfx_shutdown(vm).await?;
+        return Ok(VariableValue::new_bool(true));
+    }
+    if *name == *SET_PACING {
+        gfx_set_pacing(vm, arguments.first().map_or(0, VariableValue::as_int));
+        return Ok(VariableValue::new_bool(vm.icy_board_state.gfx_error == 0));
+    }
+    if *name == *NEW_SURFACE {
+        let width = arguments.first().map_or(0, VariableValue::as_int);
+        let height = arguments.get(1).map_or(0, VariableValue::as_int);
+        return gfx_new_surface(vm, width, height);
+    }
+    if *name == *LOAD_SURFACE {
+        let file_name = arguments.first().map(VariableValue::as_string).unwrap_or_default();
+        return gfx_load_surface(vm, &file_name).await;
+    }
+
+    let capabilities = vm.icy_board_state.query_gfx_capabilities().await?;
+    if *name == *CELL_WIDTH {
+        return Ok(VariableValue::new_int(capabilities.cell_width));
+    }
+    if *name == *CELL_HEIGHT {
+        return Ok(VariableValue::new_int(capabilities.cell_height));
+    }
+    if *name == *SCREEN_WIDTH {
+        return Ok(VariableValue::new_int(capabilities.screen_width));
+    }
+    if *name == *SCREEN_HEIGHT {
+        return Ok(VariableValue::new_int(capabilities.screen_height));
+    }
+    if *name == *SIXEL {
+        return Ok(VariableValue::new_bool(capabilities.sixel));
+    }
+    if *name == *JXL {
+        return Ok(VariableValue::new_bool(capabilities.jxl));
+    }
+    if *name == *JXL_BLOB {
+        return Ok(VariableValue::new_bool(capabilities.inline_blobs()));
+    }
+    if *name == *PIXEL_MOUSE {
+        return Ok(VariableValue::new_bool(capabilities.cterm_revision.is_some_and(|revision| revision >= 1330)));
+    }
+    if *name == *CLIENT_BLIT {
+        return Ok(VariableValue::new_bool(capabilities.cterm_revision.is_some_and(|revision| revision >= 1318)));
+    }
+    if *name == *AUDIO {
+        return Ok(VariableValue::new_bool(vm.icy_board_state.session.term_caps.sound));
+    }
+    Err(format!("Unknown GFX function {name}").into())
 }

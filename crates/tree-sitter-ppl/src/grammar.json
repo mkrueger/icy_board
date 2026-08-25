@@ -1456,6 +1456,18 @@
             "type": "TOKEN",
             "content": {
               "type": "PATTERN",
+              "value": "[gG][fF][xX]"
+            }
+          },
+          "named": false,
+          "value": "GFX"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
               "value": "[pP][aA][sS][sS][wW][oO][rR][dD]"
             }
           },
