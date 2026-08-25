@@ -55,11 +55,10 @@ fn an_empty_region_is_refused_and_says_so() {
     assert!(output.ends_with("1\n"), "{output:?}");
 }
 
-/// Resetting one axis sends the sequence for that axis alone, but the screen behind it
-/// treats DECSTBM as clearing the whole region, so both flags fall. The statements this
-/// replaces behave the same way.
+/// The two axes are independent: DECSTBM owns top and bottom, DECLRMM owns left and
+/// right, so resetting one leaves the other standing.
 #[test]
-fn resetting_one_axis_clears_both_flags() {
+fn resetting_the_vertical_axis_keeps_the_horizontal_one() {
     let through_the_object = run_ppl(
         r"
         Terminal.Margins.SetVertical(4, 23)
@@ -78,7 +77,7 @@ fn resetting_one_axis_clears_both_flags() {
         ",
     );
 
-    assert!(through_the_object.ends_with("00\n"), "{through_the_object:?}");
+    assert!(through_the_object.ends_with("01\n"), "{through_the_object:?}");
     assert_eq!(through_the_object, through_the_statements);
 }
 
