@@ -69,7 +69,7 @@ fn the_geometry_calls_report_what_the_terminal_answered() {
     assert!(output.ends_with("10x20\n800x600\n"), "{output:?}");
 }
 
-/// The capability calls replace the GfxCaps() bitmask, so they have to agree with it.
+/// The capability calls replace the `GfxCaps()` bitmask, so they have to agree with it.
 #[test]
 fn the_capability_calls_agree_with_the_bitmask() {
     let output = run_ppl_with_input(

@@ -180,7 +180,7 @@ impl Parser<'_> {
 
     /// Follows `.member` as far as it goes, so what a member answers may have members
     /// of its own, and any member in the chain may be called.
-    fn parse_member_chain(&mut self, expr: Expression) -> Option<Expression> {
+    pub(super) fn parse_member_chain(&mut self, expr: Expression) -> Option<Expression> {
         let mut expr = expr;
         while self.get_cur_token() == Some(Token::Dot) {
             let dot_token: super::lexer::Spanned<Token> = self.save_spanned_token();

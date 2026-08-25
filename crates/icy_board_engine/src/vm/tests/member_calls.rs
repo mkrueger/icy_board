@@ -103,3 +103,38 @@ fn a_property_can_answer_with_another_object() {
 
     assert_eq!(output, "80x25\nUnknown\n");
 }
+
+/// A statement is parsed as the expression it is, so a call may stand anywhere in the
+/// chain rather than only at its end.
+#[test]
+fn a_statement_may_call_in_the_middle_of_a_chain() {
+    let output = run_ppl(
+        r"
+        Terminal.Gfx.Init(GFX_SIXEL, FALSE)
+        Terminal.Gfx.NewSurface(2, 2).Free()
+        PrintLn ERR().Code
+        Terminal.Gfx.Shutdown()
+        ",
+    );
+
+    assert_eq!(output, "0\n");
+}
+
+#[test]
+fn a_static_call_is_a_statement_of_its_own() {
+    assert!(compile_errors("Terminal.Gfx.Shutdown()").is_empty());
+    assert!(compile_errors("Terminal.Gfx.Init(GFX_SIXEL, FALSE)").is_empty());
+}
+
+/// What a call answers is a copy, so there is nothing behind it to assign to.
+#[test]
+fn a_call_in_the_chain_cannot_be_assigned_through() {
+    let errors = compile_errors("Terminal.Gfx.NewSurface(2, 2).Width = 3");
+    assert!(!errors.is_empty(), "assigning through a call should be reported");
+}
+
+#[test]
+fn a_member_that_is_neither_called_nor_assigned_is_reported() {
+    let errors = compile_errors("Terminal.Info.Columns");
+    assert!(!errors.is_empty(), "a bare member reference is not a statement");
+}

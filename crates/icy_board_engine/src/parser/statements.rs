@@ -1,10 +1,9 @@
 use crate::{
     ast::{
         BlockStatement, BreakStatement, CaseBlock, CaseSpecifier, CommentAstNode, ConstDeclarationStatement, Constant, ContinueStatement, ElseBlock,
-        ElseIfBlock, Expression, ForStatement, FunctionCallExpression, GosubStatement, GotoStatement, IdentifierExpression, IfStatement, IfThenStatement,
-        LabelStatement, LetStatement, LoopStatement, MemberCallStatement, MemberReferenceExpression, OnErrorMode, OnErrorStatement, PredefinedCallStatement,
-        ProcedureCallStatement, RepeatUntilStatement, ReturnStatement, SelectStatement, Statement, VariableDeclarationStatement, WhileDoStatement,
-        WhileStatement,
+        ElseIfBlock, Expression, ForStatement, GosubStatement, GotoStatement, IdentifierExpression, IfStatement, IfThenStatement, LabelStatement,
+        LetStatement, LoopStatement, MemberCallStatement, OnErrorMode, OnErrorStatement, PredefinedCallStatement, ProcedureCallStatement,
+        RepeatUntilStatement, ReturnStatement, SelectStatement, Statement, VariableDeclarationStatement, WhileDoStatement, WhileStatement,
     },
     executable::{OpCode, StatementDefinition},
     parser::ParserErrorType,
@@ -861,53 +860,24 @@ impl Parser<'_> {
 
     fn parse_call_after_identifier(&mut self, identifier: &unicase::Ascii<String>, id_token: Spanned<Token>) -> Option<Statement> {
         if self.get_cur_token() == Some(Token::Dot) {
-            let mut members = Vec::new();
-            let mut dots = Vec::new();
-            while self.get_cur_token() == Some(Token::Dot) {
-                dots.push(self.save_spanned_token());
-                self.next_token();
-                let Some(Token::Identifier(_)) = self.get_cur_token() else {
-                    self.report_error(self.save_token_span(), ParserErrorType::IdentifierExpected(self.save_token()));
-                    return None;
-                };
-                members.push(self.save_spanned_token());
-                self.next_token();
-            }
-            if self.get_cur_token() == Some(Token::LPar) {
-                let lpar_token = self.save_spanned_token();
-                self.next_token();
-                let mut arguments = Vec::new();
-                while self.get_cur_token() != Some(Token::RPar) {
-                    let Some(argument) = self.parse_expression() else {
-                        self.report_error(self.lex.span(), ParserErrorType::ExpressionExpected(self.save_token()));
-                        return None;
-                    };
-                    arguments.push(argument);
-                    if self.get_cur_token() == Some(Token::Comma) {
-                        self.next_token();
-                    } else {
-                        break;
-                    }
-                }
-                if self.get_cur_token() != Some(Token::RPar) {
-                    self.report_error(self.save_token_span(), ParserErrorType::MissingCloseParens(self.save_token()));
-                    return None;
-                }
-                let rpar_token = self.save_spanned_token();
-                self.next_token();
+            // The same member chain an expression would parse, so a call may stand
+            // anywhere in it rather than only at the end.
+            let base = Expression::Identifier(IdentifierExpression::new(id_token.clone()));
+            let expression = self.parse_member_chain(base)?;
 
-                let mut expression = Expression::Identifier(IdentifierExpression::new(id_token));
-                for (dot_token, member) in dots.into_iter().zip(members) {
-                    expression = Expression::MemberReference(MemberReferenceExpression::new(expression, dot_token, member));
-                }
-                return Some(Statement::MemberCall(MemberCallStatement::new(Expression::FunctionCall(
-                    FunctionCallExpression::new(expression, lpar_token, arguments, rpar_token),
-                ))));
+            if matches!(expression, Expression::FunctionCall(_)) {
+                return Some(Statement::MemberCall(MemberCallStatement::new(expression)));
             }
+
             if !is_assign_token(self.get_cur_token()) {
                 self.report_error(self.save_token_span(), ParserErrorType::InvalidToken(self.save_token()));
                 return None;
             }
+            // Only a plain chain of names can be assigned to; what a call answers is a copy.
+            let Some(members) = assignable_member_chain(&expression) else {
+                self.report_error(self.save_token_span(), ParserErrorType::InvalidToken(self.save_token()));
+                return None;
+            };
             let eq_token = self.save_spanned_token();
             self.next_token();
             let Some(value_expression) = self.parse_expression() else {
@@ -1083,6 +1053,24 @@ impl Parser<'_> {
         self.report_error(id_token.span, ParserErrorType::UnknownIdentifier(id_token.token.to_string()));
         None
     }
+}
+
+/// The identifier tokens of `a.b.c`, or nothing when the chain is not a plain path.
+fn assignable_member_chain(expression: &Expression) -> Option<Vec<Spanned<Token>>> {
+    let mut members = Vec::new();
+    let mut current = expression;
+    loop {
+        match current {
+            Expression::MemberReference(member) => {
+                members.push(member.get_identifier_token().clone());
+                current = member.get_expression();
+            }
+            Expression::Identifier(_) => break,
+            _ => return None,
+        }
+    }
+    members.reverse();
+    Some(members)
 }
 
 fn is_assign_token(token_opt: Option<Token>) -> bool {
