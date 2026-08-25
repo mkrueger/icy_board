@@ -1,4 +1,4 @@
-use crate::vm::tests::{compile_errors_with_runtime, run_ppl};
+use crate::vm::tests::{compile_errors, compile_errors_with_runtime, run_ppl};
 
 /// An array declared with an upper bound of 10 holds 11 elements, index 0 through 10.
 #[test]
@@ -208,8 +208,103 @@ fn foreach_needs_runtime_400() {
     assert!(!errors.is_empty(), "FOREACH should not compile for an older runtime");
 }
 
+/// The hidden counter the loop is built from has to land in the local scope.
+#[test]
+fn foreach_works_inside_a_procedure() {
+    assert_eq!(
+        "1 2 3 ",
+        run_ppl(
+            r#"
+DECLARE PROCEDURE Walk()
+Walk()
+PROCEDURE Walk()
+  STRING a(2)
+  LET a(0) = "1"
+  LET a(1) = "2"
+  LET a(2) = "3"
+  STRING v
+  FOREACH v IN a
+    PRINT v, " "
+  ENDFOREACH
+ENDPROC
+"#
+        )
+    );
+}
+
+/// A value that is not an array is one element, so the body runs once rather than
+/// not at all. Nothing has to ask what it was handed.
+#[test]
+fn foreach_over_a_plain_value_runs_once() {
+    assert_eq!("42 ", run_ppl("INTEGER a\nLET a = 42\nINTEGER v\nFOREACH v IN a\n  PRINT v, \" \"\nENDFOREACH"));
+}
+
 /// IN keeps working as a name, so reserving the word costs nobody anything.
 #[test]
 fn in_is_still_available_as_a_variable_name() {
     assert_eq!("3", run_ppl("INTEGER in\nLET in = 3\nPRINT in"));
+}
+
+/// Every built-in array function may also be written as a member of the array.
+#[test]
+fn an_array_answers_len_as_a_member() {
+    assert_eq!(
+        "10 2 3",
+        run_ppl("INTEGER a(10)\nINTEGER b(2, 3)\nPRINT a.Len(), \" \", b.Len(0), \" \", b.Len(1)")
+    );
+}
+
+#[test]
+fn an_array_answers_the_element_functions_as_members() {
+    assert_eq!(
+        "12 42",
+        run_ppl("INTEGER a(2, 3)\nLET a(0, 1) = 42\nPRINT a.ElementCount(), \" \", a.ElementAt(1)")
+    );
+}
+
+/// The member is the same call as the function, so both may name the same array.
+#[test]
+fn a_member_and_a_function_agree() {
+    assert_eq!("1", run_ppl("INTEGER a(4, 5)\nPRINT a.Len(1) = Len(a, 1)"));
+}
+
+#[test]
+fn a_value_that_is_not_an_array_has_no_members() {
+    let errors = compile_errors("INTEGER a\nPRINT a.Len()");
+
+    assert!(!errors.is_empty(), "a plain value should not answer array members");
+}
+
+#[test]
+fn an_unknown_array_member_is_rejected() {
+    let errors = compile_errors("INTEGER a(1)\nPRINT a.Sort()");
+
+    assert!(!errors.is_empty(), "an array should not answer a member it does not have");
+}
+
+#[test]
+fn an_array_member_checks_its_argument_count() {
+    let errors = compile_errors("INTEGER a(1)\nPRINT a.Len(0, 1)");
+
+    assert!(!errors.is_empty(), "Len takes at most one argument");
+}
+
+/// REDIM is a statement, so its member is one too.
+#[test]
+fn an_array_can_be_redimmed_through_its_member() {
+    assert_eq!("1 20", run_ppl("INTEGER a(1)\nPRINT a.Len(), \" \"\na.Redim(20)\nPRINT a.Len()"));
+}
+
+#[test]
+fn redim_as_a_member_takes_one_bound_per_dimension() {
+    assert_eq!("2 3", run_ppl("INTEGER a(1)\na.Redim(2, 3)\nPRINT a.Len(0), \" \", a.Len(1)"));
+}
+
+/// The member is the same statement, so it agrees with the written out form.
+#[test]
+fn a_redim_member_and_the_statement_agree() {
+    assert_eq!(
+        "7 7",
+        run_ppl("INTEGER a(1)\nINTEGER b(1)\na.Redim(7)\nREDIM b, 7\nPRINT a.Len(), \" \", b.Len()")
+    );
 }

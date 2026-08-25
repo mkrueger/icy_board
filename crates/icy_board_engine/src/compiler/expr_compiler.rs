@@ -1,5 +1,5 @@
 use crate::{
-    ast::AstVisitor,
+    ast::{AstVisitor, Constant, Expression, constant::NumberFormat},
     executable::{FuncOpCode, PPEExpr, VariableType},
     semantic::SemanticInfo,
 };
@@ -140,6 +140,24 @@ impl AstVisitor<PPEExpr> for ExpressionCompiler<'_> {
                 let expr = call.get_expression().visit(self);
                 PPEExpr::MemberFunctionCall(Box::new(expr), arguments, idx)
             }
+            SemanticInfo::ArrayMemberFunc(op_code, defaults) => {
+                let op_code = *op_code;
+                let defaults = defaults.clone();
+                // `a.Len(0)` is `Len(a, 0)`: the receiver leads, then what was written,
+                // then whatever the member fills in for a left out argument.
+                let Expression::MemberReference(member) = call.get_expression() else {
+                    log::error!("array member call without a receiver at: {}", call.get_expression().get_span().start);
+                    return PPEExpr::Value(0);
+                };
+                let mut call_arguments = vec![member.get_expression().visit(self)];
+                call_arguments.extend(arguments);
+                call_arguments.extend(
+                    defaults
+                        .iter()
+                        .map(|value| PPEExpr::Value(self.compiler.lookup_table.lookup_constant(&Constant::Integer(*value, NumberFormat::Default)))),
+                );
+                PPEExpr::PredefinedFunctionCall(op_code.get_definition(), call_arguments)
+            }
             SemanticInfo::FunctionReference(idx) => {
                 let reference_index = self.compiler.semantic_visitor.function_containers[*idx].id;
                 let table_index = self.compiler.semantic_visitor.references[reference_index].1.variable_table_index;
@@ -152,6 +170,10 @@ impl AstVisitor<PPEExpr> for ExpressionCompiler<'_> {
             }
             SemanticInfo::PredefFunctionGroup(_) => {
                 log::error!("Invalid function call: {function_type:?}");
+                PPEExpr::Value(0)
+            }
+            SemanticInfo::ArrayMemberProc(_) => {
+                log::error!("Array statement used where a value is expected: {function_type:?}");
                 PPEExpr::Value(0)
             }
         }

@@ -18,7 +18,7 @@ use crate::{
         ErrorReporter, UserTypeRegistry,
         lexer::{Spanned, Token},
     },
-    semantic::{LookupVariabeleTable, SemanticVisitor},
+    semantic::{LookupVariabeleTable, SemanticInfo, SemanticVisitor},
 };
 
 use self::expr_compiler::ExpressionCompiler;
@@ -448,7 +448,21 @@ impl PPECompiler {
 
                 Some(PPECommand::Let(Box::new(variable), Box::new(value)))
             }
-            Statement::MemberCall(call_stmt) => Some(PPECommand::MemberCall(Box::new(self.comp_expr(call_stmt.get_expression())))),
+            Statement::MemberCall(call_stmt) => {
+                // `a.Redim(10)` is `REDIM a, 10`, so it compiles to the statement rather
+                // than to a member call.
+                if let Expression::FunctionCall(call) = call_stmt.get_expression()
+                    && let Some(SemanticInfo::ArrayMemberProc(opcode)) = self.semantic_visitor.function_type_lookup.get(&call.id).cloned()
+                    && let Expression::MemberReference(member) = call.get_expression()
+                {
+                    let mut arguments = vec![self.comp_expr(member.get_expression())];
+                    for arg in call.get_arguments() {
+                        arguments.push(self.comp_expr(arg));
+                    }
+                    return Some(PPECommand::PredefinedCall(opcode.get_definition(), arguments));
+                }
+                Some(PPECommand::MemberCall(Box::new(self.comp_expr(call_stmt.get_expression()))))
+            }
             Statement::PredifinedCall(call_stmt) => {
                 let def = call_stmt.get_func();
                 let mut arguments = Vec::new();

@@ -82,6 +82,13 @@ pub enum SemanticInfo {
 
     MemberFunctionCall(usize),
 
+    /// A built-in array function written as a member, `a.Len()` for `Len(a)`. The
+    /// array is passed as the first argument, plus the constants the member fills in.
+    ArrayMemberFunc(FuncOpCode, Vec<i32>),
+
+    /// The same for a built-in array statement, `a.Redim(10)` for `REDIM a, 10`.
+    ArrayMemberProc(OpCode),
+
     PredefFunctionGroup(Vec<usize>),
 
     /// id looks up into '`function_containers`'
@@ -89,6 +96,58 @@ pub enum SemanticInfo {
 
     /// id looks up into 'references'
     VariableReference(usize),
+}
+
+/// A built-in array function that may also be written as a member of the array.
+///
+/// Every function that takes an array first has an entry here, so `a.Len(0)` and
+/// `Len(a, 0)` are the same call and neither can drift from the other.
+pub struct ArrayMember {
+    pub name: &'static str,
+    pub opcode: FuncOpCode,
+    /// Arguments the member takes, on top of the array itself.
+    pub arguments: std::ops::RangeInclusive<usize>,
+    /// What a left out trailing argument stands for.
+    pub defaults: &'static [i32],
+    pub return_type: VariableType,
+}
+
+/// The members every array carries. `Redim` is a statement rather than a function
+/// and is resolved next to the other member call statements.
+pub const ARRAY_MEMBERS: &[ArrayMember] = &[
+    ArrayMember {
+        name: "Len",
+        opcode: FuncOpCode::Len_Dim,
+        arguments: 0..=1,
+        defaults: &[0],
+        return_type: VariableType::Integer,
+    },
+    ArrayMember {
+        name: "ElementCount",
+        opcode: FuncOpCode::ElementCount,
+        arguments: 0..=0,
+        defaults: &[],
+        return_type: VariableType::Integer,
+    },
+    ArrayMember {
+        name: "ElementAt",
+        opcode: FuncOpCode::ElementAt,
+        arguments: 1..=1,
+        defaults: &[],
+        return_type: VariableType::None,
+    },
+];
+
+pub fn array_member(name: &unicase::Ascii<String>) -> Option<&'static ArrayMember> {
+    ARRAY_MEMBERS.iter().find(|member| *name == member.name)
+}
+
+/// The built-in array statements that may also be written as a member. `REDIM` is
+/// the only one, and it takes one bound per dimension.
+pub const ARRAY_PROCEDURES: &[(&str, OpCode, std::ops::RangeInclusive<usize>)] = &[("Redim", OpCode::REDIM, 1..=3)];
+
+pub fn array_procedure(name: &unicase::Ascii<String>) -> Option<&'static (&'static str, OpCode, std::ops::RangeInclusive<usize>)> {
+    ARRAY_PROCEDURES.iter().find(|(member, _, _)| *name == *member)
 }
 
 #[derive(Default, Debug, Clone, PartialEq)]
@@ -1019,6 +1078,17 @@ impl SemanticVisitor {
         }
     }
 
+    /// True when the expression names a declared array, which is what gives it members.
+    fn names_an_array(&mut self, expression: &Expression) -> bool {
+        let Expression::Identifier(identifier) = expression else {
+            return false;
+        };
+        let Some(index) = self.lookup_variable(identifier.get_identifier()) else {
+            return false;
+        };
+        self.references[index].1.header.as_ref().is_some_and(|header| header.dim > 0)
+    }
+
     fn add_reference_to(&mut self, identifier: &Spanned<Token>, idx: usize) {
         self.references[idx].1.usages.push((
             self.errors.lock().unwrap().file_name().to_path_buf(),
@@ -1659,6 +1729,17 @@ impl AstVisitor<VariableType> for SemanticVisitor {
         }
         let receiver = self.static_receiver(member_reference_expression.get_expression(), member_reference_expression.get_identifier());
         let called_on_the_type = matches!(receiver, StaticReceiver::StaticMember(_));
+
+        // An array carries the built-in array functions as members. Its type is the
+        // element's, so the declaration is what says it has them.
+        if matches!(receiver, StaticReceiver::NotAType)
+            && self.names_an_array(member_reference_expression.get_expression())
+            && (array_member(member_reference_expression.get_identifier()).is_some() || array_procedure(member_reference_expression.get_identifier()).is_some())
+        {
+            member_reference_expression.get_expression().visit(self);
+            return array_member(member_reference_expression.get_identifier()).map_or(VariableType::None, |member| member.return_type);
+        }
+
         let t = match receiver {
             StaticReceiver::Instance(type_id) | StaticReceiver::StaticMember(type_id) => VariableType::UserData(type_id),
             StaticReceiver::NotAType => member_reference_expression.get_expression().visit(self),
@@ -1850,6 +1931,42 @@ impl AstVisitor<VariableType> for SemanticVisitor {
 
         // A member call is decided by the receiver's type, whatever expression produced it.
         if let Expression::MemberReference(member) = call.get_expression() {
+            // An array's members are the built-in array functions written the other way round.
+            if self.names_an_array(member.get_expression())
+                && let Some(array_member) = array_member(member.get_identifier())
+            {
+                for argument in call.get_arguments() {
+                    argument.visit(self);
+                }
+                let given = call.get_arguments().len();
+                if !array_member.arguments.contains(&given) {
+                    self.check_expr_arg_range(*array_member.arguments.start(), *array_member.arguments.end(), given, call.get_expression());
+                    return VariableType::None;
+                }
+                let filled_in = array_member.defaults[given.min(array_member.defaults.len())..].to_vec();
+                for value in &filled_in {
+                    self.add_constant(&Constant::Integer(*value, crate::ast::constant::NumberFormat::Default));
+                }
+                self.function_type_lookup
+                    .insert(call.id, SemanticInfo::ArrayMemberFunc(array_member.opcode, filled_in));
+                return array_member.return_type;
+            }
+
+            if self.names_an_array(member.get_expression())
+                && let Some((_, opcode, arguments)) = array_procedure(member.get_identifier())
+            {
+                for argument in call.get_arguments() {
+                    argument.visit(self);
+                }
+                let given = call.get_arguments().len();
+                if !arguments.contains(&given) {
+                    self.check_expr_arg_range(*arguments.start(), *arguments.end(), given, call.get_expression());
+                    return VariableType::None;
+                }
+                self.function_type_lookup.insert(call.id, SemanticInfo::ArrayMemberProc(*opcode));
+                return VariableType::None;
+            }
+
             let Some(user_type) = self.user_type_lookup.get(&member.get_identifier_token().span.start).copied() else {
                 // Visiting the member reference already reported why it could not be resolved.
                 for argument in call.get_arguments() {

@@ -829,6 +829,36 @@ NEXT
 `ElementAt(array, index)` returns an element of the array. An index no element
 has answers with an empty value of the array's own type rather than failing.
 
+## Array members (4.00)
+
+### Function
+
+Everything built in that takes an array first may also be written as a member of
+that array, whichever reads better at the call site. The two spellings are the
+same call, so neither can drift from the other.
+
+| Member | The same as |
+| :--- | :--- |
+| `a.Len()` | `Len(a, 0)` |
+| `a.Len(dim)` | `Len(a, dim)` |
+| `a.ElementCount()` | `ElementCount(a)` |
+| `a.ElementAt(index)` | `ElementAt(a, index)` |
+| `a.Redim(n)` | `REDIM a, n` |
+| `a.Redim(n1, n2)` | `REDIM a, n1, n2` |
+| `a.Redim(n1, n2, n3)` | `REDIM a, n1, n2, n3` |
+
+```PPL
+INTEGER values(10)
+
+PRINTLN values.Len(), " slots, ", values.ElementCount(), " elements"
+values.Redim(20)
+```
+
+Only a declared array has these members. An array's type is its element's, so it
+is the declaration that says it has them; asking a plain value for `.Len()` is a
+compile error. `Redim` is a statement rather than a function, so it stands on a
+line of its own the way `REDIM` does.
+
 ## `CONST` Declaration (3.50)
 
 ### Function
