@@ -60,11 +60,11 @@ InitShapes()
 InitColors()
 ClearBoard()
 
-music.SetVolume(100)
-rotateSound.SetVolume(100)
-lockSound.SetVolume(100)
-lineSound.SetVolume(100)
-gameOverSound.SetVolume(100)
+music.Volume = 100
+rotateSound.Volume = 100
+lockSound.Volume = 100
+lineSound.Volume = 100
+gameOverSound.Volume = 100
 music.Play(TRUE)
 
 score = 0
@@ -431,7 +431,7 @@ ENDPROC
 
 PROCEDURE DrawSandRect(INTEGER x, INTEGER y, INTEGER width, INTEGER height)
     DrawSandFill(x, y, width, height)
-    game.Rect(x, y, width, height, GB_DARKEST)
+    game.DrawRect(x, y, width, height, GB_DARKEST)
 ENDPROC
 
 ; Each piece type gets its own Game Boy-style fill motif, so pieces stay
@@ -442,7 +442,7 @@ PROCEDURE DrawCell(INTEGER x, INTEGER y, INTEGER kind, INTEGER size)
         RETURN
     ENDIF
     game.FillRect(x, y, size - 1, size - 1, pieceColor[kind])
-    game.Rect(x, y, size - 1, size - 1, GB_DARKEST)
+    game.DrawRect(x, y, size - 1, size - 1, GB_DARKEST)
     IF kind = 1 THEN
         game.FillRect(x + 2, y + 2, size - 5, size - 5, pieceAccent[kind])
         game.FillRect(x + 4, y + 4, size - 9, size - 9, GB_LIGHTEST)
@@ -461,7 +461,7 @@ PROCEDURE DrawCell(INTEGER x, INTEGER y, INTEGER kind, INTEGER size)
         game.FillRect(x + 3, y + 3, size - 7, size - 7, GB_LIGHTEST)
         game.FillRect(x + size / 2 - 1, y + size / 2 - 1, 2, 2, GB_DARKEST)
     ELSE
-        game.Rect(x + 2, y + 2, size - 5, size - 5, pieceAccent[kind])
+        game.DrawRect(x + 2, y + 2, size - 5, size - 5, pieceAccent[kind])
         game.FillRect(x + size / 2 - 1, y + size / 2 - 1, 2, 2, pieceAccent[kind])
     ENDIF
 ENDPROC
@@ -540,7 +540,7 @@ ENDPROC
 PROCEDURE DrawWall(INTEGER wx, INTEGER wy, INTEGER ww, INTEGER wh)
     INTEGER yy, row, offset
     game.FillRect(wx, wy, ww, wh, GB_DARK)
-    game.Rect(wx, wy, ww, wh, GB_DARKEST)
+    game.DrawRect(wx, wy, ww, wh, GB_DARKEST)
     yy = wy
     row = 0
     WHILE yy < wy + wh DO
@@ -555,8 +555,8 @@ ENDPROC
 
 PROCEDURE DrawBox(INTEGER bx, INTEGER by, INTEGER bw, INTEGER bh)
     game.FillRect(bx, by, bw, bh, GB_LIGHTEST)
-    game.Rect(bx, by, bw, bh, GB_DARKEST)
-    game.Rect(bx + 2, by + 2, bw - 4, bh - 4, GB_DARK)
+    game.DrawRect(bx, by, bw, bh, GB_DARKEST)
+    game.DrawRect(bx + 2, by + 2, bw - 4, bh - 4, GB_DARK)
 ENDPROC
 
 PROCEDURE DrawNumber(INTEGER value, INTEGER x, INTEGER y, INTEGER digits)
@@ -620,7 +620,7 @@ PROCEDURE RenderGame()
     DrawWall(6, 20, 10, 248)
     DrawWall(140, 20, 10, 248)
     game.FillRect(BOARD_X, BOARD_Y, BOARD_W * CELL, BOARD_H * CELL, GB_LIGHTEST)
-    game.Rect(BOARD_X - 2, BOARD_Y - 2, BOARD_W * CELL + 4, BOARD_H * CELL + 4, GB_DARKEST)
+    game.DrawRect(BOARD_X - 2, BOARD_Y - 2, BOARD_W * CELL + 4, BOARD_H * CELL + 4, GB_DARKEST)
     y = 0
     WHILE y < BOARD_H DO
         x = 0
@@ -637,8 +637,8 @@ PROCEDURE RenderGame()
     DrawNext()
     IF gameOver THEN
         game.FillRect(20, 120, 116, 36, GB_LIGHTEST)
-        game.Rect(20, 120, 116, 36, GB_DARKEST)
-        game.Rect(22, 122, 112, 32, GB_DARK)
+        game.DrawRect(20, 120, 116, 36, GB_DARKEST)
+        game.DrawRect(22, 122, 112, 32, GB_DARK)
         game.BlitRect(ui, 0, 48, 54, 7, 51, 134)
     ENDIF
     PresentGame()

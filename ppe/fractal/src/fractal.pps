@@ -203,7 +203,7 @@ ENDPROC
 PROCEDURE DrawHud(INTEGER done, INTEGER total)
     INTEGER i, x, w, barW
     hud.Clear(C_HUD)
-    hud.Rect(0, 0, VIEW_W, HUD_H, C_HUD_EDGE)
+    hud.DrawRect(0, 0, VIEW_W, HUD_H, C_HUD_EDGE)
 
     ; The palette itself, so the colouring is part of the picture.
     FOR i = 0 TO PAL_SIZE - 1
@@ -212,7 +212,7 @@ PROCEDURE DrawHud(INTEGER done, INTEGER total)
     NEXT i
 
     barW = VIEW_W - 32
-    hud.Rect(16, 36, barW, 10, C_HUD_EDGE)
+    hud.DrawRect(16, 36, barW, 10, C_HUD_EDGE)
     w = done * (barW - 2) / total
     IF w > 0 hud.FillRect(17, 37, w, 8, C_BAR)
     hud.PresentRect(0, 0, VIEW_W, HUD_H, 0, hudY)

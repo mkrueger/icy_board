@@ -183,7 +183,6 @@ The root groups the session by responsibility:
 | `Palette` | The 16 DOS colours selected by `COLOR` |
 | `Font` | Terminal font selection and uploads |
 | `Macros` | Terminal-resident DEC macro slots |
-| `Sound` | Audio-session controls |
 | `BeginUpdate()`, `EndUpdate()` | Nestable synchronized output |
 
 All operations that can fail update [`ERR()`](#errors). A function returning a
@@ -232,7 +231,7 @@ Surface members are:
 | `Width`, `Height`, `Valid` | Read-only status properties |
 | `Clear(color)` | Fill the whole surface |
 | `SetPixel(x, y, color)`, `GetPixel(x, y)` | Write or read one pixel |
-| `FillRect(x, y, w, h, color)`, `Rect(x, y, w, h, color)` | Draw packed RGBA colours |
+| `FillRect(x, y, w, h, color)`, `DrawRect(x, y, w, h, color)` | Fill or outline a rectangle in packed RGBA |
 | `Blit(source, x, y)`, `BlitRect(source, sx, sy, w, h, x, y)` | Alpha-compose surfaces |
 | `Present()`, `PresentAt(column, row)` | Present the surface |
 | `PresentRect(sx, sy, w, h[, dx, dy[, dw, dh[, flip]]])` | Present a source rectangle |
@@ -254,20 +253,22 @@ and takes an available channel. A cached file is not sent again.
 ```PPL
 AUDIO music = Audio.Load("music.opus")
 IF music.Valid THEN
-    music.SetVolume(50)
+    music.Volume = 50
     music.Play(TRUE)
 ENDIF
 ```
 
 | Member | Purpose |
 | :--- | :--- |
-| `Valid`, `Playing`, `Volume`, `Channel` | Read-only state |
+| `Valid`, `Playing`, `Channel` | Read-only state |
+| `Volume` | Playback volume in percent, writable |
 | `Play([loop])`, `Stop()` | Start or stop playback |
-| `SetVolume(percent)`, `Fade(percent, milliseconds)` | Change volume |
+| `Fade(percent, milliseconds)` | Change volume over time |
 | `Free()` | Give the channel back |
 
 A sound that ends produces `EventKind.Sound` with its channel in `Event.Channel`.
-`Terminal.Sound.StopAll()` flushes every channel the PPE started.
+`Audio.StopAll()` flushes every channel the PPE started, and
+`Terminal.Info.Sound` says whether the terminal can play anything at all.
 
 #### Input and events
 
@@ -286,7 +287,7 @@ event = Terminal.Input.Wait(16)
 IF event.Kind = EventKind.Key THEN
     IF event.Text = "q" EXIT
 ELSEIF event.Kind = EventKind.KeyEdge THEN
-    PRINTLN event.Code, " ", event.Pressed
+    PRINTLN event.ScanCode, " ", event.Pressed
 ELSEIF event.Kind = EventKind.Mouse THEN
     PRINTLN event.Action, " ", event.X, ",", event.Y
 ENDIF
@@ -305,7 +306,8 @@ Terminal.Input.Release()
 | Field | Meaning |
 | :--- | :--- |
 | `Kind` | Event category |
-| `Code` | Unicode/named key code, or physical scan code for `KeyEdge` |
+| `Code` | Unicode or named key code, zero for other kinds |
+| `ScanCode` | Physical key code of a `KeyEdge`, zero for other kinds |
 | `Text` | Translated key text; empty for other kinds |
 | `Pressed`, `Repeated` | Key press/release state |
 | `Action`, `Button` | Typed mouse action and button |
@@ -357,15 +359,15 @@ inactive update reports `ErrCode.Invalid`. Cleanup ends an update left active by
 `Terminal.Macros` manages 64 DEC macro slots numbered 0 through 63:
 
 ```PPL
-Terminal.Macros.Record(0)
+Terminal.Macros.StartRecord(0)
 COLOR @X1F
 PRINT "Reusable heading"
-Terminal.Macros.End()
+Terminal.Macros.StopRecord()
 Terminal.Macros.Play(0)
 Terminal.Macros.Delete(0)
 ```
 
-`Recording` and `Available` are read-only properties. `Clear()` deletes every
+`Recording` and `Available` are read-only properties. `DeleteAll()` deletes every
 slot this PPE defined. Definitions use hex encoding and may contain arbitrary
 ANSI, OSC, DCS, UTF-8 and control bytes. A completed macro may be played while
 another is recorded. Cleanup finishes an open recording, plays it so output is
@@ -380,12 +382,12 @@ Coordinates are 1-based and inclusive.
 Terminal.Margins.SetVertical(5, 18)
 Terminal.Margins.SetHorizontal(18, 63)
 PRINTLN Terminal.Margins.Top, "-", Terminal.Margins.Bottom
-Terminal.Margins.Reset()
+Terminal.Margins.ResetAll()
 ```
 
 `Top`, `Bottom`, `Left`, `Right`, `HasVertical` and `HasHorizontal` report the
 current virtual-screen state. `ResetVertical()` and `ResetHorizontal()` reset one
-axis; `Reset()` restores both. PPE cleanup independently remembers whether the
+axis; `ResetAll()` restores both. PPE cleanup independently remembers whether the
 PPE changed margins, so a caller is restored even if the virtual screen and
 physical terminal disagree.
 
@@ -406,13 +408,13 @@ IF ERR().OK Terminal.Font.SetAll(43)
 
 ```PPL
 Terminal.Palette.Set(1, Rgb(0, 64, 255))
-Terminal.Palette.SetRgb(1, 0, 64, 255)
 Terminal.Palette.Reset(1)
 Terminal.Palette.ResetAll()
 ```
 
-Packed alpha is ignored. Invalid colour numbers or components report
-`ErrCode.Invalid`; sessions without ANSI report `ErrCode.Unavailable`.
+Packed alpha is ignored and `Rgb()` clamps its components, so only an invalid
+colour number reports `ErrCode.Invalid`; sessions without ANSI report
+`ErrCode.Unavailable`.
 
 ### Errors
 

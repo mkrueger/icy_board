@@ -6,15 +6,15 @@ CONST INTEGER PANEL = 1
 BOOLEAN synchronized
 
 ; Upload a small primitive once. Definitions are hex-encoded DECDMAC strings.
-Terminal.Macros.Record(DIVIDER)
+Terminal.Macros.StartRecord(DIVIDER)
 COLOR @X03
 PRINT "+--------------------------------------------------+"
-Terminal.Macros.End()
+Terminal.Macros.StopRecord()
 IF (!ERR().OK) GOTO MacroError
 
 ; A terminal macro can invoke another macro. PANEL stores two DECINVM calls
 ; rather than copying the divider bytes twice.
-Terminal.Macros.Record(PANEL)
+Terminal.Macros.StartRecord(PANEL)
 Terminal.Macros.Play(DIVIDER)
 NextMacroRow()
 COLOR @X0F
@@ -23,7 +23,7 @@ NextMacroRow()
 PRINT "| Playback sends only a short DECINVM sequence.    |"
 NextMacroRow()
 Terminal.Macros.Play(DIVIDER)
-Terminal.Macros.End()
+Terminal.Macros.StopRecord()
 IF (!ERR().OK) GOTO MacroError
 
 CLS
@@ -40,13 +40,13 @@ ENDIF
 COLOR @X07
 ANSIPOS 1, 19
 PRINTLN "Two panels, one uploaded macro."
-Terminal.Macros.Clear()
+Terminal.Macros.DeleteAll()
 EXIT
 
 :MacroError
 COLOR @X07
 PRINTLN "Terminal macros are unavailable: ", ERR().Message
-Terminal.Macros.Clear()
+Terminal.Macros.DeleteAll()
 
 PROCEDURE NextMacroRow()
     PRINT Chr(27) + "[B"

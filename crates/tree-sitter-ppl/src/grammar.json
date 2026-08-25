@@ -1552,18 +1552,6 @@
             "type": "TOKEN",
             "content": {
               "type": "PATTERN",
-              "value": "[sS][oO][uU][nN][dD]"
-            }
-          },
-          "named": false,
-          "value": "SOUND"
-        },
-        {
-          "type": "ALIAS",
-          "content": {
-            "type": "TOKEN",
-            "content": {
-              "type": "PATTERN",
               "value": "[tT][eE][rR][mM][iI][nN][aA][lL]"
             }
           },

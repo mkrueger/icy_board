@@ -97,7 +97,7 @@ WHILE (running) DO
 ENDWHILE
 
 input.Release()
-Terminal.Margins.Reset()
+Terminal.Margins.ResetAll()
 COLOR @X07
 CLS
 PRINTLN "Selected: ", items[selected]

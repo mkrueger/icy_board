@@ -7,7 +7,6 @@ use crate::{
 };
 
 pub static SET: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Set".to_string()));
-pub static SET_RGB: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("SetRgb".to_string()));
 pub static RESET: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Reset".to_string()));
 pub static RESET_ALL: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("ResetAll".to_string()));
 
@@ -26,11 +25,6 @@ impl UserData for PplPalette {
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         registry.add_function(SET.clone(), vec![VariableType::Integer, VariableType::Unsigned], VariableType::Boolean);
-        registry.add_function(
-            SET_RGB.clone(),
-            vec![VariableType::Integer, VariableType::Integer, VariableType::Integer, VariableType::Integer],
-            VariableType::Boolean,
-        );
         registry.add_function(RESET.clone(), vec![VariableType::Integer], VariableType::Boolean);
         registry.add_function(RESET_ALL.clone(), Vec::new(), VariableType::Boolean);
     }
@@ -42,7 +36,7 @@ impl UserDataValue for PplPalette {
         Err(format!("Unknown PALETTE property {name}").into())
     }
 
-    fn set_property_value(&self, _vm: &mut crate::vm::VirtualMachine<'_>, _name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
+    async fn set_property_value(&self, _vm: &mut crate::vm::VirtualMachine<'_>, _name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
         Err("PALETTE properties are read-only".into())
     }
 
@@ -60,10 +54,6 @@ impl UserDataValue for PplPalette {
             return Ok(VariableValue::new_bool(
                 procedures::palette_set(vm, integer(0), PaletteComponents::Packed(packed)).await?,
             ));
-        }
-        if *name == *SET_RGB {
-            let components = PaletteComponents::Separate(integer(1), integer(2), integer(3));
-            return Ok(VariableValue::new_bool(procedures::palette_set(vm, integer(0), components).await?));
         }
         if *name == *RESET {
             return Ok(VariableValue::new_bool(procedures::palette_reset(vm, integer(0)).await?));

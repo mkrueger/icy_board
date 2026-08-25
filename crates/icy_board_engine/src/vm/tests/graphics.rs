@@ -286,7 +286,7 @@ fn creates_blits_and_presents_in_memory_surfaces() {
         SURFACE sprite = Surface.New(2, 2)
         back.Clear(255)
         sprite.Clear(4278190335)
-        sprite.Rect(0, 0, 2, 2, 16711935)
+        sprite.DrawRect(0, 0, 2, 2, 16711935)
         back.Blit(sprite, 1, 1)
         back.Present()
         back.FillRect(2, 2, 1, 1, 16711935)

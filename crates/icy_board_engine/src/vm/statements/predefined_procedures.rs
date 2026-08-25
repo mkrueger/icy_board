@@ -3326,8 +3326,31 @@ pub(crate) async fn audio_load(vm: &mut VirtualMachine<'_>, file_name: &str) -> 
 }
 
 /// Runs one `AUDIO` member. Answers whether it could be carried out.
+/// Sets a channel's volume, over `milliseconds` when that is not zero.
+pub(crate) async fn sound_set_volume(vm: &mut VirtualMachine<'_>, logical_channel: i32, volume: i32, milliseconds: i32) -> Res<bool> {
+    if vm.icy_board_state.ppl_audio_file(logical_channel).is_none() {
+        vm.set_error(PplError::new(ERR_KIND_SOUND, ERR_INVALID, "no sound is loaded").on_channel(logical_channel));
+        return Ok(false);
+    }
+    let Some((logical, channel)) = resolve_sound_channel(logical_channel) else {
+        vm.set_error(PplError::new(ERR_KIND_SOUND, ERR_INVALID, "invalid sound channel").on_channel(logical_channel));
+        return Ok(false);
+    };
+    let volume = volume.clamp(0, 100);
+    let milliseconds = milliseconds.max(0);
+    vm.icy_board_state.sound_volume[logical] = volume;
+    let body = if milliseconds > 0 {
+        format!("Volume;C={channel};V={:.2}dB;T={milliseconds}", snd_volume_db(volume))
+    } else {
+        format!("Volume;C={channel};V={:.2}dB", snd_volume_db(volume))
+    };
+    send_audio_apc(vm, &body).await?;
+    vm.operation_succeeded();
+    Ok(true)
+}
+
 pub(crate) async fn sound_member(vm: &mut VirtualMachine<'_>, logical_channel: i32, name: &unicase::Ascii<String>, arguments: &[VariableValue]) -> Res<bool> {
-    use crate::icy_board::state::ppl_audio::{FADE, FREE, PLAY, SET_VOLUME, STOP};
+    use crate::icy_board::state::ppl_audio::{FADE, FREE, PLAY, STOP};
 
     let Some(file) = vm.icy_board_state.ppl_audio_file(logical_channel).cloned() else {
         vm.set_error(PplError::new(ERR_KIND_SOUND, ERR_INVALID, "no sound is loaded").on_channel(logical_channel));
@@ -3352,18 +3375,8 @@ pub(crate) async fn sound_member(vm: &mut VirtualMachine<'_>, logical_channel: i
         vm.operation_succeeded();
         return Ok(true);
     }
-    if *name == *SET_VOLUME || *name == *FADE {
-        let volume = integer(0).clamp(0, 100);
-        let milliseconds = if *name == *FADE { integer(1).max(0) } else { 0 };
-        vm.icy_board_state.sound_volume[logical] = volume;
-        let body = if milliseconds > 0 {
-            format!("Volume;C={channel};V={:.2}dB;T={milliseconds}", snd_volume_db(volume))
-        } else {
-            format!("Volume;C={channel};V={:.2}dB", snd_volume_db(volume))
-        };
-        send_audio_apc(vm, &body).await?;
-        vm.operation_succeeded();
-        return Ok(true);
+    if *name == *FADE {
+        return sound_set_volume(vm, logical_channel, integer(0), integer(1)).await;
     }
     if *name == *FREE {
         vm.icy_board_state.sound_active[logical] = false;

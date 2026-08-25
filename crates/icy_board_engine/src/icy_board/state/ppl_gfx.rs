@@ -58,7 +58,7 @@ impl UserDataValue for PplGfx {
         Err(format!("Unknown GFX property {name}").into())
     }
 
-    fn set_property_value(&self, vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, val: VariableValue) -> crate::Res<()> {
+    async fn set_property_value(&self, vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, val: VariableValue) -> crate::Res<()> {
         if *name == *PACING {
             crate::vm::statements::predefined_procedures::gfx_set_pacing(vm, val.as_bool());
             return Ok(());

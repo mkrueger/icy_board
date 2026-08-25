@@ -9,7 +9,7 @@ fn graphics_mouse_reports_pixels() {
         input.MouseOn(MouseMode.Pixels)
         e = input.Poll()
         PrintLn e.Kind
-        PrintLn e.Code
+        PrintLn e.Action
         PrintLn e.X
         PrintLn e.Y
         PrintLn e.Pixels

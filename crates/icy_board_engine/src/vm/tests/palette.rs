@@ -27,7 +27,7 @@ fn set_palette_color_accepts_packed_rgb_and_ignores_alpha() {
 
 #[test]
 fn set_palette_color_accepts_rgb_components() {
-    let output = run_ppl("Terminal.Palette.SetRgb(4, 170, 16, 32)");
+    let output = run_ppl("Terminal.Palette.Set(4, Rgb(170, 16, 32))");
 
     assert_eq!(output, "\x1b]4;1;rgb:AA/10/20\x1b\\");
 }
@@ -45,7 +45,7 @@ fn invalid_palette_values_are_not_sent() {
         r#"
         Terminal.Palette.Set(16, Rgb(0, 0, 0))
         PrintLn ERR().Code, " ", ERR().Kind
-        Terminal.Palette.SetRgb(1, -1, 0, 0)
+        Terminal.Palette.Set(-1, Rgb(0, 0, 0))
         PrintLn ERR().Code, " ", ERR().Kind
         Terminal.Palette.Reset(-1)
         PrintLn ERR().Code, " ", ERR().Kind
@@ -53,6 +53,14 @@ fn invalid_palette_values_are_not_sent() {
     );
 
     assert_eq!(output, "2 4\n2 4\n2 4\n");
+}
+
+/// A component cannot be out of range: `Rgb()` clamps before the palette sees it.
+#[test]
+fn out_of_range_components_are_clamped_rather_than_refused() {
+    let output = run_ppl("PrintLn Terminal.Palette.Set(1, Rgb(-1, 300, 0))\nPrintLn ERR().Code");
+
+    assert!(output.ends_with("1\n0\n"), "{output:?}");
 }
 
 #[test]

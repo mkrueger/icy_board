@@ -65,7 +65,7 @@ pub fn user_data_value<T: UserDataValue + 'static>(value: T, type_id: usize) -> 
 #[async_trait(?Send)]
 pub trait UserDataValue: Send + Sync {
     fn get_property_value(&self, vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> Res<VariableValue>;
-    fn set_property_value(&self, vm: &mut crate::vm::VirtualMachine, name: &unicase::Ascii<String>, val: VariableValue) -> crate::Res<()>;
+    async fn set_property_value(&self, vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, val: VariableValue) -> crate::Res<()>;
 
     async fn call_function(
         &self,

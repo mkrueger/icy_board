@@ -46,7 +46,7 @@ fn a_sound_object_carries_its_own_channel() {
         AUDIO music = Audio.Load("tone.wav")
         AUDIO effect = Audio.Load("tone.wav")
         PRINTLN music.Valid, ":", music.Channel, ":", effect.Channel
-        music.SetVolume(70)
+        music.Volume = 70
         music.Play(TRUE)
         PRINTLN music.Playing, ":", music.Volume
         music.Fade(0, 250)

@@ -16,7 +16,7 @@ member_name!(SET_VERTICAL, "SetVertical");
 member_name!(SET_HORIZONTAL, "SetHorizontal");
 member_name!(RESET_VERTICAL, "ResetVertical");
 member_name!(RESET_HORIZONTAL, "ResetHorizontal");
-member_name!(RESET, "Reset");
+member_name!(RESET, "ResetAll");
 member_name!(TOP, "Top");
 member_name!(BOTTOM, "Bottom");
 member_name!(LEFT, "Left");
@@ -84,7 +84,7 @@ impl UserDataValue for PplMargins {
         Err(format!("Unknown MARGINS property {name}").into())
     }
 
-    fn set_property_value(&self, _vm: &mut crate::vm::VirtualMachine<'_>, _name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
+    async fn set_property_value(&self, _vm: &mut crate::vm::VirtualMachine<'_>, _name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
         Err("MARGINS properties are read-only".into())
     }
 

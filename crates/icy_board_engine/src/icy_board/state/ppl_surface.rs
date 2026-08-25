@@ -49,7 +49,7 @@ pub static CLEAR: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyL
 pub static SET_PIXEL: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("SetPixel".to_string()));
 pub static GET_PIXEL: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("GetPixel".to_string()));
 pub static FILL_RECT: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("FillRect".to_string()));
-pub static RECT: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Rect".to_string()));
+pub static RECT: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("DrawRect".to_string()));
 pub static BLIT: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Blit".to_string()));
 pub static BLIT_RECT: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("BlitRect".to_string()));
 pub static PRESENT: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Present".to_string()));
@@ -164,7 +164,7 @@ impl UserDataValue for PplSurface {
         Ok(VariableValue::new_int(-1))
     }
 
-    fn set_property_value(&self, _vm: &mut crate::vm::VirtualMachine<'_>, _name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
+    async fn set_property_value(&self, _vm: &mut crate::vm::VirtualMachine<'_>, _name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
         Ok(())
     }
 

@@ -187,7 +187,7 @@ impl UserDataValue for Door {
         Ok(VariableValue::new_int(-1))
     }
 
-    fn set_property_value(&self, _vm: &mut crate::vm::VirtualMachine, name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
+    async fn set_property_value(&self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
         log::error!("Invalid set field call on Door ({name})");
         Ok(())
     }

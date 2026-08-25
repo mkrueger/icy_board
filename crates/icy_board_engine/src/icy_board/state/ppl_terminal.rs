@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue, user_data_value},
     executable::{VariableType, VariableValue},
-    parser::{FONT_ID, GFX_ID, MACROS_ID, MARGINS_ID, PALETTE_ID, SOUND_ID, TERM_INFO_ID, TERM_INPUT_ID, TERMINAL_ID},
+    parser::{FONT_ID, GFX_ID, MACROS_ID, MARGINS_ID, PALETTE_ID, TERM_INFO_ID, TERM_INPUT_ID, TERMINAL_ID},
 };
 
 pub static INFO: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Info".to_string()));
@@ -13,7 +13,6 @@ pub static MARGINS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::Laz
 pub static PALETTE: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Palette".to_string()));
 pub static FONT: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Font".to_string()));
 pub static MACROS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Macros".to_string()));
-pub static SOUND: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Sound".to_string()));
 pub static BEGIN_UPDATE: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("BeginUpdate".to_string()));
 pub static END_UPDATE: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("EndUpdate".to_string()));
 
@@ -39,7 +38,6 @@ impl UserData for PplTerminal {
         registry.add_property(PALETTE.clone(), VariableType::UserData(PALETTE_ID as u8), false);
         registry.add_property(FONT.clone(), VariableType::UserData(FONT_ID as u8), false);
         registry.add_property(MACROS.clone(), VariableType::UserData(MACROS_ID as u8), false);
-        registry.add_property(SOUND.clone(), VariableType::UserData(SOUND_ID as u8), false);
 
         registry.add_function(BEGIN_UPDATE.clone(), Vec::new(), VariableType::Boolean);
         registry.add_function(END_UPDATE.clone(), Vec::new(), VariableType::Boolean);
@@ -70,13 +68,10 @@ impl UserDataValue for PplTerminal {
         if *name == *MACROS {
             return Ok(super::ppl_macros::PplMacros::value());
         }
-        if *name == *SOUND {
-            return Ok(super::ppl_sound::PplSound::value());
-        }
         Err(format!("Unknown TERMINAL property {name}").into())
     }
 
-    fn set_property_value(&self, _vm: &mut crate::vm::VirtualMachine<'_>, _name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
+    async fn set_property_value(&self, _vm: &mut crate::vm::VirtualMachine<'_>, _name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
         Err("TERMINAL properties are read-only".into())
     }
 

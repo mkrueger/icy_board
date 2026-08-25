@@ -12,7 +12,7 @@ fn margins_report_the_region_they_were_given() {
         PrintLn Terminal.Margins.Top, "-", Terminal.Margins.Bottom
         PrintLn Terminal.Margins.Left, "-", Terminal.Margins.Right
         PrintLn Terminal.Margins.HasVertical, Terminal.Margins.HasHorizontal
-        Terminal.Margins.Reset()
+        Terminal.Margins.ResetAll()
         PrintLn Terminal.Margins.HasVertical, Terminal.Margins.HasHorizontal
         "#,
     );
@@ -110,7 +110,7 @@ fn resetting_both_axes_leaves_nothing_for_cleanup_to_do() {
         r"
         Terminal.Margins.SetVertical(4, 23)
         Terminal.Margins.SetHorizontal(10, 70)
-        Terminal.Margins.Reset()
+        Terminal.Margins.ResetAll()
         ",
     );
 
@@ -122,7 +122,7 @@ fn a_palette_colour_takes_a_packed_value_or_components() {
     let output = run_ppl(
         r"
         PrintLn Terminal.Palette.Set(1, Rgb(0, 64, 255))
-        PrintLn Terminal.Palette.SetRgb(1, 0, 64, 255)
+        PrintLn Terminal.Palette.Set(1, Rgb(0, 64, 255))
         PrintLn Terminal.Palette.Reset(1)
         PrintLn Terminal.Palette.ResetAll()
         ",
@@ -140,7 +140,7 @@ fn a_palette_colour_outside_the_sixteen_is_refused() {
         r"
         PrintLn Terminal.Palette.Set(16, Rgb(0, 0, 0))
         PrintLn ERR().Code
-        PrintLn Terminal.Palette.SetRgb(1, 0, 300, 0)
+        PrintLn Terminal.Palette.Set(-1, Rgb(0, 0, 0))
         PrintLn ERR().Code
         ",
     );

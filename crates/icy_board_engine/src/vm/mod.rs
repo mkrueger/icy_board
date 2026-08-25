@@ -617,7 +617,7 @@ impl VirtualMachine<'_> {
                         return Err(VMError::InvalidMemberArgumentCount(type_id, *id, 1, arguments.len()).into());
                     }
                     let value = self.eval_expr(&arguments[0]).await?;
-                    object.set_property_value(self, name, value)?;
+                    object.set_property_value(self, name, value).await?;
                     return Ok(VariableValue::new_bool(true));
                 }
                 let crate::compiler::user_data::UserDataEntry::Function(name) = member else {
@@ -878,7 +878,7 @@ impl VirtualMachine<'_> {
                         let Some(crate::compiler::user_data::UserDataEntry::Field(name)) = registry.id_table.get(*member_id) else {
                             return Err(VMError::InvalidMemberId(type_id, *member_id).into());
                         };
-                        return object.set_property_value(self, name, value);
+                        return object.set_property_value(self, name, value).await;
                     }
                 }
                 // The base has to be reached as a place, not as the copy eval_expr hands out,

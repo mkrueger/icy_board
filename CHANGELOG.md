@@ -10,6 +10,17 @@ releases.
 
 ### Changed
 
+- Reworked the runtime 4.00 object API after review. Board objects report the
+  `Number` they were fetched under, counts are spelled `DoorCount`, `AreaCount`,
+  `DirectoryCount` and `ConferenceCount`, `GetDir` is `GetDirectory`, and
+  `Session` hands out the current `Area` and `Directory` as objects.
+- Tightened the terminal facade: `Audio.Volume` is writable and replaces
+  `SetVolume`, `Palette.SetRgb` is gone in favour of `Set(n, Rgb(...))`,
+  `Margins.ResetAll()` and `Macros.DeleteAll()` say that they mean all,
+  `Macros.StartRecord`/`StopRecord` replace `Record`/`End`, `Surface.DrawRect`
+  replaces `Rect`, and `Event.ScanCode` splits the physical key out of `Code`.
+- Removed the `Terminal.Sound` slot. `Audio.StopAll()` stops every channel and
+  `Terminal.Info.Sound` reports whether the terminal can play at all.
 - Collapsed the beta PPE runtimes 4.00, 4.01 and 4.02 into a single runtime
   4.00, which now carries the type table, the routine-reference marker and
   `U_CONTACT`. PPEs compiled by an earlier beta must be rebuilt from source;

@@ -42,10 +42,10 @@ pub static VOLUME: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::Lazy
 pub static CHANNEL: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Channel".to_string()));
 pub static PLAY: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Play".to_string()));
 pub static STOP: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Stop".to_string()));
-pub static SET_VOLUME: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("SetVolume".to_string()));
 pub static FADE: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Fade".to_string()));
 pub static FREE: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Free".to_string()));
 pub static LOAD: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Load".to_string()));
+pub static STOP_ALL: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("StopAll".to_string()));
 
 impl UserData for PplAudio {
     const TYPE_NAME: &'static str = "Audio";
@@ -54,17 +54,17 @@ impl UserData for PplAudio {
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         registry.add_property(VALID.clone(), VariableType::Boolean, false);
         registry.add_property(PLAYING.clone(), VariableType::Boolean, false);
-        registry.add_property(VOLUME.clone(), VariableType::Integer, false);
+        registry.add_property(VOLUME.clone(), VariableType::Integer, true);
         registry.add_property(CHANNEL.clone(), VariableType::Integer, false);
 
         // Looping is the only thing a play has to be told, and it may be left out.
         registry.add_function_with(PLAY.clone(), vec![VariableType::Boolean], 0, VariableType::Boolean);
         registry.add_function(STOP.clone(), Vec::new(), VariableType::Boolean);
-        registry.add_function(SET_VOLUME.clone(), vec![VariableType::Integer], VariableType::Boolean);
         registry.add_function(FADE.clone(), vec![VariableType::Integer, VariableType::Integer], VariableType::Boolean);
         registry.add_function(FREE.clone(), Vec::new(), VariableType::Boolean);
 
         registry.add_static_function(LOAD.clone(), vec![VariableType::String], VariableType::UserData(AUDIO_ID as u8));
+        registry.add_static_function(STOP_ALL.clone(), Vec::new(), VariableType::Boolean);
     }
 }
 
@@ -95,8 +95,12 @@ impl UserDataValue for PplAudio {
         Ok(VariableValue::new_int(-1))
     }
 
-    fn set_property_value(&self, _vm: &mut crate::vm::VirtualMachine<'_>, _name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
-        Ok(())
+    async fn set_property_value(&self, vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, val: VariableValue) -> crate::Res<()> {
+        if *name == *VOLUME {
+            crate::vm::statements::predefined_procedures::sound_set_volume(vm, self.channel, val.as_int(), 0).await?;
+            return Ok(());
+        }
+        Err(format!("AUDIO property {name} is read-only").into())
     }
 
     async fn call_function(
@@ -108,6 +112,9 @@ impl UserDataValue for PplAudio {
         if *name == *LOAD {
             let file_name = arguments.first().map(VariableValue::as_string).unwrap_or_default();
             return crate::vm::statements::predefined_procedures::audio_load(vm, &file_name).await;
+        }
+        if *name == *STOP_ALL {
+            return Ok(VariableValue::new_bool(crate::vm::statements::predefined_procedures::sound_stop_all(vm).await?));
         }
         let handled = crate::vm::statements::predefined_procedures::sound_member(vm, self.channel, name, arguments).await?;
         Ok(VariableValue::new_bool(handled))

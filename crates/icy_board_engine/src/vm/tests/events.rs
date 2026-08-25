@@ -123,9 +123,9 @@ fn unified_events_consume_character_key_edge_and_mouse_input() {
         e = input.Poll()
         PRINTLN e.Kind, ":", e.Code, ":", e.Text, ":", e.Pressed
         e = input.Poll()
-        PRINTLN e.Kind, ":", e.Code, ":", e.Text, ":", e.Pressed
+        PRINTLN e.Kind, ":", e.ScanCode, ":", e.Text, ":", e.Pressed
         e = input.Poll()
-        PRINTLN e.Kind, ":", e.Code, ":", e.X, ":", e.Y, ":", e.Button, ":", e.Shift, e.Alt, e.Ctrl, e.Meta, ":", e.Pixels
+        PRINTLN e.Kind, ":", e.Action, ":", e.X, ":", e.Y, ":", e.Button, ":", e.Shift, e.Alt, e.Ctrl, e.Meta, ":", e.Pixels
         e = input.Poll()
         PRINTLN e.Kind, ":", e.Code, ":", e.Text, ":", e.Pressed, ":", e.X, ":", e.Y
 
@@ -146,11 +146,11 @@ fn unified_events_preserve_wire_order_between_sources() {
         input.KeyboardOn()
         input.MouseOn(MouseMode.Text)
         e = input.Poll()
-        PRINTLN e.Kind, ":", e.Code
+        PRINTLN e.Kind, ":", e.Action
         e = input.Poll()
         PRINTLN e.Kind, ":", e.Text
         e = input.Poll()
-        PRINTLN e.Kind, ":", e.Code
+        PRINTLN e.Kind, ":", e.ScanCode
         input.Release()
         "#,
         b"\x1b[<0;3;4Mx\x1b[=31K",

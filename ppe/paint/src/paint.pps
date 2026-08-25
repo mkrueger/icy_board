@@ -174,13 +174,13 @@ PROCEDURE RenderToolbar()
     WHILE i < COLOR_COUNT DO
         x = SWATCH_X + i * SWATCH_STEP
         screen.FillRect(x, SWATCH_Y, SWATCH_SIZE, SWATCH_SIZE, colors[i])
-        screen.Rect(x, SWATCH_Y, SWATCH_SIZE, SWATCH_SIZE, C_INK)
-        IF i = selected screen.Rect(x - 3, SWATCH_Y - 3, SWATCH_SIZE + 6, SWATCH_SIZE + 6, C_CANVAS)
+        screen.DrawRect(x, SWATCH_Y, SWATCH_SIZE, SWATCH_SIZE, C_INK)
+        IF i = selected screen.DrawRect(x - 3, SWATCH_Y - 3, SWATCH_SIZE + 6, SWATCH_SIZE + 6, C_CANVAS)
         i += 1
     ENDWHILE
     ; Brush preview.
     screen.FillRect(432, 25, 36, 28, C_CANVAS)
-    screen.Rect(432, 25, 36, 28, C_FRAME)
+    screen.DrawRect(432, 25, 36, 28, C_FRAME)
     screen.FillRect(450 - brushSize / 2, 39 - brushSize / 2, brushSize, brushSize, colors[selected])
     screen.Present()
 ENDPROC
@@ -213,7 +213,7 @@ ENDPROC
 
 PROCEDURE ClearCanvas()
     screen.FillRect(CANVAS_X, CANVAS_Y, CANVAS_W, CANVAS_H, C_CANVAS)
-    screen.Rect(CANVAS_X, CANVAS_Y, CANVAS_W, CANVAS_H, C_FRAME)
+    screen.DrawRect(CANVAS_X, CANVAS_Y, CANVAS_W, CANVAS_H, C_FRAME)
     screen.Present()
 ENDPROC
 

@@ -50,10 +50,10 @@ fn a_macro_records_output_and_plays_it_back() {
         r#"
         BOOLEAN before, during, after
         before = Terminal.Macros.Recording
-        Terminal.Macros.Record(3)
+        Terminal.Macros.StartRecord(3)
         during = Terminal.Macros.Recording
         PRINT "hi"
-        Terminal.Macros.End()
+        Terminal.Macros.StopRecord()
         after = Terminal.Macros.Recording
         Terminal.Macros.Play(3)
         PrintLn before, during, after
@@ -72,9 +72,9 @@ fn a_macro_records_output_and_plays_it_back() {
 fn a_slot_outside_the_sixty_four_is_refused() {
     let output = run_ppl(
         r"
-        PrintLn Terminal.Macros.Record(64)
+        PrintLn Terminal.Macros.StartRecord(64)
         PrintLn ERR().Code
-        PrintLn Terminal.Macros.Record(-1)
+        PrintLn Terminal.Macros.StartRecord(-1)
         PrintLn ERR().Code
         ",
     );
@@ -88,10 +88,10 @@ fn a_second_recording_is_refused_while_one_is_active() {
         r"
         BOOLEAN second
         ERRCODE code
-        Terminal.Macros.Record(1)
-        second = Terminal.Macros.Record(2)
+        Terminal.Macros.StartRecord(1)
+        second = Terminal.Macros.StartRecord(2)
         code = ERR().Code
-        Terminal.Macros.End()
+        Terminal.Macros.StopRecord()
         PrintLn second, code = ErrCode.Invalid
         ",
     );
@@ -122,7 +122,7 @@ fn macros_are_offered_until_the_terminal_denies_them() {
 fn stopping_every_sound_flushes_the_channels_that_were_playing() {
     let output = run_ppl(
         r"
-        PrintLn Terminal.Sound.StopAll()
+        PrintLn Audio.StopAll()
         ",
     );
 
@@ -132,7 +132,7 @@ fn stopping_every_sound_flushes_the_channels_that_were_playing() {
 /// These belong to the terminal, so they are reached through it rather than named alone.
 #[test]
 fn the_terminal_objects_have_no_value_of_their_own() {
-    for source in ["PRINTLN Macros.Recording", "PRINTLN Sound.Available()"] {
+    for source in ["PRINTLN Macros.Recording", "PRINTLN Margins.Top"] {
         let errors = compile_errors(source);
         assert!(errors.iter().any(|error| error.contains("is a type")), "{source}: {errors:?}");
     }

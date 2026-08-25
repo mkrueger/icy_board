@@ -4,14 +4,14 @@ use super::{compile_errors_with_runtime, run_ppl, run_ppl_with_input};
 fn margin_api_requires_runtime_400() {
     for runtime in [330, 340] {
         let errors = compile_errors_with_runtime(
-            "Terminal.Margins.SetVertical(1, 2)\nTerminal.Margins.SetHorizontal(1, 2)\nTerminal.Margins.Reset()",
+            "Terminal.Margins.SetVertical(1, 2)\nTerminal.Margins.SetHorizontal(1, 2)\nTerminal.Margins.ResetAll()",
             runtime,
         );
         assert!(!errors.is_empty(), "runtime {runtime} unexpectedly accepted member calls");
     }
     assert!(
         compile_errors_with_runtime(
-            "Terminal.Margins.SetVertical(1, 2)\nTerminal.Margins.SetHorizontal(1, 2)\nTerminal.Margins.Reset()",
+            "Terminal.Margins.SetVertical(1, 2)\nTerminal.Margins.SetHorizontal(1, 2)\nTerminal.Margins.ResetAll()",
             400,
         )
         .is_empty()
@@ -26,7 +26,7 @@ fn margin_statements_emit_independent_ansi_regions() {
         Terminal.Margins.SetHorizontal(10, 70)
         Terminal.Margins.ResetVertical()
         Terminal.Margins.ResetHorizontal()
-        Terminal.Margins.Reset()
+        Terminal.Margins.ResetAll()
         "#,
     );
 
@@ -40,7 +40,7 @@ fn margin_statements_are_ignored_without_ansi() {
         GRAFMODE 4
         Terminal.Margins.SetVertical(4, 23)
         Terminal.Margins.SetHorizontal(10, 70)
-        Terminal.Margins.Reset()
+        Terminal.Margins.ResetAll()
         "#,
     );
 

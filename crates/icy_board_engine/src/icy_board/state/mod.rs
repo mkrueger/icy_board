@@ -47,7 +47,6 @@ pub mod ppl_margins;
 pub mod ppl_mouse;
 pub mod ppl_palette;
 pub mod ppl_session;
-pub mod ppl_sound;
 pub mod ppl_surface;
 pub mod ppl_terminal;
 pub mod ppl_terminal_control;

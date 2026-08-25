@@ -2302,10 +2302,6 @@
     "named": false
   },
   {
-    "type": "SOUND",
-    "named": false
-  },
-  {
     "type": "STEP",
     "named": false
   },

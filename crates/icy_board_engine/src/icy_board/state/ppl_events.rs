@@ -30,6 +30,7 @@ pub const KEY_INSERT: i32 = 0x11_0009;
 
 pub static KIND: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Kind".to_string()));
 pub static CODE: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Code".to_string()));
+pub static SCAN_CODE: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("ScanCode".to_string()));
 pub static TEXT: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Text".to_string()));
 pub static PRESSED: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Pressed".to_string()));
 pub static X: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("X".to_string()));
@@ -137,6 +138,7 @@ impl UserData for PplEvent {
 
         registry.add_property(KIND.clone(), VariableType::UserData(EVENT_KIND_ENUM_ID), false);
         registry.add_property(CODE.clone(), VariableType::Integer, false);
+        registry.add_property(SCAN_CODE.clone(), VariableType::Integer, false);
         registry.add_property(TEXT.clone(), VariableType::String, false);
         registry.add_property(PRESSED.clone(), VariableType::Boolean, false);
         registry.add_property(X.clone(), VariableType::Integer, false);
@@ -169,7 +171,14 @@ impl UserDataValue for PplEvent {
             return Ok(VariableValue::new_int(self.event_type));
         }
         if *name == *CODE {
-            return Ok(VariableValue::new_int(self.code));
+            // A translated key and a physical one are different numbering, so each
+            // reports only for its own kind.
+            let code = if self.event_type == EVENT_KEY { self.code } else { 0 };
+            return Ok(VariableValue::new_int(code));
+        }
+        if *name == *SCAN_CODE {
+            let scan_code = if self.event_type == EVENT_KEY_EDGE { self.code } else { 0 };
+            return Ok(VariableValue::new_int(scan_code));
         }
         if *name == *TEXT {
             return Ok(VariableValue::new_string(self.text.clone()));
@@ -239,7 +248,7 @@ impl UserDataValue for PplEvent {
         Err("Invalid EVENT property".into())
     }
 
-    fn set_property_value(&self, _vm: &mut crate::vm::VirtualMachine<'_>, _name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
+    async fn set_property_value(&self, _vm: &mut crate::vm::VirtualMachine<'_>, _name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
         Err("EVENT properties are read-only".into())
     }
 
