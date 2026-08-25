@@ -4,7 +4,7 @@ use super::run_ppl_with_input;
 fn graphics_mouse_reports_pixels() {
     let output = run_ppl_with_input(
         r#"
-        TERMINPUT input = TermInput()
+        TERMINPUT input = Terminal.Input
         EVENT e
         input.MouseOn(1)
         e = input.Poll()
@@ -13,7 +13,7 @@ fn graphics_mouse_reports_pixels() {
         PrintLn e.X
         PrintLn e.Y
         PrintLn e.Pixels
-        input.Free()
+        input.Release()
         "#,
         b"\x1b[?1016;1$y\x1b[<0;101;51M",
     );

@@ -25,21 +25,22 @@ fn retired_global_event_api_is_not_in_source_language() {
     }
 }
 
+/// Input is the terminal's, not a thing to be taken out and handed back, so naming it
+/// twice names the same keyboard both times.
 #[test]
-fn terminal_input_is_a_releasable_singleton() {
-    let output = run_ppl(
-        r#"
-        TERMINPUT first = TermInput()
-        TERMINPUT duplicate = TermInput()
-        PRINTLN first.Valid, duplicate.Valid, ERR().Code
-        first.Free()
-        TERMINPUT replacement = TermInput()
-        PRINTLN first.Valid, replacement.Valid
-        replacement.Free()
-        "#,
+fn terminal_input_is_the_terminals_own() {
+    let output = run_ppl_with_input(
+        r"
+        TERMINPUT first = Terminal.Input
+        TERMINPUT duplicate = Terminal.Input
+        PRINTLN ERR().Code
+        PRINTLN first.Poll().Text, duplicate.Poll().Text
+        first.Release()
+        ",
+        b"ab",
     );
 
-    assert_eq!(output, "102\n01\n");
+    assert_eq!(output, "0\nab\n");
 }
 
 #[test]
@@ -49,7 +50,7 @@ fn terminal_input_polls_translated_keys() {
         TERMINPUT input = TermInput()
         EVENT event = input.Poll()
         PRINTLN event.Kind, ":", event.Text
-        input.Free()
+        input.Release()
         "#,
         b"\x1b[A",
     );
@@ -61,9 +62,9 @@ fn terminal_input_polls_translated_keys() {
 fn freeing_terminal_input_hands_typeahead_to_classic_input() {
     let output = run_ppl_with_input(
         r#"
-        TERMINPUT input = TermInput()
+        TERMINPUT input = Terminal.Input
         EVENT event = input.Poll()
-        input.Free()
+        input.Release()
         STRING name
         INPUT "Name:", name
         PRINTLN "[", name, "]"
@@ -80,7 +81,7 @@ fn classic_input_reads_keys_sent_after_terminal_input_is_freed() {
         r#"
         TERMINPUT input = TermInput()
         EVENT event = input.Wait(-1)
-        input.Free()
+        input.Release()
         STRING name
         INPUT "Name:", name
         PRINTLN "[", name, "]"
@@ -98,7 +99,7 @@ fn timed_event_wait_restores_the_channel_before_classic_input() {
         r#"
         TERMINPUT input = TermInput()
         EVENT event = input.Wait(1)
-        input.Free()
+        input.Release()
         STRING name
         INPUT "Name:", name
         PRINTLN "[", name, "]"
@@ -128,7 +129,7 @@ fn unified_events_consume_character_key_edge_and_mouse_input() {
         e = input.Poll()
         PRINTLN e.Kind, ":", e.Code, ":", e.Text, ":", e.Pressed, ":", e.X, ":", e.Y
 
-        input.Free()
+        input.Release()
         "#,
         b"x\x1b[=30K\x1b[<20;11;6M",
     );
@@ -150,7 +151,7 @@ fn unified_events_preserve_wire_order_between_sources() {
         PRINTLN e.Kind, ":", e.Text
         e = input.Poll()
         PRINTLN e.Kind, ":", e.Code
-        input.Free()
+        input.Release()
         "#,
         b"\x1b[<0;3;4Mx\x1b[=31K",
     );
@@ -199,7 +200,7 @@ fn mouse_events_report_held_buttons_and_wheel_deltas() {
         PRINTLN e.Buttons, ":", e.Button, ":", e.WheelX, ":", e.WheelY
         e = input.Poll()
         PRINTLN e.Buttons
-        input.Free()
+        input.Release()
         "#,
         b"\x1b[<0;1;1M\x1b[<66;1;1M\x1b[<0;1;1m",
     );

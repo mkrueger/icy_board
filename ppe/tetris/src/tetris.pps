@@ -78,7 +78,7 @@ nextType = Random(7)
 SpawnPiece()
 RenderGame()
 KeyFlush
-input = TermInput()
+input = Terminal.Input
 inputEvent = input.Poll()
 nextFrame = inputEvent.Time + FRAME_MS
 
@@ -156,7 +156,7 @@ music.Stop()
 ui.Free()
 game.Free()
 GfxShutdown
-input.Free()
+input.Release()
 CLS
 
 PROCEDURE InitShapes()

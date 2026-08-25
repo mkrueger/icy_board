@@ -138,3 +138,19 @@ fn a_member_that_is_neither_called_nor_assigned_is_reported() {
     let errors = compile_errors("Terminal.Info.Columns");
     assert!(!errors.is_empty(), "a bare member reference is not a statement");
 }
+
+/// Input reaches the same keyboard however it is named, so a PPE need not carry it around.
+#[test]
+fn the_input_object_is_reached_from_the_terminal() {
+    let output = super::run_ppl_with_input(
+        r"
+        PRINTLN Terminal.Input.Poll().Text
+        TERMINPUT input = Terminal.Input
+        PRINTLN input.Poll().Text
+        input.Release()
+        ",
+        b"ab",
+    );
+
+    assert_eq!(output, "a\nb\n");
+}

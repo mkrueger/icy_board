@@ -11,7 +11,7 @@ INTEGER customFonts = { 43, 44, 45, 46 }
 INTEGER page, builtinFont, customIndex
 BOOLEAN running
 EVENT inputEvent
-TERMINPUT input = TermInput()
+TERMINPUT input = Terminal.Input
 
 LoadFont 43, "fonts/c64.psf"
 IF (!ERR().OK) ShowLoadError("C64", ERR().Message)
@@ -66,7 +66,7 @@ WHILE running DO
     ENDIF
 ENDWHILE
 
-input.Free()
+input.Release()
 
 RestoreFonts()
 COLOR @X07

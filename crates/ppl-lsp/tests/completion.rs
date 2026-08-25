@@ -100,13 +100,22 @@ fn runtime_402_objects_offer_their_registered_members() {
         ("ERROR value\nvalue.", &["OK", "Message", "Channel"][..]),
         ("TERMINFO value\nvalue.", &["Program", "Columns", "InlineGraphics"][..]),
         ("TERMSTATE value\nvalue.", &["MarginTop", "MarginLeft", "HorizontalMargins"][..]),
-        ("TERMINPUT value\nvalue.", &["Valid", "Poll", "KeyboardOn", "Free"][..]),
+        ("TERMINPUT value\nvalue.", &["Poll", "Wait", "KeyboardOn", "Release"][..]),
+        ("TERMINAL value\nvalue.", &["Info", "Gfx", "Input"][..]),
+        ("GFX value\nvalue.", &["Init", "Backend", "CellWidth"][..]),
     ] {
         let items = complete(source);
         for member in expected {
             assert!(items.contains(&member.to_string()), "{member} missing for {source:?}: {items:?}");
         }
     }
+}
+
+/// The list is the type's own, so a member another type happens to have is not in it.
+#[test]
+fn an_object_offers_only_its_own_members() {
+    let items = complete("TERMINPUT value\nvalue.");
+    assert_eq!(items, vec!["KeyboardOff", "KeyboardOn", "MouseOff", "MouseOn", "Poll", "Release", "Wait"]);
 }
 
 #[test]

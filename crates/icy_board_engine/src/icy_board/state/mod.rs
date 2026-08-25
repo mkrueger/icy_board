@@ -697,8 +697,6 @@ pub struct IcyBoardState {
     pub ppl_keys: ppl_keys::PplKeyState,
     pub ppl_mouse: ppl_mouse::PplMouseState,
     pub ppl_terminal: ppl_terminal_control::PplTerminalControl,
-    term_input_handle: Option<u64>,
-    next_term_input_handle: u64,
 }
 
 impl IcyBoardState {
@@ -788,8 +786,6 @@ impl IcyBoardState {
             ppl_keys: ppl_keys::PplKeyState::default(),
             ppl_mouse: ppl_mouse::PplMouseState::default(),
             ppl_terminal: ppl_terminal_control::PplTerminalControl::default(),
-            term_input_handle: None,
-            next_term_input_handle: 1,
         }
     }
     async fn update_language(&mut self) {
@@ -1177,9 +1173,7 @@ impl IcyBoardState {
     }
 
     pub(crate) async fn cleanup_ppl_media(&mut self) {
-        if let Some(handle) = self.term_input_handle {
-            let _ = self.release_term_input(handle).await;
-        }
+        let _ = self.release_term_input().await;
         if let Some(recording) = self.ppl_terminal.finish_recording()
             && !recording.overflowed
         {
@@ -1227,24 +1221,7 @@ impl IcyBoardState {
         self.gfx_error = -1;
     }
 
-    pub fn create_term_input_handle(&mut self) -> Option<u64> {
-        if self.term_input_handle.is_some() {
-            return None;
-        }
-        let handle = self.next_term_input_handle;
-        self.next_term_input_handle = self.next_term_input_handle.saturating_add(1).max(1);
-        self.term_input_handle = Some(handle);
-        Some(handle)
-    }
-
-    pub fn term_input_is_valid(&self, handle: u64) -> bool {
-        handle != 0 && self.term_input_handle == Some(handle)
-    }
-
-    async fn release_term_input(&mut self, handle: u64) -> Res<bool> {
-        if !self.term_input_is_valid(handle) {
-            return Ok(false);
-        }
+    pub async fn release_term_input(&mut self) -> Res<bool> {
         if self.ppl_mouse.is_enabled() {
             self.ppl_mouse.disable();
             self.connection.send(ppl_mouse::MOUSE_OFF_SEQUENCE).await?;
@@ -1254,25 +1231,16 @@ impl IcyBoardState {
             self.connection.send(b"\x1b[=2l\x1b[=1l").await?;
         }
         self.ppl_event_keys.clear();
-        self.term_input_handle = None;
         Ok(true)
     }
 
     pub async fn term_input_member(
         &mut self,
-        handle: u64,
         name: &unicase::Ascii<String>,
         arguments: &[crate::executable::VariableValue],
     ) -> Res<crate::executable::VariableValue> {
-        use crate::icy_board::state::ppl_terminal_input::{FREE, KEYBOARD_OFF, KEYBOARD_ON, MOUSE_OFF, MOUSE_ON, POLL, WAIT};
+        use crate::icy_board::state::ppl_terminal_input::{KEYBOARD_OFF, KEYBOARD_ON, MOUSE_OFF, MOUSE_ON, POLL, RELEASE, WAIT};
 
-        if !self.term_input_is_valid(handle) {
-            return Ok(if *name == *POLL || *name == *WAIT {
-                self.empty_ppl_event().value()
-            } else {
-                crate::executable::VariableValue::new_bool(false)
-            });
-        }
         if *name == *POLL {
             return Ok(self.poll_ppl_event().await?.value());
         }
@@ -1312,8 +1280,8 @@ impl IcyBoardState {
             self.connection.send(b"\x1b[=2l\x1b[=1l").await?;
             return Ok(crate::executable::VariableValue::new_bool(true));
         }
-        if *name == *FREE {
-            return Ok(crate::executable::VariableValue::new_bool(self.release_term_input(handle).await?));
+        if *name == *RELEASE {
+            return Ok(crate::executable::VariableValue::new_bool(self.release_term_input().await?));
         }
         Err("Invalid TERMINPUT function".into())
     }

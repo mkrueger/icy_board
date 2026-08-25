@@ -51,7 +51,7 @@ dragging = FALSE
 dirty = FALSE
 RenderToolbar()
 
-input = TermInput()
+input = Terminal.Input
 input.MouseOn(MOUSE_PIXELS, MOUSE_TRACK_ALL)
 tries = 0
 inputEvent = input.Poll()
@@ -61,7 +61,7 @@ WHILE !inputEvent.Pixels & tries < 30 DO
     tries += 1
 ENDWHILE
 IF !inputEvent.Pixels THEN
-    input.Free()
+    input.Release()
     GfxShutdown
     CLS
     PRINTLN "PPE Paint requires pixel mouse reporting (DEC mode 1016)."
@@ -134,7 +134,7 @@ WHILE running DO
     IF inputEvent.Time >= nextFrame nextFrame = inputEvent.Time + FRAME_MS
 ENDWHILE
 
-input.Free()
+input.Release()
 ui.Free()
 screen.Free()
 GfxShutdown

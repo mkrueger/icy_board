@@ -3,11 +3,12 @@ use async_trait::async_trait;
 use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue, user_data_value},
     executable::{VariableType, VariableValue},
-    parser::{GFX_ID, TERM_INFO_ID, TERMINAL_ID},
+    parser::{GFX_ID, TERM_INFO_ID, TERM_INPUT_ID, TERMINAL_ID},
 };
 
 pub static INFO: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Info".to_string()));
 pub static GFX: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Gfx".to_string()));
+pub static INPUT: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Input".to_string()));
 
 /// The caller's terminal, and the way into everything that draws on it.
 #[derive(Clone, Copy, Debug, Default)]
@@ -26,6 +27,7 @@ impl UserData for PplTerminal {
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         registry.add_property(INFO.clone(), VariableType::UserData(TERM_INFO_ID as u8), false);
         registry.add_property(GFX.clone(), VariableType::UserData(GFX_ID as u8), false);
+        registry.add_property(INPUT.clone(), VariableType::UserData(TERM_INPUT_ID as u8), false);
     }
 }
 
@@ -37,6 +39,9 @@ impl UserDataValue for PplTerminal {
         }
         if *name == *GFX {
             return Ok(super::ppl_gfx::PplGfx::value());
+        }
+        if *name == *INPUT {
+            return Ok(super::ppl_terminal_input::PplTerminalInput::value());
         }
         Err(format!("Unknown TERMINAL property {name}").into())
     }

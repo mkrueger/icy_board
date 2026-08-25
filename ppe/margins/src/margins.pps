@@ -40,7 +40,7 @@ DrawFrame()
 SetVMargins VIEW_TOP, VIEW_BOTTOM
 SetHMargins VIEW_LEFT, VIEW_RIGHT
 DrawVisible()
-input = TermInput()
+input = Terminal.Input
 input.MouseOn(MOUSE_TEXT, MOUSE_TRACK_BUTTONS)
 
 WHILE (running) DO
@@ -92,7 +92,7 @@ WHILE (running) DO
     ENDIF
 ENDWHILE
 
-input.Free()
+input.Release()
 ResetMargins
 COLOR @X07
 CLS
