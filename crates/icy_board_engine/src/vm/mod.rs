@@ -37,7 +37,6 @@ pub mod statements;
 use crate::icy_board::state::IcyBoardState;
 use crate::icy_board::user_base::Password;
 use crate::icy_board::user_base::User;
-use crate::icy_board::user_base::UserContact;
 
 use self::expressions::run_function;
 pub use self::statements::*;
@@ -374,20 +373,6 @@ impl VirtualMachine<'_> {
             self.variable_table.set_value(U_EMAIL, VariableValue::new_string(cur_user.email.clone()));
             self.variable_table.set_value(U_WEB, VariableValue::new_string(cur_user.web.clone()));
         }
-        if self.variable_table.has_u_contact() {
-            let mut contacts = cur_user
-                .contacts
-                .iter()
-                .map(|contact| contact_value(&contact.service, &contact.account))
-                .collect::<Vec<_>>();
-            if contacts.is_empty() {
-                contacts.push(contact_value("", ""));
-            }
-            self.variable_table.set_value(
-                U_CONTACT,
-                VariableValue::new_vector(VariableType::UserData(crate::parser::CONTACT_ID as u8), contacts),
-            );
-        }
         Ok(())
     }
 
@@ -463,9 +448,6 @@ impl VirtualMachine<'_> {
             cur_user.birth_date = IcbDate::parse(&self.variable_table.get_value(U_BIRTHDATE).as_string()).to_utc_date_time();
             cur_user.email = self.variable_table.get_value(U_EMAIL).as_string();
             cur_user.web = self.variable_table.get_value(U_WEB).as_string();
-        }
-        if self.variable_table.has_u_contact() {
-            cur_user.contacts = contacts_from_value(self.variable_table.get_value(U_CONTACT));
         }
     }
 
@@ -1384,35 +1366,3 @@ pub const U_GENDER: usize = 26;
 pub const U_BIRTHDATE: usize = 27;
 pub const U_EMAIL: usize = 28;
 pub const U_WEB: usize = 29;
-pub const U_CONTACT: usize = 30;
-
-fn contact_value(service: &str, account: &str) -> VariableValue {
-    let mut value = crate::executable::create_record_value(crate::parser::CONTACT_ID as u8, &[]).unwrap();
-    let GenericVariableData::Record(fields) = &mut value.generic_data else {
-        unreachable!();
-    };
-    fields[0] = VariableValue::new_string(service.to_string());
-    fields[1] = VariableValue::new_string(account.to_string());
-    value
-}
-
-fn contacts_from_value(value: &VariableValue) -> Vec<UserContact> {
-    let GenericVariableData::Dim1(values) = &value.generic_data else {
-        return Vec::new();
-    };
-    values
-        .iter()
-        .filter_map(|value| {
-            let GenericVariableData::Record(fields) = &value.generic_data else {
-                return None;
-            };
-            let service = fields.first()?.as_string().trim().to_ascii_lowercase();
-            let account = fields.get(1)?.as_string().trim().to_string();
-            if service.is_empty() || account.is_empty() {
-                None
-            } else {
-                Some(UserContact { service, account })
-            }
-        })
-        .collect()
-}

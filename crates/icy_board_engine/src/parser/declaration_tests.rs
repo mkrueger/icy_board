@@ -208,6 +208,7 @@ fn board_object_type_ids_are_frozen() {
         ("MACROS", 47),
         ("BOARD", 49),
         ("SESSION", 50),
+        ("USER", 51),
     ];
 
     for (name, id) in expected {

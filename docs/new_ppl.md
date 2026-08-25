@@ -26,7 +26,7 @@ format, so 4.00 is what a PPE targets whenever it uses anything below.
 | Overloaded built-ins | 400 | 400 | Argument-count overloads such as `Len(array, dim)` |
 | Web requests | 400 | 400 | String-returning function and file-writing statement forms |
 | UTF-8 encoding and digest functions | 400 | 400 | `BASE64ENC`, `BASE64DEC` and `SHA256` |
-| Extensible user contacts | 400 | 400 | Mutable `CONTACT` records in `U_CONTACT` |
+| Extensible user contacts | 400 | 400 | `CONTACT` records on `Session.User` |
 | User-defined records | 400 | 400 | `TYPE ... ENDTYPE`, nested fields, arrays of records and nominal type checking |
 | Named record literals | 400 | 400 | `Point { X = 1, Y = 2 }` with checked and optional fields |
 | Terminal multimedia | 400 | 400 | Sixel/JXL graphics, SyncTERM audio, mouse and physical key events |
@@ -505,7 +505,6 @@ adds:
 - a type table for `TYPE ... ENDTYPE` layouts
 - a routine-reference marker for functions and procedures passed as values
 - a record-literal opcode carrying type and field identifiers
-- `U_CONTACT` at the end of the predefined user-variable prefix
 
 A language 350 source needs runtime 400 when it passes routines; all its other
 additions can lower to an older compatible runtime.
@@ -608,6 +607,7 @@ kept in a variable still answers with what the session became:
 | Member | Type | Description |
 | :--- | :--- | :--- |
 | `Conference` | `CONFERENCE` | The conference the caller is in |
+| `User` | `USER` | The caller's own record |
 | `Area`, `Directory` | `AREA`, `DIRECTORY` | The message area and file directory in use |
 | `ConferenceNumber`, `AreaNumber`, `DirectoryNumber` | `INTEGER` | Their numbers |
 | `UserName`, `AliasName` | `STRING` | Who is calling |
@@ -626,37 +626,56 @@ PRINTLN "In ", Session.Conference.Name, " on ", Board.Name
 Both are read-only. The classic `CURCONF()`, `PCBNODE()`, `MINLEFT()` and the
 `U_*` variables keep working unchanged.
 
-## User contacts (4.00)
+## The caller (4.00)
 
-`U_CONTACT` is a mutable array of built-in `CONTACT` records and requires
-runtime 4.00 because it extends the predefined user-variable prefix. Each record has
-two `STRING` fields: `Service` and `Account`. Service names are open strings,
-so a PPE can store new services without a language or user-schema change.
-
-`GETUSER` fills the array and `PUTUSER` writes it back. On write, service names
-are trimmed and converted to lowercase; entries with a blank service or account
-are discarded. Duplicate services are allowed. Because PPL arrays use inclusive
-upper bounds, an empty contact list is represented by one blank element at
-index zero.
-
-`U_EMAIL` and `U_WEB` remain separate predefined variables for PCBoard 3.40
-compatibility and are not duplicated in `U_CONTACT`.
+`Session.User` is the caller's own record, read live. It gathers what the `U_*`
+variables report, so a 4.00 PPE does not have to remember which predefined name
+holds which detail:
 
 ```PPL
-GETUSER
+PRINTLN Session.User.Name, " from ", Session.User.City
+PRINTLN Session.User.SecurityLevel, " until ", Session.User.ExpirationDate
+```
 
+| Group | Members |
+| :--- | :--- |
+| Identity | `Name`, `Alias`, `VerifyAnswer` |
+| Address | `Street1`, `Street2`, `City`, `State`, `Zip`, `Country` |
+| Reaching them | `BusinessPhone`, `HomePhone`, `Email`, `Web`, `Gender`, `BirthDate` |
+| Sysop text | `Comment`, `SysopComment`, `NoteCount`, `GetNote(index)` |
+| Preferences | `ExpertMode`, `FullScreenEditor`, `AskForEditor`, `ClearScreen`, `ScrollMessageBody`, `ShortDescriptions`, `LongHeader`, `WideEditor`, `UseGraphics`, `UseAlias`, `PageLength`, `Protocol`, `Language`, `DateFormat` |
+| Security | `SecurityLevel`, `ExpiredSecurityLevel`, `ExpirationDate` |
+| Statistics | `TimesOn`, `FirstDateOn`, `LastDateOn`, `LastDirRead`, `MessagesRead`, `MessagesLeft`, `Uploads`, `Downloads`, `UploadBytes`, `DownloadBytes`, `DownloadBytesToday`, `MinutesToday` |
+| Contacts | `ContactCount`, `GetContact(index)`, `SetContact(service, account)`, `DeleteContact(service)` |
+
+Everything except the contact functions is read-only. Nobody logged in reads as
+an empty user rather than failing, so a member is always safe to read.
+
+### Contacts
+
+A contact is a built-in `CONTACT` record with two `STRING` fields, `Service` and
+`Account`. Service names are open strings, so a PPE can store a new service
+without a language or user-schema change.
+
+```PPL
 INTEGER i
-FOR i = 0 TO LEN(U_CONTACT, 1)
-	IF U_CONTACT[i].Service <> "" THEN
-		PRINTLN U_CONTACT[i].Service, ": ", U_CONTACT[i].Account
-	ENDIF
+FOR i = 0 TO Session.User.ContactCount - 1
+	CONTACT entry = Session.User.GetContact(i)
+	PRINTLN entry.Service, ": ", entry.Account
 NEXT
 
-REDIM U_CONTACT(LEN(U_CONTACT, 1) + 1)
-U_CONTACT[LEN(U_CONTACT, 1)].Service = "matrix"
-U_CONTACT[LEN(U_CONTACT, 1)].Account = "@sysop:example.org"
-PUTUSER
+Session.User.SetContact("matrix", "@sysop:example.org")
 ```
+
+`SetContact()` replaces the account when the service is already there and adds it
+otherwise, so there can never be two entries meaning the same service. Service
+names are trimmed and compared without regard to case; a blank service or account
+is refused and answers `FALSE`. `DeleteContact()` answers whether it removed
+anything. An index no contact has answers with an empty `CONTACT`.
+
+Both write straight through to the caller, so no `GETUSER`/`PUTUSER` round trip
+is needed. `U_EMAIL` and `U_WEB` remain separate predefined variables for
+PCBoard 3.40 compatibility and are not duplicated here.
 
 ## Encoding and digest functions (4.00)
 

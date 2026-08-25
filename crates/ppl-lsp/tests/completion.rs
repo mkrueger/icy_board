@@ -109,7 +109,8 @@ fn runtime_402_objects_offer_their_registered_members() {
             "BOARD value\nvalue.",
             &["Name", "SysopName", "NodeCount", "ConferenceCount", "GetConference"][..],
         ),
-        ("SESSION value\nvalue.", &["Conference", "Area", "Directory", "Node", "MinutesLeft"][..]),
+        ("SESSION value\nvalue.", &["Conference", "Area", "Directory", "User", "Node", "MinutesLeft"][..]),
+        ("USER value\nvalue.", &["Name", "Alias", "SecurityLevel", "ContactCount", "SetContact"][..]),
     ] {
         let items = complete(source);
         for member in expected {

@@ -10,6 +10,13 @@ releases.
 
 ### Changed
 
+- Added `Session.User`, the caller's own record: identity, address, preferences,
+  security, statistics and contacts in one object. It gathers what the `U_*`
+  variables report, which stay unchanged for PCBoard compatibility.
+- Retired `U_CONTACT`. Contacts are reached through `Session.User` with
+  `ContactCount`, `GetContact()`, `SetContact()` and `DeleteContact()`, and no
+  longer need a `GETUSER`/`PUTUSER` round trip. Runtime 4.00 therefore adds no
+  predefined user variable of its own.
 - Replaced the `ERR()` function and the `ERRCLR` statement with static members
   on the `ERROR` type: `Error.Last()` and `Error.Clear()`. Every 4.00 concept is
   now reached through an object; `ON ERROR` stays a statement because it is

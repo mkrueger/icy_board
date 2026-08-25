@@ -339,7 +339,7 @@ See the language reference for the full rules.
 A PPE built at runtime 400 will not load on an original PCBoard.
 
 Runtime 400 is the IcyBoard-only format. It carries the type table custom types
-need, the routine-reference marker and the `U_CONTACT` variable slot.
+need, the routine-reference marker and the record-literal opcode.
 
 #### Parentheses, brackets and braces
 

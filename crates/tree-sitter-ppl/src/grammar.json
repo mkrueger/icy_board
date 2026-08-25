@@ -1564,6 +1564,18 @@
             "type": "TOKEN",
             "content": {
               "type": "PATTERN",
+              "value": "[uU][sS][eE][rR]"
+            }
+          },
+          "named": false,
+          "value": "USER"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
               "value": "[tT][eE][rR][mM][iI][nN][fF][oO]"
             }
           },

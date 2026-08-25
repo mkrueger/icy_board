@@ -2362,6 +2362,10 @@
     "named": false
   },
   {
+    "type": "USER",
+    "named": false
+  },
+  {
     "type": "UWORD",
     "named": false
   },

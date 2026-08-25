@@ -4,7 +4,7 @@ use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue, user_data_value},
     executable::{VariableType, VariableValue},
     icy_board::{file_directory::FileDirectory, message_area::MessageArea},
-    parser::{CONFERENCE_ID, FILE_DIRECTORY_ID, MESSAGE_AREA_ID, SESSION_ID},
+    parser::{CONFERENCE_ID, FILE_DIRECTORY_ID, MESSAGE_AREA_ID, SESSION_ID, USER_ID},
 };
 
 macro_rules! member_name {
@@ -14,6 +14,7 @@ macro_rules! member_name {
 }
 
 member_name!(CONFERENCE, "Conference");
+member_name!(USER, "User");
 member_name!(CONFERENCE_NUMBER, "ConferenceNumber");
 member_name!(AREA, "Area");
 member_name!(AREA_NUMBER, "AreaNumber");
@@ -46,6 +47,7 @@ impl UserData for PplSession {
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         registry.add_property(CONFERENCE.clone(), VariableType::UserData(CONFERENCE_ID as u8), false);
+        registry.add_property(USER.clone(), VariableType::UserData(USER_ID as u8), false);
         registry.add_property(AREA.clone(), VariableType::UserData(MESSAGE_AREA_ID as u8), false);
         registry.add_property(DIRECTORY.clone(), VariableType::UserData(FILE_DIRECTORY_ID as u8), false);
         for name in [&*USER_NAME, &*ALIAS_NAME, &*LANGUAGE] {
@@ -76,6 +78,8 @@ impl UserDataValue for PplSession {
             let mut conference = session.current_conference.clone();
             conference.number = session.current_conference_number as usize;
             user_data_value(conference, CONFERENCE_ID)
+        } else if *name == *USER {
+            super::ppl_user::PplUser::value()
         } else if *name == *AREA {
             let area = session
                 .current_conference

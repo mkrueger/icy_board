@@ -1,7 +1,4 @@
-use icy_board_engine::{
-    executable::{SUPPORTED_PPE_VERSIONS, USER_VARIABLES, VariableType},
-    parser::CONTACT_ID,
-};
+use icy_board_engine::executable::{SUPPORTED_PPE_VERSIONS, USER_VARIABLES, VariableType};
 
 #[test]
 fn released_user_variable_layouts_are_frozen() {
@@ -35,7 +32,6 @@ fn released_user_variable_layouts_are_frozen() {
         ("U_BIRTHDATE", 340, VariableType::String, 0, 0),
         ("U_EMAIL", 340, VariableType::String, 0, 0),
         ("U_WEB", 340, VariableType::String, 0, 0),
-        ("U_CONTACT", 400, VariableType::UserData(CONTACT_ID as u8), 1, 0),
     ];
     let actual: Vec<_> = USER_VARIABLES
         .iter()
@@ -58,7 +54,8 @@ fn released_user_variable_layouts_are_frozen() {
 
 #[test]
 fn released_runtimes_keep_their_user_variable_prefix_lengths() {
-    let expected = [(100, 23), (200, 23), (300, 24), (310, 24), (320, 24), (330, 24), (340, 29), (400, 30)];
+    // 4.00 adds no predefined variable of its own; the user is reached as an object.
+    let expected = [(100, 23), (200, 23), (300, 24), (310, 24), (320, 24), (330, 24), (340, 29), (400, 29)];
     let actual: Vec<_> = SUPPORTED_PPE_VERSIONS
         .iter()
         .map(|runtime| {

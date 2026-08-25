@@ -295,6 +295,7 @@ pub const MACROS_ID: usize = 47;
 /// 48 was `Sound`; audio is reached through the `Audio` type.
 pub const BOARD_ID: usize = 49;
 pub const SESSION_ID: usize = 50;
+pub const USER_ID: usize = 51;
 
 /// Builtin enums take the top of the id space and a program's own enums grow down from
 /// below them, so the order here is what a PPE stores and may only be appended to.
@@ -360,6 +361,7 @@ impl UserTypeRegistry {
         reg.register::<crate::icy_board::state::ppl_macros::PplMacros>(MACROS_ID);
         reg.register::<crate::icy_board::state::ppl_board::PplBoard>(BOARD_ID);
         reg.register::<crate::icy_board::state::ppl_session::PplSession>(SESSION_ID);
+        reg.register::<crate::icy_board::state::ppl_user::PplUser>(USER_ID);
 
         reg
     }
