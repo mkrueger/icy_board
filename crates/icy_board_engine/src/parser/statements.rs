@@ -805,9 +805,10 @@ impl Parser<'_> {
                 let id_token = self.save_spanned_token();
                 self.next_token();
 
-                // A type name carries on into a member, so only a name on its own declares.
+                // A declaration is a type followed by the name it declares. Anything else
+                // that starts with a type's name is a variable that happens to share it.
                 if let Some(var_type) = var_type
-                    && self.get_cur_token() != Some(Token::Dot)
+                    && matches!(self.get_cur_token(), Some(Token::Identifier(_)))
                 {
                     let mut vars = Vec::new();
                     if let Some(v) = self.parse_var_info(false) {

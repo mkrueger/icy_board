@@ -289,6 +289,9 @@ pub const TERM_INFO_ID: usize = 40;
 pub const TERM_INPUT_ID: usize = 41;
 pub const TERMINAL_ID: usize = 42;
 pub const GFX_ID: usize = 43;
+pub const MARGINS_ID: usize = 44;
+pub const PALETTE_ID: usize = 45;
+pub const FONT_ID: usize = 46;
 
 /// The board objects are ours, so no `PCBoard` language knows their names.
 pub const FIRST_BOARD_OBJECT_LANGUAGE_VERSION: u16 = 400;
@@ -332,6 +335,9 @@ impl UserTypeRegistry {
         reg.register::<crate::icy_board::state::ppl_terminal_input::PplTerminalInput>(TERM_INPUT_ID);
         reg.register::<crate::icy_board::state::ppl_terminal::PplTerminal>(TERMINAL_ID);
         reg.register::<crate::icy_board::state::ppl_gfx::PplGfx>(GFX_ID);
+        reg.register::<crate::icy_board::state::ppl_margins::PplMargins>(MARGINS_ID);
+        reg.register::<crate::icy_board::state::ppl_palette::PplPalette>(PALETTE_ID);
+        reg.register::<crate::icy_board::state::ppl_font::PplFont>(FONT_ID);
 
         reg
     }

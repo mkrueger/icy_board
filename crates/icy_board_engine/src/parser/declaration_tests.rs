@@ -203,6 +203,9 @@ fn board_object_type_ids_are_frozen() {
         ("TERMINPUT", 41),
         ("TERMINAL", 42),
         ("GFX", 43),
+        ("MARGINS", 44),
+        ("PALETTE", 45),
+        ("FONT", 46),
     ];
 
     for (name, id) in expected {

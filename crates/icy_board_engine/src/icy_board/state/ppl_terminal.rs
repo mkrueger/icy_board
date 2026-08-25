@@ -3,12 +3,15 @@ use async_trait::async_trait;
 use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue, user_data_value},
     executable::{VariableType, VariableValue},
-    parser::{GFX_ID, TERM_INFO_ID, TERM_INPUT_ID, TERMINAL_ID},
+    parser::{FONT_ID, GFX_ID, MARGINS_ID, PALETTE_ID, TERM_INFO_ID, TERM_INPUT_ID, TERMINAL_ID},
 };
 
 pub static INFO: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Info".to_string()));
 pub static GFX: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Gfx".to_string()));
 pub static INPUT: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Input".to_string()));
+pub static MARGINS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Margins".to_string()));
+pub static PALETTE: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Palette".to_string()));
+pub static FONT: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Font".to_string()));
 
 /// The caller's terminal, and the way into everything that draws on it.
 #[derive(Clone, Copy, Debug, Default)]
@@ -28,6 +31,9 @@ impl UserData for PplTerminal {
         registry.add_property(INFO.clone(), VariableType::UserData(TERM_INFO_ID as u8), false);
         registry.add_property(GFX.clone(), VariableType::UserData(GFX_ID as u8), false);
         registry.add_property(INPUT.clone(), VariableType::UserData(TERM_INPUT_ID as u8), false);
+        registry.add_property(MARGINS.clone(), VariableType::UserData(MARGINS_ID as u8), false);
+        registry.add_property(PALETTE.clone(), VariableType::UserData(PALETTE_ID as u8), false);
+        registry.add_property(FONT.clone(), VariableType::UserData(FONT_ID as u8), false);
     }
 }
 
@@ -42,6 +48,15 @@ impl UserDataValue for PplTerminal {
         }
         if *name == *INPUT {
             return Ok(super::ppl_terminal_input::PplTerminalInput::value());
+        }
+        if *name == *MARGINS {
+            return Ok(super::ppl_margins::PplMargins::value());
+        }
+        if *name == *PALETTE {
+            return Ok(super::ppl_palette::PplPalette::value());
+        }
+        if *name == *FONT {
+            return Ok(super::ppl_font::PplFont::value());
         }
         Err(format!("Unknown TERMINAL property {name}").into())
     }

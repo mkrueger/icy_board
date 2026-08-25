@@ -2134,6 +2134,10 @@
     "named": false
   },
   {
+    "type": "FONT",
+    "named": false
+  },
+  {
     "type": "FOR",
     "named": false
   },
@@ -2178,6 +2182,10 @@
     "named": false
   },
   {
+    "type": "MARGINS",
+    "named": false
+  },
+  {
     "type": "MONEY",
     "named": false
   },
@@ -2199,6 +2207,10 @@
   },
   {
     "type": "ONERROR",
+    "named": false
+  },
+  {
+    "type": "PALETTE",
     "named": false
   },
   {

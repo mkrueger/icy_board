@@ -994,23 +994,35 @@ async fn write_vt_sequence(vm: &mut VirtualMachine<'_>, sequence: &str) -> Res<(
 pub async fn set_v_margins(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let top = vm.eval_expr(&args[0]).await?.as_int();
     let bottom = vm.eval_expr(&args[1]).await?.as_int();
+    margins_set_vertical(vm, top, bottom).await?;
+    Ok(())
+}
+
+pub(crate) async fn margins_set_vertical(vm: &mut VirtualMachine<'_>, top: i32, bottom: i32) -> Res<bool> {
     // A terminal ignores an empty or out of range region; sending it would only risk a
-    // malformed sequence, so the statement stops here instead.
+    // malformed sequence, so it stops here instead.
     if top < 1 || bottom <= top {
-        log::warn!("SETVMARGINS ignored: invalid region {top};{bottom}");
-        return Ok(());
+        log::warn!("vertical margins ignored: invalid region {top};{bottom}");
+        return Ok(false);
     }
-    write_vt_sequence(vm, &format!("\x1B[{top};{bottom}r")).await
+    write_vt_sequence(vm, &format!("\x1B[{top};{bottom}r")).await?;
+    Ok(true)
 }
 
 pub async fn set_h_margins(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let left = vm.eval_expr(&args[0]).await?.as_int();
     let right = vm.eval_expr(&args[1]).await?.as_int();
+    margins_set_horizontal(vm, left, right).await?;
+    Ok(())
+}
+
+pub(crate) async fn margins_set_horizontal(vm: &mut VirtualMachine<'_>, left: i32, right: i32) -> Res<bool> {
     if left < 1 || right <= left {
-        log::warn!("SETHMARGINS ignored: invalid region {left};{right}");
-        return Ok(());
+        log::warn!("horizontal margins ignored: invalid region {left};{right}");
+        return Ok(false);
     }
-    write_vt_sequence(vm, &format!("\x1B[?69h\x1B[{left};{right}s")).await
+    write_vt_sequence(vm, &format!("\x1B[?69h\x1B[{left};{right}s")).await?;
+    Ok(true)
 }
 
 pub async fn reset_v_margins(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
@@ -1029,61 +1041,88 @@ const DOS_TO_ANSI_PALETTE: [u8; 16] = [0, 4, 2, 6, 1, 5, 3, 7, 8, 12, 10, 14, 9,
 
 pub async fn set_palette_color(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let color = vm.eval_expr(&args[0]).await?.as_int();
-    if !(0..16).contains(&color) {
-        vm.set_error(PplError::new(ERR_KIND_GFX, ERR_INVALID, format!("invalid palette color {color}")));
-        return Ok(());
-    }
-    if !supports_vt_sequences(vm) {
-        vm.set_error(PplError::new(ERR_KIND_GFX, ERR_UNAVAILABLE, "the terminal has no palette support"));
-        return Ok(());
-    }
-
-    let (red, green, blue) = if args.len() == 2 {
+    let components = if args.len() == 2 {
         let rgba = vm.eval_expr(&args[1]).await?.as_unsigned() as u32;
-        ((rgba >> 24) as u8, (rgba >> 16) as u8, (rgba >> 8) as u8)
+        PaletteComponents::Packed(rgba)
     } else {
         let red = vm.eval_expr(&args[1]).await?.as_int();
         let green = vm.eval_expr(&args[2]).await?.as_int();
         let blue = vm.eval_expr(&args[3]).await?.as_int();
-        if !(0..=255).contains(&red) || !(0..=255).contains(&green) || !(0..=255).contains(&blue) {
-            vm.set_error(PplError::new(ERR_KIND_GFX, ERR_INVALID, "palette RGB components must be between 0 and 255"));
-            return Ok(());
+        PaletteComponents::Separate(red, green, blue)
+    };
+    palette_set(vm, color, components).await?;
+    Ok(())
+}
+
+/// How a palette colour was written down. The alpha of a packed value is ignored.
+pub(crate) enum PaletteComponents {
+    Packed(u32),
+    Separate(i32, i32, i32),
+}
+
+pub(crate) async fn palette_set(vm: &mut VirtualMachine<'_>, color: i32, components: PaletteComponents) -> Res<bool> {
+    if !(0..16).contains(&color) {
+        vm.set_error(PplError::new(ERR_KIND_GFX, ERR_INVALID, format!("invalid palette color {color}")));
+        return Ok(false);
+    }
+    if !supports_vt_sequences(vm) {
+        vm.set_error(PplError::new(ERR_KIND_GFX, ERR_UNAVAILABLE, "the terminal has no palette support"));
+        return Ok(false);
+    }
+
+    let (red, green, blue) = match components {
+        PaletteComponents::Packed(rgba) => ((rgba >> 24) as u8, (rgba >> 16) as u8, (rgba >> 8) as u8),
+        PaletteComponents::Separate(red, green, blue) => {
+            if !(0..=255).contains(&red) || !(0..=255).contains(&green) || !(0..=255).contains(&blue) {
+                vm.set_error(PplError::new(ERR_KIND_GFX, ERR_INVALID, "palette RGB components must be between 0 and 255"));
+                return Ok(false);
+            }
+            (red as u8, green as u8, blue as u8)
         }
-        (red as u8, green as u8, blue as u8)
     };
 
     let index = DOS_TO_ANSI_PALETTE[color as usize];
     write_vt_sequence(vm, &format!("\x1B]4;{index};rgb:{red:02X}/{green:02X}/{blue:02X}\x1B\\")).await?;
     vm.operation_succeeded();
-    Ok(())
+    Ok(true)
 }
 
 pub async fn reset_palette_color(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let color = vm.eval_expr(&args[0]).await?.as_int();
+    palette_reset(vm, color).await?;
+    Ok(())
+}
+
+pub(crate) async fn palette_reset(vm: &mut VirtualMachine<'_>, color: i32) -> Res<bool> {
     if !(0..16).contains(&color) {
         vm.set_error(PplError::new(ERR_KIND_GFX, ERR_INVALID, format!("invalid palette color {color}")));
-        return Ok(());
+        return Ok(false);
     }
     if !supports_vt_sequences(vm) {
         vm.set_error(PplError::new(ERR_KIND_GFX, ERR_UNAVAILABLE, "the terminal has no palette support"));
-        return Ok(());
+        return Ok(false);
     }
 
     let index = DOS_TO_ANSI_PALETTE[color as usize];
     write_vt_sequence(vm, &format!("\x1B]104;{index}\x1B\\")).await?;
     vm.operation_succeeded();
-    Ok(())
+    Ok(true)
 }
 
 pub async fn reset_palette(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
+    palette_reset_all(vm).await?;
+    Ok(())
+}
+
+pub(crate) async fn palette_reset_all(vm: &mut VirtualMachine<'_>) -> Res<bool> {
     if !supports_vt_sequences(vm) {
         vm.set_error(PplError::new(ERR_KIND_GFX, ERR_UNAVAILABLE, "the terminal has no palette support"));
-        return Ok(());
+        return Ok(false);
     }
 
     write_vt_sequence(vm, "\x1B]104\x1B\\").await?;
     vm.operation_succeeded();
-    Ok(())
+    Ok(true)
 }
 
 pub async fn begin_terminal_update(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
@@ -1233,36 +1272,45 @@ pub async fn errclr(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
 pub async fn set_font(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let slot = vm.eval_expr(&args[0]).await?.as_int();
     let font = vm.eval_expr(&args[1]).await?.as_int();
+    font_set(vm, slot, font).await?;
+    Ok(())
+}
+
+pub(crate) async fn font_set(vm: &mut VirtualMachine<'_>, slot: i32, font: i32) -> Res<bool> {
     let slot_valid = slot == FONT_ALL_SLOTS || (0..FONT_SLOT_COUNT).contains(&slot);
     if !slot_valid || !(0..=LAST_FONT).contains(&font) {
-        log::warn!("SETFONT ignored: invalid slot {slot} / font {font}");
+        log::warn!("font selection ignored: invalid slot {slot} / font {font}");
         vm.set_error(PplError::new(ERR_KIND_FONT, ERR_INVALID, format!("invalid font slot {slot} or font {font}")));
-        return Ok(());
+        return Ok(false);
     }
     if !supports_vt_sequences(vm) {
         vm.set_error(PplError::new(ERR_KIND_FONT, ERR_UNAVAILABLE, "the terminal has no fonts"));
-        return Ok(());
+        return Ok(false);
     }
     let (first_slot, last_slot) = if slot == FONT_ALL_SLOTS { (0, FONT_SLOT_COUNT - 1) } else { (slot, slot) };
     for slot in first_slot..=last_slot {
         write_vt_sequence(vm, &format!("\x1B[{slot};{font} D")).await?;
     }
     vm.operation_succeeded();
-    Ok(())
+    Ok(true)
 }
 
 pub async fn load_font(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let font = vm.eval_expr(&args[0]).await?.as_int();
     let file_name = vm.eval_expr(&args[1]).await?.as_string();
+    font_load(vm, font, &file_name).await?;
+    Ok(())
+}
 
+pub(crate) async fn font_load(vm: &mut VirtualMachine<'_>, font: i32, file_name: &str) -> Res<bool> {
     if !(FIRST_FREE_FONT..=LAST_FONT).contains(&font) {
-        log::warn!("LOADFONT ignored: font {font} is not a free slot");
+        log::warn!("font upload ignored: font {font} is not a free slot");
         vm.set_error(PplError::new(ERR_KIND_FONT, ERR_INVALID, format!("font {font} is not a free slot")));
-        return Ok(());
+        return Ok(false);
     }
     if !supports_vt_sequences(vm) {
         vm.set_error(PplError::new(ERR_KIND_FONT, ERR_UNAVAILABLE, "the terminal has no fonts"));
-        return Ok(());
+        return Ok(false);
     }
 
     let path = vm.resolve_file(&file_name).await;
@@ -1277,29 +1325,29 @@ pub async fn load_font(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
         Err(err) => {
             log::warn!("Can't load font {}: {err}", path.display());
             vm.set_error(PplError::new(ERR_KIND_FONT, ERR_IO, format!("can't read font {file_name}: {err}")));
-            return Ok(());
+            return Ok(false);
         }
     };
 
-    let Ok(bit_font) = icy_engine::BitFont::from_bytes(&file_name, &data) else {
+    let Ok(bit_font) = icy_engine::BitFont::from_bytes(file_name, &data) else {
         log::warn!("Unknown font format in {}", path.display());
         vm.set_error(PplError::new(ERR_KIND_FONT, ERR_FORMAT, format!("unknown font format in {file_name}")));
-        return Ok(());
+        return Ok(false);
     };
 
     let sequence = bit_font.encode_as_ansi(font as usize);
     if !vm.icy_board_state.reserve_media_upload(sequence.len()) {
         log::warn!("Font upload budget exhausted");
         vm.set_error(PplError::new(ERR_KIND_FONT, ERR_LIMIT, "font upload budget exhausted"));
-        return Ok(());
+        return Ok(false);
     }
     vm.icy_board_state.connection.send(sequence.as_bytes()).await?;
     vm.icy_board_state.acknowledge_upload(sequence.len()).await?;
     // The upload bypasses the virtual screen, so it has to be told separately or a later
-    // SETFONT finds no such font.
+    // font selection finds no such font.
     vm.icy_board_state.display_screen_mut().buffer.buffer.set_font(font as u8, bit_font);
     vm.operation_succeeded();
-    Ok(())
+    Ok(true)
 }
 
 pub async fn backup(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {

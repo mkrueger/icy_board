@@ -36,6 +36,7 @@ mod static_members;
 mod terminal_gfx;
 mod terminal_info;
 mod terminal_output;
+mod terminal_screen;
 mod tpa;
 
 use std::path::PathBuf;

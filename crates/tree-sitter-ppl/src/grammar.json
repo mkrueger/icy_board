@@ -1456,11 +1456,47 @@
             "type": "TOKEN",
             "content": {
               "type": "PATTERN",
+              "value": "[fF][oO][nN][tT]"
+            }
+          },
+          "named": false,
+          "value": "FONT"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
               "value": "[gG][fF][xX]"
             }
           },
           "named": false,
           "value": "GFX"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
+              "value": "[mM][aA][rR][gG][iI][nN][sS]"
+            }
+          },
+          "named": false,
+          "value": "MARGINS"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
+              "value": "[pP][aA][lL][eE][tT][tT][eE]"
+            }
+          },
+          "named": false,
+          "value": "PALETTE"
         },
         {
           "type": "ALIAS",

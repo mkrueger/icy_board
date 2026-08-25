@@ -139,6 +139,23 @@ fn a_member_that_is_neither_called_nor_assigned_is_reported() {
     assert!(!errors.is_empty(), "a bare member reference is not a statement");
 }
 
+/// A board object's name is an ordinary word, so a program that already uses it for a
+/// variable keeps it. Only a type followed by a name declares.
+#[test]
+fn a_variable_may_be_named_after_a_board_object() {
+    let output = run_ppl(
+        r"
+        UNSIGNED palette(4)
+        INTEGER font
+        palette[1] = 7
+        font = 3
+        PRINTLN palette[1], font
+        ",
+    );
+
+    assert_eq!(output, "73\n");
+}
+
 /// Input reaches the same keyboard however it is named, so a PPE need not carry it around.
 #[test]
 fn the_input_object_is_reached_from_the_terminal() {
