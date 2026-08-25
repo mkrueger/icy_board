@@ -114,29 +114,13 @@ pub struct ArrayMember {
 
 /// The members every array carries. `Redim` is a statement rather than a function
 /// and is resolved next to the other member call statements.
-pub const ARRAY_MEMBERS: &[ArrayMember] = &[
-    ArrayMember {
-        name: "Len",
-        opcode: FuncOpCode::Len_Dim,
-        arguments: 0..=1,
-        defaults: &[0],
-        return_type: VariableType::Integer,
-    },
-    ArrayMember {
-        name: "ElementCount",
-        opcode: FuncOpCode::ElementCount,
-        arguments: 0..=0,
-        defaults: &[],
-        return_type: VariableType::Integer,
-    },
-    ArrayMember {
-        name: "ElementAt",
-        opcode: FuncOpCode::ElementAt,
-        arguments: 1..=1,
-        defaults: &[],
-        return_type: VariableType::None,
-    },
-];
+pub const ARRAY_MEMBERS: &[ArrayMember] = &[ArrayMember {
+    name: "Len",
+    opcode: FuncOpCode::Len_Dim,
+    arguments: 0..=1,
+    defaults: &[0],
+    return_type: VariableType::Integer,
+}];
 
 pub fn array_member(name: &unicase::Ascii<String>) -> Option<&'static ArrayMember> {
     ARRAY_MEMBERS.iter().find(|member| *name == member.name)

@@ -15,12 +15,12 @@ releases.
   PPE no longer needs one nested `FOR` per dimension nor needs to know how many
   there are. The loop variable is a copy, `BREAK` and `CONTINUE` work as usual,
   and `IN` stays available as a variable name the way `TO` and `STEP` do.
-- Added `ElementCount(array)` and `ElementAt(array, index)`, the rank-agnostic
-  primitives `FOREACH` is built from, for walks that need their own index.
-- Gave arrays members: `a.Len()`, `a.Len(dim)`, `a.ElementCount()`,
-  `a.ElementAt(index)` and `a.Redim(...)` are the same calls as `Len(a, dim)`,
-  `ElementCount(a)`, `ElementAt(a, index)` and `REDIM a, ...`, written the other
-  way round. Only a declared array has them.
+  Indexing stays bound to the rank, so `a[i]` into a matrix is still the compile
+  error it should be, and the flat step `FOREACH` walks with is the compiler's
+  own rather than a function a PPE can call.
+- Gave arrays members: `a.Len()`, `a.Len(dim)` and `a.Redim(...)` are the same
+  calls as `Len(a, dim)` and `REDIM a, ...`, written the other way round. Only a
+  declared array has them.
 
 - Added `Session.User`, the caller's own record: identity, address, preferences,
   security, statistics and contacts in one object. It gathers what the `U_*`

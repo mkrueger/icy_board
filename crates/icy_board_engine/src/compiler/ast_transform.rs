@@ -8,12 +8,18 @@ use crate::{
         Statement, VariableDeclarationStatement, VariableSpecifier, const_expression, const_value_with_members, constant::NumberFormat,
     },
     decompiler::evaluation_visitor::{ConstantFolder, OptimizationVisitor},
-    executable::VariableValue,
+    executable::{FuncOpCode, VariableValue},
     parser::{
         EnumDefinition,
         lexer::{Spanned, Token},
     },
 };
+
+/// The name a compiler generated call goes by. Angle brackets keep it out of reach
+/// of source, and taking it from the definition keeps the two ends together.
+fn internal_function(opcode: FuncOpCode) -> unicase::Ascii<String> {
+    unicase::Ascii::new(opcode.get_definition().name.to_string())
+}
 
 pub struct AstTransformationVisitor {
     continue_break_labels: Vec<(unicase::Ascii<String>, unicase::Ascii<String>)>,
@@ -424,9 +430,10 @@ impl AstVisitorMut for AstTransformationVisitor {
     }
 
     /// `FOREACH value IN array` becomes a counting loop over the array's flat element
-    /// order. Rank never enters into it: `ElementCount` and `ElementAt` answer the same
-    /// way for a vector, a matrix and a cube, which matters because this transformation
-    /// runs before the declarations are known.
+    /// order. Rank never enters into it, which matters because this transformation runs
+    /// before the declarations are known. The two functions it counts and reads with are
+    /// the compiler's own: `a[i]` cannot stand in for them because it has to be written
+    /// with one index per dimension.
     fn visit_foreach_statement(&mut self, foreach_stmt: &ForEachStatement) -> Statement {
         let mut statements = Vec::new();
 
@@ -455,7 +462,7 @@ impl AstVisitorMut for AstTransformationVisitor {
 
         // IF (index >= ElementCount(collection)) GOTO break
         let element_count = FunctionCallExpression::create_empty_expression(
-            IdentifierExpression::create_empty_expression(unicase::Ascii::new("ElementCount".to_string())),
+            IdentifierExpression::create_empty_expression(internal_function(FuncOpCode::ElementCount)),
             vec![collection.clone()],
         );
         statements.push(IfStatement::create_empty_statement(
@@ -469,7 +476,7 @@ impl AstVisitorMut for AstTransformationVisitor {
             Token::Eq,
             Vec::new(),
             FunctionCallExpression::create_empty_expression(
-                IdentifierExpression::create_empty_expression(unicase::Ascii::new("ElementAt".to_string())),
+                IdentifierExpression::create_empty_expression(internal_function(FuncOpCode::ElementAt)),
                 vec![collection, index_expr.clone()],
             ),
         ));

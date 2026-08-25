@@ -1244,19 +1244,6 @@ hint-function-len_dim=
     ### Returns
         Returns the length of the array @1 on dimension @2
 
-hint-function-element_count=
-    @1 = The array to count
-    ### Returns
-        How many elements @1 holds over all of its dimensions, so an array can be
-        walked without knowing its rank. A value that is not an array counts as one.
-
-hint-function-element_at=
-    @1 = The array to read from
-    @2 = The index of the element, counted row-major over all dimensions
-    ### Returns
-        The element at @2, or an empty value of the array's own type when no element
-        has that index. This is what `FOREACH` walks with.
-
 hint-const-true=BOOLEAN `TRUE` value
 hint-const-false=BOOLEAN `FALSE` value
 hint-const-stk_limit=This constant was added so the PPL programmer could determine how close they are getting to the stack limit when using recursion.

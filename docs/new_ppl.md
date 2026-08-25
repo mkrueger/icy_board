@@ -801,33 +801,10 @@ eleven elements.
 `IN` is not a reserved word. Like `TO` and `STEP` it is only read as part of the
 statement, so it stays available as a variable name.
 
-## `ElementCount()` and `ElementAt()` Functions (4.00)
-
-### Function
-
-The two rank-agnostic array primitives `FOREACH` is built from, useful on their
-own when a walk needs its own index.
-
-`ElementCount(array)` answers how many elements the array holds over all of its
-dimensions. `ElementAt(array, index)` answers the element at a flat index,
-counted row-major. A value that is not an array counts as a single element, so
-neither has to be asked what it is being handed.
-
-```PPL
-INTEGER grid(1, 1)
-INTEGER i
-
-FOR i = 0 TO ElementCount(grid) - 1
-    PRINTLN i, ": ", ElementAt(grid, i)
-NEXT
-```
-
-### Syntax
-
-`ElementCount(array)` returns INTEGER.
-
-`ElementAt(array, index)` returns an element of the array. An index no element
-has answers with an empty value of the array's own type rather than failing.
+`FOREACH` is the only flat walk there is. Indexing is bound to the rank: `a[i]`
+reads a vector, a matrix wants `a[i, j]` and one index into it is a compile
+error. That check is worth keeping, so the flat step `FOREACH` is built from
+stays the compiler's own and is not a function a PPE can call.
 
 ## Array members (4.00)
 
@@ -841,8 +818,6 @@ same call, so neither can drift from the other.
 | :--- | :--- |
 | `a.Len()` | `Len(a, 0)` |
 | `a.Len(dim)` | `Len(a, dim)` |
-| `a.ElementCount()` | `ElementCount(a)` |
-| `a.ElementAt(index)` | `ElementAt(a, index)` |
 | `a.Redim(n)` | `REDIM a, n` |
 | `a.Redim(n1, n2)` | `REDIM a, n1, n2` |
 | `a.Redim(n1, n2, n3)` | `REDIM a, n1, n2, n3` |
@@ -850,7 +825,7 @@ same call, so neither can drift from the other.
 ```PPL
 INTEGER values(10)
 
-PRINTLN values.Len(), " slots, ", values.ElementCount(), " elements"
+PRINTLN values.Len(), " slots"
 values.Redim(20)
 ```
 

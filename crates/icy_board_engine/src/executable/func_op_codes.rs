@@ -3046,7 +3046,7 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 320]> 
             signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
-            name: "ElementCount",
+            name: "<element count>",
             version: 400,
             opcode: FuncOpCode::ElementCount,
             return_type: VariableType::Integer,
@@ -3054,7 +3054,7 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 320]> 
             signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
-            name: "ElementAt",
+            name: "<element at>",
             version: 400,
             opcode: FuncOpCode::ElementAt,
             return_type: VariableType::None,

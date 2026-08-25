@@ -1,37 +1,33 @@
 use crate::vm::tests::{compile_errors, compile_errors_with_runtime, run_ppl};
 
-/// An array declared with an upper bound of 10 holds 11 elements, index 0 through 10.
+/// An array declared with an upper bound of 10 holds 11 elements, index 0 through 10,
+/// and `FOREACH` visits every one of them.
 #[test]
-fn element_count_counts_every_slot_of_a_vector() {
-    assert_eq!("11", run_ppl("INTEGER a(10)\nPRINT ElementCount(a)"));
-}
-
-#[test]
-fn element_count_multiplies_the_dimensions_out() {
+fn a_walk_visits_every_slot_of_a_vector() {
     assert_eq!(
-        "12 24",
-        run_ppl("INTEGER a(2, 3)\nINTEGER b(1, 2, 3)\nPRINT ElementCount(a), \" \", ElementCount(b)")
+        "11",
+        run_ppl("INTEGER a(10)\nINTEGER v\nINTEGER n\nFOREACH v IN a\n  LET n = n + 1\nENDFOREACH\nPRINT n")
     );
 }
 
-/// A value that is not an array is one element, so a caller does not have to ask first.
 #[test]
-fn a_plain_value_counts_as_one_element() {
-    assert_eq!("1", run_ppl("INTEGER a\nPRINT ElementCount(a)"));
-}
-
-#[test]
-fn element_at_walks_a_vector_in_order() {
+fn a_walk_multiplies_the_dimensions_out() {
     assert_eq!(
-        "0 1 2 3",
+        "12 24",
         run_ppl(
             r#"
-INTEGER a(3)
-INTEGER i
-FOR i = 0 TO 3
-  LET a(i) = i
-NEXT
-PRINT ElementAt(a, 0), " ", ElementAt(a, 1), " ", ElementAt(a, 2), " ", ElementAt(a, 3)
+INTEGER a(2, 3)
+INTEGER b(1, 2, 3)
+INTEGER v
+INTEGER n
+INTEGER m
+FOREACH v IN a
+  LET n = n + 1
+ENDFOREACH
+FOREACH v IN b
+  LET m = m + 1
+ENDFOREACH
+PRINT n, " ", m
 "#
         )
     );
@@ -39,9 +35,9 @@ PRINT ElementAt(a, 0), " ", ElementAt(a, 1), " ", ElementAt(a, 2), " ", ElementA
 
 /// Row-major: the last index moves fastest.
 #[test]
-fn element_at_walks_a_matrix_row_by_row() {
+fn a_walk_crosses_a_matrix_row_by_row() {
     assert_eq!(
-        "11 12 21 22",
+        "11 12 21 22 ",
         run_ppl(
             r#"
 INTEGER a(1, 1)
@@ -49,15 +45,36 @@ LET a(0, 0) = 11
 LET a(0, 1) = 12
 LET a(1, 0) = 21
 LET a(1, 1) = 22
-PRINT ElementAt(a, 0), " ", ElementAt(a, 1), " ", ElementAt(a, 2), " ", ElementAt(a, 3)
+INTEGER v
+FOREACH v IN a
+  PRINT v, " "
+ENDFOREACH
 "#
         )
     );
 }
 
+/// The flat walk is the compiler's own; source says which index it means per dimension.
 #[test]
-fn an_index_no_element_has_answers_empty() {
-    assert_eq!("0 0", run_ppl("INTEGER a(1)\nPRINT ElementAt(a, 99), \" \", ElementAt(a, -1)"));
+fn indexing_takes_one_index_per_dimension() {
+    assert!(
+        !compile_errors("INTEGER a(1, 1)\nPRINT a[2]").is_empty(),
+        "one index into a matrix should not compile"
+    );
+    assert_eq!("12", run_ppl("INTEGER a(1, 1)\nLET a(0, 1) = 12\nPRINT a[0, 1]"));
+}
+
+/// The names the lowering calls cannot be written, so they are no API to keep.
+#[test]
+fn the_flat_walk_functions_are_not_callable_from_source() {
+    assert!(
+        !compile_errors("INTEGER a(1)\nPRINT ElementCount(a)").is_empty(),
+        "ElementCount should not be a name a PPE can call"
+    );
+    assert!(
+        !compile_errors("INTEGER a(1)\nPRINT ElementAt(a, 0)").is_empty(),
+        "ElementAt should not be a name a PPE can call"
+    );
 }
 
 #[test]
@@ -256,12 +273,11 @@ fn an_array_answers_len_as_a_member() {
 
 #[test]
 fn an_array_answers_the_element_functions_as_members() {
-    assert_eq!(
-        "12 42",
-        run_ppl("INTEGER a(2, 3)\nLET a(0, 1) = 42\nPRINT a.ElementCount(), \" \", a.ElementAt(1)")
+    assert!(
+        !compile_errors("INTEGER a(1)\nPRINT a.ElementCount()").is_empty(),
+        "the flat walk is not part of the member surface either"
     );
 }
-
 /// The member is the same call as the function, so both may name the same array.
 #[test]
 fn a_member_and_a_function_agree() {
