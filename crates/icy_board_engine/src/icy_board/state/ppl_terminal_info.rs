@@ -200,6 +200,7 @@ mod tests {
         let caps = TerminalCaps {
             program: TerminalProgram::SyncTerm,
             device_attributes: Some("\x1b[=67;84;101;114;109;1;332c".to_string()),
+            reported_term_size: (132, 43),
             term_size: (132, 43),
             is_utf8: true,
             rip_version: Some("3.0".to_string()),

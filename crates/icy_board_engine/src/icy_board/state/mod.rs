@@ -706,7 +706,7 @@ pub struct IcyBoardState {
     pub ppl_terminal: ppl_terminal_control::PplTerminalControl,
 }
 
-/// Serializes a screen back into PCBoard text that the write path can print again.
+/// Serializes a screen back into `PCBoard` text that the write path can print again.
 ///
 /// The screens hold Unicode, so the writer has to be asked for Unicode as well: its
 /// byte output truncates every char to its low byte, which turns `═` into `P`.
@@ -756,6 +756,7 @@ impl IcyBoardState {
             let _ = self.user_screen.print_char(ch);
             let _ = self.sysop_screen.print_char(ch);
         }
+        self.sync_logical_screen_size();
     }
 
     /// Sets the terminal the board writes to, for a caller that cannot say so in ANSI.
@@ -770,6 +771,11 @@ impl IcyBoardState {
             screen.buffer.buffer.terminal_state.set_size(size);
         }
         self.session.term_caps.term_size = (width, height);
+    }
+
+    fn sync_logical_screen_size(&mut self) {
+        let size = self.user_screen.buffer.buffer.terminal_state.size();
+        self.session.term_caps.term_size = (size.width.max(1) as u16, size.height.max(1) as u16);
     }
     pub async fn new(
         bbs: Arc<Mutex<BBS>>,
@@ -2367,9 +2373,7 @@ impl IcyBoardState {
             }
         }
         self.write_chars_internal(target, &user_bytes, &sysop_bytes).await?;
-        // A resize the board sent through is what the caller's terminal now measures.
-        let size = self.user_screen.buffer.buffer.terminal_state.size();
-        self.session.term_caps.term_size = (size.width.max(1) as u16, size.height.max(1) as u16);
+        self.sync_logical_screen_size();
         Ok(())
     }
 
@@ -3276,6 +3280,7 @@ impl IcyBoardState {
     pub async fn detect_terminal(&mut self) -> Res<()> {
         let (capabilities, probed) = TerminalCaps::detect(&mut *self.connection).await?;
         self.session.term_caps = capabilities;
+        self.sync_logical_screen_size();
         self.media_probed = true;
         self.take_probe_result(probed).await
     }
@@ -3650,6 +3655,8 @@ impl IcyBoardState {
     }
 
     async fn print_sysop_screen(&mut self) -> Res<()> {
+        let size = self.user_screen.buffer.buffer.terminal_state.size();
+        self.print(TerminalTarget::Sysop, &format!("\x1b[8;{};{}t", size.height, size.width)).await?;
         let res = screen_to_pcboard_text(&self.user_screen.buffer.buffer)?;
         self.print(TerminalTarget::Sysop, &res).await?;
         let p = self.user_screen.buffer.caret.position();
@@ -4144,6 +4151,40 @@ mod screen_tests {
             assert_eq!(state.session.term_caps.term_size, (132, 43));
             assert_eq!(state.sysop_screen.buffer.buffer.terminal_state.size(), icy_engine::Size::new(132, 43));
             assert_eq!(state.display_screen().buffer.caret.y, 0, "the line wrapped at the old width");
+        });
+    }
+
+    #[test]
+    fn ordinary_output_does_not_replace_the_reported_terminal_size() {
+        tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
+            let (mut state, _peer) = graphics_state().await;
+            state.session.term_caps.reported_term_size = (132, 43);
+
+            state.print(TerminalTarget::Both, "hello").await.unwrap();
+
+            assert_eq!(state.session.term_caps.reported_term_size, (132, 43));
+            assert_eq!(state.session.term_caps.term_size, (80, 25));
+        });
+    }
+
+    #[test]
+    fn monitor_snapshot_starts_with_the_callers_logical_size() {
+        tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
+            let (mut state, _peer) = graphics_state().await;
+            state.set_terminal_size(132, 43);
+            let (mut monitor, connection) = ChannelConnection::create_pair();
+            state.node_state.lock().await[state.node].as_mut().unwrap().sysop_connection = Some(connection);
+
+            state.print_sysop_screen().await.unwrap();
+
+            let expected = b"\x1b[8;43;132t";
+            let mut prefix = Vec::new();
+            while prefix.len() < expected.len() {
+                let mut bytes = [0; 64];
+                let size = monitor.read(&mut bytes).await.unwrap();
+                prefix.extend_from_slice(&bytes[..size]);
+            }
+            assert_eq!(&prefix[..expected.len()], expected);
         });
     }
 }
