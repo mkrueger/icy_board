@@ -10,6 +10,7 @@
 mod arrays;
 mod board_session;
 mod builtin_enums;
+mod collection_bench;
 mod contacts;
 mod control_flow;
 mod dbase;
