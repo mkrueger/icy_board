@@ -581,6 +581,20 @@ An index no entry has answers with an invalid object rather than failing, so
 `Valid` is what to ask. A collection shares the list it stands for rather than
 copying it, so reading `conf.Areas` once per loop step costs nothing.
 
+A collection is an ordinary value, so it can be held in a variable. A walk reads
+its source once for the count and once for the element on every step, which makes
+the length of that source what a long loop pays for. Naming it once is the
+cheapest form and the clearest to read:
+
+```PPL
+AREAS list = Session.Conference.Areas
+AREA item
+
+FOREACH item IN list
+	PRINTLN item.Name
+ENDFOREACH
+```
+
 ## Board and session (4.00)
 
 `Board` and `Session` are the two other objects that stand for themselves, so
