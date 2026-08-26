@@ -39,7 +39,11 @@ use tokio::sync::{Mutex, mpsc};
 const STATUS_HELP: &str = "ALT-H=Help ALT-X=Exit";
 
 /// Rows the sysop status bar sits on, kept out of the session's own screen.
-const STATUS_ROWS: u16 = 2;
+pub(crate) const STATUS_ROWS: u16 = 2;
+
+/// What a local session gets to write on: the console is twenty-five rows and the status
+/// bar keeps the last of them, so the board scrolls in what is left.
+pub(crate) const LOCAL_SCREEN_SIZE: (u16, u16) = (80, 25 - STATUS_ROWS);
 
 pub struct Tui {
     sysop_mode: bool,
@@ -66,7 +70,7 @@ struct RenderedImage {
 }
 
 fn new_terminal_screen() -> TextScreen {
-    let mut screen = TextScreen::new((80, 25));
+    let mut screen = TextScreen::new(LOCAL_SCREEN_SIZE);
     screen.buffer.buffer_type = BufferType::Unicode;
     screen
 }
@@ -77,14 +81,14 @@ fn new_monitor_screen() -> TextScreen {
     screen
 }
 
-/// Places the screen and the status bar, which takes the last rows of the screen rather
-/// than adding to it - the console is the size of the screen, not of the terminal.
+/// Places the screen and the status bar below it, clamped to the terminal. The bar keeps
+/// its rows, so a screen too tall for the terminal loses rows before the bar does.
 fn terminal_layout(frame_area: Rect, view_size: (u16, u16)) -> (Rect, Option<Rect>) {
     let (view_width, view_height) = view_size;
     let width = frame_area.width.min(view_width);
-    let total_height = view_height.min(frame_area.height);
-    let status_height = STATUS_ROWS.min(total_height);
-    let height = total_height - status_height;
+    let status_height = STATUS_ROWS.min(frame_area.height);
+    let height = view_height.min(frame_area.height - status_height);
+    let total_height = height + status_height;
     let x = frame_area.x + (frame_area.width - width) / 2;
     let y = frame_area.y + (frame_area.height - total_height) / 2;
     let status = (status_height > 0).then(|| Rect::new(x, y + height, width, status_height));
@@ -786,11 +790,11 @@ mod sixel_tests {
         assert_eq!(screen.buffer.buffer_type.convert_to_unicode(cell.ch), '═');
     }
 
-    /// The bar takes the last rows of the screen instead of adding to it, so the board
-    /// gets eighty by twenty-three out of an eighty by twenty-five console.
+    /// A local session writes on twenty-three rows and the bar sits under them, which
+    /// fills an eighty by twenty-five console exactly.
     #[test]
-    fn the_status_bar_takes_the_last_two_rows_of_the_screen() {
-        let (screen, status) = terminal_layout(Rect::new(0, 0, 80, 25), (80, 25));
+    fn a_local_screen_and_the_bar_fill_a_25_row_console() {
+        let (screen, status) = terminal_layout(Rect::new(0, 0, 80, 25), LOCAL_SCREEN_SIZE);
 
         assert_eq!(screen, Rect::new(0, 0, 80, 23));
         assert_eq!(status, Some(Rect::new(0, 23, 80, 2)));
@@ -800,11 +804,21 @@ mod sixel_tests {
     #[test]
     fn the_terminal_around_it_does_not_size_the_console() {
         for height in 25..=40 {
-            let (screen, status) = terminal_layout(Rect::new(0, 0, 100, height), (80, 25));
+            let (screen, status) = terminal_layout(Rect::new(0, 0, 100, height), LOCAL_SCREEN_SIZE);
 
             assert_eq!((screen.width, screen.height), (80, 23), "the board area moved at {height} rows");
             assert_eq!(status.map(|bar| bar.height), Some(2), "the bar moved at {height} rows");
         }
+    }
+
+    /// Watching a caller whose screen does not leave room for the bar costs screen rows,
+    /// because a monitor without its bar is what issue 24 reported.
+    #[test]
+    fn a_monitor_keeps_its_bar_when_the_callers_screen_is_too_tall() {
+        let (screen, status) = terminal_layout(Rect::new(0, 0, 80, 25), (80, 25));
+
+        assert_eq!(screen, Rect::new(0, 0, 80, 23));
+        assert_eq!(status, Some(Rect::new(0, 23, 80, 2)));
     }
 
     /// A screen an ANSI sequence made bigger is shown at that size, bar included.
@@ -812,8 +826,8 @@ mod sixel_tests {
     fn a_screen_resized_by_ansi_is_shown_at_its_own_size() {
         let (screen, status) = terminal_layout(Rect::new(0, 0, 120, 45), (120, 40));
 
-        assert_eq!(screen, Rect::new(0, 2, 120, 38));
-        assert_eq!(status, Some(Rect::new(0, 40, 120, 2)));
+        assert_eq!(screen, Rect::new(0, 1, 120, 40));
+        assert_eq!(status, Some(Rect::new(0, 41, 120, 2)));
     }
 
     #[test]

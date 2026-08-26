@@ -757,6 +757,20 @@ impl IcyBoardState {
             let _ = self.sysop_screen.print_char(ch);
         }
     }
+
+    /// Sets the terminal the board writes to, for a caller that cannot say so in ANSI.
+    ///
+    /// The buffer holds its own size next to the viewport and a terminal buffer keeps the
+    /// two apart, so both are set here.
+    pub fn set_terminal_size(&mut self, width: u16, height: u16) {
+        let (width, height) = (width.max(1), height.max(1));
+        let size = icy_engine::Size::new(i32::from(width), i32::from(height));
+        for screen in [&mut self.user_screen, &mut self.sysop_screen] {
+            screen.buffer.buffer.set_size(size);
+            screen.buffer.buffer.terminal_state.set_size(size);
+        }
+        self.session.term_caps.term_size = (width, height);
+    }
     pub async fn new(
         bbs: Arc<Mutex<BBS>>,
         board: Arc<tokio::sync::Mutex<IcyBoard>>,

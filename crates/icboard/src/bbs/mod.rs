@@ -230,6 +230,8 @@ pub async fn internal_handle_client(mut state: IcyBoardState, login_options: Opt
     cmd.state.session.is_local = local;
     if local {
         cmd.state.session.term_caps = TerminalCaps::LOCAL;
+        let (width, height) = crate::tui::LOCAL_SCREEN_SIZE;
+        cmd.state.set_terminal_size(width, height);
     } else if let Err(err) = cmd.state.detect_terminal().await {
         log::warn!("Terminal detection failed: {err}");
     }

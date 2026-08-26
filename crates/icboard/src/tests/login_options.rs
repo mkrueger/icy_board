@@ -82,3 +82,12 @@ fn a_local_session_knows_that_it_is_local() {
 
     assert!(output.starts_with("LOCAL=1"), "{output:?}");
 }
+
+/// The console keeps its last two rows for the status bar, so the board is given the rows
+/// above them and scrolls there rather than writing behind the bar.
+#[test]
+fn a_local_session_gets_the_rows_the_status_bar_leaves() {
+    let output = test_ppe_output(";$LANGVERSION 400\nPRINT \"SIZE=\", Terminal.Info.Columns, \"x\", Terminal.Info.Rows", |_| {});
+
+    assert!(output.starts_with("SIZE=80x23"), "{output:?}");
+}
