@@ -13,13 +13,14 @@ impl IcyBoardState {
     /// Used for the ppe function SCRFILE
     pub fn scan_filename(&self, start_line: i32) -> Option<(i32, String)> {
         let mut y = start_line;
-        let height = self.user_screen.buffer.height();
-        let width = self.user_screen.buffer.width();
-        let top = self.user_screen.buffer.first_visible_line();
+        let screen = self.display_screen();
+        let height = screen.buffer.height();
+        let width = screen.buffer.width();
+        let top = screen.buffer.first_visible_line();
         while y < height {
             let mut str = String::new();
             for x in 0..width {
-                let ch: icy_engine::AttributedChar = self.user_screen.buffer.char_at((x, top + y).into());
+                let ch: icy_engine::AttributedChar = screen.buffer.char_at((x, top + y).into());
                 str.push(ch.ch);
             }
 

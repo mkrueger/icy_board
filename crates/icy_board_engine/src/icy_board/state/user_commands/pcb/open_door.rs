@@ -206,6 +206,7 @@ impl IcyBoardState {
                                 if self.connection.send(&read_buf[0..size]).await.is_err() {
                                     break;
                                 }
+                                self.track_door_output(&read_buf[0..size]);
                                 let mut remove_sysop_connection = false;
                                 let node_state = &mut self.node_state.lock().await;
                                 if let Some(sysop_connection) = &mut node_state[self.node].as_mut().unwrap().sysop_connection
@@ -339,6 +340,7 @@ async fn execute_door(door_connection: &mut dyn Connection, state: &mut crate::i
                      Ok(size) => {
                           if size > 0 {
                             state.connection.send(&read_buf[0..size]).await?;
+                            state.track_door_output(&read_buf[0..size]);
                             let node_state = &mut state.node_state.lock().await;
                             if let Some(sysop_connection) = &mut node_state[state.node].as_mut().unwrap().sysop_connection {
                                 let _ = sysop_connection.send(&read_buf[0..size]).await;

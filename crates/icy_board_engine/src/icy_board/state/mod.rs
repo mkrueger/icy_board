@@ -17,7 +17,7 @@ use crate::{
 };
 use async_recursion::async_recursion;
 use chrono::{DateTime, Local, Utc};
-use codepages::tables::UNICODE_TO_CP437;
+use codepages::tables::{CP437_TO_UNICODE, UNICODE_TO_CP437};
 use dizbase::file_base::FileBase;
 use icy_engine::Position;
 use icy_engine::SaveOptions;
@@ -736,19 +736,25 @@ impl IcyBoardState {
         true
     }
 
+    /// The screen that mirrors the caller's terminal.
+    ///
+    /// Everything sent to the caller lands here, sysop or not. The sysop screen only
+    /// records what a monitor was sent, so it is never the fuller account of the two.
     pub fn display_screen(&self) -> &VirtualScreen {
-        if self.session.is_sysop || self.session.cur_user_id < 0 {
-            &self.sysop_screen
-        } else {
-            &self.user_screen
-        }
+        &self.user_screen
     }
 
     pub fn display_screen_mut(&mut self) -> &mut VirtualScreen {
-        if self.session.is_sysop || self.session.cur_user_id < 0 {
-            &mut self.sysop_screen
-        } else {
-            &mut self.user_screen
+        &mut self.user_screen
+    }
+
+    /// Door output goes straight to the terminals, so the screens have to be told what
+    /// went past them - as CP437, which is what a door emits.
+    fn track_door_output(&mut self, bytes: &[u8]) {
+        for byte in bytes {
+            let ch = CP437_TO_UNICODE[*byte as usize];
+            let _ = self.user_screen.print_char(ch);
+            let _ = self.sysop_screen.print_char(ch);
         }
     }
     pub async fn new(
@@ -3644,7 +3650,7 @@ impl IcyBoardState {
     }
 
     pub fn cur_color(&self) -> IcbColor {
-        let attr = self.user_screen.buffer.caret.attribute.as_u8(icy_engine::IceMode::Blink);
+        let attr = self.display_screen().buffer.caret.attribute.as_u8(icy_engine::IceMode::Blink);
         IcbColor::Dos(attr)
     }
 
@@ -4018,7 +4024,7 @@ mod node_status_tests {
 }
 
 #[cfg(test)]
-mod color_tests {
+mod screen_tests {
     use super::*;
     use crate::icy_board::bbs::BBS;
 
@@ -4077,6 +4083,34 @@ mod color_tests {
                 state.color_change(TerminalTarget::User, &color),
                 state.color_change(TerminalTarget::Sysop, &color)
             );
+        });
+    }
+
+    /// The sysop screen only holds what a monitor was sent, so it is the caller's screen
+    /// that answers for the terminal - a sysop session is no exception.
+    #[test]
+    fn a_sysop_session_reads_the_callers_screen() {
+        tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
+            let (mut state, _peer) = graphics_state().await;
+            state.session.is_sysop = true;
+
+            state.print(TerminalTarget::User, "caller only").await.unwrap();
+
+            assert_eq!(state.display_screen().buffer.caret.x, "caller only".len() as i32);
+        });
+    }
+
+    /// A door writes to the terminals itself, and the board still has to know what is on
+    /// them once it exits.
+    #[test]
+    fn door_output_lands_on_both_screens() {
+        tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
+            let (mut state, _peer) = graphics_state().await;
+
+            state.track_door_output(&[0xCD, b'\r']);
+
+            assert_eq!(state.user_screen.buffer.char_at(icy_engine::Position::default()).ch, '═');
+            assert_eq!(state.sysop_screen.buffer.char_at(icy_engine::Position::default()).ch, '═');
         });
     }
 }
