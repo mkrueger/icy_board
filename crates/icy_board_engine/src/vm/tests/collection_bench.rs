@@ -19,6 +19,9 @@ const AREAS: usize = 2000;
 /// rebuilt on every access, so this is what that costs.
 const EXTRA_CONFERENCES: usize = 0;
 
+// The extra conferences are a knob to turn while measuring, so the range is empty
+// as it stands.
+#[allow(clippy::reversed_empty_ranges)]
 fn seed(board: &mut crate::icy_board::IcyBoard) {
     let areas: Vec<MessageArea> = (0..AREAS)
         .map(|i| MessageArea {
