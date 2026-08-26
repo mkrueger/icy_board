@@ -88,6 +88,21 @@ PRINT Session.User.Notes[0]
     );
 }
 
+/// A compound assignment reads through the same index it writes back to.
+#[test]
+fn a_note_can_be_appended_to() {
+    assert_eq!(
+        "one and two",
+        run_ppl(
+            r#"
+Session.User.Notes[1] = "one"
+Session.User.Notes[1] += " and two"
+PRINT Session.User.Notes[1]
+"#,
+        )
+    );
+}
+
 /// The board hashes the password, so what the PPE handed over is not what is stored.
 #[test]
 fn a_password_is_hashed_rather_than_stored_as_given() {

@@ -1,10 +1,10 @@
 use crate::{
     ast::{
-        BlockStatement, BreakStatement, CaseBlock, CaseSpecifier, CommentAstNode, ConstDeclarationStatement, Constant, ContinueStatement, ElseBlock,
-        ElseIfBlock, Expression, ForEachStatement, ForStatement, FunctionCallExpression, GosubStatement, GotoStatement, IdentifierExpression, IfStatement,
-        IfThenStatement, LabelStatement, LetStatement, LoopStatement, MemberCallStatement, MemberReferenceExpression, OnErrorMode, OnErrorStatement,
-        PredefinedCallStatement, ProcedureCallStatement, RepeatUntilStatement, ReturnStatement, SelectStatement, Statement, VariableDeclarationStatement,
-        WhileDoStatement, WhileStatement,
+        BinaryExpression, BlockStatement, BreakStatement, CaseBlock, CaseSpecifier, CommentAstNode, ConstDeclarationStatement, Constant, ContinueStatement,
+        ElseBlock, ElseIfBlock, Expression, ForEachStatement, ForStatement, FunctionCallExpression, GosubStatement, GotoStatement, IdentifierExpression,
+        IfStatement, IfThenStatement, LabelStatement, LetStatement, LoopStatement, MemberCallStatement, MemberReferenceExpression, OnErrorMode,
+        OnErrorStatement, PredefinedCallStatement, ProcedureCallStatement, RepeatUntilStatement, ReturnStatement, SelectStatement, Statement,
+        VariableDeclarationStatement, WhileDoStatement, WhileStatement,
     },
     executable::{OpCode, StatementDefinition},
     parser::ParserErrorType,
@@ -920,18 +920,23 @@ impl Parser<'_> {
 
             if matches!(expression, Expression::FunctionCall(_)) {
                 // `collection[i] = value` is the collection's own setter, the mirror of
-                // the getter `[i]` reads with. Only a plain `=`: there is nothing to read
-                // and write back for a compound assignment.
-                if self.get_cur_token() == Some(Token::Eq)
+                // the getter `[i]` reads with.
+                if is_assign_token(self.get_cur_token())
                     && let Expression::FunctionCall(call) = &expression
                     && let Expression::MemberReference(member) = call.get_expression()
                     && member.get_identifier().as_str() == "<get>"
                 {
                     let eq_token = self.save_spanned_token();
+                    let compound = assign_operator(&eq_token.token);
                     self.next_token();
                     let Some(value_expression) = self.parse_expression() else {
                         self.report_error(self.lex.span(), ParserErrorType::ExpressionExpected(self.save_token()));
                         return None;
+                    };
+                    // `a[i] += v` reads through the same getter, the way `a(i) += v` does.
+                    let value_expression = match compound {
+                        Some(op) => BinaryExpression::create_empty_expression(op, expression.clone(), value_expression),
+                        None => value_expression,
                     };
                     let setter = Spanned::new(
                         Token::Identifier(unicase::Ascii::new("<set>".to_string())),
@@ -1168,6 +1173,20 @@ fn is_assign_token(token_opt: Option<Token>) -> bool {
         || token_opt == Some(Token::ModAssign)
         || token_opt == Some(Token::AndAssign)
         || token_opt == Some(Token::OrAssign)
+}
+
+/// What a compound assignment does with the value already there, or `None` for `=`.
+fn assign_operator(token: &Token) -> Option<crate::ast::BinOp> {
+    match token {
+        Token::AddAssign => Some(crate::ast::BinOp::Add),
+        Token::SubAssign => Some(crate::ast::BinOp::Sub),
+        Token::MulAssign => Some(crate::ast::BinOp::Mul),
+        Token::DivAssign => Some(crate::ast::BinOp::Div),
+        Token::ModAssign => Some(crate::ast::BinOp::Mod),
+        Token::AndAssign => Some(crate::ast::BinOp::And),
+        Token::OrAssign => Some(crate::ast::BinOp::Or),
+        _ => None,
+    }
 }
 
 static DO_TOKEN: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("DO".to_string()));

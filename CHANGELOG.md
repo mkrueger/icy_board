@@ -16,7 +16,7 @@ releases.
   `EndRecord`, so `Begin`/`End` is the one pairing the API uses.
   `Contacts.Set()` became `Contacts.Put()`, since it is keyed by service rather
   than by position, and a note is now written through its index:
-  `Session.User.Notes[0] = "..."`.
+  `Session.User.Notes[0] = "..."`, including `+=` and the rest.
 - Retired the `FONT` type. A terminal never reports which font a class is using,
   so the object had no state to read and was three write-only calls in a coat:
   `Terminal.SetFont(font [, slot])` and `Terminal.LoadFont(font, file)` say the

@@ -723,8 +723,9 @@ Session.User.Notes[0] = "Called about the upload"
 ```
 
 An index no note has is refused and leaves the rest alone. A compound assignment
-such as `Notes[0] = Notes[0] + "..."` has to be written out; `+=` on an index is
-not read as an assignment.
+reads through the same index it writes back to, so `Notes[0] += "..."` appends.
+The index is evaluated twice there, the way it is for `a(i) += v`, so an index
+with a side effect happens twice.
 
 A contact is a built-in `CONTACT` record with two `STRING` fields, `Service` and
 `Account`. Service names are open strings, so a PPE can store a new service
