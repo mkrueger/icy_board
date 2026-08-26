@@ -3652,40 +3652,53 @@ impl IcyBoardState {
         if !self.use_graphics() {
             return Ok(());
         }
+        // The sequence only carries what changes, so it is relative to the screen that
+        // receives it - screens that drifted apart each need their own.
+        if target == TerminalTarget::Both {
+            let user = self.color_change(TerminalTarget::User, &color);
+            let sysop = self.color_change(TerminalTarget::Sysop, &color);
+            if user == sysop {
+                return self.write_color_change(TerminalTarget::Both, user).await;
+            }
+            self.write_color_change(TerminalTarget::User, user).await?;
+            return self.write_color_change(TerminalTarget::Sysop, sysop).await;
+        }
+        let change = self.color_change(target, &color);
+        self.write_color_change(target, change).await
+    }
+
+    /// What the target's screen still needs to reach `color`, or `None` when it is there.
+    fn color_change(&self, target: TerminalTarget, color: &IcbColor) -> Option<String> {
         let screen = if target == TerminalTarget::Sysop {
-            &mut self.sysop_screen
+            &self.sysop_screen
         } else {
-            &mut self.user_screen
+            &self.user_screen
         };
+        let current = screen.buffer.caret.attribute;
 
         let new_color = match color {
             IcbColor::None => {
-                return Ok(());
+                return None;
             }
             IcbColor::Dos(color) => {
-                if screen.buffer.caret.attribute.as_u8(icy_engine::IceMode::Blink) == color {
-                    return Ok(());
+                if current.as_u8(icy_engine::IceMode::Blink) == *color {
+                    return None;
                 }
-
-                TextAttribute::from_u8(color, icy_engine::IceMode::Blink)
+                if self.session.disp_options.grapics_mode == GraphicsMode::Avatar {
+                    return Some(format!("\x16\x01{}", *color as char));
+                }
+                TextAttribute::from_u8(*color, icy_engine::IceMode::Blink)
             }
             IcbColor::IcyEngine(_fg) => {
                 todo!();
             }
         };
 
-        if self.session.disp_options.grapics_mode == GraphicsMode::Avatar
-            && let IcbColor::Dos(color) = color
-        {
-            let color_change = format!("\x16\x01{}", color as char);
-            return self.write_chars(target, color_change.chars().collect::<Vec<char>>().as_slice()).await;
-        }
-
         let mut color_change = "\x1B[".to_string();
-        let was_bold = screen.buffer.caret.attribute.is_bold();
+        let was_bold = current.is_bold();
         let new_bold = new_color.is_bold() || new_color.foreground() > 7;
-        let mut bg = screen.buffer.caret.attribute.background();
-        let mut fg = screen.buffer.caret.attribute.foreground();
+        let mut bg = current.background();
+        let mut fg = current.foreground();
         if was_bold != new_bold {
             if new_bold {
                 color_change += "1;";
@@ -3696,7 +3709,7 @@ impl IcyBoardState {
             }
         }
 
-        if !screen.buffer.caret.attribute.is_blinking() && new_color.is_blinking() {
+        if !current.is_blinking() && new_color.is_blinking() {
             color_change += "5;";
         }
 
@@ -3710,7 +3723,14 @@ impl IcyBoardState {
 
         color_change.pop();
         color_change += "m";
-        self.write_chars(target, color_change.chars().collect::<Vec<char>>().as_slice()).await
+        Some(color_change)
+    }
+
+    async fn write_color_change(&mut self, target: TerminalTarget, change: Option<String>) -> Res<()> {
+        let Some(change) = change else {
+            return Ok(());
+        };
+        self.write_chars(target, change.chars().collect::<Vec<char>>().as_slice()).await
     }
 
     pub fn get_caret_position(&mut self) -> (i32, i32) {
@@ -3994,5 +4014,69 @@ mod node_status_tests {
     #[test]
     fn reading_bulletins_is_not_handling_mail() {
         assert_ne!(NodeStatus::ReadBulletins.text(), NodeStatus::HandlingMail.text());
+    }
+}
+
+#[cfg(test)]
+mod color_tests {
+    use super::*;
+    use crate::icy_board::bbs::BBS;
+
+    async fn graphics_state() -> (IcyBoardState, ChannelConnection) {
+        let bbs = Arc::new(tokio::sync::Mutex::new(BBS::new(1)));
+        let mut board = IcyBoard::new();
+        board.users.new_user(crate::icy_board::user_base::User {
+            name: "SYSOP".to_string(),
+            security_level: 255,
+            ..Default::default()
+        });
+        let node = bbs.lock().await.create_new_node(ConnectionType::Channel).await;
+        let node_state = bbs.lock().await.open_connections.clone();
+        let (peer, connection) = ChannelConnection::create_pair();
+        let mut state = IcyBoardState::new(bbs, Arc::new(tokio::sync::Mutex::new(board)), node_state, node, Box::new(connection)).await;
+        // Without a caller on the node, sysop-only output is echoed to the user screen too.
+        let caller = state.get_board().await.users[0].clone();
+        state.session.current_user = Some(caller);
+        state.session.cur_user_id = 0;
+        state.session.disp_options.grapics_mode = GraphicsMode::Graphics;
+        (state, peer)
+    }
+
+    fn attribute_of(screen: &VirtualScreen) -> u8 {
+        screen.buffer.caret.attribute.as_u8(icy_engine::IceMode::Blink)
+    }
+
+    /// The escape sequence is a delta, so the screen it was computed against is the only
+    /// one it is correct for. A colour the caller already shows must still reach a sysop
+    /// screen that drifted away from it.
+    #[test]
+    fn a_colour_still_reaches_a_sysop_screen_that_drifted() {
+        tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
+            let (mut state, _peer) = graphics_state().await;
+            let caller_color = attribute_of(&state.user_screen);
+
+            state.set_color(TerminalTarget::Sysop, IcbColor::Dos(caller_color ^ 0x0F)).await.unwrap();
+            assert_ne!(attribute_of(&state.sysop_screen), caller_color, "the screens did not drift apart");
+
+            state.set_color(TerminalTarget::Both, IcbColor::Dos(caller_color)).await.unwrap();
+
+            assert_eq!(attribute_of(&state.sysop_screen), caller_color);
+            assert_eq!(attribute_of(&state.user_screen), caller_color);
+        });
+    }
+
+    /// Screens that agree are still served by a single write, so the caller sees the same
+    /// bytes as before.
+    #[test]
+    fn screens_in_step_share_one_sequence() {
+        tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
+            let (state, _peer) = graphics_state().await;
+            let color = IcbColor::Dos(attribute_of(&state.user_screen) ^ 0x0F);
+
+            assert_eq!(
+                state.color_change(TerminalTarget::User, &color),
+                state.color_change(TerminalTarget::Sysop, &color)
+            );
+        });
     }
 }
