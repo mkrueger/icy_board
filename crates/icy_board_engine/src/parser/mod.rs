@@ -307,6 +307,7 @@ pub const DOORS_ID: usize = 54;
 pub const CONFERENCES_ID: usize = 55;
 pub const NOTES_ID: usize = 56;
 pub const CONTACTS_ID: usize = 57;
+pub const MSG_ID: usize = 58;
 
 /// Builtin enums take the top of the id space and a program's own enums grow down from
 /// below them, so the order here is what a PPE stores and may only be appended to.
@@ -319,6 +320,7 @@ pub const GFX_BACKEND_ENUM_ID: u8 = 250;
 pub const ERR_KIND_ENUM_ID: u8 = 249;
 pub const ERR_CODE_ENUM_ID: u8 = 248;
 pub const EDITOR_MODE_ENUM_ID: u8 = 247;
+pub const MSG_FIELD_ENUM_ID: u8 = 246;
 
 /// The board objects are ours, so no `PCBoard` language knows their names.
 pub const FIRST_BOARD_OBJECT_LANGUAGE_VERSION: u16 = 400;
@@ -330,7 +332,7 @@ pub const FIRST_USER_TYPE_ID: usize = 100;
 /// How many records one program may declare, ids 100..=255.
 /// How many enums the board provides. They sit at the top of the id space, so a program
 /// declares that many fewer records of its own.
-pub const BUILTIN_ENUM_COUNT: usize = 9;
+pub const BUILTIN_ENUM_COUNT: usize = 10;
 
 /// How many records one program may declare, ids 100..=255 less the builtin enums.
 pub const MAX_USER_TYPES: usize = u8::MAX as usize - FIRST_USER_TYPE_ID + 1 - BUILTIN_ENUM_COUNT;
@@ -379,6 +381,7 @@ impl UserTypeRegistry {
         reg.register::<crate::icy_board::state::ppl_collection::PplConferences>(CONFERENCES_ID);
         reg.register::<crate::icy_board::state::ppl_user::PplNotes>(NOTES_ID);
         reg.register::<crate::icy_board::state::ppl_user::PplContacts>(CONTACTS_ID);
+        reg.register::<crate::icy_board::state::ppl_message::PplMessage>(MSG_ID);
 
         reg
     }
@@ -533,6 +536,8 @@ impl UserTypeRegistry {
         );
         // Whether the caller edits with the full screen editor, asks each time, or never.
         self.register_enum(EDITOR_MODE_ENUM_ID, "EditorMode", &[("Yes", 0), ("No", 1), ("Ask", 2)]);
+        // The values are the `HDR_*` constants, so naming one is a way of writing the number.
+        self.register_enum(MSG_FIELD_ENUM_ID, "MsgField", &[("To", 0x07), ("From", 0x0B), ("Subject", 0x0C)]);
     }
 
     /// The position of a field inside a record, which doubles

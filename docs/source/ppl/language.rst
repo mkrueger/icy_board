@@ -341,7 +341,10 @@ Member               Type              Description
 ``HasAccess()``      ``BOOLEAN``       Whether the current caller may list it
 ``CanEnter()``       ``BOOLEAN``       Whether the current caller may join it
 ``CanAttach()``      ``BOOLEAN``       Whether the current caller may save an attachment
+``LowMsg()``         ``INTEGER``       The lowest message number, zero when there is none
 ``HighMsg()``        ``INTEGER``       The highest message number, zero when there is none
+``Read(number)``     ``MSG``           The message with that number
+``Find(f, t[, s])``  ``MSG``           First message at or after ``s`` whose field ``f`` contains ``t``
 ===================  ================  ==================================================
 
 **DIRECTORY**
@@ -376,6 +379,83 @@ Member               Type              Description
 
 ``HighMsg()`` opens the message base to answer, so it is a call rather than a
 property: read it once per area rather than once per line of a listing.
+
+Messages
+~~~~~~~~
+
+``AREA.Read(number)`` answers with a ``MSG``, the message that area holds under
+that number::
+
+    AREA area = Session.Area
+    MSG msg = area.Read(1)
+
+    IF msg.Valid THEN
+        PRINTLN msg.Number, "  ", msg.From, " -> ", msg.To
+        PRINTLN msg.Subject, "  ", msg.Date, " ", msg.Time
+        PRINTLN msg.Text()
+    ENDIF
+
+===================  ================  ==================================================
+Member               Type              Description
+===================  ================  ==================================================
+``Valid``            ``BOOLEAN``       Whether the area has that message
+``Number``           ``INTEGER``       The number it was read under
+``From``             ``STRING``        Who wrote it
+``To``               ``STRING``        Who it is for
+``Subject``          ``STRING``        What it is about
+``Date``             ``DATE``          When it was written
+``Time``             ``TIME``          When it was written
+``ReplyTo``          ``INTEGER``       The message it answers, zero when it answers none
+``Status``           ``STRING``        The one character ``HDR_STATUS`` reports
+``IsPrivate``        ``BOOLEAN``       Whether it is private
+``IsRead``           ``BOOLEAN``       Whether it has been read
+``IsDeleted``        ``BOOLEAN``       Whether it is killed
+``IsEcho``           ``BOOLEAN``       Whether it is echoed
+``NeedsPassword``    ``BOOLEAN``       Whether reading it takes a password
+``Size``             ``INTEGER``       How many bytes the body holds
+``Text()``           ``STRING``        The body
+===================  ================  ==================================================
+
+A message is addressed by its number, not by its position. A message base is
+sparse - numbering starts at ``LowMsg()`` and a deleted message leaves its
+number behind - so a walk counts over the range and asks each one whether it is
+there::
+
+    INTEGER n
+
+    FOR n = area.LowMsg() TO area.HighMsg()
+        MSG msg = area.Read(n)
+        IF !msg.Valid CONTINUE
+        PRINTLN msg.Number, " ", msg.From, " ", msg.Subject
+    NEXT
+
+That is also why messages are not a collection: ``[ ]`` indexes a position
+everywhere else in the language, and a message number is not one.
+
+The body stays in the base until ``Text()`` asks for it, which is why it is a
+call. A listing that only prints headers never pays for a body.
+
+``Find`` is ``SCANMSGHDR`` with a type instead of a field number. It matches
+without regard to case, anywhere in the field, and answers an invalid ``MSG``
+when nothing matches. The ``start`` argument walks on to the next match::
+
+    MSG hit = area.Find(MsgField.To, "STAN")
+
+    WHILE hit.Valid DO
+        PRINTLN hit.Number, " ", hit.Subject
+        hit = area.Find(MsgField.To, "STAN", hit.Number + 1)
+    ENDWHILE
+
+``MsgField`` is ``To``, ``From`` or ``Subject``; the values are the matching
+``HDR_*`` constants.
+
+A ``MSG`` is a read-only snapshot. ``GETMSGHDR``, ``SETMSGHDR``, ``SCANMSGHDR``
+and the ``MESSAGE`` statement are unchanged, and writing a message is still
+theirs.
+
+.. note::
+   The type is called ``MSG`` rather than ``MESSAGE`` because ``MESSAGE`` has
+   been a statement since PPL 1.00 and keeps that meaning.
 
 A password is always of the runtime-only ``PASSWORD`` type. It may be compared
 against a string, but printing or converting one yields ``******`` rather than

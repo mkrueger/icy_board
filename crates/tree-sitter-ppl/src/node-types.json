@@ -2314,7 +2314,15 @@
     "named": false
   },
   {
+    "type": "MSG",
+    "named": false
+  },
+  {
     "type": "MSGAREAID",
+    "named": false
+  },
+  {
+    "type": "MSGFIELD",
     "named": false
   },
   {

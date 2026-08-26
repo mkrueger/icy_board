@@ -1,0 +1,180 @@
+//! Reading messages out of an area as `MSG` values.
+
+use super::{compile_errors, run_ppl_with_messages};
+
+/// `(from, to, subject)`, numbered from one in order.
+const MESSAGES: &[(&str, &str, &str)] = &[
+    ("SYSOP", "STAN", "About PPL"),
+    ("STAN", "SYSOP", "Re: About PPL"),
+    ("FRED", "ALL", "Announcement"),
+];
+
+#[test]
+fn a_message_reports_its_header() {
+    let output = run_ppl_with_messages(
+        r#"
+        MSG msg = Board.Conferences[0].Areas[0].Read(1)
+        PrintLn msg.Valid, " ", msg.Number
+        PrintLn msg.From, " -> ", msg.To
+        PrintLn msg.Subject
+        PrintLn msg.IsPrivate, " ", msg.IsRead, " ", msg.IsDeleted, " ", msg.IsEcho
+        "#,
+        MESSAGES,
+    );
+
+    assert_eq!(output, "1 1\nSYSOP -> STAN\nAbout PPL\n0 0 0 0\n");
+}
+
+/// The body stays in the base until it is asked for, so reading it is a call.
+#[test]
+fn a_message_reads_its_body_on_demand() {
+    let output = run_ppl_with_messages(
+        r"
+        PrintLn Board.Conferences[0].Areas[0].Read(2).Text()
+        ",
+        MESSAGES,
+    );
+
+    assert_eq!(output, "body\n");
+}
+
+/// A number the area has no message for stays readable, the way every other
+/// board object does, so a walk over a base with holes cannot fall over.
+#[test]
+fn an_unknown_message_number_answers_an_invalid_message() {
+    let output = run_ppl_with_messages(
+        r#"
+        MSG msg = Board.Conferences[0].Areas[0].Read(99)
+        PrintLn msg.Valid, " ", msg.Number, " [", msg.Subject, "] [", msg.Text(), "]"
+        PrintLn Board.Conferences[0].Areas[0].Read(-1).Valid
+        "#,
+        MESSAGES,
+    );
+
+    assert_eq!(output, "0 0 [] []\n0\n");
+}
+
+/// The numbers a walk runs between. A JAM base is sparse, so a PPE counts over
+/// the range and asks each message whether it is there.
+#[test]
+fn an_area_reports_the_range_of_its_messages() {
+    let output = run_ppl_with_messages(
+        r#"
+        AREA area = Board.Conferences[0].Areas[0]
+        PrintLn area.LowMsg(), " ", area.HighMsg()
+
+        INTEGER n
+        INTEGER found
+        FOR n = area.LowMsg() TO area.HighMsg()
+            MSG msg = area.Read(n)
+            IF msg.Valid found = found + 1
+        NEXT
+        PrintLn found
+        "#,
+        MESSAGES,
+    );
+
+    assert_eq!(output, "1 3\n3\n");
+}
+
+#[test]
+fn find_reports_the_first_message_whose_field_matches() {
+    let output = run_ppl_with_messages(
+        r#"
+        AREA area = Board.Conferences[0].Areas[0]
+        PrintLn area.Find(MsgField.To, "STAN").Number
+        PrintLn area.Find(MsgField.From, "FRED").Number
+        PrintLn area.Find(MsgField.Subject, "About PPL").Number
+        "#,
+        MESSAGES,
+    );
+
+    assert_eq!(output, "1\n3\n1\n");
+}
+
+/// Matching is case-insensitive and anywhere in the field, the way `SCANMSGHDR`
+/// has always matched.
+#[test]
+fn find_matches_part_of_a_field_whatever_its_case() {
+    let output = run_ppl_with_messages(
+        r#"
+        PrintLn Board.Conferences[0].Areas[0].Find(MsgField.Subject, "announce").Number
+        "#,
+        MESSAGES,
+    );
+
+    assert_eq!(output, "3\n");
+}
+
+/// The start number is what lets a PPE walk on to the next match.
+#[test]
+fn find_starts_where_it_is_told_to() {
+    let output = run_ppl_with_messages(
+        r#"
+        AREA area = Board.Conferences[0].Areas[0]
+        MSG first = area.Find(MsgField.Subject, "About PPL")
+        MSG later = area.Find(MsgField.Subject, "About PPL", first.Number + 1)
+        PrintLn first.Number, " ", later.Number, " ", later.Subject
+        "#,
+        MESSAGES,
+    );
+
+    assert_eq!(output, "1 2 Re: About PPL\n");
+}
+
+#[test]
+fn find_answers_an_invalid_message_when_nothing_matches() {
+    let output = run_ppl_with_messages(
+        r#"
+        MSG msg = Board.Conferences[0].Areas[0].Find(MsgField.To, "NOBODY")
+        PrintLn msg.Valid, " ", msg.Number
+        "#,
+        MESSAGES,
+    );
+
+    assert_eq!(output, "0 0\n");
+}
+
+/// A message that is there carries the date it was written; one that is not
+/// reads as the empty date rather than as today.
+#[test]
+fn a_message_carries_the_date_it_was_written() {
+    let output = run_ppl_with_messages(
+        r#"
+        AREA area = Board.Conferences[0].Areas[0]
+        PrintLn area.Read(1).Date <> "00/00/00"
+        PrintLn area.Read(99).Date
+        "#,
+        MESSAGES,
+    );
+
+    assert_eq!(output, "1\n00/00/00\n");
+}
+
+/// A message is what the area holds, not something a PPE may rewrite.
+#[test]
+fn a_message_member_cannot_be_assigned() {
+    for write in [
+        "MSG msg = Session.Area.Read(1)\nmsg.Subject = \"x\"",
+        "MSG msg = Session.Area.Read(1)\nmsg.Number = 2",
+        "MSG msg = Session.Area.Read(1)\nmsg.IsDeleted = TRUE",
+    ] {
+        let errors = compile_errors(write);
+        assert!(errors.iter().any(|error| error.contains("can only be read")), "{write}: {errors:?}");
+    }
+}
+
+/// `MESSAGE` is a statement from PPL 1.00 and stays one, which is why the type
+/// beside it is called `MSG`.
+#[test]
+fn the_message_statement_still_parses_at_language_400() {
+    let errors = compile_errors(
+        r#"
+        INTEGER conf
+        STRING to
+        MESSAGE conf, to, "SYSOP", "subject", "R", 0, TRUE, TRUE, "body.txt"
+        "#,
+    );
+
+    assert!(errors.is_empty(), "{errors:?}");
+}

@@ -405,7 +405,9 @@ still be read.
 | `HasAccess()` | `BOOLEAN` | Whether the current caller may list it |
 | `CanEnter()` | `BOOLEAN` | Whether the current caller may join it |
 | `CanAttach()` | `BOOLEAN` | Whether the current caller may save an attachment |
-| `HighMsg()` | `INTEGER` | The highest message number, zero when there is none |
+| `LowMsg()`, `HighMsg()` | `INTEGER` | The numbers its messages run between, zero when there are none |
+| `Read(number)` | `MSG` | The message with that number |
+| `Find(field, text [, start])` | `MSG` | The first message at or after `start` whose field contains `text` |
 
 **`DIRECTORY`**
 
@@ -473,10 +475,18 @@ dimension.
 | Type | Declarable | Description |
 | :--- | :--- | :--- |
 | `MSGAREAID` | yes | A combined conference/message-area identifier, produced by `AreaId()` |
+| `MSG` | yes | One message read out of its area, by number |
 | `PASSWORD` | no | A password. Comparable against a string, but printing or converting one yields `******` instead of the secret. |
 
 `PASSWORD` exists only at runtime; it is the type of `CONFERENCE.Password`,
 `DIRECTORY.Password` and `DOOR.Password`, and cannot be written in a declaration.
+
+A `MSG` comes from `AREA.Read(number)` or `AREA.Find(...)` and is a read-only
+snapshot: `Valid`, `Number`, `From`, `To`, `Subject`, `Date`, `Time`, `ReplyTo`,
+`Status`, `Size`, `IsPrivate`, `IsRead`, `IsDeleted`, `IsEcho`, `NeedsPassword`
+and `Text()`. It is called `MSG` rather than `MESSAGE` because `MESSAGE` has been
+a statement since PPL 1.00. `MsgField` - `To`, `From`, `Subject` - is what `Find`
+searches on. See [new_ppl.md](new_ppl.md#messages-400).
 
 #### New library surface
 

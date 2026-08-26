@@ -44,6 +44,7 @@ pub mod ppl_graphics;
 pub mod ppl_keys;
 pub mod ppl_macros;
 pub mod ppl_margins;
+pub mod ppl_message;
 pub mod ppl_mouse;
 pub mod ppl_palette;
 pub mod ppl_session;

@@ -11,8 +11,14 @@ use serde_with::{DisplayFromStr, serde_as};
 use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue},
     executable::{VariableType, VariableValue},
-    icy_board::is_null_16,
+    icy_board::{is_null_16, state::ppl_message::PplMessage},
+    parser::MSG_ID,
 };
+
+/// The `HDR_*` field numbers a `MsgField` names, so `Find` and `SCANMSGHDR` agree.
+const HDR_TO: i32 = 0x07;
+const HDR_FROM: i32 = 0x0B;
+const HDR_SUBJ: i32 = 0x0C;
 
 use super::{IcyBoardSerializer, security_expr::SecurityExpression};
 
@@ -66,6 +72,48 @@ impl MessageArea {
     pub fn get_high_msg(&self) -> u32 {
         JamMessageBase::open(&self.path).map_or(0, |jam| jam.highest_message_number())
     }
+
+    pub fn get_low_msg(&self) -> u32 {
+        JamMessageBase::open(&self.path).map_or(0, |jam| jam.lowest_message_number())
+    }
+
+    /// The message with that number, or an invalid one when the area has no such message.
+    fn read_message(&self, number: i32) -> VariableValue {
+        if number < 0 {
+            return PplMessage::missing();
+        }
+        JamMessageBase::open(&self.path)
+            .and_then(|base| base.read_header(number as u32))
+            .map_or_else(|_| PplMessage::missing(), |header| PplMessage::from_header(&self.path, &header).value())
+    }
+
+    /// The first message at or after `start` whose field contains `text`, matched the
+    /// way `SCANMSGHDR` matches: without regard to case, anywhere in the field.
+    fn find_message(&self, field: i32, text: &str, start: i32) -> VariableValue {
+        let Ok(base) = JamMessageBase::open(&self.path) else {
+            return PplMessage::missing();
+        };
+        let needle = text.to_uppercase();
+        let first = (start.max(0) as u32).max(base.lowest_message_number());
+        for number in first..=base.highest_message_number() {
+            let Ok(header) = base.read_header(number) else {
+                continue;
+            };
+            let candidate = match field {
+                HDR_TO => header.to().map(ToString::to_string),
+                HDR_FROM => header.from().map(ToString::to_string),
+                HDR_SUBJ => header.subject().map(ToString::to_string),
+                _ => {
+                    log::error!("Area.Find: unknown message field {field}");
+                    return PplMessage::missing();
+                }
+            };
+            if candidate.unwrap_or_default().to_uppercase().contains(&needle) {
+                return PplMessage::from_header(&self.path, &header).value();
+            }
+        }
+        PplMessage::missing()
+    }
 }
 
 #[derive(Serialize, Deserialize, Default, Clone, PartialEq)]
@@ -111,6 +159,18 @@ impl UserData for MessageArea {
         registry.add_function(CAN_ENTER.clone(), Vec::new(), VariableType::Boolean);
         registry.add_function(CAN_ATTACH.clone(), Vec::new(), VariableType::Boolean);
         registry.add_function(HIGH_MSG.clone(), Vec::new(), VariableType::Integer);
+        registry.add_function(LOW_MSG.clone(), Vec::new(), VariableType::Integer);
+        registry.add_function(READ.clone(), vec![VariableType::Integer], VariableType::UserData(MSG_ID as u8));
+        registry.add_function_with(
+            FIND.clone(),
+            vec![
+                VariableType::UserData(crate::parser::MSG_FIELD_ENUM_ID),
+                VariableType::String,
+                VariableType::Integer,
+            ],
+            2,
+            VariableType::UserData(MSG_ID as u8),
+        );
     }
 }
 
@@ -125,6 +185,9 @@ pub static HAS_ACCESS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::
 pub static CAN_ENTER: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("CanEnter".to_string()));
 pub static CAN_ATTACH: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("CanAttach".to_string()));
 pub static HIGH_MSG: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("HighMsg".to_string()));
+pub static LOW_MSG: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("LowMsg".to_string()));
+pub static READ: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Read".to_string()));
+pub static FIND: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Find".to_string()));
 
 #[async_trait(?Send)]
 impl UserDataValue for MessageArea {
@@ -162,7 +225,7 @@ impl UserDataValue for MessageArea {
         &self,
         vm: &mut crate::vm::VirtualMachine<'_>,
         name: &unicase::Ascii<String>,
-        _arguments: &[VariableValue],
+        arguments: &[VariableValue],
     ) -> crate::Res<VariableValue> {
         if *name == *HAS_ACCESS {
             let res = self.req_level_to_list.session_can_access(&vm.icy_board_state.session);
@@ -178,6 +241,18 @@ impl UserDataValue for MessageArea {
         }
         if *name == *HIGH_MSG {
             return Ok(VariableValue::new_int(self.get_high_msg() as i32));
+        }
+        if *name == *LOW_MSG {
+            return Ok(VariableValue::new_int(self.get_low_msg() as i32));
+        }
+        if *name == *READ {
+            return Ok(self.read_message(arguments[0].as_int()));
+        }
+        if *name == *FIND {
+            let field = arguments[0].as_int();
+            let text = arguments[1].as_string();
+            let start = arguments.get(2).map_or(0, VariableValue::as_int);
+            return Ok(self.find_message(field, &text, start));
         }
         log::error!("Invalid function call on MessageArea ({name})");
         Err("Function not found".into())

@@ -1600,6 +1600,18 @@
             "type": "TOKEN",
             "content": {
               "type": "PATTERN",
+              "value": "[mM][sS][gG]"
+            }
+          },
+          "named": false,
+          "value": "MSG"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
               "value": "[pP][aA][lL][eE][tT][tT][eE]"
             }
           },
@@ -1785,6 +1797,18 @@
           },
           "named": false,
           "value": "EDITORMODE"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
+              "value": "[mM][sS][gG][fF][iI][eE][lL][dD]"
+            }
+          },
+          "named": false,
+          "value": "MSGFIELD"
         }
       ]
     },

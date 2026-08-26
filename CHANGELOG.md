@@ -8,6 +8,30 @@ releases.
 
 ## [Unreleased]
 
+### Added
+
+- `MSG`, the message type. `AREA.Read(number)` answers with one, and it reports
+  `From`, `To`, `Subject`, `Date`, `Time`, `ReplyTo`, `Status`, `Size`,
+  `IsPrivate`, `IsRead`, `IsDeleted`, `IsEcho`, `NeedsPassword` and `Text()` -
+  what `GETMSGHDR(AreaId(c, a), n, HDR_SUBJ)` returned as a string picked by a
+  number is now a member with a type of its own. `AREA.Find(MsgField.To, "STAN")`
+  is `SCANMSGHDR` with a type instead of a field number, and takes a start number
+  to walk on to the next match. `AREA.LowMsg()` joins `HighMsg()`, because a
+  message base is sparse and a walk needs both ends of it.
+
+  A message is addressed by its number rather than its position, which is why it
+  is not a collection: `[ ]` indexes a position everywhere else in the language,
+  and a message number is not one. The body stays in the base until `Text()`
+  asks for it, so a listing that prints headers never pays for a body.
+
+  The type is called `MSG` because `MESSAGE` has been a statement since PPL 1.00.
+  A board object name is resolved wherever a type name is expected, so calling it
+  `MESSAGE` would have turned `MESSAGE conf, to, ...` into a declaration at
+  language 400 and quietly broken the statement.
+
+  Reading is all it does. `GETMSGHDR`, `SETMSGHDR`, `SCANMSGHDR` and the
+  `MESSAGE` statement are unchanged, and writing a message is still theirs.
+
 ### Changed
 
 - The board objects report what they are configured to be, not only what they are

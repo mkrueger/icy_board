@@ -570,7 +570,9 @@ an empty conference object, so its properties can still be read.
 | `HasAccess()` | `BOOLEAN` | Whether the current caller may list it |
 | `CanEnter()` | `BOOLEAN` | Whether the current caller may join it |
 | `CanAttach()` | `BOOLEAN` | Whether the current caller may save an attachment |
-| `HighMsg()` | `INTEGER` | The highest message number, zero when there is none |
+| `LowMsg()`, `HighMsg()` | `INTEGER` | The numbers its messages run between, zero when there are none |
+| `Read(number)` | `MSG` | The message with that number |
+| `Find(field, text [, start])` | `MSG` | The first message at or after `start` whose field contains `text` |
 
 | Directory member | Type | Description |
 | :--- | :--- | :--- |
@@ -597,8 +599,9 @@ name what a caller has to type.
 is asked separately - `CanPost()`, `CanEnter()`, `CanAttach()`, `CanDownload()` -
 because seeing a conference and writing in it are configured apart.
 
-`HighMsg()` opens the message base to answer, which is why it is a call rather
-than a property. Read it once per area rather than once per line of a listing.
+`HighMsg()` and `LowMsg()` open the message base to answer, which is why they are
+calls rather than properties. Read them once per area rather than once per line
+of a listing.
 
 A password has the runtime-only `PASSWORD` type: it can be compared with a
 string, but converting or printing it produces `******` rather than the secret.
@@ -610,6 +613,77 @@ CONFERENCE conf = Board.Conferences[0]
 
 IF conf.Password <> "" PRINTLN conf.Name, " needs a password"
 ```
+
+### Messages (4.00)
+
+A message is read out of its area as a `MSG`. What `GETMSGHDR` returned as a
+string picked by a number is a member with a type of its own:
+
+```PPL
+AREA area = Session.Area
+MSG msg = area.Read(1)
+
+IF msg.Valid THEN
+	PRINTLN msg.Number, "  ", msg.From, " -> ", msg.To
+	PRINTLN msg.Subject, "  ", msg.Date, " ", msg.Time
+	PRINTLN msg.Text()
+ENDIF
+```
+
+| Member | Type | Description |
+| :--- | :--- | :--- |
+| `Valid` | `BOOLEAN` | Whether the area has that message |
+| `Number` | `INTEGER` | The number it was read under |
+| `From`, `To`, `Subject` | `STRING` | Who wrote it, who it is for, what it is about |
+| `Date`, `Time` | `DATE`, `TIME` | When it was written |
+| `ReplyTo` | `INTEGER` | The message this one answers, zero when it answers none |
+| `Status` | `STRING` | The one character `PCBoard` kept, as `HDR_STATUS` reports it |
+| `IsPrivate`, `IsRead`, `IsDeleted`, `IsEcho`, `NeedsPassword` | `BOOLEAN` | What the header says about it |
+| `Size` | `INTEGER` | How many bytes the body holds |
+| `Text()` | `STRING` | The body |
+
+A message is addressed by its **number**, not by its position. A message base is
+sparse: numbering starts at `LowMsg()` and a deleted message leaves its number
+behind, so a walk counts over the range and asks each one whether it is there:
+
+```PPL
+INTEGER n
+
+FOR n = area.LowMsg() TO area.HighMsg()
+	MSG msg = area.Read(n)
+	IF !msg.Valid CONTINUE
+	PRINTLN msg.Number, " ", msg.From, " ", msg.Subject
+NEXT
+```
+
+That is also why messages are not a collection: `[ ]` indexes a position
+everywhere else in the language, and a message number is not one.
+
+The body stays in the base until `Text()` asks for it, which is why it is a call.
+A listing that only prints headers never pays for a single body.
+
+`Find` is `SCANMSGHDR` with a type instead of a field number. It matches without
+regard to case, anywhere in the field, and answers an invalid `MSG` when nothing
+matches. The `start` argument is what walks on to the next match:
+
+```PPL
+MSG hit = area.Find(MsgField.To, "STAN")
+
+WHILE hit.Valid DO
+	PRINTLN hit.Number, " ", hit.Subject
+	hit = area.Find(MsgField.To, "STAN", hit.Number + 1)
+ENDWHILE
+```
+
+`MsgField` is `To`, `From` or `Subject`. Its values are the matching `HDR_*`
+constants, so naming one is a way of writing the number.
+
+A `MSG` is a read-only snapshot of what the area holds. `GETMSGHDR`,
+`SETMSGHDR`, `SCANMSGHDR` and the `MESSAGE` statement are unchanged, and writing
+a message is still theirs.
+
+> The type is called `MSG` rather than `MESSAGE` because `MESSAGE` has been a
+> statement since PPL 1.00 and keeps that meaning.
 
 ### Collections
 
