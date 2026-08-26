@@ -19,6 +19,9 @@ pub static COUNT: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyL
 /// so the index is the only way to write it.
 pub static GET: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("<get>".to_string()));
 
+/// What `collection[index] = value` writes with, the mirror of `GET`.
+pub static SET: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("<set>".to_string()));
+
 /// A list the board hands to a PPE. It shares the list rather than copying it, so
 /// reading the same collection once per loop step stays cheap.
 macro_rules! ppl_collection {

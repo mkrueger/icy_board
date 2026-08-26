@@ -203,20 +203,30 @@ impl AstVisitor<()> for OutputVisitor {
     }
 
     fn visit_function_call_expression(&mut self, call: &super::FunctionCallExpression) {
-        // A collection's getter has no name a source can write, so it is written back
-        // the only way it can be read: as an index.
+        // A collection's getter and setter have no name a source can write, so they are
+        // written back the only way they can be read: as an index.
         if let super::Expression::MemberReference(member) = call.get_expression()
-            && member.get_identifier().as_str() == "<get>"
+            && matches!(member.get_identifier().as_str(), "<get>" | "<set>")
         {
+            let is_set = member.get_identifier().as_str() == "<set>";
+            let indices = if is_set {
+                &call.get_arguments()[..call.get_arguments().len() - 1]
+            } else {
+                call.get_arguments()
+            };
             member.get_expression().visit(self);
             self.output.push('[');
-            for (i, arg) in call.get_arguments().iter().enumerate() {
+            for (i, arg) in indices.iter().enumerate() {
                 arg.visit(self);
-                if i < call.get_arguments().len() - 1 {
+                if i + 1 < indices.len() {
                     self.output.push_str(", ");
                 }
             }
             self.output.push(']');
+            if is_set && let Some(value) = call.get_arguments().last() {
+                self.output.push_str(" = ");
+                value.visit(self);
+            }
             return;
         }
         match call.get_expression() {

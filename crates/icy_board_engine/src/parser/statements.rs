@@ -1,9 +1,10 @@
 use crate::{
     ast::{
         BlockStatement, BreakStatement, CaseBlock, CaseSpecifier, CommentAstNode, ConstDeclarationStatement, Constant, ContinueStatement, ElseBlock,
-        ElseIfBlock, Expression, ForEachStatement, ForStatement, GosubStatement, GotoStatement, IdentifierExpression, IfStatement, IfThenStatement,
-        LabelStatement, LetStatement, LoopStatement, MemberCallStatement, OnErrorMode, OnErrorStatement, PredefinedCallStatement, ProcedureCallStatement,
-        RepeatUntilStatement, ReturnStatement, SelectStatement, Statement, VariableDeclarationStatement, WhileDoStatement, WhileStatement,
+        ElseIfBlock, Expression, ForEachStatement, ForStatement, FunctionCallExpression, GosubStatement, GotoStatement, IdentifierExpression, IfStatement,
+        IfThenStatement, LabelStatement, LetStatement, LoopStatement, MemberCallStatement, MemberReferenceExpression, OnErrorMode, OnErrorStatement,
+        PredefinedCallStatement, ProcedureCallStatement, RepeatUntilStatement, ReturnStatement, SelectStatement, Statement, VariableDeclarationStatement,
+        WhileDoStatement, WhileStatement,
     },
     executable::{OpCode, StatementDefinition},
     parser::ParserErrorType,
@@ -918,6 +919,39 @@ impl Parser<'_> {
             let expression = self.parse_member_chain(base)?;
 
             if matches!(expression, Expression::FunctionCall(_)) {
+                // `collection[i] = value` is the collection's own setter, the mirror of
+                // the getter `[i]` reads with. Only a plain `=`: there is nothing to read
+                // and write back for a compound assignment.
+                if self.get_cur_token() == Some(Token::Eq)
+                    && let Expression::FunctionCall(call) = &expression
+                    && let Expression::MemberReference(member) = call.get_expression()
+                    && member.get_identifier().as_str() == "<get>"
+                {
+                    let eq_token = self.save_spanned_token();
+                    self.next_token();
+                    let Some(value_expression) = self.parse_expression() else {
+                        self.report_error(self.lex.span(), ParserErrorType::ExpressionExpected(self.save_token()));
+                        return None;
+                    };
+                    let setter = Spanned::new(
+                        Token::Identifier(unicase::Ascii::new("<set>".to_string())),
+                        member.get_identifier_token().span.clone(),
+                    );
+                    let mut arguments = call.get_arguments().clone();
+                    arguments.push(value_expression);
+                    return Some(Statement::MemberCall(MemberCallStatement::new(Expression::FunctionCall(
+                        FunctionCallExpression::new(
+                            Expression::MemberReference(MemberReferenceExpression::new(
+                                member.get_expression().clone(),
+                                member.get_dot_token().clone(),
+                                setter,
+                            )),
+                            eq_token.clone(),
+                            arguments,
+                            eq_token,
+                        ),
+                    ))));
+                }
                 return Some(Statement::MemberCall(MemberCallStatement::new(expression)));
             }
 

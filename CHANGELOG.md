@@ -10,6 +10,14 @@ releases.
 
 ### Changed
 
+- Followed up the 4.00 API review: `Session.ConferenceNumber`, `AreaNumber` and
+  `DirectoryNumber` are gone, because the object beside them already reports the
+  same `Number`. `Macros.StartRecord`/`StopRecord` became `BeginRecord`/
+  `EndRecord`, so `Begin`/`End` is the one pairing the API uses.
+  `Contacts.Set()` became `Contacts.Put()`, since it is keyed by service rather
+  than by position, and a note is now written through its index:
+  `Session.User.Notes[0] = "..."`.
+
 - `User.NoteCount`/`GetNote(i)`/`SetNote(i, t)` and `User.ContactCount`/
   `GetContact(i)`/`SetContact(s, a)`/`DeleteContact(s)` became the collections
   `User.Notes` and `User.Contacts`, which answer `Count`, are read with an index

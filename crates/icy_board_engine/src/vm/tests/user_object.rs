@@ -63,19 +63,29 @@ fn the_callers_name_stays_read_only() {
 #[test]
 fn a_note_can_be_written_and_read_back() {
     assert_eq!(
-        "1 Called about the upload",
+        "Called about the upload",
         run_ppl(
             r#"
-PRINT Session.User.Notes.Set(0, "Called about the upload"), " "
+Session.User.Notes[0] = "Called about the upload"
 PRINT Session.User.Notes[0]
 "#,
         )
     );
 }
 
+/// An index no note has is refused rather than failing, and leaves the rest alone.
 #[test]
 fn a_note_outside_the_five_slots_is_refused() {
-    assert_eq!("0", run_ppl(r#"PRINT Session.User.Notes.Set(5, "nowhere")"#));
+    assert_eq!(
+        "kept",
+        run_ppl(
+            r#"
+Session.User.Notes[0] = "kept"
+Session.User.Notes[5] = "nowhere"
+PRINT Session.User.Notes[0]
+"#,
+        )
+    );
 }
 
 /// The board hashes the password, so what the PPE handed over is not what is stored.

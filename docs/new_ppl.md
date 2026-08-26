@@ -712,7 +712,15 @@ refused. Both answer `FALSE` rather than failing.
 
 Both are collections: they answer `Count`, are read with an index and are walked
 with `FOREACH`. `Notes` holds the five sysop notes as `STRING`s and is written
-with `Notes.Set(index, text)`.
+through the index:
+
+```PPL
+Session.User.Notes[0] = "Called about the upload"
+```
+
+An index no note has is refused and leaves the rest alone. A compound assignment
+such as `Notes[0] = Notes[0] + "..."` has to be written out; `+=` on an index is
+not read as an assignment.
 
 A contact is a built-in `CONTACT` record with two `STRING` fields, `Service` and
 `Account`. Service names are open strings, so a PPE can store a new service
@@ -729,7 +737,8 @@ Session.User.Contacts.Put("matrix", "@sysop:example.org")
 ```
 
 `Contacts.Put()` replaces the account when the service is already there and adds
-it otherwise, so there can never be two entries meaning the same service. Service
+it otherwise, so there can never be two entries meaning the same service. It is
+`Put` rather than `Set` because it is keyed by service, not by position. Service
 names are trimmed and compared without regard to case; a blank service or account
 is refused and answers `FALSE`. `Contacts.Delete()` answers whether it removed
 anything. An index no contact has answers with an empty `CONTACT`.

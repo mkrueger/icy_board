@@ -5,7 +5,7 @@ use crate::{
     datetime::IcbDate,
     executable::{VariableType, VariableValue},
     icy_board::{
-        state::ppl_collection::{COUNT, GET},
+        state::ppl_collection::{COUNT, GET, SET as SET_INDEXED},
         user_base::{FSEMode, User, UserContact},
     },
     parser::{CONTACT_ID, CONTACTS_ID, EDITOR_MODE_ENUM_ID, NOTES_ID, USER_ID},
@@ -115,7 +115,6 @@ pub struct PplNotes;
 pub struct PplContacts;
 
 member_name!(PUT, "Put");
-member_name!(SET, "Set");
 member_name!(DELETE, "Delete");
 
 impl UserData for PplNotes {
@@ -124,7 +123,7 @@ impl UserData for PplNotes {
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         registry.add_property(COUNT.clone(), VariableType::Integer, false);
         registry.add_function(GET.clone(), vec![VariableType::Integer], VariableType::String);
-        registry.add_function(SET.clone(), vec![VariableType::Integer, VariableType::String], VariableType::Boolean);
+        registry.add_function(SET_INDEXED.clone(), vec![VariableType::Integer, VariableType::String], VariableType::Boolean);
     }
 }
 
@@ -163,7 +162,7 @@ impl UserDataValue for PplNotes {
             };
             return Ok(VariableValue::new_string(note.clone()));
         }
-        if *name == *SET {
+        if *name == *SET_INDEXED {
             let text = arguments[1].as_string();
             let Some(user) = vm.icy_board_state.session.current_user.as_mut() else {
                 return Ok(VariableValue::new_bool(false));

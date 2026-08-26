@@ -54,8 +54,8 @@ fn notes_can_be_walked() {
         "5 first  third   ",
         run_ppl(
             r#"
-Session.User.Notes.Set(0, "first")
-Session.User.Notes.Set(2, "third")
+Session.User.Notes[0] = "first"
+Session.User.Notes[2] = "third"
 STRING note
 PRINT Session.User.Notes.Count, " "
 FOREACH note IN Session.User.Notes
