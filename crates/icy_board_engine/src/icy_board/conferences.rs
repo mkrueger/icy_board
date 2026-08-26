@@ -411,9 +411,6 @@ pub static FILE_AREAS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::
 pub static DOORS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Doors".to_string()));
 pub static MESSAGE_AREAS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Areas".to_string()));
 pub static HAS_ACCESS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("HasAccess".to_string()));
-pub static GET_FILE_AREA: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("GetDirectory".to_string()));
-pub static GET_MSG_AREA: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("GetArea".to_string()));
-pub static GET_DOOR: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("GetDoor".to_string()));
 
 #[async_trait(?Send)]
 impl UserDataValue for Conference {

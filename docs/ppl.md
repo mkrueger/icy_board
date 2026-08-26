@@ -378,14 +378,10 @@ still be read.
 | `Number` | `INTEGER` | The number the conference was fetched under |
 | `Valid` | `BOOLEAN` | Whether the requested conference exists |
 | `IsPublic` | `BOOLEAN` | Whether the conference is configured as public |
-| `DirectoryCount` | `INTEGER` | Number of file directories |
-| `AreaCount` | `INTEGER` | Number of message areas |
-| `DoorCount` | `INTEGER` | Number of doors |
+| `Directories` | `DIRECTORIES` | The file directories of the conference |
+| `Areas` | `AREAS` | The message areas of the conference |
+| `Doors` | `DOORS` | The doors of the conference |
 | `HasAccess()` | `BOOLEAN` | Whether the current caller can access the conference |
-| `GetDirectory(index)` | `DIRECTORY` | File directory at the zero-based index |
-| `GetArea(index)` | `AREA` | Message area at the zero-based index |
-| `GetDoor(index)` | `DOOR` | Door at the zero-based index |
-
 **`DIRECTORY`** and **`AREA`**
 
 | Member | Type | Description |
@@ -410,12 +406,11 @@ Walking a conference:
 
 ```PPL
 CONFERENCE conf = Session.Conference
-INTEGER i
+DOOR item
 
-FOR i = 0 TO conf.DoorCount - 1
-    DOOR item = conf.GetDoor(i)
+FOREACH item IN conf.Doors
     IF item.HasAccess() PRINTLN item.Name
-NEXT
+ENDFOREACH
 ```
 
 Note that `CONFERENCE`, `DOOR`, `AREA` and `DIRECTORY` are resolved wherever a
@@ -425,7 +420,7 @@ declares too: `Point point` leaves `point` ambiguous.
 
 These objects are read-only snapshots, so assigning to a member — `conf.Name = "x"`
 — is rejected. What a member answers may be asked again, so
-`conf.GetDoor(0).Name` reads in one go.
+`conf.Doors[0].Name` reads in one go.
 
 #### Overloaded built-ins
 
