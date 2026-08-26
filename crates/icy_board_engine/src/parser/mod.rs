@@ -30,6 +30,8 @@ pub mod pre_processor_expr_visitor;
 pub mod statements;
 
 #[cfg(test)]
+mod api_dump;
+#[cfg(test)]
 mod declaration_tests;
 #[cfg(test)]
 mod expr_tests;
