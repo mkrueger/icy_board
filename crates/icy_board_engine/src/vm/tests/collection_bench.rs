@@ -32,6 +32,20 @@ fn seed(board: &mut crate::icy_board::IcyBoard) {
     board.conferences.clear();
     board.conferences.push(Conference {
         name: "Main Board".to_string(),
+        // A conference carries a lot of configured paths, and copying one used to copy
+        // all of them; this is here so that cost shows up if it ever comes back.
+        area_menu: "gen/areas".into(),
+        area_file: "config/areas.toml".into(),
+        dir_menu: "gen/dirs".into(),
+        dir_file: "config/dirs.toml".into(),
+        doors_menu: "gen/doors".into(),
+        doors_file: "config/doors.toml".into(),
+        blt_menu: "gen/blt".into(),
+        blt_file: "config/blt.toml".into(),
+        survey_menu: "gen/survey".into(),
+        survey_file: "config/survey.toml".into(),
+        pub_upload_location: "uploads/public".into(),
+        private_upload_location: "uploads/private".into(),
         areas: Some(std::sync::Arc::new(AreaList::new(areas))),
         ..Default::default()
     });

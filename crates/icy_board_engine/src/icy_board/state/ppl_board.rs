@@ -3,7 +3,6 @@ use async_trait::async_trait;
 use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue, user_data_value},
     executable::{VariableType, VariableValue},
-    icy_board::conferences::Conference,
     parser::{BOARD_ID, CONFERENCES_ID},
 };
 
@@ -28,7 +27,9 @@ pub struct PplBoard {
     operator: String,
     sysop_name: String,
     nodes: i32,
-    conferences: std::sync::Arc<Vec<Conference>>,
+    /// The ready made `Conferences` value: nothing about it can change during a run,
+    /// so handing it out is a share rather than a fresh object every time.
+    conferences: VariableValue,
 }
 
 impl PplBoard {
@@ -40,7 +41,10 @@ impl PplBoard {
             operator: board.config.board.operator.clone(),
             sysop_name: board.config.sysop.name.clone(),
             nodes: i32::from(board.config.board.num_nodes),
-            conferences: std::sync::Arc::new(board.conferences.iter().cloned().collect()),
+            conferences: crate::icy_board::state::ppl_collection::PplConferences::new(crate::icy_board::state::ppl_collection::PplConferences::build(
+                &board.conferences,
+            ))
+            .value(),
         }
     }
 
@@ -76,7 +80,7 @@ impl UserDataValue for PplBoard {
         } else if *name == *NODES {
             VariableValue::new_int(self.nodes)
         } else if *name == *CONFERENCES {
-            crate::icy_board::state::ppl_collection::PplConferences::new(self.conferences.clone()).value()
+            self.conferences.clone()
         } else {
             return Err(format!("Unknown BOARD property {name}").into());
         };

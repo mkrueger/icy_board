@@ -96,4 +96,83 @@ macro_rules! ppl_collection {
 ppl_collection!(PplAreas, "Areas", AreaList, MessageArea, AREAS_ID, MESSAGE_AREA_ID);
 ppl_collection!(PplDirectories, "Directories", DirectoryList, FileDirectory, DIRECTORIES_ID, FILE_DIRECTORY_ID);
 ppl_collection!(PplDoors, "Doors", DoorList, Door, DOORS_ID, DOOR_ID);
-ppl_collection!(PplConferences, "Conferences", Vec<Conference>, Conference, CONFERENCES_ID, CONFERENCE_ID);
+
+/// The conferences of the board, already built as values.
+///
+/// A conference is a large record, and the board it comes from is snapshotted once a
+/// run, so nothing about these can change while a PPE is running - including the
+/// `Number` and `Valid` that position alone decides. Handing one out is then a share
+/// rather than a copy.
+#[derive(Clone, Default)]
+pub struct PplConferences(std::sync::Arc<Vec<VariableValue>>);
+
+impl PplConferences {
+    pub fn new(conferences: std::sync::Arc<Vec<VariableValue>>) -> Self {
+        Self(conferences)
+    }
+
+    /// Stamps each conference with the number it sits at and wraps it up.
+    pub fn build(conferences: &[Conference]) -> std::sync::Arc<Vec<VariableValue>> {
+        std::sync::Arc::new(
+            conferences
+                .iter()
+                .enumerate()
+                .map(|(number, conference)| {
+                    let mut conference = conference.clone();
+                    conference.number = number;
+                    conference.valid = true;
+                    user_data_value(conference, CONFERENCE_ID)
+                })
+                .collect(),
+        )
+    }
+
+    pub fn value(self) -> VariableValue {
+        user_data_value(self, CONFERENCES_ID)
+    }
+}
+
+impl UserData for PplConferences {
+    const TYPE_NAME: &'static str = "Conferences";
+
+    fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
+        registry.add_property(COUNT.clone(), VariableType::Integer, false);
+        registry.add_function(GET.clone(), vec![VariableType::Integer], VariableType::UserData(CONFERENCE_ID as u8));
+    }
+}
+
+#[async_trait(?Send)]
+impl UserDataValue for PplConferences {
+    fn get_property_value(&self, _vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
+        if *name == *COUNT {
+            return Ok(VariableValue::new_int(self.0.len() as i32));
+        }
+        Err(format!("Unknown Conferences property {name}").into())
+    }
+
+    async fn set_property_value(&self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
+        Err(format!("Conferences property {name} is read-only").into())
+    }
+
+    async fn call_function(
+        &self,
+        _vm: &mut crate::vm::VirtualMachine<'_>,
+        name: &unicase::Ascii<String>,
+        arguments: &[VariableValue],
+    ) -> crate::Res<VariableValue> {
+        if *name == *GET {
+            let index = arguments[0].as_int();
+            if index >= 0
+                && let Some(conference) = self.0.get(index as usize)
+            {
+                return Ok(conference.clone());
+            }
+            return Ok(user_data_value(Conference::default(), CONFERENCE_ID));
+        }
+        Err(format!("Unknown Conferences function {name}").into())
+    }
+
+    async fn call_method(&mut self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _arguments: &[VariableValue]) -> crate::Res<()> {
+        Err(format!("Unknown Conferences method {name}").into())
+    }
+}

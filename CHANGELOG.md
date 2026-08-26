@@ -11,8 +11,9 @@ releases.
 ### Changed
 
 - `Board.ConferenceCount`/`GetConference(i)` became `Board.Conferences`, the last
-  of the board's count-and-accessor pairs. The board shares its conference list
-  rather than copying it on every read.
+  of the board's count-and-accessor pairs. The conferences are built once with the
+  board snapshot, so reading one shares it rather than copying the whole record,
+  and what a conference has configured no longer decides what reading it costs.
 - The language server no longer offers a collection's internal getter as a name,
   and completion now steps through an index, so `Board.Conferences[0].` offers
   what a conference has.
