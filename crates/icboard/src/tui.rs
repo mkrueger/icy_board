@@ -80,18 +80,23 @@ fn new_monitor_screen() -> TextScreen {
 fn terminal_layout(frame_area: Rect, view_size: (u16, u16), reserve_status: bool) -> (Rect, Option<Rect>) {
     let (view_width, view_height) = view_size;
     let width = frame_area.width.min(view_width);
-    let status_height = if (reserve_status && frame_area.height >= 3) || frame_area.height >= view_height.saturating_add(STATUS_ROWS) {
-        STATUS_ROWS
-    } else {
-        0
-    };
-    let height = view_height.min(frame_area.height.saturating_sub(status_height));
-    let total_height = height.saturating_add(status_height);
     let x = frame_area.x + (frame_area.width - width) / 2;
-    let y = frame_area.y + (frame_area.height - total_height) / 2;
-    let screen = Rect::new(x, y, width, height);
-    let status = (status_height > 0).then(|| Rect::new(x, y + height, width, status_height));
-    (screen, status)
+
+    if reserve_status {
+        // A monitor gives the sysop bar its rows even when that costs screen rows.
+        let status_height = if frame_area.height >= 3 { STATUS_ROWS } else { 0 };
+        let height = view_height.min(frame_area.height.saturating_sub(status_height));
+        let y = frame_area.y + (frame_area.height - height.saturating_add(status_height)) / 2;
+        let status = (status_height > 0).then(|| Rect::new(x, y + height, width, status_height));
+        return (Rect::new(x, y, width, height), status);
+    }
+
+    // A local session shows the whole screen, so the bar only appears when the terminal
+    // has rows to spare below it.
+    let height = frame_area.height.min(view_height);
+    let y = frame_area.y + (frame_area.height - height) / 2;
+    let status = (y + height + STATUS_ROWS < frame_area.y + frame_area.height).then(|| Rect::new(x, y + height, width, STATUS_ROWS));
+    (Rect::new(x, y, width, height), status)
 }
 
 impl Tui {
@@ -805,10 +810,22 @@ mod sixel_tests {
     /// back to the eighty columns the screen started at.
     #[test]
     fn a_resized_session_is_shown_at_its_own_size() {
-        let (screen, status) = terminal_layout(Rect::new(0, 0, 120, 42), (120, 40), false);
+        let (screen, status) = terminal_layout(Rect::new(0, 0, 120, 45), (120, 40), false);
 
-        assert_eq!(screen, Rect::new(0, 0, 120, 40));
-        assert_eq!(status, Some(Rect::new(0, 40, 120, 2)));
+        assert_eq!(screen, Rect::new(0, 2, 120, 40));
+        assert_eq!(status, Some(Rect::new(0, 42, 120, 2)));
+    }
+
+    /// The status bar costs the console two rows, so it waits until the terminal has rows
+    /// the screen does not need rather than growing the console past its screen.
+    #[test]
+    fn a_local_console_is_no_taller_than_its_screen() {
+        for height in 25..=29 {
+            let (screen, status) = terminal_layout(Rect::new(0, 0, 80, height), (80, 25), false);
+
+            assert_eq!(screen.height, 25, "screen was clipped at {height} rows");
+            assert_eq!(status, None, "the status bar grew the console at {height} rows");
+        }
     }
 
     #[test]
