@@ -14,6 +14,8 @@ pub enum BBSMessage {
     /// Show the text and drop the caller - sent when an event is about to run.
     Shutdown(String),
     GroupChat(GroupChatEvent),
+    /// The console the caller sits at changed size.
+    Resize(u16, u16),
 }
 
 pub struct BBS {

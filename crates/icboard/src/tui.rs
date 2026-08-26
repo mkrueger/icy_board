@@ -38,6 +38,9 @@ use tokio::sync::{Mutex, mpsc};
 
 const STATUS_HELP: &str = "ALT-H=Help ALT-X=Exit";
 
+/// Rows the sysop status bar sits on, kept out of the session's own screen.
+const STATUS_ROWS: u16 = 2;
+
 pub struct Tui {
     sysop_mode: bool,
     screen: Arc<std::sync::Mutex<TextScreen>>,
@@ -74,10 +77,11 @@ fn new_monitor_screen() -> TextScreen {
     screen
 }
 
-fn terminal_layout(frame_area: Rect, view_height: u16, reserve_status: bool) -> (Rect, Option<Rect>) {
-    let width = frame_area.width.min(80);
-    let status_height = if (reserve_status && frame_area.height >= 3) || frame_area.height >= view_height.saturating_add(2) {
-        2
+fn terminal_layout(frame_area: Rect, view_size: (u16, u16), reserve_status: bool) -> (Rect, Option<Rect>) {
+    let (view_width, view_height) = view_size;
+    let width = frame_area.width.min(view_width);
+    let status_height = if (reserve_status && frame_area.height >= 3) || frame_area.height >= view_height.saturating_add(STATUS_ROWS) {
+        STATUS_ROWS
     } else {
         0
     };
@@ -148,6 +152,29 @@ impl Tui {
         Ok(())
     }
 
+    /// In a local session the console is the caller, so the board follows its size. A
+    /// monitor only watches and must not resize the caller it is attached to.
+    async fn follow_terminal_size(&self, bbs: &Arc<Mutex<BBS>>, area: ratatui::layout::Size) -> Res<()> {
+        if self.sysop_mode {
+            return Ok(());
+        }
+        let width = area.width.max(1);
+        let height = area.height.saturating_sub(STATUS_ROWS).max(1);
+        {
+            let mut screen = self.screen.lock().unwrap();
+            if screen.buffer.terminal_state.width() == i32::from(width) && screen.buffer.terminal_state.height() == i32::from(height) {
+                return Ok(());
+            }
+            let size = icy_engine::Size::new(i32::from(width), i32::from(height));
+            screen.buffer.set_size(size);
+            screen.buffer.terminal_state.set_size(size);
+        }
+        if let Some(channel) = bbs.lock().await.bbs_channels.get(self.node).and_then(Option::as_ref) {
+            let _ = channel.send(BBSMessage::Resize(width, height)).await;
+        }
+        Ok(())
+    }
+
     pub async fn sysop_mode(bbs: &Arc<Mutex<BBS>>, node: usize) -> Res<Option<Self>> {
         let (ui_connection, connection) = ChannelConnection::create_pair();
         let mut bbs = bbs.lock().await;
@@ -207,6 +234,7 @@ impl Tui {
             log::warn!("Terminal image capability query failed, using half-block rendering: {err}");
             Picker::halfblocks()
         }));
+        self.follow_terminal_size(bbs, terminal.size()?).await?;
         //   let mut redraw = true;
         loop {
             if let Some(Some(node_state)) = self.handle.lock().await.get_mut(self.node) {
@@ -282,6 +310,9 @@ impl Tui {
                         }
                     }
                     Event::Mouse(mouse) => self.add_mouse_input(mouse, terminal.size()?).await?,
+                    Event::Resize(width, height) => {
+                        self.follow_terminal_size(bbs, ratatui::layout::Size::new(width, height)).await?;
+                    }
                     _ => {}
                 }
             }
@@ -314,8 +345,9 @@ impl Tui {
 
     fn ui(&self, frame: &mut Frame, status_bar_info: StatusBarInfo) {
         let screen = &self.screen.lock().unwrap();
+        let view_width = screen.buffer.terminal_state.width().max(0) as u16;
         let view_height = screen.buffer.terminal_state.height().max(0) as u16;
-        let (area, status_area) = terminal_layout(frame.area(), view_height, self.sysop_mode);
+        let (area, status_area) = terminal_layout(frame.area(), (view_width, view_height), self.sysop_mode);
 
         for y in 0..area.height as i32 {
             for x in 0..area.width as i32 {
@@ -782,7 +814,7 @@ mod sixel_tests {
 
     #[test]
     fn monitor_reserves_status_rows_at_80_by_25() {
-        let (screen, status) = terminal_layout(Rect::new(0, 0, 80, 25), 25, true);
+        let (screen, status) = terminal_layout(Rect::new(0, 0, 80, 25), (80, 25), true);
 
         assert_eq!(screen, Rect::new(0, 0, 80, 23));
         assert_eq!(status, Some(Rect::new(0, 23, 80, 2)));
@@ -790,10 +822,20 @@ mod sixel_tests {
 
     #[test]
     fn local_session_keeps_all_rows_at_80_by_25() {
-        let (screen, status) = terminal_layout(Rect::new(0, 0, 80, 25), 25, false);
+        let (screen, status) = terminal_layout(Rect::new(0, 0, 80, 25), (80, 25), false);
 
         assert_eq!(screen, Rect::new(0, 0, 80, 25));
         assert_eq!(status, None);
+    }
+
+    /// A local session that grew with its terminal is shown at its own size, not clipped
+    /// back to the eighty columns the screen started at.
+    #[test]
+    fn a_resized_session_is_shown_at_its_own_size() {
+        let (screen, status) = terminal_layout(Rect::new(0, 0, 120, 42), (120, 40), false);
+
+        assert_eq!(screen, Rect::new(0, 0, 120, 40));
+        assert_eq!(status, Some(Rect::new(0, 40, 120, 2)));
     }
 
     #[test]
