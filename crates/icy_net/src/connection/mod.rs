@@ -1,6 +1,7 @@
 use crate::NetError;
 pub mod channel;
 pub mod modem;
+pub mod proxy;
 pub mod raw;
 pub mod rlogin;
 pub mod serial;

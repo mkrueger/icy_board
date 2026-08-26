@@ -33,6 +33,7 @@ use tokio::{
 
 use crate::telnet::TerminalEmulation;
 
+use super::proxy::{ProxyConfig, connect_tcp};
 use super::{Connection, ConnectionState, ConnectionType};
 
 /// Configuration for establishing an rlogin-style session.
@@ -117,15 +118,17 @@ impl RloginConnection {
     /// Returns a ready `RloginConnection`. Does not validate remote response;
     /// classic rlogin has minimal startup acknowledgement.
     pub async fn open(addr: impl Into<String>, cfg: RloginConfig, timeout: Duration) -> crate::Result<Self> {
+        Self::open_with_proxy(addr, cfg, timeout, None).await
+    }
+
+    /// Like [`RloginConnection::open`], but routes the TCP connection through an
+    /// optional proxy (SOCKS5 with remote DNS, for Tor/I2P).
+    pub async fn open_with_proxy(addr: impl Into<String>, cfg: RloginConfig, timeout: Duration, proxy: Option<&ProxyConfig>) -> crate::Result<Self> {
         let mut addr = addr.into();
         if !addr.contains(':') {
             addr.push_str(":513");
         }
-        let mut stream = match tokio::time::timeout(timeout, TcpStream::connect(addr)).await {
-            Ok(Ok(s)) => s,
-            Ok(Err(e)) => return Err(Box::new(e)),
-            Err(e) => return Err(Box::new(e)),
-        };
+        let mut stream = connect_tcp(&addr, proxy, timeout).await?;
         stream.set_nodelay(true)?;
 
         let terminal = cfg.terminal_str();
