@@ -2018,6 +2018,14 @@
     "named": false
   },
   {
+    "type": "AREAS",
+    "named": false
+  },
+  {
+    "type": "AUDIO",
+    "named": false
+  },
+  {
     "type": "BEGIN",
     "named": false
   },
@@ -2050,11 +2058,19 @@
     "named": false
   },
   {
+    "type": "CONFERENCES",
+    "named": false
+  },
+  {
     "type": "CONST",
     "named": false
   },
   {
     "type": "CONTACT",
+    "named": false
+  },
+  {
+    "type": "CONTACTS",
     "named": false
   },
   {
@@ -2078,6 +2094,10 @@
     "named": false
   },
   {
+    "type": "DIRECTORIES",
+    "named": false
+  },
+  {
     "type": "DIRECTORY",
     "named": false
   },
@@ -2087,6 +2107,10 @@
   },
   {
     "type": "DOOR",
+    "named": false
+  },
+  {
+    "type": "DOORS",
     "named": false
   },
   {
@@ -2298,6 +2322,10 @@
     "named": false
   },
   {
+    "type": "NOTES",
+    "named": false
+  },
+  {
     "type": "OFF",
     "named": false
   },
@@ -2359,6 +2387,10 @@
   },
   {
     "type": "STRING",
+    "named": false
+  },
+  {
+    "type": "SURFACE",
     "named": false
   },
   {

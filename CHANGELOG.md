@@ -10,6 +10,11 @@ releases.
 
 ### Changed
 
+- The editor grammars are now checked against the type registry, not only against
+  the statements, constants and keywords. That found eight object types the
+  grammars never learned - `AREAS`, `AUDIO`, `CONFERENCES`, `CONTACTS`,
+  `DIRECTORIES`, `DOORS`, `NOTES`, `SURFACE` - and the `GFXBACKEND` enum.
+
 - Followed up the 4.00 API review: `Session.ConferenceNumber`, `AreaNumber` and
   `DirectoryNumber` are gone, because the object beside them already reports the
   same `Number`. `Macros.StartRecord`/`StopRecord` became `BeginRecord`/

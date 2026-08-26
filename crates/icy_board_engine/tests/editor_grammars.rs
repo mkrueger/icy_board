@@ -3,8 +3,8 @@
 
 use icy_board_engine::{
     ast::constant::BUILTIN_CONSTS,
-    executable::{FUNCTION_DEFINITIONS, STATEMENT_DEFINITIONS, StatementSignature},
-    parser::lexer::KEYWORDS,
+    executable::{FUNCTION_DEFINITIONS, LAST_PPL_LANGUAGE_VERSION, STATEMENT_DEFINITIONS, StatementSignature},
+    parser::{UserTypeRegistry, built_in_type_names, lexer::KEYWORDS},
 };
 
 /// Names the grammar spells as a keyword or that only exist as an opcode.
@@ -173,6 +173,43 @@ fn vscode_grammar_knows_every_built_in() {
         Vec::<String>::new(),
         "the TextMate grammar names a constant the engine does not have"
     );
+}
+
+/// `PASSWORD` is a type values have but no declaration may name - a door hands one
+/// out, nobody writes one down. Both grammars colour it anyway, which is why it is
+/// not expected to be a type the parser accepts.
+const COLOURED_BUT_NOT_DECLARABLE: &[&str] = &["PASSWORD"];
+
+/// A type name may stand in a declaration, so both grammars have to know every one
+/// the parser accepts: the built-in value types, the board objects and the enums.
+/// Retiring a type is what this catches - the name outlives it in the grammars.
+#[test]
+fn grammars_know_every_type_name() {
+    let registry = UserTypeRegistry::icy_board_registry();
+    let mut expected: Vec<String> = built_in_type_names(LAST_PPL_LANGUAGE_VERSION)
+        .iter()
+        .map(|name| name.to_ascii_uppercase())
+        .collect();
+    expected.extend(registry.registered_types.keys().map(|name| name.to_ascii_uppercase()));
+    expected.extend(registry.enums().iter().map(|definition| definition.name.to_ascii_uppercase()));
+
+    let allowed: Vec<String> = expected
+        .iter()
+        .cloned()
+        .chain(COLOURED_BUT_NOT_DECLARABLE.iter().map(|name| (*name).to_string()))
+        .collect();
+
+    for (grammar, in_grammar) in [
+        ("grammar.js", list_from_grammar("BUILTIN_TYPES")),
+        ("the TextMate grammar", list_from_textmate("types")),
+    ] {
+        assert_eq!(missing(&expected, &in_grammar), Vec::<String>::new(), "types missing from {grammar}");
+        assert_eq!(
+            missing(&in_grammar, &allowed),
+            Vec::<String>::new(),
+            "{grammar} names a type the engine does not have"
+        );
+    }
 }
 
 /// Words a grammar colours as a keyword that the lexer does not reserve: THEN, DO,
