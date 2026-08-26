@@ -17,6 +17,10 @@ releases.
   `Contacts.Set()` became `Contacts.Put()`, since it is keyed by service rather
   than by position, and a note is now written through its index:
   `Session.User.Notes[0] = "..."`.
+- Retired the `FONT` type. A terminal never reports which font a class is using,
+  so the object had no state to read and was three write-only calls in a coat:
+  `Terminal.SetFont(font [, slot])` and `Terminal.LoadFont(font, file)` say the
+  same thing without it.
 
 - `User.NoteCount`/`GetNote(i)`/`SetNote(i, t)` and `User.ContactCount`/
   `GetContact(i)`/`SetContact(s, a)`/`DeleteContact(s)` became the collections

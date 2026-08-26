@@ -152,8 +152,8 @@ fn a_palette_colour_outside_the_sixteen_is_refused() {
 fn a_font_binds_one_attribute_class_or_all_of_them() {
     let output = run_ppl(
         r"
-        PrintLn Terminal.Font.Set(0, 5)
-        PrintLn Terminal.Font.SetAll(5)
+        PrintLn Terminal.SetFont(5, 0)
+        PrintLn Terminal.SetFont(5)
         ",
     );
 
@@ -165,7 +165,7 @@ fn a_font_binds_one_attribute_class_or_all_of_them() {
 fn a_built_in_font_slot_cannot_be_uploaded_over() {
     let output = run_ppl(
         r#"
-        PrintLn Terminal.Font.Load(42, "topaz.psf")
+        PrintLn Terminal.LoadFont(42, "topaz.psf")
         PrintLn Error.Last().Code
         "#,
     );
@@ -176,7 +176,7 @@ fn a_built_in_font_slot_cannot_be_uploaded_over() {
 /// These change the terminal, so they are reached through it rather than named on their own.
 #[test]
 fn the_appearance_objects_have_no_value_of_their_own() {
-    for source in ["PRINTLN Margins.Top", "PRINTLN Palette.Set(1, 0)", "PRINTLN Font.Set(0, 1)"] {
+    for source in ["PRINTLN Margins.Top", "PRINTLN Palette.Set(1, 0)"] {
         let errors = compile_errors(source);
         assert!(errors.iter().any(|error| error.contains("is a type")), "{source}: {errors:?}");
     }

@@ -204,7 +204,6 @@ fn board_object_type_ids_are_frozen() {
         ("GFX", 43),
         ("MARGINS", 44),
         ("PALETTE", 45),
-        ("FONT", 46),
         ("MACROS", 47),
         ("BOARD", 49),
         ("SESSION", 50),

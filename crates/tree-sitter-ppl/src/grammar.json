@@ -1468,18 +1468,6 @@
             "type": "TOKEN",
             "content": {
               "type": "PATTERN",
-              "value": "[fF][oO][nN][tT]"
-            }
-          },
-          "named": false,
-          "value": "FONT"
-        },
-        {
-          "type": "ALIAS",
-          "content": {
-            "type": "TOKEN",
-            "content": {
-              "type": "PATTERN",
               "value": "[gG][fF][xX]"
             }
           },

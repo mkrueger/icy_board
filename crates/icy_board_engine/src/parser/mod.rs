@@ -295,7 +295,7 @@ pub const TERMINAL_ID: usize = 42;
 pub const GFX_ID: usize = 43;
 pub const MARGINS_ID: usize = 44;
 pub const PALETTE_ID: usize = 45;
-pub const FONT_ID: usize = 46;
+/// 46 was `Font`; the terminal sets and loads fonts itself.
 pub const MACROS_ID: usize = 47;
 /// 48 was `Sound`; audio is reached through the `Audio` type.
 pub const BOARD_ID: usize = 49;
@@ -369,7 +369,6 @@ impl UserTypeRegistry {
         reg.register::<crate::icy_board::state::ppl_gfx::PplGfx>(GFX_ID);
         reg.register::<crate::icy_board::state::ppl_margins::PplMargins>(MARGINS_ID);
         reg.register::<crate::icy_board::state::ppl_palette::PplPalette>(PALETTE_ID);
-        reg.register::<crate::icy_board::state::ppl_font::PplFont>(FONT_ID);
         reg.register::<crate::icy_board::state::ppl_macros::PplMacros>(MACROS_ID);
         reg.register::<crate::icy_board::state::ppl_board::PplBoard>(BOARD_ID);
         reg.register::<crate::icy_board::state::ppl_session::PplSession>(SESSION_ID);

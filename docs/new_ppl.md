@@ -180,8 +180,8 @@ The root groups the session by responsibility:
 | `Input` | Keyboard, physical-key and mouse events |
 | `Margins` | Vertical and horizontal scrolling regions |
 | `Palette` | The 16 DOS colours selected by `COLOR` |
-| `Font` | Terminal font selection and uploads |
 | `Macros` | Terminal-resident DEC macro slots |
+| `SetFont(font [, slot])`, `LoadFont(font, file)` | Terminal font selection and uploads |
 | `BeginUpdate()`, `EndUpdate()` | Nestable synchronized output |
 
 All operations that can fail update [`Error.Last()`](#errors). A function returning a
@@ -392,13 +392,17 @@ physical terminal disagree.
 
 ### Fonts
 
-`Terminal.Font.Set(slot, font)` selects a font for attribute class 0 through 3.
-`SetAll(font)` selects it for every class. `Load(font, file)` uploads PSF1, PSF2,
-YAFF or size-recognised raw data into writable font numbers 43 through 255.
+`Terminal.SetFont(font)` selects a font for every attribute class, which is what
+changing *the* font means. `Terminal.SetFont(font, slot)` selects it for one
+class, 0 through 3. `Terminal.LoadFont(font, file)` uploads PSF1, PSF2, YAFF or
+size-recognised raw data into writable font numbers 43 through 255.
+
+A terminal does not report which font a class is using, so there is nothing to
+read back and these are calls rather than an object.
 
 ```PPL
-Terminal.Font.Load(43, "topaz.psf")
-IF Error.Last().OK Terminal.Font.SetAll(43)
+Terminal.LoadFont(43, "topaz.psf")
+IF Error.Last().OK Terminal.SetFont(43)
 ```
 
 ### Palette colors
@@ -422,7 +426,7 @@ It reads the same whichever part of the board failed, so one piece of code can
 handle a file, a font, a sound or a picture going wrong.
 
 ```PPL
-Terminal.Font.Load(43, "topaz.psf")
+Terminal.LoadFont(43, "topaz.psf")
 IF (!Error.Last().OK) THEN
 	PrintLn "Sorry: ", Error.Last().Message
 ENDIF
@@ -474,7 +478,7 @@ before the jump because its cleanup path has no natural return boundary.
 DECLARE PROCEDURE Complain(ERROR e)
 
 ON ERROR Complain
-Terminal.Font.Load(43, "topaz.psf")
+Terminal.LoadFont(43, "topaz.psf")
 PrintLn "still running"
 
 PROCEDURE Complain(ERROR e)

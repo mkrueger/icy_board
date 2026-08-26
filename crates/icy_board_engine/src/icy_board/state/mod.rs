@@ -39,7 +39,6 @@ pub mod ppl_board;
 pub mod ppl_collection;
 pub mod ppl_error;
 pub mod ppl_events;
-pub mod ppl_font;
 pub mod ppl_gfx;
 pub mod ppl_graphics;
 pub mod ppl_keys;
