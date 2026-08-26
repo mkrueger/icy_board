@@ -10,6 +10,13 @@ releases.
 
 ### Changed
 
+- `Board.ConferenceCount`/`GetConference(i)` became `Board.Conferences`, the last
+  of the board's count-and-accessor pairs. The board shares its conference list
+  rather than copying it on every read.
+- The language server no longer offers a collection's internal getter as a name,
+  and completion now steps through an index, so `Board.Conferences[0].` offers
+  what a conference has.
+
 - `Board` is taken once per run rather than rebuilt on every access. Reading it
   copies every conference, so a PPE that touched `Board` inside a loop paid for
   the whole board on each step: walking 2000 areas through `Board` on a board

@@ -533,7 +533,7 @@ message area just works in icy board. But with icy board it's possible to specif
 
 ## Board objects (4.00)
 
-`Board.GetConference(index)` returns a read-only `CONFERENCE` snapshot, and
+`Board.Conferences[index]` returns a read-only `CONFERENCE` snapshot, and
 `Session.Conference` the one the caller is in. An index no conference has returns
 an empty conference object, so its properties can still be read.
 
@@ -612,21 +612,19 @@ inside a loop is not paid for again:
 | `Operator` | `STRING` | Operator named for `EMSI` |
 | `SysopName` | `STRING` | The sysop's display name |
 | `NodeCount` | `INTEGER` | Number of configured nodes |
-| `ConferenceCount` | `INTEGER` | Number of conferences |
-| `GetConference(index)` | `CONFERENCE` | Conference at the zero-based index |
+| `Conferences` | `CONFERENCES` | The conferences of the board |
 
-`ConferenceCount` and `GetConference()` are what let a PPE walk the board without
-`HIGHCONFNUM()`. An index no conference has answers with an object whose `Valid`
-property is false.
+`Conferences` is what lets a PPE walk the board without `HIGHCONFNUM()`. An index
+no conference has answers with an object whose `Valid` property is false.
 Listing conferences says nothing about who may enter
 one, so check `HasAccess()` before showing a name:
 
 ```PPL
-INTEGER i
-FOR i = 0 TO Board.ConferenceCount - 1
-	CONFERENCE conf = Board.GetConference(i)
-	IF conf.HasAccess() PRINTLN i, " ", conf.Name
-NEXT
+CONFERENCE conf
+
+FOREACH conf IN Board.Conferences
+	IF conf.HasAccess() PRINTLN conf.Number, " ", conf.Name
+ENDFOREACH
 ```
 
 `Session` is the call in progress. Unlike `Board` it is read live, so a value

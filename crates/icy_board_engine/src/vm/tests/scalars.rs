@@ -182,7 +182,7 @@ fn test_a_door_password_can_be_compared_but_not_printed() {
         r#"
         CONFERENCE conf
         DOOR item
-        conf = Board.GetConference(0)
+        conf = Board.Conferences[0]
         item = conf.Doors[0]
         PRINT "[", item.Password, "] ", item.Password = "SeCrEt", " ", item.Password = "wrong"
     "#,
@@ -213,7 +213,7 @@ fn test_reading_a_door_password_stays_cheap() {
         CONFERENCE conf
         DOOR item
         INTEGER i, hits
-        conf = Board.GetConference(0)
+        conf = Board.Conferences[0]
         item = conf.Doors[0]
         FOR i = 1 TO 200
             IF item.Password = "secret" hits = hits + 1
@@ -244,7 +244,7 @@ fn test_conference_properties_report_configuration_and_counts() {
     let output = run_ppl_on(
         r#"
         CONFERENCE conf
-        conf = Board.GetConference(0)
+        conf = Board.Conferences[0]
         PRINT conf.IsPublic, " ", conf.HasAccess(), " ", conf.Directories.Count, " ", conf.Areas.Count, " ", conf.Doors.Count
     "#,
         |board| {
@@ -271,7 +271,7 @@ fn test_an_invalid_conference_number_still_returns_a_conference() {
     let output = run_ppl(
         r#"
         CONFERENCE conf
-        conf = Board.GetConference(999)
+        conf = Board.Conferences[999]
         PRINT "[", conf.Name, "] ", conf.IsPublic, " ", conf.Directories.Count, " ", conf.Areas.Count, " ", conf.Doors.Count
     "#,
     );
@@ -301,7 +301,7 @@ fn test_a_loop_can_keep_asking_for_objects() {
         AREA first
         INTEGER i, seen
         FOR i = 1 TO 500
-            conf = Board.GetConference(0)
+            conf = Board.Conferences[0]
             first = conf.Areas[0]
             IF first.Name = "General" seen = seen + 1
         NEXT

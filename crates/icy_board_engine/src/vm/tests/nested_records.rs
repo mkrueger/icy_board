@@ -6,7 +6,7 @@ fn a_member_call_can_stand_on_its_own_as_a_statement() {
         "ok",
         run_ppl(
             r#"
-CONFERENCE conf = Board.GetConference(0)
+CONFERENCE conf = Board.Conferences[0]
 conf.HasAccess()
 PRINT "ok"
 "#
@@ -98,7 +98,7 @@ PRINTLN c.v
 fn test_what_a_board_object_answers_can_be_asked_again() {
     let output = crate::vm::tests::run_ppl_on(
         r"
-CONFERENCE conf = Board.GetConference(0)
+CONFERENCE conf = Board.Conferences[0]
 PRINT conf.Areas[0].Name
 ",
         |board| {

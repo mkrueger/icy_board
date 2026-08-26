@@ -45,7 +45,7 @@ fn board_reports_what_the_board_is_configured_to_be() {
         PrintLn Board.Location
         PrintLn Board.Operator
         PrintLn Board.SysopName
-        PrintLn Board.NodeCount, " ", Board.ConferenceCount
+        PrintLn Board.NodeCount, " ", Board.Conferences.Count
         "#,
         seed_board,
     );
@@ -60,8 +60,8 @@ fn every_conference_can_be_reached_by_number() {
     let output = run_ppl_on(
         r#"
         INTEGER i
-        FOR i = 0 TO Board.ConferenceCount - 1
-            CONFERENCE conf = Board.GetConference(i)
+        FOR i = 0 TO Board.Conferences.Count - 1
+            CONFERENCE conf = Board.Conferences[i]
             PrintLn i, ": ", conf.Name, " ", conf.HasAccess()
         NEXT
         "#,
@@ -76,8 +76,8 @@ fn every_conference_can_be_reached_by_number() {
 fn an_unknown_conference_number_answers_an_empty_conference() {
     let output = run_ppl_on(
         r#"
-        PrintLn "[", Board.GetConference(99).Name, "] ", Board.GetConference(99).Valid
-        PrintLn "[", Board.GetConference(-1).Name, "] ", Board.GetConference(-1).Valid
+        PrintLn "[", Board.Conferences[99].Name, "] ", Board.Conferences[99].Valid
+        PrintLn "[", Board.Conferences[-1].Name, "] ", Board.Conferences[-1].Valid
         "#,
         seed_board,
     );
@@ -90,7 +90,7 @@ fn a_board_value_can_be_kept_in_a_variable() {
     let output = run_ppl_on(
         r#"
         BOARD board = Board()
-        PrintLn board.Name, " ", board.ConferenceCount
+        PrintLn board.Name, " ", board.Conferences.Count
         "#,
         seed_board,
     );
@@ -145,7 +145,7 @@ fn session_hands_out_the_current_area_and_directory() {
 fn board_objects_know_their_own_number() {
     let output = run_ppl_on(
         r#"
-        CONFERENCE conf = Board.GetConference(1)
+        CONFERENCE conf = Board.Conferences[1]
         PrintLn conf.Number, " ", conf.Name, " ", conf.Valid
         PrintLn conf.Areas[1].Number, " ", conf.Areas[1].Name, " ", conf.Areas[1].Valid
         "#,

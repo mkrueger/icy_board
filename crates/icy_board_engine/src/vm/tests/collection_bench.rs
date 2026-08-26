@@ -57,7 +57,7 @@ fn walk_every_area() {
     time(
         "indexed loop, conference held in a variable",
         r#"
-CONFERENCE c = Board.GetConference(0)
+CONFERENCE c = Board.Conferences[0]
 INTEGER i
 INTEGER n
 FOR i = 0 TO c.Areas.Count - 1
@@ -71,8 +71,8 @@ PRINT n
         r#"
 INTEGER i
 INTEGER n
-FOR i = 0 TO Board.GetConference(0).Areas.Count - 1
-    IF (Board.GetConference(0).Areas[i].Name <> "") LET n = n + 1
+FOR i = 0 TO Board.Conferences[0].Areas.Count - 1
+    IF (Board.Conferences[0].Areas[i].Name <> "") LET n = n + 1
 NEXT
 PRINT n
 "#,
@@ -82,7 +82,7 @@ PRINT n
         r#"
 INTEGER n
 AREA a
-FOREACH a IN Board.GetConference(0).Areas
+FOREACH a IN Board.Conferences[0].Areas
     IF (a.Name <> "") LET n = n + 1
 ENDFOREACH
 PRINT n
@@ -91,7 +91,7 @@ PRINT n
     time(
         "FOREACH, conference held in a variable",
         r#"
-CONFERENCE c = Board.GetConference(0)
+CONFERENCE c = Board.Conferences[0]
 INTEGER n
 AREA a
 FOREACH a IN c.Areas
@@ -103,7 +103,7 @@ PRINT n
     time(
         "FOREACH, collection held in a variable",
         r#"
-AREAS list = Board.GetConference(0).Areas
+AREAS list = Board.Conferences[0].Areas
 INTEGER n
 AREA a
 FOREACH a IN list
@@ -114,11 +114,30 @@ PRINT n
     );
 }
 
+/// A conference is a much bigger record than an area, so handing one out is where a
+/// walk would notice a copy.
+#[test]
+#[ignore = "timings, run on demand"]
+fn walk_every_conference() {
+    time(
+        "FOREACH over the conferences",
+        r#"
+CONFERENCES list = Board.Conferences
+INTEGER n
+CONFERENCE c
+FOREACH c IN list
+    IF (c.Name <> "") LET n = n + 1
+ENDFOREACH
+PRINT n
+"#,
+    );
+}
+
 #[test]
 fn a_collection_reports_its_count_and_indexes() {
     let out = run_ppl_on(
         r#"
-CONFERENCE c = Board.GetConference(0)
+CONFERENCE c = Board.Conferences[0]
 PRINT c.Areas.Count, " ", c.Areas[0].Name, " ", c.Areas[1999].Name
 "#,
         seed,
@@ -132,7 +151,7 @@ fn foreach_walks_a_collection() {
         r"
 INTEGER n
 AREA a
-FOREACH a IN Board.GetConference(0).Areas
+FOREACH a IN Board.Conferences[0].Areas
     LET n = n + 1
 ENDFOREACH
 PRINT n

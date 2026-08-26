@@ -87,8 +87,17 @@ fn a_board_object_offers_fields_and_methods() {
 
 #[test]
 fn a_function_answering_an_object_offers_its_members() {
-    let items = complete("Board.GetConference(CurConf()).");
+    let items = complete("Board.Conferences[CurConf()].");
     assert!(items.contains(&"Areas".to_string()), "{items:?}");
+}
+
+/// A collection is read with an index, so the getter behind it is not offered as a
+/// name anybody could type.
+#[test]
+fn a_collection_does_not_offer_its_internal_getter() {
+    let items = complete("Board.Conferences.");
+    assert!(items.contains(&"Count".to_string()), "{items:?}");
+    assert!(!items.iter().any(|item| item.starts_with('<')), "{items:?}");
 }
 
 #[test]
@@ -105,10 +114,7 @@ fn runtime_402_objects_offer_their_registered_members() {
         ("TERMINPUT value\nvalue.", &["Poll", "Wait", "KeyboardOn", "Release"][..]),
         ("TERMINAL value\nvalue.", &["Info", "Gfx", "Input"][..]),
         ("GFX value\nvalue.", &["Init", "Backend", "Pacing"][..]),
-        (
-            "BOARD value\nvalue.",
-            &["Name", "SysopName", "NodeCount", "ConferenceCount", "GetConference"][..],
-        ),
+        ("BOARD value\nvalue.", &["Name", "SysopName", "NodeCount", "Conferences"][..]),
         ("SESSION value\nvalue.", &["Conference", "Area", "Directory", "User", "Node", "MinutesLeft"][..]),
         ("USER value\nvalue.", &["Name", "Alias", "SecurityLevel", "ContactCount", "SetContact"][..]),
     ] {

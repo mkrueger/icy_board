@@ -91,6 +91,11 @@ pub fn type_of_chain(visitor: &SemanticVisitor, path: &[String]) -> Option<Varia
     let (first, rest) = path.split_first()?;
     let mut var_type = type_of_name(visitor, first)?;
     for member in rest {
+        // An array indexes into its own type, so a step it does not have is no step.
+        if member == crate::context::INDEXED {
+            var_type = type_of_member(&visitor.type_registry, var_type, member).unwrap_or(var_type);
+            continue;
+        }
         var_type = type_of_member(&visitor.type_registry, var_type, member)?;
     }
     Some(var_type)

@@ -171,6 +171,8 @@ fn member_completion(visitor: &SemanticVisitor, path: &[String]) -> Vec<Completi
     };
     members_of(&visitor.type_registry, var_type)
         .into_iter()
+        // A member in angle brackets is the compiler's own and cannot be written.
+        .filter(|member| !member.name.starts_with('<'))
         .map(|member| CompletionItem {
             label: member.name.clone(),
             insert_text: Some(member.name),

@@ -37,6 +37,10 @@ fn is_identifier_char(c: char) -> bool {
     c.is_ascii_alphanumeric() || c == '_'
 }
 
+/// Stands for `[...]` in a member chain. It is the collection's own getter, which is
+/// why it cannot collide with anything a source can write.
+pub const INDEXED: &str = "<get>";
+
 /// The part of the line that is code, cut off where a string or comment starts.
 /// `None` when the cursor itself sits inside one.
 fn code_before_cursor(line: &str) -> Option<&str> {
@@ -84,6 +88,10 @@ fn member_chain(chars: &[char], mut end: usize) -> Option<Vec<String>> {
         // Step over an index or an argument list.
         while end > 0 && (chars[end - 1] == ')' || chars[end - 1] == ']') {
             let (open, close) = if chars[end - 1] == ')' { ('(', ')') } else { ('[', ']') };
+            // An index reads an element, so the chain continues in the element's type.
+            if close == ']' {
+                path.push(INDEXED.to_string());
+            }
             let mut depth = 0;
             loop {
                 if end == 0 {
@@ -307,9 +315,11 @@ mod tests {
 
     #[test]
     fn member_after_an_index_or_a_call() {
+        // The index stays in the chain: on a collection it steps into the element type,
+        // and on an array it is a step the type does not have and is skipped.
         assert_eq!(
             cursor_context("members[0].Home."),
-            CursorContext::Member(vec!["members".to_string(), "Home".to_string()])
+            CursorContext::Member(vec!["members".to_string(), INDEXED.to_string(), "Home".to_string()])
         );
         assert_eq!(cursor_context("ConfInfo(CurConf())."), CursorContext::Member(vec!["ConfInfo".to_string()]));
     }

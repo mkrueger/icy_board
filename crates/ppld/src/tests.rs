@@ -353,7 +353,7 @@ fn nested_records_survive_decompilation() {
 /// file, so those come back as they were written.
 #[test]
 fn board_object_members_keep_their_names() {
-    let source = "CONFERENCE Conf = Board.GetConference(0)\n\
+    let source = "CONFERENCE Conf = Board.Conferences[0]\n\
                   PRINTLN Conf.Name\n\
                   PRINTLN Conf.Doors[0].Name\n";
 

@@ -4,7 +4,7 @@ use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue, user_data_value},
     executable::{VariableType, VariableValue},
     icy_board::conferences::Conference,
-    parser::{BOARD_ID, CONFERENCE_ID},
+    parser::{BOARD_ID, CONFERENCES_ID},
 };
 
 macro_rules! member_name {
@@ -18,8 +18,7 @@ member_name!(LOCATION, "Location");
 member_name!(OPERATOR, "Operator");
 member_name!(SYSOP_NAME, "SysopName");
 member_name!(NODES, "NodeCount");
-member_name!(CONFERENCES, "ConferenceCount");
-member_name!(GET_CONFERENCE, "GetConference");
+member_name!(CONFERENCES, "Conferences");
 
 /// What the board is configured to be, apart from any one call.
 #[derive(Clone, Default)]
@@ -29,7 +28,7 @@ pub struct PplBoard {
     operator: String,
     sysop_name: String,
     nodes: i32,
-    conferences: Vec<Conference>,
+    conferences: std::sync::Arc<Vec<Conference>>,
 }
 
 impl PplBoard {
@@ -41,7 +40,7 @@ impl PplBoard {
             operator: board.config.board.operator.clone(),
             sysop_name: board.config.sysop.name.clone(),
             nodes: i32::from(board.config.board.num_nodes),
-            conferences: board.conferences.iter().cloned().collect(),
+            conferences: std::sync::Arc::new(board.conferences.iter().cloned().collect()),
         }
     }
 
@@ -58,10 +57,8 @@ impl UserData for PplBoard {
         for name in [&*NAME, &*LOCATION, &*OPERATOR, &*SYSOP_NAME] {
             registry.add_property(name.clone(), VariableType::String, false);
         }
-        for name in [&*NODES, &*CONFERENCES] {
-            registry.add_property(name.clone(), VariableType::Integer, false);
-        }
-        registry.add_function(GET_CONFERENCE.clone(), vec![VariableType::Integer], VariableType::UserData(CONFERENCE_ID as u8));
+        registry.add_property(NODES.clone(), VariableType::Integer, false);
+        registry.add_property(CONFERENCES.clone(), VariableType::UserData(CONFERENCES_ID as u8), false);
     }
 }
 
@@ -79,7 +76,7 @@ impl UserDataValue for PplBoard {
         } else if *name == *NODES {
             VariableValue::new_int(self.nodes)
         } else if *name == *CONFERENCES {
-            VariableValue::new_int(self.conferences.len() as i32)
+            crate::icy_board::state::ppl_collection::PplConferences::new(self.conferences.clone()).value()
         } else {
             return Err(format!("Unknown BOARD property {name}").into());
         };
@@ -94,21 +91,8 @@ impl UserDataValue for PplBoard {
         &self,
         _vm: &mut crate::vm::VirtualMachine<'_>,
         name: &unicase::Ascii<String>,
-        arguments: &[VariableValue],
+        _arguments: &[VariableValue],
     ) -> crate::Res<VariableValue> {
-        if *name == *GET_CONFERENCE {
-            let number = arguments[0].as_int();
-            if number >= 0
-                && let Some(conference) = self.conferences.get(number as usize)
-            {
-                let mut conference = conference.clone();
-                conference.number = number as usize;
-                conference.valid = true;
-                return Ok(user_data_value(conference, CONFERENCE_ID));
-            }
-            log::error!("PPL: Can't get conference {number} (Board.GetConference)");
-            return Ok(user_data_value(Conference::default(), CONFERENCE_ID));
-        }
         Err(format!("Unknown BOARD function {name}").into())
     }
 
