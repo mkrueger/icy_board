@@ -143,29 +143,20 @@ pub async fn len_dim(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
     Ok(VariableValue::new_int(val as i32))
 }
 
-/// How many elements an array holds over all of its dimensions, so a caller can walk
-/// one without knowing its rank. A value that is not an array counts as one element.
-pub async fn element_count(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let arr = vm.eval_expr(&args[0]).await?;
-    let count = match &arr.generic_data {
+/// How many elements a value holds over all of its dimensions, counting anything
+/// that is not an array as one.
+fn count_elements(value: &VariableValue) -> usize {
+    match &value.generic_data {
         GenericVariableData::Dim1(items) => items.len(),
         GenericVariableData::Dim2(items) => items.iter().map(Vec::len).sum(),
         GenericVariableData::Dim3(items) => items.iter().flatten().map(Vec::len).sum(),
         _ => 1,
-    };
-    Ok(VariableValue::new_int(count as i32))
+    }
 }
 
-/// The element at a flat index, counted row-major, so the rank stays out of the way.
-/// An index no element has answers with an empty value of the array's own type.
-pub async fn element_at(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let arr = vm.eval_expr(&args[0]).await?;
-    let index = vm.eval_expr(&args[1]).await?.as_int();
-    if index < 0 {
-        return Ok(arr.vtype.create_empty_value());
-    }
-    let index = index as usize;
-    let element = match &arr.generic_data {
+/// The element at a flat index, counted row-major.
+fn element_of(value: &VariableValue, index: usize) -> Option<VariableValue> {
+    match &value.generic_data {
         GenericVariableData::Dim1(items) => items.get(index).cloned(),
         GenericVariableData::Dim2(items) => {
             let width = items.first().map_or(0, Vec::len);
@@ -186,10 +177,39 @@ pub async fn element_at(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Va
                 .and_then(|row| row.get(index % width))
                 .cloned()
         }
-        _ if index == 0 => Some(arr.clone()),
+        _ if index == 0 => Some(value.clone()),
         _ => None,
-    };
-    Ok(element.unwrap_or_else(|| arr.vtype.create_empty_value()))
+    }
+}
+
+/// How many elements an array holds over all of its dimensions, so a caller can walk
+/// one without knowing its rank. A value that is not an array counts as one element.
+pub async fn element_count(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    // A whole array is worth borrowing rather than cloning: this runs once per step of
+    // every FOREACH, so cloning here would make walking a list cost its length squared.
+    if let PPEExpr::Value(id) = &args[0] {
+        return Ok(VariableValue::new_int(count_elements(vm.variable_table.get_value(*id)) as i32));
+    }
+    let arr = vm.eval_expr(&args[0]).await?;
+    Ok(VariableValue::new_int(count_elements(&arr) as i32))
+}
+
+/// The element at a flat index, counted row-major, so the rank stays out of the way.
+/// An index no element has answers with an empty value of the array's own type.
+pub async fn element_at(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let index = vm.eval_expr(&args[1]).await?.as_int();
+    if let PPEExpr::Value(id) = &args[0] {
+        let arr = vm.variable_table.get_value(*id);
+        if index < 0 {
+            return Ok(arr.vtype.create_empty_value());
+        }
+        return Ok(element_of(arr, index as usize).unwrap_or_else(|| arr.vtype.create_empty_value()));
+    }
+    let arr = vm.eval_expr(&args[0]).await?;
+    if index < 0 {
+        return Ok(arr.vtype.create_empty_value());
+    }
+    Ok(element_of(&arr, index as usize).unwrap_or_else(|| arr.vtype.create_empty_value()))
 }
 
 /// Returns the lowercase equivalent of a string
