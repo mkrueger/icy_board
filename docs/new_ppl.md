@@ -440,8 +440,8 @@ ENDIF
 | `Message` | Informational English text, meant for a log rather than control flow |
 | `Channel` | The file, dBase or sound channel, `-1` when the error has none |
 
-`ErrKind` is `None`, `File`, `DBase`, `Stack`, `Gfx`, `Font`, `Audio` or
-`Term`. `ErrCode` is `Ok`, `Unavailable`, `Invalid`, `Io`, `Format`, `Limit`,
+`ErrKind` is `None`, `File`, `DBase`, `Stack`, `Gfx`, `Font`, `Audio`, `Term` or
+`Msg`. `ErrCode` is `Ok`, `Unavailable`, `Invalid`, `Io`, `Format`, `Limit`,
 `Unsupported` or `Stack`.
 
 Use `Kind` and `Code` when a PPE has to make a decision. `Message` may include
@@ -661,6 +661,17 @@ everywhere else in the language, and a message number is not one.
 
 The body stays in the base until `Text()` asks for it, which is why it is a call.
 A listing that only prints headers never pays for a single body.
+
+A message number that is outside the base, deleted or an empty slot is an
+ordinary lookup miss: `Read()` answers an invalid `MSG`, `Text()` answers an
+empty string and `Error.Last().OK` remains true. Running off the end of `Find()`
+works the same way.
+
+An operation that cannot read the base is different. `Read()`, `Find()`,
+`LowMsg()`, `HighMsg()` and `Text()` keep their normal invalid/zero/empty return
+value, and also report `ErrKind.Msg`: `ErrCode.Io` for a filesystem failure and
+`ErrCode.Format` for corrupt JAM data. Those failures enter an `ON ERROR`
+handler. An invalid `MsgField` reports `ErrCode.Invalid`.
 
 `Find` is `SCANMSGHDR` with a type instead of a field number. It matches without
 regard to case, anywhere in the field, and answers an invalid `MSG` when nothing

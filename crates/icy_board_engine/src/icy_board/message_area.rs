@@ -11,7 +11,13 @@ use serde_with::{DisplayFromStr, serde_as};
 use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue},
     executable::{VariableType, VariableValue},
-    icy_board::{is_null_16, state::ppl_message::PplMessage},
+    icy_board::{
+        is_null_16,
+        state::{
+            ppl_error::{ERR_INVALID, ERR_KIND_MSG, PplError},
+            ppl_message::{PplMessage, message_error, message_is_missing},
+        },
+    },
     parser::MSG_ID,
 };
 
@@ -78,40 +84,71 @@ impl MessageArea {
     }
 
     /// The message with that number, or an invalid one when the area has no such message.
-    fn read_message(&self, number: i32) -> VariableValue {
+    fn read_message(&self, vm: &mut crate::vm::VirtualMachine<'_>, number: i32) -> VariableValue {
         if number < 0 {
+            vm.operation_succeeded();
             return PplMessage::missing();
         }
-        JamMessageBase::open(&self.path)
-            .and_then(|base| base.read_header(number as u32))
-            .map_or_else(|_| PplMessage::missing(), |header| PplMessage::from_header(&self.path, &header).value())
+        let base = match JamMessageBase::open(&self.path) {
+            Ok(base) => base,
+            Err(error) => {
+                vm.set_error(message_error("can't open message base", &self.path, &error));
+                return PplMessage::missing();
+            }
+        };
+        match base.read_header(number as u32) {
+            Ok(header) => {
+                vm.operation_succeeded();
+                PplMessage::from_header(&self.path, &header).value()
+            }
+            Err(error) if message_is_missing(&error) => {
+                vm.operation_succeeded();
+                PplMessage::missing()
+            }
+            Err(error) => {
+                vm.set_error(message_error(&format!("can't read message {number} from"), &self.path, &error));
+                PplMessage::missing()
+            }
+        }
     }
 
     /// The first message at or after `start` whose field contains `text`, matched the
     /// way `SCANMSGHDR` matches: without regard to case, anywhere in the field.
-    fn find_message(&self, field: i32, text: &str, start: i32) -> VariableValue {
-        let Ok(base) = JamMessageBase::open(&self.path) else {
+    fn find_message(&self, vm: &mut crate::vm::VirtualMachine<'_>, field: i32, text: &str, start: i32) -> VariableValue {
+        if !matches!(field, HDR_TO | HDR_FROM | HDR_SUBJ) {
+            vm.set_error(PplError::new(ERR_KIND_MSG, ERR_INVALID, format!("unknown message field {field}")));
             return PplMessage::missing();
+        }
+        let base = match JamMessageBase::open(&self.path) {
+            Ok(base) => base,
+            Err(error) => {
+                vm.set_error(message_error("can't open message base", &self.path, &error));
+                return PplMessage::missing();
+            }
         };
         let needle = text.to_uppercase();
         let first = (start.max(0) as u32).max(base.lowest_message_number());
         for number in first..=base.highest_message_number() {
-            let Ok(header) = base.read_header(number) else {
-                continue;
+            let header = match base.read_header(number) {
+                Ok(header) => header,
+                Err(error) if message_is_missing(&error) => continue,
+                Err(error) => {
+                    vm.set_error(message_error(&format!("can't scan message {number} in"), &self.path, &error));
+                    return PplMessage::missing();
+                }
             };
             let candidate = match field {
                 HDR_TO => header.to().map(ToString::to_string),
                 HDR_FROM => header.from().map(ToString::to_string),
                 HDR_SUBJ => header.subject().map(ToString::to_string),
-                _ => {
-                    log::error!("Area.Find: unknown message field {field}");
-                    return PplMessage::missing();
-                }
+                _ => unreachable!(),
             };
             if candidate.unwrap_or_default().to_uppercase().contains(&needle) {
+                vm.operation_succeeded();
                 return PplMessage::from_header(&self.path, &header).value();
             }
         }
+        vm.operation_succeeded();
         PplMessage::missing()
     }
 }
@@ -240,19 +277,37 @@ impl UserDataValue for MessageArea {
             return Ok(VariableValue::new_bool(res));
         }
         if *name == *HIGH_MSG {
-            return Ok(VariableValue::new_int(self.get_high_msg() as i32));
+            return Ok(match JamMessageBase::open(&self.path) {
+                Ok(base) => {
+                    vm.operation_succeeded();
+                    VariableValue::new_int(base.highest_message_number() as i32)
+                }
+                Err(error) => {
+                    vm.set_error(message_error("can't open message base", &self.path, &error));
+                    VariableValue::new_int(0)
+                }
+            });
         }
         if *name == *LOW_MSG {
-            return Ok(VariableValue::new_int(self.get_low_msg() as i32));
+            return Ok(match JamMessageBase::open(&self.path) {
+                Ok(base) => {
+                    vm.operation_succeeded();
+                    VariableValue::new_int(base.lowest_message_number() as i32)
+                }
+                Err(error) => {
+                    vm.set_error(message_error("can't open message base", &self.path, &error));
+                    VariableValue::new_int(0)
+                }
+            });
         }
         if *name == *READ {
-            return Ok(self.read_message(arguments[0].as_int()));
+            return Ok(self.read_message(vm, arguments[0].as_int()));
         }
         if *name == *FIND {
             let field = arguments[0].as_int();
             let text = arguments[1].as_string();
             let start = arguments.get(2).map_or(0, VariableValue::as_int);
-            return Ok(self.find_message(field, &text, start));
+            return Ok(self.find_message(vm, field, &text, start));
         }
         log::error!("Invalid function call on MessageArea ({name})");
         Err("Function not found".into())

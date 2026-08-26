@@ -1,6 +1,13 @@
 //! Reading messages out of an area as `MSG` values.
 
-use super::{compile_errors, run_ppl_with_messages};
+use std::{path::PathBuf, sync::Arc};
+
+use crate::icy_board::{
+    conferences::Conference,
+    message_area::{AreaList, MessageArea},
+};
+
+use super::{compile_errors, run_ppl_on, run_ppl_with_messages, scratch_dir};
 
 /// `(from, to, subject)`, numbered from one in order.
 const MESSAGES: &[(&str, &str, &str)] = &[
@@ -45,13 +52,127 @@ fn an_unknown_message_number_answers_an_invalid_message() {
     let output = run_ppl_with_messages(
         r#"
         MSG msg = Board.Conferences[0].Areas[0].Read(99)
-        PrintLn msg.Valid, " ", msg.Number, " [", msg.Subject, "] [", msg.Text(), "]"
-        PrintLn Board.Conferences[0].Areas[0].Read(-1).Valid
+        PrintLn msg.Valid, " ", msg.Number, " [", msg.Subject, "] [", msg.Text(), "] ", Error.Last().OK
+        PrintLn Board.Conferences[0].Areas[0].Read(-1).Valid, " ", Error.Last().OK
         "#,
         MESSAGES,
     );
 
-    assert_eq!(output, "0 0 [] []\n0\n");
+    assert_eq!(output, "0 0 [] [] 1\n0 1\n");
+}
+
+#[test]
+fn a_missing_message_clears_an_older_operation_error() {
+    let output = run_ppl_with_messages(
+        r#"
+        Terminal.EndUpdate()
+        PrintLn Error.Last().OK
+        MSG msg = Board.Conferences[0].Areas[0].Read(99)
+        PrintLn msg.Valid, " ", Error.Last().OK
+        "#,
+        MESSAGES,
+    );
+
+    assert_eq!(output, "0\n0 1\n");
+}
+
+fn run_on_message_base(source: &str, path: PathBuf) -> String {
+    run_ppl_on(source, |board| {
+        board.conferences.push(Conference {
+            name: "Main Board".to_string(),
+            areas: Some(Arc::new(AreaList::new(vec![MessageArea {
+                name: "General".to_string(),
+                path: path.clone(),
+                ..Default::default()
+            }]))),
+            ..Default::default()
+        });
+    })
+}
+
+#[test]
+fn a_missing_message_base_reports_message_io_errors() {
+    let path = scratch_dir("missing-message-base").join("general");
+    let output = run_on_message_base(
+        r#"
+        AREA area = Board.Conferences[0].Areas[0]
+        MSG msg = area.Read(1)
+        PrintLn msg.Valid, " ", Error.Last().Kind = ErrKind.Msg, " ", Error.Last().Code = ErrCode.Io
+        PrintLn area.Find(MsgField.To, "STAN").Valid, " ", Error.Last().Kind = ErrKind.Msg, " ", Error.Last().Code = ErrCode.Io
+        PrintLn area.LowMsg(), " ", Error.Last().Kind = ErrKind.Msg, " ", Error.Last().Code = ErrCode.Io
+        PrintLn area.HighMsg(), " ", Error.Last().Kind = ErrKind.Msg, " ", Error.Last().Code = ErrCode.Io
+        "#,
+        path.clone(),
+    );
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+
+    assert_eq!(output, "0 1 1\n0 1 1\n0 1 1\n0 1 1\n");
+}
+
+#[test]
+fn a_message_operation_failure_enters_an_on_error_handler() {
+    let path = scratch_dir("message-on-error").join("general");
+    let output = run_on_message_base(
+        r#"
+        ON ERROR GOSUB failed
+        MSG msg = Board.Conferences[0].Areas[0].Read(1)
+        PrintLn "continued"
+        EXIT
+
+        :failed
+        PrintLn Error.Last().Kind = ErrKind.Msg, " ", Error.Last().Code = ErrCode.Io
+        RETURN
+        "#,
+        path.clone(),
+    );
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+
+    assert_eq!(output, "1 1\ncontinued\n");
+}
+
+#[test]
+fn a_corrupt_message_index_reports_a_message_format_error() {
+    let path = scratch_dir("corrupt-message-index").join("general");
+    let mut base = jamjam::jam::JamMessageBase::create(&path).unwrap();
+    base.write_message(&jamjam::jam::JamMessage::default().with_text(bstr::BString::from("body")))
+        .unwrap();
+    base.write_jhr_header().unwrap();
+    drop(base);
+    std::fs::write(path.with_extension("jdx"), [0]).unwrap();
+
+    let output = run_on_message_base(
+        r#"
+        MSG msg = Board.Conferences[0].Areas[0].Read(1)
+        PrintLn msg.Valid, " ", Error.Last().Kind = ErrKind.Msg, " ", Error.Last().Code = ErrCode.Format
+        "#,
+        path.clone(),
+    );
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+
+    assert_eq!(output, "0 1 1\n");
+}
+
+#[test]
+fn a_corrupt_message_body_reports_a_message_format_error() {
+    let path = scratch_dir("corrupt-message-body").join("general");
+    let mut base = jamjam::jam::JamMessageBase::create(&path).unwrap();
+    base.write_message(&jamjam::jam::JamMessage::default().with_text(bstr::BString::from("body")))
+        .unwrap();
+    base.write_jhr_header().unwrap();
+    drop(base);
+    std::fs::write(path.with_extension("jdt"), []).unwrap();
+
+    let output = run_on_message_base(
+        r#"
+        MSG msg = Board.Conferences[0].Areas[0].Read(1)
+        PrintLn msg.Valid, " ", Error.Last().OK
+        PrintLn "[", msg.Text(), "] ", Error.Last().Kind = ErrKind.Msg, " ", Error.Last().Code = ErrCode.Format
+        "#,
+        path.clone(),
+    );
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+
+    assert_eq!(output, "1 1\n[] 1 1\n");
 }
 
 /// The numbers a walk runs between. A JAM base is sparse, so a PPE counts over

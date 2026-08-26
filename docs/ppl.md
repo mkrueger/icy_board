@@ -484,7 +484,9 @@ snapshot: `Valid`, `Number`, `From`, `To`, `Subject`, `Date`, `Time`, `ReplyTo`,
 `Status`, `Size`, `IsPrivate`, `IsRead`, `IsDeleted`, `IsEcho`, `NeedsPassword`
 and `Text()`. It is called `MSG` rather than `MESSAGE` because `MESSAGE` has been
 a statement since PPL 1.00. `MsgField` - `To`, `From`, `Subject` - is what `Find`
-searches on. See [new_ppl.md](new_ppl.md#messages-400).
+searches on. A missing number is an invalid `MSG` with no error; unreadable or
+corrupt message data reports `ErrKind.Msg` with `ErrCode.Io` or
+`ErrCode.Format`. See [new_ppl.md](new_ppl.md#messages-400).
 
 #### New library surface
 

@@ -8,9 +8,22 @@ use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue, user_data_value},
     datetime::{IcbDate, IcbTime},
     executable::{VariableData, VariableType, VariableValue},
+    icy_board::state::ppl_error::{ERR_FORMAT, ERR_IO, ERR_KIND_MSG, PplError},
     parser::MSG_ID,
     vm::expressions::predefined_functions::message_status,
 };
+
+pub fn message_is_missing(error: &jamjam::Error) -> bool {
+    matches!(
+        error,
+        jamjam::Error::Jam(jamjam::jam::JamError::MessageNumberOutOfRange(..) | jamjam::jam::JamError::MessageDeleted)
+    )
+}
+
+pub fn message_error(action: &str, path: &std::path::Path, error: &jamjam::Error) -> PplError {
+    let code = if matches!(error, jamjam::Error::Io(_)) { ERR_IO } else { ERR_FORMAT };
+    PplError::new(ERR_KIND_MSG, code, format!("{action} {}: {error}", path.display()))
+}
 
 macro_rules! member_name {
     ($name:ident, $value:literal) => {
@@ -169,19 +182,43 @@ impl UserDataValue for PplMessage {
 
     async fn call_function(
         &self,
-        _vm: &mut crate::vm::VirtualMachine<'_>,
+        vm: &mut crate::vm::VirtualMachine<'_>,
         name: &unicase::Ascii<String>,
         _arguments: &[VariableValue],
     ) -> crate::Res<VariableValue> {
         if *name == *TEXT {
             if !self.valid {
+                vm.operation_succeeded();
                 return Ok(VariableValue::new_string(String::new()));
             }
-            let text = JamMessageBase::open(&self.path)
-                .and_then(|base| base.read_header(self.number).and_then(|header| base.read_message_text(&header)))
-                .map(|text| text.to_string())
-                .unwrap_or_default();
-            return Ok(VariableValue::new_string(text));
+            let base = match JamMessageBase::open(&self.path) {
+                Ok(base) => base,
+                Err(error) => {
+                    vm.set_error(message_error("can't open message base", &self.path, &error));
+                    return Ok(VariableValue::new_string(String::new()));
+                }
+            };
+            let header = match base.read_header(self.number) {
+                Ok(header) => header,
+                Err(error) if message_is_missing(&error) => {
+                    vm.operation_succeeded();
+                    return Ok(VariableValue::new_string(String::new()));
+                }
+                Err(error) => {
+                    vm.set_error(message_error(&format!("can't read message {} from", self.number), &self.path, &error));
+                    return Ok(VariableValue::new_string(String::new()));
+                }
+            };
+            return Ok(match base.read_message_text(&header) {
+                Ok(text) => {
+                    vm.operation_succeeded();
+                    VariableValue::new_string(text.to_string())
+                }
+                Err(error) => {
+                    vm.set_error(message_error(&format!("can't read message {} text from", self.number), &self.path, &error));
+                    VariableValue::new_string(String::new())
+                }
+            });
         }
         Err(format!("Unknown MSG function {name}").into())
     }

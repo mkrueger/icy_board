@@ -3,7 +3,7 @@
 All notable user-visible changes to IcyBoard are recorded here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
-IcyBoard is still in beta, so unstable PPL runtime 4.02 APIs may change between
+IcyBoard is still in beta, so unstable PPL runtime 4.00 APIs may change between
 releases.
 
 ## [Unreleased]
@@ -33,6 +33,13 @@ releases.
   `MESSAGE` statement are unchanged, and writing a message is still theirs.
 
 ### Changed
+
+- Message lookup now distinguishes absence from failure. A number outside the
+  base, a deleted message or an empty slot still answers with an invalid `MSG`
+  and leaves `Error.Last().OK` true. `AREA.Read`, `Find`, `LowMsg`, `HighMsg`
+  and `MSG.Text()` now report `ErrKind.Msg` with `ErrCode.Io` for filesystem
+  failures, `ErrCode.Format` for corrupt JAM data, and enter `ON ERROR` handlers.
+  Their invalid, zero and empty fallback values are unchanged.
 
 - The board objects report what they are configured to be, not only what they are
   called. `CONFERENCE` gained `IsReadOnly`, `AllowAliases`, `EchoMail`,

@@ -14,6 +14,7 @@ pub const ERR_KIND_GFX: i32 = 4;
 pub const ERR_KIND_FONT: i32 = 5;
 pub const ERR_KIND_SOUND: i32 = 6;
 pub const ERR_KIND_TERM: i32 = 7;
+pub const ERR_KIND_MSG: i32 = 8;
 
 /// What went wrong. The same codes describe every subsystem, so one piece of
 /// code can handle a file, a font, a sound or a picture going wrong.

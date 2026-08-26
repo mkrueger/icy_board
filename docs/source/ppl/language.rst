@@ -435,6 +435,18 @@ everywhere else in the language, and a message number is not one.
 The body stays in the base until ``Text()`` asks for it, which is why it is a
 call. A listing that only prints headers never pays for a body.
 
+A message number outside the base, a deleted message and an empty slot are
+ordinary lookup misses. ``Read()`` answers an invalid ``MSG``, ``Text()``
+answers an empty string and ``Error.Last().OK`` remains true. Running off the
+end of ``Find()`` works the same way.
+
+An unreadable base is an operational failure. ``Read()``, ``Find()``,
+``LowMsg()``, ``HighMsg()`` and ``Text()`` keep their normal invalid, zero or
+empty return value and report ``ErrKind.Msg`` as well: ``ErrCode.Io`` for a
+filesystem failure and ``ErrCode.Format`` for corrupt JAM data. These failures
+also enter an ``ON ERROR`` handler. An invalid ``MsgField`` reports
+``ErrCode.Invalid``.
+
 ``Find`` is ``SCANMSGHDR`` with a type instead of a field number. It matches
 without regard to case, anywhere in the field, and answers an invalid ``MSG``
 when nothing matches. The ``start`` argument walks on to the next match::

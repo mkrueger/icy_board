@@ -134,3 +134,8 @@ fn an_error_names_its_kind_and_code() {
 
     assert_eq!(output, "1\n1\n0\n");
 }
+
+#[test]
+fn the_message_error_kind_keeps_its_runtime_value() {
+    assert_eq!(run_ppl("PrintLn ErrKind.Msg"), "8\n");
+}

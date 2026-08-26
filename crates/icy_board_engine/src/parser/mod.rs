@@ -518,6 +518,7 @@ impl UserTypeRegistry {
                 ("Font", 5),
                 ("Audio", 6),
                 ("Term", 7),
+                ("Msg", 8),
             ],
         );
         self.register_enum(
