@@ -45,4 +45,18 @@ mod tests {
 
         assert_eq!(screen.buffer.char_at(Position::default()).ch, '═');
     }
+
+    /// The sysop monitor gets the caller's screen as a serialized snapshot on attach,
+    /// so the round trip has to survive the writer as well as the screen itself.
+    #[test]
+    fn a_snapshot_of_the_screen_keeps_its_box_drawing() {
+        let mut screen = VirtualScreen::new(icy_parser_core::AnsiParser::default());
+        screen.print_char('═').unwrap();
+        screen.print_char('\r').unwrap();
+
+        let text = crate::icy_board::state::screen_to_pcboard_text(&screen.buffer.buffer).unwrap();
+
+        assert!(text.contains('═'), "the snapshot lost the box drawing: {text:?}");
+        assert!(!text.starts_with('\u{feff}'), "the snapshot leaks a BOM: {text:?}");
+    }
 }

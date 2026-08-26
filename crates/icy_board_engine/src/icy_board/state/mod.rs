@@ -706,6 +706,23 @@ pub struct IcyBoardState {
     pub ppl_terminal: ppl_terminal_control::PplTerminalControl,
 }
 
+/// Serializes a screen back into PCBoard text that the write path can print again.
+///
+/// The screens hold Unicode, so the writer has to be asked for Unicode as well: its
+/// byte output truncates every char to its low byte, which turns `═` into `P`.
+pub fn screen_to_pcboard_text(buffer: &icy_engine::TextBuffer) -> Res<String> {
+    let options = SaveOptions {
+        format: FormatOptions::Character(CharacterFormatOptions {
+            screen_prep: ScreenPreperation::ClearScreen,
+            unicode: true,
+        }),
+        ..Default::default()
+    };
+    let bytes = FileFormat::PCBoard.to_bytes(buffer, &options)?;
+    let text = String::from_utf8(bytes)?;
+    Ok(text.trim_start_matches('\u{feff}').to_string())
+}
+
 impl IcyBoardState {
     pub fn reserve_media_upload(&mut self, bytes: usize) -> bool {
         const MAX_MEDIA_UPLOAD_BYTES: usize = 256 * 1024 * 1024;
@@ -3603,30 +3620,14 @@ impl IcyBoardState {
 
         self.press_enter().await?;
 
-        let options = SaveOptions {
-            format: FormatOptions::Character(CharacterFormatOptions {
-                screen_prep: ScreenPreperation::ClearScreen,
-                ..Default::default()
-            }),
-            ..Default::default()
-        };
-        let res = FileFormat::PCBoard.to_bytes(&buf, &options)?;
-        let res = unsafe { String::from_utf8_unchecked(res) };
+        let res = screen_to_pcboard_text(&buf)?;
         self.print(TerminalTarget::Both, &res).await?;
         self.gotoxy(TerminalTarget::Both, pos.x, pos.y).await?;
         Ok(())
     }
 
     async fn print_sysop_screen(&mut self) -> Res<()> {
-        let options = SaveOptions {
-            format: FormatOptions::Character(CharacterFormatOptions {
-                screen_prep: ScreenPreperation::ClearScreen,
-                ..Default::default()
-            }),
-            ..Default::default()
-        };
-        let res = FileFormat::PCBoard.to_bytes(&self.user_screen.buffer.buffer, &options)?;
-        let res = res.into_iter().map(|byte| codepages::tables::CP437_TO_UNICODE[byte as usize]).collect::<String>();
+        let res = screen_to_pcboard_text(&self.user_screen.buffer.buffer)?;
         self.print(TerminalTarget::Sysop, &res).await?;
         let p = self.user_screen.buffer.caret.position();
         self.gotoxy(TerminalTarget::Sysop, p.x + 1, p.y + 1).await?;

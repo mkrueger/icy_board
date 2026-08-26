@@ -27,8 +27,7 @@ use crate::{
 use bstr::BString;
 use chrono::{DateTime, Utc};
 use codepages::tables::CP437_TO_UNICODE;
-use icy_engine::formats::{CharacterFormatOptions, FileFormat, FormatOptions, ScreenPreperation};
-use icy_engine::{BufferType, SaveOptions};
+use icy_engine::BufferType;
 use jamjam::jam::{JamMessage, JamMessageBase, attributes as jam_attributes, msg_header::SubfieldType};
 
 use crate::{
@@ -36,6 +35,7 @@ use crate::{
     icy_board::state::ppl_error::{
         ERR_FORMAT, ERR_INVALID, ERR_IO, ERR_KIND_FONT, ERR_KIND_GFX, ERR_KIND_SOUND, ERR_KIND_TERM, ERR_LIMIT, ERR_UNAVAILABLE, PplError,
     },
+    icy_board::state::screen_to_pcboard_text,
     vm::{TerminalTarget, VMError, VirtualMachine},
 };
 
@@ -1546,15 +1546,7 @@ pub async fn savescrn(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
 
 pub async fn restscrn(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     if let Some(screen) = &mut vm.stored_screen {
-        let options = SaveOptions {
-            format: FormatOptions::Character(CharacterFormatOptions {
-                screen_prep: ScreenPreperation::ClearScreen,
-                ..Default::default()
-            }),
-            ..Default::default()
-        };
-        let res = FileFormat::PCBoard.to_bytes(screen, &options)?;
-        let res = unsafe { String::from_utf8_unchecked(res) };
+        let res = screen_to_pcboard_text(screen)?;
         vm.icy_board_state.print(TerminalTarget::Both, &res).await?;
     }
     Ok(())
