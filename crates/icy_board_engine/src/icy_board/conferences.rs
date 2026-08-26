@@ -395,11 +395,19 @@ impl UserData for Conference {
         registry.add_property(NUMBER.clone(), VariableType::Integer, false);
         registry.add_property(VALID.clone(), VariableType::Boolean, false);
         registry.add_property(ISPUBLIC.clone(), VariableType::Boolean, false);
+        registry.add_property(IS_READ_ONLY.clone(), VariableType::Boolean, false);
+        registry.add_property(ALLOW_ALIASES.clone(), VariableType::Boolean, false);
+        registry.add_property(ECHO_MAIL.clone(), VariableType::Boolean, false);
+        registry.add_property(AUTO_REJOIN.clone(), VariableType::Boolean, false);
+        registry.add_property(PRIVATE_UPLOADS.clone(), VariableType::Boolean, false);
+        registry.add_property(PASSWORD.clone(), VariableType::Password, false);
         registry.add_property(FILE_AREAS.clone(), VariableType::UserData(DIRECTORIES_ID as u8), false);
         registry.add_property(MESSAGE_AREAS.clone(), VariableType::UserData(AREAS_ID as u8), false);
         registry.add_property(DOORS.clone(), VariableType::UserData(DOORS_ID as u8), false);
 
         registry.add_function(HAS_ACCESS.clone(), Vec::new(), VariableType::Boolean);
+        registry.add_function(CAN_POST.clone(), Vec::new(), VariableType::Boolean);
+        registry.add_function(CAN_ATTACH.clone(), Vec::new(), VariableType::Boolean);
     }
 }
 
@@ -407,10 +415,18 @@ pub static NAME: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLo
 pub static NUMBER: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Number".to_string()));
 pub static VALID: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Valid".to_string()));
 pub static ISPUBLIC: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("IsPublic".to_string()));
+pub static IS_READ_ONLY: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("IsReadOnly".to_string()));
+pub static ALLOW_ALIASES: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("AllowAliases".to_string()));
+pub static ECHO_MAIL: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("EchoMail".to_string()));
+pub static AUTO_REJOIN: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("AutoRejoin".to_string()));
+pub static PRIVATE_UPLOADS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("PrivateUploads".to_string()));
+pub static PASSWORD: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Password".to_string()));
 pub static FILE_AREAS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Directories".to_string()));
 pub static DOORS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Doors".to_string()));
 pub static MESSAGE_AREAS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Areas".to_string()));
 pub static HAS_ACCESS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("HasAccess".to_string()));
+pub static CAN_POST: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("CanPost".to_string()));
+pub static CAN_ATTACH: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("CanAttach".to_string()));
 
 #[async_trait(?Send)]
 impl UserDataValue for Conference {
@@ -427,6 +443,24 @@ impl UserDataValue for Conference {
         if *name == *ISPUBLIC {
             return Ok(VariableValue::new_bool(self.is_public));
         }
+        if *name == *IS_READ_ONLY {
+            return Ok(VariableValue::new_bool(self.is_read_only));
+        }
+        if *name == *ALLOW_ALIASES {
+            return Ok(VariableValue::new_bool(self.allow_aliases));
+        }
+        if *name == *ECHO_MAIL {
+            return Ok(VariableValue::new_bool(self.echo_mail_in_conference));
+        }
+        if *name == *AUTO_REJOIN {
+            return Ok(VariableValue::new_bool(self.auto_rejoin));
+        }
+        if *name == *PRIVATE_UPLOADS {
+            return Ok(VariableValue::new_bool(self.private_uploads));
+        }
+        if *name == *PASSWORD {
+            return Ok(VariableValue::new_password(self.password.protected()));
+        }
         if *name == *FILE_AREAS {
             return Ok(PplDirectories::new(self.directories.clone().unwrap_or_default()).value());
         }
@@ -441,9 +475,8 @@ impl UserDataValue for Conference {
         Ok(VariableValue::new_int(-1))
     }
 
-    async fn set_property_value(&self, _vm: &mut crate::vm::VirtualMachine<'_>, _name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
-        // Currently unsupported !
-        Ok(())
+    async fn set_property_value(&self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
+        Err(format!("CONFERENCE property {name} is read-only").into())
     }
 
     async fn call_function(
@@ -454,6 +487,14 @@ impl UserDataValue for Conference {
     ) -> crate::Res<VariableValue> {
         if *name == *HAS_ACCESS {
             let res = self.required_security.session_can_access(&vm.icy_board_state.session);
+            return Ok(VariableValue::new_bool(res));
+        }
+        if *name == *CAN_POST {
+            let res = self.sec_write_message.session_can_access(&vm.icy_board_state.session);
+            return Ok(VariableValue::new_bool(res));
+        }
+        if *name == *CAN_ATTACH {
+            let res = self.sec_attachments.session_can_access(&vm.icy_board_state.session);
             return Ok(VariableValue::new_bool(res));
         }
         log::error!("Invalid function call on Conference ({name})");

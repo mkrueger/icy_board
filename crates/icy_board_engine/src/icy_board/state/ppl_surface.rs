@@ -164,8 +164,8 @@ impl UserDataValue for PplSurface {
         Ok(VariableValue::new_int(-1))
     }
 
-    async fn set_property_value(&self, _vm: &mut crate::vm::VirtualMachine<'_>, _name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
-        Ok(())
+    async fn set_property_value(&self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
+        Err(format!("SURFACE property {name} is read-only").into())
     }
 
     async fn call_function(

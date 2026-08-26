@@ -87,8 +87,8 @@ impl UserDataValue for PplBoard {
         Ok(value)
     }
 
-    async fn set_property_value(&self, _vm: &mut crate::vm::VirtualMachine<'_>, _name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
-        Err("BOARD properties are read-only".into())
+    async fn set_property_value(&self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
+        Err(format!("BOARD property {name} is read-only").into())
     }
 
     async fn call_function(

@@ -46,8 +46,8 @@ impl UserDataValue for PplMacros {
         Err(format!("Unknown MACROS property {name}").into())
     }
 
-    async fn set_property_value(&self, _vm: &mut crate::vm::VirtualMachine<'_>, _name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
-        Err("MACROS properties are read-only".into())
+    async fn set_property_value(&self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
+        Err(format!("MACROS property {name} is read-only").into())
     }
 
     async fn call_function(

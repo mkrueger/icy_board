@@ -36,8 +36,8 @@ impl UserDataValue for PplPalette {
         Err(format!("Unknown PALETTE property {name}").into())
     }
 
-    async fn set_property_value(&self, _vm: &mut crate::vm::VirtualMachine<'_>, _name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
-        Err("PALETTE properties are read-only".into())
+    async fn set_property_value(&self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
+        Err(format!("PALETTE property {name} is read-only").into())
     }
 
     async fn call_function(

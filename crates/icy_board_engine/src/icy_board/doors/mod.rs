@@ -165,6 +165,7 @@ impl UserData for Door {
         registry.add_property(NUMBER.clone(), VariableType::Integer, false);
         registry.add_property(VALID.clone(), VariableType::Boolean, false);
         registry.add_property(DESCRIPTION.clone(), VariableType::String, false);
+        registry.add_property(PATH.clone(), VariableType::String, false);
         registry.add_property(PASSWORD.clone(), VariableType::Password, false);
         registry.add_function(HAS_ACCESS.clone(), Vec::new(), VariableType::Boolean);
     }
@@ -185,6 +186,9 @@ impl UserDataValue for Door {
         if *name == *DESCRIPTION {
             return Ok(VariableValue::new_string(self.description.clone()));
         }
+        if *name == *PATH {
+            return Ok(VariableValue::new_string(self.path.clone()));
+        }
         if *name == *PASSWORD {
             return Ok(VariableValue::new_password(crate::icy_board::user_base::Password::new_protected(
                 &self.password,
@@ -195,8 +199,7 @@ impl UserDataValue for Door {
     }
 
     async fn set_property_value(&self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
-        log::error!("Invalid set field call on Door ({name})");
-        Ok(())
+        Err(format!("DOOR property {name} is read-only").into())
     }
 
     async fn call_function(
@@ -223,6 +226,7 @@ pub static NAME: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLo
 pub static NUMBER: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Number".to_string()));
 pub static VALID: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Valid".to_string()));
 pub static DESCRIPTION: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Description".to_string()));
+pub static PATH: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Path".to_string()));
 pub static PASSWORD: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Password".to_string()));
 pub static HAS_ACCESS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("HasAccess".to_string()));
 

@@ -294,49 +294,104 @@ has to parse the board's config files to find out what is on it.
 
 .. code-block:: PPL
 
-    CONFERENCE conf = ConfInfo(CurConf())
+    CONFERENCE conf = Session.Conference
 
     IF conf.HasAccess() PRINTLN conf.Name
 
-``Board.GetConference(index)`` returns a read-only ``CONFERENCE`` snapshot, and
+``Board.Conferences[index]`` returns a read-only ``CONFERENCE`` snapshot, and
 ``Session.Conference`` the one the caller is in. An index no conference has
 returns an empty conference rather than failing, so its properties can still be
 read.
 
 **CONFERENCE**
 
-================  ===============  ==================================================
-Member            Type             Description
-================  ===============  ==================================================
-``Name``          ``STRING``       Conference name
-``Number``        ``INTEGER``      The number it was fetched under
-``Valid``         ``BOOLEAN``      Whether the requested conference exists
-``IsPublic``      ``BOOLEAN``      Whether the conference is configured as public
-``DirectoryCount``  ``INTEGER``    Number of file directories
-``AreaCount``     ``INTEGER``      Number of message areas
-``DoorCount``     ``INTEGER``      Number of doors
-``HasAccess()``   ``BOOLEAN``      Whether the current caller can access it
-``GetDirectory(i)``  ``DIRECTORY`` File directory at the zero based index
-``GetArea(i)``    ``AREA``         Message area at the zero based index
-``GetDoor(i)``    ``DOOR``         Door at the zero based index
-================  ===============  ==================================================
+===================  ================  ==================================================
+Member               Type              Description
+===================  ================  ==================================================
+``Name``             ``STRING``        Conference name
+``Number``           ``INTEGER``       The number it was fetched under
+``Valid``            ``BOOLEAN``       Whether the requested conference exists
+``IsPublic``         ``BOOLEAN``       Whether the conference is configured as public
+``IsReadOnly``       ``BOOLEAN``       Whether messages may only be read
+``AllowAliases``     ``BOOLEAN``       Whether a caller may post under an alias
+``EchoMail``         ``BOOLEAN``       Whether mail written here is echoed
+``AutoRejoin``       ``BOOLEAN``       Whether a caller is rejoined here on the next call
+``PrivateUploads``   ``BOOLEAN``       Whether uploads go to the private area
+``Password``         ``PASSWORD``      The password needed to join
+``Directories``      ``DIRECTORIES``   The file directories of the conference
+``Areas``            ``AREAS``         The message areas of the conference
+``Doors``            ``DOORS``         The doors of the conference
+``HasAccess()``      ``BOOLEAN``       Whether the current caller can join it
+``CanPost()``        ``BOOLEAN``       Whether the current caller may write a message
+``CanAttach()``      ``BOOLEAN``       Whether the current caller may attach a file
+===================  ================  ==================================================
 
-**DIRECTORY** and **AREA** provide ``Name``, ``Number``, ``Valid`` and
-``HasAccess()``. **DOOR** provides ``Name``, ``Number``, ``Valid``,
-``Description``, ``Password`` and
-``HasAccess()``.
+**AREA**
+
+===================  ================  ==================================================
+Member               Type              Description
+===================  ================  ==================================================
+``Name``             ``STRING``        Area name
+``Number``           ``INTEGER``       The number it was fetched under
+``Valid``            ``BOOLEAN``       Whether the requested area exists
+``IsReadOnly``       ``BOOLEAN``       Whether messages may only be read
+``AllowAliases``     ``BOOLEAN``       Whether a caller may post under an alias
+``QwkName``          ``STRING``        The name this area carries in a QWK packet
+``EchoTag``          ``STRING``        The FTN tag, empty when the area is local
+``HasAccess()``      ``BOOLEAN``       Whether the current caller may list it
+``CanEnter()``       ``BOOLEAN``       Whether the current caller may join it
+``CanAttach()``      ``BOOLEAN``       Whether the current caller may save an attachment
+``HighMsg()``        ``INTEGER``       The highest message number, zero when there is none
+===================  ================  ==================================================
+
+**DIRECTORY**
+
+===================  ================  ==================================================
+Member               Type              Description
+===================  ================  ==================================================
+``Name``             ``STRING``        Directory name
+``Number``           ``INTEGER``       The number it was fetched under
+``Valid``            ``BOOLEAN``       Whether the requested directory exists
+``Path``             ``STRING``        Where the files are kept
+``IsFree``           ``BOOLEAN``       Whether downloads here cost no time or bytes
+``HasNewFiles``      ``BOOLEAN``       Whether the directory is flagged as having new files
+``Password``         ``PASSWORD``      The password needed to reach it
+``HasAccess()``      ``BOOLEAN``       Whether the current caller may list it
+``CanDownload()``    ``BOOLEAN``       Whether the current caller may download from it
+===================  ================  ==================================================
+
+**DOOR**
+
+===================  ================  ==================================================
+Member               Type              Description
+===================  ================  ==================================================
+``Name``             ``STRING``        Door name
+``Number``           ``INTEGER``       The number it was fetched under
+``Valid``            ``BOOLEAN``       Whether the requested door exists
+``Description``      ``STRING``        Door description
+``Path``             ``STRING``        What the door runs
+``Password``         ``PASSWORD``      The password needed to open it
+``HasAccess()``      ``BOOLEAN``       Whether the current caller can open it
+===================  ================  ==================================================
+
+``HighMsg()`` opens the message base to answer, so it is a call rather than a
+property: read it once per area rather than once per line of a listing.
+
+A password is always of the runtime-only ``PASSWORD`` type. It may be compared
+against a string, but printing or converting one yields ``******`` rather than
+the secret, so a listing can say *that* a password is needed without saying
+which one it is.
 
 Walking a conference:
 
 .. code-block:: PPL
 
     CONFERENCE conf = Session.Conference
-    INTEGER i
+    DOOR item
 
-    FOR i = 0 TO conf.DoorCount - 1
-        DOOR item = conf.GetDoor(i)
+    FOREACH item IN conf.Doors
         IF item.HasAccess() PRINTLN item.Name
-    NEXT
+    ENDFOREACH
 
 ``CONFERENCE``, ``DOOR``, ``AREA`` and ``DIRECTORY`` are resolved wherever a type
 name is expected, so a variable cannot be called ``door`` or ``area``. The names
@@ -345,7 +400,7 @@ declares too: ``Point point`` leaves ``point`` ambiguous.
 
 These objects are read-only snapshots, so assigning to a member -
 ``conf.Name = "x"`` - is rejected. What a member answers may be asked again, so
-``conf.GetDoor(0).Name`` reads in one go.
+``conf.Doors[0].Name`` reads in one go.
 
 Overloaded built-ins
 ~~~~~~~~~~~~~~~~~~~~

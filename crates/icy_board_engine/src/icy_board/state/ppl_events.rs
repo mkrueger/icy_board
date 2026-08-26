@@ -248,8 +248,8 @@ impl UserDataValue for PplEvent {
         Err("Invalid EVENT property".into())
     }
 
-    async fn set_property_value(&self, _vm: &mut crate::vm::VirtualMachine<'_>, _name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
-        Err("EVENT properties are read-only".into())
+    async fn set_property_value(&self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
+        Err(format!("EVENT property {name} is read-only").into())
     }
 
     async fn call_function(

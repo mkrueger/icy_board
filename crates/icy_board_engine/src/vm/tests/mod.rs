@@ -8,6 +8,7 @@
 #![cfg(test)]
 
 mod arrays;
+mod board_objects;
 mod board_session;
 mod builtin_enums;
 mod collection_bench;

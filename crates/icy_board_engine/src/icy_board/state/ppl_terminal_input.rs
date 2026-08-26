@@ -52,8 +52,8 @@ impl UserDataValue for PplTerminalInput {
         Err(format!("Unknown TERMINPUT property {name}").into())
     }
 
-    async fn set_property_value(&self, _vm: &mut crate::vm::VirtualMachine<'_>, _name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
-        Err("TERMINPUT properties are read-only".into())
+    async fn set_property_value(&self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
+        Err(format!("TERMINPUT property {name} is read-only").into())
     }
 
     async fn call_function(

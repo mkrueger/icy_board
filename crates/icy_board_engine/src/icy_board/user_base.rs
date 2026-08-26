@@ -80,6 +80,15 @@ impl Password {
         Password::Protected(str.into().to_lowercase())
     }
 
+    /// The same secret in a form a PPE may compare against but never print.
+    #[must_use]
+    pub fn protected(&self) -> Password {
+        match self {
+            Password::PlainText(s) => Password::Protected(s.clone()),
+            other => other.clone(),
+        }
+    }
+
     /// The secret behind the values that are not hashed.
     fn unhashed(&self) -> Option<&str> {
         match self {

@@ -207,15 +207,25 @@ impl UserData for FileDirectory {
         registry.add_property(NAME.clone(), VariableType::String, false);
         registry.add_property(NUMBER.clone(), VariableType::Integer, false);
         registry.add_property(VALID.clone(), VariableType::Boolean, false);
+        registry.add_property(PATH.clone(), VariableType::String, false);
+        registry.add_property(IS_FREE.clone(), VariableType::Boolean, false);
+        registry.add_property(HAS_NEW_FILES.clone(), VariableType::Boolean, false);
+        registry.add_property(PASSWORD.clone(), VariableType::Password, false);
 
         registry.add_function(HAS_ACCESS.clone(), Vec::new(), VariableType::Boolean);
+        registry.add_function(CAN_DOWNLOAD.clone(), Vec::new(), VariableType::Boolean);
     }
 }
 
 pub static NAME: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Name".to_string()));
 pub static NUMBER: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Number".to_string()));
 pub static VALID: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Valid".to_string()));
+pub static PATH: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Path".to_string()));
+pub static IS_FREE: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("IsFree".to_string()));
+pub static HAS_NEW_FILES: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("HasNewFiles".to_string()));
+pub static PASSWORD: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Password".to_string()));
 pub static HAS_ACCESS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("HasAccess".to_string()));
+pub static CAN_DOWNLOAD: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("CanDownload".to_string()));
 
 #[async_trait(?Send)]
 impl UserDataValue for FileDirectory {
@@ -229,13 +239,24 @@ impl UserDataValue for FileDirectory {
         if *name == *VALID {
             return Ok(VariableValue::new_bool(self.valid));
         }
+        if *name == *PATH {
+            return Ok(VariableValue::new_string(self.path.to_string_lossy().to_string()));
+        }
+        if *name == *IS_FREE {
+            return Ok(VariableValue::new_bool(self.is_free));
+        }
+        if *name == *HAS_NEW_FILES {
+            return Ok(VariableValue::new_bool(self.has_new_files));
+        }
+        if *name == *PASSWORD {
+            return Ok(VariableValue::new_password(self.password.protected()));
+        }
         log::error!("Invalid user data call on FileDirectory ({name})");
         Ok(VariableValue::new_int(-1))
     }
 
     async fn set_property_value(&self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
-        log::error!("Invalid user data set on FileDirectory ({name})");
-        Ok(())
+        Err(format!("DIRECTORY property {name} is read-only").into())
     }
 
     async fn call_function(
@@ -246,6 +267,10 @@ impl UserDataValue for FileDirectory {
     ) -> crate::Res<VariableValue> {
         if *name == *HAS_ACCESS {
             let res = self.list_security.session_can_access(&vm.icy_board_state.session);
+            return Ok(VariableValue::new_bool(res));
+        }
+        if *name == *CAN_DOWNLOAD {
+            let res = self.download_security.session_can_access(&vm.icy_board_state.session);
             return Ok(VariableValue::new_bool(res));
         }
         log::error!("Invalid function call on FileDirectory ({name})");

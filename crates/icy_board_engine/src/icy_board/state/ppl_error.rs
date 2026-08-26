@@ -127,8 +127,8 @@ impl UserDataValue for PplError {
         Err(format!("Unknown ERROR property {name}").into())
     }
 
-    async fn set_property_value(&self, _vm: &mut crate::vm::VirtualMachine<'_>, _name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
-        Ok(())
+    async fn set_property_value(&self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
+        Err(format!("ERROR property {name} is read-only").into())
     }
 
     async fn call_function(

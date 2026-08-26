@@ -547,18 +547,69 @@ an empty conference object, so its properties can still be read.
 | `Number` | `INTEGER` | The number the conference was fetched under |
 | `Valid` | `BOOLEAN` | Whether the requested conference exists |
 | `IsPublic` | `BOOLEAN` | Whether the conference is configured as public |
+| `IsReadOnly` | `BOOLEAN` | Whether messages may only be read |
+| `AllowAliases` | `BOOLEAN` | Whether a caller may post under an alias |
+| `EchoMail` | `BOOLEAN` | Whether mail written here is echoed |
+| `AutoRejoin` | `BOOLEAN` | Whether a caller is rejoined here on the next call |
+| `PrivateUploads` | `BOOLEAN` | Whether uploads go to the private area |
+| `Password` | `PASSWORD` | The password needed to join |
 | `Directories` | `DIRECTORIES` | The file directories of the conference |
 | `Areas` | `AREAS` | The message areas of the conference |
 | `Doors` | `DOORS` | The doors of the conference |
-| `HasAccess()` | `BOOLEAN` | Whether the current caller can access the conference |
+| `HasAccess()` | `BOOLEAN` | Whether the current caller can join the conference |
+| `CanPost()` | `BOOLEAN` | Whether the current caller may write a message |
+| `CanAttach()` | `BOOLEAN` | Whether the current caller may attach a file |
 
-`DIRECTORY` and `AREA` provide `Name`, `Number`, `Valid` and `HasAccess()`.
-`DOOR` provides `Name`, `Number`, `Valid`, `Description`, `Password` and
-`HasAccess()`. Every board object
-reports the number it was fetched under, so a listing can name what a caller has
-to type. A door password has the
-runtime-only `PASSWORD` type: it can be compared with a string, but converting
-or printing it produces `******` rather than the secret.
+| Area member | Type | Description |
+| :--- | :--- | :--- |
+| `Name`, `Number`, `Valid` | | Name, the number it was fetched under, and whether it exists |
+| `IsReadOnly` | `BOOLEAN` | Whether messages may only be read |
+| `AllowAliases` | `BOOLEAN` | Whether a caller may post under an alias |
+| `QwkName` | `STRING` | The name this area carries in a QWK packet |
+| `EchoTag` | `STRING` | The FTN tag, empty when the area is local |
+| `HasAccess()` | `BOOLEAN` | Whether the current caller may list it |
+| `CanEnter()` | `BOOLEAN` | Whether the current caller may join it |
+| `CanAttach()` | `BOOLEAN` | Whether the current caller may save an attachment |
+| `HighMsg()` | `INTEGER` | The highest message number, zero when there is none |
+
+| Directory member | Type | Description |
+| :--- | :--- | :--- |
+| `Name`, `Number`, `Valid` | | Name, the number it was fetched under, and whether it exists |
+| `Path` | `STRING` | Where the files are kept |
+| `IsFree` | `BOOLEAN` | Whether downloads here cost no time or bytes |
+| `HasNewFiles` | `BOOLEAN` | Whether the directory is flagged as having new files |
+| `Password` | `PASSWORD` | The password needed to reach it |
+| `HasAccess()` | `BOOLEAN` | Whether the current caller may list it |
+| `CanDownload()` | `BOOLEAN` | Whether the current caller may download from it |
+
+| Door member | Type | Description |
+| :--- | :--- | :--- |
+| `Name`, `Number`, `Valid` | | Name, the number it was fetched under, and whether it exists |
+| `Description` | `STRING` | Door description |
+| `Path` | `STRING` | What the door runs |
+| `Password` | `PASSWORD` | The password needed to open it |
+| `HasAccess()` | `BOOLEAN` | Whether the current caller can open it |
+
+Every board object reports the number it was fetched under, so a listing can
+name what a caller has to type.
+
+`HasAccess()` is always the question a *listing* asks. What a caller may then do
+is asked separately - `CanPost()`, `CanEnter()`, `CanAttach()`, `CanDownload()` -
+because seeing a conference and writing in it are configured apart.
+
+`HighMsg()` opens the message base to answer, which is why it is a call rather
+than a property. Read it once per area rather than once per line of a listing.
+
+A password has the runtime-only `PASSWORD` type: it can be compared with a
+string, but converting or printing it produces `******` rather than the secret.
+A listing can therefore say *that* a conference, directory or door is locked
+without saying what unlocks it:
+
+```PPL
+CONFERENCE conf = Board.Conferences[0]
+
+IF conf.Password <> "" PRINTLN conf.Name, " needs a password"
+```
 
 ### Collections
 

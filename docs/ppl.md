@@ -378,29 +378,65 @@ still be read.
 | `Number` | `INTEGER` | The number the conference was fetched under |
 | `Valid` | `BOOLEAN` | Whether the requested conference exists |
 | `IsPublic` | `BOOLEAN` | Whether the conference is configured as public |
+| `IsReadOnly` | `BOOLEAN` | Whether messages may only be read |
+| `AllowAliases` | `BOOLEAN` | Whether a caller may post under an alias |
+| `EchoMail` | `BOOLEAN` | Whether mail written here is echoed |
+| `AutoRejoin` | `BOOLEAN` | Whether a caller is rejoined here on the next call |
+| `PrivateUploads` | `BOOLEAN` | Whether uploads go to the private area |
+| `Password` | `PASSWORD` | The password needed to join |
 | `Directories` | `DIRECTORIES` | The file directories of the conference |
 | `Areas` | `AREAS` | The message areas of the conference |
 | `Doors` | `DOORS` | The doors of the conference |
-| `HasAccess()` | `BOOLEAN` | Whether the current caller can access the conference |
-**`DIRECTORY`** and **`AREA`**
+| `HasAccess()` | `BOOLEAN` | Whether the current caller can join the conference |
+| `CanPost()` | `BOOLEAN` | Whether the current caller may write a message |
+| `CanAttach()` | `BOOLEAN` | Whether the current caller may attach a file |
+
+**`AREA`**
 
 | Member | Type | Description |
 | :--- | :--- | :--- |
-| `Name` | `STRING` | Directory / area name |
+| `Name` | `STRING` | Area name |
 | `Number` | `INTEGER` | The number it was fetched under |
-| `Valid` | `BOOLEAN` | Whether the requested object exists |
-| `HasAccess()` | `BOOLEAN` | Whether the current caller can access it |
+| `Valid` | `BOOLEAN` | Whether the requested area exists |
+| `IsReadOnly` | `BOOLEAN` | Whether messages may only be read |
+| `AllowAliases` | `BOOLEAN` | Whether a caller may post under an alias |
+| `QwkName` | `STRING` | The name this area carries in a QWK packet |
+| `EchoTag` | `STRING` | The FTN tag, empty when the area is local |
+| `HasAccess()` | `BOOLEAN` | Whether the current caller may list it |
+| `CanEnter()` | `BOOLEAN` | Whether the current caller may join it |
+| `CanAttach()` | `BOOLEAN` | Whether the current caller may save an attachment |
+| `HighMsg()` | `INTEGER` | The highest message number, zero when there is none |
+
+**`DIRECTORY`**
+
+| Member | Type | Description |
+| :--- | :--- | :--- |
+| `Name` | `STRING` | Directory name |
+| `Number` | `INTEGER` | The number it was fetched under |
+| `Valid` | `BOOLEAN` | Whether the requested directory exists |
+| `Path` | `STRING` | Where the files are kept |
+| `IsFree` | `BOOLEAN` | Whether downloads here cost no time or bytes |
+| `HasNewFiles` | `BOOLEAN` | Whether the directory is flagged as having new files |
+| `Password` | `PASSWORD` | The password needed to reach it |
+| `HasAccess()` | `BOOLEAN` | Whether the current caller may list it |
+| `CanDownload()` | `BOOLEAN` | Whether the current caller may download from it |
 
 **`DOOR`**
 
 | Member | Type | Description |
 | :--- | :--- | :--- |
 | `Name` | `STRING` | Door name |
-| `Valid` | `BOOLEAN` | Whether the requested door exists |
 | `Number` | `INTEGER` | The number it was fetched under |
+| `Valid` | `BOOLEAN` | Whether the requested door exists |
 | `Description` | `STRING` | Door description |
-| `Password` | `PASSWORD` | The door's password |
-| `HasAccess()` | `BOOLEAN` | Whether the current caller can access the door |
+| `Path` | `STRING` | What the door runs |
+| `Password` | `PASSWORD` | The password needed to open it |
+| `HasAccess()` | `BOOLEAN` | Whether the current caller can open the door |
+
+`HasAccess()` is always the question a *listing* asks; what a caller may then do
+is asked separately, because seeing a conference and writing in it are configured
+apart. `HighMsg()` opens the message base to answer, which is why it is a call
+rather than a property.
 
 Walking a conference:
 
@@ -439,8 +475,8 @@ dimension.
 | `MSGAREAID` | yes | A combined conference/message-area identifier, produced by `AreaId()` |
 | `PASSWORD` | no | A password. Comparable against a string, but printing or converting one yields `******` instead of the secret. |
 
-`PASSWORD` exists only at runtime; it is the type of `DOOR.Password` and cannot
-be written in a declaration.
+`PASSWORD` exists only at runtime; it is the type of `CONFERENCE.Password`,
+`DIRECTORY.Password` and `DOOR.Password`, and cannot be written in a declaration.
 
 #### New library surface
 

@@ -10,6 +10,25 @@ releases.
 
 ### Changed
 
+- The board objects report what they are configured to be, not only what they are
+  called. `CONFERENCE` gained `IsReadOnly`, `AllowAliases`, `EchoMail`,
+  `AutoRejoin`, `PrivateUploads`, `Password`, `CanPost()` and `CanAttach()`;
+  `AREA` gained `IsReadOnly`, `AllowAliases`, `QwkName`, `EchoTag`, `CanEnter()`,
+  `CanAttach()` and `HighMsg()`; `DIRECTORY` gained `Path`, `IsFree`,
+  `HasNewFiles`, `Password` and `CanDownload()`; `DOOR` gained `Path`. A PPE can
+  now write a listing that says which areas are read-only, echoed or hold new
+  mail without falling back to `CONFINFO(conf, field)`. `HasAccess()` stays the
+  question a listing asks — what a caller may then *do* is asked separately,
+  because the board configures the two apart. Every password a board object hands
+  out is of the masked `PASSWORD` type, so a listing can say that something is
+  locked without saying what unlocks it.
+- Every read-only object now refuses a write in the same words, naming the member
+  that was written. `CONFERENCE`, `DIRECTORY`, `DOOR`, `ERROR`, `SURFACE` and
+  `TERMINFO` used to accept one silently and drop it. Nothing a PPE can compile
+  reached that path - the compiler rejects the assignment and the VM has no
+  setter to call - so this is a guard for the day one of those objects gains a
+  writable member, not a hole that was open.
+
 - The editor grammars are now checked against the type registry, not only against
   the statements, constants and keywords. That found eight object types the
   grammars never learned - `AREAS`, `AUDIO`, `CONFERENCES`, `CONTACTS`,
