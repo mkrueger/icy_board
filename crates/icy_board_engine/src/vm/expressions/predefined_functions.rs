@@ -2825,7 +2825,12 @@ pub async fn terminal(_vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<Va
 }
 
 pub async fn board(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(crate::icy_board::state::ppl_board::PplBoard::snapshot(&vm.icy_board_state).await.value())
+    if let Some(value) = &vm.board_value {
+        return Ok(value.clone());
+    }
+    let value = crate::icy_board::state::ppl_board::PplBoard::snapshot(&vm.icy_board_state).await.value();
+    vm.board_value = Some(value.clone());
+    Ok(value)
 }
 
 pub async fn session(_vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<VariableValue> {

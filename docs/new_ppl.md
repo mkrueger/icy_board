@@ -601,7 +601,9 @@ ENDFOREACH
 they need no parentheses either. They split what the board *is* from what this
 one call *is doing*.
 
-`Board` is a snapshot of the configuration and its conferences, taken when it is read:
+`Board` is a snapshot of the configuration and its conferences. It is taken the
+first time a PPE reads `Board` and stands for the rest of the run, so touching it
+inside a loop is not paid for again:
 
 | Member | Type | Description |
 | :--- | :--- | :--- |

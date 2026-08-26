@@ -10,6 +10,12 @@ releases.
 
 ### Changed
 
+- `Board` is taken once per run rather than rebuilt on every access. Reading it
+  copies every conference, so a PPE that touched `Board` inside a loop paid for
+  the whole board on each step: walking 2000 areas through `Board` on a board
+  with 201 conferences went from 146 ms to 7 ms, and no longer grows with the
+  number of conferences.
+
 - Turned the conference's `AreaCount`/`GetArea(i)` pairs into collections:
   `Areas`, `Directories` and `Doors` answer `Count`, are read with an index, and
   are walked with `FOREACH`. A collection shares the list it stands for, so a

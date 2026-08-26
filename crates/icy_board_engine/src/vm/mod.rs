@@ -233,6 +233,10 @@ pub struct VirtualMachine<'a> {
     /// The call depth the handler returns to, or `None` for a `GOTO` handler that never does.
     pub handler_depth: Option<usize>,
 
+    /// `Board` is a snapshot of what the board is configured to be, so it is taken once
+    /// rather than on every access - building it copies every conference.
+    pub board_value: Option<VariableValue>,
+
     pub dbase: dbase::DbaseState,
 }
 
@@ -1316,6 +1320,7 @@ pub async fn run<P: AsRef<Path>>(file_name: &P, prg: &Executable, io: &mut dyn P
                 use_lmrs: true,
                 cached_msg_header: None,
                 abort_on_stack_error: true,
+                board_value: None,
                 last_error: PplError::default(),
                 error_pending: false,
                 error_handler: ErrorHandler::Off,

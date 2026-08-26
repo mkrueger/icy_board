@@ -15,6 +15,10 @@ use std::time::Instant;
 
 const AREAS: usize = 2000;
 
+/// How many conferences the board carries besides the one being walked. `Board` is
+/// rebuilt on every access, so this is what that costs.
+const EXTRA_CONFERENCES: usize = 0;
+
 fn seed(board: &mut crate::icy_board::IcyBoard) {
     let areas: Vec<MessageArea> = (0..AREAS)
         .map(|i| MessageArea {
@@ -28,6 +32,12 @@ fn seed(board: &mut crate::icy_board::IcyBoard) {
         areas: Some(std::sync::Arc::new(AreaList::new(areas))),
         ..Default::default()
     });
+    for i in 0..EXTRA_CONFERENCES {
+        board.conferences.push(Conference {
+            name: format!("Conference {i}"),
+            ..Default::default()
+        });
+    }
 }
 
 fn time(label: &str, source: &str) {
