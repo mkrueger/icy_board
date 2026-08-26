@@ -81,6 +81,7 @@ pub enum SemanticInfo {
     PredefinedFunc(FuncOpCode),
 
     MemberFunctionCall(usize),
+    MemberSetterCall(usize),
 
     /// A built-in array function written as a member, `a.Len()` for `Len(a)`. The
     /// array is passed as the first argument, plus the constants the member fills in.
@@ -1958,6 +1959,47 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 }
                 return VariableType::None;
             };
+            if !member.get_identifier().starts_with('<')
+                && matches!(
+                    call.get_lpar_token().token,
+                    Token::Eq
+                        | Token::AddAssign
+                        | Token::SubAssign
+                        | Token::MulAssign
+                        | Token::DivAssign
+                        | Token::ModAssign
+                        | Token::AndAssign
+                        | Token::OrAssign
+                )
+            {
+                let Some(registry) = self.type_registry.get_type_from_id(user_type) else {
+                    for argument in call.get_arguments() {
+                        argument.visit(self);
+                    }
+                    self.errors
+                        .lock()
+                        .unwrap()
+                        .report_error(member.get_identifier_token().span.clone(), CompilationErrorType::InvalidLetVariable);
+                    return VariableType::None;
+                };
+                let Some(member_id) = registry.get_member_id(member.get_identifier()) else {
+                    return VariableType::None;
+                };
+                if !matches!(registry.id_table.get(member_id), Some(crate::compiler::user_data::UserDataEntry::Field(_))) {
+                    for argument in call.get_arguments() {
+                        argument.visit(self);
+                    }
+                    self.errors.lock().unwrap().report_error(
+                        member.get_identifier_token().span.clone(),
+                        CompilationErrorType::MemberIsReadOnly(member.get_identifier().to_string()),
+                    );
+                    return VariableType::None;
+                }
+                let expected = registry.fields.get(member.get_identifier()).copied().unwrap_or(VariableType::None);
+                self.check_member_arg_types(&[expected], call.get_arguments());
+                self.function_type_lookup.insert(call.id, SemanticInfo::MemberSetterCall(member_id));
+                return VariableType::None;
+            }
             // A record field indexed like `rec.field(1)` is not a member call; the variable path below takes it.
             if self.type_registry.get_type_from_id(user_type).is_some() {
                 if let Some((member_id, required, parameters, return_type)) = self.member_function_signature(user_type, member.get_identifier()) {

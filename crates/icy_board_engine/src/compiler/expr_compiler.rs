@@ -140,6 +140,34 @@ impl AstVisitor<PPEExpr> for ExpressionCompiler<'_> {
                 let expr = call.get_expression().visit(self);
                 PPEExpr::MemberFunctionCall(Box::new(expr), arguments, idx)
             }
+            SemanticInfo::MemberSetterCall(idx) => {
+                let idx = *idx;
+                let Expression::MemberReference(member) = call.get_expression() else {
+                    log::error!("member setter without a receiver at: {}", call.get_expression().get_span().start);
+                    return PPEExpr::Value(0);
+                };
+                let arguments = match call.get_lpar_token().token {
+                    crate::parser::lexer::Token::Eq => arguments,
+                    ref token => {
+                        let op = match token {
+                            crate::parser::lexer::Token::AddAssign => crate::ast::BinOp::Add,
+                            crate::parser::lexer::Token::SubAssign => crate::ast::BinOp::Sub,
+                            crate::parser::lexer::Token::MulAssign => crate::ast::BinOp::Mul,
+                            crate::parser::lexer::Token::DivAssign => crate::ast::BinOp::Div,
+                            crate::parser::lexer::Token::ModAssign => crate::ast::BinOp::Mod,
+                            crate::parser::lexer::Token::AndAssign => crate::ast::BinOp::And,
+                            crate::parser::lexer::Token::OrAssign => crate::ast::BinOp::Or,
+                            _ => return PPEExpr::Value(0),
+                        };
+                        vec![PPEExpr::BinaryExpression(
+                            op,
+                            Box::new(PPEExpr::Member(Box::new(member.get_expression().visit(self)), idx)),
+                            Box::new(arguments.into_iter().next().unwrap_or(PPEExpr::Value(0))),
+                        )]
+                    }
+                };
+                PPEExpr::MemberFunctionCall(Box::new(member.get_expression().visit(self)), arguments, idx)
+            }
             SemanticInfo::ArrayMemberFunc(op_code, defaults) => {
                 let op_code = *op_code;
                 let defaults = defaults.clone();

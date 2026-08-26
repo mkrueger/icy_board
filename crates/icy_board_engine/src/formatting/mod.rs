@@ -5,6 +5,7 @@ use crate::ast::{
     ProcedureImplementation, RecordLiteralExpression, RepeatUntilStatement, SelectStatement, Statement, TypeDeclarationAstNode, UnaryExpression,
     VariableDeclarationStatement, WhileDoStatement, walk_binary_expression,
 };
+use crate::parser::lexer::Token;
 
 pub mod options;
 pub use options::*;
@@ -322,6 +323,45 @@ impl AstVisitor<()> for FormattingVisitor<'_> {
     }
 
     fn visit_function_call_expression(&mut self, call: &FunctionCallExpression) {
+        if let Expression::MemberReference(member) = call.get_expression()
+            && matches!(member.get_identifier().as_str(), "<get>" | "<set>")
+        {
+            let is_set = member.get_identifier().as_str() == "<set>";
+            let indices = if is_set {
+                &call.get_arguments()[..call.get_arguments().len() - 1]
+            } else {
+                call.get_arguments()
+            };
+            member.get_expression().visit(self);
+            for argument in indices {
+                argument.visit(self);
+            }
+            if is_set && let Some(value) = call.get_arguments().last() {
+                let value = if matches!(call.get_lpar_token().token, Token::Eq) {
+                    value
+                } else if let Expression::Binary(binary) = value {
+                    binary.get_right_expression()
+                } else {
+                    value
+                };
+                self.ensure_space_before(call.get_lpar_token().span.start);
+                self.ensure_text_or_newline(call.get_lpar_token().span.end..value.get_span().start, " ");
+                value.visit(self);
+            }
+            return;
+        }
+        if matches!(
+            call.get_lpar_token().token,
+            Token::Eq | Token::AddAssign | Token::SubAssign | Token::MulAssign | Token::DivAssign | Token::ModAssign | Token::AndAssign | Token::OrAssign
+        ) && call.get_arguments().len() == 1
+        {
+            call.get_expression().visit(self);
+            let value = &call.get_arguments()[0];
+            self.ensure_space_before(call.get_lpar_token().span.start);
+            self.ensure_text_or_newline(call.get_lpar_token().span.end..value.get_span().start, " ");
+            value.visit(self);
+            return;
+        }
         call.get_expression().visit(self);
         self.format_arguments(call.get_arguments());
     }

@@ -677,6 +677,11 @@ impl Parser<'_> {
                     self.report_error(self.lex.span(), ParserErrorType::IdentifierExpected(self.save_token()));
                     return None;
                 };
+                if self.get_cur_token() == Some(Token::Dot) {
+                    let base = Expression::Identifier(IdentifierExpression::new(identifier_token.clone()));
+                    let expression = self.parse_member_chain(base)?;
+                    return self.parse_member_assignment(Some(let_token), identifier_token, expression);
+                }
                 let mut leftpar_token = None;
                 let mut rightpar_token = None;
                 let mut params = Vec::new();
@@ -918,73 +923,14 @@ impl Parser<'_> {
             let base = Expression::Identifier(IdentifierExpression::new(id_token.clone()));
             let expression = self.parse_member_chain(base)?;
 
+            if is_assign_token(self.get_cur_token()) {
+                return self.parse_member_assignment(None, id_token, expression);
+            }
             if matches!(expression, Expression::FunctionCall(_)) {
-                // `collection[i] = value` is the collection's own setter, the mirror of
-                // the getter `[i]` reads with.
-                if is_assign_token(self.get_cur_token())
-                    && let Expression::FunctionCall(call) = &expression
-                    && let Expression::MemberReference(member) = call.get_expression()
-                    && member.get_identifier().as_str() == "<get>"
-                {
-                    let eq_token = self.save_spanned_token();
-                    let compound = assign_operator(&eq_token.token);
-                    self.next_token();
-                    let Some(value_expression) = self.parse_expression() else {
-                        self.report_error(self.lex.span(), ParserErrorType::ExpressionExpected(self.save_token()));
-                        return None;
-                    };
-                    // `a[i] += v` reads through the same getter, the way `a(i) += v` does.
-                    let value_expression = match compound {
-                        Some(op) => BinaryExpression::create_empty_expression(op, expression.clone(), value_expression),
-                        None => value_expression,
-                    };
-                    let setter = Spanned::new(
-                        Token::Identifier(unicase::Ascii::new("<set>".to_string())),
-                        member.get_identifier_token().span.clone(),
-                    );
-                    let mut arguments = call.get_arguments().clone();
-                    arguments.push(value_expression);
-                    return Some(Statement::MemberCall(MemberCallStatement::new(Expression::FunctionCall(
-                        FunctionCallExpression::new(
-                            Expression::MemberReference(MemberReferenceExpression::new(
-                                member.get_expression().clone(),
-                                member.get_dot_token().clone(),
-                                setter,
-                            )),
-                            eq_token.clone(),
-                            arguments,
-                            eq_token,
-                        ),
-                    ))));
-                }
                 return Some(Statement::MemberCall(MemberCallStatement::new(expression)));
             }
-
-            if !is_assign_token(self.get_cur_token()) {
-                self.report_error(self.save_token_span(), ParserErrorType::InvalidToken(self.save_token()));
-                return None;
-            }
-            // Only a plain chain of names can be assigned to; what a call answers is a copy.
-            let Some(members) = assignable_member_chain(&expression) else {
-                self.report_error(self.save_token_span(), ParserErrorType::InvalidToken(self.save_token()));
-                return None;
-            };
-            let eq_token = self.save_spanned_token();
-            self.next_token();
-            let Some(value_expression) = self.parse_expression() else {
-                self.report_error(self.lex.span(), ParserErrorType::ExpressionExpected(self.save_token()));
-                return None;
-            };
-            return Some(Statement::Let(LetStatement::new(
-                None,
-                id_token,
-                None,
-                Vec::new(),
-                None,
-                members,
-                eq_token,
-                value_expression,
-            )));
+            self.report_error(self.save_token_span(), ParserErrorType::InvalidToken(self.save_token()));
+            return None;
         }
 
         if is_assign_token(self.get_cur_token()) {
@@ -1143,6 +1089,68 @@ impl Parser<'_> {
 
         self.report_error(id_token.span, ParserErrorType::UnknownIdentifier(id_token.token.to_string()));
         None
+    }
+
+    fn parse_member_assignment(&mut self, let_token: Option<Spanned<Token>>, id_token: Spanned<Token>, expression: Expression) -> Option<Statement> {
+        if !is_assign_token(self.get_cur_token()) {
+            self.report_error(self.save_token_span(), ParserErrorType::EqTokenExpected(self.save_token()));
+            return None;
+        }
+        let eq_token = self.save_spanned_token();
+        let compound = assign_operator(&eq_token.token);
+        self.next_token();
+        let Some(value_expression) = self.parse_expression() else {
+            self.report_error(self.lex.span(), ParserErrorType::ExpressionExpected(self.save_token()));
+            return None;
+        };
+
+        if let Expression::FunctionCall(call) = &expression
+            && let Expression::MemberReference(member) = call.get_expression()
+            && member.get_identifier().as_str() == "<get>"
+        {
+            let value_expression = match compound {
+                Some(op) => BinaryExpression::create_empty_expression(op, expression.clone(), value_expression),
+                None => value_expression,
+            };
+            let setter = Spanned::new(
+                Token::Identifier(unicase::Ascii::new("<set>".to_string())),
+                member.get_identifier_token().span.clone(),
+            );
+            let mut arguments = call.get_arguments().clone();
+            arguments.push(value_expression);
+            return Some(Statement::MemberCall(MemberCallStatement::new(Expression::FunctionCall(
+                FunctionCallExpression::new(
+                    Expression::MemberReference(MemberReferenceExpression::new(
+                        member.get_expression().clone(),
+                        member.get_dot_token().clone(),
+                        setter,
+                    )),
+                    eq_token.clone(),
+                    arguments,
+                    eq_token,
+                ),
+            ))));
+        }
+
+        if let Some(members) = assignable_member_chain(&expression) {
+            return Some(Statement::Let(LetStatement::new(
+                let_token,
+                id_token,
+                None,
+                Vec::new(),
+                None,
+                members,
+                eq_token,
+                value_expression,
+            )));
+        }
+        if !matches!(expression, Expression::MemberReference(_)) {
+            self.report_error(eq_token.span, ParserErrorType::InvalidToken(eq_token.token));
+            return None;
+        }
+        Some(Statement::MemberCall(MemberCallStatement::new(Expression::FunctionCall(
+            FunctionCallExpression::new(expression, eq_token.clone(), vec![value_expression], eq_token),
+        ))))
     }
 }
 

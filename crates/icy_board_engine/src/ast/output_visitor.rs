@@ -229,6 +229,16 @@ impl AstVisitor<()> for OutputVisitor {
             }
             return;
         }
+        if matches!(
+            call.get_lpar_token().token,
+            Token::Eq | Token::AddAssign | Token::SubAssign | Token::MulAssign | Token::DivAssign | Token::ModAssign | Token::AndAssign | Token::OrAssign
+        ) && call.get_arguments().len() == 1
+        {
+            call.get_expression().visit(self);
+            self.output(&format!(" {} ", call.get_lpar_token().token));
+            call.get_arguments()[0].visit(self);
+            return;
+        }
         match call.get_expression() {
             super::Expression::Identifier(id) => {
                 self.output_function(id.get_identifier());

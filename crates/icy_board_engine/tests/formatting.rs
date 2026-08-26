@@ -34,6 +34,20 @@ pub fn test_formatting() {
     }
 }
 
+#[test]
+fn indexed_member_assignments_format_without_becoming_calls() {
+    let source = r#";$LANGVERSION 400
+BEGIN
+    Board.Conferences[0].Name = "x"
+    LET Board.Conferences[0].Areas[0].Name = "y"
+    Board.Conferences[0].Doors[0].Description += "!"
+    LET Session.User.Notes[0] += "note"
+END
+"#;
+
+    assert_eq!(format(Path::new("indexed_assignments.pps"), source), source);
+}
+
 fn collect_sources(dir: &Path, out: &mut Vec<PathBuf>) {
     let Ok(entries) = fs::read_dir(dir) else {
         return;

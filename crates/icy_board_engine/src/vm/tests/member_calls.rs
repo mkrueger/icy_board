@@ -96,7 +96,20 @@ fn a_static_call_is_a_statement_of_its_own() {
 #[test]
 fn a_call_in_the_chain_cannot_be_assigned_through() {
     let errors = compile_errors("Surface.New(2, 2).Width = 3");
-    assert!(!errors.is_empty(), "assigning through a call should be reported");
+    assert_eq!(errors, vec!["'Width' can only be read"]);
+}
+
+#[test]
+fn a_writable_property_on_a_call_result_uses_its_setter() {
+    assert!(compile_errors("Audio.Load(\"missing\").Volume = 50").is_empty());
+    assert!(compile_errors("LET Audio.Load(\"missing\").Volume = 50").is_empty());
+    assert!(run_ppl("Audio.Load(\"missing\").Volume = 50\nPrintLn \"alive\"").ends_with("alive\n"));
+
+    let errors = compile_errors("Audio.Load(\"missing\").Volume = GfxBackend.Sixel");
+    assert_eq!(errors, vec!["Argument 1 expects Integer, got GfxBackend"]);
+
+    let errors = compile_errors("Audio.Load(\"missing\").Volume(50)");
+    assert_eq!(errors, vec!["Function not found (Volume)"]);
 }
 
 #[test]

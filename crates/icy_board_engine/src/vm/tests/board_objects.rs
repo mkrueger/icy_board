@@ -246,6 +246,31 @@ fn a_board_object_member_cannot_be_assigned() {
     }
 }
 
+#[test]
+fn an_indexed_board_object_member_reaches_the_read_only_check() {
+    for write in [
+        "Board.Conferences[0].Name = \"x\"",
+        "LET Board.Conferences[0].Name = \"x\"",
+        "Board.Conferences[0].Areas[0].Name = \"x\"",
+        "Board.Conferences[0].Doors[0].Description += \"x\"",
+    ] {
+        let errors = compile_errors(write);
+        assert_eq!(
+            errors,
+            vec![format!(
+                "'{}' can only be read",
+                if write.contains("Description") { "Description" } else { "Name" }
+            )]
+        );
+    }
+}
+
+#[test]
+fn a_field_on_an_indexed_record_copy_is_not_an_assignment_target() {
+    let errors = compile_errors("Session.User.Contacts[0].Account = \"x\"");
+    assert_eq!(errors, vec!["Can't assign value to."]);
+}
+
 /// The other objects that stand for something the board owns rather than
 /// something a PPE made are read-only for the same reason.
 #[test]

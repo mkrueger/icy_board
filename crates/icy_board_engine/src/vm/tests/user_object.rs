@@ -96,7 +96,7 @@ fn a_note_can_be_appended_to() {
         run_ppl(
             r#"
 Session.User.Notes[1] = "one"
-Session.User.Notes[1] += " and two"
+LET Session.User.Notes[1] += " and two"
 PRINT Session.User.Notes[1]
 "#,
         )
