@@ -73,6 +73,12 @@ fn collect_expr_hits(expr: &PPEExpr, hits: &mut Vec<UsageHit>, span_start: usize
                 collect_expr_hits(value, hits, span_start);
             }
         }
+        PPEExpr::IndexedMember(base, _, dimensions) => {
+            collect_expr_hits(base, hits, span_start);
+            for dimension in dimensions {
+                collect_expr_hits(dimension, hits, span_start);
+            }
+        }
         PPEExpr::Value(_) | PPEExpr::RoutineReference(_) | PPEExpr::Invalid => {}
     }
 }

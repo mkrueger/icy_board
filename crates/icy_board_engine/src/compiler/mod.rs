@@ -13,7 +13,7 @@ use thiserror::Error;
 
 use crate::{
     ast::{Ast, AstNode, Expression, OnErrorMode, Statement},
-    executable::{Executable, ExpressionNegator, OnErrorTarget, OpCode, PPECommand, PPEExpr, PPEScript, VariableType},
+    executable::{Executable, ExpressionNegator, OnErrorTarget, OpCode, PPECommand, PPEExpr, PPEScript, RecordField, VariableType},
     parser::{
         ErrorReporter, UserTypeRegistry,
         lexer::{Spanned, Token},
@@ -92,6 +92,9 @@ pub enum CompilationErrorType {
 
     #[error("Whole arrays of custom types cannot be compared")]
     CustomTypeArrayComparisonNotSupported,
+
+    #[error("Record array field '{0}' has a fixed size and cannot be redimensioned")]
+    FixedRecordArrayCannotBeRedimmed(String),
 
     #[error("Record literal field '{0}' is listed more than once")]
     DuplicateRecordLiteralField(String),
@@ -362,6 +365,30 @@ impl PPECompiler {
             Statement::Let(let_smt) => {
                 let var_name = let_smt.get_identifier();
                 assert!(let_smt.get_let_variant() == &Token::Eq, "Let variants allowed in output AST.");
+                if let Some(target) = let_smt.get_target_expression() {
+                    if let crate::ast::Expression::MemberReference(member) = target
+                        && self
+                            .semantic_visitor
+                            .user_type_lookup
+                            .get(&member.get_identifier_token().span.start)
+                            .is_some_and(|type_id| !self.semantic_visitor.type_registry.is_record_type(*type_id))
+                        && !matches!(
+                            member.get_expression(),
+                            crate::ast::Expression::FunctionCall(call)
+                                if matches!(self.semantic_visitor.function_type_lookup.get(&call.id), Some(SemanticInfo::IndexedRecordField(_)))
+                        )
+                    {
+                        let PPEExpr::Member(base, member_id) = self.comp_expr(target) else {
+                            return None;
+                        };
+                        let value = self.comp_expr(let_smt.get_value_expression());
+                        return Some(PPECommand::MemberCall(Box::new(PPEExpr::MemberFunctionCall(base, vec![value], member_id))));
+                    }
+                    return Some(PPECommand::Let(
+                        Box::new(self.comp_expr(target)),
+                        Box::new(self.comp_expr(let_smt.get_value_expression())),
+                    ));
+                }
                 if self
                     .semantic_visitor
                     .instance_provider_lookup
@@ -544,7 +571,7 @@ impl PPECompiler {
     pub fn create_executable(&self) -> Result<Executable, CompilationErrorType> {
         let mut variable_table = self.lookup_table.variable_table.clone();
         variable_table.set_version(self.runtime);
-        let user_types: Vec<Vec<VariableType>> = self
+        let user_types: Vec<Vec<RecordField>> = self
             .semantic_visitor
             .type_registry
             .user_types()
@@ -553,12 +580,12 @@ impl PPECompiler {
                 definition
                     .fields
                     .iter()
-                    .map(|(_, field_type)| {
-                        if self.semantic_visitor.type_registry.is_enum_type(*field_type) {
-                            VariableType::Integer
-                        } else {
-                            *field_type
+                    .map(|(_, field)| {
+                        let mut field = *field;
+                        if self.semantic_visitor.type_registry.is_enum_type(field.variable_type) {
+                            field.variable_type = VariableType::Integer;
                         }
+                        field
                     })
                     .collect()
             })

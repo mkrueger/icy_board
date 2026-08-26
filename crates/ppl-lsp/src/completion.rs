@@ -11,7 +11,7 @@ use tower_lsp::lsp_types::{CompletionItem, CompletionItemKind, Documentation, Ho
 use crate::{
     context::{CursorContext, cursor_context},
     documentation::{get_const_hover, get_function_hover, get_statement_hover},
-    type_lookup::{MemberKind, members_of, type_name, type_of_chain},
+    type_lookup::{MemberKind, members_of, record_field_type_name, type_of_chain},
 };
 
 pub enum ImCompleteCompletionItem {
@@ -197,11 +197,11 @@ fn record_literal_completion(visitor: &SemanticVisitor, type_name_of_literal: &s
     def.fields
         .iter()
         .filter(|(name, _)| !named_fields.iter().any(|named| named.eq_ignore_ascii_case(name.as_ref())))
-        .map(|(name, field_type)| CompletionItem {
+        .map(|(name, field)| CompletionItem {
             label: name.to_string(),
             insert_text: Some(format!("{name} = ")),
             kind: Some(CompletionItemKind::FIELD),
-            detail: Some(type_name(&visitor.type_registry, *field_type)),
+            detail: Some(record_field_type_name(&visitor.type_registry, *field)),
             insert_text_format: Some(InsertTextFormat::PLAIN_TEXT),
             ..Default::default()
         })

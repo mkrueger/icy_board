@@ -16,6 +16,38 @@ use crate::{
 
 use super::{ExecutableError, GenericVariableData, LAST_PPE_RUNTIME, PPEExpr, PPEScript, VariableData, VariableNameGenerator, VariableType, VariableValue};
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct RecordField {
+    pub variable_type: VariableType,
+    pub dim: u8,
+    pub vector_size: u16,
+    pub matrix_size: u16,
+    pub cube_size: u16,
+}
+
+impl RecordField {
+    pub fn scalar(variable_type: VariableType) -> Self {
+        Self {
+            variable_type,
+            dim: 0,
+            vector_size: 0,
+            matrix_size: 0,
+            cube_size: 0,
+        }
+    }
+
+    pub fn element_count(self) -> Option<usize> {
+        if self.dim > 3 || (self.dim < 3 && self.cube_size != 0) || (self.dim < 2 && self.matrix_size != 0) || (self.dim == 0 && self.vector_size != 0) {
+            return None;
+        }
+        let bounds = [self.vector_size, self.matrix_size, self.cube_size];
+        bounds[..self.dim as usize]
+            .iter()
+            .try_fold(1usize, |count, bound| count.checked_mul(*bound as usize + 1))
+            .filter(|count| *count <= super::variable_value::MAX_ARRAY_SIZE)
+    }
+}
+
 #[derive(Clone, Default, Debug, PartialEq)]
 pub struct VarHeader {
     pub id: usize,
@@ -109,9 +141,9 @@ impl VarHeader {
 
 /// A record value with every field set up, so a field that is itself a record gets
 /// its own fields too. A type can only name types declared before it, so this ends.
-pub fn create_record_value(type_id: u8, user_types: &[Vec<VariableType>]) -> Option<VariableValue> {
+pub fn create_record_value(type_id: u8, user_types: &[Vec<RecordField>]) -> Option<VariableValue> {
     let built_in_fields = match type_id as usize {
-        crate::parser::CONTACT_ID => Some(vec![VariableType::String, VariableType::String]),
+        crate::parser::CONTACT_ID => Some(vec![RecordField::scalar(VariableType::String), RecordField::scalar(VariableType::String)]),
         _ => None,
     };
     let fields = if let Some(fields) = built_in_fields.as_ref() {
@@ -121,11 +153,27 @@ pub fn create_record_value(type_id: u8, user_types: &[Vec<VariableType>]) -> Opt
     };
     let mut values = Vec::with_capacity(fields.len());
     for field in fields {
-        let value = match field {
-            VariableType::UserData(id) if crate::parser::is_user_declared_type(*id) => {
-                create_record_value(*id, user_types).unwrap_or_else(|| field.create_empty_value())
+        let value = match field.variable_type {
+            VariableType::UserData(id) if crate::parser::is_user_declared_type(id) => {
+                create_record_value(id, user_types).unwrap_or_else(|| field.variable_type.create_empty_value())
             }
-            _ => field.create_empty_value(),
+            _ => field.variable_type.create_empty_value(),
+        };
+        let value = if field.dim == 0 {
+            value
+        } else {
+            let generic_data = GenericVariableData::create_array(
+                value,
+                field.dim,
+                field.vector_size as usize,
+                field.matrix_size as usize,
+                field.cube_size as usize,
+            )?;
+            VariableValue {
+                vtype: field.variable_type,
+                data: VariableData::default(),
+                generic_data,
+            }
         };
         values.push(value);
     }
@@ -680,7 +728,7 @@ impl VariableTable {
     fn report_usage(&mut self, variable: &PPEExpr) {
         // A member assignment names the record only at the base of the expression.
         let mut variable = variable;
-        while let PPEExpr::Member(base, _) = variable {
+        while let PPEExpr::Member(base, _) | PPEExpr::IndexedMember(base, _, _) = variable {
             variable = base;
         }
         if let Some(id) = variable.get_id()
@@ -919,7 +967,7 @@ impl VariableTable {
     /// Gives every variable of a program declared type the fields its record has.
     /// The layout is not part of a variable's own entry, so it is filled in once the
     /// type table has been read.
-    pub fn fill_in_records(&mut self, user_types: &[Vec<VariableType>]) {
+    pub fn fill_in_records(&mut self, user_types: &[Vec<RecordField>]) {
         for entry in &mut self.entries {
             let VariableType::UserData(type_id) = entry.header.variable_type else {
                 continue;

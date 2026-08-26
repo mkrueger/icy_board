@@ -580,6 +580,10 @@ fields of its own::
     members[0].Home.Town = "Kiel"
     members[1].Home.Town = "Hamburg"
 
+A record field may itself be a one-, two- or three-dimensional array. Its bounds
+are part of the record type and are the same for every value, so neither
+``REDIM record.Values, ...`` nor ``record.Values.Redim(...)`` is allowed.
+
 Record literals
 ~~~~~~~~~~~~~~~
 
@@ -611,12 +615,14 @@ Rules the compiler enforces
 * A type cannot reuse the name of a built-in or of a board object.
 * A program may declare 156 types; ids 100-255 are reserved for them. A type may
   hold 255 fields, because the PPE stores the count in a single byte.
-* An array as a field - ``INTEGER Values(10)`` inside a ``TYPE`` block - is
-  rejected: the type table stores each field's type but not its dimensions.
+* A field may be a one-, two- or three-dimensional array, including an array of
+    a previously declared record. Its dimensions are part of the runtime-400 type
+    table and cannot be changed with ``REDIM``.
 * Custom types are nominal: two separately declared records are different types
   even when their fields happen to match.
-* Equality compares two records of the same type by their fields. Whole arrays of
-  records cannot be compared; index them first.
+* Equality compares two records of the same type by their fields, including the
+    contents of array-valued fields. Whole arrays of records cannot be compared;
+    index them first.
 
 All ``TYPE`` declarations in a package are collected before its source files are
 parsed, so ``main.pps`` may use a type declared in another file. Record fields

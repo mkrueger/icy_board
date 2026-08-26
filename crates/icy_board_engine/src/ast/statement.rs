@@ -1836,6 +1836,7 @@ pub struct LetStatement {
     arguments: Vec<Expression>,
     rightpar_token: Option<Spanned<Token>>,
     members: Vec<Spanned<Token>>,
+    target_expression: Option<Box<Expression>>,
     eq_token: Spanned<Token>,
     value_expression: Box<Expression>,
 }
@@ -1858,6 +1859,7 @@ impl LetStatement {
             arguments,
             rightpar_token,
             members,
+            target_expression: None,
             eq_token,
             value_expression: Box::new(value_expression),
         }
@@ -1871,6 +1873,7 @@ impl LetStatement {
             arguments,
             rightpar_token: None,
             members: Vec::new(),
+            target_expression: None,
             eq_token: Spanned::create_empty(variant),
             value_expression: Box::new(value_expression),
         }
@@ -1879,6 +1882,16 @@ impl LetStatement {
     /// The fields a `record.field.field = value` assignment walks through.
     pub fn get_members(&self) -> &Vec<Spanned<Token>> {
         &self.members
+    }
+
+    #[must_use]
+    pub fn with_target_expression(mut self, expression: Expression) -> Self {
+        self.target_expression = Some(Box::new(expression));
+        self
+    }
+
+    pub fn get_target_expression(&self) -> Option<&Expression> {
+        self.target_expression.as_deref()
     }
 
     pub fn get_let_token(&self) -> &Option<Spanned<Token>> {

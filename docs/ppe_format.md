@@ -167,9 +167,14 @@ nothing is read - they shipped before records existed and have no type table at
 all.
 
 ```text
+u8                  type-table format, currently 1
 u8                  number of types
   u8                number of fields
-    u8              field type, repeated
+    u8              field type
+    u8              dimensions, 0 to 3
+    u16             vector upper bound
+    u16             matrix upper bound
+    u16             cube upper bound
 ```
 
 Both counts fit in a byte: ids run 100 to 255, so there can be no more than 156
@@ -181,12 +186,18 @@ Type *n* in this list is type id `100 + n`, which is how a `UserData(id)` in a
 variable header finds its layout. A field that is itself a record simply carries
 that record's type byte, so nesting needs no extra encoding.
 
-The table stores field **types** and nothing else:
+Each field descriptor is eight bytes. Its three bounds have the same meaning as
+the bounds in a variable header: ``Values(10)`` has dimension 1 and vector bound
+10, so indices 0 through 10 exist. Bounds not named by the dimension count are
+zero. The loader rejects dimensions above 3, nonzero inactive bounds and shapes
+whose element count exceeds the runtime array limit.
+
+The table stores field **layouts** and nothing source-specific:
 
 * No type name and no field name. The format keeps no variable, routine or label
   names either — the decompiler makes those up. Custom types are treated the same
   way, so no source identifier reaches a shipped PPE.
-* No field dimensions, which is why an array cannot be a field of a record.
+* No initializer. Every element begins with its type's empty value.
 
 The table is written plain. It is not encrypted and not packed.
 
@@ -264,4 +275,5 @@ decompiling:
 * No line numbers, no source file name, no comments.
 * No checksum. A corrupt PPE is found by a read running out of bounds, not by a
   mismatch.
-* No field dimensions in the type table.
+* No source spelling for field dimensions; only their rank and numeric upper
+  bounds survive.

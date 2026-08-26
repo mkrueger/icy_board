@@ -34,6 +34,22 @@ pub fn type_name(registry: &UserTypeRegistry, var_type: VariableType) -> String 
     var_type.to_string().to_ascii_uppercase()
 }
 
+pub fn record_field_type_name(registry: &UserTypeRegistry, field: icy_board_engine::executable::RecordField) -> String {
+    let mut name = type_name(registry, field.variable_type);
+    if field.dim > 0 {
+        let dimensions = [field.vector_size, field.matrix_size, field.cube_size]
+            .into_iter()
+            .take(field.dim as usize)
+            .map(|bound| bound.to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+        name.push('(');
+        name.push_str(&dimensions);
+        name.push(')');
+    }
+    name
+}
+
 /// The type of a variable, or the return type of a routine, by name.
 pub fn type_of_name(visitor: &SemanticVisitor, name: &str) -> Option<VariableType> {
     let name = unicase::Ascii::new(name.to_string());
@@ -114,9 +130,9 @@ pub fn members_of(registry: &UserTypeRegistry, var_type: VariableType) -> Vec<Me
         return def
             .fields
             .iter()
-            .map(|(name, field_type)| Member {
+            .map(|(name, field)| Member {
                 name: name.to_string(),
-                detail: type_name(registry, *field_type),
+                detail: record_field_type_name(registry, *field),
                 kind: MemberKind::Field,
             })
             .collect();

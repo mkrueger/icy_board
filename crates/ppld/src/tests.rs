@@ -327,6 +327,48 @@ fn records_survive_decompilation() {
     assert_eq!(text, decompile_to_text(rebuilt, LAST_PPL_LANGUAGE_VERSION));
 }
 
+#[test]
+fn array_fields_survive_decompilation() {
+    let source = "TYPE Rec\n\
+                  INTEGER Values(10)\n\
+                  STRING Grid(2, 3)\n\
+                  ENDTYPE\n\
+                  Rec Item\n\
+                  Item.Values(4) = 42\n\
+                  Item.Grid(1, 2) = \"room\"\n\
+                  PRINTLN Item.Values(4), Item.Grid(1, 2)\n";
+
+    let executable = compile_source(source, LAST_PPE_RUNTIME).unwrap();
+    let text = decompile_to_text(executable, LAST_PPL_LANGUAGE_VERSION);
+
+    assert!(text.contains("INTEGER FIELD001(10)"), "no vector field in:\n{text}");
+    assert!(text.contains("STRING FIELD002(2, 3)"), "no matrix field in:\n{text}");
+    assert!(text.contains(".FIELD001(4) = 42"), "no indexed assignment in:\n{text}");
+
+    let rebuilt = compile_source(&text, LAST_PPE_RUNTIME).unwrap_or_else(|e| panic!("does not compile again:\n{text}\n{e}"));
+    assert_eq!(text, decompile_to_text(rebuilt, LAST_PPL_LANGUAGE_VERSION));
+}
+
+#[test]
+fn nested_array_field_assignments_survive_decompilation() {
+    let source = "TYPE Item\n\
+                  STRING Name\n\
+                  INTEGER Values(2)\n\
+                  ENDTYPE\n\
+                  TYPE Rec\n\
+                  Item Items(1)\n\
+                  ENDTYPE\n\
+                  Rec Records(1)\n\
+                  Records(1).Items(0).Values(2) = 42\n\
+                  Records(1).Items(0).Name = \"Door\"\n";
+
+    let executable = compile_source(source, LAST_PPE_RUNTIME).unwrap();
+    let text = decompile_to_text(executable, LAST_PPL_LANGUAGE_VERSION);
+    let rebuilt = compile_source(&text, LAST_PPE_RUNTIME).unwrap_or_else(|e| panic!("does not compile again:\n{text}\n{e}"));
+
+    assert_eq!(text, decompile_to_text(rebuilt, LAST_PPL_LANGUAGE_VERSION));
+}
+
 /// A record inside a record has to come back out as two declarations, with the
 /// outer one naming the inner.
 #[test]

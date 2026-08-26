@@ -2,8 +2,8 @@ use crate::{
     ast::{
         BinaryExpression, BlockStatement, BreakStatement, CaseBlock, CaseSpecifier, CommentAstNode, ConstDeclarationStatement, Constant, ContinueStatement,
         ElseBlock, ElseIfBlock, Expression, ForEachStatement, ForStatement, FunctionCallExpression, GosubStatement, GotoStatement, IdentifierExpression,
-        IfStatement, IfThenStatement, LabelStatement, LetStatement, LoopStatement, MemberCallStatement, MemberReferenceExpression, OnErrorMode,
-        OnErrorStatement, PredefinedCallStatement, ProcedureCallStatement, RepeatUntilStatement, ReturnStatement, SelectStatement, Statement,
+        IfStatement, IfThenStatement, IndexerExpression, LabelStatement, LetStatement, LoopStatement, MemberCallStatement, MemberReferenceExpression,
+        OnErrorMode, OnErrorStatement, PredefinedCallStatement, ProcedureCallStatement, RepeatUntilStatement, ReturnStatement, SelectStatement, Statement,
         VariableDeclarationStatement, WhileDoStatement, WhileStatement,
     },
     executable::{OpCode, StatementDefinition},
@@ -730,6 +730,26 @@ impl Parser<'_> {
                     self.next_token();
                 }
 
+                if self.get_cur_token() == Some(Token::Dot) {
+                    let base = if is_lpar {
+                        Expression::FunctionCall(FunctionCallExpression::new(
+                            Expression::Identifier(IdentifierExpression::new(identifier_token.clone())),
+                            leftpar_token.clone().unwrap(),
+                            params.clone(),
+                            rightpar_token.clone().unwrap(),
+                        ))
+                    } else {
+                        Expression::Indexer(IndexerExpression::new(
+                            identifier_token.clone(),
+                            leftpar_token.clone().unwrap(),
+                            params.clone(),
+                            rightpar_token.clone().unwrap(),
+                        ))
+                    };
+                    let expression = self.parse_member_chain(base)?;
+                    return self.parse_member_assignment(Some(let_token), identifier_token, expression);
+                }
+
                 if is_assign_token(self.get_cur_token()) {
                     let eq_token = self.save_spanned_token();
                     self.next_token();
@@ -1051,6 +1071,32 @@ impl Parser<'_> {
             let rightpar_token = self.save_spanned_token();
 
             self.next_token();
+            if self.get_cur_token() == Some(Token::Dot) {
+                let base = if is_lpar {
+                    Expression::FunctionCall(FunctionCallExpression::new(
+                        Expression::Identifier(IdentifierExpression::new(id_token.clone())),
+                        lpar_token.clone(),
+                        params.clone(),
+                        rightpar_token.clone(),
+                    ))
+                } else {
+                    Expression::Indexer(IndexerExpression::new(
+                        id_token.clone(),
+                        lpar_token.clone(),
+                        params.clone(),
+                        rightpar_token.clone(),
+                    ))
+                };
+                let expression = self.parse_member_chain(base)?;
+                if is_assign_token(self.get_cur_token()) {
+                    return self.parse_member_assignment(None, id_token, expression);
+                }
+                if matches!(expression, Expression::FunctionCall(_)) {
+                    return Some(Statement::MemberCall(MemberCallStatement::new(expression)));
+                }
+                self.report_error(self.save_token_span(), ParserErrorType::InvalidToken(self.save_token()));
+                return None;
+            }
             let mut members = Vec::new();
             while self.get_cur_token() == Some(Token::Dot) {
                 self.next_token();
@@ -1144,6 +1190,15 @@ impl Parser<'_> {
                 value_expression,
             )));
         }
+        let root_is_board_object = match &id_token.token {
+            Token::Identifier(identifier) => self.type_registry.get_board_object(identifier).is_some(),
+            _ => false,
+        };
+        if !root_is_board_object && let Some(members) = assignable_indexed_member_chain(&expression) {
+            return Some(Statement::Let(
+                LetStatement::new(let_token, id_token, None, Vec::new(), None, members, eq_token, value_expression).with_target_expression(expression),
+            ));
+        }
         if !matches!(expression, Expression::MemberReference(_)) {
             self.report_error(eq_token.span, ParserErrorType::InvalidToken(eq_token.token));
             return None;
@@ -1170,6 +1225,41 @@ fn assignable_member_chain(expression: &Expression) -> Option<Vec<Spanned<Token>
     }
     members.reverse();
     Some(members)
+}
+
+fn assignable_indexed_member_chain(expression: &Expression) -> Option<Vec<Spanned<Token>>> {
+    fn collect(expression: &Expression, members: &mut Vec<Spanned<Token>>, indexed: &mut bool) -> Option<()> {
+        match expression {
+            Expression::Identifier(_) => Some(()),
+            Expression::MemberReference(member) => {
+                collect(member.get_expression(), members, indexed)?;
+                members.push(member.get_identifier_token().clone());
+                Some(())
+            }
+            Expression::FunctionCall(call) => {
+                match call.get_expression() {
+                    Expression::Identifier(_) => collect(call.get_expression(), members, indexed)?,
+                    Expression::MemberReference(member) => {
+                        collect(member.get_expression(), members, indexed)?;
+                        members.push(member.get_identifier_token().clone());
+                    }
+                    _ => return None,
+                }
+                *indexed = true;
+                Some(())
+            }
+            Expression::Indexer(_) => {
+                *indexed = true;
+                Some(())
+            }
+            _ => None,
+        }
+    }
+
+    let mut members = Vec::new();
+    let mut indexed = false;
+    collect(expression, &mut members, &mut indexed)?;
+    indexed.then_some(members)
 }
 
 fn is_assign_token(token_opt: Option<Token>) -> bool {

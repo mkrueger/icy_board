@@ -10,7 +10,7 @@ use tower_lsp::lsp_types::{Hover, HoverContents, MarkupContent, MarkupKind};
 
 use crate::{
     signature_help::routine_signature,
-    type_lookup::{type_name, type_of_member},
+    type_lookup::{record_field_type_name, type_name, type_of_member},
 };
 use std::fmt::Write as _;
 
@@ -78,8 +78,8 @@ impl<'a> MemberHoverVisitor<'a> {
         };
         let definition = self.visitor.type_registry.get_user_type_from_id(id)?;
         let mut text = format!("TYPE {}", definition.name);
-        for (name, field_type) in &definition.fields {
-            let _ = write!(text, "\n    {} {}", type_name(&self.visitor.type_registry, *field_type), name);
+        for (name, field) in &definition.fields {
+            let _ = write!(text, "\n    {} {}", record_field_type_name(&self.visitor.type_registry, *field), name);
         }
         text.push_str("\nENDTYPE");
         Some(hover(text))

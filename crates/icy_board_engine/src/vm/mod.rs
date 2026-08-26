@@ -201,7 +201,7 @@ pub struct VirtualMachine<'a> {
     pub return_addresses: Vec<ReturnAddress>,
     pub call_local_value_stack: Vec<VariableValue>,
     pub write_back_stack: Vec<PPEExpr>,
-    pub user_types: Vec<Vec<VariableType>>,
+    pub user_types: Vec<Vec<crate::executable::RecordField>>,
 
     pub label_table: HashMap<usize, usize>,
     pub push_pop_stack: Vec<VariableValue>,
@@ -627,6 +627,26 @@ impl VirtualMachine<'_> {
                 }
             }
 
+            PPEExpr::IndexedMember(base_expr, id, arguments) => {
+                let val = self.eval_expr(base_expr).await?;
+                let GenericVariableData::Record(fields) = &val.generic_data else {
+                    return Err(VMError::NoUserTypeBase.into());
+                };
+                let field = fields.get(*id).ok_or(VMError::InternalVMError)?;
+                let dim_1 = self.eval_expr(&arguments[0]).await?.as_int() as usize;
+                let dim_2 = if arguments.len() >= 2 {
+                    self.eval_expr(&arguments[1]).await?.as_int() as usize
+                } else {
+                    0
+                };
+                let dim_3 = if arguments.len() >= 3 {
+                    self.eval_expr(&arguments[2]).await?.as_int() as usize
+                } else {
+                    0
+                };
+                Ok(field.get_array_value(dim_1, dim_2, dim_3))
+            }
+
             PPEExpr::MemberFunctionCall(base_expr, arguments, id) => {
                 let val = self.eval_expr(base_expr).await?;
                 let VariableType::UserData(type_id) = val.get_type() else {
@@ -882,6 +902,24 @@ impl VirtualMachine<'_> {
         Ok(())
     }
 
+    async fn eval_array_indices(&mut self, dimensions: &[PPEExpr]) -> Res<(usize, usize, usize)> {
+        if dimensions.is_empty() || dimensions.len() > 3 {
+            return Err(VMError::InternalVMError.into());
+        }
+        let first = self.eval_expr(&dimensions[0]).await?.as_int() as usize;
+        let second = if dimensions.len() >= 2 {
+            self.eval_expr(&dimensions[1]).await?.as_int() as usize
+        } else {
+            0
+        };
+        let third = if dimensions.len() >= 3 {
+            self.eval_expr(&dimensions[2]).await?.as_int() as usize
+        } else {
+            0
+        };
+        Ok((first, second, third))
+    }
+
     async fn set_variable(&mut self, variable: &PPEExpr, value: VariableValue) -> Res<()> {
         match variable {
             PPEExpr::Value(id) => {
@@ -901,7 +939,7 @@ impl VirtualMachine<'_> {
                 };
                 self.variable_table.get_var_entry_mut(*id).value.set_array_value(dim_1, dim_2, dim_3, value)?;
             }
-            PPEExpr::Member(_, _) => {
+            PPEExpr::Member(_, _) | PPEExpr::IndexedMember(_, _, _) => {
                 if let PPEExpr::Member(base, member_id) = variable {
                     let base_value = self.eval_expr(base).await?;
                     if let VariableType::UserData(type_id) = base_value.get_type()
@@ -914,50 +952,67 @@ impl VirtualMachine<'_> {
                         return object.set_property_value(self, name, value).await;
                     }
                 }
-                // The base has to be reached as a place, not as the copy eval_expr hands out,
-                // so the slot it lives in is resolved first and then walked into.
-                let mut path = Vec::new();
-                let mut base = variable;
-                while let PPEExpr::Member(inner, member_id) = base {
-                    path.push(*member_id);
-                    base = inner.as_ref();
+
+                enum PathStep<'a> {
+                    Member(usize),
+                    IndexedMember(usize, &'a [PPEExpr]),
                 }
-                let (id, indices) = match base {
-                    PPEExpr::Value(id) => (*id, None),
-                    PPEExpr::Dim(id, dimensions) => {
-                        let dim_1 = self.eval_expr(&dimensions[0]).await?.as_int() as usize;
-                        let dim_2 = if dimensions.len() >= 2 {
-                            self.eval_expr(&dimensions[1]).await?.as_int() as usize
-                        } else {
-                            0
-                        };
-                        let dim_3 = if dimensions.len() >= 3 {
-                            self.eval_expr(&dimensions[2]).await?.as_int() as usize
-                        } else {
-                            0
-                        };
-                        (*id, Some((dim_1, dim_2, dim_3)))
+                enum ResolvedPathStep {
+                    Member(usize),
+                    IndexedMember(usize, usize, usize, usize),
+                }
+
+                let mut path = Vec::new();
+                let mut root = variable;
+                loop {
+                    match root {
+                        PPEExpr::Member(base, member_id) => {
+                            path.push(PathStep::Member(*member_id));
+                            root = base;
+                        }
+                        PPEExpr::IndexedMember(base, member_id, dimensions) => {
+                            path.push(PathStep::IndexedMember(*member_id, dimensions));
+                            root = base;
+                        }
+                        _ => break,
                     }
+                }
+                path.reverse();
+
+                let (root_id, root_indices) = match root {
+                    PPEExpr::Value(id) => (*id, None),
+                    PPEExpr::Dim(id, dimensions) => (*id, Some(self.eval_array_indices(dimensions).await?)),
                     _ => return Err(VMError::InternalVMError.into()),
                 };
-                let root = &mut self.variable_table.get_var_entry_mut(id).value;
-                let mut target = if let Some((dim_1, dim_2, dim_3)) = indices {
-                    root.get_array_value_mut(dim_1, dim_2, dim_3).ok_or(VMError::InternalVMError)?
+                let mut resolved_path = Vec::with_capacity(path.len());
+                for step in path {
+                    resolved_path.push(match step {
+                        PathStep::Member(member_id) => ResolvedPathStep::Member(member_id),
+                        PathStep::IndexedMember(member_id, dimensions) => {
+                            let (first, second, third) = self.eval_array_indices(dimensions).await?;
+                            ResolvedPathStep::IndexedMember(member_id, first, second, third)
+                        }
+                    });
+                }
+
+                let root = &mut self.variable_table.get_var_entry_mut(root_id).value;
+                let mut target = if let Some((first, second, third)) = root_indices {
+                    root.get_array_value_mut(first, second, third).ok_or(VMError::InternalVMError)?
                 } else {
                     root
                 };
-                for member_id in path.iter().rev() {
-                    let vtype = target.vtype;
+                for step in resolved_path {
                     let GenericVariableData::Record(fields) = &mut target.generic_data else {
                         return Err(VMError::NoUserTypeBase.into());
                     };
-                    let Some(field) = fields.get_mut(*member_id) else {
-                        let VariableType::UserData(type_id) = vtype else {
-                            return Err(VMError::NoUserTypeBase.into());
-                        };
-                        return Err(VMError::InvalidMemberId(type_id, *member_id).into());
+                    target = match step {
+                        ResolvedPathStep::Member(member_id) => fields.get_mut(member_id).ok_or(VMError::InternalVMError)?,
+                        ResolvedPathStep::IndexedMember(member_id, first, second, third) => fields
+                            .get_mut(member_id)
+                            .ok_or(VMError::InternalVMError)?
+                            .get_array_value_mut(first, second, third)
+                            .ok_or(VMError::InternalVMError)?,
                     };
-                    target = field;
                 }
                 let field_type = target.vtype;
                 *target = value.convert_to(field_type);

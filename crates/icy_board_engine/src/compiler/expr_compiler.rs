@@ -123,7 +123,7 @@ impl AstVisitor<PPEExpr> for ExpressionCompiler<'_> {
 
     fn visit_function_call_expression(&mut self, call: &crate::ast::FunctionCallExpression) -> PPEExpr {
         let arguments = call.get_arguments().iter().map(|e| e.visit(self)).collect();
-        let Some(function_type) = self.compiler.semantic_visitor.function_type_lookup.get(&call.id) else {
+        let Some(function_type) = self.compiler.semantic_visitor.function_type_lookup.get(&call.id).cloned() else {
             log::error!("function not found at: {} ({})", call.get_expression().get_span().start, call.get_expression());
             return PPEExpr::Value(0);
         };
@@ -136,12 +136,10 @@ impl AstVisitor<PPEExpr> for ExpressionCompiler<'_> {
                 )
             }
             SemanticInfo::MemberFunctionCall(idx) => {
-                let idx = *idx;
                 let expr = call.get_expression().visit(self);
                 PPEExpr::MemberFunctionCall(Box::new(expr), arguments, idx)
             }
             SemanticInfo::MemberSetterCall(idx) => {
-                let idx = *idx;
                 let Expression::MemberReference(member) = call.get_expression() else {
                     log::error!("member setter without a receiver at: {}", call.get_expression().get_span().start);
                     return PPEExpr::Value(0);
@@ -168,9 +166,13 @@ impl AstVisitor<PPEExpr> for ExpressionCompiler<'_> {
                 };
                 PPEExpr::MemberFunctionCall(Box::new(member.get_expression().visit(self)), arguments, idx)
             }
+            SemanticInfo::IndexedRecordField(idx) => {
+                let Expression::MemberReference(member) = call.get_expression() else {
+                    return PPEExpr::Value(0);
+                };
+                PPEExpr::IndexedMember(Box::new(member.get_expression().visit(self)), idx, arguments)
+            }
             SemanticInfo::ArrayMemberFunc(op_code, defaults) => {
-                let op_code = *op_code;
-                let defaults = defaults.clone();
                 // `a.Len(0)` is `Len(a, 0)`: the receiver leads, then what was written,
                 // then whatever the member fills in for a left out argument.
                 let Expression::MemberReference(member) = call.get_expression() else {
@@ -187,12 +189,12 @@ impl AstVisitor<PPEExpr> for ExpressionCompiler<'_> {
                 PPEExpr::PredefinedFunctionCall(op_code.get_definition(), call_arguments)
             }
             SemanticInfo::FunctionReference(idx) => {
-                let reference_index = self.compiler.semantic_visitor.function_containers[*idx].id;
+                let reference_index = self.compiler.semantic_visitor.function_containers[idx].id;
                 let table_index = self.compiler.semantic_visitor.references[reference_index].1.variable_table_index;
                 PPEExpr::FunctionCall(table_index, arguments)
             }
             SemanticInfo::VariableReference(reference_index) => {
-                let r = &self.compiler.semantic_visitor.references[*reference_index];
+                let r = &self.compiler.semantic_visitor.references[reference_index];
                 let table_index = r.1.variable_table_index;
                 PPEExpr::Dim(table_index, arguments)
             }

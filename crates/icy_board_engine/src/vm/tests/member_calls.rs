@@ -103,7 +103,8 @@ fn a_call_in_the_chain_cannot_be_assigned_through() {
 fn a_writable_property_on_a_call_result_uses_its_setter() {
     assert!(compile_errors("Audio.Load(\"missing\").Volume = 50").is_empty());
     assert!(compile_errors("LET Audio.Load(\"missing\").Volume = 50").is_empty());
-    assert!(run_ppl("Audio.Load(\"missing\").Volume = 50\nPrintLn \"alive\"").ends_with("alive\n"));
+    let output = run_ppl("Audio.Load(\"missing\").Volume = 50\nPrintLn \"alive\"");
+    assert!(output.ends_with("alive\n"), "{output:?}");
 
     let errors = compile_errors("Audio.Load(\"missing\").Volume = GfxBackend.Sixel");
     assert_eq!(errors, vec!["Argument 1 expects Integer, got GfxBackend"]);

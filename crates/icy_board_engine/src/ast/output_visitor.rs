@@ -563,6 +563,13 @@ impl AstVisitor<()> for OutputVisitor {
             self.output_keyword("Let ");
         }
 
+        if let Some(target) = let_stmt.get_target_expression() {
+            target.visit(self);
+            self.output.push_str(" = ");
+            let_stmt.get_value_expression().visit(self);
+            return;
+        }
+
         self.output(let_stmt.get_identifier());
         if !let_stmt.get_arguments().is_empty() {
             self.output.push('(');
@@ -675,6 +682,16 @@ impl AstVisitor<()> for OutputVisitor {
             self.output_type(field.get_variable_type(), field.get_type_token());
             self.output.push(' ');
             self.output(field.get_identifier());
+            if !field.get_specifier().get_dimensions().is_empty() {
+                self.output.push('(');
+                for (index, dimension) in field.get_specifier().get_dimensions().iter().enumerate() {
+                    self.output.push_str(&dimension.get_dimension().to_string());
+                    if index + 1 < field.get_specifier().get_dimensions().len() {
+                        self.output.push_str(", ");
+                    }
+                }
+                self.output.push(')');
+            }
             self.eol();
         }
         self.indent -= 1;

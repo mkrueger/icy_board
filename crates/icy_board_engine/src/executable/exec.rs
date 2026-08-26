@@ -11,7 +11,10 @@ use crate::{
     parser::{FIRST_USER_TYPE_ID, MAX_TYPE_FIELDS, MAX_USER_TYPES, is_user_declared_type},
 };
 
-use super::{FIRST_TYPE_TABLE_RUNTIME, LAST_PPE_RUNTIME, VariableTable, VariableType};
+use super::{FIRST_TYPE_TABLE_RUNTIME, LAST_PPE_RUNTIME, RecordField, VariableTable, VariableType};
+
+const TYPE_TABLE_FORMAT: u8 = 1;
+const RECORD_FIELD_SIZE: usize = 8;
 
 #[derive(Error, Debug, Clone, PartialEq)]
 pub enum ExecutableError {
@@ -65,15 +68,21 @@ pub enum ExecutableError {
 
     #[error("Variable refers to type {0}, which is not in the type table")]
     MissingTypeDefinition(u8),
+
+    #[error("Unsupported type table format: {0}")]
+    UnsupportedTypeTableFormat(u8),
+
+    #[error("Type {0} field {1} has invalid array dimensions")]
+    InvalidTypeFieldDimensions(usize, usize),
 }
 
 #[derive(Clone)]
 pub struct Executable {
     pub runtime: u16,
     pub variable_table: VariableTable,
-    /// Field types of the records the program declared, indexed by type id minus
+    /// Field layouts of the records the program declared, indexed by type id minus
     /// `FIRST_USER_TYPE_ID`. Only written for runtime 400 and above.
-    pub user_types: Vec<Vec<VariableType>>,
+    pub user_types: Vec<Vec<RecordField>>,
     pub script_buffer: Vec<i16>,
 }
 
@@ -82,7 +91,7 @@ static PREAMBLE: &[u8] = b"PCBoard Programming Language Executable";
 const HEADER_SIZE: usize = 48;
 
 impl Executable {
-    fn validate_user_types(user_types: &[Vec<VariableType>]) -> Result<(), ExecutableError> {
+    fn validate_user_types(user_types: &[Vec<RecordField>]) -> Result<(), ExecutableError> {
         if user_types.len() > MAX_USER_TYPES {
             return Err(ExecutableError::TypeCountExceedsMaximum(user_types.len(), MAX_USER_TYPES));
         }
@@ -91,13 +100,16 @@ impl Executable {
             if fields.is_empty() || fields.len() > MAX_TYPE_FIELDS {
                 return Err(ExecutableError::InvalidTypeFieldCount(type_id, fields.len()));
             }
-            for field in fields {
-                if let VariableType::UserData(field_type_id) = field {
-                    if !is_user_declared_type(*field_type_id) {
-                        return Err(ExecutableError::BoardObjectTypeField(type_id, *field_type_id));
+            for (field_index, field) in fields.iter().enumerate() {
+                if field.element_count().is_none() {
+                    return Err(ExecutableError::InvalidTypeFieldDimensions(type_id, field_index));
+                }
+                if let VariableType::UserData(field_type_id) = field.variable_type {
+                    if !is_user_declared_type(field_type_id) {
+                        return Err(ExecutableError::BoardObjectTypeField(type_id, field_type_id));
                     }
-                    if *field_type_id as usize >= type_id {
-                        return Err(ExecutableError::InvalidTypeReference(type_id, *field_type_id));
+                    if field_type_id as usize >= type_id {
+                        return Err(ExecutableError::InvalidTypeReference(type_id, field_type_id));
                     }
                 }
             }
@@ -105,7 +117,7 @@ impl Executable {
         Ok(())
     }
 
-    fn validate_variable_types(variable_table: &VariableTable, user_types: &[Vec<VariableType>]) -> Result<(), ExecutableError> {
+    fn validate_variable_types(variable_table: &VariableTable, user_types: &[Vec<RecordField>]) -> Result<(), ExecutableError> {
         for entry in variable_table.get_entries() {
             if let VariableType::UserData(type_id) = entry.header.variable_type
                 && is_user_declared_type(type_id)
@@ -151,6 +163,13 @@ impl Executable {
         let (mut i, mut variable_table) = VariableTable::deserialize(version, buffer)?;
         let mut user_types = Vec::new();
         if version >= FIRST_TYPE_TABLE_RUNTIME {
+            let Some(&format) = buffer.get(i) else {
+                return Err(Box::new(ExecutableError::BufferTooShort(buffer.len())));
+            };
+            i += 1;
+            if format != TYPE_TABLE_FORMAT {
+                return Err(Box::new(ExecutableError::UnsupportedTypeTableFormat(format)));
+            }
             let Some(&type_count) = buffer.get(i) else {
                 return Err(Box::new(ExecutableError::BufferTooShort(buffer.len())));
             };
@@ -168,14 +187,20 @@ impl Executable {
                 if field_count == 0 {
                     return Err(Box::new(ExecutableError::InvalidTypeFieldCount(FIRST_USER_TYPE_ID + user_types.len(), 0)));
                 }
-                let Some(field_bytes) = buffer.get(i..i + field_count) else {
+                let Some(field_bytes) = buffer.get(i..i + field_count * RECORD_FIELD_SIZE) else {
                     return Err(Box::new(ExecutableError::BufferTooShort(buffer.len())));
                 };
                 let mut fields = Vec::with_capacity(field_count);
-                for field in field_bytes {
-                    fields.push(VariableType::from(*field));
+                for field in field_bytes.chunks_exact(RECORD_FIELD_SIZE) {
+                    fields.push(RecordField {
+                        variable_type: VariableType::from(field[0]),
+                        dim: field[1],
+                        vector_size: u16::from_le_bytes(field[2..4].try_into()?),
+                        matrix_size: u16::from_le_bytes(field[4..6].try_into()?),
+                        cube_size: u16::from_le_bytes(field[6..8].try_into()?),
+                    });
                 }
-                i += field_count;
+                i += field_count * RECORD_FIELD_SIZE;
                 user_types.push(fields);
             }
             Self::validate_user_types(&user_types)?;
@@ -276,12 +301,16 @@ impl Executable {
         self.variable_table.serialize(&mut buffer)?;
 
         if self.runtime >= FIRST_TYPE_TABLE_RUNTIME {
-            // Ids run 100..=255, and a record is capped at 255 fields, so a byte holds both counts.
+            buffer.push(TYPE_TABLE_FORMAT);
             buffer.push(self.user_types.len() as u8);
             for fields in &self.user_types {
                 buffer.push(fields.len() as u8);
                 for field in fields {
-                    buffer.push((*field).into());
+                    buffer.push(field.variable_type.into());
+                    buffer.push(field.dim);
+                    buffer.extend_from_slice(&field.vector_size.to_le_bytes());
+                    buffer.extend_from_slice(&field.matrix_size.to_le_bytes());
+                    buffer.extend_from_slice(&field.cube_size.to_le_bytes());
                 }
             }
         }

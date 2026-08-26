@@ -330,7 +330,7 @@ impl fmt::Debug for GenericVariableData {
 }
 unsafe impl Send for GenericVariableData {}
 unsafe impl Sync for GenericVariableData {}
-const MAX_ARRAY_SIZE: usize = 100_000_000;
+pub(crate) const MAX_ARRAY_SIZE: usize = 100_000_000;
 
 impl GenericVariableData {
     pub(crate) fn create_array(base_value: VariableValue, dim: u8, vector_size: usize, matrix_size: usize, cube_size: usize) -> Option<GenericVariableData> {
@@ -423,6 +423,12 @@ impl fmt::Display for VariableValue {
 
 impl PartialEq for VariableValue {
     fn eq(&self, other: &Self) -> bool {
+        match (&self.generic_data, &other.generic_data) {
+            (GenericVariableData::Dim1(left), GenericVariableData::Dim1(right)) => return self.vtype == other.vtype && left == right,
+            (GenericVariableData::Dim2(left), GenericVariableData::Dim2(right)) => return self.vtype == other.vtype && left == right,
+            (GenericVariableData::Dim3(left), GenericVariableData::Dim3(right)) => return self.vtype == other.vtype && left == right,
+            _ => {}
+        }
         if let (VariableType::UserData(left_type), VariableType::UserData(right_type)) = (self.vtype, other.vtype) {
             if left_type != right_type {
                 return false;

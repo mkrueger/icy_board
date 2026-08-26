@@ -370,6 +370,7 @@ pub enum PPEExpr {
     RoutineReference(usize),
     RecordLiteral(u8, Vec<(usize, PPEExpr)>),
     Member(Box<PPEExpr>, usize),
+    IndexedMember(Box<PPEExpr>, usize, Vec<PPEExpr>),
     UnaryExpression(UnaryOp, Box<PPEExpr>),
     BinaryExpression(BinOp, Box<PPEExpr>, Box<PPEExpr>),
     Dim(usize, Vec<PPEExpr>),
@@ -422,6 +423,16 @@ impl PPEExpr {
                 vec.push(FuncOpCode::MemberReference as i16);
                 vec.push(*id as i16);
             }
+            PPEExpr::IndexedMember(expr, id, dimensions) => {
+                expr.serialize(vec);
+                vec.push(FuncOpCode::IndexedMember as i16);
+                vec.push(*id as i16);
+                vec.push(dimensions.len() as i16);
+                for dimension in dimensions {
+                    dimension.serialize(vec);
+                    vec.push(0);
+                }
+            }
             PPEExpr::MemberFunctionCall(expr, args, id) => {
                 expr.serialize(vec);
                 for arg in args {
@@ -473,6 +484,7 @@ impl PPEExpr {
             PPEExpr::Value(_) | PPEExpr::RoutineReference(_) => 2,
             PPEExpr::RecordLiteral(_, fields) => fields.iter().map(|(_, value)| value.get_size()).sum::<usize>() + 3 + fields.len(),
             PPEExpr::Member(expr, _) => expr.get_size() + 2,
+            PPEExpr::IndexedMember(expr, _, dimensions) => expr.get_size() + 3 + Self::count_size(dimensions) + dimensions.len(),
             PPEExpr::Dim(_, args) => 2 + Self::count_size(args) + args.len(),
             PPEExpr::PredefinedFunctionCall(_, args) => Self::count_size(args) + 1,
             PPEExpr::FunctionCall(_, args) => Self::count_size(args) + 2 + args.len(),
@@ -514,6 +526,7 @@ impl PPEExpr {
             PPEExpr::RoutineReference(id) => visitor.visit_routine_reference(*id),
             PPEExpr::RecordLiteral(type_id, fields) => visitor.visit_record_literal(*type_id, fields),
             PPEExpr::Member(expr, id) => visitor.visit_member(expr, *id),
+            PPEExpr::IndexedMember(expr, id, dimensions) => visitor.visit_member_function_call(expr, dimensions, *id),
             PPEExpr::UnaryExpression(op, expr) => visitor.visit_unary_expression(*op, expr),
             PPEExpr::BinaryExpression(op, left, right) => visitor.visit_binary_expression(*op, left, right),
             PPEExpr::Dim(id, dim) => visitor.visit_dim_expression(*id, dim),
@@ -536,6 +549,11 @@ impl PPEExpr {
             PPEExpr::RoutineReference(id) => visitor.visit_routine_reference(*id),
             PPEExpr::RecordLiteral(type_id, fields) => visitor.visit_record_literal(*type_id, fields),
             PPEExpr::Member(expr, id) => visitor.visit_member(expr, *id),
+            PPEExpr::IndexedMember(expr, id, dimensions) => PPEExpr::IndexedMember(
+                Box::new(expr.visit_mut(visitor)),
+                *id,
+                dimensions.iter().map(|dimension| dimension.visit_mut(visitor)).collect(),
+            ),
             PPEExpr::UnaryExpression(op, expr) => visitor.visit_unary_expression(*op, expr),
             PPEExpr::BinaryExpression(op, left, right) => visitor.visit_binary_expression(*op, left, right),
             PPEExpr::Dim(id, dim) => visitor.visit_dim_expression(*id, dim),

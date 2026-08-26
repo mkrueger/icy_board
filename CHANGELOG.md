@@ -10,6 +10,12 @@ releases.
 
 ### Added
 
+- PPL ``TYPE`` fields may be one-, two- or three-dimensional arrays, including
+  arrays of an earlier record type. Runtime 400's versioned type table stores a
+  fixed field descriptor with the type, rank and three `u16` upper bounds, so
+  field arrays survive PPE serialization and decompilation. Assignment copies
+  their contents and record equality compares them.
+
 - `MSG`, the message type. `AREA.Read(number)` answers with one, and it reports
   `From`, `To`, `Subject`, `Date`, `Time`, `ReplyTo`, `Status`, `Size`,
   `IsPrivate`, `IsRead`, `IsDeleted`, `IsEcho`, `NeedsPassword` and `Text()` -

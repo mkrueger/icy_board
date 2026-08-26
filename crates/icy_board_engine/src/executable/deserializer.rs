@@ -365,6 +365,26 @@ impl PPEDeserializer {
                     continue;
                 }
 
+                if id == FuncOpCode::IndexedMember as i16 {
+                    let Some(expr) = self.pop_expr() else {
+                        return Err(DeserializationErrorType::ExpressionStackEmpty);
+                    };
+                    self.offset += 1;
+                    let member_id = executable.script_buffer[self.offset] as usize;
+                    self.offset += 1;
+                    let dimension_count = executable.script_buffer[self.offset] as usize;
+                    self.offset += 1;
+                    let mut dimensions = Vec::with_capacity(dimension_count);
+                    for _ in 0..dimension_count {
+                        let Some(dimension) = self.deserialize_expression(executable)? else {
+                            return Err(DeserializationErrorType::ExpressionStackEmpty);
+                        };
+                        dimensions.push(dimension);
+                    }
+                    self.push_expr(PPEExpr::IndexedMember(Box::new(expr), member_id, dimensions));
+                    continue;
+                }
+
                 if id == FuncOpCode::MemberCall as i16 {
                     self.offset += 1;
                     let arg_count = executable.script_buffer[self.offset];
@@ -493,12 +513,29 @@ impl PPEDeserializer {
             PPEExpr::Dim(id as usize, dims)
         };
 
-        // A record field target is the variable followed by its member reference.
-        while self.offset + 1 < executable.script_buffer.len() && executable.script_buffer[self.offset] == FuncOpCode::MemberReference as i16 {
-            self.offset += 1;
-            let member_id = executable.script_buffer[self.offset];
-            self.offset += 1;
-            expr = PPEExpr::Member(Box::new(expr), member_id as usize);
+        // A record target may alternate scalar and indexed fields at any depth.
+        loop {
+            if self.offset + 1 < executable.script_buffer.len() && executable.script_buffer[self.offset] == FuncOpCode::MemberReference as i16 {
+                self.offset += 1;
+                let member_id = executable.script_buffer[self.offset];
+                self.offset += 1;
+                expr = PPEExpr::Member(Box::new(expr), member_id as usize);
+                continue;
+            }
+            if self.offset + 2 < executable.script_buffer.len() && executable.script_buffer[self.offset] == FuncOpCode::IndexedMember as i16 {
+                self.offset += 1;
+                let member_id = executable.script_buffer[self.offset] as usize;
+                self.offset += 1;
+                let dimension_count = executable.script_buffer[self.offset] as usize;
+                self.offset += 1;
+                let mut dimensions = Vec::with_capacity(dimension_count);
+                for _ in 0..dimension_count {
+                    dimensions.push(self.deserialize_expression(executable).ok().flatten()?);
+                }
+                expr = PPEExpr::IndexedMember(Box::new(expr), member_id, dimensions);
+                continue;
+            }
+            break;
         }
         Some(expr)
     }

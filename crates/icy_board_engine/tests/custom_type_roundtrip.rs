@@ -5,10 +5,14 @@ use std::{
 
 use icy_board_engine::{
     compiler::{PPECompiler, workspace::Workspace},
-    executable::{Executable, ExecutableError, FIRST_TYPE_TABLE_RUNTIME, GenericVariableData, TableEntry, VariableType},
+    executable::{Executable, ExecutableError, FIRST_TYPE_TABLE_RUNTIME, GenericVariableData, RecordField, TableEntry, VariableType},
     parser::{Encoding, ErrorReporter, MAX_TYPE_FIELDS, MAX_USER_TYPES, UserTypeRegistry, parse_ast},
 };
 use std::fmt::Write as _;
+
+fn field(variable_type: VariableType) -> RecordField {
+    RecordField::scalar(variable_type)
+}
 
 fn compile(source: &str) -> Executable {
     let registry = UserTypeRegistry::icy_board_registry();
@@ -56,9 +60,44 @@ fn custom_type_layouts_survive_the_ppe_round_trip() {
     let executable = compile("TYPE Inner\n  INTEGER Number\n  STRING Text\nENDTYPE\nTYPE Outer\n  Inner Value\n  BOOLEAN Flag\nENDTYPE\nOuter item\n");
     assert_eq!(
         vec![
-            vec![VariableType::Integer, VariableType::String],
-            vec![VariableType::UserData(100), VariableType::Boolean]
+            vec![field(VariableType::Integer), field(VariableType::String)],
+            vec![field(VariableType::UserData(100)), field(VariableType::Boolean)]
         ],
+        executable.user_types
+    );
+
+    let mut bytes = executable.to_buffer().unwrap();
+    let loaded = Executable::from_buffer(&mut bytes, false).unwrap();
+    assert_eq!(executable.user_types, loaded.user_types);
+}
+
+#[test]
+fn array_field_dimensions_survive_the_ppe_round_trip() {
+    let executable = compile("TYPE Rec\n  INTEGER Vector(10)\n  STRING Matrix(2, 3)\n  BOOLEAN Cube(1, 2, 3)\nENDTYPE\nRec item\n");
+    assert_eq!(
+        vec![vec![
+            RecordField {
+                variable_type: VariableType::Integer,
+                dim: 1,
+                vector_size: 10,
+                matrix_size: 0,
+                cube_size: 0,
+            },
+            RecordField {
+                variable_type: VariableType::String,
+                dim: 2,
+                vector_size: 2,
+                matrix_size: 3,
+                cube_size: 0,
+            },
+            RecordField {
+                variable_type: VariableType::Boolean,
+                dim: 3,
+                vector_size: 1,
+                matrix_size: 2,
+                cube_size: 3,
+            },
+        ]],
         executable.user_types
     );
 
@@ -175,7 +214,7 @@ fn a_record_past_the_byte_limit_is_rejected() {
 fn the_serializer_rejects_custom_types_on_a_pcboard_runtime() {
     let executable = Executable {
         runtime: 340,
-        user_types: vec![vec![VariableType::Integer]],
+        user_types: vec![vec![field(VariableType::Integer)]],
         ..Executable::default()
     };
     assert_eq!(
@@ -187,7 +226,7 @@ fn the_serializer_rejects_custom_types_on_a_pcboard_runtime() {
 #[test]
 fn the_serializer_rejects_counts_that_do_not_fit_the_format() {
     let too_many_types = Executable {
-        user_types: vec![vec![VariableType::Integer]; MAX_USER_TYPES + 1],
+        user_types: vec![vec![field(VariableType::Integer)]; MAX_USER_TYPES + 1],
         ..Executable::default()
     };
     assert_eq!(
@@ -196,7 +235,7 @@ fn the_serializer_rejects_counts_that_do_not_fit_the_format() {
     );
 
     let too_many_fields = Executable {
-        user_types: vec![vec![VariableType::Integer; MAX_TYPE_FIELDS + 1]],
+        user_types: vec![vec![field(VariableType::Integer); MAX_TYPE_FIELDS + 1]],
         ..Executable::default()
     };
     assert_eq!(
@@ -208,13 +247,13 @@ fn the_serializer_rejects_counts_that_do_not_fit_the_format() {
 #[test]
 fn the_serializer_rejects_recursive_or_forward_type_references() {
     let self_reference = Executable {
-        user_types: vec![vec![VariableType::UserData(100)]],
+        user_types: vec![vec![field(VariableType::UserData(100))]],
         ..Executable::default()
     };
     assert_eq!(ExecutableError::InvalidTypeReference(100, 100), self_reference.to_buffer().unwrap_err());
 
     let forward_reference = Executable {
-        user_types: vec![vec![VariableType::UserData(101)], vec![VariableType::Integer]],
+        user_types: vec![vec![field(VariableType::UserData(101))], vec![field(VariableType::Integer)]],
         ..Executable::default()
     };
     assert_eq!(ExecutableError::InvalidTypeReference(100, 101), forward_reference.to_buffer().unwrap_err());
@@ -223,7 +262,7 @@ fn the_serializer_rejects_recursive_or_forward_type_references() {
 #[test]
 fn the_serializer_rejects_a_board_object_field() {
     let executable = Executable {
-        user_types: vec![vec![VariableType::UserData(30)]],
+        user_types: vec![vec![field(VariableType::UserData(30))]],
         ..Executable::default()
     };
     assert_eq!(ExecutableError::BoardObjectTypeField(100, 30), executable.to_buffer().unwrap_err());
@@ -243,12 +282,12 @@ fn the_serializer_rejects_a_variable_whose_type_is_missing() {
 #[test]
 fn the_loader_rejects_a_recursive_type_table() {
     let executable = Executable {
-        user_types: vec![vec![VariableType::Integer]],
+        user_types: vec![vec![field(VariableType::Integer)]],
         ..Executable::default()
     };
     let mut bytes = executable.to_buffer().unwrap();
-    // Header (48), empty variable table count (2), type count, field count, field type.
-    bytes[52] = 100;
+    // Header (48), empty variable table count (2), format, type count, field count, descriptor.
+    bytes[53] = 100;
     assert!(matches!(
         Executable::from_buffer(&mut bytes, false),
         Err(error) if error.to_string() == "Type 100 refers to type 100, which has not been declared yet"
@@ -259,10 +298,35 @@ fn the_loader_rejects_a_recursive_type_table() {
 fn the_loader_rejects_a_truncated_type_table() {
     let executable = Executable::default();
     let mut bytes = executable.to_buffer().unwrap();
-    bytes[50] = 1;
-    bytes.truncate(51);
+    bytes[51] = 1;
+    bytes.truncate(52);
     assert!(matches!(
         Executable::from_buffer(&mut bytes, false),
         Err(error) if error.to_string().starts_with("Buffer too short")
+    ));
+}
+
+#[test]
+fn the_loader_rejects_an_unknown_type_table_format() {
+    let executable = Executable::default();
+    let mut bytes = executable.to_buffer().unwrap();
+    bytes[50] = 2;
+    assert!(matches!(
+        Executable::from_buffer(&mut bytes, false),
+        Err(error) if error.to_string() == "Unsupported type table format: 2"
+    ));
+}
+
+#[test]
+fn the_loader_rejects_invalid_field_dimensions() {
+    let executable = Executable {
+        user_types: vec![vec![field(VariableType::Integer)]],
+        ..Executable::default()
+    };
+    let mut bytes = executable.to_buffer().unwrap();
+    bytes[54] = 4;
+    assert!(matches!(
+        Executable::from_buffer(&mut bytes, false),
+        Err(error) if error.to_string() == "Type 100 field 0 has invalid array dimensions"
     ));
 }

@@ -193,8 +193,8 @@ pub enum ParserErrorType {
     #[error("A type can't hold a field of its own type ('{0}')")]
     TypeUsedInItself(unicase::Ascii<String>),
 
-    #[error("Record field '{0}' cannot be an array")]
-    TypeFieldArrayNotSupported(unicase::Ascii<String>),
+    #[error("Record field '{0}' has a dimension above 65535")]
+    TypeFieldDimensionTooLarge(unicase::Ascii<String>),
 
     #[error("Record field '{0}' cannot have an initializer")]
     TypeFieldInitializerNotSupported(unicase::Ascii<String>),
@@ -236,7 +236,7 @@ pub enum ParserWarningType {
 pub struct UserTypeDefinition {
     pub id: usize,
     pub name: unicase::Ascii<String>,
-    pub fields: Vec<(unicase::Ascii<String>, VariableType)>,
+    pub fields: Vec<(unicase::Ascii<String>, crate::executable::RecordField)>,
 }
 
 /// An integer-backed type that exists in source only.
@@ -264,7 +264,11 @@ impl UserTypeDefinition {
     }
 
     pub fn field_type(&self, index: usize) -> Option<VariableType> {
-        self.fields.get(index).map(|(_, t)| *t)
+        self.fields.get(index).map(|(_, field)| field.variable_type)
+    }
+
+    pub fn field(&self, index: usize) -> Option<crate::executable::RecordField> {
+        self.fields.get(index).map(|(_, field)| *field)
     }
 }
 
@@ -548,7 +552,7 @@ impl UserTypeRegistry {
     }
 
     /// Adds a record and hands back its type id, or `None` when the id space is full.
-    pub fn declare_user_type(&self, name: unicase::Ascii<String>, fields: Vec<(unicase::Ascii<String>, VariableType)>) -> Option<usize> {
+    pub fn declare_user_type(&self, name: unicase::Ascii<String>, fields: Vec<(unicase::Ascii<String>, crate::executable::RecordField)>) -> Option<usize> {
         let mut user_types = self.user_types.write().unwrap();
         let id = FIRST_USER_TYPE_ID + user_types.len();
         let lowest_enum = self.enums.read().unwrap().last().map_or(u8::MAX as usize + 1, |def| def.id as usize);
@@ -593,7 +597,10 @@ impl UserTypeRegistry {
             UserTypeDefinition {
                 id,
                 name: unicase::Ascii::new(name.to_string()),
-                fields,
+                fields: fields
+                    .into_iter()
+                    .map(|(name, variable_type)| (name, crate::executable::RecordField::scalar(variable_type)))
+                    .collect(),
             },
         );
     }
@@ -976,10 +983,10 @@ impl<'a> Parser<'a> {
 
             while let Some(specifier) = self.parse_var_info(false) {
                 let field_name = specifier.get_identifier().clone();
-                if !specifier.get_dimensions().is_empty() {
+                if specifier.get_dimensions().iter().any(|dimension| dimension.get_dimension() > u16::MAX as usize) {
                     self.error_reporter.lock().unwrap().report_error(
                         specifier.get_identifier_token().span.clone(),
-                        ParserErrorType::TypeFieldArrayNotSupported(field_name.clone()),
+                        ParserErrorType::TypeFieldDimensionTooLarge(field_name.clone()),
                     );
                 }
                 if specifier.get_initalizer().is_some() {
@@ -1022,7 +1029,22 @@ impl<'a> Parser<'a> {
             return None;
         }
 
-        let field_layout = fields.iter().map(|field| (field.get_identifier().clone(), field.get_variable_type())).collect();
+        let field_layout = fields
+            .iter()
+            .map(|field| {
+                let dimensions = field.get_specifier().get_dimensions();
+                (
+                    field.get_identifier().clone(),
+                    crate::executable::RecordField {
+                        variable_type: field.get_variable_type(),
+                        dim: dimensions.len() as u8,
+                        vector_size: field.get_specifier().get_vector_size() as u16,
+                        matrix_size: field.get_specifier().get_matrix_size() as u16,
+                        cube_size: field.get_specifier().get_cube_size() as u16,
+                    },
+                )
+            })
+            .collect();
         if !self.types_predeclared && !type_already_declared && self.type_registry.declare_user_type(name, field_layout).is_none() {
             self.error_reporter
                 .lock()

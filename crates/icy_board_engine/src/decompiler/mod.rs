@@ -55,7 +55,7 @@ fn user_field_name(index: usize) -> unicase::Ascii<String> {
 fn build_type_registry(executable: &Executable) -> UserTypeRegistry {
     let registry = UserTypeRegistry::icy_board_registry();
     for (i, fields) in executable.user_types.iter().enumerate() {
-        let fields = fields.iter().enumerate().map(|(j, t)| (user_field_name(j), *t)).collect();
+        let fields = fields.iter().enumerate().map(|(j, field)| (user_field_name(j), *field)).collect();
         registry.declare_user_type(user_type_name(i), fields);
     }
     registry
@@ -233,11 +233,16 @@ impl Decompiler {
             let fields = fields
                 .iter()
                 .enumerate()
-                .map(|(j, field_type)| {
+                .map(|(j, field)| {
+                    let dimensions = [field.vector_size, field.matrix_size, field.cube_size]
+                        .into_iter()
+                        .take(field.dim as usize)
+                        .map(usize::from)
+                        .collect();
                     TypeFieldSpecifier::new(
-                        self.type_token(*field_type),
-                        *field_type,
-                        VariableSpecifier::empty(user_field_name(j), Vec::new()),
+                        self.type_token(field.variable_type),
+                        field.variable_type,
+                        VariableSpecifier::empty(user_field_name(j), dimensions),
                     )
                 })
                 .collect();
@@ -278,7 +283,12 @@ impl Decompiler {
             return None;
         };
         if self.type_registry.is_record_type(type_id) {
-            return self.type_registry.get_record_type_from_id(type_id)?.fields.get(id).cloned();
+            return self
+                .type_registry
+                .get_record_type_from_id(type_id)?
+                .fields
+                .get(id)
+                .map(|(name, field)| (name.clone(), field.variable_type));
         }
         let registry = self.type_registry.get_type_from_id(type_id)?;
         match registry.id_table.get(id)? {
@@ -299,6 +309,7 @@ impl Decompiler {
         match expr {
             PPEExpr::Value(id) | PPEExpr::Dim(id, _) => Some(self.executable.variable_table.try_get_entry(*id)?.header.variable_type),
             PPEExpr::Member(base, id) => self.resolve_member(base, *id).map(|(_, t)| t),
+            PPEExpr::IndexedMember(base, id, _) => self.resolve_member(base, *id).map(|(_, t)| t),
             PPEExpr::MemberFunctionCall(base, _, id) => {
                 // Codegen leaves the member reference in the base, so reach past it.
                 let base = if let PPEExpr::Member(inner, _) = base.as_ref() { inner } else { base };
@@ -373,7 +384,9 @@ impl Decompiler {
                 let Some(entry) = self.executable.variable_table.try_get_entry(*id) else {
                     return ConstantExpression::create_empty_expression(Constant::String(format!("ERROR IN EXPRESSION can't read table index : {:04X}", *id)));
                 };
-                if entry.entry_type == EntryType::Constant {
+                if matches!(entry.value.get_type(), VariableType::UserData(_)) {
+                    IdentifierExpression::create_empty_expression(unicase::Ascii::new(entry.name.clone()))
+                } else if entry.entry_type == EntryType::Constant {
                     let constant = match entry.value.get_type() {
                         VariableType::BigStr | VariableType::String => Constant::String(entry.value.as_string()),
                         VariableType::Float => Constant::Double(entry.value.data.float_value as f64),
@@ -411,6 +424,10 @@ impl Decompiler {
                 ))
             }
             PPEExpr::Member(expr, id) => MemberReferenceExpression::create_empty_expression(self.decompile_expression(expr), self.member_name(expr, *id)),
+            PPEExpr::IndexedMember(expr, id, dimensions) => FunctionCallExpression::create_empty_expression(
+                MemberReferenceExpression::create_empty_expression(self.decompile_expression(expr), self.member_name(expr, *id)),
+                dimensions.iter().map(|dimension| self.decompile_expression(dimension)).collect(),
+            ),
             PPEExpr::MemberFunctionCall(expr, args, id) => {
                 let base = self.decompile_expression(expr);
                 // Codegen writes the member reference into the base as well, so only

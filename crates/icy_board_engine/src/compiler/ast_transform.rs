@@ -516,9 +516,12 @@ impl AstVisitorMut for AstTransformationVisitor {
 
     fn visit_let_statement(&mut self, let_stmt: &LetStatement) -> Statement {
         let mut val_expr = let_stmt.get_value_expression().visit_mut(self);
+        let transformed_target = let_stmt.get_target_expression().map(|target| target.visit_mut(self));
 
         // A compound assignment reads the same place it writes, including indices and members.
-        let mut target = if let (Some(left), Some(right)) = (let_stmt.get_lpar_token(), let_stmt.get_rpar_token()) {
+        let mut target = if let Some(target) = &transformed_target {
+            target.clone()
+        } else if let (Some(left), Some(right)) = (let_stmt.get_lpar_token(), let_stmt.get_rpar_token()) {
             Expression::Indexer(crate::ast::IndexerExpression::new(
                 let_stmt.get_identifier_token().clone(),
                 left.clone(),
@@ -528,12 +531,14 @@ impl AstVisitorMut for AstTransformationVisitor {
         } else {
             Expression::Identifier(IdentifierExpression::new(let_stmt.get_identifier_token().clone()))
         };
-        for member in let_stmt.get_members() {
-            target = Expression::MemberReference(crate::ast::MemberReferenceExpression::new(
-                target,
-                Spanned::create_empty(Token::Dot),
-                member.clone(),
-            ));
+        if transformed_target.is_none() {
+            for member in let_stmt.get_members() {
+                target = Expression::MemberReference(crate::ast::MemberReferenceExpression::new(
+                    target,
+                    Spanned::create_empty(Token::Dot),
+                    member.clone(),
+                ));
+            }
         }
 
         match let_stmt.get_let_variant() {
@@ -561,7 +566,7 @@ impl AstVisitorMut for AstTransformationVisitor {
             _ => {}
         }
 
-        Statement::Let(LetStatement::new(
+        let statement = LetStatement::new(
             let_stmt.get_let_token().clone(),
             Spanned {
                 span: let_stmt.get_identifier_token().span.clone(),
@@ -573,7 +578,12 @@ impl AstVisitorMut for AstTransformationVisitor {
             let_stmt.get_members().clone(),
             Spanned::create_empty(Token::Eq),
             val_expr,
-        ))
+        );
+        Statement::Let(if let Some(target) = transformed_target {
+            statement.with_target_expression(target)
+        } else {
+            statement
+        })
     }
 
     fn visit_function_implementation(&mut self, function: &FunctionImplementation) -> AstNode {

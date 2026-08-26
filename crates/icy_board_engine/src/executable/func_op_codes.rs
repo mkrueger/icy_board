@@ -323,9 +323,10 @@ pub enum FuncOpCode {
     ElementAt = -308,
     TOLONG64 = -309,
     TOULONG64 = -310,
+    IndexedMember = -311,
 }
 
-pub const LAST_FUNC: i16 = -310;
+pub const LAST_FUNC: i16 = -311;
 
 impl FuncOpCode {
     pub fn get_definition(self) -> &'static FunctionDefinition {
@@ -346,6 +347,7 @@ impl FuncOpCode {
                 | FuncOpCode::ElementAt
                 | FuncOpCode::TOLONG64
                 | FuncOpCode::TOULONG64
+                | FuncOpCode::IndexedMember
         ) {
             400
         } else {
@@ -412,7 +414,7 @@ impl FunctionDefinition {
         }
     }
 }
-pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 322]> = std::sync::LazyLock::new(|| {
+pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 323]> = std::sync::LazyLock::new(|| {
     [
         FunctionDefinition {
             name: "END",
@@ -3083,6 +3085,14 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 322]> 
             return_type: VariableType::ULong,
             args: Some(vec![ArgumentDefinition::new("exp", VariableType::None)]),
             signature: FunctionSignature::FixedParameters(1),
+        },
+        FunctionDefinition {
+            name: "<indexed member>",
+            version: 400,
+            opcode: FuncOpCode::IndexedMember,
+            return_type: VariableType::None,
+            args: None,
+            signature: FunctionSignature::Invalid,
         },
         // ALIASES (need to be last in the list)
         FunctionDefinition {

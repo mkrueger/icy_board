@@ -4618,7 +4618,8 @@ REDIM (2.00)
   **Remarks**
     Array must be declared with the desired number of dimensions before using REDIM. 
     Cannot change the number of dimensions, only their sizes. Existing data may be lost 
-    when resizing.
+    when resizing. Arrays stored as record fields have bounds fixed by their record type
+    and cannot be passed to REDIM.
 
   **Example**
 

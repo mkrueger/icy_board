@@ -323,6 +323,7 @@ pub async fn run_function(opcode: FuncOpCode, arg: &mut VirtualMachine<'_>, argu
         | FuncOpCode::OPAR
         | FuncOpCode::MemberReference
         | FuncOpCode::MemberCall
+        | FuncOpCode::IndexedMember
         | FuncOpCode::RoutineReference
         | FuncOpCode::RecordLiteral => predefined_functions::invalid(arg, arguments).await,
     }

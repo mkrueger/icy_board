@@ -580,9 +580,10 @@ Unknown and duplicate fields are errors. A field holding another record requires
 the exact nominal type. Record literals need runtime 400; the PPE stores type and
 field ids rather than their source names.
 
-The reverse shape - an array as one field of a record - is not supported yet.
-`INTEGER Values(10)` inside a `TYPE` block is rejected explicitly because the
-current PPE type table stores each field's type but not its dimensions.
+Record fields may themselves be one-, two- or three-dimensional arrays,
+including arrays whose element type is an earlier record type.
+Their bounds are part of the type layout and are the same for every record value,
+so neither `REDIM record.Values, ...` nor `record.Values.Redim(...)` is allowed.
 
 Rules the compiler enforces:
 

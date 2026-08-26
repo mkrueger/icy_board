@@ -82,6 +82,7 @@ pub enum SemanticInfo {
 
     MemberFunctionCall(usize),
     MemberSetterCall(usize),
+    IndexedRecordField(usize),
 
     /// A built-in array function written as a member, `a.Len()` for `Len(a)`. The
     /// array is passed as the first argument, plus the constants the member fills in.
@@ -1074,6 +1075,52 @@ impl SemanticVisitor {
         self.references[index].1.header.as_ref().is_some_and(|header| header.dim > 0)
     }
 
+    fn fixed_record_array_field(&mut self, expression: &Expression) -> Option<String> {
+        let Expression::MemberReference(member) = expression else {
+            return None;
+        };
+        let VariableType::UserData(type_id) = member.get_expression().visit(self) else {
+            return None;
+        };
+        let definition = self.type_registry.get_record_type_from_id(type_id)?;
+        let field_id = definition.field_index(member.get_identifier())?;
+        (definition.field(field_id)?.dim > 0).then(|| member.get_identifier().to_string())
+    }
+
+    fn is_assignable_explicit_target(&mut self, expression: &Expression) -> bool {
+        match expression {
+            Expression::Identifier(_) | Expression::Indexer(_) => true,
+            Expression::MemberReference(member) => self.is_assignable_explicit_target(member.get_expression()),
+            Expression::FunctionCall(call) => {
+                if matches!(
+                    self.function_type_lookup.get(&call.id),
+                    Some(SemanticInfo::IndexedRecordField(_) | SemanticInfo::VariableReference(_))
+                ) {
+                    return true;
+                }
+                match call.get_expression() {
+                    Expression::Identifier(identifier) => {
+                        let Some(index) = self.lookup_variable(identifier.get_identifier()) else {
+                            return false;
+                        };
+                        self.references[index].1.header.as_ref().is_some_and(|header| header.dim > 0)
+                    }
+                    Expression::MemberReference(member) => {
+                        let Some(type_id) = self.user_type_lookup.get(&member.get_identifier_token().span.start).copied() else {
+                            return false;
+                        };
+                        self.type_registry
+                            .get_record_type_from_id(type_id)
+                            .and_then(|definition| definition.field_index(member.get_identifier()).and_then(|field_id| definition.field(field_id)))
+                            .is_some_and(|field| field.dim > 0)
+                    }
+                    _ => false,
+                }
+            }
+            _ => false,
+        }
+    }
+
     fn add_reference_to(&mut self, identifier: &Spanned<Token>, idx: usize) {
         self.references[idx].1.usages.push((
             self.errors.lock().unwrap().file_name().to_path_buf(),
@@ -1811,6 +1858,23 @@ impl AstVisitor<VariableType> for SemanticVisitor {
 
     fn visit_predefined_call_statement(&mut self, call_stmt: &PredefinedCallStatement) -> VariableType {
         let def = call_stmt.get_func();
+        if def.opcode == OpCode::REDIM
+            && let Some(field_name) = call_stmt.get_arguments().first().and_then(|argument| self.fixed_record_array_field(argument))
+        {
+            for argument in call_stmt.get_arguments().iter().skip(1) {
+                argument.visit(self);
+            }
+            self.errors.lock().unwrap().report_error(
+                call_stmt.get_arguments()[0].get_span(),
+                CompilationErrorType::FixedRecordArrayCannotBeRedimmed(field_name),
+            );
+            self.add_reference(
+                ReferenceType::PredefinedProc(def.opcode),
+                VariableType::Procedure,
+                call_stmt.get_identifier_token(),
+            );
+            return VariableType::None;
+        }
         walk_predefined_call_statement(self, call_stmt);
 
         let minimum_runtime = def.opcode.minimum_runtime();
@@ -1914,6 +1978,19 @@ impl AstVisitor<VariableType> for SemanticVisitor {
     fn visit_function_call_expression(&mut self, call: &FunctionCallExpression) -> VariableType {
         let mut res = VariableType::None;
         let is_ident = matches!(call.get_expression(), Expression::Identifier(_));
+        if let Expression::MemberReference(member) = call.get_expression()
+            && array_procedure(member.get_identifier()).is_some()
+            && let Some(field_name) = self.fixed_record_array_field(member.get_expression())
+        {
+            for argument in call.get_arguments() {
+                argument.visit(self);
+            }
+            self.errors.lock().unwrap().report_error(
+                member.get_expression().get_span(),
+                CompilationErrorType::FixedRecordArrayCannotBeRedimmed(field_name),
+            );
+            return VariableType::None;
+        }
         let outer_func_call = self.cur_func_call;
         self.cur_func_call = call.id;
         call.get_expression().visit(self);
@@ -1955,6 +2032,23 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 }
                 self.function_type_lookup.insert(call.id, SemanticInfo::ArrayMemberProc(*opcode));
                 return VariableType::None;
+            }
+
+            if let Some(type_id) = self.user_type_lookup.get(&member.get_identifier_token().span.start).copied()
+                && self.type_registry.is_record_type(type_id)
+                && let Some(member_id) = self.type_registry.record_field_index(type_id, member.get_identifier())
+                && let Some(field) = self
+                    .type_registry
+                    .get_record_type_from_id(type_id)
+                    .and_then(|definition| definition.field(member_id))
+                && field.dim > 0
+            {
+                for argument in call.get_arguments() {
+                    argument.visit(self);
+                }
+                self.check_expr_arg_count(field.dim as usize, call.get_arguments().len(), call.get_expression());
+                self.function_type_lookup.insert(call.id, SemanticInfo::IndexedRecordField(member_id));
+                return field.variable_type;
             }
 
             let Some(user_type) = self.user_type_lookup.get(&member.get_identifier_token().span.start).copied() else {
@@ -2237,6 +2331,35 @@ impl AstVisitor<VariableType> for SemanticVisitor {
     }
 
     fn visit_let_statement(&mut self, let_stmt: &LetStatement) -> VariableType {
+        if let Some(target) = let_stmt.get_target_expression() {
+            let target_type = target.visit(self);
+            if !self.is_assignable_explicit_target(target) {
+                if let Expression::MemberReference(member) = target
+                    && let Some(type_id) = self.user_type_lookup.get(&member.get_identifier_token().span.start).copied()
+                {
+                    if self.type_registry.is_record_type(type_id) {
+                        self.errors
+                            .lock()
+                            .unwrap()
+                            .report_error(member.get_identifier_token().span.clone(), CompilationErrorType::InvalidLetVariable);
+                    } else if let Some(registry) = self.type_registry.get_type_from_id(type_id)
+                        && let Some(member_id) = registry.get_member_id(member.get_identifier())
+                        && !matches!(registry.id_table.get(member_id), Some(crate::compiler::user_data::UserDataEntry::Field(_)))
+                    {
+                        self.errors.lock().unwrap().report_error(
+                            member.get_identifier_token().span.clone(),
+                            CompilationErrorType::MemberIsReadOnly(member.get_identifier().to_string()),
+                        );
+                    }
+                }
+                return VariableType::None;
+            }
+            let value_type = let_stmt.get_value_expression().visit(self);
+            if target_type != value_type && !matches!(target_type, VariableType::None) {
+                let_stmt.get_value_expression().visit(self);
+            }
+            return VariableType::None;
+        }
         let mut target_type = VariableType::None;
         if self.lookup_constant(let_stmt.get_identifier()).is_some() {
             self.errors.lock().unwrap().report_error(

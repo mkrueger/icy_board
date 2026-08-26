@@ -611,7 +611,7 @@ pub trait AstVisitorMut: Sized {
     }
 
     fn visit_let_statement(&mut self, let_stmt: &LetStatement) -> Statement {
-        Statement::Let(LetStatement::new(
+        let statement = LetStatement::new(
             let_stmt.get_let_token().clone(),
             Spanned {
                 span: let_stmt.get_identifier_token().span.clone(),
@@ -623,7 +623,12 @@ pub trait AstVisitorMut: Sized {
             let_stmt.get_members().clone(),
             let_stmt.get_eq_token().clone(),
             let_stmt.get_value_expression().visit_mut(self),
-        ))
+        );
+        Statement::Let(if let Some(target) = let_stmt.get_target_expression() {
+            statement.with_target_expression(target.visit_mut(self))
+        } else {
+            statement
+        })
     }
 
     fn visit_goto_statement(&mut self, goto: &GotoStatement) -> Statement {

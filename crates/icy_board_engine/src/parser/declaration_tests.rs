@@ -371,10 +371,38 @@ fn test_a_record_field_cannot_name_a_later_record() {
 }
 
 #[test]
-fn test_a_record_field_array_is_rejected_explicitly() {
-    let (_, _, errors) = parse_types("TYPE Rec\n  INTEGER Values(10)\nENDTYPE\n");
+fn test_record_field_arrays_keep_their_dimensions() {
+    let (_, registry, errors) = parse_types("TYPE Rec\n  INTEGER Vector(10)\n  STRING Matrix(2, 3)\n  BOOLEAN Cube(1, 2, 3)\nENDTYPE\n");
+    assert!(errors.lock().unwrap().errors.is_empty());
+    let record = registry.get_user_type(&unicase::Ascii::new("Rec".to_string())).unwrap();
+    assert_eq!(
+        (1, 10, 0, 0),
+        record
+            .field(0)
+            .map(|field| (field.dim, field.vector_size, field.matrix_size, field.cube_size))
+            .unwrap()
+    );
+    assert_eq!(
+        (2, 2, 3, 0),
+        record
+            .field(1)
+            .map(|field| (field.dim, field.vector_size, field.matrix_size, field.cube_size))
+            .unwrap()
+    );
+    assert_eq!(
+        (3, 1, 2, 3),
+        record
+            .field(2)
+            .map(|field| (field.dim, field.vector_size, field.matrix_size, field.cube_size))
+            .unwrap()
+    );
+}
+
+#[test]
+fn test_a_record_field_dimension_must_fit_the_runtime_format() {
+    let (_, _, errors) = parse_types("TYPE Rec\n  INTEGER Values(65536)\nENDTYPE\n");
     let errors: Vec<String> = errors.lock().unwrap().errors.iter().map(|error| error.error.to_string()).collect();
-    assert!(errors.iter().any(|error| error == "Record field 'Values' cannot be an array"), "{errors:?}");
+    assert_eq!(vec!["Record field 'Values' has a dimension above 65535"], errors);
 }
 
 #[test]

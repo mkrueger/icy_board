@@ -1,4 +1,4 @@
-use crate::vm::tests::run_ppl;
+use crate::vm::tests::{compile_errors, run_ppl};
 
 #[test]
 fn test_a_record_field_keeps_what_was_assigned_to_it() {
@@ -34,6 +34,155 @@ TYPE Rec
 ENDTYPE
 Rec r
 PRINT "[", r.a, "][", r.b, "]"
+"#
+        )
+    );
+}
+
+#[test]
+fn test_a_record_field_can_be_a_vector() {
+    assert_eq!(
+        "0 42",
+        run_ppl(
+            r#"
+TYPE Rec
+   INTEGER Values(10)
+ENDTYPE
+Rec r
+PRINT r.Values(3), " "
+r.Values(3) = 42
+PRINT r.Values(3)
+"#
+        )
+    );
+}
+
+#[test]
+fn test_an_indexed_record_field_takes_compound_assignment() {
+    assert_eq!(
+        "43",
+        run_ppl(
+            r#"
+TYPE Rec
+   INTEGER Values(10)
+ENDTYPE
+Rec r
+r.Values(3) = 42
+r.Values(3) += 1
+PRINT r.Values(3)
+"#
+        )
+    );
+}
+
+#[test]
+fn test_a_record_field_can_be_a_matrix_or_cube() {
+    assert_eq!(
+        "23 123",
+        run_ppl(
+            r#"
+TYPE Rec
+   INTEGER Matrix(2, 3)
+   INTEGER Cube(1, 2, 3)
+ENDTYPE
+Rec r
+r.Matrix(2, 3) = 23
+r.Cube(1, 2, 3) = 123
+PRINT r.Matrix(2, 3), " ", r.Cube(1, 2, 3)
+"#
+        )
+    );
+}
+
+#[test]
+fn test_an_array_field_can_hold_records() {
+    assert_eq!(
+        "left/right",
+        run_ppl(
+            r#"
+TYPE Item
+   STRING Name
+ENDTYPE
+TYPE Rec
+   Item Items(1)
+ENDTYPE
+Rec r
+r.Items(0).Name = "left"
+r.Items(1).Name = "right"
+PRINT r.Items(0).Name, "/", r.Items(1).Name
+"#
+        )
+    );
+}
+
+#[test]
+fn test_an_array_field_inside_an_array_field_can_be_written() {
+    assert_eq!(
+        "42",
+        run_ppl(
+            r#"
+TYPE Item
+   INTEGER Values(2)
+ENDTYPE
+TYPE Rec
+   Item Items(1)
+ENDTYPE
+Rec outer
+outer.Items(0).Values(2) = 42
+PRINT outer.Items(0).Values(2)
+"#
+        )
+    );
+}
+
+#[test]
+fn test_nested_array_fields_can_be_written_through_a_record_array_element() {
+    assert_eq!(
+        "Door",
+        run_ppl(
+            r#"
+TYPE Item
+   STRING Name
+ENDTYPE
+TYPE Rec
+   Item Items(1)
+ENDTYPE
+Rec recs(1)
+recs(1).Items(0).Name = "Door"
+PRINT recs(1).Items(0).Name
+"#
+        )
+    );
+}
+
+#[test]
+fn test_record_array_field_sizes_are_fixed() {
+    let statement_errors = compile_errors("TYPE Rec\n  INTEGER Values(1)\nENDTYPE\nRec r\nREDIM r.Values, 2\n");
+    assert_eq!(
+        vec!["Record array field 'Values' has a fixed size and cannot be redimensioned"],
+        statement_errors
+    );
+
+    let member_errors = compile_errors("TYPE Rec\n  INTEGER Values(1)\nENDTYPE\nRec r\nr.Values.Redim(2)\n");
+    assert_eq!(vec!["Record array field 'Values' has a fixed size and cannot be redimensioned"], member_errors);
+}
+
+#[test]
+fn test_record_equality_includes_array_field_contents() {
+    assert_eq!(
+        "1 0 1",
+        run_ppl(
+            r#"
+TYPE Rec
+   INTEGER Values(1)
+ENDTYPE
+Rec first
+Rec second
+PRINT first = second, " "
+second.Values(1) = 7
+PRINT first = second, " "
+first = second
+PRINT first = second
 "#
         )
     );

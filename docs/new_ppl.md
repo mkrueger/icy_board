@@ -145,7 +145,23 @@ Records are nominal values. Fields can contain a previously declared record,
 record variables can be arrays, member chains can be read or assigned, and
 routine parameters and return values retain the exact record type. Equality is
 defined between individual records of the same type; arithmetic and ordering
-are not. Record fields cannot currently be arrays.
+are not. Fields can also be one-, two- or three-dimensional arrays, including
+arrays of a previously declared record:
+
+```PPL
+TYPE BoardMap
+	STRING Labels(10, 20)
+	Point Positions(100)
+ENDTYPE
+
+BoardMap map
+map.Labels(2, 3) = "Lobby"
+map.Positions(4).X = 12
+```
+
+Array fields are part of a record value: assignment copies their contents and
+record equality compares them. Their bounds are fixed by the `TYPE` declaration;
+`REDIM map.Labels, ...` and `map.Labels.Redim(...)` are compile errors.
 
 The PPE must store each record layout, so any use of `TYPE` requires runtime
 4.00. Field and type names are not stored; a decompiler invents names for them.
@@ -1060,7 +1076,8 @@ values.Redim(20)
 Only a declared array has these members. An array's type is its element's, so it
 is the declaration that says it has them; asking a plain value for `.Len()` is a
 compile error. `Redim` is a statement rather than a function, so it stands on a
-line of its own the way `REDIM` does.
+line of its own the way `REDIM` does. Array-valued record fields have the fixed
+bounds stored in their record type and cannot use either spelling of `REDIM`.
 
 ## `CONST` Declaration (3.50)
 

@@ -215,6 +215,14 @@ impl AstVisitor<()> for FormattingVisitor<'_> {
     }
 
     fn visit_let_statement(&mut self, let_stmt: &LetStatement) {
+        if let Some(target) = let_stmt.get_target_expression() {
+            target.visit(self);
+            let eq = &let_stmt.get_eq_token().span;
+            self.ensure_space_before(eq.start);
+            self.ensure_text_or_newline(eq.end..let_stmt.get_value_expression().get_span().start, " ");
+            let_stmt.get_value_expression().visit(self);
+            return;
+        }
         // `p . X = 1` names its members with tokens rather than an expression.
         let mut left = let_stmt.get_identifier_token().span.end;
         if let Some(rpar) = let_stmt.get_rpar_token() {
