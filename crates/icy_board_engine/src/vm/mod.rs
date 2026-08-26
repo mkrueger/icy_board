@@ -245,6 +245,48 @@ pub struct VirtualMachine<'a> {
     pub dbase: dbase::DbaseState,
 }
 
+impl<'a> VirtualMachine<'a> {
+    /// A machine with no program in it, which `run` fills in from an executable and a
+    /// caller that only wants one function can use as it is.
+    pub fn new(file_name: PathBuf, type_registry: &'a UserTypeRegistry, io: &'a mut dyn PCBoardIO, icy_board_state: &'a mut IcyBoardState) -> Self {
+        Self {
+            file_name,
+            type_registry,
+            return_addresses: Vec::new(),
+            script: PPEScript::default(),
+            io,
+            is_running: true,
+            aborted: false,
+            fpclear: false,
+            icy_board_state,
+            pcb_node: None,
+            variable_table: VariableTable::default(),
+            cur_ptr: 0,
+            label_table: HashMap::new(),
+            call_local_value_stack: Vec::new(),
+            write_back_stack: Vec::new(),
+            user_types: Vec::new(),
+            push_pop_stack: Vec::new(),
+            stored_screen: None,
+            fd_default_in: 0,
+            fd_default_out: 0,
+            file_list: VecDeque::new(),
+            user: User::default(),
+            use_lmrs: true,
+            cached_msg_header: None,
+            abort_on_stack_error: true,
+            board_value: None,
+            message_base: None,
+            last_error: PplError::default(),
+            error_pending: false,
+            error_handler: ErrorHandler::Off,
+            in_handler: false,
+            handler_depth: None,
+            dbase: dbase::DbaseState::default(),
+        }
+    }
+}
+
 impl VirtualMachine<'_> {
     fn set_user_variables(&mut self) -> Res<()> {
         if !self.variable_table.has_user_vars() {
@@ -1319,41 +1361,12 @@ pub async fn run<P: AsRef<Path>>(file_name: &P, prg: &Executable, io: &mut dyn P
             let reg: UserTypeRegistry = UserTypeRegistry::icy_board_registry();
             log::info!("Run PPE {}", file_name.display());
 
-            let mut vm = VirtualMachine {
-                file_name,
-                type_registry: &reg,
-                return_addresses: Vec::new(),
-                script,
-                io,
-                is_running: true,
-                aborted: false,
-                fpclear: false,
-                icy_board_state,
-                pcb_node: None,
-                variable_table: prg.variable_table.clone(),
-                cur_ptr: 0,
-                label_table,
-                call_local_value_stack: Vec::new(),
-                write_back_stack: Vec::new(),
-                user_types: prg.user_types.clone(),
-                push_pop_stack: Vec::new(),
-                stored_screen: None,
-                fd_default_in: 0,
-                fd_default_out: 0,
-                file_list: VecDeque::new(),
-                user,
-                use_lmrs: true,
-                cached_msg_header: None,
-                abort_on_stack_error: true,
-                board_value: None,
-                message_base: None,
-                last_error: PplError::default(),
-                error_pending: false,
-                error_handler: ErrorHandler::Off,
-                in_handler: false,
-                handler_depth: None,
-                dbase: dbase::DbaseState::default(),
-            };
+            let mut vm = VirtualMachine::new(file_name, &reg, io, icy_board_state);
+            vm.script = script;
+            vm.variable_table = prg.variable_table.clone();
+            vm.label_table = label_table;
+            vm.user_types = prg.user_types.clone();
+            vm.user = user;
 
             vm.run().await?;
             Ok(!vm.aborted)

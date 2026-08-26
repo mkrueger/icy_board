@@ -1,10 +1,7 @@
-use std::{
-    collections::{HashMap, VecDeque},
-    sync::Arc,
-};
+use std::sync::Arc;
 
 use icy_board_engine::{
-    executable::{PPEExpr, PPEScript, TableEntry, VariableTable, VariableValue},
+    executable::{PPEExpr, TableEntry, VariableValue},
     icy_board::{bbs::BBS, commands::CommandList, state::IcyBoardState, user_base::User, xfer_protocols::SupportedProtocols},
     parser::UserTypeRegistry,
     vm::{DiskIO, VirtualMachine},
@@ -40,40 +37,7 @@ async fn test_fmtreal(value: f64, field_width: i32, decimal_places: i32) -> Stri
     let type_registry = UserTypeRegistry::icy_board_registry();
     let mut io = DiskIO::new(".", None);
 
-    let mut vm = VirtualMachine {
-        file_name: "<test>".into(),
-        type_registry: &type_registry,
-        return_addresses: Vec::new(),
-        script: PPEScript::default(),
-        io: &mut io,
-        is_running: true,
-        aborted: false,
-        fpclear: false,
-        icy_board_state: &mut state,
-        pcb_node: None,
-        variable_table: VariableTable::default(),
-        cur_ptr: 0,
-        label_table: HashMap::new(),
-        call_local_value_stack: Vec::new(),
-        write_back_stack: Vec::new(),
-        user_types: Vec::new(),
-        push_pop_stack: Vec::new(),
-        stored_screen: None,
-        fd_default_in: 0,
-        fd_default_out: 0,
-        file_list: VecDeque::new(),
-        user: User::default(),
-        use_lmrs: true,
-        cached_msg_header: None,
-        abort_on_stack_error: true,
-        board_value: None,
-        last_error: Default::default(),
-        error_pending: false,
-        error_handler: Default::default(),
-        in_handler: false,
-        handler_depth: None,
-        dbase: Default::default(),
-    };
+    let mut vm = VirtualMachine::new("<test>".into(), &type_registry, &mut io, &mut state);
 
     vm.variable_table.push(TableEntry {
         name: "real_value".to_string(),
