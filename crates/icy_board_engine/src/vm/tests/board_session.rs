@@ -151,7 +151,7 @@ fn board_objects_know_their_own_number() {
         "#,
         |board| {
             seed_board(board);
-            board.conferences[1].areas = Some(crate::icy_board::message_area::AreaList::new(vec![
+            board.conferences[1].areas = Some(std::sync::Arc::new(crate::icy_board::message_area::AreaList::new(vec![
                 crate::icy_board::message_area::MessageArea {
                     name: "First".to_string(),
                     ..Default::default()
@@ -160,7 +160,7 @@ fn board_objects_know_their_own_number() {
                     name: "Second".to_string(),
                     ..Default::default()
                 },
-            ]));
+            ])));
         },
     );
 

@@ -189,13 +189,13 @@ fn test_a_door_password_can_be_compared_but_not_printed() {
         |board| {
             board.conferences.clear();
             board.conferences.push(crate::icy_board::conferences::Conference {
-                doors: Some(crate::icy_board::doors::DoorList {
+                doors: Some(std::sync::Arc::new(crate::icy_board::doors::DoorList {
                     doors: vec![crate::icy_board::doors::Door {
                         password: "secret".to_string(),
                         ..Default::default()
                     }],
                     ..Default::default()
-                }),
+                })),
                 ..Default::default()
             });
         },
@@ -223,13 +223,13 @@ fn test_reading_a_door_password_stays_cheap() {
         |board| {
             board.conferences.clear();
             board.conferences.push(crate::icy_board::conferences::Conference {
-                doors: Some(crate::icy_board::doors::DoorList {
+                doors: Some(std::sync::Arc::new(crate::icy_board::doors::DoorList {
                     doors: vec![crate::icy_board::doors::Door {
                         password: "secret".to_string(),
                         ..Default::default()
                     }],
                     ..Default::default()
-                }),
+                })),
                 ..Default::default()
             });
         },
@@ -251,14 +251,14 @@ fn test_conference_properties_report_configuration_and_counts() {
             board.conferences.clear();
             board.conferences.push(crate::icy_board::conferences::Conference {
                 is_public: false,
-                areas: Some(crate::icy_board::message_area::AreaList::new(vec![
+                areas: Some(std::sync::Arc::new(crate::icy_board::message_area::AreaList::new(vec![
                     crate::icy_board::message_area::MessageArea::default(),
                     crate::icy_board::message_area::MessageArea::default(),
-                ])),
-                doors: Some(crate::icy_board::doors::DoorList {
+                ]))),
+                doors: Some(std::sync::Arc::new(crate::icy_board::doors::DoorList {
                     doors: vec![crate::icy_board::doors::Door::default(), crate::icy_board::doors::Door::default()],
                     ..Default::default()
-                }),
+                })),
                 ..Default::default()
             });
         },
@@ -311,12 +311,12 @@ fn test_a_loop_can_keep_asking_for_objects() {
             board.conferences.clear();
             board.conferences.push(crate::icy_board::conferences::Conference {
                 name: "Main".to_string(),
-                areas: Some(crate::icy_board::message_area::AreaList::new(vec![
+                areas: Some(std::sync::Arc::new(crate::icy_board::message_area::AreaList::new(vec![
                     crate::icy_board::message_area::MessageArea {
                         name: "General".to_string(),
                         ..Default::default()
                     },
-                ])),
+                ]))),
                 ..Default::default()
             });
         },

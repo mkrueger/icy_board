@@ -89,7 +89,7 @@ pub fn setup_conference(board: &mut IcyBoard) {
         name: "Main Board".to_string(),
         bulletins: Some(bulletins.clone()),
         blt_menu: fixture("main/blt_menu"),
-        areas: Some(test_message_areas()),
+        areas: Some(std::sync::Arc::new(test_message_areas())),
         ..Default::default()
     });
 
@@ -97,7 +97,7 @@ pub fn setup_conference(board: &mut IcyBoard) {
         name: "TESTCONF".to_string(),
         bulletins: Some(bulletins),
         blt_menu: fixture("main/blt_menu"),
-        areas: Some(test_message_areas()),
+        areas: Some(std::sync::Arc::new(test_message_areas())),
         ..Default::default()
     });
 }
@@ -155,14 +155,14 @@ pub fn setup_conference_with_a_long_message(board: &mut IcyBoard) {
 pub fn setup_conference_with_two_areas(board: &mut IcyBoard) {
     setup_conference_with_messages(board);
 
-    let mut areas = board.conferences[1].areas.clone().unwrap_or_default();
+    let mut areas = board.conferences[1].areas.as_deref().cloned().unwrap_or_default();
     let dir = areas[0].path.parent().unwrap().to_path_buf();
     areas.push(MessageArea {
         name: "Second".to_string(),
         path: dir.join("second"),
         ..Default::default()
     });
-    board.conferences[1].areas = Some(areas);
+    board.conferences[1].areas = Some(std::sync::Arc::new(areas));
 }
 
 /// A scratch directory, unique per call, for whatever a test writes.
@@ -276,7 +276,7 @@ fn test_session_output<P: Fn(&mut IcyBoard)>(cmd: String, init_fn: P, login_syso
 
         for conference in icy_board.conferences.iter_mut() {
             if conference.areas.is_none() {
-                conference.areas = Some(test_message_areas());
+                conference.areas = Some(std::sync::Arc::new(test_message_areas()));
             }
         }
 

@@ -105,12 +105,12 @@ PRINT conf.GetArea(0).Name
             board.conferences.clear();
             board.conferences.push(crate::icy_board::conferences::Conference {
                 name: "Main".to_string(),
-                areas: Some(crate::icy_board::message_area::AreaList::new(vec![
+                areas: Some(std::sync::Arc::new(crate::icy_board::message_area::AreaList::new(vec![
                     crate::icy_board::message_area::MessageArea {
                         name: "General".to_string(),
                         ..Default::default()
                     },
-                ])),
+                ]))),
                 ..Default::default()
             });
         },

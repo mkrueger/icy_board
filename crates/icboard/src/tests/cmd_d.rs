@@ -12,7 +12,7 @@ use crate::tests::{test_dir, test_output};
 fn setup_empty_file_base(board: &mut IcyBoard) {
     board.conferences.push(Conference {
         name: "Main Board".to_string(),
-        directories: Some(DirectoryList::default()),
+        directories: Some(std::sync::Arc::new(DirectoryList::default())),
         ..Default::default()
     });
 }
@@ -53,7 +53,7 @@ fn a_filename_uppercased_by_the_prompt_flags_a_lowercase_file_on_disk() {
         });
         board.conferences.push(Conference {
             name: "Main Board".to_string(),
-            directories: Some(directories),
+            directories: Some(std::sync::Arc::new(directories)),
             ..Default::default()
         });
     });
@@ -94,7 +94,7 @@ fn an_offline_duplicate_does_not_report_missing_when_another_copy_is_on_disk() {
         }
         board.conferences.push(Conference {
             name: "Main Board".to_string(),
-            directories: Some(directories),
+            directories: Some(std::sync::Arc::new(directories)),
             ..Default::default()
         });
     });

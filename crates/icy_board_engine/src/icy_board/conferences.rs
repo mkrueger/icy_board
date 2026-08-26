@@ -1,6 +1,7 @@
 use std::{
     ops::{Deref, DerefMut},
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 use async_trait::async_trait;
@@ -219,14 +220,16 @@ pub struct Conference {
     #[serde(skip)]
     pub commands: Vec<Command>,
 
+    // Shared rather than owned: a conference is handed to a PPE by value, and copying
+    // every area and directory along with it made that cost the size of the lists.
     #[serde(skip)]
-    pub areas: Option<AreaList>,
+    pub areas: Option<Arc<AreaList>>,
 
     #[serde(skip)]
-    pub directories: Option<DirectoryList>,
+    pub directories: Option<Arc<DirectoryList>>,
 
     #[serde(skip)]
-    pub doors: Option<DoorList>,
+    pub doors: Option<Arc<DoorList>>,
 
     #[serde(skip)]
     pub bulletins: Option<BullettinList>,

@@ -253,7 +253,7 @@ fn run_ppl_collecting<P: Fn(&mut IcyBoard)>(
         init_fn(&mut board);
         for conference in board.conferences.iter_mut() {
             if conference.areas.is_none() {
-                conference.areas = Some(scratch_message_area());
+                conference.areas = Some(std::sync::Arc::new(scratch_message_area()));
             }
         }
 
@@ -342,11 +342,11 @@ pub fn run_ppl_with_messages(source: &str, messages: &[(&str, &str, &str)]) -> S
     run_ppl_on(source, |board| {
         board.conferences.push(crate::icy_board::conferences::Conference {
             name: "Main Board".to_string(),
-            areas: Some(AreaList::new(vec![MessageArea {
+            areas: Some(std::sync::Arc::new(AreaList::new(vec![MessageArea {
                 name: "General".to_string(),
                 path: path.clone(),
                 ..Default::default()
-            }])),
+            }]))),
             ..Default::default()
         });
         // A second, empty conference, so a snippet has somewhere to move a message to.

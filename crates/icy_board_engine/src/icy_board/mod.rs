@@ -237,12 +237,12 @@ impl IcyBoard {
             c.private_upload_location = get_path(&self.root_path, &c.private_upload_location);
 
             if let Some(areas) = &mut c.areas {
-                for area in areas.iter_mut() {
+                for area in std::sync::Arc::make_mut(areas).iter_mut() {
                     area.path = get_path(&self.root_path, &area.path);
                 }
             }
             if let Some(directories) = &mut c.directories {
-                for dir in directories.iter_mut() {
+                for dir in std::sync::Arc::make_mut(directories).iter_mut() {
                     dir.path = get_path(&self.root_path, &dir.path);
                     dir.metadata_path = get_path(&self.root_path, &dir.metadata_path);
                 }
@@ -459,7 +459,7 @@ impl IcyBoard {
                                 area.path = board.root_path.join(&area.path);
                             }
                         }
-                        conf.areas = Some(areas);
+                        conf.areas = Some(std::sync::Arc::new(areas));
                     }
                     Err(err) => {
                         log::error!("Error loading message areas {}: {}", area_file.display(), err);
@@ -475,7 +475,7 @@ impl IcyBoard {
             if dir_file.is_file() {
                 match DirectoryList::load(&dir_file) {
                     Ok(directories) => {
-                        conf.directories = Some(directories);
+                        conf.directories = Some(std::sync::Arc::new(directories));
                     }
                     Err(err) => {
                         log::error!("Error loading file areas {}: {}", dir_file.display(), err);
@@ -491,7 +491,7 @@ impl IcyBoard {
             if doors_file.is_file() {
                 match DoorList::load(&doors_file) {
                     Ok(doors) => {
-                        conf.doors = Some(doors);
+                        conf.doors = Some(std::sync::Arc::new(doors));
                     }
                     Err(err) => {
                         log::error!("loading door files {}: {}", doors_file.display(), err);

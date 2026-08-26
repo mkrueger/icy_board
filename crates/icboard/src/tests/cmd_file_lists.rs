@@ -37,7 +37,7 @@ fn setup_area(board: &mut IcyBoard, dir: &Path, metadata_path: &Path) {
     });
     board.conferences.push(Conference {
         name: "Main Board".to_string(),
-        directories: Some(directories),
+        directories: Some(std::sync::Arc::new(directories)),
         ..Default::default()
     });
 }

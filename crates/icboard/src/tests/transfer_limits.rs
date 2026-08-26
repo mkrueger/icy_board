@@ -33,7 +33,7 @@ fn setup(board: &mut IcyBoard, level: SecurityLevel, free_area: bool) {
     });
     board.conferences.push(Conference {
         name: "Main Board".to_string(),
-        directories: Some(directories),
+        directories: Some(std::sync::Arc::new(directories)),
         ..Default::default()
     });
 

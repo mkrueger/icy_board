@@ -323,7 +323,7 @@ fn register_new_areas(board: &mut IcyBoard, report: &TossReport) -> Res<()> {
     let Some(conference) = board.conferences.get_mut(number) else {
         return Err(format!("Conference {}, which new areas are added to, does not exist", number).into());
     };
-    let areas = conference.areas.get_or_insert_with(Default::default);
+    let areas = std::sync::Arc::make_mut(conference.areas.get_or_insert_with(Default::default));
     for (tag, path) in &report.added {
         println!("  {} is new, added to {}", tag, conference.name);
         areas.push(MessageArea {

@@ -21,7 +21,7 @@ fn seed(board: &mut crate::icy_board::IcyBoard) {
     board.conferences.clear();
     board.conferences.push(Conference {
         name: "Main Board".to_string(),
-        areas: Some(AreaList::new(areas)),
+        areas: Some(std::sync::Arc::new(AreaList::new(areas))),
         ..Default::default()
     });
 }
