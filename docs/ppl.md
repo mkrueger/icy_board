@@ -361,14 +361,14 @@ use: objects that describe the board itself. The point is that a PPE no longer
 has to parse the board's config files to find out what is on it.
 
 ```PPL
-CONFERENCE conf = CONFINFO(CURCONF())
+CONFERENCE conf = Session.Conference
 
 IF conf.HasAccess() PRINTLN conf.Name
 ```
 
-`ConfInfo(conf)` returns a read-only `CONFERENCE` snapshot. An invalid conference
-number returns an empty conference rather than failing, so its properties can
-still be read.
+`Session.Conference` is the one the caller is in and `Board.Conferences[index]`
+is any of them. An index no conference has returns an empty conference rather
+than failing, so its properties can still be read.
 
 **`CONFERENCE`**
 
@@ -463,12 +463,10 @@ These objects are read-only snapshots, so assigning to a member — `conf.Name =
 #### Overloaded built-ins
 
 A built-in can now have more than one signature, chosen by argument count.
-`CONFINFO` is the example: the original two-argument form returns a single field
-whose type depends on which field was asked for, while the new one-argument form
-returns a `CONFERENCE`. Old code keeps working unchanged.
-
-`LEN` is overloaded the same way — `Len(array, dim)` returns the length of one
-dimension.
+`LEN` is the example: `Len(str)` is the length of a string, as it always was,
+while `Len(array, dim)` is the length of one dimension of an array. `RGB` is the
+other one - `Rgb(r, g, b)` and `Rgb(r, g, b, a)`. Old code keeps working
+unchanged, because a call that named the old form still names it.
 
 #### New types
 
@@ -492,11 +490,13 @@ searches on. See [new_ppl.md](new_ppl.md#messages-400).
 
 | | Kind | Signature | Description |
 | :--- | :--- | :--- | :--- |
-| `ConfInfo` | Function | `ConfInfo(conf) : CONFERENCE` | Snapshot of a conference |
 | `AreaId` | Function | `AreaId(conf, area) : MSGAREAID` | Addresses a message area in any conference |
 | `Len` | Function | `Len(array, dim) : INTEGER` | Length of one array dimension |
+| `Rgb` | Function | `Rgb(r, g, b [, a]) : INTEGER` | Packs a colour as `0xRRGGBBAA` |
 | `WebRequest` | Function | `WebRequest(url) : STRING` | Fetches a URL and returns the body |
 | `WEBREQUEST` | Statement | `WEBREQUEST url, file` | Fetches a URL and saves it to a file |
+| `BASE64ENC`, `BASE64DEC` | Function | `BASE64ENC(value) : STRING` | Base64 of a string's UTF-8 bytes, and back |
+| `SHA256` | Function | `SHA256(value) : STRING` | Lowercase hex SHA-256 of a string's UTF-8 bytes |
 
 `AreaId()` is how message functions reach a message area outside the current
 conference without breaking any of the old calls. `WebRequest` in both forms logs

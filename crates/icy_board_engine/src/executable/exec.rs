@@ -72,7 +72,7 @@ pub struct Executable {
     pub runtime: u16,
     pub variable_table: VariableTable,
     /// Field types of the records the program declared, indexed by type id minus
-    /// `FIRST_USER_TYPE_ID`. Only written for runtime 401 and above.
+    /// `FIRST_USER_TYPE_ID`. Only written for runtime 400 and above.
     pub user_types: Vec<Vec<VariableType>>,
     pub script_buffer: Vec<i16>,
 }

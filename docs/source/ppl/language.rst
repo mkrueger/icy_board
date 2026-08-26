@@ -25,8 +25,8 @@ load are two different wishes.
     "Runtime", "``--runtime``", "``[package] runtime``", "", "The PPE format written to disk"
     "Language", "``--lang-version``", "``[compiler] language_version``", "``PPL_LANG_VERSION``", "Which syntax and built-ins are accepted"
 
-The runtime defaults to 401, the newest format. The language defaults to the
-runtime version up to 400, so the default pair is runtime 401 and language 400.
+The runtime defaults to 400, the newest format. The language defaults to the
+runtime version up to 400, so the default pair is runtime 400 and language 400.
 A format-only runtime bump therefore does not invent a new language version. The
 source's ``;$LANGVERSION`` wins over the command line, the command line wins over
 ``ppl.toml``, and the manifest wins over ``PPL_LANG_VERSION``. The environment
@@ -187,7 +187,7 @@ another routine. Outside such an argument position a bare routine name is still
 an error.
 
 .. note::
-   Routine references need runtime 401, because 4.01 adds the bytecode marker
+   Routine references need runtime 400, because 4.00 adds the bytecode marker
    that tells a routine value from a call to that routine.
 
 CONST
@@ -267,7 +267,7 @@ Language version 4.00
 ---------------------
 
 400 is where the language stops being bound by what PCBoard 15.4 could express.
-A PPE built at runtime 400 or 401 will not load on an original PCBoard.
+A PPE built at runtime 400 will not load on an original PCBoard.
 
 Parentheses, brackets and braces
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -486,11 +486,10 @@ Overloaded built-ins
 ~~~~~~~~~~~~~~~~~~~~
 
 A built-in can now have more than one signature, chosen by argument count.
-``ConfInfo`` is the example: the original two-argument form returns a single
-field whose type depends on which field was asked for, while the new one-argument
-form returns a ``CONFERENCE``. Old code keeps working unchanged. ``Len`` is
-overloaded the same way - ``Len(array, dim)`` returns the length of one
-dimension.
+``Len`` is the example: ``Len(str)`` is the length of a string, as it always was,
+while ``Len(array, dim)`` is the length of one dimension of an array. ``Rgb`` is
+the other one - ``Rgb(r, g, b)`` and ``Rgb(r, g, b, a)``. Old code keeps working
+unchanged, because a call that named the old form still names it.
 
 Records
 ~~~~~~~
@@ -563,7 +562,7 @@ Unknown and duplicate fields are errors. A field holding another record requires
 the exact nominal type.
 
 .. note::
-   Records need runtime 401, which is the first format with a type table. Record
+   Records need runtime 400, which is the first format with a type table. Record
    literals need it too; the PPE stores type and field ids rather than their
    source names.
 
@@ -644,7 +643,7 @@ back at the column its ``BEGIN`` starts on.
 What 4.00 breaks
 ~~~~~~~~~~~~~~~~
 
-* Runtime 400 and 401 PPEs do not load on an original PCBoard.
+* Runtime 400 PPEs do not load on an original PCBoard.
 * ``[`` and ``]`` are index operators.
 * ``BEGIN`` is a keyword, so a 3.50 source may still have a variable called
   ``begin`` while a 4.00 source may not.

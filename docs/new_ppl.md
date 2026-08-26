@@ -832,10 +832,10 @@ stay read-only; writing one is a compile error. Nobody logged in reads as an
 empty user rather than failing, so a member is always safe to read.
 
 `EditorMode` is one `EDITORMODE` value — `Yes`, `No` or `Ask` — rather than the
-two overlapping flags `PCBoard` kept. `Notes.Set()` takes an index from 0 to 4 and
-answers whether the note existed. `SetPassword()` hashes the text the way the
-board is configured to, so the plain text is never stored; an empty password is
-refused. Both answer `FALSE` rather than failing.
+two overlapping flags `PCBoard` kept. A note is written through its index,
+`Session.User.Notes[0] = "..."`, for an index from 0 to 4. `SetPassword()` hashes
+the text the way the board is configured to, so the plain text is never stored;
+an empty password is refused and it answers `FALSE` rather than failing.
 
 ### Notes and contacts
 

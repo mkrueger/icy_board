@@ -104,5 +104,5 @@ name that was never defined is an error:
 Would print::
 
     Version:0.1.0
-    Runtime:401
+    Runtime:400
     Language:400

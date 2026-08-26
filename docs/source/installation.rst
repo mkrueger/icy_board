@@ -164,7 +164,7 @@ Program            Purpose
 ``icbmailer``       FTN mail scanning, polling and tossing
 ``pplc``            PPL compiler, package builder and formatter
 ``ppld``            PPE decompiler and compatibility checker
-``ppl-lsp``    PPL language server for editors
+``ppl-lsp``         PPL language server for editors
 =================  ============================================================
 
 PPL editor support

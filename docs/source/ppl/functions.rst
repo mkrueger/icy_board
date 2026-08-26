@@ -599,7 +599,8 @@ CONFINFO (3.20)
        IF (CONFINFO(100,50) = 5) PRINTLN "Conference 100 is FIDO type"
 
   **See Also**
-    * CONFINFO (object form – future user data variant)
+    * :PPL:`CONFINFO()` (Delete Queue Record form)
+    * ``Session.Conference`` and ``Board.Conferences`` - the 4.00 board objects
 
 CONFINFO (Delete Queue Record) (3.20)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -1,4 +1,4 @@
-//! Runtime 4.02 shipped only the object API; the earlier flat draft is not source syntax.
+//! Runtime 4.00 shipped only the object API; the earlier flat draft is not source syntax.
 
 use super::compile_errors;
 

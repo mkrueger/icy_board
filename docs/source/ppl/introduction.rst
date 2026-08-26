@@ -34,14 +34,13 @@ A PPE has a *runtime* version, which is the format written to disk:
 * **300** - PCBoard 15.2
 * **310**, **320**, **330** - PCBoard point releases
 * **340** - PCBoard 15.4, the last one an original board can load
-* **400** - IcyBoard's own format
-* **401** - IcyBoard, with the type table records need (default)
+* **400** - IcyBoard's own format, carrying the type table records need (default)
 
 The *language* version says which syntax and which built-ins the compiler
 accepts, and is set on its own: 100 through 340 as PCBoard had them, 350 for the
 quality of life additions, constants and enums, and 400 for records and the board
 objects. It defaults to the runtime version up to 400, so the default pair is
-runtime 401 and language 400. See :doc:`language` for what each version added.
+runtime 400 and language 400. See :doc:`language` for what each version added.
 
 Command Line Usage
 ~~~~~~~~~~~~~~~~~~
@@ -60,7 +59,7 @@ directory.
 **Options**
   * ``-d, --disassemble`` - Output disassembly instead of compiling to PPE
   * ``--nowarnings`` - Suppress warning messages (errors still shown)
-  * ``--runtime <ver>`` - PPE format to write (100, 200, 300, 310, 320, 330, 340, 400, 401)
+  * ``--runtime <ver>`` - PPE format to write (100, 200, 300, 310, 320, 330, 340, 400)
   * ``--lang-version <ver>`` - Language version (100 - 400, defaults to the runtime up to 400)
   * ``--cp437`` - Force CP437 encoding for DOS source files
   * ``--init <dir>`` - Create a new PPL package
@@ -187,7 +186,7 @@ The configuration file consists of three main sections: ``[package]``, ``[compil
     [package]
     name = "my_ppe_project"
     version = "1.0.0"
-    runtime = 401                    # Target PPE runtime version (optional)
+    runtime = 400                    # Target PPE runtime version (optional)
     authors = ["Your Name"]          # List of authors (optional)
 
     [compiler]
@@ -220,8 +219,7 @@ The configuration file consists of three main sections: ``[package]``, ``[compil
     * ``320`` - PCBoard 15.22
     * ``330`` - PCBoard 15.3
     * ``340`` - PCBoard 15.4
-    * ``400`` - IcyBoard
-    * ``401`` - IcyBoard with a type table (default)
+    * ``400`` - IcyBoard, with a type table (default)
 
   * ``authors`` (array of strings, optional) - List of project authors
 
@@ -255,7 +253,7 @@ Compiled files are placed in version-specific directories under ``target/``:
 * ``target/pcboard_15.22/`` - For runtime version 320
 * ``target/pcboard_15.30/`` - For runtime version 330
 * ``target/pcboard_15.40/`` - For runtime version 340
-* ``target/icboard/`` - For runtime version 400 and 401 (IcyBoard)
+* ``target/icboard/`` - For runtime version 400 (IcyBoard)
 
 PPL Decompiler
 --------------

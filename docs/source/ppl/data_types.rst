@@ -211,7 +211,7 @@ Board objects
 what the board is configured with. They are declared like any other type and read
 with the ``.`` operator::
 
-    CONFERENCE conf = ConfInfo(CurConf())
+    CONFERENCE conf = Session.Conference
     IF conf.HasAccess() PRINTLN conf.Name
 
 See :doc:`language` for what each of them answers.
