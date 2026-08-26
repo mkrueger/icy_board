@@ -1534,6 +1534,7 @@ pub async fn message(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     } else {
         vm.icy_board_state.send_message(-1, 0, message, IceText::SavingMessage).await?;
     }
+    vm.invalidate_message_base();
     Ok(())
 }
 
@@ -2879,7 +2880,7 @@ pub async fn killmsg(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
         }
         Err(err) => log::error!("KILLMSG can't open message base {conference}:{area}: {err}"),
     }
-    vm.cached_msg_header = None;
+    vm.invalidate_message_base();
     Ok(())
 }
 
@@ -3043,7 +3044,7 @@ pub async fn move_msg(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
     if moving {
         let _ = source.delete_message(number);
     }
-    vm.cached_msg_header = None;
+    vm.invalidate_message_base();
     Ok(())
 }
 

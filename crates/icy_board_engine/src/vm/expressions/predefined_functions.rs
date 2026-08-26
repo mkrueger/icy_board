@@ -2631,7 +2631,7 @@ fn get_field(field_num: i32, header: &JamMessageHeader) -> Res<VariableValue> {
 }
 
 pub async fn setmsghdr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    vm.cached_msg_header = None;
+    vm.invalidate_message_base();
     let (conf_num, area_num) = vm.eval_expr(&args[0]).await?.as_msg_id();
     let msg_num = vm.eval_expr(&args[1]).await?.as_int() as u32;
     let field_num = vm.eval_expr(&args[2]).await?.as_int();

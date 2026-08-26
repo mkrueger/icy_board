@@ -34,6 +34,15 @@ releases.
 
 ### Changed
 
+- An area is read through one open message base instead of opening it again for
+  every message. The documented walk over 2000 messages went from 16 ms to 7 ms,
+  and from 26 ms to 13 ms when it reads the bodies too - `FOR n = area.LowMsg()
+  TO area.HighMsg()` re-evaluates the bound on every step, so the bound alone was
+  opening the base 2000 times. The modern walk is now faster than the `GETMSGHDR`
+  loop it replaces rather than slower. A message written after the base was
+  opened is still found, and `LOMSGNUM()`/`HIMSGNUM()` still open it on every
+  call for a PPE that watches what another node writes.
+
 - Message lookup now distinguishes absence from failure. A number outside the
   base, a deleted message or an empty slot still answers with an invalid `MSG`
   and leaves `Error.Last().OK` true. `AREA.Read`, `Find`, `LowMsg`, `HighMsg`

@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use jamjam::jam::{JamMessageBase, attributes as jam_attributes, msg_header::JamMessageHeader};
+use jamjam::jam::{attributes as jam_attributes, msg_header::JamMessageHeader};
 
 use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue, user_data_value},
@@ -191,31 +191,18 @@ impl UserDataValue for PplMessage {
                 vm.operation_succeeded();
                 return Ok(VariableValue::new_string(String::new()));
             }
-            let base = match JamMessageBase::open(&self.path) {
-                Ok(base) => base,
-                Err(error) => {
-                    vm.set_error(message_error("can't open message base", &self.path, &error));
-                    return Ok(VariableValue::new_string(String::new()));
-                }
-            };
-            let header = match base.read_header(self.number) {
-                Ok(header) => header,
-                Err(error) if message_is_missing(&error) => {
+            let text = vm.with_message_base(&self.path, |base| match base.read_header(self.number) {
+                Ok(header) => base.read_message_text(&header).map(|text| Some(text.to_string())),
+                Err(error) if message_is_missing(&error) => Ok(None),
+                Err(error) => Err(error),
+            });
+            return Ok(match text {
+                Ok(text) => {
                     vm.operation_succeeded();
-                    return Ok(VariableValue::new_string(String::new()));
+                    VariableValue::new_string(text.unwrap_or_default())
                 }
                 Err(error) => {
                     vm.set_error(message_error(&format!("can't read message {} from", self.number), &self.path, &error));
-                    return Ok(VariableValue::new_string(String::new()));
-                }
-            };
-            return Ok(match base.read_message_text(&header) {
-                Ok(text) => {
-                    vm.operation_succeeded();
-                    VariableValue::new_string(text.to_string())
-                }
-                Err(error) => {
-                    vm.set_error(message_error(&format!("can't read message {} text from", self.number), &self.path, &error));
                     VariableValue::new_string(String::new())
                 }
             });

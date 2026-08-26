@@ -76,6 +76,30 @@ fn a_missing_message_clears_an_older_operation_error() {
     assert_eq!(output, "0\n0 1\n");
 }
 
+/// The area is read through one open message base, so a message written past it -
+/// by this PPE here, by another node in practice - still has to show up.
+#[test]
+fn a_message_written_after_the_base_was_opened_is_still_found() {
+    let output = run_ppl_with_messages(
+        r#"
+        AREA area = Board.Conferences[0].Areas[0]
+        PrintLn area.HighMsg(), " ", area.Read(4).Valid
+
+        FCREATE 1, "body.txt", O_WR, S_DN
+        FPUTLN 1, "the body"
+        FCLOSE 1
+        MESSAGE 0, "SOMEONE", "ME", "Written later", "N", 0, FALSE, FALSE, "body.txt"
+
+        PrintLn area.HighMsg(), " ", area.Read(4).Subject
+        "#,
+        MESSAGES,
+    );
+
+    // `MESSAGE` prints a notice of its own between the two lines.
+    assert!(output.starts_with("3 0\n"), "{output:?}");
+    assert!(output.ends_with("4 Written later\n"), "{output:?}");
+}
+
 fn run_on_message_base(source: &str, path: PathBuf) -> String {
     run_ppl_on(source, |board| {
         board.conferences.push(Conference {

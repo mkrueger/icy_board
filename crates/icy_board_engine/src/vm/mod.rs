@@ -24,6 +24,7 @@ use crate::parser::UserTypeRegistry;
 use crate::vm::expressions::to_base_36;
 use async_recursion::async_recursion;
 use icy_engine::TextBuffer;
+use jamjam::jam::JamMessageBase;
 use jamjam::jam::msg_header::JamMessageHeader;
 use std::collections::HashMap;
 use std::collections::VecDeque;
@@ -236,6 +237,10 @@ pub struct VirtualMachine<'a> {
     /// `Board` is a snapshot of what the board is configured to be, so it is taken once
     /// rather than on every access - building it copies every conference.
     pub board_value: Option<VariableValue>,
+
+    /// The message base the `AREA`/`MSG` calls read through. Opening one is what such a
+    /// call costs, so a walk keeps it rather than paying for it once per message.
+    message_base: Option<(PathBuf, JamMessageBase)>,
 
     pub dbase: dbase::DbaseState,
 }
@@ -1244,6 +1249,26 @@ impl VirtualMachine<'_> {
         Some(conf.areas.as_ref()?.get(area as usize)?.path.clone())
     }
 
+    /// Runs `read` against the open message base for `path`, opening it when the last
+    /// call was for another area. The handle is what a walk saves: reading a message
+    /// costs a seek rather than opening the base again.
+    pub fn with_message_base<R>(&mut self, path: &Path, read: impl FnOnce(&mut JamMessageBase) -> jamjam::Result<R>) -> jamjam::Result<R> {
+        if self.message_base.as_ref().is_none_or(|(cached, _)| cached != path) {
+            self.message_base = Some((path.to_path_buf(), JamMessageBase::open(path)?));
+        }
+        let Some((_, base)) = self.message_base.as_mut() else {
+            unreachable!("the base was just cached")
+        };
+        read(base)
+    }
+
+    /// Forgets the open message base, so the next read opens it again. A write goes
+    /// through its own handle, which leaves what this one knows behind.
+    pub fn invalidate_message_base(&mut self) {
+        self.message_base = None;
+        self.cached_msg_header = None;
+    }
+
     async fn set_rip_mouseregion(
         &mut self,
         num: i32,
@@ -1321,6 +1346,7 @@ pub async fn run<P: AsRef<Path>>(file_name: &P, prg: &Executable, io: &mut dyn P
                 cached_msg_header: None,
                 abort_on_stack_error: true,
                 board_value: None,
+                message_base: None,
                 last_error: PplError::default(),
                 error_pending: false,
                 error_handler: ErrorHandler::Off,

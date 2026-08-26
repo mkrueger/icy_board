@@ -89,19 +89,31 @@ impl MessageArea {
             vm.operation_succeeded();
             return PplMessage::missing();
         }
-        let base = match JamMessageBase::open(&self.path) {
-            Ok(base) => base,
-            Err(error) => {
-                vm.set_error(message_error("can't open message base", &self.path, &error));
-                return PplMessage::missing();
+        let number = number as u32;
+        let header = vm.with_message_base(&self.path, |base| match base.read_header(number) {
+            Ok(header) => Ok(Some(header)),
+            Err(error) if message_is_missing(&error) => {
+                // A number past what this handle was opened with may have arrived since,
+                // so take a look before reporting it missing.
+                if number <= base.highest_message_number() {
+                    return Ok(None);
+                }
+                base.lock_shared()?;
+                base.unlock();
+                match base.read_header(number) {
+                    Ok(header) => Ok(Some(header)),
+                    Err(error) if message_is_missing(&error) => Ok(None),
+                    Err(error) => Err(error),
+                }
             }
-        };
-        match base.read_header(number as u32) {
-            Ok(header) => {
+            Err(error) => Err(error),
+        });
+        match header {
+            Ok(Some(header)) => {
                 vm.operation_succeeded();
                 PplMessage::from_header(&self.path, &header).value()
             }
-            Err(error) if message_is_missing(&error) => {
+            Ok(None) => {
                 vm.operation_succeeded();
                 PplMessage::missing()
             }
@@ -119,37 +131,57 @@ impl MessageArea {
             vm.set_error(PplError::new(ERR_KIND_MSG, ERR_INVALID, format!("unknown message field {field}")));
             return PplMessage::missing();
         }
-        let base = match JamMessageBase::open(&self.path) {
-            Ok(base) => base,
-            Err(error) => {
-                vm.set_error(message_error("can't open message base", &self.path, &error));
-                return PplMessage::missing();
-            }
-        };
         let needle = text.to_uppercase();
-        let first = (start.max(0) as u32).max(base.lowest_message_number());
-        for number in first..=base.highest_message_number() {
-            let header = match base.read_header(number) {
-                Ok(header) => header,
-                Err(error) if message_is_missing(&error) => continue,
-                Err(error) => {
-                    vm.set_error(message_error(&format!("can't scan message {number} in"), &self.path, &error));
-                    return PplMessage::missing();
+        let start = start.max(0) as u32;
+        let found = vm.with_message_base(&self.path, |base| {
+            let first = start.max(base.lowest_message_number());
+            for number in first..=base.highest_message_number() {
+                let header = match base.read_header(number) {
+                    Ok(header) => header,
+                    Err(error) if message_is_missing(&error) => continue,
+                    Err(error) => return Err(error),
+                };
+                let candidate = match field {
+                    HDR_TO => header.to().map(ToString::to_string),
+                    HDR_FROM => header.from().map(ToString::to_string),
+                    HDR_SUBJ => header.subject().map(ToString::to_string),
+                    _ => unreachable!(),
+                };
+                if candidate.unwrap_or_default().to_uppercase().contains(&needle) {
+                    return Ok(Some(header));
                 }
-            };
-            let candidate = match field {
-                HDR_TO => header.to().map(ToString::to_string),
-                HDR_FROM => header.from().map(ToString::to_string),
-                HDR_SUBJ => header.subject().map(ToString::to_string),
-                _ => unreachable!(),
-            };
-            if candidate.unwrap_or_default().to_uppercase().contains(&needle) {
+            }
+            Ok(None)
+        });
+        match found {
+            Ok(Some(header)) => {
                 vm.operation_succeeded();
-                return PplMessage::from_header(&self.path, &header).value();
+                PplMessage::from_header(&self.path, &header).value()
+            }
+            Ok(None) => {
+                vm.operation_succeeded();
+                PplMessage::missing()
+            }
+            Err(error) => {
+                vm.set_error(message_error("can't scan message base", &self.path, &error));
+                PplMessage::missing()
             }
         }
-        vm.operation_succeeded();
-        PplMessage::missing()
+    }
+
+    /// The numbers the area's messages run between, as the open base reports them.
+    fn message_bounds(&self, vm: &mut crate::vm::VirtualMachine<'_>) -> Option<(u32, u32)> {
+        let bounds = vm.with_message_base(&self.path, |base| Ok((base.lowest_message_number(), base.highest_message_number())));
+        match bounds {
+            Ok(bounds) => {
+                vm.operation_succeeded();
+                Some(bounds)
+            }
+            Err(error) => {
+                vm.set_error(message_error("can't open message base", &self.path, &error));
+                None
+            }
+        }
     }
 }
 
@@ -277,28 +309,10 @@ impl UserDataValue for MessageArea {
             return Ok(VariableValue::new_bool(res));
         }
         if *name == *HIGH_MSG {
-            return Ok(match JamMessageBase::open(&self.path) {
-                Ok(base) => {
-                    vm.operation_succeeded();
-                    VariableValue::new_int(base.highest_message_number() as i32)
-                }
-                Err(error) => {
-                    vm.set_error(message_error("can't open message base", &self.path, &error));
-                    VariableValue::new_int(0)
-                }
-            });
+            return Ok(VariableValue::new_int(self.message_bounds(vm).map_or(0, |(_, high)| high as i32)));
         }
         if *name == *LOW_MSG {
-            return Ok(match JamMessageBase::open(&self.path) {
-                Ok(base) => {
-                    vm.operation_succeeded();
-                    VariableValue::new_int(base.lowest_message_number() as i32)
-                }
-                Err(error) => {
-                    vm.set_error(message_error("can't open message base", &self.path, &error));
-                    VariableValue::new_int(0)
-                }
-            });
+            return Ok(VariableValue::new_int(self.message_bounds(vm).map_or(0, |(low, _)| low as i32)));
         }
         if *name == *READ {
             return Ok(self.read_message(vm, arguments[0].as_int()));

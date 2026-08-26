@@ -673,6 +673,15 @@ value, and also report `ErrKind.Msg`: `ErrCode.Io` for a filesystem failure and
 `ErrCode.Format` for corrupt JAM data. Those failures enter an `ON ERROR`
 handler. An invalid `MsgField` reports `ErrCode.Invalid`.
 
+An area is read through one open message base rather than opening it again for
+every message, which is what makes the walk above worth writing. The base is
+opened when a PPE first reads from that area and kept until it reads from
+another one or the PPE ends. A message written after it was opened is still
+found: writing through `MESSAGE`, `SETMSGHDR`, `KILLMSG` or `MOVEMSG` takes the
+base again, and a number past the end is looked up once more before it is
+reported missing. `LOMSGNUM()` and `HIMSGNUM()` open the base on every call, so
+they remain the way to watch a base another node is writing to.
+
 `Find` is `SCANMSGHDR` with a type instead of a field number. It matches without
 regard to case, anywhere in the field, and answers an invalid `MSG` when nothing
 matches. The `start` argument is what walks on to the next match:
