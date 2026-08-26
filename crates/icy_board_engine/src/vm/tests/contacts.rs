@@ -24,7 +24,7 @@ fn a_contact_can_be_written_and_read_back() {
         "1 matrix:@sysop:example.org",
         run_ppl(
             r#"
-PRINT Session.User.Contacts.Set("Matrix", "@sysop:example.org"), " "
+PRINT Session.User.Contacts.Put("Matrix", "@sysop:example.org"), " "
 PRINT Session.User.Contacts[0].Service, ":", Session.User.Contacts[0].Account
 "#,
         )
@@ -37,8 +37,8 @@ fn contacts_can_be_walked() {
         "github matrix ",
         run_ppl(
             r#"
-Session.User.Contacts.Set("github", "sysop")
-Session.User.Contacts.Set("matrix", "@sysop:example.org")
+Session.User.Contacts.Put("github", "sysop")
+Session.User.Contacts.Put("matrix", "@sysop:example.org")
 CONTACT entry
 FOREACH entry IN Session.User.Contacts
     PRINT entry.Service, " "
@@ -75,7 +75,7 @@ fn contacts_are_seen_and_changed_without_getuser() {
         run_ppl_on(
             r#"
 PRINT Session.User.Contacts.Count, " ", Session.User.Contacts[0].Service, ":", Session.User.Contacts[0].Account, "|"
-Session.User.Contacts.Set("MATRIX", "@sysop:example.org")
+Session.User.Contacts.Put("MATRIX", "@sysop:example.org")
 PRINT Session.User.Contacts.Count, " ", Session.User.Contacts[1].Service, ":", Session.User.Contacts[1].Account
 "#,
             |board| {
@@ -96,7 +96,7 @@ fn setting_a_known_service_replaces_its_account() {
         "1 github:someone-else",
         run_ppl_on(
             r#"
-Session.User.Contacts.Set("GitHub", "someone-else")
+Session.User.Contacts.Put("GitHub", "someone-else")
 PRINT Session.User.Contacts.Count, " ", Session.User.Contacts[0].Service, ":", Session.User.Contacts[0].Account
 "#,
             |board| {
@@ -130,7 +130,7 @@ fn a_contact_can_be_deleted() {
 fn an_empty_contact_is_refused() {
     assert_eq!(
         "0 0 0",
-        run_ppl(r#"PRINT Session.User.Contacts.Set("", "sysop"), " ", Session.User.Contacts.Set("matrix", " "), " ", Session.User.Contacts.Count"#)
+        run_ppl(r#"PRINT Session.User.Contacts.Put("", "sysop"), " ", Session.User.Contacts.Put("matrix", " "), " ", Session.User.Contacts.Count"#)
     );
 }
 

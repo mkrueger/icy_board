@@ -5,8 +5,8 @@ fn terminal_output_api_requires_runtime_400() {
     let source = r#"
         Terminal.BeginUpdate()
         Terminal.EndUpdate()
-        Terminal.Macros.StartRecord(0)
-        Terminal.Macros.StopRecord()
+        Terminal.Macros.BeginRecord(0)
+        Terminal.Macros.EndRecord()
         Terminal.Macros.Play(0)
         Terminal.Macros.Delete(0)
         Terminal.Macros.DeleteAll()
@@ -66,7 +66,7 @@ fn terminal_macros_report_unavailable_without_ansi() {
     let output = run_ppl(
         r#"
         GrafMode 4
-        Terminal.Macros.StartRecord(0)
+        Terminal.Macros.BeginRecord(0)
         PrintLn Error.Last().Code, " ", Error.Last().Kind
         "#,
     );
@@ -79,7 +79,7 @@ fn outer_cleanup_flushes_recording_before_ending_synchronization() {
     let output = run_ppl_with_cleanup(
         r#"
         Terminal.BeginUpdate()
-        Terminal.Macros.StartRecord(4)
+        Terminal.Macros.BeginRecord(4)
         Print "last frame"
         "#,
     );
@@ -91,9 +91,9 @@ fn outer_cleanup_flushes_recording_before_ending_synchronization() {
 fn macros_hide_recorded_output_until_playback() {
     let output = run_ppl(
         r#"
-        Terminal.Macros.StartRecord(3)
+        Terminal.Macros.BeginRecord(3)
         Print "hidden"
-        Terminal.Macros.StopRecord()
+        Terminal.Macros.EndRecord()
         Print "before:"
         Terminal.Macros.Play(3)
         Terminal.Macros.Play(3)
@@ -107,14 +107,14 @@ fn macros_hide_recorded_output_until_playback() {
 fn macros_can_compose_other_macros() {
     let output = run_ppl(
         r#"
-        Terminal.Macros.StartRecord(1)
+        Terminal.Macros.BeginRecord(1)
         Print "A"
-        Terminal.Macros.StopRecord()
-        Terminal.Macros.StartRecord(2)
+        Terminal.Macros.EndRecord()
+        Terminal.Macros.BeginRecord(2)
         Print "["
         Terminal.Macros.Play(1)
         Print "]"
-        Terminal.Macros.StopRecord()
+        Terminal.Macros.EndRecord()
         Terminal.Macros.Play(2)
         "#,
     );
@@ -126,13 +126,13 @@ fn macros_can_compose_other_macros() {
 fn deleted_and_invalid_macros_report_errors() {
     let output = run_ppl(
         r#"
-        Terminal.Macros.StartRecord(1)
+        Terminal.Macros.BeginRecord(1)
         Print "gone"
-        Terminal.Macros.StopRecord()
+        Terminal.Macros.EndRecord()
         Terminal.Macros.Delete(1)
         Terminal.Macros.Play(1)
         PrintLn Error.Last().Code, " ", Error.Last().Kind
-        Terminal.Macros.StartRecord(64)
+        Terminal.Macros.BeginRecord(64)
         PrintLn Error.Last().Code, " ", Error.Last().Kind
         "#,
     );
@@ -144,9 +144,9 @@ fn deleted_and_invalid_macros_report_errors() {
 fn clear_macros_emits_decdmac_delete_all() {
     let output = run_ppl(
         r#"
-        Terminal.Macros.StartRecord(0)
+        Terminal.Macros.BeginRecord(0)
         Print "A"
-        Terminal.Macros.StopRecord()
+        Terminal.Macros.EndRecord()
         Terminal.Macros.DeleteAll()
         Terminal.Macros.Play(0)
         PrintLn Error.Last().Code, " ", Error.Last().Kind
@@ -160,10 +160,10 @@ fn clear_macros_emits_decdmac_delete_all() {
 fn a_second_recording_cannot_start_before_the_first_ends() {
     let output = run_ppl(
         r#"
-        Terminal.Macros.StartRecord(1)
-        Terminal.Macros.StartRecord(2)
+        Terminal.Macros.BeginRecord(1)
+        Terminal.Macros.BeginRecord(2)
         PrintLn Error.Last().Code, " ", Error.Last().Kind
-        Terminal.Macros.StopRecord()
+        Terminal.Macros.EndRecord()
         Terminal.Macros.Play(1)
         "#,
     );

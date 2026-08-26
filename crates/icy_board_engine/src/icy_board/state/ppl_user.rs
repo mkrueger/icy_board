@@ -114,6 +114,7 @@ pub struct PplNotes;
 #[derive(Clone, Copy, Debug, Default)]
 pub struct PplContacts;
 
+member_name!(PUT, "Put");
 member_name!(SET, "Set");
 member_name!(DELETE, "Delete");
 
@@ -193,7 +194,7 @@ impl UserData for PplContacts {
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         registry.add_property(COUNT.clone(), VariableType::Integer, false);
         registry.add_function(GET.clone(), vec![VariableType::Integer], VariableType::UserData(CONTACT_ID as u8));
-        registry.add_function(SET.clone(), vec![VariableType::String, VariableType::String], VariableType::Boolean);
+        registry.add_function(PUT.clone(), vec![VariableType::String, VariableType::String], VariableType::Boolean);
         registry.add_function(DELETE.clone(), vec![VariableType::String], VariableType::Boolean);
     }
 }
@@ -231,7 +232,7 @@ impl UserDataValue for PplContacts {
                 .unwrap_or_default();
             return Ok(contact_value(&contact));
         }
-        if *name == *SET {
+        if *name == *PUT {
             let service = normalize_service(&arguments[0].as_string());
             let account = arguments[1].as_string().trim().to_string();
             if service.is_empty() || account.is_empty() {

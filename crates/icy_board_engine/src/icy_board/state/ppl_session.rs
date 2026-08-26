@@ -15,11 +15,8 @@ macro_rules! member_name {
 
 member_name!(CONFERENCE, "Conference");
 member_name!(USER, "User");
-member_name!(CONFERENCE_NUMBER, "ConferenceNumber");
 member_name!(AREA, "Area");
-member_name!(AREA_NUMBER, "AreaNumber");
 member_name!(DIRECTORY, "Directory");
-member_name!(DIRECTORY_NUMBER, "DirectoryNumber");
 member_name!(USER_NAME, "UserName");
 member_name!(ALIAS_NAME, "AliasName");
 member_name!(SECURITY_LEVEL, "SecurityLevel");
@@ -53,15 +50,7 @@ impl UserData for PplSession {
         for name in [&*USER_NAME, &*ALIAS_NAME, &*LANGUAGE] {
             registry.add_property(name.clone(), VariableType::String, false);
         }
-        for name in [
-            &*CONFERENCE_NUMBER,
-            &*AREA_NUMBER,
-            &*DIRECTORY_NUMBER,
-            &*SECURITY_LEVEL,
-            &*NODE,
-            &*MINUTES_LEFT,
-            &*PAGE_LENGTH,
-        ] {
+        for name in [&*SECURITY_LEVEL, &*NODE, &*MINUTES_LEFT, &*PAGE_LENGTH] {
             registry.add_property(name.clone(), VariableType::Integer, false);
         }
         for name in [&*IS_LOCAL, &*IS_SYSOP] {
@@ -108,12 +97,6 @@ impl UserDataValue for PplSession {
                 .as_ref()
                 .is_some_and(|directories| directories.get(session.current_file_directory).is_some());
             user_data_value(directory, FILE_DIRECTORY_ID)
-        } else if *name == *CONFERENCE_NUMBER {
-            VariableValue::new_int(i32::from(session.current_conference_number))
-        } else if *name == *AREA_NUMBER {
-            VariableValue::new_int(session.current_message_area as i32)
-        } else if *name == *DIRECTORY_NUMBER {
-            VariableValue::new_int(session.current_file_directory as i32)
         } else if *name == *USER_NAME {
             VariableValue::new_string(session.user_name.clone())
         } else if *name == *ALIAS_NAME {

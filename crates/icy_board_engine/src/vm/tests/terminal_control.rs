@@ -50,10 +50,10 @@ fn a_macro_records_output_and_plays_it_back() {
         r#"
         BOOLEAN before, during, after
         before = Terminal.Macros.Recording
-        Terminal.Macros.StartRecord(3)
+        Terminal.Macros.BeginRecord(3)
         during = Terminal.Macros.Recording
         PRINT "hi"
-        Terminal.Macros.StopRecord()
+        Terminal.Macros.EndRecord()
         after = Terminal.Macros.Recording
         Terminal.Macros.Play(3)
         PrintLn before, during, after
@@ -72,9 +72,9 @@ fn a_macro_records_output_and_plays_it_back() {
 fn a_slot_outside_the_sixty_four_is_refused() {
     let output = run_ppl(
         r"
-        PrintLn Terminal.Macros.StartRecord(64)
+        PrintLn Terminal.Macros.BeginRecord(64)
         PrintLn Error.Last().Code
-        PrintLn Terminal.Macros.StartRecord(-1)
+        PrintLn Terminal.Macros.BeginRecord(-1)
         PrintLn Error.Last().Code
         ",
     );
@@ -88,10 +88,10 @@ fn a_second_recording_is_refused_while_one_is_active() {
         r"
         BOOLEAN second
         ERRCODE code
-        Terminal.Macros.StartRecord(1)
-        second = Terminal.Macros.StartRecord(2)
+        Terminal.Macros.BeginRecord(1)
+        second = Terminal.Macros.BeginRecord(2)
         code = Error.Last().Code
-        Terminal.Macros.StopRecord()
+        Terminal.Macros.EndRecord()
         PrintLn second, code = ErrCode.Invalid
         ",
     );

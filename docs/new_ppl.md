@@ -358,10 +358,10 @@ inactive update reports `ErrCode.Invalid`. Cleanup ends an update left active by
 `Terminal.Macros` manages 64 DEC macro slots numbered 0 through 63:
 
 ```PPL
-Terminal.Macros.StartRecord(0)
+Terminal.Macros.BeginRecord(0)
 COLOR @X1F
 PRINT "Reusable heading"
-Terminal.Macros.StopRecord()
+Terminal.Macros.EndRecord()
 Terminal.Macros.Play(0)
 Terminal.Macros.Delete(0)
 ```
@@ -634,7 +634,6 @@ kept in a variable still answers with what the session became:
 | `Conference` | `CONFERENCE` | The conference the caller is in |
 | `User` | `USER` | The caller's own record |
 | `Area`, `Directory` | `AREA`, `DIRECTORY` | The message area and file directory in use |
-| `ConferenceNumber`, `AreaNumber`, `DirectoryNumber` | `INTEGER` | Their numbers |
 | `UserName`, `AliasName` | `STRING` | Who is calling |
 | `SecurityLevel` | `INTEGER` | The caller's current security level |
 | `Node` | `INTEGER` | Node number, as `PCBNODE()` reports it |
@@ -647,6 +646,26 @@ kept in a variable still answers with what the session became:
 PRINTLN "Node ", Session.Node, ", ", Session.MinutesLeft, " minutes left"
 PRINTLN "In ", Session.Conference.Name, " on ", Board.Name
 ```
+
+Where a conference, area or directory sits is asked of the thing itself:
+`Session.Conference.Number`, `Session.Area.Number`, `Session.Directory.Number`.
+
+### The session and the user are not the same thing
+
+`Session.SecurityLevel`, `Session.PageLength`, `Session.Language`,
+`Session.UserName` and `Session.AliasName` look like they repeat what
+`Session.User` holds, and mostly they agree — but they are the call's values,
+not the record's. `PCBoard` splits them that way and the split is kept:
+
+- `Session.SecurityLevel` is what the caller may do **right now**, which a
+  conference can raise for the duration. `Session.User.SecurityLevel` is what
+  the user record says.
+- `Session.PageLength` and `Session.Language` are what this call is using, and
+  may have been changed for it alone. The `Session.User` ones are what the caller
+  will get on the next call.
+
+Read the session when asking what is in force, and the user when asking what is
+stored. Writing goes to `Session.User`; the session's own values are read-only.
 
 Both are read-only. The classic `CURCONF()`, `PCBNODE()`, `MINLEFT()` and the
 `U_*` variables keep working unchanged.
@@ -706,10 +725,10 @@ FOREACH entry IN Session.User.Contacts
 	PRINTLN entry.Service, ": ", entry.Account
 ENDFOREACH
 
-Session.User.Contacts.Set("matrix", "@sysop:example.org")
+Session.User.Contacts.Put("matrix", "@sysop:example.org")
 ```
 
-`Contacts.Set()` replaces the account when the service is already there and adds
+`Contacts.Put()` replaces the account when the service is already there and adds
 it otherwise, so there can never be two entries meaning the same service. Service
 names are trimmed and compared without regard to case; a blank service or account
 is refused and answers `FALSE`. `Contacts.Delete()` answers whether it removed

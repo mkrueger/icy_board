@@ -103,7 +103,7 @@ fn session_reports_the_call_it_is_running_in() {
     let output = run_ppl(
         r#"
         PrintLn Session.Node
-        PrintLn Session.ConferenceNumber, " ", Session.AreaNumber, " ", Session.DirectoryNumber
+        PrintLn Session.Conference.Number, " ", Session.Area.Number, " ", Session.Directory.Number
         PrintLn Session.SecurityLevel, " ", Session.PageLength
         PrintLn Session.IsLocal, " ", Session.IsSysop
         PrintLn "[", Session.UserName, "] [", Session.AliasName, "] [", Session.Language, "]"
