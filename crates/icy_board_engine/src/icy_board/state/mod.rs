@@ -3626,7 +3626,7 @@ impl IcyBoardState {
             ..Default::default()
         };
         let res = FileFormat::PCBoard.to_bytes(&self.user_screen.buffer.buffer, &options)?;
-        let res = unsafe { String::from_utf8_unchecked(res) };
+        let res = res.into_iter().map(|byte| codepages::tables::CP437_TO_UNICODE[byte as usize]).collect::<String>();
         self.print(TerminalTarget::Sysop, &res).await?;
         let p = self.user_screen.buffer.caret.position();
         self.gotoxy(TerminalTarget::Sysop, p.x + 1, p.y + 1).await?;

@@ -62,6 +62,34 @@ struct RenderedImage {
     scaled_to_viewport: bool,
 }
 
+fn new_terminal_screen() -> TextScreen {
+    let mut screen = TextScreen::new((80, 25));
+    screen.buffer.buffer_type = BufferType::Unicode;
+    screen
+}
+
+fn new_monitor_screen() -> TextScreen {
+    let mut screen = TextScreen::new((80, 25));
+    screen.buffer.buffer_type = BufferType::CP437;
+    screen
+}
+
+fn terminal_layout(frame_area: Rect, view_height: u16, reserve_status: bool) -> (Rect, Option<Rect>) {
+    let width = frame_area.width.min(80);
+    let status_height = if (reserve_status && frame_area.height >= 3) || frame_area.height >= view_height.saturating_add(2) {
+        2
+    } else {
+        0
+    };
+    let height = view_height.min(frame_area.height.saturating_sub(status_height));
+    let total_height = height.saturating_add(status_height);
+    let x = frame_area.x + (frame_area.width - width) / 2;
+    let y = frame_area.y + (frame_area.height - total_height) / 2;
+    let screen = Rect::new(x, y, width, height);
+    let status = (status_height > 0).then(|| Rect::new(x, y + height, width, status_height));
+    (screen, status)
+}
+
 impl Tui {
     pub async fn local_mode(
         board: &Arc<tokio::sync::Mutex<IcyBoard>>,
@@ -76,9 +104,7 @@ impl Tui {
         let ui_node = bbs.lock().await.create_new_node(ConnectionType::Channel).await;
         let node_state = bbs.lock().await.open_connections.clone();
         let node = ui_node;
-        let mut screen_buffer = TextScreen::new((80, 25));
-        screen_buffer.buffer.buffer_type = BufferType::Unicode;
-        let screen = Arc::new(std::sync::Mutex::new(screen_buffer));
+        let screen = Arc::new(std::sync::Mutex::new(new_terminal_screen()));
         let (ui_connection, connection) = ChannelConnection::create_pair();
         let node_state2 = node_state.clone();
 
@@ -143,7 +169,7 @@ impl Tui {
             return Ok(None);
         }
 
-        let screen = Arc::new(std::sync::Mutex::new(TextScreen::new((80, 25))));
+        let screen = Arc::new(std::sync::Mutex::new(new_monitor_screen()));
         log::info!("Run terminal thread");
         let screen_generation = Arc::new(AtomicU64::new(0));
         let (_handle2, tx) = crate::terminal_thread::start_update_thread(Box::new(ui_connection), screen.clone(), screen_generation.clone());
@@ -288,13 +314,8 @@ impl Tui {
 
     fn ui(&self, frame: &mut Frame, status_bar_info: StatusBarInfo) {
         let screen = &self.screen.lock().unwrap();
-        let width = frame.area().width.min(80);
-        // Render the whole terminal viewport. The previous hard-coded 24 hid the terminal's
-        // last line, so the input prompt ended up behind the status bar.
         let view_height = screen.buffer.terminal_state.height().max(0) as u16;
-        let height = frame.area().height.min(view_height);
-
-        let mut area = Rect::new((frame.area().width - width) / 2, (frame.area().height - height) / 2, width, height);
+        let (area, status_area) = terminal_layout(frame.area(), view_height, self.sysop_mode);
 
         for y in 0..area.height as i32 {
             for x in 0..area.width as i32 {
@@ -309,22 +330,22 @@ impl Tui {
                 if c.attribute.is_blinking() {
                     s = s.slow_blink();
                 }
-                let span = Span::from(c.ch.to_string()).style(s);
+                let span = Span::from(screen.buffer.buffer_type.convert_to_unicode(c.ch).to_string()).style(s);
                 frame.buffer_mut().set_span(area.x + x as u16, area.y + y as u16, &span, 1);
             }
         }
-        let y = area.y;
-        area.y += area.height;
-        area.height = 2;
-        if area.y + area.height < frame.area().height {
-            self.draw_statusbar(frame, area, status_bar_info);
+        if let Some(status_area) = status_area {
+            self.draw_statusbar(frame, status_area, status_bar_info);
         }
         let pos: icy_engine::Position = screen.caret.position();
-        frame.set_cursor_position((area.x + pos.x as u16, y + pos.y as u16 - screen.first_visible_line() as u16));
+        let cursor_y = pos.y - screen.first_visible_line();
+        if pos.x >= 0 && pos.x < i32::from(area.width) && cursor_y >= 0 && cursor_y < i32::from(area.height) {
+            frame.set_cursor_position((area.x + pos.x as u16, area.y + cursor_y as u16));
+        }
 
         for image in &self.rendered_images {
-            let image_y = i32::from(y) + image.position.y - screen.first_visible_line();
-            if image_y < i32::from(y) || image.position.x < 0 {
+            let image_y = i32::from(area.y) + image.position.y - screen.first_visible_line();
+            if image_y < i32::from(area.y) || image.position.x < 0 {
                 continue;
             }
             let size = image.protocol.size();
@@ -749,6 +770,31 @@ mod sixel_tests {
     use super::*;
     use crossterm::event::{KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
     use icy_parser_core::{AnsiParser, CommandParser};
+
+    #[test]
+    fn monitor_screen_renders_cp437_box_drawing_as_unicode() {
+        let mut screen = new_monitor_screen();
+        AnsiParser::default().parse(&[0xCD, b'\r'], &mut icy_engine::ScreenSink::new(&mut screen));
+
+        let cell = screen.char_at(icy_engine::Position::default());
+        assert_eq!(screen.buffer.buffer_type.convert_to_unicode(cell.ch), '═');
+    }
+
+    #[test]
+    fn monitor_reserves_status_rows_at_80_by_25() {
+        let (screen, status) = terminal_layout(Rect::new(0, 0, 80, 25), 25, true);
+
+        assert_eq!(screen, Rect::new(0, 0, 80, 23));
+        assert_eq!(status, Some(Rect::new(0, 23, 80, 2)));
+    }
+
+    #[test]
+    fn local_session_keeps_all_rows_at_80_by_25() {
+        let (screen, status) = terminal_layout(Rect::new(0, 0, 80, 25), 25, false);
+
+        assert_eq!(screen, Rect::new(0, 0, 80, 25));
+        assert_eq!(status, None);
+    }
 
     #[test]
     fn parsed_sixel_is_available_to_the_local_renderer() {
