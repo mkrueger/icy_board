@@ -7,6 +7,7 @@
 use async_trait::async_trait;
 use russh::keys::{PrivateKey, ssh_key};
 use russh::{client::Msg, *};
+use serde::{Deserialize, Serialize};
 use std::{
     borrow::Cow,
     collections::HashMap,
@@ -64,7 +65,8 @@ impl Credentials {
     }
 }
 
-#[derive(Clone, Default, Eq, PartialEq)]
+#[derive(Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct SecretString(String);
 
 impl SecretString {
@@ -72,7 +74,7 @@ impl SecretString {
         Self(value.into())
     }
 
-    fn expose_secret(&self) -> &str {
+    pub(crate) fn expose_secret(&self) -> &str {
         &self.0
     }
 }
