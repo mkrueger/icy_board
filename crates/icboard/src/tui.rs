@@ -152,29 +152,6 @@ impl Tui {
         Ok(())
     }
 
-    /// In a local session the console is the caller, so the board follows its size. A
-    /// monitor only watches and must not resize the caller it is attached to.
-    async fn follow_terminal_size(&self, bbs: &Arc<Mutex<BBS>>, area: ratatui::layout::Size) -> Res<()> {
-        if self.sysop_mode {
-            return Ok(());
-        }
-        let width = area.width.max(1);
-        let height = area.height.saturating_sub(STATUS_ROWS).max(1);
-        {
-            let mut screen = self.screen.lock().unwrap();
-            if screen.buffer.terminal_state.width() == i32::from(width) && screen.buffer.terminal_state.height() == i32::from(height) {
-                return Ok(());
-            }
-            let size = icy_engine::Size::new(i32::from(width), i32::from(height));
-            screen.buffer.set_size(size);
-            screen.buffer.terminal_state.set_size(size);
-        }
-        if let Some(channel) = bbs.lock().await.bbs_channels.get(self.node).and_then(Option::as_ref) {
-            let _ = channel.send(BBSMessage::Resize(width, height)).await;
-        }
-        Ok(())
-    }
-
     pub async fn sysop_mode(bbs: &Arc<Mutex<BBS>>, node: usize) -> Res<Option<Self>> {
         let (ui_connection, connection) = ChannelConnection::create_pair();
         let mut bbs = bbs.lock().await;
@@ -234,7 +211,6 @@ impl Tui {
             log::warn!("Terminal image capability query failed, using half-block rendering: {err}");
             Picker::halfblocks()
         }));
-        self.follow_terminal_size(bbs, terminal.size()?).await?;
         //   let mut redraw = true;
         loop {
             if let Some(Some(node_state)) = self.handle.lock().await.get_mut(self.node) {
@@ -310,9 +286,6 @@ impl Tui {
                         }
                     }
                     Event::Mouse(mouse) => self.add_mouse_input(mouse, terminal.size()?).await?,
-                    Event::Resize(width, height) => {
-                        self.follow_terminal_size(bbs, ratatui::layout::Size::new(width, height)).await?;
-                    }
                     _ => {}
                 }
             }

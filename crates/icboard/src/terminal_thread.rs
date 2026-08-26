@@ -6,7 +6,7 @@ use icy_engine_gui::music::{
     audio_apc::{self, AudioFeatureQuery},
 };
 use icy_net::Connection;
-use icy_parser_core::{AnsiParser, CommandParser};
+use icy_parser_core::AnsiParser;
 use std::{
     path::{Path, PathBuf},
     sync::{
@@ -292,7 +292,7 @@ fn parse_screen(parser: &mut AnsiParser, screen: &Arc<Mutex<TextScreen>>, data: 
         return;
     }
     let mut screen = screen.lock().unwrap();
-    parser.parse(data, &mut icy_engine::ScreenSink::new(&mut *screen));
+    icy_board_engine::icy_board::state::virtual_screen::parse_into_screen(parser, &mut screen, data);
 }
 
 async fn handle_apc(connection: &mut ConnectionThreadData, screen: &Arc<Mutex<TextScreen>>, data: &[u8]) -> bool {

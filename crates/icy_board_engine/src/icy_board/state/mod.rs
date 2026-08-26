@@ -757,19 +757,6 @@ impl IcyBoardState {
             let _ = self.sysop_screen.print_char(ch);
         }
     }
-
-    /// Follows the terminal the caller is sitting at.
-    ///
-    /// The buffer keeps its own size next to the viewport, and a terminal buffer does not
-    /// carry one over to the other, so both are set here.
-    pub fn set_terminal_size(&mut self, width: u16, height: u16) {
-        let size = icy_engine::Size::new(i32::from(width.max(1)), i32::from(height.max(1)));
-        for screen in [&mut self.user_screen, &mut self.sysop_screen] {
-            screen.buffer.buffer.set_size(size);
-            screen.buffer.buffer.terminal_state.set_size(size);
-        }
-        self.session.term_caps.term_size = (width.max(1), height.max(1));
-    }
     pub async fn new(
         bbs: Arc<Mutex<BBS>>,
         board: Arc<tokio::sync::Mutex<IcyBoard>>,
@@ -2366,6 +2353,9 @@ impl IcyBoardState {
             }
         }
         self.write_chars_internal(target, &user_bytes, &sysop_bytes).await?;
+        // A resize the board sent through is what the caller's terminal now measures.
+        let size = self.user_screen.buffer.buffer.terminal_state.size();
+        self.session.term_caps.term_size = (size.width.max(1) as u16, size.height.max(1) as u16);
         Ok(())
     }
 
@@ -3127,9 +3117,6 @@ impl IcyBoardState {
                         Some(BBSMessage::GroupChat(event)) => {
                             self.handle_group_chat_event(event)?;
                         }
-                        Some(BBSMessage::Resize(width, height)) => {
-                            self.set_terminal_size(width, height);
-                        }
                         _ => {}
                     }
                     return Ok(None);
@@ -3197,9 +3184,6 @@ impl IcyBoardState {
                         }
                         Some(BBSMessage::GroupChat(event)) => {
                             self.handle_group_chat_event(event)?;
-                        }
-                        Some(BBSMessage::Resize(width, height)) => {
-                            self.set_terminal_size(width, height);
                         }
                         _ => {}
                     }
@@ -4133,15 +4117,15 @@ mod screen_tests {
         });
     }
 
-    /// A console that grew is not still eighty columns wide - the line has to run on
-    /// rather than wrap where the old screen ended.
+    /// The board resizes a terminal by saying so in ANSI, and its own screens have to end
+    /// up the same size or the line wraps where the old screen ended.
     #[test]
-    fn a_resized_console_stops_wrapping_at_the_old_width() {
+    fn an_ansi_resize_moves_the_screens_and_the_reported_size() {
         tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
             let (mut state, _peer) = graphics_state().await;
 
-            state.set_terminal_size(132, 43);
-            state.print(TerminalTarget::User, &"x".repeat(100)).await.unwrap();
+            state.print(TerminalTarget::Both, "\x1b[8;43;132t").await.unwrap();
+            state.print(TerminalTarget::Both, &"x".repeat(100)).await.unwrap();
 
             assert_eq!(state.session.term_caps.term_size, (132, 43));
             assert_eq!(state.sysop_screen.buffer.buffer.terminal_state.size(), icy_engine::Size::new(132, 43));

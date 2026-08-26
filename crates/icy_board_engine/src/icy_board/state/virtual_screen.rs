@@ -1,6 +1,19 @@
-use icy_engine::TextScreen;
+use icy_engine::{TextPane, TextScreen};
 
 use crate::Res;
+
+/// Runs the parser over `bytes` and brings the viewport along with any resize.
+///
+/// `CSI 8 ; h ; w t` resizes the buffer, but a terminal buffer keeps its viewport apart
+/// from it and the parser only touches the buffer.
+pub fn parse_into_screen(parser: &mut dyn icy_parser_core::CommandParser, screen: &mut TextScreen, bytes: &[u8]) {
+    let before = (screen.width(), screen.height());
+    parser.parse(bytes, &mut icy_engine::ScreenSink::new(screen));
+    let after = (screen.width(), screen.height());
+    if before != after {
+        screen.buffer.terminal_state.set_size(icy_engine::Size::new(after.0, after.1));
+    }
+}
 
 pub struct VirtualScreen {
     parser: Box<dyn icy_parser_core::CommandParser>,
@@ -23,9 +36,8 @@ impl VirtualScreen {
     }
 
     pub fn print_char(&mut self, c: char) -> Res<()> {
-        let mut sink = icy_engine::ScreenSink::new(&mut self.buffer);
         let mut utf8 = [0; 4];
-        self.parser.parse(c.encode_utf8(&mut utf8).as_bytes(), &mut sink);
+        parse_into_screen(self.parser.as_mut(), &mut self.buffer, c.encode_utf8(&mut utf8).as_bytes());
         Ok(())
     }
 }
@@ -58,5 +70,19 @@ mod tests {
 
         assert!(text.contains('═'), "the snapshot lost the box drawing: {text:?}");
         assert!(!text.starts_with('\u{feff}'), "the snapshot leaks a BOM: {text:?}");
+    }
+
+    /// The parser resizes the buffer alone, so the viewport has to be carried along or
+    /// nothing that reads it notices the new size.
+    #[test]
+    fn an_ansi_resize_carries_the_viewport_with_it() {
+        let mut screen = VirtualScreen::new(icy_parser_core::AnsiParser::default());
+
+        for c in "\x1b[8;43;132t".chars() {
+            screen.print_char(c).unwrap();
+        }
+
+        assert_eq!(screen.buffer.buffer.terminal_state.size(), icy_engine::Size::new(132, 43));
+        assert_eq!((screen.buffer.width(), screen.buffer.height()), (132, 43));
     }
 }
