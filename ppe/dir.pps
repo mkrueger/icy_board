@@ -1,4 +1,5 @@
 ﻿INTEGER i
+Directory dir
 
 BEGIN
   CLS
@@ -9,11 +10,11 @@ BEGIN
 
   CONFERENCE CONF = Session.Conference
   
-  FOR i = 1 to CONF.DirectoryCount
+  FOREACH dir IN CONF.Directories
     IF GetX() > 45
       PRINTLN
-    Directory dir = CONF.GetDirectory(i - 1)
-    
+    LET i = i + 1
+
     IF !dir.HasAccess() CONTINUE
 
     PRINT "@X0E", Left(String(i),2), "- "
@@ -23,7 +24,7 @@ BEGIN
       COLOR @X0F
     ENDIF
     PRINT LEFT(dir.Name,35)
-  NEXT
+  ENDFOREACH
   
   IF GetX() > 45
     PRINTLN CHR(13)

@@ -36,6 +36,7 @@ pub mod functions;
 pub mod menu_runner;
 pub mod ppl_audio;
 pub mod ppl_board;
+pub mod ppl_collection;
 pub mod ppl_error;
 pub mod ppl_events;
 pub mod ppl_font;

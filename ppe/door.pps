@@ -1,4 +1,5 @@
 ﻿INTEGER i
+Door a
 
 BEGIN
   CLS
@@ -9,15 +10,15 @@ BEGIN
   
   CONFERENCE CONF = Session.Conference
   
-  FOR i = 1 to CONF.DoorCount
-    Door a = CONF.GetDoor(i - 1)
-    
+  FOREACH a IN CONF.Doors
+    LET i = i + 1
+
     IF !a.HasAccess() CONTINUE
 
     PRINT "@X0E", Left(String(i),2), "- "
     COLOR @X0F
     PRINT LEFT(a.Name,15)
     PRINTLN a.Description
-  NEXT
+  ENDFOREACH
   PRINTLN
 END

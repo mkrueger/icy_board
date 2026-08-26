@@ -211,6 +211,32 @@ impl Parser<'_> {
             if self.get_cur_token() == Some(Token::LPar) {
                 expr = self.parse_call_suffix(expr)?;
             }
+            // `collection[i]` is the collection's own getter, which has no name a
+            // source can write, so the index is the only way to reach it.
+            while self.get_cur_token() == Some(Token::LBracket) {
+                let bracket_token = self.save_spanned_token();
+                self.next_token();
+                let mut arguments = Vec::new();
+                while self.get_cur_token() != Some(Token::RBracket) {
+                    let Some(value) = self.parse_expression() else {
+                        self.report_error(self.save_token_span(), ParserErrorType::ExpressionExpected(self.save_token()));
+                        return None;
+                    };
+                    arguments.push(value);
+                    if self.get_cur_token() == Some(Token::Comma) {
+                        self.next_token();
+                    }
+                }
+                let close_token = self.save_spanned_token();
+                self.next_token();
+                let getter = super::lexer::Spanned::new(Token::Identifier(unicase::Ascii::new("<get>".to_string())), bracket_token.span.clone());
+                expr = Expression::FunctionCall(FunctionCallExpression::new(
+                    Expression::MemberReference(MemberReferenceExpression::new(expr, bracket_token, getter)),
+                    self.save_spanned_token(),
+                    arguments,
+                    close_token,
+                ));
+            }
         }
         Some(expr)
     }

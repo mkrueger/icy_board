@@ -2330,7 +2330,12 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             );
             return VariableType::None;
         }
-        if target_type != value_type && (matches!(target_type, VariableType::UserData(_)) || matches!(value_type, VariableType::UserData(_))) {
+        // A multitype value carries its type at run time, so there is nothing here to
+        // disagree with; this is what lets FOREACH hand an element to a typed variable.
+        if target_type != value_type
+            && value_type != VariableType::None
+            && (matches!(target_type, VariableType::UserData(_)) || matches!(value_type, VariableType::UserData(_)))
+        {
             self.errors.lock().unwrap().report_error(
                 let_stmt.get_eq_token().span.clone(),
                 CompilationErrorType::AssignmentTypeMismatch(target_type, value_type),

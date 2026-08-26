@@ -209,6 +209,10 @@ fn board_object_type_ids_are_frozen() {
         ("BOARD", 49),
         ("SESSION", 50),
         ("USER", 51),
+        ("AREAS", 52),
+        ("DIRECTORIES", 53),
+        ("DOORS", 54),
+        ("CONFERENCES", 55),
     ];
 
     for (name, id) in expected {

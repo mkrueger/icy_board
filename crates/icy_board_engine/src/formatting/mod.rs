@@ -392,6 +392,7 @@ impl AstVisitor<()> for FormattingVisitor<'_> {
     }
 
     fn visit_foreach_statement(&mut self, foreach_stmt: &ForEachStatement) {
+        foreach_stmt.get_collection().visit(self);
         self.inc_indent();
         self.format_block(foreach_stmt.get_statements());
         self.dec_indent();

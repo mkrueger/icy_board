@@ -1,4 +1,5 @@
 ﻿INTEGER i
+Area a
 
 BEGIN
   CLS
@@ -9,21 +10,21 @@ BEGIN
   
   CONFERENCE CONF = Session.Conference
   
-  FOR i = 0 to CONF.AreaCount - 1
+  FOREACH a IN CONF.Areas
     IF GetX() > 45
       PRINTLN
-    Area a = CONF.GetArea(i)
-    
+    LET i = i + 1
+
     IF !a.HasAccess() CONTINUE
 
-    PRINT "@X0E", Left(String(i + 1),2), "- "
+    PRINT "@X0E", Left(String(i),2), "- "
     IF (STRIP(a.Name, " ") = "Unused") then
       COLOR @X08
     ELSE
       COLOR @X0F
     ENDIF
     PRINT LEFT(a.Name,35)
-  NEXT
+  ENDFOREACH
   PRINTLN
   
   IF GetX() > 45

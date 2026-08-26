@@ -299,6 +299,10 @@ pub const MACROS_ID: usize = 47;
 pub const BOARD_ID: usize = 49;
 pub const SESSION_ID: usize = 50;
 pub const USER_ID: usize = 51;
+pub const AREAS_ID: usize = 52;
+pub const DIRECTORIES_ID: usize = 53;
+pub const DOORS_ID: usize = 54;
+pub const CONFERENCES_ID: usize = 55;
 
 /// Builtin enums take the top of the id space and a program's own enums grow down from
 /// below them, so the order here is what a PPE stores and may only be appended to.
@@ -366,6 +370,10 @@ impl UserTypeRegistry {
         reg.register::<crate::icy_board::state::ppl_board::PplBoard>(BOARD_ID);
         reg.register::<crate::icy_board::state::ppl_session::PplSession>(SESSION_ID);
         reg.register::<crate::icy_board::state::ppl_user::PplUser>(USER_ID);
+        reg.register::<crate::icy_board::state::ppl_collection::PplAreas>(AREAS_ID);
+        reg.register::<crate::icy_board::state::ppl_collection::PplDirectories>(DIRECTORIES_ID);
+        reg.register::<crate::icy_board::state::ppl_collection::PplDoors>(DOORS_ID);
+        reg.register::<crate::icy_board::state::ppl_collection::PplConferences>(CONFERENCES_ID);
 
         reg
     }

@@ -543,13 +543,10 @@ an empty conference object, so its properties can still be read.
 | `Number` | `INTEGER` | The number the conference was fetched under |
 | `Valid` | `BOOLEAN` | Whether the requested conference exists |
 | `IsPublic` | `BOOLEAN` | Whether the conference is configured as public |
-| `DirectoryCount` | `INTEGER` | Number of file directories |
-| `AreaCount` | `INTEGER` | Number of message areas |
-| `DoorCount` | `INTEGER` | Number of doors |
+| `Directories` | `DIRECTORIES` | The file directories of the conference |
+| `Areas` | `AREAS` | The message areas of the conference |
+| `Doors` | `DOORS` | The doors of the conference |
 | `HasAccess()` | `BOOLEAN` | Whether the current caller can access the conference |
-| `GetDirectory(index)` | `DIRECTORY` | File directory at the zero-based index |
-| `GetArea(index)` | `AREA` | Message area at the zero-based index |
-| `GetDoor(index)` | `DOOR` | Door at the zero-based index |
 
 `DIRECTORY` and `AREA` provide `Name`, `Number`, `Valid` and `HasAccess()`.
 `DOOR` provides `Name`, `Number`, `Valid`, `Description`, `Password` and
@@ -559,15 +556,30 @@ to type. A door password has the
 runtime-only `PASSWORD` type: it can be compared with a string, but converting
 or printing it produces `******` rather than the secret.
 
+### Collections
+
+A collection answers `Count` and is read with an index. It is walked with
+`FOREACH`, which is what it is usually for:
+
 ```PPL
 CONFERENCE conf = Session.Conference
-INTEGER i
+DOOR item
 
-FOR i = 0 TO conf.DoorCount - 1
-	DOOR item = conf.GetDoor(i)
+FOREACH item IN conf.Doors
 	IF item.HasAccess() PRINTLN item.Name
-NEXT
+ENDFOREACH
 ```
+
+The index is there when a single entry is wanted, and `Count` when only the
+number matters:
+
+```PPL
+PRINTLN conf.Areas.Count, " areas, the first is ", conf.Areas[0].Name
+```
+
+An index no entry has answers with an invalid object rather than failing, so
+`Valid` is what to ask. A collection shares the list it stands for rather than
+copying it, so reading `conf.Areas` once per loop step costs nothing.
 
 ## Board and session (4.00)
 

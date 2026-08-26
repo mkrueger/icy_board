@@ -99,7 +99,7 @@ fn test_what_a_board_object_answers_can_be_asked_again() {
     let output = crate::vm::tests::run_ppl_on(
         r"
 CONFERENCE conf = Board.GetConference(0)
-PRINT conf.GetArea(0).Name
+PRINT conf.Areas[0].Name
 ",
         |board| {
             board.conferences.clear();

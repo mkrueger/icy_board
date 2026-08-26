@@ -9,10 +9,10 @@ use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 
 use crate::{
-    compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue, user_data_value},
+    compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue},
     executable::{VariableType, VariableValue},
-    icy_board::{doors::Door, file_directory::FileDirectory},
-    parser::{DOOR_ID, FILE_DIRECTORY_ID, MESSAGE_AREA_ID},
+    icy_board::state::ppl_collection::{PplAreas, PplDirectories, PplDoors},
+    parser::{AREAS_ID, DIRECTORIES_ID, DOORS_ID},
 };
 
 use super::{
@@ -395,18 +395,11 @@ impl UserData for Conference {
         registry.add_property(NUMBER.clone(), VariableType::Integer, false);
         registry.add_property(VALID.clone(), VariableType::Boolean, false);
         registry.add_property(ISPUBLIC.clone(), VariableType::Boolean, false);
-        registry.add_property(FILE_AREAS.clone(), VariableType::Integer, false);
-        registry.add_property(MESSAGE_AREAS.clone(), VariableType::Integer, false);
-        registry.add_property(DOORS.clone(), VariableType::Integer, false);
+        registry.add_property(FILE_AREAS.clone(), VariableType::UserData(DIRECTORIES_ID as u8), false);
+        registry.add_property(MESSAGE_AREAS.clone(), VariableType::UserData(AREAS_ID as u8), false);
+        registry.add_property(DOORS.clone(), VariableType::UserData(DOORS_ID as u8), false);
 
         registry.add_function(HAS_ACCESS.clone(), Vec::new(), VariableType::Boolean);
-        registry.add_function(
-            GET_FILE_AREA.clone(),
-            vec![VariableType::Integer],
-            VariableType::UserData(FILE_DIRECTORY_ID as u8),
-        );
-        registry.add_function(GET_MSG_AREA.clone(), vec![VariableType::Integer], VariableType::UserData(MESSAGE_AREA_ID as u8));
-        registry.add_function(GET_DOOR.clone(), vec![VariableType::Integer], VariableType::UserData(DOOR_ID as u8));
     }
 }
 
@@ -414,9 +407,9 @@ pub static NAME: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLo
 pub static NUMBER: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Number".to_string()));
 pub static VALID: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Valid".to_string()));
 pub static ISPUBLIC: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("IsPublic".to_string()));
-pub static FILE_AREAS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("DirectoryCount".to_string()));
-pub static DOORS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("DoorCount".to_string()));
-pub static MESSAGE_AREAS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("AreaCount".to_string()));
+pub static FILE_AREAS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Directories".to_string()));
+pub static DOORS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Doors".to_string()));
+pub static MESSAGE_AREAS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Areas".to_string()));
 pub static HAS_ACCESS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("HasAccess".to_string()));
 pub static GET_FILE_AREA: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("GetDirectory".to_string()));
 pub static GET_MSG_AREA: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("GetArea".to_string()));
@@ -438,22 +431,13 @@ impl UserDataValue for Conference {
             return Ok(VariableValue::new_bool(self.is_public));
         }
         if *name == *FILE_AREAS {
-            if let Some(res) = &self.directories {
-                return Ok(VariableValue::new_int(res.len() as i32));
-            }
-            return Ok(VariableValue::new_int(0));
+            return Ok(PplDirectories::new(self.directories.clone().unwrap_or_default()).value());
         }
         if *name == *MESSAGE_AREAS {
-            if let Some(res) = &self.areas {
-                return Ok(VariableValue::new_int(res.len() as i32));
-            }
-            return Ok(VariableValue::new_int(0));
+            return Ok(PplAreas::new(self.areas.clone().unwrap_or_default()).value());
         }
         if *name == *DOORS {
-            if let Some(res) = &self.doors {
-                return Ok(VariableValue::new_int(res.len() as i32));
-            }
-            return Ok(VariableValue::new_int(0));
+            return Ok(PplDoors::new(self.doors.clone().unwrap_or_default()).value());
         }
 
         log::error!("Invalid user data call on Conference ({name})");
@@ -469,54 +453,11 @@ impl UserDataValue for Conference {
         &self,
         vm: &mut crate::vm::VirtualMachine<'_>,
         name: &unicase::Ascii<String>,
-        arguments: &[VariableValue],
+        _arguments: &[VariableValue],
     ) -> crate::Res<VariableValue> {
         if *name == *HAS_ACCESS {
             let res = self.required_security.session_can_access(&vm.icy_board_state.session);
             return Ok(VariableValue::new_bool(res));
-        }
-        if *name == *GET_FILE_AREA {
-            if let Some(dir) = &self.directories {
-                let area = arguments[0].as_int();
-                if let Some(res) = dir.get(area as usize) {
-                    let mut res = (*res).clone();
-                    res.number = area as usize;
-                    res.valid = true;
-                    return Ok(user_data_value(res, FILE_DIRECTORY_ID));
-                }
-                log::error!("PPL: File area not found ({area})");
-            }
-
-            return Ok(user_data_value(FileDirectory::default(), FILE_DIRECTORY_ID));
-        }
-        if *name == *GET_MSG_AREA {
-            let area = arguments[0].as_int();
-            if let Some(areas) = &self.areas {
-                if let Some(res) = areas.get(area as usize) {
-                    let mut res = (*res).clone();
-                    res.number = area as usize;
-                    res.valid = true;
-                    return Ok(user_data_value(res, MESSAGE_AREA_ID));
-                }
-                log::error!("PPL: Message area not found ({area})");
-            }
-
-            return Ok(user_data_value(MessageArea::default(), MESSAGE_AREA_ID));
-        }
-
-        if *name == *GET_DOOR {
-            let door = arguments[0].as_int();
-            if let Some(doors) = &self.doors {
-                if let Some(res) = doors.get(door as usize) {
-                    let mut res = (*res).clone();
-                    res.number = door as usize;
-                    res.valid = true;
-                    return Ok(user_data_value(res, DOOR_ID));
-                }
-                log::error!("PPL: Door not found ({door})");
-            }
-
-            return Ok(user_data_value(Door::default(), DOOR_ID));
         }
         log::error!("Invalid function call on Conference ({name})");
         Err("Function not found".into())

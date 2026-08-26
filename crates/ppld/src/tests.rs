@@ -355,14 +355,14 @@ fn nested_records_survive_decompilation() {
 fn board_object_members_keep_their_names() {
     let source = "CONFERENCE Conf = Board.GetConference(0)\n\
                   PRINTLN Conf.Name\n\
-                  PRINTLN Conf.GetDoor(0).Name\n";
+                  PRINTLN Conf.Doors[0].Name\n";
 
     let executable = compile_source(source, LAST_PPE_RUNTIME).unwrap();
     let text = decompile_to_text(executable, LAST_PPL_LANGUAGE_VERSION);
 
     assert!(text.contains("Conference VAR001"), "type name lost in:\n{text}");
     assert!(text.contains("VAR001.Name"), "member name lost in:\n{text}");
-    assert!(text.contains("VAR001.GetDoor(0).Name"), "chained call lost in:\n{text}");
+    assert!(text.contains("VAR001.Doors[0].Name"), "chained call lost in:\n{text}");
 
     let rebuilt = compile_source(&text, LAST_PPE_RUNTIME).unwrap_or_else(|e| panic!("does not compile again:\n{text}\n{e}"));
     assert_eq!(text, decompile_to_text(rebuilt, LAST_PPL_LANGUAGE_VERSION));

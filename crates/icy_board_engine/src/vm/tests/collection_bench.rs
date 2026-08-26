@@ -43,8 +43,8 @@ fn walk_every_area() {
 CONFERENCE c = Board.GetConference(0)
 INTEGER i
 INTEGER n
-FOR i = 0 TO c.AreaCount - 1
-    IF (c.GetArea(i).Name <> "") LET n = n + 1
+FOR i = 0 TO c.Areas.Count - 1
+    IF (c.Areas[i].Name <> "") LET n = n + 1
 NEXT
 PRINT n
 "#,
@@ -54,10 +54,49 @@ PRINT n
         r#"
 INTEGER i
 INTEGER n
-FOR i = 0 TO Board.GetConference(0).AreaCount - 1
-    IF (Board.GetConference(0).GetArea(i).Name <> "") LET n = n + 1
+FOR i = 0 TO Board.GetConference(0).Areas.Count - 1
+    IF (Board.GetConference(0).Areas[i].Name <> "") LET n = n + 1
 NEXT
 PRINT n
 "#,
     );
+    time(
+        "FOREACH over the collection",
+        r#"
+INTEGER n
+AREA a
+FOREACH a IN Board.GetConference(0).Areas
+    IF (a.Name <> "") LET n = n + 1
+ENDFOREACH
+PRINT n
+"#,
+    );
+}
+
+#[test]
+fn a_collection_reports_its_count_and_indexes() {
+    let out = run_ppl_on(
+        r#"
+CONFERENCE c = Board.GetConference(0)
+PRINT c.Areas.Count, " ", c.Areas[0].Name, " ", c.Areas[1999].Name
+"#,
+        seed,
+    );
+    assert_eq!("2000 Area number 0 Area number 1999", out);
+}
+
+#[test]
+fn foreach_walks_a_collection() {
+    let out = run_ppl_on(
+        r"
+INTEGER n
+AREA a
+FOREACH a IN Board.GetConference(0).Areas
+    LET n = n + 1
+ENDFOREACH
+PRINT n
+",
+        seed,
+    );
+    assert_eq!("2000", out);
 }

@@ -203,6 +203,22 @@ impl AstVisitor<()> for OutputVisitor {
     }
 
     fn visit_function_call_expression(&mut self, call: &super::FunctionCallExpression) {
+        // A collection's getter has no name a source can write, so it is written back
+        // the only way it can be read: as an index.
+        if let super::Expression::MemberReference(member) = call.get_expression()
+            && member.get_identifier().as_str() == "<get>"
+        {
+            member.get_expression().visit(self);
+            self.output.push('[');
+            for (i, arg) in call.get_arguments().iter().enumerate() {
+                arg.visit(self);
+                if i < call.get_arguments().len() - 1 {
+                    self.output.push_str(", ");
+                }
+            }
+            self.output.push(']');
+            return;
+        }
         match call.get_expression() {
             super::Expression::Identifier(id) => {
                 self.output_function(id.get_identifier());
@@ -489,7 +505,7 @@ impl AstVisitor<()> for OutputVisitor {
         self.output.push(' ');
         self.output_keyword("In");
         self.output.push(' ');
-        self.output(foreach_stmt.get_collection());
+        foreach_stmt.get_collection().visit(self);
         self.eol();
 
         self.indent += 1;

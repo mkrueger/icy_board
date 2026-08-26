@@ -293,6 +293,7 @@ pub fn walk_for_stmt<T: Default, V: AstVisitor<T>>(visitor: &mut V, for_stmt: &F
 }
 
 pub fn walk_foreach_stmt<T: Default, V: AstVisitor<T>>(visitor: &mut V, foreach_stmt: &ForEachStatement) {
+    foreach_stmt.get_collection().visit(visitor);
     for stmt in foreach_stmt.get_statements() {
         stmt.visit(visitor);
     }
@@ -587,10 +588,7 @@ pub trait AstVisitorMut: Sized {
                 token: Token::Identifier(self.visit_identifier(foreach_stmt.get_identifier())),
             },
             foreach_stmt.get_in_token().clone(),
-            Spanned {
-                span: foreach_stmt.get_collection_token().span.clone(),
-                token: Token::Identifier(self.visit_identifier(foreach_stmt.get_collection())),
-            },
+            foreach_stmt.get_collection().visit_mut(self),
             foreach_stmt.get_statements().iter().map(|stmt| stmt.visit_mut(self)).collect(),
             foreach_stmt.get_endforeach_token().clone(),
         ))

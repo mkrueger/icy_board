@@ -188,9 +188,16 @@ pub async fn element_count(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res
     // A whole array is worth borrowing rather than cloning: this runs once per step of
     // every FOREACH, so cloning here would make walking a list cost its length squared.
     if let PPEExpr::Value(id) = &args[0] {
-        return Ok(VariableValue::new_int(count_elements(vm.variable_table.get_value(*id)) as i32));
+        let value = vm.variable_table.get_value(*id);
+        if !matches!(value.generic_data, GenericVariableData::UserData(_)) {
+            return Ok(VariableValue::new_int(count_elements(value) as i32));
+        }
     }
     let arr = vm.eval_expr(&args[0]).await?;
+    if let GenericVariableData::UserData(object) = &arr.generic_data {
+        let object = object.clone();
+        return object.get_property_value(vm, &crate::icy_board::state::ppl_collection::COUNT);
+    }
     Ok(VariableValue::new_int(count_elements(&arr) as i32))
 }
 
@@ -200,12 +207,20 @@ pub async fn element_at(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Va
     let index = vm.eval_expr(&args[1]).await?.as_int();
     if let PPEExpr::Value(id) = &args[0] {
         let arr = vm.variable_table.get_value(*id);
-        if index < 0 {
-            return Ok(arr.vtype.create_empty_value());
+        if !matches!(arr.generic_data, GenericVariableData::UserData(_)) {
+            if index < 0 {
+                return Ok(arr.vtype.create_empty_value());
+            }
+            return Ok(element_of(arr, index as usize).unwrap_or_else(|| arr.vtype.create_empty_value()));
         }
-        return Ok(element_of(arr, index as usize).unwrap_or_else(|| arr.vtype.create_empty_value()));
     }
     let arr = vm.eval_expr(&args[0]).await?;
+    if let GenericVariableData::UserData(object) = &arr.generic_data {
+        let object = object.clone();
+        return object
+            .call_function(vm, &crate::icy_board::state::ppl_collection::GET, &[VariableValue::new_int(index)])
+            .await;
+    }
     if index < 0 {
         return Ok(arr.vtype.create_empty_value());
     }

@@ -10,6 +10,13 @@ releases.
 
 ### Changed
 
+- Turned the conference's `AreaCount`/`GetArea(i)` pairs into collections:
+  `Areas`, `Directories` and `Doors` answer `Count`, are read with an index, and
+  are walked with `FOREACH`. A collection shares the list it stands for, so a
+  conference no longer carries a copy of every area and directory with it —
+  reaching an area through `Board.GetConference(0)` on each step of a loop went
+  from 802 ms to 7 ms over 2000 areas.
+
 - Added `FOREACH ... ENDFOREACH`, which walks every element of an array whatever
   its rank. A matrix or a cube walks the same way a vector does, row-major, so a
   PPE no longer needs one nested `FOR` per dimension nor needs to know how many

@@ -444,7 +444,7 @@ impl AstVisitorMut for AstTransformationVisitor {
         // A name the lexer cannot produce, so it can never collide with a user's own.
         let index = unicase::Ascii::new(format!("*(foreach{})", self.labels));
         let index_expr = IdentifierExpression::create_empty_expression(index.clone());
-        let collection = Expression::Identifier(IdentifierExpression::new(foreach_stmt.get_collection_token().clone()));
+        let collection = foreach_stmt.get_collection().visit_mut(self);
 
         statements.push(VariableDeclarationStatement::create_empty_statement(
             crate::executable::VariableType::Integer,

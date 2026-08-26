@@ -82,13 +82,13 @@ fn a_board_object_offers_fields_and_methods() {
     let items = complete("CONFERENCE conf = ConfInfo(CurConf())\nconf.");
     assert!(items.contains(&"Name".to_string()), "{items:?}");
     assert!(items.contains(&"HasAccess".to_string()), "{items:?}");
-    assert!(items.contains(&"GetDoor".to_string()), "{items:?}");
+    assert!(items.contains(&"Doors".to_string()), "{items:?}");
 }
 
 #[test]
 fn a_function_answering_an_object_offers_its_members() {
     let items = complete("Board.GetConference(CurConf()).");
-    assert!(items.contains(&"AreaCount".to_string()), "{items:?}");
+    assert!(items.contains(&"Areas".to_string()), "{items:?}");
 }
 
 #[test]

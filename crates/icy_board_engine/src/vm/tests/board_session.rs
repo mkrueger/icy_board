@@ -147,7 +147,7 @@ fn board_objects_know_their_own_number() {
         r#"
         CONFERENCE conf = Board.GetConference(1)
         PrintLn conf.Number, " ", conf.Name, " ", conf.Valid
-        PrintLn conf.GetArea(1).Number, " ", conf.GetArea(1).Name, " ", conf.GetArea(1).Valid
+        PrintLn conf.Areas[1].Number, " ", conf.Areas[1].Name, " ", conf.Areas[1].Valid
         "#,
         |board| {
             seed_board(board);

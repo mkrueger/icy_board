@@ -1181,7 +1181,7 @@ pub struct ForEachStatement {
     foreach_token: Spanned<Token>,
     identifier_token: Spanned<Token>,
     in_token: Spanned<Token>,
-    collection_token: Spanned<Token>,
+    collection: Box<Expression>,
     statements: Vec<Statement>,
     endforeach_token: Spanned<Token>,
 }
@@ -1191,7 +1191,7 @@ impl ForEachStatement {
         foreach_token: Spanned<Token>,
         identifier_token: Spanned<Token>,
         in_token: Spanned<Token>,
-        collection_token: Spanned<Token>,
+        collection: Expression,
         statements: Vec<Statement>,
         endforeach_token: Spanned<Token>,
     ) -> Self {
@@ -1199,18 +1199,18 @@ impl ForEachStatement {
             foreach_token,
             identifier_token,
             in_token,
-            collection_token,
+            collection: Box::new(collection),
             statements,
             endforeach_token,
         }
     }
 
-    pub fn empty(variable_name: unicase::Ascii<String>, collection_name: unicase::Ascii<String>, statements: Vec<Statement>) -> Self {
+    pub fn empty(variable_name: unicase::Ascii<String>, collection: Expression, statements: Vec<Statement>) -> Self {
         Self {
             foreach_token: Spanned::create_empty(Token::ForEach),
             identifier_token: Spanned::create_empty(Token::Identifier(variable_name)),
             in_token: Spanned::create_empty(Token::Identifier(unicase::Ascii::new("IN".to_string()))),
-            collection_token: Spanned::create_empty(Token::Identifier(collection_name)),
+            collection: Box::new(collection),
             statements,
             endforeach_token: Spanned::create_empty(Token::Next),
         }
@@ -1237,17 +1237,8 @@ impl ForEachStatement {
         &self.in_token
     }
 
-    pub fn get_collection_token(&self) -> &Spanned<Token> {
-        &self.collection_token
-    }
-
-    /// # Panics
-    /// Panics if the node was built with a token that is not an identifier.
-    pub fn get_collection(&self) -> &unicase::Ascii<String> {
-        if let Token::Identifier(id) = &self.collection_token.token {
-            return id;
-        }
-        panic!("Expected identifier token")
+    pub fn get_collection(&self) -> &Expression {
+        &self.collection
     }
 
     pub fn get_statements(&self) -> &Vec<Statement> {
@@ -1262,8 +1253,8 @@ impl ForEachStatement {
         &self.endforeach_token
     }
 
-    pub fn create_empty_statement(variable_name: unicase::Ascii<String>, collection_name: unicase::Ascii<String>, statements: Vec<Statement>) -> Statement {
-        Statement::ForEach(ForEachStatement::empty(variable_name, collection_name, statements))
+    pub fn create_empty_statement(variable_name: unicase::Ascii<String>, collection: Expression, statements: Vec<Statement>) -> Statement {
+        Statement::ForEach(ForEachStatement::empty(variable_name, collection, statements))
     }
 }
 

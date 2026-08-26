@@ -183,7 +183,7 @@ fn test_a_door_password_can_be_compared_but_not_printed() {
         CONFERENCE conf
         DOOR item
         conf = Board.GetConference(0)
-        item = conf.GetDoor(0)
+        item = conf.Doors[0]
         PRINT "[", item.Password, "] ", item.Password = "SeCrEt", " ", item.Password = "wrong"
     "#,
         |board| {
@@ -214,7 +214,7 @@ fn test_reading_a_door_password_stays_cheap() {
         DOOR item
         INTEGER i, hits
         conf = Board.GetConference(0)
-        item = conf.GetDoor(0)
+        item = conf.Doors[0]
         FOR i = 1 TO 200
             IF item.Password = "secret" hits = hits + 1
         NEXT
@@ -245,7 +245,7 @@ fn test_conference_properties_report_configuration_and_counts() {
         r#"
         CONFERENCE conf
         conf = Board.GetConference(0)
-        PRINT conf.IsPublic, " ", conf.HasAccess(), " ", conf.DirectoryCount, " ", conf.AreaCount, " ", conf.DoorCount
+        PRINT conf.IsPublic, " ", conf.HasAccess(), " ", conf.Directories.Count, " ", conf.Areas.Count, " ", conf.Doors.Count
     "#,
         |board| {
             board.conferences.clear();
@@ -272,7 +272,7 @@ fn test_an_invalid_conference_number_still_returns_a_conference() {
         r#"
         CONFERENCE conf
         conf = Board.GetConference(999)
-        PRINT "[", conf.Name, "] ", conf.IsPublic, " ", conf.DirectoryCount, " ", conf.AreaCount, " ", conf.DoorCount
+        PRINT "[", conf.Name, "] ", conf.IsPublic, " ", conf.Directories.Count, " ", conf.Areas.Count, " ", conf.Doors.Count
     "#,
     );
     assert_eq!(output, "[] 0 0 0 0");
@@ -302,7 +302,7 @@ fn test_a_loop_can_keep_asking_for_objects() {
         INTEGER i, seen
         FOR i = 1 TO 500
             conf = Board.GetConference(0)
-            first = conf.GetArea(0)
+            first = conf.Areas[0]
             IF first.Name = "General" seen = seen + 1
         NEXT
         PRINT seen, " ", conf.Name

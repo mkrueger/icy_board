@@ -338,12 +338,10 @@ impl Parser<'_> {
         let in_token = self.save_spanned_token();
         self.next_token();
 
-        let collection_token = self.save_spanned_token();
-        if !matches!(self.get_cur_token(), Some(Token::Identifier(_))) {
-            self.report_error(self.lex.span(), ParserErrorType::IdentifierExpected(self.save_token()));
+        let Some(collection) = self.parse_expression() else {
+            self.report_error(self.lex.span(), ParserErrorType::ExpressionExpected(self.save_token()));
             return None;
-        }
-        self.next_token();
+        };
 
         let mut statements = Vec::new();
         self.skip_eol();
@@ -362,7 +360,7 @@ impl Parser<'_> {
             foreach_token,
             identifier_token,
             in_token,
-            collection_token,
+            collection,
             statements.into_iter().flatten().collect(),
             endforeach_token,
         )))

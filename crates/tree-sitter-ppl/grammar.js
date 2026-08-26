@@ -429,7 +429,7 @@ module.exports = grammar({
       kw('FOREACH'),
       field('variable', $.identifier),
       kw('IN'),
-      field('collection', $.identifier),
+      field('collection', $._expression),
       field('body', repeat($._statement)),
       choice(kw('NEXT'), endKw('FOREACH')),
     ),
