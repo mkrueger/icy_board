@@ -582,9 +582,8 @@ An index no entry has answers with an invalid object rather than failing, so
 copying it, so reading `conf.Areas` once per loop step costs nothing.
 
 A collection is an ordinary value, so it can be held in a variable. A walk reads
-its source once for the count and once for the element on every step, which makes
-the length of that source what a long loop pays for. Naming it once is the
-cheapest form and the clearest to read:
+its source once per step, which makes the length of that source what a long loop
+pays for. Naming it once is the cheapest form and the clearest to read:
 
 ```PPL
 AREAS list = Session.Conference.Areas
@@ -823,6 +822,11 @@ the array. Write through the array itself when a walk should change it.
 `BREAK` and `CONTINUE` work the way they do in every other loop. PPL arrays are
 declared with upper bounds and index from zero, so `STRING names(10)` walks
 eleven elements.
+
+How many elements there are is settled when the loop starts. Resizing an array
+inside its own walk therefore changes neither how many steps it takes nor where
+it stops, and the source is read once per step rather than twice. The board's
+collections cannot change while a PPE runs at all.
 
 `IN` is not a reserved word. Like `TO` and `STEP` it is only read as part of the
 statement, so it stays available as a variable name.

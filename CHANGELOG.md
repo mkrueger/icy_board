@@ -10,6 +10,12 @@ releases.
 
 ### Changed
 
+- `FOREACH` settles how many elements there are when the loop starts, so it reads
+  its source once per step instead of twice. Walking a conference's areas through
+  `Board.Conferences[0].Areas` went from 5.9 ms to 3.8 ms over 2000 areas, which
+  makes the walk faster than the indexed loop it replaces. Resizing an array
+  inside its own walk no longer changes how far the walk goes.
+
 - `Board.ConferenceCount`/`GetConference(i)` became `Board.Conferences`, the last
   of the board's count-and-accessor pairs. The conferences are built once with the
   board snapshot, so reading one shares it rather than copying the whole record,

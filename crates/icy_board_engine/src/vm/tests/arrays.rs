@@ -193,6 +193,35 @@ ENDFOREACH
     );
 }
 
+/// How many elements there are is settled when the loop starts, so resizing the array
+/// inside it changes neither how many steps the walk takes nor where it stops.
+/// `Redim` clears what the array held, which is why only the count is looked at here.
+#[test]
+fn resizing_the_array_does_not_change_how_far_the_walk_goes() {
+    assert_eq!(
+        "2 4",
+        run_ppl(
+            r#"
+INTEGER grown(1)
+INTEGER shrunk(3)
+INTEGER v
+INTEGER steps
+FOREACH v IN grown
+  LET steps = steps + 1
+  grown.Redim(9)
+ENDFOREACH
+PRINT steps, " "
+LET steps = 0
+FOREACH v IN shrunk
+  LET steps = steps + 1
+  shrunk.Redim(1)
+ENDFOREACH
+PRINT steps
+"#
+        )
+    );
+}
+
 /// The loop variable is a copy, so writing it leaves the array alone.
 #[test]
 fn writing_the_loop_variable_leaves_the_array_alone() {

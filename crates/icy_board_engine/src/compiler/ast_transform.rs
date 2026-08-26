@@ -434,6 +434,10 @@ impl AstVisitorMut for AstTransformationVisitor {
     /// before the declarations are known. The two functions it counts and reads with are
     /// the compiler's own: `a[i]` cannot stand in for them because it has to be written
     /// with one index per dimension.
+    ///
+    /// How many elements there are is settled when the loop starts. That halves how
+    /// often the source is evaluated, which is what a walk over a member chain such as
+    /// `Board.Conferences[0].Areas` spends its time on.
     fn visit_foreach_statement(&mut self, foreach_stmt: &ForEachStatement) -> Statement {
         let mut statements = Vec::new();
 
@@ -441,14 +445,19 @@ impl AstVisitorMut for AstTransformationVisitor {
         let continue_label = self.next_label();
         let break_label = self.next_label();
 
-        // A name the lexer cannot produce, so it can never collide with a user's own.
+        // Names the lexer cannot produce, so they can never collide with a user's own.
         let index = unicase::Ascii::new(format!("*(foreach{})", self.labels));
+        let count = unicase::Ascii::new(format!("*(foreachcount{})", self.labels));
         let index_expr = IdentifierExpression::create_empty_expression(index.clone());
+        let count_expr = IdentifierExpression::create_empty_expression(count.clone());
         let collection = foreach_stmt.get_collection().visit_mut(self);
 
         statements.push(VariableDeclarationStatement::create_empty_statement(
             crate::executable::VariableType::Integer,
-            vec![VariableSpecifier::empty(index.clone(), Vec::new())],
+            vec![
+                VariableSpecifier::empty(index.clone(), Vec::new()),
+                VariableSpecifier::empty(count.clone(), Vec::new()),
+            ],
         ));
         statements.push(LetStatement::create_empty_statement(
             index.clone(),
@@ -456,17 +465,21 @@ impl AstVisitorMut for AstTransformationVisitor {
             Vec::new(),
             ConstantExpression::create_empty_expression(Constant::Integer(0, NumberFormat::Default)),
         ));
+        statements.push(LetStatement::create_empty_statement(
+            count,
+            Token::Eq,
+            Vec::new(),
+            FunctionCallExpression::create_empty_expression(
+                IdentifierExpression::create_empty_expression(internal_function(FuncOpCode::ElementCount)),
+                vec![collection.clone()],
+            ),
+        ));
 
         self.continue_break_labels.push((continue_label.clone(), break_label.clone()));
         statements.push(LabelStatement::create_empty_statement(loop_label.clone()));
 
-        // IF (index >= ElementCount(collection)) GOTO break
-        let element_count = FunctionCallExpression::create_empty_expression(
-            IdentifierExpression::create_empty_expression(internal_function(FuncOpCode::ElementCount)),
-            vec![collection.clone()],
-        );
         statements.push(IfStatement::create_empty_statement(
-            BinaryExpression::create_empty_expression(crate::ast::BinOp::GreaterEq, index_expr.clone(), element_count),
+            BinaryExpression::create_empty_expression(crate::ast::BinOp::GreaterEq, index_expr.clone(), count_expr),
             GotoStatement::create_empty_statement(break_label.clone()),
         ));
 
