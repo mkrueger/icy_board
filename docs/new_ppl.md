@@ -570,7 +570,7 @@ an empty conference object, so its properties can still be read.
 | `HasAccess()` | `BOOLEAN` | Whether the current caller may list it |
 | `CanEnter()` | `BOOLEAN` | Whether the current caller may join it |
 | `CanAttach()` | `BOOLEAN` | Whether the current caller may save an attachment |
-| `LowMsg()`, `HighMsg()` | `INTEGER` | The numbers its messages run between, zero when there are none |
+| `LowMsg()`, `HighMsg()` | `LONG` | The numbers its messages run between, zero when there are none |
 | `Read(number)` | `MSG` | The message with that number |
 | `Find(field, text [, start])` | `MSG` | The first message at or after `start` whose field contains `text` |
 
@@ -599,9 +599,8 @@ name what a caller has to type.
 is asked separately - `CanPost()`, `CanEnter()`, `CanAttach()`, `CanDownload()` -
 because seeing a conference and writing in it are configured apart.
 
-`HighMsg()` and `LowMsg()` open the message base to answer, which is why they are
-calls rather than properties. Read them once per area rather than once per line
-of a listing.
+`HighMsg()` and `LowMsg()` read the message base to answer, which is why they
+are calls rather than properties.
 
 A password has the runtime-only `PASSWORD` type: it can be compared with a
 string, but converting or printing it produces `******` rather than the secret.
@@ -633,13 +632,13 @@ ENDIF
 | Member | Type | Description |
 | :--- | :--- | :--- |
 | `Valid` | `BOOLEAN` | Whether the area has that message |
-| `Number` | `INTEGER` | The number it was read under |
+| `Number` | `LONG` | The number it was read under |
 | `From`, `To`, `Subject` | `STRING` | Who wrote it, who it is for, what it is about |
 | `Date`, `Time` | `DATE`, `TIME` | When it was written |
-| `ReplyTo` | `INTEGER` | The message this one answers, zero when it answers none |
+| `ReplyTo` | `LONG` | The message this one answers, zero when it answers none |
 | `Status` | `STRING` | The one character `PCBoard` kept, as `HDR_STATUS` reports it |
 | `IsPrivate`, `IsRead`, `IsDeleted`, `IsEcho`, `NeedsPassword` | `BOOLEAN` | What the header says about it |
-| `Size` | `INTEGER` | How many bytes the body holds |
+| `Size` | `LONG` | How many bytes the body holds |
 | `Text()` | `STRING` | The body |
 
 A message is addressed by its **number**, not by its position. A message base is
@@ -647,7 +646,7 @@ sparse: numbering starts at `LowMsg()` and a deleted message leaves its number
 behind, so a walk counts over the range and asks each one whether it is there:
 
 ```PPL
-INTEGER n
+LONG n
 
 FOR n = area.LowMsg() TO area.HighMsg()
 	MSG msg = area.Read(n)
@@ -655,6 +654,19 @@ FOR n = area.LowMsg() TO area.HighMsg()
 	PRINTLN msg.Number, " ", msg.From, " ", msg.Subject
 NEXT
 ```
+
+Message numbers and body sizes are `LONG`. JAM counts them in 32 unsigned bits,
+which all fit in a signed 64-bit value, and ordinary integer literals can be
+added or compared without narrowing. A number outside JAM's range is one no
+message has, so `Read()` answers an invalid `MSG` rather than wrapping.
+
+`LONG` and `ULONG` are signed and unsigned 64-bit integers in language 4.00.
+Before 4.00, `LONG` was a synonym for the 32-bit `INTEGER`, and `ToLong()`
+therefore performed the same conversion as `ToInteger()`. In 4.00 `ToLong()`
+returns the new 64-bit type; `ToULong()` returns `ULONG`. When upgrading old
+source, replace an old `ToLong(value)` with `ToInteger(value)` to keep its
+32-bit behavior. The PPL language server's **Upgrade file to language version
+400** action applies that rewrite automatically.
 
 That is also why messages are not a collection: `[ ]` indexes a position
 everywhere else in the language, and a message number is not one.

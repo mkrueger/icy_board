@@ -586,6 +586,15 @@ struct LegacyStatementVisitor {
 }
 
 impl AstVisitor<()> for LegacyStatementVisitor {
+    fn visit_function_call_expression(&mut self, call: &FunctionCallExpression) {
+        if let Expression::Identifier(identifier) = call.get_expression()
+            && identifier.get_identifier().eq_ignore_ascii_case("ToLong")
+        {
+            self.edits.push((identifier.get_identifier_token().span.clone(), "ToInteger"));
+        }
+        walk_function_call_expression(self, call);
+    }
+
     fn visit_break_statement(&mut self, break_stmt: &BreakStatement) {
         let token = break_stmt.get_break_token();
         if token_text_is(token, "QUIT") {

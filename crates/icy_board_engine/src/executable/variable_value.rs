@@ -79,6 +79,12 @@ pub enum VariableType {
 
     Password,
 
+    /// 8-byte signed integer.
+    Long,
+
+    /// 8-byte unsigned integer.
+    ULong,
+
     UserData(u8),
 }
 
@@ -112,6 +118,8 @@ impl From<VariableType> for u8 {
             VariableType::Table => 18,
             VariableType::MessageAreaID => 19,
             VariableType::Password => 20,
+            VariableType::Long => 21,
+            VariableType::ULong => 22,
             VariableType::UserData(b) => b,
             VariableType::None => 255,
         }
@@ -149,6 +157,8 @@ impl VariableType {
             18 => VariableType::Table,
             19 => VariableType::MessageAreaID,
             20 => VariableType::Password,
+            21 => VariableType::Long,
+            22 => VariableType::ULong,
             _ => VariableType::UserData(b),
         }
     }
@@ -159,7 +169,7 @@ impl VariableType {
             VariableType::Unsigned => "UNSIGNED".to_string(),
             VariableType::Date => "DATE".to_string(),
             VariableType::EDate => "EDATE".to_string(),
-            VariableType::Integer => "INTEGER / SDWORD / LONG".to_string(),
+            VariableType::Integer => "INTEGER / SDWORD".to_string(),
             VariableType::Money => "MONEY".to_string(),
             VariableType::Float => "REAL / FLOAT".to_string(),
             VariableType::String => "STRING".to_string(),
@@ -176,6 +186,8 @@ impl VariableType {
             VariableType::Table => "TABLE".to_string(),
             VariableType::MessageAreaID => "MSGAREAID".to_string(),
             VariableType::Password => "PASSWORD".to_string(),
+            VariableType::Long => "LONG".to_string(),
+            VariableType::ULong => "ULONG".to_string(),
             VariableType::UserData(u) => format!("USERDATA({u})"),
             VariableType::None => "NONE".to_string(),
         };
@@ -208,6 +220,8 @@ impl fmt::Display for VariableType {
             VariableType::Table => write!(f, "Table"),             // Generic key-value table
             VariableType::MessageAreaID => write!(f, "MsgAreaID"), // 2*u8
             VariableType::Password => write!(f, "Password"),       // Password type
+            VariableType::Long => write!(f, "Long"),               // i64
+            VariableType::ULong => write!(f, "ULong"),             // u64
             VariableType::UserData(u) => write!(f, "UserData({u})"),
         }
     }
@@ -222,6 +236,8 @@ pub struct StdStruct {
 #[derive(Clone, Copy)]
 pub union VariableData {
     pub unsigned_value: u64,
+    pub long_value: i64,
+    pub ulong_value: u64,
     pub date_value: u32,
     pub ddate_value: i32,
     pub edate_value: u32,
@@ -375,6 +391,8 @@ impl fmt::Display for VariableValue {
             match self.vtype {
                 VariableType::Boolean => write!(f, "{}", self.as_bool()),
                 VariableType::Unsigned => write!(f, "{}", self.data.unsigned_value),
+                VariableType::Long => write!(f, "{}", self.data.long_value),
+                VariableType::ULong => write!(f, "{}", self.data.ulong_value),
                 VariableType::Date | VariableType::DDate | VariableType::EDate => {
                     write!(f, "{}", IcbDate::from_pcboard(self.data.date_value))
                 }
@@ -423,6 +441,8 @@ impl PartialEq for VariableValue {
             match dest_type {
                 VariableType::Boolean => self.as_bool() == other.as_bool(),
                 VariableType::Unsigned => self.data.unsigned_value == other.data.unsigned_value,
+                VariableType::Long => self.as_long() == other.as_long(),
+                VariableType::ULong => self.as_ulong() == other.as_ulong(),
                 VariableType::Date => self.data.date_value == other.data.date_value,
                 VariableType::DDate => self.data.ddate_value == other.data.ddate_value,
                 VariableType::EDate => self.data.edate_value == other.data.edate_value,
@@ -488,6 +508,12 @@ fn promote_to(l: VariableType, r: VariableType) -> VariableType {
     if l == VariableType::Float || l == VariableType::Double || r == VariableType::Float || r == VariableType::Double {
         return VariableType::Double;
     }
+    if l == VariableType::ULong || r == VariableType::ULong {
+        return VariableType::ULong;
+    }
+    if l == VariableType::Long || r == VariableType::Long {
+        return VariableType::Long;
+    }
     VariableType::Integer
 }
 
@@ -508,6 +534,12 @@ impl Add<VariableValue> for VariableValue {
             match dest_type {
                 VariableType::Unsigned => {
                     data.unsigned_value = self.data.unsigned_value.wrapping_add(other.data.unsigned_value);
+                }
+                VariableType::Long => {
+                    data.long_value = self.as_long().wrapping_add(other.as_long());
+                }
+                VariableType::ULong => {
+                    data.ulong_value = self.as_ulong().wrapping_add(other.as_ulong());
                 }
                 VariableType::Integer => {
                     data.int_value = self.as_int().wrapping_add(other.as_int());
@@ -578,6 +610,12 @@ impl Sub<VariableValue> for VariableValue {
                 VariableType::Unsigned => {
                     data.unsigned_value = self.data.unsigned_value.wrapping_sub(other.data.unsigned_value);
                 }
+                VariableType::Long => {
+                    data.long_value = self.as_long().wrapping_sub(other.as_long());
+                }
+                VariableType::ULong => {
+                    data.ulong_value = self.as_ulong().wrapping_sub(other.as_ulong());
+                }
                 VariableType::Integer => {
                     data.int_value = self.as_int().wrapping_sub(other.as_int());
                 }
@@ -638,6 +676,12 @@ impl Mul<VariableValue> for VariableValue {
             match dest_type {
                 VariableType::Unsigned => {
                     data.unsigned_value = self.data.unsigned_value.wrapping_mul(other.data.unsigned_value);
+                }
+                VariableType::Long => {
+                    data.long_value = self.as_long().wrapping_mul(other.as_long());
+                }
+                VariableType::ULong => {
+                    data.ulong_value = self.as_ulong().wrapping_mul(other.as_ulong());
                 }
                 VariableType::Integer => {
                     data.int_value = self.as_int().wrapping_mul(other.as_int());
@@ -704,6 +748,14 @@ impl Div<VariableValue> for VariableValue {
                     } else {
                         self.data.unsigned_value.wrapping_div(other.data.unsigned_value)
                     };
+                }
+                VariableType::Long => {
+                    let divisor = other.as_long();
+                    data.long_value = if divisor == 0 { 0 } else { self.as_long().wrapping_div(divisor) };
+                }
+                VariableType::ULong => {
+                    let divisor = other.as_ulong();
+                    data.ulong_value = if divisor == 0 { 0 } else { self.as_ulong().wrapping_div(divisor) };
                 }
                 VariableType::Integer => {
                     let divisor = other.as_int();
@@ -786,6 +838,14 @@ impl Rem<VariableValue> for VariableValue {
                         self.data.unsigned_value.wrapping_rem(other.data.unsigned_value)
                     };
                 }
+                VariableType::Long => {
+                    let divisor = other.as_long();
+                    data.long_value = if divisor == 0 { 0 } else { self.as_long().wrapping_rem(divisor) };
+                }
+                VariableType::ULong => {
+                    let divisor = other.as_ulong();
+                    data.ulong_value = if divisor == 0 { 0 } else { self.as_ulong().wrapping_rem(divisor) };
+                }
                 VariableType::Integer => {
                     let divisor = other.as_int();
                     data.int_value = if divisor == 0 { 0 } else { self.as_int().wrapping_rem(divisor) };
@@ -830,6 +890,8 @@ impl PartialOrd for VariableValue {
             match dest_type {
                 VariableType::Boolean => Some(self.as_bool().cmp(&other.as_bool())),
                 VariableType::Unsigned => Some(self.data.unsigned_value.cmp(&other.data.unsigned_value)),
+                VariableType::Long => Some(self.as_long().cmp(&other.as_long())),
+                VariableType::ULong => Some(self.as_ulong().cmp(&other.as_ulong())),
                 VariableType::Date => Some(self.data.date_value.cmp(&other.data.date_value)),
                 VariableType::DDate => Some(self.data.ddate_value.cmp(&other.data.ddate_value)),
                 VariableType::EDate => Some(self.data.edate_value.cmp(&other.data.edate_value)),
@@ -888,6 +950,9 @@ impl Neg for VariableValue {
     fn neg(self) -> VariableValue {
         let mut dest_type = self.vtype;
         match dest_type {
+            VariableType::ULong => {
+                dest_type = VariableType::Long;
+            }
             VariableType::Unsigned
             | VariableType::Date
             | VariableType::EDate
@@ -913,6 +978,7 @@ impl Neg for VariableValue {
         match dest_type {
             VariableType::Boolean => data.unsigned_value = unsafe { u64::from(self.data.unsigned_value == 0) },
             VariableType::Integer => data.int_value = -self.as_int(),
+            VariableType::Long => data.long_value = self.as_long().wrapping_neg(),
             VariableType::SByte => data.sbyte_value = -self.as_sbyte(),
             VariableType::SWord => data.sword_value = -self.as_sword(),
             VariableType::Float => data.float_value = -self.as_float(),
@@ -1032,6 +1098,22 @@ impl VariableValue {
         }
     }
 
+    pub fn new_long(value: i64) -> Self {
+        Self {
+            vtype: VariableType::Long,
+            data: VariableData { long_value: value },
+            generic_data: GenericVariableData::None,
+        }
+    }
+
+    pub fn new_ulong(value: u64) -> Self {
+        Self {
+            vtype: VariableType::ULong,
+            data: VariableData { ulong_value: value },
+            generic_data: GenericVariableData::None,
+        }
+    }
+
     pub fn new_msg_id(conference: i32, area: i32) -> Self {
         Self {
             vtype: VariableType::MessageAreaID,
@@ -1143,6 +1225,12 @@ impl VariableValue {
         let generic_data = GenericVariableData::None;
         unsafe {
             match dest_type {
+                VariableType::Long => {
+                    data.long_value = self.as_long().wrapping_pow(other.as_ulong() as u32);
+                }
+                VariableType::ULong => {
+                    data.ulong_value = self.as_ulong().wrapping_pow(other.as_ulong() as u32);
+                }
                 VariableType::Integer => {
                     data.int_value = self.data.int_value.wrapping_pow(other.data.int_value as u32);
                 }
@@ -1206,6 +1294,7 @@ impl VariableValue {
             | VariableType::DDate => {
                 dest_type = VariableType::Integer;
             }
+            VariableType::ULong => return self.clone(),
             VariableType::String | VariableType::BigStr => {
                 let l = self.as_int();
                 return Self {
@@ -1220,6 +1309,7 @@ impl VariableValue {
         let generic_data = GenericVariableData::None;
         unsafe {
             match dest_type {
+                VariableType::Long => data.long_value = self.as_long().wrapping_abs(),
                 VariableType::Integer => data.int_value = self.data.int_value.abs(),
                 VariableType::Float => data.float_value = self.data.float_value.abs(),
                 VariableType::Double => data.double_value = self.data.double_value.abs(),
@@ -1289,6 +1379,8 @@ impl VariableValue {
                 0
             }
             VariableType::Unsigned => unsafe { self.data.unsigned_value as i32 },
+            VariableType::Long => unsafe { self.data.long_value as i32 },
+            VariableType::ULong => unsafe { self.data.ulong_value as i32 },
             VariableType::Date | VariableType::DDate | VariableType::EDate | VariableType::Integer => unsafe { self.data.int_value },
             VariableType::Money => unsafe { self.data.money_value },
             VariableType::Float => unsafe { self.data.float_value as i32 },
@@ -1328,6 +1420,8 @@ impl VariableValue {
                 0
             }
             VariableType::Unsigned => unsafe { self.data.unsigned_value },
+            VariableType::Long => unsafe { self.data.long_value as u64 },
+            VariableType::ULong => unsafe { self.data.ulong_value },
             VariableType::Date | VariableType::DDate | VariableType::EDate | VariableType::Integer => unsafe { self.data.int_value as u64 },
             VariableType::Money => unsafe { self.data.money_value as u64 },
             VariableType::Float => unsafe { self.data.float_value as u64 },
@@ -1340,6 +1434,28 @@ impl VariableValue {
             _ => {
                 panic!("Unsupported type: {:?}", self.vtype);
             }
+        }
+    }
+
+    pub fn as_long(&self) -> i64 {
+        if let GenericVariableData::String(value) = &self.generic_data {
+            return value.trim().parse().unwrap_or_default();
+        }
+        match self.vtype {
+            VariableType::Long => unsafe { self.data.long_value },
+            VariableType::ULong | VariableType::Unsigned => unsafe { self.data.ulong_value as i64 },
+            _ => self.as_int() as i64,
+        }
+    }
+
+    pub fn as_ulong(&self) -> u64 {
+        if let GenericVariableData::String(value) = &self.generic_data {
+            return value.trim().parse().unwrap_or_default();
+        }
+        match self.vtype {
+            VariableType::Long => unsafe { self.data.long_value as u64 },
+            VariableType::ULong | VariableType::Unsigned => unsafe { self.data.ulong_value },
+            _ => self.as_int() as u64,
         }
     }
 
@@ -1356,6 +1472,8 @@ impl VariableValue {
                 0.0
             }
             VariableType::Unsigned => unsafe { self.data.unsigned_value as f64 },
+            VariableType::Long => unsafe { self.data.long_value as f64 },
+            VariableType::ULong => unsafe { self.data.ulong_value as f64 },
             VariableType::Date | VariableType::DDate | VariableType::EDate | VariableType::Integer => unsafe { self.data.int_value as f64 },
             VariableType::Money => unsafe { self.data.money_value as f64 },
             VariableType::Float => unsafe { self.data.float_value as f64 },
@@ -1384,6 +1502,8 @@ impl VariableValue {
                 0.0
             }
             VariableType::Unsigned => unsafe { self.data.unsigned_value as f32 },
+            VariableType::Long => unsafe { self.data.long_value as f32 },
+            VariableType::ULong => unsafe { self.data.ulong_value as f32 },
             VariableType::Date | VariableType::DDate | VariableType::EDate | VariableType::Integer => unsafe { self.data.int_value as f32 },
             VariableType::Money => unsafe { self.data.money_value as f32 },
             VariableType::Float => unsafe { self.data.float_value },
@@ -1412,6 +1532,8 @@ impl VariableValue {
                 0
             }
             VariableType::Unsigned => unsafe { self.data.unsigned_value as u8 },
+            VariableType::Long => unsafe { self.data.long_value as u8 },
+            VariableType::ULong => unsafe { self.data.ulong_value as u8 },
             VariableType::Date | VariableType::DDate | VariableType::EDate | VariableType::Integer => unsafe { self.data.int_value as u8 },
             VariableType::Money => unsafe { self.data.money_value as u8 },
             VariableType::Float => unsafe { self.data.float_value as u8 },
@@ -1444,6 +1566,8 @@ impl VariableValue {
                 0
             }
             VariableType::Unsigned => unsafe { self.data.unsigned_value as u16 },
+            VariableType::Long => unsafe { self.data.long_value as u16 },
+            VariableType::ULong => unsafe { self.data.ulong_value as u16 },
             VariableType::Date | VariableType::DDate | VariableType::EDate | VariableType::Integer | VariableType::Word => unsafe { self.data.word_value },
             VariableType::Money => unsafe { self.data.money_value as u16 },
             VariableType::Float => unsafe { self.data.float_value as u16 },
@@ -1484,6 +1608,8 @@ impl VariableValue {
                         }
                     }
                     VariableType::Unsigned => self.data.unsigned_value.to_string(),
+                    VariableType::Long => self.data.long_value.to_string(),
+                    VariableType::ULong => self.data.ulong_value.to_string(),
                     VariableType::Date => pcb_date_string(self.data.date_value),
                     VariableType::EDate => pcb_edate_string(self.data.edate_value),
                     VariableType::DDate => pcb_ddate_string(self.data.ddate_value),
@@ -1691,6 +1817,12 @@ impl VariableValue {
             }
             VariableType::Unsigned => {
                 data.unsigned_value = self.as_int() as u64;
+            }
+            VariableType::Long => {
+                data.long_value = self.as_long();
+            }
+            VariableType::ULong => {
+                data.ulong_value = self.as_ulong();
             }
             VariableType::Date => {
                 data.date_value = match self.vtype {
@@ -1904,11 +2036,49 @@ pub fn convert_to(var_type: VariableType, value: &VariableValue) -> VariableValu
 
 #[cfg(test)]
 mod tests {
-    use crate::executable::VariableData;
+    use unicase::Ascii;
+
+    use crate::{
+        executable::{VariableData, VariableType, VariableValue},
+        parser::built_in_type,
+    };
 
     #[test]
     fn check_variable_size() {
         assert_eq!(8, std::mem::size_of::<VariableData>());
+    }
+
+    #[test]
+    fn long_keeps_its_historical_meaning_before_runtime_400() {
+        let name = Ascii::new("LONG".to_string());
+        assert_eq!(Some(VariableType::Integer), built_in_type(&name, 340));
+        assert_eq!(Some(VariableType::Long), built_in_type(&name, 400));
+    }
+
+    #[test]
+    fn long_arithmetic_keeps_integer_literals_at_64_bits() {
+        let value = VariableValue::new_long(i32::MAX as i64 + 1);
+        let one = VariableValue::new_int(1);
+
+        assert_eq!("2147483649", (value.clone() + one.clone()).as_string());
+        assert_eq!("2147483647", (value.clone() - one).as_string());
+        assert!(value > VariableValue::new_int(i32::MAX));
+    }
+
+    #[test]
+    fn ulong_arithmetic_uses_the_full_unsigned_width() {
+        let value = VariableValue::new_ulong(u64::MAX);
+
+        assert_eq!(u64::MAX.to_string(), value.as_string());
+        assert_eq!("0", (value + VariableValue::new_ulong(1)).as_string());
+    }
+
+    #[test]
+    fn negating_ulong_produces_a_long() {
+        let value = -VariableValue::new_ulong(1);
+
+        assert_eq!(VariableType::Long, value.vtype);
+        assert_eq!(-1, value.as_long());
     }
 }
 

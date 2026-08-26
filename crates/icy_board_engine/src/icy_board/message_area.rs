@@ -84,12 +84,11 @@ impl MessageArea {
     }
 
     /// The message with that number, or an invalid one when the area has no such message.
-    fn read_message(&self, vm: &mut crate::vm::VirtualMachine<'_>, number: i32) -> VariableValue {
-        if number < 0 {
+    fn read_message(&self, vm: &mut crate::vm::VirtualMachine<'_>, number: i64) -> VariableValue {
+        let Ok(number) = u32::try_from(number) else {
             vm.operation_succeeded();
             return PplMessage::missing();
-        }
-        let number = number as u32;
+        };
         let header = vm.with_message_base(&self.path, |base| match base.read_header(number) {
             Ok(header) => Ok(Some(header)),
             Err(error) if message_is_missing(&error) => {
@@ -126,13 +125,13 @@ impl MessageArea {
 
     /// The first message at or after `start` whose field contains `text`, matched the
     /// way `SCANMSGHDR` matches: without regard to case, anywhere in the field.
-    fn find_message(&self, vm: &mut crate::vm::VirtualMachine<'_>, field: i32, text: &str, start: i32) -> VariableValue {
+    fn find_message(&self, vm: &mut crate::vm::VirtualMachine<'_>, field: i32, text: &str, start: i64) -> VariableValue {
         if !matches!(field, HDR_TO | HDR_FROM | HDR_SUBJ) {
             vm.set_error(PplError::new(ERR_KIND_MSG, ERR_INVALID, format!("unknown message field {field}")));
             return PplMessage::missing();
         }
         let needle = text.to_uppercase();
-        let start = start.max(0) as u32;
+        let start = u32::try_from(start.max(0)).unwrap_or(u32::MAX);
         let found = vm.with_message_base(&self.path, |base| {
             let first = start.max(base.lowest_message_number());
             for number in first..=base.highest_message_number() {
@@ -227,15 +226,15 @@ impl UserData for MessageArea {
         registry.add_function(HAS_ACCESS.clone(), Vec::new(), VariableType::Boolean);
         registry.add_function(CAN_ENTER.clone(), Vec::new(), VariableType::Boolean);
         registry.add_function(CAN_ATTACH.clone(), Vec::new(), VariableType::Boolean);
-        registry.add_function(HIGH_MSG.clone(), Vec::new(), VariableType::Integer);
-        registry.add_function(LOW_MSG.clone(), Vec::new(), VariableType::Integer);
-        registry.add_function(READ.clone(), vec![VariableType::Integer], VariableType::UserData(MSG_ID as u8));
+        registry.add_function(HIGH_MSG.clone(), Vec::new(), VariableType::Long);
+        registry.add_function(LOW_MSG.clone(), Vec::new(), VariableType::Long);
+        registry.add_function(READ.clone(), vec![VariableType::Long], VariableType::UserData(MSG_ID as u8));
         registry.add_function_with(
             FIND.clone(),
             vec![
                 VariableType::UserData(crate::parser::MSG_FIELD_ENUM_ID),
                 VariableType::String,
-                VariableType::Integer,
+                VariableType::Long,
             ],
             2,
             VariableType::UserData(MSG_ID as u8),
@@ -309,18 +308,18 @@ impl UserDataValue for MessageArea {
             return Ok(VariableValue::new_bool(res));
         }
         if *name == *HIGH_MSG {
-            return Ok(VariableValue::new_int(self.message_bounds(vm).map_or(0, |(_, high)| high as i32)));
+            return Ok(VariableValue::new_long(self.message_bounds(vm).map_or(0, |(_, high)| i64::from(high))));
         }
         if *name == *LOW_MSG {
-            return Ok(VariableValue::new_int(self.message_bounds(vm).map_or(0, |(low, _)| low as i32)));
+            return Ok(VariableValue::new_long(self.message_bounds(vm).map_or(0, |(low, _)| i64::from(low))));
         }
         if *name == *READ {
-            return Ok(self.read_message(vm, arguments[0].as_int()));
+            return Ok(self.read_message(vm, arguments[0].as_long()));
         }
         if *name == *FIND {
             let field = arguments[0].as_int();
             let text = arguments[1].as_string();
-            let start = arguments.get(2).map_or(0, VariableValue::as_int);
+            let start = arguments.get(2).map_or(0, VariableValue::as_long);
             return Ok(self.find_message(vm, field, &text, start));
         }
         log::error!("Invalid function call on MessageArea ({name})");

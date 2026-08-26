@@ -34,6 +34,18 @@ releases.
 
 ### Changed
 
+- PPL 4.00 adds signed `LONG` and unsigned `ULONG` 64-bit integers. `ToLong()`
+  now returns the new `LONG`, and `ToULong()` converts to `ULONG`; before 4.00,
+  `LONG` and `ToLong()` retain their historical 32-bit `INTEGER` meaning. The
+  language server's 4.00 upgrade action rewrites old `ToLong()` calls to
+  `ToInteger()` so upgrading source preserves its behavior.
+
+- `MSG.Number`, `MSG.ReplyTo`, `MSG.Size` and `AREA.LowMsg()`/`HighMsg()` are
+  `LONG` rather than `INTEGER`. JAM counts messages and body bytes in 32
+  unsigned bits, which fit exactly without making ordinary arithmetic unsigned.
+  `Read()` answers an invalid `MSG` for a number outside JAM's range rather than
+  truncating it into a message that exists.
+
 - An area is read through one open message base instead of opening it again for
   every message. The documented walk over 2000 messages went from 16 ms to 7 ms,
   and from 26 ms to 13 ms when it reads the bodies too - `FOR n = area.LowMsg()

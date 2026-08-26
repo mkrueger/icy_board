@@ -118,6 +118,8 @@ pub fn get_type_hover(var_type: VariableType) -> Option<Hover> {
     match var_type {
         VariableType::Boolean => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-boolean")),
         VariableType::Unsigned => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-unsigned")),
+        VariableType::Long => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-long")),
+        VariableType::ULong => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-ulong")),
         VariableType::Date => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-date")),
         VariableType::EDate => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-edate")),
         VariableType::Integer => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-integer")),
@@ -309,6 +311,8 @@ pub fn get_function_hover(func: &FunctionDefinition) -> Option<Hover> {
         FuncOpCode::TODREAL => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-todreal")),
         FuncOpCode::TOEDATE => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-toedate")),
         FuncOpCode::TOINTEGER => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-tointeger")),
+        FuncOpCode::TOLONG64 => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-tolong")),
+        FuncOpCode::TOULONG64 => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-toulong")),
         FuncOpCode::TOMONEY => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-tomoney")),
         FuncOpCode::TOREAL => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-toreal")),
         FuncOpCode::TOSBYTE => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-tosbyte")),

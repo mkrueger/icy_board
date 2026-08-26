@@ -123,6 +123,13 @@ sysop-only actions too. An existing PPE that stays within the documented PPL
 and PCBoard APIs is expected to run; a failure is a compatibility bug worth
 reporting.
 
+When upgrading source to `;$LANGVERSION 400`, use the PPL language server's
+**Upgrade file to language version 400** source action. In PCBoard languages,
+`ToLong()` is an alias for the 32-bit `ToInteger()`. In language 4.00 it returns
+the new signed 64-bit `LONG`. The upgrade action rewrites existing `ToLong()`
+calls to `ToInteger()` so recompiling old source preserves its arithmetic.
+Use `ToLong()` after the upgrade only where the wider result is intended.
+
 ## 7. Test as caller and sysop
 
 Before opening a listener to the network:

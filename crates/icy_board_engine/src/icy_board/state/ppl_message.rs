@@ -110,15 +110,15 @@ impl UserData for PplMessage {
     const TYPE_NAME: &'static str = "Msg";
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
-        registry.add_property(NUMBER.clone(), VariableType::Integer, false);
+        registry.add_property(NUMBER.clone(), VariableType::Long, false);
         registry.add_property(VALID.clone(), VariableType::Boolean, false);
         for name in [&*FROM, &*TO, &*SUBJECT, &*STATUS] {
             registry.add_property(name.clone(), VariableType::String, false);
         }
         registry.add_property(DATE.clone(), VariableType::Date, false);
         registry.add_property(TIME.clone(), VariableType::Time, false);
-        registry.add_property(REPLY_TO.clone(), VariableType::Integer, false);
-        registry.add_property(SIZE.clone(), VariableType::Integer, false);
+        registry.add_property(REPLY_TO.clone(), VariableType::Long, false);
+        registry.add_property(SIZE.clone(), VariableType::Long, false);
         for name in [&*IS_PRIVATE, &*IS_READ, &*IS_DELETED, &*IS_ECHO, &*NEEDS_PASSWORD] {
             registry.add_property(name.clone(), VariableType::Boolean, false);
         }
@@ -130,7 +130,7 @@ impl UserData for PplMessage {
 impl UserDataValue for PplMessage {
     fn get_property_value(&self, _vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
         let value = if *name == *NUMBER {
-            VariableValue::new_int(self.number as i32)
+            VariableValue::new_long(i64::from(self.number))
         } else if *name == *VALID {
             VariableValue::new_bool(self.valid)
         } else if *name == *FROM {
@@ -157,9 +157,9 @@ impl UserDataValue for PplMessage {
             };
             VariableValue::new(VariableType::Time, VariableData::from_int(time))
         } else if *name == *REPLY_TO {
-            VariableValue::new_int(self.reply_to as i32)
+            VariableValue::new_long(i64::from(self.reply_to))
         } else if *name == *SIZE {
-            VariableValue::new_int(self.size as i32)
+            VariableValue::new_long(i64::from(self.size))
         } else if *name == *IS_PRIVATE {
             VariableValue::new_bool(self.is_private)
         } else if *name == *IS_READ {

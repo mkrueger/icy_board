@@ -6,10 +6,10 @@ PPL (PCBoard Programming Language) supports several fundamental data types for p
 Basic Data Types
 ----------------
 
-INTEGER / SDWORD / LONG
-~~~~~~~~~~~~~~~~~~~~~~~
-- **Size**: 2 bytes (16-bit signed)
-- **Range**: -32,768 to 32,767
+INTEGER / SDWORD
+~~~~~~~~~~~~~~~~
+- **Size**: 4 bytes (32-bit signed)
+- **Range**: -2,147,483,648 to 2,147,483,647
 - **Default value**: 0
 - **Declaration**: ``INTEGER varname`` or ``INTEGER varname = value``
 
@@ -18,6 +18,31 @@ Example::
     INTEGER count
     INTEGER maxUsers = 100
     INTEGER temperature = -5
+
+LONG
+~~~~
+- **Size**: 8 bytes (64-bit signed)
+- **Range**: -9,223,372,036,854,775,808 to 9,223,372,036,854,775,807
+- **Default value**: 0
+- **Declaration**: ``LONG varname`` or ``LONG varname = value``
+- **Since**: PPL 4.00. In older language versions, ``LONG`` remains a synonym for ``INTEGER``.
+
+Example::
+
+    LONG messageNumber = 4294967295
+    LONG nextMessage = messageNumber + 1
+
+ULONG
+~~~~~
+- **Size**: 8 bytes (64-bit unsigned)
+- **Range**: 0 to 18,446,744,073,709,551,615
+- **Default value**: 0
+- **Declaration**: ``ULONG varname`` or ``ULONG varname = value``
+- **Since**: PPL 4.00
+
+Example::
+
+    ULONG byteCount = ToULong("18446744073709551615")
 
 BOOLEAN
 ~~~~~~~

@@ -321,9 +321,11 @@ pub enum FuncOpCode {
     Session = -306,
     ElementCount = -307,
     ElementAt = -308,
+    TOLONG64 = -309,
+    TOULONG64 = -310,
 }
 
-pub const LAST_FUNC: i16 = -308;
+pub const LAST_FUNC: i16 = -310;
 
 impl FuncOpCode {
     pub fn get_definition(self) -> &'static FunctionDefinition {
@@ -342,6 +344,8 @@ impl FuncOpCode {
                 | FuncOpCode::Session
                 | FuncOpCode::ElementCount
                 | FuncOpCode::ElementAt
+                | FuncOpCode::TOLONG64
+                | FuncOpCode::TOULONG64
         ) {
             400
         } else {
@@ -408,7 +412,7 @@ impl FunctionDefinition {
         }
     }
 }
-pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 320]> = std::sync::LazyLock::new(|| {
+pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 322]> = std::sync::LazyLock::new(|| {
     [
         FunctionDefinition {
             name: "END",
@@ -3063,6 +3067,22 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 320]> 
                 ArgumentDefinition::new("index", VariableType::Integer),
             ]),
             signature: FunctionSignature::FixedParameters(2),
+        },
+        FunctionDefinition {
+            name: "ToLong",
+            version: 400,
+            opcode: FuncOpCode::TOLONG64,
+            return_type: VariableType::Long,
+            args: Some(vec![ArgumentDefinition::new("exp", VariableType::None)]),
+            signature: FunctionSignature::FixedParameters(1),
+        },
+        FunctionDefinition {
+            name: "ToULong",
+            version: 400,
+            opcode: FuncOpCode::TOULONG64,
+            return_type: VariableType::ULong,
+            args: Some(vec![ArgumentDefinition::new("exp", VariableType::None)]),
+            signature: FunctionSignature::FixedParameters(1),
         },
         // ALIASES (need to be last in the list)
         FunctionDefinition {

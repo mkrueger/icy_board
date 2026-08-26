@@ -1295,10 +1295,12 @@ impl<'a> Parser<'a> {
     }
 }
 
-static BUILT_IN_TYPE_LOOKUP: std::sync::LazyLock<HashMap<unicase::Ascii<String>, (VariableType, u16)>> = std::sync::LazyLock::new(|| {
+static BUILT_IN_TYPE_LOOKUP: std::sync::LazyLock<HashMap<unicase::Ascii<String>, Vec<(VariableType, u16)>>> = std::sync::LazyLock::new(|| {
     let mut m = HashMap::new();
     for (name, variable_type, since) in BUILT_IN_TYPES {
-        m.insert(unicase::Ascii::new((*name).to_string()), (*variable_type, *since));
+        m.entry(unicase::Ascii::new((*name).to_string()))
+            .or_insert_with(Vec::new)
+            .push((*variable_type, *since));
     }
     m
 });
@@ -1314,6 +1316,8 @@ static BUILT_IN_TYPES: &[(&str, VariableType, u16)] = &[
     ("MONEY", VariableType::Money, 100),
     ("SDWORD", VariableType::Integer, 200),
     ("LONG", VariableType::Integer, 200),
+    ("LONG", VariableType::Long, 400),
+    ("ULONG", VariableType::ULong, 400),
     ("BIGSTR", VariableType::BigStr, 200),
     ("EDATE", VariableType::EDate, 200),
     ("WORD", VariableType::Word, 200),
@@ -1340,17 +1344,20 @@ static BUILT_IN_TYPES: &[(&str, VariableType, u16)] = &[
 pub fn built_in_type(name: &unicase::Ascii<String>, lang_version: u16) -> Option<VariableType> {
     BUILT_IN_TYPE_LOOKUP
         .get(name)
-        .filter(|(_, since)| *since <= lang_version)
+        .and_then(|versions| versions.iter().rev().find(|(_, since)| *since <= lang_version))
         .map(|(variable_type, _)| *variable_type)
 }
 
 /// The type names a program written for that language version may use.
 pub fn built_in_type_names(lang_version: u16) -> Vec<&'static str> {
-    BUILT_IN_TYPES
+    let mut names: Vec<_> = BUILT_IN_TYPES
         .iter()
         .filter(|(_, _, since)| *since <= lang_version)
         .map(|(name, _, _)| *name)
-        .collect()
+        .collect();
+    names.sort_unstable();
+    names.dedup();
+    names
 }
 
 impl Parser<'_> {

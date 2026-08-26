@@ -263,10 +263,15 @@ fn a_word_is_offered_from_the_version_that_gave_it_meaning() {
     for word in ["IF", "WHILE", "DECLARE"] {
         assert!(old.contains(&word.to_string()), "{word} should be offered in 340: {old:?}");
     }
-    for word in ["CONST", "ENUM", "REPEAT", "TYPE", "EXIT"] {
+    for word in ["CONST", "ENUM", "REPEAT", "TYPE", "EXIT", "ULONG"] {
         assert!(!old.contains(&word.to_string()), "{word} should not be offered in 340");
         assert!(new.contains(&word.to_string()), "{word} should be offered in 400");
     }
+
+    let old_functions = offered_in(340, "PRINT To");
+    let new_functions = offered_in(400, "PRINT To");
+    assert!(!old_functions.contains(&"ToULong".to_string()), "{old_functions:?}");
+    assert!(new_functions.contains(&"ToULong".to_string()), "{new_functions:?}");
 }
 
 #[test]

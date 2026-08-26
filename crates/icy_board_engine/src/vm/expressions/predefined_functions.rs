@@ -1587,6 +1587,14 @@ pub async fn tounsigned(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Va
     Ok(vm.eval_expr(&args[0]).await?.clone().convert_to(VariableType::Unsigned))
 }
 
+pub async fn tolong(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    Ok(vm.eval_expr(&args[0]).await?.clone().convert_to(VariableType::Long))
+}
+
+pub async fn toulong(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    Ok(vm.eval_expr(&args[0]).await?.clone().convert_to(VariableType::ULong))
+}
+
 pub async fn toword(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(vm.eval_expr(&args[0]).await?.clone().convert_to(VariableType::Word))
 }

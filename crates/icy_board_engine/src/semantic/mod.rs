@@ -1632,7 +1632,12 @@ impl AstVisitor<VariableType> for SemanticVisitor {
         }
         let predef = FunctionDefinition::get_function_definitions(identifier.get_identifier());
         if !predef.is_empty() && (self.cur_func_call > 0 || self.lookup_variable(identifier.get_identifier()).is_none()) {
-            let def = &FUNCTION_DEFINITIONS[predef[0]];
+            let def = predef
+                .iter()
+                .map(|index| &FUNCTION_DEFINITIONS[*index])
+                .filter(|definition| definition.version <= self.lang_version)
+                .max_by_key(|definition| definition.version)
+                .unwrap_or(&FUNCTION_DEFINITIONS[predef[0]]);
             if self.cur_func_call > 0 {
                 self.function_type_lookup.insert(self.cur_func_call, SemanticInfo::PredefFunctionGroup(predef));
             } else {
@@ -2054,16 +2059,11 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 for argument in call.get_arguments() {
                     argument.visit(self);
                 }
+                let mut funcs = funcs;
+                funcs.sort_by_key(|func| std::cmp::Reverse(FUNCTION_DEFINITIONS[*func].version));
                 for func in &funcs {
                     let def = &FUNCTION_DEFINITIONS[*func];
-                    if def.parameter_count() == call.get_arguments().len() {
-                        if self.lang_version < def.version {
-                            self.errors.lock().unwrap().report_error(
-                                call.get_expression().get_span(),
-                                ParserErrorType::FunctionVersionNotSupported(def.opcode, def.version, self.lang_version),
-                            );
-                            return res;
-                        }
+                    if def.parameter_count() == call.get_arguments().len() && def.version <= self.lang_version {
                         let minimum_runtime = def.opcode.minimum_runtime();
                         if self.runtime < minimum_runtime {
                             self.errors.lock().unwrap().report_error(
@@ -2078,6 +2078,18 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                         }
                         return def.return_type;
                     }
+                }
+                if let Some(def) = funcs
+                    .iter()
+                    .map(|func| &FUNCTION_DEFINITIONS[*func])
+                    .filter(|def| def.parameter_count() == call.get_arguments().len())
+                    .min_by_key(|def| def.version)
+                {
+                    self.errors.lock().unwrap().report_error(
+                        call.get_expression().get_span(),
+                        ParserErrorType::FunctionVersionNotSupported(def.opcode, def.version, self.lang_version),
+                    );
+                    return res;
                 }
                 // report wrong argument count
                 self.check_expr_arg_count(

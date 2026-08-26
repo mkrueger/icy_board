@@ -405,7 +405,7 @@ than failing, so its properties can still be read.
 | `HasAccess()` | `BOOLEAN` | Whether the current caller may list it |
 | `CanEnter()` | `BOOLEAN` | Whether the current caller may join it |
 | `CanAttach()` | `BOOLEAN` | Whether the current caller may save an attachment |
-| `LowMsg()`, `HighMsg()` | `INTEGER` | The numbers its messages run between, zero when there are none |
+| `LowMsg()`, `HighMsg()` | `LONG` | The numbers its messages run between, zero when there are none |
 | `Read(number)` | `MSG` | The message with that number |
 | `Find(field, text [, start])` | `MSG` | The first message at or after `start` whose field contains `text` |
 
@@ -437,7 +437,7 @@ than failing, so its properties can still be read.
 
 `HasAccess()` is always the question a *listing* asks; what a caller may then do
 is asked separately, because seeing a conference and writing in it are configured
-apart. `HighMsg()` opens the message base to answer, which is why it is a call
+apart. `HighMsg()` reads the message base to answer, which is why it is a call
 rather than a property.
 
 Walking a conference:

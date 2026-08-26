@@ -1204,6 +1204,18 @@
             "type": "TOKEN",
             "content": {
               "type": "PATTERN",
+              "value": "[uU][lL][oO][nN][gG]"
+            }
+          },
+          "named": false,
+          "value": "ULONG"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
               "value": "[mM][oO][nN][eE][yY]"
             }
           },

@@ -172,6 +172,8 @@ pub async fn run_function(opcode: FuncOpCode, arg: &mut VirtualMachine<'_>, argu
         FuncOpCode::TOTIME => predefined_functions::totime(arg, arguments).await,
         FuncOpCode::TOUNSIGNED => predefined_functions::tounsigned(arg, arguments).await,
         FuncOpCode::TOWORD => predefined_functions::toword(arg, arguments).await,
+        FuncOpCode::TOLONG64 => predefined_functions::tolong(arg, arguments).await,
+        FuncOpCode::TOULONG64 => predefined_functions::toulong(arg, arguments).await,
         FuncOpCode::MIXED => predefined_functions::mixed(arg, arguments).await,
         FuncOpCode::ALIAS => predefined_functions::alias(arg, arguments).await,
         FuncOpCode::CONFREG => predefined_functions::confreg(arg, arguments).await,

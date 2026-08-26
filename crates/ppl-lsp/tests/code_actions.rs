@@ -729,6 +729,18 @@ fn upgrading_turns_obsolete_braces_into_parentheses() {
 }
 
 #[test]
+fn upgrading_preserves_the_legacy_tolong_meaning() {
+    let (mut server, _) = Server::ready();
+    let uri = "file:///tmp/upgrade-tolong.pps";
+    let source = ";$LANGVERSION 330\nINTEGER value\nvalue = ToLong(4294967295)\nPRINTLN value\n";
+    let (diagnostics, actions) = upgrade(&mut server, uri, source);
+
+    let texts = new_texts(upgrade_action(&diagnostics, &actions), uri);
+    assert!(texts.contains(&json!("ToInteger")), "{texts:?}");
+    assert!(texts.contains(&json!(";$LANGVERSION 400")), "{texts:?}");
+}
+
+#[test]
 fn a_file_that_needs_no_upgrade_is_not_offered_one() {
     let (mut server, _) = Server::ready();
     let uri = "file:///tmp/already-modern.pps";

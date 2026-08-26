@@ -61,6 +61,41 @@ fn an_unknown_message_number_answers_an_invalid_message() {
     assert_eq!(output, "0 0 [] [] 1\n0 1\n");
 }
 
+/// A number outside JAM's range is one no message has, not one that wraps.
+#[test]
+fn a_message_number_too_large_for_the_base_does_not_wrap() {
+    let output = run_ppl_with_messages(
+        r"
+        LONG number = 4294967297
+        PrintLn Board.Conferences[0].Areas[0].Read(number).Valid
+        PrintLn Board.Conferences[0].Areas[0].Read(4294967295).Valid
+        ",
+        MESSAGES,
+    );
+
+    assert_eq!(output, "0\n0\n");
+}
+
+/// The walk the docs show, pinned so the types it declares keep working.
+#[test]
+fn the_documented_walk_reads_every_message_in_the_area() {
+    let output = run_ppl_with_messages(
+        r#"
+        AREA area = Board.Conferences[0].Areas[0]
+        LONG n
+
+        FOR n = area.LowMsg() TO area.HighMsg()
+            MSG msg = area.Read(n)
+            IF !msg.Valid CONTINUE
+            PrintLn msg.Number, " ", msg.From, " ", msg.Subject
+        NEXT
+        "#,
+        MESSAGES,
+    );
+
+    assert_eq!(output, "1 SYSOP About PPL\n2 STAN Re: About PPL\n3 FRED Announcement\n");
+}
+
 #[test]
 fn a_missing_message_clears_an_older_operation_error() {
     let output = run_ppl_with_messages(

@@ -341,8 +341,8 @@ Member               Type              Description
 ``HasAccess()``      ``BOOLEAN``       Whether the current caller may list it
 ``CanEnter()``       ``BOOLEAN``       Whether the current caller may join it
 ``CanAttach()``      ``BOOLEAN``       Whether the current caller may save an attachment
-``LowMsg()``         ``INTEGER``       The lowest message number, zero when there is none
-``HighMsg()``        ``INTEGER``       The highest message number, zero when there is none
+``LowMsg()``         ``LONG``          The lowest message number, zero when there is none
+``HighMsg()``        ``LONG``          The highest message number, zero when there is none
 ``Read(number)``     ``MSG``           The message with that number
 ``Find(f, t[, s])``  ``MSG``           First message at or after ``s`` whose field ``f`` contains ``t``
 ===================  ================  ==================================================
@@ -377,8 +377,8 @@ Member               Type              Description
 ``HasAccess()``      ``BOOLEAN``       Whether the current caller can open it
 ===================  ================  ==================================================
 
-``HighMsg()`` opens the message base to answer, so it is a call rather than a
-property: read it once per area rather than once per line of a listing.
+``HighMsg()`` reads the message base to answer, so it is a call rather than a
+property.
 
 Messages
 ~~~~~~~~
@@ -399,20 +399,20 @@ that number::
 Member               Type              Description
 ===================  ================  ==================================================
 ``Valid``            ``BOOLEAN``       Whether the area has that message
-``Number``           ``INTEGER``       The number it was read under
+``Number``           ``LONG``          The number it was read under
 ``From``             ``STRING``        Who wrote it
 ``To``               ``STRING``        Who it is for
 ``Subject``          ``STRING``        What it is about
 ``Date``             ``DATE``          When it was written
 ``Time``             ``TIME``          When it was written
-``ReplyTo``          ``INTEGER``       The message it answers, zero when it answers none
+``ReplyTo``          ``LONG``          The message it answers, zero when it answers none
 ``Status``           ``STRING``        The one character ``HDR_STATUS`` reports
 ``IsPrivate``        ``BOOLEAN``       Whether it is private
 ``IsRead``           ``BOOLEAN``       Whether it has been read
 ``IsDeleted``        ``BOOLEAN``       Whether it is killed
 ``IsEcho``           ``BOOLEAN``       Whether it is echoed
 ``NeedsPassword``    ``BOOLEAN``       Whether reading it takes a password
-``Size``             ``INTEGER``       How many bytes the body holds
+``Size``             ``LONG``          How many bytes the body holds
 ``Text()``           ``STRING``        The body
 ===================  ================  ==================================================
 
@@ -421,7 +421,7 @@ sparse - numbering starts at ``LowMsg()`` and a deleted message leaves its
 number behind - so a walk counts over the range and asks each one whether it is
 there::
 
-    INTEGER n
+    LONG n
 
     FOR n = area.LowMsg() TO area.HighMsg()
         MSG msg = area.Read(n)
@@ -431,6 +431,19 @@ there::
 
 That is also why messages are not a collection: ``[ ]`` indexes a position
 everywhere else in the language, and a message number is not one.
+
+Message numbers and body sizes are ``LONG``. JAM counts them in 32 unsigned
+bits, which all fit in a signed 64-bit value, and ordinary integer literals can
+be added or compared without narrowing. A number outside JAM's range is one no
+message has, so ``Read()`` answers an invalid ``MSG`` rather than wrapping.
+
+``LONG`` and ``ULONG`` are signed and unsigned 64-bit integers in language
+4.00. Before 4.00, ``LONG`` was a synonym for the 32-bit ``INTEGER``, and
+``ToLong()`` therefore performed the same conversion as ``ToInteger()``. In
+4.00 ``ToLong()`` returns the new 64-bit type; ``ToULong()`` returns ``ULONG``.
+The language server's **Upgrade file to language version 400** source action
+rewrites old ``ToLong(value)`` calls to ``ToInteger(value)`` to preserve their
+32-bit behavior.
 
 The body stays in the base until ``Text()`` asks for it, which is why it is a
 call. A listing that only prints headers never pays for a body.

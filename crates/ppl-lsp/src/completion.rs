@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use icy_board_engine::{
     ast::{Ast, AstVisitor, IdentifierExpression, PredefinedCallStatement, constant::BUILTIN_CONSTS, walk_predefined_call_statement},
     executable::{FUNCTION_DEFINITIONS, STATEMENT_DEFINITIONS, StatementSignature},
@@ -32,7 +34,7 @@ pub fn get_completion(ast: &Ast, semantic_visitor: &SemanticVisitor, line_before
         CursorContext::Other => {}
     }
 
-    let mut map = CompletionVisitor::new(offset);
+    let mut map = CompletionVisitor::new(offset, ast.language_version);
     ast.visit(&mut map);
 
     if map.items.is_empty() {
@@ -209,12 +211,17 @@ fn record_literal_completion(visitor: &SemanticVisitor, type_name_of_literal: &s
 #[derive(Default)]
 struct CompletionVisitor {
     offset: usize,
+    language_version: u16,
     pub items: Vec<CompletionItem>,
 }
 
 impl CompletionVisitor {
-    pub fn new(offset: usize) -> Self {
-        Self { offset, items: Vec::new() }
+    pub fn new(offset: usize, language_version: u16) -> Self {
+        Self {
+            offset,
+            language_version,
+            items: Vec::new(),
+        }
     }
 
     fn add_functions(&mut self) {
@@ -239,9 +246,10 @@ impl CompletionVisitor {
             });
         }
 
-        for func in FUNCTION_DEFINITIONS.iter() {
+        let mut names = HashSet::new();
+        for func in FUNCTION_DEFINITIONS.iter().rev() {
             // Names in angle brackets are the compiler's own; they cannot be written.
-            if func.name.starts_with('<') {
+            if func.name.starts_with('<') || func.version > self.language_version || !names.insert(func.name.to_ascii_uppercase()) {
                 continue;
             }
             let content = if let Some(hover) = get_function_hover(func) {
