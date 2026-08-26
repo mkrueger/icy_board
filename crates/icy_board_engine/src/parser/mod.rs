@@ -303,6 +303,8 @@ pub const AREAS_ID: usize = 52;
 pub const DIRECTORIES_ID: usize = 53;
 pub const DOORS_ID: usize = 54;
 pub const CONFERENCES_ID: usize = 55;
+pub const NOTES_ID: usize = 56;
+pub const CONTACTS_ID: usize = 57;
 
 /// Builtin enums take the top of the id space and a program's own enums grow down from
 /// below them, so the order here is what a PPE stores and may only be appended to.
@@ -374,6 +376,8 @@ impl UserTypeRegistry {
         reg.register::<crate::icy_board::state::ppl_collection::PplDirectories>(DIRECTORIES_ID);
         reg.register::<crate::icy_board::state::ppl_collection::PplDoors>(DOORS_ID);
         reg.register::<crate::icy_board::state::ppl_collection::PplConferences>(CONFERENCES_ID);
+        reg.register::<crate::icy_board::state::ppl_user::PplNotes>(NOTES_ID);
+        reg.register::<crate::icy_board::state::ppl_user::PplContacts>(CONTACTS_ID);
 
         reg
     }

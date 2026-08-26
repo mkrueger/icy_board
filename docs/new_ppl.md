@@ -670,12 +670,12 @@ Session.User.City = "Berlin"
 | Identity | `Name`, `Alias`, `VerifyAnswer` | all but `Name` |
 | Address | `Street1`, `Street2`, `City`, `State`, `Zip`, `Country` | yes |
 | Reaching them | `BusinessPhone`, `HomePhone`, `Email`, `Web`, `Gender`, `BirthDate` | yes |
-| Sysop text | `Comment`, `SysopComment`, `NoteCount`, `GetNote(index)`, `SetNote(index, text)` | yes |
+| Sysop text | `Comment`, `SysopComment`, `Notes` | yes |
 | Preferences | `ExpertMode`, `EditorMode`, `ClearScreen`, `ScrollMessageBody`, `ShortDescriptions`, `LongHeader`, `WideEditor`, `PageLength`, `Protocol` | yes |
 | Preferences the session owns | `UseGraphics`, `UseAlias`, `Language`, `DateFormat` | no |
 | Security | `SecurityLevel`, `ExpiredSecurityLevel`, `ExpirationDate`, `PasswordExpires`, `SetPassword(text)` | yes |
 | Statistics | `TimesOn`, `FirstDateOn`, `LastDateOn`, `LastDirRead`, `MessagesRead`, `MessagesLeft`, `Uploads`, `Downloads`, `UploadBytes`, `DownloadBytes`, `DownloadBytesToday`, `MinutesToday` | no |
-| Contacts | `ContactCount`, `GetContact(index)`, `SetContact(service, account)`, `DeleteContact(service)` | yes |
+| Contacts | `Contacts` | yes |
 
 Whatever `PUTUSER` could write is writable here and lands at once, so the object
 replaces the old round trip rather than sitting beside it. The caller's `Name`
@@ -684,32 +684,40 @@ stay read-only; writing one is a compile error. Nobody logged in reads as an
 empty user rather than failing, so a member is always safe to read.
 
 `EditorMode` is one `EDITORMODE` value — `Yes`, `No` or `Ask` — rather than the
-two overlapping flags `PCBoard` kept. `SetNote()` takes an index from 0 to 4 and
+two overlapping flags `PCBoard` kept. `Notes.Set()` takes an index from 0 to 4 and
 answers whether the note existed. `SetPassword()` hashes the text the way the
 board is configured to, so the plain text is never stored; an empty password is
 refused. Both answer `FALSE` rather than failing.
 
-### Contacts
+### Notes and contacts
+
+Both are collections: they answer `Count`, are read with an index and are walked
+with `FOREACH`. `Notes` holds the five sysop notes as `STRING`s and is written
+with `Notes.Set(index, text)`.
 
 A contact is a built-in `CONTACT` record with two `STRING` fields, `Service` and
 `Account`. Service names are open strings, so a PPE can store a new service
 without a language or user-schema change.
 
 ```PPL
-INTEGER i
-FOR i = 0 TO Session.User.ContactCount - 1
-	CONTACT entry = Session.User.GetContact(i)
-	PRINTLN entry.Service, ": ", entry.Account
-NEXT
+CONTACT entry
 
-Session.User.SetContact("matrix", "@sysop:example.org")
+FOREACH entry IN Session.User.Contacts
+	PRINTLN entry.Service, ": ", entry.Account
+ENDFOREACH
+
+Session.User.Contacts.Set("matrix", "@sysop:example.org")
 ```
 
-`SetContact()` replaces the account when the service is already there and adds it
-otherwise, so there can never be two entries meaning the same service. Service
+`Contacts.Set()` replaces the account when the service is already there and adds
+it otherwise, so there can never be two entries meaning the same service. Service
 names are trimmed and compared without regard to case; a blank service or account
-is refused and answers `FALSE`. `DeleteContact()` answers whether it removed
+is refused and answers `FALSE`. `Contacts.Delete()` answers whether it removed
 anything. An index no contact has answers with an empty `CONTACT`.
+
+Unlike the board's collections these can change while a PPE runs, but how many
+steps a walk takes is settled when it starts, so adding or removing inside one
+does not change its length.
 
 Both write straight through to the caller, so no `GETUSER`/`PUTUSER` round trip
 is needed. `U_EMAIL` and `U_WEB` remain separate predefined variables for

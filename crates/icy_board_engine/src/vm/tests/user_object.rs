@@ -66,8 +66,8 @@ fn a_note_can_be_written_and_read_back() {
         "1 Called about the upload",
         run_ppl(
             r#"
-PRINT Session.User.SetNote(0, "Called about the upload"), " "
-PRINT Session.User.GetNote(0)
+PRINT Session.User.Notes.Set(0, "Called about the upload"), " "
+PRINT Session.User.Notes[0]
 "#,
         )
     );
@@ -75,7 +75,7 @@ PRINT Session.User.GetNote(0)
 
 #[test]
 fn a_note_outside_the_five_slots_is_refused() {
-    assert_eq!("0", run_ppl(r#"PRINT Session.User.SetNote(5, "nowhere")"#));
+    assert_eq!("0", run_ppl(r#"PRINT Session.User.Notes.Set(5, "nowhere")"#));
 }
 
 /// The board hashes the password, so what the PPE handed over is not what is stored.

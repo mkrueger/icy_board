@@ -24,8 +24,43 @@ fn a_contact_can_be_written_and_read_back() {
         "1 matrix:@sysop:example.org",
         run_ppl(
             r#"
-PRINT Session.User.SetContact("Matrix", "@sysop:example.org"), " "
-PRINT Session.User.GetContact(0).Service, ":", Session.User.GetContact(0).Account
+PRINT Session.User.Contacts.Set("Matrix", "@sysop:example.org"), " "
+PRINT Session.User.Contacts[0].Service, ":", Session.User.Contacts[0].Account
+"#,
+        )
+    );
+}
+
+#[test]
+fn contacts_can_be_walked() {
+    assert_eq!(
+        "github matrix ",
+        run_ppl(
+            r#"
+Session.User.Contacts.Set("github", "sysop")
+Session.User.Contacts.Set("matrix", "@sysop:example.org")
+CONTACT entry
+FOREACH entry IN Session.User.Contacts
+    PRINT entry.Service, " "
+ENDFOREACH
+"#,
+        )
+    );
+}
+
+#[test]
+fn notes_can_be_walked() {
+    assert_eq!(
+        "5 first  third   ",
+        run_ppl(
+            r#"
+Session.User.Notes.Set(0, "first")
+Session.User.Notes.Set(2, "third")
+STRING note
+PRINT Session.User.Notes.Count, " "
+FOREACH note IN Session.User.Notes
+    PRINT note, " "
+ENDFOREACH
 "#,
         )
     );
@@ -39,9 +74,9 @@ fn contacts_are_seen_and_changed_without_getuser() {
         "1 github:sysop|2 matrix:@sysop:example.org",
         run_ppl_on(
             r#"
-PRINT Session.User.ContactCount, " ", Session.User.GetContact(0).Service, ":", Session.User.GetContact(0).Account, "|"
-Session.User.SetContact("MATRIX", "@sysop:example.org")
-PRINT Session.User.ContactCount, " ", Session.User.GetContact(1).Service, ":", Session.User.GetContact(1).Account
+PRINT Session.User.Contacts.Count, " ", Session.User.Contacts[0].Service, ":", Session.User.Contacts[0].Account, "|"
+Session.User.Contacts.Set("MATRIX", "@sysop:example.org")
+PRINT Session.User.Contacts.Count, " ", Session.User.Contacts[1].Service, ":", Session.User.Contacts[1].Account
 "#,
             |board| {
                 board.users[0].contacts.push(UserContact {
@@ -61,8 +96,8 @@ fn setting_a_known_service_replaces_its_account() {
         "1 github:someone-else",
         run_ppl_on(
             r#"
-Session.User.SetContact("GitHub", "someone-else")
-PRINT Session.User.ContactCount, " ", Session.User.GetContact(0).Service, ":", Session.User.GetContact(0).Account
+Session.User.Contacts.Set("GitHub", "someone-else")
+PRINT Session.User.Contacts.Count, " ", Session.User.Contacts[0].Service, ":", Session.User.Contacts[0].Account
 "#,
             |board| {
                 board.users[0].contacts.push(UserContact {
@@ -79,7 +114,7 @@ fn a_contact_can_be_deleted() {
     assert_eq!(
         "1 0 0",
         run_ppl_on(
-            r#"PRINT Session.User.DeleteContact("GitHub"), " ", Session.User.ContactCount, " ", Session.User.DeleteContact("github")"#,
+            r#"PRINT Session.User.Contacts.Delete("GitHub"), " ", Session.User.Contacts.Count, " ", Session.User.Contacts.Delete("github")"#,
             |board| {
                 board.users[0].contacts.push(UserContact {
                     service: "github".to_string(),
@@ -95,7 +130,7 @@ fn a_contact_can_be_deleted() {
 fn an_empty_contact_is_refused() {
     assert_eq!(
         "0 0 0",
-        run_ppl(r#"PRINT Session.User.SetContact("", "sysop"), " ", Session.User.SetContact("matrix", " "), " ", Session.User.ContactCount"#)
+        run_ppl(r#"PRINT Session.User.Contacts.Set("", "sysop"), " ", Session.User.Contacts.Set("matrix", " "), " ", Session.User.Contacts.Count"#)
     );
 }
 
@@ -103,7 +138,7 @@ fn an_empty_contact_is_refused() {
 fn an_unknown_contact_index_answers_an_empty_contact() {
     assert_eq!(
         "[][]",
-        run_ppl(r#"PRINT "[", Session.User.GetContact(99).Service, "][", Session.User.GetContact(-1).Account, "]""#)
+        run_ppl(r#"PRINT "[", Session.User.Contacts[99].Service, "][", Session.User.Contacts[-1].Account, "]""#)
     );
 }
 
@@ -112,6 +147,6 @@ fn an_unknown_contact_index_answers_an_empty_contact() {
 fn the_user_reports_its_own_details() {
     assert_eq!(
         "SYSOP|255|1|0",
-        run_ppl(r#"PRINT Session.User.Name, "|", Session.User.SecurityLevel, "|", Session.User.NoteCount > 0, "|", Session.User.Uploads"#)
+        run_ppl(r#"PRINT Session.User.Name, "|", Session.User.SecurityLevel, "|", Session.User.Notes.Count > 0, "|", Session.User.Uploads"#)
     );
 }

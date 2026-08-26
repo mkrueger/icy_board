@@ -10,6 +10,13 @@ releases.
 
 ### Changed
 
+- `User.NoteCount`/`GetNote(i)`/`SetNote(i, t)` and `User.ContactCount`/
+  `GetContact(i)`/`SetContact(s, a)`/`DeleteContact(s)` became the collections
+  `User.Notes` and `User.Contacts`, which answer `Count`, are read with an index
+  and are walked with `FOREACH`. Writing goes through `Notes.Set(i, t)`,
+  `Contacts.Set(s, a)` and `Contacts.Delete(s)`. With that, every count-and-
+  accessor pair in the object model is gone.
+
 - `FOREACH` settles how many elements there are when the loop starts, so it reads
   its source once per step instead of twice. Walking a conference's areas through
   `Board.Conferences[0].Areas` went from 5.9 ms to 3.8 ms over 2000 areas, which

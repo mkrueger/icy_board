@@ -4,8 +4,11 @@ use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue, user_data_value},
     datetime::IcbDate,
     executable::{VariableType, VariableValue},
-    icy_board::user_base::{FSEMode, User, UserContact},
-    parser::{CONTACT_ID, EDITOR_MODE_ENUM_ID, USER_ID},
+    icy_board::{
+        state::ppl_collection::{COUNT, GET},
+        user_base::{FSEMode, User, UserContact},
+    },
+    parser::{CONTACT_ID, CONTACTS_ID, EDITOR_MODE_ENUM_ID, NOTES_ID, USER_ID},
 };
 
 macro_rules! member_name {
@@ -34,8 +37,7 @@ member_name!(BIRTH_DATE, "BirthDate");
 
 member_name!(COMMENT, "Comment");
 member_name!(SYSOP_COMMENT, "SysopComment");
-member_name!(NOTE_COUNT, "NoteCount");
-member_name!(GET_NOTE, "GetNote");
+member_name!(NOTES, "Notes");
 
 member_name!(EXPERT_MODE, "ExpertMode");
 member_name!(EDITOR_MODE, "EditorMode");
@@ -56,7 +58,6 @@ member_name!(EXPIRED_SECURITY_LEVEL, "ExpiredSecurityLevel");
 member_name!(EXPIRATION_DATE, "ExpirationDate");
 member_name!(PASSWORD_EXPIRES, "PasswordExpires");
 member_name!(SET_PASSWORD, "SetPassword");
-member_name!(SET_NOTE, "SetNote");
 
 member_name!(TIMES_ON, "TimesOn");
 member_name!(FIRST_DATE_ON, "FirstDateOn");
@@ -71,10 +72,7 @@ member_name!(DOWNLOAD_BYTES, "DownloadBytes");
 member_name!(DOWNLOAD_BYTES_TODAY, "DownloadBytesToday");
 member_name!(MINUTES_TODAY, "MinutesToday");
 
-member_name!(CONTACT_COUNT, "ContactCount");
-member_name!(GET_CONTACT, "GetContact");
-member_name!(SET_CONTACT, "SetContact");
-member_name!(DELETE_CONTACT, "DeleteContact");
+member_name!(CONTACTS, "Contacts");
 
 /// How many sysop notes a user carries. `PCBoard` called them `U_NOTES`.
 const NOTE_COUNT_VALUE: i32 = 5;
@@ -106,6 +104,169 @@ fn contact_value(contact: &UserContact) -> VariableValue {
 /// PPE cannot end up with two entries that mean the same service.
 fn normalize_service(service: &str) -> String {
     service.trim().to_ascii_lowercase()
+}
+
+/// The sysop notes on the caller. Read live, like the user itself.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct PplNotes;
+
+/// The services the caller can be reached on. Read live, like the user itself.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct PplContacts;
+
+member_name!(SET, "Set");
+member_name!(DELETE, "Delete");
+
+impl UserData for PplNotes {
+    const TYPE_NAME: &'static str = "Notes";
+
+    fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
+        registry.add_property(COUNT.clone(), VariableType::Integer, false);
+        registry.add_function(GET.clone(), vec![VariableType::Integer], VariableType::String);
+        registry.add_function(SET.clone(), vec![VariableType::Integer, VariableType::String], VariableType::Boolean);
+    }
+}
+
+#[async_trait(?Send)]
+impl UserDataValue for PplNotes {
+    fn get_property_value(&self, vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
+        if *name == *COUNT {
+            let _ = vm;
+            return Ok(VariableValue::new_int(NOTE_COUNT_VALUE));
+        }
+        Err(format!("Unknown Notes property {name}").into())
+    }
+
+    async fn set_property_value(&self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
+        Err(format!("Notes property {name} is read-only").into())
+    }
+
+    async fn call_function(
+        &self,
+        vm: &mut crate::vm::VirtualMachine<'_>,
+        name: &unicase::Ascii<String>,
+        arguments: &[VariableValue],
+    ) -> crate::Res<VariableValue> {
+        let index = arguments[0].as_int();
+        if *name == *GET {
+            let Some(user) = vm.icy_board_state.session.current_user.as_ref() else {
+                return Ok(VariableValue::new_string(String::new()));
+            };
+            let note = match index {
+                0 => &user.custom_comment1,
+                1 => &user.custom_comment2,
+                2 => &user.custom_comment3,
+                3 => &user.custom_comment4,
+                4 => &user.custom_comment5,
+                _ => return Ok(VariableValue::new_string(String::new())),
+            };
+            return Ok(VariableValue::new_string(note.clone()));
+        }
+        if *name == *SET {
+            let text = arguments[1].as_string();
+            let Some(user) = vm.icy_board_state.session.current_user.as_mut() else {
+                return Ok(VariableValue::new_bool(false));
+            };
+            let note = match index {
+                0 => &mut user.custom_comment1,
+                1 => &mut user.custom_comment2,
+                2 => &mut user.custom_comment3,
+                3 => &mut user.custom_comment4,
+                4 => &mut user.custom_comment5,
+                _ => return Ok(VariableValue::new_bool(false)),
+            };
+            *note = text;
+            user.flags.is_dirty = true;
+            return Ok(VariableValue::new_bool(true));
+        }
+        Err(format!("Unknown Notes function {name}").into())
+    }
+
+    async fn call_method(&mut self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _arguments: &[VariableValue]) -> crate::Res<()> {
+        Err(format!("Unknown Notes method {name}").into())
+    }
+}
+
+impl UserData for PplContacts {
+    const TYPE_NAME: &'static str = "Contacts";
+
+    fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
+        registry.add_property(COUNT.clone(), VariableType::Integer, false);
+        registry.add_function(GET.clone(), vec![VariableType::Integer], VariableType::UserData(CONTACT_ID as u8));
+        registry.add_function(SET.clone(), vec![VariableType::String, VariableType::String], VariableType::Boolean);
+        registry.add_function(DELETE.clone(), vec![VariableType::String], VariableType::Boolean);
+    }
+}
+
+#[async_trait(?Send)]
+impl UserDataValue for PplContacts {
+    fn get_property_value(&self, vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
+        if *name == *COUNT {
+            let count = vm.icy_board_state.session.current_user.as_ref().map_or(0, |user| user.contacts.len());
+            return Ok(VariableValue::new_int(count as i32));
+        }
+        Err(format!("Unknown Contacts property {name}").into())
+    }
+
+    async fn set_property_value(&self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
+        Err(format!("Contacts property {name} is read-only").into())
+    }
+
+    async fn call_function(
+        &self,
+        vm: &mut crate::vm::VirtualMachine<'_>,
+        name: &unicase::Ascii<String>,
+        arguments: &[VariableValue],
+    ) -> crate::Res<VariableValue> {
+        if *name == *GET {
+            let index = arguments[0].as_int();
+            let contact = vm
+                .icy_board_state
+                .session
+                .current_user
+                .as_ref()
+                .filter(|_| index >= 0)
+                .and_then(|user| user.contacts.get(index as usize))
+                .cloned()
+                .unwrap_or_default();
+            return Ok(contact_value(&contact));
+        }
+        if *name == *SET {
+            let service = normalize_service(&arguments[0].as_string());
+            let account = arguments[1].as_string().trim().to_string();
+            if service.is_empty() || account.is_empty() {
+                return Ok(VariableValue::new_bool(false));
+            }
+            let Some(user) = vm.icy_board_state.session.current_user.as_mut() else {
+                return Ok(VariableValue::new_bool(false));
+            };
+            if let Some(contact) = user.contacts.iter_mut().find(|contact| contact.service == service) {
+                contact.account = account;
+            } else {
+                user.contacts.push(UserContact { service, account });
+            }
+            user.flags.is_dirty = true;
+            return Ok(VariableValue::new_bool(true));
+        }
+        if *name == *DELETE {
+            let service = normalize_service(&arguments[0].as_string());
+            let Some(user) = vm.icy_board_state.session.current_user.as_mut() else {
+                return Ok(VariableValue::new_bool(false));
+            };
+            let before = user.contacts.len();
+            user.contacts.retain(|contact| contact.service != service);
+            let removed = user.contacts.len() != before;
+            if removed {
+                user.flags.is_dirty = true;
+            }
+            return Ok(VariableValue::new_bool(removed));
+        }
+        Err(format!("Unknown Contacts function {name}").into())
+    }
+
+    async fn call_method(&mut self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _arguments: &[VariableValue]) -> crate::Res<()> {
+        Err(format!("Unknown Contacts method {name}").into())
+    }
 }
 
 /// The `EditorMode` enum values, which follow `FSEMode`'s own order.
@@ -164,16 +325,7 @@ impl UserData for PplUser {
         for name in [&*PAGE_LENGTH, &*SECURITY_LEVEL, &*EXPIRED_SECURITY_LEVEL] {
             registry.add_property(name.clone(), VariableType::Integer, true);
         }
-        for name in [
-            &*NOTE_COUNT,
-            &*TIMES_ON,
-            &*MESSAGES_READ,
-            &*MESSAGES_LEFT,
-            &*UPLOADS,
-            &*DOWNLOADS,
-            &*MINUTES_TODAY,
-            &*CONTACT_COUNT,
-        ] {
+        for name in [&*TIMES_ON, &*MESSAGES_READ, &*MESSAGES_LEFT, &*UPLOADS, &*DOWNLOADS, &*MINUTES_TODAY] {
             registry.add_property(name.clone(), VariableType::Integer, false);
         }
         for name in [&*UPLOAD_BYTES, &*DOWNLOAD_BYTES, &*DOWNLOAD_BYTES_TODAY] {
@@ -194,12 +346,9 @@ impl UserData for PplUser {
         }
         registry.add_property(EDITOR_MODE.clone(), VariableType::UserData(EDITOR_MODE_ENUM_ID), true);
 
-        registry.add_function(GET_NOTE.clone(), vec![VariableType::Integer], VariableType::String);
-        registry.add_function(SET_NOTE.clone(), vec![VariableType::Integer, VariableType::String], VariableType::Boolean);
+        registry.add_property(NOTES.clone(), VariableType::UserData(NOTES_ID as u8), false);
+        registry.add_property(CONTACTS.clone(), VariableType::UserData(CONTACTS_ID as u8), false);
         registry.add_function(SET_PASSWORD.clone(), vec![VariableType::String], VariableType::Boolean);
-        registry.add_function(GET_CONTACT.clone(), vec![VariableType::Integer], VariableType::UserData(CONTACT_ID as u8));
-        registry.add_function(SET_CONTACT.clone(), vec![VariableType::String, VariableType::String], VariableType::Boolean);
-        registry.add_function(DELETE_CONTACT.clone(), vec![VariableType::String], VariableType::Boolean);
     }
 }
 
@@ -268,8 +417,8 @@ impl UserDataValue for PplUser {
             date(&user.stats.last_on)
         } else if *name == *LAST_DIR_READ {
             date(&user.date_last_dir_read)
-        } else if *name == *NOTE_COUNT {
-            VariableValue::new_int(NOTE_COUNT_VALUE)
+        } else if *name == *NOTES {
+            user_data_value(PplNotes, NOTES_ID)
         } else if *name == *PAGE_LENGTH {
             VariableValue::new_int(i32::from(user.page_len))
         } else if *name == *SECURITY_LEVEL {
@@ -288,8 +437,8 @@ impl UserDataValue for PplUser {
             VariableValue::new_int(user.stats.num_downloads as i32)
         } else if *name == *MINUTES_TODAY {
             VariableValue::new_int(i32::from(user.stats.minutes_today))
-        } else if *name == *CONTACT_COUNT {
-            VariableValue::new_int(user.contacts.len() as i32)
+        } else if *name == *CONTACTS {
+            user_data_value(PplContacts, CONTACTS_ID)
         } else if *name == *UPLOAD_BYTES {
             VariableValue::new_unsigned(user.stats.total_upld_bytes)
         } else if *name == *DOWNLOAD_BYTES {
@@ -398,39 +547,6 @@ impl UserDataValue for PplUser {
         name: &unicase::Ascii<String>,
         arguments: &[VariableValue],
     ) -> crate::Res<VariableValue> {
-        if *name == *GET_NOTE {
-            let index = arguments[0].as_int();
-            let Some(user) = vm.icy_board_state.session.current_user.as_ref() else {
-                return Ok(VariableValue::new_string(String::new()));
-            };
-            let note = match index {
-                0 => &user.custom_comment1,
-                1 => &user.custom_comment2,
-                2 => &user.custom_comment3,
-                3 => &user.custom_comment4,
-                4 => &user.custom_comment5,
-                _ => return Ok(VariableValue::new_string(String::new())),
-            };
-            return Ok(VariableValue::new_string(note.clone()));
-        }
-        if *name == *SET_NOTE {
-            let index = arguments[0].as_int();
-            let text = arguments[1].as_string();
-            let Some(user) = vm.icy_board_state.session.current_user.as_mut() else {
-                return Ok(VariableValue::new_bool(false));
-            };
-            let note = match index {
-                0 => &mut user.custom_comment1,
-                1 => &mut user.custom_comment2,
-                2 => &mut user.custom_comment3,
-                3 => &mut user.custom_comment4,
-                4 => &mut user.custom_comment5,
-                _ => return Ok(VariableValue::new_bool(false)),
-            };
-            *note = text;
-            user.flags.is_dirty = true;
-            return Ok(VariableValue::new_bool(true));
-        }
         if *name == *SET_PASSWORD {
             let plain = arguments[0].as_string();
             if plain.is_empty() {
@@ -445,49 +561,6 @@ impl UserDataValue for PplUser {
             user.password.password = password;
             user.flags.is_dirty = true;
             return Ok(VariableValue::new_bool(true));
-        }
-        if *name == *GET_CONTACT {
-            let index = arguments[0].as_int();
-            let contact = vm
-                .icy_board_state
-                .session
-                .current_user
-                .as_ref()
-                .filter(|_| index >= 0)
-                .and_then(|user| user.contacts.get(index as usize))
-                .cloned()
-                .unwrap_or_default();
-            return Ok(contact_value(&contact));
-        }
-        if *name == *SET_CONTACT {
-            let service = normalize_service(&arguments[0].as_string());
-            let account = arguments[1].as_string().trim().to_string();
-            if service.is_empty() || account.is_empty() {
-                return Ok(VariableValue::new_bool(false));
-            }
-            let Some(user) = vm.icy_board_state.session.current_user.as_mut() else {
-                return Ok(VariableValue::new_bool(false));
-            };
-            if let Some(contact) = user.contacts.iter_mut().find(|contact| contact.service == service) {
-                contact.account = account;
-            } else {
-                user.contacts.push(UserContact { service, account });
-            }
-            user.flags.is_dirty = true;
-            return Ok(VariableValue::new_bool(true));
-        }
-        if *name == *DELETE_CONTACT {
-            let service = normalize_service(&arguments[0].as_string());
-            let Some(user) = vm.icy_board_state.session.current_user.as_mut() else {
-                return Ok(VariableValue::new_bool(false));
-            };
-            let before = user.contacts.len();
-            user.contacts.retain(|contact| contact.service != service);
-            let removed = user.contacts.len() != before;
-            if removed {
-                user.flags.is_dirty = true;
-            }
-            return Ok(VariableValue::new_bool(removed));
         }
         Err(format!("Unknown USER function {name}").into())
     }
