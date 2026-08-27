@@ -40,8 +40,23 @@ cd icy_board
 cargo build --release
 ```
 
-The programs are then in `target/release/`. On a Raspberry Pi the OpenSSL
-development package has to be there as well: `sudo apt-get install libssl-dev`.
+The programs are then in `target/release/`. To build only the PPL compiler,
+decompiler and language server, without the board's audio dependencies, use:
+
+```sh
+cargo build --release -p pplc -p ppld -p ppl-lsp
+```
+
+With CMake 4, a full build may fail in the bundled Opus library with a
+`cmake_minimum_required` compatibility error. The release builds use CMake's
+policy compatibility setting for that dependency:
+
+```sh
+CMAKE_POLICY_VERSION_MINIMUM=3.5 cargo build --release
+```
+
+On a Raspberry Pi the OpenSSL development package has to be there as well:
+`sudo apt-get install libssl-dev`.
 
 ### macOS
 
