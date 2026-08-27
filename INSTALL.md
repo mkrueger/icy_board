@@ -43,6 +43,23 @@ cargo build --release
 The programs are then in `target/release/`. On a Raspberry Pi the OpenSSL
 development package has to be there as well: `sudo apt-get install libssl-dev`.
 
+### macOS
+
+The build needs `cmake` and `pkg-config` for the bundled Opus audio codec.
+Install them with [Homebrew](https://brew.sh):
+
+```sh
+brew install cmake pkg-config
+```
+
+The Opus source shipped with the `audiopus_sys` crate still declares an old
+`cmake_minimum_required`, which recent CMake (4.x) rejects. Build with the
+compatibility flag set:
+
+```sh
+CMAKE_POLICY_VERSION_MINIMUM=3.5 cargo build --release
+```
+
 ## Your first board
 
 ```sh
