@@ -813,6 +813,122 @@ pub struct BoardOptions {
     pub log_security_level: bool,
 }
 
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum PplHttpDestinationPolicy {
+    #[default]
+    Disabled,
+    Allowlist,
+    Public,
+}
+
+pub fn normalize_ppl_http_origin(value: &str) -> Result<String, String> {
+    let url = reqwest::Url::parse(value).map_err(|error| format!("invalid origin '{value}': {error}"))?;
+    if !matches!(url.scheme(), "http" | "https")
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || url.path() != "/"
+        || url.query().is_some()
+        || url.fragment().is_some()
+    {
+        return Err(format!("'{value}' is not an exact HTTP or HTTPS origin"));
+    }
+    Ok(url.origin().ascii_serialization())
+}
+
+pub fn normalize_ppl_http_origins(value: &str) -> Result<Vec<String>, String> {
+    value
+        .split(',')
+        .map(str::trim)
+        .filter(|origin| !origin.is_empty())
+        .map(normalize_ppl_http_origin)
+        .collect()
+}
+
+const fn default_http_response_bytes() -> usize {
+    16 * 1024 * 1024
+}
+
+const fn default_http_request_bytes() -> usize {
+    1024 * 1024
+}
+
+const fn default_http_connect_timeout() -> u64 {
+    5
+}
+
+const fn default_http_request_timeout() -> u64 {
+    30
+}
+
+const fn default_http_redirects() -> usize {
+    3
+}
+
+const fn default_http_concurrency() -> usize {
+    16
+}
+
+const fn default_http_node_concurrency() -> usize {
+    2
+}
+
+const fn default_http_headers() -> usize {
+    64
+}
+
+const fn default_http_header_bytes() -> usize {
+    64 * 1024
+}
+
+/// The boundary every HTTP request made by a PPE has to stay inside.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PplHttpOptions {
+    #[serde(default)]
+    pub destination_policy: PplHttpDestinationPolicy,
+    #[serde(default)]
+    pub allowed_origins: Vec<String>,
+    #[serde(default = "default_http_response_bytes")]
+    pub max_response_bytes: usize,
+    #[serde(default = "default_http_request_bytes")]
+    pub max_request_bytes: usize,
+    #[serde(default = "default_http_connect_timeout")]
+    pub connect_timeout_seconds: u64,
+    #[serde(default = "default_http_request_timeout")]
+    pub request_timeout_seconds: u64,
+    #[serde(default = "default_http_redirects")]
+    pub max_redirects: usize,
+    #[serde(default = "default_http_concurrency")]
+    pub max_concurrent_requests: usize,
+    #[serde(default = "default_http_node_concurrency")]
+    pub max_concurrent_per_node: usize,
+    #[serde(default = "default_http_headers")]
+    pub max_headers: usize,
+    #[serde(default = "default_http_header_bytes")]
+    pub max_header_bytes: usize,
+    #[serde(default)]
+    pub allow_http: bool,
+}
+
+impl Default for PplHttpOptions {
+    fn default() -> Self {
+        Self {
+            destination_policy: PplHttpDestinationPolicy::Disabled,
+            allowed_origins: Vec::new(),
+            max_response_bytes: default_http_response_bytes(),
+            max_request_bytes: default_http_request_bytes(),
+            connect_timeout_seconds: default_http_connect_timeout(),
+            request_timeout_seconds: default_http_request_timeout(),
+            max_redirects: default_http_redirects(),
+            max_concurrent_requests: default_http_concurrency(),
+            max_concurrent_per_node: default_http_node_concurrency(),
+            max_headers: default_http_headers(),
+            max_header_bytes: default_http_header_bytes(),
+            allow_http: false,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct EventOptions {
     #[serde(default)]
@@ -930,6 +1046,8 @@ pub struct IcbConfig {
     pub switches: ConfigSwitches,
     pub limits: LimitOptions,
     pub options: BoardOptions,
+    #[serde(default)]
+    pub ppl_http: PplHttpOptions,
     pub event: EventOptions,
     pub accounting: AccountingOptions,
     #[serde(default)]
@@ -986,6 +1104,7 @@ impl IcbConfig {
                 config_color_configuration: PcbScreenColors::default(),
             },
             login_server: LoginServer::default(),
+            ppl_http: PplHttpOptions::default(),
             sysop_command_level: SysopCommandLevels {
                 sysop: 100,
                 read_all_comments: SecurityExpression::from_req_security(110),
@@ -1289,7 +1408,33 @@ impl Default for QwkSettings {
 
 #[cfg(test)]
 mod tests {
-    use super::{ColorConfiguration, CommandType, PcbScreenColors, SecurityExpression, SysopInformation, UserCommandLevels};
+    use super::{
+        ColorConfiguration, CommandType, IcbConfig, PcbScreenColors, PplHttpDestinationPolicy, SecurityExpression, SysopInformation, UserCommandLevels,
+        normalize_ppl_http_origins,
+    };
+
+    #[test]
+    fn ppl_http_origins_are_normalized_as_a_complete_edit() {
+        assert_eq!(
+            normalize_ppl_http_origins(" https://EXAMPLE.com/, https://files.example.com:8443 "),
+            Ok(vec!["https://example.com".to_string(), "https://files.example.com:8443".to_string()])
+        );
+        assert!(normalize_ppl_http_origins("https://example.com, https://example.com/path").is_err());
+    }
+
+    #[test]
+    fn ppl_http_is_secure_by_default_and_round_trips() {
+        let config = IcbConfig::default();
+        assert_eq!(config.ppl_http.destination_policy, PplHttpDestinationPolicy::Disabled);
+        assert!(!config.ppl_http.allow_http);
+        assert_eq!(config.ppl_http.max_response_bytes, 16 * 1024 * 1024);
+        assert_eq!(config.ppl_http.max_concurrent_requests, 16);
+        assert_eq!(config.ppl_http.max_concurrent_per_node, 2);
+
+        let encoded = toml::to_string(&config).unwrap();
+        let decoded: IcbConfig = toml::from_str(&encoded).unwrap();
+        assert_eq!(decoded.ppl_http, config.ppl_http);
+    }
 
     #[test]
     fn old_description_low_color_key_loads_as_pcboard_duplicate_color() {

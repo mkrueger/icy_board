@@ -128,6 +128,7 @@ pub struct IcyBoard {
     pub commands: CommandList,
     pub ftn: FtnConfig,
     pub events: EventList,
+    pub ppl_http_service: std::sync::Arc<state::ppl_http::PplHttpService>,
 }
 
 impl IcyBoard {
@@ -149,6 +150,7 @@ impl IcyBoard {
             groups: GroupList::default(),
             ftn: FtnConfig::default(),
             events: EventList::default(),
+            ppl_http_service: std::sync::Arc::new(state::ppl_http::PplHttpService::default()),
         }
     }
 
@@ -426,6 +428,7 @@ impl IcyBoard {
             groups,
             ftn,
             events,
+            ppl_http_service: std::sync::Arc::new(state::ppl_http::PplHttpService::default()),
         };
 
         for conf in board.conferences.iter_mut() {

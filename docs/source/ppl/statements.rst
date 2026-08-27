@@ -4445,84 +4445,6 @@ WAITFOR (1.00)
     * :PPL:`MGETBYTE()` – Get byte from modem
     * :PPL:`SENDMODEM` – Send to modem
 
-WEBREQUEST (4.00)
-~~~~~~~~~~~~~~~~~
-  :PPL:`STATEMENT WEBREQUEST(STRING url, STRING filename)`
-
-  Downloads data from a web server and saves it to a file.
-
-  **Parameters**
-    * :PPL:`url` – Complete URL to download (including protocol)
-    * :PPL:`filename` – Local file path to save the downloaded data
-
-  **Remarks**
-    Performs an HTTP GET request and saves the response directly to a file. This statement 
-    is ideal for downloading large files, binary data, or any content that exceeds PPL's 
-    string limitations. Supports both HTTP and HTTPS protocols with automatic handling of 
-    common redirects.
-    
-    The download is synchronous - the PPE will wait until the download completes or times 
-    out before continuing. For large files, consider informing users of the download progress 
-    or expected wait time. The function overwrites existing files without warning.
-    
-    Network operations require appropriate system permissions. The download directory must 
-    be writable by the BBS process. Some installations may restrict web requests or limit 
-    accessible URLs for security reasons.
-
-  **Example**
-
-    .. code-block:: PPL
-
-       STRING tempFile, updateFile
-       BOOLEAN success
-       
-       ; Download a text file
-       tempFile = TEMPPATH() + "news_" + STRING(PCBNODE()) + ".txt"
-       WEBREQUEST "https://example.com/bbsnews.txt", tempFile
-       IF (EXIST(tempFile)) THEN
-           DISPFILE tempFile, DEFS
-           DELETE tempFile
-       ENDIF
-       
-       ; Download binary file (ZIP archive)
-       updateFile = TEMPPATH() + "update.zip"
-       PRINTLN "Downloading update package..."
-       WEBREQUEST "https://updates.bbs.com/latest.zip", updateFile
-       IF (EXIST(updateFile)) THEN
-           INTEGER size
-           size = FILEINF(updateFile, 4)
-           PRINTLN "Downloaded ", size, " bytes"
-           ; Process the downloaded file
-           SHELL TRUE, rc, "unzip -o " + updateFile
-       ELSE
-           PRINTLN "Download failed!"
-       ENDIF
-       
-       ; Fetch and save JSON data
-       STRING dataFile
-       dataFile = PPEPATH() + "userdata.json"
-       WEBREQUEST "https://api.service.com/users/current", dataFile
-       IF (EXIST(dataFile) & FILEINF(dataFile, 4) > 0) THEN
-           ; Process JSON file
-           PRINTLN "User data updated"
-       ENDIF
-       
-       ; Download with error checking
-       STRING url, dest
-       url = "https://mirror.bbs.com/files/welcome.ans"
-       dest = HELPPATH() + "welcome.ans"
-       WEBREQUEST url, dest
-       IF (!EXIST(dest) | FILEINF(dest, 4) = 0) THEN
-           LOG "Failed to download: " + url, FALSE
-       ENDIF
-
-  **See Also**
-    * :PPL:`WEBREQUEST()` function – Get response as string
-    * :PPL:`EXIST()` – Check if download succeeded
-    * :PPL:`FILEINF()` – Get file information
-    * :PPL:`TEMPPATH()` – Get temporary directory
-    * :PPL:`DELETE` – Clean up downloaded files
-
 WRUNET (1.00)
 ~~~~~~~~~~~~~
   :PPL:`STATEMENT WRUNET(INTEGER node, STRING stat, STRING name, STRING city, STRING oper, STRING br)`
@@ -4581,13 +4503,6 @@ WRUSYS (1.00)
     * :PPL:`RDUSYS` – Read USERS.SYS
     * :PPL:`SHELL` – Execute external program
 
-
-WEBREQUEST (400 tentative)
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-  :PPL:`STATEMENT WEBREQUEST(STRING url, <VAR> responseBigStr)`
-
-  **Description**
-    Experimental HTTP GET/HEAD style fetch populating response data (subject to change; may require runtime 400).
 
 D* Database / Table Primitives (Overview)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

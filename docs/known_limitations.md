@@ -20,7 +20,7 @@ procedure and this page as its risk checklist.
 | Accounting | PPL `ACCOUNT`/`RECORDUSAGE` and tracking work, but normal board activity is not charged. Balance enforcement, peak rates, money display, credit macros and the warning/info/logoff files are missing. |
 | Upload credits | Uploading earns configured byte credit but not time credit, and uploads are not test-extracted. The configured free-space threshold is enforced before a transfer starts. |
 | FTN | icy_board is a leaf or point over BinkP: scan, poll and toss. There is no BinkP answering side, netmail arrives in a single dump base, AreaFix is missing and the AKA and link setup is hand-edited TOML. |
-| Web | There is no web frontend: nothing serves the board over HTTP. A PPE can reach *out* with `WebRequest`, as a function or as a statement. |
+| Web | There is no web frontend: nothing serves the board over HTTP. A sysop may enable policy-controlled outbound HTTP for PPL 4.00 scripts. |
 | Sysop numeric commands | Commands `9`, `10`, `14` and `15` are missing. The level named for command 10 protects `PPE` instead; commands `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`, `11`, `12`, `13` and `16` work. |
 | Message reader | Inside the read loop, export (`X`), `EDIT`, `FORWARD`, `VIEW` and the capture actions (`C`, `D`, `Z`) are recognised and answered but do not run. |
 | ICBSM | Editing users and groups, sorting and packing the user file, the bulk edits over a selection of users and the security level tables. Reports, index files and the user info file of the original have no equivalent here. |

@@ -40,7 +40,7 @@ use crate::{
 };
 
 use super::super::errors::IcyError;
-use super::super::expressions::predefined_functions::{http_get, message_status};
+use super::super::expressions::predefined_functions::message_status;
 use std::fmt::Write as _;
 
 /// A statement that is not implemented yet. `PCBoard` never aborted a PPE over one,
@@ -3101,29 +3101,6 @@ pub async fn set_bank_bal(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<
                 }
             }
         }
-    }
-    Ok(())
-}
-
-pub async fn web_request(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    let url = vm.eval_expr(&args[0]).await?.as_string();
-    let file = vm.eval_expr(&args[1]).await?.as_string();
-    // The file a PPE names is resolved against the board like every other file it
-    // writes, so a DOS path lands where the rest of them do instead of wherever
-    // the daemon happens to have been started.
-    let path = vm.resolve_file(&file).await;
-    let Some(response) = http_get(&url).await else {
-        return Ok(());
-    };
-    let bytes = match response.bytes().await {
-        Ok(bytes) => bytes,
-        Err(err) => {
-            log::error!("WEBREQUEST {url}: {err}");
-            return Ok(());
-        }
-    };
-    if let Err(err) = fs::write(&path, &bytes) {
-        log::error!("WEBREQUEST can't write {}: {err}", path.display());
     }
     Ok(())
 }

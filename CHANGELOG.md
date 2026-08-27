@@ -10,6 +10,18 @@ releases.
 
 ### Added
 
+- PPL 4.00 has policy-controlled `Http`, `HttpRequest` and `HttpResponse`
+  objects. Outbound access is disabled by default; sysops may allow exact
+  origins or public destinations and set request, response, timeout, redirect
+  and board/per-node concurrency limits from `icbsetup`. DNS is validated and
+  pinned per hop, redirects are
+  rechecked, system proxies are ignored, response bodies are streamed within a
+  fixed cap, and downloads are committed atomically. Network failures report
+  `ErrKind.Net`; HTTP statuses remain available on the response. The earlier
+  beta `WebRequest` function and statement have been removed. Runtime-400 PPEs
+  built before this change must be recompiled because the unreleased opcode
+  tables were compacted after that removal.
+
 - PPL ``TYPE`` fields may be one-, two- or three-dimensional arrays, including
   arrays of an earlier record type. Runtime 400's versioned type table stores a
   fixed field descriptor with the type, rank and three `u16` upper bounds, so

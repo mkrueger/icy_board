@@ -1183,6 +1183,106 @@ configuration_options_config_switches=Configuration Switches
 configuration_options_limits=Limits
 configuration_options_colors=Colors
 configuration_options_func_keys=Function Keys
+configuration_options_ppl_http=PPL HTTP
+
+ppl_http_title=PPL HTTP Policy
+ppl_http_policy=Destination policy
+ppl_http_policy-status=Choose which outbound destinations PPL programs may contact.
+ppl_http_policy-help=
+    # Destination policy
+
+    Disabled rejects every PPL HTTP request. Allowlist permits only the exact
+    origins below. Public permits hosts only when every resolved address is
+    publicly routable. Every redirect is checked again.
+ppl_http_policy_disabled=Disabled
+ppl_http_policy_allowlist=Exact origin allowlist
+ppl_http_policy_public=Public destinations
+
+ppl_http_allowed_origins=Allowed origins
+ppl_http_allowed_origins-status=Comma-separated origins used by allowlist mode.
+ppl_http_allowed_origins-help=
+    # Allowed origins
+
+    Exact origins separated by commas, for example
+    https://api.example.com, https://files.example.com:8443
+
+    Scheme, host and port must all match. Paths do not belong here. An
+    allowlisted origin may deliberately resolve to a private service.
+
+ppl_http_allow_http=Allow plain HTTP
+ppl_http_allow_http-status=Permit unencrypted http:// destinations.
+ppl_http_allow_http-help=
+    # Allow plain HTTP
+
+    Off permits HTTPS only. Turn this on only for origins that cannot use TLS;
+    request headers and bodies sent over HTTP can be read or changed in transit.
+
+ppl_http_max_response_bytes=Maximum response bytes
+ppl_http_max_response_bytes-status=Largest response body a PPL request may receive.
+ppl_http_max_response_bytes-help=
+    # Maximum response bytes
+
+    The transfer stops when the decoded response body crosses this limit.
+    Downloads keep their previous destination file when that happens.
+
+ppl_http_max_request_bytes=Maximum request bytes
+ppl_http_max_request_bytes-status=Largest POST body a PPL request may send.
+ppl_http_max_request_bytes-help=
+    # Maximum request bytes
+
+    Requests larger than this limit are rejected before a connection is made.
+
+ppl_http_max_headers=Maximum headers
+ppl_http_max_headers-status=Maximum number of request or response headers.
+ppl_http_max_headers-help=
+    # Maximum headers
+
+    Applies to both headers supplied by a PPL program and headers returned by a
+    server.
+
+ppl_http_max_header_bytes=Maximum header bytes
+ppl_http_max_header_bytes-status=Combined byte limit for request or response headers.
+ppl_http_max_header_bytes-help=
+    # Maximum header bytes
+
+    Applies independently to each request and response header block.
+
+ppl_http_connect_timeout=Connect timeout seconds
+ppl_http_connect_timeout-status=Maximum time allowed to establish one connection.
+ppl_http_connect_timeout-help=
+    # Connect timeout
+
+    Bounds one connection attempt. The total request timeout still covers DNS,
+    queueing, redirects and the response body.
+
+ppl_http_request_timeout=Total timeout seconds
+ppl_http_request_timeout-status=Total deadline for one PPL HTTP operation.
+ppl_http_request_timeout-help=
+    # Total request timeout
+
+    Includes waiting for concurrency capacity, DNS, every redirect, connection
+    setup and the complete response body.
+
+ppl_http_max_redirects=Maximum redirects
+ppl_http_max_redirects-status=Maximum redirect hops followed by one request.
+ppl_http_max_redirects-help=
+    # Maximum redirects
+
+    Zero rejects redirects. Each permitted hop must pass the destination policy.
+
+ppl_http_max_concurrent=Board concurrent requests
+ppl_http_max_concurrent-status=Maximum PPL HTTP operations across the whole board.
+ppl_http_max_concurrent-help=
+    # Board concurrent requests
+
+    Requests beyond this number wait within their total timeout.
+
+ppl_http_max_concurrent_node=Node concurrent requests
+ppl_http_max_concurrent_node-status=Maximum PPL HTTP operations from one node.
+ppl_http_max_concurrent_node-help=
+    # Node concurrent requests
+
+    Prevents one caller or PPE from consuming all of the board-wide capacity.
 
 system_control_title=System Control
 

@@ -495,15 +495,16 @@ corrupt message data reports `ErrKind.Msg` with `ErrCode.Io` or
 | `AreaId` | Function | `AreaId(conf, area) : MSGAREAID` | Addresses a message area in any conference |
 | `Len` | Function | `Len(array, dim) : INTEGER` | Length of one array dimension |
 | `Rgb` | Function | `Rgb(r, g, b [, a]) : INTEGER` | Packs a colour as `0xRRGGBBAA` |
-| `WebRequest` | Function | `WebRequest(url) : STRING` | Fetches a URL and returns the body |
-| `WEBREQUEST` | Statement | `WEBREQUEST url, file` | Fetches a URL and saves it to a file |
+| `Http.Get` | Static function | `Http.Get(url) : HttpResponse` | Makes a policy-controlled GET request |
+| `Http.Download` | Static function | `Http.Download(url, file) : HttpResponse` | Streams a successful response atomically to a file |
+| `Http.New` | Static function | `Http.New(method, url) : HttpRequest` | Builds a GET, HEAD or POST request |
 | `BASE64ENC`, `BASE64DEC` | Function | `BASE64ENC(value) : STRING` | Base64 of a string's UTF-8 bytes, and back |
 | `SHA256` | Function | `SHA256(value) : STRING` | Lowercase hex SHA-256 of a string's UTF-8 bytes |
 
 `AreaId()` is how message functions reach a message area outside the current
-conference without breaking any of the old calls. `WebRequest` in both forms logs
-and gives up after 30 seconds rather than holding the caller's node, and a failed
-request answers an empty string / writes no file instead of stopping the PPE.
+conference without breaking any of the old calls. HTTP access is disabled by
+default and constrained by the board's `[ppl_http]` policy; responses expose
+status, headers and bounded bodies while failures report `ErrKind.Net`.
 
 See [new_ppl.md](new_ppl.md) for the per-function reference pages.
 
@@ -785,15 +786,18 @@ Language:400
 
 ## Building & Running
 
-* Get rust on your system <https://www.rust-lang.org/tools/install>
+Install [Rust](https://rustup.rs), then build the PPL compiler and decompiler
+from an IcyBoard source checkout:
 
-```bash
-cd PPLEngine
-cargo build -r
+```sh
+git clone https://github.com/mkrueger/icy_board
+cd icy_board
+cargo build --release -p pplc -p ppld
 ```
 
-```bash
-cd target/release
-./ppld [PPEFILE]
-./pplc [PPLFILE]
+The programs are written to `target/release/`:
+
+```sh
+target/release/pplc [PPLFILE]
+target/release/ppld [PPEFILE]
 ```

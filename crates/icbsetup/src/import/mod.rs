@@ -708,6 +708,7 @@ impl PCBoardImporter {
                 log_connect_string: self.data.log_connect_str,
                 log_security_level: self.data.log_sec_level,
             },
+            ppl_http: Default::default(),
             event: EventOptions {
                 enabled: self.data.event_active,
                 event_file: PathBuf::from("main/events.toml"),

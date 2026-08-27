@@ -2801,20 +2801,6 @@ pub fn fix_casing(param: String) -> String {
     res
 }
 
-pub async fn web_request(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let url = vm.eval_expr(&args[0]).await?.as_string();
-    let Some(response) = http_get(&url).await else {
-        return Ok(VariableValue::new_string(String::new()));
-    };
-    match response.text().await {
-        Ok(text) => Ok(VariableValue::new_string(text)),
-        Err(err) => {
-            log::error!("WEBREQUEST {url}: {err}");
-            Ok(VariableValue::new_string(String::new()))
-        }
-    }
-}
-
 pub async fn rgb(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let red = vm.eval_expr(&args[0]).await?.as_int();
     let green = vm.eval_expr(&args[1]).await?.as_int();
@@ -2856,28 +2842,6 @@ pub async fn static_receiver(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> R
         return Err(format!("type {type_id} has no static receiver").into());
     };
     Ok(receiver())
-}
-
-/// A request the caller's node waits on, so it needs an end: a host that never
-/// answers would hold the node until the caller gives up. A failed request is
-/// logged and answered empty rather than stopping the PPE, the way the rest of
-/// the runtime treats a call it cannot carry out.
-pub(crate) async fn http_get(url: &str) -> Option<reqwest::Response> {
-    const WEB_REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
-    let client = match reqwest::Client::builder().timeout(WEB_REQUEST_TIMEOUT).build() {
-        Ok(client) => client,
-        Err(err) => {
-            log::error!("WEBREQUEST: can't build the http client: {err}");
-            return None;
-        }
-    };
-    match client.get(url).send().await {
-        Ok(response) => Some(response),
-        Err(err) => {
-            log::error!("WEBREQUEST {url}: {err}");
-            None
-        }
-    }
 }
 
 #[cfg(test)]

@@ -41,6 +41,7 @@ pub mod ppl_error;
 pub mod ppl_events;
 pub mod ppl_gfx;
 pub mod ppl_graphics;
+pub mod ppl_http;
 pub mod ppl_keys;
 pub mod ppl_macros;
 pub mod ppl_margins;

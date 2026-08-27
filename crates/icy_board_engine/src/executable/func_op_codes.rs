@@ -305,28 +305,27 @@ pub enum FuncOpCode {
     MemberReference = -291,
     MemberCall = -292,
     AreaId = -293,
-    WebRequest = -294,
-    Len_Dim = -295,
-    RoutineReference = -296,
-    RecordLiteral = -297,
-    BASE64ENC = -298,
-    BASE64DEC = -299,
-    SHA256 = -300,
-    Rgb = -301,
-    RgbAlpha = -302,
-    Terminal = -303,
+    Len_Dim = -294,
+    RoutineReference = -295,
+    RecordLiteral = -296,
+    BASE64ENC = -297,
+    BASE64DEC = -298,
+    SHA256 = -299,
+    Rgb = -300,
+    RgbAlpha = -301,
+    Terminal = -302,
     /// Compiler generated: hands back what a static member is called on.
-    StaticReceiver = -304,
-    Board = -305,
-    Session = -306,
-    ElementCount = -307,
-    ElementAt = -308,
-    TOLONG64 = -309,
-    TOULONG64 = -310,
-    IndexedMember = -311,
+    StaticReceiver = -303,
+    Board = -304,
+    Session = -305,
+    ElementCount = -306,
+    ElementAt = -307,
+    TOLONG64 = -308,
+    TOULONG64 = -309,
+    IndexedMember = -310,
 }
 
-pub const LAST_FUNC: i16 = -311;
+pub const LAST_FUNC: i16 = -310;
 
 impl FuncOpCode {
     pub fn get_definition(self) -> &'static FunctionDefinition {
@@ -414,7 +413,7 @@ impl FunctionDefinition {
         }
     }
 }
-pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 323]> = std::sync::LazyLock::new(|| {
+pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 322]> = std::sync::LazyLock::new(|| {
     [
         FunctionDefinition {
             name: "END",
@@ -2932,14 +2931,6 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 323]> 
                 ArgumentDefinition::new("area", VariableType::Integer),
             ]),
             signature: FunctionSignature::FixedParameters(2),
-        },
-        FunctionDefinition {
-            name: "WebRequest",
-            version: 400,
-            opcode: FuncOpCode::WebRequest,
-            return_type: VariableType::String,
-            args: Some(vec![ArgumentDefinition::new("url", VariableType::String)]),
-            signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "Len",

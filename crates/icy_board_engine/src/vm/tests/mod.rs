@@ -23,6 +23,7 @@ mod file_names;
 mod fonts;
 mod forward_calls;
 mod graphics;
+mod http;
 mod hyperlinks;
 mod long;
 mod margins;

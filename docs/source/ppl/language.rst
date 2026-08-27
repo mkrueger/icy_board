@@ -632,6 +632,41 @@ All ``TYPE`` declarations in a package are collected before its source files are
 parsed, so ``main.pps`` may use a type declared in another file. Record fields
 still follow declaration order.
 
+HTTP objects
+~~~~~~~~~~~~
+
+Runtime 400 exposes outbound HTTP through typed objects. It is disabled until
+the sysop configures the board's ``[ppl_http]`` policy::
+
+    HttpResponse response = Http.Get("https://api.example.com/status")
+    IF NOT response.Valid THEN
+        PRINTLN Error.Last().Message
+        RETURN
+    ENDIF
+    PRINTLN response.Status, " ", response.OK
+    PRINTLN response.Header("Content-Type")
+    PRINTLN response.Text()
+
+``Valid`` reports a completed, bounded transport. ``OK`` reports status 200
+through 299, so a 404 remains a valid response with its status and body.
+``FinalUrl``, ``Size`` and ``ContentType`` are also available. ``Save(path)``
+writes a retained body; ``Http.Download(url, path)`` streams a successful body
+through a temporary file and commits it only after completion.
+
+A request object supplies POST bodies and safe custom headers::
+
+    HttpRequest request = Http.New(HttpMethod.Post, "https://api.example.com/items")
+    request = request.SetHeader("Accept", "application/json")
+    request = request.SetText(json, "application/json")
+    HttpResponse response = request.Send()
+
+The builder functions return a new request and leave the receiver unchanged.
+The board policy selects ``disabled``, exact-origin ``allowlist``, or ``public``
+destinations and sets body, timeout, redirect and concurrency limits. Every DNS
+answer and redirect is checked, validated addresses are pinned to the connection,
+and system proxies are ignored. Network failures report ``ErrKind.Net``; HTTP
+status codes belong to the response rather than ``Error.Last()``.
+
 BEGIN ... END
 ~~~~~~~~~~~~~
 

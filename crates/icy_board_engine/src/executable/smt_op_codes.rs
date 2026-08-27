@@ -266,10 +266,8 @@ pub enum OpCode {
     ShortDesc = 227,
     MoveMsg = 228,
     SetBankBal = 229,
-    WebRequest = 230,
-
-    MemberCall = 231,
-    OnError = 232,
+    MemberCall = 230,
+    OnError = 231,
 }
 pub const LAST_STMT: i16 = OpCode::OnError as i16;
 
@@ -603,7 +601,7 @@ pub fn format_argument_type_last(arg: &ArgumentDefinition) -> String {
 // "WAIT FOR" == "WAITFOR"
 // "GO SUB"
 // " GO TO"
-pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 238]> = std::sync::LazyLock::new(|| {
+pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 237]> = std::sync::LazyLock::new(|| {
     [
         StatementDefinition {
             // helps to map opcode to array index.
@@ -2565,16 +2563,6 @@ pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 238]
             args: Some(vec![
                 ArgumentDefinition::new("field", VariableType::Integer),
                 ArgumentDefinition::new("value", VariableType::Integer),
-            ]),
-            sig: StatementSignature::ArgumentsWithVariable(0, 2),
-        },
-        StatementDefinition {
-            name: "WebRequest",
-            version: 400,
-            opcode: OpCode::WebRequest,
-            args: Some(vec![
-                ArgumentDefinition::new("url", VariableType::String),
-                ArgumentDefinition::new("FileName", VariableType::String),
             ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 2),
         },

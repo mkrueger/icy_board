@@ -950,41 +950,72 @@ PRINTLN BASE64DEC("R3LDvMOfZQ==")
 PRINTLN SHA256("abc")
 ```
 
-## `WebRequest()`  Function (4.00)
+## HTTP objects (4.00)
 
-### Function
-Gets data from a web server and returns it as a string.
+PPL HTTP access is disabled until the sysop configures the board's
+`[ppl_http]` policy. New code receives a typed response instead of treating an
+HTTP status or a transport failure as an empty string:
 
-### Syntax
-`WebRequest(url)`
+```PPL
+HttpResponse response = Http.Get("https://api.example.com/status")
+IF NOT response.Valid THEN
+	PRINTLN Error.Last().Message
+	RETURN
+ENDIF
+PRINTLN response.Status, " ", response.OK
+PRINTLN response.Header("Content-Type")
+PRINTLN response.Text()
+```
 
-`url` An string expression stating the url to get data from.
-        
-### Returns
-`STRING`   Returns the web request value as STRING.
+`Valid` means the transport completed and the body stayed within its limit.
+`OK` means status 200 through 299. A 404 is therefore valid but not OK. Other
+properties are `Status`, `FinalUrl`, `Size` and `ContentType`. `Save(path)`
+writes a body already held by a response. `Http.Download(url, path)` streams a
+successful response through a temporary file and replaces the destination only
+after the complete body arrives.
 
-### Remarks
-A request that fails - a bad url, a host that is not there, an error from the
-server - is logged and answers an empty string rather than stopping the PPE.
-A request gives up after 30 seconds, so a host that never answers cannot hold
-the caller's node.
+For a POST request or custom headers, build a request:
 
-## `WEBREQUEST()` Statement (4.00)
+```PPL
+HttpRequest request = Http.New(HttpMethod.Post, "https://api.example.com/items")
+request = request.SetHeader("Accept", "application/json")
+request = request.SetText(json, "application/json")
+HttpResponse response = request.Send()
+```
 
-### Function
-Gets data from a web server and stores it as a file.
+The builder functions return a new request and leave the receiver unchanged.
+`HttpMethod` contains `Get`, `Head` and `Post`. Routing and hop-by-hop headers,
+including `Host`, `Content-Length`, `Connection` and `Transfer-Encoding`, cannot
+be set by a PPE.
 
-### Syntax
-`WEBREQUEST url, file`
+The recommended board policy is an exact origin allowlist:
 
-`url`  An string expression stating the url to get data from.
+```toml
+[ppl_http]
+destination_policy = "allowlist"
+allowed_origins = ["https://api.example.com"]
+max_response_bytes = 16777216
+max_request_bytes = 1048576
+connect_timeout_seconds = 5
+request_timeout_seconds = 30
+max_redirects = 3
+max_concurrent_requests = 16
+max_concurrent_per_node = 2
+max_headers = 64
+max_header_bytes = 65536
+allow_http = false
+```
 
-`file` An string expression stating the file to save the data to.
+The same fields are available under **Configuration Options → PPL HTTP** in
+`icbsetup`; editing TOML directly is not required.
 
-### Remarks
-The file is resolved against the board like every other file a PPE writes, so a
-DOS style path works the way it does everywhere else. A request that fails is
-logged, writes no file and lets the PPE carry on; it gives up after 30 seconds.
+`public` permits destinations that resolve exclusively to public addresses.
+Every redirect is checked and DNS answers are pinned to the connection. The
+transport ignores system proxies. An allowlisted origin may deliberately name a
+private service; scripts cannot add origins or relax any board limit.
+
+Policy, DNS, TLS, timeout, size and file failures set `Error.Last()` with
+`ErrKind.Net`. HTTP status codes remain on `HttpResponse.Status`.
 
 ## `Len()`  Function (4.00)
 

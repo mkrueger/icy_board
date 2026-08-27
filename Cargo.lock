@@ -3911,6 +3911,7 @@ dependencies = [
  "toml 1.1.4+spec-1.1.0",
  "unicase",
  "walkdir",
+ "windows-sys 0.61.2",
  "zip",
  "zune-core 0.5.3",
  "zune-jpegxl",

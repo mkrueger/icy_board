@@ -215,6 +215,9 @@ fn board_object_type_ids_are_frozen() {
         ("NOTES", 56),
         ("CONTACTS", 57),
         ("MSG", 58),
+        ("HTTP", 59),
+        ("HTTPREQUEST", 60),
+        ("HTTPRESPONSE", 61),
     ];
 
     for (name, id) in expected {
@@ -256,6 +259,7 @@ fn builtin_enum_ids_are_frozen() {
         ("ErrCode", 248),
         ("EditorMode", 247),
         ("MsgField", 246),
+        ("HttpMethod", 245),
     ];
 
     for (name, id) in expected {
@@ -275,7 +279,7 @@ fn a_program_enum_starts_below_the_builtin_ones() {
         .declare_enum(unicase::Ascii::new("Mine".to_string()), vec![(unicase::Ascii::new("One".to_string()), 1)])
         .expect("a program enum should still fit");
 
-    assert_eq!(id, 245);
+    assert_eq!(id, 244);
 }
 
 fn parse_types(input: &str) -> (Vec<AstNode>, UserTypeRegistry, Arc<Mutex<ErrorReporter>>) {

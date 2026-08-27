@@ -434,7 +434,6 @@ pub fn get_function_hover(func: &FunctionDefinition) -> Option<Hover> {
         FuncOpCode::GetMsgHdr => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-getmsghdr")),
         FuncOpCode::SetMsgHdr => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-setmsghdr")),
         FuncOpCode::AreaId => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-areaid")),
-        FuncOpCode::WebRequest => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-webrequest")),
         FuncOpCode::Len_Dim => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-len_dim")),
         FuncOpCode::BASE64ENC => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-base64enc")),
         FuncOpCode::BASE64DEC => get_sig_hint(sig, fl!(crate::LANGUAGE_LOADER, "hint-function-base64dec")),
@@ -669,7 +668,6 @@ pub fn get_statement_hover(stmt: &StatementDefinition) -> Option<Hover> {
         OpCode::ShortDesc => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-shortdesc")),
         OpCode::MoveMsg => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-movemsg")),
         OpCode::SetBankBal => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-setbankbal")),
-        OpCode::WebRequest => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-webrequest")),
         OpCode::OnError => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-on-error")),
         _ => None,
     }

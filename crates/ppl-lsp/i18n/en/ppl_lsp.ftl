@@ -622,10 +622,6 @@ hint-statement-setbankbal=
         9 = Amount Saved (their K byte balance in their account)
         10 = Max Withdrawal (the max a user can withdraw in a day)
         11 = Max Stored Amount (Maximum K bytes allowed to be stored)
-hint-statement-webrequest=
-    @1 = An string expression stating the url to get data from.
-    @2 = An string expression stating the file to save the data to.
-
 hint-function-len=
     ### Returns
     Returns the length of the string @1
@@ -1236,12 +1232,6 @@ hint-function-setmsghdr=
     header then it will insert the message to the end of the message
     base.
 hint-function-areaid=Generates a tuple conference/area to identify a message base.
-hint-function-webrequest=Gets data from a web server and returns it as a string.
-    ### Parameters
-    @1 = An string expression stating the url to get data from.
-
-    ### Returns
-    The web request value as STRING.
 hint-function-len_dim=
     @1 = The array to get the length of
     @2 = The dimension to get the length of

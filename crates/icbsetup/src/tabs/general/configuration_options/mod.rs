@@ -18,6 +18,7 @@ mod file_transfer;
 mod function_keys;
 mod limits;
 mod messages;
+mod ppl_http;
 mod system_control;
 
 pub struct ConfigurationOptions {
@@ -36,6 +37,7 @@ impl ConfigurationOptions {
                 MenuItem::new(4, 'E', get_text("configuration_options_limits")),
                 MenuItem::new(5, 'F', get_text("configuration_options_colors")),
                 MenuItem::new(6, 'G', get_text("configuration_options_func_keys")),
+                MenuItem::new(7, 'H', get_text("configuration_options_ppl_http")),
             ]))
             .with_center_title(get_text("configuration_options_title")),
             icy_board,
@@ -66,6 +68,7 @@ impl Page for ConfigurationOptions {
                 4 => PageMessage::OpenSubPage(Box::new(limits::Limits::new(self.icy_board.clone()))),
                 5 => PageMessage::OpenSubPage(Box::new(colors::ColorOptions::new(self.icy_board.clone()))),
                 6 => PageMessage::OpenSubPage(Box::new(function_keys::FunctionKeys::new(self.icy_board.clone()))),
+                7 => PageMessage::OpenSubPage(Box::new(ppl_http::PplHttp::new(self.icy_board.clone()))),
                 _ => PageMessage::None,
             };
         }
