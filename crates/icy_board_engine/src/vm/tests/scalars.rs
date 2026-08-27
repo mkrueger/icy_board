@@ -285,7 +285,7 @@ fn test_len_dimension_returns_each_declared_upper_bound() {
         INTEGER one(10)
         INTEGER two(2, 3)
         INTEGER three(1, 2, 3)
-        PRINT LEN(one), " ", LEN(one, 0), " ", LEN(two, 0), " ", LEN(two, 1), " ", LEN(three, 0), " ", LEN(three, 1), " ", LEN(three, 2)
+        PRINT one.Len(), " ", LEN(one, 0), " ", LEN(two, 0), " ", LEN(two, 1), " ", LEN(three, 0), " ", LEN(three, 1), " ", LEN(three, 2)
     "#,
     );
     assert_eq!(output, "10 10 2 3 1 2 3");

@@ -100,6 +100,9 @@ pub enum VMError {
     #[error("Member {1} of user type {0} expected {2} arguments, got {3}")]
     InvalidMemberArgumentCount(u8, usize, usize, usize),
 
+    #[error("Invalid array dimension count: {0}")]
+    InvalidArrayDimensionCount(usize),
+
     #[error("PPE call stack exhausted")]
     StackOverflow,
 }
@@ -155,6 +158,25 @@ pub fn calc_stmt_table(blk: &[Statement]) -> HashMap<unicase::Ascii<String>, usi
 pub struct ReturnAddress {
     ptr: usize,
     id: usize,
+}
+
+/// `PCBoard` reads a variable written without subscripts as its first element
+/// (`cVAR::getVal(0,0,0)`), so a bare array decays the same way here.
+fn decay_array(value: VariableValue) -> VariableValue {
+    match value.generic_data {
+        GenericVariableData::Dim1(_) | GenericVariableData::Dim2(_) | GenericVariableData::Dim3(_) => value.get_array_value(0, 0, 0),
+        _ => value,
+    }
+}
+
+enum LValuePathStep<'a> {
+    Member(usize),
+    IndexedMember(usize, &'a [PPEExpr]),
+}
+
+enum ResolvedLValuePathStep {
+    Member(usize),
+    IndexedMember(usize, usize, usize, usize),
 }
 
 impl ReturnAddress {
@@ -511,7 +533,7 @@ impl VirtualMachine<'_> {
     /// exactly the ones this refuses.
     fn eval_expr_sync(&mut self, expr: &PPEExpr) -> Option<VariableValue> {
         match expr {
-            PPEExpr::Value(id) | PPEExpr::RoutineReference(id) => Some(self.variable_table.get_value(*id).clone()),
+            PPEExpr::Value(id) | PPEExpr::RoutineReference(id) => Some(decay_array(self.variable_table.get_value(*id).clone())),
             PPEExpr::UnaryExpression(op, expr) => {
                 let value = self.eval_expr_sync(expr)?;
                 Some(Self::apply_unary_op(*op, value))
@@ -574,7 +596,7 @@ impl VirtualMachine<'_> {
         }
         match expr {
             PPEExpr::Invalid => Err(VMError::InternalVMError.into()),
-            PPEExpr::Value(id) | PPEExpr::RoutineReference(id) => Ok(self.variable_table.get_value(*id).clone()),
+            PPEExpr::Value(id) | PPEExpr::RoutineReference(id) => Ok(decay_array(self.variable_table.get_value(*id).clone())),
             PPEExpr::RecordLiteral(type_id, fields) => {
                 let mut value = crate::executable::create_record_value(*type_id, &self.user_types).ok_or(VMError::InternalVMError)?;
                 let GenericVariableData::Record(values) = &mut value.generic_data else {
@@ -633,17 +655,7 @@ impl VirtualMachine<'_> {
                     return Err(VMError::NoUserTypeBase.into());
                 };
                 let field = fields.get(*id).ok_or(VMError::InternalVMError)?;
-                let dim_1 = self.eval_expr(&arguments[0]).await?.as_int() as usize;
-                let dim_2 = if arguments.len() >= 2 {
-                    self.eval_expr(&arguments[1]).await?.as_int() as usize
-                } else {
-                    0
-                };
-                let dim_3 = if arguments.len() >= 3 {
-                    self.eval_expr(&arguments[2]).await?.as_int() as usize
-                } else {
-                    0
-                };
+                let (dim_1, dim_2, dim_3) = self.eval_array_indices(arguments).await?;
                 Ok(field.get_array_value(dim_1, dim_2, dim_3))
             }
 
@@ -904,7 +916,7 @@ impl VirtualMachine<'_> {
 
     async fn eval_array_indices(&mut self, dimensions: &[PPEExpr]) -> Res<(usize, usize, usize)> {
         if dimensions.is_empty() || dimensions.len() > 3 {
-            return Err(VMError::InternalVMError.into());
+            return Err(VMError::InvalidArrayDimensionCount(dimensions.len()).into());
         }
         let first = self.eval_expr(&dimensions[0]).await?.as_int() as usize;
         let second = if dimensions.len() >= 2 {
@@ -920,10 +932,32 @@ impl VirtualMachine<'_> {
         Ok((first, second, third))
     }
 
+    /// The value of an expression without the bare-array decay, for the built-ins that
+    /// take a whole array rather than one of its elements.
+    pub async fn eval_array_operand(&mut self, expr: &PPEExpr) -> Res<VariableValue> {
+        if let PPEExpr::Value(id) = expr {
+            return Ok(self.variable_table.get_value(*id).clone());
+        }
+        self.eval_expr(expr).await
+    }
+
     async fn set_variable(&mut self, variable: &PPEExpr, value: VariableValue) -> Res<()> {
         match variable {
             PPEExpr::Value(id) => {
-                self.variable_table.set_value(*id, value);
+                // Writing a bare array without subscripts reaches its first element,
+                // the way reading one does; replacing it would drop the other elements.
+                let target = self.variable_table.get_value(*id);
+                if matches!(
+                    target.generic_data,
+                    GenericVariableData::Dim1(_) | GenericVariableData::Dim2(_) | GenericVariableData::Dim3(_)
+                ) && !matches!(
+                    value.generic_data,
+                    GenericVariableData::Dim1(_) | GenericVariableData::Dim2(_) | GenericVariableData::Dim3(_)
+                ) {
+                    self.variable_table.get_var_entry_mut(*id).value.set_array_value(0, 0, 0, value)?;
+                } else {
+                    self.variable_table.set_value(*id, value);
+                }
             }
             PPEExpr::Dim(id, dims) => {
                 let dim_1 = self.eval_expr(&dims[0]).await?.as_int() as usize;
@@ -953,25 +987,16 @@ impl VirtualMachine<'_> {
                     }
                 }
 
-                enum PathStep<'a> {
-                    Member(usize),
-                    IndexedMember(usize, &'a [PPEExpr]),
-                }
-                enum ResolvedPathStep {
-                    Member(usize),
-                    IndexedMember(usize, usize, usize, usize),
-                }
-
                 let mut path = Vec::new();
                 let mut root = variable;
                 loop {
                     match root {
                         PPEExpr::Member(base, member_id) => {
-                            path.push(PathStep::Member(*member_id));
+                            path.push(LValuePathStep::Member(*member_id));
                             root = base;
                         }
                         PPEExpr::IndexedMember(base, member_id, dimensions) => {
-                            path.push(PathStep::IndexedMember(*member_id, dimensions));
+                            path.push(LValuePathStep::IndexedMember(*member_id, dimensions));
                             root = base;
                         }
                         _ => break,
@@ -987,10 +1012,10 @@ impl VirtualMachine<'_> {
                 let mut resolved_path = Vec::with_capacity(path.len());
                 for step in path {
                     resolved_path.push(match step {
-                        PathStep::Member(member_id) => ResolvedPathStep::Member(member_id),
-                        PathStep::IndexedMember(member_id, dimensions) => {
+                        LValuePathStep::Member(member_id) => ResolvedLValuePathStep::Member(member_id),
+                        LValuePathStep::IndexedMember(member_id, dimensions) => {
                             let (first, second, third) = self.eval_array_indices(dimensions).await?;
-                            ResolvedPathStep::IndexedMember(member_id, first, second, third)
+                            ResolvedLValuePathStep::IndexedMember(member_id, first, second, third)
                         }
                     });
                 }
@@ -1006,8 +1031,8 @@ impl VirtualMachine<'_> {
                         return Err(VMError::NoUserTypeBase.into());
                     };
                     target = match step {
-                        ResolvedPathStep::Member(member_id) => fields.get_mut(member_id).ok_or(VMError::InternalVMError)?,
-                        ResolvedPathStep::IndexedMember(member_id, first, second, third) => fields
+                        ResolvedLValuePathStep::Member(member_id) => fields.get_mut(member_id).ok_or(VMError::InternalVMError)?,
+                        ResolvedLValuePathStep::IndexedMember(member_id, first, second, third) => fields
                             .get_mut(member_id)
                             .ok_or(VMError::InternalVMError)?
                             .get_array_value_mut(first, second, third)

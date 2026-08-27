@@ -1,6 +1,6 @@
 use crate::executable::{EntryType, FunctionValue, VariableType, VariableValue};
 
-use super::{Executable, FUNCTION_DEFINITIONS, FuncOpCode, PPEExpr, TableEntry};
+use super::{DeserializationErrorType, Executable, FUNCTION_DEFINITIONS, FuncOpCode, PPEExpr, TableEntry};
 
 #[test]
 fn test_value_serialization() {
@@ -65,6 +65,133 @@ fn test_function_call_serialization() {
 fn test_member_reference_serialization() {
     let val = PPEExpr::Member(Box::new(PPEExpr::Value(2)), 32);
     test_serialize(&val, &[2, 0, FuncOpCode::MemberReference as i16, 32]);
+}
+
+#[test]
+fn test_indexed_member_serialization() {
+    let val = PPEExpr::IndexedMember(Box::new(PPEExpr::Value(2)), 3, vec![PPEExpr::Value(4), PPEExpr::Value(5)]);
+    test_serialize(&val, &[2, 0, FuncOpCode::IndexedMember as i16, 3, 2, 4, 0, 0, 5, 0, 0]);
+}
+
+#[test]
+fn malformed_indexed_member_dimensions_are_rejected() {
+    for (dimension_count, expected) in [
+        (0, DeserializationErrorType::InvalidIndexedMemberDimensionCount(0)),
+        (4, DeserializationErrorType::InvalidIndexedMemberDimensionCount(4)),
+    ] {
+        let mut executable = malformed_expression_executable();
+        executable.script_buffer = vec![1, 0, FuncOpCode::IndexedMember as i16, 3, dimension_count];
+        let mut deserializer = super::PPEDeserializer::default();
+        let error = deserializer.deserialize_expression(&executable).unwrap_err();
+        assert_eq!(expected, error);
+    }
+}
+
+#[test]
+fn truncated_indexed_member_operands_are_rejected() {
+    let mut executable = malformed_expression_executable();
+    executable.script_buffer = vec![1, 0, FuncOpCode::IndexedMember as i16];
+    let error = super::PPEDeserializer::default().deserialize_expression(&executable).unwrap_err();
+    assert_eq!(DeserializationErrorType::IndexOutOfBounds, error);
+}
+
+#[test]
+fn malformed_member_reference_is_rejected() {
+    let missing_base = Executable {
+        script_buffer: vec![FuncOpCode::MemberReference as i16, 1],
+        ..Executable::default()
+    };
+    assert_eq!(
+        DeserializationErrorType::ExpressionStackEmpty,
+        super::PPEDeserializer::default().deserialize_expression(&missing_base).unwrap_err()
+    );
+
+    let mut missing_id = malformed_expression_executable();
+    missing_id.script_buffer = vec![1, 0, FuncOpCode::MemberReference as i16];
+    assert_eq!(
+        DeserializationErrorType::IndexOutOfBounds,
+        super::PPEDeserializer::default().deserialize_expression(&missing_id).unwrap_err()
+    );
+}
+
+#[test]
+fn malformed_record_literal_is_rejected() {
+    for script in [
+        vec![FuncOpCode::RecordLiteral as i16],
+        vec![FuncOpCode::RecordLiteral as i16, 100],
+        vec![FuncOpCode::RecordLiteral as i16, 100, 1],
+    ] {
+        let executable = Executable {
+            script_buffer: script,
+            ..Executable::default()
+        };
+        assert_eq!(
+            DeserializationErrorType::IndexOutOfBounds,
+            super::PPEDeserializer::default().deserialize_expression(&executable).unwrap_err()
+        );
+    }
+
+    let executable = Executable {
+        script_buffer: vec![FuncOpCode::RecordLiteral as i16, 100, 1, 0],
+        ..Executable::default()
+    };
+    assert_eq!(
+        DeserializationErrorType::ExpressionStackEmpty,
+        super::PPEDeserializer::default().deserialize_expression(&executable).unwrap_err()
+    );
+}
+
+#[test]
+fn malformed_member_call_is_rejected() {
+    for script in [vec![FuncOpCode::MemberCall as i16], vec![FuncOpCode::MemberCall as i16, 0]] {
+        let executable = Executable {
+            script_buffer: script,
+            ..Executable::default()
+        };
+        assert_eq!(
+            DeserializationErrorType::IndexOutOfBounds,
+            super::PPEDeserializer::default().deserialize_expression(&executable).unwrap_err()
+        );
+    }
+
+    let executable = Executable {
+        script_buffer: vec![FuncOpCode::MemberCall as i16, 0, 1],
+        ..Executable::default()
+    };
+    assert_eq!(
+        DeserializationErrorType::TooFewFunctionArguments,
+        super::PPEDeserializer::default().deserialize_expression(&executable).unwrap_err()
+    );
+}
+
+#[test]
+fn truncated_routine_reference_is_rejected() {
+    let executable = Executable {
+        script_buffer: vec![FuncOpCode::RoutineReference as i16],
+        ..Executable::default()
+    };
+    assert_eq!(
+        DeserializationErrorType::IndexOutOfBounds,
+        super::PPEDeserializer::default().deserialize_expression(&executable).unwrap_err()
+    );
+}
+
+fn malformed_expression_executable() -> Executable {
+    let mut executable = Executable::default();
+    for id in 0..2 {
+        executable.variable_table.push(TableEntry {
+            name: format!("value{id}"),
+            value: VariableValue::new_int(0),
+            header: super::VarHeader {
+                id: id + 1,
+                variable_type: VariableType::Integer,
+                ..Default::default()
+            },
+            entry_type: EntryType::Variable,
+            function_id: 0,
+        });
+    }
+    executable
 }
 
 #[test]

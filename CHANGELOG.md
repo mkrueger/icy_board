@@ -14,7 +14,12 @@ releases.
   arrays of an earlier record type. Runtime 400's versioned type table stores a
   fixed field descriptor with the type, rank and three `u16` upper bounds, so
   field arrays survive PPE serialization and decompilation. Assignment copies
-  their contents and record equality compares them.
+  their contents and record equality compares them. Fixed fields answer `Len`,
+  work with `FOREACH`, and may be copied from another field with the same element
+  type, rank and bounds. `REDIM`, scalar use and shape-mismatched assignment are
+  rejected with specific diagnostics; malformed record literals, member
+  references, member calls and indexed-member bytecode are rejected instead of
+  reaching unchecked VM indexing.
 
 - `MSG`, the message type. `AREA.Read(number)` answers with one, and it reports
   `From`, `To`, `Subject`, `Date`, `Time`, `ReplyTo`, `Status`, `Size`,
@@ -221,6 +226,12 @@ releases.
 
 ### Fixed
 
+- Reading an array without a subscript is now an error, the way `PCBoard` had it
+  (`wrVIDSUB` wanted one subscript per dimension), instead of quietly answering
+  an unrelated empty slot. Original `REDIM` and `SORT`, plus the runtime-400
+  `.Len()`, `Len(array, dim)` and `FOREACH` APIs, still take the whole array. A
+  bare array that reaches the runtime from a foreign PPE answers its first
+  element like `cVAR::getVal(0,0,0)`.
 - File listings now keep size, date and description in their fixed columns when
   a filename longer than 12 characters wraps onto its own line.
 - File-base lookup, upload duplicate checks, flagging and downloads now treat

@@ -3,7 +3,7 @@ use crate::{
     executable::{Executable, FunctionValue, ProcedureValue, TableEntry, VariableType, VariableValue},
 };
 
-use super::{FUNCTION_DEFINITIONS, FuncOpCode, OpCode, PPECommand, PPEExpr};
+use super::{DeserializationErrorType, FUNCTION_DEFINITIONS, FuncOpCode, OpCode, PPECommand, PPEExpr};
 
 #[test]
 fn test_end_serialization() {
@@ -15,6 +15,28 @@ fn test_end_serialization() {
 fn test_return_serialization() {
     let val = PPECommand::Return;
     test_serialize(&val, &[OpCode::RETURN as i16]);
+}
+
+#[test]
+fn malformed_indexed_member_let_target_reports_its_dimension_count() {
+    let mut executable = Executable::default();
+    for id in 0..2 {
+        executable.variable_table.push(TableEntry {
+            name: format!("value{id}"),
+            value: VariableValue::new_int(0),
+            header: super::VarHeader {
+                id: id + 1,
+                variable_type: VariableType::Integer,
+                ..Default::default()
+            },
+            entry_type: super::EntryType::Variable,
+            function_id: 0,
+        });
+    }
+    executable.script_buffer = vec![OpCode::LET as i16, 1, 0, FuncOpCode::IndexedMember as i16, 3, 0];
+
+    let error = super::PPEDeserializer::default().deserialize_statement(&executable).unwrap_err();
+    assert_eq!(DeserializationErrorType::InvalidIndexedMemberDimensionCount(0), error);
 }
 
 #[test]

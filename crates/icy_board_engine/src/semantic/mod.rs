@@ -16,8 +16,8 @@ use crate::{
     compiler::{CompilationErrorType, CompilationWarningType, user_data::UserDataMemberRegistry, workspace::Workspace},
     executable::{
         EntryType, FIRST_RECORD_LITERAL_RUNTIME, FIRST_ROUTINE_REFERENCE_RUNTIME, FIRST_STATIC_MEMBER_RUNTIME, FIRST_TYPE_TABLE_RUNTIME, FUNCTION_DEFINITIONS,
-        FuncOpCode, FunctionDefinition, FunctionValue, GenericVariableData, OpCode, ProcedureValue, TableEntry, USER_VARIABLES, VarHeader, VariableData,
-        VariableTable, VariableType, VariableValue,
+        FuncOpCode, FunctionDefinition, FunctionValue, GenericVariableData, OpCode, ProcedureValue, StatementSignature, TableEntry, USER_VARIABLES, VarHeader,
+        VariableData, VariableTable, VariableType, VariableValue,
     },
     parser::{
         self, ErrorReporter, FIRST_BOARD_OBJECT_LANGUAGE_VERSION, ParserErrorType, UserTypeRegistry,
@@ -134,6 +134,44 @@ pub const ARRAY_PROCEDURES: &[(&str, OpCode, std::ops::RangeInclusive<usize>)] =
 
 pub fn array_procedure(name: &unicase::Ascii<String>) -> Option<&'static (&'static str, OpCode, std::ops::RangeInclusive<usize>)> {
     ARRAY_PROCEDURES.iter().find(|(member, _, _)| *name == *member)
+}
+
+/// True where a statement wants the array itself rather than one of its elements,
+/// the positions `PCBoard` compiled with `wrVID` instead of `wrVIDSUB`.
+fn takes_whole_array(opcode: OpCode, signature: crate::executable::StatementSignature, index: usize) -> bool {
+    if opcode == OpCode::REDIM {
+        return index == 0;
+    }
+    match signature {
+        StatementSignature::SpecialCaseDlockg => index == 2,
+        StatementSignature::SpecialCaseDcreate => index == 3,
+        StatementSignature::SpecialCaseSort => index < 2,
+        StatementSignature::Invalid
+        | StatementSignature::ArgumentsWithVariable(_, _)
+        | StatementSignature::VariableArguments(_, _, _)
+        | StatementSignature::SpecialCaseVarSeg
+        | StatementSignature::SpecialCasePop => false,
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct ArrayShape {
+    element_type: VariableType,
+    rank: u8,
+    bounds: [usize; 3],
+    resizable: bool,
+    field_name: Option<String>,
+}
+
+impl ArrayShape {
+    fn source_name(&self) -> String {
+        let bounds = self.bounds[..self.rank as usize].iter().map(usize::to_string).collect::<Vec<_>>().join(", ");
+        format!("{}({bounds})", self.element_type)
+    }
+
+    fn same_layout(&self, other: &Self) -> bool {
+        self.element_type == other.element_type && self.rank == other.rank && self.bounds == other.bounds
+    }
 }
 
 #[derive(Default, Debug, Clone, PartialEq)]
@@ -1050,41 +1088,89 @@ impl SemanticVisitor {
         None
     }
 
-    fn is_whole_custom_type_array(&mut self, expression: &Expression) -> bool {
+    fn array_shape(&mut self, expression: &Expression) -> Option<ArrayShape> {
         match expression {
             Expression::Identifier(identifier) => {
-                let Some(index) = self.lookup_variable(identifier.get_identifier()) else {
-                    return false;
-                };
+                let index = self.lookup_variable(identifier.get_identifier())?;
                 let reference = &self.references[index].1;
-                matches!(reference.variable_type, VariableType::UserData(_)) && reference.header.as_ref().is_some_and(|header| header.dim > 0)
+                // A routine reference keeps its parameter count in `dim`, which is not a bound.
+                if matches!(reference.variable_type, VariableType::Function | VariableType::Procedure) {
+                    return None;
+                }
+                let header = reference.header.as_ref()?;
+                (header.dim > 0).then(|| ArrayShape {
+                    element_type: reference.variable_type,
+                    rank: header.dim,
+                    bounds: [header.vector_size, header.matrix_size, header.cube_size],
+                    resizable: true,
+                    field_name: None,
+                })
             }
-            Expression::Parens(parens) => self.is_whole_custom_type_array(parens.get_expression()),
-            _ => false,
+            Expression::Parens(parens) => self.array_shape(parens.get_expression()),
+            Expression::MemberReference(member) => {
+                let type_id = self.user_type_lookup.get(&member.get_identifier_token().span.start).copied()?;
+                let definition = self.type_registry.get_record_type_from_id(type_id)?;
+                let field = definition.field(definition.field_index(member.get_identifier())?)?;
+                (field.dim > 0).then(|| ArrayShape {
+                    element_type: field.variable_type,
+                    rank: field.dim,
+                    bounds: [field.vector_size as usize, field.matrix_size as usize, field.cube_size as usize],
+                    resizable: false,
+                    field_name: Some(member.get_identifier().to_string()),
+                })
+            }
+            _ => None,
         }
     }
 
-    /// True when the expression names a declared array, which is what gives it members.
-    fn names_an_array(&mut self, expression: &Expression) -> bool {
-        let Expression::Identifier(identifier) = expression else {
-            return false;
-        };
-        let Some(index) = self.lookup_variable(identifier.get_identifier()) else {
-            return false;
-        };
-        self.references[index].1.header.as_ref().is_some_and(|header| header.dim > 0)
+    fn is_whole_custom_type_array(&mut self, expression: &Expression) -> bool {
+        self.array_shape(expression)
+            .is_some_and(|shape| matches!(shape.element_type, VariableType::UserData(_)))
     }
 
-    fn fixed_record_array_field(&mut self, expression: &Expression) -> Option<String> {
-        let Expression::MemberReference(member) = expression else {
-            return None;
+    /// A bare array is not a value: `PCBoard` wanted one subscript per dimension
+    /// everywhere a variable was read (`wrVIDSUB`), and only the statements that take a
+    /// whole array saw one.
+    fn reject_bare_array_value(&mut self, expression: &Expression) {
+        let Some(shape) = self.array_shape(expression) else {
+            return;
         };
-        let VariableType::UserData(type_id) = member.get_expression().visit(self) else {
-            return None;
-        };
-        let definition = self.type_registry.get_record_type_from_id(type_id)?;
-        let field_id = definition.field_index(member.get_identifier())?;
-        (definition.field(field_id)?.dim > 0).then(|| member.get_identifier().to_string())
+        if shape.field_name.is_some() {
+            self.errors
+                .lock()
+                .unwrap()
+                .report_error(expression.get_span(), CompilationErrorType::WholeArrayUsedAsScalar);
+            return;
+        }
+        let mut expression = expression;
+        while let Expression::Parens(parens) = expression {
+            expression = parens.get_expression();
+        }
+        if let Expression::Identifier(identifier) = expression {
+            self.check_arg_count(shape.rank as usize, 0, identifier.get_identifier_token());
+        }
+    }
+
+    /// Reports what stops `value` from being stored in an array shaped target.
+    fn check_array_target_assignment(&mut self, target_shape: &ArrayShape, value: &Expression, span: &core::ops::Range<usize>) {
+        let field_name = target_shape.field_name.clone().unwrap_or_default();
+        match self.array_shape(value) {
+            Some(value_shape) if target_shape.same_layout(&value_shape) => {}
+            Some(value_shape) => {
+                let expected = target_shape.source_name();
+                let actual = value_shape.source_name();
+                self.errors
+                    .lock()
+                    .unwrap()
+                    .report_error(span.clone(), CompilationErrorType::RecordArrayShapeMismatch(field_name, expected, actual));
+            }
+            None => {
+                self.errors
+                    .lock()
+                    .unwrap()
+                    .report_error(span.clone(), CompilationErrorType::RecordArrayValueExpected(field_name));
+            }
+        }
     }
 
     fn is_assignable_explicit_target(&mut self, expression: &Expression) -> bool {
@@ -1272,6 +1358,7 @@ impl SemanticVisitor {
     fn check_member_arg_types(&mut self, expected: &[VariableType], arguments: &[Expression]) {
         for (index, (argument, expected)) in arguments.iter().zip(expected).enumerate() {
             let actual = argument.visit(self);
+            self.reject_bare_array_value(argument);
             if *expected != actual && (matches!(expected, VariableType::UserData(_)) || matches!(actual, VariableType::UserData(_))) {
                 self.errors.lock().unwrap().report_error(
                     argument.get_span(),
@@ -1559,6 +1646,7 @@ impl SemanticVisitor {
                 ParameterSpecifier::Variable(parameter) => {
                     let expected = parameter.get_variable_type();
                     let actual = arguments[i].visit(self);
+                    self.reject_bare_array_value(&arguments[i]);
                     if expected != actual && (matches!(expected, VariableType::UserData(_)) || matches!(actual, VariableType::UserData(_))) {
                         self.errors.lock().unwrap().report_error(
                             arguments[i].get_span(),
@@ -1572,6 +1660,56 @@ impl SemanticVisitor {
 }
 
 impl AstVisitor<VariableType> for SemanticVisitor {
+    fn visit_unary_expression(&mut self, unary: &crate::ast::UnaryExpression) -> VariableType {
+        let result = unary.get_expression().visit(self);
+        self.reject_bare_array_value(unary.get_expression());
+        result
+    }
+
+    fn visit_if_statement(&mut self, if_stmt: &crate::ast::IfStatement) -> VariableType {
+        crate::ast::walk_if_stmt(self, if_stmt);
+        self.reject_bare_array_value(if_stmt.get_condition());
+        VariableType::None
+    }
+
+    fn visit_if_then_statement(&mut self, if_then: &crate::ast::IfThenStatement) -> VariableType {
+        crate::ast::walk_if_then_stmt(self, if_then);
+        self.reject_bare_array_value(if_then.get_condition());
+        VariableType::None
+    }
+
+    fn visit_while_statement(&mut self, while_stmt: &crate::ast::WhileStatement) -> VariableType {
+        crate::ast::walk_while_stmt(self, while_stmt);
+        self.reject_bare_array_value(while_stmt.get_condition());
+        VariableType::None
+    }
+
+    fn visit_while_do_statement(&mut self, while_do: &crate::ast::WhileDoStatement) -> VariableType {
+        crate::ast::walk_while_do_stmt(self, while_do);
+        self.reject_bare_array_value(while_do.get_condition());
+        VariableType::None
+    }
+
+    fn visit_repeat_until_statement(&mut self, repeat_until: &crate::ast::RepeatUntilStatement) -> VariableType {
+        crate::ast::walk_repeat_until_stmt(self, repeat_until);
+        self.reject_bare_array_value(repeat_until.get_condition());
+        VariableType::None
+    }
+
+    fn visit_select_statement(&mut self, select_stmt: &crate::ast::SelectStatement) -> VariableType {
+        crate::ast::walk_select_stmt(self, select_stmt);
+        self.reject_bare_array_value(select_stmt.get_expression());
+        VariableType::None
+    }
+
+    fn visit_return_statement(&mut self, return_stmt: &crate::ast::ReturnStatement) -> VariableType {
+        crate::ast::walk_return_stmt(self, return_stmt);
+        if let Some(expression) = return_stmt.get_expression() {
+            self.reject_bare_array_value(expression);
+        }
+        VariableType::None
+    }
+
     fn visit_record_literal_expression(&mut self, record: &crate::ast::RecordLiteralExpression) -> VariableType {
         if self.runtime < FIRST_RECORD_LITERAL_RUNTIME {
             self.errors.lock().unwrap().report_error(
@@ -1603,8 +1741,34 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 field.get_value().visit(self);
                 continue;
             };
-            let expected = definition.field_type(index).unwrap_or(VariableType::None);
+            let expected_field = definition.field(index);
+            let expected = expected_field.map_or(VariableType::None, |field| field.variable_type);
             let actual = field.get_value().visit(self);
+            let value_shape = self.array_shape(field.get_value());
+            if let Some(expected_field) = expected_field
+                && expected_field.dim > 0
+            {
+                let target_shape = ArrayShape {
+                    element_type: expected_field.variable_type,
+                    rank: expected_field.dim,
+                    bounds: [
+                        expected_field.vector_size as usize,
+                        expected_field.matrix_size as usize,
+                        expected_field.cube_size as usize,
+                    ],
+                    resizable: false,
+                    field_name: Some(name.to_string()),
+                };
+                self.check_array_target_assignment(&target_shape, field.get_value(), &field.get_value().get_span());
+                continue;
+            }
+            if value_shape.is_some() {
+                self.errors
+                    .lock()
+                    .unwrap()
+                    .report_error(field.get_value().get_span(), CompilationErrorType::WholeArrayUsedAsScalar);
+                continue;
+            }
             if expected != actual && (matches!(expected, VariableType::UserData(_)) || matches!(actual, VariableType::UserData(_))) {
                 self.errors.lock().unwrap().report_error(
                     field.get_value().get_span(),
@@ -1618,6 +1782,25 @@ impl AstVisitor<VariableType> for SemanticVisitor {
     fn visit_binary_expression(&mut self, binary: &crate::ast::BinaryExpression) -> VariableType {
         let left = binary.get_left_expression().visit(self);
         let right = binary.get_right_expression().visit(self);
+        let left_array = self.array_shape(binary.get_left_expression());
+        let right_array = self.array_shape(binary.get_right_expression());
+        if left_array.is_some() || right_array.is_some() {
+            let compares_record_arrays = matches!(binary.get_op(), crate::ast::BinOp::Eq | crate::ast::BinOp::NotEq)
+                && left_array
+                    .iter()
+                    .chain(right_array.iter())
+                    .any(|shape| matches!(shape.element_type, VariableType::UserData(_)));
+            if compares_record_arrays {
+                self.errors
+                    .lock()
+                    .unwrap()
+                    .report_error(binary.get_op_token().span.clone(), CompilationErrorType::CustomTypeArrayComparisonNotSupported);
+                return VariableType::None;
+            }
+            self.reject_bare_array_value(binary.get_left_expression());
+            self.reject_bare_array_value(binary.get_right_expression());
+            return VariableType::None;
+        }
         let has_enum = self.type_registry.is_enum_type(left) || self.type_registry.is_enum_type(right);
         if has_enum && self.counts_a_loop(binary.get_left_expression()) {
             // A FOR writes its own comparison and step, so it may count over an enum.
@@ -1770,7 +1953,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
         // An array carries the built-in array functions as members. Its type is the
         // element's, so the declaration is what says it has them.
         if matches!(receiver, StaticReceiver::NotAType)
-            && self.names_an_array(member_reference_expression.get_expression())
+            && self.array_shape(member_reference_expression.get_expression()).is_some()
             && (array_member(member_reference_expression.get_identifier()).is_some() || array_procedure(member_reference_expression.get_identifier()).is_some())
         {
             member_reference_expression.get_expression().visit(self);
@@ -1858,15 +2041,19 @@ impl AstVisitor<VariableType> for SemanticVisitor {
 
     fn visit_predefined_call_statement(&mut self, call_stmt: &PredefinedCallStatement) -> VariableType {
         let def = call_stmt.get_func();
+        if def.opcode == OpCode::REDIM && !call_stmt.get_arguments().is_empty() {
+            call_stmt.get_arguments()[0].visit(self);
+        }
         if def.opcode == OpCode::REDIM
-            && let Some(field_name) = call_stmt.get_arguments().first().and_then(|argument| self.fixed_record_array_field(argument))
+            && let Some(shape) = call_stmt.get_arguments().first().and_then(|argument| self.array_shape(argument))
+            && !shape.resizable
         {
             for argument in call_stmt.get_arguments().iter().skip(1) {
                 argument.visit(self);
             }
             self.errors.lock().unwrap().report_error(
                 call_stmt.get_arguments()[0].get_span(),
-                CompilationErrorType::FixedRecordArrayCannotBeRedimmed(field_name),
+                CompilationErrorType::FixedRecordArrayCannotBeRedimmed(shape.field_name.unwrap_or_default()),
             );
             self.add_reference(
                 ReferenceType::PredefinedProc(def.opcode),
@@ -1875,7 +2062,18 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             );
             return VariableType::None;
         }
-        walk_predefined_call_statement(self, call_stmt);
+        if def.opcode != OpCode::REDIM {
+            walk_predefined_call_statement(self, call_stmt);
+        } else {
+            for argument in call_stmt.get_arguments().iter().skip(1) {
+                argument.visit(self);
+            }
+        }
+        for (index, argument) in call_stmt.get_arguments().iter().enumerate() {
+            if !takes_whole_array(def.opcode, def.sig, index) {
+                self.reject_bare_array_value(argument);
+            }
+        }
 
         let minimum_runtime = def.opcode.minimum_runtime();
         if self.runtime < minimum_runtime {
@@ -1979,17 +2177,50 @@ impl AstVisitor<VariableType> for SemanticVisitor {
         let mut res = VariableType::None;
         let is_ident = matches!(call.get_expression(), Expression::Identifier(_));
         if let Expression::MemberReference(member) = call.get_expression()
-            && array_procedure(member.get_identifier()).is_some()
-            && let Some(field_name) = self.fixed_record_array_field(member.get_expression())
+            && let Some((_, opcode, arguments)) = array_procedure(member.get_identifier())
         {
-            for argument in call.get_arguments() {
-                argument.visit(self);
+            member.get_expression().visit(self);
+            if let Some(shape) = self.array_shape(member.get_expression()) {
+                for argument in call.get_arguments() {
+                    argument.visit(self);
+                }
+                if !shape.resizable {
+                    self.errors.lock().unwrap().report_error(
+                        member.get_expression().get_span(),
+                        CompilationErrorType::FixedRecordArrayCannotBeRedimmed(shape.field_name.unwrap_or_default()),
+                    );
+                    return VariableType::None;
+                }
+                let given = call.get_arguments().len();
+                if !arguments.contains(&given) {
+                    self.check_expr_arg_range(*arguments.start(), *arguments.end(), given, call.get_expression());
+                    return VariableType::None;
+                }
+                self.function_type_lookup.insert(call.id, SemanticInfo::ArrayMemberProc(*opcode));
+                return VariableType::None;
             }
-            self.errors.lock().unwrap().report_error(
-                member.get_expression().get_span(),
-                CompilationErrorType::FixedRecordArrayCannotBeRedimmed(field_name),
-            );
-            return VariableType::None;
+        }
+        if let Expression::MemberReference(member) = call.get_expression()
+            && let Some(array_member) = array_member(member.get_identifier())
+        {
+            member.get_expression().visit(self);
+            if self.array_shape(member.get_expression()).is_some() {
+                for argument in call.get_arguments() {
+                    argument.visit(self);
+                }
+                let given = call.get_arguments().len();
+                if !array_member.arguments.contains(&given) {
+                    self.check_expr_arg_range(*array_member.arguments.start(), *array_member.arguments.end(), given, call.get_expression());
+                    return VariableType::None;
+                }
+                let filled_in = array_member.defaults[given.min(array_member.defaults.len())..].to_vec();
+                for value in &filled_in {
+                    self.add_constant(&Constant::Integer(*value, crate::ast::constant::NumberFormat::Default));
+                }
+                self.function_type_lookup
+                    .insert(call.id, SemanticInfo::ArrayMemberFunc(array_member.opcode, filled_in));
+                return array_member.return_type;
+            }
         }
         let outer_func_call = self.cur_func_call;
         self.cur_func_call = call.id;
@@ -1999,7 +2230,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
         // A member call is decided by the receiver's type, whatever expression produced it.
         if let Expression::MemberReference(member) = call.get_expression() {
             // An array's members are the built-in array functions written the other way round.
-            if self.names_an_array(member.get_expression())
+            if self.array_shape(member.get_expression()).is_some()
                 && let Some(array_member) = array_member(member.get_identifier())
             {
                 for argument in call.get_arguments() {
@@ -2019,7 +2250,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 return array_member.return_type;
             }
 
-            if self.names_an_array(member.get_expression())
+            if self.array_shape(member.get_expression()).is_some()
                 && let Some((_, opcode, arguments)) = array_procedure(member.get_identifier())
             {
                 for argument in call.get_arguments() {
@@ -2046,7 +2277,17 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 for argument in call.get_arguments() {
                     argument.visit(self);
                 }
-                self.check_expr_arg_count(field.dim as usize, call.get_arguments().len(), call.get_expression());
+                if field.dim as usize != call.get_arguments().len() {
+                    self.errors.lock().unwrap().report_error(
+                        call.get_expression().get_span(),
+                        CompilationErrorType::RecordArrayIndexCount(
+                            member.get_identifier().to_string(),
+                            field.dim,
+                            call.get_arguments().len(),
+                            if call.get_arguments().len() == 1 { "index was" } else { "indices were" },
+                        ),
+                    );
+                }
                 self.function_type_lookup.insert(call.id, SemanticInfo::IndexedRecordField(member_id));
                 return field.variable_type;
             }
@@ -2137,6 +2378,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             Some(SemanticInfo::VariableReference(idx)) => {
                 for argument in call.get_arguments() {
                     argument.visit(self);
+                    self.reject_bare_array_value(argument);
                 }
 
                 let (rt, r) = &mut self.references[idx];
@@ -2167,6 +2409,11 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                             return res;
                         }
                         self.function_type_lookup.insert(call.id, SemanticInfo::PredefinedFunc(def.opcode));
+                        if !matches!(def.opcode, FuncOpCode::Len_Dim | FuncOpCode::ElementCount | FuncOpCode::ElementAt) {
+                            for argument in call.get_arguments() {
+                                self.reject_bare_array_value(argument);
+                            }
+                        }
                         if let Expression::Identifier(id) = call.get_expression() {
                             self.add_reference(ReferenceType::PredefinedFunc(def.opcode), VariableType::Function, id.get_identifier_token());
                         }
@@ -2261,6 +2508,9 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             );
         }
         walk_indexer_expression(self, indexer);
+        for argument in indexer.get_arguments() {
+            self.reject_bare_array_value(argument);
+        }
         res
     }
 
@@ -2355,12 +2605,21 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 return VariableType::None;
             }
             let value_type = let_stmt.get_value_expression().visit(self);
+            if let Some(target_shape) = self.array_shape(target) {
+                self.check_array_target_assignment(&target_shape, let_stmt.get_value_expression(), &let_stmt.get_eq_token().span);
+                return VariableType::None;
+            }
+            if self.array_shape(let_stmt.get_value_expression()).is_some() {
+                self.reject_bare_array_value(let_stmt.get_value_expression());
+                return VariableType::None;
+            }
             if target_type != value_type && !matches!(target_type, VariableType::None) {
                 let_stmt.get_value_expression().visit(self);
             }
             return VariableType::None;
         }
         let mut target_type = VariableType::None;
+        let mut target_array_shape = None;
         if self.lookup_constant(let_stmt.get_identifier()).is_some() {
             self.errors.lock().unwrap().report_error(
                 let_stmt.get_identifier_token().span.clone(),
@@ -2405,6 +2664,20 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                                 break;
                             };
                             variable_type = self.resolve_record_field(type_id, member, &member_token.span);
+                            if position + 1 == let_stmt.get_members().len()
+                                && let Some(definition) = self.type_registry.get_record_type_from_id(type_id)
+                                && let Some(field_id) = definition.field_index(member)
+                                && let Some(field) = definition.field(field_id)
+                                && field.dim > 0
+                            {
+                                target_array_shape = Some(ArrayShape {
+                                    element_type: field.variable_type,
+                                    rank: field.dim,
+                                    bounds: [field.vector_size as usize, field.matrix_size as usize, field.cube_size as usize],
+                                    resizable: false,
+                                    field_name: Some(member.to_string()),
+                                });
+                            }
                         }
                         VariableType::UserData(type_id) => {
                             let Token::Identifier(member) = &member_token.token else {
@@ -2500,6 +2773,21 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             arg.visit(self);
         }
         let value_type = let_stmt.get_value_expression().visit(self);
+        if let Some(target_shape) = target_array_shape {
+            self.check_array_target_assignment(&target_shape, let_stmt.get_value_expression(), &let_stmt.get_eq_token().span);
+            return VariableType::None;
+        }
+        if self.array_shape(let_stmt.get_value_expression()).is_some() && !let_stmt.get_members().is_empty() {
+            self.errors
+                .lock()
+                .unwrap()
+                .report_error(let_stmt.get_eq_token().span.clone(), CompilationErrorType::WholeArrayUsedAsScalar);
+            return VariableType::None;
+        }
+        if self.array_shape(let_stmt.get_value_expression()).is_some() {
+            self.reject_bare_array_value(let_stmt.get_value_expression());
+            return VariableType::None;
+        }
         if (self.type_registry.is_enum_type(target_type) || self.type_registry.is_enum_type(value_type)) && target_type != value_type {
             self.errors.lock().unwrap().report_error(
                 let_stmt.get_eq_token().span.clone(),
@@ -2536,6 +2824,27 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             );
         }
         crate::ast::walk_for_stmt(self, for_stmt);
+        self.reject_bare_array_value(for_stmt.get_start_expr());
+        self.reject_bare_array_value(for_stmt.get_end_expr());
+        if let Some(step) = for_stmt.get_step_expr() {
+            self.reject_bare_array_value(step);
+        }
+        VariableType::None
+    }
+
+    fn visit_case_specifier(&mut self, case_specifier: &crate::ast::CaseSpecifier) -> VariableType {
+        match case_specifier {
+            crate::ast::CaseSpecifier::Expression(expression) => {
+                expression.visit(self);
+                self.reject_bare_array_value(expression);
+            }
+            crate::ast::CaseSpecifier::FromTo(from, to) => {
+                from.visit(self);
+                to.visit(self);
+                self.reject_bare_array_value(from);
+                self.reject_bare_array_value(to);
+            }
+        }
         VariableType::None
     }
 

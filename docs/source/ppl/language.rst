@@ -583,6 +583,10 @@ fields of its own::
 A record field may itself be a one-, two- or three-dimensional array. Its bounds
 are part of the record type and are the same for every value, so neither
 ``REDIM record.Values, ...`` nor ``record.Values.Redim(...)`` is allowed.
+It otherwise has the read-only array surface: ``record.Values.Len(dim)`` reports
+a bound and ``FOREACH value IN record.Values`` walks every element. A whole field
+may be copied from another field only when element type, rank and all bounds
+match; use an index whenever a scalar value is required.
 
 Record literals
 ~~~~~~~~~~~~~~~

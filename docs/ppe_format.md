@@ -212,6 +212,10 @@ The code is an array of `i16`. The size field holds the size **before** packing,
 so comparing it against what is actually left in the file is how a reader learns
 whether the code was packed:
 
+Runtime 400's indexed-member expression stores a member id followed by a rank
+and that many index expressions. The rank must be 1 to 3. A missing operand or a
+rank outside that range is rejected as malformed bytecode before the VM runs it.
+
 ```text
 packed = (bytes remaining) != (code size)
 ```

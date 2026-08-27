@@ -162,6 +162,10 @@ map.Positions(4).X = 12
 Array fields are part of a record value: assignment copies their contents and
 record equality compares them. Their bounds are fixed by the `TYPE` declaration;
 `REDIM map.Labels, ...` and `map.Labels.Redim(...)` are compile errors.
+They otherwise have the read-only array surface: `map.Labels.Len(1)` reports a
+bound and `FOREACH label IN map.Labels` walks every element. A whole field may
+be assigned from another field only when element type, rank and all bounds match;
+use an index whenever a scalar value is required.
 
 The PPE must store each record layout, so any use of `TYPE` requires runtime
 4.00. Field and type names are not stored; a decompiler invents names for them.

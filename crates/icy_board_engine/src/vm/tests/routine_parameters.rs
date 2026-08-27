@@ -1,5 +1,13 @@
 use crate::vm::tests::{compile_errors, compile_errors_with_runtime, run_ppl};
 
+/// A routine reference stores its parameter count where an array keeps its bounds,
+/// so it must not be mistaken for one.
+#[test]
+fn a_routine_parameter_is_not_an_array() {
+    let errors = compile_errors("PROCEDURE Apply(FUNCTION callback(INTEGER value) INTEGER)\n    PRINT callback + 1\nENDPROC\n");
+    assert_eq!(vec!["Function used as variable (callback)"], errors);
+}
+
 #[test]
 fn a_function_can_be_passed_and_called() {
     assert_eq!(

@@ -96,6 +96,31 @@ Holder holder = Holder { Value = Second { Value = 1 } }
 }
 
 #[test]
+fn record_literal_array_fields_require_the_declared_shape() {
+    let errors = compile_errors("TYPE Rec\n  INTEGER Small(1)\n  INTEGER Large(2)\nENDTYPE\nRec r\nr = Rec { Small = r.Large }\n");
+    assert_eq!(vec!["Record array field 'Small' expects Integer(1), got Integer(2)"], errors);
+
+    let scalar = compile_errors("TYPE Rec\n  INTEGER Values(1)\nENDTYPE\nRec r\nr = Rec { Values = 5 }\n");
+    assert_eq!(vec!["Record array field 'Values' requires an array value with the same shape"], scalar);
+}
+
+#[test]
+fn record_literal_scalar_fields_reject_whole_arrays() {
+    let errors = compile_errors("TYPE Rec\n  INTEGER Scalar\n  INTEGER Values(1)\nENDTYPE\nRec r\nr = Rec { Scalar = r.Values }\n");
+    assert_eq!(vec!["Whole arrays cannot be used as scalar values; index an element first"], errors);
+}
+
+#[test]
+fn record_literal_array_fields_accept_the_same_shape() {
+    assert_eq!(
+        "7 1",
+        run_ppl(
+            "TYPE Rec\n  INTEGER Values(1)\nENDTYPE\nRec source\nRec target\nsource.Values(1) = 7\ntarget = Rec { Values = source.Values }\nPRINT target.Values(1), \" \", target.Values.Len()\n"
+        )
+    );
+}
+
+#[test]
 fn a_record_literal_needs_runtime_400() {
     let errors = compile_errors_with_runtime("TYPE Point\n INTEGER X\nENDTYPE\nPoint value = Point { X = 1 }\n", 340);
     assert!(errors.iter().any(|error| error == "Record literals need runtime 400"), "{errors:?}");

@@ -270,8 +270,8 @@ dimensions are supported.
 - **Indexing**: zero based, with ``[ ]`` or ``( )``
 - **Bounds**: the declared number is the *highest* index, so ``scores(10)`` holds
   the elements 0 to 10
-- **Length**: ``Len(array)`` answers the upper bound, ``Len(array, dim)`` the one
-  of a single dimension
+- **Length**: ``array.Len()`` answers the first upper bound,
+    ``Len(array, dim)`` the one of a single dimension
 
 Example::
 
@@ -292,6 +292,13 @@ record type works the same way, and every element has fields of its own::
 
     Member members(10)
     members[0].Name = "Sysop"
+
+An array has to be named with one subscript per dimension wherever its value is
+read, the way PCBoard required: ``scores`` on its own is an error, ``scores(0)``
+is the element. The statements and functions that genuinely take a whole array -
+``REDIM`` and ``SORT`` in the original language, plus the runtime-400
+``array.Len()``, ``Len(array, dim)`` and ``FOREACH`` APIs - still receive all of
+it. Classic one-argument ``Len(array)`` is a value read and is rejected.
 
 Type Conversion
 ---------------

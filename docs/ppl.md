@@ -584,6 +584,9 @@ Record fields may themselves be one-, two- or three-dimensional arrays,
 including arrays whose element type is an earlier record type.
 Their bounds are part of the type layout and are the same for every record value,
 so neither `REDIM record.Values, ...` nor `record.Values.Redim(...)` is allowed.
+They do answer `Len` and work with `FOREACH`. A whole field can be copied from
+another array with the same element type, rank and bounds; assigning a scalar,
+copying a different shape or using the whole field as a scalar is an error.
 
 Rules the compiler enforces:
 

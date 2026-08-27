@@ -101,7 +101,7 @@ pub async fn len(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableV
 }
 
 pub async fn len_dim(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let arr = vm.eval_expr(&args[0]).await?;
+    let arr = vm.eval_array_operand(&args[0]).await?;
     let dim = vm.eval_expr(&args[1]).await?.as_int();
 
     let val = match &arr.generic_data {

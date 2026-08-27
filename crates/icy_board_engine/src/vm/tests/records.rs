@@ -168,6 +168,162 @@ fn test_record_array_field_sizes_are_fixed() {
 }
 
 #[test]
+fn test_record_array_fields_answer_len() {
+    assert_eq!(
+        "1 3 2",
+        run_ppl(
+            r#"
+TYPE Inner
+   INTEGER Values(2, 3)
+ENDTYPE
+TYPE Outer
+   Inner Items(1)
+ENDTYPE
+Outer outer
+PRINT outer.Items.Len(), " ", outer.Items(0).Values.Len(1), " ", Len(outer.Items(0).Values, 0)
+"#
+        )
+    );
+}
+
+#[test]
+fn test_foreach_walks_a_scalar_record_array_field() {
+    assert_eq!(
+        "6",
+        run_ppl(
+            r#"
+TYPE Rec
+   INTEGER Values(2)
+ENDTYPE
+Rec rec
+INTEGER value
+INTEGER total
+rec.Values(0) = 1
+rec.Values(1) = 2
+rec.Values(2) = 3
+FOREACH value IN rec.Values
+   total += value
+ENDFOREACH
+PRINT total
+"#
+        )
+    );
+}
+
+#[test]
+fn test_foreach_walks_a_record_valued_field() {
+    assert_eq!(
+        "left/right/",
+        run_ppl(
+            r#"
+TYPE Item
+   STRING Name
+ENDTYPE
+TYPE Rec
+   Item Items(1)
+ENDTYPE
+Rec rec
+Item item
+rec.Items(0).Name = "left"
+rec.Items(1).Name = "right"
+FOREACH item IN rec.Items
+   PRINT item.Name, "/"
+ENDFOREACH
+"#
+        )
+    );
+}
+
+#[test]
+fn test_a_whole_array_field_can_be_copied_when_its_shape_matches() {
+    assert_eq!(
+        "7 9",
+        run_ppl(
+            r#"
+TYPE Rec
+   INTEGER Values(1)
+ENDTYPE
+Rec source
+Rec target
+source.Values(0) = 7
+source.Values(1) = 9
+target.Values = source.Values
+PRINT target.Values(0), " ", target.Values(1)
+"#
+        )
+    );
+}
+
+#[test]
+fn test_whole_array_field_assignment_checks_its_shape() {
+    let errors = compile_errors(
+        "TYPE Rec\n  INTEGER Small(1)\n  INTEGER Large(2)\n  INTEGER Scalar\nENDTYPE\nRec r\nr.Small = r.Large\nr.Small = 1\nr.Scalar = r.Small\n",
+    );
+    assert_eq!(
+        vec![
+            "Record array field 'Small' expects Integer(1), got Integer(2)",
+            "Record array field 'Small' requires an array value with the same shape",
+            "Whole arrays cannot be used as scalar values; index an element first",
+        ],
+        errors
+    );
+}
+
+/// The same layout rules have to hold when the field is reached through an index,
+/// because that path assigns in place and would otherwise drop the fixed bounds.
+#[test]
+fn test_whole_array_field_assignment_through_an_index_checks_its_shape() {
+    let scalar = compile_errors("TYPE Item\n  INTEGER Values(2)\nENDTYPE\nTYPE Rec\n  Item Items(1)\nENDTYPE\nRec r\nr.Items(0).Values = 5\n");
+    assert_eq!(vec!["Record array field 'Values' requires an array value with the same shape"], scalar);
+
+    let mismatch = compile_errors(
+        "TYPE Item\n  INTEGER Values(2)\n  INTEGER Other(1)\nENDTYPE\nTYPE Rec\n  Item Items(1)\nENDTYPE\nRec r\nr.Items(0).Values = r.Items(0).Other\n",
+    );
+    assert_eq!(vec!["Record array field 'Values' expects Integer(2), got Integer(1)"], mismatch);
+
+    let scalar_target = compile_errors(
+        "TYPE Item\n  STRING Name\n  INTEGER Values(2)\nENDTYPE\nTYPE Rec\n  Item Items(1)\nENDTYPE\nRec r\nr.Items(0).Name = r.Items(0).Values\n",
+    );
+    assert_eq!(vec!["Whole arrays cannot be used as scalar values; index an element first"], scalar_target);
+}
+
+#[test]
+fn test_a_whole_array_field_can_be_copied_through_an_index() {
+    assert_eq!(
+        "7 2",
+        run_ppl(
+            r#"
+TYPE Item
+   INTEGER Values(2)
+ENDTYPE
+TYPE Rec
+   Item Items(1)
+ENDTYPE
+Rec r
+r.Items(1).Values(2) = 7
+r.Items(0).Values = r.Items(1).Values
+PRINT r.Items(0).Values(2), " ", r.Items(0).Values.Len()
+"#
+        )
+    );
+}
+
+#[test]
+fn test_whole_array_fields_cannot_be_used_as_scalars() {
+    let errors = compile_errors("TYPE Rec\n  INTEGER Values(1)\nENDTYPE\nRec r\nPRINT r.Values + 1\n");
+    assert_eq!(vec!["Whole arrays cannot be used as scalar values; index an element first"], errors);
+}
+
+#[test]
+fn test_record_array_field_index_diagnostic_names_the_rank() {
+    let too_few = compile_errors("TYPE Rec\n  INTEGER Values(1, 2)\nENDTYPE\nRec r\nPRINT r.Values(1)\n");
+    assert_eq!(vec!["Record array field 'Values' has rank 2, but 1 index was supplied"], too_few);
+
+    let too_many = compile_errors("TYPE Rec\n  INTEGER Values(1)\nENDTYPE\nRec r\nPRINT r.Values(0, 1)\n");
+    assert_eq!(vec!["Record array field 'Values' has rank 1, but 2 indices were supplied"], too_many);
+}
+
+#[test]
 fn test_record_equality_includes_array_field_contents() {
     assert_eq!(
         "1 0 1",

@@ -59,6 +59,9 @@ pub enum DeserializationErrorType {
     #[error("Invalid dimensonized expression ({0:04X}:{1:02X})")]
     InvalidDimensonizedExpression(i16, i16),
 
+    #[error("Invalid indexed member dimension count ({0})")]
+    InvalidIndexedMemberDimensionCount(i16),
+
     #[error("Invalid statement signature.")]
     InvalidStatementSignature,
 
@@ -121,7 +124,7 @@ impl PPEDeserializer {
             OpCode::FPCLR => Ok(Some(PPECommand::EndProc)),
             OpCode::STOP => Ok(Some(PPECommand::Stop)),
             OpCode::LET => {
-                let Some(target) = self.read_variable_expression(executable) else {
+                let Some(target) = self.read_variable_expression(executable)? else {
                     return Err(DeserializationErrorType::LetTargetInvalid(self.offset));
                 };
                 let Some(value) = self.deserialize_expression(executable)? else {
@@ -224,8 +227,8 @@ impl PPEDeserializer {
                     }
                     crate::executable::StatementSignature::SpecialCaseVarSeg => {
                         let arguments = vec![
-                            self.read_variable_expression(executable).unwrap(),
-                            self.read_variable_expression(executable).unwrap(),
+                            self.read_variable_expression(executable)?.ok_or(DeserializationErrorType::NoExpression)?,
+                            self.read_variable_expression(executable)?.ok_or(DeserializationErrorType::NoExpression)?,
                         ];
                         return Ok(Some(PPECommand::PredefinedCall(def, arguments)));
                     }
@@ -253,7 +256,7 @@ impl PPEDeserializer {
                         self.offset += 1;
                         let mut arguments = Vec::new();
                         for _ in 0..count {
-                            arguments.push(self.read_variable_expression(executable).unwrap());
+                            arguments.push(self.read_variable_expression(executable)?.ok_or(DeserializationErrorType::NoExpression)?);
                         }
                         return Ok(Some(PPECommand::PredefinedCall(def, arguments)));
                     }
@@ -265,7 +268,7 @@ impl PPEDeserializer {
                 let mut arguments = Vec::new();
                 for i in 0..argument_count {
                     let expr = if i + 1 == var_idx {
-                        self.read_variable_expression(executable).unwrap()
+                        self.read_variable_expression(executable)?.ok_or(DeserializationErrorType::NoExpression)?
                     } else {
                         self.deserialize_expression(executable)?.unwrap()
                     };
@@ -316,7 +319,7 @@ impl PPEDeserializer {
                     }
                 }
 
-                if let Some(var_expr) = self.read_variable_expression(executable) {
+                if let Some(var_expr) = self.read_variable_expression(executable)? {
                     self.push_expr(var_expr);
                 } else {
                     break;
@@ -328,22 +331,38 @@ impl PPEDeserializer {
                 }
                 if id == FuncOpCode::RoutineReference as i16 {
                     self.offset += 1;
-                    let routine_id = executable.script_buffer[self.offset] as usize;
+                    let Some(&routine_id) = executable.script_buffer.get(self.offset) else {
+                        return Err(DeserializationErrorType::IndexOutOfBounds);
+                    };
                     self.offset += 1;
-                    self.push_expr(PPEExpr::RoutineReference(routine_id));
+                    self.push_expr(PPEExpr::RoutineReference(routine_id as usize));
                     continue;
                 }
                 if id == FuncOpCode::RecordLiteral as i16 {
                     self.offset += 1;
-                    let type_id = executable.script_buffer[self.offset] as u8;
+                    let Some(&type_id) = executable.script_buffer.get(self.offset) else {
+                        return Err(DeserializationErrorType::IndexOutOfBounds);
+                    };
                     self.offset += 1;
-                    let field_count = executable.script_buffer[self.offset] as usize;
+                    let Some(&field_count) = executable.script_buffer.get(self.offset) else {
+                        return Err(DeserializationErrorType::IndexOutOfBounds);
+                    };
                     self.offset += 1;
-                    let field_ids: Vec<usize> = executable.script_buffer[self.offset..self.offset + field_count]
-                        .iter()
-                        .map(|id| *id as usize)
-                        .collect();
-                    self.offset += field_count;
+                    if field_count < 0 {
+                        return Err(DeserializationErrorType::InvalidExpressionStackState);
+                    }
+                    let field_count = field_count as usize;
+                    let Some(field_ids_end) = self.offset.checked_add(field_count) else {
+                        return Err(DeserializationErrorType::IndexOutOfBounds);
+                    };
+                    let Some(field_ids) = executable.script_buffer.get(self.offset..field_ids_end) else {
+                        return Err(DeserializationErrorType::IndexOutOfBounds);
+                    };
+                    let field_ids: Vec<usize> = field_ids.iter().map(|id| *id as usize).collect();
+                    self.offset = field_ids_end;
+                    if self.expr_stack.len() < field_count {
+                        return Err(DeserializationErrorType::ExpressionStackEmpty);
+                    }
                     let mut values = Vec::with_capacity(field_count);
                     for field_id in field_ids.into_iter().rev() {
                         let Some(value) = self.pop_expr() else {
@@ -352,13 +371,17 @@ impl PPEDeserializer {
                         values.push((field_id, value));
                     }
                     values.reverse();
-                    self.push_expr(PPEExpr::RecordLiteral(type_id, values));
+                    self.push_expr(PPEExpr::RecordLiteral(type_id as u8, values));
                     continue;
                 }
                 if id == FuncOpCode::MemberReference as i16 {
-                    let expr = self.pop_expr().unwrap();
+                    let Some(expr) = self.pop_expr() else {
+                        return Err(DeserializationErrorType::ExpressionStackEmpty);
+                    };
                     self.offset += 1;
-                    let member_id = executable.script_buffer[self.offset];
+                    let Some(&member_id) = executable.script_buffer.get(self.offset) else {
+                        return Err(DeserializationErrorType::IndexOutOfBounds);
+                    };
                     self.offset += 1;
 
                     self.push_expr(PPEExpr::Member(Box::new(expr), member_id as usize));
@@ -370,10 +393,18 @@ impl PPEDeserializer {
                         return Err(DeserializationErrorType::ExpressionStackEmpty);
                     };
                     self.offset += 1;
-                    let member_id = executable.script_buffer[self.offset] as usize;
+                    let Some(&member_id) = executable.script_buffer.get(self.offset) else {
+                        return Err(DeserializationErrorType::IndexOutOfBounds);
+                    };
                     self.offset += 1;
-                    let dimension_count = executable.script_buffer[self.offset] as usize;
+                    let Some(&dimension_count) = executable.script_buffer.get(self.offset) else {
+                        return Err(DeserializationErrorType::IndexOutOfBounds);
+                    };
                     self.offset += 1;
+                    if !(1..=3).contains(&dimension_count) {
+                        return Err(DeserializationErrorType::InvalidIndexedMemberDimensionCount(dimension_count));
+                    }
+                    let dimension_count = dimension_count as usize;
                     let mut dimensions = Vec::with_capacity(dimension_count);
                     for _ in 0..dimension_count {
                         let Some(dimension) = self.deserialize_expression(executable)? else {
@@ -381,16 +412,27 @@ impl PPEDeserializer {
                         };
                         dimensions.push(dimension);
                     }
-                    self.push_expr(PPEExpr::IndexedMember(Box::new(expr), member_id, dimensions));
+                    self.push_expr(PPEExpr::IndexedMember(Box::new(expr), member_id as usize, dimensions));
                     continue;
                 }
 
                 if id == FuncOpCode::MemberCall as i16 {
                     self.offset += 1;
-                    let arg_count = executable.script_buffer[self.offset];
+                    let Some(&arg_count) = executable.script_buffer.get(self.offset) else {
+                        return Err(DeserializationErrorType::IndexOutOfBounds);
+                    };
                     self.offset += 1;
-                    let member_id = executable.script_buffer[self.offset];
+                    let Some(&member_id) = executable.script_buffer.get(self.offset) else {
+                        return Err(DeserializationErrorType::IndexOutOfBounds);
+                    };
                     self.offset += 1;
+                    if arg_count < 0 {
+                        return Err(DeserializationErrorType::InvalidExpressionStackState);
+                    }
+                    let arg_count = arg_count as usize;
+                    if self.expr_stack.len() < arg_count + 1 {
+                        return Err(DeserializationErrorType::TooFewFunctionArguments);
+                    }
 
                     let mut arguments = Vec::new();
                     for _ in 0..arg_count {
@@ -404,7 +446,9 @@ impl PPEDeserializer {
                     // They were written left to right and come off the stack the other way.
                     arguments.reverse();
 
-                    let expr = self.pop_expr().unwrap();
+                    let Some(expr) = self.pop_expr() else {
+                        return Err(DeserializationErrorType::ExpressionStackEmpty);
+                    };
                     self.push_expr(PPEExpr::MemberFunctionCall(Box::new(expr), arguments, member_id as usize));
                     continue;
                 }
@@ -484,30 +528,29 @@ impl PPEDeserializer {
         self.expr_stack.pop()
     }
 
-    fn read_variable_expression(&mut self, executable: &Executable) -> Option<PPEExpr> {
-        let id = executable.script_buffer[self.offset];
+    fn read_variable_expression(&mut self, executable: &Executable) -> Result<Option<PPEExpr>, DeserializationErrorType> {
+        let Some(&id) = executable.script_buffer.get(self.offset) else {
+            return Err(DeserializationErrorType::IndexOutOfBounds);
+        };
         self.offset += 1;
         if self.offset >= executable.script_buffer.len() {
-            self.report_bug(DeserializationErrorType::IndexOutOfBounds);
-            return None;
+            return Err(DeserializationErrorType::IndexOutOfBounds);
         }
         let dim = executable.script_buffer[self.offset];
         if !(0..=3).contains(&dim) {
-            self.report_bug(DeserializationErrorType::InvalidDimensonizedExpression(id, dim));
-            return None;
+            return Err(DeserializationErrorType::InvalidDimensonizedExpression(id, dim));
         }
         self.offset += 1;
         let mut expr = if dim == 0 {
             PPEExpr::Value(id as usize)
         } else {
             for _ in 0..dim {
-                if let Some(e) = self.deserialize_expression(executable).unwrap() {
+                if let Some(e) = self.deserialize_expression(executable)? {
                     self.push_expr(e);
                 }
             }
             if self.expr_stack.len() < dim as usize {
-                self.report_bug(DeserializationErrorType::InvalidExpressionStackState);
-                return None;
+                return Err(DeserializationErrorType::InvalidExpressionStackState);
             }
             let dims = self.expr_stack.drain(self.expr_stack.len() - dim as usize..).collect();
             PPEExpr::Dim(id as usize, dims)
@@ -515,28 +558,38 @@ impl PPEDeserializer {
 
         // A record target may alternate scalar and indexed fields at any depth.
         loop {
-            if self.offset + 1 < executable.script_buffer.len() && executable.script_buffer[self.offset] == FuncOpCode::MemberReference as i16 {
+            if executable.script_buffer.get(self.offset) == Some(&(FuncOpCode::MemberReference as i16)) {
+                if self.offset + 1 >= executable.script_buffer.len() {
+                    return Err(DeserializationErrorType::IndexOutOfBounds);
+                }
                 self.offset += 1;
                 let member_id = executable.script_buffer[self.offset];
                 self.offset += 1;
                 expr = PPEExpr::Member(Box::new(expr), member_id as usize);
                 continue;
             }
-            if self.offset + 2 < executable.script_buffer.len() && executable.script_buffer[self.offset] == FuncOpCode::IndexedMember as i16 {
+            if executable.script_buffer.get(self.offset) == Some(&(FuncOpCode::IndexedMember as i16)) {
+                if self.offset + 2 >= executable.script_buffer.len() {
+                    return Err(DeserializationErrorType::IndexOutOfBounds);
+                }
                 self.offset += 1;
                 let member_id = executable.script_buffer[self.offset] as usize;
                 self.offset += 1;
-                let dimension_count = executable.script_buffer[self.offset] as usize;
+                let dimension_count = executable.script_buffer[self.offset];
                 self.offset += 1;
+                if !(1..=3).contains(&dimension_count) {
+                    return Err(DeserializationErrorType::InvalidIndexedMemberDimensionCount(dimension_count));
+                }
+                let dimension_count = dimension_count as usize;
                 let mut dimensions = Vec::with_capacity(dimension_count);
                 for _ in 0..dimension_count {
-                    dimensions.push(self.deserialize_expression(executable).ok().flatten()?);
+                    dimensions.push(self.deserialize_expression(executable)?.ok_or(DeserializationErrorType::NoExpression)?);
                 }
                 expr = PPEExpr::IndexedMember(Box::new(expr), member_id, dimensions);
                 continue;
             }
             break;
         }
-        Some(expr)
+        Ok(Some(expr))
     }
 }

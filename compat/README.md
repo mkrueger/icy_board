@@ -18,6 +18,27 @@ the `.pps` sources we write and the `.out` files the original produced.
 
 ### 1. Compiler oracle — run the original `PPLC.EXE`
 
+`pplc_oracle.py` handles the DOS scratch copy, CP437 conversion, mandatory CRLF
+line endings, DOSBox-X invocation and artifact collection:
+
+```sh
+python3 compat/pplc_oracle.py test.pps
+python3 compat/pplc_oracle.py test.pps --disarr
+python3 compat/pplc_oracle.py test.pps --run-icy icb/icyboard.toml
+```
+
+The outputs are `test.pcboard.log` and, when compilation succeeds,
+`test.pcboard.ppe` beside the source. Use `--output-dir` to collect several
+results elsewhere. A rejected source or failed IcyBoard run makes the wrapper
+exit nonzero. `--disarr` passes the original compiler's `/DISARR` option, which
+disables its normal array-dimension checks and should only be used when that
+behavior is what the probe is testing.
+
+When several inputs have the same filename stem, their collected artifacts get
+a short path-derived suffix so one result cannot overwrite another.
+
+The lower-level invocation is:
+
 ```sh
 SDL_VIDEODRIVER=dummy flatpak run com.dosbox_x.DOSBox-X -silent -exit \
   -c "mount c $HOME/dos" -c "c:" -c "cd \\COMPAT" \

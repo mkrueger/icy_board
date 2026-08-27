@@ -96,6 +96,18 @@ pub enum CompilationErrorType {
     #[error("Record array field '{0}' has a fixed size and cannot be redimensioned")]
     FixedRecordArrayCannotBeRedimmed(String),
 
+    #[error("Record array field '{0}' requires an array value with the same shape")]
+    RecordArrayValueExpected(String),
+
+    #[error("Record array field '{0}' expects {1}, got {2}")]
+    RecordArrayShapeMismatch(String, String, String),
+
+    #[error("Whole arrays cannot be used as scalar values; index an element first")]
+    WholeArrayUsedAsScalar,
+
+    #[error("Record array field '{0}' has rank {1}, but {2} {3} supplied")]
+    RecordArrayIndexCount(String, u8, usize, &'static str),
+
     #[error("Record literal field '{0}' is listed more than once")]
     DuplicateRecordLiteralField(String),
 

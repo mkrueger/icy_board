@@ -353,3 +353,72 @@ fn a_redim_member_and_the_statement_agree() {
         run_ppl("INTEGER a(1)\nINTEGER b(1)\na.Redim(7)\nREDIM b, 7\nPRINT a.Len(), \" \", b.Len()")
     );
 }
+
+/// PCBoard wanted one subscript per dimension everywhere a variable was read, so a
+/// bare array is not a value here either, whatever its rank.
+#[test]
+fn a_bare_array_is_not_a_value() {
+    for source in [
+        "INTEGER a(5)\nPRINT a + 1",
+        "INTEGER a(5)\nPRINT a",
+        "INTEGER a(5)\nPRINT (a) + 1",
+        "INTEGER a(5)\nPRINT -a",
+        "INTEGER a(1), b(1)\nPRINT b(a)",
+        "INTEGER a(5)\nIF (a) PRINT a(0)",
+        "INTEGER a(5)\nWHILE (a) PRINT a(0)",
+        "INTEGER a(1), i\nFOR i = a TO 1\nNEXT",
+        "INTEGER a(1), i\nFOR i = 0 TO a\nNEXT",
+        "INTEGER a(1), i\nFOR i = 0 TO 1 STEP a\nNEXT",
+        "INTEGER a(1)\nSELECT CASE a\nCASE 0\nENDSELECT",
+        "INTEGER a(1), x\nSELECT CASE x\nCASE a\nENDSELECT",
+        "INTEGER a(5)\nINTEGER x\nx = a",
+        "INTEGER a(5)\nPRINT Upper(a)",
+        "INTEGER a(5)\nPRINT Len(a)",
+        "INTEGER a(1)\nPUSH a",
+        "INTEGER a(1)\nPOP a",
+        "STRING a(1)\nINPUT \"\", a",
+        "STRING a(1)\nFGET 1, a",
+        "INTEGER a(1), b(1)\nVARSEG a, b",
+        "DECLARE PROCEDURE P(INTEGER x)\nINTEGER a(1)\nP(a)\nPROCEDURE P(INTEGER x)\nENDPROC",
+        "DECLARE FUNCTION F(INTEGER x) INTEGER\nINTEGER a(1), x\nx = F(a)\nFUNCTION F(INTEGER x) INTEGER\nF = x\nENDFUNC",
+        "DECLARE FUNCTION F() INTEGER\nINTEGER a(1)\nPRINT F()\nFUNCTION F() INTEGER\nF = a\nENDFUNC",
+        "INTEGER a(1)\nPRINT F()\nFUNCTION F() INTEGER\nRETURN a\nENDFUNC",
+        "INTEGER a(2, 2)\nPRINT a",
+        "INTEGER a(1, 1, 1)\nPRINT a",
+    ] {
+        let errors = compile_errors(source);
+        assert!(
+            errors.iter().any(|error| error.starts_with("Not enough arguments passed (a:0:")),
+            "{source}: {errors:?}"
+        );
+    }
+}
+
+/// The two original PPLC constructs that take a whole array still do, as do the
+/// new array members and `FOREACH`.
+#[test]
+fn the_array_builtins_still_see_the_whole_array() {
+    assert_eq!("5 2", run_ppl("INTEGER a(5)\nINTEGER b(2, 3)\nPRINT a.Len(), \" \", Len(b, 0)"));
+    assert_eq!(
+        "6",
+        run_ppl("INTEGER a(5)\nINTEGER v\nINTEGER n\nFOREACH v IN a\n  n = n + 1\nENDFOREACH\nPRINT n")
+    );
+    assert!(compile_errors("INTEGER a(5)\nREDIM a, 9\nPRINT a.Len()").is_empty());
+    assert!(compile_errors("INTEGER a(5)\nINTEGER idx(5)\nSORT a, idx").is_empty());
+}
+
+/// Our compiler refuses to emit a bare array read, but a PPE built by another tool
+/// can still hold one, and PCBoard answered it with the first element.
+#[test]
+fn a_bare_array_value_decays_to_its_first_element() {
+    use crate::executable::{GenericVariableData, VariableType, VariableValue};
+
+    let mut array = VariableValue {
+        vtype: VariableType::Integer,
+        generic_data: GenericVariableData::create_array(VariableValue::new_int(0), 1, 2, 0, 0).unwrap(),
+        ..Default::default()
+    };
+    array.set_array_value(0, 0, 0, VariableValue::new_int(7)).unwrap();
+
+    assert_eq!(7, crate::vm::decay_array(array).as_int());
+}
