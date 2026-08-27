@@ -16,8 +16,8 @@ use crate::{
     },
     compiler::{user_data::UserDataEntry, workspace::Workspace},
     executable::{
-        DeserializationError, DeserializationErrorType, EntryType, Executable, OpCode, PPECommand, PPEExpr, PPEScript, PPEVisitor, StatementDefinition,
-        TableEntry, VariableType,
+        DeserializationError, DeserializationErrorType, EntryType, Executable, FuncOpCode, OpCode, PPECommand, PPEExpr, PPEScript, PPEVisitor,
+        StatementDefinition, TableEntry, VariableType,
     },
     parser::{
         ErrorReporter, UserTypeRegistry, is_user_declared_type,
@@ -277,6 +277,19 @@ impl Decompiler {
             .map(|(name, _)| name.clone())
     }
 
+    fn static_receiver_type(&self, expr: &PPEExpr) -> Option<u8> {
+        let PPEExpr::PredefinedFunctionCall(definition, arguments) = expr else {
+            return None;
+        };
+        if definition.opcode != FuncOpCode::StaticReceiver {
+            return None;
+        }
+        let PPEExpr::Value(constant_id) = arguments.first()? else {
+            return None;
+        };
+        u8::try_from(self.executable.variable_table.try_get_entry(*constant_id)?.value.as_int()).ok()
+    }
+
     /// The name and type of member `id` of whatever `base` evaluates to.
     fn resolve_member(&self, base: &PPEExpr, id: usize) -> Option<(unicase::Ascii<String>, VariableType)> {
         let VariableType::UserData(type_id) = self.expression_type(base)? else {
@@ -303,9 +316,57 @@ impl Decompiler {
             .map_or_else(|| unicase::Ascii::new(format!("MEMBER{:03}", id + 1)), |(name, _)| name)
     }
 
+    fn convert_to_type(&self, expr: Expression, expected: VariableType) -> Expression {
+        let VariableType::UserData(type_id) = expected else {
+            return expr;
+        };
+        let Some(enum_definition) = self.type_registry.get_enum_from_id(type_id) else {
+            return expr;
+        };
+        let Expression::Const(constant) = &expr else {
+            return expr;
+        };
+        let Constant::Integer(value, _) = constant.get_constant_value() else {
+            return expr;
+        };
+        let Some(variant) = enum_definition.variant_name(*value).cloned() else {
+            return expr;
+        };
+        MemberReferenceExpression::create_empty_expression(IdentifierExpression::create_empty_expression(enum_definition.name), variant)
+    }
+
+    fn convert_argument(&self, expr: Expression, arg: &crate::executable::ArgumentDefinition) -> Expression {
+        convert_argument(self.convert_to_type(expr, arg.arg_type), arg)
+    }
+
+    fn member_parameter_type(&self, base: &PPEExpr, member_id: usize, parameter: usize) -> Option<VariableType> {
+        let base = if let PPEExpr::Member(inner, _) = base { inner.as_ref() } else { base };
+        let VariableType::UserData(type_id) = self.expression_type(base)? else {
+            return None;
+        };
+        let registry = self.type_registry.get_type_from_id(type_id)?;
+        match registry.id_table.get(member_id)? {
+            UserDataEntry::Function(name) => registry.functions.get(name)?.parameters.get(parameter).copied(),
+            UserDataEntry::Procedure(name) => registry.procedures.get(name)?.parameters.get(parameter).copied(),
+            _ => None,
+        }
+    }
+
+    fn convert_member_argument(&self, expr: Expression, expected: VariableType) -> Expression {
+        let expr = self.convert_to_type(expr, expected);
+        if expected == VariableType::Boolean {
+            Statement::try_boolean_conversion(&expr)
+        } else {
+            expr
+        }
+    }
+
     /// What an expression evaluates to, as far as the variable table and the type
     /// table can say. Only member access needs this.
     fn expression_type(&self, expr: &PPEExpr) -> Option<VariableType> {
+        if let Some(type_id) = self.static_receiver_type(expr) {
+            return Some(VariableType::UserData(type_id));
+        }
         match expr {
             PPEExpr::Value(id) | PPEExpr::Dim(id, _) => Some(self.executable.variable_table.try_get_entry(*id)?.header.variable_type),
             PPEExpr::Member(base, id) => self.resolve_member(base, *id).map(|(_, t)| t),
@@ -437,7 +498,17 @@ impl Decompiler {
                 } else {
                     MemberReferenceExpression::create_empty_expression(base, self.member_name(expr, *id))
                 };
-                FunctionCallExpression::create_empty_expression(callee, args.iter().map(|e| self.decompile_expression(e)).collect())
+                FunctionCallExpression::create_empty_expression(
+                    callee,
+                    args.iter()
+                        .enumerate()
+                        .map(|(index, argument)| {
+                            let argument = self.decompile_expression(argument);
+                            self.member_parameter_type(expr, *id, index)
+                                .map_or(argument.clone(), |expected| self.convert_member_argument(argument, expected))
+                        })
+                        .collect(),
+                )
             }
             PPEExpr::UnaryExpression(op, expr) => {
                 let mut expr = self.decompile_expression(expr);
@@ -454,8 +525,14 @@ impl Decompiler {
                 }
             }
             PPEExpr::BinaryExpression(op, left, right) => {
-                let left = add_parens_if_required(*op, self.decompile_expression(left));
-                let right = add_parens_if_required(*op, self.decompile_expression(right));
+                let left_type = self.expression_type(left);
+                let right_type = self.expression_type(right);
+                let left = self.decompile_expression(left);
+                let right = self.decompile_expression(right);
+                let left = right_type.map_or(left.clone(), |expected| self.convert_to_type(left, expected));
+                let right = left_type.map_or(right.clone(), |expected| self.convert_to_type(right, expected));
+                let left = add_parens_if_required(*op, left);
+                let right = add_parens_if_required(*op, right);
 
                 let expr = BinaryExpression::create_empty_expression(*op, left, right);
                 if self.optimize_output {
@@ -467,21 +544,28 @@ impl Decompiler {
             PPEExpr::Dim(id, dims) => {
                 IndexerExpression::create_empty_expression(self.get_variable_name(*id), dims.iter().map(|e| self.decompile_expression(e)).collect())
             }
-            PPEExpr::PredefinedFunctionCall(f, args) => FunctionCallExpression::create_empty_expression(
-                IdentifierExpression::create_empty_expression(unicase::Ascii::new(f.name.to_string())),
-                args.iter()
-                    .enumerate()
-                    .map(|(i, e)| {
-                        let expr = self.decompile_expression(e);
-                        if let Some(args) = &f.args
-                            && let Some(arg) = args.get(i)
-                        {
-                            return convert_argument(expr, arg);
-                        }
-                        expr
-                    })
-                    .collect(),
-            ),
+            PPEExpr::PredefinedFunctionCall(f, args) => {
+                if let Some(type_id) = self.static_receiver_type(expression) {
+                    return IdentifierExpression::create_empty_expression(
+                        self.type_name(type_id).unwrap_or_else(|| unicase::Ascii::new(format!("TYPE{type_id}"))),
+                    );
+                }
+                FunctionCallExpression::create_empty_expression(
+                    IdentifierExpression::create_empty_expression(unicase::Ascii::new(f.name.to_string())),
+                    args.iter()
+                        .enumerate()
+                        .map(|(i, e)| {
+                            let expr = self.decompile_expression(e);
+                            if let Some(args) = &f.args
+                                && let Some(arg) = args.get(i)
+                            {
+                                return self.convert_argument(expr, arg);
+                            }
+                            expr
+                        })
+                        .collect(),
+                )
+            }
             PPEExpr::FunctionCall(f, args) => FunctionCallExpression::create_empty_expression(
                 IdentifierExpression::create_empty_expression(self.get_variable_name(*f)),
                 args.iter().map(|e| self.decompile_expression(e)).collect(),
@@ -525,7 +609,7 @@ impl Decompiler {
                         if let Some(args) = &p.args
                             && let Some(arg) = args.get(i)
                         {
-                            return convert_argument(expr, arg);
+                            return self.convert_argument(expr, arg);
                         }
                         expr
                     })
@@ -541,7 +625,9 @@ impl Decompiler {
                 }
                 members.reverse();
 
-                let (identifier, arguments) = match self.decompile_expression(base) {
+                let base_expression = self.decompile_expression(base);
+                let indexed_target = matches!(base_expression, Expression::Indexer(_)).then(|| base_expression.clone());
+                let (identifier, arguments) = match base_expression {
                     Expression::FunctionCall(f) => (unicase::Ascii::new(f.get_expression().to_string()), f.get_arguments().clone()),
                     Expression::Identifier(id) => (id.get_identifier().clone(), Vec::new()),
                     Expression::Indexer(f) => (unicase::Ascii::new(f.get_identifier().to_string()), f.get_arguments().clone()),
@@ -555,6 +641,9 @@ impl Decompiler {
                 }
 
                 if members.is_empty() {
+                    if let Some(target) = indexed_target {
+                        return Statement::Let(LetStatement::empty(identifier, Token::Eq, Vec::new(), value_expr).with_target_expression(target));
+                    }
                     return LetStatement::create_empty_statement(identifier, Token::Eq, arguments, value_expr);
                 }
                 Statement::Let(LetStatement::new(

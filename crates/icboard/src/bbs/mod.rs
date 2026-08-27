@@ -239,7 +239,7 @@ pub async fn internal_handle_client(mut state: IcyBoardState, login_options: Opt
     if let Some(login_options) = &login_options
         && let Some(ppe) = &login_options.ppe
     {
-        if let Err(err) = cmd.state.run_ppe(&ppe.ppe, None).await {
+        if let Err(err) = cmd.state.run_ppe_direct(&ppe.ppe, None).await {
             log::error!("error running PPE: {}", err);
         };
         cmd.state.new_line().await?;

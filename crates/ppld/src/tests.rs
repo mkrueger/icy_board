@@ -411,6 +411,38 @@ fn board_object_members_keep_their_names() {
 }
 
 #[test]
+fn static_object_members_decompile_to_source_names() {
+    let source = "HttpResponse response = Http.Get(\"https://example.com\")\n\
+                  Surface image = Surface.New(2, 2)\n\
+                  Terminal.Gfx.Init(GfxBackend.Sixel, FALSE)\n\
+                  PRINTLN Terminal.Gfx.Backend <> GfxBackend.Sixel\n\
+                  PRINTLN Error.Last().Message\n";
+    let executable = compile_source(source, LAST_PPE_RUNTIME).unwrap();
+    let text = decompile_to_text(executable, LAST_PPL_LANGUAGE_VERSION);
+
+    assert!(text.contains("Http.Get("), "static HTTP receiver lost in:\n{text}");
+    assert!(text.contains("Surface.New("), "static surface receiver lost in:\n{text}");
+    assert!(text.contains("GfxBackend.Sixel"), "enum variant lost in:\n{text}");
+    assert!(text.contains("Error.Last().Message"), "static error receiver lost in:\n{text}");
+    assert!(!text.contains("<STATIC RECEIVER>"), "internal receiver leaked into:\n{text}");
+    assert!(!text.contains("MEMBER"), "member names were not resolved in:\n{text}");
+
+    let rebuilt = compile_source(&text, LAST_PPE_RUNTIME).unwrap_or_else(|error| panic!("does not compile again:\n{text}\n{error}"));
+    assert_eq!(text, decompile_to_text(rebuilt, LAST_PPL_LANGUAGE_VERSION));
+}
+
+#[test]
+fn indexed_assignments_use_source_brackets() {
+    let source = "INTEGER values(1)\nvalues[0] = values[1]\n";
+    let executable = compile_source(source, LAST_PPE_RUNTIME).unwrap();
+    let text = decompile_to_text(executable, LAST_PPL_LANGUAGE_VERSION);
+
+    assert!(text.contains("INT001[0] = INT001[1]"), "indexed assignment was not canonical:\n{text}");
+    let rebuilt = compile_source(&text, LAST_PPE_RUNTIME).unwrap_or_else(|error| panic!("does not compile again:\n{text}\n{error}"));
+    assert_eq!(text, decompile_to_text(rebuilt, LAST_PPL_LANGUAGE_VERSION));
+}
+
+#[test]
 fn record_literals_survive_decompilation() {
     let source = "TYPE Point\n  INTEGER X\n  INTEGER Y\nENDTYPE\nPoint value = Point { Y = 2, X = 1 }\nPRINTLN value.X, value.Y\n";
     let executable = compile_source(source, LAST_PPE_RUNTIME).unwrap();

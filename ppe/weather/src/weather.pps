@@ -1,0 +1,314 @@
+;$LANGVERSION 400
+;
+; Live weather and downloaded radar frames shown as SIXEL.
+
+CONST INTEGER VIEW_W = 256
+CONST INTEGER VIEW_H = 256
+CONST INTEGER RADAR_FRAMES = 6
+CONST INTEGER LOOPS = 3
+CONST INTEGER ZOOM = 7
+CONST INTEGER TILE_COUNT = 128
+CONST DOUBLE PI = 3.14159265358979
+
+CONST UNSIGNED C_BACKGROUND = Rgb(8, 18, 28)
+CONST UNSIGNED C_CENTER = Rgb(255, 255, 255)
+
+STRING location, encoded, displayName
+STRING geoUrl, weatherUrl, radarUrl, radarHost
+STRING basemapUrl, basemapFile
+STRING radarPaths(5), radarFiles(5)
+BIGSTR geoJson, weatherJson, radarJson, remaining
+DOUBLE latitude, longitude, temperature, rain
+DOUBLE latRad, mercatorY, yFraction
+INTEGER cloudCover, weatherCode, isDay
+INTEGER tileX, tileY
+INTEGER imageRow, cellHeight, imageRows
+HTTPRESPONSE response
+SURFACE view, mapSurface, radarFrames(5)
+INTEGER frame, pass, found, marker, ending, i
+
+CLS
+PRINTLN "@X0BICY BOARD WEATHER@X07"
+PRINTLN "Open-Meteo conditions + RainViewer radar animation"
+PRINTLN
+
+location = "Berlin"
+INPUTSTR "City or postal code", location, @X0E, 40, MASK_ASCII(), FIELDLEN + NEWLINE + LFAFTER
+encoded = UrlEncode(location)
+
+geoUrl = "https://geocoding-api.open-meteo.com/v1/search?name=" + encoded + "&count=1&language=en&format=json"
+response = Http.Get(geoUrl)
+IF !response.Valid THEN
+    PRINTLN "@X0CGeocoding failed: @X07", Error.Last().Message
+    EXIT
+ENDIF
+IF !response.OK THEN
+    PRINTLN "@X0CGeocoding returned HTTP @X07", response.Status
+    EXIT
+ENDIF
+geoJson = response.Text()
+IF Instr(geoJson, Chr(34) + "results" + Chr(34)) = 0 THEN
+    PRINTLN "@X0CNo matching location found.@X07"
+    EXIT
+ENDIF
+
+displayName = JsonString(geoJson, "name")
+latitude = JsonNumber(geoJson, "latitude")
+longitude = JsonNumber(geoJson, "longitude")
+
+; Use one XYZ tile coordinate for both the basemap and radar overlay.
+tileX = (longitude + 180.0) / 360.0 * TILE_COUNT
+latRad = latitude * PI / 180.0
+mercatorY = Log(Tan(PI / 4.0 + latRad / 2.0))
+yFraction = (1.0 - mercatorY / PI) / 2.0
+tileY = yFraction * TILE_COUNT
+IF tileX < 0 tileX = 0
+IF tileX > TILE_COUNT - 1 tileX = TILE_COUNT - 1
+IF tileY < 0 tileY = 0
+IF tileY > TILE_COUNT - 1 tileY = TILE_COUNT - 1
+
+weatherUrl = "https://api.open-meteo.com/v1/forecast?latitude=" + String(latitude) + "&longitude=" + String(longitude)
+weatherUrl = weatherUrl + "&current=temperature_2m,precipitation,rain,cloud_cover,weather_code,is_day&timezone=auto"
+response = Http.Get(weatherUrl)
+IF !response.Valid THEN
+    PRINTLN "@X0CWeather request failed: @X07", Error.Last().Message
+    EXIT
+ENDIF
+IF !response.OK THEN
+    PRINTLN "@X0CWeather service returned HTTP @X07", response.Status
+    EXIT
+ENDIF
+weatherJson = response.Text()
+frame = Instr(weatherJson, Chr(34) + "current" + Chr(34) + ":")
+IF frame = 0 THEN
+    PRINTLN "@X0CWeather response has no current conditions.@X07"
+    EXIT
+ENDIF
+weatherJson = Mid(weatherJson, frame, Len(weatherJson))
+
+temperature = JsonNumber(weatherJson, "temperature_2m")
+rain = JsonNumber(weatherJson, "rain")
+cloudCover = JsonNumber(weatherJson, "cloud_cover")
+weatherCode = JsonNumber(weatherJson, "weather_code")
+isDay = JsonNumber(weatherJson, "is_day")
+
+PRINTLN
+PRINTLN "@X0F", displayName, "@X07  ", temperature, " C  Clouds ", cloudCover, "%  Rain ", rain, " mm"
+PRINTLN WeatherName(weatherCode), "  (press any key to stop)"
+
+; Keep the latest six RainViewer frame paths.
+response = Http.Get("https://api.rainviewer.com/public/weather-maps.json")
+IF !response.Valid | !response.OK THEN
+    PRINTLN "@X0CRadar index request failed.@X07"
+    EXIT
+ENDIF
+radarJson = response.Text()
+radarHost = JsonString(radarJson, "host")
+remaining = radarJson
+found = 0
+marker = Instr(remaining, Chr(34) + "path" + Chr(34) + ":" + Chr(34))
+WHILE marker > 0 DO
+    remaining = Mid(remaining, marker + Len(Chr(34) + "path" + Chr(34) + ":" + Chr(34)), Len(remaining))
+    ending = Instr(remaining, Chr(34))
+    IF ending = 0 GOTO RadarPathsDone
+    IF found < RADAR_FRAMES THEN
+        radarPaths[found] = Mid(remaining, 1, ending - 1)
+        found += 1
+    ELSE
+        FOR i = 0 TO RADAR_FRAMES - 2
+            radarPaths[i] = radarPaths[i + 1]
+        NEXT i
+        radarPaths[RADAR_FRAMES - 1] = Mid(remaining, 1, ending - 1)
+    ENDIF
+    remaining = Mid(remaining, ending + 1, Len(remaining))
+    marker = Instr(remaining, Chr(34) + "path" + Chr(34) + ":" + Chr(34))
+ENDWHILE
+
+:RadarPathsDone
+IF found < RADAR_FRAMES THEN
+    PRINTLN "@X0CRadar service returned too few frames.@X07"
+    EXIT
+ENDIF
+
+PRINTLN "Downloading map tile..."
+basemapUrl = "https://a.tile.opentopomap.org/" + String(ZOOM) + "/" + String(tileX) + "/" + String(tileY) + ".png"
+basemapFile = TempPath() + "icywx_map_" + String(PcbNode()) + ".png"
+response = Http.Download(basemapUrl, basemapFile)
+IF !response.Valid | !response.OK THEN
+    PRINTLN "@X0CMap tile download failed: @X07", Error.Last().Message
+    EXIT
+ENDIF
+
+PRINTLN "Downloading ", RADAR_FRAMES, " radar frames..."
+FOR frame = 0 TO RADAR_FRAMES - 1
+    radarFiles[frame] = TempPath() + "icywx_" + String(PcbNode()) + "_" + String(frame) + ".png"
+    radarUrl = radarHost + radarPaths[frame] + "/256/" + String(ZOOM) + "/" + String(tileX) + "/" + String(tileY) + "/2/1_1.png"
+    response = Http.Download(radarUrl, radarFiles[frame])
+    IF !response.Valid | !response.OK THEN
+        PRINTLN "@X0CRadar frame ", frame + 1, " failed: @X07", Error.Last().Message
+        CleanupRadar(frame - 1)
+        EXIT
+    ENDIF
+NEXT frame
+
+Terminal.Gfx.Init(GfxBackend.Sixel, FALSE)
+IF Terminal.Gfx.Backend <> GfxBackend.Sixel THEN
+    PRINTLN "@X0CThis demo needs a SIXEL-capable terminal.@X07"
+    CleanupRadar(RADAR_FRAMES - 1)
+    EXIT
+ENDIF
+
+view = Surface.New(VIEW_W, VIEW_H)
+IF !view.Valid THEN
+    PRINTLN "@X0CCould not allocate the weather surface.@X07"
+    Terminal.Gfx.Shutdown()
+    CleanupRadar(RADAR_FRAMES - 1)
+    EXIT
+ENDIF
+
+mapSurface = Surface.Load(basemapFile)
+IF !mapSurface.Valid THEN
+    PRINTLN "@X0CCould not decode the map tile.@X07"
+    view.Free()
+    Terminal.Gfx.Shutdown()
+    CleanupRadar(RADAR_FRAMES - 1)
+    EXIT
+ENDIF
+
+cellHeight = Terminal.Info.CellHeight
+IF cellHeight < 1 cellHeight = 16
+imageRows = (VIEW_H + cellHeight - 1) / cellHeight
+
+FOR frame = 0 TO RADAR_FRAMES - 1
+    radarFrames[frame] = Surface.Load(radarFiles[frame])
+    IF !radarFrames[frame].Valid THEN
+        PRINTLN "@X0CCould not decode radar frame ", frame + 1, ".@X07"
+        GOTO Finished
+    ENDIF
+NEXT frame
+
+CLS
+PRINTLN "@X0BICY BOARD WEATHER@X07  ", displayName, "  ", temperature, " C  ", WeatherName(weatherCode)
+PRINTLN "(press any key to stop)"
+imageRow = GetY()
+
+FOR pass = 1 TO LOOPS
+    FOR frame = 0 TO RADAR_FRAMES - 1
+        DrawRadarFrame(frame)
+        view.PresentAt(1, imageRow)
+        DELAY 2
+        IF InKey() <> "" GOTO Finished
+    NEXT frame
+NEXT pass
+
+:Finished
+FOR frame = 0 TO RADAR_FRAMES - 1
+    IF radarFrames[frame].Valid radarFrames[frame].Free()
+NEXT frame
+IF mapSurface.Valid mapSurface.Free()
+view.Free()
+Terminal.Gfx.Shutdown()
+CleanupRadar(RADAR_FRAMES - 1)
+FOR i = 1 TO imageRows
+    PRINTLN
+NEXT i
+PRINTLN "@X08Map: @URL:OpenStreetMap(https://www.openstreetmap.org/copyright)@ / @URL:OpenTopoMap(https://opentopomap.org/credits)@@X07"
+PRINTLN "@X08Radar: @URL:RainViewer(https://www.rainviewer.com/)@   Weather: @URL:Open-Meteo(https://open-meteo.com)@@X07"
+
+; --------------------------------------------------------------------------
+
+PROCEDURE DrawRadarFrame(INTEGER index)
+    view.Clear(C_BACKGROUND)
+    view.Blit(mapSurface, 0, 0)
+    view.Blit(radarFrames[index], 0, 0)
+    view.FillRect(VIEW_W / 2 - 6, VIEW_H / 2, 13, 1, C_CENTER)
+    view.FillRect(VIEW_W / 2, VIEW_H / 2 - 6, 1, 13, C_CENTER)
+ENDPROC
+
+PROCEDURE CleanupRadar(INTEGER last)
+    INTEGER index
+    FOR index = 0 TO last
+        IF radarFiles[index] <> "" DELETE radarFiles[index]
+    NEXT index
+    IF basemapFile <> "" DELETE basemapFile
+ENDPROC
+
+FUNCTION JsonNumber(BIGSTR json, STRING field) DOUBLE
+    STRING marker, ch, number
+    INTEGER start, pos
+
+    marker = Chr(34) + field + Chr(34) + ":"
+    start = Instr(json, marker)
+    IF start = 0 THEN
+        JsonNumber = 0.0
+        RETURN
+    ENDIF
+    pos = start + Len(marker)
+    number = ""
+    ch = Mid(json, pos, 1)
+    WHILE Instr("-+0123456789.eE", ch) > 0 DO
+        number += ch
+        pos += 1
+        ch = Mid(json, pos, 1)
+    ENDWHILE
+    JsonNumber = ToDouble(number)
+ENDFUNC
+
+FUNCTION JsonString(BIGSTR json, STRING field) STRING
+    STRING marker, ch, value
+    INTEGER start, pos
+
+    marker = Chr(34) + field + Chr(34) + ":" + Chr(34)
+    start = Instr(json, marker)
+    IF start = 0 THEN
+        JsonString = "Unknown"
+        RETURN
+    ENDIF
+    pos = start + Len(marker)
+    value = ""
+    ch = Mid(json, pos, 1)
+    WHILE ch <> Chr(34) & ch <> "" DO
+        value += ch
+        pos += 1
+        ch = Mid(json, pos, 1)
+    ENDWHILE
+    JsonString = value
+ENDFUNC
+
+FUNCTION UrlEncode(STRING value) STRING
+    value = ReplaceStr(value, "%", "%25")
+    value = ReplaceStr(value, " ", "%20")
+    value = ReplaceStr(value, ",", "%2C")
+    value = ReplaceStr(value, "+", "%2B")
+    value = ReplaceStr(value, "&", "%26")
+    value = ReplaceStr(value, "=", "%3D")
+    value = ReplaceStr(value, "?", "%3F")
+    value = ReplaceStr(value, "#", "%23")
+    value = ReplaceStr(value, "/", "%2F")
+    value = ReplaceStr(value, Chr(34), "%22")
+    UrlEncode = value
+ENDFUNC
+
+FUNCTION WeatherName(INTEGER code) STRING
+    IF code = 0 THEN
+        WeatherName = "Clear sky"
+    ELSEIF (code <= 3) THEN
+        WeatherName = "Cloudy"
+    ELSEIF (code = 45 | code = 48) THEN
+        WeatherName = "Fog"
+    ELSEIF (code >= 51 & code <= 57) THEN
+        WeatherName = "Drizzle"
+    ELSEIF (code >= 61 & code <= 67) THEN
+        WeatherName = "Rain"
+    ELSEIF (code >= 71 & code <= 77) THEN
+        WeatherName = "Snow"
+    ELSEIF (code >= 80 & code <= 82) THEN
+        WeatherName = "Rain showers"
+    ELSEIF (code >= 85 & code <= 86) THEN
+        WeatherName = "Snow showers"
+    ELSEIF (code >= 95) THEN
+        WeatherName = "Thunderstorm"
+    ELSE
+        WeatherName = "Current conditions"
+    ENDIF
+ENDFUNC

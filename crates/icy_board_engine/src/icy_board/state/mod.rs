@@ -1176,10 +1176,20 @@ impl IcyBoardState {
     /// Answers `false` when the PPE gave up or failed, which is what keeps a script
     /// questionnaire from saving the answers it collected.
     pub async fn run_ppe<P: AsRef<Path>>(&mut self, file_name: &P, answer_file: Option<&Path>) -> Res<bool> {
+        self.run_ppe_with_color_restore(file_name, answer_file, true).await
+    }
+
+    pub async fn run_ppe_direct<P: AsRef<Path>>(&mut self, file_name: &P, answer_file: Option<&Path>) -> Res<bool> {
+        self.run_ppe_with_color_restore(file_name, answer_file, false).await
+    }
+
+    async fn run_ppe_with_color_restore<P: AsRef<Path>>(&mut self, file_name: &P, answer_file: Option<&Path>, restore_color: bool) -> Res<bool> {
         let mut keep_answers = false;
         match Executable::read_file(&file_name, false) {
             Ok(executable) => {
-                keep_answers = self.run_executable(file_name, answer_file, executable).await?;
+                keep_answers = self
+                    .run_executable_with_color_restore(file_name, answer_file, executable, restore_color)
+                    .await?;
             }
             Err(err) => {
                 log::error!("Error loading PPE {}: {}", file_name.as_ref().display(), err);
@@ -1194,6 +1204,16 @@ impl IcyBoardState {
     }
 
     pub async fn run_executable<P: AsRef<Path>>(&mut self, file_name: &P, answer_file: Option<&Path>, executable: Executable) -> Res<bool> {
+        self.run_executable_with_color_restore(file_name, answer_file, executable, false).await
+    }
+
+    pub(crate) async fn run_executable_with_color_restore<P: AsRef<Path>>(
+        &mut self,
+        file_name: &P,
+        answer_file: Option<&Path>,
+        executable: Executable,
+        restore_color: bool,
+    ) -> Res<bool> {
         // PCBoard stacked no more than 16 PPEs, doScript() refused the next one.
         // See MAX_SCR_STK in SCRMISC.CPP.
         const MAX_PPE_NESTING: usize = 16;
@@ -1201,6 +1221,12 @@ impl IcyBoardState {
             log::warn!("PPE nesting limit reached, not running {}", file_name.as_ref().display());
             return Ok(false);
         }
+        let caller_colors = restore_color.then(|| {
+            (
+                IcbColor::Dos(Self::dos_attribute(self.user_screen.buffer.caret.attribute)),
+                IcbColor::Dos(Self::dos_attribute(self.sysop_screen.buffer.caret.attribute)),
+            )
+        });
         self.session.disp_options.no_change();
         let canonicalized_path: PathBuf = file_name.as_ref().canonicalize()?;
 
@@ -1212,6 +1238,10 @@ impl IcyBoardState {
         self.ppe_nesting -= 1;
         if self.ppe_nesting == 0 {
             self.cleanup_ppl_media().await;
+        }
+        if let Some((user_color, sysop_color)) = caller_colors {
+            self.restore_ppe_color(TerminalTarget::User, user_color).await?;
+            self.restore_ppe_color(TerminalTarget::Sysop, sysop_color).await?;
         }
         match result {
             Ok(keep_answers) => Ok(keep_answers),
@@ -3677,6 +3707,39 @@ impl IcyBoardState {
     pub fn cur_color(&self) -> IcbColor {
         let attr = self.display_screen().buffer.caret.attribute.as_u8(icy_engine::IceMode::Blink);
         IcbColor::Dos(attr)
+    }
+
+    fn dos_attribute(attribute: icy_engine::TextAttribute) -> u8 {
+        let mut foreground = attribute.foreground() & 7;
+        if attribute.is_bold() {
+            foreground |= 8;
+        }
+        let mut background = attribute.background() & 7;
+        if attribute.is_blinking() {
+            background |= 8;
+        }
+        (foreground | background << 4) as u8
+    }
+
+    async fn restore_ppe_color(&mut self, target: TerminalTarget, color: IcbColor) -> Res<()> {
+        let IcbColor::Dos(color) = color else {
+            return self.set_color(target, color).await;
+        };
+        let foreground = color & 7;
+        let background = (color >> 4) & 7;
+        let mut sequence = "\x1b[0;".to_string();
+        if color & 8 != 0 {
+            sequence.push_str("1;");
+        }
+        if color & 0x80 != 0 {
+            sequence.push_str("5;");
+        }
+        sequence.push_str(&format!(
+            "{};{}m",
+            ANSI_COLOR_OFFSETS[foreground as usize] + 30,
+            ANSI_COLOR_OFFSETS[background as usize] + 40
+        ));
+        self.write_chars(target, &sequence.chars().collect::<Vec<_>>()).await
     }
 
     pub async fn set_color(&mut self, target: TerminalTarget, color: IcbColor) -> Res<()> {

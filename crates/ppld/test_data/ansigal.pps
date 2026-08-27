@@ -317,12 +317,12 @@ PROCEDURE PROC003(STRING PAR003)
     LOC006 = TRUE
     LOC007 = 2
     BOOL001 = TRUE
-    STR002(1) = ".."
-    STR002(LOC007) = FINDFIRST(PAR003 + "*.*")
+    STR002[1] = ".."
+    STR002[LOC007] = FINDFIRST(PAR003 + "*.*")
     WHILE (LOC006) DO
         IF (FUNC001(STR002[LOC007]) = 0) INC LOC007
 
-        STR002(LOC007) = FINDNEXT()
+        STR002[LOC007] = FINDNEXT()
         IF (STR002[LOC007] = "") LOC006 = FALSE
 
     ENDWHILE
@@ -349,17 +349,17 @@ PROCEDURE PROC007(STRING PAR010)
     STR006 = PAR010
     LOC017 = 1
     IF (STR001 <> PAR010) THEN
-        STR002(1) = ".."
+        STR002[1] = ".."
         LOC017 = 2
     ENDIF
 
     IF (EXIST(PAR010 + "dir.lst")) THEN
         WHILE (LOC019) DO
-            STR002(LOC017) = TRIM(LEFT(READLINE(PAR010 + "dir.lst", LOC017), 12), " ")
+            STR002[LOC017] = TRIM(LEFT(READLINE(PAR010 + "dir.lst", LOC017), 12), " ")
             IF (STR002[LOC017] = "") THEN
                 LOC019 = FALSE
             ELSE
-                IF (RIGHT(STR002[LOC017], 1) <> "\") STR002(LOC017) = STR002[LOC017] + "\"
+                IF (RIGHT(STR002[LOC017], 1) <> "\") STR002[LOC017] = STR002[LOC017] + "\"
 
                 INC LOC017
             ENDIF
@@ -368,7 +368,7 @@ PROCEDURE PROC007(STRING PAR010)
 
         INT005 = LOC017 - 1
     ELSE
-        STR002(1) = "Error"
+        STR002[1] = "Error"
         INT005 = 1
     ENDIF
 
