@@ -17,7 +17,7 @@ fn a_surface_is_made_by_its_own_type() {
         "#,
     );
 
-    assert_eq!(output, "1 4x4\n1\n");
+    assert_eq!(output, "1 4x4\n1\n\x1b[0m");
 }
 
 #[test]
@@ -33,7 +33,7 @@ fn a_static_answers_the_same_as_the_global_it_replaces() {
         ",
     );
 
-    assert_eq!(output, "3232\n0\n");
+    assert_eq!(output, "3232\n0\n\x1b[0m");
 }
 
 #[test]
@@ -47,7 +47,7 @@ fn a_static_reports_a_failure_the_same_way() {
         "#,
     );
 
-    assert_eq!(output, "0 3\n");
+    assert_eq!(output, "0 3\n\x1b[0m");
 }
 
 #[test]
@@ -74,7 +74,7 @@ fn a_static_may_stand_in_a_chain() {
         ",
     );
 
-    assert_eq!(output, "6\n0\n");
+    assert_eq!(output, "6\n0\n\x1b[0m");
 }
 
 #[test]

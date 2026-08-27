@@ -2,6 +2,17 @@ use std::fmt::Write as _;
 
 use super::{compile_errors, compile_errors_with_runtime, run_ppl};
 
+fn dos_palette_sequence() -> String {
+    const DOS_ANSI_INDEX: [u8; 16] = [0, 4, 2, 6, 1, 5, 3, 7, 8, 12, 10, 14, 9, 13, 11, 15];
+    let mut sequence = "\x1b]4".to_string();
+    for (ansi_index, dos_index) in DOS_ANSI_INDEX.into_iter().enumerate() {
+        let (red, green, blue) = icy_engine::DOS_DEFAULT_PALETTE[usize::from(dos_index)].rgb();
+        let _ = write!(sequence, ";{ansi_index};rgb:{red:02X}/{green:02X}/{blue:02X}");
+    }
+    sequence.push_str("\x1b\\");
+    sequence
+}
+
 #[test]
 fn multimedia_apis_require_runtime_400() {
     for runtime in [330, 340] {
@@ -52,7 +63,7 @@ fn surface_status_reports_dimensions_and_errors() {
         "#,
     );
 
-    assert_eq!(output, "1\n12\n7\n0\n3\n");
+    assert_eq!(output, "1\n12\n7\n0\n3\n\x1b[0m");
 }
 
 #[test]
@@ -115,7 +126,7 @@ fn jxl_rejects_non_integer_destination_scaling() {
     );
 
     assert!(!output.contains("DrawJXLBlob"), "{output:?}");
-    assert!(output.ends_with("6\n"), "{output:?}");
+    assert!(output.ends_with("6\n\x1b[0m"), "{output:?}");
 }
 
 #[test]
@@ -130,7 +141,7 @@ fn sixel_cannot_scale_and_says_so() {
         ",
     );
 
-    assert_eq!(output, "6\n");
+    assert_eq!(output, "6\n\x1b[0m");
 }
 
 #[test]
@@ -152,8 +163,8 @@ fn a_surface_object_draws_and_reports_its_own_size() {
         "#,
     );
 
-    assert!(output.starts_with("1\n4,4\n"), "{output:?}");
-    assert!(output.ends_with("0\n0\n"), "{output:?}");
+    assert!(output.starts_with("1\n4,4\n\x1b[?1070h"), "{output:?}");
+    assert!(output.ends_with(&format!("0\n0\n{}\x1b[0m", dos_palette_sequence())), "{output:?}");
 }
 
 #[test]
@@ -171,7 +182,7 @@ fn get_pixel_reads_back_what_set_pixel_wrote() {
         "#,
     );
 
-    assert!(output.starts_with("1\n0\n0\n"), "{output:?}");
+    assert_eq!(output, "1\n0\n0\n\x1b[0m");
 }
 
 #[test]
@@ -188,7 +199,7 @@ fn a_surface_can_be_blitted_onto_another() {
         ",
     );
 
-    assert_eq!(output, "0\n");
+    assert_eq!(output, "0\n\x1b[0m");
 }
 
 #[test]
@@ -298,7 +309,8 @@ fn creates_blits_and_presents_in_memory_surfaces() {
 
     assert!(output.starts_with("\x1b[2J\x1b[H"));
     assert_eq!(output.matches("\x1bP").count(), 2);
-    assert!(output.ends_with("\x1b[?1070h\x1b[?80h\x1b[?7h\x1b[?25h"));
+    assert!(output.ends_with(&format!("\x1b[?1070l\x1b[?80h\x1b[?7h\x1b[?25h{}\x1b[0m", dos_palette_sequence())));
+    assert!(!output.contains("\x1b]104"), "graphics shutdown must preserve the caller's palette");
 }
 
 #[test]
@@ -318,7 +330,7 @@ fn inline_graphics_preserve_the_text_screen_and_cursor() {
 
     assert!(output.starts_with("before\n"));
     assert!(output.contains("\x1b7\x1b[3;10H\x1bP"));
-    assert!(output.contains("\x1b\\\x1b8after\n"));
+    assert!(output.contains(&format!("\x1b\\\x1b8\x1b[?1070l{}\x1b[0mafter\n", dos_palette_sequence())));
     assert!(!output.contains("\x1b[2J"));
     assert!(!output.contains("\x1b[?25l"));
     assert!(!output.contains("\x1b[?25h"));
@@ -585,4 +597,42 @@ fn tetris_flashes_a_completed_line_before_compacting_it() {
     );
 
     assert!(output.matches("\x1bP").count() >= 5);
+}
+
+/// A bright colour that follows a dim one still names bold.
+#[test]
+fn a_bright_colour_after_a_dim_one_still_sends_bold() {
+    let output = run_ppl(r#"PRINT "@X1Fwhite@X17grey@X1Eyellow""#);
+
+    assert_eq!(output, "\x1b[1;37;44mwhite\x1b[0;44mgrey\x1b[1;33myellow");
+}
+
+#[test]
+fn sixel_shutdown_restores_the_dos_palette_before_text() {
+    let output = run_ppl(
+        r#"
+        Terminal.Gfx.Init(GfxBackend.Sixel, FALSE)
+        SURFACE s = Surface.New(2, 2)
+        s.PresentAt(1, 1)
+        Terminal.Gfx.Shutdown()
+        Print "after"
+        "#,
+    );
+
+    assert!(output.ends_with(&format!("\x1b[?1070l{}\x1b[0mafter", dos_palette_sequence())), "{output:?}");
+}
+
+#[test]
+fn sixel_backend_without_a_present_changes_no_terminal_modes_or_palette() {
+    let output = run_ppl(
+        r#"
+        Terminal.Gfx.Init(GfxBackend.Sixel, FALSE)
+        SURFACE s = Surface.New(2, 2)
+        s.Free()
+        Terminal.Gfx.Shutdown()
+        Print "after"
+        "#,
+    );
+
+    assert_eq!(output, "\x1b[0mafter");
 }

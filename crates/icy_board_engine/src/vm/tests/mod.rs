@@ -28,6 +28,7 @@ mod hyperlinks;
 mod long;
 mod margins;
 mod masks;
+mod math;
 mod member_calls;
 mod message_base;
 mod message_bench;

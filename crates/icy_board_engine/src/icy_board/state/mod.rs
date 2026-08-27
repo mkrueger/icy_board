@@ -21,8 +21,8 @@ use codepages::tables::{CP437_TO_UNICODE, UNICODE_TO_CP437};
 use dizbase::file_base::FileBase;
 use icy_engine::Position;
 use icy_engine::SaveOptions;
+use icy_engine::TextPane;
 use icy_engine::formats::{CharacterFormatOptions, FileFormat, FormatOptions, ScreenPreperation};
-use icy_engine::{TextAttribute, TextPane};
 use icy_net::{Connection, ConnectionType, channel::ChannelConnection, iemsi::EmsiICI, termcap_detect, termcap_detect::TerminalCaps};
 use icy_parser_core::ANSI_COLOR_OFFSETS;
 use regex::Regex;
@@ -3705,20 +3705,21 @@ impl IcyBoardState {
         } else {
             &self.user_screen
         };
-        let current = screen.buffer.caret.attribute;
+        // Compare DOS bytes so ANSI bold and DOS intensity use one representation.
+        let current = screen.buffer.caret.attribute.as_u8(icy_engine::IceMode::Blink);
 
         let new_color = match color {
             IcbColor::None => {
                 return None;
             }
             IcbColor::Dos(color) => {
-                if current.as_u8(icy_engine::IceMode::Blink) == *color {
+                if current == *color {
                     return None;
                 }
                 if self.session.disp_options.grapics_mode == GraphicsMode::Avatar {
                     return Some(format!("\x16\x01{}", *color as char));
                 }
-                TextAttribute::from_u8(*color, icy_engine::IceMode::Blink)
+                *color
             }
             IcbColor::IcyEngine(_fg) => {
                 todo!();
@@ -3726,10 +3727,10 @@ impl IcyBoardState {
         };
 
         let mut color_change = "\x1B[".to_string();
-        let was_bold = current.is_bold();
-        let new_bold = new_color.is_bold() || new_color.foreground() > 7;
-        let mut bg = current.background();
-        let mut fg = current.foreground();
+        let was_bold = current & 0b0000_1000 != 0;
+        let new_bold = new_color & 0b0000_1000 != 0;
+        let mut fg = current & 0b0000_1111;
+        let mut bg = (current >> 4) & 0b0000_0111;
         if was_bold != new_bold {
             if new_bold {
                 color_change += "1;";
@@ -3740,16 +3741,18 @@ impl IcyBoardState {
             }
         }
 
-        if !current.is_blinking() && new_color.is_blinking() {
+        if current & 0b1000_0000 == 0 && new_color & 0b1000_0000 != 0 {
             color_change += "5;";
         }
 
-        if fg != new_color.foreground() {
-            color_change += format!("{};", ANSI_COLOR_OFFSETS[new_color.foreground() as usize % 8] + 30).as_str();
+        let new_fg = new_color & 0b0000_1111;
+        let new_bg = (new_color >> 4) & 0b0000_0111;
+        if fg != new_fg {
+            color_change += format!("{};", ANSI_COLOR_OFFSETS[(new_fg % 8) as usize] + 30).as_str();
         }
 
-        if bg != new_color.background() {
-            color_change += format!("{};", ANSI_COLOR_OFFSETS[new_color.background() as usize % 8] + 40).as_str();
+        if bg != new_bg {
+            color_change += format!("{};", ANSI_COLOR_OFFSETS[new_bg as usize] + 40).as_str();
         }
 
         color_change.pop();

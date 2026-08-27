@@ -635,8 +635,9 @@ still follow declaration order.
 HTTP objects
 ~~~~~~~~~~~~
 
-Runtime 400 exposes outbound HTTP through typed objects. It is disabled until
-the sysop configures the board's ``[ppl_http]`` policy::
+Runtime 400 exposes outbound HTTP through typed objects. Public HTTP and HTTPS work by
+default; private and special-use addresses remain blocked. The sysop may
+optionally disable access or restrict it to an exact origin allowlist::
 
     HttpResponse response = Http.Get("https://api.example.com/status")
     IF NOT response.Valid THEN
@@ -665,8 +666,9 @@ A request object supplies POST bodies and safe custom headers::
     HttpResponse response = request.Send()
 
 The builder functions return a new request and leave the receiver unchanged.
-The board policy selects ``disabled``, exact-origin ``allowlist``, or ``public``
-destinations and sets body, timeout, redirect and concurrency limits. Every DNS
+The optional board policy selects ``disabled``, exact-origin ``allowlist``, or
+the default ``public`` destinations and sets body, timeout, redirect and
+concurrency limits. Every DNS
 answer and redirect is checked, validated addresses are pinned to the connection,
 and system proxies are ignored. Network failures report ``ErrKind.Net``; HTTP
 status codes belong to the response rather than ``Error.Last()``.

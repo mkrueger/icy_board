@@ -1231,6 +1231,30 @@ pub async fn abs(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableV
     Ok(vm.eval_expr(&args[0]).await?.abs())
 }
 
+pub async fn sin(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    Ok(VariableValue::new_double(vm.eval_expr(&args[0]).await?.as_double().sin()))
+}
+
+pub async fn cos(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    Ok(VariableValue::new_double(vm.eval_expr(&args[0]).await?.as_double().cos()))
+}
+
+pub async fn tan(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    Ok(VariableValue::new_double(vm.eval_expr(&args[0]).await?.as_double().tan()))
+}
+
+pub async fn atan(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    Ok(VariableValue::new_double(vm.eval_expr(&args[0]).await?.as_double().atan()))
+}
+
+pub async fn log(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    Ok(VariableValue::new_double(vm.eval_expr(&args[0]).await?.as_double().ln()))
+}
+
+pub async fn sqrt(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    Ok(VariableValue::new_double(vm.eval_expr(&args[0]).await?.as_double().sqrt()))
+}
+
 pub async fn grafmode(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     match vm.icy_board_state.session.disp_options.grapics_mode {
         crate::icy_board::state::GraphicsMode::Ctty => Ok(VariableValue::new_string("N".to_string())),

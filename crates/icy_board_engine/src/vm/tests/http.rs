@@ -48,11 +48,11 @@ fn allow_origin(board: &mut crate::icy_board::IcyBoard, origin: &str) {
 }
 
 #[test]
-fn http_is_disabled_by_default() {
+fn default_http_policy_rejects_non_http_urls() {
     assert_eq!(
         "0 1 1",
         run_ppl(
-            "HttpResponse response = Http.Get(\"https://example.com\")\nPRINT response.Valid, \" \", Error.Last().Kind = ErrKind.Net, \" \", Error.Last().Code = ErrCode.Unavailable"
+            "HttpResponse response = Http.Get(\"file:///etc/passwd\")\nPRINT response.Valid, \" \", Error.Last().Kind = ErrKind.Net, \" \", Error.Last().Code = ErrCode.Unsupported"
         )
     );
 }
@@ -215,7 +215,7 @@ fn an_invalid_response_cannot_create_a_file() {
     assert_eq!(
         "0 0 1",
         run_ppl(
-            "HttpResponse response = Http.Get(\"https://example.com\")\nError.Clear()\nPRINT response.Save(\"invalid.bin\"), \" \", EXIST(\"invalid.bin\"), \" \", Error.Last().Code = ErrCode.Invalid"
+            "HttpResponse response = Http.Get(\"file:///not-http\")\nError.Clear()\nPRINT response.Save(\"invalid.bin\"), \" \", EXIST(\"invalid.bin\"), \" \", Error.Last().Code = ErrCode.Invalid"
         )
     );
 }
@@ -228,6 +228,17 @@ fn downloads_are_committed_only_after_success() {
         "HttpResponse response = Http.Download(\"{origin}/file\", \"download.bin\")\nPRINT response.OK, \" \", response.Size, \" \", EXIST(\"download.bin\")"
     );
     assert_eq!("1 4 1", run_ppl_on(&source, |board| allow_origin(board, &origin)));
+    server.join().unwrap();
+}
+
+#[test]
+fn a_download_to_an_absolute_temp_path_lands_where_it_was_asked_to() {
+    let response = "HTTP/1.1 200 OK\r\nContent-Length: 4\r\nConnection: close\r\n\r\ndata";
+    let (origin, _request, server) = serve(vec![response.to_string()]);
+    let source = format!(
+        "STRING dest = TempPath() + \"file.bin\"\nHttpResponse response = Http.Download(\"{origin}/file\", dest)\nPRINT response.OK, \" \", EXIST(dest)"
+    );
+    assert_eq!("1 1", run_ppl_on(&source, |board| allow_origin(board, &origin)));
     server.join().unwrap();
 }
 

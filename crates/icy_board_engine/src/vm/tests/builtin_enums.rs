@@ -118,7 +118,7 @@ fn the_backend_answers_as_the_backend_it_is() {
         ",
     );
 
-    assert_eq!(output, "1\n1\n");
+    assert_eq!(output, "1\n1\n\x1b[0m");
 }
 
 #[test]

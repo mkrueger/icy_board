@@ -231,6 +231,7 @@ pub struct PplGraphicsState {
     pub surfaces: HashMap<i32, GfxSurface>,
     pub pinned: HashMap<i32, u8>,
     pub pacing: bool,
+    pub sixel_presented: bool,
     resident_bytes: usize,
     next_handle: i32,
 }
@@ -245,6 +246,7 @@ impl PplGraphicsState {
             surfaces: HashMap::new(),
             pinned: HashMap::new(),
             pacing: false,
+            sixel_presented: false,
             resident_bytes: 0,
             next_handle: 0,
         })

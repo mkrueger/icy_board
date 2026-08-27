@@ -34,7 +34,8 @@ fn paint_demo_uses_pixel_mouse_and_preserves_quit_key() {
     assert!(output.contains("Starting PPE Paint..."));
     assert!(output.contains("\x1bP"));
     assert!(output.contains("\x1b[?1016h"));
-    assert!(output.ends_with("\x1b[?1070h\x1b[?80h\x1b[?7h\x1b[?25h\x1b[2J\x1b[H"));
+    assert!(output.contains("\x1b[?80h\x1b[?7h\x1b[?25h\x1b]4;0;rgb:00/00/00"));
+    assert!(output.ends_with("\x1b\\\x1b[0m\x1b[2J\x1b[H"));
 }
 
 #[test]

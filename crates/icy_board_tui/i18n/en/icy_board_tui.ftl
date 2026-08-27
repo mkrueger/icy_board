@@ -1191,12 +1191,12 @@ ppl_http_policy-status=Choose which outbound destinations PPL programs may conta
 ppl_http_policy-help=
     # Destination policy
 
-    Disabled rejects every PPL HTTP request. Allowlist permits only the exact
-    origins below. Public permits hosts only when every resolved address is
-    publicly routable. Every redirect is checked again.
+    Public is the default: PPEs may use HTTP and HTTPS hosts whose resolved addresses
+    are all publicly routable. Allowlist restricts access to the exact origins
+    below. Disabled rejects every PPL HTTP request. Every redirect is checked.
 ppl_http_policy_disabled=Disabled
 ppl_http_policy_allowlist=Exact origin allowlist
-ppl_http_policy_public=Public destinations
+ppl_http_policy_public=Public destinations (default)
 
 ppl_http_allowed_origins=Allowed origins
 ppl_http_allowed_origins-status=Comma-separated origins used by allowlist mode.
@@ -1210,7 +1210,7 @@ ppl_http_allowed_origins-help=
     allowlisted origin may deliberately resolve to a private service.
 
 ppl_http_allow_http=Allow plain HTTP
-ppl_http_allow_http-status=Permit unencrypted http:// destinations.
+ppl_http_allow_http-status=Permit unencrypted http:// destinations (enabled by default).
 ppl_http_allow_http-help=
     # Allow plain HTTP
 

@@ -16,7 +16,7 @@ fn the_backend_reads_back_what_init_selected() {
         ",
     );
 
-    assert_eq!(output, "-1\n2\n-1\n");
+    assert_eq!(output, "-1\n2\n\x1b[0m-1\n");
 }
 
 #[test]
@@ -34,7 +34,7 @@ fn a_surface_made_through_the_object_draws_the_same_way() {
         "#,
     );
 
-    assert_eq!(output, "1 4x4\n1\n");
+    assert_eq!(output, "1 4x4\n1\n\x1b[0m");
 }
 
 #[test]
@@ -52,7 +52,10 @@ fn pacing_reads_back_what_it_was_set_to() {
         b"\x1b[1;1R",
     );
 
-    assert!(output.starts_with("0\n1\n"), "{output:?}");
+    assert!(output.starts_with("0\n1\n\x1b[?1070h"), "{output:?}");
+    assert!(output.contains("\x1b]4;0;rgb:00/00/00;1;rgb:AA/00/00"), "{output:?}");
+    assert!(output.ends_with("\x1b\\\x1b[0m"), "{output:?}");
+    assert!(!output.contains("\x1b]104"), "{output:?}");
     assert!(output.contains("\x1b[6n"), "{output:?}");
 }
 
@@ -68,7 +71,7 @@ fn a_writable_property_may_be_set_through_a_stored_object() {
         ",
     );
 
-    assert_eq!(output, "1\n");
+    assert_eq!(output, "1\n\x1b[0m");
 }
 
 #[test]

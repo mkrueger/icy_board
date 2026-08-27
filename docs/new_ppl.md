@@ -957,11 +957,28 @@ PRINTLN BASE64DEC("R3LDvMOfZQ==")
 PRINTLN SHA256("abc")
 ```
 
+## Math functions (4.00)
+
+`SIN(radians)`, `COS(radians)` and `TAN(radians)` return the sine, cosine and
+tangent of an angle given in radians. `ATAN(value)` returns the arctangent of
+`value`, in radians. `LOG(value)` returns the natural logarithm of `value`.
+`SQRT(value)` returns the square root of `value`. All six take and return
+`DOUBLE`.
+
+```PPL
+DOUBLE pi
+pi = 3.14159265358979
+PRINTLN Sin(pi / 2.0)
+PRINTLN Sqrt(2.0)
+```
+
 ## HTTP objects (4.00)
 
-PPL HTTP access is disabled until the sysop configures the board's
-`[ppl_http]` policy. New code receives a typed response instead of treating an
-HTTP status or a transport failure as an empty string:
+PPL programs may use public HTTP and HTTPS destinations without board-specific setup.
+Private, loopback, link-local and other special-use addresses remain blocked.
+The sysop can optionally disable outbound access or restrict it to an exact
+origin allowlist. New code receives a typed response instead of treating an HTTP
+status or a transport failure as an empty string:
 
 ```PPL
 HttpResponse response = Http.Get("https://api.example.com/status")
@@ -999,7 +1016,16 @@ The builder functions return a new request and leave the receiver unchanged.
 including `Host`, `Content-Length`, `Connection` and `Transfer-Encoding`, cannot
 be set by a PPE.
 
-The recommended board policy is an exact origin allowlist:
+No `[ppl_http]` section is required. The default policy is equivalent to:
+
+```toml
+[ppl_http]
+destination_policy = "public"
+allow_http = true
+```
+
+Boards that want to restrict doors to specific services can use an exact origin
+allowlist and adjust the resource limits:
 
 ```toml
 [ppl_http]
@@ -1017,10 +1043,10 @@ max_header_bytes = 65536
 allow_http = false
 ```
 
-The same fields are available under **Configuration Options → PPL HTTP** in
-`icbsetup`; editing TOML directly is not required.
+The same optional controls are available under **Configuration Options → PPL
+HTTP** in `icbsetup`; editing TOML directly is not required.
 
-`public` permits destinations that resolve exclusively to public addresses.
+`public` permits HTTP and HTTPS destinations that resolve exclusively to public addresses.
 Every redirect is checked and DNS answers are pinned to the connection. The
 transport ignores system proxies. An allowlisted origin may deliberately name a
 private service; scripts cannot add origins or relax any board limit.

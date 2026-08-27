@@ -1044,6 +1044,16 @@ pub async fn reset_margins(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Re
 
 const DOS_TO_ANSI_PALETTE: [u8; 16] = [0, 4, 2, 6, 1, 5, 3, 7, 8, 12, 10, 14, 9, 13, 11, 15];
 
+fn dos_palette_sequence() -> String {
+    let mut sequence = "\x1b]4".to_string();
+    for (ansi_index, dos_index) in DOS_TO_ANSI_PALETTE.into_iter().enumerate() {
+        let (red, green, blue) = icy_engine::DOS_DEFAULT_PALETTE[usize::from(dos_index)].rgb();
+        sequence.push_str(&format!(";{ansi_index};rgb:{red:02X}/{green:02X}/{blue:02X}"));
+    }
+    sequence.push_str("\x1b\\");
+    sequence
+}
+
 pub async fn set_palette_color(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let color = vm.eval_expr(&args[0]).await?.as_int();
     let components = if args.len() == 2 {
@@ -3561,11 +3571,14 @@ async fn gfx_present_handle(vm: &mut VirtualMachine<'_>, handle: i32, target: Pr
                     return Ok(false);
                 };
                 let mut output = Vec::with_capacity(encoded.len() + 24);
+                output.extend_from_slice(b"\x1b[?1070h");
                 output.extend_from_slice(b"\x1b7");
                 output.extend_from_slice(format!("\x1b[{row};{column}H").as_bytes());
                 output.extend_from_slice(encoded.as_bytes());
                 output.extend_from_slice(b"\x1b8");
+                output.extend_from_slice(b"\x1b[?1070l");
                 vm.icy_board_state.connection.send(&output).await?;
+                vm.icy_board_state.ppl_graphics.as_mut().expect("graphics state was checked").sixel_presented = true;
                 finish_gfx_frame(vm).await?;
                 vm.icy_board_state.gfx_error = 0;
                 return Ok(true);
@@ -3584,6 +3597,7 @@ async fn gfx_present_handle(vm: &mut VirtualMachine<'_>, handle: i32, target: Pr
                     return Ok(false);
                 };
                 vm.icy_board_state.connection.send(&output).await?;
+                vm.icy_board_state.ppl_graphics.as_mut().expect("graphics state was checked").sixel_presented = true;
                 finish_gfx_frame(vm).await?;
                 vm.icy_board_state.gfx_error = 0;
                 return Ok(true);
@@ -3946,9 +3960,11 @@ fn gfx_sixel_output(surface: &crate::icy_board::state::ppl_graphics::GfxSurface)
             return None;
         }
     };
-    let mut output = Vec::with_capacity(encoded.len() + 3);
+    let mut output = Vec::with_capacity(encoded.len() + 19);
+    output.extend_from_slice(b"\x1b[?1070h");
     output.extend_from_slice(b"\x1b[H");
     output.extend_from_slice(encoded.as_bytes());
+    output.extend_from_slice(b"\x1b[?1070l");
     Some(output)
 }
 
@@ -4036,6 +4052,7 @@ async fn gfx_present_surface(
             return Ok(());
         };
         vm.icy_board_state.connection.send(&output).await?;
+        vm.icy_board_state.ppl_graphics.as_mut().expect("graphics state was checked").sixel_presented = true;
         vm.icy_board_state.gfx_error = 0;
         return finish_gfx_frame(vm).await;
     }
@@ -4215,6 +4232,7 @@ pub async fn gfxpresentrect(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Re
                 return Ok(());
             };
             vm.icy_board_state.connection.send(&output).await?;
+            vm.icy_board_state.ppl_graphics.as_mut().expect("graphics state was checked").sixel_presented = true;
             finish_gfx_frame(vm).await?;
             vm.icy_board_state.gfx_error = 0;
             return Ok(());
@@ -4260,11 +4278,14 @@ pub async fn gfxpresentat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<
                 return Ok(());
             };
             let mut output = Vec::with_capacity(encoded.len() + 24);
+            output.extend_from_slice(b"\x1b[?1070h");
             output.extend_from_slice(b"\x1b7");
             output.extend_from_slice(format!("\x1b[{row};{column}H").as_bytes());
             output.extend_from_slice(encoded.as_bytes());
             output.extend_from_slice(b"\x1b8");
+            output.extend_from_slice(b"\x1b[?1070l");
             vm.icy_board_state.connection.send(&output).await?;
+            vm.icy_board_state.ppl_graphics.as_mut().expect("graphics state was checked").sixel_presented = true;
             finish_gfx_frame(vm).await?;
             vm.icy_board_state.gfx_error = 0;
             return Ok(());
@@ -4354,14 +4375,19 @@ pub async fn gfxshutdown(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<
 }
 
 pub(crate) async fn gfx_shutdown(vm: &mut VirtualMachine<'_>) -> Res<()> {
-    let fullscreen = vm.icy_board_state.ppl_graphics.as_ref().is_some_and(|graphics| graphics.fullscreen);
-    vm.icy_board_state.ppl_graphics = None;
+    let Some(graphics) = vm.icy_board_state.ppl_graphics.take() else {
+        vm.icy_board_state.gfx_error = 0;
+        return Ok(());
+    };
     vm.icy_board_state.gfx_error = 0;
-    if fullscreen {
-        vm.icy_board_state.connection.send(b"\x1b[?1070h\x1b[?80h\x1b[?7h\x1b[?25h").await
-    } else {
-        Ok(())
+    if graphics.fullscreen {
+        vm.icy_board_state.connection.send(b"\x1b[?80h\x1b[?7h\x1b[?25h").await?;
     }
+    if graphics.sixel_presented {
+        vm.icy_board_state.connection.send(dos_palette_sequence().as_bytes()).await?;
+    }
+    vm.icy_board_state.print(TerminalTarget::Both, "\x1b[0m").await?;
+    vm.icy_board_state.reset_color(TerminalTarget::Both).await
 }
 
 /// Runs one `GFX` member.

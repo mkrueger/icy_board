@@ -1292,6 +1292,12 @@ impl VirtualMachine<'_> {
         if resolved.exists() {
             return resolved;
         }
+        // A brand-new absolute path whose parent directory is real - such as one built from
+        // `TempPath()` - is a modern path that simply doesn't have its target file yet, not a
+        // stale DOS import to go hunting for below the PPE.
+        if resolved.is_absolute() && resolved.parent().is_some_and(Path::exists) {
+            return resolved;
+        }
         // A bare name is the board's, the way PCBoard read it from its own directory - only a
         // path that leads somewhere else is worth looking for below the PPE.
         if !file.contains(std::path::MAIN_SEPARATOR) {

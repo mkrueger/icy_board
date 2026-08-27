@@ -816,9 +816,9 @@ pub struct BoardOptions {
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum PplHttpDestinationPolicy {
-    #[default]
     Disabled,
     Allowlist,
+    #[default]
     Public,
 }
 
@@ -881,6 +881,10 @@ const fn default_http_header_bytes() -> usize {
     64 * 1024
 }
 
+const fn default_allow_http() -> bool {
+    true
+}
+
 /// The boundary every HTTP request made by a PPE has to stay inside.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PplHttpOptions {
@@ -906,14 +910,14 @@ pub struct PplHttpOptions {
     pub max_headers: usize,
     #[serde(default = "default_http_header_bytes")]
     pub max_header_bytes: usize,
-    #[serde(default)]
+    #[serde(default = "default_allow_http")]
     pub allow_http: bool,
 }
 
 impl Default for PplHttpOptions {
     fn default() -> Self {
         Self {
-            destination_policy: PplHttpDestinationPolicy::Disabled,
+            destination_policy: PplHttpDestinationPolicy::Public,
             allowed_origins: Vec::new(),
             max_response_bytes: default_http_response_bytes(),
             max_request_bytes: default_http_request_bytes(),
@@ -924,7 +928,7 @@ impl Default for PplHttpOptions {
             max_concurrent_per_node: default_http_node_concurrency(),
             max_headers: default_http_headers(),
             max_header_bytes: default_http_header_bytes(),
-            allow_http: false,
+            allow_http: true,
         }
     }
 }
@@ -1423,10 +1427,10 @@ mod tests {
     }
 
     #[test]
-    fn ppl_http_is_secure_by_default_and_round_trips() {
+    fn ppl_http_allows_public_destinations_by_default_and_round_trips() {
         let config = IcbConfig::default();
-        assert_eq!(config.ppl_http.destination_policy, PplHttpDestinationPolicy::Disabled);
-        assert!(!config.ppl_http.allow_http);
+        assert_eq!(config.ppl_http.destination_policy, PplHttpDestinationPolicy::Public);
+        assert!(config.ppl_http.allow_http);
         assert_eq!(config.ppl_http.max_response_bytes, 16 * 1024 * 1024);
         assert_eq!(config.ppl_http.max_concurrent_requests, 16);
         assert_eq!(config.ppl_http.max_concurrent_per_node, 2);

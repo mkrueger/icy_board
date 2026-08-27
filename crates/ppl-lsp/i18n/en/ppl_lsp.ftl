@@ -783,6 +783,12 @@ hint-function-u_stat=
 
 hint-function-defcolor=Returns system default color.
 hint-function-abs=Returns the absolute value of @1
+hint-function-sin=Returns the sine of @1 (given in radians).
+hint-function-cos=Returns the cosine of @1 (given in radians).
+hint-function-tan=Returns the tangent of @1 (given in radians).
+hint-function-atan=Returns the arctangent of @1, in radians.
+hint-function-log=Returns the natural logarithm of @1.
+hint-function-sqrt=Returns the square root of @1.
 hint-function-grafmode=
     Returns a character indicating the users graphics status
 

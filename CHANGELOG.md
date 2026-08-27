@@ -10,9 +10,12 @@ releases.
 
 ### Added
 
+- PPL 4.00 has basic math functions: `Sin`, `Cos`, `Tan`, `Atan`, `Log` (natural
+  logarithm) and `Sqrt`, all taking and returning `DOUBLE`.
+
 - PPL 4.00 has policy-controlled `Http`, `HttpRequest` and `HttpResponse`
-  objects. Outbound access is disabled by default; sysops may allow exact
-  origins or public destinations and set request, response, timeout, redirect
+  objects. Public HTTP and HTTPS destinations work by default; sysops may disable
+  outbound access or restrict it to exact origins, and set request, response, timeout, redirect
   and board/per-node concurrency limits from `icbsetup`. DNS is validated and
   pinned per hop, redirects are
   rechecked, system proxies are ignored, response bodies are streamed within a

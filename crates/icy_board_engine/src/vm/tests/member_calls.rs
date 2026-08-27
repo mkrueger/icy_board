@@ -83,7 +83,7 @@ fn a_statement_may_call_in_the_middle_of_a_chain() {
         ",
     );
 
-    assert_eq!(output, "0\n");
+    assert_eq!(output, "0\n\x1b[0m");
 }
 
 #[test]

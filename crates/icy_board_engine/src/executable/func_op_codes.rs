@@ -323,9 +323,15 @@ pub enum FuncOpCode {
     TOLONG64 = -308,
     TOULONG64 = -309,
     IndexedMember = -310,
+    SIN = -311,
+    COS = -312,
+    TAN = -313,
+    ATAN = -314,
+    LOG = -315,
+    SQRT = -316,
 }
 
-pub const LAST_FUNC: i16 = -310;
+pub const LAST_FUNC: i16 = -316;
 
 impl FuncOpCode {
     pub fn get_definition(self) -> &'static FunctionDefinition {
@@ -347,6 +353,12 @@ impl FuncOpCode {
                 | FuncOpCode::TOLONG64
                 | FuncOpCode::TOULONG64
                 | FuncOpCode::IndexedMember
+                | FuncOpCode::SIN
+                | FuncOpCode::COS
+                | FuncOpCode::TAN
+                | FuncOpCode::ATAN
+                | FuncOpCode::LOG
+                | FuncOpCode::SQRT
         ) {
             400
         } else {
@@ -413,7 +425,7 @@ impl FunctionDefinition {
         }
     }
 }
-pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 322]> = std::sync::LazyLock::new(|| {
+pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 328]> = std::sync::LazyLock::new(|| {
     [
         FunctionDefinition {
             name: "END",
@@ -3084,6 +3096,54 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 322]> 
             return_type: VariableType::None,
             args: None,
             signature: FunctionSignature::Invalid,
+        },
+        FunctionDefinition {
+            name: "Sin",
+            version: 400,
+            opcode: FuncOpCode::SIN,
+            return_type: VariableType::Double,
+            args: Some(vec![ArgumentDefinition::new("radians", VariableType::Double)]),
+            signature: FunctionSignature::FixedParameters(1),
+        },
+        FunctionDefinition {
+            name: "Cos",
+            version: 400,
+            opcode: FuncOpCode::COS,
+            return_type: VariableType::Double,
+            args: Some(vec![ArgumentDefinition::new("radians", VariableType::Double)]),
+            signature: FunctionSignature::FixedParameters(1),
+        },
+        FunctionDefinition {
+            name: "Tan",
+            version: 400,
+            opcode: FuncOpCode::TAN,
+            return_type: VariableType::Double,
+            args: Some(vec![ArgumentDefinition::new("radians", VariableType::Double)]),
+            signature: FunctionSignature::FixedParameters(1),
+        },
+        FunctionDefinition {
+            name: "Atan",
+            version: 400,
+            opcode: FuncOpCode::ATAN,
+            return_type: VariableType::Double,
+            args: Some(vec![ArgumentDefinition::new("value", VariableType::Double)]),
+            signature: FunctionSignature::FixedParameters(1),
+        },
+        FunctionDefinition {
+            name: "Log",
+            version: 400,
+            opcode: FuncOpCode::LOG,
+            return_type: VariableType::Double,
+            args: Some(vec![ArgumentDefinition::new("value", VariableType::Double)]),
+            signature: FunctionSignature::FixedParameters(1),
+        },
+        FunctionDefinition {
+            name: "Sqrt",
+            version: 400,
+            opcode: FuncOpCode::SQRT,
+            return_type: VariableType::Double,
+            args: Some(vec![ArgumentDefinition::new("value", VariableType::Double)]),
+            signature: FunctionSignature::FixedParameters(1),
         },
         // ALIASES (need to be last in the list)
         FunctionDefinition {

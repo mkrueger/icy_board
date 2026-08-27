@@ -502,9 +502,10 @@ corrupt message data reports `ErrKind.Msg` with `ErrCode.Io` or
 | `SHA256` | Function | `SHA256(value) : STRING` | Lowercase hex SHA-256 of a string's UTF-8 bytes |
 
 `AreaId()` is how message functions reach a message area outside the current
-conference without breaking any of the old calls. HTTP access is disabled by
-default and constrained by the board's `[ppl_http]` policy; responses expose
-status, headers and bounded bodies while failures report `ErrKind.Net`.
+conference without breaking any of the old calls. Public HTTP and HTTPS work by default;
+the optional `[ppl_http]` policy can disable it or restrict it to exact origins.
+Responses expose status, headers and bounded bodies while failures report
+`ErrKind.Net`.
 `HttpResponse.Text()` decodes strictly as UTF-8 and returns `BIGSTR`; invalid
 text reports `ErrCode.Format`, while binary or differently encoded data should
 be handled with `Download()` or `Save()`.
