@@ -22,6 +22,10 @@ releases.
   built before this change must be recompiled because the unreleased opcode
   tables were compacted after that removal.
 
+- PPL 4.00 user statistics now expose their full stored counters as `ULONG`.
+  Writes to page length and security-level fields reject out-of-range values
+  with `ErrKind.User` instead of silently wrapping them.
+
 - PPL ``TYPE`` fields may be one-, two- or three-dimensional arrays, including
   arrays of an earlier record type. Runtime 400's versioned type table stores a
   fixed field descriptor with the type, rank and three `u16` upper bounds, so

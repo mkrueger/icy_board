@@ -505,6 +505,9 @@ corrupt message data reports `ErrKind.Msg` with `ErrCode.Io` or
 conference without breaking any of the old calls. HTTP access is disabled by
 default and constrained by the board's `[ppl_http]` policy; responses expose
 status, headers and bounded bodies while failures report `ErrKind.Net`.
+`HttpResponse.Text()` decodes strictly as UTF-8 and returns `BIGSTR`; invalid
+text reports `ErrCode.Format`, while binary or differently encoded data should
+be handled with `Download()` or `Save()`.
 
 See [new_ppl.md](new_ppl.md) for the per-function reference pages.
 

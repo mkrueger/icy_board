@@ -1,4 +1,23 @@
-use crate::vm::tests::{compile_errors, run_ppl};
+use crate::vm::tests::{compile_errors, run_ppl, run_ppl_on};
+
+#[test]
+fn cumulative_statistics_keep_their_full_unsigned_width() {
+    let output = run_ppl_on(
+        r#"
+PRINT Session.User.TimesOn, " ", Session.User.MessagesRead, " ", Session.User.MessagesLeft, " ", Session.User.Uploads, " ", Session.User.Downloads
+"#,
+        |board| {
+            let stats = &mut board.users[0].stats;
+            stats.num_times_on = 4_294_967_296;
+            stats.messages_read = 4_294_967_297;
+            stats.messages_left = 4_294_967_298;
+            stats.num_uploads = 4_294_967_299;
+            stats.num_downloads = 4_294_967_300;
+        },
+    );
+
+    assert_eq!(output, "4294967296 4294967297 4294967298 4294967299 4294967300");
+}
 
 /// What `PUTUSER` used to write is writable on the object, and it lands right away
 /// instead of waiting for a round trip.
@@ -27,6 +46,30 @@ Session.User.Alias = "Sysop"
 Session.User.SecurityLevel = 42
 GETUSER
 PRINT U_ALIAS, " ", U_SEC
+"#,
+        )
+    );
+}
+
+#[test]
+fn bounded_user_fields_reject_values_that_do_not_fit() {
+    assert_eq!(
+        "42 24 80 1 1\n1 1 1 1",
+        run_ppl(
+            r#"
+Session.User.SecurityLevel = 42
+Session.User.ExpiredSecurityLevel = 24
+Session.User.PageLength = 80
+Session.User.SecurityLevel = 300
+ERROR securityError = Error.Last()
+Error.Clear()
+Session.User.ExpiredSecurityLevel = -1
+ERROR expiredError = Error.Last()
+Error.Clear()
+Session.User.PageLength = -1
+ERROR pageError = Error.Last()
+PRINTLN Session.User.SecurityLevel, " ", Session.User.ExpiredSecurityLevel, " ", Session.User.PageLength, " ", securityError.Kind = ErrKind.User, " ", securityError.Code = ErrCode.Invalid
+PRINT expiredError.Kind = ErrKind.User, " ", expiredError.Code = ErrCode.Invalid, " ", pageError.Kind = ErrKind.User, " ", pageError.Code = ErrCode.Invalid
 "#,
         )
     );

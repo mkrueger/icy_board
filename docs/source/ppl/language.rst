@@ -653,6 +653,10 @@ through 299, so a 404 remains a valid response with its status and body.
 writes a retained body; ``Http.Download(url, path)`` streams a successful body
 through a temporary file and commits it only after completion.
 
+``Text()`` decodes strictly as UTF-8 and returns a ``BIGSTR``. Binary bodies and
+other character encodings report ``ErrKind.Net`` with ``ErrCode.Format``; use
+``Download()`` or ``Save()`` when text decoding is not appropriate.
+
 A request object supplies POST bodies and safe custom headers::
 
     HttpRequest request = Http.New(HttpMethod.Post, "https://api.example.com/items")

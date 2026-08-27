@@ -6,6 +6,7 @@ use crate::{
     executable::{VariableType, VariableValue},
     icy_board::{
         state::ppl_collection::{COUNT, GET, SET as SET_INDEXED},
+        state::ppl_error::{ERR_INVALID, ERR_KIND_USER, PplError},
         user_base::{FSEMode, User, UserContact},
     },
     parser::{CONTACT_ID, CONTACTS_ID, EDITOR_MODE_ENUM_ID, NOTES_ID, USER_ID},
@@ -325,8 +326,11 @@ impl UserData for PplUser {
         for name in [&*PAGE_LENGTH, &*SECURITY_LEVEL, &*EXPIRED_SECURITY_LEVEL] {
             registry.add_property(name.clone(), VariableType::Integer, true);
         }
-        for name in [&*TIMES_ON, &*MESSAGES_READ, &*MESSAGES_LEFT, &*UPLOADS, &*DOWNLOADS, &*MINUTES_TODAY] {
+        for name in [&*MINUTES_TODAY] {
             registry.add_property(name.clone(), VariableType::Integer, false);
+        }
+        for name in [&*TIMES_ON, &*MESSAGES_READ, &*MESSAGES_LEFT, &*UPLOADS, &*DOWNLOADS] {
+            registry.add_property(name.clone(), VariableType::ULong, false);
         }
         for name in [&*UPLOAD_BYTES, &*DOWNLOAD_BYTES, &*DOWNLOAD_BYTES_TODAY] {
             registry.add_property(name.clone(), VariableType::Unsigned, false);
@@ -426,15 +430,15 @@ impl UserDataValue for PplUser {
         } else if *name == *EXPIRED_SECURITY_LEVEL {
             VariableValue::new_int(i32::from(user.exp_security_level))
         } else if *name == *TIMES_ON {
-            VariableValue::new_int(user.stats.num_times_on as i32)
+            VariableValue::new_ulong(user.stats.num_times_on)
         } else if *name == *MESSAGES_READ {
-            VariableValue::new_int(user.stats.messages_read as i32)
+            VariableValue::new_ulong(user.stats.messages_read)
         } else if *name == *MESSAGES_LEFT {
-            VariableValue::new_int(user.stats.messages_left as i32)
+            VariableValue::new_ulong(user.stats.messages_left)
         } else if *name == *UPLOADS {
-            VariableValue::new_int(user.stats.num_uploads as i32)
+            VariableValue::new_ulong(user.stats.num_uploads)
         } else if *name == *DOWNLOADS {
-            VariableValue::new_int(user.stats.num_downloads as i32)
+            VariableValue::new_ulong(user.stats.num_downloads)
         } else if *name == *MINUTES_TODAY {
             VariableValue::new_int(i32::from(user.stats.minutes_today))
         } else if *name == *CONTACTS {
@@ -470,6 +474,18 @@ impl UserDataValue for PplUser {
     }
 
     async fn set_property_value(&self, vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, val: VariableValue) -> crate::Res<()> {
+        let number = val.as_int();
+        let invalid_range = if *name == *PAGE_LENGTH && u16::try_from(number).is_err() {
+            Some("PageLength must be between 0 and 65535")
+        } else if (*name == *SECURITY_LEVEL || *name == *EXPIRED_SECURITY_LEVEL) && u8::try_from(number).is_err() {
+            Some("security levels must be between 0 and 255")
+        } else {
+            None
+        };
+        if let Some(message) = invalid_range {
+            vm.set_error(PplError::new(ERR_KIND_USER, ERR_INVALID, message));
+            return Ok(());
+        }
         let Some(user) = vm.icy_board_state.session.current_user.as_mut() else {
             return Ok(());
         };
@@ -515,11 +531,11 @@ impl UserDataValue for PplUser {
         } else if *name == *PASSWORD_EXPIRES {
             user.password.expire_date = date();
         } else if *name == *PAGE_LENGTH {
-            user.page_len = val.as_int() as u16;
+            user.page_len = number as u16;
         } else if *name == *SECURITY_LEVEL {
-            user.security_level = val.as_int() as u8;
+            user.security_level = number as u8;
         } else if *name == *EXPIRED_SECURITY_LEVEL {
-            user.exp_security_level = val.as_int() as u8;
+            user.exp_security_level = number as u8;
         } else if *name == *EXPERT_MODE {
             user.flags.expert_mode = val.as_bool();
         } else if *name == *EDITOR_MODE {

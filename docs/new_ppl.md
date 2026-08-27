@@ -848,7 +848,7 @@ not the record's. `PCBoard` splits them that way and the split is kept:
 Read the session when asking what is in force, and the user when asking what is
 stored. Writing goes to `Session.User`; the session's own values are read-only.
 
-Both are read-only. The classic `CURCONF()`, `PCBNODE()`, `MINLEFT()` and the
+The session is read-only. The classic `CURCONF()`, `PCBNODE()`, `MINLEFT()` and the
 `U_*` variables keep working unchanged.
 
 ## The caller (4.00)
@@ -882,6 +882,13 @@ replaces the old round trip rather than sitting beside it. The caller's `Name`
 identifies them and the board's own accounting is the board's to keep, so both
 stay read-only; writing one is a compile error. Nobody logged in reads as an
 empty user rather than failing, so a member is always safe to read.
+
+The cumulative statistics `TimesOn`, `MessagesRead`, `MessagesLeft`, `Uploads`
+and `Downloads` are `ULONG`, so they preserve the full counters stored by the
+board. `PageLength`
+accepts 0 through 65535; `SecurityLevel` and `ExpiredSecurityLevel` accept 0
+through 255. An out-of-range write leaves the old value intact and reports
+`ErrKind.User` with `ErrCode.Invalid`.
 
 `EditorMode` is one `EDITORMODE` value — `Yes`, `No` or `Ask` — rather than the
 two overlapping flags `PCBoard` kept. A note is written through its index,
@@ -973,6 +980,10 @@ properties are `Status`, `FinalUrl`, `Size` and `ContentType`. `Save(path)`
 writes a body already held by a response. `Http.Download(url, path)` streams a
 successful response through a temporary file and replaces the destination only
 after the complete body arrives.
+
+`Text()` decodes the body strictly as UTF-8 and returns a `BIGSTR`. A body in any
+other character encoding reports `ErrKind.Net` with `ErrCode.Format`; use
+`Download()` or `Save()` when the response is binary or not UTF-8.
 
 For a POST request or custom headers, build a request:
 

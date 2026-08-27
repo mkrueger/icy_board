@@ -531,6 +531,7 @@ impl UserTypeRegistry {
                 ("Term", 7),
                 ("Msg", 8),
                 ("Net", 9),
+                ("User", 10),
             ],
         );
         self.register_enum(
