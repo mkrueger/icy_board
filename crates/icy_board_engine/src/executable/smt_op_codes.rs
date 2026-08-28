@@ -273,8 +273,9 @@ pub enum OpCode {
     FReadRec = 234,
     FWriteRec = 235,
     StringSplit = 236,
+    RegexSplit = 237,
 }
-pub const LAST_STMT: i16 = OpCode::StringSplit as i16;
+pub const LAST_STMT: i16 = OpCode::RegexSplit as i16;
 
 impl OpCode {
     pub fn get_definition(self) -> &'static StatementDefinition {
@@ -284,7 +285,14 @@ impl OpCode {
     pub fn minimum_runtime(self) -> u16 {
         if matches!(
             self,
-            OpCode::MemberCall | OpCode::OnError | OpCode::FGetRec | OpCode::FPutRec | OpCode::FReadRec | OpCode::FWriteRec | OpCode::StringSplit
+            OpCode::MemberCall
+                | OpCode::OnError
+                | OpCode::FGetRec
+                | OpCode::FPutRec
+                | OpCode::FReadRec
+                | OpCode::FWriteRec
+                | OpCode::StringSplit
+                | OpCode::RegexSplit
         ) {
             400
         } else {
@@ -613,7 +621,7 @@ pub fn format_argument_type_last(arg: &ArgumentDefinition) -> String {
 // "WAIT FOR" == "WAITFOR"
 // "GO SUB"
 // " GO TO"
-pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 242]> = std::sync::LazyLock::new(|| {
+pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 243]> = std::sync::LazyLock::new(|| {
     [
         StatementDefinition {
             // helps to map opcode to array index.
@@ -2637,6 +2645,13 @@ pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 242]
             name: "<string split>",
             version: 400,
             opcode: OpCode::StringSplit,
+            args: None,
+            sig: StatementSignature::ArgumentsWithVariable(3, 4),
+        },
+        StatementDefinition {
+            name: "<regex split>",
+            version: 400,
+            opcode: OpCode::RegexSplit,
             args: None,
             sig: StatementSignature::ArgumentsWithVariable(3, 4),
         },

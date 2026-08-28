@@ -146,6 +146,7 @@ pub async fn run_predefined_statement(opcode: OpCode, arg: &mut VirtualMachine<'
         OpCode::FReadRec => predefined_procedures::freadrec(arg, arguments).await,
         OpCode::FWriteRec => predefined_procedures::fwriterec(arg, arguments).await,
         OpCode::StringSplit => predefined_procedures::string_split(arg, arguments).await,
+        OpCode::RegexSplit => predefined_procedures::regex_split(arg, arguments).await,
         OpCode::FDEFIN => predefined_procedures::fdefin(arg, arguments).await,
         OpCode::FDEFOUT => predefined_procedures::fdefout(arg, arguments).await,
         OpCode::FDGET => predefined_procedures::fdget(arg, arguments).await,

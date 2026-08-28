@@ -11,7 +11,7 @@ use tower_lsp::lsp_types::{CompletionItem, CompletionItemKind, Documentation, Ho
 use crate::{
     context::{CursorContext, cursor_context},
     documentation::{get_const_hover, get_function_hover, get_member_documentation, get_statement_hover, get_string_member_documentation, get_type_hover},
-    type_lookup::{MemberKind, members_of, record_field_type_name, string_members, type_of_chain},
+    type_lookup::{MemberKind, members_of, record_field_type_name, static_members_of, static_type_of_name, string_members, type_of_chain},
 };
 
 pub enum ImCompleteCompletionItem {
@@ -191,6 +191,11 @@ fn member_completion(visitor: &SemanticVisitor, path: &[String], language_versio
     }
     if path.len() == 1 && matches!(path[0].to_ascii_uppercase().as_str(), "STRING" | "BIGSTR") {
         return completion_items(string_members(true), None);
+    }
+    if path.len() == 1
+        && let Some(var_type) = static_type_of_name(visitor, &path[0])
+    {
+        return completion_items(static_members_of(&visitor.type_registry, var_type), Some(var_type));
     }
     let Some(var_type) = type_of_chain(visitor, path) else {
         return Vec::new();

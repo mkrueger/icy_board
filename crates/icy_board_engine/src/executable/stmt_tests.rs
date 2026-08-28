@@ -87,6 +87,16 @@ fn string_split_keeps_its_append_only_encoding() {
 }
 
 #[test]
+fn regex_split_keeps_its_append_only_encoding() {
+    assert_eq!(OpCode::RegexSplit as i16, 237);
+    let command = PPECommand::PredefinedCall(
+        OpCode::RegexSplit.get_definition(),
+        vec![PPEExpr::Value(1), PPEExpr::Value(2), PPEExpr::Value(3), PPEExpr::Value(4)],
+    );
+    test_serialize(&command, &[237, 1, 0, 0, 2, 0, 0, 3, 0, 4, 0, 0]);
+}
+
+#[test]
 fn test_let_serialization() {
     let val = PPECommand::Let(Box::new(PPEExpr::Value(2)), Box::new(PPEExpr::Value(3)));
     test_serialize(&val, &[OpCode::LET as i16, 2, 0, 3, 0, 0]);

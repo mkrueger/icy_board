@@ -2378,6 +2378,22 @@
     "named": false
   },
   {
+    "type": "REGEX",
+    "named": false
+  },
+  {
+    "type": "REGEXMATCH",
+    "named": false
+  },
+  {
+    "type": "REGEXMATCHES",
+    "named": false
+  },
+  {
+    "type": "REGEXOPTIONS",
+    "named": false
+  },
+  {
     "type": "REPEAT",
     "named": false
   },

@@ -492,6 +492,22 @@ impl PPECompiler {
             }
             Statement::MemberCall(call_stmt) => {
                 if let Expression::FunctionCall(call) = call_stmt.get_expression()
+                    && let Some(SemanticInfo::RegexSplitProc { default_limit }) = self.semantic_visitor.function_type_lookup.get(&call.id).cloned()
+                    && let Expression::MemberReference(member) = call.get_expression()
+                {
+                    let mut arguments = vec![self.comp_expr(member.get_expression())];
+                    for argument in call.get_arguments() {
+                        arguments.push(self.comp_expr(argument));
+                    }
+                    if default_limit {
+                        let zero = self
+                            .lookup_table
+                            .lookup_constant(&crate::ast::Constant::Integer(0, crate::ast::constant::NumberFormat::Default));
+                        arguments.push(PPEExpr::Value(zero));
+                    }
+                    return Some(PPECommand::PredefinedCall(OpCode::RegexSplit.get_definition(), arguments));
+                }
+                if let Expression::FunctionCall(call) = call_stmt.get_expression()
                     && let Some(SemanticInfo::StringSplitProc { static_call, default_limit }) =
                         self.semantic_visitor.function_type_lookup.get(&call.id).cloned()
                     && let Expression::MemberReference(member) = call.get_expression()

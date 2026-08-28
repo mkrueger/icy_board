@@ -1,6 +1,6 @@
 use i18n_embed_fl::fl;
 use icy_board_engine::executable::{FuncOpCode, FunctionDefinition, OpCode, Signature, StatementDefinition, VariableType};
-use icy_board_engine::parser::{BOARD_ID, USER_ID, USERS_ID};
+use icy_board_engine::parser::{BOARD_ID, REGEX_ID, REGEX_MATCH_ID, REGEX_MATCHES_ID, USER_ID, USERS_ID};
 use tower_lsp::lsp_types::{Hover, HoverContents, MarkupContent, MarkupKind};
 
 use crate::LANGUAGE_LOADER;
@@ -122,6 +122,13 @@ pub fn get_type_hover(var_type: VariableType) -> Option<Hover> {
         VariableType::Long => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-long")),
         VariableType::ULong => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-ulong")),
         VariableType::UserData(id) if id == USERS_ID as u8 => get_sig_hint(Signature::new("USERS".to_string()), fl!(LANGUAGE_LOADER, "hint-type-users")),
+        VariableType::UserData(id) if id == REGEX_ID as u8 => get_sig_hint(Signature::new("REGEX".to_string()), fl!(LANGUAGE_LOADER, "hint-type-regex")),
+        VariableType::UserData(id) if id == REGEX_MATCH_ID as u8 => {
+            get_sig_hint(Signature::new("REGEXMATCH".to_string()), fl!(LANGUAGE_LOADER, "hint-type-regex-match"))
+        }
+        VariableType::UserData(id) if id == REGEX_MATCHES_ID as u8 => {
+            get_sig_hint(Signature::new("REGEXMATCHES".to_string()), fl!(LANGUAGE_LOADER, "hint-type-regex-matches"))
+        }
         VariableType::Date => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-date")),
         VariableType::EDate => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-edate")),
         VariableType::Integer => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-integer")),
@@ -152,6 +159,43 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
     }
     if id == USER_ID as u8 && member.eq_ignore_ascii_case("Valid") {
         return Some(fl!(LANGUAGE_LOADER, "hint-member-user-valid"));
+    }
+    if id == REGEX_ID as u8 {
+        return match member.to_ascii_lowercase().as_str() {
+            "valid" => Some(fl!(LANGUAGE_LOADER, "hint-regex-valid")),
+            "pattern" => Some(fl!(LANGUAGE_LOADER, "hint-regex-pattern")),
+            "compile" => Some(fl!(LANGUAGE_LOADER, "hint-regex-compile")),
+            "escape" => Some(fl!(LANGUAGE_LOADER, "hint-regex-escape")),
+            "isvalid" => Some(fl!(LANGUAGE_LOADER, "hint-regex-is-valid")),
+            "ismatch" => Some(fl!(LANGUAGE_LOADER, "hint-regex-is-match")),
+            "find" => Some(fl!(LANGUAGE_LOADER, "hint-regex-find")),
+            "findall" => Some(fl!(LANGUAGE_LOADER, "hint-regex-find-all")),
+            "replace" => Some(fl!(LANGUAGE_LOADER, "hint-regex-replace")),
+            "split" => Some(fl!(LANGUAGE_LOADER, "hint-regex-split")),
+            _ => None,
+        };
+    }
+    if id == REGEX_MATCH_ID as u8 {
+        return match member.to_ascii_lowercase().as_str() {
+            "success" => Some(fl!(LANGUAGE_LOADER, "hint-regex-match-success")),
+            "value" => Some(fl!(LANGUAGE_LOADER, "hint-regex-match-value")),
+            "start" => Some(fl!(LANGUAGE_LOADER, "hint-regex-match-start")),
+            "length" => Some(fl!(LANGUAGE_LOADER, "hint-regex-match-length")),
+            "groupcount" => Some(fl!(LANGUAGE_LOADER, "hint-regex-match-group-count")),
+            "group" => Some(fl!(LANGUAGE_LOADER, "hint-regex-match-group")),
+            "namedgroup" => Some(fl!(LANGUAGE_LOADER, "hint-regex-match-named-group")),
+            "groupmatched" | "namedgroupmatched" => Some(fl!(LANGUAGE_LOADER, "hint-regex-match-group-matched")),
+            "groupstart" | "namedgroupstart" => Some(fl!(LANGUAGE_LOADER, "hint-regex-match-group-start")),
+            "grouplength" | "namedgrouplength" => Some(fl!(LANGUAGE_LOADER, "hint-regex-match-group-length")),
+            _ => None,
+        };
+    }
+    if id == REGEX_MATCHES_ID as u8 {
+        return match member.to_ascii_lowercase().as_str() {
+            "count" | "len" => Some(fl!(LANGUAGE_LOADER, "hint-regex-matches-count")),
+            "get" => Some(fl!(LANGUAGE_LOADER, "hint-regex-matches-get")),
+            _ => None,
+        };
     }
     None
 }

@@ -18,6 +18,7 @@ pub const ERR_KIND_MSG: i32 = 8;
 pub const ERR_KIND_NET: i32 = 9;
 pub const ERR_KIND_USER: i32 = 10;
 pub const ERR_KIND_STRING: i32 = 11;
+pub const ERR_KIND_REGEX: i32 = 12;
 
 /// What went wrong. The same codes describe every subsystem, so one piece of
 /// code can handle a file, a font, a sound or a picture going wrong.

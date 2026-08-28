@@ -565,6 +565,48 @@ the last element; zero means unlimited. An empty separator or negative limit
 leaves the target unchanged and reports ``ErrKind.String`` with
 ``ErrCode.Invalid``.
 
+Regular expressions
+~~~~~~~~~~~~~~~~~~~
+
+``REGEX`` compiles a pattern once and reuses it for matching, captures,
+replacement and splitting:
+
+.. code-block:: PPL
+
+    REGEX parser = REGEX.Compile("(?P<name>\w+):(?P<value>\d+)")
+    REGEXMATCH found = parser.Find("score:120")
+    IF found.Success THEN
+        PRINTLN found.NamedGroup("name"), " = ", found.NamedGroup("value")
+    ENDIF
+
+The static members are ``Compile(pattern [, options])``, ``Escape(text)`` and
+``IsValid(pattern [, options])``. Instances provide ``Valid``, ``Pattern``,
+``IsMatch(text [, start])``, ``Find(text [, start])``,
+``FindAll(text [, start [, limit]])``, ``Replace(text, replacement [, limit])``
+and ``Split(text, VAR array() [, limit])``.
+
+``RegexOptions`` contains ``None``, ``IgnoreCase``, ``MultiLine``,
+``DotMatchesNewLine``, ``IgnoreWhitespace``, ``SwapGreed`` and ``Ascii``.
+Flags may be combined with ``|``. Matching is Unicode-aware unless ``Ascii`` is
+selected. Positions are 1-based Unicode character positions; collections and
+capture groups are zero-based, and group zero is the complete match.
+
+``REGEXMATCH`` exposes ``Success``, ``Value``, ``Start``, ``Length``,
+``GroupCount``, numbered ``Group``, ``GroupMatched``, ``GroupStart`` and
+``GroupLength`` accessors, and corresponding ``NamedGroup`` methods.
+``REGEXMATCHES`` has ``Count``, ``Len()`` and ``Get(index)``.
+
+Replacement strings expand ``$1`` and ``$name``. Zero limits mean unlimited;
+negative limits report ``ErrKind.Regex`` with ``ErrCode.Invalid``. ``Split``
+preserves empty fields and replaces a dynamic one-dimensional ``STRING`` or
+``BIGSTR`` array only after success. Match collections are limited to 100,000
+items and replacement output to 16 MiB.
+
+The engine guarantees linear-time matching and deliberately omits look-around
+and backreferences. Unicode case-insensitive matching does not perform
+multi-character folds such as ``ß`` to ``SS``. Invalid patterns return an
+invalid ``REGEX`` and report through ``Error.Last()``.
+
 Records
 ~~~~~~~
 

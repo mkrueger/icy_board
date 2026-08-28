@@ -100,6 +100,11 @@ pub enum SemanticInfo {
         default_limit: bool,
     },
 
+    /// `regex.Split(text, target [, limit])`, lowered to an array-writing statement.
+    RegexSplitProc {
+        default_limit: bool,
+    },
+
     /// The same for a built-in array statement, `a.Redim(10)` for `REDIM a, 10`.
     ArrayMemberProc(OpCode),
 
@@ -327,7 +332,7 @@ fn takes_whole_array(opcode: OpCode, signature: crate::executable::StatementSign
     if opcode == OpCode::REDIM {
         return index == 0;
     }
-    if opcode == OpCode::StringSplit {
+    if matches!(opcode, OpCode::StringSplit | OpCode::RegexSplit) {
         return index == 2;
     }
     match signature {
@@ -2057,6 +2062,12 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             return VariableType::None;
         }
         let has_enum = self.type_registry.is_enum_type(left) || self.type_registry.is_enum_type(right);
+        if left == VariableType::UserData(crate::parser::REGEX_OPTIONS_ENUM_ID)
+            && right == left
+            && matches!(binary.get_op(), crate::ast::BinOp::And | crate::ast::BinOp::Or)
+        {
+            return left;
+        }
         if has_enum && self.counts_a_loop(binary.get_left_expression()) {
             // A FOR writes its own comparison and step, so it may count over an enum.
             return match binary.get_op() {
@@ -2623,6 +2634,25 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                     call.id,
                     SemanticInfo::StringSplitProc {
                         static_call: false,
+                        default_limit: call.get_arguments().len() == 2,
+                    },
+                );
+                return VariableType::None;
+            }
+            if receiver_type == VariableType::UserData(crate::parser::REGEX_ID as u8)
+                && *member.get_identifier() == "Split"
+                && (2..=3).contains(&call.get_arguments().len())
+            {
+                for argument in call.get_arguments() {
+                    argument.visit(self);
+                }
+                self.validate_string_split_target(&call.get_arguments()[1]);
+                if call.get_arguments().len() == 2 {
+                    self.add_constant(&Constant::Integer(0, crate::ast::constant::NumberFormat::Default));
+                }
+                self.function_type_lookup.insert(
+                    call.id,
+                    SemanticInfo::RegexSplitProc {
                         default_limit: call.get_arguments().len() == 2,
                     },
                 );

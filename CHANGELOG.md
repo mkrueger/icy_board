@@ -10,6 +10,11 @@ releases.
 
 ### Added
 
+- PPL 4.00 adds compiled `REGEX`, `REGEXMATCH` and `REGEXMATCHES` objects for
+  Unicode-aware matching, numbered and named captures, bounded collection,
+  replacement and transactional splitting. `RegexOptions` controls matching,
+  while invalid patterns and limits report through `ErrKind.Regex`.
+
 - PPL 4.00 `STRING` and `BIGSTR` values expose discoverable members for length,
   forward/reverse search, containment, prefix/suffix tests, occurrence counting,
   replacement, trimming and case conversion. `Split` fills a dynamic string

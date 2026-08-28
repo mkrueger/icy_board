@@ -40,6 +40,7 @@ mod ppe_paths;
 mod record_io;
 mod record_literals;
 mod records;
+mod regex;
 mod retired_terminal_api;
 mod routine_parameters;
 mod scalars;

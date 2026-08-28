@@ -102,6 +102,7 @@ This sector owns the syntax and value model on which all later sectors depend:
 - `Base64Enc()`, `Base64Dec()`, `Sha256()` and the six `DOUBLE` math functions
 - line-oriented `FGETREC`/`FPUTREC` and framed binary `FREADREC`/`FWRITEREC`
 - discoverable `STRING`/`BIGSTR` members plus static `Join`, `Repeat` and `Split`
+- compiled `REGEX` matching with capture snapshots, match collections, replacement and transactional split
 
 The public functions are intentionally a small utility layer. Member access,
 static receivers, record literals and iteration helpers have opcode entries but

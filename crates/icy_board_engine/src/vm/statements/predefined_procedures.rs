@@ -33,7 +33,7 @@ use jamjam::jam::{JamMessage, JamMessageBase, attributes as jam_attributes, msg_
 use crate::{
     icy_board::icb_text::IceText,
     icy_board::state::ppl_error::{
-        ERR_FORMAT, ERR_INVALID, ERR_IO, ERR_KIND_FILE, ERR_KIND_FONT, ERR_KIND_GFX, ERR_KIND_SOUND, ERR_KIND_STRING, ERR_KIND_TERM, ERR_LIMIT,
+        ERR_FORMAT, ERR_INVALID, ERR_IO, ERR_KIND_FILE, ERR_KIND_FONT, ERR_KIND_GFX, ERR_KIND_REGEX, ERR_KIND_SOUND, ERR_KIND_STRING, ERR_KIND_TERM, ERR_LIMIT,
         ERR_UNAVAILABLE, PplError,
     },
     icy_board::state::screen_to_pcboard_text,
@@ -1865,6 +1865,47 @@ pub async fn string_split(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<
         text.split(&separator).map(str::to_string).collect()
     } else {
         text.splitn(limit as usize, &separator).map(str::to_string).collect()
+    };
+    let values = parts.into_iter().map(|part| VariableValue::new_string(part).convert_to(target.vtype)).collect();
+    vm.set_variable(&args[2], VariableValue::new_vector(target.vtype, values)).await?;
+    vm.operation_succeeded();
+    Ok(())
+}
+
+pub async fn regex_split(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let regex_value = vm.eval_expr(&args[0]).await?;
+    let GenericVariableData::UserData(regex_object) = regex_value.generic_data else {
+        vm.set_error(PplError::new(ERR_KIND_REGEX, ERR_INVALID, "REGEX.Split needs a REGEX receiver"));
+        return Ok(());
+    };
+    let pattern = regex_object.get_property_value(vm, &crate::icy_board::state::ppl_regex::PATTERN)?.as_string();
+    let options = regex_object.get_property_value(vm, &crate::icy_board::state::ppl_regex::OPTIONS)?.as_int();
+    let regex = match crate::icy_board::state::ppl_regex::PplRegex::compile_pattern(pattern, options) {
+        Ok(regex) => regex,
+        Err(message) => {
+            vm.set_error(PplError::new(ERR_KIND_REGEX, ERR_INVALID, message));
+            return Ok(());
+        }
+    };
+    let text = vm.eval_expr(&args[1]).await?.as_string();
+    let target = vm.eval_array_operand(&args[2]).await?;
+    let limit = vm.eval_expr(&args[3]).await?.as_int();
+    if limit < 0 {
+        vm.set_error(PplError::new(ERR_KIND_REGEX, ERR_INVALID, "REGEX.Split limit cannot be negative"));
+        return Ok(());
+    }
+    if !matches!(target.vtype, VariableType::String | VariableType::BigStr) || !matches!(target.generic_data, GenericVariableData::Dim1(_)) {
+        vm.set_error(PplError::new(
+            ERR_KIND_REGEX,
+            ERR_INVALID,
+            "REGEX.Split needs a dynamic one-dimensional string array",
+        ));
+        return Ok(());
+    }
+    let parts: Vec<_> = if limit == 0 {
+        regex.compiled().split(&text).map(str::to_string).collect()
+    } else {
+        regex.compiled().splitn(&text, limit as usize).map(str::to_string).collect()
     };
     let values = parts.into_iter().map(|part| VariableValue::new_string(part).convert_to(target.vtype)).collect();
     vm.set_variable(&args[2], VariableValue::new_vector(target.vtype, values)).await?;

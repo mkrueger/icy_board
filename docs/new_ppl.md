@@ -30,6 +30,7 @@ format, so 4.00 is what a PPE targets whenever it uses anything below.
 | User-defined records | 400 | 400 | `TYPE ... ENDTYPE`, nested fields, arrays of records and nominal type checking |
 | Named record literals | 400 | 400 | `Point { X = 1, Y = 2 }` with checked and optional fields |
 | Terminal multimedia | 400 | 400 | Sixel/JXL graphics, SyncTERM audio, mouse and physical key events |
+| Regular expressions | 400 | 400 | Compiled Unicode patterns, captures, replacement and splitting |
 
 Several compiler improvements are deliberately **not** tied to 3.50. The
 compiler collects routine signatures before generating code, so `DECLARE` is
@@ -232,6 +233,48 @@ of zero means unlimited. Empty separators and negative limits report
 `STRING.Join(array, separator)` joins a one-dimensional string array and returns
 `BIGSTR`. `STRING.Repeat(value, count)` returns `BIGSTR`; a negative count is an
 error and results above 16 MiB report `ErrCode.Limit`.
+
+### Regular expressions
+
+`REGEX` compiles a pattern once and reuses it for matching, capture extraction,
+replacement and splitting:
+
+```PPL
+REGEX parser = REGEX.Compile("(?P<name>\w+):(?P<value>\d+)")
+REGEXMATCH found = parser.Find("score:120")
+
+IF found.Success THEN
+	PRINTLN found.NamedGroup("name"), " = ", found.NamedGroup("value")
+ENDIF
+```
+
+Static members are `REGEX.Compile(pattern [, options])`, `REGEX.Escape(text)`
+and `REGEX.IsValid(pattern [, options])`. A compiled value exposes `Valid`,
+`Pattern`, `IsMatch(text [, start])`, `Find(text [, start])`,
+`FindAll(text [, start [, limit]])`, `Replace(text, replacement [, limit])` and
+`Split(text, VAR array() [, limit])`.
+
+`RegexOptions` flags are `None`, `IgnoreCase`, `MultiLine`,
+`DotMatchesNewLine`, `IgnoreWhitespace`, `SwapGreed` and `Ascii`; flags may be
+combined with `|`. Matching is Unicode-aware unless `Ascii` is selected.
+Positions are 1-based Unicode character positions, while match collections and
+capture groups are zero-based. Group zero is the complete match.
+
+`REGEXMATCH` exposes `Success`, `Value`, `Start`, `Length`, `GroupCount`,
+`Group(index)`, `NamedGroup(name)`, and corresponding `GroupMatched`,
+`GroupStart` and `GroupLength` methods. Named variants use the `Named` prefix.
+`REGEXMATCHES` provides `Count`, `Len()` and `Get(index)`.
+
+Replacement strings expand `$1` and `$name`. A zero limit means unlimited;
+negative limits report `ErrKind.Regex` / `ErrCode.Invalid`. `Split` preserves
+empty fields and replaces only dynamic one-dimensional `STRING` or `BIGSTR`
+arrays, transactionally. Results are limited to 100,000 matches and replacement
+output to 16 MiB.
+
+The engine guarantees linear-time matching and deliberately does not support
+look-around or backreferences. Unicode case-insensitive matching does not apply
+multi-character folds such as `ß` to `SS`. Invalid patterns return an invalid
+`REGEX` value and report through `Error.Last()`.
 
 #### Record file I/O
 

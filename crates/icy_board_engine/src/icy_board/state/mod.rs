@@ -48,6 +48,7 @@ pub mod ppl_margins;
 pub mod ppl_message;
 pub mod ppl_mouse;
 pub mod ppl_palette;
+pub mod ppl_regex;
 pub mod ppl_session;
 pub mod ppl_surface;
 pub mod ppl_terminal;

@@ -137,6 +137,31 @@ fn a_collection_does_not_offer_its_internal_getter() {
 }
 
 #[test]
+fn regex_completion_covers_static_instance_and_result_members() {
+    let static_items = complete("REGEX.");
+    for member in ["Compile", "Escape", "IsValid"] {
+        assert!(static_items.contains(&member.to_string()), "{member} missing: {static_items:?}");
+    }
+    assert!(!static_items.contains(&"Find".to_string()), "{static_items:?}");
+
+    let instance_items = complete("REGEX pattern\npattern.");
+    for member in ["Valid", "Pattern", "IsMatch", "Find", "FindAll", "Replace", "Split"] {
+        assert!(instance_items.contains(&member.to_string()), "{member} missing: {instance_items:?}");
+    }
+    assert!(!instance_items.contains(&"Compile".to_string()), "{instance_items:?}");
+
+    let match_items = complete("REGEX pattern\npattern.Find(\"text\").");
+    for member in ["Success", "Value", "Group", "NamedGroup"] {
+        assert!(match_items.contains(&member.to_string()), "{member} missing: {match_items:?}");
+    }
+
+    let matches_items = complete("REGEX pattern\npattern.FindAll(\"text\").");
+    for member in ["Count", "Len", "Get"] {
+        assert!(matches_items.contains(&member.to_string()), "{member} missing: {matches_items:?}");
+    }
+}
+
+#[test]
 fn strings_offer_instance_static_and_chained_members() {
     let instance = complete("STRING text\ntext.");
     for member in ["Find", "FindLast", "Contains", "StartsWith", "EndsWith", "Count", "Replace", "Trim", "Split"] {

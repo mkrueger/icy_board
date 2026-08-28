@@ -316,6 +316,9 @@ pub const HTTP_ID: usize = 59;
 pub const HTTP_REQUEST_ID: usize = 60;
 pub const HTTP_RESPONSE_ID: usize = 61;
 pub const USERS_ID: usize = 62;
+pub const REGEX_ID: usize = 63;
+pub const REGEX_MATCH_ID: usize = 64;
+pub const REGEX_MATCHES_ID: usize = 65;
 
 /// Builtin enums take the top of the id space and a program's own enums grow down from
 /// below them, so the order here is what a PPE stores and may only be appended to.
@@ -330,6 +333,7 @@ pub const ERR_CODE_ENUM_ID: u8 = 248;
 pub const EDITOR_MODE_ENUM_ID: u8 = 247;
 pub const MSG_FIELD_ENUM_ID: u8 = 246;
 pub const HTTP_METHOD_ENUM_ID: u8 = 245;
+pub const REGEX_OPTIONS_ENUM_ID: u8 = 244;
 
 /// The board objects are ours, so no `PCBoard` language knows their names.
 pub const FIRST_BOARD_OBJECT_LANGUAGE_VERSION: u16 = 400;
@@ -341,7 +345,7 @@ pub const FIRST_USER_TYPE_ID: usize = 100;
 /// How many records one program may declare, ids 100..=255.
 /// How many enums the board provides. They sit at the top of the id space, so a program
 /// declares that many fewer records of its own.
-pub const BUILTIN_ENUM_COUNT: usize = 11;
+pub const BUILTIN_ENUM_COUNT: usize = 12;
 
 /// How many records one program may declare, ids 100..=255 less the builtin enums.
 pub const MAX_USER_TYPES: usize = u8::MAX as usize - FIRST_USER_TYPE_ID + 1 - BUILTIN_ENUM_COUNT;
@@ -395,6 +399,9 @@ impl UserTypeRegistry {
         reg.register::<crate::icy_board::state::ppl_http::PplHttpRequest>(HTTP_REQUEST_ID);
         reg.register::<crate::icy_board::state::ppl_http::PplHttpResponse>(HTTP_RESPONSE_ID);
         reg.register::<crate::icy_board::state::ppl_user::PplUsers>(USERS_ID);
+        reg.register::<crate::icy_board::state::ppl_regex::PplRegex>(REGEX_ID);
+        reg.register::<crate::icy_board::state::ppl_regex::PplRegexMatch>(REGEX_MATCH_ID);
+        reg.register::<crate::icy_board::state::ppl_regex::PplRegexMatches>(REGEX_MATCHES_ID);
 
         reg
     }
@@ -535,6 +542,7 @@ impl UserTypeRegistry {
                 ("Net", 9),
                 ("User", 10),
                 ("String", 11),
+                ("Regex", 12),
             ],
         );
         self.register_enum(
@@ -558,6 +566,19 @@ impl UserTypeRegistry {
         // The values are the `HDR_*` constants, so naming one is a way of writing the number.
         self.register_enum(MSG_FIELD_ENUM_ID, "MsgField", &[("To", 0x07), ("From", 0x0B), ("Subject", 0x0C)]);
         self.register_enum(HTTP_METHOD_ENUM_ID, "HttpMethod", &[("Get", 0), ("Head", 1), ("Post", 2)]);
+        self.register_enum(
+            REGEX_OPTIONS_ENUM_ID,
+            "RegexOptions",
+            &[
+                ("None", 0),
+                ("IgnoreCase", 1),
+                ("MultiLine", 2),
+                ("DotMatchesNewLine", 4),
+                ("IgnoreWhitespace", 8),
+                ("SwapGreed", 16),
+                ("Ascii", 32),
+            ],
+        );
     }
 
     /// The position of a field inside a record, which doubles

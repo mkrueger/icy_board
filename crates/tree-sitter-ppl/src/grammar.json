@@ -1468,6 +1468,18 @@
             "type": "TOKEN",
             "content": {
               "type": "PATTERN",
+              "value": "[rR][eE][gG][eE][xX][mM][aA][tT][cC][hH][eE][sS]"
+            }
+          },
+          "named": false,
+          "value": "REGEXMATCHES"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
               "value": "[sS][uU][rR][fF][aA][cC][eE]"
             }
           },
@@ -1689,6 +1701,42 @@
           },
           "named": false,
           "value": "PASSWORD"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
+              "value": "[rR][eE][gG][eE][xX]"
+            }
+          },
+          "named": false,
+          "value": "REGEX"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
+              "value": "[rR][eE][gG][eE][xX][mM][aA][tT][cC][hH]"
+            }
+          },
+          "named": false,
+          "value": "REGEXMATCH"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
+              "value": "[rR][eE][gG][eE][xX][oO][pP][tT][iI][oO][nN][sS]"
+            }
+          },
+          "named": false,
+          "value": "REGEXOPTIONS"
         },
         {
           "type": "ALIAS",

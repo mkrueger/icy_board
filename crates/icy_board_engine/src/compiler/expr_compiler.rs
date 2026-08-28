@@ -211,7 +211,7 @@ impl AstVisitor<PPEExpr> for ExpressionCompiler<'_> {
                 log::error!("Invalid function call: {function_type:?}");
                 PPEExpr::Value(0)
             }
-            SemanticInfo::ArrayMemberProc(_) | SemanticInfo::StringSplitProc { .. } => {
+            SemanticInfo::ArrayMemberProc(_) | SemanticInfo::StringSplitProc { .. } | SemanticInfo::RegexSplitProc { .. } => {
                 log::error!("Array statement used where a value is expected: {function_type:?}");
                 PPEExpr::Value(0)
             }

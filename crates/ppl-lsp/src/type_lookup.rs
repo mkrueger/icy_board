@@ -86,7 +86,23 @@ pub fn type_of_name(visitor: &SemanticVisitor, name: &str) -> Option<VariableTyp
     if name == "BIGSTR" {
         return Some(VariableType::BigStr);
     }
+    if let Some(var_type) = visitor.type_registry.get_board_object(&name) {
+        return Some(var_type);
+    }
     fallback
+}
+
+pub fn static_type_of_name(visitor: &SemanticVisitor, name: &str) -> Option<VariableType> {
+    let identifier = unicase::Ascii::new(name.to_string());
+    let shadowed = visitor.references.iter().any(|(reference_type, reference)| {
+        matches!(reference_type, ReferenceType::Variable(_) | ReferenceType::Function(_))
+            && reference
+                .declaration
+                .as_ref()
+                .or(reference.implementation.as_ref())
+                .is_some_and(|(_, declaration)| unicase::Ascii::new(declaration.token.clone()) == identifier)
+    });
+    (!shadowed).then(|| visitor.type_registry.get_board_object(&identifier)).flatten()
 }
 
 /// The type a field of `var_type` has.
@@ -156,15 +172,29 @@ pub fn members_of(registry: &UserTypeRegistry, var_type: VariableType) -> Vec<Me
     let Some(object) = registry.get_type_from_id(id) else {
         return Vec::new();
     };
+    user_data_members(registry, object, false)
+}
+
+pub fn static_members_of(registry: &UserTypeRegistry, var_type: VariableType) -> Vec<Member> {
+    let VariableType::UserData(id) = var_type else {
+        return Vec::new();
+    };
+    let Some(object) = registry.get_type_from_id(id) else {
+        return Vec::new();
+    };
+    user_data_members(registry, object, object.instance_provider.is_none())
+}
+
+fn user_data_members(registry: &UserTypeRegistry, object: &icy_board_engine::compiler::user_data::UserDataRegistry, statik: bool) -> Vec<Member> {
     let mut members = Vec::new();
-    for (name, field_type) in &object.fields {
+    for (name, field_type) in object.fields.iter().filter(|_| !statik) {
         members.push(Member {
             name: name.to_string(),
             detail: type_name(registry, *field_type),
             kind: MemberKind::Field,
         });
     }
-    for (name, function) in &object.functions {
+    for (name, function) in object.functions.iter().filter(|(name, _)| object.statics.contains(*name) == statik) {
         members.push(Member {
             name: name.to_string(),
             detail: format!(
@@ -175,7 +205,7 @@ pub fn members_of(registry: &UserTypeRegistry, var_type: VariableType) -> Vec<Me
             kind: MemberKind::Method,
         });
     }
-    for (name, procedure) in &object.procedures {
+    for (name, procedure) in object.procedures.iter().filter(|_| !statik) {
         members.push(Member {
             name: name.to_string(),
             detail: format!("({})", parameter_types(registry, &procedure.parameters)),

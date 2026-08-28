@@ -638,7 +638,7 @@ impl Decompiler {
             }
             PPECommand::MemberCall(expr) => MemberCallStatement::create_empty_statement(self.decompile_expression(expr)),
             PPECommand::PredefinedCall(p, args) => {
-                if p.opcode == OpCode::StringSplit && args.len() == 4 {
+                if matches!(p.opcode, OpCode::StringSplit | OpCode::RegexSplit) && args.len() == 4 {
                     return MemberCallStatement::create_empty_statement(FunctionCallExpression::create_empty_expression(
                         MemberReferenceExpression::create_empty_expression(self.decompile_expression(&args[0]), unicase::Ascii::new("Split".to_string())),
                         args[1..].iter().map(|argument| self.decompile_expression(argument)).collect(),
