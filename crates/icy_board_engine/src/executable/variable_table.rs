@@ -16,6 +16,8 @@ use crate::{
 
 use super::{ExecutableError, GenericVariableData, LAST_PPE_RUNTIME, PPEExpr, PPEScript, VariableData, VariableNameGenerator, VariableType, VariableValue};
 
+pub const VARIABLE_FLAG_DYNAMIC_ARRAY: u8 = 0x01;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct RecordField {
     pub variable_type: VariableType,
@@ -125,6 +127,14 @@ impl VarHeader {
     ///
     /// Panics if .
     pub fn create_generic_data(&self) -> Option<GenericVariableData> {
+        if self.flags & VARIABLE_FLAG_DYNAMIC_ARRAY != 0 {
+            return match self.dim {
+                1 => Some(GenericVariableData::Dim1(Vec::new())),
+                2 => Some(GenericVariableData::Dim2(Vec::new())),
+                3 => Some(GenericVariableData::Dim3(Vec::new())),
+                _ => None,
+            };
+        }
         match self.dim {
             0 => Some(GenericVariableData::None),
             1..=3 => GenericVariableData::create_array(

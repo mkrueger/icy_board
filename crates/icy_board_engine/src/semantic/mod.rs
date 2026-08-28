@@ -363,7 +363,7 @@ impl ArrayShape {
     }
 
     fn same_layout(&self, other: &Self) -> bool {
-        self.element_type == other.element_type && self.rank == other.rank && self.bounds == other.bounds
+        self.element_type == other.element_type && self.rank == other.rank && (self.resizable || self.bounds == other.bounds)
     }
 }
 
@@ -524,6 +524,7 @@ pub struct SemanticVisitor {
     pub static_receiver_lookup: HashMap<usize, u8>,
 
     pub function_type_lookup: HashMap<u64, SemanticInfo>,
+    member_array_returns: HashMap<u64, (VariableType, u8)>,
 
     pub require_user_variables: bool,
     allow_routine_reference: bool,
@@ -758,6 +759,7 @@ impl SemanticVisitor {
             instance_provider_lookup: HashMap::new(),
             static_receiver_lookup: HashMap::new(),
             function_type_lookup: HashMap::new(),
+            member_array_returns: HashMap::new(),
 
             global_lookup: VariableLookups::default(),
             local_variable_lookup: None,
@@ -986,19 +988,33 @@ impl SemanticVisitor {
             if let FunctionDeclaration::Function(f) = &f.functions {
                 let return_type = f.get_return_type();
                 let storage_type = self.storage_type(return_type);
+                let return_rank = f.get_return_rank();
                 let header = VarHeader {
                     id,
-                    dim: 0,
+                    dim: return_rank,
                     vector_size: 0,
                     matrix_size: 0,
                     cube_size: 0,
                     variable_type: storage_type,
-                    flags: 0,
+                    flags: if return_rank > 0 {
+                        crate::executable::variable_table::VARIABLE_FLAG_DYNAMIC_ARRAY
+                    } else {
+                        0
+                    },
+                };
+                let value = if return_rank == 0 {
+                    storage_type.create_empty_value()
+                } else {
+                    VariableValue {
+                        vtype: storage_type,
+                        data: VariableData::default(),
+                        generic_data: header.create_generic_data().unwrap_or_default(),
+                    }
                 };
                 variable_table.push(TableEntry::new(
                     format!("{} result", f.get_identifier()),
                     header,
-                    storage_type.create_empty_value(),
+                    value,
                     EntryType::Variable,
                 ));
             }
@@ -1241,15 +1257,20 @@ impl SemanticVisitor {
         cube_size: usize,
     ) {
         let id = self.add_declaration(variable_type, identifier);
+        let dynamic = dim > 0 && vector_size == usize::MAX;
 
         let header = VarHeader {
             id,
             variable_type,
             dim,
-            vector_size,
-            matrix_size,
-            cube_size,
-            flags: 0,
+            vector_size: if dynamic { 0 } else { vector_size },
+            matrix_size: if dynamic { 0 } else { matrix_size },
+            cube_size: if dynamic { 0 } else { cube_size },
+            flags: if dynamic {
+                crate::executable::variable_table::VARIABLE_FLAG_DYNAMIC_ARRAY
+            } else {
+                0
+            },
         };
         self.references.last_mut().unwrap().1.header = Some(header);
 
@@ -1300,6 +1321,30 @@ impl SemanticVisitor {
                 })
             }
             Expression::Parens(parens) => self.array_shape(parens.get_expression()),
+            Expression::FunctionCall(call) => {
+                if let Some((element_type, rank)) = self.member_array_returns.get(&call.id).copied() {
+                    return Some(ArrayShape {
+                        element_type,
+                        rank,
+                        bounds: [0; 3],
+                        resizable: true,
+                        field_name: None,
+                    });
+                }
+                let SemanticInfo::FunctionReference(index) = self.function_type_lookup.get(&call.id)? else {
+                    return None;
+                };
+                let FunctionDeclaration::Function(function) = &self.function_containers[*index].functions else {
+                    return None;
+                };
+                (function.get_return_rank() > 0).then(|| ArrayShape {
+                    element_type: function.get_return_type(),
+                    rank: function.get_return_rank(),
+                    bounds: [0; 3],
+                    resizable: true,
+                    field_name: None,
+                })
+            }
             Expression::MemberReference(member) => {
                 let type_id = self.user_type_lookup.get(&member.get_identifier_token().span.start).copied()?;
                 let definition = self.type_registry.get_record_type_from_id(type_id)?;
@@ -1608,11 +1653,11 @@ impl SemanticVisitor {
     }
 
     /// Looks a callable member up on a board object.
-    fn member_function_signature(&self, user_type: u8, name: &unicase::Ascii<String>) -> Option<(usize, usize, Vec<VariableType>, VariableType)> {
+    fn member_function_signature(&self, user_type: u8, name: &unicase::Ascii<String>) -> Option<(usize, usize, Vec<VariableType>, VariableType, u8)> {
         let registry = self.type_registry.get_type_from_id(user_type)?;
         let function = registry.functions.get(name)?;
         let member_id = registry.get_member_id(name)?;
-        Some((member_id, function.required, function.parameters.clone(), function.return_type))
+        Some((member_id, function.required, function.parameters.clone(), function.return_type, function.return_rank))
     }
 
     fn check_member_arg_types(&mut self, expected: &[VariableType], arguments: &[Expression]) {
@@ -2787,10 +2832,13 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             }
             // A record field indexed like `rec.field(1)` is not a member call; the variable path below takes it.
             if self.type_registry.get_type_from_id(user_type).is_some() {
-                if let Some((member_id, required, parameters, return_type)) = self.member_function_signature(user_type, member.get_identifier()) {
+                if let Some((member_id, required, parameters, return_type, return_rank)) = self.member_function_signature(user_type, member.get_identifier()) {
                     self.check_expr_arg_range(required, parameters.len(), call.get_arguments().len(), call.get_expression());
                     self.check_member_arg_types(&parameters, call.get_arguments());
                     self.function_type_lookup.insert(call.id, SemanticInfo::MemberFunctionCall(member_id));
+                    if return_rank > 0 {
+                        self.member_array_returns.insert(call.id, (return_type, return_rank));
+                    }
                     return return_type;
                 }
                 for argument in call.get_arguments() {
@@ -2827,6 +2875,16 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 }
 
                 let (rt, r) = &mut self.references[idx];
+
+                if self.lang_version >= 400
+                    && r.header.as_ref().is_some_and(|header| header.dim > 0)
+                    && call.get_lpar_token().token == Token::LPar
+                {
+                    self.errors
+                        .lock()
+                        .unwrap()
+                        .report_warning(call.get_lpar_token().span.clone(), CompilationWarningType::ArrayBracketsRequired);
+                }
 
                 let arg_count = if let ReferenceType::Variable(_func) = rt {
                     r.header.as_ref().unwrap().dim as usize
@@ -3087,11 +3145,30 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                     && let FunctionDeclaration::Function(function) = &container.functions
                 {
                     target_type = function.get_return_type();
+                    if function.get_return_rank() > 0 {
+                        target_array_shape = Some(ArrayShape {
+                            element_type: target_type,
+                            rank: function.get_return_rank(),
+                            bounds: [0; 3],
+                            resizable: true,
+                            field_name: None,
+                        });
+                    }
                 }
             } else {
                 target_type = self.references[idx].1.variable_type;
                 if let Some(header) = &self.references[idx].1.header {
-                    self.check_arg_count(header.dim as usize, let_stmt.get_arguments().len(), let_stmt.get_identifier_token());
+                    if self.lang_version >= 400 && header.dim > 0 && let_stmt.get_arguments().is_empty() {
+                        target_array_shape = Some(ArrayShape {
+                            element_type: target_type,
+                            rank: header.dim,
+                            bounds: [header.vector_size, header.matrix_size, header.cube_size],
+                            resizable: true,
+                            field_name: None,
+                        });
+                    } else {
+                        self.check_arg_count(header.dim as usize, let_stmt.get_arguments().len(), let_stmt.get_identifier_token());
+                    }
                 } else {
                     self.errors
                         .lock()
@@ -3523,7 +3600,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                                 CompilationErrorType::ParameterMismatch(function.get_identifier().to_string()),
                             );
                         }
-                        if func.get_return_type() != function.get_return_type() {
+                        if func.get_return_type() != function.get_return_type() || func.get_return_rank() != function.get_return_rank() {
                             self.errors.lock().unwrap().report_error(
                                 function.get_return_type_token().span.clone(),
                                 CompilationErrorType::ReturnTypeMismatch(function.get_identifier().to_string()),
@@ -3537,11 +3614,14 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                             CompilationErrorType::ParameterMismatch(function.get_identifier().to_string()),
                         );
                     }
-                    cont.functions = FunctionDeclaration::Function(FunctionDeclarationAstNode::empty(
-                        function.get_identifier().clone(),
-                        function.get_parameters().clone(),
-                        function.get_return_type(),
-                    ));
+                    cont.functions = FunctionDeclaration::Function(
+                        FunctionDeclarationAstNode::empty(
+                            function.get_identifier().clone(),
+                            function.get_parameters().clone(),
+                            function.get_return_type(),
+                        )
+                        .with_return_rank(function.get_return_rank()),
+                    );
                     break;
                 }
             }

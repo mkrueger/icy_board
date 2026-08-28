@@ -603,6 +603,7 @@ impl AstVisitorMut for AstTransformationVisitor {
             function.get_rightpar_token().clone(),
             function.get_return_type_token().clone(),
             function.get_return_type(),
+            function.get_return_rank(),
             function.get_statements().iter().map(|stmt| stmt.visit_mut(self)).collect(),
             function.get_endfunc_token().clone(),
         ));

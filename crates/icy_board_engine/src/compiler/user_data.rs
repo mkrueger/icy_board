@@ -15,6 +15,14 @@ pub trait UserDataMemberRegistry {
     /// `required` is how many leading parameters a caller may not leave out.
     fn add_procedure_with(&mut self, name: unicase::Ascii<String>, parameters: Vec<VariableType>, required: usize);
     fn add_function_with(&mut self, name: unicase::Ascii<String>, parameters: Vec<VariableType>, required: usize, return_type: VariableType);
+    fn add_array_function_with(
+        &mut self,
+        name: unicase::Ascii<String>,
+        parameters: Vec<VariableType>,
+        required: usize,
+        return_type: VariableType,
+        return_rank: u8,
+    );
 
     /// A function called on the type rather than on one of its values, such as
     /// `Surface.New`. It is an ordinary member otherwise, so adding one needs
@@ -87,6 +95,7 @@ pub struct MemberFunction {
     pub parameters: Vec<VariableType>,
     pub required: usize,
     pub return_type: VariableType,
+    pub return_rank: u8,
 }
 
 pub struct MemberProcedure {
@@ -140,6 +149,28 @@ impl UserDataMemberRegistry for UserDataRegistry {
                 parameters,
                 required,
                 return_type,
+                return_rank: 0,
+            },
+        );
+    }
+
+    fn add_array_function_with(
+        &mut self,
+        name: unicase::Ascii<String>,
+        parameters: Vec<VariableType>,
+        required: usize,
+        return_type: VariableType,
+        return_rank: u8,
+    ) {
+        self.member_id_lookup.insert(name.clone(), self.id_table.len());
+        self.id_table.push(UserDataEntry::Function(name.clone()));
+        self.functions.insert(
+            name,
+            MemberFunction {
+                parameters,
+                required,
+                return_type,
+                return_rank,
             },
         );
     }

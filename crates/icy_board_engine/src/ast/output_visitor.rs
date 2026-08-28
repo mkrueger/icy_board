@@ -57,6 +57,34 @@ impl OutputVisitor {
         self.output_keyword(variable_type.to_string().as_str());
     }
 
+    fn output_dimensions(&mut self, dimensions: &[super::DimensionSpecifier]) {
+        if dimensions.is_empty() {
+            return;
+        }
+        let ppl_400 = self.version >= 400 || dimensions.iter().any(super::DimensionSpecifier::is_dynamic);
+        self.output.push(if ppl_400 { '[' } else { '(' });
+        for (index, dimension) in dimensions.iter().enumerate() {
+            if !dimension.is_dynamic() {
+                self.output.push_str(&dimension.get_dimension().to_string());
+            }
+            if index + 1 < dimensions.len() {
+                self.output.push(',');
+            }
+        }
+        self.output.push(if ppl_400 { ']' } else { ')' });
+    }
+
+    fn output_return_rank(&mut self, rank: u8) {
+        if rank == 0 {
+            return;
+        }
+        self.output.push('[');
+        for _ in 1..rank {
+            self.output.push(',');
+        }
+        self.output.push(']');
+    }
+
     fn indent(&mut self) {
         let one_indent = if self.options.use_tabs {
             "\t".to_string()
@@ -97,17 +125,7 @@ impl OutputVisitor {
                     self.output.push(' ');
                     self.output(variable.get_identifier());
 
-                    if !variable.get_dimensions().is_empty() {
-                        self.output.push('(');
-                        for (j, dim) in variable.get_dimensions().iter().enumerate() {
-                            self.output.push_str(dim.get_dimension().to_string().as_str());
-                            if j < variable.get_dimensions().len() - 1 {
-                                // PCBoard's PPLC reads dimensions with a constant expression parser that rejects blanks.
-                                self.output.push(',');
-                            }
-                        }
-                        self.output.push(')');
-                    }
+                    self.output_dimensions(variable.get_dimensions());
                 }
             }
 
@@ -639,17 +657,7 @@ impl AstVisitor<()> for OutputVisitor {
         self.output.push(' ');
         for (i, var) in var_decl.get_variables().iter().enumerate() {
             self.output(var.get_identifier());
-            if !var.get_dimensions().is_empty() {
-                self.output.push('(');
-                for (j, dim) in var.get_dimensions().iter().enumerate() {
-                    self.output.push_str(dim.get_dimension().to_string().as_str());
-                    if j < var.get_dimensions().len() - 1 {
-                        // PCBoard's PPLC reads dimensions with a constant expression parser that rejects blanks.
-                        self.output.push(',');
-                    }
-                }
-                self.output.push(')');
-            }
+            self.output_dimensions(var.get_dimensions());
             if let Some(init) = var.get_initalizer() {
                 self.output.push_str(" = ");
                 init.visit(self);
@@ -682,16 +690,7 @@ impl AstVisitor<()> for OutputVisitor {
             self.output_type(field.get_variable_type(), field.get_type_token());
             self.output.push(' ');
             self.output(field.get_identifier());
-            if !field.get_specifier().get_dimensions().is_empty() {
-                self.output.push('(');
-                for (index, dimension) in field.get_specifier().get_dimensions().iter().enumerate() {
-                    self.output.push_str(&dimension.get_dimension().to_string());
-                    if index + 1 < field.get_specifier().get_dimensions().len() {
-                        self.output.push_str(", ");
-                    }
-                }
-                self.output.push(')');
-            }
+            self.output_dimensions(field.get_specifier().get_dimensions());
             self.eol();
         }
         self.indent -= 1;
@@ -745,6 +744,7 @@ impl AstVisitor<()> for OutputVisitor {
         }
         self.output.push_str(") ");
         self.output_type(func_decl.get_return_type(), func_decl.get_return_type_token());
+        self.output_return_rank(func_decl.get_return_rank());
     }
 
     fn visit_function_implementation(&mut self, function: &super::FunctionImplementation) {
@@ -760,6 +760,7 @@ impl AstVisitor<()> for OutputVisitor {
         }
         self.output.push_str(") ");
         self.output_type(function.get_return_type(), function.get_return_type_token());
+        self.output_return_rank(function.get_return_rank());
         self.eol();
 
         self.indent += 1;

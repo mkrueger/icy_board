@@ -725,6 +725,7 @@ pub trait AstVisitorMut: Sized {
             func_decl.get_rightpar_token().clone(),
             func_decl.get_return_type_token().clone(),
             func_decl.get_return_type(),
+            func_decl.get_return_rank(),
         ))
     }
 
@@ -747,6 +748,7 @@ pub trait AstVisitorMut: Sized {
             function.get_rightpar_token().clone(),
             function.get_return_type_token().clone(),
             function.get_return_type(),
+            function.get_return_rank(),
             function.get_statements().iter().map(|stmt| stmt.visit_mut(self)).collect(),
             function.get_endfunc_token().clone(),
         ))

@@ -423,6 +423,7 @@ impl Decompiler {
                             Spanned::create_empty(Token::RPar),
                             self.type_token(return_value.header.variable_type),
                             return_value.header.variable_type,
+                            return_value.header.dim,
                         );
                         ast.nodes.push(AstNode::FunctionDeclaration(func_decl));
                     } else {
@@ -744,6 +745,7 @@ impl Decompiler {
                         Spanned::create_empty(Token::RPar),
                         self.type_token(return_value.header.variable_type),
                         return_value.header.variable_type,
+                        return_value.header.dim,
                         func_body,
                         Spanned::create_empty(Token::EndFunc),
                     );

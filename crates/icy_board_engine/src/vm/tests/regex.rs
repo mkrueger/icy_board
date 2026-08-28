@@ -32,11 +32,13 @@ fn regex_finds_captures_collections_and_replaces() {
         PRINTLN found.GroupMatched(2), " ", found.NamedGroupMatched("missing")
         PRINTLN found.GroupStart(1), " ", found.NamedGroupStart("value"), " ", found.GroupLength(2)
 
-        REGEXMATCHES all = REGEX.Compile("\w+").FindAll("ä one two", 3)
-        PRINTLN all.Count, " ", all.Len(), " ", all.Get(0).Value, " ", all.Get(1).Value
+        REGEXMATCH all[]
+        all = REGEX.Compile("\w+").FindAll("ä one two", 3)
+        PRINTLN all.Len(), " ", all[0].Value, " ", all[1].Value
         PRINTLN REGEX.Compile("^two").Find("one two", 5).Success
-        REGEXMATCHES limited = REGEX.Compile("\w+").FindAll("one two three", 1, 2)
-        PRINTLN limited.Count, " ", limited.Get(1).Value
+        REGEXMATCH limited[]
+        limited = REGEX.Compile("\w+").FindAll("one two three", 1, 2)
+        PRINTLN limited.Len(), " ", limited[1].Value
         PRINTLN parser.Replace("a:1 b:2 c:3", "$name=$value", 2)
         PRINTLN found.NamedGroup("missing")
         PRINTLN Error.Last().Kind = ErrKind.Regex, " ", Error.Last().Code = ErrCode.Invalid
@@ -45,7 +47,7 @@ fn regex_finds_captures_collections_and_replaces() {
 
     assert_eq!(
         output,
-        "1 score:120 3 9 2\nscore:120 score 120\n1 0\n3 9 3\n2 2 one two\n0\n2 two\na=1 b=2 c:3\n\n1 1\n"
+        "1 score:120 3 9 2\nscore:120 score 120\n1 0\n3 9 3\n1 one two\n0\n1 two\na=1 b=2 c:3\n\n1 1\n"
     );
 }
 

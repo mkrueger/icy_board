@@ -188,6 +188,7 @@ pub struct FunctionImplementation {
 
     return_type_token: Spanned<Token>,
     return_type: VariableType,
+    return_rank: u8,
 
     statements: Vec<Statement>,
     endfunc_token: Spanned<Token>,
@@ -204,6 +205,7 @@ impl FunctionImplementation {
         rightpar_token: Spanned<Token>,
         return_type_token: Spanned<Token>,
         return_type: VariableType,
+        return_rank: u8,
         statements: Vec<Statement>,
         endfunc_token: Spanned<Token>,
     ) -> Self {
@@ -216,6 +218,7 @@ impl FunctionImplementation {
             rightpar_token,
             return_type_token,
             return_type,
+            return_rank,
             statements,
             endfunc_token,
         }
@@ -237,6 +240,7 @@ impl FunctionImplementation {
             rightpar_token: Spanned::create_empty(Token::RPar),
             return_type_token: Spanned::create_empty(Token::Identifier(unicase::Ascii::new(return_type.to_string()))),
             return_type,
+            return_rank: 0,
             statements,
             endfunc_token: Spanned::create_empty(Token::EndFunc),
         }
@@ -290,6 +294,10 @@ impl FunctionImplementation {
 
     pub fn get_return_type(&self) -> VariableType {
         self.return_type
+    }
+
+    pub fn get_return_rank(&self) -> u8 {
+        self.return_rank
     }
 
     pub fn get_statements(&self) -> &Vec<Statement> {

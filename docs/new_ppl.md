@@ -213,7 +213,7 @@ The `STRING` and `BIGSTR` type names also provide operations that do not belong
 to one value:
 
 ```PPL
-STRING parts(0)
+STRING parts[]
 
 "a,,b,".Split(",", parts)
 PRINTLN STRING.Join(parts, "|")
@@ -242,6 +242,8 @@ replacement and splitting:
 ```PPL
 REGEX parser = REGEX.Compile("(?P<name>\w+):(?P<value>\d+)")
 REGEXMATCH found = parser.Find("score:120")
+REGEXMATCH foundAll[]
+foundAll = parser.FindAll("score:120 level:4")
 
 IF found.Success THEN
 	PRINTLN found.NamedGroup("name"), " = ", found.NamedGroup("value")
@@ -251,8 +253,8 @@ ENDIF
 Static members are `REGEX.Compile(pattern [, options])`, `REGEX.Escape(text)`
 and `REGEX.IsValid(pattern [, options])`. A compiled value exposes `Valid`,
 `Pattern`, `IsMatch(text [, start])`, `Find(text [, start])`,
-`FindAll(text [, start [, limit]])`, `Replace(text, replacement [, limit])` and
-`Split(text, VAR array() [, limit])`.
+`FindAll(text [, start [, limit]]) -> REGEXMATCH[]`,
+`Replace(text, replacement [, limit])` and `Split(text, VAR array[] [, limit])`.
 
 `RegexOptions` flags are `None`, `IgnoreCase`, `MultiLine`,
 `DotMatchesNewLine`, `IgnoreWhitespace`, `SwapGreed` and `Ascii`; flags may be
@@ -263,7 +265,8 @@ capture groups are zero-based. Group zero is the complete match.
 `REGEXMATCH` exposes `Success`, `Value`, `Start`, `Length`, `GroupCount`,
 `Group(index)`, `NamedGroup(name)`, and corresponding `GroupMatched`,
 `GroupStart` and `GroupLength` methods. Named variants use the `Named` prefix.
-`REGEXMATCHES` provides `Count`, `Len()` and `Get(index)`.
+`FindAll` returns a dynamic `REGEXMATCH[]` array. Access matches with
+`matches[index]`; `matches.Len()` reports the current upper bound.
 
 Replacement strings expand `$1` and `$name`. A zero limit means unlimited;
 negative limits report `ErrKind.Regex` / `ErrCode.Invalid`. `Split` preserves
@@ -1286,6 +1289,32 @@ stays the compiler's own and is not a function a PPE can call.
 
 ### Function
 
+PPL 4.00 uses square brackets for array declarations and indexing. Empty
+brackets declare a dynamic vector; commas declare a dynamic matrix or cube:
+
+```PPL
+INTEGER values[]
+STRING matrix[,]
+REGEXMATCH cubes[,,]
+INTEGER fixed[10]
+```
+
+Functions can return dynamic arrays by adding the rank after the return type:
+
+```PPL
+DECLARE FUNCTION ReadValues() INTEGER[]
+
+INTEGER values[]
+values = ReadValues()
+PRINTLN values[0]
+```
+
+Whole-array assignment copies the value and adopts its bounds when element type
+and rank match. Existing 4.00 source that declares arrays with parentheses is
+accepted with a migration warning; newly formatted and decompiled 4.00 source
+always writes square brackets. Older language versions retain the classic
+parenthesis syntax.
+
 Everything built in that takes an array first may also be written as a member of
 that array, whichever reads better at the call site. The two spellings are the
 same call, so neither can drift from the other.
@@ -1299,7 +1328,7 @@ same call, so neither can drift from the other.
 | `a.Redim(n1, n2, n3)` | `REDIM a, n1, n2, n3` |
 
 ```PPL
-INTEGER values(10)
+INTEGER values[10]
 
 PRINTLN values.Len(), " slots"
 values.Redim(20)
@@ -1310,6 +1339,8 @@ is the declaration that says it has them; asking a plain value for `.Len()` is a
 compile error. `Redim` is a statement rather than a function, so it stands on a
 line of its own the way `REDIM` does. Array-valued record fields have the fixed
 bounds stored in their record type and cannot use either spelling of `REDIM`.
+As in classic PPL, `Len()` reports the upper bound rather than the element
+count; after `Redim(20)`, valid indices are 0 through 20.
 
 ## `CONST` Declaration (3.50)
 

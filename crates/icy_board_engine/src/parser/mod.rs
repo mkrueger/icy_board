@@ -214,6 +214,9 @@ pub enum ParserErrorType {
 
 #[derive(Error, Debug, Clone, PartialEq)]
 pub enum ParserWarningType {
+    #[error("PPL 4.00 array declarations should use '[' and ']' instead of '(' and ')'")]
+    ArrayBracketsRequired,
+
     #[error("$USEFUNCS is not valid there, ignoring.")]
     UsefuncsIgnored,
     #[error("$USEFUNCS already set, ignoring.")]
@@ -1419,6 +1422,28 @@ pub fn built_in_type_names(lang_version: u16) -> Vec<&'static str> {
 }
 
 impl Parser<'_> {
+    fn parse_dynamic_array_rank(&mut self) -> u8 {
+        if self.lang_version < 400 || self.get_cur_token() != Some(Token::LBracket) {
+            return 0;
+        }
+        self.next_token();
+        let mut rank = 1usize;
+        while self.get_cur_token() == Some(Token::Comma) {
+            rank += 1;
+            self.next_token();
+        }
+        if rank > 3 {
+            self.report_error(self.lex.span(), ParserErrorType::TooManyDimensions(rank));
+            return 0;
+        }
+        if self.get_cur_token() != Some(Token::RBracket) {
+            self.report_error(self.lex.span(), ParserErrorType::MissingCloseParens(self.save_token()));
+            return 0;
+        }
+        self.next_token();
+        rank as u8
+    }
+
     pub fn get_variable_type(&self) -> Option<VariableType> {
         if let Some(token) = &self.cur_token {
             if let Token::Identifier(id) = &token.token {
@@ -1463,8 +1488,32 @@ impl Parser<'_> {
         let mut rightpar_token = None;
         let is_lpar = matches!(self.get_cur_token(), Some(Token::LPar));
         if is_lpar || matches!(self.get_cur_token(), Some(Token::LBracket)) {
+            if self.lang_version >= 400 && is_lpar {
+                self.error_reporter
+                    .lock()
+                    .unwrap()
+                    .report_warning(self.lex.span(), ParserWarningType::ArrayBracketsRequired);
+            }
             leftpar_token = Some(self.save_spanned_token());
             self.next_token();
+            if !is_lpar && matches!(self.get_cur_token(), Some(Token::RBracket) | Some(Token::Comma)) {
+                dimensions.push(DimensionSpecifier::dynamic());
+                while matches!(self.get_cur_token(), Some(Token::Comma)) {
+                    self.next_token();
+                    dimensions.push(DimensionSpecifier::dynamic());
+                }
+                if dimensions.len() > 3 {
+                    self.report_error(self.lex.span(), ParserErrorType::TooManyDimensions(dimensions.len()));
+                    return None;
+                }
+                if !matches!(self.get_cur_token(), Some(Token::RBracket)) {
+                    self.report_error(self.lex.span(), ParserErrorType::MissingCloseParens(self.save_token()));
+                    return None;
+                }
+                rightpar_token = Some(self.save_spanned_token());
+                self.next_token();
+                return Some(VariableSpecifier::new(identifier_token, leftpar_token, dimensions, rightpar_token, None, None));
+            }
             let Some(Token::Const(Constant::Integer(_, _))) = self.get_cur_token() else {
                 self.report_error(self.lex.span(), ParserErrorType::NumberExpected(self.save_token()));
                 return None;
@@ -1625,6 +1674,7 @@ impl Parser<'_> {
         };
         let return_type_token = self.save_spanned_token();
         self.next_token();
+        let return_rank = self.parse_dynamic_array_rank();
         self.check_eol();
         Some(AstNode::FunctionDeclaration(FunctionDeclarationAstNode::new(
             declare_token,
@@ -1635,6 +1685,7 @@ impl Parser<'_> {
             rightpar_token,
             return_type_token,
             return_type,
+            return_rank,
         )))
     }
 
@@ -1826,6 +1877,7 @@ impl Parser<'_> {
             };
             let return_type_token = self.save_spanned_token();
             self.next_token();
+            let return_rank = self.parse_dynamic_array_rank();
             self.skip_eol();
 
             let mut statements = Vec::new();
@@ -1858,6 +1910,7 @@ impl Parser<'_> {
                 rightpar_token,
                 return_type_token,
                 return_type,
+                return_rank,
                 statements.into_iter().flatten().collect(),
                 endfunc_token.clone(),
             ));

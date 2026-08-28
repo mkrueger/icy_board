@@ -1194,9 +1194,21 @@ impl VirtualMachine<'_> {
                 };
             }
             PPECommand::Let(variable, expr) => {
-                let val = match self.eval_expr_sync(expr) {
-                    Some(value) => value,
-                    None => self.eval_expr(expr).await?,
+                let whole_dynamic_array = match variable.as_ref() {
+                    PPEExpr::Value(id) => {
+                        self.variable_table.get_var_entry(*id).header.flags
+                            & crate::executable::variable_table::VARIABLE_FLAG_DYNAMIC_ARRAY
+                            != 0
+                    }
+                    _ => false,
+                };
+                let val = if whole_dynamic_array {
+                    self.eval_array_operand(expr).await?
+                } else {
+                    match self.eval_expr_sync(expr) {
+                        Some(value) => value,
+                        None => self.eval_expr(expr).await?,
+                    }
                 };
                 self.set_variable(variable, val).await?;
             }

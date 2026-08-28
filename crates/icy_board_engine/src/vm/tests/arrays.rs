@@ -1,5 +1,51 @@
 use crate::vm::tests::{compile_errors, compile_errors_with_runtime, run_ppl};
 
+#[test]
+fn ppl_400_dynamic_arrays_use_square_bracket_rank_syntax() {
+    assert_eq!(
+        "0 0 0 2 7",
+        run_ppl(
+            r#"
+;$LANGVERSION 400
+INTEGER vector[]
+INTEGER matrix[,]
+INTEGER cube[,,]
+PRINT vector.Len(), " ", matrix.Len(), " ", cube.Len(), " "
+vector.Redim(2)
+vector[2] = 7
+PRINT vector.Len(), " ", vector[2]
+"#
+        )
+    );
+}
+
+#[test]
+fn ppl_400_accepts_legacy_array_declarations_during_migration() {
+    assert!(compile_errors(";$LANGVERSION 400\nINTEGER values(10)").is_empty());
+    assert!(compile_errors(";$LANGVERSION 340\nINTEGER values(10)").is_empty());
+}
+
+#[test]
+fn ppl_400_functions_return_dynamic_arrays() {
+    assert_eq!(
+        "3 20",
+        run_ppl(
+            r#";$LANGVERSION 400
+DECLARE FUNCTION MakeValues() INTEGER[]
+INTEGER values[]
+values = MakeValues()
+PRINT values.Len(), " ", values[2]
+
+FUNCTION MakeValues() INTEGER[]
+  INTEGER result[3]
+  result[2] = 20
+  RETURN result
+ENDFUNC
+"#
+        )
+    );
+}
+
 /// An array declared with an upper bound of 10 holds 11 elements, index 0 through 10,
 /// and `FOREACH` visits every one of them.
 #[test]

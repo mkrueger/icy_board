@@ -5,7 +5,7 @@ use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue, user_data_value},
     executable::{VariableType, VariableValue},
     icy_board::state::ppl_error::{ERR_INVALID, ERR_KIND_REGEX, PplError},
-    parser::{REGEX_ID, REGEX_MATCH_ID, REGEX_MATCHES_ID, REGEX_OPTIONS_ENUM_ID},
+    parser::{REGEX_ID, REGEX_MATCH_ID, REGEX_OPTIONS_ENUM_ID},
 };
 
 const MAX_REGEX_RESULTS: usize = 100_000;
@@ -90,6 +90,13 @@ impl PplRegexMatch {
         user_data_value(self, REGEX_MATCH_ID)
     }
 
+    fn array_value(matches: Vec<Self>) -> VariableValue {
+        VariableValue::new_vector(
+            VariableType::UserData(REGEX_MATCH_ID as u8),
+            matches.into_iter().map(Self::value).collect(),
+        )
+    }
+
     fn group(&self, index: i32) -> Option<&PplRegexGroup> {
         usize::try_from(index).ok().and_then(|index| self.groups.get(index))
     }
@@ -101,12 +108,6 @@ impl PplRegexMatch {
 
 #[derive(Clone, Default)]
 pub struct PplRegexMatches(std::sync::Arc<Vec<PplRegexMatch>>);
-
-impl PplRegexMatches {
-    fn value(self) -> VariableValue {
-        user_data_value(self, REGEX_MATCHES_ID)
-    }
-}
 
 #[derive(Clone, Default)]
 pub struct PplRegex {
@@ -189,11 +190,12 @@ impl UserData for PplRegex {
             1,
             VariableType::UserData(REGEX_MATCH_ID as u8),
         );
-        registry.add_function_with(
+        registry.add_array_function_with(
             FIND_ALL.clone(),
             vec![VariableType::String, VariableType::Integer, VariableType::Integer],
             1,
-            VariableType::UserData(REGEX_MATCHES_ID as u8),
+            VariableType::UserData(REGEX_MATCH_ID as u8),
+            1,
         );
         registry.add_function_with(
             REPLACE.clone(),
@@ -276,7 +278,7 @@ impl UserDataValue for PplRegex {
                 return Ok(if *name == *FIND {
                     PplRegexMatch::default().value()
                 } else {
-                    PplRegexMatches::default().value()
+                    PplRegexMatch::array_value(Vec::new())
                 });
             };
             let text = arguments[0].as_string();
@@ -286,7 +288,7 @@ impl UserDataValue for PplRegex {
                 return Ok(if *name == *FIND {
                     PplRegexMatch::default().value()
                 } else {
-                    PplRegexMatches::default().value()
+                    PplRegexMatch::array_value(Vec::new())
                 });
             };
             if *name == *FIND {
@@ -300,7 +302,7 @@ impl UserDataValue for PplRegex {
             let limit = arguments.get(2).map_or(0, VariableValue::as_int);
             if limit < 0 {
                 vm.set_error(PplError::new(ERR_KIND_REGEX, ERR_INVALID, "REGEX.FindAll limit cannot be negative"));
-                return Ok(PplRegexMatches::default().value());
+                return Ok(PplRegexMatch::array_value(Vec::new()));
             }
             if limit as usize > MAX_REGEX_RESULTS {
                 vm.set_error(PplError::new(
@@ -308,7 +310,7 @@ impl UserDataValue for PplRegex {
                     crate::icy_board::state::ppl_error::ERR_LIMIT,
                     "REGEX.FindAll limit exceeds 100000 matches",
                 ));
-                return Ok(PplRegexMatches::default().value());
+                return Ok(PplRegexMatch::array_value(Vec::new()));
             }
             let maximum = if limit == 0 { MAX_REGEX_RESULTS } else { limit as usize };
             let take = if limit == 0 { maximum.saturating_add(1) } else { maximum };
@@ -324,10 +326,10 @@ impl UserDataValue for PplRegex {
                     crate::icy_board::state::ppl_error::ERR_LIMIT,
                     "REGEX.FindAll result exceeds 100000 matches",
                 ));
-                return Ok(PplRegexMatches::default().value());
+                return Ok(PplRegexMatch::array_value(Vec::new()));
             }
             vm.operation_succeeded();
-            return Ok(PplRegexMatches(std::sync::Arc::new(matches)).value());
+            return Ok(PplRegexMatch::array_value(matches));
         }
         if *name == *REPLACE {
             let Some(compiled) = &self.compiled else {

@@ -9,6 +9,7 @@ use super::{AstVisitorMut, Constant, Expression, Statement, constant::NumberForm
 #[derive(Debug, PartialEq, Clone)]
 pub struct DimensionSpecifier {
     dimension_token: Spanned<Token>,
+    dynamic: bool,
 }
 
 impl DimensionSpecifier {
@@ -22,13 +23,28 @@ impl DimensionSpecifier {
         if !matches!(dimension_token.token, Token::Const(Constant::Integer(_, _))) {
             panic!("DimensionSpecifier::new: invalid token {dimension_token:?}");
         }
-        Self { dimension_token }
+        Self {
+            dimension_token,
+            dynamic: false,
+        }
     }
 
     pub fn empty(dimension: usize) -> Self {
         Self {
             dimension_token: Spanned::create_empty(Token::Const(Constant::Integer(dimension as i32, NumberFormat::Default))),
+            dynamic: false,
         }
+    }
+
+    pub fn dynamic() -> Self {
+        Self {
+            dimension_token: Spanned::create_empty(Token::Const(Constant::Integer(0, NumberFormat::Default))),
+            dynamic: true,
+        }
+    }
+
+    pub fn is_dynamic(&self) -> bool {
+        self.dynamic
     }
 
     pub fn get_dimension_token(&self) -> &Spanned<Token> {
@@ -138,6 +154,13 @@ impl VariableSpecifier {
 
     pub fn create_empty_value(&self, variable_type: VariableType) -> VariableValue {
         let var_value = variable_type.create_empty_value();
+        if self.dimensions.first().is_some_and(DimensionSpecifier::is_dynamic) {
+            return match self.dimensions.len() {
+                1 => VariableValue::new_vector(variable_type, Vec::new()),
+                2 => VariableValue::new_matrix(variable_type, Vec::new()),
+                _ => VariableValue::new_cube(variable_type, Vec::new()),
+            };
+        }
         match self.dimensions.len() {
             0 => var_value,
             1 => VariableValue::new_vector(variable_type, vec![var_value; self.dimensions[0].get_dimension()]),
@@ -156,6 +179,9 @@ impl VariableSpecifier {
         if self.dimensions.is_empty() {
             return 0;
         }
+        if self.dimensions[0].is_dynamic() {
+            return usize::MAX;
+        }
         self.dimensions[0].get_dimension()
     }
 
@@ -163,12 +189,18 @@ impl VariableSpecifier {
         if self.dimensions.len() < 2 {
             return 0;
         }
+        if self.dimensions[1].is_dynamic() {
+            return usize::MAX;
+        }
         self.dimensions[1].get_dimension()
     }
 
     pub fn get_cube_size(&self) -> usize {
         if self.dimensions.len() < 3 {
             return 0;
+        }
+        if self.dimensions[2].is_dynamic() {
+            return usize::MAX;
         }
         self.dimensions[2].get_dimension()
     }
@@ -563,6 +595,7 @@ pub struct FunctionDeclarationAstNode {
     rightpar_token: Spanned<Token>,
     return_type_token: Spanned<Token>,
     return_type: VariableType,
+    return_rank: u8,
 }
 
 impl FunctionDeclarationAstNode {
@@ -576,6 +609,7 @@ impl FunctionDeclarationAstNode {
         rightpar_token: Spanned<Token>,
         return_type_token: Spanned<Token>,
         return_type: VariableType,
+        return_rank: u8,
     ) -> Self {
         Self {
             declare_token,
@@ -586,6 +620,7 @@ impl FunctionDeclarationAstNode {
             rightpar_token,
             return_type_token,
             return_type,
+            return_rank,
         }
     }
 
@@ -599,6 +634,7 @@ impl FunctionDeclarationAstNode {
             rightpar_token: Spanned::create_empty(Token::RPar),
             return_type_token: Spanned::create_empty(Token::Identifier(unicase::Ascii::new(return_type.to_string()))),
             return_type,
+            return_rank: 0,
         }
     }
     pub fn get_declare_token(&self) -> &Spanned<Token> {
@@ -653,6 +689,15 @@ impl FunctionDeclarationAstNode {
 
     pub fn get_return_type(&self) -> VariableType {
         self.return_type
+    }
+
+    pub fn get_return_rank(&self) -> u8 {
+        self.return_rank
+    }
+
+    pub fn with_return_rank(mut self, return_rank: u8) -> Self {
+        self.return_rank = return_rank;
+        self
     }
 
     pub fn empty_node(identifier: unicase::Ascii<String>, parameters: Vec<ParameterSpecifier>, return_type: VariableType) -> super::AstNode {

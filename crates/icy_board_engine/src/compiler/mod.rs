@@ -186,6 +186,9 @@ pub enum CompilationErrorType {
 
 #[derive(Error, Debug)]
 pub enum CompilationWarningType {
+    #[error("PPL 4.00 array indexing should use '[' and ']' instead of '(' and ')'")]
+    ArrayBracketsRequired,
+
     #[error("Unused label {0}")]
     UnusedLabel(String),
 
@@ -441,7 +444,9 @@ impl PPECompiler {
                     }
                 }
 
-                if decl.header.dim != let_smt.get_arguments().len() as u8 {
+                let whole_dynamic_array = decl.header.flags & crate::executable::variable_table::VARIABLE_FLAG_DYNAMIC_ARRAY != 0
+                    && let_smt.get_arguments().is_empty();
+                if decl.header.dim != let_smt.get_arguments().len() as u8 && !whole_dynamic_array {
                     log::error!("Invalid dimensions for variable: {var_name}");
                     return None;
                 }
@@ -452,7 +457,7 @@ impl PPECompiler {
                 };
                 let variable_type = decl.header.variable_type;
                 let dim = decl.header.dim;
-                let variable = if dim == 0 {
+                let variable = if dim == 0 || whole_dynamic_array {
                     PPEExpr::Value(decl_id)
                 } else {
                     let mut arguments = Vec::new();
