@@ -268,8 +268,13 @@ pub enum OpCode {
     SetBankBal = 229,
     MemberCall = 230,
     OnError = 231,
+    FGetRec = 232,
+    FPutRec = 233,
+    FReadRec = 234,
+    FWriteRec = 235,
+    StringSplit = 236,
 }
-pub const LAST_STMT: i16 = OpCode::OnError as i16;
+pub const LAST_STMT: i16 = OpCode::StringSplit as i16;
 
 impl OpCode {
     pub fn get_definition(self) -> &'static StatementDefinition {
@@ -277,7 +282,14 @@ impl OpCode {
     }
 
     pub fn minimum_runtime(self) -> u16 {
-        if matches!(self, OpCode::MemberCall | OpCode::OnError) { 400 } else { 100 }
+        if matches!(
+            self,
+            OpCode::MemberCall | OpCode::OnError | OpCode::FGetRec | OpCode::FPutRec | OpCode::FReadRec | OpCode::FWriteRec | OpCode::StringSplit
+        ) {
+            400
+        } else {
+            100
+        }
     }
 }
 
@@ -601,7 +613,7 @@ pub fn format_argument_type_last(arg: &ArgumentDefinition) -> String {
 // "WAIT FOR" == "WAITFOR"
 // "GO SUB"
 // " GO TO"
-pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 237]> = std::sync::LazyLock::new(|| {
+pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 242]> = std::sync::LazyLock::new(|| {
     [
         StatementDefinition {
             // helps to map opcode to array index.
@@ -2580,6 +2592,53 @@ pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 237]
             opcode: OpCode::OnError,
             args: None,
             sig: StatementSignature::Invalid,
+        },
+        StatementDefinition {
+            name: "FGetRec",
+            version: 400,
+            opcode: OpCode::FGetRec,
+            args: Some(vec![
+                ArgumentDefinition::new("chnl", VariableType::Integer),
+                ArgumentDefinition::new("record", VariableType::None),
+            ]),
+            sig: StatementSignature::ArgumentsWithVariable(2, 2),
+        },
+        StatementDefinition {
+            name: "FPutRec",
+            version: 400,
+            opcode: OpCode::FPutRec,
+            args: Some(vec![
+                ArgumentDefinition::new("chnl", VariableType::Integer),
+                ArgumentDefinition::new("record", VariableType::None),
+            ]),
+            sig: StatementSignature::ArgumentsWithVariable(0, 2),
+        },
+        StatementDefinition {
+            name: "FReadRec",
+            version: 400,
+            opcode: OpCode::FReadRec,
+            args: Some(vec![
+                ArgumentDefinition::new("chnl", VariableType::Integer),
+                ArgumentDefinition::new("record", VariableType::None),
+            ]),
+            sig: StatementSignature::ArgumentsWithVariable(2, 2),
+        },
+        StatementDefinition {
+            name: "FWriteRec",
+            version: 400,
+            opcode: OpCode::FWriteRec,
+            args: Some(vec![
+                ArgumentDefinition::new("chnl", VariableType::Integer),
+                ArgumentDefinition::new("record", VariableType::None),
+            ]),
+            sig: StatementSignature::ArgumentsWithVariable(0, 2),
+        },
+        StatementDefinition {
+            name: "<string split>",
+            version: 400,
+            opcode: OpCode::StringSplit,
+            args: None,
+            sig: StatementSignature::ArgumentsWithVariable(3, 4),
         },
         // Alias section
         // Moving to the end, so that the opcode <--> index mapping is not broken

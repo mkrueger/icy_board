@@ -1,5 +1,7 @@
-﻿' This file utilizes some PPL 3.50 features 
-' It's compileable & runnable on PCBoard 3.x with --runtime 330 
+﻿;$LANGVERSION 350
+
+' This file utilizes some PPL 3.50 features
+' It's compileable & runnable on PCBoard 3.x with --runtime 330
 
 DECLARE FUNCTION Has_Access(INTEGER conf) BOOLEAN
 INTEGER i
@@ -20,7 +22,7 @@ BEGIN
       PRINT "@X0E", LEFT(TOSTRING(i), 3)," - ", "@X0F", LEFT(name,30)
       CONTINUE
     ENDIF
-    IF Abort() EXIT
+    IF Abort() END
   NEXT
 
   PRINTLN CHR(13)

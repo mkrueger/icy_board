@@ -17,6 +17,7 @@ use crate::icy_board::read_with_encoding_detection;
 use crate::icy_board::security_expr::SecurityExpression;
 use crate::icy_board::state::GraphicsMode;
 use crate::icy_board::state::functions::{MASK_ALNUM, MASK_ALPHA, MASK_ASCII, MASK_FILE, MASK_MESSAGE, MASK_NUM, MASK_PATH, MASK_PWD};
+use crate::icy_board::state::ppl_error::{ERR_INVALID, ERR_KIND_STRING, ERR_LIMIT, PplError};
 use crate::icy_board::user_base::{ConferenceFlags, Password};
 use crate::icy_board::user_inf::{BankUserInf, QwkConfigUserInf};
 use crate::vm::{TerminalTarget, VirtualMachine, dbase, get_file_channel};
@@ -402,6 +403,133 @@ pub async fn instr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variabl
         }
         _ => Ok(VariableValue::new_int(0)),
     }
+}
+
+fn char_offset(text: &str, one_based: i32) -> Option<usize> {
+    if one_based < 1 {
+        return None;
+    }
+    if one_based == 1 {
+        return Some(0);
+    }
+    text.char_indices().nth(one_based as usize - 1).map(|(offset, _)| offset)
+}
+
+pub async fn string_find_from(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let text = vm.eval_expr(&args[0]).await?.as_string();
+    let search = vm.eval_expr(&args[1]).await?.as_string();
+    let start = vm.eval_expr(&args[2]).await?.as_int();
+    if search.is_empty() {
+        return Ok(VariableValue::new_int(0));
+    }
+    let Some(offset) = char_offset(&text, start) else {
+        return Ok(VariableValue::new_int(0));
+    };
+    let result = text[offset..]
+        .find(&search)
+        .map_or(0, |found| text[..offset + found].chars().count() as i32 + 1);
+    Ok(VariableValue::new_int(result))
+}
+
+pub async fn string_find_last_from(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let text = vm.eval_expr(&args[0]).await?.as_string();
+    let search = vm.eval_expr(&args[1]).await?.as_string();
+    let start = vm.eval_expr(&args[2]).await?.as_int();
+    if search.is_empty() || start < 1 {
+        return Ok(VariableValue::new_int(0));
+    }
+    let end = text.char_indices().nth(start as usize).map_or(text.len(), |(offset, _)| offset);
+    let result = text[..end].rfind(&search).map_or(0, |found| text[..found].chars().count() as i32 + 1);
+    Ok(VariableValue::new_int(result))
+}
+
+pub async fn string_contains(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let text = vm.eval_expr(&args[0]).await?.as_string();
+    let search = vm.eval_expr(&args[1]).await?.as_string();
+    Ok(VariableValue::new_bool(!search.is_empty() && text.contains(&search)))
+}
+
+pub async fn string_starts_with(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let text = vm.eval_expr(&args[0]).await?.as_string();
+    let prefix = vm.eval_expr(&args[1]).await?.as_string();
+    Ok(VariableValue::new_bool(text.starts_with(&prefix)))
+}
+
+pub async fn string_ends_with(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let text = vm.eval_expr(&args[0]).await?.as_string();
+    let suffix = vm.eval_expr(&args[1]).await?.as_string();
+    Ok(VariableValue::new_bool(text.ends_with(&suffix)))
+}
+
+pub async fn string_count(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let text = vm.eval_expr(&args[0]).await?.as_string();
+    let search = vm.eval_expr(&args[1]).await?.as_string();
+    let count = if search.is_empty() { 0 } else { text.matches(&search).count() as i32 };
+    Ok(VariableValue::new_int(count))
+}
+
+pub async fn string_trim(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let text = vm.eval_expr(&args[0]).await?.as_string();
+    Ok(VariableValue::new_string(text.trim().to_string()).convert_to(VariableType::BigStr))
+}
+
+pub async fn string_trim_start(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let text = vm.eval_expr(&args[0]).await?.as_string();
+    Ok(VariableValue::new_string(text.trim_start().to_string()).convert_to(VariableType::BigStr))
+}
+
+pub async fn string_trim_end(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let text = vm.eval_expr(&args[0]).await?.as_string();
+    Ok(VariableValue::new_string(text.trim_end().to_string()).convert_to(VariableType::BigStr))
+}
+
+pub async fn string_trim_chars(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let text = vm.eval_expr(&args[0]).await?.as_string();
+    let characters = vm.eval_expr(&args[1]).await?.as_string();
+    Ok(VariableValue::new_string(text.trim_matches(|character| characters.contains(character)).to_string()).convert_to(VariableType::BigStr))
+}
+
+pub async fn string_trim_start_chars(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let text = vm.eval_expr(&args[0]).await?.as_string();
+    let characters = vm.eval_expr(&args[1]).await?.as_string();
+    Ok(VariableValue::new_string(text.trim_start_matches(|character| characters.contains(character)).to_string()).convert_to(VariableType::BigStr))
+}
+
+pub async fn string_trim_end_chars(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let text = vm.eval_expr(&args[0]).await?.as_string();
+    let characters = vm.eval_expr(&args[1]).await?.as_string();
+    Ok(VariableValue::new_string(text.trim_end_matches(|character| characters.contains(character)).to_string()).convert_to(VariableType::BigStr))
+}
+
+pub async fn string_join(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let array = vm.eval_array_operand(&args[0]).await?;
+    let separator = vm.eval_expr(&args[1]).await?.as_string();
+    let GenericVariableData::Dim1(values) = array.generic_data else {
+        vm.set_error(PplError::new(ERR_KIND_STRING, ERR_INVALID, "STRING.Join needs a one-dimensional string array"));
+        return Ok(VariableValue::new_string(String::new()).convert_to(VariableType::BigStr));
+    };
+    let joined = values.iter().map(VariableValue::as_string).collect::<Vec<_>>().join(&separator);
+    vm.operation_succeeded();
+    Ok(VariableValue::new_string(joined).convert_to(VariableType::BigStr))
+}
+
+pub async fn string_repeat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let text = vm.eval_expr(&args[0]).await?.as_string();
+    let count = vm.eval_expr(&args[1]).await?.as_int();
+    if count < 0 {
+        vm.set_error(PplError::new(ERR_KIND_STRING, ERR_INVALID, "STRING.Repeat count cannot be negative"));
+        return Ok(VariableValue::new_string(String::new()).convert_to(VariableType::BigStr));
+    }
+    let Some(length) = text.len().checked_mul(count as usize) else {
+        vm.set_error(PplError::new(ERR_KIND_STRING, ERR_LIMIT, "STRING.Repeat result is too large"));
+        return Ok(VariableValue::new_string(String::new()).convert_to(VariableType::BigStr));
+    };
+    if length > 16 * 1024 * 1024 {
+        vm.set_error(PplError::new(ERR_KIND_STRING, ERR_LIMIT, "STRING.Repeat result exceeds 16 MiB"));
+        return Ok(VariableValue::new_string(String::new()).convert_to(VariableType::BigStr));
+    }
+    vm.operation_succeeded();
+    Ok(VariableValue::new_string(text.repeat(count as usize)).convert_to(VariableType::BigStr))
 }
 
 /// Returns a flag indicating if the user has aborted the display of information.

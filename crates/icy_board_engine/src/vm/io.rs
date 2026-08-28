@@ -132,6 +132,9 @@ pub trait PCBoardIO: Send {
 
     fn is_open(&self, channel: i32) -> bool;
 
+    /// Records a structured-data failure on an otherwise usable file channel.
+    fn record_error(&mut self, channel: i32, message: String);
+
     /// What the last fallible operation did. EOF does not count as an operation result.
     fn take_operation_result(&mut self) -> Option<std::result::Result<(), (i32, String)>> {
         None
@@ -268,6 +271,12 @@ impl PCBoardIO for DiskIO {
 
     fn is_open(&self, channel: i32) -> bool {
         self.channels.get(&channel).is_some_and(|chan| chan.file.is_some() || chan.reader.is_some())
+    }
+
+    fn record_error(&mut self, channel: i32, message: String) {
+        let channel = self.channels.entry(channel).or_insert_with(FileChannel::new);
+        channel.err = true;
+        log::error!("structured record error on channel: {message}");
     }
 
     fn take_operation_result(&mut self) -> Option<std::result::Result<(), (i32, String)>> {

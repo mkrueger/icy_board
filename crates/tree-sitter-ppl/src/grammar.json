@@ -4904,6 +4904,10 @@
           },
           {
             "type": "PATTERN",
+            "value": "[fF][gG][eE][tT][rR][eE][cC]"
+          },
+          {
+            "type": "PATTERN",
             "value": "[fF][oO][pP][eE][nN]"
           },
           {
@@ -4924,7 +4928,15 @@
           },
           {
             "type": "PATTERN",
+            "value": "[fF][pP][uU][tT][rR][eE][cC]"
+          },
+          {
+            "type": "PATTERN",
             "value": "[fF][rR][eE][aA][dD]"
+          },
+          {
+            "type": "PATTERN",
+            "value": "[fF][rR][eE][aA][dD][rR][eE][cC]"
           },
           {
             "type": "PATTERN",
@@ -4941,6 +4953,10 @@
           {
             "type": "PATTERN",
             "value": "[fF][wW][rR][iI][tT][eE]"
+          },
+          {
+            "type": "PATTERN",
+            "value": "[fF][wW][rR][iI][tT][eE][rR][eE][cC]"
           },
           {
             "type": "PATTERN",

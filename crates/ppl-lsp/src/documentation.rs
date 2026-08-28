@@ -156,6 +156,28 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
     None
 }
 
+pub fn get_string_member_documentation(member: &str) -> Option<String> {
+    match member.to_ascii_lowercase().as_str() {
+        "len" => Some(fl!(LANGUAGE_LOADER, "hint-string-len")),
+        "find" => Some(fl!(LANGUAGE_LOADER, "hint-string-find")),
+        "findlast" => Some(fl!(LANGUAGE_LOADER, "hint-string-find-last")),
+        "contains" => Some(fl!(LANGUAGE_LOADER, "hint-string-contains")),
+        "startswith" => Some(fl!(LANGUAGE_LOADER, "hint-string-starts-with")),
+        "endswith" => Some(fl!(LANGUAGE_LOADER, "hint-string-ends-with")),
+        "count" => Some(fl!(LANGUAGE_LOADER, "hint-string-count")),
+        "replace" => Some(fl!(LANGUAGE_LOADER, "hint-string-replace")),
+        "trim" => Some(fl!(LANGUAGE_LOADER, "hint-string-trim")),
+        "trimstart" => Some(fl!(LANGUAGE_LOADER, "hint-string-trim-start")),
+        "trimend" => Some(fl!(LANGUAGE_LOADER, "hint-string-trim-end")),
+        "toupper" => Some(fl!(LANGUAGE_LOADER, "hint-string-to-upper")),
+        "tolower" => Some(fl!(LANGUAGE_LOADER, "hint-string-to-lower")),
+        "split" => Some(fl!(LANGUAGE_LOADER, "hint-string-split")),
+        "join" => Some(fl!(LANGUAGE_LOADER, "hint-string-join")),
+        "repeat" => Some(fl!(LANGUAGE_LOADER, "hint-string-repeat")),
+        _ => None,
+    }
+}
+
 fn format_signature(sig: Signature, arg: String) -> MarkupContent {
     let mut value = format!("`{}`\n\n{arg}", sig.signature);
 
@@ -693,6 +715,10 @@ pub fn get_statement_hover(stmt: &StatementDefinition) -> Option<Hover> {
         OpCode::MoveMsg => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-movemsg")),
         OpCode::SetBankBal => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-setbankbal")),
         OpCode::OnError => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-on-error")),
+        OpCode::FGetRec => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-fgetrec")),
+        OpCode::FPutRec => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-fputrec")),
+        OpCode::FReadRec => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-freadrec")),
+        OpCode::FWriteRec => get_sig_hint(sig, fl!(LANGUAGE_LOADER, "hint-statement-fwriterec")),
         _ => None,
     }
 }

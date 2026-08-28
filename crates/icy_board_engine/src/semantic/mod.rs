@@ -88,6 +88,18 @@ pub enum SemanticInfo {
     /// array is passed as the first argument, plus the constants the member fills in.
     ArrayMemberFunc(FuncOpCode, Vec<i32>),
 
+    /// A scalar string function written with its receiver first.
+    StringMemberFunc(FuncOpCode),
+
+    /// A built-in scalar type namespace function, `STRING.Join(...)`.
+    StringStaticFunc(FuncOpCode),
+
+    /// `value.Split(...)` or `STRING.Split(value, ...)`, lowered to one statement.
+    StringSplitProc {
+        static_call: bool,
+        default_limit: bool,
+    },
+
     /// The same for a built-in array statement, `a.Redim(10)` for `REDIM a, 10`.
     ArrayMemberProc(OpCode),
 
@@ -128,6 +140,179 @@ pub fn array_member(name: &unicase::Ascii<String>) -> Option<&'static ArrayMembe
     ARRAY_MEMBERS.iter().find(|member| *name == member.name)
 }
 
+pub struct StringMember {
+    pub name: &'static str,
+    pub arguments: std::ops::RangeInclusive<usize>,
+    pub return_type: VariableType,
+    pub is_static: bool,
+    pub is_procedure: bool,
+}
+
+pub const STRING_MEMBERS: &[StringMember] = &[
+    StringMember {
+        name: "Len",
+        arguments: 0..=0,
+        return_type: VariableType::Integer,
+        is_static: false,
+        is_procedure: false,
+    },
+    StringMember {
+        name: "Find",
+        arguments: 1..=2,
+        return_type: VariableType::Integer,
+        is_static: false,
+        is_procedure: false,
+    },
+    StringMember {
+        name: "FindLast",
+        arguments: 1..=2,
+        return_type: VariableType::Integer,
+        is_static: false,
+        is_procedure: false,
+    },
+    StringMember {
+        name: "Contains",
+        arguments: 1..=1,
+        return_type: VariableType::Boolean,
+        is_static: false,
+        is_procedure: false,
+    },
+    StringMember {
+        name: "StartsWith",
+        arguments: 1..=1,
+        return_type: VariableType::Boolean,
+        is_static: false,
+        is_procedure: false,
+    },
+    StringMember {
+        name: "EndsWith",
+        arguments: 1..=1,
+        return_type: VariableType::Boolean,
+        is_static: false,
+        is_procedure: false,
+    },
+    StringMember {
+        name: "Count",
+        arguments: 1..=1,
+        return_type: VariableType::Integer,
+        is_static: false,
+        is_procedure: false,
+    },
+    StringMember {
+        name: "Replace",
+        arguments: 2..=2,
+        return_type: VariableType::BigStr,
+        is_static: false,
+        is_procedure: false,
+    },
+    StringMember {
+        name: "Trim",
+        arguments: 0..=1,
+        return_type: VariableType::BigStr,
+        is_static: false,
+        is_procedure: false,
+    },
+    StringMember {
+        name: "TrimStart",
+        arguments: 0..=1,
+        return_type: VariableType::BigStr,
+        is_static: false,
+        is_procedure: false,
+    },
+    StringMember {
+        name: "TrimEnd",
+        arguments: 0..=1,
+        return_type: VariableType::BigStr,
+        is_static: false,
+        is_procedure: false,
+    },
+    StringMember {
+        name: "ToUpper",
+        arguments: 0..=0,
+        return_type: VariableType::BigStr,
+        is_static: false,
+        is_procedure: false,
+    },
+    StringMember {
+        name: "ToLower",
+        arguments: 0..=0,
+        return_type: VariableType::BigStr,
+        is_static: false,
+        is_procedure: false,
+    },
+    StringMember {
+        name: "Split",
+        arguments: 2..=3,
+        return_type: VariableType::None,
+        is_static: false,
+        is_procedure: true,
+    },
+    StringMember {
+        name: "Join",
+        arguments: 2..=2,
+        return_type: VariableType::BigStr,
+        is_static: true,
+        is_procedure: false,
+    },
+    StringMember {
+        name: "Repeat",
+        arguments: 2..=2,
+        return_type: VariableType::BigStr,
+        is_static: true,
+        is_procedure: false,
+    },
+    StringMember {
+        name: "Split",
+        arguments: 3..=4,
+        return_type: VariableType::None,
+        is_static: true,
+        is_procedure: true,
+    },
+];
+
+fn string_member(name: &unicase::Ascii<String>, arguments: usize) -> Option<(FuncOpCode, VariableType)> {
+    let normalized = name.as_ref().to_ascii_lowercase();
+    let (opcode, return_type, expected) = match (normalized.as_str(), arguments) {
+        ("len", 0) => (FuncOpCode::LEN, VariableType::Integer, true),
+        ("find", 1) => (FuncOpCode::INSTR, VariableType::Integer, true),
+        ("find", 2) => (FuncOpCode::StringFindFrom, VariableType::Integer, true),
+        ("findlast", 1) => (FuncOpCode::INSTRR, VariableType::Integer, true),
+        ("findlast", 2) => (FuncOpCode::StringFindLastFrom, VariableType::Integer, true),
+        ("contains", 1) => (FuncOpCode::StringContains, VariableType::Boolean, true),
+        ("startswith", 1) => (FuncOpCode::StringStartsWith, VariableType::Boolean, true),
+        ("endswith", 1) => (FuncOpCode::StringEndsWith, VariableType::Boolean, true),
+        ("count", 1) => (FuncOpCode::StringCount, VariableType::Integer, true),
+        ("replace", 2) => (FuncOpCode::REPLACESTR, VariableType::BigStr, true),
+        ("trim", 0) => (FuncOpCode::StringTrim, VariableType::BigStr, true),
+        ("trim", 1) => (FuncOpCode::StringTrimChars, VariableType::BigStr, true),
+        ("trimstart", 0) => (FuncOpCode::StringTrimStart, VariableType::BigStr, true),
+        ("trimstart", 1) => (FuncOpCode::StringTrimStartChars, VariableType::BigStr, true),
+        ("trimend", 0) => (FuncOpCode::StringTrimEnd, VariableType::BigStr, true),
+        ("trimend", 1) => (FuncOpCode::StringTrimEndChars, VariableType::BigStr, true),
+        ("toupper", 0) => (FuncOpCode::UPPER, VariableType::BigStr, true),
+        ("tolower", 0) => (FuncOpCode::LOWER, VariableType::BigStr, true),
+        _ => (FuncOpCode::END, VariableType::None, false),
+    };
+    expected.then_some((opcode, return_type))
+}
+
+fn string_member_type(name: &unicase::Ascii<String>) -> Option<VariableType> {
+    STRING_MEMBERS
+        .iter()
+        .find(|member| !member.is_static && *name == member.name)
+        .map(|member| member.return_type)
+}
+
+fn string_type_name(expression: &Expression, lang_version: u16) -> bool {
+    let Expression::Identifier(identifier) = expression else {
+        return false;
+    };
+    matches!(
+        crate::parser::built_in_type(identifier.get_identifier(), lang_version),
+        Some(VariableType::String | VariableType::BigStr)
+    )
+}
+
 /// The built-in array statements that may also be written as a member. `REDIM` is
 /// the only one, and it takes one bound per dimension.
 pub const ARRAY_PROCEDURES: &[(&str, OpCode, std::ops::RangeInclusive<usize>)] = &[("Redim", OpCode::REDIM, 1..=3)];
@@ -141,6 +326,9 @@ pub fn array_procedure(name: &unicase::Ascii<String>) -> Option<&'static (&'stat
 fn takes_whole_array(opcode: OpCode, signature: crate::executable::StatementSignature, index: usize) -> bool {
     if opcode == OpCode::REDIM {
         return index == 0;
+    }
+    if opcode == OpCode::StringSplit {
+        return index == 2;
     }
     match signature {
         StatementSignature::SpecialCaseDlockg => index == 2,
@@ -1329,6 +1517,73 @@ impl SemanticVisitor {
             .report_error(expr.get_span().clone(), CompilationErrorType::VariableExpected(arg_num + 1));
     }
 
+    fn validate_string_split_target(&mut self, expression: &Expression) {
+        let valid = self
+            .array_shape(expression)
+            .is_some_and(|shape| shape.rank == 1 && shape.resizable && matches!(shape.element_type, VariableType::String | VariableType::BigStr));
+        if !valid {
+            self.errors.lock().unwrap().report_error(
+                expression.get_span(),
+                CompilationErrorType::ArgumentTypeMismatch(3, "dynamic one-dimensional string array".to_string(), "value".to_string()),
+            );
+        }
+    }
+
+    fn resolved_record_io_type(&mut self, expression: &Expression) -> VariableType {
+        match expression {
+            Expression::Identifier(identifier) => self
+                .lookup_variable(identifier.get_identifier())
+                .map_or(VariableType::None, |index| self.references[index].1.variable_type),
+            Expression::RecordLiteral(record) => record.get_variable_type(),
+            Expression::Parens(parens) => self.resolved_record_io_type(parens.get_expression()),
+            Expression::MemberReference(member) => {
+                let Some(type_id) = self.user_type_lookup.get(&member.get_identifier_token().span.start).copied() else {
+                    return VariableType::None;
+                };
+                self.type_registry
+                    .get_record_type_from_id(type_id)
+                    .and_then(|definition| definition.field_index(member.get_identifier()).and_then(|index| definition.field_type(index)))
+                    .unwrap_or(VariableType::None)
+            }
+            _ => VariableType::None,
+        }
+    }
+
+    fn first_unserializable_record_field(&self, type_id: u8, prefix: &str) -> Option<(String, VariableType)> {
+        let definition = self.type_registry.get_user_type_from_id(type_id)?;
+        for (name, field) in &definition.fields {
+            let path = if prefix.is_empty() { name.to_string() } else { format!("{prefix}.{name}") };
+            match field.variable_type {
+                VariableType::UserData(id) if crate::parser::is_user_declared_type(id) => {
+                    if let Some(invalid) = self.first_unserializable_record_field(id, &path) {
+                        return Some(invalid);
+                    }
+                }
+                VariableType::Boolean
+                | VariableType::Unsigned
+                | VariableType::Date
+                | VariableType::EDate
+                | VariableType::Integer
+                | VariableType::Money
+                | VariableType::Float
+                | VariableType::String
+                | VariableType::Time
+                | VariableType::Byte
+                | VariableType::Word
+                | VariableType::SByte
+                | VariableType::SWord
+                | VariableType::BigStr
+                | VariableType::Double
+                | VariableType::DDate
+                | VariableType::MessageAreaID
+                | VariableType::Long
+                | VariableType::ULong => {}
+                other => return Some((path, other)),
+            }
+        }
+        None
+    }
+
     /// Resolves a field of a record the program declared and remembers the type, so
     /// code generation can look the field up again by the member's source position.
     fn resolve_record_field(&mut self, type_id: u8, member: &unicase::Ascii<String>, span: &core::ops::Range<usize>) -> VariableType {
@@ -1947,6 +2202,32 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             );
             return VariableType::None;
         }
+        if let Expression::Identifier(base) = member_reference_expression.get_expression()
+            && self.lookup_variable(base.get_identifier()).is_none()
+            && matches!(
+                crate::parser::built_in_type(base.get_identifier(), self.lang_version),
+                Some(VariableType::String | VariableType::BigStr)
+            )
+        {
+            if self.lang_version < 400 {
+                self.errors.lock().unwrap().report_error(
+                    member_reference_expression.get_identifier_token().span.clone(),
+                    CompilationErrorType::BuiltinNeedsRuntime(format!("STRING.{}", member_reference_expression.get_identifier()), 400),
+                );
+                return VariableType::None;
+            }
+            return match member_reference_expression.get_identifier().as_ref().to_ascii_lowercase().as_str() {
+                "join" | "repeat" => VariableType::BigStr,
+                "split" => VariableType::None,
+                _ => {
+                    self.errors.lock().unwrap().report_error(
+                        member_reference_expression.get_identifier_token().span.clone(),
+                        CompilationErrorType::InvalidMemberReferenceExpression,
+                    );
+                    VariableType::None
+                }
+            };
+        }
         let receiver = self.static_receiver(member_reference_expression.get_expression(), member_reference_expression.get_identifier());
         let called_on_the_type = matches!(receiver, StaticReceiver::StaticMember(_));
 
@@ -1965,6 +2246,18 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             StaticReceiver::NotAType => member_reference_expression.get_expression().visit(self),
             StaticReceiver::Rejected => return VariableType::None,
         };
+        if matches!(t, VariableType::String | VariableType::BigStr)
+            && let Some(return_type) = string_member_type(member_reference_expression.get_identifier())
+        {
+            if self.lang_version < 400 {
+                self.errors.lock().unwrap().report_error(
+                    member_reference_expression.get_identifier_token().span.clone(),
+                    CompilationErrorType::BuiltinNeedsRuntime(format!("STRING.{}", member_reference_expression.get_identifier()), 400),
+                );
+                return VariableType::None;
+            }
+            return return_type;
+        }
         if let VariableType::UserData(d) = t {
             if self.type_registry.is_record_type(d) {
                 return self.resolve_record_field(
@@ -2165,6 +2458,30 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             }
         }
 
+        if matches!(def.opcode, OpCode::FGetRec | OpCode::FPutRec | OpCode::FReadRec | OpCode::FWriteRec)
+            && let Some(record) = call_stmt.get_arguments().get(1)
+        {
+            let actual = self.resolved_record_io_type(record);
+            let VariableType::UserData(type_id) = actual else {
+                self.errors.lock().unwrap().report_error(
+                    record.get_span(),
+                    CompilationErrorType::ArgumentTypeMismatch(2, "user-defined record".to_string(), self.source_type_name(actual)),
+                );
+                return VariableType::None;
+            };
+            if !crate::parser::is_user_declared_type(type_id) {
+                self.errors.lock().unwrap().report_error(
+                    record.get_span(),
+                    CompilationErrorType::ArgumentTypeMismatch(2, "user-defined record".to_string(), self.source_type_name(actual)),
+                );
+            } else if let Some((path, field_type)) = self.first_unserializable_record_field(type_id, "") {
+                self.errors
+                    .lock()
+                    .unwrap()
+                    .report_error(record.get_span(), CompilationErrorType::RecordIoFieldNotSerializable(path, field_type));
+            }
+        }
+
         self.add_reference(
             ReferenceType::PredefinedProc(call_stmt.get_func().opcode),
             VariableType::Procedure,
@@ -2229,6 +2546,104 @@ impl AstVisitor<VariableType> for SemanticVisitor {
 
         // A member call is decided by the receiver's type, whatever expression produced it.
         if let Expression::MemberReference(member) = call.get_expression() {
+            if string_type_name(member.get_expression(), self.lang_version)
+                && let Expression::Identifier(base) = member.get_expression()
+                && self.lookup_variable(base.get_identifier()).is_none()
+            {
+                match member.get_identifier().as_ref().to_ascii_lowercase().as_str() {
+                    "join" if call.get_arguments().len() == 2 => {
+                        for argument in call.get_arguments() {
+                            argument.visit(self);
+                        }
+                        let valid_array = call
+                            .get_arguments()
+                            .first()
+                            .and_then(|argument| self.array_shape(argument))
+                            .is_some_and(|shape| shape.rank == 1 && matches!(shape.element_type, VariableType::String | VariableType::BigStr));
+                        if !valid_array {
+                            self.errors.lock().unwrap().report_error(
+                                call.get_arguments()[0].get_span(),
+                                CompilationErrorType::ArgumentTypeMismatch(1, "one-dimensional string array".to_string(), "value".to_string()),
+                            );
+                        }
+                        self.function_type_lookup
+                            .insert(call.id, SemanticInfo::StringStaticFunc(FuncOpCode::StringJoin));
+                        return VariableType::BigStr;
+                    }
+                    "repeat" if call.get_arguments().len() == 2 => {
+                        for argument in call.get_arguments() {
+                            argument.visit(self);
+                        }
+                        self.function_type_lookup
+                            .insert(call.id, SemanticInfo::StringStaticFunc(FuncOpCode::StringRepeat));
+                        return VariableType::BigStr;
+                    }
+                    "split" if (3..=4).contains(&call.get_arguments().len()) => {
+                        for argument in call.get_arguments() {
+                            argument.visit(self);
+                        }
+                        self.validate_string_split_target(&call.get_arguments()[2]);
+                        if call.get_arguments().len() == 3 {
+                            self.add_constant(&Constant::Integer(0, crate::ast::constant::NumberFormat::Default));
+                        }
+                        self.function_type_lookup.insert(
+                            call.id,
+                            SemanticInfo::StringSplitProc {
+                                static_call: true,
+                                default_limit: call.get_arguments().len() == 3,
+                            },
+                        );
+                        return VariableType::None;
+                    }
+                    _ => {}
+                }
+            }
+
+            let registered_type_receiver = matches!(
+                member.get_expression(),
+                Expression::Identifier(identifier) if self.type_registry.get_board_object(identifier.get_identifier()).is_some()
+            );
+            let receiver_type = if registered_type_receiver {
+                VariableType::None
+            } else {
+                member.get_expression().visit(self)
+            };
+            if matches!(receiver_type, VariableType::String | VariableType::BigStr)
+                && *member.get_identifier() == "Split"
+                && (2..=3).contains(&call.get_arguments().len())
+            {
+                for argument in call.get_arguments() {
+                    argument.visit(self);
+                }
+                self.validate_string_split_target(&call.get_arguments()[1]);
+                if call.get_arguments().len() == 2 {
+                    self.add_constant(&Constant::Integer(0, crate::ast::constant::NumberFormat::Default));
+                }
+                self.function_type_lookup.insert(
+                    call.id,
+                    SemanticInfo::StringSplitProc {
+                        static_call: false,
+                        default_limit: call.get_arguments().len() == 2,
+                    },
+                );
+                return VariableType::None;
+            }
+            if matches!(receiver_type, VariableType::String | VariableType::BigStr)
+                && let Some((opcode, return_type)) = string_member(member.get_identifier(), call.get_arguments().len())
+            {
+                for argument in call.get_arguments() {
+                    argument.visit(self);
+                }
+                if self.runtime < opcode.minimum_runtime() {
+                    self.errors.lock().unwrap().report_error(
+                        member.get_identifier_token().span.clone(),
+                        CompilationErrorType::BuiltinNeedsRuntime(format!("STRING.{}", member.get_identifier()), opcode.minimum_runtime()),
+                    );
+                }
+                self.function_type_lookup.insert(call.id, SemanticInfo::StringMemberFunc(opcode));
+                return return_type;
+            }
+
             // An array's members are the built-in array functions written the other way round.
             if self.array_shape(member.get_expression()).is_some()
                 && let Some(array_member) = array_member(member.get_identifier())

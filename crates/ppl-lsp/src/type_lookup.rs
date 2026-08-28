@@ -4,7 +4,7 @@
 use icy_board_engine::{
     executable::{FUNCTION_DEFINITIONS, VariableType},
     parser::{UserTypeRegistry, is_user_declared_type},
-    semantic::{ReferenceType, SemanticVisitor},
+    semantic::{ReferenceType, STRING_MEMBERS, SemanticVisitor},
 };
 
 /// One member of a record or of a board object.
@@ -80,11 +80,23 @@ pub fn type_of_name(visitor: &SemanticVisitor, name: &str) -> Option<VariableTyp
         }
         fallback.get_or_insert(def.return_type);
     }
+    if name == "STRING" {
+        return Some(VariableType::String);
+    }
+    if name == "BIGSTR" {
+        return Some(VariableType::BigStr);
+    }
     fallback
 }
 
 /// The type a field of `var_type` has.
 pub fn type_of_member(registry: &UserTypeRegistry, var_type: VariableType, member: &str) -> Option<VariableType> {
+    if matches!(var_type, VariableType::String | VariableType::BigStr) {
+        return STRING_MEMBERS
+            .iter()
+            .find(|definition| !definition.is_static && definition.name.eq_ignore_ascii_case(member))
+            .map(|definition| definition.return_type);
+    }
     let VariableType::UserData(id) = var_type else {
         return None;
     };
@@ -119,6 +131,9 @@ pub fn type_of_chain(visitor: &SemanticVisitor, path: &[String]) -> Option<Varia
 
 /// Everything that may follow a `.` on a value of this type.
 pub fn members_of(registry: &UserTypeRegistry, var_type: VariableType) -> Vec<Member> {
+    if matches!(var_type, VariableType::String | VariableType::BigStr) {
+        return string_members(false);
+    }
     let VariableType::UserData(id) = var_type else {
         return Vec::new();
     };
@@ -169,6 +184,23 @@ pub fn members_of(registry: &UserTypeRegistry, var_type: VariableType) -> Vec<Me
     }
     members.sort_by(|a, b| a.name.cmp(&b.name));
     members
+}
+
+pub fn string_members(statik: bool) -> Vec<Member> {
+    STRING_MEMBERS
+        .iter()
+        .filter(|member| member.is_static == statik)
+        .map(|member| Member {
+            name: member.name.to_string(),
+            detail: format!(
+                "({}..{} args) {}",
+                member.arguments.start(),
+                member.arguments.end(),
+                type_name(&UserTypeRegistry::default(), member.return_type)
+            ),
+            kind: MemberKind::Method,
+        })
+        .collect()
 }
 
 fn parameter_types(registry: &UserTypeRegistry, parameters: &[VariableType]) -> String {

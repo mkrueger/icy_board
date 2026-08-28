@@ -1,3 +1,42 @@
+#[test]
+fn string_member_function_ids_are_append_only() {
+    assert_eq!(FuncOpCode::StringFindFrom as i16, -317);
+    assert_eq!(FuncOpCode::StringFindLastFrom as i16, -318);
+    assert_eq!(FuncOpCode::StringContains as i16, -319);
+    assert_eq!(FuncOpCode::StringStartsWith as i16, -320);
+    assert_eq!(FuncOpCode::StringEndsWith as i16, -321);
+    assert_eq!(FuncOpCode::StringCount as i16, -322);
+    assert_eq!(FuncOpCode::StringTrim as i16, -323);
+    assert_eq!(FuncOpCode::StringTrimStart as i16, -324);
+    assert_eq!(FuncOpCode::StringTrimEnd as i16, -325);
+    assert_eq!(FuncOpCode::StringJoin as i16, -326);
+    assert_eq!(FuncOpCode::StringRepeat as i16, -327);
+    assert_eq!(FuncOpCode::StringTrimChars as i16, -328);
+    assert_eq!(FuncOpCode::StringTrimStartChars as i16, -329);
+    assert_eq!(FuncOpCode::StringTrimEndChars as i16, -330);
+
+    for (opcode, arity) in [
+        (FuncOpCode::StringFindFrom, 3),
+        (FuncOpCode::StringFindLastFrom, 3),
+        (FuncOpCode::StringContains, 2),
+        (FuncOpCode::StringStartsWith, 2),
+        (FuncOpCode::StringEndsWith, 2),
+        (FuncOpCode::StringCount, 2),
+        (FuncOpCode::StringTrim, 1),
+        (FuncOpCode::StringTrimStart, 1),
+        (FuncOpCode::StringTrimEnd, 1),
+        (FuncOpCode::StringJoin, 2),
+        (FuncOpCode::StringRepeat, 2),
+        (FuncOpCode::StringTrimChars, 2),
+        (FuncOpCode::StringTrimStartChars, 2),
+        (FuncOpCode::StringTrimEndChars, 2),
+    ] {
+        let arguments: Vec<_> = (1..=arity).map(PPEExpr::Value).collect();
+        let mut expected: Vec<_> = (1..=arity).flat_map(|id| [id as i16, 0]).collect();
+        expected.push(opcode as i16);
+        test_serialize(&PPEExpr::PredefinedFunctionCall(opcode.get_definition(), arguments), &expected);
+    }
+}
 use crate::executable::{EntryType, FunctionValue, VariableType, VariableValue};
 
 use super::{DeserializationErrorType, Executable, FUNCTION_DEFINITIONS, FuncOpCode, PPEExpr, TableEntry};

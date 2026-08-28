@@ -120,6 +120,9 @@ pub enum CompilationErrorType {
     #[error("Record literals need runtime {0}")]
     RecordLiteralNeedsRuntime(u16),
 
+    #[error("Record field '{0}' of type {1} cannot be stored by record I/O")]
+    RecordIoFieldNotSerializable(String, VariableType),
+
     #[error("Unused variable ({0})")]
     UnusedVariable(String),
 
@@ -488,6 +491,26 @@ impl PPECompiler {
                 Some(PPECommand::Let(Box::new(variable), Box::new(value)))
             }
             Statement::MemberCall(call_stmt) => {
+                if let Expression::FunctionCall(call) = call_stmt.get_expression()
+                    && let Some(SemanticInfo::StringSplitProc { static_call, default_limit }) =
+                        self.semantic_visitor.function_type_lookup.get(&call.id).cloned()
+                    && let Expression::MemberReference(member) = call.get_expression()
+                {
+                    let mut arguments = Vec::new();
+                    if !static_call {
+                        arguments.push(self.comp_expr(member.get_expression()));
+                    }
+                    for argument in call.get_arguments() {
+                        arguments.push(self.comp_expr(argument));
+                    }
+                    if default_limit {
+                        let zero = self
+                            .lookup_table
+                            .lookup_constant(&crate::ast::Constant::Integer(0, crate::ast::constant::NumberFormat::Default));
+                        arguments.push(PPEExpr::Value(zero));
+                    }
+                    return Some(PPECommand::PredefinedCall(OpCode::StringSplit.get_definition(), arguments));
+                }
                 // `a.Redim(10)` is `REDIM a, 10`, so it compiles to the statement rather
                 // than to a member call.
                 if let Expression::FunctionCall(call) = call_stmt.get_expression()

@@ -550,6 +550,43 @@ impl Decompiler {
                         self.type_name(type_id).unwrap_or_else(|| unicase::Ascii::new(format!("TYPE{type_id}"))),
                     );
                 }
+                let instance_member = match f.opcode {
+                    FuncOpCode::StringFindFrom => Some("Find"),
+                    FuncOpCode::StringFindLastFrom => Some("FindLast"),
+                    FuncOpCode::StringContains => Some("Contains"),
+                    FuncOpCode::StringStartsWith => Some("StartsWith"),
+                    FuncOpCode::StringEndsWith => Some("EndsWith"),
+                    FuncOpCode::StringCount => Some("Count"),
+                    FuncOpCode::StringTrim => Some("Trim"),
+                    FuncOpCode::StringTrimStart => Some("TrimStart"),
+                    FuncOpCode::StringTrimEnd => Some("TrimEnd"),
+                    FuncOpCode::StringTrimChars => Some("Trim"),
+                    FuncOpCode::StringTrimStartChars => Some("TrimStart"),
+                    FuncOpCode::StringTrimEndChars => Some("TrimEnd"),
+                    _ => None,
+                };
+                if let Some(member) = instance_member
+                    && let Some((receiver, arguments)) = args.split_first()
+                {
+                    return FunctionCallExpression::create_empty_expression(
+                        MemberReferenceExpression::create_empty_expression(self.decompile_expression(receiver), unicase::Ascii::new(member.to_string())),
+                        arguments.iter().map(|argument| self.decompile_expression(argument)).collect(),
+                    );
+                }
+                let static_member = match f.opcode {
+                    FuncOpCode::StringJoin => Some("Join"),
+                    FuncOpCode::StringRepeat => Some("Repeat"),
+                    _ => None,
+                };
+                if let Some(member) = static_member {
+                    return FunctionCallExpression::create_empty_expression(
+                        MemberReferenceExpression::create_empty_expression(
+                            IdentifierExpression::create_empty_expression(unicase::Ascii::new("STRING".to_string())),
+                            unicase::Ascii::new(member.to_string()),
+                        ),
+                        args.iter().map(|argument| self.decompile_expression(argument)).collect(),
+                    );
+                }
                 FunctionCallExpression::create_empty_expression(
                     IdentifierExpression::create_empty_expression(unicase::Ascii::new(f.name.to_string())),
                     args.iter()
@@ -600,21 +637,29 @@ impl Decompiler {
                 ProcedureCallStatement::create_empty_statement(self.get_variable_name(*p), args.iter().map(|e| self.decompile_expression(e)).collect())
             }
             PPECommand::MemberCall(expr) => MemberCallStatement::create_empty_statement(self.decompile_expression(expr)),
-            PPECommand::PredefinedCall(p, args) => PredefinedCallStatement::create_empty_statement(
-                p,
-                args.iter()
-                    .enumerate()
-                    .map(|(i, e)| {
-                        let expr = self.decompile_expression(e);
-                        if let Some(args) = &p.args
-                            && let Some(arg) = args.get(i)
-                        {
-                            return self.convert_argument(expr, arg);
-                        }
-                        expr
-                    })
-                    .collect(),
-            ),
+            PPECommand::PredefinedCall(p, args) => {
+                if p.opcode == OpCode::StringSplit && args.len() == 4 {
+                    return MemberCallStatement::create_empty_statement(FunctionCallExpression::create_empty_expression(
+                        MemberReferenceExpression::create_empty_expression(self.decompile_expression(&args[0]), unicase::Ascii::new("Split".to_string())),
+                        args[1..].iter().map(|argument| self.decompile_expression(argument)).collect(),
+                    ));
+                }
+                PredefinedCallStatement::create_empty_statement(
+                    p,
+                    args.iter()
+                        .enumerate()
+                        .map(|(i, e)| {
+                            let expr = self.decompile_expression(e);
+                            if let Some(args) = &p.args
+                                && let Some(arg) = args.get(i)
+                            {
+                                return self.convert_argument(expr, arg);
+                            }
+                            expr
+                        })
+                        .collect(),
+                )
+            }
             PPECommand::Let(left, expr) => {
                 // A member assignment keeps the fields it walks through beside the base.
                 let mut members = Vec::new();

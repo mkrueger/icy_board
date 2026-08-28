@@ -1648,6 +1648,43 @@ FFLUSH (2.00)
     * :PPL:`FOPEN` – Open file
     * :PPL:`FPUT` / :PPL:`FPUTLN` – Write to file
 
+FGETREC (4.00)
+~~~~~~~~~~~~~~
+  :PPL:`STATEMENT FGETREC(INTEGER channel, RECORD destination)`
+
+  Reads one escaped text line per scalar field into a user-defined record. Fields
+  follow declaration order; nested records are depth-first and fixed arrays are
+  row-major. The destination changes only when the complete record is valid.
+  Lines after the record remain unread and may contain documentation for `FGET`.
+
+  Strings escape ``\\``, carriage return, line feed and NUL as ``\\\\``, ``\\r``,
+  ``\\n`` and ``\\0``. Failures set `FERR(channel)` and `Error.Last()`.
+
+FPUTREC (4.00)
+~~~~~~~~~~~~~~
+  :PPL:`STATEMENT FPUTREC(INTEGER channel, RECORD value)`
+
+  Writes a user-defined record as one escaped text line per scalar field. Text
+  written afterward is not part of the record, so `FPUTLN` can attach comments
+  or documentation.
+
+FREADREC (4.00)
+~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT FREADREC(INTEGER channel, RECORD destination)`
+
+  Reads one compact binary record. Each record starts with a little-endian
+  ``u32`` payload length. Values are positional and carry no schema fingerprint;
+  use the same record type that wrote the frame. A failed read leaves the
+  destination unchanged. Frames larger than 16 MiB are refused.
+
+FWRITEREC (4.00)
+~~~~~~~~~~~~~~~~
+  :PPL:`STATEMENT FWRITEREC(INTEGER channel, RECORD value)`
+
+  Writes a length-framed binary record. Numeric values are little endian at
+  their declared widths. Strings contain a little-endian ``u32`` UTF-8 byte
+  length followed by their bytes. Nested records add no inner frame.
+
 FGET (1.00)
 ~~~~~~~~~~~
   :PPL:`STATEMENT FGET(INTEGER chan, VAR var)`

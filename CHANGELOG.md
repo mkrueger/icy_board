@@ -10,6 +10,20 @@ releases.
 
 ### Added
 
+- PPL 4.00 `STRING` and `BIGSTR` values expose discoverable members for length,
+  forward/reverse search, containment, prefix/suffix tests, occurrence counting,
+  replacement, trimming and case conversion. `Split` fills a dynamic string
+  array while retaining empty fields, and static `STRING.Join()` and
+  `STRING.Repeat()` cover aggregation. Search positions remain 1-based Unicode
+  character positions, and string operation failures report `ErrKind.String`.
+
+- PPL 4.00 records can be stored through existing file channels. `FGETREC` and
+  `FPUTREC` use an escaped one-scalar-per-line format that leaves following
+  documentation unread; `FREADREC` and `FWRITEREC` use compact length-framed
+  binary values. Both support nested records and fixed arrays, and failed reads
+  leave their destination unchanged while reporting through `FERR` and
+  `Error.Last()`.
+
 - PPL 4.00 exposes the board's registered users through the read-only
   `Board.Users` collection. Entries are `USER` snapshots, including their notes
   and contacts, and `USER.Valid` distinguishes missing indexes. `Session.User`

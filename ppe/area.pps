@@ -1,4 +1,6 @@
-﻿INTEGER i
+﻿;$LANGVERSION 400
+
+INTEGER i
 Area a
 
 BEGIN

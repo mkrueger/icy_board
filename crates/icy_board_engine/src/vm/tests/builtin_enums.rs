@@ -142,5 +142,5 @@ fn the_message_error_kind_keeps_its_runtime_value() {
 
 #[test]
 fn the_user_error_kind_is_appended_without_moving_existing_values() {
-    assert_eq!(run_ppl("PrintLn ErrKind.Net, \" \", ErrKind.User"), "9 10\n");
+    assert_eq!(run_ppl("PrintLn ErrKind.Net, \" \", ErrKind.User, \" \", ErrKind.String"), "9 10 11\n");
 }

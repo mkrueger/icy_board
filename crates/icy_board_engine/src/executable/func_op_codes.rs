@@ -329,9 +329,23 @@ pub enum FuncOpCode {
     ATAN = -314,
     LOG = -315,
     SQRT = -316,
+    StringFindFrom = -317,
+    StringFindLastFrom = -318,
+    StringContains = -319,
+    StringStartsWith = -320,
+    StringEndsWith = -321,
+    StringCount = -322,
+    StringTrim = -323,
+    StringTrimStart = -324,
+    StringTrimEnd = -325,
+    StringJoin = -326,
+    StringRepeat = -327,
+    StringTrimChars = -328,
+    StringTrimStartChars = -329,
+    StringTrimEndChars = -330,
 }
 
-pub const LAST_FUNC: i16 = -316;
+pub const LAST_FUNC: i16 = -330;
 
 impl FuncOpCode {
     pub fn get_definition(self) -> &'static FunctionDefinition {
@@ -359,6 +373,20 @@ impl FuncOpCode {
                 | FuncOpCode::ATAN
                 | FuncOpCode::LOG
                 | FuncOpCode::SQRT
+                | FuncOpCode::StringFindFrom
+                | FuncOpCode::StringFindLastFrom
+                | FuncOpCode::StringContains
+                | FuncOpCode::StringStartsWith
+                | FuncOpCode::StringEndsWith
+                | FuncOpCode::StringCount
+                | FuncOpCode::StringTrim
+                | FuncOpCode::StringTrimStart
+                | FuncOpCode::StringTrimEnd
+                | FuncOpCode::StringJoin
+                | FuncOpCode::StringRepeat
+                | FuncOpCode::StringTrimChars
+                | FuncOpCode::StringTrimStartChars
+                | FuncOpCode::StringTrimEndChars
         ) {
             400
         } else {
@@ -425,7 +453,7 @@ impl FunctionDefinition {
         }
     }
 }
-pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 328]> = std::sync::LazyLock::new(|| {
+pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 342]> = std::sync::LazyLock::new(|| {
     [
         FunctionDefinition {
             name: "END",
@@ -3144,6 +3172,118 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 328]> 
             return_type: VariableType::Double,
             args: Some(vec![ArgumentDefinition::new("value", VariableType::Double)]),
             signature: FunctionSignature::FixedParameters(1),
+        },
+        FunctionDefinition {
+            name: "<string find from>",
+            version: 400,
+            opcode: FuncOpCode::StringFindFrom,
+            return_type: VariableType::Integer,
+            args: None,
+            signature: FunctionSignature::FixedParameters(3),
+        },
+        FunctionDefinition {
+            name: "<string find last from>",
+            version: 400,
+            opcode: FuncOpCode::StringFindLastFrom,
+            return_type: VariableType::Integer,
+            args: None,
+            signature: FunctionSignature::FixedParameters(3),
+        },
+        FunctionDefinition {
+            name: "<string contains>",
+            version: 400,
+            opcode: FuncOpCode::StringContains,
+            return_type: VariableType::Boolean,
+            args: None,
+            signature: FunctionSignature::FixedParameters(2),
+        },
+        FunctionDefinition {
+            name: "<string starts with>",
+            version: 400,
+            opcode: FuncOpCode::StringStartsWith,
+            return_type: VariableType::Boolean,
+            args: None,
+            signature: FunctionSignature::FixedParameters(2),
+        },
+        FunctionDefinition {
+            name: "<string ends with>",
+            version: 400,
+            opcode: FuncOpCode::StringEndsWith,
+            return_type: VariableType::Boolean,
+            args: None,
+            signature: FunctionSignature::FixedParameters(2),
+        },
+        FunctionDefinition {
+            name: "<string count>",
+            version: 400,
+            opcode: FuncOpCode::StringCount,
+            return_type: VariableType::Integer,
+            args: None,
+            signature: FunctionSignature::FixedParameters(2),
+        },
+        FunctionDefinition {
+            name: "<string trim>",
+            version: 400,
+            opcode: FuncOpCode::StringTrim,
+            return_type: VariableType::BigStr,
+            args: None,
+            signature: FunctionSignature::FixedParameters(1),
+        },
+        FunctionDefinition {
+            name: "<string trim start>",
+            version: 400,
+            opcode: FuncOpCode::StringTrimStart,
+            return_type: VariableType::BigStr,
+            args: None,
+            signature: FunctionSignature::FixedParameters(1),
+        },
+        FunctionDefinition {
+            name: "<string trim end>",
+            version: 400,
+            opcode: FuncOpCode::StringTrimEnd,
+            return_type: VariableType::BigStr,
+            args: None,
+            signature: FunctionSignature::FixedParameters(1),
+        },
+        FunctionDefinition {
+            name: "<string join>",
+            version: 400,
+            opcode: FuncOpCode::StringJoin,
+            return_type: VariableType::BigStr,
+            args: None,
+            signature: FunctionSignature::FixedParameters(2),
+        },
+        FunctionDefinition {
+            name: "<string repeat>",
+            version: 400,
+            opcode: FuncOpCode::StringRepeat,
+            return_type: VariableType::BigStr,
+            args: None,
+            signature: FunctionSignature::FixedParameters(2),
+        },
+        FunctionDefinition {
+            name: "<string trim chars>",
+            version: 400,
+            opcode: FuncOpCode::StringTrimChars,
+            return_type: VariableType::BigStr,
+            args: None,
+            signature: FunctionSignature::FixedParameters(2),
+        },
+        FunctionDefinition {
+            name: "<string trim start chars>",
+            version: 400,
+            opcode: FuncOpCode::StringTrimStartChars,
+            return_type: VariableType::BigStr,
+            args: None,
+            signature: FunctionSignature::FixedParameters(2),
+        },
+        FunctionDefinition {
+            name: "<string trim end chars>",
+            version: 400,
+            opcode: FuncOpCode::StringTrimEndChars,
+            return_type: VariableType::BigStr,
+            args: None,
+            signature: FunctionSignature::FixedParameters(2),
         },
         // ALIASES (need to be last in the list)
         FunctionDefinition {

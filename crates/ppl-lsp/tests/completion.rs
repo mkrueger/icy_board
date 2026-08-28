@@ -137,6 +137,25 @@ fn a_collection_does_not_offer_its_internal_getter() {
 }
 
 #[test]
+fn strings_offer_instance_static_and_chained_members() {
+    let instance = complete("STRING text\ntext.");
+    for member in ["Find", "FindLast", "Contains", "StartsWith", "EndsWith", "Count", "Replace", "Trim", "Split"] {
+        assert!(instance.contains(&member.to_string()), "{member} missing: {instance:?}");
+    }
+    assert!(!instance.contains(&"Join".to_string()), "{instance:?}");
+
+    let statik = complete("STRING.");
+    assert_eq!(statik, vec!["Join", "Repeat", "Split"]);
+
+    let chained = complete("STRING text\ntext.Trim().");
+    assert!(chained.contains(&"ToLower".to_string()), "{chained:?}");
+    assert!(chained.contains(&"Split".to_string()), "{chained:?}");
+
+    assert!(complete(";$LANGVERSION 350\nSTRING text\ntext.").is_empty());
+    assert!(complete(";$LANGVERSION 350\nSTRING.").is_empty());
+}
+
+#[test]
 fn runtime_400_objects_offer_their_registered_members() {
     for (source, expected) in [
         ("SURFACE value\nvalue.", &["Width", "SetPixel", "PresentRect"][..]),
@@ -338,6 +357,10 @@ fn a_built_in_statement_is_offered_from_the_version_that_added_it() {
 
     let new = offered(400);
     assert!(new.contains(&"MoveMsg".to_string()), "{new:?}");
+    for statement in ["FGetRec", "FPutRec", "FReadRec", "FWriteRec"] {
+        assert!(!old.contains(&statement.to_string()), "{statement} should not be offered in 330");
+        assert!(new.contains(&statement.to_string()), "{statement} should be offered in 400: {new:?}");
+    }
 }
 
 #[test]

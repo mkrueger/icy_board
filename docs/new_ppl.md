@@ -170,6 +170,106 @@ use an index whenever a scalar value is required.
 The PPE must store each record layout, so any use of `TYPE` requires runtime
 4.00. Field and type names are not stored; a decompiler invents names for them.
 
+### String members
+
+`STRING` and `BIGSTR` values expose their common operations as members. This is
+the same operation as the classic global function where one exists, written
+with the value first:
+
+```PPL
+BIGSTR text = "  one,two,two  "
+
+PRINTLN text.Len()
+PRINTLN text.Find("two")
+PRINTLN text.Find("two", 7)
+PRINTLN text.FindLast("two")
+PRINTLN text.Contains("one")
+PRINTLN text.Count("two")
+PRINTLN text.Trim().ToUpper().Replace("TWO", "THREE")
+```
+
+| Member | Returns | Meaning |
+| :--- | :--- | :--- |
+| `Len()` | `INTEGER` | Number of Unicode characters |
+| `Find(search [, start])` | `INTEGER` | First match at or after `start` |
+| `FindLast(search [, start])` | `INTEGER` | Last match at or before `start` |
+| `Contains(search)` | `BOOLEAN` | Whether a non-empty search string occurs |
+| `StartsWith(prefix)`, `EndsWith(suffix)` | `BOOLEAN` | Prefix or suffix test |
+| `Count(search)` | `INTEGER` | Non-overlapping occurrence count |
+| `Replace(search, replacement)` | `BIGSTR` | Replace every substring match |
+| `Trim([characters])` | `BIGSTR` | Trim whitespace, or the supplied characters, at both ends |
+| `TrimStart([characters])`, `TrimEnd([characters])` | `BIGSTR` | Trim one end |
+| `ToUpper()`, `ToLower()` | `BIGSTR` | Change case |
+
+Positions are 1-based Unicode character positions; zero means no match. Searches
+are case-sensitive. An empty search string is not considered a match and has a
+count of zero.
+
+Operations that transform text return `BIGSTR`, so member chains do not silently
+truncate at the `STRING` limit.
+
+The `STRING` and `BIGSTR` type names also provide operations that do not belong
+to one value:
+
+```PPL
+STRING parts(0)
+
+"a,,b,".Split(",", parts)
+PRINTLN STRING.Join(parts, "|")
+PRINTLN STRING.Repeat("-", 40)
+
+STRING.Split("one:two:three:four", ":", parts, 3)
+; parts contains "one", "two", "three:four"
+```
+
+`Split` accepts a multi-character separator and retains empty elements. Its
+destination must be a dynamic one-dimensional `STRING` or `BIGSTR` array; it is
+replaced only after the operation succeeds. The optional positive limit is the
+maximum number of elements, with the unsplit remainder in the last one. A limit
+of zero means unlimited. Empty separators and negative limits report
+`ErrKind.String` / `ErrCode.Invalid` and leave the target unchanged.
+
+`STRING.Join(array, separator)` joins a one-dimensional string array and returns
+`BIGSTR`. `STRING.Repeat(value, count)` returns `BIGSTR`; a negative count is an
+error and results above 16 MiB report `ErrCode.Limit`.
+
+#### Record file I/O
+
+Records can use an already open file channel in either an editable line format
+or a compact binary format. Both formats walk fields in declaration order,
+nested records depth-first and fixed arrays in row-major order.
+
+`FPUTREC` writes one physical line per scalar field. `FGETREC` reads exactly the
+number of lines the destination record needs, so ordinary text after the record
+is left for the next `FGET`:
+
+```PPL
+FCREATE 1, "person.txt", O_WR, S_DN
+FPUTREC 1, person
+FPUTLN 1, "This text documents the record."
+FCLOSE 1
+
+FOPEN 1, "person.txt", O_RD, S_DN
+FGETREC 1, person
+FGET 1, documentation
+FCLOSE 1
+```
+
+Strings keep one physical line by escaping backslash, carriage return, line
+feed and NUL as `\\`, `\r`, `\n` and `\0`. Numeric values use locale-independent
+decimal text, booleans use `0` or `1`, and `MSGAREAID` uses `conference,area`.
+
+`FWRITEREC` writes a little-endian `u32` payload length followed by a positional
+binary payload. Fixed-width values use their declared widths; `STRING` and
+`BIGSTR` use a little-endian `u32` UTF-8 byte length followed by their bytes.
+`FREADREC` reads one such frame. Frames are limited to 16 MiB and deliberately
+carry no schema fingerprint, so they must be read with the matching record type.
+
+All record reads are transactional. A malformed or truncated input leaves the
+destination unchanged and reports through both `FERR(channel)` and
+`Error.Last()`. Record I/O supports nested records and fixed arrays, but not
+functions, procedures, tables or board resource objects.
+
 ### Board objects
 
 Board objects are read-only snapshots rather than custom records. They expose

@@ -1,505 +1,428 @@
-DECLARE FUNCTION FUNC001(BIGSTR PAR001, BIGSTR PAR002) WORD
-DECLARE PROCEDURE UserAbortsChat()
-DECLARE PROCEDURE DisplayChatBackground()
-DECLARE PROCEDURE SysopUnavailable()
-DECLARE PROCEDURE ExitChat()
-DECLARE PROCEDURE ReasonTooShort()
-STRING SYSOP_NAME
- 
-STRING READ_KEY
-STRING SYSOP_INKEY
-STRING USER_INKEY
+;$LANGVERSION 400
 
+DECLARE FUNCTION LoadConfiguration() BOOLEAN
+DECLARE FUNCTION PagingIsOpen() BOOLEAN
+DECLARE FUNCTION RequestEmergencyPage() BOOLEAN
+DECLARE FUNCTION ReadPageReason() BOOLEAN
+DECLARE FUNCTION WaitForSysop() INTEGER
+DECLARE FUNCTION PollPageAction() INTEGER
+DECLARE FUNCTION MinutesOfDay(STRING value) INTEGER
+DECLARE FUNCTION CharacterColor(INTEGER code, INTEGER chatter) STRING
+DECLARE FUNCTION LastSpace(BIGSTR text) INTEGER
+DECLARE FUNCTION VisibleLength(BIGSTR text) INTEGER
+
+DECLARE PROCEDURE RunChat()
+DECLARE PROCEDURE HandleInput(STRING key, INTEGER chatter, INTEGER top, INTEGER bottom, VAR INTEGER cursorX, VAR INTEGER cursorY)
+DECLARE PROCEDURE AppendCharacter(STRING key, INTEGER chatter, INTEGER row)
+DECLARE PROCEDURE PrintColored(STRING key, INTEGER chatter)
+DECLARE PROCEDURE Backspace(INTEGER chatter, INTEGER top, VAR INTEGER cursorX, VAR INTEGER cursorY)
+DECLARE PROCEDURE WrapLine(INTEGER chatter, INTEGER top, INTEGER bottom, VAR INTEGER cursorX, VAR INTEGER cursorY)
+DECLARE PROCEDURE ScrollPane(INTEGER chatter, INTEGER top, INTEGER bottom, VAR INTEGER cursorY)
+DECLARE PROCEDURE ClearPane(INTEGER chatter, INTEGER top, INTEGER bottom)
+DECLARE PROCEDURE RedrawPane(INTEGER chatter, INTEGER top, INTEGER bottom)
+DECLARE PROCEDURE RedrawChat()
+DECLARE PROCEDURE Finish(STRING message, BOOLEAN pause)
+
+CONST INTEGER SYSOP = 1
+CONST INTEGER CALLER = 2
+CONST INTEGER SYSOP_TOP = 2
+CONST INTEGER SYSOP_BOTTOM = 11
+CONST INTEGER CALLER_TOP = 13
+CONST INTEGER CALLER_BOTTOM = 22
+CONST INTEGER FIRST_CHAT_COLUMN = 4
+CONST INTEGER LAST_CHAT_COLUMN = 77
+
+STRING SysopName
+STRING PageHours
 STRING SysopLowerColor
 STRING SysopUpperColor
 STRING SysopNumberColor
 STRING SysopPunctuationColor
 STRING SysopOtherColor
+STRING CallerLowerColor
+STRING CallerUpperColor
+STRING CallerNumberColor
+STRING CallerPunctuationColor
+STRING CallerOtherColor
 
-STRING UserLowerColor
-STRING UserUpperColor
-STRING UserNumberColor
-STRING UserPunctuationColor
-STRING UserOtherColor
+BIGSTR ChatLines(10, 2)
+BOOLEAN PageBell = TRUE
+BOOLEAN PageActive = FALSE
 
-STRING CHAT_LINES(10, 2)
+BEGIN
+    SAVESCRN
 
-BOOLEAN PAGE_SOUND
-INTEGER CHAT_USER
-INTEGER CH
-INTEGER SYSOP_X
-INTEGER SYSOP_Y
-INTEGER USER_X
-INTEGER USER_Y
-INTEGER Y_POS
-INTEGER Y_START
-INTEGER Y_END
-INTEGER CURSOR_X
-INTEGER CURSOR_Y
-
-INTEGER INT016
-INTEGER INT017
-INTEGER INT018
-INTEGER INT019
-
-SAVESCRN
-STRING ARG = GetToken()
-IF Upper(ARG) == "/A" GOTO PAGE_SYSOP
-STRING PageHours = ReadLine(PPEPath() + "lchat.cfg", 10 + Dow(Date()))
-IF (Left(PageHours, 8) <> Right(PageHours, 8)) GOTO LABEL021
-GOTO PAGE_SYSOP
-
-:LABEL021
-    INT016 = Left(PageHours, 2) * 10
-    INT019 = 100 * Mid(PageHours, 4, 2) / 60
-    INT016 = INT016 + INT019 / 10
-    INT017 = Mid(PageHours, 10, 2) * 10
-    INT019 = 100 * Mid(PageHours, 13, 2) / 60
-    INT017 = INT017 + INT019 / 10
-    INT018 = Left(Time(), 2) * 10
-    INT019 = 100 * Mid(Time(), 4, 2) / 60
-    INT018 = INT018 + INT019 / 10
-    IF (INT018 <= INT016 | INT018 >= INT017) GOTO LABEL003
-
-    GOTO PAGE_SYSOP
-:LABEL003
-    PRINTLN "@X0BT@X03he @X0BS@X03ysop can@X02'@X03t be paged now @X02..."
-    PRINTLN "@X0BT@X03ry it between @X02: @X09" + PageHours
-    PRINTLN "@X0BB@X03ut if u know the magic code @X02... @X03u can page emergency"
-    PRINT "@X0BD@X03o you want to page emergency (Y/N)?"
-    PageHours = "N"
-    INPUTYN "@X00_", PageHours, 7
-    IF (PageHours <> "N") GOTO LABEL136
-    END 
-:LABEL136
-    PageHours = "N"
-    PRINTLN ""
-    PRINTLN "@X0BEnter the magic code : @X07"
-    INPUT "_", PageHours
-    IF (Upper(PageHours) <> Upper(ReadLine(PPEPath() + "lchat.cfg", 18))) GOTO LABEL082
-    GOTO PAGE_SYSOP
-:LABEL082
-    PRINTLN ""
-    PRINTLN "@X0BI hate lamers like you !!! ... "
-    PRINTLN "I'll take you 10MB upload creds ..."
-    DELAY 10
-    END
-
-:HANDLE_INPUT
-    IF READ_KEY == "" RETURN
-    ANSIPOS CURSOR_X, CURSOR_Y
-    CH = Asc(READ_KEY)
-    
-    ; CTRL+R - Redraw
-    IF CH == 18 THEN
-      DisplayChatBackground()
-      Y_POS = 1
-      WHILE (Y_POS < 11) DO
-        ANSIPOS 4, Y_POS
-        PRINT CHAT_LINES[Y_POS - 1, 1]
-        Y_POS = Y_POS + 1
-      ENDWHILE
-    
-      Y_POS = 12
-      WHILE (Y_POS < 23) DO
-        ANSIPOS 4, Y_POS
-        PRINT CHAT_LINES[Y_POS - 12, 2]
-        Y_POS = Y_POS + 1
-      ENDWHILE
-      ANSIPOS CURSOR_X, CURSOR_Y
-      GOTO LABEL067
-    END IF
-    
-    ; CTRL+W - Clear
-    IF CH == 23 THEN
-      Y_POS = Y_START
-      WHILE (Y_POS <= Y_END) DO
-        ANSIPOS 4, Y_POS
-        CHAT_LINES(Y_POS - Y_START + 1, CHAT_USER) = ""
-        PRINT "                                                                          "
-        Y_POS = Y_POS + 1
-      ENDWHILE
-      CURSOR_X = 4
-      CURSOR_Y = Y_START
-      ANSIPOS CURSOR_X, CURSOR_Y
-      GOTO LABEL067
-    END IF
-    
-    IF CH == 13 THEN
-        CURSOR_X = 4
-        CURSOR_Y = CURSOR_Y + 1
-        IF CURSOR_Y <= Y_END THEN        
-            CHAT_LINES(CURSOR_Y - Y_START + 1, CHAT_USER) = ""
-            ANSIPOS 4, CURSOR_Y
-            PRINT "                                                                          "
-            ANSIPOS 4, CURSOR_Y
-        ENDIF
-        GOTO LABEL067
+    IF !LoadConfiguration() THEN
+        Finish("lchat.cfg not found", FALSE)
     ENDIF
 
-    IF CH == 8 GOTO BACKPACE
+    STRING argument = Upper(GetToken())
+    IF argument = "/A" THEN
+        RunChat()
+    ENDIF
 
-    IF CH >= 32 GOSUB OUTPUT_CH
-    IF CHAT_USER == 1 THEN
-        GOTO LABEL041
+    IF !PagingIsOpen() THEN
+        IF !RequestEmergencyPage() THEN
+            Finish("", FALSE)
+        ENDIF
+    ENDIF
+
+    IF !ReadPageReason() THEN
+        Finish("The chat reason is not long enough!", TRUE)
+    ENDIF
+
+    INTEGER pageResult
+    pageResult = WaitForSysop()
+    IF pageResult < 0 THEN
+        Finish("User aborted chat.", TRUE)
     ELSE
-        GOTO LABEL032
-    ENDIF
-    
-:LABEL041
-    IF (CH >= 48) GOTO LABEL023
-    CHAT_LINES(CURSOR_Y - Y_START + 1, CHAT_USER) = CHAT_LINES[CURSOR_Y - Y_START + 1, CHAT_USER] + SysopPunctuationColor + READ_KEY
-:LABEL023
-    IF (CH >= 65 || CH <= 57) GOTO LABEL027
-    CHAT_LINES(CURSOR_Y - Y_START + 1, CHAT_USER) = CHAT_LINES[CURSOR_Y - Y_START + 1, CHAT_USER] + SysopPunctuationColor + READ_KEY
-:LABEL027
-    IF (CH <= 47 || CH >= 58) GOTO LABEL085
-    CHAT_LINES(CURSOR_Y - Y_START + 1, CHAT_USER) = CHAT_LINES[CURSOR_Y - Y_START + 1, CHAT_USER] + SysopNumberColor + READ_KEY
-:LABEL085
-    IF (CH <= 64 || CH >= 91) GOTO LABEL103
-    CHAT_LINES(CURSOR_Y - Y_START + 1, CHAT_USER) = CHAT_LINES[CURSOR_Y - Y_START + 1, CHAT_USER] + SysopUpperColor + READ_KEY
-:LABEL103
-    IF (CH <= 96 || CH >= 123) GOTO LABEL014
-    CHAT_LINES(CURSOR_Y - Y_START + 1, CHAT_USER) = CHAT_LINES[CURSOR_Y - Y_START + 1, CHAT_USER] + SysopLowerColor + READ_KEY
-:LABEL014
-    IF (CH <= 128) GOTO LABEL089
-    CHAT_LINES(CURSOR_Y - Y_START + 1, CHAT_USER) = CHAT_LINES[CURSOR_Y - Y_START + 1, CHAT_USER] + SysopOtherColor + READ_KEY
-:LABEL089
-    GOTO LABEL067
-
-:LABEL032
-    IF (CH >= 48) GOTO LABEL140
-    CHAT_LINES(CURSOR_Y - Y_START + 1, CHAT_USER) = CHAT_LINES[CURSOR_Y - Y_START + 1, CHAT_USER] + UserPunctuationColor + READ_KEY
-:LABEL140
-    IF (CH >= 65 || CH <= 57) GOTO LABEL149
-    CHAT_LINES(CURSOR_Y - Y_START + 1, CHAT_USER) = CHAT_LINES[CURSOR_Y - Y_START + 1, CHAT_USER] + UserPunctuationColor + READ_KEY
-:LABEL149
-    IF (CH <= 47 || CH >= 58) GOTO LABEL150
-    CHAT_LINES(CURSOR_Y - Y_START + 1, CHAT_USER) = CHAT_LINES[CURSOR_Y - Y_START + 1, CHAT_USER] + UserNumberColor + READ_KEY
-:LABEL150
-    IF (CH <= 64 || CH >= 91) GOTO LABEL147
-    CHAT_LINES(CURSOR_Y - Y_START + 1, CHAT_USER) = CHAT_LINES[CURSOR_Y - Y_START + 1, CHAT_USER] + UserUpperColor + READ_KEY
-:LABEL147
-    IF (CH <= 96 || CH >= 123) GOTO LABEL120
-    CHAT_LINES(CURSOR_Y - Y_START + 1, CHAT_USER) = CHAT_LINES[CURSOR_Y - Y_START + 1, CHAT_USER] + UserLowerColor + READ_KEY
-:LABEL120
-    IF (CH <= 128) GOTO LABEL067
-    CHAT_LINES(CURSOR_Y - Y_START + 1, CHAT_USER) = CHAT_LINES[CURSOR_Y - Y_START + 1, CHAT_USER] + UserOtherColor + READ_KEY
-    GOTO LABEL067
-
-:BACKPACE
-    IF (CURSOR_X <= 4) THEN 
-        BACKUP 1
-        PRINT " "
-        BACKUP 1
-        Y_POS = Len(CHAT_LINES[CURSOR_Y - Y_START + 1, CHAT_USER])
-        Y_POS = Y_POS - 5
-        CHAT_LINES(CURSOR_Y - Y_START + 1, CHAT_USER) = Left(CHAT_LINES[CURSOR_Y - Y_START + 1, CHAT_USER], Y_POS)
-    ENDIF
-    IF !(CURSOR_X <= 4 & CURSOR_Y > Y_START) GOTO LABEL067
-    CURSOR_Y = CURSOR_Y - 1
-    IF (CURSOR_Y < Y_START) CURSOR_Y = Y_START
-    
-    CURSOR_X = 3 + Len(CHAT_LINES[CURSOR_Y - Y_START + 1, CHAT_USER]) / 5
-    ANSIPOS CURSOR_X, CURSOR_Y
-    PRINT " "
-    BACKUP 1
-    Y_POS = Len(CHAT_LINES[CURSOR_Y - Y_START + 1, CHAT_USER])
-    Y_POS = Y_POS - 5
-    CHAT_LINES(CURSOR_Y - Y_START + 1, CHAT_USER) = Left(CHAT_LINES[CURSOR_Y - Y_START + 1, CHAT_USER], Y_POS)
-:LABEL067
-    CURSOR_X = GetX()
-    CURSOR_Y = GetY()
-
-    IF CURSOR_X < 4 THEN
-      CURSOR_X = 4
-      ANSIPOS CURSOR_X, GetY()
-    ENDIF
-
-:LABEL026
-    IF (CURSOR_X > 77) THEN
-        CURSOR_Y = CURSOR_Y + 1
-        CURSOR_X = FUNC001(" ", CHAT_LINES[CURSOR_Y - Y_START, CHAT_USER])
-        
-        IF CURSOR_X = 0 THEN
-        CURSOR_X = 4
-        ANSIPOS 4, CURSOR_Y
-        RETURN
+        IF pageResult = 0 THEN
+            Finish("The sysop is not available for chat now.", TRUE)
         ENDIF
-
-        STRING LINE = Right(CHAT_LINES[CURSOR_Y - Y_START, CHAT_USER], Len(CHAT_LINES[CURSOR_Y - Y_START, CHAT_USER]) - CURSOR_X)
-        CHAT_LINES(CURSOR_Y - Y_START, CHAT_USER) = Left(CHAT_LINES[CURSOR_Y - Y_START, CHAT_USER], Len(CHAT_LINES[CURSOR_Y - Y_START, CHAT_USER]) - Len(LINE))
-        CHAT_LINES(CURSOR_Y - Y_START + 1, CHAT_USER) = LINE
-        ANSIPOS 4 + Len(CHAT_LINES[CURSOR_Y - Y_START, CHAT_USER]) / 5, CURSOR_Y - 1
-        CURSOR_X = 0
-
-        WHILE (CURSOR_X < 74 - Len(CHAT_LINES[CURSOR_Y - Y_START, CHAT_USER]) / 5) DO
-            PRINT " "
-            CURSOR_X = CURSOR_X + 1
-        ENDWHILE
-
-        ANSIPOS 4, CURSOR_Y
-        PRINT LINE
-        CURSOR_X = Len(LINE) / 5 + 4
-        ANSIPOS CURSOR_X, CURSOR_Y
-    ENDIF
-    
-    IF (CURSOR_Y >= Y_END) THEN
-        CHAT_LINES(1, CHAT_USER) = CHAT_LINES[8, CHAT_USER]
-        CHAT_LINES(2, CHAT_USER) = CHAT_LINES[9, CHAT_USER]
-        CHAT_LINES(3, CHAT_USER) = ""
-        CHAT_LINES(4, CHAT_USER) = ""
-        CHAT_LINES(5, CHAT_USER) = ""
-        CHAT_LINES(6, CHAT_USER) = ""
-        CHAT_LINES(7, CHAT_USER) = ""
-        CHAT_LINES(8, CHAT_USER) = ""
-        CHAT_LINES(9, CHAT_USER) = ""
-        CHAT_LINES(10, CHAT_USER) = ""
-        IF (Len(CHAT_LINES[1, CHAT_USER]) <= 5) THEN
-            CHAT_LINES(1, CHAT_USER) = CHAT_LINES[2, CHAT_USER]
-            CHAT_LINES(2, CHAT_USER) = ""
-        ENDIF
-        
-        Y_POS = Y_START
-        WHILE Y_POS <= Y_END DO
-            ANSIPOS 4, Y_POS
-            PRINT "                                                                          "
-            Y_POS = Y_POS + 1
-        ENDWHILE
-
-        ANSIPOS 4, Y_START
-        PRINT CHAT_LINES[1, CHAT_USER]
-        ANSIPOS 4, Y_START + 1
-        PRINT CHAT_LINES[2, CHAT_USER]
-        
-        IF CURSOR_X >= 5 THEN
-            CURSOR_Y = Y_START + 1
-            CURSOR_X = Len(CHAT_LINES[2, CHAT_USER]) / 5 + 4
-        ELSE
-            CURSOR_Y = Y_START + 2
-        ENDIF
-        ANSIPOS CURSOR_X, CURSOR_Y
     ENDIF
 
+    RunChat()
+END
 
-    RETURN
-:PAGE_SYSOP
-    IF (Exist(PPEPath() + "lchat.cfg") = 0) THEN
-      PRINTLN "lchat.cfg not found"
-      END 
+FUNCTION LoadConfiguration() BOOLEAN
+    IF Exist(PPEPath() + "lchat.cfg") = 0 THEN
+        RETURN FALSE
     ENDIF
-    
+
     SysopLowerColor = ReadLine(PPEPath() + "lchat.cfg", 1)
     SysopUpperColor = ReadLine(PPEPath() + "lchat.cfg", 2)
     SysopNumberColor = ReadLine(PPEPath() + "lchat.cfg", 3)
     SysopPunctuationColor = ReadLine(PPEPath() + "lchat.cfg", 4)
     SysopOtherColor = ReadLine(PPEPath() + "lchat.cfg", 5)
-
-    UserLowerColor = ReadLine(PPEPath() + "lchat.cfg", 6)
-    UserUpperColor = ReadLine(PPEPath() + "lchat.cfg", 7)
-    UserNumberColor = ReadLine(PPEPath() + "lchat.cfg", 8)
-    UserPunctuationColor = ReadLine(PPEPath() + "lchat.cfg", 9)
-    UserOtherColor = ReadLine(PPEPath() + "lchat.cfg", 10)
-    
-    PAGE_SOUND = TRUE
-    SYSOP_NAME = ReadLine(PCBDat(), 2)
-    IF (Upper(ARG) == "/A") GOTO START_CHAT
-
-    DISPFILE PPEPath() + "data\pagescr.pcb", GRAPH
-    ANSIPOS 13, 10
-    INTEGER REASON_LEN = 0
-    PAGEON
-    LOOP 
-      READ_KEY = InKey()
-      IF READ_KEY = Chr(8) && REASON_LEN > 0 THEN
-        PRINT Chr(8), "@X07·"
-        BACKUP 1
-        REASON_LEN = REASON_LEN - 1
-        CONTINUE
-      ENDIF
-
-      IF READ_KEY == Chr(13) THEN
-        IF REASON_LEN < 3 ReasonTooShort()
-        BREAK
-      ENDIF 
-      CH = Asc(READ_KEY)
-      IF CH >= 32 && REASON_LEN < 57 THEN
-        GOSUB OUTPUT_CH
-        REASON_LEN = REASON_LEN + 1
-      ENDIF
-    ENDLOOP
-
-    ANSIPOS 1, 12
-    PRINTLN "[25C@X0BP@X03aging @X0BS@X03ysop @X02... @X03please wait"
-    PRINTLN "[19C@X02@X01╔════════════════════════════════════════╗"
-    PRINTLN "[20C@X0F░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░"
-    PRINTLN "[19C@X01╚════════════════════════════════════════╝[0;32m"
-    MPRINTLN "[34C<A>bort page"
-    SPRINTLN "[15C<C>hat with user <A> Abort page <S> Turn sound off"
-    ANSIPOS 21, 14
-    
-    INTEGER PAGE_LOOP = 0
-    REPEAT
-      USER_INKEY = ""
-      SYSOP_INKEY = ""
-      IF PAGE_SOUND THEN
-        SOUND 400
-      END IF
-      GOSUB PAGE_INKEY
-      DELAY 1
-      GOSUB PAGE_INKEY
-      DELAY 1
-      GOSUB PAGE_INKEY
-      DELAY 1
-      GOSUB PAGE_INKEY
-      SOUND 0
-      DELAY 1
-      GOSUB PAGE_INKEY
-      DELAY 1
-      GOSUB PAGE_INKEY
-      PRINT "@X08■"
-      PAGE_LOOP = PAGE_LOOP + 1
-    UNTIL PAGE_LOOP > 40
-    SysopUnavailable()
-
-:START_CHAT
-    PAGEOFF
-    DisplayChatBackground()
-    SYSOP_X = 4
-    SYSOP_Y = 2
-    USER_X = 4
-    USER_Y = 13
-    ANSIPOS SYSOP_X, SYSOP_Y
-    LOOP
-        CHAT_USER = 1
-        SYSOP_INKEY = KInkey()
-        IF SYSOP_INKEY == Chr(27) ExitChat()
-        READ_KEY = SYSOP_INKEY
-        Y_START = 2
-        Y_END = 11
-        CURSOR_X = SYSOP_X
-        CURSOR_Y = SYSOP_Y
-        GOSUB HANDLE_INPUT
-        SYSOP_X = CURSOR_X
-        SYSOP_Y = CURSOR_Y        
-
-        CHAT_USER = 2
-        USER_INKEY = MInkey()
-        IF USER_INKEY == Chr(27) ExitChat()
-        READ_KEY = USER_INKEY
-        Y_START = 13
-        Y_END = 22
-        CURSOR_X = USER_X
-        CURSOR_Y = USER_Y
-        GOSUB HANDLE_INPUT
-        USER_X = CURSOR_X
-        USER_Y = CURSOR_Y
-    ENDLOOP
-
-:OUTPUT_CH
-    CH = Asc(READ_KEY)
-    IF (CHAT_USER = 1) GOTO LABEL148
-    GOTO LABEL034
-:LABEL148
-    IF (CH >= 48) GOTO LABEL101
-    PRINT SysopPunctuationColor + READ_KEY
-:LABEL101
-    IF (CH >= 65 || CH <= 57) GOTO LABEL052
-    PRINT SysopPunctuationColor + READ_KEY
-:LABEL052
-    IF (CH <= 47 || CH >= 58) GOTO LABEL131
-    PRINT SysopNumberColor + READ_KEY
-:LABEL131
-    IF (CH <= 64 || CH >= 91) GOTO LABEL072
-    PRINT SysopUpperColor + READ_KEY
-:LABEL072
-    IF (CH <= 96 || CH >= 123) GOTO LABEL031
-    PRINT SysopLowerColor + READ_KEY
-:LABEL031
-    IF (CH <= 128) GOTO LABEL028
-    PRINT SysopOtherColor + READ_KEY
-:LABEL028
-    GOTO LABEL133
-
-:LABEL034
-    IF (CH >= 48) GOTO LABEL117
-    PRINT UserPunctuationColor + READ_KEY
-:LABEL117
-    IF (CH >= 65 || CH <= 57) GOTO LABEL012
-    PRINT UserPunctuationColor + READ_KEY
-:LABEL012
-    IF (CH <= 47 || CH >= 58) GOTO LABEL124
-    PRINT UserNumberColor + READ_KEY
-:LABEL124
-    IF (CH <= 64 || CH >= 91) GOTO LABEL071
-    PRINT UserUpperColor + READ_KEY
-:LABEL071
-    IF (CH <= 96 || CH >= 123) GOTO LABEL086
-    PRINT UserLowerColor + READ_KEY
-:LABEL086
-    IF (CH <= 128) GOTO LABEL133
-    PRINT UserOtherColor + READ_KEY
-:LABEL133
-    RETURN 
-
-:PAGE_INKEY
-    USER_INKEY = MInkey()
-    SYSOP_INKEY = KInkey()
-    IF Upper(USER_INKEY) == "A" || Upper(SYSOP_INKEY) == "A" UserAbortsChat()
-    IF Upper(SYSOP_INKEY) == "C" THEN
-        SOUND 0
-        GOTO START_CHAT
-    END IF
-    IF Upper(SYSOP_INKEY) == "S" PAGE_SOUND = FALSE
-    RETURN 
-
-FUNCTION FUNC001(BIGSTR PAR001, BIGSTR PAR002) WORD
-    INTEGER LOC010 = Len(PAR001)
-    INTEGER LOC009 = Len(PAR002)
-    WHILE (Mid(PAR002, LOC009, LOC010) != " ") DO
-        LOC009 = LOC009 - 5
-    END WHILE
-    FUNC001 = LOC009
+    CallerLowerColor = ReadLine(PPEPath() + "lchat.cfg", 6)
+    CallerUpperColor = ReadLine(PPEPath() + "lchat.cfg", 7)
+    CallerNumberColor = ReadLine(PPEPath() + "lchat.cfg", 8)
+    CallerPunctuationColor = ReadLine(PPEPath() + "lchat.cfg", 9)
+    CallerOtherColor = ReadLine(PPEPath() + "lchat.cfg", 10)
+    PageHours = ReadLine(PPEPath() + "lchat.cfg", 10 + Dow(Date()))
+    SysopName = ReadLine(PCBDat(), 2)
+    RETURN TRUE
 ENDFUNC
 
-PROCEDURE ReasonTooShort()
-    CLS 
-    PRINTLN "@X0BT@X03he chat reason is not long enough @X02!"
-    MORE
-    RestScrn
-    END 
+FUNCTION PagingIsOpen() BOOLEAN
+    STRING opens = Left(PageHours, 8)
+    STRING closes = Right(PageHours, 8)
+    IF opens = closes THEN
+        RETURN TRUE
+    ENDIF
+    INTEGER now = MinutesOfDay(Time())
+    RETURN now > MinutesOfDay(opens) && now < MinutesOfDay(closes)
+ENDFUNC
+
+FUNCTION MinutesOfDay(STRING value) INTEGER
+    RETURN Left(value, 2) * 60 + Mid(value, 4, 2)
+ENDFUNC
+
+FUNCTION RequestEmergencyPage() BOOLEAN
+    PRINTLN "@X0BT@X03he @X0BS@X03ysop can@X02'@X03t be paged now @X02..."
+    PRINTLN "@X0BT@X03ry it between @X02: @X09", PageHours
+    PRINTLN "@X0BB@X03ut if u know the magic code @X02... @X03u can page emergency"
+
+    STRING answer = "N"
+    INPUTYN "@X0BDo you want to page emergency (Y/N)? @X00", answer, 7
+    IF Upper(answer) = "N" THEN
+        RETURN FALSE
+    ENDIF
+
+    PRINTLN
+    PRINTLN "@X0BEnter the magic code : @X07"
+    STRING code
+    INPUT "_", code
+    IF Upper(code) = Upper(ReadLine(PPEPath() + "lchat.cfg", 18)) THEN
+        RETURN TRUE
+    ENDIF
+
+    PRINTLN
+    PRINTLN "@X0BInvalid emergency code."
+    DELAY 10
+    RETURN FALSE
+ENDFUNC
+
+FUNCTION ReadPageReason() BOOLEAN
+    DISPFILE PPEPath() + "data\pagescr.pcb", GRAPH
+    ANSIPOS 13, 10
+    PAGEON
+    PageActive = TRUE
+
+    INTEGER reasonLength
+    LOOP
+        STRING key = InKey()
+        IF key = Chr(8) && reasonLength > 0 THEN
+            PRINT Chr(8), " ", Chr(8)
+            reasonLength = reasonLength - 1
+            CONTINUE
+        ENDIF
+        IF key = Chr(13) THEN
+            RETURN reasonLength >= 3
+        ENDIF
+        INTEGER code = Asc(key)
+        IF code >= 32 && reasonLength < 57 THEN
+            PrintColored(key, CALLER)
+            reasonLength = reasonLength + 1
+        ENDIF
+    ENDLOOP
+ENDFUNC
+
+FUNCTION WaitForSysop() INTEGER
+    ANSIPOS 1, 12
+    PRINTLN "                         @X0BP@X03aging @X0BS@X03ysop @X02... @X03please wait"
+    PRINTLN "                   @X02@X01╔════════════════════════════════════════╗"
+    PRINTLN "                    @X0F░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░"
+    PRINTLN "                   @X01╚════════════════════════════════════════╝"
+    MPRINTLN "                                  <A>bort page"
+    SPRINTLN "               <C>hat with user <A> Abort page <S> Turn bell off"
+    ANSIPOS 21, 14
+
+    INTEGER pageLoop
+    FOR pageLoop = 0 TO 40
+        IF PageBell THEN
+            SPRINT Chr(7)
+        ENDIF
+        INTEGER pulse
+        FOR pulse = 1 TO 6
+            INTEGER action
+            action = PollPageAction()
+            IF action != 0 THEN
+                RETURN action
+            ENDIF
+            DELAY 1
+        NEXT pulse
+        PRINT "@X08■"
+    NEXT pageLoop
+    RETURN 0
+ENDFUNC
+
+FUNCTION PollPageAction() INTEGER
+    STRING callerKey = Upper(MInkey())
+    STRING sysopKey = Upper(KInkey())
+    IF callerKey = "A" || sysopKey = "A" THEN
+        RETURN -1
+    ENDIF
+    IF sysopKey = "C" THEN
+        RETURN 1
+    ENDIF
+    IF sysopKey = "S" THEN
+        PageBell = FALSE
+    ENDIF
+    RETURN 0
+ENDFUNC
+
+PROCEDURE RunChat()
+    IF PageActive THEN
+        PAGEOFF
+        PageActive = FALSE
+    ENDIF
+
+    INTEGER sysopX = FIRST_CHAT_COLUMN
+    INTEGER sysopY = SYSOP_TOP
+    INTEGER callerX = FIRST_CHAT_COLUMN
+    INTEGER callerY = CALLER_TOP
+    RedrawChat()
+    ANSIPOS sysopX, sysopY
+
+    LOOP
+        STRING sysopKey = KInkey()
+        IF sysopKey = Chr(27) THEN
+            Finish("Chat ended.", TRUE)
+        ENDIF
+        HandleInput(sysopKey, SYSOP, SYSOP_TOP, SYSOP_BOTTOM, sysopX, sysopY)
+
+        STRING callerKey = MInkey()
+        IF callerKey = Chr(27) THEN
+            Finish("User aborted chat.", TRUE)
+        ENDIF
+        HandleInput(callerKey, CALLER, CALLER_TOP, CALLER_BOTTOM, callerX, callerY)
+    ENDLOOP
 ENDPROC
 
-PROCEDURE ExitChat()
-    CLS 
-    PRINTLN "@X0BC@X03hat ended@X02."
-    MORE
-    RestScrn
-    END 
+PROCEDURE HandleInput(STRING key, INTEGER chatter, INTEGER top, INTEGER bottom, VAR INTEGER cursorX, VAR INTEGER cursorY)
+    IF key = "" THEN
+        RETURN
+    ENDIF
+
+    INTEGER code = Asc(key)
+    IF code = 18 THEN
+        RedrawChat()
+        ANSIPOS cursorX, cursorY
+        RETURN
+    ENDIF
+    IF code = 23 THEN
+        ClearPane(chatter, top, bottom)
+        cursorX = FIRST_CHAT_COLUMN
+        cursorY = top
+        ANSIPOS cursorX, cursorY
+        RETURN
+    ENDIF
+    IF code = 13 THEN
+        cursorX = FIRST_CHAT_COLUMN
+        cursorY = cursorY + 1
+        IF cursorY > bottom THEN
+            ScrollPane(chatter, top, bottom, cursorY)
+        ENDIF
+        ChatLines[cursorY - top + 1, chatter] = ""
+        ANSIPOS cursorX, cursorY
+        RETURN
+    ENDIF
+    IF code = 8 THEN
+        Backspace(chatter, top, cursorX, cursorY)
+        RETURN
+    ENDIF
+    IF code < 32 THEN
+        RETURN
+    ENDIF
+
+    ANSIPOS cursorX, cursorY
+    AppendCharacter(key, chatter, cursorY - top + 1)
+    cursorX = cursorX + 1
+    WrapLine(chatter, top, bottom, cursorX, cursorY)
 ENDPROC
 
-PROCEDURE UserAbortsChat()
-    CLS 
-    PRINTLN "@X0BU@X03ser aborts chat@X02."
-    MORE
-    RestScrn
-    END 
+PROCEDURE AppendCharacter(STRING key, INTEGER chatter, INTEGER row)
+    STRING color = CharacterColor(Asc(key), chatter)
+    PRINT color, key
+    ChatLines[row, chatter] += color + key
 ENDPROC
 
-PROCEDURE SysopUnavailable()
-    CLS 
-    PRINTLN "@X0BT@X03he sysop is not avaible for chat now@X02."
-    MORE
-    RestScrn
-    END 
+PROCEDURE PrintColored(STRING key, INTEGER chatter)
+    PRINT CharacterColor(Asc(key), chatter), key
 ENDPROC
 
-PROCEDURE DisplayChatBackground()
+FUNCTION CharacterColor(INTEGER code, INTEGER chatter) STRING
+    IF code >= 48 && code <= 57 THEN
+        IF chatter = SYSOP RETURN SysopNumberColor
+        RETURN CallerNumberColor
+    ENDIF
+    IF code >= 65 && code <= 90 THEN
+        IF chatter = SYSOP RETURN SysopUpperColor
+        RETURN CallerUpperColor
+    ENDIF
+    IF code >= 97 && code <= 122 THEN
+        IF chatter = SYSOP RETURN SysopLowerColor
+        RETURN CallerLowerColor
+    ENDIF
+    IF code <= 128 THEN
+        IF chatter = SYSOP RETURN SysopPunctuationColor
+        RETURN CallerPunctuationColor
+    ENDIF
+    IF chatter = SYSOP RETURN SysopOtherColor
+    RETURN CallerOtherColor
+ENDFUNC
+
+PROCEDURE Backspace(INTEGER chatter, INTEGER top, VAR INTEGER cursorX, VAR INTEGER cursorY)
+    IF cursorX <= FIRST_CHAT_COLUMN && cursorY > top THEN
+        cursorY = cursorY - 1
+        cursorX = FIRST_CHAT_COLUMN + VisibleLength(ChatLines[cursorY - top + 1, chatter])
+    ENDIF
+    IF cursorX <= FIRST_CHAT_COLUMN THEN
+        RETURN
+    ENDIF
+
+    INTEGER row = cursorY - top + 1
+    INTEGER length = Len(ChatLines[row, chatter])
+    IF length >= 5 THEN
+        ChatLines[row, chatter] = Left(ChatLines[row, chatter], length - 5)
+    ENDIF
+    cursorX = cursorX - 1
+    ANSIPOS cursorX, cursorY
+    PRINT " "
+    ANSIPOS cursorX, cursorY
+ENDPROC
+
+PROCEDURE WrapLine(INTEGER chatter, INTEGER top, INTEGER bottom, VAR INTEGER cursorX, VAR INTEGER cursorY)
+    IF cursorX <= LAST_CHAT_COLUMN THEN
+        RETURN
+    ENDIF
+
+    INTEGER row = cursorY - top + 1
+    INTEGER split
+    split = LastSpace(ChatLines[row, chatter])
+    BIGSTR carry
+    IF split > 0 THEN
+        carry = Right(ChatLines[row, chatter], Len(ChatLines[row, chatter]) - split)
+        ChatLines[row, chatter] = Left(ChatLines[row, chatter], split)
+    ENDIF
+
+    cursorY = cursorY + 1
+    IF cursorY > bottom THEN
+        ScrollPane(chatter, top, bottom, cursorY)
+    ENDIF
+    row = cursorY - top + 1
+    ChatLines[row, chatter] = carry
+    RedrawPane(chatter, top, bottom)
+    cursorX = FIRST_CHAT_COLUMN + VisibleLength(carry)
+    ANSIPOS cursorX, cursorY
+ENDPROC
+
+FUNCTION LastSpace(BIGSTR text) INTEGER
+    INTEGER position = Len(text)
+    WHILE position > 0 DO
+        IF Mid(text, position, 1) = " " THEN
+            RETURN position
+        ENDIF
+        position = position - 5
+    ENDWHILE
+    RETURN 0
+ENDFUNC
+
+FUNCTION VisibleLength(BIGSTR text) INTEGER
+    RETURN Len(text) / 5
+ENDFUNC
+
+PROCEDURE ScrollPane(INTEGER chatter, INTEGER top, INTEGER bottom, VAR INTEGER cursorY)
+    INTEGER line
+    FOR line = 1 TO 9
+        ChatLines[line, chatter] = ChatLines[line + 1, chatter]
+    NEXT line
+    ChatLines[10, chatter] = ""
+    cursorY = bottom
+    RedrawPane(chatter, top, bottom)
+ENDPROC
+
+PROCEDURE ClearPane(INTEGER chatter, INTEGER top, INTEGER bottom)
+    INTEGER line
+    FOR line = 1 TO 10
+        ChatLines[line, chatter] = ""
+    NEXT line
+    RedrawPane(chatter, top, bottom)
+ENDPROC
+
+PROCEDURE RedrawChat()
     DISPFILE PPEPath() + "data\lchat.pcb", GRAPH
-    
-    ANSIPOS (80 - Len(SYSOP_NAME) + 2) / 2, 1
-    PRINT "@X0F[@X0B", SYSOP_NAME, "@X0F]"
-    
+    RedrawPane(SYSOP, SYSOP_TOP, SYSOP_BOTTOM)
+    RedrawPane(CALLER, CALLER_TOP, CALLER_BOTTOM)
+    ANSIPOS (80 - Len(SysopName) + 2) / 2, 1
+    PRINT "@X0F[@X0B", SysopName, "@X0F]"
     ANSIPOS (80 - Len(U_Name()) + 2) / 2, 12
     PRINT "[@X0B", U_Name(), "@X0F]"
+ENDPROC
+
+PROCEDURE RedrawPane(INTEGER chatter, INTEGER top, INTEGER bottom)
+    INTEGER screenRow
+    FOR screenRow = top TO bottom
+        ANSIPOS FIRST_CHAT_COLUMN, screenRow
+        PRINT "                                                                          "
+        ANSIPOS FIRST_CHAT_COLUMN, screenRow
+        PRINT ChatLines[screenRow - top + 1, chatter]
+    NEXT
+ENDPROC
+
+PROCEDURE Finish(STRING message, BOOLEAN pause)
+    IF PageActive THEN
+        PAGEOFF
+        PageActive = FALSE
+    ENDIF
+    CLS
+    IF message != "" THEN
+        PRINTLN "@X0B", message
+    ENDIF
+    IF pause THEN
+        MORE
+    ENDIF
+    RESTSCRN
+    EXIT
 ENDPROC

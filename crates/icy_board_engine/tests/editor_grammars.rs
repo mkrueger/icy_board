@@ -122,6 +122,7 @@ fn vscode_grammar_knows_every_built_in() {
         .iter()
         .filter(|def| def.sig != StatementSignature::Invalid)
         .map(|def| def.name.to_ascii_uppercase())
+        .filter(|name| !name.starts_with('<'))
         .collect();
     let in_grammar: Vec<String> = list_from_textmate("builtin-statements").into_iter().collect();
     // END, LET, RETURN and STOP are keywords there, the rest has to be listed.

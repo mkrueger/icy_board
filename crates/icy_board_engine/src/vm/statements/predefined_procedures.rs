@@ -11,7 +11,7 @@ use std::{
 use crate::{
     Res,
     datetime::{IcbDate, IcbTime},
-    executable::{PPEExpr, VariableType, VariableValue},
+    executable::{GenericVariableData, PPEExpr, VariableType, VariableValue},
     icy_board::{
         ftn::queue,
         icb_config::IcbColor,
@@ -33,7 +33,8 @@ use jamjam::jam::{JamMessage, JamMessageBase, attributes as jam_attributes, msg_
 use crate::{
     icy_board::icb_text::IceText,
     icy_board::state::ppl_error::{
-        ERR_FORMAT, ERR_INVALID, ERR_IO, ERR_KIND_FONT, ERR_KIND_GFX, ERR_KIND_SOUND, ERR_KIND_TERM, ERR_LIMIT, ERR_UNAVAILABLE, PplError,
+        ERR_FORMAT, ERR_INVALID, ERR_IO, ERR_KIND_FILE, ERR_KIND_FONT, ERR_KIND_GFX, ERR_KIND_SOUND, ERR_KIND_STRING, ERR_KIND_TERM, ERR_LIMIT,
+        ERR_UNAVAILABLE, PplError,
     },
     icy_board::state::screen_to_pcboard_text,
     vm::{TerminalTarget, VMError, VirtualMachine},
@@ -1750,6 +1751,125 @@ pub async fn fwrite(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let val = vm.eval_expr(&args[1]).await?;
     let size = vm.eval_expr(&args[2]).await?.as_int() as usize;
     internal_fwrite(vm, channel, val, size).await
+}
+
+fn record_io_error(vm: &mut VirtualMachine<'_>, channel: i32, code: i32, message: String) {
+    vm.io.record_error(channel, message.clone());
+    vm.set_error(PplError::new(ERR_KIND_FILE, code, message).on_channel(channel));
+}
+
+pub async fn fgetrec(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let channel = get_file_channel(vm, args).await?;
+    let template = vm.eval_expr(&args[1]).await?;
+    let count = match crate::vm::record_io::line_count(&template) {
+        Ok(count) => count,
+        Err(message) => {
+            record_io_error(vm, channel, ERR_FORMAT, message);
+            return Ok(());
+        }
+    };
+    let mut lines = Vec::with_capacity(count);
+    for _ in 0..count {
+        let line = vm.io.fget(channel)?;
+        if vm.io.ferr(channel) {
+            record_io_error(vm, channel, ERR_FORMAT, "text record is truncated".to_string());
+            return Ok(());
+        }
+        lines.push(line);
+    }
+    match crate::vm::record_io::decode_lines(&template, &lines) {
+        Ok(value) => vm.set_variable(&args[1], value).await?,
+        Err(message) => record_io_error(vm, channel, ERR_FORMAT, message),
+    }
+    Ok(())
+}
+
+pub async fn fputrec(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let channel = get_file_channel(vm, args).await?;
+    let value = vm.eval_expr(&args[1]).await?;
+    match crate::vm::record_io::encode_lines(&value) {
+        Ok(lines) => {
+            for line in lines {
+                vm.io.fput(channel, format!("{line}\n"))?;
+            }
+        }
+        Err(message) => record_io_error(vm, channel, ERR_FORMAT, message),
+    }
+    Ok(())
+}
+
+pub async fn freadrec(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let channel = get_file_channel(vm, args).await?;
+    let template = vm.eval_expr(&args[1]).await?;
+    if !crate::vm::record_io::is_record(&template) {
+        record_io_error(vm, channel, ERR_FORMAT, "a user-defined record is required".to_string());
+        return Ok(());
+    }
+    let header = vm.io.fread(channel, 4)?;
+    if header.len() != 4 {
+        record_io_error(vm, channel, ERR_FORMAT, "binary record length is truncated".to_string());
+        return Ok(());
+    }
+    let length = u32::from_le_bytes(header.try_into().unwrap()) as usize;
+    if length > crate::vm::record_io::MAX_RECORD_FRAME {
+        record_io_error(vm, channel, ERR_LIMIT, "record exceeds the 16 MiB frame limit".to_string());
+        return Ok(());
+    }
+    let payload = vm.io.fread(channel, length)?;
+    if payload.len() != length {
+        record_io_error(vm, channel, ERR_FORMAT, "binary record is truncated".to_string());
+        return Ok(());
+    }
+    match crate::vm::record_io::decode_binary(&template, &payload) {
+        Ok(value) => vm.set_variable(&args[1], value).await?,
+        Err(message) => record_io_error(vm, channel, ERR_FORMAT, message),
+    }
+    Ok(())
+}
+
+pub async fn fwriterec(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let channel = get_file_channel(vm, args).await?;
+    let value = vm.eval_expr(&args[1]).await?;
+    match crate::vm::record_io::encode_binary(&value) {
+        Ok(frame) => vm.io.fwrite(channel, &frame)?,
+        Err(message) => {
+            let code = if message.contains("16 MiB") { ERR_LIMIT } else { ERR_FORMAT };
+            record_io_error(vm, channel, code, message);
+        }
+    }
+    Ok(())
+}
+
+pub async fn string_split(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    let text = vm.eval_expr(&args[0]).await?.as_string();
+    let separator = vm.eval_expr(&args[1]).await?.as_string();
+    let target = vm.eval_array_operand(&args[2]).await?;
+    let limit = vm.eval_expr(&args[3]).await?.as_int();
+    if separator.is_empty() {
+        vm.set_error(PplError::new(ERR_KIND_STRING, ERR_INVALID, "STRING.Split separator cannot be empty"));
+        return Ok(());
+    }
+    if limit < 0 {
+        vm.set_error(PplError::new(ERR_KIND_STRING, ERR_INVALID, "STRING.Split limit cannot be negative"));
+        return Ok(());
+    }
+    if !matches!(target.vtype, VariableType::String | VariableType::BigStr) || !matches!(target.generic_data, GenericVariableData::Dim1(_)) {
+        vm.set_error(PplError::new(
+            ERR_KIND_STRING,
+            ERR_INVALID,
+            "STRING.Split needs a dynamic one-dimensional string array",
+        ));
+        return Ok(());
+    }
+    let parts: Vec<_> = if limit == 0 {
+        text.split(&separator).map(str::to_string).collect()
+    } else {
+        text.splitn(limit as usize, &separator).map(str::to_string).collect()
+    };
+    let values = parts.into_iter().map(|part| VariableValue::new_string(part).convert_to(target.vtype)).collect();
+    vm.set_variable(&args[2], VariableValue::new_vector(target.vtype, values)).await?;
+    vm.operation_succeeded();
+    Ok(())
 }
 
 async fn internal_fwrite(vm: &mut VirtualMachine<'_>, channel: i32, val: VariableValue, size: usize) -> Res<()> {

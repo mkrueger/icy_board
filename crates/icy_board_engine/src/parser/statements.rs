@@ -877,6 +877,17 @@ impl Parser<'_> {
                 self.parse_statement()
             }
 
+            Some(Token::Const(Constant::String(_))) => {
+                let Some(expression) = self.parse_expression() else {
+                    return None;
+                };
+                if matches!(expression, Expression::FunctionCall(_)) {
+                    return Some(Statement::MemberCall(MemberCallStatement::new(expression)));
+                }
+                self.report_error(expression.get_span(), ParserErrorType::InvalidToken(self.save_token()));
+                None
+            }
+
             Some(Token::Identifier(id)) => {
                 let var_type = self.get_variable_type();
                 let id_token = self.save_spanned_token();

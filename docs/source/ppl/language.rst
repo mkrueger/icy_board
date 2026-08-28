@@ -525,6 +525,46 @@ while ``Len(array, dim)`` is the length of one dimension of an array. ``Rgb`` is
 the other one - ``Rgb(r, g, b)`` and ``Rgb(r, g, b, a)``. Old code keeps working
 unchanged, because a call that named the old form still names it.
 
+String members
+~~~~~~~~~~~~~~
+
+Language 400 exposes common operations directly on ``STRING`` and ``BIGSTR``
+values. Positions are 1-based Unicode character positions and zero means no
+match:
+
+.. code-block:: PPL
+
+    BIGSTR text = "  one,two,two  "
+    PRINTLN text.Find("two")
+    PRINTLN text.Find("two", 7)
+    PRINTLN text.FindLast("two")
+    PRINTLN text.Contains("one")
+    PRINTLN text.Count("two")
+    PRINTLN text.Trim().ToUpper().Replace("TWO", "THREE")
+
+The instance members are ``Len()``, ``Find(search [, start])``,
+``FindLast(search [, start])``, ``Contains(search)``, ``StartsWith(prefix)``,
+``EndsWith(suffix)``, ``Count(search)``, ``Replace(search, replacement)``,
+``Trim([characters])``, ``TrimStart([characters])``,
+``TrimEnd([characters])``, ``ToUpper()`` and ``ToLower()``. Transformations
+return ``BIGSTR`` so chaining does not truncate at the ``STRING`` limit.
+
+The type name carries aggregation helpers:
+
+.. code-block:: PPL
+
+    STRING parts(0)
+    "a,,b,".Split(",", parts)
+    PRINTLN STRING.Join(parts, "|")
+    PRINTLN STRING.Repeat("-", 40)
+    STRING.Split("one:two:three:four", ":", parts, 3)
+
+``Split`` preserves empty elements and replaces a dynamic one-dimensional
+``STRING`` or ``BIGSTR`` array. With a positive limit, the unsplit remainder is
+the last element; zero means unlimited. An empty separator or negative limit
+leaves the target unchanged and reports ``ErrKind.String`` with
+``ErrCode.Invalid``.
+
 Records
 ~~~~~~~
 

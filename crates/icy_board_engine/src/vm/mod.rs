@@ -43,6 +43,7 @@ use self::expressions::run_function;
 pub use self::statements::*;
 
 pub mod io;
+mod record_io;
 
 pub mod dbase;
 pub use self::io::*;

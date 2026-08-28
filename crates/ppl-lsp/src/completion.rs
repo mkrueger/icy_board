@@ -10,8 +10,8 @@ use tower_lsp::lsp_types::{CompletionItem, CompletionItemKind, Documentation, Ho
 
 use crate::{
     context::{CursorContext, cursor_context},
-    documentation::{get_const_hover, get_function_hover, get_member_documentation, get_statement_hover, get_type_hover},
-    type_lookup::{MemberKind, members_of, record_field_type_name, type_of_chain},
+    documentation::{get_const_hover, get_function_hover, get_member_documentation, get_statement_hover, get_string_member_documentation, get_type_hover},
+    type_lookup::{MemberKind, members_of, record_field_type_name, string_members, type_of_chain},
 };
 
 pub enum ImCompleteCompletionItem {
@@ -27,7 +27,7 @@ const CONTEXTUAL_WORDS: &[(&str, u16)] = &[("EXIT", 400)];
 pub fn get_completion(ast: &Ast, semantic_visitor: &SemanticVisitor, line_before_cursor: &str, offset: usize) -> Vec<CompletionItem> {
     match cursor_context(line_before_cursor) {
         CursorContext::Nothing => return Vec::new(),
-        CursorContext::Member(path) => return member_completion(semantic_visitor, &path),
+        CursorContext::Member(path) => return member_completion(semantic_visitor, &path, ast.language_version),
         CursorContext::RecordLiteralField { type_name, named_fields } => {
             return record_literal_completion(semantic_visitor, &type_name, &named_fields);
         }
@@ -176,16 +176,38 @@ fn declared_type_names(visitor: &SemanticVisitor, lang_version: u16) -> Vec<Stri
 }
 
 /// What may follow the `.` of a member chain.
-fn member_completion(visitor: &SemanticVisitor, path: &[String]) -> Vec<CompletionItem> {
+fn member_completion(visitor: &SemanticVisitor, path: &[String], language_version: u16) -> Vec<CompletionItem> {
+    if language_version < FIRST_BOARD_OBJECT_LANGUAGE_VERSION {
+        let namespace = path.len() == 1 && matches!(path[0].to_ascii_uppercase().as_str(), "STRING" | "BIGSTR");
+        let value = type_of_chain(visitor, path).is_some_and(|value| {
+            matches!(
+                value,
+                icy_board_engine::executable::VariableType::String | icy_board_engine::executable::VariableType::BigStr
+            )
+        });
+        if namespace || value {
+            return Vec::new();
+        }
+    }
+    if path.len() == 1 && matches!(path[0].to_ascii_uppercase().as_str(), "STRING" | "BIGSTR") {
+        return completion_items(string_members(true), None);
+    }
     let Some(var_type) = type_of_chain(visitor, path) else {
         return Vec::new();
     };
-    members_of(&visitor.type_registry, var_type)
+    completion_items(members_of(&visitor.type_registry, var_type), Some(var_type))
+}
+
+fn completion_items(members: Vec<crate::type_lookup::Member>, receiver_type: Option<icy_board_engine::executable::VariableType>) -> Vec<CompletionItem> {
+    members
         .into_iter()
         // A member in angle brackets is the compiler's own and cannot be written.
         .filter(|member| !member.name.starts_with('<'))
         .map(|member| CompletionItem {
-            documentation: get_member_documentation(var_type, &member.name).map(Documentation::String),
+            documentation: receiver_type
+                .and_then(|var_type| get_member_documentation(var_type, &member.name))
+                .or_else(|| get_string_member_documentation(&member.name))
+                .map(Documentation::String),
             label: member.name.clone(),
             insert_text: Some(member.name),
             kind: Some(match member.kind {
