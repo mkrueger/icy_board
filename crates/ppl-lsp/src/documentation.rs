@@ -1,5 +1,6 @@
 use i18n_embed_fl::fl;
 use icy_board_engine::executable::{FuncOpCode, FunctionDefinition, OpCode, Signature, StatementDefinition, VariableType};
+use icy_board_engine::parser::{BOARD_ID, USER_ID, USERS_ID};
 use tower_lsp::lsp_types::{Hover, HoverContents, MarkupContent, MarkupKind};
 
 use crate::LANGUAGE_LOADER;
@@ -120,6 +121,7 @@ pub fn get_type_hover(var_type: VariableType) -> Option<Hover> {
         VariableType::Unsigned => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-unsigned")),
         VariableType::Long => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-long")),
         VariableType::ULong => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-ulong")),
+        VariableType::UserData(id) if id == USERS_ID as u8 => get_sig_hint(Signature::new("USERS".to_string()), fl!(LANGUAGE_LOADER, "hint-type-users")),
         VariableType::Date => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-date")),
         VariableType::EDate => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-edate")),
         VariableType::Integer => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-integer")),
@@ -136,6 +138,22 @@ pub fn get_type_hover(var_type: VariableType) -> Option<Hover> {
         VariableType::DDate => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-ddate")),
         _ => None,
     }
+}
+
+pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<String> {
+    let VariableType::UserData(id) = var_type else {
+        return None;
+    };
+    if id == BOARD_ID as u8 && member.eq_ignore_ascii_case("Users") {
+        return Some(fl!(LANGUAGE_LOADER, "hint-member-board-users"));
+    }
+    if id == USERS_ID as u8 && member.eq_ignore_ascii_case("Count") {
+        return Some(fl!(LANGUAGE_LOADER, "hint-member-users-count"));
+    }
+    if id == USER_ID as u8 && member.eq_ignore_ascii_case("Valid") {
+        return Some(fl!(LANGUAGE_LOADER, "hint-member-user-valid"));
+    }
+    None
 }
 
 fn format_signature(sig: Signature, arg: String) -> MarkupContent {

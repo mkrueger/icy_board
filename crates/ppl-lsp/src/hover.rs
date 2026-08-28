@@ -9,6 +9,7 @@ use icy_board_engine::{
 use tower_lsp::lsp_types::{Hover, HoverContents, MarkupContent, MarkupKind};
 
 use crate::{
+    documentation::get_member_documentation,
     signature_help::routine_signature,
     type_lookup::{record_field_type_name, type_name, type_of_member},
 };
@@ -19,6 +20,20 @@ fn hover(text: String) -> Hover {
         contents: HoverContents::Markup(MarkupContent {
             kind: MarkupKind::Markdown,
             value: format!("```PPL\n{text}\n```"),
+        }),
+        range: None,
+    }
+}
+
+fn documented_hover(signature: String, documentation: Option<String>) -> Hover {
+    let value = match documentation {
+        Some(documentation) => format!("```PPL\n{signature}\n```\n\n{documentation}"),
+        None => format!("```PPL\n{signature}\n```"),
+    };
+    Hover {
+        contents: HoverContents::Markup(MarkupContent {
+            kind: MarkupKind::Markdown,
+            value,
         }),
         range: None,
     }
@@ -98,12 +113,13 @@ impl<'a> AstVisitor<()> for MemberHoverVisitor<'a> {
         };
         let object = VariableType::UserData(*type_id);
         if let Some(field_type) = type_of_member(&self.visitor.type_registry, object, member.get_identifier().as_ref()) {
-            self.hover = Some(hover(format!(
+            let signature = format!(
                 "{} {}.{}",
                 type_name(&self.visitor.type_registry, field_type),
                 type_name(&self.visitor.type_registry, object),
                 member.get_identifier()
-            )));
+            );
+            self.hover = Some(documented_hover(signature, get_member_documentation(object, member.get_identifier().as_ref())));
         }
     }
 

@@ -9,7 +9,7 @@ use icy_board_engine::{
     semantic::SemanticVisitor,
 };
 use ppl_lsp::{completion::get_completion, signature_help::get_signature_help};
-use tower_lsp::lsp_types::ParameterLabel;
+use tower_lsp::lsp_types::{CompletionItem, Documentation, ParameterLabel};
 
 /// Parses a source the way the server does and hands back its semantic model.
 fn analyze(source: &str) -> (icy_board_engine::ast::Ast, SemanticVisitor) {
@@ -24,13 +24,25 @@ fn analyze(source: &str) -> (icy_board_engine::ast::Ast, SemanticVisitor) {
 }
 
 /// Completes at the end of `source`, which is where the cursor is.
-fn complete(source: &str) -> Vec<String> {
+fn complete_items(source: &str) -> Vec<CompletionItem> {
     let (ast, visitor) = analyze(source);
     let line = source.lines().last().unwrap_or("");
     get_completion(&ast, &visitor, line, source.chars().count())
+}
+
+fn complete(source: &str) -> Vec<String> {
+    complete_items(source).into_iter().map(|item| item.label).collect()
+}
+
+fn completion_documentation(source: &str, label: &str) -> String {
+    let item = complete_items(source)
         .into_iter()
-        .map(|item| item.label)
-        .collect()
+        .find(|item| item.label.eq_ignore_ascii_case(label))
+        .unwrap_or_else(|| panic!("{label} not offered for {source:?}"));
+    match item.documentation.expect("completion has documentation") {
+        Documentation::String(value) => value,
+        Documentation::MarkupContent(value) => value.value,
+    }
 }
 
 fn help(source: &str) -> Vec<String> {
@@ -98,6 +110,21 @@ fn an_indexed_board_user_offers_user_members() {
         assert!(items.contains(&member.to_string()), "{member} missing: {items:?}");
     }
     assert!(!items.contains(&"Count".to_string()), "{items:?}");
+}
+
+#[test]
+fn new_board_user_api_completion_explains_its_types_and_members() {
+    let users_type = completion_documentation("USE", "Users");
+    assert!(users_type.starts_with("`USERS`\n\n"), "{users_type}");
+
+    let board_users = completion_documentation("Board.", "Users");
+    assert!(board_users.contains("`Board`") && board_users.contains("`USER`"), "{board_users}");
+
+    let count = completion_documentation("USERS users\nusers.", "Count");
+    assert!(!count.trim().is_empty());
+
+    let valid = completion_documentation("USER user\nuser.", "Valid");
+    assert!(valid.contains("`Board.Users`") && valid.contains("`Valid`"), "{valid}");
 }
 
 /// A collection is read with an index, so the getter behind it is not offered as a

@@ -10,7 +10,7 @@ use tower_lsp::lsp_types::{CompletionItem, CompletionItemKind, Documentation, Ho
 
 use crate::{
     context::{CursorContext, cursor_context},
-    documentation::{get_const_hover, get_function_hover, get_statement_hover},
+    documentation::{get_const_hover, get_function_hover, get_member_documentation, get_statement_hover, get_type_hover},
     type_lookup::{MemberKind, members_of, record_field_type_name, type_of_chain},
 };
 
@@ -67,11 +67,20 @@ pub fn get_completion(ast: &Ast, semantic_visitor: &SemanticVisitor, line_before
         }
 
         for name in declared_type_names(semantic_visitor, ast.language_version) {
+            let documentation = semantic_visitor
+                .type_registry
+                .get_type(&unicase::Ascii::new(name.clone()))
+                .and_then(get_type_hover)
+                .and_then(|hover| match hover.contents {
+                    HoverContents::Markup(content) => Some(Documentation::MarkupContent(content)),
+                    _ => None,
+                });
             map.items.push(CompletionItem {
                 label: name.clone(),
                 insert_text: Some(name),
                 kind: Some(CompletionItemKind::STRUCT),
                 insert_text_format: Some(InsertTextFormat::PLAIN_TEXT),
+                documentation,
                 ..Default::default()
             });
         }
@@ -176,6 +185,7 @@ fn member_completion(visitor: &SemanticVisitor, path: &[String]) -> Vec<Completi
         // A member in angle brackets is the compiler's own and cannot be written.
         .filter(|member| !member.name.starts_with('<'))
         .map(|member| CompletionItem {
+            documentation: get_member_documentation(var_type, &member.name).map(Documentation::String),
             label: member.name.clone(),
             insert_text: Some(member.name),
             kind: Some(match member.kind {
