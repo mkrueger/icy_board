@@ -10,6 +10,11 @@ releases.
 
 ### Added
 
+- PPL 4.00 exposes the board's registered users through the read-only
+  `Board.Users` collection. Entries are `USER` snapshots, including their notes
+  and contacts, and `USER.Valid` distinguishes missing indexes. `Session.User`
+  remains the live writable caller record.
+
 - PPL 4.00 has basic math functions: `Sin`, `Cos`, `Tan`, `Atan`, `Log` (natural
   logarithm) and `Sqrt`, all taking and returning `DOUBLE`.
 

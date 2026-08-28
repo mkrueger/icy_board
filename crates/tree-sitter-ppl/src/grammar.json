@@ -1480,6 +1480,18 @@
             "type": "TOKEN",
             "content": {
               "type": "PATTERN",
+              "value": "[uU][sS][eE][rR][sS]"
+            }
+          },
+          "named": false,
+          "value": "USERS"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
               "value": "[aA][rR][eE][aA]"
             }
           },
@@ -1581,6 +1593,42 @@
           },
           "named": false,
           "value": "GFX"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
+              "value": "[hH][tT][tT][pP]"
+            }
+          },
+          "named": false,
+          "value": "HTTP"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
+              "value": "[hH][tT][tT][pP][rR][eE][qQ][uU][eE][sS][tT]"
+            }
+          },
+          "named": false,
+          "value": "HTTPREQUEST"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
+              "value": "[hH][tT][tT][pP][rR][eE][sS][pP][oO][nN][sS][eE]"
+            }
+          },
+          "named": false,
+          "value": "HTTPRESPONSE"
         },
         {
           "type": "ALIAS",
@@ -1749,6 +1797,18 @@
           },
           "named": false,
           "value": "GFXBACKEND"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
+              "value": "[hH][tT][tT][pP][mM][eE][tT][hH][oO][dD]"
+            }
+          },
+          "named": false,
+          "value": "HTTPMETHOD"
         },
         {
           "type": "ALIAS",
@@ -5321,10 +5381,6 @@
           {
             "type": "PATTERN",
             "value": "[wW][aA][iI][tT][fF][oO][rR]"
-          },
-          {
-            "type": "PATTERN",
-            "value": "[wW][eE][bB][rR][eE][qQ][uU][eE][sS][tT]"
           }
         ]
       }

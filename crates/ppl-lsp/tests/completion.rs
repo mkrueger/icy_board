@@ -91,6 +91,15 @@ fn a_function_answering_an_object_offers_its_members() {
     assert!(items.contains(&"Areas".to_string()), "{items:?}");
 }
 
+#[test]
+fn an_indexed_board_user_offers_user_members() {
+    let items = complete("Board.Users[0].");
+    for member in ["Valid", "Name", "City", "Notes", "Contacts"] {
+        assert!(items.contains(&member.to_string()), "{member} missing: {items:?}");
+    }
+    assert!(!items.contains(&"Count".to_string()), "{items:?}");
+}
+
 /// A collection is read with an index, so the getter behind it is not offered as a
 /// name anybody could type.
 #[test]
@@ -101,7 +110,7 @@ fn a_collection_does_not_offer_its_internal_getter() {
 }
 
 #[test]
-fn runtime_402_objects_offer_their_registered_members() {
+fn runtime_400_objects_offer_their_registered_members() {
     for (source, expected) in [
         ("SURFACE value\nvalue.", &["Width", "SetPixel", "PresentRect"][..]),
         ("AUDIO value\nvalue.", &["Valid", "Volume", "Play"][..]),
@@ -114,9 +123,10 @@ fn runtime_402_objects_offer_their_registered_members() {
         ("TERMINPUT value\nvalue.", &["Poll", "Wait", "KeyboardOn", "Release"][..]),
         ("TERMINAL value\nvalue.", &["Info", "Gfx", "Input"][..]),
         ("GFX value\nvalue.", &["Init", "Backend", "Pacing"][..]),
-        ("BOARD value\nvalue.", &["Name", "SysopName", "NodeCount", "Conferences"][..]),
+        ("BOARD value\nvalue.", &["Name", "SysopName", "NodeCount", "Conferences", "Users"][..]),
         ("SESSION value\nvalue.", &["Conference", "Area", "Directory", "User", "Node", "MinutesLeft"][..]),
-        ("USER value\nvalue.", &["Name", "Alias", "SecurityLevel", "Contacts", "Notes"][..]),
+        ("USER value\nvalue.", &["Valid", "Name", "Alias", "SecurityLevel", "Contacts", "Notes"][..]),
+        ("USERS value\nvalue.", &["Count"][..]),
     ] {
         let items = complete(source);
         for member in expected {
@@ -322,13 +332,13 @@ fn a_type_is_offered_from_the_version_that_named_it() {
 #[test]
 fn a_board_object_is_only_offered_from_400() {
     let last = offered(400);
-    for word in ["Conference", "Area", "Directory", "Door"] {
+    for word in ["Conference", "Area", "Directory", "Door", "Users"] {
         assert!(last.contains(&word.to_string()), "{word} should be offered in 400: {last:?}");
     }
 
     // An enum is a type from 350 on, so the objects are what 350 must not see.
     let older = offered(350);
-    for word in ["Conference", "Area", "Directory", "Door"] {
+    for word in ["Conference", "Area", "Directory", "Door", "Users"] {
         assert!(!older.contains(&word.to_string()), "{word} should not be offered in 350: {older:?}");
     }
 }

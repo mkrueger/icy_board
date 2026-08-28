@@ -315,6 +315,7 @@ pub const MSG_ID: usize = 58;
 pub const HTTP_ID: usize = 59;
 pub const HTTP_REQUEST_ID: usize = 60;
 pub const HTTP_RESPONSE_ID: usize = 61;
+pub const USERS_ID: usize = 62;
 
 /// Builtin enums take the top of the id space and a program's own enums grow down from
 /// below them, so the order here is what a PPE stores and may only be appended to.
@@ -393,6 +394,7 @@ impl UserTypeRegistry {
         reg.register::<crate::icy_board::state::ppl_http::PplHttp>(HTTP_ID);
         reg.register::<crate::icy_board::state::ppl_http::PplHttpRequest>(HTTP_REQUEST_ID);
         reg.register::<crate::icy_board::state::ppl_http::PplHttpResponse>(HTTP_RESPONSE_ID);
+        reg.register::<crate::icy_board::state::ppl_user::PplUsers>(USERS_ID);
 
         reg
     }

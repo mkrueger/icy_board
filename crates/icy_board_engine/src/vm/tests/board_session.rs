@@ -1,4 +1,7 @@
-use crate::icy_board::conferences::Conference;
+use crate::icy_board::{
+    conferences::Conference,
+    user_base::{User, UserContact},
+};
 
 use super::{compile_errors_with_runtime, run_ppl, run_ppl_on};
 
@@ -69,6 +72,44 @@ fn every_conference_can_be_reached_by_number() {
     );
 
     assert_eq!(output, "0: Main Board 1\n1: Second 1\n");
+}
+
+#[test]
+fn every_user_can_be_read_as_an_independent_snapshot() {
+    let output = run_ppl_on(
+        r#"
+        PrintLn Board.Users.Count
+        PrintLn Board.Users[0].Name, " ", Board.Users[0].City
+        PrintLn Board.Users[1].Name, " ", Board.Users[1].Notes[0]
+        PrintLn Board.Users[1].Contacts[0].Service, " ", Board.Users[1].Contacts[0].Account
+        PrintLn Board.Users[99].Valid, " [", Board.Users[99].Name, "]"
+        Board.Users[0].City = "Changed"
+        PrintLn Error.Last().OK, " ", Board.Users[0].City
+        "#,
+        |board| {
+            board.users.clear();
+            let mut first = User {
+                name: "Alice".to_string(),
+                city_or_state: "Berlin".to_string(),
+                ..Default::default()
+            };
+            first.custom_comment1 = "First note".to_string();
+            board.users.new_user(first);
+
+            let mut second = User {
+                name: "Bob".to_string(),
+                ..Default::default()
+            };
+            second.custom_comment1 = "Second note".to_string();
+            second.contacts.push(UserContact {
+                service: "matrix".to_string(),
+                account: "@bob:example.org".to_string(),
+            });
+            board.users.new_user(second);
+        },
+    );
+
+    assert_eq!(output, "2\nAlice Berlin\nBob Second note\nmatrix @bob:example.org\n0 []\n0 Berlin\n");
 }
 
 /// A bad number stays readable but cannot be mistaken for conference zero.

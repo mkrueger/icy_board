@@ -218,6 +218,7 @@ fn board_object_type_ids_are_frozen() {
         ("HTTP", 59),
         ("HTTPREQUEST", 60),
         ("HTTPRESPONSE", 61),
+        ("USERS", 62),
     ];
 
     for (name, id) in expected {

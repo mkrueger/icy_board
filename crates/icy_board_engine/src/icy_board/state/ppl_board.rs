@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue, user_data_value},
     executable::{VariableType, VariableValue},
-    parser::{BOARD_ID, CONFERENCES_ID},
+    parser::{BOARD_ID, CONFERENCES_ID, USERS_ID},
 };
 
 macro_rules! member_name {
@@ -18,6 +18,7 @@ member_name!(OPERATOR, "Operator");
 member_name!(SYSOP_NAME, "SysopName");
 member_name!(NODES, "NodeCount");
 member_name!(CONFERENCES, "Conferences");
+member_name!(USERS, "Users");
 
 /// What the board is configured to be, apart from any one call.
 #[derive(Clone, Default)]
@@ -30,6 +31,7 @@ pub struct PplBoard {
     /// The ready made `Conferences` value: nothing about it can change during a run,
     /// so handing it out is a share rather than a fresh object every time.
     conferences: VariableValue,
+    users: VariableValue,
 }
 
 impl PplBoard {
@@ -45,6 +47,7 @@ impl PplBoard {
                 &board.conferences,
             ))
             .value(),
+            users: crate::icy_board::state::ppl_user::PplUsers::snapshot(&board.users).value(),
         }
     }
 
@@ -63,6 +66,7 @@ impl UserData for PplBoard {
         }
         registry.add_property(NODES.clone(), VariableType::Integer, false);
         registry.add_property(CONFERENCES.clone(), VariableType::UserData(CONFERENCES_ID as u8), false);
+        registry.add_property(USERS.clone(), VariableType::UserData(USERS_ID as u8), false);
     }
 }
 
@@ -81,6 +85,8 @@ impl UserDataValue for PplBoard {
             VariableValue::new_int(self.nodes)
         } else if *name == *CONFERENCES {
             self.conferences.clone()
+        } else if *name == *USERS {
+            self.users.clone()
         } else {
             return Err(format!("Unknown BOARD property {name}").into());
         };

@@ -9,7 +9,7 @@ use crate::{
         state::ppl_error::{ERR_INVALID, ERR_KIND_USER, PplError},
         user_base::{FSEMode, User, UserContact},
     },
-    parser::{CONTACT_ID, CONTACTS_ID, EDITOR_MODE_ENUM_ID, NOTES_ID, USER_ID},
+    parser::{CONTACT_ID, CONTACTS_ID, EDITOR_MODE_ENUM_ID, NOTES_ID, USER_ID, USERS_ID},
 };
 
 macro_rules! member_name {
@@ -19,6 +19,7 @@ macro_rules! member_name {
 }
 
 member_name!(NAME, "Name");
+member_name!(VALID, "Valid");
 member_name!(ALIAS, "Alias");
 member_name!(VERIFY_ANSWER, "VerifyAnswer");
 
@@ -78,14 +79,38 @@ member_name!(CONTACTS, "Contacts");
 /// How many sysop notes a user carries. `PCBoard` called them `U_NOTES`.
 const NOTE_COUNT_VALUE: i32 = 5;
 
-/// The caller's own record. It is read live from the session, so a value kept in a
-/// variable still answers with what the user became.
-#[derive(Clone, Copy, Debug, Default)]
-pub struct PplUser;
+/// A user record. `Session.User` is live; entries from `Board.Users` are snapshots.
+#[derive(Clone, Default)]
+pub enum PplUser {
+    #[default]
+    Current,
+    Snapshot {
+        user: std::sync::Arc<User>,
+        valid: bool,
+    },
+}
 
 impl PplUser {
     pub fn value() -> VariableValue {
-        user_data_value(PplUser, USER_ID)
+        user_data_value(PplUser::Current, USER_ID)
+    }
+
+    fn snapshot(user: std::sync::Arc<User>, valid: bool) -> Self {
+        Self::Snapshot { user, valid }
+    }
+
+    fn user<'a>(&'a self, vm: &'a crate::vm::VirtualMachine) -> Option<&'a User> {
+        match self {
+            Self::Current => vm.icy_board_state.session.current_user.as_ref(),
+            Self::Snapshot { user, .. } => Some(user),
+        }
+    }
+
+    fn valid(&self, vm: &crate::vm::VirtualMachine) -> bool {
+        match self {
+            Self::Current => vm.icy_board_state.session.current_user.is_some(),
+            Self::Snapshot { valid, .. } => *valid,
+        }
     }
 }
 
@@ -107,13 +132,99 @@ fn normalize_service(service: &str) -> String {
     service.trim().to_ascii_lowercase()
 }
 
-/// The sysop notes on the caller. Read live, like the user itself.
-#[derive(Clone, Copy, Debug, Default)]
-pub struct PplNotes;
+/// A user's sysop notes, either live for the caller or part of a board snapshot.
+#[derive(Clone, Default)]
+pub struct PplNotes(Option<std::sync::Arc<User>>);
 
-/// The services the caller can be reached on. Read live, like the user itself.
-#[derive(Clone, Copy, Debug, Default)]
-pub struct PplContacts;
+impl PplNotes {
+    fn current() -> Self {
+        Self(None)
+    }
+
+    fn snapshot(user: std::sync::Arc<User>) -> Self {
+        Self(Some(user))
+    }
+
+    fn user<'a>(&'a self, vm: &'a crate::vm::VirtualMachine) -> Option<&'a User> {
+        self.0.as_deref().or(vm.icy_board_state.session.current_user.as_ref())
+    }
+}
+
+/// A user's contact services, either live for the caller or part of a board snapshot.
+#[derive(Clone, Default)]
+pub struct PplContacts(Option<std::sync::Arc<User>>);
+
+impl PplContacts {
+    fn current() -> Self {
+        Self(None)
+    }
+
+    fn snapshot(user: std::sync::Arc<User>) -> Self {
+        Self(Some(user))
+    }
+
+    fn user<'a>(&'a self, vm: &'a crate::vm::VirtualMachine) -> Option<&'a User> {
+        self.0.as_deref().or(vm.icy_board_state.session.current_user.as_ref())
+    }
+}
+
+/// A stable view of the users present when `Board` was first read.
+#[derive(Clone, Default)]
+pub struct PplUsers(std::sync::Arc<Vec<std::sync::Arc<User>>>);
+
+impl PplUsers {
+    pub fn snapshot(users: &[User]) -> Self {
+        Self(std::sync::Arc::new(users.iter().cloned().map(std::sync::Arc::new).collect()))
+    }
+
+    pub fn value(self) -> VariableValue {
+        user_data_value(self, USERS_ID)
+    }
+}
+
+impl UserData for PplUsers {
+    const TYPE_NAME: &'static str = "Users";
+
+    fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
+        registry.add_property(COUNT.clone(), VariableType::Integer, false);
+        registry.add_function(GET.clone(), vec![VariableType::Integer], VariableType::UserData(USER_ID as u8));
+    }
+}
+
+#[async_trait(?Send)]
+impl UserDataValue for PplUsers {
+    fn get_property_value(&self, _vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
+        if *name == *COUNT {
+            return Ok(VariableValue::new_int(self.0.len() as i32));
+        }
+        Err(format!("Unknown Users property {name}").into())
+    }
+
+    async fn set_property_value(&self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
+        Err(format!("Users property {name} is read-only").into())
+    }
+
+    async fn call_function(
+        &self,
+        _vm: &mut crate::vm::VirtualMachine<'_>,
+        name: &unicase::Ascii<String>,
+        arguments: &[VariableValue],
+    ) -> crate::Res<VariableValue> {
+        if *name == *GET {
+            let index = arguments[0].as_int();
+            let user = (index >= 0).then(|| self.0.get(index as usize)).flatten();
+            return Ok(match user {
+                Some(user) => user_data_value(PplUser::snapshot(user.clone(), true), USER_ID),
+                None => user_data_value(PplUser::snapshot(std::sync::Arc::new(User::default()), false), USER_ID),
+            });
+        }
+        Err(format!("Unknown Users function {name}").into())
+    }
+
+    async fn call_method(&mut self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _arguments: &[VariableValue]) -> crate::Res<()> {
+        Err(format!("Unknown Users method {name}").into())
+    }
+}
 
 member_name!(PUT, "Put");
 member_name!(DELETE, "Delete");
@@ -150,7 +261,7 @@ impl UserDataValue for PplNotes {
     ) -> crate::Res<VariableValue> {
         let index = arguments[0].as_int();
         if *name == *GET {
-            let Some(user) = vm.icy_board_state.session.current_user.as_ref() else {
+            let Some(user) = self.user(vm) else {
                 return Ok(VariableValue::new_string(String::new()));
             };
             let note = match index {
@@ -164,6 +275,9 @@ impl UserDataValue for PplNotes {
             return Ok(VariableValue::new_string(note.clone()));
         }
         if *name == *SET_INDEXED {
+            if self.0.is_some() {
+                return Ok(VariableValue::new_bool(false));
+            }
             let text = arguments[1].as_string();
             let Some(user) = vm.icy_board_state.session.current_user.as_mut() else {
                 return Ok(VariableValue::new_bool(false));
@@ -203,7 +317,7 @@ impl UserData for PplContacts {
 impl UserDataValue for PplContacts {
     fn get_property_value(&self, vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
         if *name == *COUNT {
-            let count = vm.icy_board_state.session.current_user.as_ref().map_or(0, |user| user.contacts.len());
+            let count = self.user(vm).map_or(0, |user| user.contacts.len());
             return Ok(VariableValue::new_int(count as i32));
         }
         Err(format!("Unknown Contacts property {name}").into())
@@ -221,11 +335,8 @@ impl UserDataValue for PplContacts {
     ) -> crate::Res<VariableValue> {
         if *name == *GET {
             let index = arguments[0].as_int();
-            let contact = vm
-                .icy_board_state
-                .session
-                .current_user
-                .as_ref()
+            let contact = self
+                .user(vm)
                 .filter(|_| index >= 0)
                 .and_then(|user| user.contacts.get(index as usize))
                 .cloned()
@@ -233,6 +344,9 @@ impl UserDataValue for PplContacts {
             return Ok(contact_value(&contact));
         }
         if *name == *PUT {
+            if self.0.is_some() {
+                return Ok(VariableValue::new_bool(false));
+            }
             let service = normalize_service(&arguments[0].as_string());
             let account = arguments[1].as_string().trim().to_string();
             if service.is_empty() || account.is_empty() {
@@ -250,6 +364,9 @@ impl UserDataValue for PplContacts {
             return Ok(VariableValue::new_bool(true));
         }
         if *name == *DELETE {
+            if self.0.is_some() {
+                return Ok(VariableValue::new_bool(false));
+            }
             let service = normalize_service(&arguments[0].as_string());
             let Some(user) = vm.icy_board_state.session.current_user.as_mut() else {
                 return Ok(VariableValue::new_bool(false));
@@ -317,6 +434,7 @@ impl UserData for PplUser {
         for name in [&*NAME, &*LANGUAGE, &*DATE_FORMAT] {
             registry.add_property(name.clone(), VariableType::String, false);
         }
+        registry.add_property(VALID.clone(), VariableType::Boolean, false);
         for name in [&*BIRTH_DATE, &*EXPIRATION_DATE, &*PASSWORD_EXPIRES] {
             registry.add_property(name.clone(), VariableType::Date, true);
         }
@@ -361,7 +479,7 @@ impl UserDataValue for PplUser {
     fn get_property_value(&self, vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
         // Nobody logged in reads as an empty user, so a member keeps its declared type.
         let no_user;
-        let user = match vm.icy_board_state.session.current_user.as_ref() {
+        let user = match self.user(vm) {
             Some(user) => user,
             None => {
                 no_user = User::default();
@@ -371,7 +489,9 @@ impl UserDataValue for PplUser {
         let string = |value: &str| VariableValue::new_string(value.to_string());
         let date = |value: &chrono::DateTime<chrono::Utc>| VariableValue::new_date(IcbDate::from_utc(value).to_pcboard_date());
 
-        let value = if *name == *NAME {
+        let value = if *name == *VALID {
+            VariableValue::new_bool(self.valid(vm))
+        } else if *name == *NAME {
             string(&user.name)
         } else if *name == *ALIAS {
             string(&user.alias)
@@ -422,7 +542,10 @@ impl UserDataValue for PplUser {
         } else if *name == *LAST_DIR_READ {
             date(&user.date_last_dir_read)
         } else if *name == *NOTES {
-            user_data_value(PplNotes, NOTES_ID)
+            match self {
+                Self::Current => user_data_value(PplNotes::current(), NOTES_ID),
+                Self::Snapshot { user, .. } => user_data_value(PplNotes::snapshot(user.clone()), NOTES_ID),
+            }
         } else if *name == *PAGE_LENGTH {
             VariableValue::new_int(i32::from(user.page_len))
         } else if *name == *SECURITY_LEVEL {
@@ -442,7 +565,10 @@ impl UserDataValue for PplUser {
         } else if *name == *MINUTES_TODAY {
             VariableValue::new_int(i32::from(user.stats.minutes_today))
         } else if *name == *CONTACTS {
-            user_data_value(PplContacts, CONTACTS_ID)
+            match self {
+                Self::Current => user_data_value(PplContacts::current(), CONTACTS_ID),
+                Self::Snapshot { user, .. } => user_data_value(PplContacts::snapshot(user.clone()), CONTACTS_ID),
+            }
         } else if *name == *UPLOAD_BYTES {
             VariableValue::new_unsigned(user.stats.total_upld_bytes)
         } else if *name == *DOWNLOAD_BYTES {
@@ -474,6 +600,10 @@ impl UserDataValue for PplUser {
     }
 
     async fn set_property_value(&self, vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, val: VariableValue) -> crate::Res<()> {
+        if matches!(self, Self::Snapshot { .. }) {
+            vm.set_error(PplError::new(ERR_KIND_USER, ERR_INVALID, "Board.Users entries are read-only"));
+            return Ok(());
+        }
         let number = val.as_int();
         let invalid_range = if *name == *PAGE_LENGTH && u16::try_from(number).is_err() {
             Some("PageLength must be between 0 and 65535")
@@ -564,6 +694,10 @@ impl UserDataValue for PplUser {
         arguments: &[VariableValue],
     ) -> crate::Res<VariableValue> {
         if *name == *SET_PASSWORD {
+            if matches!(self, Self::Snapshot { .. }) {
+                vm.set_error(PplError::new(ERR_KIND_USER, ERR_INVALID, "Board.Users entries are read-only"));
+                return Ok(VariableValue::new_bool(false));
+            }
             let plain = arguments[0].as_string();
             if plain.is_empty() {
                 return Ok(VariableValue::new_bool(false));

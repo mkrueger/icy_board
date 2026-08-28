@@ -781,7 +781,7 @@ ENDFOREACH
 they need no parentheses either. They split what the board *is* from what this
 one call *is doing*.
 
-`Board` is a snapshot of the configuration and its conferences. It is taken the
+`Board` is a snapshot of the configuration, conferences and users. It is taken the
 first time a PPE reads `Board` and stands for the rest of the run, so touching it
 inside a loop is not paid for again:
 
@@ -793,6 +793,7 @@ inside a loop is not paid for again:
 | `SysopName` | `STRING` | The sysop's display name |
 | `NodeCount` | `INTEGER` | Number of configured nodes |
 | `Conferences` | `CONFERENCES` | The conferences of the board |
+| `Users` | `USERS` | The registered users of the board |
 
 `Conferences` is what lets a PPE walk the board without `HIGHCONFNUM()`. An index
 no conference has answers with an object whose `Valid` property is false.
@@ -806,6 +807,21 @@ FOREACH conf IN Board.Conferences
 	IF conf.HasAccess() PRINTLN conf.Number, " ", conf.Name
 ENDFOREACH
 ```
+
+`Users` exposes every registered user as a read-only `USER` snapshot. The
+collection is fixed when `Board` is first read, and an index it does not contain
+returns an empty user whose `Valid` property is false:
+
+```PPL
+USER user
+
+FOREACH user IN Board.Users
+	PRINTLN user.Name, " from ", user.City
+ENDFOREACH
+```
+
+The snapshot includes the user's notes and contacts, but assignments and
+`SetPassword()` are refused. Use `Session.User` when changing the caller.
 
 `Session` is the call in progress. Unlike `Board` it is read live, so a value
 kept in a variable still answers with what the session became:
@@ -867,7 +883,7 @@ Session.User.City = "Berlin"
 
 | Group | Members | Writable |
 | :--- | :--- | :--- |
-| Identity | `Name`, `Alias`, `VerifyAnswer` | all but `Name` |
+| Identity | `Valid`, `Name`, `Alias`, `VerifyAnswer` | all but `Valid` and `Name` |
 | Address | `Street1`, `Street2`, `City`, `State`, `Zip`, `Country` | yes |
 | Reaching them | `BusinessPhone`, `HomePhone`, `Email`, `Web`, `Gender`, `BirthDate` | yes |
 | Sysop text | `Comment`, `SysopComment`, `Notes` | yes |
@@ -881,7 +897,8 @@ Whatever `PUTUSER` could write is writable here and lands at once, so the object
 replaces the old round trip rather than sitting beside it. The caller's `Name`
 identifies them and the board's own accounting is the board's to keep, so both
 stay read-only; writing one is a compile error. Nobody logged in reads as an
-empty user rather than failing, so a member is always safe to read.
+empty user with `Valid` false rather than failing, so a member is always safe to
+read.
 
 The cumulative statistics `TimesOn`, `MessagesRead`, `MessagesLeft`, `Uploads`
 and `Downloads` are `ULONG`, so they preserve the full counters stored by the

@@ -2258,6 +2258,22 @@
     "named": false
   },
   {
+    "type": "HTTP",
+    "named": false
+  },
+  {
+    "type": "HTTPMETHOD",
+    "named": false
+  },
+  {
+    "type": "HTTPREQUEST",
+    "named": false
+  },
+  {
+    "type": "HTTPRESPONSE",
+    "named": false
+  },
+  {
     "type": "IF",
     "named": false
   },
@@ -2459,6 +2475,10 @@
   },
   {
     "type": "USER",
+    "named": false
+  },
+  {
+    "type": "USERS",
     "named": false
   },
   {
