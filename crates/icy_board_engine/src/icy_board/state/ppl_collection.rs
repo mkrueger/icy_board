@@ -37,6 +37,22 @@ macro_rules! ppl_collection {
             pub fn value(self) -> VariableValue {
                 user_data_value(self, $collection_id)
             }
+
+            pub fn array_value(items: std::sync::Arc<$container>) -> VariableValue {
+                VariableValue::new_vector(
+                    VariableType::UserData($item_id as u8),
+                    items
+                        .iter()
+                        .enumerate()
+                        .map(|(number, item)| {
+                            let mut item: $item = item.clone();
+                            item.number = number;
+                            item.valid = true;
+                            user_data_value(item, $item_id)
+                        })
+                        .collect(),
+                )
+            }
         }
 
         impl UserData for $name {
@@ -132,6 +148,10 @@ impl PplConferences {
 
     pub fn value(self) -> VariableValue {
         user_data_value(self, CONFERENCES_ID)
+    }
+
+    pub fn array_value(conferences: std::sync::Arc<Vec<VariableValue>>) -> VariableValue {
+        VariableValue::new_vector(VariableType::UserData(CONFERENCE_ID as u8), conferences.as_ref().clone())
     }
 }
 

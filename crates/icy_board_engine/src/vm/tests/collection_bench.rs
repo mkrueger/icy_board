@@ -74,7 +74,7 @@ fn walk_every_area() {
 CONFERENCE c = Board.Conferences[0]
 INTEGER i
 INTEGER n
-FOR i = 0 TO c.Areas.Count - 1
+FOR i = 0 TO c.Areas.Len() - 1
     IF (c.Areas[i].Name <> "") LET n = n + 1
 NEXT
 PRINT n
@@ -85,7 +85,7 @@ PRINT n
         r#"
 INTEGER i
 INTEGER n
-FOR i = 0 TO Board.Conferences[0].Areas.Count - 1
+FOR i = 0 TO Board.Conferences[0].Areas.Len() - 1
     IF (Board.Conferences[0].Areas[i].Name <> "") LET n = n + 1
 NEXT
 PRINT n
@@ -152,7 +152,7 @@ fn a_collection_reports_its_count_and_indexes() {
     let out = run_ppl_on(
         r#"
 CONFERENCE c = Board.Conferences[0]
-PRINT c.Areas.Count, " ", c.Areas[0].Name, " ", c.Areas[1999].Name
+PRINT c.Areas.Len(), " ", c.Areas[0].Name, " ", c.Areas[1999].Name
 "#,
         seed,
     );

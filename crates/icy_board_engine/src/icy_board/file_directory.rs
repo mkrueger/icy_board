@@ -7,7 +7,7 @@ use std::{
 
 use crate::{
     Res,
-    compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue},
+    compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue, user_data_value},
     executable::{VariableType, VariableValue},
     tables::export_cp437_string,
 };
@@ -202,6 +202,7 @@ impl IcyBoardSerializer for DirectoryList {
 
 impl UserData for FileDirectory {
     const TYPE_NAME: &'static str = "Directory";
+    const EMPTY_VALUE: Option<fn() -> VariableValue> = Some(|| user_data_value(FileDirectory::default(), crate::parser::FILE_DIRECTORY_ID));
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         registry.add_property(NAME.clone(), VariableType::String, false);

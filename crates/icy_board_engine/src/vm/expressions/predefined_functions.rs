@@ -647,10 +647,15 @@ pub async fn array_value_at(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Re
     let GenericVariableData::Dim1(values) = &array.generic_data else {
         return Ok(array.vtype.create_empty_value());
     };
-    Ok(usize::try_from(index)
-        .ok()
-        .and_then(|index| values.get(index).cloned())
-        .unwrap_or_else(|| array.vtype.create_empty_value()))
+    if let Some(value) = usize::try_from(index).ok().and_then(|index| values.get(index).cloned()) {
+        return Ok(value);
+    }
+    if let VariableType::UserData(type_id) = array.vtype
+        && let Some(empty_value) = vm.type_registry.get_type_from_id(type_id).and_then(|registry| registry.empty_value)
+    {
+        return Ok(empty_value());
+    }
+    Ok(array.vtype.create_empty_value())
 }
 
 pub async fn string_join(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {

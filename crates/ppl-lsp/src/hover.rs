@@ -113,9 +113,17 @@ impl<'a> AstVisitor<()> for MemberHoverVisitor<'a> {
         };
         let object = VariableType::UserData(*type_id);
         if let Some(field_type) = type_of_member(&self.visitor.type_registry, object, member.get_identifier().as_ref()) {
+            let rank = self
+                .visitor
+                .type_registry
+                .get_type_from_id(*type_id)
+                .and_then(|registry| registry.field_ranks.get(member.get_identifier()))
+                .copied()
+                .unwrap_or(0);
             let signature = format!(
-                "{} {}.{}",
+                "{}{} {}.{}",
                 type_name(&self.visitor.type_registry, field_type),
+                "[]".repeat(rank as usize),
                 type_name(&self.visitor.type_registry, object),
                 member.get_identifier()
             );

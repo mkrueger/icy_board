@@ -192,6 +192,24 @@ fn member_completion(visitor: &SemanticVisitor, path: &[String], language_versio
     if path.len() == 1 && matches!(path[0].to_ascii_uppercase().as_str(), "STRING" | "BIGSTR") {
         return completion_items(string_members(true), None);
     }
+    if let Some((property, receiver)) = path.split_last()
+        && let Some(icy_board_engine::executable::VariableType::UserData(type_id)) = type_of_chain(visitor, receiver)
+        && let Some(registry) = visitor.type_registry.get_type_from_id(type_id)
+        && (registry.field_ranks.contains_key(&unicase::Ascii::new(property.clone()))
+            || registry
+                .functions
+                .get(&unicase::Ascii::new(property.clone()))
+                .is_some_and(|function| function.return_rank > 0))
+    {
+        return completion_items(
+            vec![crate::type_lookup::Member {
+                name: "Len".to_string(),
+                detail: "() INTEGER".to_string(),
+                kind: MemberKind::Method,
+            }],
+            None,
+        );
+    }
     if path.len() == 1
         && let Some(definition) = visitor.type_registry.get_enum(&unicase::Ascii::new(path[0].clone()))
     {

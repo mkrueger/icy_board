@@ -390,6 +390,9 @@ impl Decompiler {
                 let return_var = unsafe { entry.value.data.function_value.return_var } as usize;
                 Some(self.executable.variable_table.try_get_entry(return_var)?.header.variable_type)
             }
+            PPEExpr::PredefinedFunctionCall(def, arguments) if def.opcode == FuncOpCode::ArrayValueAt => {
+                arguments.first().and_then(|array| self.expression_type(array))
+            }
             PPEExpr::PredefinedFunctionCall(def, _) => Some(def.return_type),
             _ => None,
         }

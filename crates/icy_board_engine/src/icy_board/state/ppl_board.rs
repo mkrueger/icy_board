@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue, user_data_value},
     executable::{VariableType, VariableValue},
-    parser::{BOARD_ID, CONFERENCES_ID, USERS_ID},
+    parser::{BOARD_ID, CONFERENCE_ID, USER_ID},
 };
 
 macro_rules! member_name {
@@ -43,11 +43,10 @@ impl PplBoard {
             operator: board.config.board.operator.clone(),
             sysop_name: board.config.sysop.name.clone(),
             nodes: i32::from(board.config.board.num_nodes),
-            conferences: crate::icy_board::state::ppl_collection::PplConferences::new(crate::icy_board::state::ppl_collection::PplConferences::build(
+            conferences: crate::icy_board::state::ppl_collection::PplConferences::array_value(crate::icy_board::state::ppl_collection::PplConferences::build(
                 &board.conferences,
-            ))
-            .value(),
-            users: crate::icy_board::state::ppl_user::PplUsers::snapshot(&board.users).value(),
+            )),
+            users: crate::icy_board::state::ppl_user::PplUsers::array_value(&board.users),
         }
     }
 
@@ -65,8 +64,8 @@ impl UserData for PplBoard {
             registry.add_property(name.clone(), VariableType::String, false);
         }
         registry.add_property(NODES.clone(), VariableType::Integer, false);
-        registry.add_property(CONFERENCES.clone(), VariableType::UserData(CONFERENCES_ID as u8), false);
-        registry.add_property(USERS.clone(), VariableType::UserData(USERS_ID as u8), false);
+        registry.add_array_property(CONFERENCES.clone(), VariableType::UserData(CONFERENCE_ID as u8), 1);
+        registry.add_array_property(USERS.clone(), VariableType::UserData(USER_ID as u8), 1);
     }
 }
 

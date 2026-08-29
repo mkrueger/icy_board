@@ -231,7 +231,7 @@ fn test_conference_properties_report_configuration_and_counts() {
         r#"
         CONFERENCE conf
         conf = Board.Conferences[0]
-        PRINT conf.IsPublic, " ", conf.HasAccess(), " ", conf.Directories.Count, " ", conf.Areas.Count, " ", conf.Doors.Count
+        PRINT conf.IsPublic, " ", conf.HasAccess(), " ", conf.Directories.Len(), " ", conf.Areas.Len(), " ", conf.Doors.Len()
     "#,
         |board| {
             board.conferences.clear();
@@ -258,7 +258,7 @@ fn test_an_invalid_conference_number_still_returns_a_conference() {
         r#"
         CONFERENCE conf
         conf = Board.Conferences[999]
-        PRINT "[", conf.Name, "] ", conf.IsPublic, " ", conf.Directories.Count, " ", conf.Areas.Count, " ", conf.Doors.Count
+        PRINT "[", conf.Name, "] ", conf.IsPublic, " ", conf.Directories.Len(), " ", conf.Areas.Len(), " ", conf.Doors.Len()
     "#,
     );
     assert_eq!(output, "[] 0 0 0 0");

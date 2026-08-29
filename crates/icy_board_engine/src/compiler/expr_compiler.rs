@@ -225,7 +225,7 @@ impl AstVisitor<PPEExpr> for ExpressionCompiler<'_> {
                 log::error!("Invalid function call: {function_type:?}");
                 PPEExpr::Value(0)
             }
-            SemanticInfo::ArrayMemberProc(_) | SemanticInfo::RegexSplitProc { .. } => {
+            SemanticInfo::ArrayMemberProc(_) => {
                 log::error!("Array statement used where a value is expected: {function_type:?}");
                 PPEExpr::Value(0)
             }
@@ -248,6 +248,16 @@ impl AstVisitor<PPEExpr> for ExpressionCompiler<'_> {
             if var.header.dim == 0 && matches!(var.header.variable_type, VariableType::String | VariableType::BigStr) && arguments.len() == 1 {
                 return PPEExpr::PredefinedFunctionCall(
                     FuncOpCode::StringCharAt.get_definition(),
+                    vec![PPEExpr::Value(var.header.id), arguments.into_iter().next().unwrap()],
+                );
+            }
+            if var.header.dim == 1
+                && let VariableType::UserData(type_id) = var.header.variable_type
+                && self.compiler.semantic_visitor.type_registry.get_type_from_id(type_id).is_some()
+                && arguments.len() == 1
+            {
+                return PPEExpr::PredefinedFunctionCall(
+                    FuncOpCode::ArrayValueAt.get_definition(),
                     vec![PPEExpr::Value(var.header.id), arguments.into_iter().next().unwrap()],
                 );
             }

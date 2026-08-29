@@ -1,4 +1,4 @@
-use super::{compile_errors_with_runtime, run_ppl};
+use super::{compile_errors, compile_errors_with_runtime, run_ppl};
 
 #[test]
 fn regex_compiles_tests_and_reports_errors() {
@@ -66,20 +66,24 @@ fn regex_api_requires_language_and_runtime_400() {
 fn regex_split_preserves_fields_limits_and_target_on_error() {
     let output = run_ppl(
         r#"
-        STRING parts(0)
         REGEX separators = REGEX.Compile("[,;]\s*")
-        separators.Split("one, two;;four", parts)
+        BIGSTR parts[]
+        parts = separators.Split("one, two;;four")
         PRINTLN parts.Len(), " ", STRING.Join(parts, "|")
 
-        separators.Split("one, two; three; four", parts, 3)
+        parts = separators.Split("one, two; three; four", 3)
         PRINTLN parts.Len(), " ", STRING.Join(parts, "|")
+        PRINTLN separators.Split("a,b")[1]
 
         REGEX invalid = REGEX.Compile("[")
-        invalid.Split("changed", parts)
+        parts = invalid.Split("changed")
         PRINTLN Error.Last().Kind = ErrKind.Regex
-        PRINTLN parts.Len(), " ", STRING.Join(parts, "|")
+        PRINTLN parts.Len()
         "#,
     );
 
-    assert_eq!(output, "4 one|two||four\n3 one|two|three; four\n1\n3 one|two|three; four\n");
+    assert_eq!(output, "4 one|two||four\n3 one|two|three; four\nb\n1\n0\n");
+
+    let errors = compile_errors("REGEX regex = REGEX.Compile(\",\")\nBIGSTR parts[]\nregex.Split(\"a,b\", parts)");
+    assert!(!errors.is_empty(), "the removed output-array REGEX.Split signature should not compile");
 }

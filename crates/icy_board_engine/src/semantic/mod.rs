@@ -97,11 +97,6 @@ pub enum SemanticInfo {
     /// A built-in scalar type namespace function, `STRING.Join(...)`.
     StringStaticFunc(FuncOpCode),
 
-    /// `regex.Split(text, target [, limit])`, lowered to an array-writing statement.
-    RegexSplitProc {
-        default_limit: bool,
-    },
-
     /// The same for a built-in array statement, `a.Redim(10)` for `REDIM a, 10`.
     ArrayMemberProc(OpCode),
 
@@ -1355,13 +1350,23 @@ impl SemanticVisitor {
             }
             Expression::MemberReference(member) => {
                 let type_id = self.user_type_lookup.get(&member.get_identifier_token().span.start).copied()?;
-                let definition = self.type_registry.get_record_type_from_id(type_id)?;
-                let field = definition.field(definition.field_index(member.get_identifier())?)?;
-                (field.dim > 0).then(|| ArrayShape {
-                    element_type: field.variable_type,
-                    rank: field.dim,
-                    bounds: [field.vector_size as usize, field.matrix_size as usize, field.cube_size as usize],
-                    resizable: false,
+                if let Some(definition) = self.type_registry.get_record_type_from_id(type_id) {
+                    let field = definition.field(definition.field_index(member.get_identifier())?)?;
+                    return (field.dim > 0).then(|| ArrayShape {
+                        element_type: field.variable_type,
+                        rank: field.dim,
+                        bounds: [field.vector_size as usize, field.matrix_size as usize, field.cube_size as usize],
+                        resizable: false,
+                        field_name: Some(member.get_identifier().to_string()),
+                    });
+                }
+                let registry = self.type_registry.get_type_from_id(type_id)?;
+                let rank = registry.field_ranks.get(member.get_identifier()).copied()?;
+                Some(ArrayShape {
+                    element_type: registry.fields.get(member.get_identifier()).copied()?,
+                    rank,
+                    bounds: [0; 3],
+                    resizable: true,
                     field_name: Some(member.get_identifier().to_string()),
                 })
             }
@@ -1573,18 +1578,6 @@ impl SemanticVisitor {
             .lock()
             .unwrap()
             .report_error(expr.get_span().clone(), CompilationErrorType::VariableExpected(arg_num + 1));
-    }
-
-    fn validate_string_split_target(&mut self, expression: &Expression) {
-        let valid = self
-            .array_shape(expression)
-            .is_some_and(|shape| shape.rank == 1 && shape.resizable && matches!(shape.element_type, VariableType::String | VariableType::BigStr));
-        if !valid {
-            self.errors.lock().unwrap().report_error(
-                expression.get_span(),
-                CompilationErrorType::ArgumentTypeMismatch(3, "dynamic one-dimensional string array".to_string(), "value".to_string()),
-            );
-        }
     }
 
     fn resolved_record_io_type(&mut self, expression: &Expression) -> VariableType {
@@ -2699,25 +2692,6 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             } else {
                 member.get_expression().visit(self)
             };
-            if receiver_type == VariableType::UserData(crate::parser::REGEX_ID as u8)
-                && *member.get_identifier() == "Split"
-                && (2..=3).contains(&call.get_arguments().len())
-            {
-                for argument in call.get_arguments() {
-                    argument.visit(self);
-                }
-                self.validate_string_split_target(&call.get_arguments()[1]);
-                if call.get_arguments().len() == 2 {
-                    self.add_constant(&Constant::Integer(0, crate::ast::constant::NumberFormat::Default));
-                }
-                self.function_type_lookup.insert(
-                    call.id,
-                    SemanticInfo::RegexSplitProc {
-                        default_limit: call.get_arguments().len() == 2,
-                    },
-                );
-                return VariableType::None;
-            }
             if matches!(receiver_type, VariableType::String | VariableType::BigStr)
                 && let Some((opcode, return_type, defaults)) = string_member(member.get_identifier(), call.get_arguments().len())
             {

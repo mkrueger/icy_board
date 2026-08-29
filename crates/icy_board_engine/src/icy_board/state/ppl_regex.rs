@@ -216,7 +216,7 @@ impl UserData for PplRegex {
             2,
             VariableType::BigStr,
         );
-        registry.add_procedure_with(SPLIT.clone(), vec![VariableType::String, VariableType::String, VariableType::Integer], 2);
+        registry.add_array_function_with(SPLIT.clone(), vec![VariableType::String, VariableType::Integer], 1, VariableType::BigStr, 1);
     }
 }
 
@@ -371,6 +371,31 @@ impl UserDataValue for PplRegex {
             }
             vm.operation_succeeded();
             return Ok(VariableValue::new_string(replaced.into_owned()).convert_to(VariableType::BigStr));
+        }
+        if *name == *SPLIT {
+            let Some(compiled) = &self.compiled else {
+                vm.set_error(PplError::new(ERR_KIND_REGEX, ERR_INVALID, self.error.clone()));
+                return Ok(VariableValue::new_vector(VariableType::BigStr, Vec::new()));
+            };
+            let text = arguments[0].as_string();
+            let limit = arguments.get(1).map_or(0, VariableValue::as_int);
+            if limit < 0 {
+                vm.set_error(PplError::new(ERR_KIND_REGEX, ERR_INVALID, "REGEX.Split limit cannot be negative"));
+                return Ok(VariableValue::new_vector(VariableType::BigStr, Vec::new()));
+            }
+            let parts: Vec<_> = if limit == 0 {
+                compiled.split(&text).map(str::to_string).collect()
+            } else {
+                compiled.splitn(&text, limit as usize).map(str::to_string).collect()
+            };
+            vm.operation_succeeded();
+            return Ok(VariableValue::new_vector(
+                VariableType::BigStr,
+                parts
+                    .into_iter()
+                    .map(|part| VariableValue::new_string(part).convert_to(VariableType::BigStr))
+                    .collect(),
+            ));
         }
         Err(format!("Unknown REGEX function {name}").into())
     }

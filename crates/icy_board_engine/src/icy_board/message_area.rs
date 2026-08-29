@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 
 use crate::{
-    compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue},
+    compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue, user_data_value},
     executable::{VariableType, VariableValue},
     icy_board::{
         is_null_16,
@@ -214,6 +214,7 @@ impl IcyBoardSerializer for AreaList {
 
 impl UserData for MessageArea {
     const TYPE_NAME: &'static str = "Area";
+    const EMPTY_VALUE: Option<fn() -> VariableValue> = Some(|| user_data_value(MessageArea::default(), crate::parser::MESSAGE_AREA_ID));
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         registry.add_property(NAME.clone(), VariableType::String, false);

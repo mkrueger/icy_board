@@ -318,9 +318,9 @@ Member               Type              Description
 ``AutoRejoin``       ``BOOLEAN``       Whether a caller is rejoined here on the next call
 ``PrivateUploads``   ``BOOLEAN``       Whether uploads go to the private area
 ``Password``         ``PASSWORD``      The password needed to join
-``Directories``      ``DIRECTORIES``   The file directories of the conference
-``Areas``            ``AREAS``         The message areas of the conference
-``Doors``            ``DOORS``         The doors of the conference
+``Directories``      ``DIRECTORY[]``   The file directories of the conference
+``Areas``            ``AREA[]``        The message areas of the conference
+``Doors``            ``DOOR[]``        The doors of the conference
 ``HasAccess()``      ``BOOLEAN``       Whether the current caller can join it
 ``CanPost()``        ``BOOLEAN``       Whether the current caller may write a message
 ``CanAttach()``      ``BOOLEAN``       Whether the current caller may attach a file
@@ -596,7 +596,7 @@ The static members are ``Compile(pattern [, options])``, ``Escape(text)`` and
 ``IsValid(pattern [, options])``. Instances provide ``Valid``, ``Pattern``,
 ``IsMatch(text [, start])``, ``Find(text [, start])``,
 ``FindAll(text [, start [, limit]])``, ``Replace(text, replacement [, limit])``
-and ``Split(text, VAR array() [, limit])``.
+and ``Split(text [, limit])``, which returns a dynamic ``BIGSTR[]``.
 
 ``RegexOptions`` contains ``None``, ``IgnoreCase``, ``MultiLine``,
 ``DotMatchesNewLine``, ``IgnoreWhitespace``, ``SwapGreed`` and ``Ascii``.

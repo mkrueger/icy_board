@@ -9,10 +9,10 @@ use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 
 use crate::{
-    compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue},
+    compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue, user_data_value},
     executable::{VariableType, VariableValue},
     icy_board::state::ppl_collection::{PplAreas, PplDirectories, PplDoors},
-    parser::{AREAS_ID, DIRECTORIES_ID, DOORS_ID},
+    parser::{DOOR_ID, FILE_DIRECTORY_ID, MESSAGE_AREA_ID},
 };
 
 use super::{
@@ -389,6 +389,7 @@ impl IcyBoardSerializer for ConferenceBase {
 
 impl UserData for Conference {
     const TYPE_NAME: &'static str = "Conference";
+    const EMPTY_VALUE: Option<fn() -> VariableValue> = Some(|| user_data_value(Conference::default(), crate::parser::CONFERENCE_ID));
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         registry.add_property(NAME.clone(), VariableType::String, false);
@@ -401,9 +402,9 @@ impl UserData for Conference {
         registry.add_property(AUTO_REJOIN.clone(), VariableType::Boolean, false);
         registry.add_property(PRIVATE_UPLOADS.clone(), VariableType::Boolean, false);
         registry.add_property(PASSWORD.clone(), VariableType::Password, false);
-        registry.add_property(FILE_AREAS.clone(), VariableType::UserData(DIRECTORIES_ID as u8), false);
-        registry.add_property(MESSAGE_AREAS.clone(), VariableType::UserData(AREAS_ID as u8), false);
-        registry.add_property(DOORS.clone(), VariableType::UserData(DOORS_ID as u8), false);
+        registry.add_array_property(FILE_AREAS.clone(), VariableType::UserData(FILE_DIRECTORY_ID as u8), 1);
+        registry.add_array_property(MESSAGE_AREAS.clone(), VariableType::UserData(MESSAGE_AREA_ID as u8), 1);
+        registry.add_array_property(DOORS.clone(), VariableType::UserData(DOOR_ID as u8), 1);
 
         registry.add_function(HAS_ACCESS.clone(), Vec::new(), VariableType::Boolean);
         registry.add_function(CAN_POST.clone(), Vec::new(), VariableType::Boolean);
@@ -462,13 +463,13 @@ impl UserDataValue for Conference {
             return Ok(VariableValue::new_password(self.password.protected()));
         }
         if *name == *FILE_AREAS {
-            return Ok(PplDirectories::new(self.directories.clone().unwrap_or_default()).value());
+            return Ok(PplDirectories::array_value(self.directories.clone().unwrap_or_default()));
         }
         if *name == *MESSAGE_AREAS {
-            return Ok(PplAreas::new(self.areas.clone().unwrap_or_default()).value());
+            return Ok(PplAreas::array_value(self.areas.clone().unwrap_or_default()));
         }
         if *name == *DOORS {
-            return Ok(PplDoors::new(self.doors.clone().unwrap_or_default()).value());
+            return Ok(PplDoors::array_value(self.doors.clone().unwrap_or_default()));
         }
 
         log::error!("Invalid user data call on Conference ({name})");

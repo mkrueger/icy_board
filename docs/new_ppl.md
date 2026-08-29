@@ -264,7 +264,7 @@ Static members are `REGEX.Compile(pattern [, options])`, `REGEX.Escape(text)`
 and `REGEX.IsValid(pattern [, options])`. A compiled value exposes `Valid`,
 `Pattern`, `IsMatch(text [, start])`, `Find(text [, start])`,
 `FindAll(text [, start [, limit]]) -> REGEXMATCH[]`,
-`Replace(text, replacement [, limit])` and `Split(text, VAR array[] [, limit])`.
+`Replace(text, replacement [, limit])` and `Split(text [, limit]) -> BIGSTR[]`.
 
 `RegexOptions` flags are `None`, `IgnoreCase`, `MultiLine`,
 `DotMatchesNewLine`, `IgnoreWhitespace`, `SwapGreed` and `Ascii`; flags may be
@@ -729,9 +729,9 @@ an empty conference object, so its properties can still be read.
 | `AutoRejoin` | `BOOLEAN` | Whether a caller is rejoined here on the next call |
 | `PrivateUploads` | `BOOLEAN` | Whether uploads go to the private area |
 | `Password` | `PASSWORD` | The password needed to join |
-| `Directories` | `DIRECTORIES` | The file directories of the conference |
-| `Areas` | `AREAS` | The message areas of the conference |
-| `Doors` | `DOORS` | The doors of the conference |
+| `Directories` | `DIRECTORY[]` | The file directories of the conference |
+| `Areas` | `AREA[]` | The message areas of the conference |
+| `Doors` | `DOOR[]` | The doors of the conference |
 | `HasAccess()` | `BOOLEAN` | Whether the current caller can join the conference |
 | `CanPost()` | `BOOLEAN` | Whether the current caller may write a message |
 | `CanAttach()` | `BOOLEAN` | Whether the current caller may attach a file |
@@ -911,7 +911,7 @@ The index is there when a single entry is wanted, and `Count` when only the
 number matters:
 
 ```PPL
-PRINTLN conf.Areas.Count, " areas, the first is ", conf.Areas[0].Name
+PRINTLN conf.Areas.Len(), " areas, the first is ", conf.Areas[0].Name
 ```
 
 An index no entry has answers with an invalid object rather than failing, so
@@ -923,7 +923,7 @@ its source once per step, which makes the length of that source what a long loop
 pays for. Naming it once is the cheapest form and the clearest to read:
 
 ```PPL
-AREAS list = Session.Conference.Areas
+AREA list[] = Session.Conference.Areas
 AREA item
 
 FOREACH item IN list
@@ -948,8 +948,8 @@ inside a loop is not paid for again:
 | `Operator` | `STRING` | Operator named for `EMSI` |
 | `SysopName` | `STRING` | The sysop's display name |
 | `NodeCount` | `INTEGER` | Number of configured nodes |
-| `Conferences` | `CONFERENCES` | The conferences of the board |
-| `Users` | `USERS` | The registered users of the board |
+| `Conferences` | `CONFERENCE[]` | The conferences of the board |
+| `Users` | `USER[]` | The registered users of the board |
 
 `Conferences` is what lets a PPE walk the board without `HIGHCONFNUM()`. An index
 no conference has answers with an object whose `Valid` property is false.

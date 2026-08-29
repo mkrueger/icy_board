@@ -180,6 +180,17 @@ impl PplUsers {
     pub fn value(self) -> VariableValue {
         user_data_value(self, USERS_ID)
     }
+
+    pub fn array_value(users: &[User]) -> VariableValue {
+        VariableValue::new_vector(
+            VariableType::UserData(USER_ID as u8),
+            users
+                .iter()
+                .cloned()
+                .map(|user| user_data_value(PplUser::snapshot(std::sync::Arc::new(user), true), USER_ID))
+                .collect(),
+        )
+    }
 }
 
 impl UserData for PplUsers {
@@ -406,6 +417,7 @@ fn editor_mode_from_int(value: i32) -> FSEMode {
 
 impl UserData for PplUser {
     const TYPE_NAME: &'static str = "User";
+    const EMPTY_VALUE: Option<fn() -> VariableValue> = Some(|| user_data_value(PplUser::snapshot(std::sync::Arc::new(User::default()), false), USER_ID));
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         // What `PUTUSER` used to write is writable here, so the object replaces the

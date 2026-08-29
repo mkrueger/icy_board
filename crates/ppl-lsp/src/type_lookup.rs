@@ -190,7 +190,11 @@ fn user_data_members(registry: &UserTypeRegistry, object: &icy_board_engine::com
     for (name, field_type) in object.fields.iter().filter(|_| !statik) {
         members.push(Member {
             name: name.to_string(),
-            detail: type_name(registry, *field_type),
+            detail: format!(
+                "{}{}",
+                type_name(registry, *field_type),
+                "[]".repeat(object.field_ranks.get(name).copied().unwrap_or(0) as usize)
+            ),
             kind: MemberKind::Field,
         });
     }
@@ -200,7 +204,7 @@ fn user_data_members(registry: &UserTypeRegistry, object: &icy_board_engine::com
             detail: format!(
                 "({}) {}",
                 parameter_types(registry, &function.parameters),
-                type_name(registry, function.return_type)
+                format!("{}{}", type_name(registry, function.return_type), "[]".repeat(function.return_rank as usize))
             ),
             kind: MemberKind::Method,
         });

@@ -122,9 +122,9 @@ fn hover_over_a_field_shows_the_record_it_belongs_to() {
 
 #[test]
 fn hover_over_new_board_user_members_includes_documentation() {
-    let source = "PRINTLN Board.Users.Count\nPRINTLN Board.Users[0].Valid\n";
-    let users = hover(source, "Users.Count").unwrap();
-    assert!(users.contains("Users Board.Users"), "{users}");
+    let source = "PRINTLN Board.Users.Len()\nPRINTLN Board.Users[0].Valid\n";
+    let users = hover(source, "Users.Len").unwrap();
+    assert!(users.contains("User[] Board.Users"), "{users}");
     assert!(users.contains("\n```\n\n") && users.contains("`Board`"), "{users}");
 
     let valid = hover(source, "Valid").unwrap();

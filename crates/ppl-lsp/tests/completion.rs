@@ -114,25 +114,19 @@ fn an_indexed_board_user_offers_user_members() {
 
 #[test]
 fn new_board_user_api_completion_explains_its_types_and_members() {
-    let users_type = completion_documentation("USE", "Users");
-    assert!(users_type.starts_with("`USERS`\n\n"), "{users_type}");
-
     let board_users = completion_documentation("Board.", "Users");
-    assert!(board_users.contains("`Board`") && board_users.contains("`USER`"), "{board_users}");
-
-    let count = completion_documentation("USERS users\nusers.", "Count");
-    assert!(!count.trim().is_empty());
+    assert!(board_users.contains("`Board`") && board_users.contains("`USER[]`"), "{board_users}");
 
     let valid = completion_documentation("USER user\nuser.", "Valid");
     assert!(valid.contains("`Board.Users`") && valid.contains("`Valid`"), "{valid}");
 }
 
-/// A collection is read with an index, so the getter behind it is not offered as a
-/// name anybody could type.
+/// Snapshot arrays expose array members rather than their internal legacy getter.
 #[test]
 fn a_collection_does_not_offer_its_internal_getter() {
     let items = complete("Board.Conferences.");
-    assert!(items.contains(&"Count".to_string()), "{items:?}");
+    assert!(items.contains(&"Len".to_string()), "{items:?}");
+    assert!(!items.contains(&"Count".to_string()), "{items:?}");
     assert!(!items.iter().any(|item| item.starts_with('<')), "{items:?}");
 }
 
@@ -156,9 +150,9 @@ fn regex_completion_covers_static_instance_and_result_members() {
     }
 
     let matches_items = complete("REGEX pattern\npattern.FindAll(\"text\").");
-    for member in ["Count", "Len", "Get"] {
-        assert!(matches_items.contains(&member.to_string()), "{member} missing: {matches_items:?}");
-    }
+    assert!(matches_items.contains(&"Len".to_string()), "Len missing: {matches_items:?}");
+    assert!(!matches_items.contains(&"Count".to_string()), "{matches_items:?}");
+    assert!(!matches_items.contains(&"Get".to_string()), "{matches_items:?}");
 }
 
 #[test]

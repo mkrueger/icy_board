@@ -48,7 +48,7 @@ fn board_reports_what_the_board_is_configured_to_be() {
         PrintLn Board.Location
         PrintLn Board.Operator
         PrintLn Board.SysopName
-        PrintLn Board.NodeCount, " ", Board.Conferences.Count
+        PrintLn Board.NodeCount, " ", Board.Conferences.Len()
         "#,
         seed_board,
     );
@@ -63,7 +63,7 @@ fn every_conference_can_be_reached_by_number() {
     let output = run_ppl_on(
         r#"
         INTEGER i
-        FOR i = 0 TO Board.Conferences.Count - 1
+        FOR i = 0 TO Board.Conferences.Len() - 1
             CONFERENCE conf = Board.Conferences[i]
             PrintLn i, ": ", conf.Name, " ", conf.HasAccess()
         NEXT
@@ -75,10 +75,36 @@ fn every_conference_can_be_reached_by_number() {
 }
 
 #[test]
+fn board_snapshot_collections_are_typed_arrays() {
+    let output = run_ppl_on(
+        r#"
+        CONFERENCE conferences[]
+        USER users[]
+        AREA areas[]
+        DIRECTORY directories[]
+        DOOR doors[]
+        conferences = Board.Conferences
+        users = Board.Users
+        areas = conferences[0].Areas
+        directories = conferences[0].Directories
+        doors = conferences[0].Doors
+        PrintLn conferences.Len(), " ", users.Len(), " ", areas.Len(), " ", directories.Len(), " ", doors.Len()
+        "#,
+        |board| {
+            seed_board(board);
+            board.users.clear();
+            board.users.new_user(User::default());
+        },
+    );
+
+    assert_eq!(output, "2 1 1 0 0\n");
+}
+
+#[test]
 fn every_user_can_be_read_as_an_independent_snapshot() {
     let output = run_ppl_on(
         r#"
-        PrintLn Board.Users.Count
+        PrintLn Board.Users.Len()
         PrintLn Board.Users[0].Name, " ", Board.Users[0].City
         PrintLn Board.Users[1].Name, " ", Board.Users[1].Notes[0]
         PrintLn Board.Users[1].Contacts[0].Service, " ", Board.Users[1].Contacts[0].Account
@@ -131,7 +157,7 @@ fn a_board_value_can_be_kept_in_a_variable() {
     let output = run_ppl_on(
         r#"
         BOARD board = Board()
-        PrintLn board.Name, " ", board.Conferences.Count
+        PrintLn board.Name, " ", board.Conferences.Len()
         "#,
         seed_board,
     );

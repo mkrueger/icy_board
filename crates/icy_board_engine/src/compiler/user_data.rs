@@ -11,6 +11,7 @@ pub trait UserDataMemberRegistry {
     fn get_member_id(&self, name: &unicase::Ascii<String>) -> Option<usize>;
 
     fn add_property(&mut self, name: unicase::Ascii<String>, var_type: VariableType, has_setter: bool);
+    fn add_array_property(&mut self, name: unicase::Ascii<String>, var_type: VariableType, rank: u8);
 
     /// `required` is how many leading parameters a caller may not leave out.
     fn add_procedure_with(&mut self, name: unicase::Ascii<String>, parameters: Vec<VariableType>, required: usize);
@@ -47,6 +48,7 @@ pub trait UserDataMemberRegistry {
 
 pub trait UserData: Sized + UserDataValue {
     const TYPE_NAME: &'static str;
+    const EMPTY_VALUE: Option<fn() -> VariableValue> = None;
 
     /// The zero-argument builtin that hands back the one instance of this object, which is
     /// what lets `Terminal.Info` start at the caller's one `Terminal` value.
@@ -109,6 +111,7 @@ pub struct UserDataRegistry {
     pub member_id_lookup: HashMap<unicase::Ascii<String>, usize>,
 
     pub fields: HashMap<unicase::Ascii<String>, VariableType>,
+    pub field_ranks: HashMap<unicase::Ascii<String>, u8>,
     pub procedures: HashMap<unicase::Ascii<String>, MemberProcedure>,
     pub functions: HashMap<unicase::Ascii<String>, MemberFunction>,
 
@@ -117,6 +120,7 @@ pub struct UserDataRegistry {
 
     pub instance_provider: Option<crate::executable::FuncOpCode>,
     pub static_receiver: Option<fn() -> VariableValue>,
+    pub empty_value: Option<fn() -> VariableValue>,
 }
 
 impl UserDataMemberRegistry for UserDataRegistry {
@@ -131,6 +135,13 @@ impl UserDataMemberRegistry for UserDataRegistry {
         } else {
             self.id_table.push(UserDataEntry::Getter(name.clone()));
         }
+        self.fields.insert(name, var_type);
+    }
+
+    fn add_array_property(&mut self, name: unicase::Ascii<String>, var_type: VariableType, rank: u8) {
+        self.member_id_lookup.insert(name.clone(), self.id_table.len());
+        self.id_table.push(UserDataEntry::Getter(name.clone()));
+        self.field_ranks.insert(name.clone(), rank);
         self.fields.insert(name, var_type);
     }
 

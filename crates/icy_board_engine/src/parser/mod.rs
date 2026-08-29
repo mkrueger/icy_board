@@ -370,6 +370,9 @@ impl UserTypeRegistry {
         reg.register::<MessageArea>(MESSAGE_AREA_ID);
         reg.register::<FileDirectory>(FILE_DIRECTORY_ID);
         reg.register::<Door>(DOOR_ID);
+        reg.types.get_mut(&(DOOR_ID as u8)).unwrap().empty_value = Some(|| {
+            crate::compiler::user_data::user_data_value(crate::icy_board::doors::Door::default(), DOOR_ID)
+        });
         reg.register_record(
             CONTACT_ID,
             "CONTACT",
@@ -621,6 +624,7 @@ impl UserTypeRegistry {
         let mut registry = UserDataRegistry {
             instance_provider: T::INSTANCE_PROVIDER,
             static_receiver: T::STATIC_RECEIVER,
+            empty_value: T::EMPTY_VALUE,
             ..Default::default()
         };
         T::register_members(&mut registry);
