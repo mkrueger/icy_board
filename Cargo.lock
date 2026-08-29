@@ -5720,6 +5720,7 @@ dependencies = [
 [[package]]
 name = "native-v86-core"
 version = "0.1.6"
+source = "git+https://github.com/mkrueger/x86#e720d69c6595e66a7a560ad51c355f202c215daa"
 dependencies = [
  "cc",
  "serde_json",
@@ -12244,6 +12245,7 @@ checksum = "ea6fc2961e4ef194dcbfe56bb845534d0dc8098940c7e5c012a258bfec6701bd"
 [[package]]
 name = "x86-native"
 version = "0.1.8"
+source = "git+https://github.com/mkrueger/x86#e720d69c6595e66a7a560ad51c355f202c215daa"
 dependencies = [
  "crossterm 0.29.0",
  "hex",

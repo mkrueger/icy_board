@@ -65,7 +65,7 @@ async-recursion = "1.1.1"
 rand = "0.10.2"
 zip = "8.6.0"
 fatfs = "0.3.6"
-x86-native = { path = "../x86" }
+x86-native = { git = "https://github.com/mkrueger/x86" }
 sha2 = "0.10.9"
 
 walkdir = "2.2.6"
