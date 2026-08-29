@@ -365,19 +365,9 @@ impl IcyBoardState {
         let run_batch = crate::icy_board::doors::dos::expand_run_batch(door, self.node, drop_file);
         crate::icy_board::doors::dos::inject_session_files(&image_path, &files, &run_batch)?;
 
-        let runtime_remaining = dos_runtime_remaining(
-            self.session.login_date,
-            self.session.time_limit,
-            door.dos_max_runtime_seconds,
-        )
-        .expect("DOS doors always have a hard runtime limit");
-        let mut session = crate::icy_board::doors::dos::start_session(
-            &image_path,
-            &bios_path,
-            &vga_bios_path,
-            door.dos_memory_mb,
-            runtime_remaining,
-        )?;
+        let runtime_remaining = dos_runtime_remaining(self.session.login_date, self.session.time_limit, door.dos_max_runtime_seconds)
+            .expect("DOS doors always have a hard runtime limit");
+        let mut session = crate::icy_board::doors::dos::start_session(&image_path, &bios_path, &vga_bios_path, door.dos_memory_mb, runtime_remaining)?;
         let mut input = vec![0; 32 * 1024];
         let mut input_encoder = DosInputEncoder::default();
         let startup_timeout = tokio::time::sleep(Duration::from_secs(30));
@@ -638,9 +628,7 @@ pub enum BBSLinkError {
 mod test {
     use std::time::Duration;
 
-    use crate::icy_board::state::user_commands::pcb::open_door::{
-        BBSLinkError, DosInputEncoder, dos_output_for_terminal, dos_runtime_remaining,
-    };
+    use crate::icy_board::state::user_commands::pcb::open_door::{BBSLinkError, DosInputEncoder, dos_output_for_terminal, dos_runtime_remaining};
 
     use super::parse_bbslink_error;
     #[test]
