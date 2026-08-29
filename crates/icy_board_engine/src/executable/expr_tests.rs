@@ -14,6 +14,18 @@ fn string_member_function_ids_are_append_only() {
     assert_eq!(FuncOpCode::StringTrimChars as i16, -328);
     assert_eq!(FuncOpCode::StringTrimStartChars as i16, -329);
     assert_eq!(FuncOpCode::StringTrimEndChars as i16, -330);
+    assert_eq!(FuncOpCode::StringCharAt as i16, -331);
+    assert_eq!(FuncOpCode::StringFindComparison as i16, -332);
+    assert_eq!(FuncOpCode::StringFindLastComparison as i16, -333);
+    assert_eq!(FuncOpCode::StringContainsComparison as i16, -334);
+    assert_eq!(FuncOpCode::StringStartsWithComparison as i16, -335);
+    assert_eq!(FuncOpCode::StringEndsWithComparison as i16, -336);
+    assert_eq!(FuncOpCode::StringCountComparison as i16, -337);
+    assert_eq!(FuncOpCode::StringEquals as i16, -338);
+    assert_eq!(FuncOpCode::StringEqualsComparison as i16, -339);
+    assert_eq!(FuncOpCode::StringSplit as i16, -340);
+    assert_eq!(FuncOpCode::StringSplitLimit as i16, -341);
+    assert_eq!(FuncOpCode::ArrayValueAt as i16, -342);
 
     for (opcode, arity) in [
         (FuncOpCode::StringFindFrom, 3),
@@ -30,6 +42,18 @@ fn string_member_function_ids_are_append_only() {
         (FuncOpCode::StringTrimChars, 2),
         (FuncOpCode::StringTrimStartChars, 2),
         (FuncOpCode::StringTrimEndChars, 2),
+        (FuncOpCode::StringCharAt, 2),
+        (FuncOpCode::StringFindComparison, 4),
+        (FuncOpCode::StringFindLastComparison, 4),
+        (FuncOpCode::StringContainsComparison, 3),
+        (FuncOpCode::StringStartsWithComparison, 3),
+        (FuncOpCode::StringEndsWithComparison, 3),
+        (FuncOpCode::StringCountComparison, 3),
+        (FuncOpCode::StringEquals, 2),
+        (FuncOpCode::StringEqualsComparison, 3),
+        (FuncOpCode::StringSplit, 2),
+        (FuncOpCode::StringSplitLimit, 3),
+        (FuncOpCode::ArrayValueAt, 2),
     ] {
         let arguments: Vec<_> = (1..=arity).map(PPEExpr::Value).collect();
         let mut expected: Vec<_> = (1..=arity).flat_map(|id| [id as i16, 0]).collect();

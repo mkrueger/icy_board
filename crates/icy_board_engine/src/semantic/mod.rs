@@ -89,16 +89,13 @@ pub enum SemanticInfo {
     ArrayMemberFunc(FuncOpCode, Vec<i32>),
 
     /// A scalar string function written with its receiver first.
-    StringMemberFunc(FuncOpCode),
+    StringMemberFunc(FuncOpCode, &'static [i32]),
+
+    /// Indexing a one-dimensional array produced by an expression.
+    ArrayValueAt,
 
     /// A built-in scalar type namespace function, `STRING.Join(...)`.
     StringStaticFunc(FuncOpCode),
-
-    /// `value.Split(...)` or `STRING.Split(value, ...)`, lowered to one statement.
-    StringSplitProc {
-        static_call: bool,
-        default_limit: bool,
-    },
 
     /// `regex.Split(text, target [, limit])`, lowered to an array-writing statement.
     RegexSplitProc {
@@ -163,43 +160,50 @@ pub const STRING_MEMBERS: &[StringMember] = &[
     },
     StringMember {
         name: "Find",
-        arguments: 1..=2,
+        arguments: 1..=3,
         return_type: VariableType::Integer,
         is_static: false,
         is_procedure: false,
     },
     StringMember {
         name: "FindLast",
-        arguments: 1..=2,
+        arguments: 1..=3,
         return_type: VariableType::Integer,
         is_static: false,
         is_procedure: false,
     },
     StringMember {
         name: "Contains",
-        arguments: 1..=1,
+        arguments: 1..=2,
         return_type: VariableType::Boolean,
         is_static: false,
         is_procedure: false,
     },
     StringMember {
         name: "StartsWith",
-        arguments: 1..=1,
+        arguments: 1..=2,
         return_type: VariableType::Boolean,
         is_static: false,
         is_procedure: false,
     },
     StringMember {
         name: "EndsWith",
-        arguments: 1..=1,
+        arguments: 1..=2,
         return_type: VariableType::Boolean,
         is_static: false,
         is_procedure: false,
     },
     StringMember {
         name: "Count",
-        arguments: 1..=1,
+        arguments: 1..=2,
         return_type: VariableType::Integer,
+        is_static: false,
+        is_procedure: false,
+    },
+    StringMember {
+        name: "Equals",
+        arguments: 1..=2,
+        return_type: VariableType::Boolean,
         is_static: false,
         is_procedure: false,
     },
@@ -247,10 +251,10 @@ pub const STRING_MEMBERS: &[StringMember] = &[
     },
     StringMember {
         name: "Split",
-        arguments: 2..=3,
-        return_type: VariableType::None,
+        arguments: 1..=2,
+        return_type: VariableType::BigStr,
         is_static: false,
-        is_procedure: true,
+        is_procedure: false,
     },
     StringMember {
         name: "Join",
@@ -268,37 +272,46 @@ pub const STRING_MEMBERS: &[StringMember] = &[
     },
     StringMember {
         name: "Split",
-        arguments: 3..=4,
-        return_type: VariableType::None,
+        arguments: 2..=3,
+        return_type: VariableType::BigStr,
         is_static: true,
-        is_procedure: true,
+        is_procedure: false,
     },
 ];
 
-fn string_member(name: &unicase::Ascii<String>, arguments: usize) -> Option<(FuncOpCode, VariableType)> {
+fn string_member(name: &unicase::Ascii<String>, arguments: usize) -> Option<(FuncOpCode, VariableType, &'static [i32])> {
     let normalized = name.as_ref().to_ascii_lowercase();
-    let (opcode, return_type, expected) = match (normalized.as_str(), arguments) {
-        ("len", 0) => (FuncOpCode::LEN, VariableType::Integer, true),
-        ("find", 1) => (FuncOpCode::INSTR, VariableType::Integer, true),
-        ("find", 2) => (FuncOpCode::StringFindFrom, VariableType::Integer, true),
-        ("findlast", 1) => (FuncOpCode::INSTRR, VariableType::Integer, true),
-        ("findlast", 2) => (FuncOpCode::StringFindLastFrom, VariableType::Integer, true),
-        ("contains", 1) => (FuncOpCode::StringContains, VariableType::Boolean, true),
-        ("startswith", 1) => (FuncOpCode::StringStartsWith, VariableType::Boolean, true),
-        ("endswith", 1) => (FuncOpCode::StringEndsWith, VariableType::Boolean, true),
-        ("count", 1) => (FuncOpCode::StringCount, VariableType::Integer, true),
-        ("replace", 2) => (FuncOpCode::REPLACESTR, VariableType::BigStr, true),
-        ("trim", 0) => (FuncOpCode::StringTrim, VariableType::BigStr, true),
-        ("trim", 1) => (FuncOpCode::StringTrimChars, VariableType::BigStr, true),
-        ("trimstart", 0) => (FuncOpCode::StringTrimStart, VariableType::BigStr, true),
-        ("trimstart", 1) => (FuncOpCode::StringTrimStartChars, VariableType::BigStr, true),
-        ("trimend", 0) => (FuncOpCode::StringTrimEnd, VariableType::BigStr, true),
-        ("trimend", 1) => (FuncOpCode::StringTrimEndChars, VariableType::BigStr, true),
-        ("toupper", 0) => (FuncOpCode::UPPER, VariableType::BigStr, true),
-        ("tolower", 0) => (FuncOpCode::LOWER, VariableType::BigStr, true),
-        _ => (FuncOpCode::END, VariableType::None, false),
-    };
-    expected.then_some((opcode, return_type))
+    match (normalized.as_str(), arguments) {
+        ("len", 0) => Some((FuncOpCode::LEN, VariableType::Integer, &[])),
+        ("find", 1) => Some((FuncOpCode::StringFindFrom, VariableType::Integer, &[0])),
+        ("find", 2) => Some((FuncOpCode::StringFindFrom, VariableType::Integer, &[])),
+        ("find", 3) => Some((FuncOpCode::StringFindComparison, VariableType::Integer, &[])),
+        ("findlast", 1) => Some((FuncOpCode::StringFindLastFrom, VariableType::Integer, &[i32::MAX])),
+        ("findlast", 2) => Some((FuncOpCode::StringFindLastFrom, VariableType::Integer, &[])),
+        ("findlast", 3) => Some((FuncOpCode::StringFindLastComparison, VariableType::Integer, &[])),
+        ("contains", 1) => Some((FuncOpCode::StringContains, VariableType::Boolean, &[])),
+        ("contains", 2) => Some((FuncOpCode::StringContainsComparison, VariableType::Boolean, &[])),
+        ("startswith", 1) => Some((FuncOpCode::StringStartsWith, VariableType::Boolean, &[])),
+        ("startswith", 2) => Some((FuncOpCode::StringStartsWithComparison, VariableType::Boolean, &[])),
+        ("endswith", 1) => Some((FuncOpCode::StringEndsWith, VariableType::Boolean, &[])),
+        ("endswith", 2) => Some((FuncOpCode::StringEndsWithComparison, VariableType::Boolean, &[])),
+        ("count", 1) => Some((FuncOpCode::StringCount, VariableType::Integer, &[])),
+        ("count", 2) => Some((FuncOpCode::StringCountComparison, VariableType::Integer, &[])),
+        ("equals", 1) => Some((FuncOpCode::StringEquals, VariableType::Boolean, &[])),
+        ("equals", 2) => Some((FuncOpCode::StringEqualsComparison, VariableType::Boolean, &[])),
+        ("replace", 2) => Some((FuncOpCode::REPLACESTR, VariableType::BigStr, &[])),
+        ("trim", 0) => Some((FuncOpCode::StringTrim, VariableType::BigStr, &[])),
+        ("trim", 1) => Some((FuncOpCode::StringTrimChars, VariableType::BigStr, &[])),
+        ("trimstart", 0) => Some((FuncOpCode::StringTrimStart, VariableType::BigStr, &[])),
+        ("trimstart", 1) => Some((FuncOpCode::StringTrimStartChars, VariableType::BigStr, &[])),
+        ("trimend", 0) => Some((FuncOpCode::StringTrimEnd, VariableType::BigStr, &[])),
+        ("trimend", 1) => Some((FuncOpCode::StringTrimEndChars, VariableType::BigStr, &[])),
+        ("toupper", 0) => Some((FuncOpCode::UPPER, VariableType::BigStr, &[])),
+        ("tolower", 0) => Some((FuncOpCode::LOWER, VariableType::BigStr, &[])),
+        ("split", 1) => Some((FuncOpCode::StringSplit, VariableType::BigStr, &[])),
+        ("split", 2) => Some((FuncOpCode::StringSplitLimit, VariableType::BigStr, &[])),
+        _ => None,
+    }
 }
 
 fn string_member_type(name: &unicase::Ascii<String>) -> Option<VariableType> {
@@ -1011,12 +1024,7 @@ impl SemanticVisitor {
                         generic_data: header.create_generic_data().unwrap_or_default(),
                     }
                 };
-                variable_table.push(TableEntry::new(
-                    format!("{} result", f.get_identifier()),
-                    header,
-                    value,
-                    EntryType::Variable,
-                ));
+                variable_table.push(TableEntry::new(format!("{} result", f.get_identifier()), header, value, EntryType::Variable));
             }
 
             variable_table.end_compile_function_body();
@@ -1657,7 +1665,13 @@ impl SemanticVisitor {
         let registry = self.type_registry.get_type_from_id(user_type)?;
         let function = registry.functions.get(name)?;
         let member_id = registry.get_member_id(name)?;
-        Some((member_id, function.required, function.parameters.clone(), function.return_type, function.return_rank))
+        Some((
+            member_id,
+            function.required,
+            function.parameters.clone(),
+            function.return_type,
+            function.return_rank,
+        ))
     }
 
     fn check_member_arg_types(&mut self, expected: &[VariableType], arguments: &[Expression]) {
@@ -2595,6 +2609,26 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 return array_member.return_type;
             }
         }
+        if self.lang_version >= 400
+            && let Expression::MemberReference(member) = call.get_expression()
+            && member.get_identifier().as_ref() == "<get>"
+            && call.get_arguments().len() == 1
+        {
+            let receiver_type = member.get_expression().visit(self);
+            if let Some(shape) = self.array_shape(member.get_expression())
+                && shape.rank == 1
+            {
+                call.get_arguments()[0].visit(self);
+                self.function_type_lookup.insert(call.id, SemanticInfo::ArrayValueAt);
+                return shape.element_type;
+            }
+            if matches!(receiver_type, VariableType::String | VariableType::BigStr) {
+                call.get_arguments()[0].visit(self);
+                self.function_type_lookup
+                    .insert(call.id, SemanticInfo::StringMemberFunc(FuncOpCode::StringCharAt, &[]));
+                return VariableType::String;
+            }
+        }
         let outer_func_call = self.cur_func_call;
         self.cur_func_call = call.id;
         call.get_expression().visit(self);
@@ -2634,22 +2668,23 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                             .insert(call.id, SemanticInfo::StringStaticFunc(FuncOpCode::StringRepeat));
                         return VariableType::BigStr;
                     }
-                    "split" if (3..=4).contains(&call.get_arguments().len()) => {
-                        for argument in call.get_arguments() {
-                            argument.visit(self);
+                    "split" if (2..=3).contains(&call.get_arguments().len()) => {
+                        let argument_types: Vec<_> = call.get_arguments().iter().map(|argument| argument.visit(self)).collect();
+                        let opcode = if call.get_arguments().len() == 2 {
+                            FuncOpCode::StringSplit
+                        } else {
+                            FuncOpCode::StringSplitLimit
+                        };
+                        if opcode == FuncOpCode::StringSplitLimit && argument_types.last() != Some(&VariableType::Integer) {
+                            let actual = argument_types.last().copied().unwrap_or(VariableType::None);
+                            self.errors.lock().unwrap().report_error(
+                                call.get_arguments().last().unwrap().get_span(),
+                                CompilationErrorType::ArgumentTypeMismatch(3, "INTEGER".to_string(), self.source_type_name(actual)),
+                            );
                         }
-                        self.validate_string_split_target(&call.get_arguments()[2]);
-                        if call.get_arguments().len() == 3 {
-                            self.add_constant(&Constant::Integer(0, crate::ast::constant::NumberFormat::Default));
-                        }
-                        self.function_type_lookup.insert(
-                            call.id,
-                            SemanticInfo::StringSplitProc {
-                                static_call: true,
-                                default_limit: call.get_arguments().len() == 3,
-                            },
-                        );
-                        return VariableType::None;
+                        self.function_type_lookup.insert(call.id, SemanticInfo::StringStaticFunc(opcode));
+                        self.member_array_returns.insert(call.id, (VariableType::BigStr, 1));
+                        return VariableType::BigStr;
                     }
                     _ => {}
                 }
@@ -2664,26 +2699,6 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             } else {
                 member.get_expression().visit(self)
             };
-            if matches!(receiver_type, VariableType::String | VariableType::BigStr)
-                && *member.get_identifier() == "Split"
-                && (2..=3).contains(&call.get_arguments().len())
-            {
-                for argument in call.get_arguments() {
-                    argument.visit(self);
-                }
-                self.validate_string_split_target(&call.get_arguments()[1]);
-                if call.get_arguments().len() == 2 {
-                    self.add_constant(&Constant::Integer(0, crate::ast::constant::NumberFormat::Default));
-                }
-                self.function_type_lookup.insert(
-                    call.id,
-                    SemanticInfo::StringSplitProc {
-                        static_call: false,
-                        default_limit: call.get_arguments().len() == 2,
-                    },
-                );
-                return VariableType::None;
-            }
             if receiver_type == VariableType::UserData(crate::parser::REGEX_ID as u8)
                 && *member.get_identifier() == "Split"
                 && (2..=3).contains(&call.get_arguments().len())
@@ -2704,10 +2719,35 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 return VariableType::None;
             }
             if matches!(receiver_type, VariableType::String | VariableType::BigStr)
-                && let Some((opcode, return_type)) = string_member(member.get_identifier(), call.get_arguments().len())
+                && let Some((opcode, return_type, defaults)) = string_member(member.get_identifier(), call.get_arguments().len())
             {
-                for argument in call.get_arguments() {
-                    argument.visit(self);
+                let argument_types: Vec<_> = call.get_arguments().iter().map(|argument| argument.visit(self)).collect();
+                if opcode == FuncOpCode::StringSplitLimit && argument_types.last() != Some(&VariableType::Integer) {
+                    let actual = argument_types.last().copied().unwrap_or(VariableType::None);
+                    self.errors.lock().unwrap().report_error(
+                        call.get_arguments().last().unwrap().get_span(),
+                        CompilationErrorType::ArgumentTypeMismatch(call.get_arguments().len(), "INTEGER".to_string(), self.source_type_name(actual)),
+                    );
+                }
+                if matches!(
+                    opcode,
+                    FuncOpCode::StringFindComparison
+                        | FuncOpCode::StringFindLastComparison
+                        | FuncOpCode::StringContainsComparison
+                        | FuncOpCode::StringStartsWithComparison
+                        | FuncOpCode::StringEndsWithComparison
+                        | FuncOpCode::StringCountComparison
+                        | FuncOpCode::StringEqualsComparison
+                ) && argument_types.last() != Some(&VariableType::UserData(crate::parser::STRING_COMPARISON_ENUM_ID))
+                {
+                    let actual = argument_types.last().copied().unwrap_or(VariableType::None);
+                    self.errors.lock().unwrap().report_error(
+                        call.get_arguments().last().unwrap().get_span(),
+                        CompilationErrorType::ArgumentTypeMismatch(call.get_arguments().len(), "StringComparison".to_string(), self.source_type_name(actual)),
+                    );
+                }
+                for value in defaults {
+                    self.add_constant(&Constant::Integer(*value, crate::ast::constant::NumberFormat::Default));
                 }
                 if self.runtime < opcode.minimum_runtime() {
                     self.errors.lock().unwrap().report_error(
@@ -2715,7 +2755,10 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                         CompilationErrorType::BuiltinNeedsRuntime(format!("STRING.{}", member.get_identifier()), opcode.minimum_runtime()),
                     );
                 }
-                self.function_type_lookup.insert(call.id, SemanticInfo::StringMemberFunc(opcode));
+                self.function_type_lookup.insert(call.id, SemanticInfo::StringMemberFunc(opcode, defaults));
+                if matches!(opcode, FuncOpCode::StringSplit | FuncOpCode::StringSplitLimit) {
+                    self.member_array_returns.insert(call.id, (VariableType::BigStr, 1));
+                }
                 return return_type;
             }
 
@@ -2876,10 +2919,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
 
                 let (rt, r) = &mut self.references[idx];
 
-                if self.lang_version >= 400
-                    && r.header.as_ref().is_some_and(|header| header.dim > 0)
-                    && call.get_lpar_token().token == Token::LPar
-                {
+                if self.lang_version >= 400 && r.header.as_ref().is_some_and(|header| header.dim > 0) && call.get_lpar_token().token == Token::LPar {
                     self.errors
                         .lock()
                         .unwrap()
@@ -2982,6 +3022,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
     fn visit_indexer_expression(&mut self, indexer: &crate::ast::IndexerExpression) -> VariableType {
         let mut found = false;
         let mut res = VariableType::None;
+        let mut string_index = false;
         let arg_count = if let Some(idx) = self.lookup_variable(indexer.get_identifier()) {
             let (rt, r) = &mut self.references[idx];
             if matches!(rt, ReferenceType::Function(_)) {
@@ -2993,6 +3034,10 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             }
             found = true;
             res = r.variable_type;
+            string_index = self.lang_version >= 400
+                && matches!(r.variable_type, VariableType::String | VariableType::BigStr)
+                && r.header.as_ref().unwrap().dim == 0
+                && indexer.get_arguments().len() == 1;
             r.usages.push((
                 self.errors.lock().unwrap().file_name().to_path_buf(),
                 Spanned::new(indexer.get_identifier().to_string(), indexer.get_identifier_token().span.clone()),
@@ -3003,7 +3048,11 @@ impl AstVisitor<VariableType> for SemanticVisitor {
         };
 
         if found {
-            self.check_arg_count(arg_count, indexer.get_arguments().len(), indexer.get_identifier_token());
+            if string_index {
+                res = VariableType::String;
+            } else {
+                self.check_arg_count(arg_count, indexer.get_arguments().len(), indexer.get_identifier_token());
+            }
         } else {
             self.errors.lock().unwrap().report_error(
                 indexer.get_identifier_token().span.clone(),
@@ -3628,12 +3677,8 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                         );
                     }
                     cont.functions = FunctionDeclaration::Function(
-                        FunctionDeclarationAstNode::empty(
-                            function.get_identifier().clone(),
-                            function.get_parameters().clone(),
-                            function.get_return_type(),
-                        )
-                        .with_return_rank(function.get_return_rank()),
+                        FunctionDeclarationAstNode::empty(function.get_identifier().clone(), function.get_parameters().clone(), function.get_return_type())
+                            .with_return_rank(function.get_return_rank()),
                     );
                     break;
                 }

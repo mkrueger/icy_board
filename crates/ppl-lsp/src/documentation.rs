@@ -209,6 +209,7 @@ pub fn get_string_member_documentation(member: &str) -> Option<String> {
         "startswith" => Some(fl!(LANGUAGE_LOADER, "hint-string-starts-with")),
         "endswith" => Some(fl!(LANGUAGE_LOADER, "hint-string-ends-with")),
         "count" => Some(fl!(LANGUAGE_LOADER, "hint-string-count")),
+        "equals" => Some(fl!(LANGUAGE_LOADER, "hint-string-equals")),
         "replace" => Some(fl!(LANGUAGE_LOADER, "hint-string-replace")),
         "trim" => Some(fl!(LANGUAGE_LOADER, "hint-string-trim")),
         "trimstart" => Some(fl!(LANGUAGE_LOADER, "hint-string-trim-start")),

@@ -193,6 +193,22 @@ fn member_completion(visitor: &SemanticVisitor, path: &[String], language_versio
         return completion_items(string_members(true), None);
     }
     if path.len() == 1
+        && let Some(definition) = visitor.type_registry.get_enum(&unicase::Ascii::new(path[0].clone()))
+    {
+        return completion_items(
+            definition
+                .variants
+                .iter()
+                .map(|(name, _)| crate::type_lookup::Member {
+                    name: name.to_string(),
+                    detail: definition.name.to_string(),
+                    kind: MemberKind::Field,
+                })
+                .collect(),
+            Some(icy_board_engine::executable::VariableType::UserData(definition.id)),
+        );
+    }
+    if path.len() == 1
         && let Some(var_type) = static_type_of_name(visitor, &path[0])
     {
         return completion_items(static_members_of(&visitor.type_registry, var_type), Some(var_type));

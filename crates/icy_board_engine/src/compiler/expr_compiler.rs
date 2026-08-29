@@ -188,15 +188,29 @@ impl AstVisitor<PPEExpr> for ExpressionCompiler<'_> {
                 );
                 PPEExpr::PredefinedFunctionCall(op_code.get_definition(), call_arguments)
             }
-            SemanticInfo::StringMemberFunc(op_code) => {
+            SemanticInfo::StringMemberFunc(op_code, defaults) => {
                 let Expression::MemberReference(member) = call.get_expression() else {
                     return PPEExpr::Value(0);
                 };
                 let mut call_arguments = vec![member.get_expression().visit(self)];
                 call_arguments.extend(arguments);
+                call_arguments.extend(
+                    defaults
+                        .iter()
+                        .map(|value| PPEExpr::Value(self.compiler.lookup_table.lookup_constant(&Constant::Integer(*value, NumberFormat::Default)))),
+                );
                 PPEExpr::PredefinedFunctionCall(op_code.get_definition(), call_arguments)
             }
             SemanticInfo::StringStaticFunc(op_code) => PPEExpr::PredefinedFunctionCall(op_code.get_definition(), arguments),
+            SemanticInfo::ArrayValueAt => {
+                let Expression::MemberReference(member) = call.get_expression() else {
+                    return PPEExpr::Value(0);
+                };
+                PPEExpr::PredefinedFunctionCall(
+                    FuncOpCode::ArrayValueAt.get_definition(),
+                    vec![member.get_expression().visit(self), arguments.into_iter().next().unwrap()],
+                )
+            }
             SemanticInfo::FunctionReference(idx) => {
                 let reference_index = self.compiler.semantic_visitor.function_containers[idx].id;
                 let table_index = self.compiler.semantic_visitor.references[reference_index].1.variable_table_index;
@@ -211,7 +225,7 @@ impl AstVisitor<PPEExpr> for ExpressionCompiler<'_> {
                 log::error!("Invalid function call: {function_type:?}");
                 PPEExpr::Value(0)
             }
-            SemanticInfo::ArrayMemberProc(_) | SemanticInfo::StringSplitProc { .. } | SemanticInfo::RegexSplitProc { .. } => {
+            SemanticInfo::ArrayMemberProc(_) | SemanticInfo::RegexSplitProc { .. } => {
                 log::error!("Array statement used where a value is expected: {function_type:?}");
                 PPEExpr::Value(0)
             }
@@ -230,6 +244,12 @@ impl AstVisitor<PPEExpr> for ExpressionCompiler<'_> {
             let var = self.compiler.lookup_table.variable_table.get_var_entry(table_idx);
             if var.value.get_type() == VariableType::Function {
                 return PPEExpr::FunctionCall(var.header.id, arguments);
+            }
+            if var.header.dim == 0 && matches!(var.header.variable_type, VariableType::String | VariableType::BigStr) && arguments.len() == 1 {
+                return PPEExpr::PredefinedFunctionCall(
+                    FuncOpCode::StringCharAt.get_definition(),
+                    vec![PPEExpr::Value(var.header.id), arguments.into_iter().next().unwrap()],
+                );
             }
             if var.header.dim as usize != arguments.len() {
                 log::error!("Invalid dimensions for function call: {}", indexer.get_identifier());

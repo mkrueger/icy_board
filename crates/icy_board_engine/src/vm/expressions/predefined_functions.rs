@@ -336,29 +336,28 @@ pub async fn instr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variabl
     }
 }
 
-fn char_offset(text: &str, one_based: i32) -> Option<usize> {
-    if one_based < 1 {
+fn char_offset(text: &str, index: i32) -> Option<usize> {
+    if index < 0 {
         return None;
     }
-    if one_based == 1 {
-        return Some(0);
-    }
-    text.char_indices().nth(one_based as usize - 1).map(|(offset, _)| offset)
+    text.char_indices().nth(index as usize).map(|(offset, _)| offset)
 }
 
 pub async fn string_find_from(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let text = vm.eval_expr(&args[0]).await?.as_string();
     let search = vm.eval_expr(&args[1]).await?.as_string();
     let start = vm.eval_expr(&args[2]).await?.as_int();
+    string_find_values(&text, &search, start)
+}
+
+fn string_find_values(text: &str, search: &str, start: i32) -> Res<VariableValue> {
     if search.is_empty() {
-        return Ok(VariableValue::new_int(0));
+        return Ok(VariableValue::new_int(-1));
     }
-    let Some(offset) = char_offset(&text, start) else {
-        return Ok(VariableValue::new_int(0));
+    let Some(offset) = char_offset(text, start) else {
+        return Ok(VariableValue::new_int(-1));
     };
-    let result = text[offset..]
-        .find(&search)
-        .map_or(0, |found| text[..offset + found].chars().count() as i32 + 1);
+    let result = text[offset..].find(search).map_or(-1, |found| text[..offset + found].chars().count() as i32);
     Ok(VariableValue::new_int(result))
 }
 
@@ -366,11 +365,23 @@ pub async fn string_find_last_from(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]
     let text = vm.eval_expr(&args[0]).await?.as_string();
     let search = vm.eval_expr(&args[1]).await?.as_string();
     let start = vm.eval_expr(&args[2]).await?.as_int();
-    if search.is_empty() || start < 1 {
-        return Ok(VariableValue::new_int(0));
+    string_find_last_values(&text, &search, start)
+}
+
+fn string_find_last_end(text: &str, start: i32) -> usize {
+    usize::try_from(start)
+        .ok()
+        .and_then(|start| start.checked_add(1))
+        .and_then(|end| text.char_indices().nth(end).map(|(offset, _)| offset))
+        .unwrap_or(text.len())
+}
+
+fn string_find_last_values(text: &str, search: &str, start: i32) -> Res<VariableValue> {
+    if search.is_empty() || start < 0 {
+        return Ok(VariableValue::new_int(-1));
     }
-    let end = text.char_indices().nth(start as usize).map_or(text.len(), |(offset, _)| offset);
-    let result = text[..end].rfind(&search).map_or(0, |found| text[..found].chars().count() as i32 + 1);
+    let end = string_find_last_end(text, start);
+    let result = text[..end].rfind(search).map_or(-1, |found| text[..found].chars().count() as i32);
     Ok(VariableValue::new_int(result))
 }
 
@@ -430,6 +441,216 @@ pub async fn string_trim_end_chars(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]
     let text = vm.eval_expr(&args[0]).await?.as_string();
     let characters = vm.eval_expr(&args[1]).await?.as_string();
     Ok(VariableValue::new_string(text.trim_end_matches(|character| characters.contains(character)).to_string()).convert_to(VariableType::BigStr))
+}
+
+pub async fn string_char_at(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let text = vm.eval_expr(&args[0]).await?.as_string();
+    let index = vm.eval_expr(&args[1]).await?.as_int();
+    let character = usize::try_from(index)
+        .ok()
+        .and_then(|index| text.chars().nth(index))
+        .map(|character| character.to_string())
+        .unwrap_or_default();
+    Ok(VariableValue::new_string(character))
+}
+
+fn string_comparison_mode(vm: &mut VirtualMachine<'_>, value: i32) -> Option<bool> {
+    match value {
+        0 => Some(false),
+        1 => Some(true),
+        _ => {
+            vm.set_error(PplError::new(ERR_KIND_STRING, ERR_INVALID, "invalid StringComparison value"));
+            None
+        }
+    }
+}
+
+fn ignore_case_regex(pattern: &str) -> regex::Regex {
+    regex::RegexBuilder::new(&regex::escape(pattern))
+        .case_insensitive(true)
+        .build()
+        .expect("an escaped string is always a valid regex")
+}
+
+pub async fn string_find_comparison(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let text = vm.eval_expr(&args[0]).await?.as_string();
+    let search = vm.eval_expr(&args[1]).await?.as_string();
+    let start = vm.eval_expr(&args[2]).await?.as_int();
+    let mode = vm.eval_expr(&args[3]).await?.as_int();
+    let Some(ignore_case) = string_comparison_mode(vm, mode) else {
+        return Ok(VariableValue::new_int(-1));
+    };
+    if !ignore_case {
+        return string_find_values(&text, &search, start);
+    }
+    if search.is_empty() {
+        return Ok(VariableValue::new_int(-1));
+    }
+    let Some(offset) = char_offset(&text, start) else {
+        return Ok(VariableValue::new_int(-1));
+    };
+    let result = ignore_case_regex(&search)
+        .find_at(&text, offset)
+        .map_or(-1, |found| text[..found.start()].chars().count() as i32);
+    Ok(VariableValue::new_int(result))
+}
+
+pub async fn string_find_last_comparison(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let text = vm.eval_expr(&args[0]).await?.as_string();
+    let search = vm.eval_expr(&args[1]).await?.as_string();
+    let start = vm.eval_expr(&args[2]).await?.as_int();
+    let mode = vm.eval_expr(&args[3]).await?.as_int();
+    let Some(ignore_case) = string_comparison_mode(vm, mode) else {
+        return Ok(VariableValue::new_int(-1));
+    };
+    if !ignore_case {
+        return string_find_last_values(&text, &search, start);
+    }
+    if search.is_empty() || start < 0 {
+        return Ok(VariableValue::new_int(-1));
+    }
+    let end = string_find_last_end(&text, start);
+    let result = ignore_case_regex(&search)
+        .find_iter(&text[..end])
+        .last()
+        .map_or(-1, |found| text[..found.start()].chars().count() as i32);
+    Ok(VariableValue::new_int(result))
+}
+
+pub async fn string_contains_comparison(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let text = vm.eval_expr(&args[0]).await?.as_string();
+    let search = vm.eval_expr(&args[1]).await?.as_string();
+    let mode = vm.eval_expr(&args[2]).await?.as_int();
+    let Some(ignore_case) = string_comparison_mode(vm, mode) else {
+        return Ok(VariableValue::new_bool(false));
+    };
+    let found = !search.is_empty()
+        && if ignore_case {
+            ignore_case_regex(&search).is_match(&text)
+        } else {
+            text.contains(&search)
+        };
+    Ok(VariableValue::new_bool(found))
+}
+
+pub async fn string_starts_with_comparison(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let text = vm.eval_expr(&args[0]).await?.as_string();
+    let prefix = vm.eval_expr(&args[1]).await?.as_string();
+    let mode = vm.eval_expr(&args[2]).await?.as_int();
+    let Some(ignore_case) = string_comparison_mode(vm, mode) else {
+        return Ok(VariableValue::new_bool(false));
+    };
+    let found = if ignore_case {
+        ignore_case_regex(&prefix).find(&text).is_some_and(|found| found.start() == 0)
+    } else {
+        text.starts_with(&prefix)
+    };
+    Ok(VariableValue::new_bool(found))
+}
+
+pub async fn string_ends_with_comparison(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let text = vm.eval_expr(&args[0]).await?.as_string();
+    let suffix = vm.eval_expr(&args[1]).await?.as_string();
+    let mode = vm.eval_expr(&args[2]).await?.as_int();
+    let Some(ignore_case) = string_comparison_mode(vm, mode) else {
+        return Ok(VariableValue::new_bool(false));
+    };
+    let found = if ignore_case {
+        ignore_case_regex(&suffix)
+            .find_iter(&text)
+            .last()
+            .is_some_and(|found| found.end() == text.len())
+    } else {
+        text.ends_with(&suffix)
+    };
+    Ok(VariableValue::new_bool(found))
+}
+
+pub async fn string_count_comparison(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let text = vm.eval_expr(&args[0]).await?.as_string();
+    let search = vm.eval_expr(&args[1]).await?.as_string();
+    let mode = vm.eval_expr(&args[2]).await?.as_int();
+    let Some(ignore_case) = string_comparison_mode(vm, mode) else {
+        return Ok(VariableValue::new_int(0));
+    };
+    let count = if search.is_empty() {
+        0
+    } else if ignore_case {
+        ignore_case_regex(&search).find_iter(&text).count() as i32
+    } else {
+        text.matches(&search).count() as i32
+    };
+    Ok(VariableValue::new_int(count))
+}
+
+pub async fn string_equals(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let left = vm.eval_expr(&args[0]).await?.as_string();
+    let right = vm.eval_expr(&args[1]).await?.as_string();
+    Ok(VariableValue::new_bool(left == right))
+}
+
+pub async fn string_equals_comparison(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let left = vm.eval_expr(&args[0]).await?.as_string();
+    let right = vm.eval_expr(&args[1]).await?.as_string();
+    let mode = vm.eval_expr(&args[2]).await?.as_int();
+    let Some(ignore_case) = string_comparison_mode(vm, mode) else {
+        return Ok(VariableValue::new_bool(false));
+    };
+    let equal = if ignore_case {
+        ignore_case_regex(&right)
+            .find(&left)
+            .is_some_and(|found| found.start() == 0 && found.end() == left.len())
+    } else {
+        left == right
+    };
+    Ok(VariableValue::new_bool(equal))
+}
+
+pub async fn string_split(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    string_split_values(vm, args, 0).await
+}
+
+pub async fn string_split_limit(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let limit = vm.eval_expr(&args[2]).await?.as_int();
+    string_split_values(vm, args, limit).await
+}
+
+async fn string_split_values(vm: &mut VirtualMachine<'_>, args: &[PPEExpr], limit: i32) -> Res<VariableValue> {
+    let text = vm.eval_expr(&args[0]).await?.as_string();
+    let separator = vm.eval_expr(&args[1]).await?.as_string();
+    if separator.is_empty() {
+        vm.set_error(PplError::new(ERR_KIND_STRING, ERR_INVALID, "STRING.Split separator cannot be empty"));
+        return Ok(VariableValue::new_vector(VariableType::BigStr, Vec::new()));
+    }
+    if limit < 0 {
+        vm.set_error(PplError::new(ERR_KIND_STRING, ERR_INVALID, "STRING.Split limit cannot be negative"));
+        return Ok(VariableValue::new_vector(VariableType::BigStr, Vec::new()));
+    }
+    let parts: Vec<_> = if limit == 0 {
+        text.split(&separator).map(str::to_string).collect()
+    } else {
+        text.splitn(limit as usize, &separator).map(str::to_string).collect()
+    };
+    vm.operation_succeeded();
+    Ok(VariableValue::new_vector(
+        VariableType::BigStr,
+        parts
+            .into_iter()
+            .map(|part| VariableValue::new_string(part).convert_to(VariableType::BigStr))
+            .collect(),
+    ))
+}
+
+pub async fn array_value_at(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let array = vm.eval_array_operand(&args[0]).await?;
+    let index = vm.eval_expr(&args[1]).await?.as_int();
+    let GenericVariableData::Dim1(values) = &array.generic_data else {
+        return Ok(array.vtype.create_empty_value());
+    };
+    Ok(usize::try_from(index)
+        .ok()
+        .and_then(|index| values.get(index).cloned())
+        .unwrap_or_else(|| array.vtype.create_empty_value()))
 }
 
 pub async fn string_join(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {

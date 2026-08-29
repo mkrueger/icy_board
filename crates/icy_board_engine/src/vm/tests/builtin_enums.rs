@@ -152,4 +152,5 @@ fn the_user_error_kind_is_appended_without_moving_existing_values() {
         ),
         "0 1 2 4 8 16 32\n"
     );
+    assert_eq!(run_ppl("PrintLn StringComparison.Ordinal, \" \", StringComparison.OrdinalIgnoreCase"), "0 1\n");
 }

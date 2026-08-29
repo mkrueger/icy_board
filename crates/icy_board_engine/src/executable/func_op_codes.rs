@@ -343,9 +343,21 @@ pub enum FuncOpCode {
     StringTrimChars = -328,
     StringTrimStartChars = -329,
     StringTrimEndChars = -330,
+    StringCharAt = -331,
+    StringFindComparison = -332,
+    StringFindLastComparison = -333,
+    StringContainsComparison = -334,
+    StringStartsWithComparison = -335,
+    StringEndsWithComparison = -336,
+    StringCountComparison = -337,
+    StringEquals = -338,
+    StringEqualsComparison = -339,
+    StringSplit = -340,
+    StringSplitLimit = -341,
+    ArrayValueAt = -342,
 }
 
-pub const LAST_FUNC: i16 = -330;
+pub const LAST_FUNC: i16 = -342;
 
 impl FuncOpCode {
     pub fn get_definition(self) -> &'static FunctionDefinition {
@@ -387,6 +399,18 @@ impl FuncOpCode {
                 | FuncOpCode::StringTrimChars
                 | FuncOpCode::StringTrimStartChars
                 | FuncOpCode::StringTrimEndChars
+                | FuncOpCode::StringCharAt
+                | FuncOpCode::StringFindComparison
+                | FuncOpCode::StringFindLastComparison
+                | FuncOpCode::StringContainsComparison
+                | FuncOpCode::StringStartsWithComparison
+                | FuncOpCode::StringEndsWithComparison
+                | FuncOpCode::StringCountComparison
+                | FuncOpCode::StringEquals
+                | FuncOpCode::StringEqualsComparison
+                | FuncOpCode::StringSplit
+                | FuncOpCode::StringSplitLimit
+                | FuncOpCode::ArrayValueAt
         ) {
             400
         } else {
@@ -453,7 +477,7 @@ impl FunctionDefinition {
         }
     }
 }
-pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 342]> = std::sync::LazyLock::new(|| {
+pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 354]> = std::sync::LazyLock::new(|| {
     [
         FunctionDefinition {
             name: "END",
@@ -3279,6 +3303,102 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 342]> 
             version: 400,
             opcode: FuncOpCode::StringTrimEndChars,
             return_type: VariableType::BigStr,
+            args: None,
+            signature: FunctionSignature::FixedParameters(2),
+        },
+        FunctionDefinition {
+            name: "<string char at>",
+            version: 400,
+            opcode: FuncOpCode::StringCharAt,
+            return_type: VariableType::String,
+            args: None,
+            signature: FunctionSignature::FixedParameters(2),
+        },
+        FunctionDefinition {
+            name: "<string find comparison>",
+            version: 400,
+            opcode: FuncOpCode::StringFindComparison,
+            return_type: VariableType::Integer,
+            args: None,
+            signature: FunctionSignature::FixedParameters(4),
+        },
+        FunctionDefinition {
+            name: "<string find last comparison>",
+            version: 400,
+            opcode: FuncOpCode::StringFindLastComparison,
+            return_type: VariableType::Integer,
+            args: None,
+            signature: FunctionSignature::FixedParameters(4),
+        },
+        FunctionDefinition {
+            name: "<string contains comparison>",
+            version: 400,
+            opcode: FuncOpCode::StringContainsComparison,
+            return_type: VariableType::Boolean,
+            args: None,
+            signature: FunctionSignature::FixedParameters(3),
+        },
+        FunctionDefinition {
+            name: "<string starts with comparison>",
+            version: 400,
+            opcode: FuncOpCode::StringStartsWithComparison,
+            return_type: VariableType::Boolean,
+            args: None,
+            signature: FunctionSignature::FixedParameters(3),
+        },
+        FunctionDefinition {
+            name: "<string ends with comparison>",
+            version: 400,
+            opcode: FuncOpCode::StringEndsWithComparison,
+            return_type: VariableType::Boolean,
+            args: None,
+            signature: FunctionSignature::FixedParameters(3),
+        },
+        FunctionDefinition {
+            name: "<string count comparison>",
+            version: 400,
+            opcode: FuncOpCode::StringCountComparison,
+            return_type: VariableType::Integer,
+            args: None,
+            signature: FunctionSignature::FixedParameters(3),
+        },
+        FunctionDefinition {
+            name: "<string equals>",
+            version: 400,
+            opcode: FuncOpCode::StringEquals,
+            return_type: VariableType::Boolean,
+            args: None,
+            signature: FunctionSignature::FixedParameters(2),
+        },
+        FunctionDefinition {
+            name: "<string equals comparison>",
+            version: 400,
+            opcode: FuncOpCode::StringEqualsComparison,
+            return_type: VariableType::Boolean,
+            args: None,
+            signature: FunctionSignature::FixedParameters(3),
+        },
+        FunctionDefinition {
+            name: "<string split>",
+            version: 400,
+            opcode: FuncOpCode::StringSplit,
+            return_type: VariableType::BigStr,
+            args: None,
+            signature: FunctionSignature::FixedParameters(2),
+        },
+        FunctionDefinition {
+            name: "<string split limit>",
+            version: 400,
+            opcode: FuncOpCode::StringSplitLimit,
+            return_type: VariableType::BigStr,
+            args: None,
+            signature: FunctionSignature::FixedParameters(3),
+        },
+        FunctionDefinition {
+            name: "<array value at>",
+            version: 400,
+            opcode: FuncOpCode::ArrayValueAt,
+            return_type: VariableType::None,
             args: None,
             signature: FunctionSignature::FixedParameters(2),
         },

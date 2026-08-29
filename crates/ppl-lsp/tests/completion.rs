@@ -164,10 +164,26 @@ fn regex_completion_covers_static_instance_and_result_members() {
 #[test]
 fn strings_offer_instance_static_and_chained_members() {
     let instance = complete("STRING text\ntext.");
-    for member in ["Find", "FindLast", "Contains", "StartsWith", "EndsWith", "Count", "Replace", "Trim", "Split"] {
+    for member in [
+        "Find",
+        "FindLast",
+        "Contains",
+        "StartsWith",
+        "EndsWith",
+        "Count",
+        "Equals",
+        "Replace",
+        "Trim",
+        "Split",
+    ] {
         assert!(instance.contains(&member.to_string()), "{member} missing: {instance:?}");
     }
     assert!(!instance.contains(&"Join".to_string()), "{instance:?}");
+
+    let comparisons = complete("StringComparison.");
+    for value in ["Ordinal", "OrdinalIgnoreCase"] {
+        assert!(comparisons.contains(&value.to_string()), "{value} missing: {comparisons:?}");
+    }
 
     let statik = complete("STRING.");
     assert_eq!(statik, vec!["Join", "Repeat", "Split"]);

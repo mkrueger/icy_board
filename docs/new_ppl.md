@@ -192,19 +192,31 @@ PRINTLN text.Trim().ToUpper().Replace("TWO", "THREE")
 | Member | Returns | Meaning |
 | :--- | :--- | :--- |
 | `Len()` | `INTEGER` | Number of Unicode characters |
-| `Find(search [, start])` | `INTEGER` | First match at or after `start` |
-| `FindLast(search [, start])` | `INTEGER` | Last match at or before `start` |
-| `Contains(search)` | `BOOLEAN` | Whether a non-empty search string occurs |
-| `StartsWith(prefix)`, `EndsWith(suffix)` | `BOOLEAN` | Prefix or suffix test |
-| `Count(search)` | `INTEGER` | Non-overlapping occurrence count |
+| `Find(search [, start [, comparison]])` | `INTEGER` | First match at or after `start` |
+| `FindLast(search [, start [, comparison]])` | `INTEGER` | Last match at or before `start` |
+| `Contains(search [, comparison])` | `BOOLEAN` | Whether a non-empty search string occurs |
+| `StartsWith(prefix [, comparison])`, `EndsWith(suffix [, comparison])` | `BOOLEAN` | Prefix or suffix test |
+| `Count(search [, comparison])` | `INTEGER` | Non-overlapping occurrence count |
+| `Equals(other [, comparison])` | `BOOLEAN` | String equality |
 | `Replace(search, replacement)` | `BIGSTR` | Replace every substring match |
 | `Trim([characters])` | `BIGSTR` | Trim whitespace, or the supplied characters, at both ends |
 | `TrimStart([characters])`, `TrimEnd([characters])` | `BIGSTR` | Trim one end |
 | `ToUpper()`, `ToLower()` | `BIGSTR` | Change case |
 
-Positions are 1-based Unicode character positions; zero means no match. Searches
-are case-sensitive. An empty search string is not considered a match and has a
-count of zero.
+Positions in the PPL 400 member API are zero-based Unicode character positions;
+`-1` means no match. Searches are case-sensitive. An empty search string is not
+considered a match and has a count of zero. The classic `INSTR` and `INSTRR`
+functions remain 1-based and return zero when no match is found.
+
+`StringComparison.Ordinal` is the default. Pass
+`StringComparison.OrdinalIgnoreCase` as the last argument for Unicode-aware,
+case-insensitive searching or equality.
+
+Scalar strings support zero-based Unicode character indexing in language 400.
+`text[0]` returns the first character as a `STRING`; a negative or out-of-range
+index returns an empty string. String arrays keep their normal array semantics,
+and indexing can be chained: `words[0][0]` reads the first character of the
+first string.
 
 Operations that transform text return `BIGSTR`, so member chains do not silently
 truncate at the `STRING` limit.
@@ -213,22 +225,20 @@ The `STRING` and `BIGSTR` type names also provide operations that do not belong
 to one value:
 
 ```PPL
-STRING parts[]
-
-"a,,b,".Split(",", parts)
+BIGSTR parts[] = "a,,b,".Split(",")
 PRINTLN STRING.Join(parts, "|")
 PRINTLN STRING.Repeat("-", 40)
 
-STRING.Split("one:two:three:four", ":", parts, 3)
+parts = STRING.Split("one:two:three:four", ":", 3)
 ; parts contains "one", "two", "three:four"
 ```
 
 `Split` accepts a multi-character separator and retains empty elements. Its
-destination must be a dynamic one-dimensional `STRING` or `BIGSTR` array; it is
-replaced only after the operation succeeds. The optional positive limit is the
-maximum number of elements, with the unsplit remainder in the last one. A limit
-of zero means unlimited. Empty separators and negative limits report
-`ErrKind.String` / `ErrCode.Invalid` and leave the target unchanged.
+result is a dynamic `BIGSTR[]`. The optional positive limit is the maximum
+number of elements, with the unsplit remainder in the last one. A limit of zero
+means unlimited. Empty separators and negative limits report `ErrKind.String` /
+`ErrCode.Invalid` and return an empty array. Returned arrays may be assigned,
+indexed, queried with `Len()` or consumed directly by `FOREACH`.
 
 `STRING.Join(array, separator)` joins a one-dimensional string array and returns
 `BIGSTR`. `STRING.Repeat(value, count)` returns `BIGSTR`; a negative count is an
@@ -259,8 +269,8 @@ and `REGEX.IsValid(pattern [, options])`. A compiled value exposes `Valid`,
 `RegexOptions` flags are `None`, `IgnoreCase`, `MultiLine`,
 `DotMatchesNewLine`, `IgnoreWhitespace`, `SwapGreed` and `Ascii`; flags may be
 combined with `|`. Matching is Unicode-aware unless `Ascii` is selected.
-Positions are 1-based Unicode character positions, while match collections and
-capture groups are zero-based. Group zero is the complete match.
+Positions, match collections and capture groups are zero-based. A missing match
+or unmatched capture has start position `-1`. Group zero is the complete match.
 
 `REGEXMATCH` exposes `Success`, `Value`, `Start`, `Length`, `GroupCount`,
 `Group(index)`, `NamedGroup(name)`, and corresponding `GroupMatched`,

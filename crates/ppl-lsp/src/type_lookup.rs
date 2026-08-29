@@ -223,10 +223,11 @@ pub fn string_members(statik: bool) -> Vec<Member> {
         .map(|member| Member {
             name: member.name.to_string(),
             detail: format!(
-                "({}..{} args) {}",
+                "({}..{} args) {}{}",
                 member.arguments.start(),
                 member.arguments.end(),
-                type_name(&UserTypeRegistry::default(), member.return_type)
+                type_name(&UserTypeRegistry::default(), member.return_type),
+                if member.name == "Split" { "[]" } else { "" }
             ),
             kind: MemberKind::Method,
         })

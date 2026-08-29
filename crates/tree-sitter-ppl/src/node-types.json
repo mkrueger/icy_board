@@ -2430,6 +2430,10 @@
     "named": false
   },
   {
+    "type": "STRINGCOMPARISON",
+    "named": false
+  },
+  {
     "type": "SURFACE",
     "named": false
   },

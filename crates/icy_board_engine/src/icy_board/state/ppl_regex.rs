@@ -47,13 +47,25 @@ pub static COUNT: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyL
 pub static LEN: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Len".to_string()));
 pub static GET: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Get".to_string()));
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 struct PplRegexGroup {
     name: Option<String>,
     value: String,
     start: i32,
     length: i32,
     matched: bool,
+}
+
+impl Default for PplRegexGroup {
+    fn default() -> Self {
+        Self {
+            name: None,
+            value: String::new(),
+            start: -1,
+            length: 0,
+            matched: false,
+        }
+    }
 }
 
 #[derive(Clone, Default)]
@@ -77,7 +89,7 @@ impl PplRegexMatch {
                 PplRegexGroup {
                     name: name.map(str::to_string),
                     value: found.as_str().to_string(),
-                    start: text[..byte_start].chars().count() as i32 + 1,
+                    start: text[..byte_start].chars().count() as i32,
                     length: found.as_str().chars().count() as i32,
                     matched: true,
                 }
@@ -91,10 +103,7 @@ impl PplRegexMatch {
     }
 
     fn array_value(matches: Vec<Self>) -> VariableValue {
-        VariableValue::new_vector(
-            VariableType::UserData(REGEX_MATCH_ID as u8),
-            matches.into_iter().map(Self::value).collect(),
-        )
+        VariableValue::new_vector(VariableType::UserData(REGEX_MATCH_ID as u8), matches.into_iter().map(Self::value).collect())
     }
 
     fn group(&self, index: i32) -> Option<&PplRegexGroup> {
@@ -156,10 +165,14 @@ impl PplRegex {
     }
 
     fn start_byte(text: &str, start: i32) -> Option<usize> {
-        if start <= 1 {
-            return Some(0);
+        if start < 0 {
+            return None;
         }
-        text.char_indices().nth((start - 1) as usize).map(|(offset, _)| offset)
+        let start = start as usize;
+        text.char_indices()
+            .nth(start)
+            .map(|(offset, _)| offset)
+            .or_else(|| (start == text.chars().count()).then_some(text.len()))
     }
 }
 
@@ -267,7 +280,7 @@ impl UserDataValue for PplRegex {
                 return Ok(VariableValue::new_bool(false));
             };
             let text = arguments[0].as_string();
-            let start = arguments.get(1).map_or(1, VariableValue::as_int);
+            let start = arguments.get(1).map_or(0, VariableValue::as_int);
             let matched = Self::start_byte(&text, start).is_some_and(|offset| compiled.find_at(&text, offset).is_some());
             vm.operation_succeeded();
             return Ok(VariableValue::new_bool(matched));
@@ -282,7 +295,7 @@ impl UserDataValue for PplRegex {
                 });
             };
             let text = arguments[0].as_string();
-            let start = arguments.get(1).map_or(1, VariableValue::as_int);
+            let start = arguments.get(1).map_or(0, VariableValue::as_int);
             let Some(offset) = Self::start_byte(&text, start) else {
                 vm.operation_succeeded();
                 return Ok(if *name == *FIND {
@@ -398,7 +411,7 @@ impl UserDataValue for PplRegexMatch {
             return Ok(VariableValue::new_string(whole.map(|group| group.value.clone()).unwrap_or_default()).convert_to(VariableType::BigStr));
         }
         if *name == *START {
-            return Ok(VariableValue::new_int(whole.map_or(0, |group| group.start)));
+            return Ok(VariableValue::new_int(whole.map_or(-1, |group| group.start)));
         }
         if *name == *LENGTH {
             return Ok(VariableValue::new_int(whole.map_or(0, |group| group.length)));

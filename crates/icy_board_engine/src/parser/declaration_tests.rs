@@ -265,6 +265,7 @@ fn builtin_enum_ids_are_frozen() {
         ("MsgField", 246),
         ("HttpMethod", 245),
         ("RegexOptions", 244),
+        ("StringComparison", 243),
     ];
 
     for (name, id) in expected {
@@ -284,7 +285,7 @@ fn a_program_enum_starts_below_the_builtin_ones() {
         .declare_enum(unicase::Ascii::new("Mine".to_string()), vec![(unicase::Ascii::new("One".to_string()), 1)])
         .expect("a program enum should still fit");
 
-    assert_eq!(id, 243);
+    assert_eq!(id, 242);
 }
 
 fn parse_types(input: &str) -> (Vec<AstNode>, UserTypeRegistry, Arc<Mutex<ErrorReporter>>) {

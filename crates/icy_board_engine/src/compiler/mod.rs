@@ -475,8 +475,8 @@ impl PPECompiler {
                     }
                 }
 
-                let whole_dynamic_array = decl.header.flags & crate::executable::variable_table::VARIABLE_FLAG_DYNAMIC_ARRAY != 0
-                    && let_smt.get_arguments().is_empty();
+                let whole_dynamic_array =
+                    decl.header.flags & crate::executable::variable_table::VARIABLE_FLAG_DYNAMIC_ARRAY != 0 && let_smt.get_arguments().is_empty();
                 if decl.header.dim != let_smt.get_arguments().len() as u8 && !whole_dynamic_array {
                     log::error!("Invalid dimensions for variable: {var_name}");
                     return None;
@@ -542,26 +542,6 @@ impl PPECompiler {
                         arguments.push(PPEExpr::Value(zero));
                     }
                     return Some(PPECommand::PredefinedCall(OpCode::RegexSplit.get_definition(), arguments));
-                }
-                if let Expression::FunctionCall(call) = call_stmt.get_expression()
-                    && let Some(SemanticInfo::StringSplitProc { static_call, default_limit }) =
-                        self.semantic_visitor.function_type_lookup.get(&call.id).cloned()
-                    && let Expression::MemberReference(member) = call.get_expression()
-                {
-                    let mut arguments = Vec::new();
-                    if !static_call {
-                        arguments.push(self.comp_expr(member.get_expression()));
-                    }
-                    for argument in call.get_arguments() {
-                        arguments.push(self.comp_expr(argument));
-                    }
-                    if default_limit {
-                        let zero = self
-                            .lookup_table
-                            .lookup_constant(&crate::ast::Constant::Integer(0, crate::ast::constant::NumberFormat::Default));
-                        arguments.push(PPEExpr::Value(zero));
-                    }
-                    return Some(PPECommand::PredefinedCall(OpCode::StringSplit.get_definition(), arguments));
                 }
                 // `a.Redim(10)` is `REDIM a, 10`, so it compiles to the statement rather
                 // than to a member call.
@@ -735,10 +715,7 @@ impl PPECompiler {
         let last = (self.commands.statements.len() as i32 - 1) as usize;
         for stmt in &mut self.commands.statements {
             match &mut stmt.command {
-                PPECommand::IfNot(_, idx)
-                | PPECommand::Goto(idx)
-                | PPECommand::Gosub(idx)
-                | PPECommand::ForEach(_, _, idx) => {
+                PPECommand::IfNot(_, idx) | PPECommand::Goto(idx) | PPECommand::Gosub(idx) | PPECommand::ForEach(_, _, idx) => {
                     if let Some(label_descr) = self.label_table.get(*idx) {
                         if let Some(offset) = label_descr.offset {
                             *idx = offset * 2;

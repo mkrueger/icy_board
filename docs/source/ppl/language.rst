@@ -529,8 +529,9 @@ String members
 ~~~~~~~~~~~~~~
 
 Language 400 exposes common operations directly on ``STRING`` and ``BIGSTR``
-values. Positions are 1-based Unicode character positions and zero means no
-match:
+values. Positions in this member API are zero-based Unicode character positions
+and ``-1`` means no match. The classic ``INSTR`` and ``INSTRR`` functions remain
+1-based and return zero when no match is found:
 
 .. code-block:: PPL
 
@@ -542,28 +543,40 @@ match:
     PRINTLN text.Count("two")
     PRINTLN text.Trim().ToUpper().Replace("TWO", "THREE")
 
-The instance members are ``Len()``, ``Find(search [, start])``,
-``FindLast(search [, start])``, ``Contains(search)``, ``StartsWith(prefix)``,
-``EndsWith(suffix)``, ``Count(search)``, ``Replace(search, replacement)``,
+Scalar strings support zero-based Unicode character indexing. ``text[0]``
+returns the first character as a ``STRING``; a negative or out-of-range index
+returns an empty string. String arrays keep their normal array semantics.
+Indexing may be chained, so ``words[0][0]`` reads the first character of the
+first string in an array.
+
+The instance members are ``Len()``,
+``Find(search [, start [, comparison]])``,
+``FindLast(search [, start [, comparison]])``,
+``Contains(search [, comparison])``, ``StartsWith(prefix [, comparison])``,
+``EndsWith(suffix [, comparison])``, ``Count(search [, comparison])``,
+``Equals(other [, comparison])``, ``Replace(search, replacement)``,
 ``Trim([characters])``, ``TrimStart([characters])``,
 ``TrimEnd([characters])``, ``ToUpper()`` and ``ToLower()``. Transformations
 return ``BIGSTR`` so chaining does not truncate at the ``STRING`` limit.
+
+``StringComparison.Ordinal`` is the default. Pass
+``StringComparison.OrdinalIgnoreCase`` as the last argument for Unicode-aware,
+case-insensitive searching or equality.
 
 The type name carries aggregation helpers:
 
 .. code-block:: PPL
 
-    STRING parts(0)
-    "a,,b,".Split(",", parts)
+    BIGSTR parts[] = "a,,b,".Split(",")
     PRINTLN STRING.Join(parts, "|")
     PRINTLN STRING.Repeat("-", 40)
-    STRING.Split("one:two:three:four", ":", parts, 3)
+    parts = STRING.Split("one:two:three:four", ":", 3)
 
-``Split`` preserves empty elements and replaces a dynamic one-dimensional
-``STRING`` or ``BIGSTR`` array. With a positive limit, the unsplit remainder is
-the last element; zero means unlimited. An empty separator or negative limit
-leaves the target unchanged and reports ``ErrKind.String`` with
-``ErrCode.Invalid``.
+``Split`` preserves empty elements and returns a dynamic ``BIGSTR[]``. With a
+positive limit, the unsplit remainder is the last element; zero means unlimited.
+An empty separator or negative limit returns an empty array and reports
+``ErrKind.String`` with ``ErrCode.Invalid``. The result may be assigned, indexed,
+queried with ``Len()`` or consumed directly by ``FOREACH``.
 
 Regular expressions
 ~~~~~~~~~~~~~~~~~~~
@@ -588,8 +601,9 @@ and ``Split(text, VAR array() [, limit])``.
 ``RegexOptions`` contains ``None``, ``IgnoreCase``, ``MultiLine``,
 ``DotMatchesNewLine``, ``IgnoreWhitespace``, ``SwapGreed`` and ``Ascii``.
 Flags may be combined with ``|``. Matching is Unicode-aware unless ``Ascii`` is
-selected. Positions are 1-based Unicode character positions; collections and
-capture groups are zero-based, and group zero is the complete match.
+selected. Positions, collections and capture groups are zero-based. A missing
+match or unmatched capture has start position ``-1``. Group zero is the
+complete match.
 
 ``REGEXMATCH`` exposes ``Success``, ``Value``, ``Start``, ``Length``,
 ``GroupCount``, numbered ``Group``, ``GroupMatched``, ``GroupStart`` and

@@ -1,7 +1,7 @@
 //! The loose scalar functions: DDATE conversion, the event flag, the keyboard
 //! script flag and free disk space.
 
-use super::{run_ppl, run_ppl_on};
+use super::{compile_errors, run_ppl, run_ppl_on};
 
 #[test]
 fn test_toddate_reads_a_ccyymmdd_string() {
@@ -275,6 +275,82 @@ fn test_len_dimension_returns_each_dimension_element_count() {
     "#,
     );
     assert_eq!(output, "11 11 3 4 2 3 4");
+}
+
+#[test]
+fn test_ppl400_string_member_positions_are_zero_based() {
+    let output = run_ppl(
+        r#"
+        BIGSTR text = "ä two two"
+        PRINTLN text.Find("ä"), " ", text.Find("two"), " ", text.Find("two", 3)
+        PRINTLN text.FindLast("two"), " ", text.FindLast("two", 4)
+        PRINTLN text.Find("missing"), " ", text.FindLast("missing")
+        PRINTLN INSTR(text, "two"), " ", INSTRR(text, "two")
+        "#,
+    );
+    assert_eq!(output, "0 2 6\n6 2\n-1 -1\n3 7\n");
+}
+
+#[test]
+fn test_ppl400_scalar_strings_support_zero_based_character_indices() {
+    let output = run_ppl(
+        r#"
+        BIGSTR text = "Aäß"
+        PRINTLN "[", text[0], "][", text[1], "][", text[2], "]"
+        PRINTLN "[", text[-1], "][", text[3], "]"
+        PRINTLN "xy"[1], " ", " z ".Trim()[0]
+        STRING words[0]
+        words[0] = "whole"
+        PRINTLN words[0], " ", words[0][0], words[0][4]
+        "#,
+    );
+    assert_eq!(output, "[A][ä][ß]\n[][]\ny z\nwhole we\n");
+
+    let errors = compile_errors(";$LANGVERSION 340\nSTRING text = \"abc\"\nPRINTLN text[0]");
+    assert!(!errors.is_empty(), "scalar string indexing should require language 400");
+}
+
+#[test]
+fn test_ppl400_string_comparison_controls_search_and_equality() {
+    let output = run_ppl(
+        r#"
+        BIGSTR text = "Ä One ONE"
+        PRINTLN text.Find("one"), " ", text.Find("one", 0, StringComparison.OrdinalIgnoreCase)
+        PRINTLN text.FindLast("one", 8, StringComparison.OrdinalIgnoreCase), " ", text.FindLast("one", 5, StringComparison.OrdinalIgnoreCase)
+        PRINTLN text.Contains("one"), " ", text.Contains("one", StringComparison.OrdinalIgnoreCase)
+        PRINTLN text.StartsWith("ä", StringComparison.OrdinalIgnoreCase), " ", text.EndsWith("one", StringComparison.OrdinalIgnoreCase)
+        PRINTLN text.Count("one"), " ", text.Count("one", StringComparison.OrdinalIgnoreCase)
+        PRINTLN "Äpfel".Equals("äPFEL"), " ", "Äpfel".Equals("äPFEL", StringComparison.OrdinalIgnoreCase)
+        "#,
+    );
+    assert_eq!(output, "-1 2\n6 2\n0 1\n1 1\n0 2\n0 1\n");
+
+    let errors = compile_errors("PRINTLN \"text\".Contains(\"x\", 1)");
+    assert!(errors.iter().any(|error| error.contains("StringComparison")), "{errors:?}");
+}
+
+#[test]
+fn test_ppl400_string_split_returns_a_dynamic_bigstr_array() {
+    let output = run_ppl(
+        r#"
+        BIGSTR text = "one,,two,three"
+        BIGSTR parts[]
+        parts = text.Split(",")
+        PRINTLN parts.Len(), " ", parts[0], "[", parts[1], "]", parts[2], " ", parts[3]
+        PRINTLN text.Split(",", 3).Len(), " ", text.Split(",", 3)[2]
+        BIGSTR part
+        FOREACH part IN STRING.Split("a:b:c", ":")
+            PRINT part
+        ENDFOREACH
+        BIGSTR invalid[]
+        invalid = text.Split("")
+        PRINTLN " ", invalid.Len(), " ", Error.Last().Kind = ErrKind.String, " ", Error.Last().Code = ErrCode.Invalid
+        "#,
+    );
+    assert_eq!(output, "4 one[]two three\n3 two,three\nabc 0 1 1\n");
+
+    let errors = compile_errors("STRING parts[]\n\"a,b\".Split(\",\", parts)");
+    assert!(!errors.is_empty(), "the removed output-array Split signature should not compile");
 }
 
 /// An object is held by the values that name it rather than by a table that only

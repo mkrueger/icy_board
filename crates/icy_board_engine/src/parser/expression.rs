@@ -187,33 +187,35 @@ impl Parser<'_> {
     /// of its own, and any member in the chain may be called.
     pub(super) fn parse_member_chain(&mut self, expr: Expression) -> Option<Expression> {
         let mut expr = expr;
-        while self.get_cur_token() == Some(Token::Dot) {
-            let dot_token: super::lexer::Spanned<Token> = self.save_spanned_token();
-            self.next_token();
-            let token = self.save_spanned_token();
-            // After a dot a name is a member, so one that also names a built-in constant
-            // is read as the member it is written as.
-            let identifier_token = match &token.token {
-                Token::Identifier(_) => token,
-                Token::Const(crate::ast::Constant::Builtin(constant)) => {
-                    super::lexer::Spanned::new(Token::Identifier(unicase::Ascii::new(constant.name.to_string())), token.span.clone())
+        loop {
+            if self.get_cur_token() == Some(Token::Dot) {
+                let dot_token: super::lexer::Spanned<Token> = self.save_spanned_token();
+                self.next_token();
+                let token = self.save_spanned_token();
+                // After a dot a name is a member, so one that also names a built-in constant
+                // is read as the member it is written as.
+                let identifier_token = match &token.token {
+                    Token::Identifier(_) => token,
+                    Token::Const(crate::ast::Constant::Builtin(constant)) => {
+                        super::lexer::Spanned::new(Token::Identifier(unicase::Ascii::new(constant.name.to_string())), token.span.clone())
+                    }
+                    _ => {
+                        self.error_reporter
+                            .lock()
+                            .unwrap()
+                            .report_error(self.save_token_span(), ParserErrorType::IdentifierExpected(self.save_token()));
+                        return None;
+                    }
+                };
+                self.next_token();
+                expr = Expression::MemberReference(MemberReferenceExpression::new(expr, dot_token, identifier_token));
+                if self.get_cur_token() == Some(Token::LPar) {
+                    expr = self.parse_call_suffix(expr)?;
                 }
-                _ => {
-                    self.error_reporter
-                        .lock()
-                        .unwrap()
-                        .report_error(self.save_token_span(), ParserErrorType::IdentifierExpected(self.save_token()));
-                    return None;
-                }
-            };
-            self.next_token();
-            expr = Expression::MemberReference(MemberReferenceExpression::new(expr, dot_token, identifier_token));
-            if self.get_cur_token() == Some(Token::LPar) {
-                expr = self.parse_call_suffix(expr)?;
+                continue;
             }
-            // `collection[i]` is the collection's own getter, which has no name a
-            // source can write, so the index is the only way to reach it.
-            while self.get_cur_token() == Some(Token::LBracket) {
+
+            if self.get_cur_token() == Some(Token::LBracket) {
                 let bracket_token = self.save_spanned_token();
                 self.next_token();
                 let mut arguments = Vec::new();
@@ -236,7 +238,10 @@ impl Parser<'_> {
                     arguments,
                     close_token,
                 ));
+                continue;
             }
+
+            break;
         }
         Some(expr)
     }
@@ -403,7 +408,7 @@ impl Parser<'_> {
         };
 
         match expr {
-            Some(expr) if self.get_cur_token() == Some(Token::Dot) => self.parse_member_chain(expr),
+            Some(expr) if matches!(self.get_cur_token(), Some(Token::Dot | Token::LBracket)) => self.parse_member_chain(expr),
             expr => expr,
         }
     }

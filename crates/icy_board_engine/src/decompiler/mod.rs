@@ -9,11 +9,11 @@ use crate::{
     Res,
     ast::{
         Ast, AstNode, BinOp, BinaryExpression, BlockStatement, BreakStatement, CommentAstNode, Constant, ConstantExpression, ContinueStatement, Expression,
-        ForEachStatement, FunctionCallExpression,
-        FunctionDeclarationAstNode, FunctionImplementation, GosubStatement, GotoStatement, IdentifierExpression, IfStatement, IndexerExpression,
-        LabelStatement, LetStatement, MemberCallStatement, MemberReferenceExpression, OnErrorMode, OnErrorStatement, ParameterSpecifier, ParensExpression,
-        PredefinedCallStatement, ProcedureCallStatement, ProcedureDeclarationAstNode, ProcedureImplementation, Statement, TypeDeclarationAstNode,
-        TypeFieldSpecifier, UnaryExpression, UnaryOp, VariableDeclarationStatement, VariableParameterSpecifier, VariableSpecifier, constant::NumberFormat,
+        ForEachStatement, FunctionCallExpression, FunctionDeclarationAstNode, FunctionImplementation, GosubStatement, GotoStatement, IdentifierExpression,
+        IfStatement, IndexerExpression, LabelStatement, LetStatement, MemberCallStatement, MemberReferenceExpression, OnErrorMode, OnErrorStatement,
+        ParameterSpecifier, ParensExpression, PredefinedCallStatement, ProcedureCallStatement, ProcedureDeclarationAstNode, ProcedureImplementation, Statement,
+        TypeDeclarationAstNode, TypeFieldSpecifier, UnaryExpression, UnaryOp, VariableDeclarationStatement, VariableParameterSpecifier, VariableSpecifier,
+        constant::NumberFormat,
     },
     compiler::{user_data::UserDataEntry, workspace::Workspace},
     executable::{
@@ -552,6 +552,25 @@ impl Decompiler {
                 IndexerExpression::create_empty_expression(self.get_variable_name(*id), dims.iter().map(|e| self.decompile_expression(e)).collect())
             }
             PPEExpr::PredefinedFunctionCall(f, args) => {
+                if f.opcode == FuncOpCode::ArrayValueAt
+                    && let [array, index] = args.as_slice()
+                {
+                    return FunctionCallExpression::create_empty_expression(
+                        MemberReferenceExpression::create_empty_expression(self.decompile_expression(array), unicase::Ascii::new("<get>".to_string())),
+                        vec![self.decompile_expression(index)],
+                    );
+                }
+                if f.opcode == FuncOpCode::StringCharAt
+                    && let [receiver, index] = args.as_slice()
+                {
+                    if let PPEExpr::Value(receiver) = receiver {
+                        return IndexerExpression::create_empty_expression(self.get_variable_name(*receiver), vec![self.decompile_expression(index)]);
+                    }
+                    return FunctionCallExpression::create_empty_expression(
+                        MemberReferenceExpression::create_empty_expression(self.decompile_expression(receiver), unicase::Ascii::new("<get>".to_string())),
+                        vec![self.decompile_expression(index)],
+                    );
+                }
                 if let Some(type_id) = self.static_receiver_type(expression) {
                     return IdentifierExpression::create_empty_expression(
                         self.type_name(type_id).unwrap_or_else(|| unicase::Ascii::new(format!("TYPE{type_id}"))),
@@ -559,11 +578,19 @@ impl Decompiler {
                 }
                 let instance_member = match f.opcode {
                     FuncOpCode::StringFindFrom => Some("Find"),
+                    FuncOpCode::StringFindComparison => Some("Find"),
                     FuncOpCode::StringFindLastFrom => Some("FindLast"),
+                    FuncOpCode::StringFindLastComparison => Some("FindLast"),
                     FuncOpCode::StringContains => Some("Contains"),
+                    FuncOpCode::StringContainsComparison => Some("Contains"),
                     FuncOpCode::StringStartsWith => Some("StartsWith"),
+                    FuncOpCode::StringStartsWithComparison => Some("StartsWith"),
                     FuncOpCode::StringEndsWith => Some("EndsWith"),
+                    FuncOpCode::StringEndsWithComparison => Some("EndsWith"),
                     FuncOpCode::StringCount => Some("Count"),
+                    FuncOpCode::StringCountComparison => Some("Count"),
+                    FuncOpCode::StringEquals | FuncOpCode::StringEqualsComparison => Some("Equals"),
+                    FuncOpCode::StringSplit | FuncOpCode::StringSplitLimit => Some("Split"),
                     FuncOpCode::StringTrim => Some("Trim"),
                     FuncOpCode::StringTrimStart => Some("TrimStart"),
                     FuncOpCode::StringTrimEnd => Some("TrimEnd"),
@@ -575,9 +602,23 @@ impl Decompiler {
                 if let Some(member) = instance_member
                     && let Some((receiver, arguments)) = args.split_first()
                 {
+                    let mut arguments: Vec<_> = arguments.iter().map(|argument| self.decompile_expression(argument)).collect();
+                    if matches!(
+                        f.opcode,
+                        FuncOpCode::StringFindComparison
+                            | FuncOpCode::StringFindLastComparison
+                            | FuncOpCode::StringContainsComparison
+                            | FuncOpCode::StringStartsWithComparison
+                            | FuncOpCode::StringEndsWithComparison
+                            | FuncOpCode::StringCountComparison
+                            | FuncOpCode::StringEqualsComparison
+                    ) && let Some(comparison) = arguments.pop()
+                    {
+                        arguments.push(self.convert_to_type(comparison, VariableType::UserData(crate::parser::STRING_COMPARISON_ENUM_ID)));
+                    }
                     return FunctionCallExpression::create_empty_expression(
                         MemberReferenceExpression::create_empty_expression(self.decompile_expression(receiver), unicase::Ascii::new(member.to_string())),
-                        arguments.iter().map(|argument| self.decompile_expression(argument)).collect(),
+                        arguments,
                     );
                 }
                 let static_member = match f.opcode {

@@ -1744,6 +1744,18 @@
             "type": "TOKEN",
             "content": {
               "type": "PATTERN",
+              "value": "[sS][tT][rR][iI][nN][gG][cC][oO][mM][pP][aA][rR][iI][sS][oO][nN]"
+            }
+          },
+          "named": false,
+          "value": "STRINGCOMPARISON"
+        },
+        {
+          "type": "ALIAS",
+          "content": {
+            "type": "TOKEN",
+            "content": {
+              "type": "PATTERN",
               "value": "[sS][eE][sS][sS][iI][oO][nN]"
             }
           },
