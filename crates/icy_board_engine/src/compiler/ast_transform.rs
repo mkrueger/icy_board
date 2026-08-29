@@ -3,9 +3,9 @@ use std::collections::{HashMap, HashSet};
 use crate::{
     ast::{
         Ast, AstNode, AstVisitorMut, BinaryExpression, BlockStatement, CommentAstNode, ConstDeclarationStatement, Constant, ConstantExpression,
-        DimensionSpecifier, Expression, ForEachStatement, ForStatement, FunctionImplementation, GotoStatement, IdentifierExpression,
-        IfStatement, LabelStatement, LetStatement, MemberReferenceExpression, ParameterSpecifier, ProcedureImplementation, ReturnStatement, SelectStatement,
-        Statement, VariableDeclarationStatement, VariableSpecifier, const_expression, const_value_with_members, constant::NumberFormat,
+        DimensionSpecifier, Expression, ForEachStatement, ForStatement, FunctionImplementation, GotoStatement, IdentifierExpression, IfStatement,
+        LabelStatement, LetStatement, MemberReferenceExpression, ParameterSpecifier, ProcedureImplementation, ReturnStatement, SelectStatement, Statement,
+        VariableDeclarationStatement, VariableSpecifier, const_expression, const_value_with_members, constant::NumberFormat,
     },
     decompiler::evaluation_visitor::{ConstantFolder, OptimizationVisitor},
     executable::VariableValue,
@@ -152,11 +152,7 @@ impl AstVisitorMut for AstTransformationVisitor {
     }
 
     fn visit_continue_statement(&mut self, _continue_stmt: &crate::ast::ContinueStatement) -> Statement {
-        if self
-            .foreach_label_depths
-            .last()
-            .is_some_and(|depth| self.continue_break_labels.len() == *depth)
-        {
+        if self.foreach_label_depths.last().is_some_and(|depth| self.continue_break_labels.len() == *depth) {
             return Statement::Continue(_continue_stmt.clone());
         }
         if self.continue_break_labels.is_empty() {
@@ -166,11 +162,7 @@ impl AstVisitorMut for AstTransformationVisitor {
         GotoStatement::create_empty_statement(continue_label.clone())
     }
     fn visit_break_statement(&mut self, _break_stmt: &crate::ast::BreakStatement) -> Statement {
-        if self
-            .foreach_label_depths
-            .last()
-            .is_some_and(|depth| self.continue_break_labels.len() == *depth)
-        {
+        if self.foreach_label_depths.last().is_some_and(|depth| self.continue_break_labels.len() == *depth) {
             return Statement::Break(_break_stmt.clone());
         }
         if self.continue_break_labels.is_empty() {
