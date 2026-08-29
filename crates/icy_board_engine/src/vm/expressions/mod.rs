@@ -163,6 +163,7 @@ pub async fn run_function(opcode: FuncOpCode, arg: &mut VirtualMachine<'_>, argu
         FuncOpCode::StringEqualsComparison => predefined_functions::string_equals_comparison(arg, arguments).await,
         FuncOpCode::StringSplit => predefined_functions::string_split(arg, arguments).await,
         FuncOpCode::StringSplitLimit => predefined_functions::string_split_limit(arg, arguments).await,
+        FuncOpCode::StringMid => predefined_functions::string_mid(arg, arguments).await,
         FuncOpCode::ArrayValueAt => predefined_functions::array_value_at(arg, arguments).await,
         FuncOpCode::GRAFMODE => predefined_functions::grafmode(arg, arguments).await,
         FuncOpCode::PSA => predefined_functions::psa(arg, arguments).await,

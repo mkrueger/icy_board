@@ -233,6 +233,31 @@ pub async fn mid(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableV
     Ok(VariableValue::new_string(res))
 }
 
+/// `str.Mid(start, len)`: the PPL 400 member form of `MID`, with a zero-based start.
+pub async fn string_mid(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let str = vm.eval_expr(&args[0]).await?.as_string();
+    let mut pos = vm.eval_expr(&args[1]).await?.as_int();
+    let chars = vm.eval_expr(&args[2]).await?.as_int();
+    if chars <= 0 {
+        return Ok(VariableValue::new_string(String::new()).convert_to(VariableType::BigStr));
+    }
+
+    let mut res = String::new();
+    let mut remaining = chars;
+    while pos < 0 && remaining > 0 {
+        res.push(' ');
+        pos += 1;
+        remaining -= 1;
+    }
+    if remaining > 0 {
+        str.chars().skip(pos as usize).take(remaining as usize).for_each(|c| res.push(c));
+    }
+    while res.chars().count() < chars as usize {
+        res.push(' ');
+    }
+    Ok(VariableValue::new_string(res).convert_to(VariableType::BigStr))
+}
+
 pub async fn left(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let mut chars = vm.eval_expr(&args[1]).await?.as_int();
     if chars <= 0 {

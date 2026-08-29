@@ -611,6 +611,7 @@ impl Decompiler {
                     FuncOpCode::StringTrimChars => Some("Trim"),
                     FuncOpCode::StringTrimStartChars => Some("TrimStart"),
                     FuncOpCode::StringTrimEndChars => Some("TrimEnd"),
+                    FuncOpCode::StringMid => Some("Mid"),
                     _ => None,
                 };
                 if let Some(member) = instance_member

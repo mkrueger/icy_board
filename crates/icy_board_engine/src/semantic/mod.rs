@@ -230,6 +230,24 @@ pub const STRING_MEMBERS: &[StringMember] = &[
         is_static: false,
     },
     StringMember {
+        name: "Mid",
+        arguments: 2..=2,
+        return_type: VariableType::String,
+        is_static: false,
+    },
+    StringMember {
+        name: "Left",
+        arguments: 1..=1,
+        return_type: VariableType::String,
+        is_static: false,
+    },
+    StringMember {
+        name: "Right",
+        arguments: 1..=1,
+        return_type: VariableType::String,
+        is_static: false,
+    },
+    StringMember {
         name: "Split",
         arguments: 1..=2,
         return_type: VariableType::String,
@@ -286,6 +304,9 @@ fn string_member(name: &unicase::Ascii<String>, arguments: usize) -> Option<(Fun
         ("tolower", 0) => Some((FuncOpCode::LOWER, VariableType::String, &[])),
         ("split", 1) => Some((FuncOpCode::StringSplit, VariableType::String, &[])),
         ("split", 2) => Some((FuncOpCode::StringSplitLimit, VariableType::String, &[])),
+        ("mid", 2) => Some((FuncOpCode::StringMid, VariableType::String, &[])),
+        ("left", 1) => Some((FuncOpCode::LEFT, VariableType::String, &[])),
+        ("right", 1) => Some((FuncOpCode::RIGHT, VariableType::String, &[])),
         _ => None,
     }
 }

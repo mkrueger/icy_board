@@ -353,9 +353,10 @@ pub enum FuncOpCode {
     StringSplit = -338,
     StringSplitLimit = -339,
     ArrayValueAt = -340,
+    StringMid = -341,
 }
 
-pub const LAST_FUNC: i16 = -340;
+pub const LAST_FUNC: i16 = -341;
 
 impl FuncOpCode {
     pub fn get_definition(self) -> &'static FunctionDefinition {
@@ -407,6 +408,7 @@ impl FuncOpCode {
                 | FuncOpCode::StringSplit
                 | FuncOpCode::StringSplitLimit
                 | FuncOpCode::ArrayValueAt
+                | FuncOpCode::StringMid
         ) {
             400
         } else {
@@ -473,7 +475,7 @@ impl FunctionDefinition {
         }
     }
 }
-pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 352]> = std::sync::LazyLock::new(|| {
+pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 353]> = std::sync::LazyLock::new(|| {
     [
         FunctionDefinition {
             name: "END",
@@ -3381,6 +3383,14 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 352]> 
             return_type: VariableType::None,
             args: None,
             signature: FunctionSignature::FixedParameters(2),
+        },
+        FunctionDefinition {
+            name: "<string mid>",
+            version: 400,
+            opcode: FuncOpCode::StringMid,
+            return_type: VariableType::BigStr,
+            args: None,
+            signature: FunctionSignature::FixedParameters(3),
         },
         // ALIASES (need to be last in the list)
         FunctionDefinition {
