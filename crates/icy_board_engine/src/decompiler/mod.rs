@@ -66,6 +66,7 @@ fn build_type_registry(executable: &Executable) -> UserTypeRegistry {
 pub struct Decompiler {
     executable: Executable,
     script: PPEScript,
+    output_language_version: u16,
 
     functions: Vec<AstNode>,
 
@@ -85,12 +86,13 @@ impl Decompiler {
     /// # Errors
     ///
     /// This function will return an error if .
-    pub fn new(executable: Executable, optimize_output: bool) -> Result<Self, DeserializationError> {
+    pub fn new(executable: Executable, optimize_output: bool, output_language_version: u16) -> Result<Self, DeserializationError> {
         let script = PPEScript::from_ppe_file(&executable)?;
         let type_registry = build_type_registry(&executable);
         Ok(Self {
             executable,
             script,
+            output_language_version,
             label_lookup: HashMap::new(),
             function_lookup: HashMap::new(),
             used_labels: HashSet::new(),
@@ -227,7 +229,8 @@ impl Decompiler {
     fn generate_global_variable_declarations(&mut self, ast: &mut Ast) {
         for var in self.executable.variable_table.get_entries() {
             if let EntryType::Variable = var.entry_type {
-                let var_decl = generate_variable_declaration(var, self.type_token(var.header.variable_type));
+                let source_type = self.source_type(var.header.variable_type);
+                let var_decl = generate_variable_declaration(var, self.type_token(source_type), source_type);
                 ast.nodes.push(AstNode::TopLevelStatement(var_decl));
             }
         }
@@ -246,8 +249,8 @@ impl Decompiler {
                         .map(usize::from)
                         .collect();
                     TypeFieldSpecifier::new(
-                        self.type_token(field.variable_type),
-                        field.variable_type,
+                        self.type_token(self.source_type(field.variable_type)),
+                        self.source_type(field.variable_type),
                         VariableSpecifier::empty(user_field_name(j), dimensions),
                     )
                 })
@@ -270,6 +273,14 @@ impl Decompiler {
         };
         let name = name.unwrap_or_else(|| unicase::Ascii::new(variable_type.to_string()));
         Spanned::create_empty(Token::Identifier(name))
+    }
+
+    fn source_type(&self, variable_type: VariableType) -> VariableType {
+        if self.output_language_version >= 400 && variable_type == VariableType::BigStr {
+            VariableType::String
+        } else {
+            variable_type
+        }
     }
 
     fn type_name(&self, type_id: u8) -> Option<unicase::Ascii<String>> {
@@ -430,8 +441,8 @@ impl Decompiler {
                             Spanned::create_empty(Token::LPar),
                             parameters,
                             Spanned::create_empty(Token::RPar),
-                            self.type_token(return_value.header.variable_type),
-                            return_value.header.variable_type,
+                            self.type_token(self.source_type(return_value.header.variable_type)),
+                            self.source_type(return_value.header.variable_type),
                             return_value.header.dim,
                         );
                         ast.nodes.push(AstNode::FunctionDeclaration(func_decl));
@@ -833,8 +844,8 @@ impl Decompiler {
                         Spanned::create_empty(Token::LPar),
                         parameters,
                         Spanned::create_empty(Token::RPar),
-                        self.type_token(return_value.header.variable_type),
-                        return_value.header.variable_type,
+                        self.type_token(self.source_type(return_value.header.variable_type)),
+                        self.source_type(return_value.header.variable_type),
                         return_value.header.dim,
                         func_body,
                         Spanned::create_empty(Token::EndFunc),
@@ -874,7 +885,8 @@ impl Decompiler {
             for i in start..end {
                 let local_var = self.executable.variable_table.get_var_entry(i);
                 if local_var.entry_type == EntryType::LocalVariable {
-                    decl.push(generate_variable_declaration(local_var, self.type_token(local_var.header.variable_type)));
+                    let source_type = self.source_type(local_var.header.variable_type);
+                    decl.push(generate_variable_declaration(local_var, self.type_token(source_type), source_type));
                 }
             }
 
@@ -925,8 +937,8 @@ impl Decompiler {
                     } else {
                         None
                     },
-                    self.type_token(param.header.variable_type),
-                    param.header.variable_type,
+                    self.type_token(self.source_type(param.header.variable_type)),
+                    self.source_type(param.header.variable_type),
                     Some(VariableSpecifier::empty(unicase::Ascii::new(param.name.clone()), dimensions)),
                 )));
             }
@@ -959,7 +971,7 @@ fn add_parens_if_required(op: BinOp, expr: Expression) -> Expression {
     if add_parens { ParensExpression::create_empty_expression(expr) } else { expr }
 }
 
-fn generate_variable_declaration(var: &TableEntry, type_token: Spanned<Token>) -> Statement {
+fn generate_variable_declaration(var: &TableEntry, type_token: Spanned<Token>, source_type: VariableType) -> Statement {
     let dims = match var.header.dim {
         1 => {
             vec![var.header.vector_size]
@@ -974,7 +986,7 @@ fn generate_variable_declaration(var: &TableEntry, type_token: Spanned<Token>) -
     };
     Statement::VariableDeclaration(VariableDeclarationStatement::new(
         type_token,
-        var.header.variable_type,
+        source_type,
         vec![VariableSpecifier::empty(unicase::Ascii::new(var.name.clone()), dims)],
     ))
 }
@@ -985,7 +997,7 @@ fn generate_variable_declaration(var: &TableEntry, type_token: Spanned<Token>) -
 ///
 /// Panics if .
 pub fn decompile(executable: Executable, raw: bool, lang_version: u16) -> Res<(Ast, Vec<DecompilerIssue>)> {
-    match Decompiler::new(executable, !raw) {
+    match Decompiler::new(executable, !raw, lang_version) {
         Ok(mut d) => {
             let mut ast = d.decompile()?;
             ast.language_version = lang_version;

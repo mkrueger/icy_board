@@ -196,61 +196,61 @@ pub const STRING_MEMBERS: &[StringMember] = &[
     StringMember {
         name: "Replace",
         arguments: 2..=2,
-        return_type: VariableType::BigStr,
+        return_type: VariableType::String,
         is_static: false,
     },
     StringMember {
         name: "Trim",
         arguments: 0..=1,
-        return_type: VariableType::BigStr,
+        return_type: VariableType::String,
         is_static: false,
     },
     StringMember {
         name: "TrimStart",
         arguments: 0..=1,
-        return_type: VariableType::BigStr,
+        return_type: VariableType::String,
         is_static: false,
     },
     StringMember {
         name: "TrimEnd",
         arguments: 0..=1,
-        return_type: VariableType::BigStr,
+        return_type: VariableType::String,
         is_static: false,
     },
     StringMember {
         name: "ToUpper",
         arguments: 0..=0,
-        return_type: VariableType::BigStr,
+        return_type: VariableType::String,
         is_static: false,
     },
     StringMember {
         name: "ToLower",
         arguments: 0..=0,
-        return_type: VariableType::BigStr,
+        return_type: VariableType::String,
         is_static: false,
     },
     StringMember {
         name: "Split",
         arguments: 1..=2,
-        return_type: VariableType::BigStr,
+        return_type: VariableType::String,
         is_static: false,
     },
     StringMember {
         name: "Join",
         arguments: 2..=2,
-        return_type: VariableType::BigStr,
+        return_type: VariableType::String,
         is_static: true,
     },
     StringMember {
         name: "Repeat",
         arguments: 2..=2,
-        return_type: VariableType::BigStr,
+        return_type: VariableType::String,
         is_static: true,
     },
     StringMember {
         name: "Split",
         arguments: 2..=3,
-        return_type: VariableType::BigStr,
+        return_type: VariableType::String,
         is_static: true,
     },
 ];
@@ -275,17 +275,17 @@ fn string_member(name: &unicase::Ascii<String>, arguments: usize) -> Option<(Fun
         ("count", 2) => Some((FuncOpCode::StringCountComparison, VariableType::Integer, &[])),
         ("equals", 1) => Some((FuncOpCode::StringEquals, VariableType::Boolean, &[])),
         ("equals", 2) => Some((FuncOpCode::StringEqualsComparison, VariableType::Boolean, &[])),
-        ("replace", 2) => Some((FuncOpCode::REPLACESTR, VariableType::BigStr, &[])),
-        ("trim", 0) => Some((FuncOpCode::StringTrim, VariableType::BigStr, &[])),
-        ("trim", 1) => Some((FuncOpCode::StringTrimChars, VariableType::BigStr, &[])),
-        ("trimstart", 0) => Some((FuncOpCode::StringTrimStart, VariableType::BigStr, &[])),
-        ("trimstart", 1) => Some((FuncOpCode::StringTrimStartChars, VariableType::BigStr, &[])),
-        ("trimend", 0) => Some((FuncOpCode::StringTrimEnd, VariableType::BigStr, &[])),
-        ("trimend", 1) => Some((FuncOpCode::StringTrimEndChars, VariableType::BigStr, &[])),
-        ("toupper", 0) => Some((FuncOpCode::UPPER, VariableType::BigStr, &[])),
-        ("tolower", 0) => Some((FuncOpCode::LOWER, VariableType::BigStr, &[])),
-        ("split", 1) => Some((FuncOpCode::StringSplit, VariableType::BigStr, &[])),
-        ("split", 2) => Some((FuncOpCode::StringSplitLimit, VariableType::BigStr, &[])),
+        ("replace", 2) => Some((FuncOpCode::REPLACESTR, VariableType::String, &[])),
+        ("trim", 0) => Some((FuncOpCode::StringTrim, VariableType::String, &[])),
+        ("trim", 1) => Some((FuncOpCode::StringTrimChars, VariableType::String, &[])),
+        ("trimstart", 0) => Some((FuncOpCode::StringTrimStart, VariableType::String, &[])),
+        ("trimstart", 1) => Some((FuncOpCode::StringTrimStartChars, VariableType::String, &[])),
+        ("trimend", 0) => Some((FuncOpCode::StringTrimEnd, VariableType::String, &[])),
+        ("trimend", 1) => Some((FuncOpCode::StringTrimEndChars, VariableType::String, &[])),
+        ("toupper", 0) => Some((FuncOpCode::UPPER, VariableType::String, &[])),
+        ("tolower", 0) => Some((FuncOpCode::LOWER, VariableType::String, &[])),
+        ("split", 1) => Some((FuncOpCode::StringSplit, VariableType::String, &[])),
+        ("split", 2) => Some((FuncOpCode::StringSplitLimit, VariableType::String, &[])),
         _ => None,
     }
 }
@@ -349,7 +349,10 @@ impl ArrayShape {
     }
 
     fn same_layout(&self, other: &Self) -> bool {
-        self.element_type == other.element_type && self.rank == other.rank && (self.resizable || self.bounds == other.bounds)
+        let compatible_elements = self.element_type == other.element_type
+            || (matches!(self.element_type, VariableType::String | VariableType::BigStr)
+                && matches!(other.element_type, VariableType::String | VariableType::BigStr));
+        compatible_elements && self.rank == other.rank && (self.resizable || self.bounds == other.bounds)
     }
 }
 
@@ -682,9 +685,11 @@ impl LookupVariabeleTable {
 }
 
 impl SemanticVisitor {
-    fn storage_type(&self, source_type: VariableType) -> VariableType {
+    pub(crate) fn storage_type(&self, source_type: VariableType) -> VariableType {
         if self.type_registry.is_enum_type(source_type) {
             VariableType::Integer
+        } else if self.lang_version >= 400 && source_type == VariableType::String {
+            VariableType::BigStr
         } else {
             source_type
         }
@@ -2258,7 +2263,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 return VariableType::None;
             }
             return match member_reference_expression.get_identifier().as_ref().to_ascii_lowercase().as_str() {
-                "join" | "repeat" => VariableType::BigStr,
+                "join" | "repeat" => VariableType::String,
                 "split" => VariableType::None,
                 _ => {
                     self.errors.lock().unwrap().report_error(
@@ -2629,7 +2634,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                         }
                         self.function_type_lookup
                             .insert(call.id, SemanticInfo::StringStaticFunc(FuncOpCode::StringJoin));
-                        return VariableType::BigStr;
+                        return VariableType::String;
                     }
                     "repeat" if call.get_arguments().len() == 2 => {
                         for argument in call.get_arguments() {
@@ -2637,7 +2642,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                         }
                         self.function_type_lookup
                             .insert(call.id, SemanticInfo::StringStaticFunc(FuncOpCode::StringRepeat));
-                        return VariableType::BigStr;
+                        return VariableType::String;
                     }
                     "split" if (2..=3).contains(&call.get_arguments().len()) => {
                         let argument_types: Vec<_> = call.get_arguments().iter().map(|argument| argument.visit(self)).collect();
@@ -2654,8 +2659,8 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                             );
                         }
                         self.function_type_lookup.insert(call.id, SemanticInfo::StringStaticFunc(opcode));
-                        self.member_array_returns.insert(call.id, (VariableType::BigStr, 1));
-                        return VariableType::BigStr;
+                        self.member_array_returns.insert(call.id, (VariableType::String, 1));
+                        return VariableType::String;
                     }
                     _ => {}
                 }
@@ -2709,7 +2714,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 }
                 self.function_type_lookup.insert(call.id, SemanticInfo::StringMemberFunc(opcode, defaults));
                 if matches!(opcode, FuncOpCode::StringSplit | FuncOpCode::StringSplitLimit) {
-                    self.member_array_returns.insert(call.id, (VariableType::BigStr, 1));
+                    self.member_array_returns.insert(call.id, (VariableType::String, 1));
                 }
                 return return_type;
             }
@@ -3428,6 +3433,8 @@ impl AstVisitor<VariableType> for SemanticVisitor {
         let name = const_decl.get_identifier().clone();
         // An enum keeps the value its member stands for; converting to the type itself would mean nothing.
         let entry = if self.type_registry.is_enum_type(declared_type) {
+            (declared_type, value)
+        } else if self.lang_version >= 400 && declared_type == VariableType::String {
             (declared_type, value)
         } else {
             (declared_type, value.convert_to(declared_type))

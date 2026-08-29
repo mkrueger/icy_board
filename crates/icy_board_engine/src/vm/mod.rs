@@ -616,8 +616,18 @@ impl VirtualMachine<'_> {
                     return Err(VMError::InternalVMError.into());
                 };
                 for (field_id, expression) in fields {
-                    let field_type = values.get(*field_id).ok_or(VMError::InvalidMemberId(*type_id, *field_id))?.vtype;
-                    values[*field_id] = self.eval_expr(expression).await?.convert_to(field_type);
+                    let field = values.get(*field_id).ok_or(VMError::InvalidMemberId(*type_id, *field_id))?;
+                    let field_type = field.vtype;
+                    let is_array = matches!(
+                        field.generic_data,
+                        GenericVariableData::Dim1(_) | GenericVariableData::Dim2(_) | GenericVariableData::Dim3(_)
+                    );
+                    let field_value = if is_array {
+                        self.eval_array_operand(expression).await?
+                    } else {
+                        self.eval_expr(expression).await?
+                    };
+                    values[*field_id] = field_value.convert_to(field_type);
                 }
                 Ok(value)
             }

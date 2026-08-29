@@ -328,6 +328,34 @@ fn records_survive_decompilation() {
 }
 
 #[test]
+fn type13_storage_decompiles_as_string_in_ppl400() {
+    let source = ";$LANGVERSION 400\n\
+                  TYPE Item\n\
+                  STRING Text\n\
+                  ENDTYPE\n\
+                  STRING Global\n\
+                  Item Value\n\
+                  Global = Echo(Value.Text)\n\
+                  PRINT Global\n\
+                  FUNCTION Echo(STRING Input) STRING\n\
+                  RETURN Input\n\
+                  ENDFUNC\n";
+    let executable = compile_source(source, LAST_PPE_RUNTIME).unwrap();
+
+    let modern = decompile_to_text(executable.clone(), LAST_PPL_LANGUAGE_VERSION);
+    assert!(modern.contains("STRING FIELD001"), "record field leaked storage type:\n{modern}");
+    assert!(modern.contains("STRING BSTR001"), "global leaked storage type:\n{modern}");
+    assert!(
+        modern.contains("FUNCTION FUNC001(STRING PAR001) STRING"),
+        "routine leaked storage type:\n{modern}"
+    );
+    assert!(!modern.contains("BIGSTR"), "modern source contains BIGSTR:\n{modern}");
+
+    let legacy = decompile_to_text(executable, 340);
+    assert!(legacy.contains("BIGSTR"), "legacy source lost type-13 spelling:\n{legacy}");
+}
+
+#[test]
 fn array_fields_survive_decompilation() {
     let source = "TYPE Rec\n\
                   INTEGER Values(10)\n\
@@ -341,8 +369,8 @@ fn array_fields_survive_decompilation() {
     let executable = compile_source(source, LAST_PPE_RUNTIME).unwrap();
     let text = decompile_to_text(executable, LAST_PPL_LANGUAGE_VERSION);
 
-    assert!(text.contains("INTEGER FIELD001(10)"), "no vector field in:\n{text}");
-    assert!(text.contains("STRING FIELD002(2, 3)"), "no matrix field in:\n{text}");
+    assert!(text.contains("INTEGER FIELD001[10]"), "no vector field in:\n{text}");
+    assert!(text.contains("STRING FIELD002[2,3]"), "no matrix field in:\n{text}");
     assert!(text.contains(".FIELD001(4) = 42"), "no indexed assignment in:\n{text}");
 
     let rebuilt = compile_source(&text, LAST_PPE_RUNTIME).unwrap_or_else(|e| panic!("does not compile again:\n{text}\n{e}"));

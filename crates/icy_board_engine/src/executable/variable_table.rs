@@ -153,7 +153,7 @@ impl VarHeader {
 /// its own fields too. A type can only name types declared before it, so this ends.
 pub fn create_record_value(type_id: u8, user_types: &[Vec<RecordField>]) -> Option<VariableValue> {
     let built_in_fields = match type_id as usize {
-        crate::parser::CONTACT_ID => Some(vec![RecordField::scalar(VariableType::String), RecordField::scalar(VariableType::String)]),
+        crate::parser::CONTACT_ID => Some(vec![RecordField::scalar(VariableType::BigStr), RecordField::scalar(VariableType::BigStr)]),
         _ => None,
     };
     let fields = if let Some(fields) = built_in_fields.as_ref() {
@@ -367,9 +367,6 @@ impl TableEntry {
                 let GenericVariableData::String(s) = &self.value.generic_data else {
                     return Err(ExecutableError::StringTypeInvalid(self.value.vtype));
                 };
-                if s.len() > u16::MAX as usize {
-                    return Err(ExecutableError::StringConstantTooLong(s.len()));
-                }
                 let mut string_buffer: Vec<u8> = Vec::new();
                 for c in s.chars() {
                     if let Some(b) = UNICODE_TO_CP437.get(&c) {
@@ -379,6 +376,9 @@ impl TableEntry {
                     }
                 }
                 string_buffer.push(0);
+                if string_buffer.len() > u16::MAX as usize {
+                    return Err(ExecutableError::StringConstantTooLong(string_buffer.len() - 1));
+                }
 
                 buffer.extend_from_slice(&u16::to_le_bytes(string_buffer.len() as u16));
                 encrypt_chunks(&mut string_buffer, version, false);
@@ -1048,6 +1048,33 @@ impl VariableTable {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn string_constant(length: usize) -> TableEntry {
+        TableEntry::new(
+            "text".to_string(),
+            VarHeader {
+                id: 1,
+                variable_type: VariableType::String,
+                ..Default::default()
+            },
+            VariableValue::new_string("x".repeat(length)),
+            EntryType::Constant,
+        )
+    }
+
+    #[test]
+    fn string_constant_length_reserves_space_for_the_terminating_nul() {
+        assert!(string_constant(u16::MAX as usize - 1).to_buffer(400).is_ok());
+        assert!(matches!(
+            string_constant(u16::MAX as usize).to_buffer(400),
+            Err(ExecutableError::StringConstantTooLong(length)) if length == u16::MAX as usize
+        ));
     }
 }
 

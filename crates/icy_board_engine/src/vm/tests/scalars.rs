@@ -1,7 +1,64 @@
 //! The loose scalar functions: DDATE conversion, the event flag, the keyboard
 //! script flag and free disk space.
 
-use super::{compile_errors, run_ppl, run_ppl_on};
+use crate::executable::{EntryType, VariableType};
+
+use super::{compile, compile_errors, run_ppl, run_ppl_on};
+
+#[test]
+fn ppl400_string_uses_bigstr_storage_without_changing_literal_encoding() {
+    let executable = compile(
+        ";$LANGVERSION 400\nDECLARE FUNCTION Echo(STRING input) STRING\nSTRING text\nSTRING values[]\ntext = Echo(\"literal\")\nPRINT text, values.Len()\nFUNCTION Echo(STRING input) STRING\n STRING local\n local = input\n RETURN local\nENDFUNC",
+    );
+    let text = executable
+        .variable_table
+        .get_entries()
+        .iter()
+        .find(|entry| entry.header.variable_type == VariableType::BigStr && entry.header.dim == 0)
+        .unwrap();
+    let values = executable
+        .variable_table
+        .get_entries()
+        .iter()
+        .find(|entry| entry.header.variable_type == VariableType::BigStr && entry.header.dim == 1)
+        .unwrap();
+    let literal = executable
+        .variable_table
+        .get_entries()
+        .iter()
+        .find(|entry| entry.value.as_string() == "literal")
+        .unwrap();
+    assert_eq!(VariableType::BigStr, text.header.variable_type);
+    assert_eq!(VariableType::BigStr, values.header.variable_type);
+    assert_eq!(VariableType::String, literal.header.variable_type);
+    assert!(
+        executable
+            .variable_table
+            .get_entries()
+            .iter()
+            .filter(|entry| entry.entry_type != EntryType::Constant)
+            .all(|entry| entry.header.variable_type != VariableType::String)
+    );
+
+    let legacy = compile(";$LANGVERSION 340\nSTRING text\nPRINT text");
+    let text = legacy
+        .variable_table
+        .get_entries()
+        .iter()
+        .find(|entry| entry.header.variable_type == VariableType::String)
+        .unwrap();
+    assert_eq!(VariableType::String, text.header.variable_type);
+
+    assert_eq!("70000\n", run_ppl("STRING text\ntext = STRING.Repeat(\"x\", 70000)\nPRINTLN text.Len()"));
+}
+
+#[test]
+fn ppl400_const_string_keeps_long_literal_values() {
+    let literal = "x".repeat(300);
+    let source = format!(";$LANGVERSION 400\nCONST STRING text = \"{literal}\"\nSTRING value = text\nPRINT value.Len()");
+
+    assert_eq!("300", run_ppl(&source));
+}
 
 #[test]
 fn test_toddate_reads_a_ccyymmdd_string() {

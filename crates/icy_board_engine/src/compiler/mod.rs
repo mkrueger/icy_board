@@ -633,9 +633,7 @@ impl PPECompiler {
                     .iter()
                     .map(|(_, field)| {
                         let mut field = *field;
-                        if self.semantic_visitor.type_registry.is_enum_type(field.variable_type) {
-                            field.variable_type = VariableType::Integer;
-                        }
+                        field.variable_type = self.semantic_visitor.storage_type(field.variable_type);
                         field
                     })
                     .collect()

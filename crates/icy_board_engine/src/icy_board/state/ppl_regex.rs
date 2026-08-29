@@ -172,14 +172,14 @@ impl UserData for PplRegex {
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         registry.add_property(VALID.clone(), VariableType::Boolean, false);
-        registry.add_property(PATTERN.clone(), VariableType::BigStr, false);
+        registry.add_property(PATTERN.clone(), VariableType::String, false);
         registry.add_static_function_with(
             COMPILE.clone(),
             vec![VariableType::String, VariableType::UserData(REGEX_OPTIONS_ENUM_ID)],
             1,
             VariableType::UserData(REGEX_ID as u8),
         );
-        registry.add_static_function(ESCAPE.clone(), vec![VariableType::String], VariableType::BigStr);
+        registry.add_static_function(ESCAPE.clone(), vec![VariableType::String], VariableType::String);
         registry.add_static_function_with(
             IS_VALID.clone(),
             vec![VariableType::String, VariableType::UserData(REGEX_OPTIONS_ENUM_ID)],
@@ -204,9 +204,9 @@ impl UserData for PplRegex {
             REPLACE.clone(),
             vec![VariableType::String, VariableType::String, VariableType::Integer],
             2,
-            VariableType::BigStr,
+            VariableType::String,
         );
-        registry.add_array_function_with(SPLIT.clone(), vec![VariableType::String, VariableType::Integer], 1, VariableType::BigStr, 1);
+        registry.add_array_function_with(SPLIT.clone(), vec![VariableType::String, VariableType::Integer], 1, VariableType::String, 1);
     }
 }
 
@@ -400,12 +400,12 @@ impl UserData for PplRegexMatch {
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         registry.add_property(SUCCESS.clone(), VariableType::Boolean, false);
-        registry.add_property(VALUE.clone(), VariableType::BigStr, false);
+        registry.add_property(VALUE.clone(), VariableType::String, false);
         registry.add_property(START.clone(), VariableType::Integer, false);
         registry.add_property(LENGTH.clone(), VariableType::Integer, false);
         registry.add_property(GROUP_COUNT.clone(), VariableType::Integer, false);
-        registry.add_function(GROUP.clone(), vec![VariableType::Integer], VariableType::BigStr);
-        registry.add_function(NAMED_GROUP.clone(), vec![VariableType::String], VariableType::BigStr);
+        registry.add_function(GROUP.clone(), vec![VariableType::Integer], VariableType::String);
+        registry.add_function(NAMED_GROUP.clone(), vec![VariableType::String], VariableType::String);
         registry.add_function(GROUP_MATCHED.clone(), vec![VariableType::Integer], VariableType::Boolean);
         registry.add_function(NAMED_GROUP_MATCHED.clone(), vec![VariableType::String], VariableType::Boolean);
         registry.add_function(GROUP_START.clone(), vec![VariableType::Integer], VariableType::Integer);

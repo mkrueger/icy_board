@@ -488,6 +488,14 @@ fn lex_all(src: &str) -> (Vec<Token>, Vec<String>) {
     (tokens, reported)
 }
 
+fn lex_warnings(src: &str) -> Vec<String> {
+    let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+    let mut lex = Lexer::new(PathBuf::from("."), &Workspace::default(), src, Encoding::Utf8, errors.clone());
+    while lex.next_token().is_some() {}
+    let warnings = errors.lock().unwrap().warnings.iter().map(|warning| warning.error.to_string()).collect();
+    warnings
+}
+
 /// The identifiers a source lexes to, i.e. the code that survived the preprocessor.
 fn active_code(src: &str) -> Vec<String> {
     lex_all(src)
@@ -908,4 +916,13 @@ fn an_unknown_language_version_is_reported() {
 
     assert_eq!(Some(400), crate::parser::lexer::scan_language_version(";$LANGVERSION 400\nBEGIN"));
     assert_eq!(None, crate::parser::lexer::scan_language_version("BEGIN"));
+}
+
+#[test]
+fn bigstr_is_deprecated_from_language_400() {
+    assert!(lex_warnings(";$LANGVERSION 340\nBIGSTR text").is_empty());
+    assert_eq!(
+        vec!["BIGSTR is deprecated in PPL 4.00; use STRING instead".to_string()],
+        lex_warnings(";$LANGVERSION 400\nBIGSTR text")
+    );
 }

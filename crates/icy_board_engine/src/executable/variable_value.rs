@@ -129,7 +129,12 @@ impl From<VariableType> for u8 {
 impl VariableType {
     pub fn create_empty_value(&self) -> VariableValue {
         match self {
-            VariableType::String | VariableType::BigStr => VariableValue::new_string(String::new()),
+            VariableType::String => VariableValue::new_string(String::new()),
+            VariableType::BigStr => VariableValue {
+                vtype: VariableType::BigStr,
+                generic_data: GenericVariableData::String(String::new()),
+                ..Default::default()
+            },
             _ => VariableValue::new(*self, VariableData::default()),
         }
     }
@@ -1811,22 +1816,22 @@ impl VariableValue {
     /// Panics if .
     #[must_use]
     pub fn convert_to(self, convert_to_type: VariableType) -> VariableValue {
-        if convert_to_type == VariableType::String {
+        if matches!(convert_to_type, VariableType::String | VariableType::BigStr) {
             match self.generic_data {
                 GenericVariableData::Dim1(values) => {
                     return VariableValue {
-                        vtype: VariableType::String,
-                        generic_data: GenericVariableData::Dim1(values.into_iter().map(|value| value.convert_to(VariableType::String)).collect()),
+                        vtype: convert_to_type,
+                        generic_data: GenericVariableData::Dim1(values.into_iter().map(|value| value.convert_to(convert_to_type)).collect()),
                         ..Default::default()
                     };
                 }
                 GenericVariableData::Dim2(values) => {
                     return VariableValue {
-                        vtype: VariableType::String,
+                        vtype: convert_to_type,
                         generic_data: GenericVariableData::Dim2(
                             values
                                 .into_iter()
-                                .map(|row| row.into_iter().map(|value| value.convert_to(VariableType::String)).collect())
+                                .map(|row| row.into_iter().map(|value| value.convert_to(convert_to_type)).collect())
                                 .collect(),
                         ),
                         ..Default::default()
@@ -1834,14 +1839,14 @@ impl VariableValue {
                 }
                 GenericVariableData::Dim3(values) => {
                     return VariableValue {
-                        vtype: VariableType::String,
+                        vtype: convert_to_type,
                         generic_data: GenericVariableData::Dim3(
                             values
                                 .into_iter()
                                 .map(|plane| {
                                     plane
                                         .into_iter()
-                                        .map(|row| row.into_iter().map(|value| value.convert_to(VariableType::String)).collect())
+                                        .map(|row| row.into_iter().map(|value| value.convert_to(convert_to_type)).collect())
                                         .collect()
                                 })
                                 .collect(),
@@ -1851,10 +1856,16 @@ impl VariableValue {
                 }
                 generic_data => {
                     let mut value = VariableValue { generic_data, ..self }.as_string();
-                    if let Some((byte_index, _)) = value.char_indices().nth(256) {
-                        value.truncate(byte_index);
+                    if convert_to_type == VariableType::String {
+                        if let Some((byte_index, _)) = value.char_indices().nth(256) {
+                            value.truncate(byte_index);
+                        }
                     }
-                    return VariableValue::new_string(value);
+                    return VariableValue {
+                        vtype: convert_to_type,
+                        generic_data: GenericVariableData::String(value),
+                        ..Default::default()
+                    };
                 }
             }
         }
@@ -1900,14 +1911,7 @@ impl VariableValue {
                     _ => self.as_int(),
                 };
             }
-            VariableType::String => unreachable!(),
-            VariableType::BigStr => {
-                return VariableValue {
-                    vtype: VariableType::BigStr,
-                    data,
-                    generic_data: GenericVariableData::String(self.as_string()),
-                };
-            }
+            VariableType::String | VariableType::BigStr => unreachable!(),
             VariableType::Time => {
                 data.time_value = match self.vtype {
                     VariableType::String | VariableType::BigStr => IcbTime::parse(&self.as_string()).to_pcboard_time(),

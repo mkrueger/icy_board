@@ -4,6 +4,15 @@ use crate::{
 };
 
 #[test]
+fn contact_record_fields_use_dynamic_string_storage() {
+    let value = crate::executable::create_record_value(crate::parser::CONTACT_ID as u8, &[]).unwrap();
+    let crate::executable::GenericVariableData::Record(fields) = value.generic_data else {
+        panic!("contact record fields were not initialized");
+    };
+    assert!(fields.iter().all(|field| field.vtype == crate::executable::VariableType::BigStr));
+}
+
+#[test]
 fn the_user_object_requires_runtime_400() {
     let errors = compile_errors_with_runtime("PRINT Session.User.Name", 340);
 

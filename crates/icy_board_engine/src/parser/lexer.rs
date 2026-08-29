@@ -41,6 +41,9 @@ pub enum LexingErrorType {
     #[error("Don't use braces, they will get another meaning in the future. Use '(', ')' instead.")]
     DontUseBraces,
 
+    #[error("BIGSTR is deprecated in PPL 4.00; use STRING instead")]
+    BigStrDeprecated,
+
     #[error("Invalid define value: {0}")]
     InvalidDefineValue(String),
 
@@ -1185,6 +1188,12 @@ impl Lexer {
         }
 
         let identifier = unicase::Ascii::new(self.text[self.token_start..self.token_end].iter().collect::<String>());
+        if self.lang_version >= 400 && identifier == "BIGSTR" {
+            self.errors
+                .lock()
+                .unwrap()
+                .report_warning(self.token_start..self.token_end, LexingErrorType::BigStrDeprecated);
+        }
         if !open_bracket && let Some(token) = self.lookup_table.get(&identifier) {
             return Some(token.clone());
         }

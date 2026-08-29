@@ -119,8 +119,8 @@ fn contact_value(contact: &UserContact) -> VariableValue {
         vtype: VariableType::UserData(CONTACT_ID as u8),
         data: crate::executable::VariableData::default(),
         generic_data: crate::executable::GenericVariableData::Record(vec![
-            VariableValue::new_string(contact.service.clone()),
-            VariableValue::new_string(contact.account.clone()),
+            VariableValue::new_string(contact.service.clone()).convert_to(VariableType::BigStr),
+            VariableValue::new_string(contact.account.clone()).convert_to(VariableType::BigStr),
         ]),
     }
 }

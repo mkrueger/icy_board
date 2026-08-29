@@ -729,7 +729,7 @@ impl UserData for PplHttpResponse {
         registry.add_property(FINAL_URL.clone(), VariableType::String, false);
         registry.add_property(SIZE.clone(), VariableType::Long, false);
         registry.add_property(CONTENT_TYPE.clone(), VariableType::String, false);
-        registry.add_function(TEXT.clone(), Vec::new(), VariableType::BigStr);
+        registry.add_function(TEXT.clone(), Vec::new(), VariableType::String);
         registry.add_function(HEADER.clone(), vec![VariableType::String], VariableType::String);
         registry.add_function(SAVE.clone(), vec![VariableType::String], VariableType::Boolean);
     }

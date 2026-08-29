@@ -1,4 +1,63 @@
-use crate::vm::tests::{compile_errors, compile_errors_with_runtime, run_ppl};
+use crate::{
+    executable::{GenericVariableData, VariableType},
+    vm::tests::{compile, compile_errors, compile_errors_with_runtime, run_ppl},
+};
+
+#[test]
+fn ppl400_string_record_fields_use_dynamic_storage() {
+    let executable = compile(";$LANGVERSION 400\nTYPE Item\n STRING Text\n STRING Lines(1)\nENDTYPE\nItem value\nPRINT value.Text");
+
+    assert_eq!(VariableType::BigStr, executable.user_types[0][0].variable_type);
+    assert_eq!(VariableType::BigStr, executable.user_types[0][1].variable_type);
+    assert_eq!(1, executable.user_types[0][1].dim);
+    let direct = crate::executable::create_record_value(crate::parser::FIRST_USER_TYPE_ID as u8, &executable.user_types).unwrap();
+    let GenericVariableData::Record(direct_fields) = direct.generic_data else {
+        panic!("record factory did not initialize fields");
+    };
+    assert_eq!(VariableType::BigStr, direct_fields[0].vtype);
+    let record = executable
+        .variable_table
+        .get_entries()
+        .iter()
+        .find(|entry| entry.header.variable_type == VariableType::UserData(crate::parser::FIRST_USER_TYPE_ID as u8))
+        .unwrap();
+    let GenericVariableData::Record(fields) = &record.value.generic_data else {
+        panic!("record fields were not initialized");
+    };
+    assert_eq!(VariableType::BigStr, fields[0].vtype);
+    assert_eq!(
+        "70000|70000|70000",
+        run_ppl(
+            r#";$LANGVERSION 400
+            TYPE Item
+                STRING Text
+            ENDTYPE
+            STRING text = STRING.Repeat("x", 70000)
+            Item assigned
+            assigned.Text = text
+            Item value = Item { Text = text }
+            PRINT text.Len(), "|", assigned.Text.Len(), "|", value.Text.Len()
+            "#,
+        )
+    );
+}
+
+#[test]
+fn ppl400_string_array_record_literals_preserve_shape_and_long_elements() {
+    assert_eq!(
+        "2|70000|tail",
+        run_ppl(
+            r#";$LANGVERSION 400
+            TYPE Item
+                STRING Lines(1)
+            ENDTYPE
+            STRING lines = { STRING.Repeat("x", 70000), "tail" }
+            Item value = Item { Lines = lines }
+            PRINT value.Lines.Len(), "|", value.Lines[0].Len(), "|", value.Lines[1]
+            "#,
+        )
+    );
+}
 
 #[test]
 fn a_named_record_literal_initializes_fields_in_any_order() {
