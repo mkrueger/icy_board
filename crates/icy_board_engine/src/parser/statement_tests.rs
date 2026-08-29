@@ -719,7 +719,7 @@ fn an_older_language_still_ends_a_program_with_end() {
 fn a_type_is_only_known_from_the_version_that_named_it() {
     // The PPL release notes put the widths and the big string in 2.00 and the
     // DBase date in 3.00.
-    for (source, since) in [("BIGSTR s\n", 200), ("DDATE d\n", 300), ("MSGAREAID a\n", 400)] {
+    for (source, since) in [("BIGSTR s\n", 200), ("DDATE d\n", 300), ("MSGAREAID a\n", 400), ("BYTES b\n", 400)] {
         let (_, messages) = parse_program(source, since);
         assert!(messages.is_empty(), "{source:?} at {since}: {messages:?}");
 

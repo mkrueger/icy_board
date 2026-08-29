@@ -85,6 +85,9 @@ pub enum VariableType {
     /// 8-byte unsigned integer.
     ULong,
 
+    /// Contiguous, growable binary blob (`Vec<u8>`). Language extension (>=400) for binary data and fast I/O.
+    Bytes,
+
     UserData(u8),
 }
 
@@ -120,6 +123,7 @@ impl From<VariableType> for u8 {
             VariableType::Password => 20,
             VariableType::Long => 21,
             VariableType::ULong => 22,
+            VariableType::Bytes => 23,
             VariableType::UserData(b) => b,
             VariableType::None => 255,
         }
@@ -135,6 +139,7 @@ impl VariableType {
                 generic_data: GenericVariableData::String(String::new()),
                 ..Default::default()
             },
+            VariableType::Bytes => VariableValue::new_bytes(Vec::new()),
             _ => VariableValue::new(*self, VariableData::default()),
         }
     }
@@ -164,6 +169,7 @@ impl VariableType {
             20 => VariableType::Password,
             21 => VariableType::Long,
             22 => VariableType::ULong,
+            23 => VariableType::Bytes,
             _ => VariableType::UserData(b),
         }
     }
@@ -193,6 +199,7 @@ impl VariableType {
             VariableType::Password => "PASSWORD".to_string(),
             VariableType::Long => "LONG".to_string(),
             VariableType::ULong => "ULONG".to_string(),
+            VariableType::Bytes => "BYTES".to_string(),
             VariableType::UserData(u) => format!("USERDATA({u})"),
             VariableType::None => "NONE".to_string(),
         };
@@ -227,6 +234,7 @@ impl fmt::Display for VariableType {
             VariableType::Password => write!(f, "Password"),       // Password type
             VariableType::Long => write!(f, "Long"),               // i64
             VariableType::ULong => write!(f, "ULong"),             // u64
+            VariableType::Bytes => write!(f, "Bytes"),             // Vec<u8>
             VariableType::UserData(u) => write!(f, "UserData({u})"),
         }
     }
@@ -302,6 +310,9 @@ pub enum GenericVariableData {
     None,
     String(String),
 
+    /// Contiguous binary payload for `VariableType::Bytes`.
+    Bytes(Vec<u8>),
+
     Dim1(Vec<VariableValue>),
     Dim2(Vec<Vec<VariableValue>>),
     Dim3(Vec<Vec<Vec<VariableValue>>>),
@@ -322,6 +333,7 @@ impl fmt::Debug for GenericVariableData {
         match self {
             GenericVariableData::None => write!(f, "None"),
             GenericVariableData::String(s) => write!(f, "String({s:?})"),
+            GenericVariableData::Bytes(data) => write!(f, "Bytes({} bytes)", data.len()),
             GenericVariableData::Dim1(data) => write!(f, "Dim1({data:?})"),
             GenericVariableData::Dim2(data) => write!(f, "Dim2({data:?})"),
             GenericVariableData::Dim3(data) => write!(f, "Dim3({data:?})"),
@@ -418,6 +430,13 @@ impl fmt::Display for VariableValue {
                         write!(f, "")
                     }
                 }
+                VariableType::Bytes => {
+                    if let GenericVariableData::Bytes(data) = &self.generic_data {
+                        write!(f, "{}", bytes_to_hex(data))
+                    } else {
+                        write!(f, "")
+                    }
+                }
                 _ => {
                     write!(f, "")
                 }
@@ -432,6 +451,7 @@ impl PartialEq for VariableValue {
             (GenericVariableData::Dim1(left), GenericVariableData::Dim1(right)) => return self.vtype == other.vtype && left == right,
             (GenericVariableData::Dim2(left), GenericVariableData::Dim2(right)) => return self.vtype == other.vtype && left == right,
             (GenericVariableData::Dim3(left), GenericVariableData::Dim3(right)) => return self.vtype == other.vtype && left == right,
+            (GenericVariableData::Bytes(left), GenericVariableData::Bytes(right)) => return left == right,
             _ => {}
         }
         if let (VariableType::UserData(left_type), VariableType::UserData(right_type)) = (self.vtype, other.vtype) {
@@ -1057,6 +1077,23 @@ impl VariableValue {
         }
     }
 
+    pub fn new_bytes(bytes: Vec<u8>) -> Self {
+        Self {
+            vtype: VariableType::Bytes,
+            data: VariableData::default(),
+            generic_data: GenericVariableData::Bytes(bytes),
+        }
+    }
+
+    /// The raw binary payload of a `Bytes` value, or an empty slice for any other type.
+    pub fn as_byte_slice(&self) -> &[u8] {
+        if let GenericVariableData::Bytes(data) = &self.generic_data {
+            data
+        } else {
+            &[]
+        }
+    }
+
     pub fn new_int(i: i32) -> Self {
         Self {
             vtype: VariableType::Integer,
@@ -1606,6 +1643,7 @@ impl VariableValue {
         unsafe {
             match &self.generic_data {
                 GenericVariableData::String(s) => s.clone(),
+                GenericVariableData::Bytes(data) => bytes_to_hex(data),
                 GenericVariableData::Password(p) => match p {
                     Password::PlainText(s) => s.clone(),
                     _ => "******".to_string(),
@@ -1822,6 +1860,17 @@ impl VariableValue {
         if self.vtype == convert_to_type && convert_to_type == VariableType::BigStr {
             return self;
         }
+        if convert_to_type == VariableType::Bytes {
+            return match self.generic_data {
+                // A byte array (BYTE[]) collapses element-wise into a compact blob.
+                GenericVariableData::Dim1(values) => VariableValue::new_bytes(values.iter().map(VariableValue::as_byte).collect()),
+                // Already a blob: keep it as-is.
+                GenericVariableData::Bytes(_) => self,
+                // A string contributes its UTF-8 bytes.
+                GenericVariableData::String(s) => VariableValue::new_bytes(s.into_bytes()),
+                _ => VariableValue::new_bytes(Vec::new()),
+            };
+        }
         if matches!(convert_to_type, VariableType::String | VariableType::BigStr) {
             match self.generic_data {
                 GenericVariableData::Dim1(values) => {
@@ -1918,6 +1967,7 @@ impl VariableValue {
                 };
             }
             VariableType::String | VariableType::BigStr => unreachable!(),
+            VariableType::Bytes => unreachable!(),
             VariableType::Time => {
                 data.time_value = match self.vtype {
                     VariableType::String | VariableType::BigStr => IcbTime::parse(&self.as_string()).to_pcboard_time(),
@@ -1979,6 +2029,16 @@ impl VariableValue {
             generic_data: GenericVariableData::Password(password),
         }
     }
+}
+
+/// Uppercase, separator-free hex rendering of a byte blob (e.g. `48656C6C6F`).
+fn bytes_to_hex(data: &[u8]) -> String {
+    use std::fmt::Write;
+    let mut s = String::with_capacity(data.len() * 2);
+    for b in data {
+        let _ = write!(s, "{b:02X}");
+    }
+    s
 }
 
 /// `PCBoard` prints a date as MM/DD/YY and an empty one as 00/00/00.
@@ -2109,6 +2169,32 @@ mod tests {
     #[test]
     fn check_variable_size() {
         assert_eq!(8, std::mem::size_of::<VariableData>());
+    }
+
+    #[test]
+    fn bytes_round_trips_its_binary_payload() {
+        let value = VariableValue::new_bytes(vec![0x00, 0x48, 0xFF, 0x10]);
+        assert_eq!(VariableType::Bytes, value.get_type());
+        assert_eq!(&[0x00, 0x48, 0xFF, 0x10], value.as_byte_slice());
+    }
+
+    #[test]
+    fn bytes_render_as_uppercase_hex() {
+        assert_eq!("48656C6C6F", VariableValue::new_bytes(b"Hello".to_vec()).as_string());
+        assert_eq!("", VariableValue::new_bytes(Vec::new()).as_string());
+    }
+
+    #[test]
+    fn bytes_compare_by_content_not_identity() {
+        assert_eq!(VariableValue::new_bytes(vec![1, 2, 3]), VariableValue::new_bytes(vec![1, 2, 3]));
+        assert_ne!(VariableValue::new_bytes(vec![1, 2, 3]), VariableValue::new_bytes(vec![1, 2, 4]));
+    }
+
+    #[test]
+    fn a_string_converts_to_its_utf8_bytes() {
+        let value = VariableValue::new_string("Grüße".to_string()).convert_to(VariableType::Bytes);
+        assert_eq!(VariableType::Bytes, value.get_type());
+        assert_eq!("Grüße".as_bytes(), value.as_byte_slice());
     }
 
     #[test]

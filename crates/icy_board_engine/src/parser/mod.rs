@@ -1385,6 +1385,7 @@ static BUILT_IN_TYPES: &[(&str, VariableType, u16)] = &[
     ("DREAL", VariableType::Double, 200),
     ("DDATE", VariableType::DDate, 300),
     ("MSGAREAID", VariableType::MessageAreaID, 400),
+    ("BYTES", VariableType::Bytes, 400),
 ];
 
 /// The built-in type that name stands for, or nothing if the language did not have
