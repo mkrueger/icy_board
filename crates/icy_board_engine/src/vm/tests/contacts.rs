@@ -60,10 +60,10 @@ fn notes_can_be_walked() {
         "5 first  third   ",
         run_ppl(
             r#"
-Session.User.Notes[0] = "first"
-Session.User.Notes[2] = "third"
+Session.User.SetNote(0, "first")
+Session.User.SetNote(2, "third")
 STRING note
-PRINT Session.User.Notes.Count, " "
+PRINT Session.User.Notes.Len(), " "
 FOREACH note IN Session.User.Notes
     PRINT note, " "
 ENDFOREACH
@@ -175,6 +175,6 @@ fn an_unknown_contact_index_answers_an_empty_contact() {
 fn the_user_reports_its_own_details() {
     assert_eq!(
         "SYSOP|255|1|0",
-        run_ppl(r#"PRINT Session.User.Name, "|", Session.User.SecurityLevel, "|", Session.User.Notes.Count > 0, "|", Session.User.Uploads"#)
+        run_ppl(r#"PRINT Session.User.Name, "|", Session.User.SecurityLevel, "|", Session.User.Notes.Len() > 0, "|", Session.User.Uploads"#)
     );
 }

@@ -1444,18 +1444,6 @@
             "type": "TOKEN",
             "content": {
               "type": "PATTERN",
-              "value": "[nN][oO][tT][eE][sS]"
-            }
-          },
-          "named": false,
-          "value": "NOTES"
-        },
-        {
-          "type": "ALIAS",
-          "content": {
-            "type": "TOKEN",
-            "content": {
-              "type": "PATTERN",
               "value": "[rR][eE][gG][eE][xX][mM][aA][tT][cC][hH][eE][sS]"
             }
           },

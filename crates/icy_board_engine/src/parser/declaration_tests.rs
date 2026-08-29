@@ -212,7 +212,6 @@ fn board_object_type_ids_are_frozen() {
         ("DIRECTORIES", 53),
         ("DOORS", 54),
         ("CONFERENCES", 55),
-        ("NOTES", 56),
         ("MSG", 58),
         ("HTTP", 59),
         ("HTTPREQUEST", 60),

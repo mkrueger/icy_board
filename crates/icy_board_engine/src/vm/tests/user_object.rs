@@ -109,7 +109,7 @@ fn a_note_can_be_written_and_read_back() {
         "Called about the upload",
         run_ppl(
             r#"
-Session.User.Notes[0] = "Called about the upload"
+Session.User.SetNote(0, "Called about the upload")
 PRINT Session.User.Notes[0]
 "#,
         )
@@ -120,30 +120,41 @@ PRINT Session.User.Notes[0]
 #[test]
 fn a_note_outside_the_five_slots_is_refused() {
     assert_eq!(
-        "kept",
+        "1 0 kept",
         run_ppl(
             r#"
-Session.User.Notes[0] = "kept"
-Session.User.Notes[5] = "nowhere"
-PRINT Session.User.Notes[0]
+PRINT Session.User.SetNote(0, "kept"), " ", Session.User.SetNote(5, "nowhere"), " ", Session.User.Notes[0]
 "#,
         )
     );
 }
 
-/// A compound assignment reads through the same index it writes back to.
+/// Notes are snapshots, so mutation is explicit and an existing array stays unchanged.
 #[test]
-fn a_note_can_be_appended_to() {
+fn notes_are_array_snapshots() {
     assert_eq!(
-        "one and two",
+        "one|one and two",
         run_ppl(
             r#"
-Session.User.Notes[1] = "one"
-LET Session.User.Notes[1] += " and two"
-PRINT Session.User.Notes[1]
+Session.User.SetNote(1, "one")
+STRING notes[]
+notes = Session.User.Notes
+Session.User.SetNote(1, "one and two")
+PRINT notes[1], "|", Session.User.Notes[1]
 "#,
         )
     );
+}
+
+#[test]
+fn the_notes_wrapper_type_is_no_longer_defined() {
+    let errors = compile_errors("NOTES notes");
+    assert!(!errors.is_empty(), "NOTES should not remain a PPL 400 type");
+}
+
+#[test]
+fn a_snapshot_user_cannot_set_notes() {
+    assert_eq!("0", run_ppl("PRINT Board.Users[0].SetNote(0, \"changed\")"));
 }
 
 /// The board hashes the password, so what the PPE handed over is not what is stored.

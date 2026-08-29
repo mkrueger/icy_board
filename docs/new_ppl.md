@@ -1042,7 +1042,7 @@ Session.User.City = "Berlin"
 | Identity | `Valid`, `Name`, `Alias`, `VerifyAnswer` | all but `Valid` and `Name` |
 | Address | `Street1`, `Street2`, `City`, `State`, `Zip`, `Country` | yes |
 | Reaching them | `BusinessPhone`, `HomePhone`, `Email`, `Web`, `Gender`, `BirthDate` | yes |
-| Sysop text | `Comment`, `SysopComment`, `Notes` | yes |
+| Sysop text | `Comment`, `SysopComment`, `Notes`, `SetNote(index, text)` | yes |
 | Preferences | `ExpertMode`, `EditorMode`, `ClearScreen`, `ScrollMessageBody`, `ShortDescriptions`, `LongHeader`, `WideEditor`, `PageLength`, `Protocol` | yes |
 | Preferences the session owns | `UseGraphics`, `UseAlias`, `Language`, `DateFormat` | no |
 | Security | `SecurityLevel`, `ExpiredSecurityLevel`, `ExpirationDate`, `PasswordExpires`, `SetPassword(text)` | yes |
@@ -1064,24 +1064,24 @@ through 255. An out-of-range write leaves the old value intact and reports
 `ErrKind.User` with `ErrCode.Invalid`.
 
 `EditorMode` is one `EDITORMODE` value — `Yes`, `No` or `Ask` — rather than the
-two overlapping flags `PCBoard` kept. A note is written through its index,
-`Session.User.Notes[0] = "..."`, for an index from 0 to 4. `SetPassword()` hashes
+two overlapping flags `PCBoard` kept. `SetNote(index, text)` writes one of the
+five note slots, for an index from 0 to 4. `SetPassword()` hashes
 the text the way the board is configured to, so the plain text is never stored;
 an empty password is refused and it answers `FALSE` rather than failing.
 
 ### Notes and contacts
 
-`Notes` holds the five sysop notes as `STRING`s, answers `Count`, is read with
-an index and is walked with `FOREACH`. It is written through the index:
+`User.Notes` returns a five-element `STRING[]` snapshot. It is read with an
+index, queried with `Len()` and walked with `FOREACH`. Mutation is explicit:
 
 ```PPL
-Session.User.Notes[0] = "Called about the upload"
+Session.User.SetNote(0, "Called about the upload")
 ```
 
-An index no note has is refused and leaves the rest alone. A compound assignment
-reads through the same index it writes back to, so `Notes[0] += "..."` appends.
-The index is evaluated twice there, the way it is for `a(i) += v`, so an index
-with a side effect happens twice.
+An index outside 0 through 4 is refused and leaves the notes unchanged. Passing
+an empty string clears a slot. An array already returned by `User.Notes` remains
+unchanged after `SetNote`; read the property again to obtain the new snapshot.
+`Board.Users` entries are read-only and reject `SetNote`.
 
 A contact is a built-in `CONTACT` record with two `STRING` fields, `Service` and
 `Account`. `User.Contacts` returns a `CONTACT[]` snapshot in stable list order.

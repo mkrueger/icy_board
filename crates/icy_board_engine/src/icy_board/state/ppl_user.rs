@@ -5,11 +5,11 @@ use crate::{
     datetime::IcbDate,
     executable::{VariableType, VariableValue},
     icy_board::{
-        state::ppl_collection::{COUNT, GET, SET as SET_INDEXED},
+        state::ppl_collection::{COUNT, GET},
         state::ppl_error::{ERR_INVALID, ERR_KIND_USER, PplError},
         user_base::{FSEMode, User, UserContact},
     },
-    parser::{CONTACT_ID, EDITOR_MODE_ENUM_ID, NOTES_ID, USER_ID, USERS_ID},
+    parser::{CONTACT_ID, EDITOR_MODE_ENUM_ID, USER_ID, USERS_ID},
 };
 
 macro_rules! member_name {
@@ -77,9 +77,7 @@ member_name!(MINUTES_TODAY, "MinutesToday");
 member_name!(CONTACTS, "Contacts");
 member_name!(ADD_CONTACT, "AddContact");
 member_name!(REMOVE_CONTACT, "RemoveContact");
-
-/// How many sysop notes a user carries. `PCBoard` called them `U_NOTES`.
-const NOTE_COUNT_VALUE: i32 = 5;
+member_name!(SET_NOTE, "SetNote");
 
 /// A user record. `Session.User` is live; entries from `Board.Users` are snapshots.
 #[derive(Clone, Default)]
@@ -132,24 +130,6 @@ fn contact_value(contact: &UserContact) -> VariableValue {
 /// PPE cannot end up with two entries that mean the same service.
 fn normalize_service(service: &str) -> String {
     service.trim().to_ascii_lowercase()
-}
-
-/// A user's sysop notes, either live for the caller or part of a board snapshot.
-#[derive(Clone, Default)]
-pub struct PplNotes(Option<std::sync::Arc<User>>);
-
-impl PplNotes {
-    fn current() -> Self {
-        Self(None)
-    }
-
-    fn snapshot(user: std::sync::Arc<User>) -> Self {
-        Self(Some(user))
-    }
-
-    fn user<'a>(&'a self, vm: &'a crate::vm::VirtualMachine) -> Option<&'a User> {
-        self.0.as_deref().or(vm.icy_board_state.session.current_user.as_ref())
-    }
 }
 
 /// A stable view of the users present when `Board` was first read.
@@ -218,79 +198,6 @@ impl UserDataValue for PplUsers {
 
     async fn call_method(&mut self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _arguments: &[VariableValue]) -> crate::Res<()> {
         Err(format!("Unknown Users method {name}").into())
-    }
-}
-
-impl UserData for PplNotes {
-    const TYPE_NAME: &'static str = "Notes";
-
-    fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
-        registry.add_property(COUNT.clone(), VariableType::Integer, false);
-        registry.add_function(GET.clone(), vec![VariableType::Integer], VariableType::String);
-        registry.add_function(SET_INDEXED.clone(), vec![VariableType::Integer, VariableType::String], VariableType::Boolean);
-    }
-}
-
-#[async_trait(?Send)]
-impl UserDataValue for PplNotes {
-    fn get_property_value(&self, vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
-        if *name == *COUNT {
-            let _ = vm;
-            return Ok(VariableValue::new_int(NOTE_COUNT_VALUE));
-        }
-        Err(format!("Unknown Notes property {name}").into())
-    }
-
-    async fn set_property_value(&self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
-        Err(format!("Notes property {name} is read-only").into())
-    }
-
-    async fn call_function(
-        &self,
-        vm: &mut crate::vm::VirtualMachine<'_>,
-        name: &unicase::Ascii<String>,
-        arguments: &[VariableValue],
-    ) -> crate::Res<VariableValue> {
-        let index = arguments[0].as_int();
-        if *name == *GET {
-            let Some(user) = self.user(vm) else {
-                return Ok(VariableValue::new_string(String::new()));
-            };
-            let note = match index {
-                0 => &user.custom_comment1,
-                1 => &user.custom_comment2,
-                2 => &user.custom_comment3,
-                3 => &user.custom_comment4,
-                4 => &user.custom_comment5,
-                _ => return Ok(VariableValue::new_string(String::new())),
-            };
-            return Ok(VariableValue::new_string(note.clone()));
-        }
-        if *name == *SET_INDEXED {
-            if self.0.is_some() {
-                return Ok(VariableValue::new_bool(false));
-            }
-            let text = arguments[1].as_string();
-            let Some(user) = vm.icy_board_state.session.current_user.as_mut() else {
-                return Ok(VariableValue::new_bool(false));
-            };
-            let note = match index {
-                0 => &mut user.custom_comment1,
-                1 => &mut user.custom_comment2,
-                2 => &mut user.custom_comment3,
-                3 => &mut user.custom_comment4,
-                4 => &mut user.custom_comment5,
-                _ => return Ok(VariableValue::new_bool(false)),
-            };
-            *note = text;
-            user.flags.is_dirty = true;
-            return Ok(VariableValue::new_bool(true));
-        }
-        Err(format!("Unknown Notes function {name}").into())
-    }
-
-    async fn call_method(&mut self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _arguments: &[VariableValue]) -> crate::Res<()> {
-        Err(format!("Unknown Notes method {name}").into())
     }
 }
 
@@ -376,11 +283,12 @@ impl UserData for PplUser {
         }
         registry.add_property(EDITOR_MODE.clone(), VariableType::UserData(EDITOR_MODE_ENUM_ID), true);
 
-        registry.add_property(NOTES.clone(), VariableType::UserData(NOTES_ID as u8), false);
+        registry.add_array_property(NOTES.clone(), VariableType::String, 1);
         registry.add_array_property(CONTACTS.clone(), VariableType::UserData(CONTACT_ID as u8), 1);
         registry.add_function(SET_PASSWORD.clone(), vec![VariableType::String], VariableType::Boolean);
         registry.add_function(ADD_CONTACT.clone(), vec![VariableType::String, VariableType::String], VariableType::Boolean);
         registry.add_function(REMOVE_CONTACT.clone(), vec![VariableType::Integer], VariableType::Boolean);
+        registry.add_function(SET_NOTE.clone(), vec![VariableType::Integer, VariableType::String], VariableType::Boolean);
     }
 }
 
@@ -452,10 +360,19 @@ impl UserDataValue for PplUser {
         } else if *name == *LAST_DIR_READ {
             date(&user.date_last_dir_read)
         } else if *name == *NOTES {
-            match self {
-                Self::Current => user_data_value(PplNotes::current(), NOTES_ID),
-                Self::Snapshot { user, .. } => user_data_value(PplNotes::snapshot(user.clone()), NOTES_ID),
-            }
+            VariableValue::new_vector(
+                VariableType::String,
+                [
+                    &user.custom_comment1,
+                    &user.custom_comment2,
+                    &user.custom_comment3,
+                    &user.custom_comment4,
+                    &user.custom_comment5,
+                ]
+                .into_iter()
+                .map(|note| VariableValue::new_string(note.clone()))
+                .collect(),
+            )
         } else if *name == *PAGE_LENGTH {
             VariableValue::new_int(i32::from(user.page_len))
         } else if *name == *SECURITY_LEVEL {
@@ -651,6 +568,28 @@ impl UserDataValue for PplUser {
                 return Ok(VariableValue::new_bool(false));
             }
             user.contacts.remove(index);
+            user.flags.is_dirty = true;
+            return Ok(VariableValue::new_bool(true));
+        }
+        if *name == *SET_NOTE {
+            if matches!(self, Self::Snapshot { .. }) {
+                vm.set_error(PplError::new(ERR_KIND_USER, ERR_INVALID, "Board.Users entries are read-only"));
+                return Ok(VariableValue::new_bool(false));
+            }
+            let index = arguments[0].as_int();
+            let text = arguments[1].as_string();
+            let Some(user) = vm.icy_board_state.session.current_user.as_mut() else {
+                return Ok(VariableValue::new_bool(false));
+            };
+            let note = match index {
+                0 => &mut user.custom_comment1,
+                1 => &mut user.custom_comment2,
+                2 => &mut user.custom_comment3,
+                3 => &mut user.custom_comment4,
+                4 => &mut user.custom_comment5,
+                _ => return Ok(VariableValue::new_bool(false)),
+            };
+            *note = text;
             user.flags.is_dirty = true;
             return Ok(VariableValue::new_bool(true));
         }

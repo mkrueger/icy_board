@@ -312,7 +312,7 @@ pub const AREAS_ID: usize = 52;
 pub const DIRECTORIES_ID: usize = 53;
 pub const DOORS_ID: usize = 54;
 pub const CONFERENCES_ID: usize = 55;
-pub const NOTES_ID: usize = 56;
+/// 56 was `NOTES`; notes are exposed as `STRING[]` on `USER`.
 /// 57 was `CONTACTS`; contacts are exposed as `CONTACT[]` on `USER`.
 pub const MSG_ID: usize = 58;
 pub const HTTP_ID: usize = 59;
@@ -398,7 +398,6 @@ impl UserTypeRegistry {
         reg.register::<crate::icy_board::state::ppl_collection::PplDirectories>(DIRECTORIES_ID);
         reg.register::<crate::icy_board::state::ppl_collection::PplDoors>(DOORS_ID);
         reg.register::<crate::icy_board::state::ppl_collection::PplConferences>(CONFERENCES_ID);
-        reg.register::<crate::icy_board::state::ppl_user::PplNotes>(NOTES_ID);
         reg.register::<crate::icy_board::state::ppl_message::PplMessage>(MSG_ID);
         reg.register::<crate::icy_board::state::ppl_http::PplHttp>(HTTP_ID);
         reg.register::<crate::icy_board::state::ppl_http::PplHttpRequest>(HTTP_REQUEST_ID);

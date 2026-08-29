@@ -149,9 +149,9 @@ and do not turn messages into a collection whose index would imply position.
 
 ## Sector 3: session and user
 
-The sector contains `SESSION`, `USERS`, `USER`, `NOTES` and the built-in
-`CONTACT` record, with `EditorMode` as its enum. Contacts are exposed as
-`CONTACT[]`; there is no separate `CONTACTS` type.
+The sector contains `SESSION`, `USERS`, `USER` and the built-in `CONTACT`
+record, with `EditorMode` as its enum. Notes and contacts are exposed as
+`STRING[]` and `CONTACT[]`; there are no separate `NOTES` or `CONTACTS` types.
 
 `Session` describes the active call. `Session.User` describes the stored caller
 record and writes through immediately. The apparent duplicates are deliberate:
@@ -167,7 +167,8 @@ A conference may temporarily raise security, and a call may temporarily change
 language or page length. Code should read `Session` for what is in force and
 `Session.User` for what is stored.
 
-User-owned mutable lists follow list semantics. Notes are addressed by index.
+User-owned mutable lists follow snapshot semantics. `User.Notes` returns a
+five-element `STRING[]`, with mutation through `SetNote(index, text)`.
 `User.Contacts` returns a stable `CONTACT[]` snapshot; `AddContact(service,
 account)` appends and `RemoveContact(index)` removes by zero-based position.
 Duplicate services are allowed. Mutation does not alter arrays already returned.
