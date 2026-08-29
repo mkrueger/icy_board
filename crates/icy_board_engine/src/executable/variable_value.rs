@@ -1816,6 +1816,12 @@ impl VariableValue {
     /// Panics if .
     #[must_use]
     pub fn convert_to(self, convert_to_type: VariableType) -> VariableValue {
+        // BigStr is unbounded, so an identical-type conversion has nothing to do. A
+        // type-7 String still has to fall through: it may hold an untruncated value
+        // and needs the 256 char cap enforced on the way into its slot.
+        if self.vtype == convert_to_type && convert_to_type == VariableType::BigStr {
+            return self;
+        }
         if matches!(convert_to_type, VariableType::String | VariableType::BigStr) {
             match self.generic_data {
                 GenericVariableData::Dim1(values) => {
