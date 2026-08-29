@@ -328,6 +328,7 @@ pub const MSG_FIELD_ENUM_ID: u8 = 246;
 pub const HTTP_METHOD_ENUM_ID: u8 = 245;
 pub const REGEX_OPTIONS_ENUM_ID: u8 = 244;
 pub const STRING_COMPARISON_ENUM_ID: u8 = 243;
+pub const CHECKSUM_ENUM_ID: u8 = 242;
 
 /// The board objects are ours, so no `PCBoard` language knows their names.
 pub const FIRST_BOARD_OBJECT_LANGUAGE_VERSION: u16 = 400;
@@ -339,7 +340,7 @@ pub const FIRST_USER_TYPE_ID: usize = 100;
 /// How many records one program may declare, ids 100..=255.
 /// How many enums the board provides. They sit at the top of the id space, so a program
 /// declares that many fewer records of its own.
-pub const BUILTIN_ENUM_COUNT: usize = 13;
+pub const BUILTIN_ENUM_COUNT: usize = 14;
 
 /// How many records one program may declare, ids 100..=255 less the builtin enums.
 pub const MAX_USER_TYPES: usize = u8::MAX as usize - FIRST_USER_TYPE_ID + 1 - BUILTIN_ENUM_COUNT;
@@ -568,6 +569,7 @@ impl UserTypeRegistry {
             ],
         );
         self.register_enum(STRING_COMPARISON_ENUM_ID, "StringComparison", &[("Ordinal", 0), ("OrdinalIgnoreCase", 1)]);
+        self.register_enum(CHECKSUM_ENUM_ID, "Checksum", &[("CRC32", 0), ("MD5", 1), ("SHA256", 2)]);
     }
 
     /// The position of a field inside a record, which doubles

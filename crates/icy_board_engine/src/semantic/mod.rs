@@ -89,13 +89,13 @@ pub enum SemanticInfo {
     ArrayMemberFunc(FuncOpCode, Vec<i32>),
 
     /// A scalar string function written with its receiver first.
-    StringMemberFunc(FuncOpCode, &'static [i32]),
+    ScalarMemberFunc(FuncOpCode, &'static [i32]),
 
     /// Indexing a one-dimensional array produced by an expression.
     ArrayValueAt,
 
     /// A built-in scalar type namespace function, `STRING.Join(...)`.
-    StringStaticFunc(FuncOpCode),
+    ScalarStaticFunc(FuncOpCode),
 
     /// The same for a built-in array statement, `a.Redim(10)` for `REDIM a, 10`.
     ArrayMemberProc(OpCode),
@@ -137,138 +137,177 @@ pub fn array_member(name: &unicase::Ascii<String>) -> Option<&'static ArrayMembe
     ARRAY_MEMBERS.iter().find(|member| *name == member.name)
 }
 
-pub struct StringMember {
+pub struct ScalarMember {
     pub name: &'static str,
     pub arguments: std::ops::RangeInclusive<usize>,
     pub return_type: VariableType,
     pub is_static: bool,
 }
 
-pub const STRING_MEMBERS: &[StringMember] = &[
-    StringMember {
+pub const STRING_MEMBERS: &[ScalarMember] = &[
+    ScalarMember {
         name: "Len",
         arguments: 0..=0,
         return_type: VariableType::Integer,
         is_static: false,
     },
-    StringMember {
+    ScalarMember {
         name: "Find",
         arguments: 1..=3,
         return_type: VariableType::Integer,
         is_static: false,
     },
-    StringMember {
+    ScalarMember {
         name: "FindLast",
         arguments: 1..=3,
         return_type: VariableType::Integer,
         is_static: false,
     },
-    StringMember {
+    ScalarMember {
         name: "Contains",
         arguments: 1..=2,
         return_type: VariableType::Boolean,
         is_static: false,
     },
-    StringMember {
+    ScalarMember {
         name: "StartsWith",
         arguments: 1..=2,
         return_type: VariableType::Boolean,
         is_static: false,
     },
-    StringMember {
+    ScalarMember {
         name: "EndsWith",
         arguments: 1..=2,
         return_type: VariableType::Boolean,
         is_static: false,
     },
-    StringMember {
+    ScalarMember {
         name: "Count",
         arguments: 1..=2,
         return_type: VariableType::Integer,
         is_static: false,
     },
-    StringMember {
+    ScalarMember {
         name: "Equals",
         arguments: 1..=2,
         return_type: VariableType::Boolean,
         is_static: false,
     },
-    StringMember {
+    ScalarMember {
         name: "Replace",
         arguments: 2..=2,
         return_type: VariableType::String,
         is_static: false,
     },
-    StringMember {
+    ScalarMember {
         name: "Trim",
         arguments: 0..=1,
         return_type: VariableType::String,
         is_static: false,
     },
-    StringMember {
+    ScalarMember {
         name: "TrimStart",
         arguments: 0..=1,
         return_type: VariableType::String,
         is_static: false,
     },
-    StringMember {
+    ScalarMember {
         name: "TrimEnd",
         arguments: 0..=1,
         return_type: VariableType::String,
         is_static: false,
     },
-    StringMember {
+    ScalarMember {
         name: "ToUpper",
         arguments: 0..=0,
         return_type: VariableType::String,
         is_static: false,
     },
-    StringMember {
+    ScalarMember {
         name: "ToLower",
         arguments: 0..=0,
         return_type: VariableType::String,
         is_static: false,
     },
-    StringMember {
+    ScalarMember {
         name: "Mid",
         arguments: 2..=2,
         return_type: VariableType::String,
         is_static: false,
     },
-    StringMember {
+    ScalarMember {
         name: "Left",
         arguments: 1..=1,
         return_type: VariableType::String,
         is_static: false,
     },
-    StringMember {
+    ScalarMember {
         name: "Right",
         arguments: 1..=1,
         return_type: VariableType::String,
         is_static: false,
     },
-    StringMember {
+    ScalarMember {
         name: "Split",
         arguments: 1..=2,
         return_type: VariableType::String,
         is_static: false,
     },
-    StringMember {
+    ScalarMember {
         name: "Join",
         arguments: 2..=2,
         return_type: VariableType::String,
         is_static: true,
     },
-    StringMember {
+    ScalarMember {
         name: "Repeat",
         arguments: 2..=2,
         return_type: VariableType::String,
         is_static: true,
     },
-    StringMember {
+    ScalarMember {
         name: "Split",
         arguments: 2..=3,
         return_type: VariableType::String,
+        is_static: true,
+    },
+];
+
+pub const BYTES_MEMBERS: &[ScalarMember] = &[
+    ScalarMember {
+        name: "Len",
+        arguments: 0..=0,
+        return_type: VariableType::Integer,
+        is_static: false,
+    },
+    ScalarMember {
+        name: "ToString",
+        arguments: 0..=0,
+        return_type: VariableType::String,
+        is_static: false,
+    },
+    ScalarMember {
+        name: "ToBase64",
+        arguments: 0..=0,
+        return_type: VariableType::String,
+        is_static: false,
+    },
+    ScalarMember {
+        name: "ToHex",
+        arguments: 0..=0,
+        return_type: VariableType::String,
+        is_static: false,
+    },
+    ScalarMember {
+        name: "GetChecksum",
+        arguments: 1..=1,
+        return_type: VariableType::Bytes,
+        is_static: false,
+    },
+    ScalarMember {
+        name: "FromBase64",
+        arguments: 1..=1,
+        return_type: VariableType::Bytes,
         is_static: true,
     },
 ];
@@ -316,6 +355,25 @@ fn string_member_type(name: &unicase::Ascii<String>) -> Option<VariableType> {
         .iter()
         .find(|member| !member.is_static && *name == member.name)
         .map(|member| member.return_type)
+}
+
+fn bytes_member_type(name: &unicase::Ascii<String>) -> Option<VariableType> {
+    BYTES_MEMBERS
+        .iter()
+        .find(|member| !member.is_static && *name == member.name)
+        .map(|member| member.return_type)
+}
+
+fn bytes_member(name: &unicase::Ascii<String>, arguments: usize) -> Option<(FuncOpCode, VariableType)> {
+    let normalized = name.as_ref().to_ascii_lowercase();
+    match (normalized.as_str(), arguments) {
+        ("len", 0) => Some((FuncOpCode::LEN, VariableType::Integer)),
+        ("tostring", 0) => Some((FuncOpCode::FromBytes, VariableType::String)),
+        ("tobase64", 0) => Some((FuncOpCode::BASE64ENC, VariableType::String)),
+        ("tohex", 0) => Some((FuncOpCode::BytesToHex, VariableType::String)),
+        ("getchecksum", 1) => Some((FuncOpCode::BytesGetChecksum, VariableType::Bytes)),
+        _ => None,
+    }
 }
 
 fn string_type_name(expression: &Expression, lang_version: u16) -> bool {
@@ -2295,6 +2353,20 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 }
             };
         }
+        if let Expression::Identifier(base) = member_reference_expression.get_expression()
+            && self.lookup_variable(base.get_identifier()).is_none()
+            && crate::parser::built_in_type(base.get_identifier(), self.lang_version) == Some(VariableType::Bytes)
+        {
+            return if member_reference_expression.get_identifier().as_ref().eq_ignore_ascii_case("FromBase64") {
+                VariableType::Bytes
+            } else {
+                self.errors.lock().unwrap().report_error(
+                    member_reference_expression.get_identifier_token().span.clone(),
+                    CompilationErrorType::InvalidMemberReferenceExpression,
+                );
+                VariableType::None
+            };
+        }
         let receiver = self.static_receiver(member_reference_expression.get_expression(), member_reference_expression.get_identifier());
         let called_on_the_type = matches!(receiver, StaticReceiver::StaticMember(_));
 
@@ -2323,6 +2395,11 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 );
                 return VariableType::None;
             }
+            return return_type;
+        }
+        if t == VariableType::Bytes
+            && let Some(return_type) = bytes_member_type(member_reference_expression.get_identifier())
+        {
             return return_type;
         }
         if let VariableType::UserData(d) = t {
@@ -2622,7 +2699,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             if matches!(receiver_type, VariableType::String | VariableType::BigStr) {
                 call.get_arguments()[0].visit(self);
                 self.function_type_lookup
-                    .insert(call.id, SemanticInfo::StringMemberFunc(FuncOpCode::StringCharAt, &[]));
+                    .insert(call.id, SemanticInfo::ScalarMemberFunc(FuncOpCode::StringCharAt, &[]));
                 return VariableType::String;
             }
         }
@@ -2654,7 +2731,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                             );
                         }
                         self.function_type_lookup
-                            .insert(call.id, SemanticInfo::StringStaticFunc(FuncOpCode::StringJoin));
+                            .insert(call.id, SemanticInfo::ScalarStaticFunc(FuncOpCode::StringJoin));
                         return VariableType::String;
                     }
                     "repeat" if call.get_arguments().len() == 2 => {
@@ -2662,7 +2739,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                             argument.visit(self);
                         }
                         self.function_type_lookup
-                            .insert(call.id, SemanticInfo::StringStaticFunc(FuncOpCode::StringRepeat));
+                            .insert(call.id, SemanticInfo::ScalarStaticFunc(FuncOpCode::StringRepeat));
                         return VariableType::String;
                     }
                     "split" if (2..=3).contains(&call.get_arguments().len()) => {
@@ -2679,12 +2756,25 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                                 CompilationErrorType::ArgumentTypeMismatch(3, "INTEGER".to_string(), self.source_type_name(actual)),
                             );
                         }
-                        self.function_type_lookup.insert(call.id, SemanticInfo::StringStaticFunc(opcode));
+                        self.function_type_lookup.insert(call.id, SemanticInfo::ScalarStaticFunc(opcode));
                         self.member_array_returns.insert(call.id, (VariableType::String, 1));
                         return VariableType::String;
                     }
                     _ => {}
                 }
+            }
+
+            if matches!(
+                member.get_expression(),
+                Expression::Identifier(identifier)
+                    if crate::parser::built_in_type(identifier.get_identifier(), self.lang_version) == Some(VariableType::Bytes)
+                        && self.lookup_variable(identifier.get_identifier()).is_none()
+            ) && member.get_identifier().as_ref().eq_ignore_ascii_case("FromBase64")
+                && call.get_arguments().len() == 1
+            {
+                call.get_arguments()[0].visit(self);
+                self.function_type_lookup.insert(call.id, SemanticInfo::ScalarStaticFunc(FuncOpCode::BASE64DEC));
+                return VariableType::Bytes;
             }
 
             let registered_type_receiver = matches!(
@@ -2733,10 +2823,24 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                         CompilationErrorType::BuiltinNeedsRuntime(format!("STRING.{}", member.get_identifier()), opcode.minimum_runtime()),
                     );
                 }
-                self.function_type_lookup.insert(call.id, SemanticInfo::StringMemberFunc(opcode, defaults));
+                self.function_type_lookup.insert(call.id, SemanticInfo::ScalarMemberFunc(opcode, defaults));
                 if matches!(opcode, FuncOpCode::StringSplit | FuncOpCode::StringSplitLimit) {
                     self.member_array_returns.insert(call.id, (VariableType::String, 1));
                 }
+                return return_type;
+            }
+            if receiver_type == VariableType::Bytes
+                && let Some((opcode, return_type)) = bytes_member(member.get_identifier(), call.get_arguments().len())
+            {
+                let argument_types: Vec<_> = call.get_arguments().iter().map(|argument| argument.visit(self)).collect();
+                if opcode == FuncOpCode::BytesGetChecksum && argument_types.first() != Some(&VariableType::UserData(crate::parser::CHECKSUM_ENUM_ID)) {
+                    let actual = argument_types.first().copied().unwrap_or(VariableType::None);
+                    self.errors.lock().unwrap().report_error(
+                        call.get_arguments()[0].get_span(),
+                        CompilationErrorType::ArgumentTypeMismatch(1, "Checksum".to_string(), self.source_type_name(actual)),
+                    );
+                }
+                self.function_type_lookup.insert(call.id, SemanticInfo::ScalarMemberFunc(opcode, &[]));
                 return return_type;
             }
 

@@ -99,7 +99,7 @@ This sector owns the syntax and value model on which all later sectors depend:
 - function and procedure references
 - 64-bit `LONG` and `ULONG`, with `ToLong()` and `ToULong()`
 - `AreaId()` for lossless conference/message-area addressing
-- `Base64Enc()`, `Base64Dec()`, `Sha256()` and the six `DOUBLE` math functions
+- `Base64Enc()`, `Base64Dec()`, `BYTES.GetChecksum()` and the six `DOUBLE` math functions
 - line-oriented `FGETREC`/`FPUTREC` and framed binary `FREADREC`/`FWRITEREC`
 - discoverable `STRING` members plus static `Join`, `Repeat` and `Split`
 - compiled `REGEX` matching with capture snapshots, match collections, replacement and transactional split

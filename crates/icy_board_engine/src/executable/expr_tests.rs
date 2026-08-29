@@ -1,31 +1,42 @@
 #[test]
+fn bytes_function_ids_are_compact() {
+    assert_eq!(FuncOpCode::ToBytes as i16, -341);
+    assert_eq!(FuncOpCode::FromBytes as i16, -342);
+    assert_eq!(FuncOpCode::BytesToHex as i16, -343);
+    assert_eq!(FuncOpCode::BytesGetChecksum as i16, -344);
+
+    assert_eq!(FuncOpCode::BytesToHex.get_definition().parameter_count(), 1);
+    assert_eq!(FuncOpCode::BytesGetChecksum.get_definition().parameter_count(), 2);
+}
+
+#[test]
 fn string_member_function_ids_are_compact() {
-    assert_eq!(FuncOpCode::StringFindFrom as i16, -315);
-    assert_eq!(FuncOpCode::StringFindLastFrom as i16, -316);
-    assert_eq!(FuncOpCode::StringContains as i16, -317);
-    assert_eq!(FuncOpCode::StringStartsWith as i16, -318);
-    assert_eq!(FuncOpCode::StringEndsWith as i16, -319);
-    assert_eq!(FuncOpCode::StringCount as i16, -320);
-    assert_eq!(FuncOpCode::StringTrim as i16, -321);
-    assert_eq!(FuncOpCode::StringTrimStart as i16, -322);
-    assert_eq!(FuncOpCode::StringTrimEnd as i16, -323);
-    assert_eq!(FuncOpCode::StringJoin as i16, -324);
-    assert_eq!(FuncOpCode::StringRepeat as i16, -325);
-    assert_eq!(FuncOpCode::StringTrimChars as i16, -326);
-    assert_eq!(FuncOpCode::StringTrimStartChars as i16, -327);
-    assert_eq!(FuncOpCode::StringTrimEndChars as i16, -328);
-    assert_eq!(FuncOpCode::StringCharAt as i16, -329);
-    assert_eq!(FuncOpCode::StringFindComparison as i16, -330);
-    assert_eq!(FuncOpCode::StringFindLastComparison as i16, -331);
-    assert_eq!(FuncOpCode::StringContainsComparison as i16, -332);
-    assert_eq!(FuncOpCode::StringStartsWithComparison as i16, -333);
-    assert_eq!(FuncOpCode::StringEndsWithComparison as i16, -334);
-    assert_eq!(FuncOpCode::StringCountComparison as i16, -335);
-    assert_eq!(FuncOpCode::StringEquals as i16, -336);
-    assert_eq!(FuncOpCode::StringEqualsComparison as i16, -337);
-    assert_eq!(FuncOpCode::StringSplit as i16, -338);
-    assert_eq!(FuncOpCode::StringSplitLimit as i16, -339);
-    assert_eq!(FuncOpCode::ArrayValueAt as i16, -340);
+    assert_eq!(FuncOpCode::StringFindFrom as i16, -314);
+    assert_eq!(FuncOpCode::StringFindLastFrom as i16, -315);
+    assert_eq!(FuncOpCode::StringContains as i16, -316);
+    assert_eq!(FuncOpCode::StringStartsWith as i16, -317);
+    assert_eq!(FuncOpCode::StringEndsWith as i16, -318);
+    assert_eq!(FuncOpCode::StringCount as i16, -319);
+    assert_eq!(FuncOpCode::StringTrim as i16, -320);
+    assert_eq!(FuncOpCode::StringTrimStart as i16, -321);
+    assert_eq!(FuncOpCode::StringTrimEnd as i16, -322);
+    assert_eq!(FuncOpCode::StringJoin as i16, -323);
+    assert_eq!(FuncOpCode::StringRepeat as i16, -324);
+    assert_eq!(FuncOpCode::StringTrimChars as i16, -325);
+    assert_eq!(FuncOpCode::StringTrimStartChars as i16, -326);
+    assert_eq!(FuncOpCode::StringTrimEndChars as i16, -327);
+    assert_eq!(FuncOpCode::StringCharAt as i16, -328);
+    assert_eq!(FuncOpCode::StringFindComparison as i16, -329);
+    assert_eq!(FuncOpCode::StringFindLastComparison as i16, -330);
+    assert_eq!(FuncOpCode::StringContainsComparison as i16, -331);
+    assert_eq!(FuncOpCode::StringStartsWithComparison as i16, -332);
+    assert_eq!(FuncOpCode::StringEndsWithComparison as i16, -333);
+    assert_eq!(FuncOpCode::StringCountComparison as i16, -334);
+    assert_eq!(FuncOpCode::StringEquals as i16, -335);
+    assert_eq!(FuncOpCode::StringEqualsComparison as i16, -336);
+    assert_eq!(FuncOpCode::StringSplit as i16, -337);
+    assert_eq!(FuncOpCode::StringSplitLimit as i16, -338);
+    assert_eq!(FuncOpCode::ArrayValueAt as i16, -339);
 
     for (opcode, arity) in [
         (FuncOpCode::StringFindFrom, 3),

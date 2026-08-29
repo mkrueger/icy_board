@@ -850,9 +850,25 @@ pub async fn stripstr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
     Ok(VariableValue::new_string(input.replace(&search, "")))
 }
 
+fn bytes_from_value(vm: &mut VirtualMachine<'_>, value: &VariableValue, operation: &str) -> Option<Vec<u8>> {
+    if let Some(bytes) = value.to_bytes() {
+        return Some(bytes);
+    }
+    vm.set_error(PplError::new(
+        ERR_KIND_STRING,
+        ERR_INVALID,
+        format!("{operation}: unsupported {} value", value.vtype),
+    ));
+    None
+}
+
 pub async fn base64enc(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let value = vm.eval_expr(&args[0]).await?.convert_to(VariableType::Bytes);
-    Ok(VariableValue::new_string(general_purpose::STANDARD.encode(value.as_byte_slice())))
+    let value = vm.eval_expr(&args[0]).await?;
+    let Some(bytes) = bytes_from_value(vm, &value, "Base64Enc") else {
+        return Ok(VariableValue::new_string(String::new()));
+    };
+    vm.operation_succeeded();
+    Ok(VariableValue::new_string(general_purpose::STANDARD.encode(bytes)))
 }
 
 pub async fn base64dec(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -875,21 +891,22 @@ pub async fn base64dec(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Var
     }
 }
 
-pub async fn sha256(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let value = vm.eval_expr(&args[0]).await?.convert_to(VariableType::Bytes);
-    Ok(VariableValue::new_string(format!("{:x}", Sha256::digest(value.as_byte_slice()))))
-}
-
-/// The UTF-8 bytes of a string as a binary blob.
 pub async fn tobytes(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let value = vm.eval_expr(&args[0]).await?.as_string();
-    Ok(VariableValue::new_bytes(value.into_bytes()))
+    let value = vm.eval_expr(&args[0]).await?;
+    let Some(bytes) = bytes_from_value(vm, &value, "ToBytes") else {
+        return Ok(VariableValue::new_bytes(Vec::new()));
+    };
+    vm.operation_succeeded();
+    Ok(VariableValue::new_bytes(bytes))
 }
 
 /// Decode a binary blob as UTF-8 text; invalid bytes report ErrCode.Format.
 pub async fn frombytes(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let value = vm.eval_expr(&args[0]).await?.convert_to(VariableType::Bytes);
-    match String::from_utf8(value.as_byte_slice().to_vec()) {
+    let value = vm.eval_expr(&args[0]).await?;
+    let Some(bytes) = bytes_from_value(vm, &value, "FromBytes") else {
+        return Ok(VariableValue::new_string(String::new()));
+    };
+    match String::from_utf8(bytes) {
         Ok(text) => {
             vm.operation_succeeded();
             Ok(VariableValue::new_string(text))
@@ -899,6 +916,38 @@ pub async fn frombytes(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Var
             Ok(VariableValue::new_string(String::new()))
         }
     }
+}
+
+pub async fn bytes_get_checksum(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let value = vm.eval_expr(&args[0]).await?;
+    let Some(bytes) = bytes_from_value(vm, &value, "Bytes.GetChecksum") else {
+        return Ok(VariableValue::new_bytes(Vec::new()));
+    };
+    let algorithm = vm.eval_expr(&args[1]).await?.as_int();
+    let checksum = match algorithm {
+        0 => calc_crc32(&bytes).to_be_bytes().to_vec(),
+        1 => md5::compute(&bytes).0.to_vec(),
+        2 => Sha256::digest(&bytes).to_vec(),
+        _ => {
+            vm.set_error(PplError::new(ERR_KIND_STRING, ERR_INVALID, "Bytes.GetChecksum: invalid Checksum value"));
+            return Ok(VariableValue::new_bytes(Vec::new()));
+        }
+    };
+    vm.operation_succeeded();
+    Ok(VariableValue::new_bytes(checksum))
+}
+
+pub async fn bytes_to_hex(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let value = vm.eval_expr(&args[0]).await?;
+    let Some(bytes) = bytes_from_value(vm, &value, "Bytes.ToHex") else {
+        return Ok(VariableValue::new_string(String::new()));
+    };
+    let mut result = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        let _ = write!(result, "{byte:02X}");
+    }
+    vm.operation_succeeded();
+    Ok(VariableValue::new_string(result))
 }
 
 /// Trim specified characters from the end of a string

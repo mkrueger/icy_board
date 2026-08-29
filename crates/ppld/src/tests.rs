@@ -419,6 +419,25 @@ fn nested_records_survive_decompilation() {
     assert_eq!(text, decompile_to_text(rebuilt, LAST_PPL_LANGUAGE_VERSION));
 }
 
+#[test]
+fn bytes_members_survive_decompilation() {
+    let source = "BYTES Raw = ToBytes(\"abc\")\n\
+                  PRINTLN Raw.ToBase64()\n\
+                  PRINTLN Raw.GetChecksum(Checksum.SHA256)\n\
+                  PRINTLN Raw.GetChecksum(Checksum.MD5).ToHex()\n\
+                  PRINTLN Bytes.FromBase64(\"YWJj\").ToString()\n";
+
+    let executable = compile_source(source, LAST_PPE_RUNTIME).unwrap();
+    let text = decompile_to_text(executable, LAST_PPL_LANGUAGE_VERSION);
+    let rebuilt = compile_source(&text, LAST_PPE_RUNTIME).unwrap_or_else(|e| panic!("does not compile again:\n{text}\n{e}"));
+
+    assert!(text.contains(".ToBase64()"), "{text}");
+    assert!(text.contains(".GetChecksum(Checksum.SHA256)"), "{text}");
+    assert!(text.contains(".GetChecksum(Checksum.MD5).ToHex()"), "{text}");
+    assert!(text.contains("BYTES.FromBase64(\"YWJj\").ToString()"), "{text}");
+    assert_eq!(text, decompile_to_text(rebuilt, LAST_PPL_LANGUAGE_VERSION));
+}
+
 /// Board objects do carry their member names, in the registry rather than in the
 /// file, so those come back as they were written.
 #[test]

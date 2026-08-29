@@ -612,6 +612,10 @@ impl Decompiler {
                     FuncOpCode::StringTrimStartChars => Some("TrimStart"),
                     FuncOpCode::StringTrimEndChars => Some("TrimEnd"),
                     FuncOpCode::StringMid => Some("Mid"),
+                    FuncOpCode::BASE64ENC => Some("ToBase64"),
+                    FuncOpCode::FromBytes => Some("ToString"),
+                    FuncOpCode::BytesToHex => Some("ToHex"),
+                    FuncOpCode::BytesGetChecksum => Some("GetChecksum"),
                     _ => None,
                 };
                 if let Some(member) = instance_member
@@ -627,9 +631,15 @@ impl Decompiler {
                             | FuncOpCode::StringEndsWithComparison
                             | FuncOpCode::StringCountComparison
                             | FuncOpCode::StringEqualsComparison
+                            | FuncOpCode::BytesGetChecksum
                     ) && let Some(comparison) = arguments.pop()
                     {
-                        arguments.push(self.convert_to_type(comparison, VariableType::UserData(crate::parser::STRING_COMPARISON_ENUM_ID)));
+                        let enum_type = if f.opcode == FuncOpCode::BytesGetChecksum {
+                            crate::parser::CHECKSUM_ENUM_ID
+                        } else {
+                            crate::parser::STRING_COMPARISON_ENUM_ID
+                        };
+                        arguments.push(self.convert_to_type(comparison, VariableType::UserData(enum_type)));
                     }
                     return FunctionCallExpression::create_empty_expression(
                         MemberReferenceExpression::create_empty_expression(self.decompile_expression(receiver), unicase::Ascii::new(member.to_string())),
@@ -639,12 +649,15 @@ impl Decompiler {
                 let static_member = match f.opcode {
                     FuncOpCode::StringJoin => Some("Join"),
                     FuncOpCode::StringRepeat => Some("Repeat"),
+                    FuncOpCode::BASE64DEC => Some("FromBase64"),
                     _ => None,
                 };
                 if let Some(member) = static_member {
                     return FunctionCallExpression::create_empty_expression(
                         MemberReferenceExpression::create_empty_expression(
-                            IdentifierExpression::create_empty_expression(unicase::Ascii::new("STRING".to_string())),
+                            IdentifierExpression::create_empty_expression(unicase::Ascii::new(
+                                if f.opcode == FuncOpCode::BASE64DEC { "BYTES" } else { "STRING" }.to_string(),
+                            )),
                             unicase::Ascii::new(member.to_string()),
                         ),
                         args.iter().map(|argument| self.decompile_expression(argument)).collect(),

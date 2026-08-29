@@ -310,55 +310,56 @@ pub enum FuncOpCode {
     RecordLiteral = -296,
     BASE64ENC = -297,
     BASE64DEC = -298,
-    SHA256 = -299,
-    Rgb = -300,
-    RgbAlpha = -301,
-    Terminal = -302,
+    Rgb = -299,
+    RgbAlpha = -300,
+    Terminal = -301,
     /// Compiler generated: hands back what a static member is called on.
-    StaticReceiver = -303,
-    Board = -304,
-    Session = -305,
-    TOLONG64 = -306,
-    TOULONG64 = -307,
-    IndexedMember = -308,
-    SIN = -309,
-    COS = -310,
-    TAN = -311,
-    ATAN = -312,
-    LOG = -313,
-    SQRT = -314,
-    StringFindFrom = -315,
-    StringFindLastFrom = -316,
-    StringContains = -317,
-    StringStartsWith = -318,
-    StringEndsWith = -319,
-    StringCount = -320,
-    StringTrim = -321,
-    StringTrimStart = -322,
-    StringTrimEnd = -323,
-    StringJoin = -324,
-    StringRepeat = -325,
-    StringTrimChars = -326,
-    StringTrimStartChars = -327,
-    StringTrimEndChars = -328,
-    StringCharAt = -329,
-    StringFindComparison = -330,
-    StringFindLastComparison = -331,
-    StringContainsComparison = -332,
-    StringStartsWithComparison = -333,
-    StringEndsWithComparison = -334,
-    StringCountComparison = -335,
-    StringEquals = -336,
-    StringEqualsComparison = -337,
-    StringSplit = -338,
-    StringSplitLimit = -339,
-    ArrayValueAt = -340,
-    StringMid = -341,
-    ToBytes = -342,
-    FromBytes = -343,
+    StaticReceiver = -302,
+    Board = -303,
+    Session = -304,
+    TOLONG64 = -305,
+    TOULONG64 = -306,
+    IndexedMember = -307,
+    SIN = -308,
+    COS = -309,
+    TAN = -310,
+    ATAN = -311,
+    LOG = -312,
+    SQRT = -313,
+    StringFindFrom = -314,
+    StringFindLastFrom = -315,
+    StringContains = -316,
+    StringStartsWith = -317,
+    StringEndsWith = -318,
+    StringCount = -319,
+    StringTrim = -320,
+    StringTrimStart = -321,
+    StringTrimEnd = -322,
+    StringJoin = -323,
+    StringRepeat = -324,
+    StringTrimChars = -325,
+    StringTrimStartChars = -326,
+    StringTrimEndChars = -327,
+    StringCharAt = -328,
+    StringFindComparison = -329,
+    StringFindLastComparison = -330,
+    StringContainsComparison = -331,
+    StringStartsWithComparison = -332,
+    StringEndsWithComparison = -333,
+    StringCountComparison = -334,
+    StringEquals = -335,
+    StringEqualsComparison = -336,
+    StringSplit = -337,
+    StringSplitLimit = -338,
+    ArrayValueAt = -339,
+    StringMid = -340,
+    ToBytes = -341,
+    FromBytes = -342,
+    BytesToHex = -343,
+    BytesGetChecksum = -344,
 }
 
-pub const LAST_FUNC: i16 = -343;
+pub const LAST_FUNC: i16 = -344;
 
 impl FuncOpCode {
     pub fn get_definition(self) -> &'static FunctionDefinition {
@@ -411,6 +412,8 @@ impl FuncOpCode {
                 | FuncOpCode::StringSplitLimit
                 | FuncOpCode::ArrayValueAt
                 | FuncOpCode::StringMid
+                | FuncOpCode::BytesGetChecksum
+                | FuncOpCode::BytesToHex
         ) {
             400
         } else {
@@ -477,7 +480,7 @@ impl FunctionDefinition {
         }
     }
 }
-pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 355]> = std::sync::LazyLock::new(|| {
+pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 356]> = std::sync::LazyLock::new(|| {
     [
         FunctionDefinition {
             name: "END",
@@ -3040,14 +3043,6 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 355]> 
             signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
-            name: "Sha256",
-            version: 400,
-            opcode: FuncOpCode::SHA256,
-            return_type: VariableType::String,
-            args: Some(vec![ArgumentDefinition::new("value", VariableType::Bytes)]),
-            signature: FunctionSignature::FixedParameters(1),
-        },
-        FunctionDefinition {
             name: "Rgb",
             version: 400,
             opcode: FuncOpCode::Rgb,
@@ -3399,7 +3394,7 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 355]> 
             version: 400,
             opcode: FuncOpCode::ToBytes,
             return_type: VariableType::Bytes,
-            args: Some(vec![ArgumentDefinition::new("value", VariableType::String)]),
+            args: None,
             signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
@@ -3409,6 +3404,22 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 355]> 
             return_type: VariableType::String,
             args: Some(vec![ArgumentDefinition::new("value", VariableType::Bytes)]),
             signature: FunctionSignature::FixedParameters(1),
+        },
+        FunctionDefinition {
+            name: "<bytes to hex>",
+            version: 400,
+            opcode: FuncOpCode::BytesToHex,
+            return_type: VariableType::String,
+            args: None,
+            signature: FunctionSignature::FixedParameters(1),
+        },
+        FunctionDefinition {
+            name: "<bytes get checksum>",
+            version: 400,
+            opcode: FuncOpCode::BytesGetChecksum,
+            return_type: VariableType::Bytes,
+            args: None,
+            signature: FunctionSignature::FixedParameters(2),
         },
         // ALIASES (need to be last in the list)
         FunctionDefinition {

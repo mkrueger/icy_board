@@ -188,7 +188,7 @@ impl AstVisitor<PPEExpr> for ExpressionCompiler<'_> {
                 );
                 PPEExpr::PredefinedFunctionCall(op_code.get_definition(), call_arguments)
             }
-            SemanticInfo::StringMemberFunc(op_code, defaults) => {
+            SemanticInfo::ScalarMemberFunc(op_code, defaults) => {
                 let Expression::MemberReference(member) = call.get_expression() else {
                     return PPEExpr::Value(0);
                 };
@@ -201,7 +201,7 @@ impl AstVisitor<PPEExpr> for ExpressionCompiler<'_> {
                 );
                 PPEExpr::PredefinedFunctionCall(op_code.get_definition(), call_arguments)
             }
-            SemanticInfo::StringStaticFunc(op_code) => PPEExpr::PredefinedFunctionCall(op_code.get_definition(), arguments),
+            SemanticInfo::ScalarStaticFunc(op_code) => PPEExpr::PredefinedFunctionCall(op_code.get_definition(), arguments),
             SemanticInfo::ArrayValueAt => {
                 let Expression::MemberReference(member) = call.get_expression() else {
                     return PPEExpr::Value(0);

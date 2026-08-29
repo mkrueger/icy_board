@@ -498,8 +498,9 @@ corrupt message data reports `ErrKind.Msg` with `ErrCode.Io` or
 | `Http.Get` | Static function | `Http.Get(url) : HttpResponse` | Makes a policy-controlled GET request |
 | `Http.Download` | Static function | `Http.Download(url, file) : HttpResponse` | Streams a successful response atomically to a file |
 | `Http.New` | Static function | `Http.New(method, url) : HttpRequest` | Builds a GET, HEAD or POST request |
-| `BASE64ENC`, `BASE64DEC` | Function | `BASE64ENC(value) : STRING` | Base64 of a string's UTF-8 bytes, and back |
-| `SHA256` | Function | `SHA256(value) : STRING` | Lowercase hex SHA-256 of a string's UTF-8 bytes |
+| `BYTES.ToBase64`, `Bytes.FromBase64` | Function | `value.ToBase64() : STRING`, `Bytes.FromBase64(text) : BYTES` | Binary-safe Base64 encoding and decoding; global aliases remain available |
+| `BYTES.GetChecksum` | Function | `value.GetChecksum(Checksum) : BYTES` | CRC32, MD5 or SHA-256 as raw bytes |
+| `BYTES.ToHex` | Function | `value.ToHex() : STRING` | Uppercase hexadecimal with leading zero bytes preserved |
 
 `AreaId()` is how message functions reach a message area outside the current
 conference without breaking any of the old calls. Public HTTP and HTTPS work by default;

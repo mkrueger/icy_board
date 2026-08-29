@@ -11,7 +11,7 @@ use tower_lsp::lsp_types::{CompletionItem, CompletionItemKind, Documentation, Ho
 use crate::{
     context::{CursorContext, cursor_context},
     documentation::{get_const_hover, get_function_hover, get_member_documentation, get_statement_hover, get_string_member_documentation, get_type_hover},
-    type_lookup::{MemberKind, members_of, record_field_type_name, static_members_of, static_type_of_name, string_members, type_of_chain},
+    type_lookup::{MemberKind, bytes_members, members_of, record_field_type_name, static_members_of, static_type_of_name, string_members, type_of_chain},
 };
 
 pub enum ImCompleteCompletionItem {
@@ -191,6 +191,9 @@ fn member_completion(visitor: &SemanticVisitor, path: &[String], language_versio
     }
     if path.len() == 1 && matches!(path[0].to_ascii_uppercase().as_str(), "STRING" | "BIGSTR") {
         return completion_items(string_members(true), None);
+    }
+    if path.len() == 1 && path[0].eq_ignore_ascii_case("BYTES") {
+        return completion_items(bytes_members(true), None);
     }
     if let Some((property, receiver)) = path.split_last()
         && let Some(icy_board_engine::executable::VariableType::UserData(type_id)) = type_of_chain(visitor, receiver)

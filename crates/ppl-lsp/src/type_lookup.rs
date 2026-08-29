@@ -4,7 +4,7 @@
 use icy_board_engine::{
     executable::{FUNCTION_DEFINITIONS, VariableType},
     parser::{UserTypeRegistry, is_user_declared_type},
-    semantic::{ReferenceType, STRING_MEMBERS, SemanticVisitor},
+    semantic::{BYTES_MEMBERS, ReferenceType, STRING_MEMBERS, SemanticVisitor},
 };
 
 /// One member of a record or of a board object.
@@ -113,6 +113,12 @@ pub fn type_of_member(registry: &UserTypeRegistry, var_type: VariableType, membe
             .find(|definition| !definition.is_static && definition.name.eq_ignore_ascii_case(member))
             .map(|definition| definition.return_type);
     }
+    if var_type == VariableType::Bytes {
+        return BYTES_MEMBERS
+            .iter()
+            .find(|definition| !definition.is_static && definition.name.eq_ignore_ascii_case(member))
+            .map(|definition| definition.return_type);
+    }
     let VariableType::UserData(id) = var_type else {
         return None;
     };
@@ -150,6 +156,9 @@ pub fn members_of(registry: &UserTypeRegistry, var_type: VariableType) -> Vec<Me
     if matches!(var_type, VariableType::String | VariableType::BigStr) {
         return string_members(false);
     }
+    if var_type == VariableType::Bytes {
+        return bytes_members(false);
+    }
     let VariableType::UserData(id) = var_type else {
         return Vec::new();
     };
@@ -176,6 +185,9 @@ pub fn members_of(registry: &UserTypeRegistry, var_type: VariableType) -> Vec<Me
 }
 
 pub fn static_members_of(registry: &UserTypeRegistry, var_type: VariableType) -> Vec<Member> {
+    if var_type == VariableType::Bytes {
+        return bytes_members(true);
+    }
     let VariableType::UserData(id) = var_type else {
         return Vec::new();
     };
@@ -232,6 +244,23 @@ pub fn string_members(statik: bool) -> Vec<Member> {
                 member.arguments.end(),
                 type_name(&UserTypeRegistry::default(), member.return_type),
                 if member.name == "Split" { "[]" } else { "" }
+            ),
+            kind: MemberKind::Method,
+        })
+        .collect()
+}
+
+pub fn bytes_members(statik: bool) -> Vec<Member> {
+    BYTES_MEMBERS
+        .iter()
+        .filter(|member| member.is_static == statik)
+        .map(|member| Member {
+            name: member.name.to_string(),
+            detail: format!(
+                "({}..{} args) {}",
+                member.arguments.start(),
+                member.arguments.end(),
+                type_name(&UserTypeRegistry::default(), member.return_type)
             ),
             kind: MemberKind::Method,
         })

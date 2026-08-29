@@ -1094,6 +1094,41 @@ impl VariableValue {
         }
     }
 
+    pub fn to_bytes(&self) -> Option<Vec<u8>> {
+        if let GenericVariableData::Bytes(data) = &self.generic_data {
+            return Some(data.clone());
+        }
+        if let GenericVariableData::String(value) = &self.generic_data {
+            return Some(value.as_bytes().to_vec());
+        }
+        unsafe {
+            match self.vtype {
+                VariableType::Boolean => Some(vec![u8::from(self.as_bool())]),
+                VariableType::Byte => Some(vec![self.data.byte_value]),
+                VariableType::SByte => Some(self.data.sbyte_value.to_le_bytes().to_vec()),
+                VariableType::Word => Some(self.data.word_value.to_le_bytes().to_vec()),
+                VariableType::SWord => Some(self.data.sword_value.to_le_bytes().to_vec()),
+                VariableType::Integer => Some(self.data.int_value.to_le_bytes().to_vec()),
+                VariableType::Unsigned => Some((self.data.unsigned_value as u32).to_le_bytes().to_vec()),
+                VariableType::Long => Some(self.data.long_value.to_le_bytes().to_vec()),
+                VariableType::ULong => Some(self.data.ulong_value.to_le_bytes().to_vec()),
+                VariableType::Float => Some(self.data.float_value.to_le_bytes().to_vec()),
+                VariableType::Double => Some(self.data.double_value.to_le_bytes().to_vec()),
+                VariableType::Money => Some(self.data.money_value.to_le_bytes().to_vec()),
+                VariableType::Date => Some(self.data.date_value.to_le_bytes().to_vec()),
+                VariableType::EDate => Some(self.data.edate_value.to_le_bytes().to_vec()),
+                VariableType::DDate => Some(self.data.ddate_value.to_le_bytes().to_vec()),
+                VariableType::Time => Some(self.data.time_value.to_le_bytes().to_vec()),
+                VariableType::MessageAreaID => {
+                    let mut result = self.data.message_id_value.conference.to_le_bytes().to_vec();
+                    result.extend_from_slice(&self.data.message_id_value.area.to_le_bytes());
+                    Some(result)
+                }
+                _ => None,
+            }
+        }
+    }
+
     pub fn new_int(i: i32) -> Self {
         Self {
             vtype: VariableType::Integer,
@@ -1861,15 +1896,10 @@ impl VariableValue {
             return self;
         }
         if convert_to_type == VariableType::Bytes {
-            return match self.generic_data {
-                // A byte array (BYTE[]) collapses element-wise into a compact blob.
-                GenericVariableData::Dim1(values) => VariableValue::new_bytes(values.iter().map(VariableValue::as_byte).collect()),
-                // Already a blob: keep it as-is.
-                GenericVariableData::Bytes(_) => self,
-                // A string contributes its UTF-8 bytes.
-                GenericVariableData::String(s) => VariableValue::new_bytes(s.into_bytes()),
-                _ => VariableValue::new_bytes(Vec::new()),
-            };
+            if let GenericVariableData::Dim1(values) = &self.generic_data {
+                return VariableValue::new_bytes(values.iter().map(VariableValue::as_byte).collect());
+            }
+            return VariableValue::new_bytes(self.to_bytes().unwrap_or_default());
         }
         if matches!(convert_to_type, VariableType::String | VariableType::BigStr) {
             match self.generic_data {

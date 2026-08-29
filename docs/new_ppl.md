@@ -25,7 +25,7 @@ format, so 4.00 is what a PPE targets whenever it uses anything below.
 | Message-area identifiers | 400 | 400 | `MSGAREAID` and `AreaId(conf, area)` |
 | Overloaded built-ins | 400 | 400 | Argument-count overloads such as `Len(array, dim)` |
 | Web requests | 400 | 400 | String-returning function and file-writing statement forms |
-| UTF-8 encoding and digest functions | 400 | 400 | `BYTES` blobs, `TOBYTES`, `FROMBYTES`, `BASE64ENC`, `BASE64DEC` and `SHA256` |
+| Binary conversion and checksums | 400 | 400 | `BYTES`, `Checksum`, `TOBYTES`, base64 and checksum members |
 | Extensible user contacts | 400 | 400 | `CONTACT` records on `Session.User` |
 | User-defined records | 400 | 400 | `TYPE ... ENDTYPE`, nested fields, arrays of records and nominal type checking |
 | Named record literals | 400 | 400 | `Point { X = 1, Y = 2 }` with checked and optional fields |
@@ -1130,15 +1130,17 @@ byte per byte, unlike `BYTE[]` which boxes every element. It is the type for
 binary data, hashing, encoding and fast I/O. A `BYTES` value prints as
 uppercase, separator-free hexadecimal, and `LEN(value)` returns its byte count.
 
-`TOBYTES(value)` returns the UTF-8 bytes of a string as a `BYTES` blob.
-`FROMBYTES(value)` decodes a `BYTES` blob back to a string as UTF-8; invalid
-bytes report `ErrCode.Format` through `Error.Last()` and yield an empty string.
+`TOBYTES(value)` returns the binary representation of a supported scalar. Strings
+use UTF-8; numeric values use their fixed-width little-endian representation.
+Arrays, records, objects, tables, passwords and routine references are rejected
+with `ErrCode.Invalid`. `value.ToString()` decodes UTF-8; invalid bytes report
+`ErrCode.Format`.
 
 ```PPL
 BYTES raw = TOBYTES("Grüße")
 PRINTLN raw              ' 47 72 c3 bc c3 9f 65 -> "4772C3BCC39F65"
 PRINTLN LEN(raw)         ' 7
-PRINTLN FROMBYTES(raw)   ' Grüße
+PRINTLN raw.ToString()   ' Grüße
 ```
 
 ## Encoding and digest functions (4.00)
@@ -1148,15 +1150,19 @@ taken as its UTF-8 bytes. `BASE64DEC(value)` decodes base64 text to a `BYTES`
 blob; whitespace (for line-wrapped input) is ignored, and any other malformed
 input reports `ErrCode.Format` through `Error.Last()`.
 
-`SHA256(value)` returns the 64-character lowercase hexadecimal SHA-256 digest
-of a `BYTES` blob (a string is taken as its UTF-8 bytes). It is intended for
-content integrity and identity, not password storage.
+`value.GetChecksum(algorithm)` returns the checksum as raw `BYTES`. Supported
+algorithms are `Checksum.CRC32`, `Checksum.MD5` and `Checksum.SHA256`; more can
+be added without changing the method. MD5 and SHA-256 are intended for content
+integrity and identity, not password storage. `value.ToHex()` returns an
+uppercase hexadecimal `STRING` with two digits per byte, preserving leading
+zero bytes. `value.ToString()` remains the UTF-8 decoder.
 
 ```PPL
 PRINTLN BASE64ENC("Grüße")
-BYTES decoded = BASE64DEC("R3LDvMOfZQ==")
-PRINTLN FROMBYTES(decoded)
-PRINTLN SHA256("abc")
+BYTES decoded = Bytes.FromBase64("R3LDvMOfZQ==")
+PRINTLN decoded.ToString()
+STRING fingerprint = TOBYTES("abc").GetChecksum(Checksum.SHA256).ToHex()
+PRINTLN fingerprint
 ```
 
 
