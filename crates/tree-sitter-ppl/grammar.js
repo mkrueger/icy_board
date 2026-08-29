@@ -85,7 +85,7 @@ const BUILTIN_STATEMENTS = [
 
 // Types that may be written in a declaration, plus the read-only board objects.
 const BUILTIN_TYPES = [
-  'BIGSTR', 'BOOLEAN', 'BYTE', 'DATE', 'DDATE', 'DOUBLE', 'DREAL', 'DWORD', 'EDATE', 'FLOAT',
+  'BIGSTR', 'BOOLEAN', 'BYTE', 'BYTES', 'DATE', 'DDATE', 'DOUBLE', 'DREAL', 'DWORD', 'EDATE', 'FLOAT',
   'INTEGER', 'INT', 'LONG', 'ULONG', 'MONEY', 'MSGAREAID', 'REAL', 'SBYTE', 'SDWORD', 'SHORT', 'STRING',
   'SWORD', 'TIME', 'UBYTE', 'UDWORD', 'UNSIGNED', 'UWORD', 'WORD',
   'AUDIO', 'SURFACE',
