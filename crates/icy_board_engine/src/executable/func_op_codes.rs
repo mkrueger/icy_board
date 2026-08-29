@@ -318,46 +318,44 @@ pub enum FuncOpCode {
     StaticReceiver = -303,
     Board = -304,
     Session = -305,
-    Reserved306 = -306,
-    Reserved307 = -307,
-    TOLONG64 = -308,
-    TOULONG64 = -309,
-    IndexedMember = -310,
-    SIN = -311,
-    COS = -312,
-    TAN = -313,
-    ATAN = -314,
-    LOG = -315,
-    SQRT = -316,
-    StringFindFrom = -317,
-    StringFindLastFrom = -318,
-    StringContains = -319,
-    StringStartsWith = -320,
-    StringEndsWith = -321,
-    StringCount = -322,
-    StringTrim = -323,
-    StringTrimStart = -324,
-    StringTrimEnd = -325,
-    StringJoin = -326,
-    StringRepeat = -327,
-    StringTrimChars = -328,
-    StringTrimStartChars = -329,
-    StringTrimEndChars = -330,
-    StringCharAt = -331,
-    StringFindComparison = -332,
-    StringFindLastComparison = -333,
-    StringContainsComparison = -334,
-    StringStartsWithComparison = -335,
-    StringEndsWithComparison = -336,
-    StringCountComparison = -337,
-    StringEquals = -338,
-    StringEqualsComparison = -339,
-    StringSplit = -340,
-    StringSplitLimit = -341,
-    ArrayValueAt = -342,
+    TOLONG64 = -306,
+    TOULONG64 = -307,
+    IndexedMember = -308,
+    SIN = -309,
+    COS = -310,
+    TAN = -311,
+    ATAN = -312,
+    LOG = -313,
+    SQRT = -314,
+    StringFindFrom = -315,
+    StringFindLastFrom = -316,
+    StringContains = -317,
+    StringStartsWith = -318,
+    StringEndsWith = -319,
+    StringCount = -320,
+    StringTrim = -321,
+    StringTrimStart = -322,
+    StringTrimEnd = -323,
+    StringJoin = -324,
+    StringRepeat = -325,
+    StringTrimChars = -326,
+    StringTrimStartChars = -327,
+    StringTrimEndChars = -328,
+    StringCharAt = -329,
+    StringFindComparison = -330,
+    StringFindLastComparison = -331,
+    StringContainsComparison = -332,
+    StringStartsWithComparison = -333,
+    StringEndsWithComparison = -334,
+    StringCountComparison = -335,
+    StringEquals = -336,
+    StringEqualsComparison = -337,
+    StringSplit = -338,
+    StringSplitLimit = -339,
+    ArrayValueAt = -340,
 }
 
-pub const LAST_FUNC: i16 = -342;
+pub const LAST_FUNC: i16 = -340;
 
 impl FuncOpCode {
     pub fn get_definition(self) -> &'static FunctionDefinition {
@@ -374,8 +372,6 @@ impl FuncOpCode {
                 | FuncOpCode::StaticReceiver
                 | FuncOpCode::Board
                 | FuncOpCode::Session
-                | FuncOpCode::Reserved306
-                | FuncOpCode::Reserved307
                 | FuncOpCode::TOLONG64
                 | FuncOpCode::TOULONG64
                 | FuncOpCode::IndexedMember
@@ -477,7 +473,7 @@ impl FunctionDefinition {
         }
     }
 }
-pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 354]> = std::sync::LazyLock::new(|| {
+pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 352]> = std::sync::LazyLock::new(|| {
     [
         FunctionDefinition {
             name: "END",
@@ -3076,7 +3072,7 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 354]> 
             name: "Terminal",
             version: 400,
             opcode: FuncOpCode::Terminal,
-            return_type: VariableType::UserData(42),
+            return_type: VariableType::UserData(41),
             args: None,
             signature: FunctionSignature::FixedParameters(0),
         },
@@ -3094,7 +3090,7 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 354]> 
             name: "Board",
             version: 400,
             opcode: FuncOpCode::Board,
-            return_type: VariableType::UserData(49),
+            return_type: VariableType::UserData(46),
             args: None,
             signature: FunctionSignature::FixedParameters(0),
         },
@@ -3102,25 +3098,9 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 354]> 
             name: "Session",
             version: 400,
             opcode: FuncOpCode::Session,
-            return_type: VariableType::UserData(50),
+            return_type: VariableType::UserData(47),
             args: None,
             signature: FunctionSignature::FixedParameters(0),
-        },
-        FunctionDefinition {
-            name: "<reserved 306>",
-            version: 400,
-            opcode: FuncOpCode::Reserved306,
-            return_type: VariableType::None,
-            args: None,
-            signature: FunctionSignature::Invalid,
-        },
-        FunctionDefinition {
-            name: "<reserved 307>",
-            version: 400,
-            opcode: FuncOpCode::Reserved307,
-            return_type: VariableType::None,
-            args: None,
-            signature: FunctionSignature::Invalid,
         },
         FunctionDefinition {
             name: "ToLong",

@@ -1384,18 +1384,6 @@
             "type": "TOKEN",
             "content": {
               "type": "PATTERN",
-              "value": "[aA][rR][eE][aA][sS]"
-            }
-          },
-          "named": false,
-          "value": "AREAS"
-        },
-        {
-          "type": "ALIAS",
-          "content": {
-            "type": "TOKEN",
-            "content": {
-              "type": "PATTERN",
               "value": "[aA][uU][dD][iI][oO]"
             }
           },
@@ -1408,71 +1396,11 @@
             "type": "TOKEN",
             "content": {
               "type": "PATTERN",
-              "value": "[cC][oO][nN][fF][eE][rR][eE][nN][cC][eE][sS]"
-            }
-          },
-          "named": false,
-          "value": "CONFERENCES"
-        },
-        {
-          "type": "ALIAS",
-          "content": {
-            "type": "TOKEN",
-            "content": {
-              "type": "PATTERN",
-              "value": "[dD][iI][rR][eE][cC][tT][oO][rR][iI][eE][sS]"
-            }
-          },
-          "named": false,
-          "value": "DIRECTORIES"
-        },
-        {
-          "type": "ALIAS",
-          "content": {
-            "type": "TOKEN",
-            "content": {
-              "type": "PATTERN",
-              "value": "[dD][oO][oO][rR][sS]"
-            }
-          },
-          "named": false,
-          "value": "DOORS"
-        },
-        {
-          "type": "ALIAS",
-          "content": {
-            "type": "TOKEN",
-            "content": {
-              "type": "PATTERN",
-              "value": "[rR][eE][gG][eE][xX][mM][aA][tT][cC][hH][eE][sS]"
-            }
-          },
-          "named": false,
-          "value": "REGEXMATCHES"
-        },
-        {
-          "type": "ALIAS",
-          "content": {
-            "type": "TOKEN",
-            "content": {
-              "type": "PATTERN",
               "value": "[sS][uU][rR][fF][aA][cC][eE]"
             }
           },
           "named": false,
           "value": "SURFACE"
-        },
-        {
-          "type": "ALIAS",
-          "content": {
-            "type": "TOKEN",
-            "content": {
-              "type": "PATTERN",
-              "value": "[uU][sS][eE][rR][sS]"
-            }
-          },
-          "named": false,
-          "value": "USERS"
         },
         {
           "type": "ALIAS",

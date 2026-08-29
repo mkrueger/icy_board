@@ -295,36 +295,26 @@ pub const CONTACT_ID: usize = 34;
 pub const SURFACE_ID: usize = 35;
 pub const EVENT_ID: usize = 36;
 pub const AUDIO_ID: usize = 37;
-pub const ERROR_ID: usize = 39;
-pub const TERM_INFO_ID: usize = 40;
-pub const TERM_INPUT_ID: usize = 41;
-pub const TERMINAL_ID: usize = 42;
-pub const GFX_ID: usize = 43;
-pub const MARGINS_ID: usize = 44;
-pub const PALETTE_ID: usize = 45;
-/// 46 was `Font`; the terminal sets and loads fonts itself.
-pub const MACROS_ID: usize = 47;
-/// 48 was `Sound`; audio is reached through the `Audio` type.
-pub const BOARD_ID: usize = 49;
-pub const SESSION_ID: usize = 50;
-pub const USER_ID: usize = 51;
-pub const AREAS_ID: usize = 52;
-pub const DIRECTORIES_ID: usize = 53;
-pub const DOORS_ID: usize = 54;
-pub const CONFERENCES_ID: usize = 55;
-/// 56 was `NOTES`; notes are exposed as `STRING[]` on `USER`.
-/// 57 was `CONTACTS`; contacts are exposed as `CONTACT[]` on `USER`.
-pub const MSG_ID: usize = 58;
-pub const HTTP_ID: usize = 59;
-pub const HTTP_REQUEST_ID: usize = 60;
-pub const HTTP_RESPONSE_ID: usize = 61;
-pub const USERS_ID: usize = 62;
-pub const REGEX_ID: usize = 63;
-pub const REGEX_MATCH_ID: usize = 64;
-pub const REGEX_MATCHES_ID: usize = 65;
+pub const ERROR_ID: usize = 38;
+pub const TERM_INFO_ID: usize = 39;
+pub const TERM_INPUT_ID: usize = 40;
+pub const TERMINAL_ID: usize = 41;
+pub const GFX_ID: usize = 42;
+pub const MARGINS_ID: usize = 43;
+pub const PALETTE_ID: usize = 44;
+pub const MACROS_ID: usize = 45;
+pub const BOARD_ID: usize = 46;
+pub const SESSION_ID: usize = 47;
+pub const USER_ID: usize = 48;
+pub const MSG_ID: usize = 49;
+pub const HTTP_ID: usize = 50;
+pub const HTTP_REQUEST_ID: usize = 51;
+pub const HTTP_RESPONSE_ID: usize = 52;
+pub const REGEX_ID: usize = 53;
+pub const REGEX_MATCH_ID: usize = 54;
 
 /// Builtin enums take the top of the id space and a program's own enums grow down from
-/// below them, so the order here is what a PPE stores and may only be appended to.
+/// below them. Their current compact order is what a PPE stores.
 pub const EVENT_KIND_ENUM_ID: u8 = 255;
 pub const MOUSE_ACTION_ENUM_ID: u8 = 254;
 pub const MOUSE_BUTTON_ENUM_ID: u8 = 253;
@@ -394,18 +384,12 @@ impl UserTypeRegistry {
         reg.register::<crate::icy_board::state::ppl_board::PplBoard>(BOARD_ID);
         reg.register::<crate::icy_board::state::ppl_session::PplSession>(SESSION_ID);
         reg.register::<crate::icy_board::state::ppl_user::PplUser>(USER_ID);
-        reg.register::<crate::icy_board::state::ppl_collection::PplAreas>(AREAS_ID);
-        reg.register::<crate::icy_board::state::ppl_collection::PplDirectories>(DIRECTORIES_ID);
-        reg.register::<crate::icy_board::state::ppl_collection::PplDoors>(DOORS_ID);
-        reg.register::<crate::icy_board::state::ppl_collection::PplConferences>(CONFERENCES_ID);
         reg.register::<crate::icy_board::state::ppl_message::PplMessage>(MSG_ID);
         reg.register::<crate::icy_board::state::ppl_http::PplHttp>(HTTP_ID);
         reg.register::<crate::icy_board::state::ppl_http::PplHttpRequest>(HTTP_REQUEST_ID);
         reg.register::<crate::icy_board::state::ppl_http::PplHttpResponse>(HTTP_RESPONSE_ID);
-        reg.register::<crate::icy_board::state::ppl_user::PplUsers>(USERS_ID);
         reg.register::<crate::icy_board::state::ppl_regex::PplRegex>(REGEX_ID);
         reg.register::<crate::icy_board::state::ppl_regex::PplRegexMatch>(REGEX_MATCH_ID);
-        reg.register::<crate::icy_board::state::ppl_regex::PplRegexMatches>(REGEX_MATCHES_ID);
 
         reg
     }

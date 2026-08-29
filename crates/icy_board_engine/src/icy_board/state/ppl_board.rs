@@ -43,10 +43,8 @@ impl PplBoard {
             operator: board.config.board.operator.clone(),
             sysop_name: board.config.sysop.name.clone(),
             nodes: i32::from(board.config.board.num_nodes),
-            conferences: crate::icy_board::state::ppl_collection::PplConferences::array_value(crate::icy_board::state::ppl_collection::PplConferences::build(
-                &board.conferences,
-            )),
-            users: crate::icy_board::state::ppl_user::PplUsers::array_value(&board.users),
+            conferences: crate::icy_board::state::ppl_array::conference_array_value(&board.conferences),
+            users: crate::icy_board::state::ppl_user::user_array_value(&board.users),
         }
     }
 

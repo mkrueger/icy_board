@@ -608,13 +608,12 @@ complete match.
 ``REGEXMATCH`` exposes ``Success``, ``Value``, ``Start``, ``Length``,
 ``GroupCount``, numbered ``Group``, ``GroupMatched``, ``GroupStart`` and
 ``GroupLength`` accessors, and corresponding ``NamedGroup`` methods.
-``REGEXMATCHES`` has ``Count``, ``Len()`` and ``Get(index)``.
+``FindAll`` returns a dynamic ``REGEXMATCH[]``.
 
 Replacement strings expand ``$1`` and ``$name``. Zero limits mean unlimited;
 negative limits report ``ErrKind.Regex`` with ``ErrCode.Invalid``. ``Split``
-preserves empty fields and replaces a dynamic one-dimensional ``STRING`` or
-``BIGSTR`` array only after success. Match collections are limited to 100,000
-items and replacement output to 16 MiB.
+preserves empty fields and returns a dynamic ``BIGSTR[]``. Match collections
+are limited to 100,000 items and replacement output to 16 MiB.
 
 The engine guarantees linear-time matching and deliberately omits look-around
 and backreferences. Unicode case-insensitive matching does not perform

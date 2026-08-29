@@ -907,7 +907,7 @@ FOREACH item IN conf.Doors
 ENDFOREACH
 ```
 
-The index is there when a single entry is wanted, and `Count` when only the
+The index is there when a single entry is wanted, and `Len()` when only the
 number matters:
 
 ```PPL
@@ -915,12 +915,11 @@ PRINTLN conf.Areas.Len(), " areas, the first is ", conf.Areas[0].Name
 ```
 
 An index no entry has answers with an invalid object rather than failing, so
-`Valid` is what to ask. A collection shares the list it stands for rather than
-copying it, so reading `conf.Areas` once per loop step costs nothing.
+`Valid` is what to ask. Collection properties return array snapshots; bind one
+to a variable when it will be reused.
 
-A collection is an ordinary value, so it can be held in a variable. A walk reads
-its source once per step, which makes the length of that source what a long loop
-pays for. Naming it once is the cheapest form and the clearest to read:
+An array snapshot is an ordinary value, so it can be held in a variable. Naming
+it once avoids rebuilding it and is the clearest form for repeated access:
 
 ```PPL
 AREA list[] = Session.Conference.Areas

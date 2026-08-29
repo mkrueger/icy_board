@@ -1213,9 +1213,7 @@ impl VirtualMachine<'_> {
             PPECommand::Let(variable, expr) => {
                 let whole_dynamic_array = match variable.as_ref() {
                     PPEExpr::Value(id) => {
-                        self.variable_table.get_var_entry(*id).header.flags
-                            & crate::executable::variable_table::VARIABLE_FLAG_DYNAMIC_ARRAY
-                            != 0
+                        self.variable_table.get_var_entry(*id).header.flags & crate::executable::variable_table::VARIABLE_FLAG_DYNAMIC_ARRAY != 0
                     }
                     _ => false,
                 };
@@ -1277,13 +1275,6 @@ impl VirtualMachine<'_> {
             GenericVariableData::Dim1(items) => items.len(),
             GenericVariableData::Dim2(items) => items.iter().map(Vec::len).sum(),
             GenericVariableData::Dim3(items) => items.iter().flatten().map(Vec::len).sum(),
-            GenericVariableData::UserData(object) => {
-                return Ok(object
-                    .clone()
-                    .get_property_value(self, &crate::icy_board::state::ppl_collection::COUNT)?
-                    .as_int()
-                    .max(0) as usize);
-            }
             _ => 1,
         };
         Ok(count)
@@ -1294,16 +1285,6 @@ impl VirtualMachine<'_> {
             GenericVariableData::Dim1(items) => items.get(index).cloned(),
             GenericVariableData::Dim2(items) => items.iter().flatten().nth(index).cloned(),
             GenericVariableData::Dim3(items) => items.iter().flatten().flatten().nth(index).cloned(),
-            GenericVariableData::UserData(object) => {
-                return object
-                    .clone()
-                    .call_function(
-                        self,
-                        &crate::icy_board::state::ppl_collection::GET,
-                        &[VariableValue::new_int(index as i32)],
-                    )
-                    .await;
-            }
             _ if index == 0 => Some(collection.clone()),
             _ => None,
         };
@@ -1312,9 +1293,11 @@ impl VirtualMachine<'_> {
 
     fn cleanup_foreach_for_jump(&mut self, target: usize) {
         let call_depth = self.return_addresses.len();
-        while self.foreach_stack.last().is_some_and(|frame| {
-            frame.call_depth == call_depth && !(frame.body_start <= target && target < frame.end)
-        }) {
+        while self
+            .foreach_stack
+            .last()
+            .is_some_and(|frame| frame.call_depth == call_depth && !(frame.body_start <= target && target < frame.end))
+        {
             self.foreach_stack.pop();
         }
     }

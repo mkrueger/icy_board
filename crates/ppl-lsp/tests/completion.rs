@@ -220,7 +220,6 @@ fn runtime_400_objects_offer_their_registered_members() {
                 "RemoveContact",
             ][..],
         ),
-        ("USERS value\nvalue.", &["Count"][..]),
     ] {
         let items = complete(source);
         for member in expected {
@@ -430,13 +429,13 @@ fn a_type_is_offered_from_the_version_that_named_it() {
 #[test]
 fn a_board_object_is_only_offered_from_400() {
     let last = offered(400);
-    for word in ["Conference", "Area", "Directory", "Door", "Users"] {
+    for word in ["Conference", "Area", "Directory", "Door"] {
         assert!(last.contains(&word.to_string()), "{word} should be offered in 400: {last:?}");
     }
 
     // An enum is a type from 350 on, so the objects are what 350 must not see.
     let older = offered(350);
-    for word in ["Conference", "Area", "Directory", "Door", "Users"] {
+    for word in ["Conference", "Area", "Directory", "Door"] {
         assert!(!older.contains(&word.to_string()), "{word} should not be offered in 350: {older:?}");
     }
 }

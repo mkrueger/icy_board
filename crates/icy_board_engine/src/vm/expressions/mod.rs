@@ -331,8 +331,6 @@ pub async fn run_function(opcode: FuncOpCode, arg: &mut VirtualMachine<'_>, argu
         FuncOpCode::Session => predefined_functions::session(arg, arguments).await,
         FuncOpCode::StaticReceiver => predefined_functions::static_receiver(arg, arguments).await,
         FuncOpCode::END
-        | FuncOpCode::Reserved306
-        | FuncOpCode::Reserved307
         | FuncOpCode::CPAR
         | FuncOpCode::UPLUS
         | FuncOpCode::UMINUS

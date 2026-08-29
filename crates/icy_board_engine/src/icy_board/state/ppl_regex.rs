@@ -43,9 +43,6 @@ pub static GROUP_START: std::sync::LazyLock<unicase::Ascii<String>> = std::sync:
 pub static NAMED_GROUP_START: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("NamedGroupStart".to_string()));
 pub static GROUP_LENGTH: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("GroupLength".to_string()));
 pub static NAMED_GROUP_LENGTH: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("NamedGroupLength".to_string()));
-pub static COUNT: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Count".to_string()));
-pub static LEN: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Len".to_string()));
-pub static GET: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("Get".to_string()));
 
 #[derive(Clone)]
 struct PplRegexGroup {
@@ -116,9 +113,6 @@ impl PplRegexMatch {
 }
 
 #[derive(Clone, Default)]
-pub struct PplRegexMatches(std::sync::Arc<Vec<PplRegexMatch>>);
-
-#[derive(Clone, Default)]
 pub struct PplRegex {
     pattern: String,
     options: i32,
@@ -158,10 +152,6 @@ impl PplRegex {
                 error: String::new(),
             })
             .map_err(|error| error.to_string())
-    }
-
-    pub(crate) fn compiled(&self) -> &Regex {
-        self.compiled.as_ref().expect("a successfully compiled PplRegex always contains Regex")
     }
 
     fn start_byte(text: &str, start: i32) -> Option<usize> {
@@ -490,53 +480,5 @@ impl UserDataValue for PplRegexMatch {
 
     async fn call_method(&mut self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _arguments: &[VariableValue]) -> crate::Res<()> {
         Err(format!("Unknown REGEXMATCH method {name}").into())
-    }
-}
-
-impl UserData for PplRegexMatches {
-    const TYPE_NAME: &'static str = "RegexMatches";
-
-    fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
-        registry.add_property(COUNT.clone(), VariableType::Integer, false);
-        registry.add_function(LEN.clone(), Vec::new(), VariableType::Integer);
-        registry.add_function(GET.clone(), vec![VariableType::Integer], VariableType::UserData(REGEX_MATCH_ID as u8));
-    }
-}
-
-#[async_trait(?Send)]
-impl UserDataValue for PplRegexMatches {
-    fn get_property_value(&self, _vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
-        if *name == *COUNT {
-            return Ok(VariableValue::new_int(self.0.len() as i32));
-        }
-        Err(format!("Unknown REGEXMATCHES property {name}").into())
-    }
-
-    async fn set_property_value(&self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
-        Err(format!("REGEXMATCHES property {name} is read-only").into())
-    }
-
-    async fn call_function(
-        &self,
-        _vm: &mut crate::vm::VirtualMachine<'_>,
-        name: &unicase::Ascii<String>,
-        arguments: &[VariableValue],
-    ) -> crate::Res<VariableValue> {
-        if *name == *LEN {
-            return Ok(VariableValue::new_int(self.0.len() as i32));
-        }
-        if *name == *GET {
-            let match_value = usize::try_from(arguments[0].as_int())
-                .ok()
-                .and_then(|index| self.0.get(index))
-                .cloned()
-                .unwrap_or_default();
-            return Ok(match_value.value());
-        }
-        Err(format!("Unknown REGEXMATCHES function {name}").into())
-    }
-
-    async fn call_method(&mut self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _arguments: &[VariableValue]) -> crate::Res<()> {
-        Err(format!("Unknown REGEXMATCHES method {name}").into())
     }
 }

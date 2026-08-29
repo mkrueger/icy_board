@@ -272,10 +272,8 @@ pub enum OpCode {
     FPutRec = 233,
     FReadRec = 234,
     FWriteRec = 235,
-    StringSplit = 236,
-    RegexSplit = 237,
-    ForEach = 238,
-    NextForEach = 239,
+    ForEach = 236,
+    NextForEach = 237,
 }
 pub const LAST_STMT: i16 = OpCode::NextForEach as i16;
 
@@ -293,8 +291,6 @@ impl OpCode {
                 | OpCode::FPutRec
                 | OpCode::FReadRec
                 | OpCode::FWriteRec
-                | OpCode::StringSplit
-                | OpCode::RegexSplit
                 | OpCode::ForEach
                 | OpCode::NextForEach
         ) {
@@ -625,7 +621,7 @@ pub fn format_argument_type_last(arg: &ArgumentDefinition) -> String {
 // "WAIT FOR" == "WAITFOR"
 // "GO SUB"
 // " GO TO"
-pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 245]> = std::sync::LazyLock::new(|| {
+pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 243]> = std::sync::LazyLock::new(|| {
     [
         StatementDefinition {
             // helps to map opcode to array index.
@@ -2644,20 +2640,6 @@ pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 245]
                 ArgumentDefinition::new("record", VariableType::None),
             ]),
             sig: StatementSignature::ArgumentsWithVariable(0, 2),
-        },
-        StatementDefinition {
-            name: "<string split>",
-            version: 400,
-            opcode: OpCode::StringSplit,
-            args: None,
-            sig: StatementSignature::ArgumentsWithVariable(3, 4),
-        },
-        StatementDefinition {
-            name: "<regex split>",
-            version: 400,
-            opcode: OpCode::RegexSplit,
-            args: None,
-            sig: StatementSignature::ArgumentsWithVariable(3, 4),
         },
         StatementDefinition {
             name: "<foreach>",

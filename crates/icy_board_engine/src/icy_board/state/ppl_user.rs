@@ -5,11 +5,10 @@ use crate::{
     datetime::IcbDate,
     executable::{VariableType, VariableValue},
     icy_board::{
-        state::ppl_collection::{COUNT, GET},
         state::ppl_error::{ERR_INVALID, ERR_KIND_USER, PplError},
         user_base::{FSEMode, User, UserContact},
     },
-    parser::{CONTACT_ID, EDITOR_MODE_ENUM_ID, USER_ID, USERS_ID},
+    parser::{CONTACT_ID, EDITOR_MODE_ENUM_ID, USER_ID},
 };
 
 macro_rules! member_name {
@@ -132,73 +131,15 @@ fn normalize_service(service: &str) -> String {
     service.trim().to_ascii_lowercase()
 }
 
-/// A stable view of the users present when `Board` was first read.
-#[derive(Clone, Default)]
-pub struct PplUsers(std::sync::Arc<Vec<std::sync::Arc<User>>>);
-
-impl PplUsers {
-    pub fn snapshot(users: &[User]) -> Self {
-        Self(std::sync::Arc::new(users.iter().cloned().map(std::sync::Arc::new).collect()))
-    }
-
-    pub fn value(self) -> VariableValue {
-        user_data_value(self, USERS_ID)
-    }
-
-    pub fn array_value(users: &[User]) -> VariableValue {
-        VariableValue::new_vector(
-            VariableType::UserData(USER_ID as u8),
-            users
-                .iter()
-                .cloned()
-                .map(|user| user_data_value(PplUser::snapshot(std::sync::Arc::new(user), true), USER_ID))
-                .collect(),
-        )
-    }
-}
-
-impl UserData for PplUsers {
-    const TYPE_NAME: &'static str = "Users";
-
-    fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
-        registry.add_property(COUNT.clone(), VariableType::Integer, false);
-        registry.add_function(GET.clone(), vec![VariableType::Integer], VariableType::UserData(USER_ID as u8));
-    }
-}
-
-#[async_trait(?Send)]
-impl UserDataValue for PplUsers {
-    fn get_property_value(&self, _vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
-        if *name == *COUNT {
-            return Ok(VariableValue::new_int(self.0.len() as i32));
-        }
-        Err(format!("Unknown Users property {name}").into())
-    }
-
-    async fn set_property_value(&self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
-        Err(format!("Users property {name} is read-only").into())
-    }
-
-    async fn call_function(
-        &self,
-        _vm: &mut crate::vm::VirtualMachine<'_>,
-        name: &unicase::Ascii<String>,
-        arguments: &[VariableValue],
-    ) -> crate::Res<VariableValue> {
-        if *name == *GET {
-            let index = arguments[0].as_int();
-            let user = (index >= 0).then(|| self.0.get(index as usize)).flatten();
-            return Ok(match user {
-                Some(user) => user_data_value(PplUser::snapshot(user.clone(), true), USER_ID),
-                None => user_data_value(PplUser::snapshot(std::sync::Arc::new(User::default()), false), USER_ID),
-            });
-        }
-        Err(format!("Unknown Users function {name}").into())
-    }
-
-    async fn call_method(&mut self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _arguments: &[VariableValue]) -> crate::Res<()> {
-        Err(format!("Unknown Users method {name}").into())
-    }
+pub fn user_array_value(users: &[User]) -> VariableValue {
+    VariableValue::new_vector(
+        VariableType::UserData(USER_ID as u8),
+        users
+            .iter()
+            .cloned()
+            .map(|user| user_data_value(PplUser::snapshot(std::sync::Arc::new(user), true), USER_ID))
+            .collect(),
+    )
 }
 
 /// The `EditorMode` enum values, which follow `FSEMode`'s own order.

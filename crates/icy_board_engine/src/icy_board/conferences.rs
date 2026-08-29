@@ -11,7 +11,7 @@ use serde_with::{DisplayFromStr, serde_as};
 use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue, user_data_value},
     executable::{VariableType, VariableValue},
-    icy_board::state::ppl_collection::{PplAreas, PplDirectories, PplDoors},
+    icy_board::state::ppl_array::{area_array_value, directory_array_value, door_array_value},
     parser::{DOOR_ID, FILE_DIRECTORY_ID, MESSAGE_AREA_ID},
 };
 
@@ -463,13 +463,13 @@ impl UserDataValue for Conference {
             return Ok(VariableValue::new_password(self.password.protected()));
         }
         if *name == *FILE_AREAS {
-            return Ok(PplDirectories::array_value(self.directories.clone().unwrap_or_default()));
+            return Ok(directory_array_value(self.directories.clone().unwrap_or_default()));
         }
         if *name == *MESSAGE_AREAS {
-            return Ok(PplAreas::array_value(self.areas.clone().unwrap_or_default()));
+            return Ok(area_array_value(self.areas.clone().unwrap_or_default()));
         }
         if *name == *DOORS {
-            return Ok(PplDoors::array_value(self.doors.clone().unwrap_or_default()));
+            return Ok(door_array_value(self.doors.clone().unwrap_or_default()));
         }
 
         log::error!("Invalid user data call on Conference ({name})");

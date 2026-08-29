@@ -64,7 +64,7 @@ fn test_predef_serialization() {
 }
 
 #[test]
-fn record_io_statements_keep_their_append_only_encoding() {
+fn record_io_statement_ids_are_compact() {
     for opcode in [OpCode::FGetRec, OpCode::FPutRec, OpCode::FReadRec, OpCode::FWriteRec] {
         let command = PPECommand::PredefinedCall(opcode.get_definition(), vec![PPEExpr::Value(2), PPEExpr::Value(3)]);
         let second = if matches!(opcode, OpCode::FGetRec | OpCode::FReadRec) {
@@ -77,31 +77,11 @@ fn record_io_statements_keep_their_append_only_encoding() {
 }
 
 #[test]
-fn string_split_keeps_its_append_only_encoding() {
-    assert_eq!(OpCode::StringSplit as i16, 236);
-    let command = PPECommand::PredefinedCall(
-        OpCode::StringSplit.get_definition(),
-        vec![PPEExpr::Value(1), PPEExpr::Value(2), PPEExpr::Value(3), PPEExpr::Value(4)],
-    );
-    test_serialize(&command, &[236, 1, 0, 0, 2, 0, 0, 3, 0, 4, 0, 0]);
-}
-
-#[test]
-fn regex_split_keeps_its_append_only_encoding() {
-    assert_eq!(OpCode::RegexSplit as i16, 237);
-    let command = PPECommand::PredefinedCall(
-        OpCode::RegexSplit.get_definition(),
-        vec![PPEExpr::Value(1), PPEExpr::Value(2), PPEExpr::Value(3), PPEExpr::Value(4)],
-    );
-    test_serialize(&command, &[237, 1, 0, 0, 2, 0, 0, 3, 0, 4, 0, 0]);
-}
-
-#[test]
-fn foreach_statements_keep_their_append_only_encoding() {
-    assert_eq!(OpCode::ForEach as i16, 238);
-    assert_eq!(OpCode::NextForEach as i16, 239);
-    test_serialize(&PPECommand::ForEach(2, Box::new(PPEExpr::Value(3)), 20), &[238, 2, 3, 0, 0, 20]);
-    test_serialize(&PPECommand::NextForEach(10), &[239, 10]);
+fn foreach_statement_ids_are_compact() {
+    assert_eq!(OpCode::ForEach as i16, 236);
+    assert_eq!(OpCode::NextForEach as i16, 237);
+    test_serialize(&PPECommand::ForEach(2, Box::new(PPEExpr::Value(3)), 20), &[236, 2, 3, 0, 0, 20]);
+    test_serialize(&PPECommand::NextForEach(10), &[237, 10]);
 }
 
 #[test]

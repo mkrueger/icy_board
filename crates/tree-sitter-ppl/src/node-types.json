@@ -2018,10 +2018,6 @@
     "named": false
   },
   {
-    "type": "AREAS",
-    "named": false
-  },
-  {
     "type": "AUDIO",
     "named": false
   },
@@ -2058,10 +2054,6 @@
     "named": false
   },
   {
-    "type": "CONFERENCES",
-    "named": false
-  },
-  {
     "type": "CONST",
     "named": false
   },
@@ -2090,10 +2082,6 @@
     "named": false
   },
   {
-    "type": "DIRECTORIES",
-    "named": false
-  },
-  {
     "type": "DIRECTORY",
     "named": false
   },
@@ -2103,10 +2091,6 @@
   },
   {
     "type": "DOOR",
-    "named": false
-  },
-  {
-    "type": "DOORS",
     "named": false
   },
   {
@@ -2378,10 +2362,6 @@
     "named": false
   },
   {
-    "type": "REGEXMATCHES",
-    "named": false
-  },
-  {
     "type": "REGEXOPTIONS",
     "named": false
   },
@@ -2487,10 +2467,6 @@
   },
   {
     "type": "USER",
-    "named": false
-  },
-  {
-    "type": "USERS",
     "named": false
   },
   {

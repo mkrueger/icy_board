@@ -694,29 +694,21 @@ impl Decompiler {
                 ProcedureCallStatement::create_empty_statement(self.get_variable_name(*p), args.iter().map(|e| self.decompile_expression(e)).collect())
             }
             PPECommand::MemberCall(expr) => MemberCallStatement::create_empty_statement(self.decompile_expression(expr)),
-            PPECommand::PredefinedCall(p, args) => {
-                if matches!(p.opcode, OpCode::StringSplit | OpCode::RegexSplit) && args.len() == 4 {
-                    return MemberCallStatement::create_empty_statement(FunctionCallExpression::create_empty_expression(
-                        MemberReferenceExpression::create_empty_expression(self.decompile_expression(&args[0]), unicase::Ascii::new("Split".to_string())),
-                        args[1..].iter().map(|argument| self.decompile_expression(argument)).collect(),
-                    ));
-                }
-                PredefinedCallStatement::create_empty_statement(
-                    p,
-                    args.iter()
-                        .enumerate()
-                        .map(|(i, e)| {
-                            let expr = self.decompile_expression(e);
-                            if let Some(args) = &p.args
-                                && let Some(arg) = args.get(i)
-                            {
-                                return self.convert_argument(expr, arg);
-                            }
-                            expr
-                        })
-                        .collect(),
-                )
-            }
+            PPECommand::PredefinedCall(p, args) => PredefinedCallStatement::create_empty_statement(
+                p,
+                args.iter()
+                    .enumerate()
+                    .map(|(i, e)| {
+                        let expr = self.decompile_expression(e);
+                        if let Some(args) = &p.args
+                            && let Some(arg) = args.get(i)
+                        {
+                            return self.convert_argument(expr, arg);
+                        }
+                        expr
+                    })
+                    .collect(),
+            ),
             PPECommand::Let(left, expr) => {
                 // A member assignment keeps the fields it walks through beside the base.
                 let mut members = Vec::new();

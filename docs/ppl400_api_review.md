@@ -120,9 +120,9 @@ remain absent from completion, hover coverage and grammar keyword lists.
 
 ## Sector 2: board and messaging
 
-The sector contains `BOARD`, `CONFERENCES`, `CONFERENCE`, `AREAS`, `AREA`,
-`DIRECTORIES`, `DIRECTORY`, `DOORS`, `DOOR` and `MSG`, with `MsgField` as its
-typed selector enum.
+The sector contains `BOARD`, `CONFERENCE`, `AREA`, `DIRECTORY`, `DOOR` and
+`MSG`, with `MsgField` as its typed selector enum. Collections are arrays of
+these element types rather than separate wrapper types.
 
 `Board` is the configured-board root. Conferences own their area, directory and
 door collections; `Session` provides the current conference, area and directory.
@@ -149,8 +149,8 @@ and do not turn messages into a collection whose index would imply position.
 
 ## Sector 3: session and user
 
-The sector contains `SESSION`, `USERS`, `USER` and the built-in `CONTACT`
-record, with `EditorMode` as its enum. Notes and contacts are exposed as
+The sector contains `SESSION`, `USER` and the built-in `CONTACT` record, with
+`EditorMode` as its enum. Notes and contacts are exposed as
 `STRING[]` and `CONTACT[]`; there are no separate `NOTES` or `CONTACTS` types.
 
 `Session` describes the active call. `Session.User` describes the stored caller
@@ -173,8 +173,8 @@ five-element `STRING[]`, with mutation through `SetNote(index, text)`.
 account)` appends and `RemoveContact(index)` removes by zero-based position.
 Duplicate services are allowed. Mutation does not alter arrays already returned.
 
-`Board.Users` is the board-wide `USERS` collection. It is snapshotted with
-`Board`, and each indexed item is a read-only `USER` whose `Valid` property
+`Board.Users` is the board-wide `USER[]` snapshot. Each indexed item is a
+read-only `USER` whose `Valid` property
 distinguishes a real record from an out-of-range lookup. Its nested notes and
 contacts belong to that snapshot. Only `Session.User` is writable.
 
@@ -266,8 +266,8 @@ sector-specific numeric details.
   and predefined variables.
 - Language 3.50 features may target older runtimes unless they need routine
   references. Object members and records require runtime 4.00.
-- Built-in type and enum ids are serialized and must remain frozen. Retired ids
-  stay unused rather than being reassigned.
+- Built-in IDs added for language 4.00 remain compact and may be renumbered
+  until the format is released. PCBoard-compatible IDs stay frozen.
 - Internal angle-bracketed members and opcodes are lowering details, not source
   API, and must remain hidden from editor completion.
 - New members should follow the owning sector's naming, lifetime, failure and
@@ -281,6 +281,7 @@ enums - are applied consistently. The remaining asymmetries are explained by
 PCBoard compatibility, protocol values or PPL syntax rather than accidental
 design.
 
-The surface can remain frozen. Future reviews should be sector-specific and use
+The surface is coherent but remains unfrozen until the 4.00 format is released.
+Future reviews should be sector-specific and use
 the registry dump as their inventory, with a full review reserved for changes to
 the shared error, lifetime, serialization or collection contracts.

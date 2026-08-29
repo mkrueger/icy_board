@@ -106,10 +106,11 @@ trusted.
 | 9 | `BYTE` | 20 | `PASSWORD` |
 | 10 | `WORD` | 255 | none |
 
-Everything from 21 upward is a user data type. 30 to 99 are the board objects
-IcyBoard provides — `CONFERENCE`, `AREA`, `DIRECTORY`, `DOOR` — and 100 to 255
-are records a program declares with `TYPE`. Anything a reader does not know
-should be treated as an opaque user type rather than as a broken file.
+Everything from 21 upward is a user data type. IcyBoard's compact object range
+starts at 30 and includes board, session, user, messaging, terminal, media, HTTP
+and regex types. IDs from 100 upward are records a program declares with
+`TYPE`. Anything a reader does not know should be treated as an opaque user type
+rather than as a broken file.
 
 ### Entry payload
 
@@ -220,8 +221,8 @@ Runtime 400 stores `FOREACH` structurally instead of lowering it to hidden
 function calls and temporary variables:
 
 ```text
-238 FOREACH       variable-id, collection-expression, end-byte-offset
-239 NEXTFOREACH   body-byte-offset
+236 FOREACH       variable-id, collection-expression, end-byte-offset
+237 NEXTFOREACH   body-byte-offset
 ```
 
 `FOREACH` evaluates the collection once and creates a VM iterator frame.

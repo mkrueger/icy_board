@@ -1,6 +1,6 @@
 use i18n_embed_fl::fl;
 use icy_board_engine::executable::{FuncOpCode, FunctionDefinition, OpCode, Signature, StatementDefinition, VariableType};
-use icy_board_engine::parser::{BOARD_ID, REGEX_ID, REGEX_MATCH_ID, REGEX_MATCHES_ID, USER_ID, USERS_ID};
+use icy_board_engine::parser::{BOARD_ID, REGEX_ID, REGEX_MATCH_ID, USER_ID};
 use tower_lsp::lsp_types::{Hover, HoverContents, MarkupContent, MarkupKind};
 
 use crate::LANGUAGE_LOADER;
@@ -121,13 +121,9 @@ pub fn get_type_hover(var_type: VariableType) -> Option<Hover> {
         VariableType::Unsigned => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-unsigned")),
         VariableType::Long => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-long")),
         VariableType::ULong => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-ulong")),
-        VariableType::UserData(id) if id == USERS_ID as u8 => get_sig_hint(Signature::new("USERS".to_string()), fl!(LANGUAGE_LOADER, "hint-type-users")),
         VariableType::UserData(id) if id == REGEX_ID as u8 => get_sig_hint(Signature::new("REGEX".to_string()), fl!(LANGUAGE_LOADER, "hint-type-regex")),
         VariableType::UserData(id) if id == REGEX_MATCH_ID as u8 => {
             get_sig_hint(Signature::new("REGEXMATCH".to_string()), fl!(LANGUAGE_LOADER, "hint-type-regex-match"))
-        }
-        VariableType::UserData(id) if id == REGEX_MATCHES_ID as u8 => {
-            get_sig_hint(Signature::new("REGEXMATCHES".to_string()), fl!(LANGUAGE_LOADER, "hint-type-regex-matches"))
         }
         VariableType::Date => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-date")),
         VariableType::EDate => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-edate")),
@@ -153,9 +149,6 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
     };
     if id == BOARD_ID as u8 && member.eq_ignore_ascii_case("Users") {
         return Some(fl!(LANGUAGE_LOADER, "hint-member-board-users"));
-    }
-    if id == USERS_ID as u8 && member.eq_ignore_ascii_case("Count") {
-        return Some(fl!(LANGUAGE_LOADER, "hint-member-users-count"));
     }
     if id == USER_ID as u8 && member.eq_ignore_ascii_case("Valid") {
         return Some(fl!(LANGUAGE_LOADER, "hint-member-user-valid"));
@@ -187,13 +180,6 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
             "groupmatched" | "namedgroupmatched" => Some(fl!(LANGUAGE_LOADER, "hint-regex-match-group-matched")),
             "groupstart" | "namedgroupstart" => Some(fl!(LANGUAGE_LOADER, "hint-regex-match-group-start")),
             "grouplength" | "namedgrouplength" => Some(fl!(LANGUAGE_LOADER, "hint-regex-match-group-length")),
-            _ => None,
-        };
-    }
-    if id == REGEX_MATCHES_ID as u8 {
-        return match member.to_ascii_lowercase().as_str() {
-            "count" | "len" => Some(fl!(LANGUAGE_LOADER, "hint-regex-matches-count")),
-            "get" => Some(fl!(LANGUAGE_LOADER, "hint-regex-matches-get")),
             _ => None,
         };
     }

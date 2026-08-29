@@ -186,7 +186,7 @@ fn test_function() {
 /// The id of a board object is stored in every PPE that names its type, so the
 /// list may only ever grow at the end.
 #[test]
-fn board_object_type_ids_are_frozen() {
+fn board_object_type_ids_are_compact() {
     let registry = UserTypeRegistry::icy_board_registry();
     let expected = [
         ("CONFERENCE", 30),
@@ -197,29 +197,23 @@ fn board_object_type_ids_are_frozen() {
         ("SURFACE", 35),
         ("EVENT", 36),
         ("AUDIO", 37),
-        ("ERROR", 39),
-        ("TERMINFO", 40),
-        ("TERMINPUT", 41),
-        ("TERMINAL", 42),
-        ("GFX", 43),
-        ("MARGINS", 44),
-        ("PALETTE", 45),
-        ("MACROS", 47),
-        ("BOARD", 49),
-        ("SESSION", 50),
-        ("USER", 51),
-        ("AREAS", 52),
-        ("DIRECTORIES", 53),
-        ("DOORS", 54),
-        ("CONFERENCES", 55),
-        ("MSG", 58),
-        ("HTTP", 59),
-        ("HTTPREQUEST", 60),
-        ("HTTPRESPONSE", 61),
-        ("USERS", 62),
-        ("REGEX", 63),
-        ("REGEXMATCH", 64),
-        ("REGEXMATCHES", 65),
+        ("ERROR", 38),
+        ("TERMINFO", 39),
+        ("TERMINPUT", 40),
+        ("TERMINAL", 41),
+        ("GFX", 42),
+        ("MARGINS", 43),
+        ("PALETTE", 44),
+        ("MACROS", 45),
+        ("BOARD", 46),
+        ("SESSION", 47),
+        ("USER", 48),
+        ("MSG", 49),
+        ("HTTP", 50),
+        ("HTTPREQUEST", 51),
+        ("HTTPRESPONSE", 52),
+        ("REGEX", 53),
+        ("REGEXMATCH", 54),
     ];
 
     for (name, id) in expected {
@@ -237,7 +231,7 @@ fn board_object_type_ids_are_frozen() {
 }
 
 #[test]
-fn error_member_ids_are_frozen() {
+fn error_member_ids_are_compact() {
     let registry = UserTypeRegistry::icy_board_registry();
     let error = &registry.types[&(super::ERROR_ID as u8)];
     for (name, id) in [("OK", 0), ("KIND", 1), ("CODE", 2), ("MESSAGE", 3), ("CHANNEL", 4)] {
@@ -248,7 +242,7 @@ fn error_member_ids_are_frozen() {
 /// A builtin enum takes a fixed id at the top of the space and a program's own enums
 /// grow down from below them, so adding one in the middle would move every id after it.
 #[test]
-fn builtin_enum_ids_are_frozen() {
+fn builtin_enum_ids_are_compact() {
     let registry = UserTypeRegistry::icy_board_registry();
     let expected = [
         ("EventKind", 255),

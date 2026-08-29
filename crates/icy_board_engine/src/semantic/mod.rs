@@ -142,7 +142,6 @@ pub struct StringMember {
     pub arguments: std::ops::RangeInclusive<usize>,
     pub return_type: VariableType,
     pub is_static: bool,
-    pub is_procedure: bool,
 }
 
 pub const STRING_MEMBERS: &[StringMember] = &[
@@ -151,126 +150,108 @@ pub const STRING_MEMBERS: &[StringMember] = &[
         arguments: 0..=0,
         return_type: VariableType::Integer,
         is_static: false,
-        is_procedure: false,
     },
     StringMember {
         name: "Find",
         arguments: 1..=3,
         return_type: VariableType::Integer,
         is_static: false,
-        is_procedure: false,
     },
     StringMember {
         name: "FindLast",
         arguments: 1..=3,
         return_type: VariableType::Integer,
         is_static: false,
-        is_procedure: false,
     },
     StringMember {
         name: "Contains",
         arguments: 1..=2,
         return_type: VariableType::Boolean,
         is_static: false,
-        is_procedure: false,
     },
     StringMember {
         name: "StartsWith",
         arguments: 1..=2,
         return_type: VariableType::Boolean,
         is_static: false,
-        is_procedure: false,
     },
     StringMember {
         name: "EndsWith",
         arguments: 1..=2,
         return_type: VariableType::Boolean,
         is_static: false,
-        is_procedure: false,
     },
     StringMember {
         name: "Count",
         arguments: 1..=2,
         return_type: VariableType::Integer,
         is_static: false,
-        is_procedure: false,
     },
     StringMember {
         name: "Equals",
         arguments: 1..=2,
         return_type: VariableType::Boolean,
         is_static: false,
-        is_procedure: false,
     },
     StringMember {
         name: "Replace",
         arguments: 2..=2,
         return_type: VariableType::BigStr,
         is_static: false,
-        is_procedure: false,
     },
     StringMember {
         name: "Trim",
         arguments: 0..=1,
         return_type: VariableType::BigStr,
         is_static: false,
-        is_procedure: false,
     },
     StringMember {
         name: "TrimStart",
         arguments: 0..=1,
         return_type: VariableType::BigStr,
         is_static: false,
-        is_procedure: false,
     },
     StringMember {
         name: "TrimEnd",
         arguments: 0..=1,
         return_type: VariableType::BigStr,
         is_static: false,
-        is_procedure: false,
     },
     StringMember {
         name: "ToUpper",
         arguments: 0..=0,
         return_type: VariableType::BigStr,
         is_static: false,
-        is_procedure: false,
     },
     StringMember {
         name: "ToLower",
         arguments: 0..=0,
         return_type: VariableType::BigStr,
         is_static: false,
-        is_procedure: false,
     },
     StringMember {
         name: "Split",
         arguments: 1..=2,
         return_type: VariableType::BigStr,
         is_static: false,
-        is_procedure: false,
     },
     StringMember {
         name: "Join",
         arguments: 2..=2,
         return_type: VariableType::BigStr,
         is_static: true,
-        is_procedure: false,
     },
     StringMember {
         name: "Repeat",
         arguments: 2..=2,
         return_type: VariableType::BigStr,
         is_static: true,
-        is_procedure: false,
     },
     StringMember {
         name: "Split",
         arguments: 2..=3,
         return_type: VariableType::BigStr,
         is_static: true,
-        is_procedure: false,
     },
 ];
 
@@ -339,9 +320,6 @@ pub fn array_procedure(name: &unicase::Ascii<String>) -> Option<&'static (&'stat
 fn takes_whole_array(opcode: OpCode, signature: crate::executable::StatementSignature, index: usize) -> bool {
     if opcode == OpCode::REDIM {
         return index == 0;
-    }
-    if matches!(opcode, OpCode::StringSplit | OpCode::RegexSplit) {
-        return index == 2;
     }
     match signature {
         StatementSignature::SpecialCaseDlockg => index == 2,
