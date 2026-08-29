@@ -1778,6 +1778,14 @@ impl IcyBoardState {
     }
 
     fn find_more_specific_file(&self, base_name: String) -> PathBuf {
+        // A caller may deliberately give a display file a nonstandard extension. In that
+        // case the name as written is the file, not the base of a security, graphics,
+        // language, or display-extension variant such as `name.topg.pcb`.
+        let exact = PathBuf::from(&base_name);
+        if exact.extension().is_some() && exact.exists() {
+            return exact;
+        }
+
         if let Some(result) = self.find_more_specific_file_with_graphics(base_name.clone() + self.session.cur_security.to_string().as_str()) {
             return result;
         }

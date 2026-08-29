@@ -50,6 +50,30 @@ fn dispstr_shows_the_file_a_percent_names() {
     assert_eq!(output, "the file was found\n");
 }
 
+/// A file named with a nonstandard extension is exact, even if old graphics and
+/// display-extension variants remain beside it. Otherwise edits appear to be cached.
+#[test]
+fn display_prefers_the_exact_name_over_an_appended_extension() {
+    let output = run_ppl_with_files(
+        r#"
+        DISPFILE "found.top", 0
+        DISPSTR "%found.top"
+    "#,
+        &[
+            ("found.top", b"current\r\n"),
+            ("found.top.pcb", b"stale extension\r\n"),
+            ("found.topg.pcb", b"stale graphics variant\r\n"),
+        ],
+    );
+    assert_eq!(output, "current\ncurrent\n");
+}
+
+#[test]
+fn display_uses_an_appended_extension_when_the_exact_name_is_missing() {
+    let output = run_ppl_with_files(r#"DISPFILE "found.top", 0"#, &[("found.top.pcb", CONTENT)]);
+    assert_eq!(output, "the file was found\n");
+}
+
 #[test]
 fn dispstr_prints_a_string_that_names_no_file() {
     let output = run_ppl_with_files(r#"DISPSTR "plain text""#, &[]);
