@@ -1047,7 +1047,7 @@ Session.User.City = "Berlin"
 | Preferences the session owns | `UseGraphics`, `UseAlias`, `Language`, `DateFormat` | no |
 | Security | `SecurityLevel`, `ExpiredSecurityLevel`, `ExpirationDate`, `PasswordExpires`, `SetPassword(text)` | yes |
 | Statistics | `TimesOn`, `FirstDateOn`, `LastDateOn`, `LastDirRead`, `MessagesRead`, `MessagesLeft`, `Uploads`, `Downloads`, `UploadBytes`, `DownloadBytes`, `DownloadBytesToday`, `MinutesToday` | no |
-| Contacts | `Contacts` | yes |
+| Contacts | `Contacts`, `AddContact(service, account)`, `RemoveContact(index)` | yes |
 
 Whatever `PUTUSER` could write is writable here and lands at once, so the object
 replaces the old round trip rather than sitting beside it. The caller's `Name`
@@ -1071,9 +1071,8 @@ an empty password is refused and it answers `FALSE` rather than failing.
 
 ### Notes and contacts
 
-Both are collections: they answer `Count`, are read with an index and are walked
-with `FOREACH`. `Notes` holds the five sysop notes as `STRING`s and is written
-through the index:
+`Notes` holds the five sysop notes as `STRING`s, answers `Count`, is read with
+an index and is walked with `FOREACH`. It is written through the index:
 
 ```PPL
 Session.User.Notes[0] = "Called about the upload"
@@ -1085,8 +1084,9 @@ The index is evaluated twice there, the way it is for `a(i) += v`, so an index
 with a side effect happens twice.
 
 A contact is a built-in `CONTACT` record with two `STRING` fields, `Service` and
-`Account`. Service names are open strings, so a PPE can store a new service
-without a language or user-schema change.
+`Account`. `User.Contacts` returns a `CONTACT[]` snapshot in stable list order.
+Service names are open strings, so a PPE can store a new service without a
+language or user-schema change.
 
 ```PPL
 CONTACT entry
@@ -1095,21 +1095,20 @@ FOREACH entry IN Session.User.Contacts
 	PRINTLN entry.Service, ": ", entry.Account
 ENDFOREACH
 
-Session.User.Contacts.Put("matrix", "@sysop:example.org")
+Session.User.AddContact("matrix", "@sysop:example.org")
+Session.User.RemoveContact(0)
 ```
 
-`Contacts.Put()` replaces the account when the service is already there and adds
-it otherwise, so there can never be two entries meaning the same service. It is
-`Put` rather than `Set` because it is keyed by service, not by position. Service
-names are trimmed and compared without regard to case; a blank service or account
-is refused and answers `FALSE`. `Contacts.Delete()` answers whether it removed
-anything. An index no contact has answers with an empty `CONTACT`.
+`AddContact()` trims and normalizes the service name, trims the account and
+appends the contact. Duplicate services are allowed. A blank service or account
+is refused and answers `FALSE`. `RemoveContact(index)` removes the entry at the
+zero-based index and answers whether it succeeded. An index no contact has
+answers with an empty `CONTACT`.
 
-Unlike the board's collections these can change while a PPE runs, but how many
-steps a walk takes is settled when it starts, so adding or removing inside one
-does not change its length.
+The returned array is a snapshot. Adding or removing contacts does not mutate an
+array already held by the PPE; read `User.Contacts` again to get the new list.
 
-Both write straight through to the caller, so no `GETUSER`/`PUTUSER` round trip
+Mutations write straight through to the caller, so no `GETUSER`/`PUTUSER` round trip
 is needed. `U_EMAIL` and `U_WEB` remain separate predefined variables for
 PCBoard 3.40 compatibility and are not duplicated here.
 

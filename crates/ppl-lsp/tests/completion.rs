@@ -106,7 +106,7 @@ fn a_function_answering_an_object_offers_its_members() {
 #[test]
 fn an_indexed_board_user_offers_user_members() {
     let items = complete("Board.Users[0].");
-    for member in ["Valid", "Name", "City", "Notes", "Contacts"] {
+    for member in ["Valid", "Name", "City", "Notes", "Contacts", "AddContact", "RemoveContact"] {
         assert!(items.contains(&member.to_string()), "{member} missing: {items:?}");
     }
     assert!(!items.contains(&"Count".to_string()), "{items:?}");
@@ -206,7 +206,10 @@ fn runtime_400_objects_offer_their_registered_members() {
         ("GFX value\nvalue.", &["Init", "Backend", "Pacing"][..]),
         ("BOARD value\nvalue.", &["Name", "SysopName", "NodeCount", "Conferences", "Users"][..]),
         ("SESSION value\nvalue.", &["Conference", "Area", "Directory", "User", "Node", "MinutesLeft"][..]),
-        ("USER value\nvalue.", &["Valid", "Name", "Alias", "SecurityLevel", "Contacts", "Notes"][..]),
+        (
+            "USER value\nvalue.",
+            &["Valid", "Name", "Alias", "SecurityLevel", "Contacts", "Notes", "AddContact", "RemoveContact"][..],
+        ),
         ("USERS value\nvalue.", &["Count"][..]),
     ] {
         let items = complete(source);

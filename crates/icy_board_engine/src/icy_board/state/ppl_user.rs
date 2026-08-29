@@ -9,7 +9,7 @@ use crate::{
         state::ppl_error::{ERR_INVALID, ERR_KIND_USER, PplError},
         user_base::{FSEMode, User, UserContact},
     },
-    parser::{CONTACT_ID, CONTACTS_ID, EDITOR_MODE_ENUM_ID, NOTES_ID, USER_ID, USERS_ID},
+    parser::{CONTACT_ID, EDITOR_MODE_ENUM_ID, NOTES_ID, USER_ID, USERS_ID},
 };
 
 macro_rules! member_name {
@@ -75,6 +75,8 @@ member_name!(DOWNLOAD_BYTES_TODAY, "DownloadBytesToday");
 member_name!(MINUTES_TODAY, "MinutesToday");
 
 member_name!(CONTACTS, "Contacts");
+member_name!(ADD_CONTACT, "AddContact");
+member_name!(REMOVE_CONTACT, "RemoveContact");
 
 /// How many sysop notes a user carries. `PCBoard` called them `U_NOTES`.
 const NOTE_COUNT_VALUE: i32 = 5;
@@ -137,24 +139,6 @@ fn normalize_service(service: &str) -> String {
 pub struct PplNotes(Option<std::sync::Arc<User>>);
 
 impl PplNotes {
-    fn current() -> Self {
-        Self(None)
-    }
-
-    fn snapshot(user: std::sync::Arc<User>) -> Self {
-        Self(Some(user))
-    }
-
-    fn user<'a>(&'a self, vm: &'a crate::vm::VirtualMachine) -> Option<&'a User> {
-        self.0.as_deref().or(vm.icy_board_state.session.current_user.as_ref())
-    }
-}
-
-/// A user's contact services, either live for the caller or part of a board snapshot.
-#[derive(Clone, Default)]
-pub struct PplContacts(Option<std::sync::Arc<User>>);
-
-impl PplContacts {
     fn current() -> Self {
         Self(None)
     }
@@ -237,9 +221,6 @@ impl UserDataValue for PplUsers {
     }
 }
 
-member_name!(PUT, "Put");
-member_name!(DELETE, "Delete");
-
 impl UserData for PplNotes {
     const TYPE_NAME: &'static str = "Notes";
 
@@ -310,91 +291,6 @@ impl UserDataValue for PplNotes {
 
     async fn call_method(&mut self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _arguments: &[VariableValue]) -> crate::Res<()> {
         Err(format!("Unknown Notes method {name}").into())
-    }
-}
-
-impl UserData for PplContacts {
-    const TYPE_NAME: &'static str = "Contacts";
-
-    fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
-        registry.add_property(COUNT.clone(), VariableType::Integer, false);
-        registry.add_function(GET.clone(), vec![VariableType::Integer], VariableType::UserData(CONTACT_ID as u8));
-        registry.add_function(PUT.clone(), vec![VariableType::String, VariableType::String], VariableType::Boolean);
-        registry.add_function(DELETE.clone(), vec![VariableType::String], VariableType::Boolean);
-    }
-}
-
-#[async_trait(?Send)]
-impl UserDataValue for PplContacts {
-    fn get_property_value(&self, vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
-        if *name == *COUNT {
-            let count = self.user(vm).map_or(0, |user| user.contacts.len());
-            return Ok(VariableValue::new_int(count as i32));
-        }
-        Err(format!("Unknown Contacts property {name}").into())
-    }
-
-    async fn set_property_value(&self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _val: VariableValue) -> crate::Res<()> {
-        Err(format!("Contacts property {name} is read-only").into())
-    }
-
-    async fn call_function(
-        &self,
-        vm: &mut crate::vm::VirtualMachine<'_>,
-        name: &unicase::Ascii<String>,
-        arguments: &[VariableValue],
-    ) -> crate::Res<VariableValue> {
-        if *name == *GET {
-            let index = arguments[0].as_int();
-            let contact = self
-                .user(vm)
-                .filter(|_| index >= 0)
-                .and_then(|user| user.contacts.get(index as usize))
-                .cloned()
-                .unwrap_or_default();
-            return Ok(contact_value(&contact));
-        }
-        if *name == *PUT {
-            if self.0.is_some() {
-                return Ok(VariableValue::new_bool(false));
-            }
-            let service = normalize_service(&arguments[0].as_string());
-            let account = arguments[1].as_string().trim().to_string();
-            if service.is_empty() || account.is_empty() {
-                return Ok(VariableValue::new_bool(false));
-            }
-            let Some(user) = vm.icy_board_state.session.current_user.as_mut() else {
-                return Ok(VariableValue::new_bool(false));
-            };
-            if let Some(contact) = user.contacts.iter_mut().find(|contact| contact.service == service) {
-                contact.account = account;
-            } else {
-                user.contacts.push(UserContact { service, account });
-            }
-            user.flags.is_dirty = true;
-            return Ok(VariableValue::new_bool(true));
-        }
-        if *name == *DELETE {
-            if self.0.is_some() {
-                return Ok(VariableValue::new_bool(false));
-            }
-            let service = normalize_service(&arguments[0].as_string());
-            let Some(user) = vm.icy_board_state.session.current_user.as_mut() else {
-                return Ok(VariableValue::new_bool(false));
-            };
-            let before = user.contacts.len();
-            user.contacts.retain(|contact| contact.service != service);
-            let removed = user.contacts.len() != before;
-            if removed {
-                user.flags.is_dirty = true;
-            }
-            return Ok(VariableValue::new_bool(removed));
-        }
-        Err(format!("Unknown Contacts function {name}").into())
-    }
-
-    async fn call_method(&mut self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _arguments: &[VariableValue]) -> crate::Res<()> {
-        Err(format!("Unknown Contacts method {name}").into())
     }
 }
 
@@ -481,8 +377,10 @@ impl UserData for PplUser {
         registry.add_property(EDITOR_MODE.clone(), VariableType::UserData(EDITOR_MODE_ENUM_ID), true);
 
         registry.add_property(NOTES.clone(), VariableType::UserData(NOTES_ID as u8), false);
-        registry.add_property(CONTACTS.clone(), VariableType::UserData(CONTACTS_ID as u8), false);
+        registry.add_array_property(CONTACTS.clone(), VariableType::UserData(CONTACT_ID as u8), 1);
         registry.add_function(SET_PASSWORD.clone(), vec![VariableType::String], VariableType::Boolean);
+        registry.add_function(ADD_CONTACT.clone(), vec![VariableType::String, VariableType::String], VariableType::Boolean);
+        registry.add_function(REMOVE_CONTACT.clone(), vec![VariableType::Integer], VariableType::Boolean);
     }
 }
 
@@ -577,10 +475,7 @@ impl UserDataValue for PplUser {
         } else if *name == *MINUTES_TODAY {
             VariableValue::new_int(i32::from(user.stats.minutes_today))
         } else if *name == *CONTACTS {
-            match self {
-                Self::Current => user_data_value(PplContacts::current(), CONTACTS_ID),
-                Self::Snapshot { user, .. } => user_data_value(PplContacts::snapshot(user.clone()), CONTACTS_ID),
-            }
+            VariableValue::new_vector(VariableType::UserData(CONTACT_ID as u8), user.contacts.iter().map(contact_value).collect())
         } else if *name == *UPLOAD_BYTES {
             VariableValue::new_unsigned(user.stats.total_upld_bytes)
         } else if *name == *DOWNLOAD_BYTES {
@@ -721,6 +616,41 @@ impl UserDataValue for PplUser {
                 return Ok(VariableValue::new_bool(false));
             };
             user.password.password = password;
+            user.flags.is_dirty = true;
+            return Ok(VariableValue::new_bool(true));
+        }
+        if *name == *ADD_CONTACT {
+            if matches!(self, Self::Snapshot { .. }) {
+                vm.set_error(PplError::new(ERR_KIND_USER, ERR_INVALID, "Board.Users entries are read-only"));
+                return Ok(VariableValue::new_bool(false));
+            }
+            let service = normalize_service(&arguments[0].as_string());
+            let account = arguments[1].as_string().trim().to_string();
+            if service.is_empty() || account.is_empty() {
+                return Ok(VariableValue::new_bool(false));
+            }
+            let Some(user) = vm.icy_board_state.session.current_user.as_mut() else {
+                return Ok(VariableValue::new_bool(false));
+            };
+            user.contacts.push(UserContact { service, account });
+            user.flags.is_dirty = true;
+            return Ok(VariableValue::new_bool(true));
+        }
+        if *name == *REMOVE_CONTACT {
+            if matches!(self, Self::Snapshot { .. }) {
+                vm.set_error(PplError::new(ERR_KIND_USER, ERR_INVALID, "Board.Users entries are read-only"));
+                return Ok(VariableValue::new_bool(false));
+            }
+            let Ok(index) = usize::try_from(arguments[0].as_int()) else {
+                return Ok(VariableValue::new_bool(false));
+            };
+            let Some(user) = vm.icy_board_state.session.current_user.as_mut() else {
+                return Ok(VariableValue::new_bool(false));
+            };
+            if index >= user.contacts.len() {
+                return Ok(VariableValue::new_bool(false));
+            }
+            user.contacts.remove(index);
             user.flags.is_dirty = true;
             return Ok(VariableValue::new_bool(true));
         }

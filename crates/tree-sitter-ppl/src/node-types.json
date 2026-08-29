@@ -2070,10 +2070,6 @@
     "named": false
   },
   {
-    "type": "CONTACTS",
-    "named": false
-  },
-  {
     "type": "CONTINUE",
     "named": false
   },

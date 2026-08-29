@@ -19,12 +19,18 @@ fn the_retired_contact_variable_is_no_longer_defined() {
 }
 
 #[test]
+fn the_contacts_wrapper_type_is_no_longer_defined() {
+    let errors = compile_errors("CONTACTS contacts");
+    assert!(!errors.is_empty(), "CONTACTS should not remain a PPL 400 type");
+}
+
+#[test]
 fn a_contact_can_be_written_and_read_back() {
     assert_eq!(
         "1 matrix:@sysop:example.org",
         run_ppl(
             r#"
-PRINT Session.User.Contacts.Put("Matrix", "@sysop:example.org"), " "
+PRINT Session.User.AddContact("Matrix", "@sysop:example.org"), " "
 PRINT Session.User.Contacts[0].Service, ":", Session.User.Contacts[0].Account
 "#,
         )
@@ -37,8 +43,8 @@ fn contacts_can_be_walked() {
         "github matrix ",
         run_ppl(
             r#"
-Session.User.Contacts.Put("github", "sysop")
-Session.User.Contacts.Put("matrix", "@sysop:example.org")
+Session.User.AddContact("github", "sysop")
+Session.User.AddContact("matrix", "@sysop:example.org")
 CONTACT entry
 FOREACH entry IN Session.User.Contacts
     PRINT entry.Service, " "
@@ -66,17 +72,16 @@ ENDFOREACH
     );
 }
 
-/// The object is read live, so a contact the PPE adds is there without a
-/// `GETUSER`/`PUTUSER` round trip.
+/// Reading Contacts again returns the current list without a GETUSER/PUTUSER round trip.
 #[test]
 fn contacts_are_seen_and_changed_without_getuser() {
     assert_eq!(
         "1 github:sysop|2 matrix:@sysop:example.org",
         run_ppl_on(
             r#"
-PRINT Session.User.Contacts.Count, " ", Session.User.Contacts[0].Service, ":", Session.User.Contacts[0].Account, "|"
-Session.User.Contacts.Put("MATRIX", "@sysop:example.org")
-PRINT Session.User.Contacts.Count, " ", Session.User.Contacts[1].Service, ":", Session.User.Contacts[1].Account
+PRINT Session.User.Contacts.Len(), " ", Session.User.Contacts[0].Service, ":", Session.User.Contacts[0].Account, "|"
+Session.User.AddContact("MATRIX", "@sysop:example.org")
+PRINT Session.User.Contacts.Len(), " ", Session.User.Contacts[1].Service, ":", Session.User.Contacts[1].Account
 "#,
             |board| {
                 board.users[0].contacts.push(UserContact {
@@ -88,16 +93,15 @@ PRINT Session.User.Contacts.Count, " ", Session.User.Contacts[1].Service, ":", S
     );
 }
 
-/// Setting a service that is already there replaces its account rather than
-/// adding a second entry that means the same thing.
+/// Contacts are a list, so duplicate services remain separate entries.
 #[test]
-fn setting_a_known_service_replaces_its_account() {
+fn adding_a_known_service_appends_another_contact() {
     assert_eq!(
-        "1 github:someone-else",
+        "2 github:sysop github:someone-else",
         run_ppl_on(
             r#"
-Session.User.Contacts.Put("GitHub", "someone-else")
-PRINT Session.User.Contacts.Count, " ", Session.User.Contacts[0].Service, ":", Session.User.Contacts[0].Account
+Session.User.AddContact("GitHub", "someone-else")
+PRINT Session.User.Contacts.Len(), " ", Session.User.Contacts[0].Service, ":", Session.User.Contacts[0].Account, " ", Session.User.Contacts[1].Service, ":", Session.User.Contacts[1].Account
 "#,
             |board| {
                 board.users[0].contacts.push(UserContact {
@@ -112,9 +116,12 @@ PRINT Session.User.Contacts.Count, " ", Session.User.Contacts[0].Service, ":", S
 #[test]
 fn a_contact_can_be_deleted() {
     assert_eq!(
-        "1 0 0",
+        "1 1 matrix 0",
         run_ppl_on(
-            r#"PRINT Session.User.Contacts.Delete("GitHub"), " ", Session.User.Contacts.Count, " ", Session.User.Contacts.Delete("github")"#,
+            r#"
+Session.User.AddContact("matrix", "account")
+PRINT Session.User.RemoveContact(0), " ", Session.User.Contacts.Len(), " ", Session.User.Contacts[0].Service, " ", Session.User.RemoveContact(99)
+"#,
             |board| {
                 board.users[0].contacts.push(UserContact {
                     service: "github".to_string(),
@@ -130,7 +137,28 @@ fn a_contact_can_be_deleted() {
 fn an_empty_contact_is_refused() {
     assert_eq!(
         "0 0 0",
-        run_ppl(r#"PRINT Session.User.Contacts.Put("", "sysop"), " ", Session.User.Contacts.Put("matrix", " "), " ", Session.User.Contacts.Count"#)
+        run_ppl(r#"PRINT Session.User.AddContact("", "sysop"), " ", Session.User.AddContact("matrix", " "), " ", Session.User.Contacts.Len()"#)
+    );
+}
+
+#[test]
+fn a_contacts_array_is_a_snapshot() {
+    assert_eq!(
+        "1 2",
+        run_ppl_on(
+            r#"
+CONTACT contacts[]
+contacts = Session.User.Contacts
+Session.User.AddContact("matrix", "account")
+PRINT contacts.Len(), " ", Session.User.Contacts.Len()
+"#,
+            |board| {
+                board.users[0].contacts.push(UserContact {
+                    service: "github".to_string(),
+                    account: "sysop".to_string(),
+                });
+            },
+        )
     );
 }
 

@@ -313,7 +313,7 @@ pub const DIRECTORIES_ID: usize = 53;
 pub const DOORS_ID: usize = 54;
 pub const CONFERENCES_ID: usize = 55;
 pub const NOTES_ID: usize = 56;
-pub const CONTACTS_ID: usize = 57;
+/// 57 was `CONTACTS`; contacts are exposed as `CONTACT[]` on `USER`.
 pub const MSG_ID: usize = 58;
 pub const HTTP_ID: usize = 59;
 pub const HTTP_REQUEST_ID: usize = 60;
@@ -370,9 +370,8 @@ impl UserTypeRegistry {
         reg.register::<MessageArea>(MESSAGE_AREA_ID);
         reg.register::<FileDirectory>(FILE_DIRECTORY_ID);
         reg.register::<Door>(DOOR_ID);
-        reg.types.get_mut(&(DOOR_ID as u8)).unwrap().empty_value = Some(|| {
-            crate::compiler::user_data::user_data_value(crate::icy_board::doors::Door::default(), DOOR_ID)
-        });
+        reg.types.get_mut(&(DOOR_ID as u8)).unwrap().empty_value =
+            Some(|| crate::compiler::user_data::user_data_value(crate::icy_board::doors::Door::default(), DOOR_ID));
         reg.register_record(
             CONTACT_ID,
             "CONTACT",
@@ -400,7 +399,6 @@ impl UserTypeRegistry {
         reg.register::<crate::icy_board::state::ppl_collection::PplDoors>(DOORS_ID);
         reg.register::<crate::icy_board::state::ppl_collection::PplConferences>(CONFERENCES_ID);
         reg.register::<crate::icy_board::state::ppl_user::PplNotes>(NOTES_ID);
-        reg.register::<crate::icy_board::state::ppl_user::PplContacts>(CONTACTS_ID);
         reg.register::<crate::icy_board::state::ppl_message::PplMessage>(MSG_ID);
         reg.register::<crate::icy_board::state::ppl_http::PplHttp>(HTTP_ID);
         reg.register::<crate::icy_board::state::ppl_http::PplHttpRequest>(HTTP_REQUEST_ID);

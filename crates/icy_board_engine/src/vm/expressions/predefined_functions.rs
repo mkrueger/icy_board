@@ -655,6 +655,15 @@ pub async fn array_value_at(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Re
     {
         return Ok(empty_value());
     }
+    if let VariableType::UserData(type_id) = array.vtype
+        && let Some(definition) = vm.type_registry.get_record_type_from_id(type_id)
+    {
+        return Ok(VariableValue {
+            vtype: array.vtype,
+            data: crate::executable::VariableData::default(),
+            generic_data: GenericVariableData::Record(definition.fields.iter().map(|(_, field)| field.variable_type.create_empty_value()).collect()),
+        });
+    }
     Ok(array.vtype.create_empty_value())
 }
 
