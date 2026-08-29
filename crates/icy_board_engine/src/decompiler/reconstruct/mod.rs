@@ -41,6 +41,13 @@ pub fn optimize_loops(visitor: &SemanticVisitor, statements: &mut Vec<Statement>
 }
 
 fn optimize_block(visitor: &SemanticVisitor, statements: &mut Vec<Statement>, lang_version: u16) {
+    // FOREACH comes structured out of the bytecode, so its body is reached here rather
+    // than where a pass builds one.
+    for statement in statements.iter_mut() {
+        if let Statement::ForEach(foreach_stmt) = statement {
+            optimize_block(visitor, foreach_stmt.get_statements_mut(), lang_version);
+        }
+    }
     optimize_loops(visitor, statements, lang_version);
     optimize_ifs(visitor, statements, lang_version);
     if lang_version >= 200 {

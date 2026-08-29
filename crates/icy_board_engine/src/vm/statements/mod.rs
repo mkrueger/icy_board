@@ -33,6 +33,8 @@ pub async fn run_predefined_statement(opcode: OpCode, arg: &mut VirtualMachine<'
         | OpCode::PROCEDURE
         | OpCode::PCALL
         | OpCode::FPCLR
+        | OpCode::ForEach
+        | OpCode::NextForEach
         | OpCode::BEGIN
         | OpCode::FEND
         | OpCode::OnError

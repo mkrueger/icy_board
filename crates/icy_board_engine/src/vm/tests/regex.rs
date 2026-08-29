@@ -47,7 +47,7 @@ fn regex_finds_captures_collections_and_replaces() {
 
     assert_eq!(
         output,
-        "1 score:120 3 9 2\nscore:120 score 120\n1 0\n3 9 3\n1 one two\n0\n1 two\na=1 b=2 c:3\n\n1 1\n"
+        "1 score:120 3 9 2\nscore:120 score 120\n1 0\n3 9 3\n2 one two\n0\n2 two\na=1 b=2 c:3\n\n1 1\n"
     );
 }
 
@@ -76,5 +76,5 @@ fn regex_split_preserves_fields_limits_and_target_on_error() {
         "#,
     );
 
-    assert_eq!(output, "3 one|two||four\n2 one|two|three; four\n1\n2 one|two|three; four\n");
+    assert_eq!(output, "4 one|two||four\n3 one|two|three; four\n1\n3 one|two|three; four\n");
 }

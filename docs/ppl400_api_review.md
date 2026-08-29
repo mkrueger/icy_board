@@ -105,8 +105,9 @@ This sector owns the syntax and value model on which all later sectors depend:
 - compiled `REGEX` matching with capture snapshots, match collections, replacement and transactional split
 
 The public functions are intentionally a small utility layer. Member access,
-static receivers, record literals and iteration helpers have opcode entries but
-angle-bracketed internal names and are excluded from completion and source.
+static receivers and record literals have opcode entries but angle-bracketed
+internal names and are excluded from completion and source. `FOREACH` uses
+dedicated statement bytecodes rather than internal helper functions.
 
 `LONG` is the one intentional source-compatibility edge: before language 4.00 it
 was a 32-bit `INTEGER` alias, while at 4.00 it is a signed 64-bit type. The

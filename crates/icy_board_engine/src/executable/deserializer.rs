@@ -147,6 +147,21 @@ impl PPEDeserializer {
                 self.offset += 1;
                 Ok(Some(PPECommand::IfNot(Box::new(expr), label)))
             }
+            OpCode::ForEach => {
+                let variable = executable.script_buffer[self.offset] as usize;
+                self.offset += 1;
+                let Some(collection) = self.deserialize_expression(executable)? else {
+                    return Err(DeserializationErrorType::NoExpression);
+                };
+                let end = executable.script_buffer[self.offset] as usize;
+                self.offset += 1;
+                Ok(Some(PPECommand::ForEach(variable, Box::new(collection), end)))
+            }
+            OpCode::NextForEach => {
+                let start = executable.script_buffer[self.offset] as usize;
+                self.offset += 1;
+                Ok(Some(PPECommand::NextForEach(start)))
+            }
             OpCode::GOSUB => {
                 let label = executable.script_buffer[self.offset] as usize;
                 self.offset += 1;

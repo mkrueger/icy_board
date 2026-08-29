@@ -115,6 +115,9 @@ fn collect_statement_hits(stmt: &icy_board_engine::executable::PPEStatement, hit
         PPECommand::MemberCall(expr) => {
             collect_expr_hits(expr, hits, span_start);
         }
+        PPECommand::ForEach(_, collection, _) => {
+            collect_expr_hits(collection, hits, span_start);
+        }
         PPECommand::Return
         | PPECommand::End
         | PPECommand::Goto(_)
@@ -122,7 +125,8 @@ fn collect_statement_hits(stmt: &icy_board_engine::executable::PPEStatement, hit
         | PPECommand::OnError(_)
         | PPECommand::EndFunc
         | PPECommand::EndProc
-        | PPECommand::Stop => {}
+        | PPECommand::Stop
+        | PPECommand::NextForEach(_) => {}
     }
 }
 

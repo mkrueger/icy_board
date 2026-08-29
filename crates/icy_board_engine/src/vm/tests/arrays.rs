@@ -1,9 +1,9 @@
-use crate::vm::tests::{compile_errors, compile_errors_with_runtime, run_ppl};
+use crate::vm::tests::{compile, compile_errors, compile_errors_with_runtime, run_ppl};
 
 #[test]
 fn ppl_400_dynamic_arrays_use_square_bracket_rank_syntax() {
     assert_eq!(
-        "0 0 0 2 7",
+        "0 0 0 3 7",
         run_ppl(
             r#"
 ;$LANGVERSION 400
@@ -28,7 +28,7 @@ fn ppl_400_accepts_legacy_array_declarations_during_migration() {
 #[test]
 fn ppl_400_functions_return_dynamic_arrays() {
     assert_eq!(
-        "3 20",
+        "4 20",
         run_ppl(
             r#";$LANGVERSION 400
 DECLARE FUNCTION MakeValues() INTEGER[]
@@ -110,17 +110,13 @@ fn indexing_takes_one_index_per_dimension() {
     assert_eq!("12", run_ppl("INTEGER a(1, 1)\nLET a(0, 1) = 12\nPRINT a[0, 1]"));
 }
 
-/// The names the lowering calls cannot be written, so they are no API to keep.
 #[test]
-fn the_flat_walk_functions_are_not_callable_from_source() {
-    assert!(
-        !compile_errors("INTEGER a(1)\nPRINT ElementCount(a)").is_empty(),
-        "ElementCount should not be a name a PPE can call"
-    );
-    assert!(
-        !compile_errors("INTEGER a(1)\nPRINT ElementAt(a, 0)").is_empty(),
-        "ElementAt should not be a name a PPE can call"
-    );
+fn foreach_compiles_to_its_statement_bytecode() {
+    let executable = compile("INTEGER values(1)\nINTEGER value\nFOREACH value IN values\n  PRINT value\nENDFOREACH");
+    assert!(executable.script_buffer.contains(&(crate::executable::OpCode::ForEach as i16)));
+    assert!(executable.script_buffer.contains(&(crate::executable::OpCode::NextForEach as i16)));
+    assert!(!executable.script_buffer.contains(&-306));
+    assert!(!executable.script_buffer.contains(&-307));
 }
 
 #[test]
@@ -324,6 +320,51 @@ ENDPROC
     );
 }
 
+#[test]
+fn returning_from_foreach_cleans_up_its_iterator() {
+        assert_eq!(
+                "7 7",
+                run_ppl(
+                        r#"
+DECLARE FUNCTION First() INTEGER
+PRINT First(), " ", First()
+
+FUNCTION First() INTEGER
+    INTEGER values(1)
+    INTEGER value
+    values(0) = 7
+    FOREACH value IN values
+        RETURN value
+    ENDFOREACH
+    RETURN 0
+ENDFUNC
+"#
+                )
+        );
+}
+
+#[test]
+fn goto_out_of_foreach_cleans_up_its_iterator() {
+        assert_eq!(
+                "2",
+                run_ppl(
+                        r#"
+INTEGER values(1)
+INTEGER value
+INTEGER count
+FOREACH value IN values
+    GOTO done
+ENDFOREACH
+:done
+FOREACH value IN values
+    count = count + 1
+ENDFOREACH
+PRINT count
+"#
+                )
+        );
+}
+
 /// A value that is not an array is one element, so the body runs once rather than
 /// not at all. Nothing has to ask what it was handed.
 #[test]
@@ -341,18 +382,34 @@ fn in_is_still_available_as_a_variable_name() {
 #[test]
 fn an_array_answers_len_as_a_member() {
     assert_eq!(
-        "10 2 3",
+        "11 3 4",
         run_ppl("INTEGER a(10)\nINTEGER b(2, 3)\nPRINT a.Len(), \" \", b.Len(0), \" \", b.Len(1)")
     );
 }
 
 #[test]
-fn an_array_answers_the_element_functions_as_members() {
-    assert!(
-        !compile_errors("INTEGER a(1)\nPRINT a.ElementCount()").is_empty(),
-        "the flat walk is not part of the member surface either"
+fn array_len_reports_element_counts() {
+    assert_eq!(
+        "11 12 3 4 0",
+        run_ppl(
+            ";$LANGVERSION 400\nINTEGER vector[10]\nINTEGER matrix[2, 3]\nINTEGER empty[]\nPRINT vector.Len(), \" \", matrix.Len(), \" \", matrix.Len(0), \" \", matrix.Len(1), \" \", empty.Len()"
+        )
     );
 }
+
+#[test]
+fn arrays_expose_len_but_not_count() {
+    assert!(!compile_errors(";$LANGVERSION 400\nINTEGER values[10]\nPRINT values.Count()").is_empty());
+}
+
+#[test]
+fn array_initializer_len_is_its_element_count() {
+    assert_eq!(
+        "3 30",
+        run_ppl(";$LANGVERSION 400\nINTEGER values = { 10, 20, 30 }\nPRINT values.Len(), \" \", values[2]")
+    );
+}
+
 /// The member is the same call as the function, so both may name the same array.
 #[test]
 fn a_member_and_a_function_agree() {
@@ -383,19 +440,19 @@ fn an_array_member_checks_its_argument_count() {
 /// REDIM is a statement, so its member is one too.
 #[test]
 fn an_array_can_be_redimmed_through_its_member() {
-    assert_eq!("1 20", run_ppl("INTEGER a(1)\nPRINT a.Len(), \" \"\na.Redim(20)\nPRINT a.Len()"));
+    assert_eq!("2 21", run_ppl("INTEGER a(1)\nPRINT a.Len(), \" \"\na.Redim(20)\nPRINT a.Len()"));
 }
 
 #[test]
 fn redim_as_a_member_takes_one_bound_per_dimension() {
-    assert_eq!("2 3", run_ppl("INTEGER a(1)\na.Redim(2, 3)\nPRINT a.Len(0), \" \", a.Len(1)"));
+    assert_eq!("3 4", run_ppl("INTEGER a(1)\na.Redim(2, 3)\nPRINT a.Len(0), \" \", a.Len(1)"));
 }
 
 /// The member is the same statement, so it agrees with the written out form.
 #[test]
 fn a_redim_member_and_the_statement_agree() {
     assert_eq!(
-        "7 7",
+        "8 8",
         run_ppl("INTEGER a(1)\nINTEGER b(1)\na.Redim(7)\nREDIM b, 7\nPRINT a.Len(), \" \", b.Len()")
     );
 }
@@ -444,7 +501,7 @@ fn a_bare_array_is_not_a_value() {
 /// new array members and `FOREACH`.
 #[test]
 fn the_array_builtins_still_see_the_whole_array() {
-    assert_eq!("5 2", run_ppl("INTEGER a(5)\nINTEGER b(2, 3)\nPRINT a.Len(), \" \", Len(b, 0)"));
+    assert_eq!("6 3", run_ppl("INTEGER a(5)\nINTEGER b(2, 3)\nPRINT a.Len(), \" \", Len(b, 0)"));
     assert_eq!(
         "6",
         run_ppl("INTEGER a(5)\nINTEGER v\nINTEGER n\nFOREACH v IN a\n  n = n + 1\nENDFOREACH\nPRINT n")

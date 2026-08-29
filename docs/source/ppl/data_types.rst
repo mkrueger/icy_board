@@ -270,8 +270,8 @@ dimensions are supported.
 - **Indexing**: zero based, with ``[ ]`` or ``( )``
 - **Bounds**: the declared number is the *highest* index, so ``scores(10)`` holds
   the elements 0 to 10
-- **Length**: ``array.Len()`` answers the first upper bound,
-    ``Len(array, dim)`` the one of a single dimension
+- **Length**: ``array.Len()`` answers the total number of elements;
+    ``array.Len(dim)`` and ``Len(array, dim)`` answer the number in one dimension
 
 Example::
 
@@ -287,7 +287,7 @@ Since language version 350 an array may be written out instead::
 
     INTEGER values = { 1, 2, 3 }
 
-which declares ``values(3)`` and fills the first three elements. An array of a
+which declares an array with exactly three elements and fills them. An array of a
 record type works the same way, and every element has fields of its own::
 
     Member members(10)

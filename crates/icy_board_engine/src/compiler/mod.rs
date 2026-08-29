@@ -210,6 +210,7 @@ pub struct PPECompiler {
 
     label_table: Vec<LabelDescriptor>,
     label_lookup_table: HashMap<unicase::Ascii<String>, usize>,
+    foreach_stack: Vec<(usize, usize)>,
 
     commands: PPEScript,
 }
@@ -223,6 +224,7 @@ impl PPECompiler {
             cur_offset: 0,
             label_table: Vec::new(),
             label_lookup_table: HashMap::new(),
+            foreach_stack: Vec::new(),
             runtime: workspace.runtime(),
             commands: PPEScript::default(),
         }
@@ -268,11 +270,12 @@ impl PPECompiler {
                     AstNode::TypeDeclaration(_type_decl) => {}
                     AstNode::EnumDeclaration(_enum_decl) => {}
                     AstNode::TopLevelStatement(stmt) => {
-                        // may get transformed by the ast transformer.
                         if let Statement::Block(block) = stmt {
                             for s in optimize_statements(block.get_statements()) {
                                 self.compile_add_statement(&s);
                             }
+                        } else {
+                            self.compile_add_statement(stmt);
                         }
                     }
                     AstNode::Main(block) => {
@@ -336,6 +339,34 @@ impl PPECompiler {
             for s in block.get_statements() {
                 self.compile_add_statement(s);
             }
+            return;
+        }
+        if let Statement::ForEach(foreach_stmt) = stmt {
+            if self.runtime < 400 {
+                self.semantic_visitor.errors.lock().unwrap().report_error(
+                    foreach_stmt.get_foreach_token().span.clone(),
+                    CompilationErrorType::BuiltinNeedsRuntime("FOREACH".to_string(), 400),
+                );
+                return;
+            }
+            let Some(variable_index) = self.lookup_variable_index(foreach_stmt.get_identifier()) else {
+                log::error!("FOREACH variable not found: {}", foreach_stmt.get_identifier());
+                return;
+            };
+            let variable = self.lookup_table.variable_table.get_var_entry(variable_index).header.id;
+            let collection = self.comp_expr(foreach_stmt.get_collection());
+            let end_label = self.label_table.len();
+            self.label_table.push(LabelDescriptor { offset: None });
+            let command = PPECommand::ForEach(variable, Box::new(collection), end_label);
+            let body_start = (self.cur_offset + command.get_size()) * 2;
+            self.commands.add_statement(&mut self.cur_offset, command);
+            self.foreach_stack.push((body_start, end_label));
+            for statement in foreach_stmt.get_statements() {
+                self.compile_add_statement(statement);
+            }
+            self.foreach_stack.pop();
+            self.commands.add_statement(&mut self.cur_offset, PPECommand::NextForEach(body_start));
+            self.label_table[end_label].offset = Some(self.cur_offset);
             return;
         }
         if let Some(stmt) = self.compile_statement(stmt) {
@@ -594,14 +625,14 @@ impl PPECompiler {
             }
             Statement::While(_) => panic!("While not allowed in output AST."),
             Statement::Block(_) => panic!("Block not handled by compile statement."),
-            Statement::Continue(_) => panic!("Continue not allowed in output AST."),
-            Statement::Break(_) => panic!("Break not allowed in output AST."),
+            Statement::Continue(_) => self.foreach_stack.last().map(|(start, _)| PPECommand::NextForEach(*start)),
+            Statement::Break(_) => self.foreach_stack.last().map(|(_, end)| PPECommand::Goto(*end)),
             Statement::IfThen(_) => panic!("if then not allowed in output AST."),
             Statement::WhileDo(_) => panic!("do while not allowed in output AST."),
             Statement::RepeatUntil(_) => panic!("repeat until not allowed in output AST."),
             Statement::Loop(_) => panic!("loop not allowed in output AST."),
             Statement::For(_) => panic!("for not allowed in output AST."),
-            Statement::ForEach(_) => panic!("foreach not allowed in output AST."),
+            Statement::ForEach(_) => panic!("foreach is handled by compile_add_statement."),
             Statement::Select(_) => panic!("select not allowed in output AST."),
         }
     }
@@ -704,7 +735,10 @@ impl PPECompiler {
         let last = (self.commands.statements.len() as i32 - 1) as usize;
         for stmt in &mut self.commands.statements {
             match &mut stmt.command {
-                PPECommand::IfNot(_, idx) | PPECommand::Goto(idx) | PPECommand::Gosub(idx) => {
+                PPECommand::IfNot(_, idx)
+                | PPECommand::Goto(idx)
+                | PPECommand::Gosub(idx)
+                | PPECommand::ForEach(_, _, idx) => {
                     if let Some(label_descr) = self.label_table.get(*idx) {
                         if let Some(offset) = label_descr.offset {
                             *idx = offset * 2;

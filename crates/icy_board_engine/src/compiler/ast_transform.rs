@@ -3,26 +3,21 @@ use std::collections::{HashMap, HashSet};
 use crate::{
     ast::{
         Ast, AstNode, AstVisitorMut, BinaryExpression, BlockStatement, CommentAstNode, ConstDeclarationStatement, Constant, ConstantExpression,
-        DimensionSpecifier, Expression, ForEachStatement, ForStatement, FunctionCallExpression, FunctionImplementation, GotoStatement, IdentifierExpression,
+        DimensionSpecifier, Expression, ForEachStatement, ForStatement, FunctionImplementation, GotoStatement, IdentifierExpression,
         IfStatement, LabelStatement, LetStatement, MemberReferenceExpression, ParameterSpecifier, ProcedureImplementation, ReturnStatement, SelectStatement,
         Statement, VariableDeclarationStatement, VariableSpecifier, const_expression, const_value_with_members, constant::NumberFormat,
     },
     decompiler::evaluation_visitor::{ConstantFolder, OptimizationVisitor},
-    executable::{FuncOpCode, VariableValue},
+    executable::VariableValue,
     parser::{
         EnumDefinition,
         lexer::{Spanned, Token},
     },
 };
 
-/// The name a compiler generated call goes by. Angle brackets keep it out of reach
-/// of source, and taking it from the definition keeps the two ends together.
-fn internal_function(opcode: FuncOpCode) -> unicase::Ascii<String> {
-    unicase::Ascii::new(opcode.get_definition().name.to_string())
-}
-
 pub struct AstTransformationVisitor {
     continue_break_labels: Vec<(unicase::Ascii<String>, unicase::Ascii<String>)>,
+    foreach_label_depths: Vec<usize>,
     cur_function: Option<unicase::Ascii<String>>,
     optimize_output: bool,
     labels: usize,
@@ -37,6 +32,7 @@ impl AstTransformationVisitor {
     pub fn new(optimize_output: bool, enums: Vec<EnumDefinition>) -> Self {
         Self {
             continue_break_labels: Vec::new(),
+            foreach_label_depths: Vec::new(),
             cur_function: None,
             optimize_output,
             labels: 0,
@@ -156,6 +152,13 @@ impl AstVisitorMut for AstTransformationVisitor {
     }
 
     fn visit_continue_statement(&mut self, _continue_stmt: &crate::ast::ContinueStatement) -> Statement {
+        if self
+            .foreach_label_depths
+            .last()
+            .is_some_and(|depth| self.continue_break_labels.len() == *depth)
+        {
+            return Statement::Continue(_continue_stmt.clone());
+        }
         if self.continue_break_labels.is_empty() {
             return CommentAstNode::create_empty_statement("no continue block");
         }
@@ -163,6 +166,13 @@ impl AstVisitorMut for AstTransformationVisitor {
         GotoStatement::create_empty_statement(continue_label.clone())
     }
     fn visit_break_statement(&mut self, _break_stmt: &crate::ast::BreakStatement) -> Statement {
+        if self
+            .foreach_label_depths
+            .last()
+            .is_some_and(|depth| self.continue_break_labels.len() == *depth)
+        {
+            return Statement::Break(_break_stmt.clone());
+        }
         if self.continue_break_labels.is_empty() {
             return CommentAstNode::create_empty_statement("no break block");
         }
@@ -429,89 +439,19 @@ impl AstVisitorMut for AstTransformationVisitor {
         Statement::Block(BlockStatement::empty(statements))
     }
 
-    /// `FOREACH value IN array` becomes a counting loop over the array's flat element
-    /// order. Rank never enters into it, which matters because this transformation runs
-    /// before the declarations are known. The two functions it counts and reads with are
-    /// the compiler's own: `a[i]` cannot stand in for them because it has to be written
-    /// with one index per dimension.
-    ///
-    /// How many elements there are is settled when the loop starts. That halves how
-    /// often the source is evaluated, which is what a walk over a member chain such as
-    /// `Board.Conferences[0].Areas` spends its time on.
     fn visit_foreach_statement(&mut self, foreach_stmt: &ForEachStatement) -> Statement {
-        let mut statements = Vec::new();
-
-        let loop_label = self.next_label();
-        let continue_label = self.next_label();
-        let break_label = self.next_label();
-
-        // Names the lexer cannot produce, so they can never collide with a user's own.
-        let index = unicase::Ascii::new(format!("*(foreach{})", self.labels));
-        let count = unicase::Ascii::new(format!("*(foreachcount{})", self.labels));
-        let index_expr = IdentifierExpression::create_empty_expression(index.clone());
-        let count_expr = IdentifierExpression::create_empty_expression(count.clone());
+        self.foreach_label_depths.push(self.continue_break_labels.len());
         let collection = foreach_stmt.get_collection().visit_mut(self);
-
-        statements.push(VariableDeclarationStatement::create_empty_statement(
-            crate::executable::VariableType::Integer,
-            vec![
-                VariableSpecifier::empty(index.clone(), Vec::new()),
-                VariableSpecifier::empty(count.clone(), Vec::new()),
-            ],
-        ));
-        statements.push(LetStatement::create_empty_statement(
-            index.clone(),
-            Token::Eq,
-            Vec::new(),
-            ConstantExpression::create_empty_expression(Constant::Integer(0, NumberFormat::Default)),
-        ));
-        statements.push(LetStatement::create_empty_statement(
-            count,
-            Token::Eq,
-            Vec::new(),
-            FunctionCallExpression::create_empty_expression(
-                IdentifierExpression::create_empty_expression(internal_function(FuncOpCode::ElementCount)),
-                vec![collection.clone()],
-            ),
-        ));
-
-        self.continue_break_labels.push((continue_label.clone(), break_label.clone()));
-        statements.push(LabelStatement::create_empty_statement(loop_label.clone()));
-
-        statements.push(IfStatement::create_empty_statement(
-            BinaryExpression::create_empty_expression(crate::ast::BinOp::GreaterEq, index_expr.clone(), count_expr),
-            GotoStatement::create_empty_statement(break_label.clone()),
-        ));
-
-        // The loop variable is a copy; writing it does not reach back into the array.
-        statements.push(LetStatement::create_empty_statement(
-            foreach_stmt.get_identifier().clone(),
-            Token::Eq,
-            Vec::new(),
-            FunctionCallExpression::create_empty_expression(
-                IdentifierExpression::create_empty_expression(internal_function(FuncOpCode::ElementAt)),
-                vec![collection, index_expr.clone()],
-            ),
-        ));
-
-        statements.extend(foreach_stmt.get_statements().iter().map(|s| s.visit_mut(self)));
-
-        statements.push(LabelStatement::create_empty_statement(continue_label.clone()));
-        statements.push(LetStatement::create_empty_statement(
-            index,
-            Token::Eq,
-            Vec::new(),
-            BinaryExpression::create_empty_expression(
-                crate::ast::BinOp::Add,
-                index_expr,
-                ConstantExpression::create_empty_expression(Constant::Integer(1, NumberFormat::Default)),
-            ),
-        ));
-
-        statements.push(GotoStatement::create_empty_statement(loop_label.clone()));
-        statements.push(LabelStatement::create_empty_statement(break_label.clone()));
-        self.continue_break_labels.pop();
-        Statement::Block(BlockStatement::empty(statements))
+        let statements = foreach_stmt.get_statements().iter().map(|statement| statement.visit_mut(self)).collect();
+        self.foreach_label_depths.pop();
+        Statement::ForEach(ForEachStatement::new(
+            foreach_stmt.get_foreach_token().clone(),
+            foreach_stmt.get_identifier_token().clone(),
+            foreach_stmt.get_in_token().clone(),
+            collection,
+            statements,
+            foreach_stmt.get_endforeach_token().clone(),
+        ))
     }
 
     fn visit_let_statement(&mut self, let_stmt: &LetStatement) -> Statement {
@@ -712,7 +652,7 @@ impl AstVisitorMut for AstTransformationVisitor {
                         vec![VariableSpecifier::new(
                             var.get_identifier_token().clone(),
                             None,
-                            vec![DimensionSpecifier::empty(array.get_expressions().len())],
+                            vec![DimensionSpecifier::empty(array.get_expressions().len().saturating_sub(1))],
                             None,
                             None,
                             None,

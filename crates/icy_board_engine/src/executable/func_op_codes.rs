@@ -318,8 +318,8 @@ pub enum FuncOpCode {
     StaticReceiver = -303,
     Board = -304,
     Session = -305,
-    ElementCount = -306,
-    ElementAt = -307,
+    Reserved306 = -306,
+    Reserved307 = -307,
     TOLONG64 = -308,
     TOULONG64 = -309,
     IndexedMember = -310,
@@ -362,8 +362,8 @@ impl FuncOpCode {
                 | FuncOpCode::StaticReceiver
                 | FuncOpCode::Board
                 | FuncOpCode::Session
-                | FuncOpCode::ElementCount
-                | FuncOpCode::ElementAt
+                | FuncOpCode::Reserved306
+                | FuncOpCode::Reserved307
                 | FuncOpCode::TOLONG64
                 | FuncOpCode::TOULONG64
                 | FuncOpCode::IndexedMember
@@ -3083,23 +3083,20 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 342]> 
             signature: FunctionSignature::FixedParameters(0),
         },
         FunctionDefinition {
-            name: "<element count>",
+            name: "<reserved 306>",
             version: 400,
-            opcode: FuncOpCode::ElementCount,
-            return_type: VariableType::Integer,
-            args: Some(vec![ArgumentDefinition::new("array", VariableType::None)]),
-            signature: FunctionSignature::FixedParameters(1),
+            opcode: FuncOpCode::Reserved306,
+            return_type: VariableType::None,
+            args: None,
+            signature: FunctionSignature::Invalid,
         },
         FunctionDefinition {
-            name: "<element at>",
+            name: "<reserved 307>",
             version: 400,
-            opcode: FuncOpCode::ElementAt,
+            opcode: FuncOpCode::Reserved307,
             return_type: VariableType::None,
-            args: Some(vec![
-                ArgumentDefinition::new("array", VariableType::None),
-                ArgumentDefinition::new("index", VariableType::Integer),
-            ]),
-            signature: FunctionSignature::FixedParameters(2),
+            args: None,
+            signature: FunctionSignature::Invalid,
         },
         FunctionDefinition {
             name: "ToLong",

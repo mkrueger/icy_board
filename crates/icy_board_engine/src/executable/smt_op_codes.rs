@@ -274,8 +274,10 @@ pub enum OpCode {
     FWriteRec = 235,
     StringSplit = 236,
     RegexSplit = 237,
+    ForEach = 238,
+    NextForEach = 239,
 }
-pub const LAST_STMT: i16 = OpCode::RegexSplit as i16;
+pub const LAST_STMT: i16 = OpCode::NextForEach as i16;
 
 impl OpCode {
     pub fn get_definition(self) -> &'static StatementDefinition {
@@ -293,6 +295,8 @@ impl OpCode {
                 | OpCode::FWriteRec
                 | OpCode::StringSplit
                 | OpCode::RegexSplit
+                | OpCode::ForEach
+                | OpCode::NextForEach
         ) {
             400
         } else {
@@ -621,7 +625,7 @@ pub fn format_argument_type_last(arg: &ArgumentDefinition) -> String {
 // "WAIT FOR" == "WAITFOR"
 // "GO SUB"
 // " GO TO"
-pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 243]> = std::sync::LazyLock::new(|| {
+pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 245]> = std::sync::LazyLock::new(|| {
     [
         StatementDefinition {
             // helps to map opcode to array index.
@@ -2654,6 +2658,20 @@ pub static STATEMENT_DEFINITIONS: std::sync::LazyLock<[StatementDefinition; 243]
             opcode: OpCode::RegexSplit,
             args: None,
             sig: StatementSignature::ArgumentsWithVariable(3, 4),
+        },
+        StatementDefinition {
+            name: "<foreach>",
+            version: 400,
+            opcode: OpCode::ForEach,
+            args: None,
+            sig: StatementSignature::Invalid,
+        },
+        StatementDefinition {
+            name: "<next foreach>",
+            version: 400,
+            opcode: OpCode::NextForEach,
+            args: None,
+            sig: StatementSignature::Invalid,
         },
         // Alias section
         // Moving to the end, so that the opcode <--> index mapping is not broken

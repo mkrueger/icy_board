@@ -163,8 +163,8 @@ map.Positions(4).X = 12
 Array fields are part of a record value: assignment copies their contents and
 record equality compares them. Their bounds are fixed by the `TYPE` declaration;
 `REDIM map.Labels, ...` and `map.Labels.Redim(...)` are compile errors.
-They otherwise have the read-only array surface: `map.Labels.Len(1)` reports a
-bound and `FOREACH label IN map.Labels` walks every element. A whole field may
+They otherwise have the read-only array surface: `map.Labels.Len(1)` reports the
+number of elements in that dimension and `FOREACH label IN map.Labels` walks every element. A whole field may
 be assigned from another field only when element type, rank and all bounds match;
 use an index whenever a scalar value is required.
 
@@ -266,7 +266,7 @@ capture groups are zero-based. Group zero is the complete match.
 `Group(index)`, `NamedGroup(name)`, and corresponding `GroupMatched`,
 `GroupStart` and `GroupLength` methods. Named variants use the `Named` prefix.
 `FindAll` returns a dynamic `REGEXMATCH[]` array. Access matches with
-`matches[index]`; `matches.Len()` reports the current upper bound.
+`matches[index]`; `matches.Len()` reports the number of matches.
 
 Replacement strings expand `$1` and `$name`. A zero limit means unlimited;
 negative limits report `ErrKind.Regex` / `ErrCode.Invalid`. `Split` preserves
@@ -1220,10 +1220,10 @@ Policy, DNS, TLS, timeout, size and file failures set `Error.Last()` with
 ## `Len()`  Function (4.00)
 
 ### Function
-With this overload of the len function it's possible to get the length of an array dimension.
-Note: With 400 `Len(arr, 0)` behaves like `Len(arr)`. PPL array declarations
-use upper bounds, so `INTEGER values(10)` makes both calls return `10`.
-For multidimensional arrays, `dim` is zero-based.
+This overload returns the number of elements in one array dimension. PPL array
+declarations still use upper bounds, so `INTEGER values(10)` contains eleven
+elements and `Len(values, 0)` returns `11`. For multidimensional arrays, `dim`
+is zero-based.
 
 ### Syntax
 `Len(array, dim)`
@@ -1282,8 +1282,9 @@ statement, so it stays available as a variable name.
 
 `FOREACH` is the only flat walk there is. Indexing is bound to the rank: `a[i]`
 reads a vector, a matrix wants `a[i, j]` and one index into it is a compile
-error. That check is worth keeping, so the flat step `FOREACH` is built from
-stays the compiler's own and is not a function a PPE can call.
+error. Runtime 4.00 therefore stores `FOREACH`, its next step and its break as
+dedicated bytecodes. The VM keeps the flat row-major iterator state; there are
+no hidden element-count or element-access functions a PPE can call.
 
 ## Array members (4.00)
 
@@ -1319,13 +1320,13 @@ Everything built in that takes an array first may also be written as a member of
 that array, whichever reads better at the call site. The two spellings are the
 same call, so neither can drift from the other.
 
-| Member | The same as |
+| Member | Meaning |
 | :--- | :--- |
-| `a.Len()` | `Len(a, 0)` |
-| `a.Len(dim)` | `Len(a, dim)` |
-| `a.Redim(n)` | `REDIM a, n` |
-| `a.Redim(n1, n2)` | `REDIM a, n1, n2` |
-| `a.Redim(n1, n2, n3)` | `REDIM a, n1, n2, n3` |
+| `a.Len()` | Total number of elements across all dimensions |
+| `a.Len(dim)` | Number of elements in one zero-based dimension |
+| `a.Redim(n)` | Same as `REDIM a, n` |
+| `a.Redim(n1, n2)` | Same as `REDIM a, n1, n2` |
+| `a.Redim(n1, n2, n3)` | Same as `REDIM a, n1, n2, n3` |
 
 ```PPL
 INTEGER values[10]
@@ -1339,8 +1340,8 @@ is the declaration that says it has them; asking a plain value for `.Len()` is a
 compile error. `Redim` is a statement rather than a function, so it stands on a
 line of its own the way `REDIM` does. Array-valued record fields have the fixed
 bounds stored in their record type and cannot use either spelling of `REDIM`.
-As in classic PPL, `Len()` reports the upper bound rather than the element
-count; after `Redim(20)`, valid indices are 0 through 20.
+`Len()` reports the element count; after `Redim(20)`, it returns 21 and valid
+indices are 0 through 20. Empty dynamic arrays report zero.
 
 ## `CONST` Declaration (3.50)
 

@@ -180,6 +180,16 @@ enum ResolvedLValuePathStep {
     IndexedMember(usize, usize, usize, usize),
 }
 
+struct ForEachFrame {
+    variable: usize,
+    collection: VariableValue,
+    index: usize,
+    count: usize,
+    body_start: usize,
+    end: usize,
+    call_depth: usize,
+}
+
 impl ReturnAddress {
     pub fn gosub(cur_ptr: usize) -> ReturnAddress {
         ReturnAddress { ptr: cur_ptr, id: 0 }
@@ -228,6 +238,7 @@ pub struct VirtualMachine<'a> {
 
     pub label_table: HashMap<usize, usize>,
     pub push_pop_stack: Vec<VariableValue>,
+    foreach_stack: Vec<ForEachFrame>,
 
     pub stored_screen: Option<TextBuffer>,
 
@@ -290,6 +301,7 @@ impl<'a> VirtualMachine<'a> {
             write_back_stack: Vec::new(),
             user_types: Vec::new(),
             push_pop_stack: Vec::new(),
+            foreach_stack: Vec::new(),
             stored_screen: None,
             fd_default_in: 0,
             fd_default_out: 0,
@@ -1053,6 +1065,7 @@ impl VirtualMachine<'_> {
     async fn execute_statement(&mut self, stmt: &PPECommand) -> Res<()> {
         match stmt {
             PPECommand::End => {
+                self.foreach_stack.clear();
                 self.is_running = false;
             }
 
@@ -1066,6 +1079,8 @@ impl VirtualMachine<'_> {
             }
 
             PPECommand::EndFunc | PPECommand::EndProc | PPECommand::Return => {
+                let call_depth = self.return_addresses.len();
+                self.foreach_stack.retain(|frame| frame.call_depth < call_depth);
                 if let Some(addr) = self.return_addresses.pop() {
                     self.cur_ptr = addr.get_ptr();
                     let proc_id = addr.get_id();
@@ -1147,6 +1162,7 @@ impl VirtualMachine<'_> {
                     None => self.eval_expr(expr).await?,
                 };
                 if !value.as_bool() {
+                    self.cleanup_foreach_for_jump(*label);
                     self.goto(*label)?;
                 }
             }
@@ -1178,6 +1194,7 @@ impl VirtualMachine<'_> {
             }
 
             PPECommand::Goto(label) => {
+                self.cleanup_foreach_for_jump(*label);
                 self.goto(*label)?;
             }
             PPECommand::Gosub(label) => {
@@ -1212,9 +1229,94 @@ impl VirtualMachine<'_> {
                 };
                 self.set_variable(variable, val).await?;
             }
+            PPECommand::ForEach(variable, collection, end) => {
+                let collection = self.eval_array_operand(collection).await?;
+                let count = self.foreach_element_count(&collection).await?;
+                if count == 0 {
+                    self.goto(*end)?;
+                } else {
+                    let element = self.foreach_element_at(&collection, 0).await?;
+                    self.variable_table.set_value(*variable, element);
+                    let body_start = self.script.statements.get(self.cur_ptr).map_or(*end, |statement| statement.span.start * 2);
+                    self.foreach_stack.push(ForEachFrame {
+                        variable: *variable,
+                        collection,
+                        index: 0,
+                        count,
+                        body_start,
+                        end: *end,
+                        call_depth: self.return_addresses.len(),
+                    });
+                }
+            }
+            PPECommand::NextForEach(start) => {
+                let Some(frame) = self.foreach_stack.last_mut() else {
+                    return Err(VMError::InternalVMError.into());
+                };
+                frame.index += 1;
+                if frame.index >= frame.count {
+                    let end = frame.end;
+                    self.foreach_stack.pop();
+                    self.goto(end)?;
+                } else {
+                    let variable = frame.variable;
+                    let index = frame.index;
+                    let collection = frame.collection.clone();
+                    let element = self.foreach_element_at(&collection, index).await?;
+                    self.variable_table.set_value(variable, element);
+                    self.goto(*start)?;
+                }
+            }
         }
 
         Ok(())
+    }
+
+    async fn foreach_element_count(&mut self, collection: &VariableValue) -> Res<usize> {
+        let count = match &collection.generic_data {
+            GenericVariableData::Dim1(items) => items.len(),
+            GenericVariableData::Dim2(items) => items.iter().map(Vec::len).sum(),
+            GenericVariableData::Dim3(items) => items.iter().flatten().map(Vec::len).sum(),
+            GenericVariableData::UserData(object) => {
+                return Ok(object
+                    .clone()
+                    .get_property_value(self, &crate::icy_board::state::ppl_collection::COUNT)?
+                    .as_int()
+                    .max(0) as usize);
+            }
+            _ => 1,
+        };
+        Ok(count)
+    }
+
+    async fn foreach_element_at(&mut self, collection: &VariableValue, index: usize) -> Res<VariableValue> {
+        let element = match &collection.generic_data {
+            GenericVariableData::Dim1(items) => items.get(index).cloned(),
+            GenericVariableData::Dim2(items) => items.iter().flatten().nth(index).cloned(),
+            GenericVariableData::Dim3(items) => items.iter().flatten().flatten().nth(index).cloned(),
+            GenericVariableData::UserData(object) => {
+                return object
+                    .clone()
+                    .call_function(
+                        self,
+                        &crate::icy_board::state::ppl_collection::GET,
+                        &[VariableValue::new_int(index as i32)],
+                    )
+                    .await;
+            }
+            _ if index == 0 => Some(collection.clone()),
+            _ => None,
+        };
+        Ok(element.unwrap_or_else(|| collection.vtype.create_empty_value()))
+    }
+
+    fn cleanup_foreach_for_jump(&mut self, target: usize) {
+        let call_depth = self.return_addresses.len();
+        while self.foreach_stack.last().is_some_and(|frame| {
+            frame.call_depth == call_depth && !(frame.body_start <= target && target < frame.end)
+        }) {
+            self.foreach_stack.pop();
+        }
     }
 
     #[allow(clippy::needless_range_loop)]

@@ -187,6 +187,20 @@ impl PPEVisitor<()> for PPEOutputVisitor {
         value.visit(self);
     }
 
+    fn visit_foreach(&mut self, variable: usize, collection: &PPEExpr, end: usize) {
+        self.output_keyword("FOREACH ");
+        self.visit_value(variable);
+        self.output_keyword(" IN ");
+        collection.visit(self);
+        self.output_keyword(" END ");
+        self.output_function(end);
+    }
+
+    fn visit_next_foreach(&mut self, start: usize) {
+        self.output_keyword("NEXTFOREACH ");
+        self.output_function(start);
+    }
+
     fn visit_script(&mut self, _script: &PPEScript) {
         todo!();
     }

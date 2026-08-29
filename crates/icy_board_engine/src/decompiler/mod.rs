@@ -8,7 +8,8 @@ use reconstruct::strip_unused_labels;
 use crate::{
     Res,
     ast::{
-        Ast, AstNode, BinOp, BinaryExpression, BlockStatement, CommentAstNode, Constant, ConstantExpression, Expression, FunctionCallExpression,
+        Ast, AstNode, BinOp, BinaryExpression, BlockStatement, BreakStatement, CommentAstNode, Constant, ConstantExpression, ContinueStatement, Expression,
+        ForEachStatement, FunctionCallExpression,
         FunctionDeclarationAstNode, FunctionImplementation, GosubStatement, GotoStatement, IdentifierExpression, IfStatement, IndexerExpression,
         LabelStatement, LetStatement, MemberCallStatement, MemberReferenceExpression, OnErrorMode, OnErrorStatement, ParameterSpecifier, ParensExpression,
         PredefinedCallStatement, ProcedureCallStatement, ProcedureDeclarationAstNode, ProcedureImplementation, Statement, TypeDeclarationAstNode,
@@ -158,6 +159,11 @@ impl Decompiler {
 
             if let Some(func) = self.function_lookup.get(&byte_offset) {
                 self.parse_function(*func);
+                continue;
+            }
+
+            if matches!(statement.command, PPECommand::ForEach(_, _, _)) {
+                statements.push(self.decompile_foreach());
                 continue;
             }
 
@@ -634,6 +640,12 @@ impl Decompiler {
                 let expr = Statement::try_boolean_conversion(&expr);
                 IfStatement::create_empty_statement(expr.negate_expression(), GotoStatement::create_empty_statement(self.get_label_name(*label)))
             }
+            PPECommand::ForEach(variable, collection, end) => CommentAstNode::create_empty_statement(format!(
+                " FOREACH {} IN {} END {end:04X}",
+                self.get_variable_name(*variable),
+                self.decompile_expression(collection)
+            )),
+            PPECommand::NextForEach(start) => CommentAstNode::create_empty_statement(format!(" NEXT FOREACH {start:04X}")),
             PPECommand::ProcedureCall(p, args) => {
                 ProcedureCallStatement::create_empty_statement(self.get_variable_name(*p), args.iter().map(|e| self.decompile_expression(e)).collect())
             }
@@ -706,6 +718,48 @@ impl Decompiler {
         }
     }
 
+    fn decompile_foreach(&mut self) -> Statement {
+        let PPECommand::ForEach(variable, collection, end) = self.script.statements[self.cur_ptr].command.clone() else {
+            unreachable!("decompile_foreach called on another command")
+        };
+        let variable = self.get_variable_name(variable);
+        let collection = self.decompile_expression(&collection);
+        self.cur_ptr += 1;
+        let mut body = Vec::new();
+        while self.cur_ptr < self.script.statements.len() {
+            let statement = &self.script.statements[self.cur_ptr];
+            let byte_offset = statement.span.start * 2;
+            if byte_offset >= end {
+                break;
+            }
+            if self.label_lookup.contains_key(&byte_offset) {
+                self.used_labels.insert(byte_offset);
+                body.push(LabelStatement::create_empty_statement(self.get_label_name(byte_offset)));
+            }
+            match &statement.command {
+                PPECommand::ForEach(_, _, _) => body.push(self.decompile_foreach()),
+                PPECommand::NextForEach(_) if statement.span.end * 2 == end => {
+                    self.cur_ptr += 1;
+                    break;
+                }
+                PPECommand::NextForEach(_) => {
+                    body.push(ContinueStatement::create_empty_statement());
+                    self.cur_ptr += 1;
+                }
+                // A jump to the loop end leaves the iterator behind, which is what BREAK does.
+                PPECommand::Goto(target) if *target == end => {
+                    body.push(BreakStatement::create_empty_statement());
+                    self.cur_ptr += 1;
+                }
+                command => {
+                    body.push(self.decompile_statement(command));
+                    self.cur_ptr += 1;
+                }
+            }
+        }
+        ForEachStatement::create_empty_statement(variable, collection, body)
+    }
+
     fn get_label_name(&self, label: usize) -> unicase::Ascii<String> {
         if let Some(name) = self.label_lookup.get(&label) {
             unicase::Ascii::new(format!("LABEL{:03}", *name + 1))
@@ -719,8 +773,8 @@ impl Decompiler {
     }
 
     fn parse_function(&mut self, func: usize) {
-        let entry = self.executable.variable_table.get_var_entry(func);
-        let mut func_body = self.generate_local_variable_declarations(entry);
+        let entry = self.executable.variable_table.get_var_entry(func).clone();
+        let mut func_body = self.generate_local_variable_declarations(&entry);
         while self.cur_ptr < self.script.statements.len() {
             let statement = &self.script.statements[self.cur_ptr];
             let byte_offset = statement.span.start * 2;
@@ -731,7 +785,7 @@ impl Decompiler {
 
             if matches!(statement.command, PPECommand::EndFunc) || matches!(statement.command, PPECommand::EndProc) {
                 if entry.header.variable_type == VariableType::Function {
-                    let parameters = self.generate_parameter_list(entry);
+                    let parameters = self.generate_parameter_list(&entry);
                     let return_value = self
                         .executable
                         .variable_table
@@ -751,12 +805,17 @@ impl Decompiler {
                     );
                     self.functions.push(AstNode::Function(func_impl));
                 } else {
-                    let parameters = self.generate_parameter_list(entry);
+                    let parameters = self.generate_parameter_list(&entry);
                     let proc_impl = ProcedureImplementation::empty(func, unicase::Ascii::new(entry.name.clone()), parameters, func_body);
                     self.functions.push(AstNode::Procedure(proc_impl));
                 }
                 self.cur_ptr += 1;
                 break;
+            }
+
+            if matches!(statement.command, PPECommand::ForEach(_, _, _)) {
+                func_body.push(self.decompile_foreach());
+                continue;
             }
 
             func_body.push(self.decompile_statement(&statement.command));
@@ -1018,4 +1077,10 @@ impl PPEVisitor<()> for VariableConstantVisitor<'_> {
         target.visit(self);
         value.visit(self);
     }
+
+    fn visit_foreach(&mut self, _variable: usize, collection: &PPEExpr, _end: usize) {
+        collection.visit(self);
+    }
+
+    fn visit_next_foreach(&mut self, _start: usize) {}
 }

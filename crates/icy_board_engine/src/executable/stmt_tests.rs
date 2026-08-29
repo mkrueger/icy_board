@@ -97,6 +97,14 @@ fn regex_split_keeps_its_append_only_encoding() {
 }
 
 #[test]
+fn foreach_statements_keep_their_append_only_encoding() {
+    assert_eq!(OpCode::ForEach as i16, 238);
+    assert_eq!(OpCode::NextForEach as i16, 239);
+    test_serialize(&PPECommand::ForEach(2, Box::new(PPEExpr::Value(3)), 20), &[238, 2, 3, 0, 0, 20]);
+    test_serialize(&PPECommand::NextForEach(10), &[239, 10]);
+}
+
+#[test]
 fn test_let_serialization() {
     let val = PPECommand::Let(Box::new(PPEExpr::Value(2)), Box::new(PPEExpr::Value(3)));
     test_serialize(&val, &[OpCode::LET as i16, 2, 0, 3, 0, 0]);

@@ -113,7 +113,7 @@ fn record_literal_scalar_fields_reject_whole_arrays() {
 #[test]
 fn record_literal_array_fields_accept_the_same_shape() {
     assert_eq!(
-        "7 1",
+        "7 2",
         run_ppl(
             "TYPE Rec\n  INTEGER Values(1)\nENDTYPE\nRec source\nRec target\nsource.Values(1) = 7\ntarget = Rec { Values = source.Values }\nPRINT target.Values(1), \" \", target.Values.Len()\n"
         )

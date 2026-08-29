@@ -731,6 +731,10 @@ impl VariableTable {
             super::PPECommand::Let(variable, _) => {
                 self.report_usage(variable);
             }
+            super::PPECommand::ForEach(variable, collection, _) => {
+                self.report_usage(&super::PPEExpr::Value(*variable));
+                self.report_usage(collection);
+            }
             _ => {}
         }
     }

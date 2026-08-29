@@ -83,9 +83,9 @@ pub async fn len(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableV
     let str = vm.eval_expr(&args[0]).await?;
     let val = match str.generic_data {
         GenericVariableData::String(str) => str.chars().count(),
-        GenericVariableData::Dim1(items) => items.len() - 1,
-        GenericVariableData::Dim2(items) => items.len() - 1,
-        GenericVariableData::Dim3(items) => items.len() - 1,
+        GenericVariableData::Dim1(items) => items.len(),
+        GenericVariableData::Dim2(items) => items.iter().map(Vec::len).sum(),
+        GenericVariableData::Dim3(items) => items.iter().flatten().map(Vec::len).sum(),
         GenericVariableData::Password(p) => {
             match p {
                 Password::PlainText(s) => s.chars().count(),
@@ -105,6 +105,10 @@ pub async fn len_dim(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
     let arr = vm.eval_array_operand(&args[0]).await?;
     let dim = vm.eval_expr(&args[1]).await?.as_int();
 
+    if dim < 0 {
+        return Ok(VariableValue::new_int(count_elements(&arr) as i32));
+    }
+
     let val = match &arr.generic_data {
         GenericVariableData::String(str) => {
             if dim == 0 {
@@ -114,18 +118,18 @@ pub async fn len_dim(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
             }
         }
         GenericVariableData::Dim1(items) => match dim {
-            0 => items.len().saturating_sub(1),
+            0 => items.len(),
             _ => 0,
         },
         GenericVariableData::Dim2(items) => match dim {
-            0 => items.len().saturating_sub(1),
-            1 => items.first().map_or(0, |row| row.len().saturating_sub(1)),
+            0 => items.len(),
+            1 => items.first().map_or(0, Vec::len),
             _ => 0,
         },
         GenericVariableData::Dim3(items) => match dim {
-            0 => items.len().saturating_sub(1),
-            1 => items.first().map_or(0, |plane| plane.len().saturating_sub(1)),
-            2 => items.first().and_then(|plane| plane.first()).map_or(0, |row| row.len().saturating_sub(1)),
+            0 => items.len(),
+            1 => items.first().map_or(0, Vec::len),
+            2 => items.first().and_then(|plane| plane.first()).map_or(0, Vec::len),
             _ => 0,
         },
         GenericVariableData::Password(_) => {
@@ -153,79 +157,6 @@ fn count_elements(value: &VariableValue) -> usize {
         GenericVariableData::Dim3(items) => items.iter().flatten().map(Vec::len).sum(),
         _ => 1,
     }
-}
-
-/// The element at a flat index, counted row-major.
-fn element_of(value: &VariableValue, index: usize) -> Option<VariableValue> {
-    match &value.generic_data {
-        GenericVariableData::Dim1(items) => items.get(index).cloned(),
-        GenericVariableData::Dim2(items) => {
-            let width = items.first().map_or(0, Vec::len);
-            index
-                .checked_div(width)
-                .and_then(|row| items.get(row))
-                .and_then(|row| row.get(index % width))
-                .cloned()
-        }
-        GenericVariableData::Dim3(items) => {
-            let height = items.first().map_or(0, Vec::len);
-            let width = items.first().and_then(|plane| plane.first()).map_or(0, Vec::len);
-            let plane_size = height * width;
-            index
-                .checked_div(plane_size)
-                .and_then(|plane| items.get(plane))
-                .and_then(|plane| plane.get(index % plane_size / width))
-                .and_then(|row| row.get(index % width))
-                .cloned()
-        }
-        _ if index == 0 => Some(value.clone()),
-        _ => None,
-    }
-}
-
-/// How many elements an array holds over all of its dimensions, so a caller can walk
-/// one without knowing its rank. A value that is not an array counts as one element.
-pub async fn element_count(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    // A whole array is worth borrowing rather than cloning: this runs once per step of
-    // every FOREACH, so cloning here would make walking a list cost its length squared.
-    if let PPEExpr::Value(id) = &args[0] {
-        let value = vm.variable_table.get_value(*id);
-        if !matches!(value.generic_data, GenericVariableData::UserData(_)) {
-            return Ok(VariableValue::new_int(count_elements(value) as i32));
-        }
-    }
-    let arr = vm.eval_expr(&args[0]).await?;
-    if let GenericVariableData::UserData(object) = &arr.generic_data {
-        let object = object.clone();
-        return object.get_property_value(vm, &crate::icy_board::state::ppl_collection::COUNT);
-    }
-    Ok(VariableValue::new_int(count_elements(&arr) as i32))
-}
-
-/// The element at a flat index, counted row-major, so the rank stays out of the way.
-/// An index no element has answers with an empty value of the array's own type.
-pub async fn element_at(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let index = vm.eval_expr(&args[1]).await?.as_int();
-    if let PPEExpr::Value(id) = &args[0] {
-        let arr = vm.variable_table.get_value(*id);
-        if !matches!(arr.generic_data, GenericVariableData::UserData(_)) {
-            if index < 0 {
-                return Ok(arr.vtype.create_empty_value());
-            }
-            return Ok(element_of(arr, index as usize).unwrap_or_else(|| arr.vtype.create_empty_value()));
-        }
-    }
-    let arr = vm.eval_expr(&args[0]).await?;
-    if let GenericVariableData::UserData(object) = &arr.generic_data {
-        let object = object.clone();
-        return object
-            .call_function(vm, &crate::icy_board::state::ppl_collection::GET, &[VariableValue::new_int(index)])
-            .await;
-    }
-    if index < 0 {
-        return Ok(arr.vtype.create_empty_value());
-    }
-    Ok(element_of(&arr, index as usize).unwrap_or_else(|| arr.vtype.create_empty_value()))
 }
 
 /// Returns the lowercase equivalent of a string

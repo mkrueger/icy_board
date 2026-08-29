@@ -128,6 +128,8 @@ pub enum PPECommand {
     Let(Box<PPEExpr>, Box<PPEExpr>),
     MemberCall(Box<PPEExpr>),
     OnError(OnErrorTarget),
+    ForEach(usize, Box<PPEExpr>, usize),
+    NextForEach(usize),
 }
 
 /// Where `ON ERROR` sends the program. The label is patched like a `GOTO` label is,
@@ -209,6 +211,17 @@ impl PPECommand {
                 expr.serialize(vec);
                 vec.push(0);
                 vec.push(*label as i16);
+            }
+            PPECommand::ForEach(variable, collection, end) => {
+                vec.push(OpCode::ForEach as i16);
+                vec.push(*variable as i16);
+                collection.serialize(vec);
+                vec.push(0);
+                vec.push(*end as i16);
+            }
+            PPECommand::NextForEach(start) => {
+                vec.push(OpCode::NextForEach as i16);
+                vec.push(*start as i16);
             }
             PPECommand::PredefinedCall(def, args) => {
                 vec.push(def.opcode as i16);
@@ -312,8 +325,10 @@ impl PPECommand {
             PPECommand::End | PPECommand::Return | PPECommand::EndFunc | PPECommand::EndProc | PPECommand::Stop => 1,
 
             PPECommand::Goto(_) | PPECommand::Gosub(_) => 2,
+            PPECommand::NextForEach(_) => 2,
             PPECommand::OnError(_) => 3,
             PPECommand::IfNot(expr, _) => 1 + expr.get_size() + 2,
+            PPECommand::ForEach(_, collection, _) => 4 + collection.get_size(),
             PPECommand::ProcedureCall(_, args) => 3 + PPEExpr::count_size(args) + args.len(),
             PPECommand::PredefinedCall(def, args) => match def.sig {
                 super::StatementSignature::ArgumentsWithVariable(var_index, _) => 1 + PPEExpr::count_size(args) + args.len() - usize::from(var_index > 0),
@@ -350,6 +365,8 @@ impl PPECommand {
             PPECommand::Stop => visitor.visit_stop(),
             PPECommand::Let(target, value) => visitor.visit_let(target, value),
             PPECommand::MemberCall(expr) => expr.visit(visitor),
+            PPECommand::ForEach(variable, collection, end) => visitor.visit_foreach(*variable, collection, *end),
+            PPECommand::NextForEach(start) => visitor.visit_next_foreach(*start),
         }
     }
 }
@@ -595,6 +612,8 @@ pub trait PPEVisitor<T>: Sized {
     fn visit_end_proc(&mut self) -> T;
     fn visit_stop(&mut self) -> T;
     fn visit_let(&mut self, target: &PPEExpr, value: &PPEExpr) -> T;
+    fn visit_foreach(&mut self, variable: usize, collection: &PPEExpr, end: usize) -> T;
+    fn visit_next_foreach(&mut self, start: usize) -> T;
 }
 
 #[allow(unused_variables)]
@@ -801,6 +820,14 @@ impl PPEVisitor<Result<VariableValue, PPEError>> for PPEConstantValueVisitor<'_>
 
     fn visit_let(&mut self, _target: &PPEExpr, _value: &PPEExpr) -> Result<VariableValue, PPEError> {
         todo!()
+    }
+
+    fn visit_foreach(&mut self, _variable: usize, collection: &PPEExpr, _end: usize) -> Result<VariableValue, PPEError> {
+        collection.visit(self)
+    }
+
+    fn visit_next_foreach(&mut self, _start: usize) -> Result<VariableValue, PPEError> {
+        Err(PPEError::OnlyConstantsAllowed)
     }
 }
 

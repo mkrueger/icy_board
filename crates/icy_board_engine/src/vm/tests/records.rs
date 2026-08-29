@@ -170,7 +170,7 @@ fn test_record_array_field_sizes_are_fixed() {
 #[test]
 fn test_record_array_fields_answer_len() {
     assert_eq!(
-        "1 3 2",
+        "2 4 3",
         run_ppl(
             r#"
 TYPE Inner
@@ -290,7 +290,7 @@ fn test_whole_array_field_assignment_through_an_index_checks_its_shape() {
 #[test]
 fn test_a_whole_array_field_can_be_copied_through_an_index() {
     assert_eq!(
-        "7 2",
+        "7 3",
         run_ppl(
             r#"
 TYPE Item

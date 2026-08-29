@@ -265,7 +265,7 @@ fn test_an_invalid_conference_number_still_returns_a_conference() {
 }
 
 #[test]
-fn test_len_dimension_returns_each_declared_upper_bound() {
+fn test_len_dimension_returns_each_dimension_element_count() {
     let output = run_ppl(
         r#"
         INTEGER one(10)
@@ -274,7 +274,7 @@ fn test_len_dimension_returns_each_declared_upper_bound() {
         PRINT one.Len(), " ", LEN(one, 0), " ", LEN(two, 0), " ", LEN(two, 1), " ", LEN(three, 0), " ", LEN(three, 1), " ", LEN(three, 2)
     "#,
     );
-    assert_eq!(output, "10 10 2 3 1 2 3");
+    assert_eq!(output, "11 11 3 4 2 3 4");
 }
 
 /// An object is held by the values that name it rather than by a table that only

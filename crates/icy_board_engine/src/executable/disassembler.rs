@@ -372,6 +372,27 @@ impl PPEVisitor<()> for DisassembleVisitor<'_> {
         value.visit(self);
     }
 
+    fn visit_foreach(&mut self, variable: usize, collection: &PPEExpr, end: usize) {
+        Self::output_op_code(OpCode::ForEach);
+        let _ = execute!(stdout(), Print(" "));
+        self.visit_value(variable);
+        let _ = execute!(stdout(), SetForegroundColor(Color::Yellow), Print(" IN "), SetAttribute(Attribute::Reset));
+        collection.visit(self);
+        let _ = execute!(
+            stdout(),
+            SetForegroundColor(Color::Yellow),
+            Print(" END "),
+            SetForegroundColor(Color::Cyan),
+            Print(format!("{{{end:04X}}}")),
+            SetAttribute(Attribute::Reset),
+        );
+    }
+
+    fn visit_next_foreach(&mut self, start: usize) {
+        Self::output_op_code(OpCode::NextForEach);
+        let _ = execute!(stdout(), Print(format!(" {{{start:04X}}}")));
+    }
+
     fn visit_script(&mut self, script: &PPEScript) {
         print_disassemble_header();
         for stmt in &script.statements {

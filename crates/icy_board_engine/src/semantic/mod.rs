@@ -137,7 +137,7 @@ pub const ARRAY_MEMBERS: &[ArrayMember] = &[ArrayMember {
     name: "Len",
     opcode: FuncOpCode::Len_Dim,
     arguments: 0..=1,
-    defaults: &[0],
+    defaults: &[-1],
     return_type: VariableType::Integer,
 }];
 
@@ -2912,7 +2912,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                             return res;
                         }
                         self.function_type_lookup.insert(call.id, SemanticInfo::PredefinedFunc(def.opcode));
-                        if !matches!(def.opcode, FuncOpCode::Len_Dim | FuncOpCode::ElementCount | FuncOpCode::ElementAt) {
+                        if def.opcode != FuncOpCode::Len_Dim {
                             for argument in call.get_arguments() {
                                 self.reject_bare_array_value(argument);
                             }
@@ -3354,6 +3354,19 @@ impl AstVisitor<VariableType> for SemanticVisitor {
         VariableType::None
     }
 
+    fn visit_foreach_statement(&mut self, foreach_stmt: &crate::ast::ForEachStatement) -> VariableType {
+        if let Some(index) = self.lookup_variable(foreach_stmt.get_identifier()) {
+            self.add_reference_to(foreach_stmt.get_identifier_token(), index);
+        } else {
+            self.errors.lock().unwrap().report_error(
+                foreach_stmt.get_identifier_token().span.clone(),
+                CompilationErrorType::VariableNotFound(foreach_stmt.get_identifier().to_string()),
+            );
+        }
+        crate::ast::walk_foreach_stmt(self, foreach_stmt);
+        VariableType::None
+    }
+
     fn visit_case_specifier(&mut self, case_specifier: &crate::ast::CaseSpecifier) -> VariableType {
         match case_specifier {
             crate::ast::CaseSpecifier::Expression(expression) => {
@@ -3439,7 +3452,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 for expr in arr_expr.get_expressions() {
                     expr.visit(self);
                 }
-                (1, arr_expr.get_expressions().len())
+                (1, arr_expr.get_expressions().len().saturating_sub(1))
             } else {
                 (v.get_dimensions().len() as u8, v.get_vector_size())
             };

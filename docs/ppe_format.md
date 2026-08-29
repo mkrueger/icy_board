@@ -216,6 +216,21 @@ Runtime 400's indexed-member expression stores a member id followed by a rank
 and that many index expressions. The rank must be 1 to 3. A missing operand or a
 rank outside that range is rejected as malformed bytecode before the VM runs it.
 
+Runtime 400 stores `FOREACH` structurally instead of lowering it to hidden
+function calls and temporary variables:
+
+```text
+238 FOREACH       variable-id, collection-expression, end-byte-offset
+239 NEXTFOREACH   body-byte-offset
+```
+
+`FOREACH` evaluates the collection once and creates a VM iterator frame.
+`NEXTFOREACH` advances its flat row-major index and jumps to the body while an
+element remains. The stored targets are byte offsets, like `GOTO` targets.
+
+`BREAK` needs no opcode of its own: it compiles to a `GOTO` onto the loop end,
+and any jump leaving the body discards the iterator frame.
+
 ```text
 packed = (bytes remaining) != (code size)
 ```
