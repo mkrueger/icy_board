@@ -232,6 +232,28 @@ fn downloads_are_committed_only_after_success() {
 }
 
 #[test]
+fn a_download_response_cannot_save_or_decode_an_unretained_body() {
+    let response = "HTTP/1.1 200 OK\r\nContent-Length: 4\r\nConnection: close\r\n\r\ndata";
+    let (origin, _request, server) = serve(vec![response.to_string()]);
+    let source = format!(
+        "HttpResponse response = Http.Download(\"{origin}/file\", \"download.bin\")\nSTRING text = response.Text()\nERRCODE textError = Error.Last().Code\nError.Clear()\nBOOLEAN saved = response.Save(\"copy.bin\")\nPRINT response.Size, \" \", text.Len(), \" \", textError = ErrCode.Invalid, \" \", saved, \" \", EXIST(\"copy.bin\")"
+    );
+    assert_eq!("4 0 1 0 0", run_ppl_on(&source, |board| allow_origin(board, &origin)));
+    server.join().unwrap();
+}
+
+#[test]
+fn an_empty_retained_response_body_can_be_decoded_and_saved() {
+    let response = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+    let (origin, _request, server) = serve(vec![response.to_string()]);
+    let source = format!(
+        "HttpResponse response = Http.Get(\"{origin}/empty\")\nSTRING text = response.Text()\nBOOLEAN saved = response.Save(\"empty.bin\")\nPRINT text.Len(), \" \", saved, \" \", EXIST(\"empty.bin\"), \" \", Error.Last().OK"
+    );
+    assert_eq!("0 1 1 1", run_ppl_on(&source, |board| allow_origin(board, &origin)));
+    server.join().unwrap();
+}
+
+#[test]
 fn a_download_to_an_absolute_temp_path_lands_where_it_was_asked_to() {
     let response = "HTTP/1.1 200 OK\r\nContent-Length: 4\r\nConnection: close\r\n\r\ndata";
     let (origin, _request, server) = serve(vec![response.to_string()]);

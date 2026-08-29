@@ -1176,7 +1176,9 @@ PRINTLN response.Text()
 properties are `Status`, `FinalUrl`, `Size` and `ContentType`. `Save(path)`
 writes a body already held by a response. `Http.Download(url, path)` streams a
 successful response through a temporary file and replaces the destination only
-after the complete body arrives.
+after the complete body arrives. Its successful response reports status and
+size but does not retain another copy of the body; calling `Text()` or `Save()`
+on that response reports `ErrCode.Invalid`.
 
 `Text()` decodes the body strictly as UTF-8 and returns a `STRING`. A body in any
 other character encoding reports `ErrKind.Net` with `ErrCode.Format`; use

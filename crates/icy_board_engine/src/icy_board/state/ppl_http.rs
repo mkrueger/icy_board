@@ -95,7 +95,7 @@ pub struct PplHttpResponse {
     status: u16,
     final_url: String,
     headers: HashMap<String, String>,
-    body: Vec<u8>,
+    body: Option<Vec<u8>>,
     size: usize,
 }
 
@@ -311,6 +311,7 @@ async fn execute_request(
         let status = response.status();
         validate_headers(options, response.headers(), "response")?;
         let headers = response_headers(response.headers());
+        let retain_body = download.is_none() || !status.is_success();
         let mut body = Vec::new();
         let mut size = 0usize;
         let mut output = if download.is_some() && status.is_success() {
@@ -339,7 +340,7 @@ async fn execute_request(
             status: status.as_u16(),
             final_url: url.to_string(),
             headers,
-            body,
+            body: retain_body.then_some(body),
             size,
         });
     }
@@ -770,7 +771,15 @@ impl UserDataValue for PplHttpResponse {
         arguments: &[VariableValue],
     ) -> crate::Res<VariableValue> {
         if *name == *TEXT {
-            return match String::from_utf8(self.body.clone()) {
+            if !self.valid {
+                vm.set_error(PplError::new(ERR_KIND_NET, ERR_INVALID, "invalid HTTP response has no body"));
+                return Ok(VariableValue::new_string(String::new()).convert_to(VariableType::BigStr));
+            }
+            let Some(body) = &self.body else {
+                vm.set_error(PplError::new(ERR_KIND_NET, ERR_INVALID, "HTTP response body was not retained"));
+                return Ok(VariableValue::new_string(String::new()).convert_to(VariableType::BigStr));
+            };
+            return match String::from_utf8(body.clone()) {
                 Ok(text) => {
                     vm.operation_succeeded();
                     Ok(VariableValue::new_string(text).convert_to(VariableType::BigStr))
@@ -791,10 +800,14 @@ impl UserDataValue for PplHttpResponse {
                 vm.set_error(PplError::new(ERR_KIND_NET, ERR_INVALID, "invalid HTTP response has no body to save"));
                 return Ok(VariableValue::new_bool(false));
             }
+            let Some(body) = &self.body else {
+                vm.set_error(PplError::new(ERR_KIND_NET, ERR_INVALID, "HTTP response body was not retained"));
+                return Ok(VariableValue::new_bool(false));
+            };
             let file = arguments.first().map(VariableValue::as_string).unwrap_or_default();
             let path = vm.resolve_file(&file).await;
             match DownloadFile::create(&path).and_then(|mut output| {
-                output.write(&self.body)?;
+                output.write(body)?;
                 output.commit()
             }) {
                 Ok(()) => {
