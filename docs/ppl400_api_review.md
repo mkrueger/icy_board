@@ -101,7 +101,7 @@ This sector owns the syntax and value model on which all later sectors depend:
 - `AreaId()` for lossless conference/message-area addressing
 - `Base64Enc()`, `Base64Dec()`, `Sha256()` and the six `DOUBLE` math functions
 - line-oriented `FGETREC`/`FPUTREC` and framed binary `FREADREC`/`FWRITEREC`
-- discoverable `STRING`/`BIGSTR` members plus static `Join`, `Repeat` and `Split`
+- discoverable `STRING` members plus static `Join`, `Repeat` and `Split`
 - compiled `REGEX` matching with capture snapshots, match collections, replacement and transactional split
 
 The public functions are intentionally a small utility layer. Member access,

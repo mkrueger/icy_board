@@ -506,7 +506,7 @@ conference without breaking any of the old calls. Public HTTP and HTTPS work by 
 the optional `[ppl_http]` policy can disable it or restrict it to exact origins.
 Responses expose status, headers and bounded bodies while failures report
 `ErrKind.Net`.
-`HttpResponse.Text()` decodes strictly as UTF-8 and returns `BIGSTR`; invalid
+`HttpResponse.Text()` decodes strictly as UTF-8 and returns `STRING`; invalid
 text reports `ErrCode.Format`, while binary or differently encoded data should
 be handled with `Download()` or `Save()`.
 

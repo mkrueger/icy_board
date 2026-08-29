@@ -528,14 +528,15 @@ unchanged, because a call that named the old form still names it.
 String members
 ~~~~~~~~~~~~~~
 
-Language 400 exposes common operations directly on ``STRING`` and ``BIGSTR``
-values. Positions in this member API are zero-based Unicode character positions
-and ``-1`` means no match. The classic ``INSTR`` and ``INSTRR`` functions remain
+Language 400 exposes common operations directly on ``STRING`` values, which are
+not length-limited. ``BIGSTR`` is a deprecated alias kept only for older sources.
+Positions in this member API are zero-based Unicode character positions and
+``-1`` means no match. The classic ``INSTR`` and ``INSTRR`` functions remain
 1-based and return zero when no match is found:
 
 .. code-block:: PPL
 
-    BIGSTR text = "  one,two,two  "
+    STRING text = "  one,two,two  "
     PRINTLN text.Find("two")
     PRINTLN text.Find("two", 7)
     PRINTLN text.FindLast("two")
@@ -555,9 +556,12 @@ The instance members are ``Len()``,
 ``Contains(search [, comparison])``, ``StartsWith(prefix [, comparison])``,
 ``EndsWith(suffix [, comparison])``, ``Count(search [, comparison])``,
 ``Equals(other [, comparison])``, ``Replace(search, replacement)``,
+``Mid(start, length)``, ``Left(count)``, ``Right(count)``,
 ``Trim([characters])``, ``TrimStart([characters])``,
-``TrimEnd([characters])``, ``ToUpper()`` and ``ToLower()``. Transformations
-return ``BIGSTR`` so chaining does not truncate at the ``STRING`` limit.
+``TrimEnd([characters])``, ``ToUpper()`` and ``ToLower()``. ``Mid`` is zero-based,
+unlike the 1-based classic ``MID``; ``Left`` and ``Right`` mirror the classic
+functions. Transformations return ``STRING``; a language 400 ``STRING`` has no
+length limit, so chaining does not truncate.
 
 ``StringComparison.Ordinal`` is the default. Pass
 ``StringComparison.OrdinalIgnoreCase`` as the last argument for Unicode-aware,
@@ -567,12 +571,12 @@ The type name carries aggregation helpers:
 
 .. code-block:: PPL
 
-    BIGSTR parts[] = "a,,b,".Split(",")
+    STRING parts[] = "a,,b,".Split(",")
     PRINTLN STRING.Join(parts, "|")
     PRINTLN STRING.Repeat("-", 40)
     parts = STRING.Split("one:two:three:four", ":", 3)
 
-``Split`` preserves empty elements and returns a dynamic ``BIGSTR[]``. With a
+``Split`` preserves empty elements and returns a dynamic ``STRING[]``. With a
 positive limit, the unsplit remainder is the last element; zero means unlimited.
 An empty separator or negative limit returns an empty array and reports
 ``ErrKind.String`` with ``ErrCode.Invalid``. The result may be assigned, indexed,
@@ -596,7 +600,7 @@ The static members are ``Compile(pattern [, options])``, ``Escape(text)`` and
 ``IsValid(pattern [, options])``. Instances provide ``Valid``, ``Pattern``,
 ``IsMatch(text [, start])``, ``Find(text [, start])``,
 ``FindAll(text [, start [, limit]])``, ``Replace(text, replacement [, limit])``
-and ``Split(text [, limit])``, which returns a dynamic ``BIGSTR[]``.
+and ``Split(text [, limit])``, which returns a dynamic ``STRING[]``.
 
 ``RegexOptions`` contains ``None``, ``IgnoreCase``, ``MultiLine``,
 ``DotMatchesNewLine``, ``IgnoreWhitespace``, ``SwapGreed`` and ``Ascii``.
@@ -612,7 +616,7 @@ complete match.
 
 Replacement strings expand ``$1`` and ``$name``. Zero limits mean unlimited;
 negative limits report ``ErrKind.Regex`` with ``ErrCode.Invalid``. ``Split``
-preserves empty fields and returns a dynamic ``BIGSTR[]``. Match collections
+preserves empty fields and returns a dynamic ``STRING[]``. Match collections
 are limited to 100,000 items and replacement output to 16 MiB.
 
 The engine guarantees linear-time matching and deliberately omits look-around
@@ -749,7 +753,7 @@ through 299, so a 404 remains a valid response with its status and body.
 writes a retained body; ``Http.Download(url, path)`` streams a successful body
 through a temporary file and commits it only after completion.
 
-``Text()`` decodes strictly as UTF-8 and returns a ``BIGSTR``. Binary bodies and
+``Text()`` decodes strictly as UTF-8 and returns a ``STRING``. Binary bodies and
 other character encodings report ``ErrKind.Net`` with ``ErrCode.Format``; use
 ``Download()`` or ``Save()`` when text decoding is not appropriate.
 
