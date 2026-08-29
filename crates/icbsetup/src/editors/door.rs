@@ -164,6 +164,7 @@ impl<'a> DoorEditor<'a> {
             drop_file: Default::default(),
             dos_command: String::new(),
             dos_memory_mb: 64,
+            dos_max_runtime_seconds: 0,
         });
         drop(door_list);
         self.insert_table.content_length += 1;
@@ -425,6 +426,16 @@ impl<'a> Page for DoorEditor<'a> {
                                             .with_update_u32_value(&|(i, list): &(usize, Arc<Mutex<DoorList>>), value: u32| {
                                                 list.lock().unwrap()[*i].dos_memory_mb = value;
                                             }),
+                                    ),
+                                    ConfigEntry::Item(
+                                        ListItem::new(
+                                            "DOS max seconds".to_string(),
+                                            ListValue::U32(action.dos_max_runtime_seconds, 0, 86400),
+                                        )
+                                        .with_label_width(16)
+                                        .with_update_u32_value(&|(i, list): &(usize, Arc<Mutex<DoorList>>), value: u32| {
+                                            list.lock().unwrap()[*i].dos_max_runtime_seconds = value;
+                                        }),
                                     ),
                                 ],
                             });

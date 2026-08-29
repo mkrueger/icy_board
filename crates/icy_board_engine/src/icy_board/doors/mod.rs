@@ -187,6 +187,10 @@ pub struct Door {
 
     #[serde(default = "default_dos_memory_mb")]
     pub dos_memory_mb: u32,
+
+    /// Maximum wall-clock runtime for this DOS door; zero leaves it unlimited.
+    #[serde(default)]
+    pub dos_max_runtime_seconds: u32,
 }
 
 fn default_dos_memory_mb() -> u32 {
@@ -336,6 +340,7 @@ impl DoorList {
                 },
                 dos_command: String::new(),
                 dos_memory_mb: default_dos_memory_mb(),
+                dos_max_runtime_seconds: 0,
             };
             result.doors.push(door);
         }

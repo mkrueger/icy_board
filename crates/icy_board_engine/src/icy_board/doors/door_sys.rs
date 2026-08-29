@@ -18,6 +18,7 @@ pub async fn create_door_sys(state: &IcyBoardState, path: &std::path::Path) -> R
     let _ = write!(contents, "{DOOR_BPS_RATE}\r\n"); // Com Port Speed
     contents.push_str("8\r\n"); // Data bits
     let _ = write!(contents, "{}\r\n", state.node + 1); // Node number
+    let _ = write!(contents, "{DOOR_BPS_RATE}\r\n"); // DTE/locked baud rate
     contents.push_str("Y\r\n"); // Screen display On
     contents.push_str("N\r\n"); // Printer toggle Off
     contents.push_str("N\r\n"); // Page bell Off

@@ -22,6 +22,21 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 static DOS_MACHINE_LOCK: std::sync::LazyLock<tokio::sync::Mutex<()>> = std::sync::LazyLock::new(|| tokio::sync::Mutex::new(()));
 
+fn dos_runtime_remaining(login_date: chrono::DateTime<chrono::Utc>, time_limit: i32, max_runtime_seconds: u32) -> Option<Duration> {
+    let session_remaining = if time_limit == 0 {
+        None
+    } else {
+        let deadline = login_date + chrono::Duration::minutes(time_limit.into());
+        Some((deadline - chrono::Utc::now()).to_std().unwrap_or(Duration::ZERO))
+    };
+    match (session_remaining, max_runtime_seconds) {
+        (Some(remaining), 0) => Some(remaining),
+        (Some(remaining), maximum) => Some(remaining.min(Duration::from_secs(maximum.into()))),
+        (None, 0) => None,
+        (None, maximum) => Some(Duration::from_secs(maximum.into())),
+    }
+}
+
 fn dos_output_for_terminal(bytes: &[u8], utf8: bool) -> Vec<u8> {
     if !utf8 {
         return bytes.to_vec();
@@ -352,6 +367,18 @@ impl IcyBoardState {
         let mut input_encoder = DosInputEncoder::default();
         let startup_timeout = tokio::time::sleep(Duration::from_secs(30));
         tokio::pin!(startup_timeout);
+        let runtime_remaining = dos_runtime_remaining(
+            self.session.login_date,
+            self.session.time_limit,
+            door.dos_max_runtime_seconds,
+        );
+        let session_timeout = async move {
+            match runtime_remaining {
+                Some(remaining) => tokio::time::sleep(remaining).await,
+                None => std::future::pending().await,
+            }
+        };
+        tokio::pin!(session_timeout);
         let mut received_output = false;
         loop {
             tokio::select! {
@@ -392,6 +419,16 @@ impl IcyBoardState {
                         image_path.display()
                     )
                     .into());
+                }
+                _ = &mut session_timeout => {
+                    if !session.stop().await {
+                        log::error!(
+                            "native DOS emulator for '{}' did not stop within 5 seconds after its runtime limit",
+                            door.name
+                        );
+                    }
+                    self.check_time_left().await;
+                    break;
                 }
             }
         }
@@ -578,7 +615,11 @@ pub enum BBSLinkError {
 
 #[cfg(test)]
 mod test {
-    use crate::icy_board::state::user_commands::pcb::open_door::{BBSLinkError, DosInputEncoder, dos_output_for_terminal};
+    use std::time::Duration;
+
+    use crate::icy_board::state::user_commands::pcb::open_door::{
+        BBSLinkError, DosInputEncoder, dos_output_for_terminal, dos_runtime_remaining,
+    };
 
     use super::parse_bbslink_error;
     #[test]
@@ -601,5 +642,19 @@ mod test {
         assert_eq!(encoder.encode(&[0xBC, 0xE2, 0x94], true), vec![0x81]);
         assert_eq!(encoder.encode(&[0x80], true), vec![0xC4]);
         assert_eq!(encoder.encode("€".as_bytes(), true), b".");
+    }
+
+    #[test]
+    fn dos_doors_observe_runtime_limits() {
+        let now = chrono::Utc::now();
+        assert_eq!(dos_runtime_remaining(now, 0, 0), None);
+        assert_eq!(dos_runtime_remaining(now - chrono::Duration::minutes(2), 1, 0), Some(Duration::ZERO));
+
+        let remaining = dos_runtime_remaining(now, 1, 0).unwrap();
+        assert!(remaining > Duration::from_secs(59));
+        assert!(remaining <= Duration::from_secs(60));
+
+        assert_eq!(dos_runtime_remaining(now, 0, 180), Some(Duration::from_secs(180)));
+        assert_eq!(dos_runtime_remaining(now, 1, 30), Some(Duration::from_secs(30)));
     }
 }

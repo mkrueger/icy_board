@@ -383,16 +383,20 @@ mod tests {
         let session_image = directory.path().join("session.img");
         std::fs::copy(image, &session_image).unwrap();
 
-        inject_session_files(&session_image, &[], "@ECHO OFF\nECHO No DOS door configured. > COM1").unwrap();
+        let run_batch = std::env::var("ICB_DOS_RUN_BATCH").unwrap_or_else(|_| "@ECHO OFF\nECHO No DOS door configured. > COM1".into());
+        inject_session_files(&session_image, &[], &run_batch).unwrap();
         let mut session = start_session(&session_image, Path::new(&bios), Path::new(&vga_bios), 8).unwrap();
         let mut serial_output = Vec::new();
+        let mut output_open = true;
         let result = tokio::time::timeout(std::time::Duration::from_secs(30), async {
             loop {
                 tokio::select! {
                     result = &mut session.finished => return result.unwrap(),
-                    output = session.output.recv() => {
-                        let output = output.expect("DOS output closed before session completion");
-                        serial_output.extend_from_slice(&output);
+                    output = session.output.recv(), if output_open => {
+                        match output {
+                            Some(output) => serial_output.extend_from_slice(&output),
+                            None => output_open = false,
+                        }
                     },
                 }
             }
@@ -400,6 +404,9 @@ mod tests {
         .await
         .unwrap_or_else(|_| panic!("FreeDOS poweroff did not finish the DOS worker; serial={:?}", String::from_utf8_lossy(&serial_output)));
         result.unwrap();
+        if std::env::var_os("ICB_DOS_RUN_BATCH").is_some() {
+            eprintln!("DOS serial output: {}", String::from_utf8_lossy(&serial_output));
+        }
     }
 
     #[test]
