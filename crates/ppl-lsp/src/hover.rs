@@ -108,6 +108,21 @@ impl<'a> AstVisitor<()> for MemberHoverVisitor<'a> {
         if !token.span.contains(&self.offset) {
             return;
         }
+        if let Some(receiver_type) = self.visitor.member_receiver_type_lookup.get(&token.span.start).copied()
+            && let Some(member_type) = type_of_member(&self.visitor.type_registry, receiver_type, member.get_identifier().as_ref())
+        {
+            let signature = format!(
+                "{} {}.{}",
+                type_name(&self.visitor.type_registry, member_type),
+                type_name(&self.visitor.type_registry, receiver_type),
+                member.get_identifier()
+            );
+            self.hover = Some(documented_hover(
+                signature,
+                get_member_documentation(receiver_type, member.get_identifier().as_ref()),
+            ));
+            return;
+        }
         let Some(type_id) = self.visitor.user_type_lookup.get(&token.span.start) else {
             return;
         };

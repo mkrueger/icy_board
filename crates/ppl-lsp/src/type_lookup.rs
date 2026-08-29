@@ -116,7 +116,7 @@ pub fn type_of_member(registry: &UserTypeRegistry, var_type: VariableType, membe
     if var_type == VariableType::Bytes {
         return BYTES_MEMBERS
             .iter()
-            .find(|definition| !definition.is_static && definition.name.eq_ignore_ascii_case(member))
+            .find(|definition| definition.name.eq_ignore_ascii_case(member))
             .map(|definition| definition.return_type);
     }
     let VariableType::UserData(id) = var_type else {

@@ -1,6 +1,6 @@
 use i18n_embed_fl::fl;
 use icy_board_engine::executable::{FuncOpCode, FunctionDefinition, OpCode, Signature, StatementDefinition, VariableType};
-use icy_board_engine::parser::{BOARD_ID, REGEX_ID, REGEX_MATCH_ID, USER_ID};
+use icy_board_engine::parser::{BOARD_ID, CHECKSUM_ENUM_ID, HTTP_ID, HTTP_REQUEST_ID, HTTP_RESPONSE_ID, REGEX_ID, REGEX_MATCH_ID, SESSION_ID, USER_ID};
 use tower_lsp::lsp_types::{Hover, HoverContents, MarkupContent, MarkupKind};
 
 use crate::LANGUAGE_LOADER;
@@ -125,6 +125,19 @@ pub fn get_type_hover(var_type: VariableType) -> Option<Hover> {
         VariableType::UserData(id) if id == REGEX_MATCH_ID as u8 => {
             get_sig_hint(Signature::new("REGEXMATCH".to_string()), fl!(LANGUAGE_LOADER, "hint-type-regex-match"))
         }
+        VariableType::UserData(id) if id == BOARD_ID as u8 => get_sig_hint(Signature::new("BOARD".to_string()), fl!(LANGUAGE_LOADER, "hint-type-board")),
+        VariableType::UserData(id) if id == SESSION_ID as u8 => get_sig_hint(Signature::new("SESSION".to_string()), fl!(LANGUAGE_LOADER, "hint-type-session")),
+        VariableType::UserData(id) if id == USER_ID as u8 => get_sig_hint(Signature::new("USER".to_string()), fl!(LANGUAGE_LOADER, "hint-type-user")),
+        VariableType::UserData(id) if id == HTTP_ID as u8 => get_sig_hint(Signature::new("HTTP".to_string()), fl!(LANGUAGE_LOADER, "hint-type-http")),
+        VariableType::UserData(id) if id == HTTP_REQUEST_ID as u8 => {
+            get_sig_hint(Signature::new("HTTPREQUEST".to_string()), fl!(LANGUAGE_LOADER, "hint-type-http-request"))
+        }
+        VariableType::UserData(id) if id == HTTP_RESPONSE_ID as u8 => {
+            get_sig_hint(Signature::new("HTTPRESPONSE".to_string()), fl!(LANGUAGE_LOADER, "hint-type-http-response"))
+        }
+        VariableType::UserData(id) if id == CHECKSUM_ENUM_ID => {
+            get_sig_hint(Signature::new("CHECKSUM".to_string()), fl!(LANGUAGE_LOADER, "hint-type-checksum"))
+        }
         VariableType::Date => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-date")),
         VariableType::EDate => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-edate")),
         VariableType::Integer => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-integer")),
@@ -137,6 +150,7 @@ pub fn get_type_hover(var_type: VariableType) -> Option<Hover> {
         VariableType::SByte => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-sbyte")),
         VariableType::SWord => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-sword")),
         VariableType::BigStr => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-bigstr")),
+        VariableType::Bytes => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-bytes")),
         VariableType::Double => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-double")),
         VariableType::DDate => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-ddate")),
         _ => None,
@@ -144,6 +158,17 @@ pub fn get_type_hover(var_type: VariableType) -> Option<Hover> {
 }
 
 pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<String> {
+    if var_type == VariableType::Bytes {
+        return match member.to_ascii_lowercase().as_str() {
+            "len" => Some(fl!(LANGUAGE_LOADER, "hint-bytes-len")),
+            "tostring" => Some(fl!(LANGUAGE_LOADER, "hint-bytes-to-string")),
+            "tobase64" => Some(fl!(LANGUAGE_LOADER, "hint-bytes-to-base64")),
+            "tohex" => Some(fl!(LANGUAGE_LOADER, "hint-bytes-to-hex")),
+            "getchecksum" => Some(fl!(LANGUAGE_LOADER, "hint-bytes-get-checksum")),
+            "frombase64" => Some(fl!(LANGUAGE_LOADER, "hint-bytes-from-base64")),
+            _ => None,
+        };
+    }
     let VariableType::UserData(id) = var_type else {
         return None;
     };
@@ -152,6 +177,52 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
     }
     if id == USER_ID as u8 && member.eq_ignore_ascii_case("Valid") {
         return Some(fl!(LANGUAGE_LOADER, "hint-member-user-valid"));
+    }
+    if id == SESSION_ID as u8 {
+        return match member.to_ascii_lowercase().as_str() {
+            "conference" | "area" | "directory" | "user" => Some(fl!(LANGUAGE_LOADER, "hint-member-session-context")),
+            "username" | "aliasname" | "securitylevel" | "node" | "minutesleft" | "pagelength" | "language" | "islocal" | "issysop" => {
+                Some(fl!(LANGUAGE_LOADER, "hint-member-session-value"))
+            }
+            _ => None,
+        };
+    }
+    if id == USER_ID as u8 {
+        return match member.to_ascii_lowercase().as_str() {
+            "recordnumber" => Some(fl!(LANGUAGE_LOADER, "hint-member-user-record-number")),
+            "contacts" => Some(fl!(LANGUAGE_LOADER, "hint-member-user-contacts")),
+            "notes" => Some(fl!(LANGUAGE_LOADER, "hint-member-user-notes")),
+            "setpassword" => Some(fl!(LANGUAGE_LOADER, "hint-member-user-set-password")),
+            "addcontact" | "removecontact" => Some(fl!(LANGUAGE_LOADER, "hint-member-user-contact-method")),
+            "setnote" => Some(fl!(LANGUAGE_LOADER, "hint-member-user-set-note")),
+            _ => None,
+        };
+    }
+    if id == HTTP_ID as u8 {
+        return match member.to_ascii_lowercase().as_str() {
+            "get" => Some(fl!(LANGUAGE_LOADER, "hint-http-get")),
+            "new" => Some(fl!(LANGUAGE_LOADER, "hint-http-new")),
+            "download" => Some(fl!(LANGUAGE_LOADER, "hint-http-download")),
+            _ => None,
+        };
+    }
+    if id == HTTP_REQUEST_ID as u8 {
+        return match member.to_ascii_lowercase().as_str() {
+            "url" | "method" => Some(fl!(LANGUAGE_LOADER, "hint-http-request-property")),
+            "setheader" => Some(fl!(LANGUAGE_LOADER, "hint-http-request-set-header")),
+            "settext" => Some(fl!(LANGUAGE_LOADER, "hint-http-request-set-text")),
+            "send" => Some(fl!(LANGUAGE_LOADER, "hint-http-request-send")),
+            _ => None,
+        };
+    }
+    if id == HTTP_RESPONSE_ID as u8 {
+        return match member.to_ascii_lowercase().as_str() {
+            "valid" | "ok" | "status" | "finalurl" | "size" | "contenttype" => Some(fl!(LANGUAGE_LOADER, "hint-http-response-property")),
+            "text" => Some(fl!(LANGUAGE_LOADER, "hint-http-response-text")),
+            "header" => Some(fl!(LANGUAGE_LOADER, "hint-http-response-header")),
+            "save" => Some(fl!(LANGUAGE_LOADER, "hint-http-response-save")),
+            _ => None,
+        };
     }
     if id == REGEX_ID as u8 {
         return match member.to_ascii_lowercase().as_str() {
@@ -757,7 +828,10 @@ pub fn get_statement_hover(stmt: &StatementDefinition) -> Option<Hover> {
 
 #[cfg(test)]
 mod test {
-    use icy_board_engine::executable::{FUNCTION_DEFINITIONS, FunctionSignature};
+    use icy_board_engine::{
+        executable::{FUNCTION_DEFINITIONS, FunctionSignature, VariableType},
+        parser::{BOARD_ID, CHECKSUM_ENUM_ID, HTTP_ID, HTTP_REQUEST_ID, HTTP_RESPONSE_ID, SESSION_ID, USER_ID},
+    };
 
     #[test]
     fn test_function_translations() {
@@ -769,6 +843,22 @@ mod test {
             if let FunctionSignature::FixedParameters(_) = f.signature {
                 assert!(super::get_function_hover(f).is_some(), "Function {:?} failed", f.opcode);
             }
+        }
+    }
+
+    #[test]
+    fn new_runtime_types_have_hover_documentation() {
+        for variable_type in [
+            VariableType::Bytes,
+            VariableType::UserData(BOARD_ID as u8),
+            VariableType::UserData(SESSION_ID as u8),
+            VariableType::UserData(USER_ID as u8),
+            VariableType::UserData(HTTP_ID as u8),
+            VariableType::UserData(HTTP_REQUEST_ID as u8),
+            VariableType::UserData(HTTP_RESPONSE_ID as u8),
+            VariableType::UserData(CHECKSUM_ENUM_ID),
+        ] {
+            assert!(super::get_type_hover(variable_type).is_some(), "missing hover for {variable_type}");
         }
     }
 }

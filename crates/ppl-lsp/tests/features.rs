@@ -9,7 +9,7 @@ use icy_board_engine::{
     parser::{Encoding, ErrorReporter, UserTypeRegistry, parse_ast},
     semantic::SemanticVisitor,
 };
-use ppl_lsp::{document_symbol::get_document_symbols, hover::get_user_hover};
+use ppl_lsp::{document_symbol::get_document_symbols, documentation::get_type_hover, hover::get_user_hover};
 use ropey::Rope;
 use tower_lsp::lsp_types::{HoverContents, SymbolKind};
 
@@ -130,6 +130,35 @@ fn hover_over_new_board_user_members_includes_documentation() {
     let valid = hover(source, "Valid").unwrap();
     assert!(valid.contains("BOOLEAN User.Valid"), "{valid}");
     assert!(valid.contains("\n```\n\n") && valid.contains("`Board.Users`"), "{valid}");
+}
+
+#[test]
+fn hover_over_bytes_type_and_members_includes_documentation() {
+    let source = r#";$LANGVERSION 400
+BYTES raw = ToBytes("abc")
+PRINTLN raw.ToHex()
+PRINTLN raw.GetChecksum(Checksum.SHA256)
+PRINTLN Bytes.FromBase64("YWJj").ToString()
+"#;
+
+    let HoverContents::Markup(bytes_type) = get_type_hover(icy_board_engine::executable::VariableType::Bytes).unwrap().contents else {
+        panic!("expected markup");
+    };
+    let bytes_type = bytes_type.value;
+    assert!(bytes_type.contains("BYTES"), "{bytes_type}");
+    assert!(bytes_type.contains("binary data"), "{bytes_type}");
+
+    let to_hex = hover(source, "ToHex").unwrap();
+    assert!(to_hex.contains("STRING BYTES.ToHex"), "{to_hex}");
+    assert!(to_hex.contains("leading zero bytes"), "{to_hex}");
+
+    let checksum = hover(source, "GetChecksum").unwrap();
+    assert!(checksum.contains("BYTES BYTES.GetChecksum"), "{checksum}");
+    assert!(checksum.contains("raw checksum bytes"), "{checksum}");
+
+    let from_base64 = hover(source, "FromBase64").unwrap();
+    assert!(from_base64.contains("BYTES BYTES.FromBase64"), "{from_base64}");
+    assert!(from_base64.contains("malformed input"), "{from_base64}");
 }
 
 #[test]

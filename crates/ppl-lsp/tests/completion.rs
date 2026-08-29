@@ -121,6 +121,27 @@ fn new_board_user_api_completion_explains_its_types_and_members() {
     assert!(valid.contains("`Board.Users`") && valid.contains("`Valid`"), "{valid}");
 }
 
+#[test]
+fn session_user_and_http_workflows_have_completion_documentation() {
+    let session_user = completion_documentation("Session.", "User");
+    assert!(session_user.contains("currently selected"), "{session_user}");
+
+    let contacts = completion_documentation("USER user\nuser.", "Contacts");
+    assert!(contacts.contains("100 entries") && contacts.contains("AddContact"), "{contacts}");
+
+    let http_get = completion_documentation("HTTP.", "Get");
+    assert!(http_get.contains("policy-controlled GET"), "{http_get}");
+
+    let set_text = completion_documentation("HTTPREQUEST request\nrequest.", "SetText");
+    assert!(set_text.contains("GET and HEAD") && set_text.contains("UTF-8 body"), "{set_text}");
+
+    let response_text = completion_documentation("HTTPRESPONSE response\nresponse.", "Text");
+    assert!(
+        response_text.contains("strictly as UTF-8") && response_text.contains("ErrCode.Format"),
+        "{response_text}"
+    );
+}
+
 /// Snapshot arrays expose array members rather than their internal legacy getter.
 #[test]
 fn a_collection_does_not_offer_its_internal_getter() {
@@ -188,6 +209,24 @@ fn strings_offer_instance_static_and_chained_members() {
 
     assert!(complete(";$LANGVERSION 350\nSTRING text\ntext.").is_empty());
     assert!(complete(";$LANGVERSION 350\nSTRING.").is_empty());
+}
+
+#[test]
+fn bytes_and_checksum_completion_match_the_engine_surface() {
+    let instance = complete(";$LANGVERSION 400\nBYTES data\ndata.");
+    assert_eq!(instance, vec!["Len", "ToString", "ToBase64", "ToHex", "GetChecksum"]);
+
+    let statik = complete(";$LANGVERSION 400\nBYTES.");
+    assert_eq!(statik, vec!["FromBase64"]);
+
+    let algorithms = complete(";$LANGVERSION 400\nChecksum.");
+    assert_eq!(algorithms, vec!["CRC32", "MD5", "SHA256"]);
+
+    let to_hex = completion_documentation(";$LANGVERSION 400\nBYTES data\ndata.", "ToHex");
+    assert!(to_hex.contains("leading zero bytes"), "{to_hex}");
+
+    let checksum = completion_documentation(";$LANGVERSION 400\nBYTES data\ndata.", "GetChecksum");
+    assert!(checksum.contains("raw checksum bytes"), "{checksum}");
 }
 
 #[test]

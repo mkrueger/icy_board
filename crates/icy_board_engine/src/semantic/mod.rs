@@ -585,6 +585,9 @@ pub struct SemanticVisitor {
     /// Maps member references -> user type IDs
     pub user_type_lookup: HashMap<usize, u8>,
 
+    /// Maps built-in scalar member references -> receiver types.
+    pub member_receiver_type_lookup: HashMap<usize, VariableType>,
+
     /// Maps a type name used as a receiver -> the builtin that hands its instance back.
     pub instance_provider_lookup: HashMap<usize, FuncOpCode>,
 
@@ -826,6 +829,7 @@ impl SemanticVisitor {
             label_count: 0,
             label_lookup_table: HashMap::new(),
             user_type_lookup: HashMap::new(),
+            member_receiver_type_lookup: HashMap::new(),
             instance_provider_lookup: HashMap::new(),
             static_receiver_lookup: HashMap::new(),
             function_type_lookup: HashMap::new(),
@@ -2334,6 +2338,8 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 Some(VariableType::String | VariableType::BigStr)
             )
         {
+            self.member_receiver_type_lookup
+                .insert(member_reference_expression.get_identifier_token().span.start, VariableType::String);
             if self.lang_version < 400 {
                 self.errors.lock().unwrap().report_error(
                     member_reference_expression.get_identifier_token().span.clone(),
@@ -2357,6 +2363,8 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             && self.lookup_variable(base.get_identifier()).is_none()
             && crate::parser::built_in_type(base.get_identifier(), self.lang_version) == Some(VariableType::Bytes)
         {
+            self.member_receiver_type_lookup
+                .insert(member_reference_expression.get_identifier_token().span.start, VariableType::Bytes);
             return if member_reference_expression.get_identifier().as_ref().eq_ignore_ascii_case("FromBase64") {
                 VariableType::Bytes
             } else {
@@ -2388,6 +2396,8 @@ impl AstVisitor<VariableType> for SemanticVisitor {
         if matches!(t, VariableType::String | VariableType::BigStr)
             && let Some(return_type) = string_member_type(member_reference_expression.get_identifier())
         {
+            self.member_receiver_type_lookup
+                .insert(member_reference_expression.get_identifier_token().span.start, t);
             if self.lang_version < 400 {
                 self.errors.lock().unwrap().report_error(
                     member_reference_expression.get_identifier_token().span.clone(),
@@ -2400,6 +2410,8 @@ impl AstVisitor<VariableType> for SemanticVisitor {
         if t == VariableType::Bytes
             && let Some(return_type) = bytes_member_type(member_reference_expression.get_identifier())
         {
+            self.member_receiver_type_lookup
+                .insert(member_reference_expression.get_identifier_token().span.start, t);
             return return_type;
         }
         if let VariableType::UserData(d) = t {
