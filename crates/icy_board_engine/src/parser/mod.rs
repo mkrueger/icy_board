@@ -1499,6 +1499,22 @@ impl Parser<'_> {
                 }
                 rightpar_token = Some(self.save_spanned_token());
                 self.next_token();
+                // A dynamic array may still take an initializer, e.g. `STRING p[] = a.Split(",")`.
+                if self.lang_version >= 350
+                    && let Some(Token::Eq) = self.get_cur_token()
+                {
+                    let eq_token = self.save_spanned_token();
+                    self.next_token();
+                    let initializer = self.parse_expression();
+                    return Some(VariableSpecifier::new(
+                        identifier_token,
+                        leftpar_token,
+                        dimensions,
+                        rightpar_token,
+                        Some(eq_token),
+                        initializer,
+                    ));
+                }
                 return Some(VariableSpecifier::new(identifier_token, leftpar_token, dimensions, rightpar_token, None, None));
             }
             let Some(Token::Const(Constant::Integer(_, _))) = self.get_cur_token() else {

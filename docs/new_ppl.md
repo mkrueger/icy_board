@@ -173,12 +173,16 @@ The PPE must store each record layout, so any use of `TYPE` requires runtime
 
 ### String members
 
-`STRING` and `BIGSTR` values expose their common operations as members. This is
-the same operation as the classic global function where one exists, written
-with the value first:
+At language 400 `STRING` is the string type and is not length-limited, so it is
+used throughout. `BIGSTR` is a deprecated alias kept only for older sources; the
+compiler warns when it is written at 400.
+
+`STRING` values expose their common operations as members. This is the same
+operation as the classic global function where one exists, written with the
+value first:
 
 ```PPL
-BIGSTR text = "  one,two,two  "
+STRING text = "  one,two,two  "
 
 PRINTLN text.Len()
 PRINTLN text.Find("two")
@@ -198,15 +202,18 @@ PRINTLN text.Trim().ToUpper().Replace("TWO", "THREE")
 | `StartsWith(prefix [, comparison])`, `EndsWith(suffix [, comparison])` | `BOOLEAN` | Prefix or suffix test |
 | `Count(search [, comparison])` | `INTEGER` | Non-overlapping occurrence count |
 | `Equals(other [, comparison])` | `BOOLEAN` | String equality |
-| `Replace(search, replacement)` | `BIGSTR` | Replace every substring match |
-| `Trim([characters])` | `BIGSTR` | Trim whitespace, or the supplied characters, at both ends |
-| `TrimStart([characters])`, `TrimEnd([characters])` | `BIGSTR` | Trim one end |
-| `ToUpper()`, `ToLower()` | `BIGSTR` | Change case |
+| `Replace(search, replacement)` | `STRING` | Replace every substring match |
+| `Trim([characters])` | `STRING` | Trim whitespace, or the supplied characters, at both ends |
+| `TrimStart([characters])`, `TrimEnd([characters])` | `STRING` | Trim one end |
+| `ToUpper()`, `ToLower()` | `STRING` | Change case |
 
 Positions in the PPL 400 member API are zero-based Unicode character positions;
 `-1` means no match. Searches are case-sensitive. An empty search string is not
-considered a match and has a count of zero. The classic `INSTR` and `INSTRR`
-functions remain 1-based and return zero when no match is found.
+considered a match and has a count of zero. `Find` and `FindLast` are the
+zero-based member forms of the classic `INSTR` and `INSTRR`, which remain 1-based
+and return zero when no match is found. There is no member form of `MID`, `LEFT`
+or `RIGHT`; extract a single character with zero-based indexing (`text[0]`) and
+use the classic 1-based functions for substrings.
 
 `StringComparison.Ordinal` is the default. Pass
 `StringComparison.OrdinalIgnoreCase` as the last argument for Unicode-aware,
@@ -218,14 +225,13 @@ index returns an empty string. String arrays keep their normal array semantics,
 and indexing can be chained: `words[0][0]` reads the first character of the
 first string.
 
-Operations that transform text return `BIGSTR`, so member chains do not silently
-truncate at the `STRING` limit.
+Operations that transform text return `STRING`. A language 400 `STRING` has no
+length limit, so member chains do not truncate.
 
-The `STRING` and `BIGSTR` type names also provide operations that do not belong
-to one value:
+The `STRING` type name also provides operations that do not belong to one value:
 
 ```PPL
-BIGSTR parts[] = "a,,b,".Split(",")
+STRING parts[] = "a,,b,".Split(",")
 PRINTLN STRING.Join(parts, "|")
 PRINTLN STRING.Repeat("-", 40)
 
@@ -234,14 +240,14 @@ parts = STRING.Split("one:two:three:four", ":", 3)
 ```
 
 `Split` accepts a multi-character separator and retains empty elements. Its
-result is a dynamic `BIGSTR[]`. The optional positive limit is the maximum
+result is a dynamic `STRING[]`. The optional positive limit is the maximum
 number of elements, with the unsplit remainder in the last one. A limit of zero
 means unlimited. Empty separators and negative limits report `ErrKind.String` /
 `ErrCode.Invalid` and return an empty array. Returned arrays may be assigned,
 indexed, queried with `Len()` or consumed directly by `FOREACH`.
 
 `STRING.Join(array, separator)` joins a one-dimensional string array and returns
-`BIGSTR`. `STRING.Repeat(value, count)` returns `BIGSTR`; a negative count is an
+`STRING`. `STRING.Repeat(value, count)` returns `STRING`; a negative count is an
 error and results above 16 MiB report `ErrCode.Limit`.
 
 ### Regular expressions
@@ -264,7 +270,7 @@ Static members are `REGEX.Compile(pattern [, options])`, `REGEX.Escape(text)`
 and `REGEX.IsValid(pattern [, options])`. A compiled value exposes `Valid`,
 `Pattern`, `IsMatch(text [, start])`, `Find(text [, start])`,
 `FindAll(text [, start [, limit]]) -> REGEXMATCH[]`,
-`Replace(text, replacement [, limit])` and `Split(text [, limit]) -> BIGSTR[]`.
+`Replace(text, replacement [, limit])` and `Split(text [, limit]) -> STRING[]`.
 
 `RegexOptions` flags are `None`, `IgnoreCase`, `MultiLine`,
 `DotMatchesNewLine`, `IgnoreWhitespace`, `SwapGreed` and `Ascii`; flags may be
@@ -280,8 +286,8 @@ or unmatched capture has start position `-1`. Group zero is the complete match.
 
 Replacement strings expand `$1` and `$name`. A zero limit means unlimited;
 negative limits report `ErrKind.Regex` / `ErrCode.Invalid`. `Split` preserves
-empty fields and replaces only dynamic one-dimensional `STRING` or `BIGSTR`
-arrays, transactionally. Results are limited to 100,000 matches and replacement
+empty fields and replaces only dynamic one-dimensional `STRING` (or legacy
+`BIGSTR`) arrays, transactionally. Results are limited to 100,000 matches and replacement
 output to 16 MiB.
 
 The engine guarantees linear-time matching and deliberately does not support
@@ -1169,7 +1175,7 @@ writes a body already held by a response. `Http.Download(url, path)` streams a
 successful response through a temporary file and replaces the destination only
 after the complete body arrives.
 
-`Text()` decodes the body strictly as UTF-8 and returns a `BIGSTR`. A body in any
+`Text()` decodes the body strictly as UTF-8 and returns a `STRING`. A body in any
 other character encoding reports `ErrKind.Net` with `ErrCode.Format`; use
 `Download()` or `Save()` when the response is binary or not UTF-8.
 

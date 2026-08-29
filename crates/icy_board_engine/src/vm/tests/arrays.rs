@@ -26,6 +26,29 @@ fn ppl_400_accepts_legacy_array_declarations_during_migration() {
 }
 
 #[test]
+fn ppl_400_dynamic_array_declarations_accept_initializers() {
+    assert_eq!(
+        "3 a|b|",
+        run_ppl(
+            r#";$LANGVERSION 400
+STRING parts[] = "a,b,".Split(",")
+PRINT parts.Len(), " ", STRING.Join(parts, "|")
+"#
+        )
+    );
+
+    assert_eq!(
+        "2 first",
+        run_ppl(
+            r#";$LANGVERSION 400
+STRING lines[] = { "first", "second" }
+PRINT lines.Len(), " ", lines[0]
+"#
+        )
+    );
+}
+
+#[test]
 fn ppl_400_functions_return_dynamic_arrays() {
     assert_eq!(
         "4 20",
@@ -322,10 +345,10 @@ ENDPROC
 
 #[test]
 fn returning_from_foreach_cleans_up_its_iterator() {
-        assert_eq!(
-                "7 7",
-                run_ppl(
-                        r#"
+    assert_eq!(
+        "7 7",
+        run_ppl(
+            r#"
 DECLARE FUNCTION First() INTEGER
 PRINT First(), " ", First()
 
@@ -339,16 +362,16 @@ FUNCTION First() INTEGER
     RETURN 0
 ENDFUNC
 "#
-                )
-        );
+        )
+    );
 }
 
 #[test]
 fn goto_out_of_foreach_cleans_up_its_iterator() {
-        assert_eq!(
-                "2",
-                run_ppl(
-                        r#"
+    assert_eq!(
+        "2",
+        run_ppl(
+            r#"
 INTEGER values(1)
 INTEGER value
 INTEGER count
@@ -361,8 +384,8 @@ FOREACH value IN values
 ENDFOREACH
 PRINT count
 "#
-                )
-        );
+        )
+    );
 }
 
 /// A value that is not an array is one element, so the body runs once rather than
