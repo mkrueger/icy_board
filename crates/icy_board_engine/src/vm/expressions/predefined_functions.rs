@@ -17,7 +17,7 @@ use crate::icy_board::read_with_encoding_detection;
 use crate::icy_board::security_expr::SecurityExpression;
 use crate::icy_board::state::GraphicsMode;
 use crate::icy_board::state::functions::{MASK_ALNUM, MASK_ALPHA, MASK_ASCII, MASK_FILE, MASK_MESSAGE, MASK_NUM, MASK_PATH, MASK_PWD};
-use crate::icy_board::state::ppl_error::{ERR_INVALID, ERR_KIND_STRING, ERR_LIMIT, PplError};
+use crate::icy_board::state::ppl_error::{ERR_FORMAT, ERR_INVALID, ERR_KIND_STRING, ERR_LIMIT, PplError};
 use crate::icy_board::user_base::{ConferenceFlags, Password};
 use crate::icy_board::user_inf::{BankUserInf, QwkConfigUserInf};
 use crate::vm::{TerminalTarget, VirtualMachine, dbase, get_file_channel};
@@ -83,6 +83,7 @@ pub async fn len(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableV
     let str = vm.eval_expr(&args[0]).await?;
     let val = match str.generic_data {
         GenericVariableData::String(str) => str.chars().count(),
+        GenericVariableData::Bytes(data) => data.len(),
         GenericVariableData::Dim1(items) => items.len(),
         GenericVariableData::Dim2(items) => items.iter().map(Vec::len).sum(),
         GenericVariableData::Dim3(items) => items.iter().flatten().map(Vec::len).sum(),
@@ -850,26 +851,54 @@ pub async fn stripstr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
 }
 
 pub async fn base64enc(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let value = vm.eval_expr(&args[0]).await?.as_string();
-    Ok(VariableValue::new_string(general_purpose::STANDARD.encode(value.as_bytes())))
+    let value = vm.eval_expr(&args[0]).await?.convert_to(VariableType::Bytes);
+    Ok(VariableValue::new_string(general_purpose::STANDARD.encode(value.as_byte_slice())))
 }
 
 pub async fn base64dec(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let value = vm.eval_expr(&args[0]).await?.as_string();
-    let filtered = value
-        .bytes()
-        .filter(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'+' | b'/' | b'='))
-        .collect::<Vec<_>>();
-    let decoded = general_purpose::STANDARD
+    // Line-wrapped base64 (MIME) is common, so whitespace is tolerated; anything else that
+    // does not decode is a real error the PPE can see through Error.Last().
+    let filtered = value.bytes().filter(|byte| !byte.is_ascii_whitespace()).collect::<Vec<_>>();
+    match general_purpose::STANDARD
         .decode(&filtered)
         .or_else(|_| general_purpose::STANDARD_NO_PAD.decode(&filtered))
-        .unwrap_or_default();
-    Ok(VariableValue::new_string(String::from_utf8_lossy(&decoded).into_owned()))
+    {
+        Ok(decoded) => {
+            vm.operation_succeeded();
+            Ok(VariableValue::new_bytes(decoded))
+        }
+        Err(_) => {
+            vm.set_error(PplError::new(ERR_KIND_STRING, ERR_FORMAT, "Base64Dec: invalid base64 input"));
+            Ok(VariableValue::new_bytes(Vec::new()))
+        }
+    }
 }
 
 pub async fn sha256(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let value = vm.eval_expr(&args[0]).await?.convert_to(VariableType::Bytes);
+    Ok(VariableValue::new_string(format!("{:x}", Sha256::digest(value.as_byte_slice()))))
+}
+
+/// The UTF-8 bytes of a string as a binary blob.
+pub async fn tobytes(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let value = vm.eval_expr(&args[0]).await?.as_string();
-    Ok(VariableValue::new_string(format!("{:x}", Sha256::digest(value.as_bytes()))))
+    Ok(VariableValue::new_bytes(value.into_bytes()))
+}
+
+/// Decode a binary blob as UTF-8 text; invalid bytes report ErrCode.Format.
+pub async fn frombytes(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let value = vm.eval_expr(&args[0]).await?.convert_to(VariableType::Bytes);
+    match String::from_utf8(value.as_byte_slice().to_vec()) {
+        Ok(text) => {
+            vm.operation_succeeded();
+            Ok(VariableValue::new_string(text))
+        }
+        Err(_) => {
+            vm.set_error(PplError::new(ERR_KIND_STRING, ERR_FORMAT, "FromBytes: invalid UTF-8"));
+            Ok(VariableValue::new_string(String::new()))
+        }
+    }
 }
 
 /// Trim specified characters from the end of a string

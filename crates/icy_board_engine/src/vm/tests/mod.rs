@@ -11,6 +11,7 @@ mod arrays;
 mod board_objects;
 mod board_session;
 mod builtin_enums;
+mod bytes;
 mod collection_bench;
 mod contacts;
 mod control_flow;

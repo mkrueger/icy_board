@@ -1149,9 +1149,11 @@ hint-function-cwd=
     The current working directory
 hint-function-instrr=
     Returns the right most position of @2 in @1 `(1-LEN(@1))` or `0` if @2 not in @1
-hint-function-base64enc=Encodes the UTF-8 bytes of @1 as base64 text.
-hint-function-base64dec=Decodes base64 text in @1 as UTF-8. Characters outside the base64 alphabet are ignored.
-hint-function-sha256=Returns the lowercase hexadecimal SHA-256 digest of the UTF-8 bytes of @1.
+hint-function-base64enc=Encodes the bytes of @1 as base64 text. A string argument contributes its UTF-8 bytes.
+hint-function-base64dec=Decodes base64 text in @1 to a byte blob. Malformed input reports `ErrCode.Format`.
+hint-function-sha256=Returns the lowercase hexadecimal SHA-256 digest of the bytes of @1.
+hint-function-tobytes=The UTF-8 bytes of the string @1 as a byte blob.
+hint-function-frombytes=Decodes the byte blob @1 as UTF-8 text. Invalid bytes report `ErrCode.Format`.
 hint-function-rgb=Packs red, green, blue and optional alpha components into an RGBA color.
 hint-function-terminal=The caller's terminal and the root of graphics, input, margins, palette, fonts, macros, audio and cached capability information.
 hint-function-board=A snapshot of the configured board: name, location, operator, sysop name, node count, conferences and registered users.

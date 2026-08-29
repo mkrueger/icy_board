@@ -354,9 +354,11 @@ pub enum FuncOpCode {
     StringSplitLimit = -339,
     ArrayValueAt = -340,
     StringMid = -341,
+    ToBytes = -342,
+    FromBytes = -343,
 }
 
-pub const LAST_FUNC: i16 = -341;
+pub const LAST_FUNC: i16 = -343;
 
 impl FuncOpCode {
     pub fn get_definition(self) -> &'static FunctionDefinition {
@@ -475,7 +477,7 @@ impl FunctionDefinition {
         }
     }
 }
-pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 353]> = std::sync::LazyLock::new(|| {
+pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 355]> = std::sync::LazyLock::new(|| {
     [
         FunctionDefinition {
             name: "END",
@@ -3025,16 +3027,16 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 353]> 
             name: "Base64Enc",
             version: 400,
             opcode: FuncOpCode::BASE64ENC,
-            return_type: VariableType::BigStr,
-            args: Some(vec![ArgumentDefinition::new("value", VariableType::BigStr)]),
+            return_type: VariableType::String,
+            args: Some(vec![ArgumentDefinition::new("value", VariableType::Bytes)]),
             signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
             name: "Base64Dec",
             version: 400,
             opcode: FuncOpCode::BASE64DEC,
-            return_type: VariableType::BigStr,
-            args: Some(vec![ArgumentDefinition::new("value", VariableType::BigStr)]),
+            return_type: VariableType::Bytes,
+            args: Some(vec![ArgumentDefinition::new("value", VariableType::String)]),
             signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
@@ -3042,7 +3044,7 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 353]> 
             version: 400,
             opcode: FuncOpCode::SHA256,
             return_type: VariableType::String,
-            args: Some(vec![ArgumentDefinition::new("value", VariableType::BigStr)]),
+            args: Some(vec![ArgumentDefinition::new("value", VariableType::Bytes)]),
             signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
@@ -3391,6 +3393,22 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 353]> 
             return_type: VariableType::BigStr,
             args: None,
             signature: FunctionSignature::FixedParameters(3),
+        },
+        FunctionDefinition {
+            name: "ToBytes",
+            version: 400,
+            opcode: FuncOpCode::ToBytes,
+            return_type: VariableType::Bytes,
+            args: Some(vec![ArgumentDefinition::new("value", VariableType::String)]),
+            signature: FunctionSignature::FixedParameters(1),
+        },
+        FunctionDefinition {
+            name: "FromBytes",
+            version: 400,
+            opcode: FuncOpCode::FromBytes,
+            return_type: VariableType::String,
+            args: Some(vec![ArgumentDefinition::new("value", VariableType::Bytes)]),
+            signature: FunctionSignature::FixedParameters(1),
         },
         // ALIASES (need to be last in the list)
         FunctionDefinition {

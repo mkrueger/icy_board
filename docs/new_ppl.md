@@ -25,7 +25,7 @@ format, so 4.00 is what a PPE targets whenever it uses anything below.
 | Message-area identifiers | 400 | 400 | `MSGAREAID` and `AreaId(conf, area)` |
 | Overloaded built-ins | 400 | 400 | Argument-count overloads such as `Len(array, dim)` |
 | Web requests | 400 | 400 | String-returning function and file-writing statement forms |
-| UTF-8 encoding and digest functions | 400 | 400 | `BASE64ENC`, `BASE64DEC` and `SHA256` |
+| UTF-8 encoding and digest functions | 400 | 400 | `BYTES` blobs, `TOBYTES`, `FROMBYTES`, `BASE64ENC`, `BASE64DEC` and `SHA256` |
 | Extensible user contacts | 400 | 400 | `CONTACT` records on `Session.User` |
 | User-defined records | 400 | 400 | `TYPE ... ENDTYPE`, nested fields, arrays of records and nominal type checking |
 | Named record literals | 400 | 400 | `Point { X = 1, Y = 2 }` with checked and optional fields |
@@ -1123,22 +1123,42 @@ Mutations write straight through to the caller, so no `GETUSER`/`PUTUSER` round 
 is needed. `U_EMAIL` and `U_WEB` remain separate predefined variables for
 PCBoard 3.40 compatibility and are not duplicated here.
 
+## The `BYTES` type (4.00)
+
+`BYTES` is a compact, growable binary blob — a contiguous run of bytes stored one
+byte per byte, unlike `BYTE[]` which boxes every element. It is the type for
+binary data, hashing, encoding and fast I/O. A `BYTES` value prints as
+uppercase, separator-free hexadecimal, and `LEN(value)` returns its byte count.
+
+`TOBYTES(value)` returns the UTF-8 bytes of a string as a `BYTES` blob.
+`FROMBYTES(value)` decodes a `BYTES` blob back to a string as UTF-8; invalid
+bytes report `ErrCode.Format` through `Error.Last()` and yield an empty string.
+
+```PPL
+BYTES raw = TOBYTES("Grüße")
+PRINTLN raw              ' 47 72 c3 bc c3 9f 65 -> "4772C3BCC39F65"
+PRINTLN LEN(raw)         ' 7
+PRINTLN FROMBYTES(raw)   ' Grüße
+```
+
 ## Encoding and digest functions (4.00)
 
-`BASE64ENC(value)` encodes the UTF-8 bytes of a string and returns base64 text.
-`BASE64DEC(value)` ignores characters outside the base64 alphabet, decodes the
-remaining text, and interprets the result as UTF-8. Invalid UTF-8 bytes become
-the Unicode replacement character.
+`BASE64ENC(value)` encodes a `BYTES` blob as base64 text. A string argument is
+taken as its UTF-8 bytes. `BASE64DEC(value)` decodes base64 text to a `BYTES`
+blob; whitespace (for line-wrapped input) is ignored, and any other malformed
+input reports `ErrCode.Format` through `Error.Last()`.
 
 `SHA256(value)` returns the 64-character lowercase hexadecimal SHA-256 digest
-of the value's UTF-8 bytes. It is intended for content integrity and identity,
-not password storage.
+of a `BYTES` blob (a string is taken as its UTF-8 bytes). It is intended for
+content integrity and identity, not password storage.
 
 ```PPL
 PRINTLN BASE64ENC("Grüße")
-PRINTLN BASE64DEC("R3LDvMOfZQ==")
+BYTES decoded = BASE64DEC("R3LDvMOfZQ==")
+PRINTLN FROMBYTES(decoded)
 PRINTLN SHA256("abc")
 ```
+
 
 ## Math functions (4.00)
 
