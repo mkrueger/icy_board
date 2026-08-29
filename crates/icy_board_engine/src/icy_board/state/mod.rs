@@ -1777,6 +1777,23 @@ impl IcyBoardState {
         Ok(())
     }
 
+    /// Writes the current user straight to the user base without the logoff-time
+    /// accounting, so a PPE's `Session.User` change lands on disk immediately.
+    pub async fn persist_current_user(&mut self) -> Res<()> {
+        if let Some(user) = &self.session.current_user {
+            let mut board = self.get_board().await;
+            for u in 0..board.users.len() {
+                if board.users[u].get_name() == user.get_name() {
+                    board.users[u] = user.clone();
+                    board.save_userbase()?;
+                    return Ok(());
+                }
+            }
+            log::error!("User not found in user list");
+        }
+        Ok(())
+    }
+
     fn find_more_specific_file(&self, base_name: String) -> PathBuf {
         // A caller may deliberately give a display file a nonstandard extension. In that
         // case the name as written is the file, not the base of a security, graphics,

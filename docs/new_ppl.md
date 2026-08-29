@@ -1047,7 +1047,7 @@ Session.User.City = "Berlin"
 
 | Group | Members | Writable |
 | :--- | :--- | :--- |
-| Identity | `Valid`, `Name`, `Alias`, `VerifyAnswer` | all but `Valid` and `Name` |
+| Identity | `Valid`, `RecordNumber`, `Name`, `Alias`, `VerifyAnswer` | all but `Valid`, `RecordNumber` and `Name` |
 | Address | `Street1`, `Street2`, `City`, `State`, `Zip`, `Country` | yes |
 | Reaching them | `BusinessPhone`, `HomePhone`, `Email`, `Web`, `Gender`, `BirthDate` | yes |
 | Sysop text | `Comment`, `SysopComment`, `Notes`, `SetNote(index, text)` | yes |
@@ -1057,16 +1057,18 @@ Session.User.City = "Berlin"
 | Statistics | `TimesOn`, `FirstDateOn`, `LastDateOn`, `LastDirRead`, `MessagesRead`, `MessagesLeft`, `Uploads`, `Downloads`, `UploadBytes`, `DownloadBytes`, `DownloadBytesToday`, `MinutesToday` | no |
 | Contacts | `Contacts`, `AddContact(service, account)`, `RemoveContact(index)` | yes |
 
-Whatever `PUTUSER` could write is writable here and lands at once, so the object
-replaces the old round trip rather than sitting beside it. The caller's `Name`
-identifies them and the board's own accounting is the board's to keep, so both
-stay read-only; writing one is a compile error. Nobody logged in reads as an
-empty user with `Valid` false rather than failing, so a member is always safe to
-read.
+Whatever `PUTUSER` could write is writable here and is saved to the user file
+immediately, so the object replaces the old round trip rather than sitting beside
+it. The caller's `Name` identifies them and the board's own accounting is the
+board's to keep, so both stay read-only; writing one is a compile error.
+`RecordNumber` is the 1-based position of the record in the user file. Nobody
+logged in reads as an empty user with `Valid` false rather than failing, so a
+member is always safe to read.
 
 The cumulative statistics `TimesOn`, `MessagesRead`, `MessagesLeft`, `Uploads`
-and `Downloads` are `ULONG`, so they preserve the full counters stored by the
-board. `PageLength`
+and `Downloads`, together with the byte totals `UploadBytes`, `DownloadBytes`
+and `DownloadBytesToday`, are 64-bit `ULONG`, so they preserve the full counters
+stored by the board. `PageLength`
 accepts 0 through 65535; `SecurityLevel` and `ExpiredSecurityLevel` accept 0
 through 255. An out-of-range write leaves the old value intact and reports
 `ErrKind.User` with `ErrCode.Invalid`.
@@ -1109,9 +1111,10 @@ Session.User.RemoveContact(0)
 
 `AddContact()` trims and normalizes the service name, trims the account and
 appends the contact. Duplicate services are allowed. A blank service or account
-is refused and answers `FALSE`. `RemoveContact(index)` removes the entry at the
-zero-based index and answers whether it succeeded. An index no contact has
-answers with an empty `CONTACT`.
+is refused and answers `FALSE`. A user may hold at most 100 contacts; a further
+`AddContact()` is refused with `ErrCode.Limit`. `RemoveContact(index)` removes
+the entry at the zero-based index and answers whether it succeeded. An index no
+contact has answers with an empty `CONTACT`.
 
 The returned array is a snapshot. Adding or removing contacts does not mutate an
 array already held by the PPE; read `User.Contacts` again to get the new list.

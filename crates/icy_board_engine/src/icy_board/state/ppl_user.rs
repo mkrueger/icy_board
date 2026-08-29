@@ -5,8 +5,8 @@ use crate::{
     datetime::IcbDate,
     executable::{VariableType, VariableValue},
     icy_board::{
-        state::ppl_error::{ERR_INVALID, ERR_KIND_USER, PplError},
-        user_base::{FSEMode, User, UserContact},
+        state::ppl_error::{ERR_INVALID, ERR_KIND_USER, ERR_LIMIT, PplError},
+        user_base::{FSEMode, MAX_CONTACTS, User, UserContact},
     },
     parser::{CONTACT_ID, EDITOR_MODE_ENUM_ID, USER_ID},
 };
@@ -19,6 +19,7 @@ macro_rules! member_name {
 
 member_name!(NAME, "Name");
 member_name!(VALID, "Valid");
+member_name!(RECORD_NUMBER, "RecordNumber");
 member_name!(ALIAS, "Alias");
 member_name!(VERIFY_ANSWER, "VerifyAnswer");
 
@@ -86,6 +87,7 @@ pub enum PplUser {
     Snapshot {
         user: std::sync::Arc<User>,
         valid: bool,
+        index: usize,
     },
 }
 
@@ -94,8 +96,8 @@ impl PplUser {
         user_data_value(PplUser::Current, USER_ID)
     }
 
-    fn snapshot(user: std::sync::Arc<User>, valid: bool) -> Self {
-        Self::Snapshot { user, valid }
+    fn snapshot(user: std::sync::Arc<User>, valid: bool, index: usize) -> Self {
+        Self::Snapshot { user, valid, index }
     }
 
     fn user<'a>(&'a self, vm: &'a crate::vm::VirtualMachine) -> Option<&'a User> {
@@ -137,7 +139,8 @@ pub fn user_array_value(users: &[User]) -> VariableValue {
         users
             .iter()
             .cloned()
-            .map(|user| user_data_value(PplUser::snapshot(std::sync::Arc::new(user), true), USER_ID))
+            .enumerate()
+            .map(|(index, user)| user_data_value(PplUser::snapshot(std::sync::Arc::new(user), true, index), USER_ID))
             .collect(),
     )
 }
@@ -161,7 +164,7 @@ fn editor_mode_from_int(value: i32) -> FSEMode {
 
 impl UserData for PplUser {
     const TYPE_NAME: &'static str = "User";
-    const EMPTY_VALUE: Option<fn() -> VariableValue> = Some(|| user_data_value(PplUser::snapshot(std::sync::Arc::new(User::default()), false), USER_ID));
+    const EMPTY_VALUE: Option<fn() -> VariableValue> = Some(|| user_data_value(PplUser::snapshot(std::sync::Arc::new(User::default()), false, 0), USER_ID));
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         // What `PUTUSER` used to write is writable here, so the object replaces the
@@ -191,6 +194,7 @@ impl UserData for PplUser {
             registry.add_property(name.clone(), VariableType::String, false);
         }
         registry.add_property(VALID.clone(), VariableType::Boolean, false);
+        registry.add_property(RECORD_NUMBER.clone(), VariableType::Integer, false);
         for name in [&*BIRTH_DATE, &*EXPIRATION_DATE, &*PASSWORD_EXPIRES] {
             registry.add_property(name.clone(), VariableType::Date, true);
         }
@@ -207,7 +211,7 @@ impl UserData for PplUser {
             registry.add_property(name.clone(), VariableType::ULong, false);
         }
         for name in [&*UPLOAD_BYTES, &*DOWNLOAD_BYTES, &*DOWNLOAD_BYTES_TODAY] {
-            registry.add_property(name.clone(), VariableType::Unsigned, false);
+            registry.add_property(name.clone(), VariableType::ULong, false);
         }
         for name in [
             &*EXPERT_MODE,
@@ -250,6 +254,12 @@ impl UserDataValue for PplUser {
 
         let value = if *name == *VALID {
             VariableValue::new_bool(self.valid(vm))
+        } else if *name == *RECORD_NUMBER {
+            let number = match self {
+                Self::Current => vm.icy_board_state.session.cur_user_id + 1,
+                Self::Snapshot { index, .. } => *index as i32 + 1,
+            };
+            VariableValue::new_int(number.max(0))
         } else if *name == *NAME {
             string(&user.name)
         } else if *name == *ALIAS {
@@ -335,11 +345,11 @@ impl UserDataValue for PplUser {
         } else if *name == *CONTACTS {
             VariableValue::new_vector(VariableType::UserData(CONTACT_ID as u8), user.contacts.iter().map(contact_value).collect())
         } else if *name == *UPLOAD_BYTES {
-            VariableValue::new_unsigned(user.stats.total_upld_bytes)
+            VariableValue::new_ulong(user.stats.total_upld_bytes)
         } else if *name == *DOWNLOAD_BYTES {
-            VariableValue::new_unsigned(user.stats.total_dnld_bytes)
+            VariableValue::new_ulong(user.stats.total_dnld_bytes)
         } else if *name == *DOWNLOAD_BYTES_TODAY {
-            VariableValue::new_unsigned(user.stats.today_dnld_bytes.max(0) as u64)
+            VariableValue::new_ulong(user.stats.today_dnld_bytes.max(0) as u64)
         } else if *name == *EXPERT_MODE {
             VariableValue::new_bool(user.flags.expert_mode)
         } else if *name == *EDITOR_MODE {
@@ -449,6 +459,9 @@ impl UserDataValue for PplUser {
             return Err(format!("USER property {name} is read-only").into());
         }
         user.flags.is_dirty = true;
+        if let Err(err) = vm.icy_board_state.persist_current_user().await {
+            log::error!("failed to persist Session.User write: {err}");
+        }
         Ok(())
     }
 
@@ -475,6 +488,9 @@ impl UserDataValue for PplUser {
             };
             user.password.password = password;
             user.flags.is_dirty = true;
+            if let Err(err) = vm.icy_board_state.persist_current_user().await {
+                log::error!("failed to persist Session.User password: {err}");
+            }
             return Ok(VariableValue::new_bool(true));
         }
         if *name == *ADD_CONTACT {
@@ -490,8 +506,18 @@ impl UserDataValue for PplUser {
             let Some(user) = vm.icy_board_state.session.current_user.as_mut() else {
                 return Ok(VariableValue::new_bool(false));
             };
-            user.contacts.push(UserContact { service, account });
+            if !user.add_contact(UserContact { service, account }) {
+                vm.set_error(PplError::new(
+                    ERR_KIND_USER,
+                    ERR_LIMIT,
+                    format!("a user may hold at most {MAX_CONTACTS} contacts"),
+                ));
+                return Ok(VariableValue::new_bool(false));
+            }
             user.flags.is_dirty = true;
+            if let Err(err) = vm.icy_board_state.persist_current_user().await {
+                log::error!("failed to persist added contact: {err}");
+            }
             return Ok(VariableValue::new_bool(true));
         }
         if *name == *REMOVE_CONTACT {
@@ -510,6 +536,9 @@ impl UserDataValue for PplUser {
             }
             user.contacts.remove(index);
             user.flags.is_dirty = true;
+            if let Err(err) = vm.icy_board_state.persist_current_user().await {
+                log::error!("failed to persist removed contact: {err}");
+            }
             return Ok(VariableValue::new_bool(true));
         }
         if *name == *SET_NOTE {
@@ -532,6 +561,9 @@ impl UserDataValue for PplUser {
             };
             *note = text;
             user.flags.is_dirty = true;
+            if let Err(err) = vm.icy_board_state.persist_current_user().await {
+                log::error!("failed to persist note: {err}");
+            }
             return Ok(VariableValue::new_bool(true));
         }
         Err(format!("Unknown USER function {name}").into())

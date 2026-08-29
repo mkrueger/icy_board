@@ -187,3 +187,38 @@ fn the_user_reports_its_own_details() {
         run_ppl(r#"PRINT Session.User.Name, "|", Session.User.SecurityLevel, "|", Session.User.Notes.Len() > 0, "|", Session.User.Uploads"#)
     );
 }
+
+/// The record number is the 1-based position matching PCBoard's user file.
+#[test]
+fn the_user_exposes_its_one_based_record_number() {
+    assert_eq!("1 1", run_ppl(r#"PRINT Session.User.RecordNumber, " ", Board.Users[0].RecordNumber"#));
+}
+
+/// A user record holds at most 100 contacts, and the overflow reports ErrCode.Limit.
+#[test]
+fn contacts_are_capped_at_one_hundred() {
+    assert_eq!(
+        "100 0 1",
+        run_ppl(
+            r#"
+INTEGER i
+FOR i = 1 TO 100
+    Session.User.AddContact("svc" + STRING(i), "acc")
+NEXT
+BOOLEAN over = Session.User.AddContact("over", "acc")
+PRINT Session.User.Contacts.Len(), " ", over, " ", Error.Last().Code = ErrCode.Limit
+"#,
+        )
+    );
+}
+
+/// Byte totals are 64-bit, so a value above 4 GiB is not truncated.
+#[test]
+fn download_bytes_use_64_bit_storage() {
+    assert_eq!(
+        "5000000000",
+        run_ppl_on(r#"PRINT Session.User.DownloadBytes"#, |board| {
+            board.users[0].stats.total_dnld_bytes = 5_000_000_000;
+        })
+    );
+}

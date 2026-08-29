@@ -490,6 +490,9 @@ pub struct UserContact {
     pub account: String,
 }
 
+/// The most contacts one user record may hold, so a runaway PPE cannot grow it without bound.
+pub const MAX_CONTACTS: usize = 100;
+
 #[derive(Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct User {
     /// Path to the user file
@@ -797,6 +800,15 @@ mod conference_flags_format {
 impl User {
     pub fn get_name(&self) -> &String {
         &self.name
+    }
+
+    /// Appends a contact, returning `false` when the per-user cap is already reached.
+    pub fn add_contact(&mut self, contact: UserContact) -> bool {
+        if self.contacts.len() >= MAX_CONTACTS {
+            return false;
+        }
+        self.contacts.push(contact);
+        true
     }
 
     /// A keyword a third party application never wrote reads back as empty.
