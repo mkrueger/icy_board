@@ -211,6 +211,27 @@ fn restricted_request_headers_are_rejected() {
 }
 
 #[test]
+fn set_text_is_rejected_on_bodyless_methods() {
+    let response = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+    let (origin, request, server) = serve(vec![response.to_string()]);
+    let source = format!(
+        r#"
+HttpRequest req = Http.New(HttpMethod.Get, "{origin}/items")
+req = req.SetText("body", "text/plain")
+ERRCODE code = Error.Last().Code
+HttpResponse response = req.Send()
+PRINT code = ErrCode.Invalid, " ", response.OK
+"#
+    );
+    assert_eq!("1 1", run_ppl_on(&source, |board| allow_origin(board, &origin)));
+    let sent = request.recv().unwrap();
+    assert!(sent.starts_with("GET /items HTTP/1.1"), "{sent}");
+    assert!(!sent.to_ascii_lowercase().contains("content-type"), "{sent}");
+    assert!(sent.ends_with("\r\n\r\n"), "{sent}");
+    server.join().unwrap();
+}
+
+#[test]
 fn an_invalid_response_cannot_create_a_file() {
     assert_eq!(
         "0 0 1",

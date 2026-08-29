@@ -1194,9 +1194,10 @@ HttpResponse response = request.Send()
 ```
 
 The builder functions return a new request and leave the receiver unchanged.
-`HttpMethod` contains `Get`, `Head` and `Post`. Routing and hop-by-hop headers,
-including `Host`, `Content-Length`, `Connection` and `Transfer-Encoding`, cannot
-be set by a PPE.
+`HttpMethod` contains `Get`, `Head` and `Post`. `SetText()` needs a method that
+carries a body; on a `Get` or `Head` request it reports `ErrCode.Invalid` and
+leaves the request unchanged. Routing and hop-by-hop headers, including `Host`,
+`Content-Length`, `Connection` and `Transfer-Encoding`, cannot be set by a PPE.
 
 No `[ppl_http]` section is required. The default policy is equivalent to:
 

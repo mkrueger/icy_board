@@ -693,6 +693,10 @@ impl UserDataValue for PplHttpRequest {
             }
         }
         if *name == *SET_TEXT {
+            if matches!(self.request.method, Method::GET | Method::HEAD) {
+                vm.set_error(PplError::new(ERR_KIND_NET, ERR_INVALID, "HTTP GET and HEAD requests cannot carry a body"));
+                return Ok(self.clone().value());
+            }
             let text = arguments.first().map(VariableValue::as_string).unwrap_or_default();
             let content_type = arguments
                 .get(1)
