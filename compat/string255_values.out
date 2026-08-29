@@ -1,0 +1,13 @@
+---BEGIN---
+assign255=255:[  A]
+assign256=256:[ AB]
+assign300=256:[   ]
+concat255=255:[  12345]
+concat260=256:[ 123456]
+bigstr300=300:[  B]
+big_to_string=256:[   ]
+string_copy=256:[   ]
+index254=1:[  X]
+index255=1:[  Y]
+index256=1:[  Z]
+---END---

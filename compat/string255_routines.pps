@@ -1,0 +1,29 @@
+DECLARE FUNCTION ECHO(STRING value) STRING
+DECLARE FUNCTION GROW(STRING value) STRING
+
+STRING values(1), s
+BIGSTR b
+
+PRINTLN "---BEGIN---"
+
+values(0) = SPACE(254) + "AB"
+PRINTLN "array256=", LEN(values(0)), ":[", RIGHT(values(0), 3), "]"
+
+b = SPACE(299) + "B"
+s = ECHO(b)
+PRINTLN "param_return300=", LEN(s), ":[", RIGHT(s, 3), "]"
+s = GROW(SPACE(250))
+PRINTLN "return260=", LEN(s), ":[", RIGHT(s, 7), "]"
+
+PRINTLN "---END---"
+
+FUNCTION ECHO(STRING value) STRING
+    PRINTLN "param300=", LEN(value), ":[", RIGHT(value, 3), "]"
+    ECHO = value
+ENDFUNC
+
+FUNCTION GROW(STRING value) STRING
+    value = value + "1234567890"
+    PRINTLN "local260=", LEN(value), ":[", RIGHT(value, 7), "]"
+    GROW = value
+ENDFUNC

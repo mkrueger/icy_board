@@ -114,6 +114,33 @@ fn a_channel_can_be_opened_again_after_it_was_closed() {
     assert_eq!(output, "line=first line err=0\n");
 }
 
+#[test]
+fn text_and_binary_reads_truncate_legacy_strings_but_not_bigstr() {
+    let mut content = vec![b' '; 299];
+    content.extend_from_slice(b"B\r\n");
+    let output = run_ppl_with_files(
+        r#";$LANGVERSION 340
+        STRING s
+        BIGSTR b
+        FOPEN 1, "data.pag", O_RD, S_DN
+        FGET 1, s
+        FCLOSE 1
+        PRINTLN "fget300=", LEN(s), ":[", RIGHT(s, 3), "]"
+        FOPEN 1, "data.pag", O_RD, S_DN
+        FREAD 1, s, 300
+        FCLOSE 1
+        PRINTLN "fread300=", LEN(s), ":[", RIGHT(s, 3), "]"
+        FOPEN 1, "data.pag", O_RD, S_DN
+        FREAD 1, b, 300
+        FCLOSE 1
+        PRINTLN "fread_big300=", LEN(b), ":[", RIGHT(b, 3), "]"
+        "#,
+        &[("data.pag", &content)],
+    );
+
+    assert_eq!(output, "fget300=256:[   ]\nfread300=256:[   ]\nfread_big300=300:[  B]\n");
+}
+
 /// FREAD past the end of a file used to index into an empty buffer and take the
 /// whole board down with it. `PCBoard` set the error flag and carried on.
 #[test]

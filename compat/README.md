@@ -140,6 +140,16 @@ PCBoard counted bytes. Both agree for the ASCII range, so keep edge-case fixture
 inside it — a case built from box-drawing or accented characters will differ from
 the original by design, and its `.out` cannot be copied from the oracle verbatim.
 
+### Type-7 STRING capacity
+
+The `string255_*.pps` probes verify that PCBoard's type-7 `STRING` stores **256
+payload bytes**, despite commonly being described as a 255-character type.
+Assignment, concatenation, array elements, routine parameters, local variables,
+and function results all truncate to 256 bytes. Type-13 `BIGSTR` remains
+unbounded. `FPUTLN` and `FWRITE` persist all 300 probe bytes; `FGET` and `FREAD`
+truncate only when their destination is type 7. The adjacent `.out` files are
+the output captured from PCBoard 15.4/M.
+
 Printing to the screen rather than writing a file with `FOPEN` means one fixture
 works for both the original and icy_board, with no DOS paths involved.
 

@@ -1,0 +1,7 @@
+---BEGIN---
+array256=256:[ AB]
+param300=256:[   ]
+param_return300=256:[   ]
+local260=256:[ 123456]
+return260=256:[ 123456]
+---END---

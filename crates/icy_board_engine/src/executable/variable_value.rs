@@ -206,7 +206,7 @@ impl fmt::Display for VariableType {
             VariableType::Integer => write!(f, "Integer"),         // i32
             VariableType::Money => write!(f, "Money"),             // i32 - x/100 Dollar x%100 Cents
             VariableType::Float => write!(f, "Real"),              // f32
-            VariableType::String => write!(f, "String"),           // String without \0 and maximum length of 255 (Pascal like)
+            VariableType::String => write!(f, "String"),           // String without \0 and maximum length of 256
             VariableType::Time => write!(f, "Time"),               // u32 - Seconds elapsed since midnight
             VariableType::Byte => write!(f, "Byte"),               // u8
             VariableType::Word => write!(f, "Word"),               // u16
@@ -1811,6 +1811,53 @@ impl VariableValue {
     /// Panics if .
     #[must_use]
     pub fn convert_to(self, convert_to_type: VariableType) -> VariableValue {
+        if convert_to_type == VariableType::String {
+            match self.generic_data {
+                GenericVariableData::Dim1(values) => {
+                    return VariableValue {
+                        vtype: VariableType::String,
+                        generic_data: GenericVariableData::Dim1(values.into_iter().map(|value| value.convert_to(VariableType::String)).collect()),
+                        ..Default::default()
+                    };
+                }
+                GenericVariableData::Dim2(values) => {
+                    return VariableValue {
+                        vtype: VariableType::String,
+                        generic_data: GenericVariableData::Dim2(
+                            values
+                                .into_iter()
+                                .map(|row| row.into_iter().map(|value| value.convert_to(VariableType::String)).collect())
+                                .collect(),
+                        ),
+                        ..Default::default()
+                    };
+                }
+                GenericVariableData::Dim3(values) => {
+                    return VariableValue {
+                        vtype: VariableType::String,
+                        generic_data: GenericVariableData::Dim3(
+                            values
+                                .into_iter()
+                                .map(|plane| {
+                                    plane
+                                        .into_iter()
+                                        .map(|row| row.into_iter().map(|value| value.convert_to(VariableType::String)).collect())
+                                        .collect()
+                                })
+                                .collect(),
+                        ),
+                        ..Default::default()
+                    };
+                }
+                generic_data => {
+                    let mut value = VariableValue { generic_data, ..self }.as_string();
+                    if let Some((byte_index, _)) = value.char_indices().nth(256) {
+                        value.truncate(byte_index);
+                    }
+                    return VariableValue::new_string(value);
+                }
+            }
+        }
         if self.vtype == convert_to_type {
             return self;
         }
@@ -1853,7 +1900,7 @@ impl VariableValue {
                     _ => self.as_int(),
                 };
             }
-            VariableType::String => return VariableValue::new_string(self.as_string()),
+            VariableType::String => unreachable!(),
             VariableType::BigStr => {
                 return VariableValue {
                     vtype: VariableType::BigStr,
@@ -2052,6 +2099,21 @@ mod tests {
     #[test]
     fn check_variable_size() {
         assert_eq!(8, std::mem::size_of::<VariableData>());
+    }
+
+    #[test]
+    fn string_conversion_matches_pcboard_capacity() {
+        let text = "x".repeat(300);
+
+        assert_eq!(256, VariableValue::new_string(text.clone()).convert_to(VariableType::String).as_string().len());
+        assert_eq!(
+            300,
+            VariableValue::new_string(text)
+                .convert_to(VariableType::BigStr)
+                .convert_to(VariableType::BigStr)
+                .as_string()
+                .len()
+        );
     }
 
     #[test]

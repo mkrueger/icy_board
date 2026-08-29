@@ -1,0 +1,34 @@
+STRING s, t
+BIGSTR b
+
+PRINTLN "---BEGIN---"
+
+s = SPACE(254) + "A"
+PRINTLN "assign255=", LEN(s), ":[", RIGHT(s, 3), "]"
+s = SPACE(254) + "AB"
+PRINTLN "assign256=", LEN(s), ":[", RIGHT(s, 3), "]"
+s = SPACE(299) + "A"
+PRINTLN "assign300=", LEN(s), ":[", RIGHT(s, 3), "]"
+
+s = SPACE(250)
+s = s + "12345"
+PRINTLN "concat255=", LEN(s), ":[", RIGHT(s, 7), "]"
+s = s + "67890"
+PRINTLN "concat260=", LEN(s), ":[", RIGHT(s, 7), "]"
+
+b = SPACE(299) + "B"
+PRINTLN "bigstr300=", LEN(b), ":[", RIGHT(b, 3), "]"
+s = b
+PRINTLN "big_to_string=", LEN(s), ":[", RIGHT(s, 3), "]"
+t = s
+PRINTLN "string_copy=", LEN(t), ":[", RIGHT(t, 3), "]"
+
+s = SPACE(255)
+s(254) = "X"
+PRINTLN "index254=", LEN(s), ":[", RIGHT(s, 3), "]"
+s(255) = "Y"
+PRINTLN "index255=", LEN(s), ":[", RIGHT(s, 3), "]"
+s(256) = "Z"
+PRINTLN "index256=", LEN(s), ":[", RIGHT(s, 3), "]"
+
+PRINTLN "---END---"

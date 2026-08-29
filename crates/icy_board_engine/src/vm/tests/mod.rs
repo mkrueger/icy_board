@@ -46,6 +46,7 @@ mod routine_parameters;
 mod scalars;
 mod sound;
 mod static_members;
+mod string_capacity;
 mod string_members;
 mod terminal_control;
 mod terminal_gfx;
