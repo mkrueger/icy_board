@@ -162,6 +162,9 @@ Icy Board is a small suite rather than one oversized executable:
 
 ## Documentation
 
+See [Native DOS doors](docs/native_dos_doors.md) for the experimental in-process
+FreeDOS door runtime and image-management workflow.
+
 The **handbook** is the long form — installation, running a board, events, the
 FTN mailer, customizing, and a complete PPL reference. It is built from
 [docs/source](docs/source) and ships as a PDF with each release.

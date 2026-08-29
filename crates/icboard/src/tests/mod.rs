@@ -20,6 +20,13 @@ use icy_net::{Connection, ConnectionType, channel::ChannelConnection};
 
 use crate::bbs::{LoginOptions, internal_handle_client};
 
+#[test]
+fn failed_board_tool_status_is_reported() {
+    let status = std::process::Command::new("sh").args(["-c", "exit 7"]).status().unwrap();
+    let error = crate::check_board_tool_status(std::path::Path::new("icbsetup"), status).unwrap_err();
+    assert_eq!(error.to_string(), "icbsetup exited with exit status: 7");
+}
+
 mod cmd_3;
 mod cmd_7;
 mod cmd_a;

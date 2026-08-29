@@ -37,6 +37,9 @@ strum = { workspace = true }
 log = { workspace = true }
 fern = { workspace = true }
 fastrand = { workspace = true }
+reqwest = { version = "0.13", features = ["blocking"] }
+sha2 = { workspace = true }
+zip = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

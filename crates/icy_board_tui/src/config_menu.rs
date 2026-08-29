@@ -1536,11 +1536,15 @@ impl<T> ConfigMenu<T> {
     /// to rest on a greyed out one.
     fn snap_to_selectable(&self, state: &mut ConfigMenuState) {
         let count = self.count();
-        if count == 0 || self.is_selectable(state.selected) {
+        if count == 0 {
+            return;
+        }
+        state.selected %= count;
+        if self.is_selectable(state.selected) {
             return;
         }
         for offset in 1..=count {
-            let index = (state.selected + offset) % count;
+            let index = state.selected.wrapping_add(offset) % count;
             if self.is_selectable(index) {
                 state.selected = index;
                 return;
@@ -1743,5 +1747,18 @@ mod tests {
 
         menu.snap_to_selectable(&mut state);
         assert_eq!(state.selected, 1);
+    }
+
+    #[test]
+    fn snapping_accepts_the_no_selection_sentinel() {
+        let menu = menu(&[]);
+        let mut state = ConfigMenuState {
+            selected: usize::MAX,
+            ..Default::default()
+        };
+
+        menu.snap_to_selectable(&mut state);
+        assert!(state.selected < menu.count());
+        assert!(menu.is_selectable(state.selected));
     }
 }

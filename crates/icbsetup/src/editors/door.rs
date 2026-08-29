@@ -9,7 +9,7 @@ use icy_board_engine::{
     Res,
     icy_board::{
         IcyBoard, IcyBoardSerializer,
-        doors::{BBSLink, Door, DoorList, DoorServerAccount, DoorType},
+        doors::{BBSLink, Door, DoorList, DoorServerAccount, DoorType, DropFile},
         security_expr::SecurityExpression,
     },
 };
@@ -147,6 +147,29 @@ impl<'a> DoorEditor<'a> {
         self.insert_table.render_table(frame, *area);
         self.insert_table.table_state.select(sel);
     }
+
+    fn add_door(&mut self) {
+        let mut door_list = self.door_list.lock().unwrap();
+        let selected = door_list.len();
+        door_list.push(Door {
+            name: format!("door{}", selected + 1),
+            number: 0,
+            valid: false,
+            description: String::new(),
+            password: String::new(),
+            securiy_level: SecurityExpression::default(),
+            use_shell_execute: false,
+            door_type: DoorType::Local,
+            path: String::new(),
+            drop_file: Default::default(),
+            dos_command: String::new(),
+            dos_memory_mb: 64,
+        });
+        drop(door_list);
+        self.insert_table.content_length += 1;
+        self.insert_table.table_state.select(Some(selected));
+        self.mode = EditCommandMode::Table;
+    }
 }
 
 impl<'a> Page for DoorEditor<'a> {
@@ -259,26 +282,11 @@ impl<'a> Page for DoorEditor<'a> {
                 }
             }
 
+            KeyCode::F(2) => self.add_door(),
+
             _ => match self.mode {
                 EditCommandMode::Table => match key.code {
-                    KeyCode::Insert => {
-                        let name = format!("door{}", self.door_list.lock().unwrap().len() + 1);
-                        if let Ok(lock) = &mut self.door_list.lock() {
-                            lock.push(Door {
-                                name,
-                                number: 0,
-                                valid: false,
-                                description: "".to_string(),
-                                password: "".to_string(),
-                                securiy_level: SecurityExpression::default(),
-                                use_shell_execute: false,
-                                door_type: DoorType::BBSlink,
-                                path: "".to_string(),
-                                drop_file: Default::default(),
-                            });
-                        }
-                        self.insert_table.content_length += 1;
-                    }
+                    KeyCode::Insert => self.add_door(),
                     KeyCode::Delete => {
                         if let Some(selected_item) = self.insert_table.table_state.selected()
                             && selected_item < self.door_list.lock().unwrap().len()
@@ -337,6 +345,18 @@ impl<'a> Page for DoorEditor<'a> {
                                                 list.lock().unwrap()[*i].path = value;
                                             }),
                                     ),
+                                        ConfigEntry::Item(
+                                            ListItem::new(
+                                                get_text("door_editor_security"),
+                                                ListValue::Security(action.securiy_level.clone(), action.securiy_level.to_string()),
+                                            )
+                                            .with_label_width(16)
+                                            .with_update_sec_value(
+                                                &|(i, list): &(usize, Arc<Mutex<DoorList>>), value: SecurityExpression| {
+                                                    list.lock().unwrap()[*i].securiy_level = value;
+                                                },
+                                            ),
+                                        ),
                                     ConfigEntry::Item(
                                         ListItem::new(
                                             get_text("door_editor_door_type"),
@@ -355,6 +375,8 @@ impl<'a> Page for DoorEditor<'a> {
                                             &|(i, list): &(usize, Arc<Mutex<DoorList>>), value: &ComboBox| {
                                                 if value.cur_value.value == "BBSlink" {
                                                     list.lock().unwrap()[*i].door_type = DoorType::BBSlink;
+                                                } else if value.cur_value.value == "Dos" {
+                                                    list.lock().unwrap()[*i].door_type = DoorType::Dos;
                                                 } else {
                                                     list.lock().unwrap()[*i].door_type = DoorType::Local;
                                                 }
@@ -366,6 +388,42 @@ impl<'a> Page for DoorEditor<'a> {
                                             .with_label_width(16)
                                             .with_update_bool_value(&|(i, list): &(usize, Arc<Mutex<DoorList>>), value: bool| {
                                                 list.lock().unwrap()[*i].use_shell_execute = value;
+                                            }),
+                                    ),
+                                        ConfigEntry::Item(
+                                            ListItem::new(
+                                                get_text("door_editor_drop_file"),
+                                                ListValue::ComboBox(ComboBox {
+                                                    cur_value: ComboBoxValue::new(action.drop_file.to_string(), format!("{:?}", action.drop_file)),
+                                                    selected_item: 0,
+                                                    is_edit_open: false,
+                                                    first_item: 0,
+                                                    values: DropFile::iter()
+                                                        .map(|drop_file| ComboBoxValue::new(drop_file.to_string(), format!("{drop_file:?}")))
+                                                        .collect(),
+                                                }),
+                                            )
+                                            .with_label_width(16)
+                                            .with_update_combobox_value(
+                                                &|(i, list): &(usize, Arc<Mutex<DoorList>>), value: &ComboBox| {
+                                                    if let Some(drop_file) = DropFile::iter().find(|drop_file| format!("{drop_file:?}") == value.cur_value.value) {
+                                                        list.lock().unwrap()[*i].drop_file = drop_file;
+                                                    }
+                                                },
+                                            ),
+                                        ),
+                                    ConfigEntry::Item(
+                                        ListItem::new("DOS command".to_string(), ListValue::Text(60, TextFlags::None, action.dos_command.clone()))
+                                            .with_label_width(16)
+                                            .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<DoorList>>), value: String| {
+                                                list.lock().unwrap()[*i].dos_command = value;
+                                            }),
+                                    ),
+                                    ConfigEntry::Item(
+                                        ListItem::new("DOS memory MB".to_string(), ListValue::U32(action.dos_memory_mb, 1, 512))
+                                            .with_label_width(16)
+                                            .with_update_u32_value(&|(i, list): &(usize, Arc<Mutex<DoorList>>), value: u32| {
+                                                list.lock().unwrap()[*i].dos_memory_mb = value;
                                             }),
                                     ),
                                 ],
@@ -390,4 +448,51 @@ impl<'a> Page for DoorEditor<'a> {
 
 pub fn edit_doors(_board: (usize, Arc<Mutex<IcyBoard>>), path: PathBuf) -> PageMessage {
     PageMessage::OpenSubPage(Box::new(DoorEditor::new(&path).unwrap()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crossterm::event::KeyModifiers;
+
+    fn key(code: KeyCode) -> KeyEvent {
+        KeyEvent::new(code, KeyModifiers::NONE)
+    }
+
+    #[test]
+    fn empty_door_table_accepts_focus_and_f2_creates_the_first_door() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("doors.toml");
+        let mut editor = DoorEditor::new(&path).unwrap();
+        assert!(editor.door_list.lock().unwrap().is_empty());
+
+        editor.handle_key_press(key(KeyCode::Tab));
+        assert_eq!(editor.mode, EditCommandMode::Table);
+        editor.handle_key_press(key(KeyCode::PageDown));
+        editor.handle_key_press(key(KeyCode::F(2)));
+
+        assert_eq!(editor.door_list.lock().unwrap().len(), 1);
+        assert_eq!(editor.insert_table.table_state.selected(), Some(0));
+    }
+
+    #[test]
+    fn door_form_exposes_security_and_every_drop_file_format() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("doors.toml");
+        let mut editor = DoorEditor::new(&path).unwrap();
+        editor.handle_key_press(key(KeyCode::Tab));
+        editor.handle_key_press(key(KeyCode::F(2)));
+        editor.handle_key_press(key(KeyCode::Enter));
+
+        let entries = &editor.edit_config.as_ref().unwrap().entry;
+        assert_eq!(entries.iter().filter(|entry| matches!(entry, ConfigEntry::Item(item) if matches!(item.value, ListValue::Security(..)))).count(), 1);
+        let drop_files = entries.iter().find_map(|entry| match entry {
+            ConfigEntry::Item(item) => match &item.value {
+                ListValue::ComboBox(combo) if combo.values.len() == DropFile::iter().count() => Some(combo),
+                _ => None,
+            },
+            _ => None,
+        });
+        assert_eq!(drop_files.unwrap().values.len(), 13);
+    }
 }

@@ -16,7 +16,7 @@ use icy_board_tui::{app::SaveChoice, print_error, term, theme::set_tui_theme};
 use import::{PCBoardImporter, console_logger::ConsoleLogger};
 use semver::Version;
 use std::{
-    fs,
+    fs::{self, File},
     path::{Path, PathBuf},
     process::{self, exit},
     sync::{Arc, Mutex},
@@ -59,6 +59,8 @@ enum Commands {
     Create(Create),
     PPEConvert(PPEConvert),
     Check(Check),
+    DosImage(DosImage),
+    DosCopy(DosCopy),
 }
 
 #[derive(FromArgs, PartialEq, Debug)]
@@ -111,6 +113,30 @@ struct Check {
     /// path/file name of the icyboard.toml configuration file
     #[argh(positional)]
     file: Option<PathBuf>,
+}
+
+#[derive(FromArgs, PartialEq, Debug)]
+/// Downloads and prepares the native FreeDOS door image and BIOS files
+#[argh(subcommand, name = "dos-image")]
+struct DosImage {
+    /// board directory that will receive assets/dos
+    #[argh(positional)]
+    directory: PathBuf,
+}
+
+#[derive(FromArgs, PartialEq, Debug)]
+/// Copies a host file into a prepared DOS disk image
+#[argh(subcommand, name = "dos-copy")]
+struct DosCopy {
+    /// prepared raw FreeDOS image
+    #[argh(positional)]
+    image: PathBuf,
+    /// host file to copy
+    #[argh(positional)]
+    source: PathBuf,
+    /// destination path inside DOS, for example DOORS/LORD/LORD.EXE
+    #[argh(positional)]
+    destination: String,
 }
 
 fn main() -> Result<()> {
@@ -237,6 +263,15 @@ fn main() -> Result<()> {
                 return Ok(());
             }
             process::exit(1);
+        }
+        Some(Commands::DosImage(DosImage { directory })) => {
+            prepare_dos_image(directory)?;
+            return Ok(());
+        }
+        Some(Commands::DosCopy(DosCopy { image, source, destination })) => {
+            icy_board_engine::icy_board::doors::dos::copy_file_into_image(image, source, destination).map_err(|error| eyre!(error.to_string()))?;
+            println!("Copied {} to {} in {}", source.display(), destination, image.display());
+            return Ok(());
         }
         _ => {}
     }
@@ -387,6 +422,43 @@ fn init_log(path: &Path) -> Result<()> {
         // Apply globally
         .apply()
         .map_err(|err| eyre!("Can't initialize logging: {err}"))?;
+    Ok(())
+}
+
+fn prepare_dos_image(board_directory: &Path) -> Result<()> {
+    use sha2::{Digest, Sha256};
+    use std::io::Cursor;
+
+    const FREEDOS_URL: &str = "https://download.freedos.org/1.4/FD14-LiteUSB.zip";
+    const FREEDOS_SHA256: &str = "857dcd2ebf9d3d094320154db5fb5b830acba6fb98f981a95a0ca7ab3350338b";
+    const BIOS_URL: &str = "https://raw.githubusercontent.com/copy/v86/master/bios/seabios.bin";
+    const BIOS_SHA256: &str = "73e3f359102e3a9982c35fce98eb7cd08f18303ac7f1ba6ebfbe6cdc1c244d98";
+    const VGA_BIOS_URL: &str = "https://raw.githubusercontent.com/copy/v86/master/bios/vgabios.bin";
+    const VGA_BIOS_SHA256: &str = "a4bc0d80cc3ca028c73dafa8fee396b8d054ce87ebd8abfbd31b06b437607880";
+
+    fn download(url: &str, expected: &str) -> Result<Vec<u8>> {
+        let bytes = reqwest::blocking::get(url)?.error_for_status()?.bytes()?.to_vec();
+        let actual = format!("{:x}", Sha256::digest(&bytes));
+        if actual != expected {
+            return Err(eyre!("checksum mismatch for {url}: expected {expected}, got {actual}"));
+        }
+        Ok(bytes)
+    }
+
+    let destination = board_directory.join("assets/dos");
+    fs::create_dir_all(&destination)?;
+    println!("Downloading FreeDOS 1.4 LiteUSB...");
+    let archive = download(FREEDOS_URL, FREEDOS_SHA256)?;
+    let mut archive = zip::ZipArchive::new(Cursor::new(archive))?;
+    let mut image = archive.by_name("FD14LITE.img")?;
+    let image_path = destination.join("freedos.img");
+    let mut output = File::create(&image_path)?;
+    std::io::copy(&mut image, &mut output)?;
+    drop(output);
+    icy_board_engine::icy_board::doors::dos::configure_base_image(&image_path).map_err(|error| eyre!(error.to_string()))?;
+    fs::write(destination.join("seabios.bin"), download(BIOS_URL, BIOS_SHA256)?)?;
+    fs::write(destination.join("vgabios.bin"), download(VGA_BIOS_URL, VGA_BIOS_SHA256)?)?;
+    println!("Native DOS assets prepared in {}", destination.display());
     Ok(())
 }
 

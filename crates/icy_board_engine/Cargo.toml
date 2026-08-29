@@ -61,7 +61,9 @@ rand_core = { version = "0.6", features = ["getrandom"] }
 bcrypt = "0.19.3"
 fs4 = "1"
 base64 = "0.22.1"
-sha2 = "0.10.9"
+sha2 = { workspace = true }
+fatfs = { workspace = true }
+x86-native = { workspace = true }
 
 # interpreter deps
 [dev-dependencies]

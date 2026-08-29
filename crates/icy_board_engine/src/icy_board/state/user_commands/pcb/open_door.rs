@@ -20,6 +20,60 @@ use regex::Regex;
 use thiserror::Error;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
+static DOS_MACHINE_LOCK: std::sync::LazyLock<tokio::sync::Mutex<()>> = std::sync::LazyLock::new(|| tokio::sync::Mutex::new(()));
+
+fn dos_output_for_terminal(bytes: &[u8], utf8: bool) -> Vec<u8> {
+    if !utf8 {
+        return bytes.to_vec();
+    }
+    let mut output = Vec::with_capacity(bytes.len());
+    let mut utf8_buffer = [0; 4];
+    for byte in bytes {
+        let encoded = codepages::tables::CP437_TO_UNICODE[*byte as usize].encode_utf8(&mut utf8_buffer);
+        output.extend_from_slice(encoded.as_bytes());
+    }
+    output
+}
+
+fn append_cp437(output: &mut Vec<u8>, text: &str) {
+    output.extend(text.chars().map(|ch| codepages::tables::UNICODE_TO_CP437.get(&ch).copied().unwrap_or(b'.')));
+}
+
+#[derive(Default)]
+struct DosInputEncoder {
+    pending_utf8: Vec<u8>,
+}
+
+impl DosInputEncoder {
+    fn encode(&mut self, bytes: &[u8], utf8: bool) -> Vec<u8> {
+        if !utf8 {
+            return bytes.to_vec();
+        }
+        self.pending_utf8.extend_from_slice(bytes);
+        let mut output = Vec::with_capacity(self.pending_utf8.len());
+        loop {
+            match std::str::from_utf8(&self.pending_utf8) {
+                Ok(text) => {
+                    append_cp437(&mut output, text);
+                    self.pending_utf8.clear();
+                    break;
+                }
+                Err(error) => {
+                    let valid_up_to = error.valid_up_to();
+                    let error_len = error.error_len();
+                    let valid = std::str::from_utf8(&self.pending_utf8[..valid_up_to]).expect("valid UTF-8 prefix");
+                    append_cp437(&mut output, valid);
+                    self.pending_utf8.drain(..valid_up_to);
+                    let Some(error_len) = error_len else { break };
+                    output.push(b'.');
+                    self.pending_utf8.drain(..error_len);
+                }
+            }
+        }
+        output
+    }
+}
+
 impl IcyBoardState {
     /// `PCBoard`'s command dispatcher falls through to the door list when a caller
     /// with OPEN access types a word that is not a command; the door name is
@@ -163,6 +217,9 @@ impl IcyBoardState {
             DoorType::Local => {
                 self.run_local_door(door, door_number).await?;
             }
+            DoorType::Dos => {
+                self.run_dos_door(door, door_number).await?;
+            }
         }
         Ok(())
     }
@@ -245,6 +302,99 @@ impl IcyBoardState {
         }
         log::info!("door exited.");
 
+        Ok(())
+    }
+
+    async fn run_dos_door(&mut self, door: &crate::icy_board::doors::Door, door_number: usize) -> Res<()> {
+        let _machine_guard = DOS_MACHINE_LOCK.lock().await;
+        let source_path = self.resolve_path(&door.path);
+        let assets = self.resolve_path(&"assets/dos");
+        let base_image_path = assets.join("freedos.img");
+        let image_path = assets.join("doors").join(crate::icy_board::doors::dos::image_file_name(&door.name));
+        let bios_path = assets.join("seabios.bin");
+        let vga_bios_path = assets.join("vgabios.bin");
+        if !source_path.is_dir() {
+            return Err(format!("DOS door path is not a directory: {}", source_path.display()).into());
+        }
+        if door.dos_command.trim().is_empty() {
+            return Err(format!("DOS command is empty for door '{}'", door.name).into());
+        }
+        crate::icy_board::doors::dos::validate_simple_command(&source_path, &door.dos_command)?;
+        for path in [&base_image_path, &bios_path, &vga_bios_path] {
+            if !path.is_file() {
+                return Err(format!(
+                    "native DOS asset not found: {}. Run 'icbsetup dos-image {}' first",
+                    path.display(),
+                    self.root_path.display()
+                )
+                .into());
+            }
+        }
+        if crate::icy_board::doors::dos::create_door_image(&base_image_path, &image_path, &source_path)? {
+            log::info!("Created DOS door image {} from {}", image_path.display(), source_path.display());
+        }
+
+        let drop_directory = tempfile::tempdir()?;
+        door.create_drop_file(self, drop_directory.path(), door_number).await?;
+        let mut files = Vec::new();
+        for entry in std::fs::read_dir(drop_directory.path())? {
+            let entry = entry?;
+            if entry.file_type()?.is_file() {
+                files.push((entry.file_name().to_string_lossy().to_string(), std::fs::read(entry.path())?));
+            }
+        }
+        let drop_file = files.first().map(|(name, _)| name.as_str()).unwrap_or("");
+        let run_batch = crate::icy_board::doors::dos::expand_run_batch(door, self.node, drop_file);
+        crate::icy_board::doors::dos::inject_session_files(&image_path, &files, &run_batch)?;
+
+        let mut session = crate::icy_board::doors::dos::start_session(&image_path, &bios_path, &vga_bios_path, door.dos_memory_mb)?;
+        let mut input = vec![0; 32 * 1024];
+        let mut input_encoder = DosInputEncoder::default();
+        let startup_timeout = tokio::time::sleep(Duration::from_secs(30));
+        tokio::pin!(startup_timeout);
+        let mut received_output = false;
+        loop {
+            tokio::select! {
+                output = session.output.recv() => {
+                    let Some(output) = output else { break };
+                    received_output = true;
+                    let caller_output = dos_output_for_terminal(&output, self.session.term_caps.is_utf8);
+                    self.connection.send(&caller_output).await?;
+                    self.track_door_output(&output);
+                    let node_state = &mut self.node_state.lock().await;
+                    if let Some(sysop_connection) = &mut node_state[self.node].as_mut().unwrap().sysop_connection {
+                        let _ = sysop_connection.send(&output).await;
+                    }
+                }
+                read = self.connection.read(&mut input) => {
+                    let size = read?;
+                    let dos_input = input_encoder.encode(&input[..size], self.session.term_caps.is_utf8);
+                    if size == 0 || (!dos_input.is_empty() && session.input.send(dos_input).is_err()) {
+                        break;
+                    }
+                }
+                result = &mut session.finished => {
+                    result.map_err(|_| "native DOS emulator thread ended unexpectedly")??;
+                    break;
+                }
+                _ = &mut startup_timeout, if !received_output => {
+                    let stopped = session.stop().await;
+                    if !stopped {
+                        log::error!(
+                            "native DOS emulator for '{}' did not stop within 5 seconds after startup timeout",
+                            door.name
+                        );
+                    }
+                    return Err(format!(
+                        "native DOS door '{}' produced no COM1 output within 30 seconds; emulator stopped: {}; image: {}",
+                        door.name,
+                        stopped,
+                        image_path.display()
+                    )
+                    .into());
+                }
+            }
+        }
         Ok(())
     }
 
@@ -428,12 +578,28 @@ pub enum BBSLinkError {
 
 #[cfg(test)]
 mod test {
-    use crate::icy_board::state::user_commands::pcb::open_door::BBSLinkError;
+    use crate::icy_board::state::user_commands::pcb::open_door::{BBSLinkError, DosInputEncoder, dos_output_for_terminal};
 
     use super::parse_bbslink_error;
     #[test]
     fn test_parse_bbslink_error() {
         let output = parse_bbslink_error("Unauthorised (Error 7)*xxUnauthorised (Error 2)");
         assert_eq!(output, vec![BBSLinkError::Error7, BBSLinkError::Error2]);
+    }
+
+    #[test]
+    fn dos_output_is_cp437_for_legacy_terminals_and_utf8_for_unicode_terminals() {
+        let cp437 = [0x1B, b'[', b'1', b'm', 0x81, 0x82, 0xC4];
+        assert_eq!(dos_output_for_terminal(&cp437, false), cp437);
+        assert_eq!(dos_output_for_terminal(&cp437, true), "\x1B[1müé─".as_bytes());
+    }
+
+    #[test]
+    fn utf8_dos_input_is_encoded_as_cp437_across_read_boundaries() {
+        let mut encoder = DosInputEncoder::default();
+        assert_eq!(encoder.encode(&[0x1B, b'[', b'A', 0xC3], true), b"\x1B[A");
+        assert_eq!(encoder.encode(&[0xBC, 0xE2, 0x94], true), vec![0x81]);
+        assert_eq!(encoder.encode(&[0x80], true), vec![0xC4]);
+        assert_eq!(encoder.encode("€".as_bytes(), true), b".");
     }
 }

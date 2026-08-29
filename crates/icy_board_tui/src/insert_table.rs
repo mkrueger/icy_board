@@ -106,6 +106,9 @@ impl<'a> InsertTable<'a> {
     }
 
     fn page_down(&mut self) {
+        if self.content_length == 0 {
+            return;
+        }
         let i = match self.table_state.selected() {
             Some(i) => (i + 10).min(self.content_length - 1),
             None => 0,

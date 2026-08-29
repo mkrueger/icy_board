@@ -125,11 +125,13 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
         .level(log::LevelFilter::Info)
         // - and per-module overrides
         .level_for("hyper", log::LevelFilter::Info)
+        .level_for("x86_native", log::LevelFilter::Debug)
         // Output to stdout, files, and other Dispatch configurations
         .chain(fern::log_file(&log_file).map_err(|err| std::io::Error::new(err.kind(), format!("Can't open log file {}: {err}", log_file.display())))?)
         // Apply globally
         .apply()
         .map_err(|err| format!("Can't initialize logging: {err}"))?;
+    let _ = x86::set_native_log_handler(|message| log::debug!(target: "x86_native", "{message}"));
     match IcyBoard::load(&config_file) {
         Ok(mut icy_board) => {
             icy_board.resolve_paths();
@@ -182,7 +184,7 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
                                 bbs_guard.open_connections.clone()
                             };
                             if states.lock().await.iter().any(Option::is_some) {
-                                print_error("Board tools cannot start while callers are online.".to_string());
+                                app.show_error("Board tools cannot start while callers are online.");
                                 connection_token = CancellationToken::new();
                                 web_admin = start_connections(&bbs, &board, &config_file, connection_token.clone()).await;
                                 continue;
@@ -193,7 +195,16 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
                         let result = run_message(msg, &mut terminal, &board, &mut bbs, arguments.full_screen, String::new(), web_admin.clone()).await;
 
                         if launches_board_tool {
-                            board_lock = Some(BoardLock::acquire(&board.lock().await.root_path)?);
+                            match BoardLock::acquire(&board.lock().await.root_path) {
+                                Ok(lock) => board_lock = Some(lock),
+                                Err(err) => {
+                                    log::error!("could not reacquire board lock after running tool: {err}");
+                                    app.show_error(format!("Could not reacquire the board lock: {err}"));
+                                    connection_token = CancellationToken::new();
+                                    web_admin = start_connections(&bbs, &board, &config_file, connection_token.clone()).await;
+                                    continue;
+                                }
+                            }
                         }
 
                         match result {
@@ -212,10 +223,13 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
                                 }
                             }
                             Err(err) => {
-                                restore_terminal()?;
                                 log::error!("while processing call wait screen message: {}", err);
-                                print_error(err.to_string());
-                                return Err(err);
+                                app.show_error(err.to_string());
+                                if launches_board_tool {
+                                    connection_token = CancellationToken::new();
+                                    web_admin = start_connections(&bbs, &board, &config_file, connection_token.clone()).await;
+                                }
+                                continue;
                             }
                         }
                     }
@@ -510,15 +524,13 @@ where
         CallWaitMessage::SystemManager => {
             let path = std::env::current_exe()?.with_file_name("icbsm");
             let board_file = board.lock().await.file_name.clone();
-            icy_board_tui::term::with_terminal(|| Command::new(&path).arg(board_file.as_os_str()).status())
-                .map_err(|err| format!("Can't run {}: {err}", path.display()))?;
+            run_board_tool(&path, &board_file)?;
             return Ok(true);
         }
         CallWaitMessage::Setup => {
             let path = std::env::current_exe()?.with_file_name("icbsetup");
             let board_file = board.lock().await.file_name.clone();
-            icy_board_tui::term::with_terminal(|| Command::new(&path).arg(board_file.as_os_str()).status())
-                .map_err(|err| format!("Can't run {}: {err}", path.display()))?;
+            run_board_tool(&path, &board_file)?;
             return Ok(true);
         }
         CallWaitMessage::IcbText => {
@@ -526,8 +538,7 @@ where
             let icbtxt_path = board.lock().await.resolve_file(&icbtxt_path);
 
             let path = std::env::current_exe()?.with_file_name("mkicbtxt");
-            icy_board_tui::term::with_terminal(|| Command::new(&path).arg(icbtxt_path.as_os_str()).status())
-                .map_err(|err| format!("Can't run {}: {err}", path.display()))?;
+            run_board_tool(&path, &icbtxt_path)?;
             return Ok(true);
         }
         CallWaitMessage::ToggleStatistics => unsafe {
@@ -556,11 +567,48 @@ where
     Ok(false)
 }
 
+fn run_board_tool(path: &std::path::Path, argument: &std::path::Path) -> Res<()> {
+    let status = icy_board_tui::term::with_terminal(|| Command::new(path).arg(argument.as_os_str()).status())
+        .map_err(|err| format!("Can't run {}: {err}", path.display()))?;
+    check_board_tool_status(path, status)
+}
+
+fn check_board_tool_status(path: &std::path::Path, status: std::process::ExitStatus) -> Res<()> {
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!("{} exited with {}", path.display(), status).into())
+    }
+}
+
 fn init_terminal() -> Res<ratatui::DefaultTerminal> {
     color_eyre::install()?;
+    install_panic_hook();
     let terminal = ratatui::init();
     icy_board_tui::term::apply_dos_palette()?;
     Ok(terminal)
+}
+
+fn install_panic_hook() {
+    let original = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |panic_info| {
+        let thread = std::thread::current();
+        let thread = thread.name().unwrap_or("unnamed");
+        let location = panic_info
+            .location()
+            .map(|location| format!("{}:{}:{}", location.file(), location.line(), location.column()))
+            .unwrap_or_else(|| "unknown location".to_string());
+        let message = panic_info
+            .payload()
+            .downcast_ref::<&str>()
+            .copied()
+            .or_else(|| panic_info.payload().downcast_ref::<String>().map(String::as_str))
+            .unwrap_or("non-string panic payload");
+        log::error!("panic in thread '{thread}' at {location}: {message}");
+        ratatui::restore();
+        let _ = icy_board_tui::term::restore_palette();
+        original(panic_info);
+    }));
 }
 
 pub fn restore_terminal() -> Res<()> {

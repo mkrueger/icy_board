@@ -20,7 +20,7 @@ use ratatui::{
     prelude::Backend,
     style::{Color, Style, Stylize},
     text::Line,
-    widgets::{Block, BorderType, Borders, Widget},
+    widgets::{Block, BorderType, Borders, Clear, Paragraph, Widget, Wrap},
 };
 
 use tokio::sync::Mutex;
@@ -60,6 +60,7 @@ pub struct CallWaitScreen {
     board_name: String,
     date_format: String,
     statistics: Statistics,
+    error_message: Option<String>,
 }
 
 impl CallWaitScreen {
@@ -173,7 +174,13 @@ impl CallWaitScreen {
             board_name,
             date_format,
             statistics: Statistics::default(),
+            error_message: None,
         })
+    }
+
+    pub fn show_error(&mut self, message: impl Into<String>) {
+        self.selected = None;
+        self.error_message = Some(message.into());
     }
 
     pub async fn reset(&mut self, board: &Arc<Mutex<IcyBoard>>) {
@@ -220,11 +227,17 @@ impl CallWaitScreen {
 
             let timeout = tick_rate.saturating_sub(last_tick.elapsed());
 
-            if self.selected.is_none()
-                && event::poll(timeout)?
+            if event::poll(timeout)?
                 && let Event::Key(key) = event::read()?
                 && key.kind == KeyEventKind::Press
             {
+                if self.error_message.take().is_some() {
+                    self.selected = None;
+                    continue;
+                }
+                if self.selected.is_some() {
+                    continue;
+                }
                 match key.code {
                     KeyCode::Esc => {
                         return Ok(CallWaitMessage::Exit(false));
@@ -260,6 +273,7 @@ impl CallWaitScreen {
 
         let ver = VERSION.to_string();
         let area = get_screen_size(frame, full_screen);
+        let screen_area = area;
 
         let b = Block::default()
             .title_top(Line::from(format!(" {} ", dt)).style(Style::new().white()).left_aligned())
@@ -408,6 +422,23 @@ impl CallWaitScreen {
                 .theme(stat_teme)
                 .render(uls.inner(Margin { horizontal, vertical: 0 }), frame.buffer_mut());
         }
+
+        if let Some(message) = &self.error_message {
+            let width = screen_area.width.saturating_sub(8).clamp(30, 72).min(screen_area.width);
+            let height = 8.min(screen_area.height.saturating_sub(2)).max(3).min(screen_area.height);
+            let popup = Rect::new(
+                screen_area.x + screen_area.width.saturating_sub(width) / 2,
+                screen_area.y + screen_area.height.saturating_sub(height) / 2,
+                width,
+                height,
+            );
+            frame.render_widget(Clear, popup);
+            Paragraph::new(format!("{message}\n\nPress any key to continue."))
+                .wrap(Wrap { trim: true })
+                .style(Style::new().fg(DOS_WHITE).bg(DOS_RED))
+                .block(Block::bordered().title(" Error ").border_type(BorderType::Double))
+                .render(popup, frame.buffer_mut());
+        }
     }
 
     fn get_select_state(&self, button: i32) -> State {
@@ -528,5 +559,46 @@ impl<'a> Widget for PcbButton<'a> {
             &self.label,
             area.width,
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ratatui::backend::TestBackend;
+
+    #[test]
+    fn tool_error_is_rendered_as_a_visible_dialog() {
+        let buttons = (0..15)
+            .map(|_| Button {
+                title: "Tool".into(),
+                description: "Description".into(),
+                message: CallWaitMessage::ToggleAlarm,
+            })
+            .collect();
+        let mut screen = CallWaitScreen {
+            x: 0,
+            y: 0,
+            selected: None,
+            buttons,
+            board_name: "Test Board".into(),
+            date_format: "%m/%d/%y".into(),
+            statistics: Statistics::default(),
+            error_message: None,
+        };
+        screen.show_error("icbsetup exited with exit status: 7");
+        let backend = TestBackend::new(80, 25);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|frame| screen.ui(frame, false)).unwrap();
+
+        let text = terminal
+            .backend()
+            .buffer()
+            .content()
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<String>();
+        assert!(text.contains("icbsetup exited with exit status: 7"));
+        assert!(text.contains("Press any key to continue."));
     }
 }

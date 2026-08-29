@@ -23,6 +23,7 @@ mod door32_sys;
 mod door_sys;
 mod doorfile_sr;
 mod dorinfo_x;
+pub mod dos;
 mod exitinfo_bbs;
 mod jumper_dat;
 pub mod pcboard;
@@ -49,6 +50,7 @@ pub enum DoorType {
     #[default]
     Local,
     BBSlink,
+    Dos,
 }
 
 impl std::fmt::Display for DoorType {
@@ -56,13 +58,14 @@ impl std::fmt::Display for DoorType {
         match self {
             DoorType::Local => write!(f, "Local"),
             DoorType::BBSlink => write!(f, "BBSlink"),
+            DoorType::Dos => write!(f, "Dos"),
         }
     }
 }
 
 impl DoorType {
     pub fn iter() -> impl Iterator<Item = DoorType> {
-        vec![DoorType::Local, DoorType::BBSlink].into_iter()
+        vec![DoorType::Local, DoorType::BBSlink, DoorType::Dos].into_iter()
     }
 }
 
@@ -73,6 +76,7 @@ impl FromStr for DoorType {
         match s {
             "Local" => Ok(DoorType::Local),
             "BBSlink" => Ok(DoorType::BBSlink),
+            "Dos" => Ok(DoorType::Dos),
             _ => Err(format!("Invalid DoorType: {s}")),
         }
     }
@@ -105,9 +109,50 @@ pub enum DropFile {
     /// `QuickBBS` + `RemoteAccess` 2.62 extensions
     ExitInfoBBS,
     /// 2AM BBS
-    JumperDat, // currently unsupported (need more info on them)
-               // USERINFO.DAT WildCat!
-               // INFO.BBS  Phoenix BBS
+    JumperDat,
+    // USERINFO.DAT WildCat!
+    // INFO.BBS  Phoenix BBS
+}
+
+impl DropFile {
+    pub fn iter() -> impl Iterator<Item = DropFile> {
+        [
+            DropFile::None,
+            DropFile::PCBoard,
+            DropFile::DoorSys,
+            DropFile::Door32Sys,
+            DropFile::DorInfo,
+            DropFile::CallInfo,
+            DropFile::DoorFileSR,
+            DropFile::CurruserBBS,
+            DropFile::ChainTXT,
+            DropFile::TriBBSSYS,
+            DropFile::SFDoorsDAT,
+            DropFile::ExitInfoBBS,
+            DropFile::JumperDat,
+        ]
+        .into_iter()
+    }
+}
+
+impl std::fmt::Display for DropFile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            DropFile::None => "None",
+            DropFile::PCBoard => "PCBOARD.SYS + USER.SYS",
+            DropFile::DoorSys => "DOOR.SYS",
+            DropFile::Door32Sys => "DOOR32.SYS",
+            DropFile::DorInfo => "DORINFOx.DEF",
+            DropFile::CallInfo => "CALLINFO.BBS",
+            DropFile::DoorFileSR => "DOORFILE.SR",
+            DropFile::CurruserBBS => "CURRUSER.BBS",
+            DropFile::ChainTXT => "CHAIN.TXT",
+            DropFile::TriBBSSYS => "TRIBBS.SYS",
+            DropFile::SFDoorsDAT => "SFDOORS.DAT",
+            DropFile::ExitInfoBBS => "EXITINFO.BBS",
+            DropFile::JumperDat => "JUMPER.DAT",
+        })
+    }
 }
 
 #[serde_as]
@@ -136,6 +181,16 @@ pub struct Door {
 
     #[serde(default)]
     pub drop_file: DropFile,
+
+    #[serde(default)]
+    pub dos_command: String,
+
+    #[serde(default = "default_dos_memory_mb")]
+    pub dos_memory_mb: u32,
+}
+
+fn default_dos_memory_mb() -> u32 {
+    64
 }
 impl Door {
     pub async fn create_drop_file(&self, state: &super::state::IcyBoardState, path: &std::path::Path, door_number: usize) -> Res<()> {
@@ -279,6 +334,8 @@ impl DoorList {
                 } else {
                     DropFile::None
                 },
+                dos_command: String::new(),
+                dos_memory_mb: default_dos_memory_mb(),
             };
             result.doors.push(door);
         }
@@ -302,4 +359,37 @@ impl DerefMut for DoorList {
 
 impl IcyBoardSerializer for DoorList {
     const FILE_TYPE: &'static str = "doors";
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn drop_file_choices_cover_every_serialized_variant() {
+        let choices = DropFile::iter().collect::<Vec<_>>();
+        assert_eq!(choices.len(), 13);
+        for choice in &choices {
+            assert_eq!(choices.iter().filter(|candidate| *candidate == choice).count(), 1);
+            assert!(!choice.to_string().is_empty());
+        }
+    }
+
+    #[test]
+    fn door_security_and_drop_file_round_trip() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("doors.toml");
+        let mut list = DoorList::default();
+        list.doors.push(Door {
+            name: "BRE".into(),
+            securiy_level: SecurityExpression::from_str("U_SEC() >= 50").unwrap(),
+            drop_file: DropFile::DoorSys,
+            ..Door::default()
+        });
+
+        list.save(&path).unwrap();
+        let loaded = DoorList::load(&path).unwrap();
+        assert!(loaded.doors[0].securiy_level == list.doors[0].securiy_level);
+        assert_eq!(loaded.doors[0].drop_file, DropFile::DoorSys);
+    }
 }

@@ -3374,8 +3374,8 @@ area_editor_qwk_number-help=
 
 doors_editor_title=DOORS File Editor { $conference }
 doors_editor_edit_title=Edit Door
-doors_editor_key_help=↑ Up  ↓ Down  Tab Edit Doors ␛ Back
-doors_editor_key_help_door=↑ Up  ↓ Down  INS New  ␡ Delete  Tab Edit BBSLINK ␛ Back
+doors_editor_key_help=↑ Up  ↓ Down  F2 New Door  Tab Edit Doors  ␛ Back
+doors_editor_key_help_door=↑ Up  ↓ Down  F2/INS New  ␡ Delete  Tab Edit BBSLINK  ␛ Back
 
 doors_editor_header_door=Door
 doors_editor_header_description=Description
@@ -3414,8 +3414,22 @@ door_editor_door_type-status=Door Type
 door_editor_door_type-help=
     # Door Type
 
-    What kind of program this is, which decides the drop file the board writes
-    and how the door is handed the caller's session.
+    What kind of program this is and how the door is handed the caller's session.
+
+door_editor_security=Security
+door_editor_security-status=Required security expression
+door_editor_security-help=
+    # Security
+
+    The security expression a caller must satisfy before the door can start.
+
+door_editor_drop_file=Drop File
+door_editor_drop_file-status=Drop file generated before the door starts
+door_editor_drop_file-help=
+    # Drop File
+
+    The BBS session file generated in the door directory before launch. DOS
+    doors receive the same file in C:\DOOR and C:\ICB.
 
 door_editor_use_shell_execute=Use Shell Execute
 door_editor_use_shell_execute-status=Use Shell Execute

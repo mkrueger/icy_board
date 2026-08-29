@@ -81,7 +81,8 @@ pub fn init() -> Result<TerminalType> {
     let options = TerminalOptions {
         viewport: Viewport::Fullscreen,
     };
-    let terminal = ratatui::init_with_options(options);
+    let mut terminal = ratatui::init_with_options(options);
+    terminal.clear()?;
     Ok(terminal)
 }
 
