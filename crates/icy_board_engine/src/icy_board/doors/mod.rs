@@ -188,13 +188,19 @@ pub struct Door {
     #[serde(default = "default_dos_memory_mb")]
     pub dos_memory_mb: u32,
 
-    /// Maximum wall-clock runtime for this DOS door; zero leaves it unlimited.
-    #[serde(default)]
+    /// Maximum wall-clock runtime for this DOS door; zero uses the safe default.
+    #[serde(default = "default_dos_max_runtime_seconds")]
     pub dos_max_runtime_seconds: u32,
 }
 
 fn default_dos_memory_mb() -> u32 {
     64
+}
+
+pub const DEFAULT_DOS_MAX_RUNTIME_SECONDS: u32 = 3600;
+
+fn default_dos_max_runtime_seconds() -> u32 {
+    DEFAULT_DOS_MAX_RUNTIME_SECONDS
 }
 impl Door {
     pub async fn create_drop_file(&self, state: &super::state::IcyBoardState, path: &std::path::Path, door_number: usize) -> Res<()> {
@@ -340,7 +346,7 @@ impl DoorList {
                 },
                 dos_command: String::new(),
                 dos_memory_mb: default_dos_memory_mb(),
-                dos_max_runtime_seconds: 0,
+                dos_max_runtime_seconds: default_dos_max_runtime_seconds(),
             };
             result.doors.push(door);
         }

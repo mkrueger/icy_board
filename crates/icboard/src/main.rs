@@ -604,7 +604,8 @@ fn install_panic_hook() {
             .copied()
             .or_else(|| panic_info.payload().downcast_ref::<String>().map(String::as_str))
             .unwrap_or("non-string panic payload");
-        log::error!("panic in thread '{thread}' at {location}: {message}");
+        let backtrace = std::backtrace::Backtrace::force_capture();
+        log::error!("panic in thread '{thread}' at {location}: {message}\n{backtrace}");
         ratatui::restore();
         let _ = icy_board_tui::term::restore_palette();
         original(panic_info);

@@ -23,18 +23,21 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 static DOS_MACHINE_LOCK: std::sync::LazyLock<tokio::sync::Mutex<()>> = std::sync::LazyLock::new(|| tokio::sync::Mutex::new(()));
 
 fn dos_runtime_remaining(login_date: chrono::DateTime<chrono::Utc>, time_limit: i32, max_runtime_seconds: u32) -> Option<Duration> {
+    let maximum = Duration::from_secs(
+        if max_runtime_seconds == 0 {
+            crate::icy_board::doors::DEFAULT_DOS_MAX_RUNTIME_SECONDS
+        } else {
+            max_runtime_seconds
+        }
+        .into(),
+    );
     let session_remaining = if time_limit == 0 {
         None
     } else {
         let deadline = login_date + chrono::Duration::minutes(time_limit.into());
         Some((deadline - chrono::Utc::now()).to_std().unwrap_or(Duration::ZERO))
     };
-    match (session_remaining, max_runtime_seconds) {
-        (Some(remaining), 0) => Some(remaining),
-        (Some(remaining), maximum) => Some(remaining.min(Duration::from_secs(maximum.into()))),
-        (None, 0) => None,
-        (None, maximum) => Some(Duration::from_secs(maximum.into())),
-    }
+    Some(session_remaining.map_or(maximum, |remaining| remaining.min(maximum)))
 }
 
 fn dos_output_for_terminal(bytes: &[u8], utf8: bool) -> Vec<u8> {
@@ -362,24 +365,29 @@ impl IcyBoardState {
         let run_batch = crate::icy_board::doors::dos::expand_run_batch(door, self.node, drop_file);
         crate::icy_board::doors::dos::inject_session_files(&image_path, &files, &run_batch)?;
 
-        let mut session = crate::icy_board::doors::dos::start_session(&image_path, &bios_path, &vga_bios_path, door.dos_memory_mb)?;
-        let mut input = vec![0; 32 * 1024];
-        let mut input_encoder = DosInputEncoder::default();
-        let startup_timeout = tokio::time::sleep(Duration::from_secs(30));
-        tokio::pin!(startup_timeout);
         let runtime_remaining = dos_runtime_remaining(
             self.session.login_date,
             self.session.time_limit,
             door.dos_max_runtime_seconds,
-        );
+        )
+        .expect("DOS doors always have a hard runtime limit");
+        let mut session = crate::icy_board::doors::dos::start_session(
+            &image_path,
+            &bios_path,
+            &vga_bios_path,
+            door.dos_memory_mb,
+            runtime_remaining,
+        )?;
+        let mut input = vec![0; 32 * 1024];
+        let mut input_encoder = DosInputEncoder::default();
+        let startup_timeout = tokio::time::sleep(Duration::from_secs(30));
+        tokio::pin!(startup_timeout);
         let session_timeout = async move {
-            match runtime_remaining {
-                Some(remaining) => tokio::time::sleep(remaining).await,
-                None => std::future::pending().await,
-            }
+            tokio::time::sleep(runtime_remaining).await;
         };
         tokio::pin!(session_timeout);
         let mut received_output = false;
+        let mut worker_finished = false;
         loop {
             tokio::select! {
                 output = session.output.recv() => {
@@ -395,13 +403,18 @@ impl IcyBoardState {
                 }
                 read = self.connection.read(&mut input) => {
                     let size = read?;
+                    if size == 0 {
+                        self.session.request_logoff = true;
+                        break;
+                    }
                     let dos_input = input_encoder.encode(&input[..size], self.session.term_caps.is_utf8);
-                    if size == 0 || (!dos_input.is_empty() && session.input.send(dos_input).is_err()) {
+                    if !dos_input.is_empty() && session.input.send(dos_input).is_err() {
                         break;
                     }
                 }
                 result = &mut session.finished => {
-                    result.map_err(|_| "native DOS emulator thread ended unexpectedly")??;
+                    worker_finished = true;
+                    result.map_err(|_| "native DOS emulator thread ended unexpectedly; see icboard.log for the panic backtrace")??;
                     break;
                 }
                 _ = &mut startup_timeout, if !received_output => {
@@ -427,10 +440,18 @@ impl IcyBoardState {
                             door.name
                         );
                     }
+                    let _ = self.connection.send(b"\r\nDOS door runtime limit reached; returning to Icy Board.\r\n").await;
                     self.check_time_left().await;
+                    worker_finished = true;
                     break;
                 }
             }
+        }
+        if !worker_finished && !session.stop().await {
+            log::error!(
+                "native DOS emulator for '{}' did not stop within 5 seconds after the caller disconnected",
+                door.name
+            );
         }
         Ok(())
     }
@@ -647,7 +668,10 @@ mod test {
     #[test]
     fn dos_doors_observe_runtime_limits() {
         let now = chrono::Utc::now();
-        assert_eq!(dos_runtime_remaining(now, 0, 0), None);
+        assert_eq!(
+            dos_runtime_remaining(now, 0, 0),
+            Some(Duration::from_secs(crate::icy_board::doors::DEFAULT_DOS_MAX_RUNTIME_SECONDS.into()))
+        );
         assert_eq!(dos_runtime_remaining(now - chrono::Duration::minutes(2), 1, 0), Some(Duration::ZERO));
 
         let remaining = dos_runtime_remaining(now, 1, 0).unwrap();

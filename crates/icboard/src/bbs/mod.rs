@@ -314,6 +314,12 @@ pub async fn internal_handle_client(mut state: IcyBoardState, login_options: Opt
             )
             .await?;
 
+        if cmd.state.session.request_logoff {
+            cmd.state.connection.shutdown().await?;
+            cmd.state.save_current_user().await?;
+            return Ok(());
+        }
+
         if command.starts_with('!') {
             if command.len() == 1 && !cmd.state.saved_cmd.is_empty() {
                 let str = cmd.state.saved_cmd.clone();

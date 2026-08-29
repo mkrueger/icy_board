@@ -164,7 +164,7 @@ impl<'a> DoorEditor<'a> {
             drop_file: Default::default(),
             dos_command: String::new(),
             dos_memory_mb: 64,
-            dos_max_runtime_seconds: 0,
+            dos_max_runtime_seconds: icy_board_engine::icy_board::doors::DEFAULT_DOS_MAX_RUNTIME_SECONDS,
         });
         drop(door_list);
         self.insert_table.content_length += 1;

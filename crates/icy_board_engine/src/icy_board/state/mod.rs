@@ -3214,6 +3214,8 @@ impl IcyBoardState {
                         self.char_buffer.extend(keys);
                         return Ok(key);
                     }
+                    self.session.request_logoff = true;
+                    return Ok(None);
                 }
                 () = sleep(wait) => {
                     if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
@@ -3267,6 +3269,8 @@ impl IcyBoardState {
                         self.char_buffer.extend(keys);
                         return Ok(key);
                     }
+                    self.session.request_logoff = true;
+                    return Ok(None);
                 }
                 () = sleep(wait) => {
                     if let Some(state) = self.node_state.lock().await[self.node].as_mut() {

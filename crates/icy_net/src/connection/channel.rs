@@ -8,7 +8,7 @@ use crate::{Connection, ConnectionType};
 pub struct ChannelConnection {
     buffer: VecDeque<u8>,
     rx: UnboundedReceiver<Vec<u8>>,
-    tx: UnboundedSender<Vec<u8>>,
+    tx: Option<UnboundedSender<Vec<u8>>>,
 }
 unsafe impl Send for ChannelConnection {}
 unsafe impl Sync for ChannelConnection {}
@@ -18,7 +18,7 @@ impl ChannelConnection {
         Self {
             buffer: VecDeque::new(),
             rx,
-            tx,
+            tx: Some(tx),
         }
     }
 
@@ -76,11 +76,28 @@ impl Connection for ChannelConnection {
     }
 
     async fn send(&mut self, buf: &[u8]) -> crate::Result<()> {
-        self.tx.send(buf.to_vec())?;
+        self.tx
+            .as_ref()
+            .ok_or(crate::NetError::ConnectionClosed)?
+            .send(buf.to_vec())?;
         Ok(())
     }
 
     async fn shutdown(&mut self) -> crate::Result<()> {
+        self.tx = None;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn shutdown_makes_the_peer_read_return_eof() {
+        let (mut local, mut peer) = ChannelConnection::create_pair();
+        local.shutdown().await.unwrap();
+        let mut buf = [0; 8];
+        assert_eq!(peer.read(&mut buf).await.unwrap(), 0);
     }
 }

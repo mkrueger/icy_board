@@ -153,6 +153,11 @@ impl Tui {
         Ok(())
     }
 
+    async fn disconnect_local_session(&self) -> Res<()> {
+        let _ = self.tx.send(SendData::Disconnect).await;
+        Ok(())
+    }
+
     pub async fn sysop_mode(bbs: &Arc<Mutex<BBS>>, node: usize) -> Res<Option<Self>> {
         let (ui_connection, connection) = ChannelConnection::create_pair();
         let mut bbs = bbs.lock().await;
@@ -243,8 +248,11 @@ impl Tui {
                                     //redraw = true;
                                 }
                                 KeyCode::Char('x') => {
-                                    self.logoff_sysop(bbs).await?;
-                                    return Ok(());
+                                    if self.sysop_mode {
+                                        self.logoff_sysop(bbs).await?;
+                                        return Ok(());
+                                    }
+                                    self.disconnect_local_session().await?;
                                 }
                                 _ => {}
                             }
@@ -252,10 +260,12 @@ impl Tui {
                             match key.code {
                                 KeyCode::Char(c) => {
                                     if c == 'x' || c == 'c' {
-                                        self.logoff_sysop(bbs).await?;
-                                        return Ok(());
-                                    }
-                                    if c.is_ascii_lowercase() {
+                                        if self.sysop_mode {
+                                            self.logoff_sysop(bbs).await?;
+                                            return Ok(());
+                                        }
+                                        self.disconnect_local_session().await?;
+                                    } else if c.is_ascii_lowercase() {
                                         self.add_input(((c as u8 - b'a' + 1) as char).to_string().chars()).await?;
                                     }
                                 }

@@ -281,7 +281,13 @@ pub fn validate_simple_command(source_directory: &Path, command: &str) -> Res<()
     }
 }
 
-pub fn start_session(image_path: &Path, bios_path: &Path, vga_bios_path: &Path, memory_mb: u32) -> Res<DosSession> {
+pub fn start_session(
+    image_path: &Path,
+    bios_path: &Path,
+    vga_bios_path: &Path,
+    memory_mb: u32,
+    max_runtime: std::time::Duration,
+) -> Res<DosSession> {
     let image_path = image_path.to_path_buf();
     let bios_path = bios_path.to_path_buf();
     let vga_bios_path = vga_bios_path.to_path_buf();
@@ -304,7 +310,8 @@ pub fn start_session(image_path: &Path, bios_path: &Path, vga_bios_path: &Path, 
             machine.prepare()?;
             machine.set_modem_status(0, ModemStatus::default())?;
             let mut serial = vec![0; 32 * 1024];
-            while !thread_cancel.load(Ordering::Acquire) {
+            let started = std::time::Instant::now();
+            while !thread_cancel.load(Ordering::Acquire) && started.elapsed() < max_runtime {
                 while let Ok(bytes) = input_rx.try_recv() {
                     machine.serial_input(0, &bytes)?;
                 }
@@ -320,8 +327,14 @@ pub fn start_session(image_path: &Path, bios_path: &Path, vga_bios_path: &Path, 
                     break;
                 }
             }
-            let snapshot = machine.hard_disk_snapshot(0)?;
-            crate::icy_board::write_atomic(&image_path, &snapshot)?;
+            let timed_out = started.elapsed() >= max_runtime;
+            if timed_out {
+                log::warn!("native DOS emulator reached its hard runtime limit of {} seconds", max_runtime.as_secs());
+            }
+            if !thread_cancel.load(Ordering::Acquire) && !timed_out {
+                let snapshot = machine.hard_disk_snapshot(0)?;
+                crate::icy_board::write_atomic(&image_path, &snapshot)?;
+            }
             Ok(())
         })();
         let _ = finished_tx.send(result);
@@ -384,8 +397,20 @@ mod tests {
         std::fs::copy(image, &session_image).unwrap();
 
         let run_batch = std::env::var("ICB_DOS_RUN_BATCH").unwrap_or_else(|_| "@ECHO OFF\nECHO No DOS door configured. > COM1".into());
+        let max_runtime = std::env::var("ICB_DOS_MAX_RUNTIME_SECONDS")
+            .ok()
+            .and_then(|value| value.parse().ok())
+            .map(std::time::Duration::from_secs)
+            .unwrap_or_else(|| std::time::Duration::from_secs(30));
         inject_session_files(&session_image, &[], &run_batch).unwrap();
-        let mut session = start_session(&session_image, Path::new(&bios), Path::new(&vga_bios), 8).unwrap();
+        let mut session = start_session(
+            &session_image,
+            Path::new(&bios),
+            Path::new(&vga_bios),
+            8,
+            max_runtime,
+        )
+        .unwrap();
         let mut serial_output = Vec::new();
         let mut output_open = true;
         let result = tokio::time::timeout(std::time::Duration::from_secs(30), async {

@@ -386,7 +386,7 @@ async fn handle_receive(c: &mut ConnectionThreadData, data: SendData) -> Res<()>
             c.com.send(&buf).await?;
         }
 
-        SendData::_Disconnect => {
+        SendData::Disconnect => {
             c.com.shutdown().await?;
         }
     }
@@ -397,7 +397,7 @@ async fn handle_receive(c: &mut ConnectionThreadData, data: SendData) -> Res<()>
 #[derive(Debug)]
 pub enum SendData {
     Data(Vec<u8>),
-    _Disconnect,
+    Disconnect,
 }
 
 #[cfg(test)]
@@ -435,6 +435,28 @@ mod tests {
         })
         .await
         .unwrap();
+
+        drop(tx);
+        drop(board_connection);
+        handle.join().unwrap();
+    }
+
+    #[tokio::test]
+    async fn disconnect_closes_the_board_side_of_the_local_terminal() {
+        let (ui_connection, mut board_connection) = ChannelConnection::create_pair();
+        let screen = Arc::new(Mutex::new(TextScreen::new((80, 25))));
+        let generation = Arc::new(AtomicU64::new(0));
+        let (handle, tx) = start_update_thread(Box::new(ui_connection), screen, generation);
+
+        tx.send(SendData::Disconnect).await.unwrap();
+        let mut input = [0; 1];
+        assert_eq!(
+            tokio::time::timeout(Duration::from_secs(1), board_connection.read(&mut input))
+                .await
+                .unwrap()
+                .unwrap(),
+            0
+        );
 
         drop(tx);
         drop(board_connection);
