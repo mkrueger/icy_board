@@ -230,10 +230,18 @@ impl UserData for PplUser {
 
         registry.add_array_property(NOTES.clone(), VariableType::String, 1);
         registry.add_array_property(CONTACTS.clone(), VariableType::UserData(CONTACT_ID as u8), 1);
-        registry.add_function(SET_PASSWORD.clone(), vec![VariableType::String], VariableType::Boolean);
-        registry.add_function(ADD_CONTACT.clone(), vec![VariableType::String, VariableType::String], VariableType::Boolean);
-        registry.add_function(REMOVE_CONTACT.clone(), vec![VariableType::Integer], VariableType::Boolean);
-        registry.add_function(SET_NOTE.clone(), vec![VariableType::Integer, VariableType::String], VariableType::Boolean);
+        registry.add_named_function(SET_PASSWORD.clone(), vec![("password", VariableType::String)], VariableType::Boolean);
+        registry.add_named_function(
+            ADD_CONTACT.clone(),
+            vec![("service", VariableType::String), ("account", VariableType::String)],
+            VariableType::Boolean,
+        );
+        registry.add_named_function(REMOVE_CONTACT.clone(), vec![("index", VariableType::Integer)], VariableType::Boolean);
+        registry.add_named_function(
+            SET_NOTE.clone(),
+            vec![("index", VariableType::Integer), ("text", VariableType::String)],
+            VariableType::Boolean,
+        );
     }
 }
 

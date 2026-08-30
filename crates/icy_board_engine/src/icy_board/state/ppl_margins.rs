@@ -44,10 +44,14 @@ impl UserData for PplMargins {
         registry.add_property(HAS_VERTICAL.clone(), VariableType::Boolean, false);
         registry.add_property(HAS_HORIZONTAL.clone(), VariableType::Boolean, false);
 
-        registry.add_function(SET_VERTICAL.clone(), vec![VariableType::Integer, VariableType::Integer], VariableType::Boolean);
-        registry.add_function(
+        registry.add_named_function(
+            SET_VERTICAL.clone(),
+            vec![("top", VariableType::Integer), ("bottom", VariableType::Integer)],
+            VariableType::Boolean,
+        );
+        registry.add_named_function(
             SET_HORIZONTAL.clone(),
-            vec![VariableType::Integer, VariableType::Integer],
+            vec![("left", VariableType::Integer), ("right", VariableType::Integer)],
             VariableType::Boolean,
         );
         registry.add_function(RESET_VERTICAL.clone(), Vec::new(), VariableType::Boolean);

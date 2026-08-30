@@ -571,15 +571,15 @@ impl UserData for PplHttp {
     const STATIC_RECEIVER: Option<fn() -> VariableValue> = Some(PplHttp::value);
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
-        registry.add_static_function(GET.clone(), vec![VariableType::String], VariableType::UserData(HTTP_RESPONSE_ID as u8));
-        registry.add_static_function(
+        registry.add_named_static_function(GET.clone(), vec![("url", VariableType::String)], VariableType::UserData(HTTP_RESPONSE_ID as u8));
+        registry.add_named_static_function(
             NEW.clone(),
-            vec![VariableType::UserData(HTTP_METHOD_ENUM_ID), VariableType::String],
+            vec![("method", VariableType::UserData(HTTP_METHOD_ENUM_ID)), ("url", VariableType::String)],
             VariableType::UserData(HTTP_REQUEST_ID as u8),
         );
-        registry.add_static_function(
+        registry.add_named_static_function(
             DOWNLOAD.clone(),
-            vec![VariableType::String, VariableType::String],
+            vec![("url", VariableType::String), ("file", VariableType::String)],
             VariableType::UserData(HTTP_RESPONSE_ID as u8),
         );
     }
@@ -637,14 +637,14 @@ impl UserData for PplHttpRequest {
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         registry.add_property(URL.clone(), VariableType::String, false);
         registry.add_property(METHOD.clone(), VariableType::UserData(HTTP_METHOD_ENUM_ID), false);
-        registry.add_function(
+        registry.add_named_function(
             SET_HEADER.clone(),
-            vec![VariableType::String, VariableType::String],
+            vec![("name", VariableType::String), ("value", VariableType::String)],
             VariableType::UserData(HTTP_REQUEST_ID as u8),
         );
-        registry.add_function_with(
+        registry.add_named_function_with(
             SET_TEXT.clone(),
-            vec![VariableType::String, VariableType::String],
+            vec![("text", VariableType::String), ("contentType", VariableType::String)],
             1,
             VariableType::UserData(HTTP_REQUEST_ID as u8),
         );
@@ -735,8 +735,8 @@ impl UserData for PplHttpResponse {
         registry.add_property(SIZE.clone(), VariableType::Long, false);
         registry.add_property(CONTENT_TYPE.clone(), VariableType::String, false);
         registry.add_function(TEXT.clone(), Vec::new(), VariableType::String);
-        registry.add_function(HEADER.clone(), vec![VariableType::String], VariableType::String);
-        registry.add_function(SAVE.clone(), vec![VariableType::String], VariableType::Boolean);
+        registry.add_named_function(HEADER.clone(), vec![("name", VariableType::String)], VariableType::String);
+        registry.add_named_function(SAVE.clone(), vec![("file", VariableType::String)], VariableType::Boolean);
     }
 }
 

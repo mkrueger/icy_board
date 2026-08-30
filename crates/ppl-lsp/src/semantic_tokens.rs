@@ -1,15 +1,17 @@
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashSet},
     path::Path,
     sync::{Arc, Mutex},
 };
 
 use icy_board_engine::{
     ast::{
-        Ast, AstVisitor, ConstDeclarationStatement, Constant, EnumDeclarationAstNode, Expression, MemberReferenceExpression, ParameterSpecifier,
-        TypeDeclarationAstNode, VariableDeclarationStatement,
+        Ast, AstVisitor, ConstDeclarationStatement, Constant, EnumDeclarationAstNode, Expression, FunctionDeclarationAstNode, FunctionImplementation,
+        MemberReferenceExpression, ParameterSpecifier, TypeDeclarationAstNode, VariableDeclarationStatement, walk_function_declaration,
+        walk_function_implementation,
     },
     compiler::workspace::Workspace,
+    executable::VariableType,
     parser::{
         Encoding, ErrorReporter,
         lexer::{KEYWORDS, Lexer, Token},
@@ -33,6 +35,7 @@ const ENUM: u32 = 8;
 const ENUM_MEMBER: u32 = 9;
 const PROPERTY: u32 = 10;
 const LABEL: u32 = 11;
+const CONSTANT: u32 = 12;
 
 const DECLARATION: u32 = 1 << 0;
 const DEFINITION: u32 = 1 << 1;
@@ -52,6 +55,7 @@ pub fn legend_types() -> Vec<SemanticTokenType> {
         SemanticTokenType::ENUM_MEMBER,
         SemanticTokenType::PROPERTY,
         SemanticTokenType::new("label"),
+        SemanticTokenType::new("constant"),
     ]
 }
 
@@ -85,7 +89,8 @@ fn insert(tokens: &mut BTreeMap<usize, RawToken>, span: &std::ops::Range<usize>,
 
 pub fn get_semantic_tokens(ast: &Ast, visitor: &SemanticVisitor, rope: &Rope, source: &str, workspace: &Workspace) -> Vec<SemanticToken> {
     let mut raw = lexical_tokens(ast, source, workspace);
-    reference_tokens(ast, visitor, &mut raw);
+    let parameter_spans = parameter_spans(ast);
+    reference_tokens(ast, visitor, &parameter_spans, &mut raw);
 
     let mut collector = AstTokens { visitor, tokens: &mut raw };
     ast.visit(&mut collector);
@@ -106,7 +111,7 @@ fn lexical_tokens(ast: &Ast, source: &str, workspace: &Workspace) -> BTreeMap<us
                 Token::Comment(_, _) | Token::UseFuncs(_, _) | Token::Define(_, _, _) => Some((COMMENT, 0)),
                 Token::Const(Constant::String(_)) => Some((STRING, 0)),
                 Token::Const(Constant::Integer(_, _) | Constant::Unsigned(_, _) | Constant::Money(_) | Constant::Double(_)) => Some((NUMBER, 0)),
-                Token::Const(Constant::Boolean(_) | Constant::Builtin(_)) => Some((VARIABLE, READONLY)),
+                Token::Const(Constant::Boolean(_) | Constant::Builtin(_)) => Some((CONSTANT, READONLY)),
                 Token::Label(_) => Some((LABEL, DEFINITION)),
                 _ => None,
             }
@@ -118,13 +123,21 @@ fn lexical_tokens(ast: &Ast, source: &str, workspace: &Workspace) -> BTreeMap<us
     tokens
 }
 
-fn reference_tokens(ast: &Ast, visitor: &SemanticVisitor, tokens: &mut BTreeMap<usize, RawToken>) {
+fn reference_tokens(ast: &Ast, visitor: &SemanticVisitor, parameter_spans: &HashSet<usize>, tokens: &mut BTreeMap<usize, RawToken>) {
     for (reference_type, reference) in &visitor.references {
+        let is_parameter = reference
+            .declaration
+            .as_ref()
+            .into_iter()
+            .chain(reference.implementation.as_ref())
+            .any(|(path, identifier)| same_file(path, &ast.file_name) && parameter_spans.contains(&identifier.span.start));
         let token_type = match reference_type {
             ReferenceType::PredefinedFunc(_) | ReferenceType::Function(_) => FUNCTION,
             ReferenceType::PredefinedProc(_) | ReferenceType::Procedure(_) => FUNCTION,
             ReferenceType::Label(_) => LABEL,
+            ReferenceType::Variable(_) if is_parameter => PARAMETER,
             ReferenceType::Variable(_) => VARIABLE,
+            ReferenceType::Constant(_) => CONSTANT,
         };
         if let Some((path, declaration)) = &reference.declaration
             && same_file(path, &ast.file_name)
@@ -142,6 +155,37 @@ fn reference_tokens(ast: &Ast, visitor: &SemanticVisitor, tokens: &mut BTreeMap<
             }
         }
     }
+}
+
+fn parameter_spans(ast: &Ast) -> HashSet<usize> {
+    #[derive(Default)]
+    struct ParameterSpans(HashSet<usize>);
+
+    impl AstVisitor<()> for ParameterSpans {
+        fn visit_parameter_specifier(&mut self, parameter: &ParameterSpecifier) {
+            match parameter {
+                ParameterSpecifier::Variable(parameter) => {
+                    if let Some(variable) = parameter.get_variable() {
+                        self.0.insert(variable.get_identifier_token().span.start);
+                    }
+                }
+                ParameterSpecifier::Function(parameter) => {
+                    for nested in parameter.get_parameters() {
+                        nested.visit(self);
+                    }
+                }
+                ParameterSpecifier::Procedure(parameter) => {
+                    for nested in parameter.get_parameters() {
+                        nested.visit(self);
+                    }
+                }
+            }
+        }
+    }
+
+    let mut spans = ParameterSpans::default();
+    ast.visit(&mut spans);
+    spans.0
 }
 
 fn same_file(left: &Path, right: &Path) -> bool {
@@ -180,13 +224,23 @@ impl AstVisitor<()> for AstTokens<'_> {
 
     fn visit_const_declaration_statement(&mut self, declaration: &ConstDeclarationStatement) {
         insert(self.tokens, &declaration.get_type_token().span, TYPE, 0);
-        insert(self.tokens, &declaration.get_identifier_token().span, VARIABLE, DECLARATION | READONLY);
+        insert(self.tokens, &declaration.get_identifier_token().span, CONSTANT, DECLARATION | READONLY);
         declaration.get_value().visit(self);
     }
 
     fn visit_variable_declaration_statement(&mut self, declaration: &VariableDeclarationStatement) {
         insert(self.tokens, &declaration.get_type_token().span, TYPE, 0);
         icy_board_engine::ast::walk_variable_declaration_statement(self, declaration);
+    }
+
+    fn visit_function_declaration(&mut self, declaration: &FunctionDeclarationAstNode) {
+        insert(self.tokens, &declaration.get_return_type_token().span, TYPE, 0);
+        walk_function_declaration(self, declaration);
+    }
+
+    fn visit_function_implementation(&mut self, function: &FunctionImplementation) {
+        insert(self.tokens, &function.get_return_type_token().span, TYPE, 0);
+        walk_function_implementation(self, function);
     }
 
     fn visit_type_declaration(&mut self, declaration: &TypeDeclarationAstNode) {
@@ -209,11 +263,24 @@ impl AstVisitor<()> for AstTokens<'_> {
 
     fn visit_member_reference_expression(&mut self, member: &MemberReferenceExpression) {
         let start = member.get_identifier_token().span.start;
-        let token_type = if self.visitor.user_type_lookup.contains_key(&start) {
-            PROPERTY
-        } else if let Expression::Identifier(base) = member.get_expression() {
-            if self.visitor.type_registry.get_enum(base.get_identifier()).is_some() {
-                ENUM_MEMBER
+        let direct_receiver = if let Expression::Identifier(base) = member.get_expression() {
+            self.visitor.type_registry.get_type(base.get_identifier())
+        } else {
+            None
+        };
+        let receiver_type_id = self.visitor.user_type_lookup.get(&start).copied().or_else(|| match direct_receiver {
+            Some(VariableType::UserData(type_id)) => Some(type_id),
+            _ => None,
+        });
+        let token_type = if let Expression::Identifier(base) = member.get_expression()
+            && self.visitor.type_registry.get_enum(base.get_identifier()).is_some()
+        {
+            ENUM_MEMBER
+        } else if let Some(type_id) = receiver_type_id {
+            if let Some(definition) = self.visitor.type_registry.get_type_from_id(type_id)
+                && (definition.functions.contains_key(member.get_identifier()) || definition.procedures.contains_key(member.get_identifier()))
+            {
+                FUNCTION
             } else {
                 PROPERTY
             }
@@ -221,6 +288,19 @@ impl AstVisitor<()> for AstTokens<'_> {
             PROPERTY
         };
         insert(self.tokens, &member.get_identifier_token().span, token_type, 0);
+
+        if let Expression::Identifier(base) = member.get_expression() {
+            let span = &base.get_identifier_token().span;
+            // A referenced variable already has a semantic token. With no such
+            // reference, a name used as a member receiver denotes its type.
+            if !self.tokens.contains_key(&span.start) {
+                if self.visitor.type_registry.get_enum(base.get_identifier()).is_some() {
+                    insert(self.tokens, span, ENUM, 0);
+                } else if self.visitor.type_registry.get_type(base.get_identifier()).is_some() {
+                    insert(self.tokens, span, TYPE, 0);
+                }
+            }
+        }
         member.get_expression().visit(self);
     }
 }

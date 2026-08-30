@@ -9,7 +9,7 @@ use icy_board_engine::{
     semantic::SemanticVisitor,
 };
 use ppl_lsp::{completion::get_completion, signature_help::get_signature_help};
-use tower_lsp::lsp_types::{CompletionItem, Documentation, ParameterLabel};
+use tower_lsp::lsp_types::{CompletionItem, CompletionItemTag, Documentation, ParameterLabel};
 
 /// Parses a source the way the server does and hands back its semantic model.
 fn analyze(source: &str) -> (icy_board_engine::ast::Ast, SemanticVisitor) {
@@ -34,6 +34,15 @@ fn complete(source: &str) -> Vec<String> {
     complete_items(source).into_iter().map(|item| item.label).collect()
 }
 
+#[test]
+fn bigstr_completion_is_deprecated_in_ppl_400() {
+    let item = complete_items(";$LANGVERSION 400\nBIG")
+        .into_iter()
+        .find(|item| item.label.eq_ignore_ascii_case("BIGSTR"))
+        .expect("BIGSTR completion");
+    assert_eq!(item.tags, Some(vec![CompletionItemTag::DEPRECATED]));
+}
+
 fn completion_documentation(source: &str, label: &str) -> String {
     let item = complete_items(source)
         .into_iter()
@@ -43,6 +52,19 @@ fn completion_documentation(source: &str, label: &str) -> String {
         Documentation::String(value) => value,
         Documentation::MarkupContent(value) => value.value,
     }
+}
+
+#[test]
+fn keywords_include_localized_completion_documentation() {
+    let if_doc = completion_documentation("I", "IF");
+    assert!(if_doc.starts_with("```PPL\nIF\n```"), "{if_doc}");
+    assert!(if_doc.len() > "```PPL\nIF\n```".len());
+
+    let foreach_doc = completion_documentation(";$LANGVERSION 400\nF", "FOREACH");
+    assert!(foreach_doc.starts_with("```PPL\nFOREACH\n```"), "{foreach_doc}");
+
+    let exit_doc = completion_documentation(";$LANGVERSION 400\nE", "EXIT");
+    assert!(exit_doc.starts_with("```PPL\nEXIT\n```"), "{exit_doc}");
 }
 
 fn help(source: &str) -> Vec<String> {
@@ -122,22 +144,36 @@ fn new_board_user_api_completion_explains_its_types_and_members() {
 }
 
 #[test]
+fn a_user_contact_offers_documented_record_fields() {
+    let items = complete("USER user\nuser.Contacts[0].");
+    assert_eq!(items, vec!["Service", "Account"]);
+
+    let service = completion_documentation("USER user\nuser.Contacts[0].", "Service");
+    assert!(service.contains("Kontaktdienst") || service.contains("contact service"), "{service}");
+}
+
+#[test]
 fn session_user_and_http_workflows_have_completion_documentation() {
     let session_user = completion_documentation("Session.", "User");
-    assert!(session_user.contains("currently selected"), "{session_user}");
+    assert!(session_user.contains("currently selected") || session_user.contains("aktuell") && session_user.contains("ausgewählt"), "{session_user}");
 
     let contacts = completion_documentation("USER user\nuser.", "Contacts");
-    assert!(contacts.contains("100 entries") && contacts.contains("AddContact"), "{contacts}");
+    assert!((contacts.contains("100 entries") || contacts.contains("100 Einträgen")) && contacts.contains("AddContact"), "{contacts}");
 
     let http_get = completion_documentation("HTTP.", "Get");
-    assert!(http_get.contains("policy-controlled GET"), "{http_get}");
+    assert!(http_get.contains("policy-controlled GET") || http_get.contains("richtliniengesteuerte GET"), "{http_get}");
 
     let set_text = completion_documentation("HTTPREQUEST request\nrequest.", "SetText");
-    assert!(set_text.contains("GET and HEAD") && set_text.contains("UTF-8 body"), "{set_text}");
+    assert!(
+        (set_text.contains("GET and HEAD") || set_text.contains("GET- und HEAD"))
+            && (set_text.contains("UTF-8 body") || set_text.contains("UTF-8-Body")),
+        "{set_text}"
+    );
 
     let response_text = completion_documentation("HTTPRESPONSE response\nresponse.", "Text");
     assert!(
-        response_text.contains("strictly as UTF-8") && response_text.contains("ErrCode.Format"),
+        (response_text.contains("strictly as UTF-8") || response_text.contains("strikt als UTF-8"))
+            && response_text.contains("ErrCode.Format"),
         "{response_text}"
     );
 }
@@ -223,10 +259,10 @@ fn bytes_and_checksum_completion_match_the_engine_surface() {
     assert_eq!(algorithms, vec!["CRC32", "MD5", "SHA256"]);
 
     let to_hex = completion_documentation(";$LANGVERSION 400\nBYTES data\ndata.", "ToHex");
-    assert!(to_hex.contains("leading zero bytes"), "{to_hex}");
+    assert!(to_hex.contains("leading zero bytes") || to_hex.contains("führende Nullbytes"), "{to_hex}");
 
     let checksum = completion_documentation(";$LANGVERSION 400\nBYTES data\ndata.", "GetChecksum");
-    assert!(checksum.contains("raw checksum bytes"), "{checksum}");
+    assert!(checksum.contains("CRC32") && checksum.contains("MD5") && checksum.contains("SHA256") && checksum.contains("32"), "{checksum}");
 }
 
 #[test]
@@ -278,6 +314,43 @@ fn an_object_offers_only_its_own_members() {
 fn graphics_only_offers_session_control() {
     let items = complete("GFX value\nvalue.");
     assert_eq!(items, vec!["Backend", "Init", "Pacing", "Shutdown"]);
+}
+
+#[test]
+fn graphics_completion_includes_member_documentation() {
+    let init = completion_documentation(";$LANGVERSION 400\nTerminal.Gfx.", "Init");
+    assert!(init.contains("Grafiksitzung") || init.contains("graphics session"), "{init}");
+    assert!(init.contains("`backend`") && init.contains("`fullscreen`"), "{init}");
+    assert!(init.contains("**Parameters**") || init.contains("**Parameter**"), "{init}");
+
+    let present_at = completion_documentation(";$LANGVERSION 400\nSURFACE banner\nbanner.", "PresentAt");
+    assert!(present_at.contains("Textspalte") || present_at.contains("text column"), "{present_at}");
+}
+
+#[test]
+fn terminal_input_and_margins_completion_include_documentation() {
+    let margins = completion_documentation(";$LANGVERSION 400\nTerminal.", "Margins");
+    assert!(margins.contains("Scroll") || margins.contains("scrolling"), "{margins}");
+
+    let set_horizontal = completion_documentation(";$LANGVERSION 400\nTerminal.Margins.", "SetHorizontal");
+    assert!(set_horizontal.contains("1-basiert") || set_horizontal.contains("1-based"), "{set_horizontal}");
+    assert!(set_horizontal.contains("CSI ? 69 h") && set_horizontal.contains("CSI left ; right s"), "{set_horizontal}");
+
+    let mouse_on = completion_documentation(";$LANGVERSION 400\nTerminal.Input.", "MouseOn");
+    assert!(mouse_on.contains("Tracking") || mouse_on.contains("tracking"), "{mouse_on}");
+    assert!(mouse_on.contains("1006") && mouse_on.contains("1016"), "{mouse_on}");
+}
+
+#[test]
+fn member_call_arguments_offer_qualified_enum_values() {
+    let mouse_modes = complete(";$LANGVERSION 400\nTERMINPUT input\ninput.MouseOn(");
+    assert_eq!(mouse_modes, vec!["MouseMode.Text", "MouseMode.Pixels"]);
+
+    let tracking = complete(";$LANGVERSION 400\nTERMINPUT input\ninput.MouseOn(MouseMode.Text, ");
+    assert_eq!(
+        tracking,
+        vec!["MouseTracking.Buttons", "MouseTracking.Drag", "MouseTracking.All"]
+    );
 }
 
 #[test]
@@ -355,6 +428,33 @@ fn signature_help_for_a_built_in_statement() {
     let signatures = help(source);
     assert_eq!(signatures.len(), 1);
     assert!(signatures[0].starts_with("ANSIPOS "), "{signatures:?}");
+}
+
+#[test]
+fn signature_help_for_member_calls_marks_optional_parameters() {
+    let (_, visitor) = analyze(";$LANGVERSION 400\nTERMINPUT input\n");
+    let help = get_signature_help("input.MouseOn(MouseMode.Text, ", &visitor).unwrap();
+    assert_eq!(help.active_parameter, Some(1));
+    assert_eq!(help.signatures[0].label, "TermInput.MouseOn(MouseMode mode, [MouseTracking tracking]) BOOLEAN");
+    let tracking = &help.signatures[0].parameters.as_ref().unwrap()[1];
+    assert!(tracking.documentation.is_some(), "optional tracking parameter has no documentation");
+
+    let (_, visitor) = analyze(";$LANGVERSION 400\n");
+    let help = get_signature_help("Terminal.Margins.SetHorizontal(", &visitor).unwrap();
+    assert_eq!(help.active_parameter, Some(0));
+    assert_eq!(help.signatures[0].label, "Margins.SetHorizontal(INTEGER left, INTEGER right) BOOLEAN");
+}
+
+#[test]
+fn graphics_signature_help_names_and_documents_parameters() {
+    let (_, visitor) = analyze(";$LANGVERSION 400\n");
+    let help = get_signature_help("Terminal.Gfx.Init(GfxBackend.Auto, ", &visitor).unwrap();
+    let signature = &help.signatures[0];
+    assert_eq!(signature.label, "Gfx.Init([GfxBackend backend], [BOOLEAN fullscreen]) BOOLEAN");
+    assert_eq!(help.active_parameter, Some(1));
+    for parameter in signature.parameters.as_ref().unwrap() {
+        assert!(parameter.documentation.is_some(), "parameter has no documentation: {parameter:?}");
+    }
 }
 
 #[test]

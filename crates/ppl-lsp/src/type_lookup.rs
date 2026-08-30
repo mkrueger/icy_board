@@ -3,7 +3,7 @@
 
 use icy_board_engine::{
     executable::{FUNCTION_DEFINITIONS, VariableType},
-    parser::{UserTypeRegistry, is_user_declared_type},
+    parser::UserTypeRegistry,
     semantic::{BYTES_MEMBERS, ReferenceType, STRING_MEMBERS, SemanticVisitor},
 };
 
@@ -25,6 +25,9 @@ pub fn type_name(registry: &UserTypeRegistry, var_type: VariableType) -> String 
         if let Some(def) = registry.get_user_type_from_id(id) {
             return def.name.to_string();
         }
+        if let Some(def) = registry.get_enum_from_id(id) {
+            return def.name.to_string();
+        }
         for (name, registered) in &registry.registered_types {
             if *registered == var_type {
                 return name.to_string();
@@ -43,9 +46,9 @@ pub fn record_field_type_name(registry: &UserTypeRegistry, field: icy_board_engi
             .map(|bound| bound.to_string())
             .collect::<Vec<_>>()
             .join(", ");
-        name.push('(');
+        name.push('[');
         name.push_str(&dimensions);
-        name.push(')');
+        name.push(']');
     }
     name
 }
@@ -55,7 +58,7 @@ pub fn type_of_name(visitor: &SemanticVisitor, name: &str) -> Option<VariableTyp
     let name = unicase::Ascii::new(name.to_string());
 
     for (reference_type, reference) in &visitor.references {
-        if !matches!(reference_type, ReferenceType::Variable(_) | ReferenceType::Function(_)) {
+        if !matches!(reference_type, ReferenceType::Variable(_) | ReferenceType::Constant(_) | ReferenceType::Function(_)) {
             continue;
         }
         let declared = reference
@@ -95,7 +98,7 @@ pub fn type_of_name(visitor: &SemanticVisitor, name: &str) -> Option<VariableTyp
 pub fn static_type_of_name(visitor: &SemanticVisitor, name: &str) -> Option<VariableType> {
     let identifier = unicase::Ascii::new(name.to_string());
     let shadowed = visitor.references.iter().any(|(reference_type, reference)| {
-        matches!(reference_type, ReferenceType::Variable(_) | ReferenceType::Function(_))
+        matches!(reference_type, ReferenceType::Variable(_) | ReferenceType::Constant(_) | ReferenceType::Function(_))
             && reference
                 .declaration
                 .as_ref()
@@ -124,8 +127,7 @@ pub fn type_of_member(registry: &UserTypeRegistry, var_type: VariableType, membe
     };
     let member = unicase::Ascii::new(member.to_string());
 
-    if is_user_declared_type(id) {
-        let def = registry.get_user_type_from_id(id)?;
+    if let Some(def) = registry.get_record_type_from_id(id) {
         return def.field_type(def.field_index(&member)?);
     }
 
@@ -163,10 +165,7 @@ pub fn members_of(registry: &UserTypeRegistry, var_type: VariableType) -> Vec<Me
         return Vec::new();
     };
 
-    if is_user_declared_type(id) {
-        let Some(def) = registry.get_user_type_from_id(id) else {
-            return Vec::new();
-        };
+    if let Some(def) = registry.get_record_type_from_id(id) {
         return def
             .fields
             .iter()
@@ -215,7 +214,7 @@ fn user_data_members(registry: &UserTypeRegistry, object: &icy_board_engine::com
             name: name.to_string(),
             detail: format!(
                 "({}) {}",
-                parameter_types(registry, &function.parameters),
+                named_parameters(registry, &function.parameters, &function.parameter_names, function.required),
                 format!("{}{}", type_name(registry, function.return_type), "[]".repeat(function.return_rank as usize))
             ),
             kind: MemberKind::Method,
@@ -224,7 +223,10 @@ fn user_data_members(registry: &UserTypeRegistry, object: &icy_board_engine::com
     for (name, procedure) in object.procedures.iter().filter(|_| !statik) {
         members.push(Member {
             name: name.to_string(),
-            detail: format!("({})", parameter_types(registry, &procedure.parameters)),
+            detail: format!(
+                "({})",
+                named_parameters(registry, &procedure.parameters, &procedure.parameter_names, procedure.required)
+            ),
             kind: MemberKind::Method,
         });
     }
@@ -267,6 +269,35 @@ pub fn bytes_members(statik: bool) -> Vec<Member> {
         .collect()
 }
 
-fn parameter_types(registry: &UserTypeRegistry, parameters: &[VariableType]) -> String {
-    parameters.iter().map(|p| type_name(registry, *p)).collect::<Vec<_>>().join(", ")
+fn named_parameters(registry: &UserTypeRegistry, parameters: &[VariableType], names: &[String], required: usize) -> String {
+    parameters
+        .iter()
+        .enumerate()
+        .map(|(index, parameter)| {
+            let var_type = type_name(registry, *parameter);
+            let text = names.get(index).map_or(var_type.clone(), |name| format!("{var_type} {name}"));
+            if index < required { text } else { format!("[{text}]") }
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// The parameter list of a callable member, so a signature can read as a call.
+pub fn member_parameters(registry: &UserTypeRegistry, receiver: VariableType, member: &unicase::Ascii<String>) -> Option<String> {
+    let VariableType::UserData(id) = receiver else {
+        return None;
+    };
+    let object = registry.get_type_from_id(id)?;
+    if let Some(function) = object.functions.get(member) {
+        return Some(named_parameters(
+            registry,
+            &function.parameters,
+            &function.parameter_names,
+            function.required,
+        ));
+    }
+    object
+        .procedures
+        .get(member)
+        .map(|procedure| named_parameters(registry, &procedure.parameters, &procedure.parameter_names, procedure.required))
 }

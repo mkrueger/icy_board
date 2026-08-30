@@ -202,7 +202,8 @@ fn grammars_know_every_type_name() {
 
     for (grammar, in_grammar) in [
         ("grammar.js", list_from_grammar("BUILTIN_TYPES")),
-        ("the TextMate grammar", list_from_textmate("types")),
+        // Enums are coloured as enums there, so both rules together are the type names.
+        ("the TextMate grammar", [list_from_textmate("types"), list_from_textmate("enum-types")].concat()),
     ] {
         assert_eq!(missing(&expected, &in_grammar), Vec::<String>::new(), "types missing from {grammar}");
         assert_eq!(

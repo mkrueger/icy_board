@@ -229,13 +229,13 @@ impl UserData for MessageArea {
         registry.add_function(CAN_ATTACH.clone(), Vec::new(), VariableType::Boolean);
         registry.add_function(HIGH_MSG.clone(), Vec::new(), VariableType::Long);
         registry.add_function(LOW_MSG.clone(), Vec::new(), VariableType::Long);
-        registry.add_function(READ.clone(), vec![VariableType::Long], VariableType::UserData(MSG_ID as u8));
-        registry.add_function_with(
+        registry.add_named_function(READ.clone(), vec![("messageNumber", VariableType::Long)], VariableType::UserData(MSG_ID as u8));
+        registry.add_named_function_with(
             FIND.clone(),
             vec![
-                VariableType::UserData(crate::parser::MSG_FIELD_ENUM_ID),
-                VariableType::String,
-                VariableType::Long,
+            ("field", VariableType::UserData(crate::parser::MSG_FIELD_ENUM_ID)),
+            ("text", VariableType::String),
+            ("startMessage", VariableType::Long),
             ],
             2,
             VariableType::UserData(MSG_ID as u8),

@@ -26,6 +26,9 @@ pub enum CursorContext {
 #[derive(Debug, PartialEq)]
 pub struct CallContext {
     pub name: String,
+    /// The expression left of a member call's final `.`, split into its parts.
+    /// Empty for an ordinary routine or built-in call.
+    pub receiver: Vec<String>,
     /// Zero based index of the argument the cursor is in.
     pub argument: usize,
     /// True when the call is written without parentheses, the way a built-in
@@ -256,8 +259,14 @@ pub fn call_context(line_before_cursor: &str) -> Option<CallContext> {
         if end == name_end {
             return None;
         }
+        let receiver = if end > 0 && chars[end - 1] == '.' {
+            member_chain(&chars, end - 1).unwrap_or_default()
+        } else {
+            Vec::new()
+        };
         return Some(CallContext {
             name: chars[end..name_end].iter().collect(),
+            receiver,
             argument: count_arguments(&chars, open + 1),
             bare: false,
         });
@@ -280,6 +289,7 @@ pub fn call_context(line_before_cursor: &str) -> Option<CallContext> {
     }
     Some(CallContext {
         name: chars[start..name_end].iter().collect(),
+        receiver: Vec::new(),
         argument: count_arguments(&chars, name_end),
         bare: true,
     })
@@ -358,8 +368,21 @@ mod tests {
     fn call_with_parentheses() {
         let ctx = call_context("    x = Mid(a, ").unwrap();
         assert_eq!(ctx.name, "Mid");
+        assert!(ctx.receiver.is_empty());
         assert_eq!(ctx.argument, 1);
         assert!(!ctx.bare);
+    }
+
+    #[test]
+    fn member_call_has_a_receiver() {
+        let ctx = call_context("input.MouseOn(MouseMode.Text, ").unwrap();
+        assert_eq!(ctx.name, "MouseOn");
+        assert_eq!(ctx.receiver, vec!["input"]);
+        assert_eq!(ctx.argument, 1);
+
+        let ctx = call_context("Terminal.Margins.SetHorizontal(").unwrap();
+        assert_eq!(ctx.name, "SetHorizontal");
+        assert_eq!(ctx.receiver, vec!["Terminal", "Margins"]);
     }
 
     #[test]

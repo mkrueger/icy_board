@@ -582,6 +582,35 @@ An empty separator or negative limit returns an empty array and reports
 ``ErrKind.String`` with ``ErrCode.Invalid``. The result may be assigned, indexed,
 queried with ``Len()`` or consumed directly by ``FOREACH``.
 
+Binary data
+~~~~~~~~~~~
+
+``BYTES`` stores compact binary data without the per-element overhead of a
+``BYTE[]`` array. It is a scalar binary value rather than a general-purpose
+array, so use ``Len()`` for its byte count and conversion members for text::
+
+    BYTES raw = Bytes.FromBase64("AP8=")
+    PRINTLN raw.Len()          ; 2
+    PRINTLN raw.ToHex()        ; 00FF
+    PRINTLN raw.ToBase64()     ; AP8=
+
+``FromBase64`` accepts padded and unpadded Base64 and ignores ASCII whitespace,
+which permits MIME-wrapped input. Invalid input returns empty ``BYTES`` and
+reports ``ErrKind.String`` with ``ErrCode.Format``. ``ToString()`` performs
+strict UTF-8 decoding and reports the same error for invalid text; it does not
+guess a legacy code page.
+
+``GetChecksum(algorithm)`` returns the digest as binary ``BYTES``. The
+``Checksum`` enum offers ``CRC32`` (4 bytes in network byte order), ``MD5``
+(16 bytes) and ``SHA256`` (32 bytes). Use ``ToHex()`` for the usual uppercase
+hexadecimal representation::
+
+    STRING digest = raw.GetChecksum(Checksum.SHA256).ToHex()
+
+An invalid checksum value returns empty ``BYTES`` and reports
+``ErrCode.Invalid``. Successful binary and conversion operations clear an older
+``Error.Last()`` result.
+
 Regular expressions
 ~~~~~~~~~~~~~~~~~~~
 

@@ -35,7 +35,7 @@ impl UserData for PplGfx {
         registry.add_property(BACKEND.clone(), backend, false);
         registry.add_property(PACING.clone(), VariableType::Boolean, true);
 
-        registry.add_function_with(INIT.clone(), vec![backend, VariableType::Boolean], 0, VariableType::Boolean);
+        registry.add_named_function_with(INIT.clone(), vec![("backend", backend), ("fullscreen", VariableType::Boolean)], 0, VariableType::Boolean);
         registry.add_function(SHUTDOWN.clone(), Vec::new(), VariableType::Boolean);
     }
 }

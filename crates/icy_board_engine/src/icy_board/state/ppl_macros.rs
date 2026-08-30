@@ -29,10 +29,10 @@ impl UserData for PplMacros {
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         registry.add_property(RECORDING.clone(), VariableType::Boolean, false);
 
-        registry.add_function(RECORD.clone(), vec![VariableType::Integer], VariableType::Boolean);
+        registry.add_named_function(RECORD.clone(), vec![("slot", VariableType::Integer)], VariableType::Boolean);
         registry.add_function(END.clone(), Vec::new(), VariableType::Boolean);
-        registry.add_function(PLAY.clone(), vec![VariableType::Integer], VariableType::Boolean);
-        registry.add_function(DELETE.clone(), vec![VariableType::Integer], VariableType::Boolean);
+        registry.add_named_function(PLAY.clone(), vec![("slot", VariableType::Integer)], VariableType::Boolean);
+        registry.add_named_function(DELETE.clone(), vec![("slot", VariableType::Integer)], VariableType::Boolean);
         registry.add_function(CLEAR.clone(), Vec::new(), VariableType::Boolean);
     }
 }

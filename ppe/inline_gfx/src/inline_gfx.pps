@@ -6,8 +6,11 @@ CLS
 
 ; FALSE keeps normal text mode: no clear, hidden cursor, or wrap changes.
 Terminal.Gfx.Init(GfxBackend.Auto, FALSE)
+
+
 IF Terminal.Gfx.Backend <> GfxBackend.None THEN
     SURFACE banner = Surface.Load("./banner.png")
+
     ; Coordinates are normal 1-based text columns and rows.
     banner.PresentAt(18, 2)
     banner.Free()

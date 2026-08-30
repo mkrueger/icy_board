@@ -32,15 +32,18 @@ impl UserData for PplTerminalInput {
         use crate::parser::{MOUSE_MODE_ENUM_ID, MOUSE_TRACKING_ENUM_ID};
 
         registry.add_function(POLL.clone(), Vec::new(), VariableType::UserData(EVENT_ID as u8));
-        registry.add_function(WAIT.clone(), vec![VariableType::Integer], VariableType::UserData(EVENT_ID as u8));
-        registry.add_function_with(
+        registry.add_named_function(WAIT.clone(), vec![("timeoutMs", VariableType::Integer)], VariableType::UserData(EVENT_ID as u8));
+        registry.add_named_function_with(
             MOUSE_ON.clone(),
-            vec![VariableType::UserData(MOUSE_MODE_ENUM_ID), VariableType::UserData(MOUSE_TRACKING_ENUM_ID)],
+            vec![
+                ("mode", VariableType::UserData(MOUSE_MODE_ENUM_ID)),
+                ("tracking", VariableType::UserData(MOUSE_TRACKING_ENUM_ID)),
+            ],
             1,
             VariableType::Boolean,
         );
         registry.add_function(MOUSE_OFF.clone(), Vec::new(), VariableType::Boolean);
-        registry.add_function_with(KEYBOARD_ON.clone(), vec![VariableType::Boolean], 0, VariableType::Boolean);
+        registry.add_named_function_with(KEYBOARD_ON.clone(), vec![("echo", VariableType::Boolean)], 0, VariableType::Boolean);
         registry.add_function(KEYBOARD_OFF.clone(), Vec::new(), VariableType::Boolean);
         registry.add_function(RELEASE.clone(), Vec::new(), VariableType::Boolean);
     }

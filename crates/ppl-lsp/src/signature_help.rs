@@ -5,9 +5,13 @@ use icy_board_engine::{
     executable::{FUNCTION_DEFINITIONS, STATEMENT_DEFINITIONS, StatementSignature, VariableType, format_argument},
     semantic::{FunctionDeclaration, SemanticVisitor},
 };
-use tower_lsp::lsp_types::{ParameterInformation, ParameterLabel, SignatureHelp, SignatureInformation};
+use tower_lsp::lsp_types::{Documentation, ParameterInformation, ParameterLabel, SignatureHelp, SignatureInformation};
 
-use crate::{context::call_context, type_lookup::type_name};
+use crate::{
+    context::{CallContext, call_context},
+    documentation::get_parameter_documentation,
+    type_lookup::{type_name, type_of_chain},
+};
 use std::fmt::Write as _;
 
 /// Builds one signature out of a name, its parameters and what it returns.
@@ -25,6 +29,10 @@ impl SignatureBuilder {
     }
 
     fn push(&mut self, text: &str) {
+        self.push_documented(text, None);
+    }
+
+    fn push_documented(&mut self, text: &str, documentation: Option<String>) {
         if !self.parameters.is_empty() {
             self.label.push_str(", ");
         }
@@ -33,7 +41,7 @@ impl SignatureBuilder {
         let end = self.label.chars().count() as u32;
         self.parameters.push(ParameterInformation {
             label: ParameterLabel::LabelOffsets([start, end]),
-            documentation: None,
+            documentation: documentation.map(Documentation::String),
         });
     }
 
@@ -126,7 +134,7 @@ fn builtin_functions(name: &str) -> Vec<SignatureInformation> {
         let mut builder = SignatureBuilder::new(&def.name.to_ascii_uppercase(), "(");
         for argument in arguments {
             let text = format_argument(argument);
-            builder.push(&text);
+            builder.push_documented(&text, get_parameter_documentation(argument.name));
         }
         let return_type = if def.return_type == VariableType::None {
             "MULTITYPE".to_string()
@@ -146,9 +154,37 @@ fn builtin_statement(name: &str) -> Option<SignatureInformation> {
     let mut builder = SignatureBuilder::new(&def.name.to_ascii_uppercase(), " ");
     for argument in arguments {
         let text = format_argument(argument);
-        builder.push(&text);
+        builder.push_documented(&text, get_parameter_documentation(argument.name));
     }
     Some(builder.finish(""))
+}
+
+fn member_call(visitor: &SemanticVisitor, call: &CallContext) -> Option<SignatureInformation> {
+    let receiver_type = type_of_chain(visitor, &call.receiver)?;
+    let VariableType::UserData(receiver_id) = receiver_type else {
+        return None;
+    };
+    let object = visitor.type_registry.get_type_from_id(receiver_id)?;
+    let member_name = unicase::Ascii::new(call.name.clone());
+    let (parameters, parameter_names, required, return_type) = if let Some(function) = object.functions.get(&member_name) {
+        (&function.parameters, &function.parameter_names, function.required, Some(function.return_type))
+    } else {
+        let procedure = object.procedures.get(&member_name)?;
+        (&procedure.parameters, &procedure.parameter_names, procedure.required, None)
+    };
+
+    let head = format!("{}.{}", type_name(&visitor.type_registry, receiver_type), call.name);
+    let mut builder = SignatureBuilder::new(&head, "(");
+    for (index, parameter) in parameters.iter().enumerate() {
+        let var_type = type_name(&visitor.type_registry, *parameter);
+        let parameter = parameter_names.get(index).map_or(var_type.clone(), |name| format!("{var_type} {name}"));
+        builder.push_documented(
+            &if index < required { parameter } else { format!("[{parameter}]") },
+            parameter_names.get(index).and_then(|name| get_parameter_documentation(name)),
+        );
+    }
+    let tail = return_type.map_or_else(|| ")".to_string(), |value| format!(") {}", type_name(&visitor.type_registry, value)));
+    Some(builder.finish(&tail))
 }
 
 /// How a routine the program declares is written out.
@@ -160,7 +196,9 @@ pub fn routine_signature(visitor: &SemanticVisitor, name: &str) -> Option<String
 pub fn get_signature_help(line_before_cursor: &str, visitor: &SemanticVisitor) -> Option<SignatureHelp> {
     let call = call_context(line_before_cursor)?;
 
-    let signatures = if call.bare {
+    let signatures = if !call.receiver.is_empty() {
+        member_call(visitor, &call).into_iter().collect::<Vec<_>>()
+    } else if call.bare {
         builtin_statement(&call.name).into_iter().collect::<Vec<_>>()
     } else {
         let mut signatures = user_routine(visitor, &call.name).into_iter().collect::<Vec<_>>();

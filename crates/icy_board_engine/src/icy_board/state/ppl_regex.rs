@@ -173,40 +173,51 @@ impl UserData for PplRegex {
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         registry.add_property(VALID.clone(), VariableType::Boolean, false);
         registry.add_property(PATTERN.clone(), VariableType::String, false);
-        registry.add_static_function_with(
+        registry.add_named_static_function_with(
             COMPILE.clone(),
-            vec![VariableType::String, VariableType::UserData(REGEX_OPTIONS_ENUM_ID)],
+            vec![("pattern", VariableType::String), ("options", VariableType::UserData(REGEX_OPTIONS_ENUM_ID))],
             1,
             VariableType::UserData(REGEX_ID as u8),
         );
-        registry.add_static_function(ESCAPE.clone(), vec![VariableType::String], VariableType::String);
-        registry.add_static_function_with(
+        registry.add_named_static_function(ESCAPE.clone(), vec![("text", VariableType::String)], VariableType::String);
+        registry.add_named_static_function_with(
             IS_VALID.clone(),
-            vec![VariableType::String, VariableType::UserData(REGEX_OPTIONS_ENUM_ID)],
+            vec![("pattern", VariableType::String), ("options", VariableType::UserData(REGEX_OPTIONS_ENUM_ID))],
             1,
             VariableType::Boolean,
         );
-        registry.add_function_with(IS_MATCH.clone(), vec![VariableType::String, VariableType::Integer], 1, VariableType::Boolean);
-        registry.add_function_with(
+        registry.add_named_function_with(
+            IS_MATCH.clone(),
+            vec![("text", VariableType::String), ("start", VariableType::Integer)],
+            1,
+            VariableType::Boolean,
+        );
+        registry.add_named_function_with(
             FIND.clone(),
-            vec![VariableType::String, VariableType::Integer],
+            vec![("text", VariableType::String), ("start", VariableType::Integer)],
             1,
             VariableType::UserData(REGEX_MATCH_ID as u8),
         );
-        registry.add_array_function_with(
+        registry.add_named_array_function_with(
             FIND_ALL.clone(),
-            vec![VariableType::String, VariableType::Integer, VariableType::Integer],
+            vec![("text", VariableType::String), ("start", VariableType::Integer), ("limit", VariableType::Integer)],
             1,
             VariableType::UserData(REGEX_MATCH_ID as u8),
             1,
         );
-        registry.add_function_with(
+        registry.add_named_function_with(
             REPLACE.clone(),
-            vec![VariableType::String, VariableType::String, VariableType::Integer],
+            vec![("text", VariableType::String), ("replacement", VariableType::String), ("limit", VariableType::Integer)],
             2,
             VariableType::String,
         );
-        registry.add_array_function_with(SPLIT.clone(), vec![VariableType::String, VariableType::Integer], 1, VariableType::String, 1);
+        registry.add_named_array_function_with(
+            SPLIT.clone(),
+            vec![("text", VariableType::String), ("limit", VariableType::Integer)],
+            1,
+            VariableType::String,
+            1,
+        );
     }
 }
 
@@ -404,14 +415,14 @@ impl UserData for PplRegexMatch {
         registry.add_property(START.clone(), VariableType::Integer, false);
         registry.add_property(LENGTH.clone(), VariableType::Integer, false);
         registry.add_property(GROUP_COUNT.clone(), VariableType::Integer, false);
-        registry.add_function(GROUP.clone(), vec![VariableType::Integer], VariableType::String);
-        registry.add_function(NAMED_GROUP.clone(), vec![VariableType::String], VariableType::String);
-        registry.add_function(GROUP_MATCHED.clone(), vec![VariableType::Integer], VariableType::Boolean);
-        registry.add_function(NAMED_GROUP_MATCHED.clone(), vec![VariableType::String], VariableType::Boolean);
-        registry.add_function(GROUP_START.clone(), vec![VariableType::Integer], VariableType::Integer);
-        registry.add_function(NAMED_GROUP_START.clone(), vec![VariableType::String], VariableType::Integer);
-        registry.add_function(GROUP_LENGTH.clone(), vec![VariableType::Integer], VariableType::Integer);
-        registry.add_function(NAMED_GROUP_LENGTH.clone(), vec![VariableType::String], VariableType::Integer);
+        registry.add_named_function(GROUP.clone(), vec![("index", VariableType::Integer)], VariableType::String);
+        registry.add_named_function(NAMED_GROUP.clone(), vec![("name", VariableType::String)], VariableType::String);
+        registry.add_named_function(GROUP_MATCHED.clone(), vec![("index", VariableType::Integer)], VariableType::Boolean);
+        registry.add_named_function(NAMED_GROUP_MATCHED.clone(), vec![("name", VariableType::String)], VariableType::Boolean);
+        registry.add_named_function(GROUP_START.clone(), vec![("index", VariableType::Integer)], VariableType::Integer);
+        registry.add_named_function(NAMED_GROUP_START.clone(), vec![("name", VariableType::String)], VariableType::Integer);
+        registry.add_named_function(GROUP_LENGTH.clone(), vec![("index", VariableType::Integer)], VariableType::Integer);
+        registry.add_named_function(NAMED_GROUP_LENGTH.clone(), vec![("name", VariableType::String)], VariableType::Integer);
     }
 }
 

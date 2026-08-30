@@ -15,8 +15,12 @@ use ropey::Rope;
 const KEYWORD: u32 = 0;
 const VARIABLE: u32 = 4;
 const PARAMETER: u32 = 5;
+const FUNCTION: u32 = 6;
+const TYPE: u32 = 7;
 const ENUM: u32 = 8;
 const ENUM_MEMBER: u32 = 9;
+const PROPERTY: u32 = 10;
+const CONSTANT: u32 = 12;
 const READONLY: u32 = 1 << 2;
 
 fn analyze(source: &str, version: u16) -> (Ast, SemanticVisitor, Workspace) {
@@ -64,8 +68,20 @@ fn enums_and_constants_have_semantic_kinds() {
     assert!(tokens.contains(&("Color".to_string(), ENUM, 1)), "{tokens:?}");
     assert!(tokens.contains(&("Red".to_string(), ENUM_MEMBER, 1 | READONLY)), "{tokens:?}");
     assert!(tokens.contains(&("CONST".to_string(), KEYWORD, 0)), "{tokens:?}");
-    assert!(tokens.contains(&("Favorite".to_string(), VARIABLE, 1 | READONLY)), "{tokens:?}");
+    assert!(tokens.contains(&("Favorite".to_string(), CONSTANT, 1 | READONLY)), "{tokens:?}");
     assert!(tokens.contains(&("Red".to_string(), ENUM_MEMBER, 0)), "{tokens:?}");
+    assert!(tokens.contains(&("Favorite".to_string(), CONSTANT, 0)), "{tokens:?}");
+}
+
+#[test]
+fn constant_usages_in_other_constant_expressions_stay_constants() {
+    let source = "CONST INTEGER LEFT = 17\nCONST INTEGER VIEW = LEFT + 1\nINTEGER selected = VIEW\n";
+    let tokens = decoded(source, 400);
+
+    assert!(tokens.contains(&("LEFT".to_string(), CONSTANT, 1 | READONLY)), "{tokens:?}");
+    assert!(tokens.contains(&("VIEW".to_string(), CONSTANT, 1 | READONLY)), "{tokens:?}");
+    assert!(tokens.contains(&("LEFT".to_string(), CONSTANT, 0)), "{tokens:?}");
+    assert!(tokens.contains(&("VIEW".to_string(), CONSTANT, 0)), "{tokens:?}");
 }
 
 #[test]
@@ -86,6 +102,56 @@ fn a_routine_parameter_is_not_just_a_variable() {
     let source = "PROCEDURE Show(INTEGER value)\n  PRINTLN value\nENDPROC\n";
     let tokens = decoded(source, 350);
     assert!(tokens.contains(&("value".to_string(), PARAMETER, 1)), "{tokens:?}");
+    assert!(tokens.contains(&("value".to_string(), PARAMETER, 0)), "{tokens:?}");
+    assert!(!tokens.contains(&("value".to_string(), VARIABLE, 0)), "{tokens:?}");
+}
+
+#[test]
+fn every_routine_parameter_usage_keeps_parameter_highlighting() {
+    let source = "PROCEDURE DrawRow(INTEGER item, INTEGER row)\n  STRING label\n  label = items[item]\n  ANSIPOS 1, row\n  IF (item = selected) THEN\n    PRINT label\n  ENDIF\nENDPROC\n";
+    let tokens = decoded(source, 400);
+
+    for (name, expected_usages) in [("item", 2), ("row", 1)] {
+        let usages = tokens
+            .iter()
+            .filter(|(text, token_type, modifiers)| text == name && *token_type == PARAMETER && *modifiers == 0)
+            .count();
+        assert_eq!(usages, expected_usages, "{name} usages are not parameters: {tokens:?}");
+        assert!(
+            !tokens.iter().any(|(text, token_type, modifiers)| text == name && *token_type == VARIABLE && *modifiers == 0),
+            "{name} has variable-highlighted usages: {tokens:?}"
+        );
+    }
+}
+
+#[test]
+fn function_return_types_are_types_in_declarations_and_implementations() {
+    let source = "DECLARE FUNCTION HasAccess(INTEGER conf) BOOLEAN\nFUNCTION HasAccess(INTEGER conf) BOOLEAN\n  RETURN TRUE\nENDFUNC\n";
+    let tokens = decoded(source, 350);
+    let return_types = tokens
+        .iter()
+        .filter(|(text, token_type, modifiers)| text == "BOOLEAN" && *token_type == TYPE && *modifiers == 0)
+        .count();
+
+    assert_eq!(return_types, 2, "{tokens:?}");
+}
+
+#[test]
+fn board_object_types_methods_and_properties_have_distinct_semantic_kinds() {
+    let source = "Terminal.Gfx.Init(GfxBackend.Auto, FALSE)\nIF Terminal.Gfx.Backend <> GfxBackend.None THEN\n  SURFACE banner = Surface.Load(\"banner.png\")\n  banner.PresentAt(18, 2)\n  banner.Free()\nENDIF\nTerminal.Gfx.Shutdown()\n";
+    let tokens = decoded(source, 400);
+
+    for name in ["Terminal", "Surface"] {
+        assert!(tokens.iter().any(|token| token == &(name.to_string(), TYPE, 0)), "{name}: {tokens:?}");
+    }
+    assert!(tokens.iter().any(|token| token == &("GfxBackend".to_string(), ENUM, 0)), "{tokens:?}");
+    assert!(tokens.iter().any(|token| token == &("Auto".to_string(), ENUM_MEMBER, 0)), "{tokens:?}");
+    for name in ["Init", "Load", "PresentAt", "Free", "Shutdown"] {
+        assert!(tokens.iter().any(|token| token == &(name.to_string(), FUNCTION, 0)), "{name}: {tokens:?}");
+    }
+    for name in ["Gfx", "Backend"] {
+        assert!(tokens.iter().any(|token| token == &(name.to_string(), PROPERTY, 0)), "{name}: {tokens:?}");
+    }
 }
 
 #[test]

@@ -22,6 +22,21 @@ fn actions(server: &mut Server, uri: &str, diagnostics: Value) -> Value {
 }
 
 #[test]
+fn deprecated_bigstr_can_be_replaced_with_string() {
+    let (mut server, _) = Server::ready();
+    let uri = "file:///tmp/deprecated-bigstr.pps";
+    server.open(uri, ";$LANGVERSION 400\nBIGSTR text\n");
+    let diagnostics = server.diagnostics(uri);
+    let action_list = actions(&mut server, uri, diagnostics.clone());
+    let action = action_list
+        .as_array()
+        .and_then(|actions| actions.iter().find(|action| action["title"] == "Replace BIGSTR with STRING"))
+        .unwrap_or_else(|| panic!("diagnostics={diagnostics}, actions={action_list}"));
+    assert_eq!(action["edit"]["changes"][uri][0]["newText"], "STRING");
+    assert_eq!(action["diagnostics"][0]["tags"], json!([2]));
+}
+
+#[test]
 fn a_function_closed_with_endproc_can_be_fixed() {
     let (mut server, _) = Server::ready();
     let uri = "file:///tmp/end-token.pps";

@@ -13,16 +13,18 @@ use icy_board_engine::compiler::{CompilationErrorType, CompilationWarningType, w
 use icy_board_engine::executable::{FUNCTION_DEFINITIONS, FunctionDefinition, FunctionSignature, LAST_PPL_LANGUAGE_VERSION, OpCode, VariableType};
 use icy_board_engine::formatting::FormattingVisitor;
 use icy_board_engine::icy_board::read_data_with_encoding_detection;
-use icy_board_engine::parser::lexer::{LexingErrorType, Spanned, Token};
+use icy_board_engine::parser::lexer::{KEYWORDS, LexingErrorType, Spanned, Token};
 use icy_board_engine::parser::{
     Encoding, ErrorReporter, ParserErrorType, ParserWarningType, UserTypeRegistry, parse_ast_with_predeclared_types, preparse_type_declarations,
 };
 use icy_board_engine::semantic::{FunctionDeclaration, ReferenceType, SemanticVisitor};
 use ppl_lsp::completion::get_completion;
+use ppl_lsp::code_lens::get_code_lenses;
 use ppl_lsp::document_symbol::get_document_symbols;
-use ppl_lsp::documentation::{get_const_hover, get_function_hover, get_statement_hover, get_type_hover};
+use ppl_lsp::documentation::{get_const_hover, get_function_hover, get_keyword_hover, get_statement_hover, get_type_hover_for_version};
 use ppl_lsp::formatting::VSCodeFormattingBackend;
 use ppl_lsp::hover::get_user_hover;
+use ppl_lsp::inlay_hints::get_inlay_hints;
 use ppl_lsp::jump_definition::get_definition;
 use ppl_lsp::reference::get_reference;
 use ppl_lsp::semantic_tokens::{get_semantic_tokens, legend_modifiers, legend_types};
@@ -83,7 +85,7 @@ impl LanguageServer for Backend {
 
                 completion_provider: Some(CompletionOptions {
                     resolve_provider: Some(false),
-                    trigger_characters: Some(vec![".".to_string(), "{".to_string()]),
+                    trigger_characters: Some(vec![".".to_string(), "{".to_string(), "(".to_string(), ",".to_string()]),
                     work_done_progress_options: Default::default(),
                     all_commit_characters: None,
                     completion_item: None,
@@ -108,6 +110,10 @@ impl LanguageServer for Backend {
                 rename_provider: Some(OneOf::Left(true)),
                 document_symbol_provider: Some(OneOf::Left(true)),
                 document_highlight_provider: Some(OneOf::Left(true)),
+                code_lens_provider: Some(CodeLensOptions {
+                    resolve_provider: Some(false),
+                }),
+                inlay_hint_provider: Some(OneOf::Left(true)),
                 code_action_provider: Some(CodeActionProviderCapability::Options(CodeActionOptions {
                     code_action_kinds: Some(vec![CodeActionKind::QUICKFIX, UPGRADE_ACTION_KIND]),
                     work_done_progress_options: Default::default(),
@@ -211,6 +217,11 @@ impl LanguageServer for Backend {
                     ("Replace braces with parentheses", uri.clone(), edits)
                 }
                 "ppl.obsolete-pow" => ("Replace ** with ^", uri.clone(), vec![TextEdit::new(diagnostic.range, "^".to_string())]),
+                "ppl.deprecated-bigstr" => (
+                    "Replace BIGSTR with STRING",
+                    uri.clone(),
+                    vec![TextEdit::new(diagnostic.range, "STRING".to_string())],
+                ),
                 "ppl.var-not-allowed" => (
                     "Remove VAR",
                     uri.clone(),
@@ -343,7 +354,9 @@ impl LanguageServer for Backend {
 
             let offset = position_to_offset(&rope, params.text_document_position_params.position)?;
 
-            get_tooltip(ast, offset).or_else(|| get_user_hover(ast, visitor, offset))
+            get_tooltip(ast, offset)
+                .or_else(|| get_user_hover(ast, visitor, offset))
+                .or_else(|| get_keyword_tooltip(&rope, offset, ast.language_version))
         })
     }
 
@@ -376,6 +389,24 @@ impl LanguageServer for Backend {
         };
         let symbols = self.get_ast(&uri, |ast, _| get_document_symbols(ast, &rope))?;
         Ok(Some(DocumentSymbolResponse::Nested(symbols)))
+    }
+
+    async fn code_lens(&self, params: CodeLensParams) -> Result<Option<Vec<CodeLens>>> {
+        let uri = params.text_document.uri;
+        let Some(rope) = self.document_map.get(&uri) else {
+            return Ok(None);
+        };
+        let lenses = self.get_ast(&uri, |ast, visitor| get_code_lenses(ast, visitor, &rope))?;
+        Ok((!lenses.is_empty()).then_some(lenses))
+    }
+
+    async fn inlay_hint(&self, params: InlayHintParams) -> Result<Option<Vec<InlayHint>>> {
+        let uri = params.text_document.uri;
+        let Some(rope) = self.document_map.get(&uri) else {
+            return Ok(None);
+        };
+        let hints = self.get_ast(&uri, |ast, visitor| get_inlay_hints(ast, visitor, &rope, params.range))?;
+        Ok((!hints.is_empty()).then_some(hints))
     }
 
     async fn document_highlight(&self, params: DocumentHighlightParams) -> Result<Option<Vec<DocumentHighlight>>> {
@@ -993,6 +1024,11 @@ impl Backend {
                         Some(NumberOrString::String(code)) if matches!(code.as_str(), "ppl.unused-label" | "ppl.unused-routine" | "ppl.unused-variable")
                     ) {
                         diag.tags = Some(vec![DiagnosticTag::UNNECESSARY]);
+                    } else if matches!(
+                        diag.code.as_ref(),
+                        Some(NumberOrString::String(code)) if code == "ppl.deprecated-bigstr"
+                    ) {
+                        diag.tags = Some(vec![DiagnosticTag::DEPRECATED]);
                     }
                     diagnostics.entry(uri).or_default().push(diag);
                 }
@@ -1030,6 +1066,7 @@ fn diagnostic_details(
         }
     } else if let Some(error) = error.downcast_ref::<LexingErrorType>() {
         match error {
+            LexingErrorType::BigStrDeprecated => "ppl.deprecated-bigstr",
             LexingErrorType::DontUseBraces => match rope.get_char(start) {
                 Some('{') => "ppl.obsolete-brace-open",
                 Some('}') => "ppl.obsolete-brace-close",
@@ -1587,6 +1624,7 @@ async fn main() {
 struct TooltipVisitor {
     pub tooltip: Option<Hover>,
     pub offset: usize,
+    pub language_version: u16,
 }
 
 impl AstVisitor<()> for TooltipVisitor {
@@ -1600,7 +1638,7 @@ impl AstVisitor<()> for TooltipVisitor {
 
     fn visit_variable_declaration_statement(&mut self, var_decl: &icy_board_engine::ast::VariableDeclarationStatement) {
         if var_decl.get_type_token().span.contains(&self.offset) {
-            self.tooltip = get_type_hover(var_decl.get_variable_type());
+            self.tooltip = get_type_hover_for_version(var_decl.get_variable_type(), self.language_version);
         }
         walk_variable_declaration_statement(self, var_decl);
     }
@@ -1609,12 +1647,12 @@ impl AstVisitor<()> for TooltipVisitor {
         match param {
             ParameterSpecifier::Variable(param) => {
                 if param.get_type_token().span.contains(&self.offset) {
-                    self.tooltip = get_type_hover(param.get_variable_type());
+                    self.tooltip = get_type_hover_for_version(param.get_variable_type(), self.language_version);
                 }
             }
             ParameterSpecifier::Function(f) => {
                 if f.get_return_type_token().span.contains(&self.offset) {
-                    self.tooltip = get_type_hover(f.get_return_type());
+                    self.tooltip = get_type_hover_for_version(f.get_return_type(), self.language_version);
                 }
                 for p in f.get_parameters() {
                     p.visit(self);
@@ -1630,14 +1668,14 @@ impl AstVisitor<()> for TooltipVisitor {
 
     fn visit_function_declaration(&mut self, func_decl: &icy_board_engine::ast::FunctionDeclarationAstNode) {
         if func_decl.get_return_type_token().span.contains(&self.offset) {
-            self.tooltip = get_type_hover(func_decl.get_return_type());
+            self.tooltip = get_type_hover_for_version(func_decl.get_return_type(), self.language_version);
         }
         walk_function_declaration(self, func_decl);
     }
 
     fn visit_function_implementation(&mut self, function: &icy_board_engine::ast::FunctionImplementation) {
         if function.get_return_type_token().span.contains(&self.offset) {
-            self.tooltip = get_type_hover(function.get_return_type());
+            self.tooltip = get_type_hover_for_version(function.get_return_type(), self.language_version);
         }
         walk_function_implementation(self, function);
     }
@@ -1666,7 +1704,47 @@ impl AstVisitor<()> for TooltipVisitor {
 }
 
 fn get_tooltip(ast: &Ast, offset: usize) -> Option<Hover> {
-    let mut visitor = TooltipVisitor { tooltip: None, offset };
+    let mut visitor = TooltipVisitor {
+        tooltip: None,
+        offset,
+        language_version: ast.language_version,
+    };
     ast.visit(&mut visitor);
     visitor.tooltip
+}
+
+fn get_keyword_tooltip(rope: &Rope, offset: usize, language_version: u16) -> Option<Hover> {
+    fn is_word_char(ch: char) -> bool {
+        ch.is_ascii_alphanumeric() || ch == '_'
+    }
+
+    let mut start = offset.min(rope.len_chars());
+    while start > 0 && rope.get_char(start - 1).is_some_and(is_word_char) {
+        start -= 1;
+    }
+    let mut end = offset.min(rope.len_chars());
+    while end < rope.len_chars() && rope.get_char(end).is_some_and(is_word_char) {
+        end += 1;
+    }
+    let word = rope.slice(start..end).to_string();
+    let is_reserved = KEYWORDS
+        .iter()
+        .any(|keyword| keyword.since <= language_version && keyword.name.eq_ignore_ascii_case(&word));
+    let is_contextual = language_version >= 400 && word.eq_ignore_ascii_case("EXIT");
+    (is_reserved || is_contextual).then(|| get_keyword_hover(&word)).flatten()
+}
+
+#[cfg(test)]
+mod keyword_hover_tests {
+    use super::*;
+
+    #[test]
+    fn lexical_keyword_hover_obeys_language_versions() {
+        let rope = Rope::from_str("IF value\nFOREACH item IN values\nEXIT");
+        assert!(get_keyword_tooltip(&rope, 1, 100).is_some());
+        assert!(get_keyword_tooltip(&rope, 10, 100).is_none());
+        assert!(get_keyword_tooltip(&rope, 10, 400).is_some());
+        assert!(get_keyword_tooltip(&rope, rope.len_chars() - 1, 350).is_none());
+        assert!(get_keyword_tooltip(&rope, rope.len_chars() - 1, 400).is_some());
+    }
 }

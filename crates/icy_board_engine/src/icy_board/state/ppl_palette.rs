@@ -24,8 +24,12 @@ impl UserData for PplPalette {
     const TYPE_NAME: &'static str = "Palette";
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
-        registry.add_function(SET.clone(), vec![VariableType::Integer, VariableType::Unsigned], VariableType::Boolean);
-        registry.add_function(RESET.clone(), vec![VariableType::Integer], VariableType::Boolean);
+        registry.add_named_function(
+            SET.clone(),
+            vec![("color", VariableType::Integer), ("rgba", VariableType::Unsigned)],
+            VariableType::Boolean,
+        );
+        registry.add_named_function(RESET.clone(), vec![("color", VariableType::Integer)], VariableType::Boolean);
         registry.add_function(RESET_ALL.clone(), Vec::new(), VariableType::Boolean);
     }
 }

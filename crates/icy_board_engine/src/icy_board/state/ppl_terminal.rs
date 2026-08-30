@@ -43,8 +43,17 @@ impl UserData for PplTerminal {
         registry.add_function(END_UPDATE.clone(), Vec::new(), VariableType::Boolean);
         // Leaving the slot out means every attribute class, which is what changing
         // *the* font means.
-        registry.add_function_with(SET_FONT.clone(), vec![VariableType::Integer, VariableType::Integer], 1, VariableType::Boolean);
-        registry.add_function(LOAD_FONT.clone(), vec![VariableType::Integer, VariableType::String], VariableType::Boolean);
+        registry.add_named_function_with(
+            SET_FONT.clone(),
+            vec![("font", VariableType::Integer), ("slot", VariableType::Integer)],
+            1,
+            VariableType::Boolean,
+        );
+        registry.add_named_function(
+            LOAD_FONT.clone(),
+            vec![("font", VariableType::Integer), ("file", VariableType::String)],
+            VariableType::Boolean,
+        );
     }
 }
 

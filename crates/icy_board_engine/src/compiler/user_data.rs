@@ -30,6 +30,55 @@ pub trait UserDataMemberRegistry {
     /// nothing from the runtime.
     fn add_static_function_with(&mut self, name: unicase::Ascii<String>, parameters: Vec<VariableType>, required: usize, return_type: VariableType);
 
+    fn set_parameter_names(&mut self, name: &unicase::Ascii<String>, names: Vec<String>);
+
+    fn add_named_function_with(
+        &mut self,
+        name: unicase::Ascii<String>,
+        parameters: Vec<(&str, VariableType)>,
+        required: usize,
+        return_type: VariableType,
+    ) {
+        let (names, types) = split_named_parameters(parameters);
+        self.add_function_with(name.clone(), types, required, return_type);
+        self.set_parameter_names(&name, names);
+    }
+
+    fn add_named_array_function_with(
+        &mut self,
+        name: unicase::Ascii<String>,
+        parameters: Vec<(&str, VariableType)>,
+        required: usize,
+        return_type: VariableType,
+        return_rank: u8,
+    ) {
+        let (names, types) = split_named_parameters(parameters);
+        self.add_array_function_with(name.clone(), types, required, return_type, return_rank);
+        self.set_parameter_names(&name, names);
+    }
+
+    fn add_named_static_function_with(
+        &mut self,
+        name: unicase::Ascii<String>,
+        parameters: Vec<(&str, VariableType)>,
+        required: usize,
+        return_type: VariableType,
+    ) {
+        let (names, types) = split_named_parameters(parameters);
+        self.add_static_function_with(name.clone(), types, required, return_type);
+        self.set_parameter_names(&name, names);
+    }
+
+    fn add_named_function(&mut self, name: unicase::Ascii<String>, parameters: Vec<(&str, VariableType)>, return_type: VariableType) {
+        let required = parameters.len();
+        self.add_named_function_with(name, parameters, required, return_type);
+    }
+
+    fn add_named_static_function(&mut self, name: unicase::Ascii<String>, parameters: Vec<(&str, VariableType)>, return_type: VariableType) {
+        let required = parameters.len();
+        self.add_named_static_function_with(name, parameters, required, return_type);
+    }
+
     fn add_procedure(&mut self, name: unicase::Ascii<String>, parameters: Vec<VariableType>) {
         let required = parameters.len();
         self.add_procedure_with(name, parameters, required);
@@ -44,6 +93,10 @@ pub trait UserDataMemberRegistry {
         let required = parameters.len();
         self.add_static_function_with(name, parameters, required, return_type);
     }
+}
+
+fn split_named_parameters(parameters: Vec<(&str, VariableType)>) -> (Vec<String>, Vec<VariableType>) {
+    parameters.into_iter().map(|(name, var_type)| (name.to_string(), var_type)).unzip()
 }
 
 pub trait UserData: Sized + UserDataValue {
@@ -95,6 +148,7 @@ pub enum UserDataEntry {
 
 pub struct MemberFunction {
     pub parameters: Vec<VariableType>,
+    pub parameter_names: Vec<String>,
     pub required: usize,
     pub return_type: VariableType,
     pub return_rank: u8,
@@ -102,6 +156,7 @@ pub struct MemberFunction {
 
 pub struct MemberProcedure {
     pub parameters: Vec<VariableType>,
+    pub parameter_names: Vec<String>,
     pub required: usize,
 }
 
@@ -148,7 +203,14 @@ impl UserDataMemberRegistry for UserDataRegistry {
     fn add_procedure_with(&mut self, name: unicase::Ascii<String>, parameters: Vec<VariableType>, required: usize) {
         self.member_id_lookup.insert(name.clone(), self.id_table.len());
         self.id_table.push(UserDataEntry::Procedure(name.clone()));
-        self.procedures.insert(name, MemberProcedure { parameters, required });
+        self.procedures.insert(
+            name,
+            MemberProcedure {
+                parameters,
+                parameter_names: Vec::new(),
+                required,
+            },
+        );
     }
 
     fn add_function_with(&mut self, name: unicase::Ascii<String>, parameters: Vec<VariableType>, required: usize, return_type: VariableType) {
@@ -158,6 +220,7 @@ impl UserDataMemberRegistry for UserDataRegistry {
             name,
             MemberFunction {
                 parameters,
+                parameter_names: Vec::new(),
                 required,
                 return_type,
                 return_rank: 0,
@@ -179,6 +242,7 @@ impl UserDataMemberRegistry for UserDataRegistry {
             name,
             MemberFunction {
                 parameters,
+                parameter_names: Vec::new(),
                 required,
                 return_type,
                 return_rank,
@@ -189,5 +253,13 @@ impl UserDataMemberRegistry for UserDataRegistry {
     fn add_static_function_with(&mut self, name: unicase::Ascii<String>, parameters: Vec<VariableType>, required: usize, return_type: VariableType) {
         self.statics.insert(name.clone());
         self.add_function_with(name, parameters, required, return_type);
+    }
+
+    fn set_parameter_names(&mut self, name: &unicase::Ascii<String>, names: Vec<String>) {
+        if let Some(function) = self.functions.get_mut(name) {
+            function.parameter_names = names;
+        } else if let Some(procedure) = self.procedures.get_mut(name) {
+            procedure.parameter_names = names;
+        }
     }
 }

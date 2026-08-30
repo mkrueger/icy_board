@@ -6,11 +6,14 @@ use icy_board_engine::{
     parser::{FIRST_BOARD_OBJECT_LANGUAGE_VERSION, built_in_type_names, lexer::KEYWORDS},
     semantic::{ReferenceType, SemanticVisitor},
 };
-use tower_lsp::lsp_types::{CompletionItem, CompletionItemKind, Documentation, HoverContents, InsertTextFormat};
+use tower_lsp::lsp_types::{CompletionItem, CompletionItemKind, Documentation, HoverContents, InsertTextFormat, MarkupContent, MarkupKind};
 
 use crate::{
-    context::{CursorContext, cursor_context},
-    documentation::{get_const_hover, get_function_hover, get_member_documentation, get_statement_hover, get_string_member_documentation, get_type_hover},
+    context::{CursorContext, call_context, cursor_context},
+    documentation::{
+        get_const_hover, get_function_hover, get_keyword_hover, get_member_documentation, get_member_documentation_with_parameters,
+        get_statement_hover, get_string_member_documentation, get_type_hover,
+    },
     type_lookup::{MemberKind, bytes_members, members_of, record_field_type_name, static_members_of, static_type_of_name, string_members, type_of_chain},
 };
 
@@ -34,25 +37,34 @@ pub fn get_completion(ast: &Ast, semantic_visitor: &SemanticVisitor, line_before
         CursorContext::Other => {}
     }
 
+    let parameter_items = parameter_completion(semantic_visitor, line_before_cursor);
+    if !parameter_items.is_empty() {
+        return parameter_items;
+    }
+
     let mut map = CompletionVisitor::new(offset, ast.language_version);
     ast.visit(&mut map);
 
     if map.items.is_empty() {
         for keyword in KEYWORDS.iter().filter(|keyword| keyword.since <= ast.language_version) {
+            let documentation = hover_documentation(get_keyword_hover(keyword.name));
             map.items.push(CompletionItem {
                 label: keyword.name.to_ascii_uppercase(),
                 insert_text: Some(keyword.name.to_ascii_uppercase()),
                 kind: Some(tower_lsp::lsp_types::CompletionItemKind::KEYWORD),
                 insert_text_format: Some(tower_lsp::lsp_types::InsertTextFormat::PLAIN_TEXT),
+                documentation,
                 ..Default::default()
             });
         }
         for (word, _) in CONTEXTUAL_WORDS.iter().filter(|(_, since)| *since <= ast.language_version) {
+            let documentation = hover_documentation(get_keyword_hover(word));
             map.items.push(CompletionItem {
                 label: word.to_string(),
                 insert_text: Some(word.to_string()),
                 kind: Some(tower_lsp::lsp_types::CompletionItemKind::KEYWORD),
                 insert_text_format: Some(tower_lsp::lsp_types::InsertTextFormat::PLAIN_TEXT),
+                documentation,
                 ..Default::default()
             });
         }
@@ -61,6 +73,8 @@ pub fn get_completion(ast: &Ast, semantic_visitor: &SemanticVisitor, line_before
                 label: stmt.to_string(),
                 insert_text: Some(stmt.to_string()),
                 kind: Some(tower_lsp::lsp_types::CompletionItemKind::CLASS),
+                tags: (ast.language_version >= 400 && stmt.eq_ignore_ascii_case("BIGSTR"))
+                    .then_some(vec![tower_lsp::lsp_types::CompletionItemTag::DEPRECATED]),
                 insert_text_format: Some(tower_lsp::lsp_types::InsertTextFormat::PLAIN_TEXT),
                 ..Default::default()
             });
@@ -121,13 +135,17 @@ pub fn get_completion(ast: &Ast, semantic_visitor: &SemanticVisitor, line_before
                     ..Default::default()
                 });
             }
-            if matches!(rt, ReferenceType::Variable(_))
+            if matches!(rt, ReferenceType::Variable(_) | ReferenceType::Constant(_))
                 && let Some((_, decl)) = &r.declaration
             {
                 map.items.push(CompletionItem {
                     label: decl.token.to_string(),
                     insert_text: Some(decl.token.to_string()),
-                    kind: Some(tower_lsp::lsp_types::CompletionItemKind::VARIABLE),
+                    kind: Some(if matches!(rt, ReferenceType::Constant(_)) {
+                        CompletionItemKind::CONSTANT
+                    } else {
+                        CompletionItemKind::VARIABLE
+                    }),
                     insert_text_format: Some(tower_lsp::lsp_types::InsertTextFormat::PLAIN_TEXT),
                     ..Default::default()
                 });
@@ -147,13 +165,17 @@ pub fn get_completion(ast: &Ast, semantic_visitor: &SemanticVisitor, line_before
                 });
             }
 
-            if matches!(rt, ReferenceType::Variable(_))
+            if matches!(rt, ReferenceType::Variable(_) | ReferenceType::Constant(_))
                 && let Some((_, decl)) = &r.declaration
             {
                 map.items.push(CompletionItem {
                     label: decl.token.to_string(),
                     insert_text: Some(decl.token.to_string()),
-                    kind: Some(tower_lsp::lsp_types::CompletionItemKind::VARIABLE),
+                    kind: Some(if matches!(rt, ReferenceType::Constant(_)) {
+                        CompletionItemKind::CONSTANT
+                    } else {
+                        CompletionItemKind::VARIABLE
+                    }),
                     insert_text_format: Some(tower_lsp::lsp_types::InsertTextFormat::PLAIN_TEXT),
                     ..Default::default()
                 });
@@ -162,6 +184,65 @@ pub fn get_completion(ast: &Ast, semantic_visitor: &SemanticVisitor, line_before
     }
 
     map.items
+}
+
+fn hover_documentation(hover: Option<tower_lsp::lsp_types::Hover>) -> Option<Documentation> {
+    hover.and_then(|hover| match hover.contents {
+        HoverContents::Markup(content) => Some(Documentation::MarkupContent(content)),
+        _ => None,
+    })
+}
+
+/// Qualified enum values suitable for the member-call argument under the cursor.
+fn parameter_completion(visitor: &SemanticVisitor, line_before_cursor: &str) -> Vec<CompletionItem> {
+    let Some(call) = call_context(line_before_cursor) else {
+        return Vec::new();
+    };
+    let Some(receiver_type) = (!call.receiver.is_empty()).then(|| type_of_chain(visitor, &call.receiver)).flatten() else {
+        return Vec::new();
+    };
+    let icy_board_engine::executable::VariableType::UserData(receiver_id) = receiver_type else {
+        return Vec::new();
+    };
+    let Some(object) = visitor.type_registry.get_type_from_id(receiver_id) else {
+        return Vec::new();
+    };
+    let name = unicase::Ascii::new(call.name);
+    let parameter_type = object
+        .functions
+        .get(&name)
+        .map(|function| &function.parameters)
+        .or_else(|| object.procedures.get(&name).map(|procedure| &procedure.parameters))
+        .and_then(|parameters| parameters.get(call.argument))
+        .copied();
+    let Some(icy_board_engine::executable::VariableType::UserData(parameter_id)) = parameter_type else {
+        return Vec::new();
+    };
+    let Some(definition) = visitor.type_registry.get_enum_from_id(parameter_id) else {
+        return Vec::new();
+    };
+
+    definition
+        .variants
+        .iter()
+        .map(|(name, _)| {
+            let qualified = format!("{}.{}", definition.name, name);
+            CompletionItem {
+                label: qualified.clone(),
+                insert_text: Some(qualified),
+                kind: Some(CompletionItemKind::ENUM_MEMBER),
+                detail: Some(definition.name.to_string()),
+                documentation: get_member_documentation(icy_board_engine::executable::VariableType::UserData(parameter_id), name.as_ref()).map(|value| {
+                    Documentation::MarkupContent(MarkupContent {
+                        kind: MarkupKind::Markdown,
+                        value,
+                    })
+                }),
+                insert_text_format: Some(InsertTextFormat::PLAIN_TEXT),
+                ..Default::default()
+            }
+        })
+        .collect()
 }
 
 /// The names of the record types the program declares plus, from the version that
@@ -190,10 +271,10 @@ fn member_completion(visitor: &SemanticVisitor, path: &[String], language_versio
         }
     }
     if path.len() == 1 && matches!(path[0].to_ascii_uppercase().as_str(), "STRING" | "BIGSTR") {
-        return completion_items(string_members(true), None);
+        return completion_items(string_members(true), None, &visitor.type_registry);
     }
     if path.len() == 1 && path[0].eq_ignore_ascii_case("BYTES") {
-        return completion_items(bytes_members(true), None);
+        return completion_items(bytes_members(true), None, &visitor.type_registry);
     }
     if let Some((property, receiver)) = path.split_last()
         && let Some(icy_board_engine::executable::VariableType::UserData(type_id)) = type_of_chain(visitor, receiver)
@@ -211,6 +292,7 @@ fn member_completion(visitor: &SemanticVisitor, path: &[String], language_versio
                 kind: MemberKind::Method,
             }],
             None,
+            &visitor.type_registry,
         );
     }
     if path.len() == 1
@@ -227,29 +309,41 @@ fn member_completion(visitor: &SemanticVisitor, path: &[String], language_versio
                 })
                 .collect(),
             Some(icy_board_engine::executable::VariableType::UserData(definition.id)),
+            &visitor.type_registry,
         );
     }
     if path.len() == 1
         && let Some(var_type) = static_type_of_name(visitor, &path[0])
     {
-        return completion_items(static_members_of(&visitor.type_registry, var_type), Some(var_type));
+        return completion_items(static_members_of(&visitor.type_registry, var_type), Some(var_type), &visitor.type_registry);
     }
     let Some(var_type) = type_of_chain(visitor, path) else {
         return Vec::new();
     };
-    completion_items(members_of(&visitor.type_registry, var_type), Some(var_type))
+    completion_items(members_of(&visitor.type_registry, var_type), Some(var_type), &visitor.type_registry)
 }
 
-fn completion_items(members: Vec<crate::type_lookup::Member>, receiver_type: Option<icy_board_engine::executable::VariableType>) -> Vec<CompletionItem> {
+fn completion_items(
+    members: Vec<crate::type_lookup::Member>,
+    receiver_type: Option<icy_board_engine::executable::VariableType>,
+    registry: &icy_board_engine::parser::UserTypeRegistry,
+) -> Vec<CompletionItem> {
     members
         .into_iter()
         // A member in angle brackets is the compiler's own and cannot be written.
         .filter(|member| !member.name.starts_with('<'))
         .map(|member| CompletionItem {
             documentation: receiver_type
-                .and_then(|var_type| get_member_documentation(var_type, &member.name))
+                .and_then(|var_type| {
+                    get_member_documentation_with_parameters(registry, var_type, &unicase::Ascii::new(member.name.clone()))
+                })
                 .or_else(|| get_string_member_documentation(&member.name))
-                .map(Documentation::String),
+                .map(|value| {
+                    Documentation::MarkupContent(MarkupContent {
+                        kind: MarkupKind::Markdown,
+                        value,
+                    })
+                }),
             label: member.name.clone(),
             insert_text: Some(member.name),
             kind: Some(match member.kind {

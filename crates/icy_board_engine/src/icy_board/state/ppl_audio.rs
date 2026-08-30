@@ -58,12 +58,16 @@ impl UserData for PplAudio {
         registry.add_property(CHANNEL.clone(), VariableType::Integer, false);
 
         // Looping is the only thing a play has to be told, and it may be left out.
-        registry.add_function_with(PLAY.clone(), vec![VariableType::Boolean], 0, VariableType::Boolean);
+        registry.add_named_function_with(PLAY.clone(), vec![("looping", VariableType::Boolean)], 0, VariableType::Boolean);
         registry.add_function(STOP.clone(), Vec::new(), VariableType::Boolean);
-        registry.add_function(FADE.clone(), vec![VariableType::Integer, VariableType::Integer], VariableType::Boolean);
+        registry.add_named_function(
+            FADE.clone(),
+            vec![("durationMs", VariableType::Integer), ("targetVolume", VariableType::Integer)],
+            VariableType::Boolean,
+        );
         registry.add_function(FREE.clone(), Vec::new(), VariableType::Boolean);
 
-        registry.add_static_function(LOAD.clone(), vec![VariableType::String], VariableType::UserData(AUDIO_ID as u8));
+        registry.add_named_static_function(LOAD.clone(), vec![("file", VariableType::String)], VariableType::UserData(AUDIO_ID as u8));
         registry.add_static_function(STOP_ALL.clone(), Vec::new(), VariableType::Boolean);
     }
 }

@@ -34,6 +34,7 @@ pub enum ReferenceType {
     PredefinedProc(OpCode),
     Label(usize),
     Variable(usize),
+    Constant(usize),
 
     Function(usize),
     Procedure(usize),
@@ -613,8 +614,8 @@ pub struct SemanticVisitor {
 
     /// Named constants never reach the variable table - the value takes the place of
     /// the name - so they are kept beside it.
-    global_constants: HashMap<unicase::Ascii<String>, (VariableType, VariableValue)>,
-    local_constants: Option<HashMap<unicase::Ascii<String>, (VariableType, VariableValue)>>,
+    global_constants: HashMap<unicase::Ascii<String>, (VariableType, VariableValue, usize)>,
+    local_constants: Option<HashMap<unicase::Ascii<String>, (VariableType, VariableValue, usize)>>,
 
     /// Where the FOR statements of the current file keep their count, which a
     /// desugared loop compares and steps itself.
@@ -799,7 +800,7 @@ impl SemanticVisitor {
     /// constant of that type.
     fn declared_constant_type(&self, expr: &Expression) -> Option<VariableType> {
         match expr {
-            Expression::Identifier(identifier) => self.lookup_constant(identifier.get_identifier()).map(|(variable_type, _)| *variable_type),
+            Expression::Identifier(identifier) => self.lookup_constant(identifier.get_identifier()).map(|(variable_type, _, _)| *variable_type),
             Expression::MemberReference(member) => {
                 let Expression::Identifier(base) = member.get_expression() else {
                     return None;
@@ -1268,7 +1269,7 @@ impl SemanticVisitor {
         self.global_constants.contains_key(id) || self.global_lookup.variable_lookup.contains_key(id)
     }
 
-    fn lookup_constant(&self, id: &unicase::Ascii<String>) -> Option<&(VariableType, VariableValue)> {
+    fn lookup_constant(&self, id: &unicase::Ascii<String>) -> Option<&(VariableType, VariableValue, usize)> {
         if let Some(local) = &self.local_constants
             && let Some(constant) = local.get(id)
         {
@@ -2241,8 +2242,12 @@ impl AstVisitor<VariableType> for SemanticVisitor {
     }
 
     fn visit_identifier_expression(&mut self, identifier: &IdentifierExpression) -> VariableType {
-        if let Some((variable_type, _)) = self.lookup_constant(identifier.get_identifier()) {
-            return *variable_type;
+        if let Some((variable_type, reference_index)) = self
+            .lookup_constant(identifier.get_identifier())
+            .map(|(variable_type, _, reference_index)| (*variable_type, *reference_index))
+        {
+            self.add_reference_to(identifier.get_identifier_token(), reference_index);
+            return variable_type;
         }
         let predef = FunctionDefinition::get_function_definitions(identifier.get_identifier());
         if !predef.is_empty() && (self.cur_func_call > 0 || self.lookup_variable(identifier.get_identifier()).is_none()) {
@@ -2323,6 +2328,8 @@ impl AstVisitor<VariableType> for SemanticVisitor {
         {
             if let Some(value) = definition.value(member_reference_expression.get_identifier()) {
                 self.add_constant(&Constant::Integer(value, crate::ast::constant::NumberFormat::Default));
+                self.user_type_lookup
+                    .insert(member_reference_expression.get_identifier_token().span.start, definition.id);
                 return VariableType::UserData(definition.id);
             }
             self.errors.lock().unwrap().report_error(
@@ -3527,8 +3534,18 @@ impl AstVisitor<VariableType> for SemanticVisitor {
     }
 
     fn visit_const_declaration_statement(&mut self, const_decl: &ConstDeclarationStatement) -> VariableType {
-        // The value is never read at runtime, so walking it would put literals nobody
-        // uses into the table.
+        // The value is never read at runtime, so walking it with the semantic visitor
+        // would put literals nobody uses into the variable table. Collect only names
+        // here so references to earlier constants still support navigation and hover.
+        #[derive(Default)]
+        struct ConstantReferences(Vec<Spanned<Token>>);
+
+        impl AstVisitor<()> for ConstantReferences {
+            fn visit_identifier_expression(&mut self, identifier: &IdentifierExpression) {
+                self.0.push(identifier.get_identifier_token().clone());
+            }
+        }
+
         if self.has_variable_defined(const_decl.get_identifier()) {
             self.errors.lock().unwrap().report_error(
                 const_decl.get_identifier_token().span.clone(),
@@ -3539,7 +3556,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
 
         let value = const_value_with_members(
             const_decl.get_value(),
-            &|id| self.lookup_constant(id).map(|(_, value)| value.clone()),
+            &|id| self.lookup_constant(id).map(|(_, value, _)| value.clone()),
             &|type_name, member| {
                 self.type_registry
                     .get_enum(type_name)
@@ -3554,6 +3571,16 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 .report_error(const_decl.get_value().get_span(), CompilationErrorType::ConstantValueExpected);
             return VariableType::None;
         };
+
+        let mut constant_references = ConstantReferences::default();
+        const_decl.get_value().visit(&mut constant_references);
+        for identifier in constant_references.0 {
+            if let Token::Identifier(name) = &identifier.token
+                && let Some(reference_index) = self.lookup_constant(name).map(|(_, _, reference_index)| *reference_index)
+            {
+                self.add_reference_to(&identifier, reference_index);
+            }
+        }
 
         let declared_type = const_decl.get_variable_type();
         if self.type_registry.is_enum_type(declared_type) {
@@ -3576,6 +3603,23 @@ impl AstVisitor<VariableType> for SemanticVisitor {
         } else {
             (declared_type, value.convert_to(declared_type))
         };
+        let reference_index = self.references.len();
+        self.references.push((
+            ReferenceType::Constant(reference_index),
+            References {
+                variable_type: entry.0,
+                variable_table_index: 0,
+                header: None,
+                declaration: Some((
+                    self.errors.lock().unwrap().file_name().to_path_buf(),
+                    Spanned::new(const_decl.get_identifier_token().token.to_string(), const_decl.get_identifier_token().span.clone()),
+                )),
+                implementation: None,
+                return_types: vec![],
+                usages: vec![],
+            },
+        ));
+        let entry = (entry.0, entry.1, reference_index);
         if let Some(local) = &mut self.local_constants {
             local.insert(name, entry);
         } else {
@@ -3599,6 +3643,9 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 }
                 (1, arr_expr.get_expressions().len().saturating_sub(1))
             } else {
+                if let Some(initializer) = v.get_initalizer() {
+                    initializer.visit(self);
+                }
                 (v.get_dimensions().len() as u8, v.get_vector_size())
             };
             self.add_variable(

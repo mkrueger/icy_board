@@ -36,7 +36,8 @@ impl BuiltinConst {
     pub const FALSE: BuiltinConst = BuiltinConst { name: "FALSE", value: 0x00 };
 
     pub fn get_signature(&self) -> Signature {
-        let mut res = self.name.to_ascii_uppercase();
+        let constant_type = if matches!(self.name, "TRUE" | "FALSE") { "BOOLEAN" } else { "INTEGER" };
+        let mut res = format!("CONSTANT {constant_type} {}", self.name.to_ascii_uppercase());
         res.push_str(format!(" = {:X}h", self.value).as_str());
         Signature::new(res)
     }

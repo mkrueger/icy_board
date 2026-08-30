@@ -54,6 +54,30 @@ fn a_call_leads_to_the_routine_it_calls() {
 }
 
 #[test]
+fn a_constant_usage_leads_to_its_declaration() {
+    let (mut server, _) = Server::ready();
+    let uri = "file:///tmp/constants.pps";
+    server.opened(uri, ";$LANGVERSION 400\nCONST INTEGER LEFT = 17\nCONST INTEGER VIEW = LEFT + 1\nPRINTLN VIEW\n");
+
+    let left = server.at("textDocument/definition", uri, 2, 23);
+    assert_eq!(left["range"]["start"]["line"], 1, "{left}");
+
+    let view = server.at("textDocument/definition", uri, 3, 9);
+    assert_eq!(view["range"]["start"]["line"], 2, "{view}");
+}
+
+#[test]
+fn every_predefined_constant_has_a_tooltip() {
+    let (mut server, _) = Server::ready();
+    let uri = "file:///tmp/predefined-constant.pps";
+    server.opened(uri, ";$LANGVERSION 400\nPRINTLN KEY_ESCAPE\n");
+
+    let hover = server.at("textDocument/hover", uri, 1, 10);
+    let text = hover["contents"]["value"].as_str().unwrap_or_else(|| panic!("missing tooltip: {hover}"));
+    assert!(text.starts_with("```PPL\nCONSTANT INTEGER KEY_ESCAPE = 1Bh\n```"), "{text}");
+}
+
+#[test]
 fn every_use_of_a_variable_is_found() {
     let mut server = opened();
     let references = server.request(

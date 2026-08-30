@@ -103,6 +103,11 @@
 				"id": "label",
 				"superType": "variable",
 				"description": "A PPL jump label"
+			},
+			{
+				"id": "constant",
+				"superType": "variable",
+				"description": "A PPL constant"
 			}
 		],
 		"semanticTokenScopes": [
@@ -111,6 +116,9 @@
 				"scopes": {
 					"label": [
 						"entity.name.label.ppl"
+					],
+					"constant": [
+						"constant.language.ppl"
 					]
 				}
 			}

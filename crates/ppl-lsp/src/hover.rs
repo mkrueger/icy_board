@@ -2,18 +2,18 @@
 //! record types and their fields. The built-ins are answered by `documentation`.
 
 use icy_board_engine::{
-    ast::{Ast, AstVisitor, MemberReferenceExpression, VariableDeclarationStatement, walk_variable_declaration_statement},
+    ast::{Ast, AstVisitor, ConstDeclarationStatement, MemberReferenceExpression, VariableDeclarationStatement, walk_variable_declaration_statement},
     executable::VariableType,
     semantic::{ReferenceType, SemanticVisitor},
 };
 use tower_lsp::lsp_types::{Hover, HoverContents, MarkupContent, MarkupKind};
+use std::fmt::Write as _;
 
 use crate::{
-    documentation::get_member_documentation,
+    documentation::get_member_documentation_with_parameters,
     signature_help::routine_signature,
-    type_lookup::{record_field_type_name, type_name, type_of_member},
+    type_lookup::{member_parameters, record_field_type_name, static_type_of_name, type_name, type_of_member},
 };
-use std::fmt::Write as _;
 
 fn hover(text: String) -> Hover {
     Hover {
@@ -65,10 +65,20 @@ pub fn get_user_hover(ast: &Ast, visitor: &SemanticVisitor, offset: usize) -> Op
                         _ => Vec::new(),
                     };
                     if !dimensions.is_empty() {
-                        let _ = write!(text, "({})", dimensions.iter().map(usize::to_string).collect::<Vec<_>>().join(", "));
+                        let _ = write!(text, "[{}]", dimensions.iter().map(usize::to_string).collect::<Vec<_>>().join(", "));
                     }
                 }
                 Some(hover(text))
+            }
+            ReferenceType::Constant(_) => {
+                let declaration_start = reference.declaration.as_ref()?.1.span.start;
+                let mut constant = ConstantHoverVisitor {
+                    visitor,
+                    declaration_start,
+                    hover: None,
+                };
+                ast.visit(&mut constant);
+                constant.hover
             }
             _ => None,
         };
@@ -77,6 +87,25 @@ pub fn get_user_hover(ast: &Ast, visitor: &SemanticVisitor, offset: usize) -> Op
     let mut member_visitor = MemberHoverVisitor { visitor, offset, hover: None };
     ast.visit(&mut member_visitor);
     member_visitor.hover
+}
+
+struct ConstantHoverVisitor<'a> {
+    visitor: &'a SemanticVisitor,
+    declaration_start: usize,
+    hover: Option<Hover>,
+}
+
+impl AstVisitor<()> for ConstantHoverVisitor<'_> {
+    fn visit_const_declaration_statement(&mut self, declaration: &ConstDeclarationStatement) {
+        if declaration.get_identifier_token().span.start == self.declaration_start {
+            self.hover = Some(hover(format!(
+                "CONSTANT {} {} = {}",
+                type_name(&self.visitor.type_registry, declaration.get_variable_type()),
+                declaration.get_identifier(),
+                declaration.get_value()
+            )));
+        }
+    }
 }
 
 /// Answers a record type where it is named and a field where it is used.
@@ -108,18 +137,33 @@ impl<'a> AstVisitor<()> for MemberHoverVisitor<'a> {
         if !token.span.contains(&self.offset) {
             return;
         }
-        if let Some(receiver_type) = self.visitor.member_receiver_type_lookup.get(&token.span.start).copied()
+        let receiver_type = self.visitor.member_receiver_type_lookup.get(&token.span.start).copied().or_else(|| {
+            let icy_board_engine::ast::Expression::Identifier(identifier) = member.get_expression() else {
+                return None;
+            };
+            let receiver_type = static_type_of_name(self.visitor, identifier.get_identifier().as_ref())?;
+            let VariableType::UserData(type_id) = receiver_type else {
+                return None;
+            };
+            self.visitor
+                .type_registry
+                .get_type_from_id(type_id)
+                .is_some_and(|definition| definition.statics.contains(member.get_identifier()))
+                .then_some(receiver_type)
+        });
+        if let Some(receiver_type) = receiver_type
             && let Some(member_type) = type_of_member(&self.visitor.type_registry, receiver_type, member.get_identifier().as_ref())
         {
             let signature = format!(
-                "{} {}.{}",
+                "{} {}.{}{}",
                 type_name(&self.visitor.type_registry, member_type),
                 type_name(&self.visitor.type_registry, receiver_type),
-                member.get_identifier()
+                member.get_identifier(),
+                member_parameters(&self.visitor.type_registry, receiver_type, member.get_identifier()).map_or(String::new(), |p| format!("({p})"))
             );
             self.hover = Some(documented_hover(
                 signature,
-                get_member_documentation(receiver_type, member.get_identifier().as_ref()),
+                get_member_documentation_with_parameters(&self.visitor.type_registry, receiver_type, member.get_identifier()),
             ));
             return;
         }
@@ -127,7 +171,13 @@ impl<'a> AstVisitor<()> for MemberHoverVisitor<'a> {
             return;
         };
         let object = VariableType::UserData(*type_id);
-        if let Some(field_type) = type_of_member(&self.visitor.type_registry, object, member.get_identifier().as_ref()) {
+        let field_type = type_of_member(&self.visitor.type_registry, object, member.get_identifier().as_ref()).or_else(|| {
+            self.visitor
+                .type_registry
+                .get_enum_from_id(*type_id)
+                .and_then(|definition| definition.value(member.get_identifier()).map(|_| object))
+        });
+        if let Some(field_type) = field_type {
             let rank = self
                 .visitor
                 .type_registry
@@ -136,13 +186,17 @@ impl<'a> AstVisitor<()> for MemberHoverVisitor<'a> {
                 .copied()
                 .unwrap_or(0);
             let signature = format!(
-                "{}{} {}.{}",
+                "{}{} {}.{}{}",
                 type_name(&self.visitor.type_registry, field_type),
                 "[]".repeat(rank as usize),
                 type_name(&self.visitor.type_registry, object),
-                member.get_identifier()
+                member.get_identifier(),
+                member_parameters(&self.visitor.type_registry, object, member.get_identifier()).map_or(String::new(), |p| format!("({p})"))
             );
-            self.hover = Some(documented_hover(signature, get_member_documentation(object, member.get_identifier().as_ref())));
+            self.hover = Some(documented_hover(
+                signature,
+                get_member_documentation_with_parameters(&self.visitor.type_registry, object, member.get_identifier()),
+            ));
         }
     }
 

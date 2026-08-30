@@ -1,3 +1,44 @@
+hint-keyword-if=Starts a conditional block. Its body runs when the condition is true; optional `ELSEIF` and `ELSE` branches may follow.
+hint-keyword-let=Introduces an assignment. `LET` is optional in ordinary assignments and is retained for compatibility with classic PPL source.
+hint-keyword-while=Starts a pre-test loop that repeats while its condition remains true.
+hint-keyword-endwhile=Ends a `WHILE` loop.
+hint-keyword-else=Starts the fallback branch of an `IF` block when no preceding condition matched.
+hint-keyword-elseif=Adds another condition to an `IF` block. It is tested only when all preceding conditions were false.
+hint-keyword-endif=Ends an `IF` block.
+hint-keyword-for=Starts a counted loop with an initial value, limit and optional step.
+hint-keyword-next=Ends a `FOR` loop and advances its control variable. `ENDFOR` is an equivalent spelling.
+hint-keyword-endfor=Ends a `FOR` loop and advances its control variable. `NEXT` is an equivalent spelling.
+hint-keyword-break=Immediately leaves the innermost active loop or selection construct.
+hint-keyword-continue=Skips the remainder of the current iteration and begins the next iteration of the innermost loop.
+hint-keyword-return=Returns from the current function or procedure. A function return supplies its result value.
+hint-keyword-gosub=Calls a label as a subroutine. Execution resumes after the `GOSUB` when the subroutine returns.
+hint-keyword-goto=Continues execution at the named label.
+hint-keyword-select=Starts a multi-branch selection block whose expression is compared with its `CASE` branches.
+hint-keyword-case=Introduces one value branch inside a `SELECT` block.
+hint-keyword-default=Introduces the fallback branch of a `SELECT` block when no `CASE` matched.
+hint-keyword-endselect=Ends a `SELECT` block.
+hint-keyword-declare=Declares a function or procedure signature before its implementation, allowing earlier calls and type checking.
+hint-keyword-function=Starts a named routine that computes and returns a value.
+hint-keyword-procedure=Starts a named routine that performs actions without returning a value.
+hint-keyword-endproc=Ends a `PROCEDURE` implementation.
+hint-keyword-endfunc=Ends a `FUNCTION` implementation.
+hint-keyword-repeat=Starts a post-test loop. Its body runs at least once and is followed by `UNTIL`.
+hint-keyword-until=Ends a `REPEAT` loop and stops repetition when its condition becomes true.
+hint-keyword-loop=Starts an unconditional loop that continues until control leaves it, normally with `BREAK` or `RETURN`.
+hint-keyword-endloop=Ends a `LOOP` block and starts its next iteration.
+hint-keyword-const=Declares a compile-time named constant.
+hint-keyword-enum=Starts a declaration of named integer constants belonging to one enum type.
+hint-keyword-endenum=Ends an `ENUM` declaration.
+hint-keyword-type=Starts a user-defined record type declaration containing named fields.
+hint-keyword-endtype=Ends a `TYPE` declaration.
+hint-keyword-begin=Starts the executable body following declarations in a structured PPL 400 program.
+hint-keyword-onerror=Declares the routine or label that handles runtime errors for the current program.
+hint-keyword-foreach=Starts a PPL 400 loop over a real array. Each iteration assigns the next element to the loop variable; empty arrays execute no iterations. The element variable must be type-compatible with the array.
+hint-keyword-endforeach=Ends a `FOREACH` loop and advances to the next collection element.
+hint-keyword-exit=Terminates the current PPE. In PPL 400 this contextual statement replaces the classic `END` statement name.
+hint-keyword-usage=Usage
+hint-const-builtin=A predefined PPL constant.
+
 hint-type-boolean=unsigned character (1 byte) 0 = FALSE, non-0 = TRUE
 hint-type-date=unsigned integer (2 bytes) PCBoard julian date (count of days since 1/1/1900) 
 hint-type-ddate=
@@ -6,6 +47,7 @@ hint-type-ddate=
 hint-type-integer=signed long integer (4 bytes) Range: -2,147,483,648 → +2,147,483,647
 hint-type-money=signed long integer (4 bytes) Range: -$21,474,836.48 → +$21,474,836.47
 hint-type-string=far character pointer (4 bytes) NULL is an empty string non-NULL points to a string of some length less than or equal to 256
+hint-type-string-unbounded=Unbounded string. Starting with PPL 400, `STRING` is no longer limited to 256 characters.
 hint-type-time=signed long integer (4 bytes) Count of seconds since midnight
 hint-type-bigstr=Allows up to 2048 characters per big string (up from 256 for STRING variables) May include CHR(0) characters in the middle of the big string (unlike STRING variables which may not)
 hint-type-edate=Julian date in earth date format Deals with dates formatted YYMM.DD Range: Same as DATE
@@ -19,8 +61,8 @@ hint-bytes-len=Returns the number of bytes in this value.
 hint-bytes-to-string=Decodes these bytes as UTF-8 text. Invalid UTF-8 reports `ErrCode.Format`.
 hint-bytes-to-base64=Encodes these bytes as base64 text.
 hint-bytes-to-hex=Returns uppercase hexadecimal text with two digits per byte, preserving leading zero bytes.
-hint-bytes-get-checksum=Calculates the selected `Checksum` algorithm and returns the raw checksum bytes.
-hint-bytes-from-base64=Decodes base64 text into raw bytes. This static `Bytes` function reports `ErrCode.Format` for malformed input.
+hint-bytes-get-checksum=Calculates the selected `Checksum` algorithm and returns raw bytes: CRC32 produces 4 bytes in network order, MD5 16 bytes and SHA256 32 bytes. An invalid algorithm returns empty `BYTES` and reports `ErrCode.Invalid`.
+hint-bytes-from-base64=Decodes padded or unpadded base64 text into raw bytes. ASCII whitespace is ignored so MIME-wrapped input is accepted. Malformed input returns empty `BYTES` and reports `ErrCode.Format`.
 hint-type-regex=A compiled regular expression. Matching uses Unicode by default and guarantees linear-time search without look-around or backreferences.
 hint-type-regex-match=An immutable snapshot of one regular-expression match and its capture groups.
 hint-type-board=Read-only snapshot of board configuration and indexed conference and user collections.
@@ -30,8 +72,249 @@ hint-type-http=Static entry point for policy-controlled HTTP requests and downlo
 hint-type-http-request=Immutable HTTP request builder. SetHeader and SetText return updated request values.
 hint-type-http-response=HTTP result with status, headers and a bounded retained body, or an invalid value with details in `Error.Last()`.
 hint-type-checksum=Algorithm used by `BYTES.GetChecksum`: `CRC32`, `MD5` or `SHA256`.
+hint-type-gfx=The caller's graphics session. Use `Terminal.Gfx` to select a backend and control frame pacing.
+hint-type-gfx-backend=Graphics transport selected for a session: `None`, `Auto`, `Sixel` or `Jxl`.
+hint-type-surface=An off-screen RGBA drawing target. Create one with `Surface.New()` or decode an image with `Surface.Load()`.
 hint-member-board-users=The users registered when `Board` was first read, exposed as a read-only `USER[]` snapshot.
 hint-member-user-valid=Whether this `USER` represents an existing record. An out-of-range `Board.Users` index returns an empty user with `Valid` false.
+hint-member-terminal-gfx=The caller's graphics session. Initialize it before creating or presenting surfaces and shut it down when drawing is complete.
+hint-member-terminal-input=Keyboard and mouse input for the caller. Enable event reporting before polling or waiting, and call `Release` to return input to the board.
+hint-member-terminal-margins=The terminal's active scrolling and text-output margins.
+hint-member-margins-set-vertical=
+    Sets 1-based top and bottom rows; `top` must be at least 1 and less than `bottom`.
+    <br><br>**Terminal protocol:** sends DECSTBM `CSI top ; bottom r`, bytes `ESC [ top ; bottom r`. Requires a VT/ANSI terminal that implements DECSTBM; unsupported terminals may ignore it.
+hint-member-margins-set-horizontal=
+    Sets 1-based left and right columns; `left` must be at least 1 and less than `right`.
+    <br><br>**Terminal protocol:** first sends DECLRMM `CSI ? 69 h` (DECSET private mode 69), then DECSLRM `CSI left ; right s`. Requires a DEC-compatible terminal with left/right margin support; many basic ANSI terminals do not implement it.
+hint-member-margins-reset-vertical=
+    Restores the full terminal height. <br><br>**Terminal protocol:** sends DECSTBM reset `CSI r`, bytes `ESC [ r`.
+hint-member-margins-reset-horizontal=
+    Restores the full terminal width. <br><br>**Terminal protocol:** sends `CSI ? 69 l` (DECRST private mode 69), bytes `ESC [ ? 6 9 l`.
+hint-member-margins-reset-all=
+    Restores both margin axes. <br><br>**Terminal protocol:** sends DECSTBM reset `CSI r`, followed by DECRST 69 `CSI ? 69 l`.
+hint-member-margins-edge=The current 1-based margin edge, or zero when that margin is not active.
+hint-member-margins-active=Whether the corresponding terminal margin is active.
+hint-member-terminput-poll=Returns the next pending input event without waiting.
+hint-member-terminput-wait=Waits up to the requested number of milliseconds for an input event.
+hint-member-terminput-mouse-on=Enables mouse events in text-cell or pixel coordinates and returns whether the mode was accepted. Tracking may be `Buttons`, `Drag` or `All`; when omitted it defaults to `MouseTracking.All`. <br><br>**Terminal protocol:** disables DECSET modes 1000, 1002 and 1003, enables respectively 1000 (button), 1002 (drag) or 1003 (all motion), then enables SGR mouse mode 1006. Pixel mode also enables mode 1016 and queries it with `CSI ? 1016 $ p`; text mode disables 1016. Requires xterm/DEC mouse reporting, and pixel mode requires mode 1016.
+hint-member-terminput-mouse-off=Disables mouse event reporting. <br><br>**Terminal protocol:** sends DECRST for private modes 1000, 1002, 1003, 1006 and 1016: `CSI ? 1000 l` … `CSI ? 1016 l`.
+hint-member-terminput-keyboard-on=Enables physical keyboard events. The optional `echo` flag controls whether translated key input is suppressed. <br><br>**Terminal protocol:** always enables CTerm physical-key mode with `CSI = 1 h`. With `echo = FALSE` it first sends `CSI = 2 l`; with `echo = TRUE` it sends `CSI = 2 h`. These are CTerm/SyncTERM extensions, not standard ANSI.
+hint-member-terminput-keyboard-off=Disables physical keyboard events. <br><br>**Terminal protocol:** sends `CSI = 2 l` followed by `CSI = 1 l`. These are CTerm/SyncTERM extensions, not standard ANSI.
+hint-member-terminput-release=Disables input reporting and returns keyboard and mouse handling to the board.
+hint-type-terminal=The caller's live terminal and the entry point for capabilities, input, graphics, margins, palette, macros, synchronized output and downloadable fonts.
+hint-type-terminfo=Read-only snapshot of terminal capabilities negotiated when the session started.
+hint-type-terminput=Keyboard and mouse event control for the current caller.
+hint-type-margins=The active vertical scrolling region and horizontal text-output margins.
+hint-type-palette=Controls the 16 DOS colors used by `COLOR` through terminal OSC palette commands.
+hint-type-macros=Records raw terminal output in 64 session-local slots and replays it without interpreting its text or escape sequences.
+hint-type-audio=A terminal audio channel. Failed loads return an invalid object; inspect `Error.Last()` for details.
+hint-type-error=A snapshot of the last PPL 400 operation result, including subsystem, error code, message and optional channel.
+hint-type-event=One keyboard, mouse, queue-overflow or audio-channel event returned by `Terminal.Input`.
+hint-type-msg=A read-only message header with lazy access to its message body.
+hint-type-conference=A board conference with its message areas, file directories, doors and access checks.
+hint-type-area=A conference message area with access checks and read/search operations.
+hint-type-directory=A conference file directory with download access information.
+hint-type-door=A configured external program or game and its access requirement.
+hint-type-contact=One service/account pair from a user's read-only contact list.
+hint-type-enum-400=A strongly named PPL 400 enum value. Enum values are stored as their documented integer representation.
+hint-member-terminal-info=Read-only capabilities and dimensions negotiated with the caller's terminal.
+hint-member-terminal-palette=Controls the 16 DOS palette entries through xterm-compatible OSC 4 and OSC 104 commands.
+hint-member-terminal-macros=Records and replays the raw byte stream sent to this caller. Slots are local to the session.
+hint-member-terminal-begin-update=
+    Starts or nests a synchronized terminal update. Drawing is buffered by supporting terminals until the matching outermost `EndUpdate`, reducing visible flicker. Returns `FALSE` with `ErrKind.Term`/`ErrCode.Unavailable` when unsupported.
+    <br><br>**Terminal protocol:** the outermost call sends `CSI ? 2026 h`, bytes `ESC [ ? 2 0 2 6 h`. This is DEC private mode 2026, **Synchronized Output**; support is checked through `Terminal.Info.SynchronizedOutput`.
+hint-member-terminal-end-update=
+    Ends one synchronized-update nesting level. The terminal presents accumulated output when the outermost level ends. Returns `FALSE` with `ErrCode.Invalid` if no update is active.
+    <br><br>**Terminal protocol:** the outermost end sends `CSI ? 2026 l`, bytes `ESC [ ? 2 0 2 6 l` (DECRST private mode 2026).
+hint-member-terminal-set-font=
+    Selects font number 0–255 for attribute slot 0–3. If `slot` is omitted, the font is assigned to all four slots; `LoadFont` can upload writable font numbers 43–255.
+    <br><br>**Terminal protocol:** sends the SyncTERM/CTerm extension `CSI slot ; font SP D`, bytes `ESC [ slot ; font SPACE D`, once per selected attribute slot. This is not standard ANSI.
+hint-member-terminal-load-font=
+    Loads a board-relative font file, decodes it with `BitFont`, and uploads it into writable terminal font number 43–255. File, format and per-session upload limits are reported through `Error.Last()`.
+    <br><br>**Terminal protocol:** sends the CTerm DCS `DCS CTerm:Font:font:base64 ST`, bytes `ESC P CTerm:Font:… ESC \`. The payload is a base64-encoded 256-glyph bitmap. This is a CTerm extension, not standard ANSI.
+hint-member-terminfo-program=Detected terminal program: `IcyTerm`, `SyncTerm`, or `Unknown`.
+hint-member-terminfo-device-attrs=Raw primary/secondary device-attribute response retained during terminal negotiation.
+hint-member-terminfo-cells=Current terminal size in text columns or rows.
+hint-member-terminfo-utf8=Whether the connection negotiated UTF-8 text instead of a legacy code page.
+hint-member-terminfo-rip=Negotiated RIP graphics version, or an empty string when RIP is unavailable.
+hint-member-terminfo-cterm=Detected CTerm protocol revision, or zero when CTerm extensions are unavailable.
+hint-member-terminfo-graphics=Whether this terminal advertises the selected inline graphics transport (`Sixel`, JPEG XL, or any inline blob transport).
+hint-member-terminfo-audio=Whether terminal-side audio playback is available.
+hint-member-terminfo-physical-keys=Whether the terminal can report physical key transitions independently of translated text input.
+hint-member-terminfo-pixel-mouse=Whether mouse coordinates can be reported in pixels (CTerm revision 1330 or newer).
+hint-member-terminfo-client-blit=Whether client-side image blitting is available (CTerm revision 1318 or newer).
+hint-member-terminfo-synchronized-output=Whether DEC private mode 2026 synchronized output is advertised for `BeginUpdate` and `EndUpdate`.
+hint-member-terminfo-terminal-macros=Whether terminal macro facilities were negotiated.
+hint-member-terminfo-cell-pixels=Detected width or height of one text cell in pixels; zero when unknown.
+hint-member-terminfo-screen-pixels=Detected physical screen width or height in pixels; zero when unknown.
+hint-member-palette-set=
+    Replaces DOS color 0–15 with packed `0xRRGGBBAA`; alpha is ignored. Invalid colors set `ErrCode.Invalid`.
+    <br><br>**Terminal protocol:** sends xterm `OSC 4 ; index ; rgb:RR/GG/BB ST`, bytes `ESC ] 4 ; index ; rgb:RR/GG/BB ESC \`. Requires an xterm-compatible writable palette. DOS indices map to ANSI as `0,4,2,6,1,5,3,7,8,12,10,14,9,13,11,15`.
+hint-member-palette-reset=
+    Restores one DOS color 0–15 to the terminal default.
+    <br><br>**Terminal protocol:** sends xterm `OSC 104 ; index ST`, bytes `ESC ] 104 ; index ESC \`, after DOS-to-ANSI index translation.
+hint-member-palette-reset-all=
+    Restores all 16 colors to the DOS default palette.
+    <br><br>**Terminal protocol:** sends one combined OSC 4 command containing all 16 `index ; rgb:RR/GG/BB` pairs, terminated by ST (`ESC \`). Requires xterm-compatible OSC 4 support.
+hint-member-macros-recording=Whether a terminal macro is currently recording.
+hint-member-macros-begin-record=Starts recording raw output for slot 0–63. Text, control characters and ANSI/VT sequences are preserved verbatim; each stream is limited to 512 KiB. No terminal command is emitted until recorded bytes are replayed.
+hint-member-macros-end-record=Stops the active recording and stores its caller/sysop byte streams. No terminal sequence is sent.
+hint-member-macros-play=Writes the recorded bytes directly to the caller/sysop terminal stream. The bytes may contain any ANSI/VT or proprietary sequences originally recorded; no transformation or capability check is performed.
+hint-member-macros-delete=Deletes one session-local recording. No terminal sequence is sent.
+hint-member-macros-delete-all=Deletes all session-local recordings. No terminal sequence is sent.
+hint-member-audio-valid=Whether this value identifies a successfully loaded terminal audio channel.
+hint-member-audio-playing=Whether this loaded channel is currently tracked as active.
+hint-member-audio-volume=Current logical volume from 0 through 100. Assigning it sends a SyncTERM Audio `Volume` APC.
+hint-member-audio-channel=Logical PPL channel 0–13; it maps to SyncTERM/CTerm channel 2–15.
+hint-member-audio-play=Starts playback; optional `looping` defaults to `FALSE`. <br><br>**Terminal protocol:** sends `APC SyncTERM:A;Load;S=slot;cache ST`, `…;Volume;C=channel;V=dB ST`, then `…;Queue;C=channel;S=slot[;L] ST`. Non-looping playback also sends `…;Update;C=channel ST`. Requires SyncTERM/CTerm audio APC support.
+hint-member-audio-stop=Stops this channel without freeing its data. <br><br>**Terminal protocol:** sends `APC SyncTERM:A;Flush;C=channel;O=0 ST` (`APC` = `ESC _`, `ST` = `ESC \`).
+hint-member-audio-fade=Fades this channel to `targetVolume` over `durationMs`. <br><br>**Terminal protocol:** sends `APC SyncTERM:A;Volume;C=channel;V=dB;T=durationMs ST`; volume 0–100 is converted to decibels.
+hint-member-audio-free=Stops and releases this channel. <br><br>**Terminal protocol:** sends `APC SyncTERM:A;Flush;C=channel;O=0 ST`; the client cache may remain for reuse.
+hint-member-audio-load=Loads a board-relative WAV, AIFF, FLAC, Ogg/Vorbis or Opus file up to 16 MiB. <br><br>**Terminal protocol:** probes using `APC SyncTERM:Q;libsndfileFormat;major;subtype ST`, expects `CSI = 7 ; 101 ; major ; subtype ; supported n`, and uploads with `APC SyncTERM:C;S;cacheName;base64 ST`. Requires SyncTERM/CTerm media and audio extensions.
+hint-member-audio-stop-all=Stops every active PPL audio channel by sending `APC SyncTERM:A;Flush;C=channel;O=0 ST` for each one.
+hint-member-error-ok=Whether `Code` equals `ErrCode.Ok`.
+hint-member-error-kind=Subsystem that produced the result, such as file, graphics, font, audio, terminal, message, network, user, string or regex.
+hint-member-error-code=Machine-readable result category such as invalid input, unavailable capability, I/O failure, limit or timeout.
+hint-member-error-message=Human-readable diagnostic detail. Programs should branch on `Kind` and `Code`, not translated prose.
+hint-member-error-channel=Related audio/media channel, or `-1` when the result is not channel-specific.
+hint-member-error-last=Returns a stable copy of the most recently published PPL 400 operation result.
+hint-member-error-clear=Clears the stored error and returns `TRUE`.
+hint-member-event-kind=Discriminator for this event. Read only the properties meaningful for the selected `EventKind`.
+hint-member-event-key=Keyboard data: translated key code/text or physical scan code, press state and repeat state, depending on `Kind`.
+hint-member-event-position=Mouse position and whether `X`/`Y` are pixels rather than text cells.
+hint-member-event-mouse=Mouse action, changed button, or horizontal/vertical wheel delta.
+hint-member-event-time=Terminal event timestamp in milliseconds.
+hint-member-event-channel=Audio channel reported as drained by an `EventKind.Audio` event.
+hint-member-event-dropped=Number of queue entries lost before an `EventKind.Overflow` event.
+hint-member-event-buttons=Whether the corresponding mouse button was held when the event was generated.
+hint-member-event-modifiers=Whether the corresponding keyboard modifier was active.
+hint-member-msg-number=Message number, reply target, or stored body size from the read-only JAM header.
+hint-member-msg-valid=Whether this value names an existing message. Missing or out-of-range reads return an invalid `MSG` instead of failing the member chain.
+hint-member-msg-header=Read-only sender, recipient, subject, or status text from the message header.
+hint-member-msg-written=Message creation date or time; an invalid message returns zero.
+hint-member-msg-flags=Read-only message attribute derived from its JAM header.
+hint-member-msg-text=Loads and returns the message body on demand. I/O failures return an empty string and update `Error.Last()`.
+hint-member-contact-service=Name of the contact service, such as email, web, IRC or another configured service.
+hint-member-contact-account=Account name or address on this contact's service.
+hint-member-conference-identity=Read-only conference name, configured number, or validity flag.
+hint-member-conference-options=Read-only conference behavior and messaging policy.
+hint-member-conference-password=Protected conference password value; it can be compared by access checks but is not exposed as plain text.
+hint-member-conference-collections=Read-only one-dimensional snapshot of this conference's file directories, message areas, or doors.
+hint-member-conference-access=Checks the current caller's security and conference configuration for general access, posting, or attachments.
+hint-member-area-identity=Read-only message-area name, configured number, or validity flag.
+hint-member-area-options=Read-only area policy and QWK/echo-network metadata.
+hint-member-area-access=Checks whether the current caller may access, enter, or attach files in this area.
+hint-member-area-range=Lowest or highest currently available message number in this area's message base.
+hint-member-area-read=Reads an exact message number. A missing message returns an invalid `MSG`; inspect its `Valid` property.
+hint-member-area-find=Finds the next message whose `To`, `From`, or `Subject` field contains the text. Optional `startAfter` continues after a message number.
+hint-member-directory-identity=Read-only file-directory name, configured number, or validity flag.
+hint-member-directory-options=Read-only storage path, free-download/new-file state, or protected password.
+hint-member-directory-access=Checks the current caller's security for directory access or downloading.
+hint-member-door-identity=Read-only door name, configured number, or validity flag.
+hint-member-door-options=Read-only description, executable path, or protected password for this external program.
+hint-member-door-access=Checks whether the current caller meets this door's security requirement.
+hint-member-board-property=Read-only board identity, location, operator/sysop name, or configured node count.
+hint-member-board-conferences=Read-only `CONFERENCE[]` snapshot of configured conferences.
+hint-member-user-editor-mode=Preferred full-screen editor policy: always use it, never use it, or ask each time.
+hint-member-user-profile=User profile or usage statistic. `Session.User` is live and writable where supported; entries from `Board.Users` are read-only snapshots.
+hint-enum-event-kind-none=No event was available, for example after a non-blocking `Poll` or a timed-out `Wait`.
+hint-enum-event-kind-value=Selects which `EVENT` property group is meaningful: translated key, physical key edge, mouse, queue overflow, or audio completion.
+hint-enum-mouse-action=Mouse transition reported by `EVENT.Action`: none, press, release, motion, or wheel.
+hint-enum-mouse-button=Mouse button or wheel direction that generated an event; held buttons are exposed separately as booleans.
+hint-enum-mouse-mode-text=Reports mouse coordinates in 1-based terminal text cells.
+hint-enum-mouse-mode-pixels=Reports mouse coordinates in pixels; requires `Terminal.Info.PixelMouse`.
+hint-enum-mouse-tracking=Selects button-only, drag-motion, or all-motion mouse reporting.
+hint-enum-error-kind=Subsystem category used by `Error.Kind`; `None` means no subsystem error.
+hint-enum-error-code=Portable operation result used by `Error.Code`: success, unavailable, invalid, I/O, format, limit, unsupported, stack, denied, or timeout.
+hint-enum-editor-mode=User preference for the full-screen editor: `Yes`, `No`, or `Ask`.
+hint-enum-msg-field=Message-header field searched by `AREA.Find`: recipient, sender, or subject.
+hint-enum-http-method=HTTP request method accepted by the policy-controlled request builder: GET, HEAD, or POST.
+hint-enum-regex-options=Bit flags for regex compilation: `None`, `IgnoreCase`, `MultiLine`, `DotMatchesNewLine`, `IgnoreWhitespace`, `SwapGreed` and `Ascii`. Combine flags with `|`.
+hint-enum-string-comparison=Ordinal Unicode comparison, either case-sensitive or case-insensitive.
+hint-enum-checksum=Algorithm used by `Bytes.GetChecksum`: `CRC32` returns 4 raw bytes in network order, `MD5` 16 bytes and `SHA256` 32 bytes. Call `ToHex()` when text is required.
+hint-member-gfx-init=
+    Starts a graphics session with the requested `GfxBackend`. `Auto` chooses the best terminal capability; fullscreen defaults to `TRUE`.
+    <br><br>**Terminal protocol:** `Auto` uses negotiated Sixel/JPEG-XL capabilities; an explicit Sixel request performs no additional probe. Fullscreen sends `CSI 2 J`, `CSI H`, then `CSI ? 25 l`, `CSI ? 7 l`, `CSI ? 80 l`, and `CSI ? 1070 l`. Sixel requires Sixel DCS support; JPEG XL requires SyncTERM/CTerm media APC support.
+hint-member-gfx-shutdown=
+    Ends the graphics session and restores normal text output.
+    <br><br>**Terminal protocol:** fullscreen sends `CSI ? 80 h`, `CSI ? 7 h`, and `CSI ? 25 h`. After Sixel output it restores all 16 DOS colors with OSC 4, then sends SGR reset `CSI 0 m` and restores the board color.
+hint-member-gfx-backend=The selected read-only `GfxBackend`, or `None` when no graphics session is active.
+hint-member-gfx-pacing=Controls frame pacing. When true, presentation waits for terminal acknowledgement before sending another frame.
+hint-param-backend=Graphics backend to request; `Auto` chooses the best available backend.
+hint-parameters-title=Parameters
+hint-param-optional=optional
+hint-param-fullscreen=Whether to clear the screen and switch the terminal into fullscreen graphics mode. Defaults to `TRUE`.
+hint-param-top=1-based first row of the vertical scrolling region.
+hint-param-bottom=1-based last row of the vertical scrolling region.
+hint-param-left=1-based first column of the horizontal margin region.
+hint-param-right=1-based last column of the horizontal margin region.
+hint-param-timeout-ms=Maximum time to wait, in milliseconds.
+hint-param-mode=Input, rendering, or operation mode to use.
+hint-param-tracking=Mouse tracking policy; defaults to `MouseTracking.All` when omitted.
+hint-param-echo=Whether accepted keyboard input is also echoed. Defaults to `FALSE`.
+hint-param-color=DOS palette color number from 0 through 15.
+hint-param-rgba=Packed color in `0xRRGGBBAA` format.
+hint-param-slot=Target slot number.
+hint-param-looping=Whether playback restarts after reaching the end. Defaults to `FALSE`.
+hint-param-duration-ms=Fade duration in milliseconds.
+hint-param-target-volume=Final volume from 0 through 100.
+hint-param-font=Terminal font number.
+hint-param-file=Board-relative source or destination file name.
+hint-param-password=New plain-text password to validate and store securely.
+hint-param-service=Contact service name, such as an email or chat provider.
+hint-param-account=Account name or address for the selected service.
+hint-param-index=Zero-based item or capture-group index.
+hint-param-text=Input or replacement text used by the operation.
+hint-param-url=Absolute HTTP URL permitted by the board network policy.
+hint-param-method=HTTP method to use: `Get`, `Head`, or `Post`.
+hint-param-name=Header, group, or field name to select.
+hint-param-value=Value assigned to the selected name.
+hint-param-content-type=Optional MIME content type of the text body.
+hint-param-pattern=Regular-expression pattern to compile or validate.
+hint-param-options=Optional `RegexOptions` flags; defaults to `RegexOptions.None`.
+hint-param-start=Optional zero-based Unicode character position at which searching begins.
+hint-param-limit=Optional maximum result or replacement count; zero uses the documented unlimited bound.
+hint-param-replacement=Replacement template; `$1` and `$name` expand capture groups.
+hint-param-message-number=Message number to read.
+hint-param-field=Field selected for the operation.
+hint-param-start-message=Optional message number at which searching begins.
+hint-param-x=Zero-based horizontal pixel coordinate.
+hint-param-y=Zero-based vertical pixel coordinate.
+hint-param-width=Width in pixels.
+hint-param-height=Height in pixels.
+hint-param-source=Source surface to copy from.
+hint-param-source-x=Zero-based left edge of the source rectangle.
+hint-param-source-y=Zero-based top edge of the source rectangle.
+hint-param-source-width=Width of the source rectangle in pixels.
+hint-param-source-height=Height of the source rectangle in pixels.
+hint-param-destination-x=Zero-based horizontal destination pixel coordinate.
+hint-param-destination-y=Zero-based vertical destination pixel coordinate.
+hint-param-column=1-based terminal text column.
+hint-param-row=1-based terminal text row.
+hint-param-destination-width=Optional displayed width in pixels; omission keeps the source width.
+hint-param-destination-height=Optional displayed height in pixels; omission keeps the source height.
+hint-param-flip=Optional flip flags used by the graphics backend.
+hint-member-gfx-backend-none=No graphics backend is active.
+hint-member-gfx-backend-auto=Selects the best graphics backend advertised by `Terminal.Info`.
+hint-member-gfx-backend-sixel=Uses Sixel graphics.
+hint-member-gfx-backend-jxl=Uses the JPEG XL graphics protocol.
+hint-member-surface-dimension=The read-only surface dimension in pixels.
+hint-member-surface-valid=Whether this surface refers to a live image. Resource failures return an invalid surface and set `Error.Last()`.
+hint-member-surface-clear=Fills the entire surface with a packed `0xRRGGBBAA` color.
+hint-member-surface-set-pixel=Writes a packed `0xRRGGBBAA` color at the zero-based pixel coordinates.
+hint-member-surface-get-pixel=Returns the packed `0xRRGGBBAA` color at the zero-based pixel coordinates.
+hint-member-surface-fill-rect=Fills the pixel rectangle with a packed `0xRRGGBBAA` color.
+hint-member-surface-draw-rect=Outlines the pixel rectangle with a packed `0xRRGGBBAA` color.
+hint-member-surface-blit=Alpha-composites the source surface at the destination pixel coordinates.
+hint-member-surface-blit-rect=Alpha-composites a source pixel rectangle at the destination pixel coordinates.
+hint-member-surface-present=Presents the entire surface at the current terminal position. <br><br>**Terminal protocol:** Sixel sends a Sixel DCS image. JPEG XL uses `APC SyncTERM:C;DrawJXLBlob;DX=x;DY=y;base64 ST`, or uploads with `…;S;cacheName;base64 ST` and draws with `…;DrawJXL;DX=x;DY=y;cacheName ST`.
+hint-member-surface-present-at=Presents the entire surface at the given 1-based text column and row. <br><br>**Terminal protocol:** Sixel sends `CSI ? 1070 h`, saves with `ESC 7`, moves with `CSI row ; column H`, sends Sixel DCS, restores with `ESC 8`, then sends `CSI ? 1070 l`. JPEG XL converts cells to pixels and uses SyncTERM `DrawJXLBlob`/`DrawJXL` APC.
+hint-member-surface-present-rect=Presents a source pixel rectangle with optional destination, scaling and flip. <br><br>**Terminal protocol:** identity output may use Sixel DCS. Scaling or flipping requires JPEG XL and SyncTERM/CTerm `DrawJXLBlob` or `DrawJXL` APC with `DX`, `DY`, and transform options.
+hint-member-surface-pin=Uploads an immutable JPEG-XL client buffer. <br><br>**Terminal protocol:** sends `APC SyncTERM:C;LoadJXLBlob;B=buffer;base64 ST`. Requires the JPEG-XL backend and SyncTERM/CTerm client-buffer support.
+hint-member-surface-unpin=Releases the server-side association with the pinned JPEG-XL client buffer. No terminal sequence is sent; the client may retain its cached buffer.
+hint-member-surface-free=Releases the surface and its resident pixel memory.
+hint-member-surface-new=Creates a transparent surface with the requested pixel dimensions. Surfaces are limited to 2048 by 2048 pixels.
+hint-member-surface-load=Decodes an image file into a surface. The source file is limited to 32 MiB.
 hint-member-session-context=The object currently selected by this live session. Read it again after changing conference, area, directory or user state.
 hint-member-session-value=A live, read-only value from the current caller's session.
 hint-member-user-record-number=The zero-based persistent user record number, or `-1` when this is not a stored user.
@@ -40,9 +323,9 @@ hint-member-user-notes=Read-only `STRING[]` snapshot of the five note slots. Use
 hint-member-user-set-password=Validates and hashes a new password for the current user. Snapshots cannot change passwords.
 hint-member-user-contact-method=Adds or removes a contact on the current user and reports failures through `Error.Last()`.
 hint-member-user-set-note=Updates one of the five note slots on the current user.
-hint-http-get=Performs a policy-controlled GET request and returns its response.
-hint-http-new=Builds an immutable GET, HEAD or POST request for the given URL.
-hint-http-download=Streams a successful GET response atomically to a board-relative file.
+hint-http-get=Performs a policy-controlled GET request and returns an `HTTPRESPONSE`. Transport or policy failures return an invalid response and report details through `Error.Last()`; HTTP error statuses remain valid responses.
+hint-http-new=Builds an immutable `HTTPREQUEST` for `HttpMethod.Get`, `Head` or `Post` and the supplied URL. It performs no network I/O until `Send()` is called.
+hint-http-download=Streams a successful GET response to a temporary board-relative file and commits it atomically only after completion. The configured response-size limit applies; failures leave the destination unchanged and return an invalid response.
 hint-http-request-property=Read-only request metadata.
 hint-http-request-set-header=Returns a request with this header set. Restricted or malformed headers report `ErrCode.Invalid`.
 hint-http-request-set-text=Returns a request with a UTF-8 body and optional content type. GET and HEAD requests reject bodies.
@@ -268,7 +551,10 @@ hint-statement-forward=Move the cursor forward @1 columns without going past col
 hint-statement-freshline=If the cursor is not in column 1, do a newline
 hint-statement-wrusys=Writes (creates) a USERS.SYS file which can be used by a SHELLed application
 hint-statement-rdusys=Reads a USERS.SYS file, if present, and updates the users record
-hint-statement-newpwd=todo
+hint-statement-newpwd=
+    Changes the current user's password with PSA validation.
+
+    `@1` is the new password. `@2` receives `TRUE` when it was accepted or `FALSE` when validation failed. Password history, expiration and the change counter are updated on success.
 hint-statement-opencap=
     Open @1 and capture all screen output to it.
     If an error occurs creating or opening @1, @2 is set to `TRUE`, otherwise @2 is set to `FALSE`.
@@ -344,8 +630,11 @@ hint-statement-adjbytes=
 
     To add bytes use a positive number.
 hint-statement-kbdstring=Stuff strings to the keyboard (just like KbdStuff except 'keystrokes' are echoed to the display)
-hint-statement-alias=todo
-hint-statement-redim=todo
+hint-statement-alias=Enables (`TRUE`) or disables (`FALSE`) use of the current user's alias. It has no effect when aliases are not permitted for the user or conference. Use `ALIAS()` to query the current state.
+hint-statement-redim=
+    Resizes a previously declared array at runtime: `REDIM array, dim1 [, dim2 [, dim3]]`.
+
+    The number of dimensions must match the declaration; only their bounds may change. Existing values outside the new bounds are lost. Record-field arrays have fixed bounds and cannot be resized.
 hint-statement-append=Append the contents of one file to another file.
 hint-statement-copy=Copy the contents of one file to another file.
 hint-statement-kbdflush=Flush the local keyboard buffer and any stuffed keystroke buffers. It takes no arguments.
@@ -485,7 +774,7 @@ hint-statement-bitclear=
     non-string buffers and then trying to access them later as their 'intended' type without re-initializing the variable.
     
     If the bit parameter (an integer from 0 to the number of bits in the object) is invalid no processing takes place.
-hint-statement-brag=todo
+hint-statement-brag=Obsolete PCBoard command for the former BRAG display. PCBoard 15.3 and IcyBoard accept it for compatibility but perform no action.
 hint-statement-frealtuser=
     Since only one `GETALTUSER` can be active at one time, `FREALTUSER` can allow other processes which need to use `GETALTUSER` (such as the `MESSAGE` commend) to do so.
 hint-statement-setlmr=
@@ -576,7 +865,7 @@ hint-statement-command=
 
     NOTES!!! Not all portions of PCBoard are re-entrant. For example, you should not try to have two message editor processes active at the same time (in other words, you shouldn't launch the message editor from within a MNU and then launch a PPE from a shifted function key that tries to enter another message). So you'll need to be carefull about nested COMMAND (or equivalent) calls. But sequential processing should not be a problem at all.
     If it is determined at some point in the future that allowing this flexibility causes more problems than it solves, the COMMAND statement will be scaled back to ensure that attempts are not made to re-enter code. So use it well and wisely!
-hint-statement-uselmrs=todo
+hint-statement-uselmrs=Controls whether subsequent `GETALTUSER` calls load the alternate user's Last Message Read pointers. Pass `FALSE` to save memory when LMR data is not needed and `TRUE` to restore loading. `USELMRS()` returns the current setting.
 hint-statement-confinfo=
     This statement can be used to modify a field in the conference
     configuration.
@@ -629,10 +918,10 @@ hint-statement-rmdir=
 
     ### Note
     The directory must be empty before removing it.
-hint-statement-fdowraka=todo
-hint-statement-fdoaddaka=todo
-hint-statement-fdowrorg=todo
-hint-statement-fdoaddorg=todo
+hint-statement-fdowraka=Compatibility stub for writing a PCBoard FidoNet AKA entry. The original PCBoard implementation was never completed; IcyBoard logs a warning and makes no change.
+hint-statement-fdoaddaka=Compatibility stub for adding a PCBoard FidoNet AKA entry. The original PCBoard implementation was never completed; IcyBoard logs a warning and makes no change.
+hint-statement-fdowrorg=Compatibility stub for writing a PCBoard FidoNet origin line. The original PCBoard implementation was never completed; IcyBoard logs a warning and makes no change.
+hint-statement-fdoaddorg=Compatibility stub for adding a PCBoard FidoNet origin line. The original PCBoard implementation was never completed; IcyBoard logs a warning and makes no change.
 hint-statement-fdoqmod=
     Replaces an entry of the outbound queue
 
@@ -717,7 +1006,7 @@ hint-function-right=
 hint-function-space=
     ### Returns
     Returns a string of @1 spaces
-hint-function-ferr=todo
+hint-function-ferr=Returns whether an error has occurred on file channel `@1` since it was last checked. Reading `FERR()` clears that channel's error flag. End-of-file after `FGET` or `FREAD` also sets the flag.
 hint-function-chr=
     ### Returns
     Returns a single character long string of the character represented by ASCII code var (0-255)
@@ -994,7 +1283,7 @@ hint-function-fmtreal=
 hint-function-flagcnt=Return the number of files flagged for download.
 hint-function-kbdbufsize=Return the number of key presses pending in the KbdString buffer
 hint-function-pplbufsize=Returns the number of key presses pending in the KbdStuff buffer.
-hint-function-kbdfilused=todo
+hint-function-kbdfilused=Returns `TRUE` while keyboard input is being supplied by a `KBDFILE` script, otherwise `FALSE`. This distinguishes file-driven input from `KBDSTUFF` and `KBDSTRING`.
 hint-function-lomsgnum=Returns the low message number for the current conference.
 hint-function-himsgnum=Returns the high message number for the current conference.
 hint-function-drivespace=Return Val: Amount of divespace left of drive drivespec. 
@@ -1019,7 +1308,7 @@ hint-function-actmsgnum=
 hint-function-stackleft=Returns the number of bytes left on the system stack.
 hint-function-stackerr=Returns a boolean value which indicates a stack error has occured if TRUE.
 hint-function-dgetalias=return the current alias
-hint-function-dbof=return the begin of file statustodo
+hint-function-dbof=Returns `TRUE` when the selected DBase channel's record pointer is before the first record, otherwise `FALSE`.
 hint-function-dchanged=return the changed flag
 hint-function-ddecimals=return decimals of named field
 hint-function-ddeleted=return the deleted flag
@@ -1028,11 +1317,14 @@ hint-function-derr=return error flag for channel
 hint-function-dfields=return count of fields
 hint-function-dlength=return length of named field
 hint-function-dname=return name of numbered field
-hint-function-dreccount=return the number of recordstodo
+hint-function-dreccount=Returns the total number of records in the active DBase file.
 hint-function-drecno=return the current record number
 hint-function-dtype=return type of named field
 hint-function-fnext=Returns an available file channel. -1 when none are available.
-hint-function-dnext=todo
+hint-function-dnext=
+    Returns the next unused DBase channel number, or `-1` when none is available.
+
+    The channel is not reserved until a file is opened. Repeated `DNEXT()` calls therefore return the same number; store it and open the file before asking again.
 hint-function-toddate=Converts a date to a string in the format MM/DD/YYYY
 hint-function-dcloseall=close all DBF files
 hint-function-dopen=open DBF file
@@ -1041,7 +1333,7 @@ hint-function-dsetalias=set DBF alias
 hint-function-dpack=pack DBF file
 hint-function-dlockf=lock DBF file
 hint-function-dlock=lock DBF file
-hint-function-dlockr=lock a recordtodo
+hint-function-dlockr=Attempts to lock one record on the selected DBase channel and returns whether the lock succeeded. Use the matching unlock operation when the update is complete.
 hint-function-dunlock=unlock any current locks
 hint-function-dnopen=open NDX file
 hint-function-dnclose=close NDX file
@@ -1067,7 +1359,7 @@ hint-function-dget=get a value from a named field
 hint-function-dput=put a value to a named field
 hint-function-dfcopy=copy a field to a field
 hint-function-dselect=returns channel associated with alias
-hint-function-dchkstat=todo
+hint-function-dchkstat=Returns `0` when DBase channel `@1` is open and `1` when it is closed or unavailable.
 hint-function-pcbaccount=
     Returns what PCBoard will charge a user for a certain activity. These are values the SysOp assigns in PCBsetup when accounting is configures and enabled.
     Valid values for the field parameter are 0-14. Use of the corresponding constants is encouraged. (see the Accounting section)
@@ -1095,7 +1387,10 @@ hint-function-scanmsghdr=
 hint-function-checkrip=Returns `TRUE` if the terminal has RIP.
 hint-function-ripver=
     Returns a string containing the RIP version. If no RIP is available "0" is returned.
-hint-function-qwklimits=todo
+hint-function-qwklimits=
+    Returns one QWK limit for the current user. `@1` is `MAXMSGS`, `CMAXMSGS`, `ATTACH_LIM_U` or `ATTACH_LIM_P`.
+
+    Call `GETUSER` first. System-wide PCBSetup limits still cap values configured for an individual user.
 hint-function-findfirst=
     Find the first occurence of filespec in a directory. Used in conjunction with FindNext to get a directory listing.
 
@@ -1225,7 +1520,7 @@ hint-function-getdrive=
     B: = 1
     C: = 2
     …
-hint-function-setdrive=todo
+hint-function-setdrive=Selects DOS drive number `@1` and returns the selected drive number. IcyBoard has no DOS current-drive state, so this compatibility function returns its argument without changing path resolution.
 hint-function-bs2i=
     Converts a 4 byte bsreal to a PPL integer.
 
@@ -1318,22 +1613,22 @@ hint-function-setmsghdr=
     base.
 hint-function-areaid=Generates a tuple conference/area to identify a message base.
 hint-function-len_dim=
-    @1 = The array to get the length of
-    @2 = The dimension to get the length of
+    @1 = The array whose element count is requested
+    @2 = Zero-based dimension number (`0`, `1` or `2`)
     ### Returns
-        Returns the length of the array @1 on dimension @2
+        Returns the element count in dimension @2, not its highest index. For example, an array declared with bound `[10]` has length 11. An invalid dimension returns 0.
 
 hint-const-true=BOOLEAN `TRUE` value
 hint-const-false=BOOLEAN `FALSE` value
 hint-const-stk_limit=This constant was added so the PPL programmer could determine how close they are getting to the stack limit when using recursion.
 hint-const-attach_lim_p=Public attach bytes limit
 hint-const-attach_lim_u=Personal attach bytes limit
-hint-const-f_net=todo
+hint-const-f_net=Conference network-mail flag used with `CONFFLAG` and `CONFUNFLAG`.
 hint-const-cmaxmsgs=Max Messages per conference
 hint-const-maxmsgs=Max messages per qwk packet
 hint-const-cur_user=Parameter passed to `CURUSER()`/Return by `GetUser` - User variables are for the current user
 hint-const-no_user=Return by `GetUser` - variables are currently undefined
-hint-const-acc_cur_bal=Return the up to the minute user balance.todo
+hint-const-acc_cur_bal=Selects the user's current, up-to-date account balance.
 hint-const-acc_stat=
     Returns status of the "Enable Accounting" switch in the PWRD file.  
 
@@ -1388,11 +1683,11 @@ hint-const-start_session=Users starting balance for this session.
 hint-const-deb_call=Debit for this call
 hint-const-deb_time=Debit for time on
 hint-const-deb_msgread=Debit for reading message
-hint-const-deb_msgcap=Debit for capturing a messagetodo
+hint-const-deb_msgcap=Debit for capturing a message.
 hint-const-deb_msgwrite=Debit for writing a message
 hint-const-deb_msgechoed=Debit for echoed message
 hint-const-deb_msgprivate=Debit for writing private message
-hint-const-deb_downfile=Debit for downloading a filetodo
+hint-const-deb_downfile=Debit for downloading a file.
 hint-const-deb_downbytes=Debit for downloading bytes
 hint-const-deb_chat=Debit for chat
 hint-const-deb_tpu=Debit for TPU
@@ -1418,7 +1713,7 @@ hint-const-hdr_date=Date message was written
 hint-const-hdr_echo=Echoed message flag
 hint-const-hdr_from=Who the message is from
 hint-const-hdr_msgnum=Message number
-hint-const-hdr_msgref=Reference messagetodo
+hint-const-hdr_msgref=Selects the message reference field in the current message header.
 hint-const-hdr_pwd=Message password
 hint-const-hdr_reply=Message reply flag
 hint-const-hdr_rplydate=Reply message date

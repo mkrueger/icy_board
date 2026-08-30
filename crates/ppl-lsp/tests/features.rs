@@ -97,8 +97,21 @@ fn hover_over_a_variable_shows_its_type() {
 }
 
 #[test]
+fn hover_over_a_user_constant_shows_type_name_and_value() {
+    let source = ";$LANGVERSION 400\nCONST INTEGER BASE = 17\nCONST INTEGER OFFSET = BASE + 1\nPRINTLN OFFSET\n";
+    assert_eq!(
+        hover(source, "BASE +"),
+        Some("```PPL\nCONSTANT INTEGER BASE = 17\n```".to_string())
+    );
+    assert_eq!(
+        hover(source, "OFFSET\n"),
+        Some("```PPL\nCONSTANT INTEGER OFFSET = BASE + 1\n```".to_string())
+    );
+}
+
+#[test]
 fn hover_over_an_array_shows_its_bounds() {
-    assert_eq!(hover(SOURCE, "people[0]"), Some("```PPL\nMember people(10)\n```".to_string()));
+    assert_eq!(hover(SOURCE, "people[0]"), Some("```PPL\nMember people[10]\n```".to_string()));
 }
 
 #[test]
@@ -133,6 +146,25 @@ fn hover_over_new_board_user_members_includes_documentation() {
 }
 
 #[test]
+fn hover_over_new_api_call_names_and_describes_parameters() {
+    let source = ";$LANGVERSION 400\nBOOLEAN ok = Terminal.Gfx.Init(GfxBackend.Auto, TRUE)\n";
+    let init = hover(source, "Init").unwrap();
+    assert!(init.contains("GfxBackend backend") && init.contains("BOOLEAN fullscreen"), "{init}");
+    assert!(init.contains("**Parameters**") || init.contains("**Parameter**"), "{init}");
+    assert!(init.contains("`backend`") && init.contains("`fullscreen`"), "{init}");
+    assert!(init.contains("CSI ? 25 l") && init.contains("Sixel"), "{init}");
+}
+
+#[test]
+fn margin_hover_exposes_the_exact_terminal_sequence() {
+    let source = ";$LANGVERSION 400\nBOOLEAN ok = Terminal.Margins.SetVertical(2, 23)\n";
+    let set_vertical = hover(source, "SetVertical").unwrap();
+    assert!(set_vertical.contains("CSI top ; bottom r"), "{set_vertical}");
+    assert!(set_vertical.contains("ESC [ top ; bottom r"), "{set_vertical}");
+    assert!(set_vertical.contains("DECSTBM"), "{set_vertical}");
+}
+
+#[test]
 fn hover_over_bytes_type_and_members_includes_documentation() {
     let source = r#";$LANGVERSION 400
 BYTES raw = ToBytes("abc")
@@ -146,19 +178,66 @@ PRINTLN Bytes.FromBase64("YWJj").ToString()
     };
     let bytes_type = bytes_type.value;
     assert!(bytes_type.contains("BYTES"), "{bytes_type}");
-    assert!(bytes_type.contains("binary data"), "{bytes_type}");
+    assert!(bytes_type.contains("binary data") || bytes_type.contains("Binärdaten"), "{bytes_type}");
 
     let to_hex = hover(source, "ToHex").unwrap();
     assert!(to_hex.contains("STRING BYTES.ToHex"), "{to_hex}");
-    assert!(to_hex.contains("leading zero bytes"), "{to_hex}");
+    assert!(to_hex.contains("leading zero bytes") || to_hex.contains("führende Nullbytes"), "{to_hex}");
 
     let checksum = hover(source, "GetChecksum").unwrap();
     assert!(checksum.contains("BYTES BYTES.GetChecksum"), "{checksum}");
-    assert!(checksum.contains("raw checksum bytes"), "{checksum}");
+    assert!(checksum.contains("CRC32") && checksum.contains("MD5") && checksum.contains("SHA256") && checksum.contains("32"), "{checksum}");
 
     let from_base64 = hover(source, "FromBase64").unwrap();
     assert!(from_base64.contains("BYTES BYTES.FromBase64"), "{from_base64}");
-    assert!(from_base64.contains("malformed input"), "{from_base64}");
+    assert!(from_base64.contains("malformed input") || from_base64.contains("Ungültige Eingabe"), "{from_base64}");
+}
+
+#[test]
+fn hover_over_graphics_api_includes_documentation() {
+    let source = r#";$LANGVERSION 400
+Terminal.Gfx.Init(GfxBackend.Auto, FALSE)
+IF Terminal.Gfx.Backend <> GfxBackend.None THEN
+    SURFACE banner = Surface.Load("banner.png")
+    banner.PresentAt(18, 2)
+    banner.Free()
+ENDIF
+Terminal.Gfx.Shutdown()
+"#;
+
+    let assert_documented = |text: &str| assert!(text.contains("\n```\n\n"), "{text}");
+
+    let gfx = hover(source, "Gfx.Init").unwrap();
+    assert!(gfx.contains("Gfx Terminal.Gfx"), "{gfx}");
+    assert_documented(&gfx);
+
+    let init = hover(source, "Init").unwrap();
+    assert!(init.contains("BOOLEAN Gfx.Init([GfxBackend backend], [BOOLEAN fullscreen])"), "{init}");
+    assert_documented(&init);
+
+    let auto = hover(source, "Auto").unwrap();
+    assert!(auto.contains("GfxBackend.AUTO"), "{auto}");
+    assert_documented(&auto);
+
+    let backend = hover(source, "Backend <>").unwrap();
+    assert!(backend.contains("GfxBackend Gfx.Backend"), "{backend}");
+    assert_documented(&backend);
+
+    let load = hover(source, "Load").unwrap();
+    assert!(load.contains("Surface Surface.Load"), "{load}");
+    assert_documented(&load);
+
+    let present_at = hover(source, "PresentAt").unwrap();
+    assert!(present_at.contains("BOOLEAN Surface.PresentAt(INTEGER column, INTEGER row)"), "{present_at}");
+    assert_documented(&present_at);
+
+    let free = hover(source, "Free").unwrap();
+    assert!(free.contains("BOOLEAN Surface.Free"), "{free}");
+    assert_documented(&free);
+
+    let shutdown = hover(source, "Shutdown").unwrap();
+    assert!(shutdown.contains("BOOLEAN Gfx.Shutdown"), "{shutdown}");
+    assert_documented(&shutdown);
 }
 
 #[test]
