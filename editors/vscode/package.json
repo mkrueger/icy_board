@@ -108,6 +108,11 @@
 				"id": "constant",
 				"superType": "variable",
 				"description": "A PPL constant"
+			},
+			{
+				"id": "directive",
+				"superType": "macro",
+				"description": "A PPL preprocessor directive"
 			}
 		],
 		"semanticTokenScopes": [
@@ -119,6 +124,9 @@
 					],
 					"constant": [
 						"constant.language.ppl"
+					],
+					"directive": [
+						"keyword.control.directive.ppl"
 					]
 				}
 			}

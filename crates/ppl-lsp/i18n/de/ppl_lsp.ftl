@@ -1,3 +1,12 @@
+hint-preprocessor-langversion=Legt die von dieser Quelldatei verwendete PPL-Sprachversion fest. Die Direktive muss vor Programmcode stehen und hat Vorrang vor Workspace-, Kommandozeilen- und Umgebungseinstellungen.
+hint-preprocessor-define=Definiert eine von Groß-/Kleinschreibung unabhängige Präprozessorvariable. Der optionale Wert kann in bedingten Ausdrücken verwendet oder mit `;#name` in den Quelltext eingefügt werden; eine Definition ohne Wert ist wahr.
+hint-preprocessor-if=Beginnt einen Zweig der bedingten Übersetzung. Der Ausdruck kann `VERSION`, `RUNTIME`, `LANGVERSION` und mit `;$DEFINE` eingeführte Variablen verwenden. Quelltext in einem inaktiven Zweig wird nicht übersetzt.
+hint-preprocessor-elseif=Beginnt einen weiteren Zweig der bedingten Übersetzung, wenn im selben Block noch kein vorheriger Zweig gewählt wurde.
+hint-preprocessor-elif=Kurzform von `;$ELSEIF`; beginnt einen weiteren Zweig, wenn noch kein vorheriger Zweig gewählt wurde.
+hint-preprocessor-else=Beginnt den Ersatzzweig der bedingten Übersetzung, wenn im selben Block kein vorheriger Zweig gewählt wurde.
+hint-preprocessor-endif=Beendet den mit `;$IF` begonnenen Block der bedingten Übersetzung.
+hint-preprocessor-usefuncs=Historische Kompatibilitätsmarkierung für Quelltexte mit benutzerdefinierten Funktionen. Aktuelle Compiler akzeptieren sie ohne Wirkung.
+hint-preprocessor-substitution=Fügt den Wert einer vordefinierten, im Workspace gesetzten oder mit `;$DEFINE` angelegten Präprozessorvariable in den Tokenstrom ein. Ein unbekannter Name ist ein Fehler.
 hint-keyword-if=Beginnt einen bedingten Block. Sein Inhalt wird ausgeführt, wenn die Bedingung wahr ist; optionale Zweige mit `ELSEIF` und `ELSE` können folgen.
 hint-keyword-let=Leitet eine Zuweisung ein. `LET` ist bei gewöhnlichen Zuweisungen optional und bleibt zur Kompatibilität mit klassischem PPL-Quelltext erhalten.
 hint-keyword-while=Beginnt eine kopfgesteuerte Schleife, die wiederholt wird, solange ihre Bedingung wahr bleibt.

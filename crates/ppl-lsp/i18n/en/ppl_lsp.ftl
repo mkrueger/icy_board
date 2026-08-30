@@ -1,3 +1,12 @@
+hint-preprocessor-langversion=Declares the PPL language version used by this source file. It must appear before code and takes precedence over workspace, command-line, and environment settings.
+hint-preprocessor-define=Defines a case-insensitive preprocessor variable. The optional value may be used in conditional expressions or inserted into source with `;#name`; a definition without a value is true.
+hint-preprocessor-if=Starts a conditional-compilation branch. The expression may use `VERSION`, `RUNTIME`, `LANGVERSION`, and variables introduced with `;$DEFINE`. Source in an inactive branch is not compiled.
+hint-preprocessor-elseif=Starts another conditional-compilation branch when no preceding branch in the same block was selected.
+hint-preprocessor-elif=Short spelling of `;$ELSEIF`; starts another conditional-compilation branch when no preceding branch was selected.
+hint-preprocessor-else=Starts the fallback conditional-compilation branch when no preceding branch in the same block was selected.
+hint-preprocessor-endif=Ends the conditional-compilation block opened by `;$IF`.
+hint-preprocessor-usefuncs=Legacy compatibility marker indicating that a source uses user-defined functions. Current compilers accept it as a no-op.
+hint-preprocessor-substitution=Inserts the value of a predefined, workspace, or `;$DEFINE` preprocessor variable into the token stream. An undefined name is an error.
 hint-keyword-if=Starts a conditional block. Its body runs when the condition is true; optional `ELSEIF` and `ELSE` branches may follow.
 hint-keyword-let=Introduces an assignment. `LET` is optional in ordinary assignments and is retained for compatibility with classic PPL source.
 hint-keyword-while=Starts a pre-test loop that repeats while its condition remains true.

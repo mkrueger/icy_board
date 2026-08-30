@@ -763,6 +763,24 @@ fn get_sig_hint(sig: Signature, arg: String) -> Option<Hover> {
     })
 }
 
+/// Documentation shared by preprocessor-directive hover and completion.
+pub fn get_preprocessor_hover(directive: &str) -> Option<Hover> {
+    let directive = directive.trim_start_matches(';').trim_start_matches(['$', '#']).to_ascii_uppercase();
+    let (signature, documentation) = match directive.as_str() {
+        "LANGVERSION" => (";$LANGVERSION number", fl!(LANGUAGE_LOADER, "hint-preprocessor-langversion")),
+        "DEFINE" => (";$DEFINE name[=value]", fl!(LANGUAGE_LOADER, "hint-preprocessor-define")),
+        "IF" => (";$IF expression", fl!(LANGUAGE_LOADER, "hint-preprocessor-if")),
+        "ELSEIF" => (";$ELSEIF expression", fl!(LANGUAGE_LOADER, "hint-preprocessor-elseif")),
+        "ELIF" => (";$ELIF expression", fl!(LANGUAGE_LOADER, "hint-preprocessor-elif")),
+        "ELSE" => (";$ELSE", fl!(LANGUAGE_LOADER, "hint-preprocessor-else")),
+        "ENDIF" => (";$ENDIF", fl!(LANGUAGE_LOADER, "hint-preprocessor-endif")),
+        "USEFUNCS" => (";$USEFUNCS", fl!(LANGUAGE_LOADER, "hint-preprocessor-usefuncs")),
+        "SUBSTITUTION" => (";#name", fl!(LANGUAGE_LOADER, "hint-preprocessor-substitution")),
+        _ => return None,
+    };
+    get_sig_hint(Signature::new(signature.to_string()), documentation)
+}
+
 /// Documentation shared by reserved-word hover and completion.
 pub fn get_keyword_hover(keyword: &str) -> Option<Hover> {
     let keyword = keyword.to_ascii_lowercase();

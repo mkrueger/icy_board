@@ -21,6 +21,7 @@ const ENUM: u32 = 8;
 const ENUM_MEMBER: u32 = 9;
 const PROPERTY: u32 = 10;
 const CONSTANT: u32 = 12;
+const DIRECTIVE: u32 = 13;
 const READONLY: u32 = 1 << 2;
 
 fn analyze(source: &str, version: u16) -> (Ast, SemanticVisitor, Workspace) {
@@ -164,4 +165,18 @@ fn token_lengths_are_utf16_code_units() {
     let string = tokens.iter().find(|token| token.token_type == 2).expect("string token");
     assert_eq!(comment.length, 9);
     assert_eq!(string.length, 4);
+}
+
+#[test]
+fn preprocessor_directives_and_variables_have_semantic_kinds() {
+    let source = ";$LANGVERSION 400\n;$DEFINE FEATURE=1\n;$IF FEATURE AND RUNTIME >= 400\nPRINTLN ;#FEATURE\n;$ELSE\n;$ENDIF\n";
+    let tokens = decoded(source, 400);
+
+    for directive in [";$LANGVERSION", ";$DEFINE", ";$IF", ";$ELSE", ";$ENDIF"] {
+        assert!(tokens.contains(&(directive.to_string(), DIRECTIVE, 0)), "{directive}: {tokens:?}");
+    }
+    for name in ["FEATURE", "RUNTIME"] {
+        assert!(tokens.iter().any(|token| token == &(name.to_string(), CONSTANT, READONLY)), "{name}: {tokens:?}");
+    }
+    assert!(tokens.contains(&(";#".to_string(), DIRECTIVE, 0)), "{tokens:?}");
 }

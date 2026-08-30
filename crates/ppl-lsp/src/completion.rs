@@ -12,7 +12,7 @@ use crate::{
     context::{CursorContext, call_context, cursor_context},
     documentation::{
         get_const_hover, get_function_hover, get_keyword_hover, get_member_documentation, get_member_documentation_with_parameters,
-        get_statement_hover, get_string_member_documentation, get_type_hover,
+        get_preprocessor_hover, get_statement_hover, get_string_member_documentation, get_type_hover,
     },
     type_lookup::{MemberKind, bytes_members, members_of, record_field_type_name, static_members_of, static_type_of_name, string_members, type_of_chain},
 };
@@ -26,8 +26,48 @@ pub enum ImCompleteCompletionItem {
 /// them their meaning. EXIT is the statement END used to be.
 const CONTEXTUAL_WORDS: &[(&str, u16)] = &[("EXIT", 400)];
 
+const PREPROCESSOR_DIRECTIVES: &[&str] = &["LANGVERSION", "DEFINE", "IF", "ELSEIF", "ELIF", "ELSE", "ENDIF", "USEFUNCS"];
+const PREPROCESSOR_VARIABLES: &[&str] = &["VERSION", "RUNTIME", "LANGVERSION"];
+
+fn preprocessor_completion(line: &str) -> Option<Vec<CompletionItem>> {
+    let trimmed = line.trim_start();
+    let (names, documentation_name, kind, filter_prefix) = if trimmed.starts_with(";$") && !trimmed[2..].contains(char::is_whitespace) {
+        (PREPROCESSOR_DIRECTIVES, None, CompletionItemKind::KEYWORD, Some(";$"))
+    } else if trimmed.starts_with(";#") && !trimmed[2..].contains(char::is_whitespace) {
+        (PREPROCESSOR_VARIABLES, Some("SUBSTITUTION"), CompletionItemKind::CONSTANT, Some(";#"))
+    } else if [";$IF", ";$ELSEIF", ";$ELIF"]
+        .iter()
+        .any(|directive| trimmed.get(..directive.len()).is_some_and(|prefix| prefix.eq_ignore_ascii_case(directive)))
+    {
+        (PREPROCESSOR_VARIABLES, None, CompletionItemKind::CONSTANT, None)
+    } else {
+        return None;
+    };
+
+    Some(
+        names
+            .iter()
+            .map(|name| CompletionItem {
+                label: (*name).to_string(),
+                insert_text: Some((*name).to_string()),
+                // VS Code includes punctuation immediately before the cursor in
+                // completion filtering. Without this, `;$` and `;#` reject every
+                // otherwise valid item before presenting the completion menu.
+                filter_text: Some(format!("{}{name}", filter_prefix.unwrap_or_default())),
+                kind: Some(kind),
+                insert_text_format: Some(InsertTextFormat::PLAIN_TEXT),
+                documentation: hover_documentation(get_preprocessor_hover(documentation_name.unwrap_or(name))),
+                ..Default::default()
+            })
+            .collect(),
+    )
+}
+
 /// return (need_to_continue_search, founded reference)
 pub fn get_completion(ast: &Ast, semantic_visitor: &SemanticVisitor, line_before_cursor: &str, offset: usize) -> Vec<CompletionItem> {
+    if let Some(items) = preprocessor_completion(line_before_cursor) {
+        return items;
+    }
     match cursor_context(line_before_cursor) {
         CursorContext::Nothing => return Vec::new(),
         CursorContext::Member(path) => return member_completion(semantic_visitor, &path, ast.language_version),

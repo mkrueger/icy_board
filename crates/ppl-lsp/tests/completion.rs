@@ -35,6 +35,34 @@ fn complete(source: &str) -> Vec<String> {
 }
 
 #[test]
+fn preprocessor_directives_and_variables_complete() {
+    let directive_items = complete_items(";$");
+    let directives: Vec<_> = directive_items.iter().map(|item| item.label.clone()).collect();
+    for name in ["LANGVERSION", "DEFINE", "IF", "ELSEIF", "ELIF", "ELSE", "ENDIF", "USEFUNCS"] {
+        assert!(directives.contains(&name.to_string()), "{name}: {directives:?}");
+    }
+    assert!(directive_items.iter().all(|item| item.filter_text.as_deref().is_some_and(|text| text.starts_with(";$"))));
+
+    let substitution_items = complete_items(";#");
+    let substitutions: Vec<_> = substitution_items.iter().map(|item| item.label.clone()).collect();
+    assert_eq!(substitutions, vec!["VERSION", "RUNTIME", "LANGVERSION"]);
+    assert!(substitution_items.iter().all(|item| item.filter_text.as_deref().is_some_and(|text| text.starts_with(";#"))));
+
+    let expressions = complete(";$IF ");
+    assert_eq!(expressions, vec!["VERSION", "RUNTIME", "LANGVERSION"]);
+}
+
+#[test]
+fn preprocessor_completion_carries_hover_documentation() {
+    let define = completion_documentation(";$", "DEFINE");
+    assert!(define.contains(";$DEFINE name[=value]"), "{define}");
+    assert!(define.contains("preprocessor") || define.contains("Präprozessor"), "{define}");
+
+    let runtime = completion_documentation(";#", "RUNTIME");
+    assert!(runtime.contains(";#name"), "{runtime}");
+}
+
+#[test]
 fn bigstr_completion_is_deprecated_in_ppl_400() {
     let item = complete_items(";$LANGVERSION 400\nBIG")
         .into_iter()

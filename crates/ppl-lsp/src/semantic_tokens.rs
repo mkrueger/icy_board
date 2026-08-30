@@ -36,6 +36,7 @@ const ENUM_MEMBER: u32 = 9;
 const PROPERTY: u32 = 10;
 const LABEL: u32 = 11;
 const CONSTANT: u32 = 12;
+const DIRECTIVE: u32 = 13;
 
 const DECLARATION: u32 = 1 << 0;
 const DEFINITION: u32 = 1 << 1;
@@ -56,6 +57,7 @@ pub fn legend_types() -> Vec<SemanticTokenType> {
         SemanticTokenType::PROPERTY,
         SemanticTokenType::new("label"),
         SemanticTokenType::new("constant"),
+        SemanticTokenType::new("directive"),
     ]
 }
 
@@ -89,6 +91,7 @@ fn insert(tokens: &mut BTreeMap<usize, RawToken>, span: &std::ops::Range<usize>,
 
 pub fn get_semantic_tokens(ast: &Ast, visitor: &SemanticVisitor, rope: &Rope, source: &str, workspace: &Workspace) -> Vec<SemanticToken> {
     let mut raw = lexical_tokens(ast, source, workspace);
+    preprocessor_tokens(source, &mut raw);
     let parameter_spans = parameter_spans(ast);
     reference_tokens(ast, visitor, &parameter_spans, &mut raw);
 
@@ -96,6 +99,80 @@ pub fn get_semantic_tokens(ast: &Ast, visitor: &SemanticVisitor, rope: &Rope, so
     ast.visit(&mut collector);
 
     encode(raw, rope)
+}
+
+fn preprocessor_tokens(source: &str, tokens: &mut BTreeMap<usize, RawToken>) {
+    const DIRECTIVES: &[&str] = &["LANGVERSION", "DEFINE", "IF", "ELSEIF", "ELIF", "ELSE", "ENDIF", "USEFUNCS"];
+    let mut offset = 0;
+    for line in source.split_inclusive('\n') {
+        let line_without_lf = line.strip_suffix('\n').unwrap_or(line);
+        let line_without_newline = line_without_lf.strip_suffix('\r').unwrap_or(line_without_lf);
+        let leading = line_without_newline.chars().take_while(|ch| ch.is_whitespace()).count();
+        let rest: String = line_without_newline.chars().skip(leading).collect();
+        let marker_start = offset + leading;
+
+        if let Some(after_marker) = rest.strip_prefix(";$") {
+            let word: String = after_marker.chars().take_while(|ch| ch.is_ascii_alphabetic()).collect();
+            if DIRECTIVES.iter().any(|directive| directive.eq_ignore_ascii_case(&word)) {
+                let marker_end = marker_start + 2 + word.chars().count();
+                remove_covering_comment(tokens, marker_start);
+                insert(tokens, &(marker_start..marker_end), DIRECTIVE, 0);
+                highlight_preprocessor_names(tokens, after_marker, marker_start + 2, word.chars().count());
+            }
+        }
+        for (marker_byte, _) in line_without_newline.match_indices(";#") {
+            if line_without_newline[..marker_byte].chars().filter(|ch| *ch == '"').count() % 2 != 0 {
+                continue;
+            }
+            let after_marker = &line_without_newline[marker_byte + 2..];
+            let name: String = after_marker.chars().take_while(|ch| ch.is_ascii_alphanumeric() || *ch == '_').collect();
+            if name.is_empty() {
+                continue;
+            }
+            let marker_start = offset + line_without_newline[..marker_byte].chars().count();
+            let marker_end = marker_start + 2 + name.chars().count();
+            remove_covering_comment(tokens, marker_start);
+            insert(tokens, &(marker_start..marker_start + 2), DIRECTIVE, 0);
+            insert(tokens, &(marker_start + 2..marker_end), CONSTANT, READONLY);
+        }
+        offset += line.chars().count();
+    }
+}
+
+fn remove_covering_comment(tokens: &mut BTreeMap<usize, RawToken>, offset: usize) {
+    let covering = tokens
+        .range(..=offset)
+        .next_back()
+        .filter(|(_, token)| token.token_type == COMMENT && token.end > offset)
+        .map(|(start, _)| *start);
+    if let Some(start) = covering {
+        tokens.remove(&start);
+    }
+}
+
+fn highlight_preprocessor_names(tokens: &mut BTreeMap<usize, RawToken>, text: &str, text_start: usize, directive_len: usize) {
+    let mut quoted = false;
+    let mut start = None;
+    for (byte, ch) in text.char_indices().chain(std::iter::once((text.len(), ' '))) {
+        if byte < directive_len {
+            continue;
+        }
+        if ch == '"' {
+            quoted = !quoted;
+        }
+        let is_name = !quoted && (ch.is_ascii_alphanumeric() || ch == '_');
+        if is_name && start.is_none() && (ch.is_ascii_alphabetic() || ch == '_') {
+            start = Some(byte);
+        } else if !is_name
+            && let Some(name_start) = start.take()
+        {
+            let name = &text[name_start..byte];
+            if !matches!(name.to_ascii_uppercase().as_str(), "AND" | "OR" | "NOT" | "TRUE" | "FALSE") {
+                let start = text_start + text[..name_start].chars().count();
+                insert(tokens, &(start..start + name.chars().count()), CONSTANT, READONLY);
+            }
+        }
+    }
 }
 
 fn lexical_tokens(ast: &Ast, source: &str, workspace: &Workspace) -> BTreeMap<usize, RawToken> {

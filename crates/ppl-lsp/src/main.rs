@@ -21,7 +21,7 @@ use icy_board_engine::semantic::{FunctionDeclaration, ReferenceType, SemanticVis
 use ppl_lsp::completion::get_completion;
 use ppl_lsp::code_lens::get_code_lenses;
 use ppl_lsp::document_symbol::get_document_symbols;
-use ppl_lsp::documentation::{get_const_hover, get_function_hover, get_keyword_hover, get_statement_hover, get_type_hover_for_version};
+use ppl_lsp::documentation::{get_const_hover, get_function_hover, get_keyword_hover, get_preprocessor_hover, get_statement_hover, get_type_hover_for_version};
 use ppl_lsp::formatting::VSCodeFormattingBackend;
 use ppl_lsp::hover::get_user_hover;
 use ppl_lsp::inlay_hints::get_inlay_hints;
@@ -85,7 +85,7 @@ impl LanguageServer for Backend {
 
                 completion_provider: Some(CompletionOptions {
                     resolve_provider: Some(false),
-                    trigger_characters: Some(vec![".".to_string(), "{".to_string(), "(".to_string(), ",".to_string()]),
+                    trigger_characters: Some(vec![".".to_string(), "{".to_string(), "(".to_string(), ",".to_string(), "$".to_string(), "#".to_string()]),
                     work_done_progress_options: Default::default(),
                     all_commit_characters: None,
                     completion_item: None,
@@ -356,6 +356,7 @@ impl LanguageServer for Backend {
 
             get_tooltip(ast, offset)
                 .or_else(|| get_user_hover(ast, visitor, offset))
+                .or_else(|| get_preprocessor_tooltip(&rope, offset))
                 .or_else(|| get_keyword_tooltip(&rope, offset, ast.language_version))
         })
     }
@@ -1732,6 +1733,47 @@ fn get_keyword_tooltip(rope: &Rope, offset: usize, language_version: u16) -> Opt
         .any(|keyword| keyword.since <= language_version && keyword.name.eq_ignore_ascii_case(&word));
     let is_contextual = language_version >= 400 && word.eq_ignore_ascii_case("EXIT");
     (is_reserved || is_contextual).then(|| get_keyword_hover(&word)).flatten()
+}
+
+fn get_preprocessor_tooltip(rope: &Rope, offset: usize) -> Option<Hover> {
+    let offset = offset.min(rope.len_chars());
+    let mut line_start = offset;
+    while line_start > 0 && rope.get_char(line_start - 1) != Some('\n') {
+        line_start -= 1;
+    }
+    let mut line_end = offset;
+    while line_end < rope.len_chars() && rope.get_char(line_end) != Some('\n') {
+        line_end += 1;
+    }
+    let line = rope.slice(line_start..line_end).to_string();
+    let leading = line.chars().take_while(|ch| ch.is_whitespace()).count();
+    let rest: String = line.chars().skip(leading).collect();
+    let (marker, documentation_name) = if let Some(rest) = rest.strip_prefix(";$") {
+        let word: String = rest.chars().take_while(|ch| ch.is_ascii_alphabetic()).collect();
+        if word.is_empty() {
+            return None;
+        }
+        (format!(";${word}"), word)
+    } else {
+        for (marker_byte, _) in line.match_indices(";#") {
+            if line[..marker_byte].chars().filter(|ch| *ch == '"').count() % 2 != 0 {
+                continue;
+            }
+            let after_marker = &line[marker_byte + 2..];
+            let name: String = after_marker.chars().take_while(|ch| ch.is_ascii_alphanumeric() || *ch == '_').collect();
+            let token_start = line_start + line[..marker_byte].chars().count();
+            let token_end = token_start + 2 + name.chars().count();
+            if !name.is_empty() && offset >= token_start && offset <= token_end {
+                return get_preprocessor_hover("SUBSTITUTION");
+            }
+        }
+        return None;
+    };
+    let token_start = line_start + leading;
+    let token_end = token_start + marker.chars().count();
+    (offset >= token_start && offset <= token_end)
+        .then(|| get_preprocessor_hover(&documentation_name))
+        .flatten()
 }
 
 #[cfg(test)]
