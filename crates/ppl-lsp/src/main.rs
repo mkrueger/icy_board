@@ -1,7 +1,9 @@
 use std::collections::{HashMap, HashSet};
-use std::mem;
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use dashmap::DashMap;
 use icy_board_engine::ast::{
@@ -36,14 +38,39 @@ use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer, LspService, Server};
 
-struct Backend {
+/// How long typing has to pause before the program is looked at again.
+const ANALYSIS_DELAY: Duration = Duration::from_millis(150);
+
+/// A handle on the server state, so that a slow analysis can be handed to a
+/// thread of its own without the editor having to wait for it.
+#[derive(Clone)]
+struct Backend(Arc<State>);
+
+impl std::ops::Deref for Backend {
+    type Target = State;
+
+    fn deref(&self) -> &State {
+        &self.0
+    }
+}
+
+struct State {
     client: Client,
+
+    /// The folder the editor opened, so the package can be read again later.
+    root: Mutex<Option<PathBuf>>,
+    /// Whether the editor offered to report changes made outside of it.
+    reports_file_changes: AtomicBool,
 
     workspace: Mutex<Workspace>,
     workspace_visitor: Mutex<SemanticVisitor>,
     workspace_map: DashMap<Url, Ast>,
 
-    ast_map: Arc<Mutex<HashMap<Url, (Ast, SemanticVisitor)>>>,
+    /// Held while a program is being read. A request takes it in passing, so that
+    /// it is answered from the tree that belongs to the text on screen.
+    analysis: tokio::sync::Mutex<()>,
+
+    ast_map: Mutex<HashMap<Url, (Ast, SemanticVisitor)>>,
     document_map: DashMap<Url, Rope>,
     document_versions: DashMap<Url, i32>,
 }
@@ -71,9 +98,19 @@ fn loose_workspace() -> Workspace {
 #[tower_lsp::async_trait]
 impl LanguageServer for Backend {
     async fn initialize(&self, params: InitializeParams) -> Result<InitializeResult> {
+        let reports_file_changes = params
+            .capabilities
+            .workspace
+            .as_ref()
+            .and_then(|workspace| workspace.did_change_watched_files.as_ref())
+            .and_then(|watched| watched.dynamic_registration)
+            .unwrap_or(false);
+        self.reports_file_changes.store(reports_file_changes, Ordering::Relaxed);
+
         if let Some(root) = params.root_uri
             && let Ok(root) = root.to_file_path()
         {
+            *self.root.lock().unwrap() = Some(root.clone());
             self.load_workspace(root);
         }
         Ok(InitializeResult {
@@ -136,7 +173,24 @@ impl LanguageServer for Backend {
     }
 
     async fn initialized(&self, _: InitializedParams) {
-        self.client.log_message(MessageType::INFO, "initialized!").await;
+        if !self.reports_file_changes.load(Ordering::Relaxed) {
+            return;
+        }
+        let watchers = ["**/*.pps", "**/ppl.toml"]
+            .into_iter()
+            .map(|pattern| FileSystemWatcher {
+                glob_pattern: GlobPattern::String(pattern.to_string()),
+                kind: None,
+            })
+            .collect();
+        let registration = Registration {
+            id: "ppl-watched-files".to_string(),
+            method: "workspace/didChangeWatchedFiles".to_string(),
+            register_options: serde_json::to_value(DidChangeWatchedFilesRegistrationOptions { watchers }).ok(),
+        };
+        if let Err(err) = self.client.register_capability(vec![registration]).await {
+            log::error!("changes made outside the editor will go unnoticed: {err}");
+        }
     }
 
     async fn shutdown(&self) -> Result<()> {
@@ -144,11 +198,16 @@ impl LanguageServer for Backend {
     }
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
-        self.on_change(TextDocumentItem {
-            uri: params.text_document.uri,
-            text: params.text_document.text,
-            version: params.text_document.version,
-        })
+        // A file that has just been opened is looked at at once, so the editor is
+        // never left without an answer about it.
+        self.on_change(
+            TextDocumentItem {
+                uri: params.text_document.uri,
+                text: params.text_document.text,
+                version: params.text_document.version,
+            },
+            false,
+        )
         .await
     }
 
@@ -156,17 +215,17 @@ impl LanguageServer for Backend {
         let Some(change) = params.content_changes.get_mut(0) else {
             return;
         };
-        self.on_change(TextDocumentItem {
-            uri: params.text_document.uri,
-            text: std::mem::take(&mut change.text),
-            version: params.text_document.version,
-        })
+        self.on_change(
+            TextDocumentItem {
+                uri: params.text_document.uri,
+                text: std::mem::take(&mut change.text),
+                version: params.text_document.version,
+            },
+            true,
+        )
         .await;
     }
 
-    async fn did_save(&self, _: DidSaveTextDocumentParams) {
-        self.client.log_message(MessageType::INFO, "file saved!").await;
-    }
     async fn did_close(&self, params: DidCloseTextDocumentParams) {
         let uri = params.text_document.uri;
 
@@ -177,6 +236,7 @@ impl LanguageServer for Backend {
     }
 
     async fn code_action(&self, params: CodeActionParams) -> Result<Option<CodeActionResponse>> {
+        self.settled().await;
         let uri = params.text_document.uri;
         let Some(rope) = self.document_map.get(&uri) else {
             return Ok(None);
@@ -345,6 +405,7 @@ impl LanguageServer for Backend {
     }
 
     async fn hover(&self, params: HoverParams) -> Result<Option<Hover>> {
+        self.settled().await;
         let uri = params.text_document_position_params.text_document.uri;
         if !self.document_map.contains_key(&uri) {
             return Ok(None);
@@ -362,12 +423,13 @@ impl LanguageServer for Backend {
     }
 
     async fn goto_definition(&self, params: GotoDefinitionParams) -> Result<Option<GotoDefinitionResponse>> {
+        self.settled().await;
         let uri2 = params.text_document_position_params.text_document.uri.clone();
         let uri = params.text_document_position_params.text_document.uri;
         if !self.document_map.contains_key(&uri) {
             return Ok(None);
         }
-        let res = self.get_ast(&uri, |ast, visitor| {
+        self.get_ast(&uri, |ast, visitor| {
             let rope = self.document_map.get(&uri2)?;
 
             let offset = position_to_offset(&rope, params.text_document_position_params.position)?;
@@ -375,15 +437,11 @@ impl LanguageServer for Backend {
                 return self.location(&path, r.span).map(GotoDefinitionResponse::Scalar);
             }
             None
-        });
-        if let Ok(Some(r)) = &res {
-            self.client.log_message(MessageType::INFO, format!("{:?}!", r)).await;
-        }
-
-        res
+        })
     }
 
     async fn document_symbol(&self, params: DocumentSymbolParams) -> Result<Option<DocumentSymbolResponse>> {
+        self.settled().await;
         let uri = params.text_document.uri;
         let Some(rope) = self.document_map.get(&uri) else {
             return Ok(None);
@@ -393,6 +451,7 @@ impl LanguageServer for Backend {
     }
 
     async fn code_lens(&self, params: CodeLensParams) -> Result<Option<Vec<CodeLens>>> {
+        self.settled().await;
         let uri = params.text_document.uri;
         let Some(rope) = self.document_map.get(&uri) else {
             return Ok(None);
@@ -402,6 +461,7 @@ impl LanguageServer for Backend {
     }
 
     async fn inlay_hint(&self, params: InlayHintParams) -> Result<Option<Vec<InlayHint>>> {
+        self.settled().await;
         let uri = params.text_document.uri;
         let Some(rope) = self.document_map.get(&uri) else {
             return Ok(None);
@@ -411,6 +471,7 @@ impl LanguageServer for Backend {
     }
 
     async fn document_highlight(&self, params: DocumentHighlightParams) -> Result<Option<Vec<DocumentHighlight>>> {
+        self.settled().await;
         let uri = params.text_document_position_params.text_document.uri;
         let Some(rope) = self.document_map.get(&uri) else {
             return Ok(None);
@@ -439,6 +500,7 @@ impl LanguageServer for Backend {
     }
 
     async fn completion(&self, params: CompletionParams) -> Result<Option<CompletionResponse>> {
+        self.settled().await;
         let uri = params.text_document_position.text_document.uri;
         let position = params.text_document_position.position;
         let Some(rope) = self.document_map.get(&uri) else {
@@ -455,6 +517,7 @@ impl LanguageServer for Backend {
     }
 
     async fn signature_help(&self, params: SignatureHelpParams) -> Result<Option<SignatureHelp>> {
+        self.settled().await;
         let uri = params.text_document_position_params.text_document.uri;
         let position = params.text_document_position_params.position;
         let Some(rope) = self.document_map.get(&uri) else {
@@ -467,6 +530,7 @@ impl LanguageServer for Backend {
     }
 
     async fn semantic_tokens_full(&self, params: SemanticTokensParams) -> Result<Option<SemanticTokensResult>> {
+        self.settled().await;
         let uri = params.text_document.uri;
         let Some(rope) = self.document_map.get(&uri) else {
             return Ok(None);
@@ -500,6 +564,7 @@ impl LanguageServer for Backend {
     }
 
     async fn references(&self, params: ReferenceParams) -> Result<Option<Vec<Location>>> {
+        self.settled().await;
         let uri = params.text_document_position.text_document.uri;
         let Some(rope) = self.document_map.get(&uri) else {
             return Ok(None);
@@ -508,11 +573,7 @@ impl LanguageServer for Backend {
             return Ok(None);
         };
 
-        self.client.log_message(MessageType::INFO, format!("OFFSET {offset}!")).await;
-
         let reference_list = self.get_ast(&uri, |ast: &Ast, visitor| get_reference(ast, offset, visitor, true))?;
-
-        self.client.log_message(MessageType::INFO, format!("got {} refs!", reference_list.len())).await;
 
         let list: Vec<Location> = reference_list
             .into_iter()
@@ -522,6 +583,7 @@ impl LanguageServer for Backend {
     }
 
     async fn rename(&self, params: RenameParams) -> Result<Option<WorkspaceEdit>> {
+        self.settled().await;
         let uri = params.text_document_position.text_document.uri;
         let Some(rope) = self.document_map.get(&uri) else {
             return Ok(None);
@@ -530,11 +592,7 @@ impl LanguageServer for Backend {
             return Ok(None);
         };
 
-        self.client.log_message(MessageType::INFO, format!("OFFSET {offset}!")).await;
-
         let reference_list = self.get_ast(&uri, |ast: &Ast, visitor| get_reference(ast, offset, visitor, true))?;
-
-        self.client.log_message(MessageType::INFO, format!("got {} refs!", reference_list.len())).await;
 
         let mut map: HashMap<Url, Vec<TextEdit>> = HashMap::new();
         for (path, reference) in reference_list {
@@ -548,23 +606,48 @@ impl LanguageServer for Backend {
         if map.is_empty() { Ok(None) } else { Ok(Some(WorkspaceEdit::new(map))) }
     }
 
+    /// Settings can decide how a program is read, so everything open is looked at
+    /// again once they change.
     async fn did_change_configuration(&self, _: DidChangeConfigurationParams) {
-        self.client.log_message(MessageType::INFO, "configuration changed!").await;
+        self.reload_workspace().await;
+        self.reanalyze().await;
     }
 
-    async fn did_change_workspace_folders(&self, _params: DidChangeWorkspaceFoldersParams) {
-        self.client.log_message(MessageType::INFO, "workspace folders changed!").await;
+    async fn did_change_workspace_folders(&self, params: DidChangeWorkspaceFoldersParams) {
+        for removed in &params.event.removed {
+            if let Ok(path) = removed.uri.to_file_path() {
+                self.forget_workspace(&path).await;
+            }
+        }
+        for added in &params.event.added {
+            if let Ok(path) = added.uri.to_file_path() {
+                *self.root.lock().unwrap() = Some(path);
+            }
+        }
+        self.reload_workspace().await;
+        self.reanalyze().await;
     }
 
-    async fn did_change_watched_files(&self, _: DidChangeWatchedFilesParams) {
-        self.client.log_message(MessageType::INFO, "watched files have changed!").await;
+    /// A file that changed on disk rather than in the editor still belongs to the
+    /// package, so what is open is measured against it again.
+    async fn did_change_watched_files(&self, params: DidChangeWatchedFilesParams) {
+        let manifest_changed = params
+            .changes
+            .iter()
+            .any(|change| change.uri.to_file_path().is_ok_and(|path| path.file_name() == Some(OsStr::new("ppl.toml"))));
+        if manifest_changed {
+            self.reload_workspace().await;
+        }
+        self.reanalyze().await;
     }
 
     async fn formatting(&self, params: DocumentFormattingParams) -> Result<Option<Vec<TextEdit>>> {
+        self.settled().await;
         self.format(&params.text_document.uri)
     }
 
     async fn range_formatting(&self, params: DocumentRangeFormattingParams) -> Result<Option<Vec<TextEdit>>> {
+        self.settled().await;
         // The formatter reads the whole tree; only what falls into the selection is handed back.
         let selection = params.range;
         let Some(edits) = self.format(&params.text_document.uri)? else {
@@ -873,6 +956,8 @@ impl Backend {
             }
 
             let mut semantic_visitor = SemanticVisitor::new(&ws, errors, registry);
+            // A file the manifest no longer names must not linger from an earlier read.
+            self.workspace_map.clear();
             for ast in asts {
                 ast.visit(&mut semantic_visitor);
                 if let Ok(uri) = Url::from_file_path(&ast.file_name) {
@@ -881,8 +966,56 @@ impl Backend {
             }
             semantic_visitor.finish();
 
-            let mut state = self.workspace.lock().unwrap();
-            let _ = mem::replace(&mut *state, ws);
+            *self.workspace_visitor.lock().unwrap() = semantic_visitor;
+            *self.workspace.lock().unwrap() = ws;
+        }
+    }
+
+    /// Drops what is known about a folder the editor no longer holds open.
+    async fn forget_workspace(&self, root: &Path) {
+        let _analysis = self.analysis.lock().await;
+        let gone: Vec<Url> = self
+            .workspace_map
+            .iter()
+            .filter(|entry| entry.key().to_file_path().is_ok_and(|path| path.starts_with(root)))
+            .map(|entry| entry.key().clone())
+            .collect();
+        for uri in gone {
+            self.workspace_map.remove(&uri);
+            self.client.publish_diagnostics(uri, Vec::new(), None).await;
+        }
+    }
+
+    /// Reads the manifest again, for when it or a setting behind it has moved.
+    async fn reload_workspace(&self) {
+        let root = self.root.lock().unwrap().clone();
+        let Some(root) = root else {
+            return;
+        };
+        let _analysis = self.analysis.lock().await;
+        self.load_workspace(root);
+    }
+
+    /// Looks at every open document again, after something around it changed.
+    async fn reanalyze(&self) {
+        let mut package_seen = false;
+        let open: Vec<TextDocumentItem> = self
+            .document_map
+            .iter()
+            .filter_map(|entry| {
+                // One pass reads the whole package, so one file of it stands for all.
+                if self.workspace_map.contains_key(entry.key()) && std::mem::replace(&mut package_seen, true) {
+                    return None;
+                }
+                Some(TextDocumentItem {
+                    uri: entry.key().clone(),
+                    text: entry.value().to_string(),
+                    version: self.document_versions.get(entry.key()).map(|version| *version).unwrap_or_default(),
+                })
+            })
+            .collect();
+        for document in open {
+            self.analyze(document).await;
         }
     }
 
@@ -898,15 +1031,56 @@ impl Backend {
         }
     }
 
-    async fn on_change(&self, params: TextDocumentItem) {
-        let rope: Rope = ropey::Rope::from_str(&params.text);
-        let uri = params.uri;
-        self.document_map.insert(uri.clone(), rope.clone());
-        self.document_versions.insert(uri.clone(), params.version);
-        self.client.publish_diagnostics(uri.clone(), Vec::new(), Some(params.version)).await;
+    /// Whether the given text is still the newest the editor sent for that file.
+    fn is_current(&self, uri: &Url, version: i32) -> bool {
+        self.document_versions.get(uri).is_some_and(|current| *current == version)
+    }
 
-        if self.workspace_map.get(&uri).is_some() {
-            let semantic_visitor = {
+    async fn on_change(&self, params: TextDocumentItem, debounce: bool) {
+        self.document_map.insert(params.uri.clone(), Rope::from_str(&params.text));
+        self.document_versions.insert(params.uri.clone(), params.version);
+
+        if !debounce {
+            self.analyze(params).await;
+            return;
+        }
+
+        // Reading the program takes long enough that it is not worth doing for
+        // every keystroke; the last one of a burst is the one that counts.
+        let backend = self.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(ANALYSIS_DELAY).await;
+            if backend.is_current(&params.uri, params.version) {
+                backend.analyze(params).await;
+            }
+        });
+    }
+
+    /// Waits for a program that is being read, so that nothing is answered from a
+    /// tree the editor has already left behind.
+    async fn settled(&self) {
+        let _ = self.analysis.lock().await;
+    }
+
+    async fn analyze(&self, params: TextDocumentItem) {
+        let _analysis = self.analysis.lock().await;
+        let uri = params.uri.clone();
+        let version = params.version;
+        let backend = self.clone();
+        // Parsing a whole package keeps a thread busy; the one answering the
+        // editor is not the one to keep busy with it.
+        let Ok(Some(diagnostics)) = tokio::task::spawn_blocking(move || backend.build_semantics(&params)).await else {
+            return;
+        };
+        self.publish(diagnostics, &uri, version).await;
+    }
+
+    /// Reads the program the editor has and keeps the result, handing back what
+    /// should be underlined. Nothing comes back once the text has moved on.
+    fn build_semantics(&self, params: &TextDocumentItem) -> Option<HashMap<Url, Vec<Diagnostic>>> {
+        let uri = &params.uri;
+        if self.workspace_map.contains_key(uri) {
+            let (semantic_visitor, parsed) = {
                 let workspace = self.workspace.lock().unwrap();
                 let errors = Arc::new(Mutex::new(ErrorReporter::default()));
                 let registry = UserTypeRegistry::icy_board_registry();
@@ -916,7 +1090,7 @@ impl Backend {
                     let Ok(cur_uri) = Url::from_file_path(&file) else {
                         continue;
                     };
-                    let content = if uri == cur_uri {
+                    let content = if *uri == cur_uri {
                         params.text.clone()
                     } else if let Some(document) = self.document_map.get(&cur_uri) {
                         document.to_string()
@@ -940,43 +1114,64 @@ impl Backend {
                 }
 
                 let mut semantic_visitor = SemanticVisitor::new(&workspace, errors, registry);
+                let mut parsed = Vec::new();
                 for (cur_uri, ast) in asts {
                     semantic_visitor.errors.lock().unwrap().set_file_name(&ast.file_name);
                     ast.visit(&mut semantic_visitor);
-                    self.workspace_map.insert(cur_uri, ast);
+                    parsed.push((cur_uri, ast));
                 }
                 semantic_visitor.finish();
-                semantic_visitor
+                (semantic_visitor, parsed)
             };
-            self.add_diagnostics(&semantic_visitor, &uri, params.version).await;
-            {
-                let mut state: std::sync::MutexGuard<'_, SemanticVisitor> = self.workspace_visitor.lock().unwrap();
-                let _ = mem::replace(&mut *state, semantic_visitor);
-            }
-        } else {
-            let reg: UserTypeRegistry = UserTypeRegistry::icy_board_registry();
-            let errors = Arc::new(Mutex::new(ErrorReporter::default()));
-            let Ok(path) = uri.to_file_path() else {
-                return;
-            };
-            let workspace = loose_workspace();
-            preparse_type_declarations(path.clone(), errors.clone(), &params.text, &reg, Encoding::Utf8, &workspace);
-            let ast = parse_ast_with_predeclared_types(path, errors.clone(), &params.text, &reg, Encoding::Utf8, &workspace);
 
-            let mut semantic_visitor = SemanticVisitor::new(&workspace, errors, reg);
+            // The editor has moved on while this was being read; that edit brings
+            // its own answer, and an older tree must not replace a newer one.
+            if !self.is_current(uri, params.version) {
+                return None;
+            }
+            let diagnostics = self.collect_diagnostics(&semantic_visitor, uri);
+            for (cur_uri, ast) in parsed {
+                self.workspace_map.insert(cur_uri, ast);
+            }
+            *self.workspace_visitor.lock().unwrap() = semantic_visitor;
+            Some(diagnostics)
+        } else {
+            let registry = UserTypeRegistry::icy_board_registry();
+            let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+            let path = uri.to_file_path().ok()?;
+            let workspace = loose_workspace();
+            preparse_type_declarations(path.clone(), errors.clone(), &params.text, &registry, Encoding::Utf8, &workspace);
+            let ast = parse_ast_with_predeclared_types(path, errors.clone(), &params.text, &registry, Encoding::Utf8, &workspace);
+
+            let mut semantic_visitor = SemanticVisitor::new(&workspace, errors, registry);
             ast.visit(&mut semantic_visitor);
             semantic_visitor.finish();
 
-            self.add_diagnostics(&semantic_visitor, &uri, params.version).await;
-
-            self.ast_map.lock().unwrap().insert(uri, (ast, semantic_visitor));
+            if !self.is_current(uri, params.version) {
+                return None;
+            }
+            let diagnostics = self.collect_diagnostics(&semantic_visitor, uri);
+            self.ast_map.lock().unwrap().insert(uri.clone(), (ast, semantic_visitor));
+            Some(diagnostics)
         }
     }
 
-    async fn add_diagnostics(&self, semantic_visitor: &SemanticVisitor, changed: &Url, version: i32) {
+    async fn publish(&self, diagnostics: HashMap<Url, Vec<Diagnostic>>, changed: &Url, version: i32) {
+        for (uri, diagnostics) in diagnostics {
+            // A newer edit is already being looked at, so this answer is out of date.
+            if !self.is_current(changed, version) {
+                return;
+            }
+            let published = self.document_versions.get(&uri).map(|version| *version);
+            self.client.publish_diagnostics(uri, diagnostics, published).await;
+        }
+    }
+
+    fn collect_diagnostics(&self, semantic_visitor: &SemanticVisitor, changed: &Url) -> HashMap<Url, Vec<Diagnostic>> {
         let mut diagnostics: HashMap<Url, Vec<Diagnostic>> = HashMap::new();
         // Every file that was looked at gets an answer, so that a report which no
         // longer applies is taken back rather than left standing.
+        diagnostics.insert(changed.clone(), Vec::new());
         for uri in self.workspace_map.iter().map(|entry| entry.key().clone()) {
             diagnostics.insert(uri, Vec::new());
         }
@@ -1036,14 +1231,7 @@ impl Backend {
             }
         }
 
-        for (uri, diagnostics) in diagnostics {
-            // A newer edit is already being looked at, so this answer is out of date.
-            if self.document_versions.get(changed).is_some_and(|current| *current != version) {
-                return;
-            }
-            let published = self.document_versions.get(&uri).map(|version| *version);
-            self.client.publish_diagnostics(uri, diagnostics, published).await;
-        }
+        diagnostics
     }
 }
 
@@ -1603,22 +1791,26 @@ async fn main() {
     let stdin = tokio::io::stdin();
     let stdout = tokio::io::stdout();
 
-    let (service, socket) = LspService::build(|client| Backend {
-        client,
-        ast_map: Arc::new(Mutex::new(HashMap::new())),
-        document_map: DashMap::new(),
-        document_versions: DashMap::new(),
-        workspace: Mutex::new(loose_workspace()),
-        workspace_visitor: Mutex::new(SemanticVisitor::new(
-            &loose_workspace(),
-            Arc::new(Mutex::new(ErrorReporter::default())),
-            UserTypeRegistry::default(),
-        )),
-        workspace_map: DashMap::new(),
+    let (service, socket) = LspService::build(|client| {
+        Backend(Arc::new(State {
+            client,
+            root: Mutex::new(None),
+            reports_file_changes: AtomicBool::new(false),
+            analysis: tokio::sync::Mutex::new(()),
+            ast_map: Mutex::new(HashMap::new()),
+            document_map: DashMap::new(),
+            document_versions: DashMap::new(),
+            workspace: Mutex::new(loose_workspace()),
+            workspace_visitor: Mutex::new(SemanticVisitor::new(
+                &loose_workspace(),
+                Arc::new(Mutex::new(ErrorReporter::default())),
+                UserTypeRegistry::default(),
+            )),
+            workspace_map: DashMap::new(),
+        }))
     })
     .finish();
 
-    serde_json::json!({"test": 20});
     Server::new(stdin, stdout, socket).serve(service).await;
 }
 

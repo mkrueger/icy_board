@@ -98,15 +98,21 @@ impl Server {
     /// does so while answering other requests, so the answer is the last thing it
     /// said once it has fallen silent.
     pub fn diagnostics(&mut self, uri: &str) -> Value {
+        self.diagnostic_reports(uri).pop().unwrap_or_else(|| json!([]))
+    }
+
+    /// Every set of diagnostics the server sent for a document, in the order it
+    /// sent them, once it has fallen silent.
+    pub fn diagnostic_reports(&mut self, uri: &str) -> Vec<Value> {
         let deadline = Instant::now() + ANSWER;
-        let mut latest = json!([]);
+        let mut reports = Vec::new();
         let mut others = Vec::new();
         while Instant::now() < deadline {
             let Some(message) = self.take(QUIET) else {
                 break;
             };
             if message.get("method").and_then(Value::as_str) == Some("textDocument/publishDiagnostics") && message["params"]["uri"] == uri {
-                latest = message["params"]["diagnostics"].clone();
+                reports.push(message["params"]["diagnostics"].clone());
             } else {
                 others.push(message);
             }
@@ -114,7 +120,18 @@ impl Server {
         for message in others.into_iter().rev() {
             self.pending.push_front(message);
         }
-        latest
+        reports
+    }
+
+    /// Reports an edit the way an editor does, replacing the whole document.
+    pub fn change(&mut self, uri: &str, version: i64, text: &str) {
+        self.send(json!({
+            "jsonrpc": "2.0", "method": "textDocument/didChange",
+            "params": {
+                "textDocument": {"uri": uri, "version": version},
+                "contentChanges": [{"text": text}]
+            }
+        }));
     }
 
     pub fn request(&mut self, method: &str, params: Value) -> Value {

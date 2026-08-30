@@ -88,6 +88,18 @@ releases.
 
 ### Changed
 
+- The language server waits for typing to pause before reading a program again,
+  and reads it on a thread of its own. A burst of keystrokes is answered once
+  instead of once per key, and completion, hover and the outline no longer queue
+  behind the reading of a whole package. Requests still wait for a reading that
+  is under way, so an answer never comes from a program the editor has already
+  left behind.
+
+- The language server notices a file or a `ppl.toml` that changed outside the
+  editor, and re-reads what is open when settings or workspace folders change. A
+  manifest edited by hand or a branch switched underneath no longer needs a
+  window reload to take effect.
+
 - PPL 4.00 adds signed `LONG` and unsigned `ULONG` 64-bit integers. `ToLong()`
   now returns the new `LONG`, and `ToULong()` converts to `ULONG`; before 4.00,
   `LONG` and `ToLong()` retain their historical 32-bit `INTEGER` meaning. The
