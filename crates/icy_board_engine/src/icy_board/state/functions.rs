@@ -10,8 +10,10 @@ use crate::Res;
 use async_recursion::async_recursion;
 use chrono::{DateTime, Local};
 use codepages::tables::CP437_TO_UNICODE;
-use icy_engine::IceMode;
+use icy_engine::{AnsiCompatibilityLevel, FileFormat, FormatOptions, IceMode, LineBreakBehavior, LineLength, SaveOptions, Screen};
+use icy_engine_scripting::Animator;
 use jamjam::jam::{JamMessage, JamMessageBase};
+use tokio::time::{Duration, sleep};
 
 use crate::{
     icy_board::{
@@ -254,6 +256,37 @@ impl IcyBoardState {
             return Ok(true);
         }
 
+        if resolved_name.extension().is_some_and(|extension| extension.eq_ignore_ascii_case("icyanim")) {
+            let Ok(script) = fs::read_to_string(&resolved_name) else {
+                if display_error {
+                    self.bell().await?;
+                }
+                return Ok(false);
+            };
+            self.displayed_files.push(resolved_name.clone());
+            let result = self.display_icy_animation(&resolved_name, script).await;
+            self.displayed_files.pop();
+            result?;
+            return Ok(true);
+        }
+
+        if resolved_name.extension().is_some_and(|extension| extension.eq_ignore_ascii_case("icy")) {
+            let mut document = match FileFormat::IcyDraw.load(&resolved_name, None) {
+                Ok(document) => document,
+                Err(_) if !resolved_name.exists() => {
+                    if display_error {
+                        self.bell().await?;
+                    }
+                    return Ok(false);
+                }
+                Err(error) => return Err(error.into()),
+            };
+            let user_bytes = screen_as_ansi_bytes(&mut document.screen, self.session.term_caps.is_utf8)?;
+            let sysop_bytes = screen_as_ansi_bytes(&mut document.screen, false)?;
+            self.write_terminal_bytes(TerminalTarget::Both, &user_bytes, &sysop_bytes).await?;
+            return Ok(true);
+        }
+
         let Ok(content) = fs::read(&resolved_name) else {
             if display_error {
                 self.bell().await?;
@@ -281,6 +314,52 @@ impl IcyBoardState {
         self.displayed_files.pop();
         result?;
         Ok(true)
+    }
+
+    async fn display_icy_animation(&mut self, path: &Path, script: String) -> Res<()> {
+        let parent = path.parent().map(Path::to_path_buf);
+        let animator = Animator::run(&parent, script);
+        animator.lock().set_is_playing(true);
+
+        self.write_terminal_bytes(TerminalTarget::Both, b"\x1b[?25l", b"\x1b[?25l").await?;
+        let result: Res<()> = async {
+            while animator.lock().is_playing() && !self.session.disp_options.abort_printout && !self.session.request_logoff {
+                let frame = {
+                    let mut animator = animator.lock();
+                    animator.get_cur_frame_buffer_mut().map(|(screen, _, delay)| {
+                        (
+                            screen_as_ansi_bytes(screen.as_mut(), self.session.term_caps.is_utf8),
+                            screen_as_ansi_bytes(screen.as_mut(), false),
+                            *delay,
+                        )
+                    })
+                };
+
+                let Some((user_bytes, sysop_bytes, delay)) = frame else {
+                    if !animator.lock().is_thread_running() {
+                        break;
+                    }
+                    sleep(Duration::from_millis(10)).await;
+                    continue;
+                };
+
+                self.write_terminal_bytes(TerminalTarget::Both, &user_bytes?, &sysop_bytes?).await?;
+                sleep(Duration::from_millis(u64::from(delay))).await;
+                while !animator.lock().next_frame() {
+                    sleep(Duration::from_millis(10)).await;
+                }
+            }
+
+            let animator = animator.lock();
+            if !animator.error.is_empty() {
+                return Err(format!("Error playing {}: {}", path.display(), animator.error).into());
+            }
+            Ok(())
+        }
+        .await;
+        let restore_result = self.write_terminal_bytes(TerminalTarget::Both, b"\x1b[?25h", b"\x1b[?25h").await;
+        result?;
+        restore_result
     }
 
     async fn display_file_content(&mut self, converted_content: &str) -> Res<()> {
@@ -680,6 +759,22 @@ impl IcyBoardState {
         file.write_all(text.as_bytes())?;
         Ok(())
     }
+}
+
+fn screen_as_ansi_bytes(screen: &mut dyn Screen, utf8: bool) -> Res<Vec<u8>> {
+    let level = if utf8 {
+        AnsiCompatibilityLevel::Utf8Terminal
+    } else {
+        AnsiCompatibilityLevel::Vt100
+    };
+    let mut options = SaveOptions::ansi(level);
+    options.preprocess.optimize_colors = false;
+    options.sauce = None;
+    if let FormatOptions::Ansi(ansi_options) = &mut options.format {
+        ansi_options.line_break = LineBreakBehavior::GotoXY;
+        ansi_options.line_length = LineLength::Minimum(80);
+    }
+    Ok(screen.to_bytes("ans", &options)?)
 }
 
 fn transfer_log_line(upload: bool, user_name: &str, time: DateTime<Local>, file_name: &str, protocol: &str, errors: usize, cps: usize) -> String {

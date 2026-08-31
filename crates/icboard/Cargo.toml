@@ -54,3 +54,6 @@ rand = { workspace = true }
 
 russh = { workspace = true }
 async-trait = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"

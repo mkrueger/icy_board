@@ -40,6 +40,10 @@ impl VirtualScreen {
         parse_into_screen(self.parser.as_mut(), &mut self.buffer, c.encode_utf8(&mut utf8).as_bytes());
         Ok(())
     }
+
+    pub fn write_bytes(&mut self, bytes: &[u8]) {
+        parse_into_screen(self.parser.as_mut(), &mut self.buffer, bytes);
+    }
 }
 
 #[cfg(test)]

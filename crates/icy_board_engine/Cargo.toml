@@ -8,6 +8,7 @@ edition.workspace = true
 
 [dependencies]
 icy_engine = { workspace = true }
+icy_engine_scripting = { workspace = true }
 icy_net = { workspace = true }
 icy_parser_core =  { workspace = true }
 icy_sixel = { workspace = true }

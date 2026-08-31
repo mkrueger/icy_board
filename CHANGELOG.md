@@ -10,6 +10,9 @@ releases.
 
 ### Added
 
+- Display files can use native IcyDraw `.icy` screens and scripted `.icyanim`
+  animations directly, without invoking the external `icy_play` utility.
+
 - PPL package manifests support transitive source-library dependencies through
   local `path` entries and Git repositories selected by `rev`, `branch` or
   `tag`. Plain dependency sources form an implicit module named after the

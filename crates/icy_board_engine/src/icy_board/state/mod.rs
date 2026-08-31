@@ -2540,6 +2540,18 @@ impl IcyBoardState {
         Ok(())
     }
 
+    pub(crate) async fn write_terminal_bytes(&mut self, target: TerminalTarget, user_bytes: &[u8], sysop_bytes: &[u8]) -> Res<()> {
+        if target != TerminalTarget::Sysop || self.session.is_sysop || self.session.current_user.is_none() {
+            self.user_screen.write_bytes(user_bytes);
+        }
+        if target != TerminalTarget::User {
+            self.sysop_screen.write_bytes(sysop_bytes);
+        }
+        self.write_chars_internal(target, user_bytes, sysop_bytes).await?;
+        self.sync_logical_screen_size();
+        Ok(())
+    }
+
     /// # Errors
     #[async_recursion(?Send)]
     pub async fn write_raw(&mut self, target: TerminalTarget, data: &[char]) -> Res<()> {

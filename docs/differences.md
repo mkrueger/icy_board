@@ -56,6 +56,15 @@ while unmodified DOS artwork still displays correctly.
 explicit choice rather than an encoding guess, because many CP437 byte streams
 also happen to be valid UTF-8.
 
+Icy Board also displays native IcyDraw `.icy` screens and scripted `.icyanim`
+animations directly. They are converted to terminal ANSI for the caller and
+the sysop view, so boards do not need to launch `icy_play` as an external
+utility.
+
+**Compatibility cost:** these formats are Icy Board extensions rather than
+PCBoard display-file formats. Use an ANSI or ASCII variant when the board must
+remain portable to PCBoard.
+
 ## Configuration is TOML
 
 Board, conference, menu, protocol, language and security configuration is

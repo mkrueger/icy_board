@@ -24,7 +24,6 @@ tracks the larger remaining directions; it is not a release-date promise.
 - Add a self-service password-reset flow without weakening password storage.
 - Provide a web administration or caller frontend; IcyTerm can run as
   WebAssembly, but the board still needs a suitable API.
-- Support IcyAnim directly so boards do not need to invoke `icy_play`.
 
 ## Explicitly out of scope
 

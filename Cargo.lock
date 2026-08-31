@@ -251,7 +251,7 @@ version = "1.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "40c48f72fd53cd289104fc64099abca73db4166ad86ea0b4341abe65af83dadc"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -262,7 +262,7 @@ checksum = "291e6a250ff86cd4a820112fb8898808a366d8f9f58ce16d1f538353ad55747d"
 dependencies = [
  "anstyle",
  "once_cell_polyfill",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -1328,14 +1328,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "codepages"
-version = "0.1.0"
-source = "git+https://github.com/mkrueger/icy_board#b91f1c2d50c683d587cad9a071f3fa869973eaf2"
-dependencies = [
- "lazy_static",
-]
-
-[[package]]
 name = "codespan-reporting"
 version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2176,7 +2168,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -2215,7 +2207,7 @@ dependencies = [
  "bitflags 2.13.1",
  "bstr",
  "chrono",
- "codepages 0.1.0",
+ "codepages",
  "icy_net",
  "icy_sauce",
  "log",
@@ -2489,7 +2481,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -3647,7 +3639,7 @@ version = "0.2.1"
 dependencies = [
  "argh",
  "chrono",
- "codepages 0.1.0",
+ "codepages",
  "dizbase",
  "icy_board_engine",
  "libc",
@@ -3680,7 +3672,7 @@ dependencies = [
  "base64 0.22.1",
  "bstr",
  "chrono",
- "codepages 0.1.0",
+ "codepages",
  "color-eyre",
  "crossterm 0.29.0",
  "dizbase",
@@ -3710,6 +3702,7 @@ dependencies = [
  "semver",
  "serde",
  "substring",
+ "tempfile",
  "thiserror 2.0.20",
  "tokio",
  "tokio-util",
@@ -3727,7 +3720,7 @@ dependencies = [
  "ariadne",
  "bstr",
  "chrono",
- "codepages 0.1.0",
+ "codepages",
  "color-eyre",
  "crossterm 0.29.0",
  "dizbase",
@@ -3765,7 +3758,7 @@ dependencies = [
  "ariadne",
  "bstr",
  "chrono",
- "codepages 0.1.0",
+ "codepages",
  "color-eyre",
  "crossterm 0.29.0",
  "dizbase",
@@ -3887,7 +3880,7 @@ dependencies = [
  "byteorder",
  "chrono",
  "chumsky",
- "codepages 0.1.0",
+ "codepages",
  "creditcard",
  "crossterm 0.29.0",
  "dizbase",
@@ -3897,6 +3890,7 @@ dependencies = [
  "glob",
  "humanize-bytes",
  "icy_engine",
+ "icy_engine_scripting",
  "icy_net",
  "icy_parser_core",
  "icy_sixel 0.6.0",
@@ -3962,14 +3956,14 @@ dependencies = [
 [[package]]
 name = "icy_engine"
 version = "0.5.0"
-source = "git+https://github.com/mkrueger/icy_tools#cace73595f6acf44d1b502f6c47e0aa907ff0785"
+source = "git+https://github.com/mkrueger/icy_tools?rev=cace73595f6acf44d1b502f6c47e0aa907ff0785#cace73595f6acf44d1b502f6c47e0aa907ff0785"
 dependencies = [
  "base64 0.23.1",
  "bitflags 2.13.1",
  "bstr",
  "byteorder",
  "chrono",
- "codepages 0.1.0 (git+https://github.com/mkrueger/icy_board)",
+ "codepages",
  "gif 0.14.2",
  "icy_net",
  "icy_parser_core",
@@ -4001,13 +3995,13 @@ dependencies = [
 [[package]]
 name = "icy_engine_gui"
 version = "0.5.0"
-source = "git+https://github.com/mkrueger/icy_tools#cace73595f6acf44d1b502f6c47e0aa907ff0785"
+source = "git+https://github.com/mkrueger/icy_tools?rev=cace73595f6acf44d1b502f6c47e0aa907ff0785#cace73595f6acf44d1b502f6c47e0aa907ff0785"
 dependencies = [
  "anyhow",
  "base64 0.23.1",
  "bitflags 2.13.1",
  "bytemuck",
- "codepages 0.1.0 (git+https://github.com/mkrueger/icy_board)",
+ "codepages",
  "cpal",
  "fastrand",
  "i18n-embed",
@@ -4040,11 +4034,29 @@ dependencies = [
 [[package]]
 name = "icy_engine_gui_macros"
 version = "0.1.0"
-source = "git+https://github.com/mkrueger/icy_tools#cace73595f6acf44d1b502f6c47e0aa907ff0785"
+source = "git+https://github.com/mkrueger/icy_tools?rev=cace73595f6acf44d1b502f6c47e0aa907ff0785#cace73595f6acf44d1b502f6c47e0aa907ff0785"
 dependencies = [
  "proc-macro2",
  "quote",
  "syn 3.0.3",
+]
+
+[[package]]
+name = "icy_engine_scripting"
+version = "0.1.0"
+source = "git+https://github.com/mkrueger/icy_tools?rev=cace73595f6acf44d1b502f6c47e0aa907ff0785#cace73595f6acf44d1b502f6c47e0aa907ff0785"
+dependencies = [
+ "codepages",
+ "icy_engine",
+ "icy_parser_core",
+ "image",
+ "lazy_static",
+ "log",
+ "mlua",
+ "parking_lot",
+ "regex",
+ "serde",
+ "web-time",
 ]
 
 [[package]]
@@ -4081,7 +4093,7 @@ dependencies = [
 [[package]]
 name = "icy_parser_core"
 version = "0.1.0"
-source = "git+https://github.com/mkrueger/icy_tools#cace73595f6acf44d1b502f6c47e0aa907ff0785"
+source = "git+https://github.com/mkrueger/icy_tools?rev=cace73595f6acf44d1b502f6c47e0aa907ff0785#cace73595f6acf44d1b502f6c47e0aa907ff0785"
 dependencies = [
  "base64 0.23.1",
  "bitflags 2.13.1",
@@ -5314,6 +5326,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "lua-src"
+version = "551.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "087097f9936a7d819bda525b32d6e96f9c54f3d35ff23ff72fc0c1697d2127db"
+dependencies = [
+ "cc",
+]
+
+[[package]]
+name = "luajit-src"
+version = "210.7.3+1ee778a"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "869665372263eb337b14f480cfb864b89f12eade4eb42cb415f71517b4a67572"
+dependencies = [
+ "cc",
+ "which",
+]
+
+[[package]]
 name = "lyon"
 version = "1.0.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5637,6 +5668,35 @@ dependencies = [
  "pkcs8",
  "rand_core 0.10.1",
  "sha3 0.11.0",
+]
+
+[[package]]
+name = "mlua"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d96e5d00f19d8c46c71ceaced99593b90c31c57aa1fe2cb3e93a8b1698eedba9"
+dependencies = [
+ "bstr",
+ "either",
+ "libc",
+ "mlua-sys",
+ "num-traits",
+ "parking_lot",
+ "rustc-hash 2.1.3",
+]
+
+[[package]]
+name = "mlua-sys"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b806d7ade031f5d6607eae3e283fb034cb795a76247dd0d1ba753c8c42debccf"
+dependencies = [
+ "cc",
+ "cfg-if",
+ "libc",
+ "lua-src",
+ "luajit-src",
+ "pkg-config",
 ]
 
 [[package]]
@@ -7198,7 +7258,7 @@ version = "0.2.1"
 dependencies = [
  "argh",
  "ariadne",
- "codepages 0.1.0",
+ "codepages",
  "crossterm 0.29.0",
  "diff",
  "icy_board_engine",
@@ -7219,7 +7279,7 @@ name = "ppld"
 version = "0.2.1"
 dependencies = [
  "argh",
- "codepages 0.1.0",
+ "codepages",
  "crossterm 0.29.0",
  "icy_board_engine",
  "lazy_static",
@@ -7513,7 +7573,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -8512,7 +8572,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -8580,7 +8640,7 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -9281,7 +9341,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3d1e2c7f27f8d4cb10542a02c49005dbd6e93095799d6f3be745fae9f8fedd4"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -9427,7 +9487,7 @@ dependencies = [
  "cfg-if",
  "libc",
  "psm",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -9819,7 +9879,7 @@ dependencies = [
  "getrandom 0.4.3",
  "once_cell",
  "rustix 1.1.4",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -9841,7 +9901,7 @@ dependencies = [
  "parking_lot",
  "rustix 1.1.4",
  "signal-hook",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -10744,7 +10804,7 @@ checksum = "f2f6fb2847f6742cd76af783a2a2c49e9375d0a111c7bef6f71cd9e738c72d6e"
 dependencies = [
  "memoffset",
  "tempfile",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -11556,7 +11616,7 @@ dependencies = [
  "ndk-sys",
  "objc",
  "once_cell",
- "ordered-float 5.5.0",
+ "ordered-float 4.6.0",
  "parking_lot",
  "portable-atomic",
  "portable-atomic-util",
@@ -11585,6 +11645,15 @@ dependencies = [
  "log",
  "thiserror 2.0.20",
  "web-sys",
+]
+
+[[package]]
+name = "which"
+version = "8.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bae2f2b2b816647a1cab1acc91f5bd20812d53cb344382635ec2181940c8034f"
+dependencies = [
+ "libc",
 ]
 
 [[package]]
@@ -11625,7 +11694,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
