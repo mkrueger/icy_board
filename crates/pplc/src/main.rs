@@ -321,10 +321,14 @@ fn apply_arguments(workspace: &mut Workspace, arguments: &Cli) {
 }
 
 /// A source states which language it is written in, so it wins over the manifest and
-/// the command line. Two files may not disagree about it.
+/// the command line. Two files may not disagree about it. A library states this for
+/// itself, so only the package being built is asked.
 fn declared_language_version(workspace: &Workspace, encoding: Encoding) -> Res<Option<(PathBuf, u16)>> {
     let mut declared: Option<(PathBuf, u16)> = None;
     for src_file in workspace.files() {
+        if workspace.is_dependency_file(&src_file) {
+            continue;
+        }
         let Ok(src) = load_with_encoding(&src_file, encoding) else {
             continue;
         };

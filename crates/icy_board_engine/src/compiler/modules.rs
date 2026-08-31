@@ -44,6 +44,7 @@ pub fn lower_modules(asts: &[&Ast], errors: Arc<Mutex<ErrorReporter>>) -> Vec<As
 
     for (module_index, ast) in asts.iter().enumerate() {
         let Some(module) = &ast.module else { continue };
+        report_module_statements(ast, module.name(), &errors);
         let existing = catalog.get(module.name());
         if existing.is_some() && !(module.is_implicit() && existing.is_some_and(|info| info.implicit)) {
             errors.lock().unwrap().report_error_file(
@@ -195,6 +196,28 @@ impl AstVisitor<()> for TypeVisibilityValidator<'_> {
     fn visit_procedure_implementation(&mut self, procedure: &crate::ast::ProcedureImplementation) {
         self.validate_parameters(procedure.get_parameters());
         walk_procedure_implementation(self, procedure);
+    }
+}
+
+/// A module is a namespace, so anything it would run would land in the program of
+/// whoever imports it, at a place that source never asked for.
+fn report_module_statements(ast: &Ast, module: &Ascii<String>, errors: &Arc<Mutex<ErrorReporter>>) {
+    for node in &ast.nodes {
+        let span = match node {
+            AstNode::Main(block) => block
+                .get_begin_token()
+                .map(|token| token.span.clone())
+                .or_else(|| block.get_statements().first().map(Statement::get_span)),
+            AstNode::TopLevelStatement(Statement::VariableDeclaration(_) | Statement::ConstDeclaration(_) | Statement::Comment(_)) => None,
+            AstNode::TopLevelStatement(statement) => Some(statement.get_span()),
+            _ => None,
+        };
+        if let Some(span) = span {
+            errors
+                .lock()
+                .unwrap()
+                .report_error_file(ast.file_name.clone(), span, CompilationErrorType::StatementInModule(module.to_string()));
+        }
     }
 }
 
@@ -470,6 +493,26 @@ mod tests {
             !errors.lock().unwrap().errors.is_empty(),
             "module syntax must not be enabled before language 4.00"
         );
+    }
+
+    #[test]
+    fn a_module_may_not_run_statements_of_its_own() {
+        let errors = compile(&[("greeter.pps", "MODULE Greeter\nPRINTLN \"loaded\"\nENDMODULE\n")]);
+        let messages = errors.lock().unwrap().errors.iter().map(|error| error.error.to_string()).collect::<Vec<_>>();
+        assert!(
+            messages.iter().any(|message| message.contains("Module Greeter may only declare")),
+            "{messages:?}"
+        );
+    }
+
+    #[test]
+    fn a_module_may_declare_variables_and_constants() {
+        let errors = compile(&[
+            ("greeter.pps", "MODULE Greeter\nCONST INTEGER One = 1\nINTEGER count\nENDMODULE\n"),
+            ("main.pps", "IMPORT Greeter AS G\nPRINTLN G.One, G.count\n"),
+        ]);
+        let messages = errors.lock().unwrap().errors.iter().map(|error| error.error.to_string()).collect::<Vec<_>>();
+        assert!(messages.is_empty(), "declarations are not statements a module runs: {messages:?}");
     }
 
     #[test]

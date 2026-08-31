@@ -150,6 +150,10 @@ inside their own module but cannot be reached through an import. Module names,
 imports and visibility are removed while compiling; the result is still one
 self-contained PPE and the syntax itself adds no runtime requirement.
 
+A module declares; it has no program of its own. Variables, constants, types and
+routines are allowed, executable statements are not, because the module would
+otherwise run inside whichever program imports it.
+
 One source file defines at most one module. Module and alias names are single PPL
 identifiers. A package may contain ordinary application sources and module sources
 together.
@@ -195,9 +199,10 @@ This behaves as if the plain sources had been enclosed by `MODULE themes` and
 `ENDMODULE`; declarations from all plain source files form one namespace.
 `PUBLIC` and `PRIVATE` sections can be used without writing those delimiters.
 A library source that declares an explicit `MODULE` keeps that explicit module
-instead, allowing one package to provide additional named modules. Library
-packages should avoid top-level executable statements. Pin Git dependencies
-with `rev` when reproducible builds are required.
+instead, allowing one package to provide additional named modules. Because a
+library is a module, its sources declare rather than run, and a `;$LANGVERSION`
+a library states applies to that library alone. Pin Git dependencies with `rev`
+when reproducible builds are required.
 
 ### Routine documentation
 

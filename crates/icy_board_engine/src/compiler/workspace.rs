@@ -277,6 +277,11 @@ impl Dependency {
         if references > 1 {
             return Err(format!("Git dependency '{name}' may specify only one of rev, branch, or tag").into());
         }
+        // A manifest may itself come from a dependency, so nothing it states may reach Git as an option.
+        reject_git_option(name, "git", Some(git))?;
+        reject_git_option(name, "rev", self.rev.as_deref())?;
+        reject_git_option(name, "branch", self.branch.as_deref())?;
+        reject_git_option(name, "tag", self.tag.as_deref())?;
         let selector = self
             .rev
             .as_ref()
@@ -295,8 +300,13 @@ impl Dependency {
             if self.rev.is_none() && self.tag.is_none() {
                 let destination_name = destination.to_string_lossy().into_owned();
                 let reference = self.branch.as_deref().unwrap_or("HEAD");
-                run_git(["-C", destination_name.as_str(), "fetch", "--quiet", "--depth", "1", "origin", reference])?;
-                run_git(["-C", destination_name.as_str(), "checkout", "--quiet", "--detach", "FETCH_HEAD"])?;
+                // A moving branch is refreshed when it can be, but an unreachable remote
+                // must not stop a build that already has the package.
+                if let Err(err) = run_git(["-C", destination_name.as_str(), "fetch", "--quiet", "--depth", "1", "origin", reference])
+                    .and_then(|()| run_git(["-C", destination_name.as_str(), "checkout", "--quiet", "--detach", "FETCH_HEAD"]))
+                {
+                    log::warn!("Keeping the cached checkout of Git dependency '{name}': {err}");
+                }
             }
             return Ok(destination);
         }
@@ -340,6 +350,13 @@ impl Dependency {
     }
 }
 
+fn reject_git_option(name: &str, field: &str, value: Option<&str>) -> Res<()> {
+    match value {
+        Some(value) if value.starts_with('-') => Err(format!("Git dependency '{name}' has a {field} value that starts with '-'").into()),
+        _ => Ok(()),
+    }
+}
+
 fn run_git<I, S>(arguments: I) -> Res<()>
 where
     I: IntoIterator<Item = S>,
@@ -347,6 +364,8 @@ where
 {
     let output = Command::new("git")
         .args(arguments)
+        // A prompt would block the compiler and the language server forever.
+        .env("GIT_TERMINAL_PROMPT", "0")
         .output()
         .map_err(|err| format!("failed to run Git: {err}"))?;
     if output.status.success() {
@@ -482,6 +501,27 @@ mod tests {
         let library = &root.files()[1];
         assert!(root.is_dependency_file(library));
         assert!(library.starts_with(root.file_name.parent().unwrap().join("target/ppl-dependencies/git")));
+    }
+
+    #[test]
+    fn a_git_dependency_may_not_smuggle_options_into_git() {
+        let temp = tempfile::tempdir().unwrap();
+        let dependency = Dependency {
+            path: None,
+            git: Some("--upload-pack=touch /tmp/ppl-should-not-exist".to_string()),
+            rev: None,
+            branch: None,
+            tag: None,
+        };
+        let mut root = package(
+            &temp.path().join("application"),
+            "application",
+            BTreeMap::from([("hostile".to_string(), dependency)]),
+        );
+        fs::write(root.file_name.parent().unwrap().join("src/main.pps"), "PRINTLN \"hi\"\n").unwrap();
+
+        let message = root.resolve_dependencies().unwrap_err().to_string();
+        assert!(message.contains("starts with '-'"), "{message}");
     }
 
     #[test]
