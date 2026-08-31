@@ -538,7 +538,8 @@ impl AstVisitorMut for AstTransformationVisitor {
             function.get_return_rank(),
             function.get_statements().iter().map(|stmt| stmt.visit_mut(self)).collect(),
             function.get_endfunc_token().clone(),
-        ));
+        )
+        .with_documentation(function.get_documentation()));
 
         self.cur_function = None;
         self.local_constants = None;
@@ -562,7 +563,8 @@ impl AstVisitorMut for AstTransformationVisitor {
             procedure.get_rightpar_token().clone(),
             procedure.get_statements().iter().map(|stmt| stmt.visit_mut(self)).collect(),
             procedure.get_endproc_token().clone(),
-        ));
+        )
+        .with_documentation(procedure.get_documentation()));
         self.local_constants = None;
         self.local_bindings = None;
         res

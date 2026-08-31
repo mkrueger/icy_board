@@ -2,6 +2,8 @@ pub use ast_transform::*;
 use workspace::Workspace;
 pub mod ast_transform;
 mod enum_lowering;
+mod modules;
+pub use modules::lower_modules;
 pub mod optimizer;
 pub mod user_data;
 
@@ -50,6 +52,21 @@ pub enum CompilationErrorType {
 
     #[error("Function not found ({0})")]
     FunctionNotFound(String),
+
+    #[error("Module already defined ({0})")]
+    ModuleAlreadyDefined(String),
+
+    #[error("Module not found ({0})")]
+    ModuleNotFound(String),
+
+    #[error("Import alias already defined ({0})")]
+    ImportAliasAlreadyDefined(String),
+
+    #[error("Module {0} has no member named {1}")]
+    ModuleMemberNotFound(String, String),
+
+    #[error("{1} is private to module {0}")]
+    PrivateModuleMember(String, String),
 
     #[error("SORT arguments should be one (1) dimensional arrays ({0})")]
     SortArgumentDimensionError(u8),
@@ -240,6 +257,9 @@ impl PPECompiler {
     ///
     /// Panics if .
     pub fn compile(&mut self, asts: &[&Ast]) {
+        self.semantic_visitor.set_modules(asts);
+        let lowered = modules::lower_modules(asts, self.semantic_visitor.errors.clone());
+        let asts = lowered.iter().collect::<Vec<_>>();
         let mut visted = Vec::new();
         // One transformer for the whole package, so its generated labels stay unique across files.
         let mut transformer = AstTransformationVisitor::new(true, self.semantic_visitor.type_registry.enums());

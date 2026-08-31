@@ -1,5 +1,9 @@
 ; Scopes, definitions and references for PPL.
 
+(module_declaration) @local.scope
+(module_declaration name: (identifier) @local.definition.namespace)
+(import_declaration alias: (identifier) @local.definition.namespace)
+
 (function_definition) @local.scope
 (procedure_definition) @local.scope
 

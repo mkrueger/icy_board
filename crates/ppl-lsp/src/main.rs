@@ -11,7 +11,7 @@ use icy_board_engine::ast::{
     PredefinedCallStatement, ProcedureCallStatement, RecordLiteralExpression, walk_function_call_expression, walk_function_declaration,
     walk_function_implementation, walk_predefined_call_statement, walk_procedure_call_statement, walk_variable_declaration_statement,
 };
-use icy_board_engine::compiler::{CompilationErrorType, CompilationWarningType, workspace::CompilerData, workspace::Workspace};
+use icy_board_engine::compiler::{CompilationErrorType, CompilationWarningType, lower_modules, workspace::CompilerData, workspace::Workspace};
 use icy_board_engine::executable::{FUNCTION_DEFINITIONS, FunctionDefinition, FunctionSignature, LAST_PPL_LANGUAGE_VERSION, OpCode, VariableType};
 use icy_board_engine::formatting::FormattingVisitor;
 use icy_board_engine::icy_board::read_data_with_encoding_detection;
@@ -20,8 +20,8 @@ use icy_board_engine::parser::{
     Encoding, ErrorReporter, ParserErrorType, ParserWarningType, UserTypeRegistry, parse_ast_with_predeclared_types, preparse_type_declarations,
 };
 use icy_board_engine::semantic::{FunctionDeclaration, ReferenceType, SemanticVisitor};
-use ppl_lsp::completion::get_completion;
 use ppl_lsp::code_lens::get_code_lenses;
+use ppl_lsp::completion::get_completion;
 use ppl_lsp::document_symbol::get_document_symbols;
 use ppl_lsp::documentation::{get_const_hover, get_function_hover, get_keyword_hover, get_preprocessor_hover, get_statement_hover, get_type_hover_for_version};
 use ppl_lsp::formatting::VSCodeFormattingBackend;
@@ -122,7 +122,14 @@ impl LanguageServer for Backend {
 
                 completion_provider: Some(CompletionOptions {
                     resolve_provider: Some(false),
-                    trigger_characters: Some(vec![".".to_string(), "{".to_string(), "(".to_string(), ",".to_string(), "$".to_string(), "#".to_string()]),
+                    trigger_characters: Some(vec![
+                        ".".to_string(),
+                        "{".to_string(),
+                        "(".to_string(),
+                        ",".to_string(),
+                        "$".to_string(),
+                        "#".to_string(),
+                    ]),
                     work_done_progress_options: Default::default(),
                     all_commit_characters: None,
                     completion_item: None,
@@ -147,9 +154,7 @@ impl LanguageServer for Backend {
                 rename_provider: Some(OneOf::Left(true)),
                 document_symbol_provider: Some(OneOf::Left(true)),
                 document_highlight_provider: Some(OneOf::Left(true)),
-                code_lens_provider: Some(CodeLensOptions {
-                    resolve_provider: Some(false),
-                }),
+                code_lens_provider: Some(CodeLensOptions { resolve_provider: Some(false) }),
                 inlay_hint_provider: Some(OneOf::Left(true)),
                 code_action_provider: Some(CodeActionProviderCapability::Options(CodeActionOptions {
                     code_action_kinds: Some(vec![CodeActionKind::QUICKFIX, UPGRADE_ACTION_KIND]),
@@ -955,11 +960,16 @@ impl Backend {
                 asts.push(ast);
             }
 
-            let mut semantic_visitor = SemanticVisitor::new(&ws, errors, registry);
+            let mut semantic_visitor = SemanticVisitor::new(&ws, errors.clone(), registry);
+            semantic_visitor.set_modules(&asts.iter().collect::<Vec<_>>());
+            let lowered = lower_modules(&asts.iter().collect::<Vec<_>>(), errors);
             // A file the manifest no longer names must not linger from an earlier read.
             self.workspace_map.clear();
-            for ast in asts {
+            for ast in &lowered {
+                semantic_visitor.errors.lock().unwrap().set_file_name(&ast.file_name);
                 ast.visit(&mut semantic_visitor);
+            }
+            for ast in asts {
                 if let Ok(uri) = Url::from_file_path(&ast.file_name) {
                     self.workspace_map.insert(uri, ast);
                 }
@@ -1113,11 +1123,15 @@ impl Backend {
                     asts.push((cur_uri, ast));
                 }
 
-                let mut semantic_visitor = SemanticVisitor::new(&workspace, errors, registry);
+                let mut semantic_visitor = SemanticVisitor::new(&workspace, errors.clone(), registry);
                 let mut parsed = Vec::new();
-                for (cur_uri, ast) in asts {
+                semantic_visitor.set_modules(&asts.iter().map(|(_, ast)| ast).collect::<Vec<_>>());
+                let lowered = lower_modules(&asts.iter().map(|(_, ast)| ast).collect::<Vec<_>>(), errors);
+                for ast in &lowered {
                     semantic_visitor.errors.lock().unwrap().set_file_name(&ast.file_name);
                     ast.visit(&mut semantic_visitor);
+                }
+                for (cur_uri, ast) in asts {
                     parsed.push((cur_uri, ast));
                 }
                 semantic_visitor.finish();
@@ -1143,8 +1157,10 @@ impl Backend {
             preparse_type_declarations(path.clone(), errors.clone(), &params.text, &registry, Encoding::Utf8, &workspace);
             let ast = parse_ast_with_predeclared_types(path, errors.clone(), &params.text, &registry, Encoding::Utf8, &workspace);
 
-            let mut semantic_visitor = SemanticVisitor::new(&workspace, errors, registry);
-            ast.visit(&mut semantic_visitor);
+            let mut semantic_visitor = SemanticVisitor::new(&workspace, errors.clone(), registry);
+            semantic_visitor.set_modules(&[&ast]);
+            let lowered = lower_modules(&[&ast], errors);
+            lowered[0].visit(&mut semantic_visitor);
             semantic_visitor.finish();
 
             if !self.is_current(uri, params.version) {

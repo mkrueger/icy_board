@@ -187,6 +187,7 @@ Comments
 
 ; a semicolon comment
 ' an apostrophe comment
+;;; routine documentation
 PRINTLN "x" ; trailing
 
 --------------------------------------------------------------------------------
@@ -194,6 +195,7 @@ PRINTLN "x" ; trailing
 (source_file
   (comment)
   (comment)
+  (doc_comment)
   (predefined_call
     name: (builtin_statement)
     argument: (constant

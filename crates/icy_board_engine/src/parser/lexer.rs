@@ -426,6 +426,7 @@ fn elseif_directive_len(upper: &str) -> Option<usize> {
     directive_len(upper, "$ELSEIF").or_else(|| directive_len(upper, "$ELIF"))
 }
 
+#[derive(Clone)]
 pub struct Lexer {
     lookup_table: &'static HashMap<unicase::Ascii<String>, Token>,
     define_table: HashMap<unicase::Ascii<String>, Constant>,

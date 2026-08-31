@@ -10,6 +10,17 @@ releases.
 
 ### Added
 
+- PPL 4.00 adds compile-time `MODULE ... ENDMODULE` namespaces. Declarations
+  are public by default, standalone `PUBLIC` and `PRIVATE` lines switch section
+  visibility, and `IMPORT module AS alias` provides qualified access without
+  changing the PPE runtime format. The compiler isolates equal declaration and
+  type names across modules, and the language server highlights and completes
+  imported public APIs.
+
+- PPL 4.00 functions, procedures and `DECLARE` statements support Rust-style
+  Markdown documentation through contiguous `;;;` comments. The language
+  server shows the documentation in hover, completion and signature help.
+
 - PPL 4.00 adds compiled `REGEX`, `REGEXMATCH` and `REGEXMATCHES` objects for
   Unicode-aware matching, numbered and named captures, bounded collection,
   replacement and transactional splitting. `RegexOptions` controls matching,

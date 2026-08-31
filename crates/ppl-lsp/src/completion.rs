@@ -4,15 +4,15 @@ use icy_board_engine::{
     ast::{Ast, AstVisitor, IdentifierExpression, PredefinedCallStatement, constant::BUILTIN_CONSTS, walk_predefined_call_statement},
     executable::{FUNCTION_DEFINITIONS, STATEMENT_DEFINITIONS, StatementSignature},
     parser::{FIRST_BOARD_OBJECT_LANGUAGE_VERSION, built_in_type_names, lexer::KEYWORDS},
-    semantic::{ReferenceType, SemanticVisitor},
+    semantic::{ModuleSymbolKind, ReferenceType, SemanticVisitor},
 };
 use tower_lsp::lsp_types::{CompletionItem, CompletionItemKind, Documentation, HoverContents, InsertTextFormat, MarkupContent, MarkupKind};
 
 use crate::{
     context::{CursorContext, call_context, cursor_context},
     documentation::{
-        get_const_hover, get_function_hover, get_keyword_hover, get_member_documentation, get_member_documentation_with_parameters,
-        get_preprocessor_hover, get_statement_hover, get_string_member_documentation, get_type_hover,
+        get_const_hover, get_function_hover, get_keyword_hover, get_member_documentation, get_member_documentation_with_parameters, get_preprocessor_hover,
+        get_statement_hover, get_string_member_documentation, get_type_hover,
     },
     type_lookup::{MemberKind, bytes_members, members_of, record_field_type_name, static_members_of, static_type_of_name, string_members, type_of_chain},
 };
@@ -24,7 +24,15 @@ pub enum ImCompleteCompletionItem {
 
 /// Words the parser reads by name instead of as a token, with the version that gave
 /// them their meaning. EXIT is the statement END used to be.
-const CONTEXTUAL_WORDS: &[(&str, u16)] = &[("EXIT", 400)];
+const CONTEXTUAL_WORDS: &[(&str, u16)] = &[
+    ("EXIT", 400),
+    ("MODULE", 400),
+    ("ENDMODULE", 400),
+    ("IMPORT", 400),
+    ("AS", 400),
+    ("PUBLIC", 400),
+    ("PRIVATE", 400),
+];
 
 const PREPROCESSOR_DIRECTIVES: &[&str] = &["LANGVERSION", "DEFINE", "IF", "ELSEIF", "ELIF", "ELSE", "ENDIF", "USEFUNCS"];
 const PREPROCESSOR_VARIABLES: &[&str] = &["VERSION", "RUNTIME", "LANGVERSION"];
@@ -70,7 +78,12 @@ pub fn get_completion(ast: &Ast, semantic_visitor: &SemanticVisitor, line_before
     }
     match cursor_context(line_before_cursor) {
         CursorContext::Nothing => return Vec::new(),
-        CursorContext::Member(path) => return member_completion(semantic_visitor, &path, ast.language_version),
+        CursorContext::Member(path) => {
+            if let Some(items) = module_member_completion(ast, semantic_visitor, &path) {
+                return items;
+            }
+            return member_completion(semantic_visitor, &path, ast.language_version);
+        }
         CursorContext::RecordLiteralField { type_name, named_fields } => {
             return record_literal_completion(semantic_visitor, &type_name, &named_fields);
         }
@@ -113,8 +126,7 @@ pub fn get_completion(ast: &Ast, semantic_visitor: &SemanticVisitor, line_before
                 label: stmt.to_string(),
                 insert_text: Some(stmt.to_string()),
                 kind: Some(tower_lsp::lsp_types::CompletionItemKind::CLASS),
-                tags: (ast.language_version >= 400 && stmt.eq_ignore_ascii_case("BIGSTR"))
-                    .then_some(vec![tower_lsp::lsp_types::CompletionItemTag::DEPRECATED]),
+                tags: (ast.language_version >= 400 && stmt.eq_ignore_ascii_case("BIGSTR")).then_some(vec![tower_lsp::lsp_types::CompletionItemTag::DEPRECATED]),
                 insert_text_format: Some(tower_lsp::lsp_types::InsertTextFormat::PLAIN_TEXT),
                 ..Default::default()
             });
@@ -172,6 +184,7 @@ pub fn get_completion(ast: &Ast, semantic_visitor: &SemanticVisitor, line_before
                     insert_text: Some(decl.token.to_string()),
                     kind: Some(tower_lsp::lsp_types::CompletionItemKind::METHOD),
                     insert_text_format: Some(tower_lsp::lsp_types::InsertTextFormat::PLAIN_TEXT),
+                    documentation: routine_documentation(semantic_visitor, &decl.token),
                     ..Default::default()
                 });
             }
@@ -201,6 +214,7 @@ pub fn get_completion(ast: &Ast, semantic_visitor: &SemanticVisitor, line_before
                     insert_text: Some(decl.token.to_string()),
                     kind: Some(tower_lsp::lsp_types::CompletionItemKind::FUNCTION),
                     insert_text_format: Some(tower_lsp::lsp_types::InsertTextFormat::PLAIN_TEXT),
+                    documentation: routine_documentation(semantic_visitor, &decl.token),
                     ..Default::default()
                 });
             }
@@ -224,6 +238,51 @@ pub fn get_completion(ast: &Ast, semantic_visitor: &SemanticVisitor, line_before
     }
 
     map.items
+}
+
+fn module_member_completion(ast: &Ast, visitor: &SemanticVisitor, path: &[String]) -> Option<Vec<CompletionItem>> {
+    if path.len() != 1 {
+        return None;
+    }
+    let import = ast.imports.iter().find(|import| import.alias().eq_ignore_ascii_case(&path[0]))?;
+    let exports = visitor.module_exports.get(import.module_name())?;
+    Some(
+        exports
+            .iter()
+            .map(|export| {
+                let kind = match export.kind {
+                    ModuleSymbolKind::Function => CompletionItemKind::FUNCTION,
+                    ModuleSymbolKind::Procedure => CompletionItemKind::METHOD,
+                    ModuleSymbolKind::Type => CompletionItemKind::STRUCT,
+                    ModuleSymbolKind::Enum => CompletionItemKind::ENUM,
+                    ModuleSymbolKind::Variable => CompletionItemKind::VARIABLE,
+                    ModuleSymbolKind::Constant => CompletionItemKind::CONSTANT,
+                };
+                CompletionItem {
+                    label: export.name.clone(),
+                    insert_text: Some(export.name.clone()),
+                    kind: Some(kind),
+                    insert_text_format: Some(InsertTextFormat::PLAIN_TEXT),
+                    ..Default::default()
+                }
+            })
+            .collect(),
+    )
+}
+
+fn routine_documentation(visitor: &SemanticVisitor, name: &str) -> Option<Documentation> {
+    let documentation = visitor
+        .function_containers
+        .iter()
+        .find(|container| container.name.eq_ignore_ascii_case(name))
+        .and_then(|container| match &container.functions {
+            icy_board_engine::semantic::FunctionDeclaration::Function(function) => function.get_documentation(),
+            icy_board_engine::semantic::FunctionDeclaration::Procedure(procedure) => procedure.get_documentation(),
+        })?;
+    Some(Documentation::MarkupContent(MarkupContent {
+        kind: MarkupKind::Markdown,
+        value: documentation.to_string(),
+    }))
 }
 
 fn hover_documentation(hover: Option<tower_lsp::lsp_types::Hover>) -> Option<Documentation> {
@@ -374,9 +433,7 @@ fn completion_items(
         .filter(|member| !member.name.starts_with('<'))
         .map(|member| CompletionItem {
             documentation: receiver_type
-                .and_then(|var_type| {
-                    get_member_documentation_with_parameters(registry, var_type, &unicase::Ascii::new(member.name.clone()))
-                })
+                .and_then(|var_type| get_member_documentation_with_parameters(registry, var_type, &unicase::Ascii::new(member.name.clone())))
                 .or_else(|| get_string_member_documentation(&member.name))
                 .map(|value| {
                     Documentation::MarkupContent(MarkupContent {

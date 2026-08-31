@@ -6,8 +6,8 @@ use icy_board_engine::{
     executable::VariableType,
     semantic::{ReferenceType, SemanticVisitor},
 };
-use tower_lsp::lsp_types::{Hover, HoverContents, MarkupContent, MarkupKind};
 use std::fmt::Write as _;
+use tower_lsp::lsp_types::{Hover, HoverContents, MarkupContent, MarkupKind};
 
 use crate::{
     documentation::get_member_documentation_with_parameters,
@@ -53,7 +53,18 @@ pub fn get_user_hover(ast: &Ast, visitor: &SemanticVisitor, offset: usize) -> Op
             .or_else(|| reference.usages.first().map(|(_, usage)| usage.token.clone()))?;
 
         return match reference_type {
-            ReferenceType::Function(_) | ReferenceType::Procedure(_) => Some(hover(routine_signature(visitor, &name)?)),
+            ReferenceType::Function(_) | ReferenceType::Procedure(_) => {
+                let documentation = visitor
+                    .function_containers
+                    .iter()
+                    .find(|container| container.name.eq_ignore_ascii_case(&name))
+                    .and_then(|container| match &container.functions {
+                        icy_board_engine::semantic::FunctionDeclaration::Function(function) => function.get_documentation(),
+                        icy_board_engine::semantic::FunctionDeclaration::Procedure(procedure) => procedure.get_documentation(),
+                    })
+                    .map(str::to_owned);
+                Some(documented_hover(routine_signature(visitor, &name)?, documentation))
+            }
             ReferenceType::Label(_) => Some(hover(format!(":{}", name.trim_start_matches(':')))),
             ReferenceType::Variable(_) => {
                 let mut text = format!("{} {}", type_name(&visitor.type_registry, reference.variable_type), name);

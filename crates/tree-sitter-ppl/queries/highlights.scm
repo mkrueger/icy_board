@@ -6,6 +6,7 @@
 
 ; ---------- Comments ----------
 (comment) @comment @comment.line
+(doc_comment) @comment.documentation @comment.line
 
 ; ---------- Literals ----------
 (string_literal) @string
@@ -20,6 +21,9 @@
 (type_identifier) @type
 
 ; ---------- Declarations ----------
+(module_declaration name: (identifier) @namespace)
+(import_declaration module: (identifier) @namespace)
+(import_declaration alias: (identifier) @namespace)
 (type_declaration name: (identifier) @type)
 (enum_declaration name: (identifier) @type)
 (enum_variant name: (identifier) @constant)
@@ -116,6 +120,12 @@
 ] @keyword.function
 
 [
+  "MODULE"
+  "ENDMODULE"
+  "IMPORT"
+  "AS"
+  "PUBLIC"
+  "PRIVATE"
   "TYPE"
   "ENDTYPE"
   "ENUM"

@@ -487,6 +487,7 @@ impl fmt::Display for VariableDeclarationStatement {
 }
 #[derive(Debug, PartialEq, Clone)]
 pub struct ProcedureDeclarationAstNode {
+    documentation: Option<String>,
     declare_token: Spanned<Token>,
     procedure_token: Spanned<Token>,
     identifier_token: Spanned<Token>,
@@ -505,6 +506,7 @@ impl ProcedureDeclarationAstNode {
         rightpar_token: Spanned<Token>,
     ) -> Self {
         Self {
+            documentation: None,
             declare_token,
             procedure_token,
             identifier_token,
@@ -516,6 +518,7 @@ impl ProcedureDeclarationAstNode {
 
     pub fn empty(identifier: unicase::Ascii<String>, parameters: Vec<ParameterSpecifier>) -> Self {
         Self {
+            documentation: None,
             declare_token: Spanned::create_empty(Token::Declare),
             procedure_token: Spanned::create_empty(Token::Procedure),
             identifier_token: Spanned::create_empty(Token::Identifier(identifier)),
@@ -524,6 +527,19 @@ impl ProcedureDeclarationAstNode {
             rightpar_token: Spanned::create_empty(Token::RPar),
         }
     }
+    pub fn get_documentation(&self) -> Option<&str> {
+        self.documentation.as_deref()
+    }
+
+    pub fn set_documentation(&mut self, documentation: String) {
+        self.documentation = Some(documentation);
+    }
+
+    pub fn with_documentation(mut self, documentation: Option<&str>) -> Self {
+        self.documentation = documentation.map(str::to_owned);
+        self
+    }
+
     pub fn get_declare_token(&self) -> &Spanned<Token> {
         &self.declare_token
     }
@@ -587,6 +603,7 @@ impl ProcedureDeclarationAstNode {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct FunctionDeclarationAstNode {
+    documentation: Option<String>,
     declare_token: Spanned<Token>,
     function_token: Spanned<Token>,
     identifier_token: Spanned<Token>,
@@ -612,6 +629,7 @@ impl FunctionDeclarationAstNode {
         return_rank: u8,
     ) -> Self {
         Self {
+            documentation: None,
             declare_token,
             function_token,
             identifier_token,
@@ -626,6 +644,7 @@ impl FunctionDeclarationAstNode {
 
     pub fn empty(identifier: unicase::Ascii<String>, parameters: Vec<ParameterSpecifier>, return_type: VariableType) -> Self {
         Self {
+            documentation: None,
             declare_token: Spanned::create_empty(Token::Declare),
             function_token: Spanned::create_empty(Token::Function),
             identifier_token: Spanned::create_empty(Token::Identifier(identifier)),
@@ -637,6 +656,19 @@ impl FunctionDeclarationAstNode {
             return_rank: 0,
         }
     }
+    pub fn get_documentation(&self) -> Option<&str> {
+        self.documentation.as_deref()
+    }
+
+    pub fn set_documentation(&mut self, documentation: String) {
+        self.documentation = Some(documentation);
+    }
+
+    pub fn with_documentation(mut self, documentation: Option<&str>) -> Self {
+        self.documentation = documentation.map(str::to_owned);
+        self
+    }
+
     pub fn get_declare_token(&self) -> &Spanned<Token> {
         &self.declare_token
     }

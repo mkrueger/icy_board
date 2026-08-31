@@ -1,11 +1,79 @@
 use super::{AstNode, AstVisitor, AstVisitorMut};
 use crate::executable::LAST_PPL_LANGUAGE_VERSION;
+use crate::parser::lexer::{Spanned, Token};
 use std::{fmt, path::PathBuf};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Visibility {
+    Public,
+    Private,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct VisibilitySection {
+    pub token: Spanned<Token>,
+    pub visibility: Visibility,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ImportDeclaration {
+    pub import_token: Spanned<Token>,
+    pub module_token: Spanned<Token>,
+    pub as_token: Spanned<Token>,
+    pub alias_token: Spanned<Token>,
+}
+
+impl ImportDeclaration {
+    pub fn module_name(&self) -> &unicase::Ascii<String> {
+        match &self.module_token.token {
+            Token::Identifier(name) => name,
+            _ => unreachable!("an import module is always an identifier"),
+        }
+    }
+
+    pub fn alias(&self) -> &unicase::Ascii<String> {
+        match &self.alias_token.token {
+            Token::Identifier(name) => name,
+            _ => unreachable!("an import alias is always an identifier"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ModuleDeclaration {
+    pub module_token: Spanned<Token>,
+    pub name_token: Spanned<Token>,
+    pub endmodule_token: Spanned<Token>,
+    pub visibility_sections: Vec<VisibilitySection>,
+}
+
+impl ModuleDeclaration {
+    pub fn name(&self) -> &unicase::Ascii<String> {
+        match &self.name_token.token {
+            Token::Identifier(name) => name,
+            _ => unreachable!("a module name is always an identifier"),
+        }
+    }
+
+    pub fn visibility_at(&self, offset: usize) -> Visibility {
+        self.visibility_sections
+            .iter()
+            .take_while(|section| section.token.span.start < offset)
+            .last()
+            .map_or(Visibility::Public, |section| section.visibility)
+    }
+}
 
 #[derive(Debug)]
 pub struct Ast {
     pub nodes: Vec<AstNode>,
     pub file_name: PathBuf,
+
+    /// A source may wrap its declarations in one compile-time namespace.
+    pub module: Option<ModuleDeclaration>,
+
+    /// Imports are source-local aliases and never reach the PPE.
+    pub imports: Vec<ImportDeclaration>,
 
     /// The language the file was read as, `;$LANGVERSION` included.
     pub language_version: u16,
@@ -18,6 +86,8 @@ impl Ast {
         Ast {
             nodes: vec![],
             file_name: PathBuf::new(),
+            module: None,
+            imports: Vec::new(),
             language_version: LAST_PPL_LANGUAGE_VERSION,
             require_user_variables: false,
         }

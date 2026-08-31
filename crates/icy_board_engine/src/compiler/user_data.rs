@@ -32,13 +32,7 @@ pub trait UserDataMemberRegistry {
 
     fn set_parameter_names(&mut self, name: &unicase::Ascii<String>, names: Vec<String>);
 
-    fn add_named_function_with(
-        &mut self,
-        name: unicase::Ascii<String>,
-        parameters: Vec<(&str, VariableType)>,
-        required: usize,
-        return_type: VariableType,
-    ) {
+    fn add_named_function_with(&mut self, name: unicase::Ascii<String>, parameters: Vec<(&str, VariableType)>, required: usize, return_type: VariableType) {
         let (names, types) = split_named_parameters(parameters);
         self.add_function_with(name.clone(), types, required, return_type);
         self.set_parameter_names(&name, names);

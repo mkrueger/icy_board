@@ -48,6 +48,13 @@ END
     assert_eq!(format(Path::new("indexed_assignments.pps"), source), source);
 }
 
+#[test]
+fn modules_format_as_nested_declaration_blocks() {
+    let source = "MODULE Example\nPROCEDURE PublicCall()\nPRINTLN \"public\"\nENDPROC\nPRIVATE\nINTEGER state\nENDMODULE\n";
+    let expected = "MODULE Example\n    PROCEDURE PublicCall()\n        PRINTLN \"public\"\n    ENDPROC\n    PRIVATE\n    INTEGER state\nENDMODULE\n";
+    assert_eq!(format(Path::new("module.pps"), source), expected);
+}
+
 fn collect_sources(dir: &Path, out: &mut Vec<PathBuf>) {
     let Ok(entries) = fs::read_dir(dir) else {
         return;

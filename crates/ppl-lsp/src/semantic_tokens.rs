@@ -37,6 +37,7 @@ const PROPERTY: u32 = 10;
 const LABEL: u32 = 11;
 const CONSTANT: u32 = 12;
 const DIRECTIVE: u32 = 13;
+const NAMESPACE: u32 = 14;
 
 const DECLARATION: u32 = 1 << 0;
 const DEFINITION: u32 = 1 << 1;
@@ -58,6 +59,7 @@ pub fn legend_types() -> Vec<SemanticTokenType> {
         SemanticTokenType::new("label"),
         SemanticTokenType::new("constant"),
         SemanticTokenType::new("directive"),
+        SemanticTokenType::NAMESPACE,
     ]
 }
 
@@ -92,6 +94,7 @@ fn insert(tokens: &mut BTreeMap<usize, RawToken>, span: &std::ops::Range<usize>,
 pub fn get_semantic_tokens(ast: &Ast, visitor: &SemanticVisitor, rope: &Rope, source: &str, workspace: &Workspace) -> Vec<SemanticToken> {
     let mut raw = lexical_tokens(ast, source, workspace);
     preprocessor_tokens(source, &mut raw);
+    module_tokens(ast, &mut raw);
     let parameter_spans = parameter_spans(ast);
     reference_tokens(ast, visitor, &parameter_spans, &mut raw);
 
@@ -99,6 +102,23 @@ pub fn get_semantic_tokens(ast: &Ast, visitor: &SemanticVisitor, rope: &Rope, so
     ast.visit(&mut collector);
 
     encode(raw, rope)
+}
+
+fn module_tokens(ast: &Ast, tokens: &mut BTreeMap<usize, RawToken>) {
+    if let Some(module) = &ast.module {
+        insert(tokens, &module.module_token.span, KEYWORD, 0);
+        insert(tokens, &module.name_token.span, NAMESPACE, DECLARATION);
+        insert(tokens, &module.endmodule_token.span, KEYWORD, 0);
+        for section in &module.visibility_sections {
+            insert(tokens, &section.token.span, KEYWORD, 0);
+        }
+    }
+    for import in &ast.imports {
+        insert(tokens, &import.import_token.span, KEYWORD, 0);
+        insert(tokens, &import.module_token.span, NAMESPACE, 0);
+        insert(tokens, &import.as_token.span, KEYWORD, 0);
+        insert(tokens, &import.alias_token.span, NAMESPACE, DECLARATION);
+    }
 }
 
 fn preprocessor_tokens(source: &str, tokens: &mut BTreeMap<usize, RawToken>) {
@@ -163,9 +183,7 @@ fn highlight_preprocessor_names(tokens: &mut BTreeMap<usize, RawToken>, text: &s
         let is_name = !quoted && (ch.is_ascii_alphanumeric() || ch == '_');
         if is_name && start.is_none() && (ch.is_ascii_alphabetic() || ch == '_') {
             start = Some(byte);
-        } else if !is_name
-            && let Some(name_start) = start.take()
-        {
+        } else if !is_name && let Some(name_start) = start.take() {
             let name = &text[name_start..byte];
             if !matches!(name.to_ascii_uppercase().as_str(), "AND" | "OR" | "NOT" | "TRUE" | "FALSE") {
                 let start = text_start + text[..name_start].chars().count();

@@ -144,5 +144,11 @@ pub fn get_document_symbols(ast: &Ast, rope: &Rope) -> Vec<DocumentSymbol> {
         }
     }
 
-    symbols
+    let Some(module) = &ast.module else { return symbols };
+    let full = range(rope, &(module.module_token.span.start..module.endmodule_token.span.end));
+    let selection = range(rope, &module.name_token.span);
+    match (full, selection) {
+        (Some(full), Some(selection)) => vec![symbol(module.name().to_string(), None, SymbolKind::NAMESPACE, full, selection, symbols)],
+        _ => symbols,
+    }
 }

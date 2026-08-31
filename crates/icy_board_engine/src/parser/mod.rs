@@ -8,8 +8,9 @@ use std::{
 use crate::{
     ast::{
         Ast, AstNode, BlockStatement, CommentAstNode, Constant, DimensionSpecifier, EnumDeclarationAstNode, EnumVariantSpecifier, FunctionDeclarationAstNode,
-        FunctionImplementation, FunctionParameterSpecifier, ParameterSpecifier, ProcedureDeclarationAstNode, ProcedureImplementation,
-        ProcedureParameterSpecifier, Statement, TypeDeclarationAstNode, TypeFieldSpecifier, VariableParameterSpecifier, VariableSpecifier, const_value,
+        FunctionImplementation, FunctionParameterSpecifier, ImportDeclaration, ModuleDeclaration, ParameterSpecifier, ProcedureDeclarationAstNode,
+        ProcedureImplementation, ProcedureParameterSpecifier, Statement, TypeDeclarationAstNode, TypeFieldSpecifier, VariableParameterSpecifier,
+        VariableSpecifier, Visibility, VisibilitySection, const_value,
     },
     compiler::{
         user_data::{UserData, UserDataRegistry},
@@ -19,7 +20,7 @@ use crate::{
     icy_board::{conferences::Conference, doors::Door, file_directory::FileDirectory, message_area::MessageArea},
 };
 
-use self::lexer::{Lexer, Spanned, Token};
+use self::lexer::{CommentType, Lexer, Spanned, Token};
 use codepages::tables::CP437_TO_UNICODE;
 use thiserror::Error;
 use unicase::Ascii;
@@ -177,6 +178,21 @@ pub enum ParserErrorType {
 
     #[error("'ENDENUM' expected before the end of the file")]
     EndEnumExpected,
+
+    #[error("'ENDMODULE' expected before the end of the file")]
+    EndModuleExpected,
+
+    #[error("MODULE expects a name")]
+    ModuleNameExpected,
+
+    #[error("Only one MODULE is allowed in a source file")]
+    ModuleAlreadyDefined,
+
+    #[error("{0} is only valid directly inside a MODULE")]
+    VisibilityOutsideModule(String),
+
+    #[error("IMPORT expects 'AS' and a local alias")]
+    InvalidImport,
 
     #[error("An enum needs at least one member")]
     EnumNeedsAMember,
@@ -354,6 +370,10 @@ pub fn is_user_declared_type(id: u8) -> bool {
 }
 
 impl UserTypeRegistry {
+    pub fn module_type_name(module: &unicase::Ascii<String>, name: &unicase::Ascii<String>) -> unicase::Ascii<String> {
+        unicase::Ascii::new(format!("__T_{}_{}", module.as_str(), name.as_str()))
+    }
+
     pub fn icy_board_registry() -> Self {
         let mut reg = UserTypeRegistry::default();
         reg.register_builtin_enums();
@@ -409,6 +429,12 @@ impl UserTypeRegistry {
         self.get_user_type(identifier)
             .map(|def| VariableType::UserData(def.id as u8))
             .or_else(|| self.get_enum(identifier).map(|def| VariableType::UserData(def.id)))
+    }
+
+    pub fn get_module_declared_type(&self, module: Option<&unicase::Ascii<String>>, identifier: &unicase::Ascii<String>) -> Option<VariableType> {
+        module
+            .and_then(|module| self.get_declared_type(&Self::module_type_name(module, identifier)))
+            .or_else(|| self.get_declared_type(identifier))
     }
 
     /// The record declared under `identifier`, if the program declared one.
@@ -657,6 +683,9 @@ pub struct Parser<'a> {
     got_funcs: bool,
     in_function: bool,
     types_predeclared: bool,
+    module: Option<ModuleDeclaration>,
+    imports: Vec<ImportDeclaration>,
+    in_module: bool,
 }
 static PROC_TOKEN: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("PROC".to_string()));
 static FUNC_TOKEN: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("FUNC".to_string()));
@@ -664,6 +693,15 @@ static ON_TOKEN: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLo
 static ERROR_TOKEN: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("ERROR".to_string()));
 
 impl<'a> Parser<'a> {
+    fn current_module_name(&self) -> Option<&unicase::Ascii<String>> {
+        self.module.as_ref().map(ModuleDeclaration::name)
+    }
+
+    fn declared_type_name(&self, name: &unicase::Ascii<String>) -> unicase::Ascii<String> {
+        self.current_module_name()
+            .map_or_else(|| name.clone(), |module| UserTypeRegistry::module_type_name(module, name))
+    }
+
     pub fn new(
         file: PathBuf,
         error_reporter: Arc<Mutex<ErrorReporter>>,
@@ -689,6 +727,9 @@ impl<'a> Parser<'a> {
             got_funcs: false,
             in_function: false,
             types_predeclared: false,
+            module: None,
+            imports: Vec::new(),
+            in_module: false,
         }
     }
 
@@ -822,8 +863,44 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn peek_after_current(&mut self, count: usize) -> Vec<Option<Token>> {
+        let lex = self.lex.clone();
+        let cur_token = self.cur_token.clone();
+        let lookahead_token = self.lookahead_token.clone();
+        let result = (0..count).map(|_| self.next_token().map(|token| token.token)).collect();
+        self.lex = lex;
+        self.cur_token = cur_token;
+        self.lookahead_token = lookahead_token;
+        result
+    }
+
     fn parse_ast_node(&mut self) -> Option<AstNode> {
-        let cur_token = self.cur_token.as_ref()?;
+        let cur_token = self.cur_token.clone()?;
+        if self.lang_version >= 400
+            && let Token::Identifier(keyword) = &cur_token.token
+        {
+            if keyword.eq_ignore_ascii_case("MODULE") && matches!(self.peek_after_current(1).as_slice(), [Some(Token::Identifier(_))]) {
+                self.parse_module_start();
+                return None;
+            }
+            if keyword.eq_ignore_ascii_case("ENDMODULE") && matches!(self.peek_after_current(1).as_slice(), [Some(Token::Eol | Token::Comment(_, _)) | None]) {
+                self.parse_module_end();
+                return None;
+            }
+            if keyword.eq_ignore_ascii_case("IMPORT")
+                && matches!(self.peek_after_current(2).as_slice(), [Some(Token::Identifier(_)), Some(Token::Identifier(as_name))] if as_name.eq_ignore_ascii_case("AS"))
+            {
+                self.parse_import();
+                return None;
+            }
+            if self.in_module
+                && (keyword.eq_ignore_ascii_case("PUBLIC") || keyword.eq_ignore_ascii_case("PRIVATE"))
+                && matches!(self.peek_after_current(1).as_slice(), [Some(Token::Eol | Token::Comment(_, _)) | None])
+            {
+                self.parse_visibility_section(keyword.eq_ignore_ascii_case("PUBLIC"));
+                return None;
+            }
+        }
         match cur_token.token {
             Token::Eol => {
                 self.next_token();
@@ -920,7 +997,7 @@ impl<'a> Parser<'a> {
                         self.report_error(self.lex.span(), ParserErrorType::NoStatementsAllowedOutsideBlock);
                         return None;
                     }
-                    if self.got_funcs && !self.use_funcs {
+                    if self.got_funcs && !self.use_funcs && !self.in_module {
                         if matches!(stmt, Statement::Comment(_)) {
                             return Some(AstNode::TopLevelStatement(stmt));
                         }
@@ -947,6 +1024,97 @@ impl<'a> Parser<'a> {
         None
     }
 
+    fn parse_module_start(&mut self) {
+        let module_token = self.save_spanned_token();
+        if self.module.is_some() {
+            self.report_error(module_token.span, ParserErrorType::ModuleAlreadyDefined);
+            return;
+        }
+        self.next_token();
+        let Some(Token::Identifier(_)) = self.get_cur_token() else {
+            self.report_error(self.save_token_span(), ParserErrorType::ModuleNameExpected);
+            return;
+        };
+        let name_token = self.save_spanned_token();
+        self.next_token();
+        self.check_eol();
+        self.module = Some(ModuleDeclaration {
+            module_token,
+            name_token,
+            endmodule_token: Spanned::new(Token::Identifier(Ascii::new("ENDMODULE".to_string())), 0..0),
+            visibility_sections: Vec::new(),
+        });
+        self.in_module = true;
+    }
+
+    fn parse_module_end(&mut self) {
+        let token = self.save_spanned_token();
+        if !self.in_module {
+            self.report_error(token.span, ParserErrorType::EndModuleExpected);
+            return;
+        }
+        if let Some(module) = &mut self.module {
+            module.endmodule_token = token;
+        }
+        self.in_module = false;
+        self.next_token();
+        self.check_eol();
+    }
+
+    fn parse_visibility_section(&mut self, public: bool) {
+        let token = self.save_spanned_token();
+        if !self.in_module {
+            self.report_error(
+                token.span,
+                ParserErrorType::VisibilityOutsideModule(if public { "PUBLIC" } else { "PRIVATE" }.to_string()),
+            );
+            return;
+        }
+        self.next_token();
+        if !self.check_eol() {
+            return;
+        }
+        self.module.as_mut().unwrap().visibility_sections.push(VisibilitySection {
+            token,
+            visibility: if public { Visibility::Public } else { Visibility::Private },
+        });
+    }
+
+    fn parse_import(&mut self) {
+        let import_token = self.save_spanned_token();
+        self.next_token();
+        let Some(Token::Identifier(_)) = self.get_cur_token() else {
+            self.report_error(self.save_token_span(), ParserErrorType::InvalidImport);
+            return;
+        };
+        let module_token = self.save_spanned_token();
+        self.next_token();
+        let Some(Token::Identifier(as_name)) = self.get_cur_token() else {
+            self.report_error(self.save_token_span(), ParserErrorType::InvalidImport);
+            return;
+        };
+        if !as_name.eq_ignore_ascii_case("AS") {
+            self.report_error(self.save_token_span(), ParserErrorType::InvalidImport);
+            return;
+        }
+        let as_token = self.save_spanned_token();
+        self.next_token();
+        let Some(Token::Identifier(_)) = self.get_cur_token() else {
+            self.report_error(self.save_token_span(), ParserErrorType::InvalidImport);
+            return;
+        };
+        let alias_token = self.save_spanned_token();
+        self.next_token();
+        if self.check_eol() {
+            self.imports.push(ImportDeclaration {
+                import_token,
+                module_token,
+                as_token,
+                alias_token,
+            });
+        }
+    }
+
     /// Parses `TYPE <name> ... ENDTYPE` and registers the record so later
     /// declarations can name it as a type.
     fn parse_type_declaration(&mut self) -> Option<TypeDeclarationAstNode> {
@@ -960,7 +1128,8 @@ impl<'a> Parser<'a> {
         let identifier_token = self.save_spanned_token();
         self.next_token();
 
-        let type_already_declared = self.type_registry.get_type(&name).is_some() || built_in_type(&name, self.lang_version).is_some();
+        let declared_name = self.declared_type_name(&name);
+        let type_already_declared = self.type_registry.get_type(&declared_name).is_some() || built_in_type(&name, self.lang_version).is_some();
         if !self.types_predeclared && type_already_declared {
             self.error_reporter
                 .lock()
@@ -996,19 +1165,16 @@ impl<'a> Parser<'a> {
                 continue;
             }
 
-            let Some(field_type) = self.get_variable_type() else {
+            let Some((field_type, field_type_token)) = self.parse_variable_type() else {
                 self.report_error(self.save_token_span(), ParserErrorType::InvalidToken(self.save_token()));
                 continue;
             };
-            let field_type_token = self.save_spanned_token();
             if !self.types_predeclared && matches!(field_type, VariableType::UserData(id) if !is_user_declared_type(id)) {
                 self.error_reporter
                     .lock()
                     .unwrap()
                     .report_error(field_type_token.span.clone(), ParserErrorType::TypeFieldBoardObjectNotSupported(field_type));
             }
-            self.next_token();
-
             while let Some(specifier) = self.parse_var_info(false) {
                 let field_name = specifier.get_identifier().clone();
                 if specifier.get_dimensions().iter().any(|dimension| dimension.get_dimension() > u16::MAX as usize) {
@@ -1073,7 +1239,7 @@ impl<'a> Parser<'a> {
                 )
             })
             .collect();
-        if !self.types_predeclared && !type_already_declared && self.type_registry.declare_user_type(name, field_layout).is_none() {
+        if !self.types_predeclared && !type_already_declared && self.type_registry.declare_user_type(declared_name, field_layout).is_none() {
             self.error_reporter
                 .lock()
                 .unwrap()
@@ -1095,7 +1261,8 @@ impl<'a> Parser<'a> {
         let identifier_token = self.save_spanned_token();
         self.next_token();
 
-        let type_already_declared = self.type_registry.get_type(&name).is_some() || built_in_type(&name, self.lang_version).is_some();
+        let declared_name = self.declared_type_name(&name);
+        let type_already_declared = self.type_registry.get_type(&declared_name).is_some() || built_in_type(&name, self.lang_version).is_some();
         if !self.types_predeclared && type_already_declared {
             self.error_reporter
                 .lock()
@@ -1170,7 +1337,7 @@ impl<'a> Parser<'a> {
         }
 
         let layout = variants.iter().map(|variant| (variant.get_identifier().clone(), variant.get_value())).collect();
-        if !self.types_predeclared && !type_already_declared && self.type_registry.declare_enum(name, layout).is_none() {
+        if !self.types_predeclared && !type_already_declared && self.type_registry.declare_enum(declared_name, layout).is_none() {
             self.error_reporter
                 .lock()
                 .unwrap()
@@ -1231,9 +1398,7 @@ impl<'a> Parser<'a> {
                 var_token = Some(self.save_spanned_token());
                 self.next_token();
             }
-            if let Some(var_type) = self.get_variable_type() {
-                let type_token = self.save_spanned_token();
-                self.next_token();
+            if let Some((var_type, type_token)) = self.parse_variable_type() {
                 let info = self.parse_var_info(false);
                 parameters.push(ParameterSpecifier::Variable(VariableParameterSpecifier::new(
                     var_token, type_token, var_type, info,
@@ -1248,13 +1413,12 @@ impl<'a> Parser<'a> {
             }
         }
         let rightpar_token = self.save_spanned_token();
-        let return_type_token = self.next_token();
+        self.next_token();
 
-        let Some(return_type) = self.get_variable_type() else {
+        let Some((return_type, return_type_token)) = self.parse_variable_type() else {
             self.report_error(self.lex.span(), ParserErrorType::TypeExpected(self.save_token()));
             return ParameterSpecifier::Variable(VariableParameterSpecifier::new(None, func_token, VariableType::Integer, None));
         };
-        self.next_token();
 
         ParameterSpecifier::Function(FunctionParameterSpecifier::new(
             func_token,
@@ -1262,7 +1426,7 @@ impl<'a> Parser<'a> {
             leftpar_token,
             parameters,
             rightpar_token,
-            return_type_token.unwrap(),
+            return_type_token,
             return_type,
         ))
     }
@@ -1316,9 +1480,7 @@ impl<'a> Parser<'a> {
                 var_token = Some(self.save_spanned_token());
                 self.next_token();
             }
-            if let Some(var_type) = self.get_variable_type() {
-                let type_token = self.save_spanned_token();
-                self.next_token();
+            if let Some((var_type, type_token)) = self.parse_variable_type() {
                 let info = self.parse_var_info(false);
                 parameters.push(ParameterSpecifier::Variable(VariableParameterSpecifier::new(
                     var_token, type_token, var_type, info,
@@ -1446,7 +1608,7 @@ impl Parser<'_> {
                     return Some(vt);
                 }
                 // An enum is a type from 350 on, so this is not gated with the objects.
-                if let Some(vt) = self.type_registry.get_declared_type(id) {
+                if let Some(vt) = self.type_registry.get_module_declared_type(self.current_module_name(), id) {
                     return Some(vt);
                 }
                 None
@@ -1456,6 +1618,42 @@ impl Parser<'_> {
         } else {
             None
         }
+    }
+
+    fn parse_variable_type(&mut self) -> Option<(VariableType, Spanned<Token>)> {
+        let lex = self.lex.clone();
+        let cur_token = self.cur_token.clone();
+        let lookahead_token = self.lookahead_token.clone();
+        let result = self.parse_variable_type_inner();
+        if result.is_none() {
+            self.lex = lex;
+            self.cur_token = cur_token;
+            self.lookahead_token = lookahead_token;
+        }
+        result
+    }
+
+    fn parse_variable_type_inner(&mut self) -> Option<(VariableType, Spanned<Token>)> {
+        if let Some(variable_type) = self.get_variable_type() {
+            let token = self.save_spanned_token();
+            self.next_token();
+            return Some((variable_type, token));
+        }
+
+        let Some(Token::Identifier(alias)) = self.get_cur_token() else { return None };
+        let module = self.imports.iter().find(|import| import.alias() == &alias)?.module_name().clone();
+        let start = self.save_token_span().start;
+        self.next_token();
+        if self.get_cur_token() != Some(Token::Dot) {
+            return None;
+        }
+        self.next_token();
+        let Some(Token::Identifier(name)) = self.get_cur_token() else { return None };
+        let qualified = UserTypeRegistry::module_type_name(&module, &name);
+        let variable_type = self.type_registry.get_declared_type(&qualified)?;
+        let end = self.save_token_span().end;
+        self.next_token();
+        Some((variable_type, Spanned::new(Token::Identifier(qualified), start..end)))
     }
 
     /// Returns the parse var info of this [`Tokenizer`].
@@ -1636,9 +1834,7 @@ impl Parser<'_> {
                 }
                 self.next_token();
             }
-            if let Some(var_type) = self.get_variable_type() {
-                let type_token = self.save_spanned_token();
-                self.next_token();
+            if let Some((var_type, type_token)) = self.parse_variable_type() {
                 let info = self.parse_var_info(true);
                 parameters.push(ParameterSpecifier::Variable(VariableParameterSpecifier::new(
                     var_token, type_token, var_type, info,
@@ -1674,12 +1870,10 @@ impl Parser<'_> {
             self.report_error(identifier_token.span, ParserErrorType::FunctionAlreadyDefined(self.save_token()));
             return None;
         }
-        let Some(return_type) = self.get_variable_type() else {
+        let Some((return_type, return_type_token)) = self.parse_variable_type() else {
             self.report_error(self.lex.span(), ParserErrorType::TypeExpected(self.save_token()));
             return None;
         };
-        let return_type_token = self.save_spanned_token();
-        self.next_token();
         let return_rank = self.parse_dynamic_array_rank();
         self.check_eol();
         Some(AstNode::FunctionDeclaration(FunctionDeclarationAstNode::new(
@@ -1764,10 +1958,7 @@ impl Parser<'_> {
                     self.next_token();
                 }
 
-                if let Some(var_type) = self.get_variable_type() {
-                    let type_token = self.save_spanned_token();
-                    self.next_token();
-
+                if let Some((var_type, type_token)) = self.parse_variable_type() {
                     let info = self.parse_var_info(false);
                     parameters.push(ParameterSpecifier::Variable(VariableParameterSpecifier::new(
                         var_token, type_token, var_type, info,
@@ -1859,10 +2050,7 @@ impl Parser<'_> {
                     self.next_token();
                 }
 
-                if let Some(var_type) = self.get_variable_type() {
-                    let type_token = self.save_spanned_token();
-                    self.next_token();
-
+                if let Some((var_type, type_token)) = self.parse_variable_type() {
                     let info = self.parse_var_info(false);
                     parameters.push(ParameterSpecifier::Variable(VariableParameterSpecifier::new(None, type_token, var_type, info)));
                 } else {
@@ -1877,12 +2065,10 @@ impl Parser<'_> {
             let rightpar_token = self.save_spanned_token();
             self.next_token();
 
-            let Some(return_type) = self.get_variable_type() else {
+            let Some((return_type, return_type_token)) = self.parse_variable_type() else {
                 self.report_error(self.lex.span(), ParserErrorType::TypeExpected(self.save_token()));
                 return None;
             };
-            let return_type_token = self.save_spanned_token();
-            self.next_token();
             let return_rank = self.parse_dynamic_array_rank();
             self.skip_eol();
 
@@ -1974,11 +2160,87 @@ fn parse_ast_internal(
         }
     }
 
+    if parser.in_module {
+        parser
+            .error_reporter
+            .lock()
+            .unwrap()
+            .report_error(parser.lex.span(), ParserErrorType::EndModuleExpected);
+    }
+
+    attach_routine_documentation(input, &mut nodes);
+
     Ast {
         nodes,
         file_name,
+        module: parser.module,
+        imports: parser.imports,
         language_version: parser.lang_version,
         require_user_variables: parser.require_user_variables,
+    }
+}
+
+fn attach_routine_documentation(input: &str, nodes: &mut [AstNode]) {
+    for routine_index in 0..nodes.len() {
+        let routine_start = match &nodes[routine_index] {
+            AstNode::Function(node) => node.get_function_token().span.start,
+            AstNode::Procedure(node) => node.get_procedure_token().span.start,
+            AstNode::FunctionDeclaration(node) => node.get_declare_token().span.start,
+            AstNode::ProcedureDeclaration(node) => node.get_declare_token().span.start,
+            _ => continue,
+        };
+
+        let mut lines = Vec::new();
+        let mut next_start = routine_start;
+        let mut collect_comment = |comment: &CommentAstNode| {
+            let token = comment.get_comment_token();
+            let Token::Comment(CommentType::SingleLineSemicolon, text) = &token.token else {
+                return false;
+            };
+            let Some(documentation) = text.strip_prefix(";;") else {
+                return false;
+            };
+            let gap = &input[token.span.end.min(input.len())..next_start.min(input.len())];
+            if !gap.chars().all(char::is_whitespace) || gap.matches('\n').count() > 1 {
+                return false;
+            }
+            lines.push(documentation.strip_prefix(' ').unwrap_or(documentation).to_string());
+            next_start = token.span.start;
+            true
+        };
+
+        if let Some(AstNode::Main(main)) = nodes.get(routine_index.wrapping_sub(1)) {
+            for statement in main.get_statements().iter().rev() {
+                let Statement::Comment(comment) = statement else {
+                    break;
+                };
+                if !collect_comment(comment) {
+                    break;
+                }
+            }
+        } else {
+            for previous in nodes[..routine_index].iter().rev() {
+                let AstNode::TopLevelStatement(Statement::Comment(comment)) = previous else {
+                    break;
+                };
+                if !collect_comment(comment) {
+                    break;
+                }
+            }
+        }
+
+        if lines.is_empty() {
+            continue;
+        }
+        lines.reverse();
+        let documentation = lines.join("\n");
+        match &mut nodes[routine_index] {
+            AstNode::Function(node) => node.set_documentation(documentation),
+            AstNode::Procedure(node) => node.set_documentation(documentation),
+            AstNode::FunctionDeclaration(node) => node.set_documentation(documentation),
+            AstNode::ProcedureDeclaration(node) => node.set_documentation(documentation),
+            _ => unreachable!(),
+        }
     }
 }
 
@@ -1997,7 +2259,22 @@ pub fn preparse_type_declarations(
     let mut parser = Parser::new(file_name, scratch, user_types, input, encoding, workspace);
     parser.next_token();
     while parser.cur_token.is_some() {
-        if matches!(parser.get_cur_token(), Some(Token::Type | Token::Enum)) {
+        if parser.lang_version >= 400
+            && matches!(parser.get_cur_token(), Some(Token::Identifier(ref name)) if name.eq_ignore_ascii_case("MODULE"))
+            && matches!(parser.peek_after_current(1).as_slice(), [Some(Token::Identifier(_))])
+        {
+            parser.parse_module_start();
+        } else if parser.lang_version >= 400
+            && matches!(parser.get_cur_token(), Some(Token::Identifier(ref name)) if name.eq_ignore_ascii_case("ENDMODULE"))
+            && matches!(parser.peek_after_current(1).as_slice(), [Some(Token::Eol | Token::Comment(_, _)) | None])
+        {
+            parser.parse_module_end();
+        } else if parser.lang_version >= 400
+            && matches!(parser.get_cur_token(), Some(Token::Identifier(ref name)) if name.eq_ignore_ascii_case("IMPORT"))
+            && matches!(parser.peek_after_current(2).as_slice(), [Some(Token::Identifier(_)), Some(Token::Identifier(as_name))] if as_name.eq_ignore_ascii_case("AS"))
+        {
+            parser.parse_import();
+        } else if matches!(parser.get_cur_token(), Some(Token::Type | Token::Enum)) {
             let scratch = std::mem::replace(&mut parser.error_reporter, error_reporter.clone());
             if parser.get_cur_token() == Some(Token::Type) {
                 parser.parse_type_declaration();

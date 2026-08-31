@@ -109,7 +109,14 @@ fn user_routine(visitor: &SemanticVisitor, name: &str) -> Option<SignatureInform
                 let text = render_parameter(visitor, parameter);
                 builder.push(&text);
             }
-            Some(builder.finish(&format!(") {}", type_name(&visitor.type_registry, function.get_return_type()))))
+            let mut signature = builder.finish(&format!(") {}", type_name(&visitor.type_registry, function.get_return_type())));
+            signature.documentation = function.get_documentation().map(|documentation| {
+                Documentation::MarkupContent(tower_lsp::lsp_types::MarkupContent {
+                    kind: tower_lsp::lsp_types::MarkupKind::Markdown,
+                    value: documentation.to_string(),
+                })
+            });
+            Some(signature)
         }
         FunctionDeclaration::Procedure(procedure) => {
             let mut builder = SignatureBuilder::new(&format!("PROCEDURE {}", procedure.get_identifier()), "(");
@@ -117,7 +124,14 @@ fn user_routine(visitor: &SemanticVisitor, name: &str) -> Option<SignatureInform
                 let text = render_parameter(visitor, parameter);
                 builder.push(&text);
             }
-            Some(builder.finish(")"))
+            let mut signature = builder.finish(")");
+            signature.documentation = procedure.get_documentation().map(|documentation| {
+                Documentation::MarkupContent(tower_lsp::lsp_types::MarkupContent {
+                    kind: tower_lsp::lsp_types::MarkupKind::Markdown,
+                    value: documentation.to_string(),
+                })
+            });
+            Some(signature)
         }
     }
 }

@@ -706,7 +706,8 @@ pub trait AstVisitorMut: Sized {
             proc_decl.get_leftpar_token().clone(),
             proc_decl.get_parameters().iter().map(|param| param.visit_mut(self)).collect(),
             proc_decl.get_rightpar_token().clone(),
-        ))
+        )
+        .with_documentation(proc_decl.get_documentation()))
     }
 
     fn visit_enum_declaration(&mut self, enum_decl: &EnumDeclarationAstNode) -> AstNode {
@@ -726,7 +727,8 @@ pub trait AstVisitorMut: Sized {
             func_decl.get_return_type_token().clone(),
             func_decl.get_return_type(),
             func_decl.get_return_rank(),
-        ))
+        )
+        .with_documentation(func_decl.get_documentation()))
     }
 
     // visit implementations
@@ -751,7 +753,8 @@ pub trait AstVisitorMut: Sized {
             function.get_return_rank(),
             function.get_statements().iter().map(|stmt| stmt.visit_mut(self)).collect(),
             function.get_endfunc_token().clone(),
-        ))
+        )
+        .with_documentation(function.get_documentation()))
     }
 
     fn visit_parameter_specifier(&mut self, param: &ParameterSpecifier) -> ParameterSpecifier {
@@ -771,13 +774,17 @@ pub trait AstVisitorMut: Sized {
             procedure.get_rightpar_token().clone(),
             procedure.get_statements().iter().map(|stmt| stmt.visit_mut(self)).collect(),
             procedure.get_endproc_token().clone(),
-        ))
+        )
+        .with_documentation(procedure.get_documentation()))
     }
 
     fn visit_ast(&mut self, program: &Ast) -> Ast {
         let mut new_program = Ast::new();
         new_program.file_name.clone_from(&program.file_name);
+        new_program.module.clone_from(&program.module);
+        new_program.imports.clone_from(&program.imports);
         new_program.language_version = program.language_version;
+        new_program.require_user_variables = program.require_user_variables;
         for node in &program.nodes {
             new_program.nodes.push(node.visit_mut(self));
         }

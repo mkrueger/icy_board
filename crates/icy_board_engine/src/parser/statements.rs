@@ -131,13 +131,11 @@ impl Parser<'_> {
         let const_token = self.save_spanned_token();
         self.next_token();
 
-        let Some(variable_type) = self.get_variable_type() else {
+        let Some((variable_type, type_token)) = self.parse_variable_type() else {
             self.report_error(self.lex.span(), ParserErrorType::TypeExpected(self.save_token()));
             self.next_token();
             return None;
         };
-        let type_token = self.save_spanned_token();
-        self.next_token();
 
         if !matches!(self.get_cur_token(), Some(Token::Identifier(_))) {
             self.report_error(self.lex.span(), ParserErrorType::IdentifierExpected(self.save_token()));
@@ -889,13 +887,13 @@ impl Parser<'_> {
             }
 
             Some(Token::Identifier(id)) => {
-                let var_type = self.get_variable_type();
                 let id_token = self.save_spanned_token();
-                self.next_token();
+                let parsed_type = self.parse_variable_type();
+                let was_type = parsed_type.is_some();
 
                 // A declaration is a type followed by the name it declares. Anything else
                 // that starts with a type's name is a variable that happens to share it.
-                if let Some(var_type) = var_type
+                if let Some((var_type, type_token)) = parsed_type
                     && matches!(self.get_cur_token(), Some(Token::Identifier(_)))
                 {
                     let mut vars = Vec::new();
@@ -912,9 +910,12 @@ impl Parser<'_> {
                             return None;
                         }
                     }
-                    return Some(Statement::VariableDeclaration(VariableDeclarationStatement::new(id_token, var_type, vars)));
+                    return Some(Statement::VariableDeclaration(VariableDeclarationStatement::new(type_token, var_type, vars)));
                 }
 
+                if !was_type {
+                    self.next_token();
+                }
                 if let Some(value) = self.parse_call_after_identifier(&id, id_token) {
                     return Some(value);
                 }

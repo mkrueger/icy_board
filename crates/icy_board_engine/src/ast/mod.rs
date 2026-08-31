@@ -180,6 +180,7 @@ impl fmt::Display for AstNode {
 #[derive(Debug, Clone, PartialEq)]
 pub struct FunctionImplementation {
     pub id: usize,
+    documentation: Option<String>,
     function_token: Spanned<Token>,
     identifier_token: Spanned<Token>,
     leftpar_token: Spanned<Token>,
@@ -211,6 +212,7 @@ impl FunctionImplementation {
     ) -> Self {
         Self {
             id,
+            documentation: None,
             function_token,
             identifier_token,
             leftpar_token,
@@ -233,6 +235,7 @@ impl FunctionImplementation {
     ) -> Self {
         Self {
             id,
+            documentation: None,
             function_token: Spanned::create_empty(Token::Function),
             identifier_token: Spanned::create_empty(Token::Identifier(identifier)),
             leftpar_token: Spanned::create_empty(Token::LPar),
@@ -244,6 +247,19 @@ impl FunctionImplementation {
             statements,
             endfunc_token: Spanned::create_empty(Token::EndFunc),
         }
+    }
+
+    pub fn get_documentation(&self) -> Option<&str> {
+        self.documentation.as_deref()
+    }
+
+    pub fn set_documentation(&mut self, documentation: String) {
+        self.documentation = Some(documentation);
+    }
+
+    pub fn with_documentation(mut self, documentation: Option<&str>) -> Self {
+        self.documentation = documentation.map(str::to_owned);
+        self
     }
 
     pub fn get_function_token(&self) -> &Spanned<Token> {
@@ -350,6 +366,7 @@ impl FunctionImplementation {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ProcedureImplementation {
     pub id: usize,
+    documentation: Option<String>,
     procedure_token: Spanned<Token>,
     identifier_token: Spanned<Token>,
     leftpar_token: Spanned<Token>,
@@ -380,6 +397,7 @@ impl ProcedureImplementation {
     ) -> Self {
         Self {
             id,
+            documentation: None,
             procedure_token,
             identifier_token,
             leftpar_token,
@@ -393,6 +411,7 @@ impl ProcedureImplementation {
     pub fn empty(id: usize, identifier: unicase::Ascii<String>, parameters: Vec<ParameterSpecifier>, statements: Vec<Statement>) -> Self {
         Self {
             id,
+            documentation: None,
             procedure_token: Spanned::create_empty(Token::Procedure),
             identifier_token: Spanned::create_empty(Token::Identifier(identifier)),
             leftpar_token: Spanned::create_empty(Token::LPar),
@@ -401,6 +420,19 @@ impl ProcedureImplementation {
             statements,
             endproc_token: Spanned::create_empty(Token::EndProc),
         }
+    }
+
+    pub fn get_documentation(&self) -> Option<&str> {
+        self.documentation.as_deref()
+    }
+
+    pub fn set_documentation(&mut self, documentation: String) {
+        self.documentation = Some(documentation);
+    }
+
+    pub fn with_documentation(mut self, documentation: Option<&str>) -> Self {
+        self.documentation = documentation.map(str::to_owned);
+        self
     }
 
     pub fn get_procedure_token(&self) -> &Spanned<Token> {

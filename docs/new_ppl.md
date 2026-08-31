@@ -20,6 +20,8 @@ format, so 4.00 is what a PPE targets whenever it uses anything below.
 | Typed constants | 350 | any compatible runtime | `CONST`, erased to its value during compilation |
 | Nominal integer enums | 350 | any compatible runtime | `ENUM ... ENDENUM`, scoped members such as `Color.Red` |
 | Routine parameters | 350 | 400 | Pass a matching function or procedure as a checked callable value |
+| Routine documentation | 400 | any compatible runtime | Markdown `;;;` comments shown by editor hover, completion and signature help |
+| Compile-time modules | 400 | any compatible runtime | `MODULE`, visibility sections and `IMPORT ... AS ...` namespaces |
 | Main-program block | 400 | 400 | Real `BEGIN ... END`; `EXIT` replaces the old terminating use of `END` |
 | Board objects and member calls | 400 | 400 | `CONFERENCE`, `DIRECTORY`, `AREA`, `DOOR`, `PASSWORD`, `Board`, `Session` |
 | Message-area identifiers | 400 | 400 | `MSGAREAID` and `AreaId(conf, area)` |
@@ -109,6 +111,73 @@ to another routine. The callable reference needs runtime 4.00.
 
 4.00 adds syntax and board APIs that do not exist on PCBoard. A runtime 4.00 PPE
 therefore targets Icy Board rather than the original board.
+
+### Modules and imports
+
+A source file can place its declarations in a compile-time namespace. Declarations
+are public by default; a standalone `PRIVATE` or `PUBLIC` line changes the
+visibility of the declarations which follow it:
+
+```PPL
+MODULE TerminalList
+
+PROCEDURE Draw()
+ENDPROC
+
+PRIVATE
+
+INTEGER selected
+
+PROCEDURE ClearRow(INTEGER row)
+ENDPROC
+
+ENDMODULE
+```
+
+Another source in the same package imports the module under a local alias and
+qualifies public routines, values and types through that alias:
+
+```PPL
+IMPORT TerminalList AS List
+
+List.Draw()
+```
+
+`PUBLIC` and `PRIVATE` are context-sensitive section words only inside a module,
+so existing variables with those names remain valid elsewhere. Imports are local
+aliases and are never re-exported. Private declarations remain available to code
+inside their own module but cannot be reached through an import. Module names,
+imports and visibility are removed while compiling; the result is still one
+self-contained PPE and the syntax itself adds no runtime requirement.
+
+One source file defines at most one module. Module and alias names are single PPL
+identifiers. A package may contain ordinary application sources and module sources
+together.
+
+### Routine documentation
+
+A contiguous block of `;;;` comments documents the function, procedure or
+`DECLARE` statement immediately below it. The text is Markdown and follows the
+usual Rust documentation style for summaries, headings, lists and fenced PPL
+examples:
+
+```PPL
+;;; Draws one item in the visible list.
+;;;
+;;; # Arguments
+;;;
+;;; - `item` - Zero-based item index.
+;;; - `row` - Screen row where the item is drawn.
+PROCEDURE DrawRow(INTEGER item, INTEGER row)
+	PRINTLN item, row
+ENDPROC
+```
+
+One optional space after `;;;` is removed; other Markdown indentation is
+preserved. A blank line or ordinary comment breaks attachment. When both a
+`DECLARE` statement and its implementation have documentation, the declaration
+is canonical. Documentation is source metadata and does not change the PPE
+runtime format.
 
 ### Blocks and program exit
 

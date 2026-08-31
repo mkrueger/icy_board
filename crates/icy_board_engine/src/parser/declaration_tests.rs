@@ -13,7 +13,7 @@ use crate::{
     executable::VariableType,
 };
 
-use super::{Encoding, ErrorReporter, Parser, UserTypeRegistry, parse_ast_with_predeclared_types, preparse_type_declarations};
+use super::{Encoding, ErrorReporter, Parser, UserTypeRegistry, parse_ast, parse_ast_with_predeclared_types, preparse_type_declarations};
 
 fn parse_ast_node(input: &str, assert_eof: bool) -> AstNode {
     let reg = UserTypeRegistry::default();
@@ -34,6 +34,33 @@ fn check_ast_node(input: &str, check: &AstNode) {
         println!("was:\n{node}\nShould be:\n{check}");
         panic!();
     }
+}
+
+#[test]
+fn documentation_comments_attach_to_routines() {
+    let registry = UserTypeRegistry::default();
+    let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+    let workspace = Workspace::default();
+    let source = ";;; Summary.\n;;;\n;;; # Arguments\nDECLARE PROCEDURE Show(STRING text)\n\nPRINTLN \"main\"\n;;; Implementation summary.\nFUNCTION Plain() INTEGER\nRETURN 1\nENDFUNC\n";
+    let ast = parse_ast(PathBuf::from("test.pps"), errors, source, &registry, Encoding::Utf8, &workspace);
+
+    let declaration = ast.nodes.iter().find_map(|node| match node {
+        AstNode::ProcedureDeclaration(declaration) => Some(declaration),
+        _ => None,
+    });
+    let implementation = ast.nodes.iter().find_map(|node| match node {
+        AstNode::Function(implementation) => Some(implementation),
+        _ => None,
+    });
+
+    assert_eq!(
+        declaration.and_then(ProcedureDeclarationAstNode::get_documentation),
+        Some("Summary.\n\n# Arguments")
+    );
+    assert_eq!(
+        implementation.and_then(|node| node.get_documentation()),
+        Some("Implementation summary.")
+    );
 }
 
 #[test]

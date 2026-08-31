@@ -22,5 +22,5 @@
 
 (record_literal_field) @entry.around
 
-(comment) @comment.inside @comment.inner
-(comment)+ @comment.around @comment.outer
+[(comment) (doc_comment)] @comment.inside @comment.inner
+[(comment) (doc_comment)]+ @comment.around @comment.outer

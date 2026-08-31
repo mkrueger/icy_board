@@ -131,7 +131,7 @@ const PREC = {
 module.exports = grammar({
   name: 'ppl',
 
-  extras: $ => [/\s/, $.comment],
+  extras: $ => [/\s/, $.comment, $.doc_comment],
 
   word: $ => $.identifier,
 
@@ -151,6 +151,8 @@ module.exports = grammar({
     source_file: $ => repeat($._top_level_item),
 
     _top_level_item: $ => choice(
+      $.module_declaration,
+      $.import_declaration,
       $.type_declaration,
       $.enum_declaration,
       $.function_declaration,
@@ -203,6 +205,34 @@ module.exports = grammar({
     substitution: $ => token(seq(';#', /[A-Za-z_][A-Za-z0-9_]*/)),
 
     // ---------- Declarations ----------
+    module_declaration: $ => seq(
+      kw('MODULE'),
+      field('name', $.identifier),
+      repeat(choice(
+        $.visibility_section,
+        $.import_declaration,
+        $.type_declaration,
+        $.enum_declaration,
+        $.function_declaration,
+        $.procedure_declaration,
+        $.function_definition,
+        $.procedure_definition,
+        $.variable_declaration,
+        $.const_declaration,
+        $._preprocessor_directive,
+      )),
+      endKw('MODULE'),
+    ),
+
+    visibility_section: $ => choice(kw('PUBLIC'), kw('PRIVATE')),
+
+    import_declaration: $ => seq(
+      kw('IMPORT'),
+      field('module', $.identifier),
+      kw('AS'),
+      field('alias', $.identifier),
+    ),
+
     type_declaration: $ => seq(
       kw('TYPE'),
       field('name', $.identifier),
@@ -644,6 +674,8 @@ module.exports = grammar({
     color_code: $ => token(seq('@', /[xX]/, /[0-9A-Fa-f]{2}/)),
 
     boolean_literal: $ => choice(kw('TRUE'), kw('FALSE')),
+
+    doc_comment: $ => token(prec(1, seq(';;;', /[^\n]*/))),
 
     comment: $ => token(choice(
       seq(';', /[^$#\n][^\n]*/),

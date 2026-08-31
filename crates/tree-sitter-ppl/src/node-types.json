@@ -1149,6 +1149,32 @@
     }
   },
   {
+    "type": "import_declaration",
+    "named": true,
+    "fields": {
+      "alias": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "module": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "index_expression",
     "named": true,
     "fields": {
@@ -1261,6 +1287,96 @@
       "types": [
         {
           "type": "argument_list",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "module_declaration",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "const_declaration",
+          "named": true
+        },
+        {
+          "type": "define_directive",
+          "named": true
+        },
+        {
+          "type": "else_directive",
+          "named": true
+        },
+        {
+          "type": "elseif_directive",
+          "named": true
+        },
+        {
+          "type": "endif_directive",
+          "named": true
+        },
+        {
+          "type": "enum_declaration",
+          "named": true
+        },
+        {
+          "type": "function_declaration",
+          "named": true
+        },
+        {
+          "type": "function_definition",
+          "named": true
+        },
+        {
+          "type": "if_directive",
+          "named": true
+        },
+        {
+          "type": "import_declaration",
+          "named": true
+        },
+        {
+          "type": "langversion_directive",
+          "named": true
+        },
+        {
+          "type": "procedure_declaration",
+          "named": true
+        },
+        {
+          "type": "procedure_definition",
+          "named": true
+        },
+        {
+          "type": "type_declaration",
+          "named": true
+        },
+        {
+          "type": "usefuncs_directive",
+          "named": true
+        },
+        {
+          "type": "variable_declaration",
+          "named": true
+        },
+        {
+          "type": "visibility_section",
           "named": true
         }
       ]
@@ -1660,6 +1776,14 @@
           "named": true
         },
         {
+          "type": "import_declaration",
+          "named": true
+        },
+        {
+          "type": "module_declaration",
+          "named": true
+        },
+        {
           "type": "procedure_declaration",
           "named": true
         },
@@ -1808,6 +1932,11 @@
         }
       ]
     }
+  },
+  {
+    "type": "visibility_section",
+    "named": true,
+    "fields": {}
   },
   {
     "type": "while_block",
@@ -2018,6 +2147,10 @@
     "named": false
   },
   {
+    "type": "AS",
+    "named": false
+  },
+  {
     "type": "AUDIO",
     "named": false
   },
@@ -2046,7 +2179,15 @@
     "named": false
   },
   {
+    "type": "BYTES",
+    "named": false
+  },
+  {
     "type": "CASE",
+    "named": false
+  },
+  {
+    "type": "CHECKSUM",
     "named": false
   },
   {
@@ -2154,6 +2295,10 @@
     "named": false
   },
   {
+    "type": "ENDMODULE",
+    "named": false
+  },
+  {
     "type": "ENDPROC",
     "named": false
   },
@@ -2258,6 +2403,10 @@
     "named": false
   },
   {
+    "type": "IMPORT",
+    "named": false
+  },
+  {
     "type": "IN",
     "named": false
   },
@@ -2287,6 +2436,10 @@
   },
   {
     "type": "MARGINS",
+    "named": false
+  },
+  {
+    "type": "MODULE",
     "named": false
   },
   {
@@ -2346,7 +2499,15 @@
     "named": false
   },
   {
+    "type": "PRIVATE",
+    "named": false
+  },
+  {
     "type": "PROCEDURE",
+    "named": false
+  },
+  {
+    "type": "PUBLIC",
     "named": false
   },
   {
@@ -2511,6 +2672,11 @@
   },
   {
     "type": "comment",
+    "named": true,
+    "extra": true
+  },
+  {
+    "type": "doc_comment",
     "named": true,
     "extra": true
   },

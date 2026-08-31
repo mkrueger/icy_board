@@ -536,6 +536,22 @@ pub struct FunctionContainer {
     pub local_variables: core::ops::Range<usize>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ModuleSymbolKind {
+    Function,
+    Procedure,
+    Type,
+    Enum,
+    Variable,
+    Constant,
+}
+
+#[derive(Debug, Clone)]
+pub struct ModuleExport {
+    pub name: String,
+    pub kind: ModuleSymbolKind,
+}
+
 #[derive(Default, Clone)]
 pub struct VariableLookups {
     pub variable_lookup: NameTableLookup,
@@ -582,6 +598,7 @@ pub struct SemanticVisitor {
 
     pub errors: Arc<Mutex<ErrorReporter>>,
     pub references: Vec<(ReferenceType, References)>,
+    pub module_exports: HashMap<unicase::Ascii<String>, Vec<ModuleExport>>,
 
     /// Maps member references -> user type IDs
     pub user_type_lookup: HashMap<usize, u8>,
@@ -768,6 +785,67 @@ impl LookupVariabeleTable {
 }
 
 impl SemanticVisitor {
+    pub fn set_modules(&mut self, asts: &[&crate::ast::Ast]) {
+        self.module_exports.clear();
+        for ast in asts {
+            let Some(module) = &ast.module else { continue };
+            let mut exports = Vec::new();
+            for node in &ast.nodes {
+                let mut add = |name: &str, offset: usize, kind: ModuleSymbolKind| {
+                    if module.visibility_at(offset) == crate::ast::Visibility::Public {
+                        exports.push(ModuleExport { name: name.to_string(), kind });
+                    }
+                };
+                match node {
+                    crate::ast::AstNode::Function(value) => add(
+                        value.get_identifier().as_str(),
+                        value.get_identifier_token().span.start,
+                        ModuleSymbolKind::Function,
+                    ),
+                    crate::ast::AstNode::Procedure(value) => add(
+                        value.get_identifier().as_str(),
+                        value.get_identifier_token().span.start,
+                        ModuleSymbolKind::Procedure,
+                    ),
+                    crate::ast::AstNode::FunctionDeclaration(value) => add(
+                        value.get_identifier().as_str(),
+                        value.get_identifier_token().span.start,
+                        ModuleSymbolKind::Function,
+                    ),
+                    crate::ast::AstNode::ProcedureDeclaration(value) => add(
+                        value.get_identifier().as_str(),
+                        value.get_identifier_token().span.start,
+                        ModuleSymbolKind::Procedure,
+                    ),
+                    crate::ast::AstNode::TypeDeclaration(value) => {
+                        add(value.get_identifier().as_str(), value.get_identifier_token().span.start, ModuleSymbolKind::Type)
+                    }
+                    crate::ast::AstNode::EnumDeclaration(value) => {
+                        add(value.get_identifier().as_str(), value.get_identifier_token().span.start, ModuleSymbolKind::Enum)
+                    }
+                    crate::ast::AstNode::TopLevelStatement(crate::ast::Statement::VariableDeclaration(value)) => {
+                        for variable in value.get_variables() {
+                            add(
+                                variable.get_identifier().as_str(),
+                                variable.get_identifier_token().span.start,
+                                ModuleSymbolKind::Variable,
+                            );
+                        }
+                    }
+                    crate::ast::AstNode::TopLevelStatement(crate::ast::Statement::ConstDeclaration(value)) => {
+                        add(
+                            value.get_identifier().as_str(),
+                            value.get_identifier_token().span.start,
+                            ModuleSymbolKind::Constant,
+                        );
+                    }
+                    crate::ast::AstNode::TopLevelStatement(_) | crate::ast::AstNode::Main(_) => {}
+                }
+            }
+            self.module_exports.insert(module.name().clone(), exports);
+        }
+    }
+
     pub(crate) fn storage_type(&self, source_type: VariableType) -> VariableType {
         if self.type_registry.is_enum_type(source_type) {
             VariableType::Integer
@@ -825,6 +903,7 @@ impl SemanticVisitor {
             runtime: workspace.runtime(),
             errors,
             references: Vec::new(),
+            module_exports: HashMap::new(),
             type_registry,
 
             label_count: 0,
@@ -3612,7 +3691,10 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 header: None,
                 declaration: Some((
                     self.errors.lock().unwrap().file_name().to_path_buf(),
-                    Spanned::new(const_decl.get_identifier_token().token.to_string(), const_decl.get_identifier_token().span.clone()),
+                    Spanned::new(
+                        const_decl.get_identifier_token().token.to_string(),
+                        const_decl.get_identifier_token().span.clone(),
+                    ),
                 )),
                 implementation: None,
                 return_types: vec![],
@@ -3798,6 +3880,12 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             ));
             for cont in &mut self.function_containers {
                 if cont.id == idx {
+                    let documentation = match &cont.functions {
+                        FunctionDeclaration::Function(declaration) => declaration.get_documentation(),
+                        FunctionDeclaration::Procedure(declaration) => declaration.get_documentation(),
+                    }
+                    .or_else(|| function.get_documentation())
+                    .map(str::to_owned);
                     if let FunctionDeclaration::Function(func) = &cont.functions {
                         if func.get_parameters().len() != function.get_parameters().len() {
                             self.errors.lock().unwrap().report_error(
@@ -3821,7 +3909,8 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                     }
                     cont.functions = FunctionDeclaration::Function(
                         FunctionDeclarationAstNode::empty(function.get_identifier().clone(), function.get_parameters().clone(), function.get_return_type())
-                            .with_return_rank(function.get_return_rank()),
+                            .with_return_rank(function.get_return_rank())
+                            .with_documentation(documentation.as_deref()),
                     );
                     break;
                 }
@@ -3840,11 +3929,10 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 name: function.get_identifier().clone(),
                 parameter_index: None,
                 id,
-                functions: FunctionDeclaration::Function(FunctionDeclarationAstNode::empty(
-                    function.get_identifier().clone(),
-                    function.get_parameters().clone(),
-                    function.get_return_type(),
-                )),
+                functions: FunctionDeclaration::Function(
+                    FunctionDeclarationAstNode::empty(function.get_identifier().clone(), function.get_parameters().clone(), function.get_return_type())
+                        .with_documentation(function.get_documentation()),
+                ),
                 lookup: VariableLookups::default(),
                 parameters: 0..0,
                 local_variables: 0..0,
@@ -3931,6 +4019,12 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             ));
             for cont in &mut self.function_containers {
                 if cont.id == idx {
+                    let documentation = match &cont.functions {
+                        FunctionDeclaration::Function(declaration) => declaration.get_documentation(),
+                        FunctionDeclaration::Procedure(declaration) => declaration.get_documentation(),
+                    }
+                    .or_else(|| procedure.get_documentation())
+                    .map(str::to_owned);
                     if let FunctionDeclaration::Procedure(func) = &cont.functions
                         && func.get_parameters().len() != procedure.get_parameters().len()
                     {
@@ -3939,10 +4033,10 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                             CompilationErrorType::ParameterMismatch(procedure.get_identifier().to_string()),
                         );
                     }
-                    cont.functions = FunctionDeclaration::Procedure(ProcedureDeclarationAstNode::empty(
-                        procedure.get_identifier().clone(),
-                        procedure.get_parameters().clone(),
-                    ));
+                    cont.functions = FunctionDeclaration::Procedure(
+                        ProcedureDeclarationAstNode::empty(procedure.get_identifier().clone(), procedure.get_parameters().clone())
+                            .with_documentation(documentation.as_deref()),
+                    );
                     break;
                 }
             }
@@ -3965,10 +4059,10 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 name: procedure.get_identifier().clone(),
                 parameter_index: None,
                 id,
-                functions: FunctionDeclaration::Procedure(ProcedureDeclarationAstNode::empty(
-                    procedure.get_identifier().clone(),
-                    procedure.get_parameters().clone(),
-                )),
+                functions: FunctionDeclaration::Procedure(
+                    ProcedureDeclarationAstNode::empty(procedure.get_identifier().clone(), procedure.get_parameters().clone())
+                        .with_documentation(procedure.get_documentation()),
+                ),
                 lookup: VariableLookups::default(),
                 parameters: 0..0,
                 local_variables: 0..0,
