@@ -45,9 +45,20 @@ pub struct ModuleDeclaration {
     pub name_token: Spanned<Token>,
     pub endmodule_token: Spanned<Token>,
     pub visibility_sections: Vec<VisibilitySection>,
+    pub implicit: bool,
 }
 
 impl ModuleDeclaration {
+    pub fn implicit(name: impl Into<String>) -> Self {
+        Self {
+            module_token: Spanned::create_empty(Token::Identifier(unicase::Ascii::new("MODULE".to_string()))),
+            name_token: Spanned::create_empty(Token::Identifier(unicase::Ascii::new(name.into()))),
+            endmodule_token: Spanned::create_empty(Token::Identifier(unicase::Ascii::new("ENDMODULE".to_string()))),
+            visibility_sections: Vec::new(),
+            implicit: true,
+        }
+    }
+
     pub fn name(&self) -> &unicase::Ascii<String> {
         match &self.name_token.token {
             Token::Identifier(name) => name,
@@ -61,6 +72,10 @@ impl ModuleDeclaration {
             .take_while(|section| section.token.span.start < offset)
             .last()
             .map_or(Visibility::Public, |section| section.visibility)
+    }
+
+    pub fn is_implicit(&self) -> bool {
+        self.implicit
     }
 }
 

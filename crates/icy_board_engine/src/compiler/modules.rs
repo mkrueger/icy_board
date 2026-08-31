@@ -32,41 +32,56 @@ struct ModuleSymbol {
     kind: SymbolKind,
 }
 
-type ModuleCatalog = HashMap<Ascii<String>, HashMap<Ascii<String>, ModuleSymbol>>;
+struct ModuleInfo {
+    symbols: HashMap<Ascii<String>, ModuleSymbol>,
+    implicit: bool,
+}
+
+type ModuleCatalog = HashMap<Ascii<String>, ModuleInfo>;
 
 pub fn lower_modules(asts: &[&Ast], errors: Arc<Mutex<ErrorReporter>>) -> Vec<Ast> {
     let mut catalog = ModuleCatalog::new();
 
     for (module_index, ast) in asts.iter().enumerate() {
         let Some(module) = &ast.module else { continue };
-        let mut symbols = HashMap::new();
+        let existing = catalog.get(module.name());
+        if existing.is_some() && !(module.is_implicit() && existing.is_some_and(|info| info.implicit)) {
+            errors.lock().unwrap().report_error_file(
+                ast.file_name.clone(),
+                module.name_token.span.clone(),
+                CompilationErrorType::ModuleAlreadyDefined(module.name().to_string()),
+            );
+            continue;
+        }
+        let symbols = &mut catalog
+            .entry(module.name().clone())
+            .or_insert_with(|| ModuleInfo {
+                symbols: HashMap::new(),
+                implicit: module.is_implicit(),
+            })
+            .symbols;
         for (name, span, kind) in global_symbols(ast) {
             let lowered = if kind == SymbolKind::Type {
                 UserTypeRegistry::module_type_name(module.name(), &name)
             } else {
                 Ascii::new(format!("__M{module_index}_{}", name.as_str()))
             };
-            symbols.insert(
-                name,
-                ModuleSymbol {
-                    lowered,
-                    visibility: module.visibility_at(span),
-                    kind,
-                },
-            );
-        }
-        if catalog.insert(module.name().clone(), symbols).is_some() {
-            errors.lock().unwrap().report_error_file(
-                ast.file_name.clone(),
-                module.name_token.span.clone(),
-                CompilationErrorType::ModuleAlreadyDefined(module.name().to_string()),
-            );
+            symbols.entry(name).or_insert_with(|| ModuleSymbol {
+                lowered,
+                visibility: module.visibility_at(span),
+                kind,
+            });
         }
     }
 
     asts.iter()
         .map(|ast| {
-            let own = ast.module.as_ref().and_then(|module| catalog.get(module.name())).cloned().unwrap_or_default();
+            let own = ast
+                .module
+                .as_ref()
+                .and_then(|module| catalog.get(module.name()))
+                .map(|module| module.symbols.clone())
+                .unwrap_or_default();
             let mut imports = HashMap::new();
             for import in &ast.imports {
                 if !catalog.contains_key(import.module_name()) {
@@ -114,8 +129,9 @@ impl TypeVisibilityValidator<'_> {
     fn validate_type(&self, token: &Spanned<Token>) {
         let Token::Identifier(name) = &token.token else { return };
         for module in self.imports.values() {
-            let Some(symbols) = self.catalog.get(module) else { continue };
-            if let Some((source_name, _)) = symbols
+            let Some(module_info) = self.catalog.get(module) else { continue };
+            if let Some((source_name, _)) = module_info
+                .symbols
                 .iter()
                 .find(|(_, symbol)| symbol.kind == SymbolKind::Type && symbol.visibility == Visibility::Private && symbol.lowered == *name)
             {
@@ -249,7 +265,7 @@ impl ModuleLowering<'_> {
         let Expression::MemberReference(member) = expression else { return None };
         let Expression::Identifier(base) = member.get_expression() else { return None };
         let module = self.imports.get(base.get_identifier())?;
-        let symbols = self.catalog.get(module)?;
+        let symbols = &self.catalog.get(module)?.symbols;
         let Some(symbol) = symbols.get(member.get_identifier()) else {
             self.errors.lock().unwrap().report_error_file(
                 self.file.clone(),
@@ -441,13 +457,19 @@ mod tests {
             "main.pps",
             "PROCEDURE module()\nENDPROC\nPROCEDURE import()\nENDPROC\nPROCEDURE public()\nENDPROC\n",
         )]);
-        assert!(errors.lock().unwrap().errors.is_empty(), "module words should only be recognized in complete contextual forms");
+        assert!(
+            errors.lock().unwrap().errors.is_empty(),
+            "module words should only be recognized in complete contextual forms"
+        );
     }
 
     #[test]
     fn module_syntax_requires_language_400() {
         let errors = compile(&[("main.pps", ";$LANGVERSION 350\nMODULE Legacy\nENDMODULE\n")]);
-        assert!(!errors.lock().unwrap().errors.is_empty(), "module syntax must not be enabled before language 4.00");
+        assert!(
+            !errors.lock().unwrap().errors.is_empty(),
+            "module syntax must not be enabled before language 4.00"
+        );
     }
 
     #[test]
@@ -507,6 +529,9 @@ mod tests {
             ),
             ("main.pps", "IMPORT Sections AS S\nS.Visible()\n"),
         ]);
-        assert!(errors.lock().unwrap().errors.is_empty(), "PUBLIC should restore public visibility after a PRIVATE section");
+        assert!(
+            errors.lock().unwrap().errors.is_empty(),
+            "PUBLIC should restore public visibility after a PRIVATE section"
+        );
     }
 }

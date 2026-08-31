@@ -145,6 +145,9 @@ pub fn get_document_symbols(ast: &Ast, rope: &Rope) -> Vec<DocumentSymbol> {
     }
 
     let Some(module) = &ast.module else { return symbols };
+    if module.is_implicit() {
+        return symbols;
+    }
     let full = range(rope, &(module.module_token.span.start..module.endmodule_token.span.end));
     let selection = range(rope, &module.name_token.span);
     match (full, selection) {

@@ -106,9 +106,11 @@ pub fn get_semantic_tokens(ast: &Ast, visitor: &SemanticVisitor, rope: &Rope, so
 
 fn module_tokens(ast: &Ast, tokens: &mut BTreeMap<usize, RawToken>) {
     if let Some(module) = &ast.module {
-        insert(tokens, &module.module_token.span, KEYWORD, 0);
-        insert(tokens, &module.name_token.span, NAMESPACE, DECLARATION);
-        insert(tokens, &module.endmodule_token.span, KEYWORD, 0);
+        if !module.is_implicit() {
+            insert(tokens, &module.module_token.span, KEYWORD, 0);
+            insert(tokens, &module.name_token.span, NAMESPACE, DECLARATION);
+            insert(tokens, &module.endmodule_token.span, KEYWORD, 0);
+        }
         for section in &module.visibility_sections {
             insert(tokens, &section.token.span, KEYWORD, 0);
         }

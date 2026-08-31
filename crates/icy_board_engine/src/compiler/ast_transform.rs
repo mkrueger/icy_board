@@ -605,6 +605,8 @@ impl AstVisitorMut for AstTransformationVisitor {
 
         let mut new_program = Ast::new();
         new_program.file_name.clone_from(&program.file_name);
+        new_program.module.clone_from(&program.module);
+        new_program.imports.clone_from(&program.imports);
         new_program.language_version = program.language_version;
         new_program.require_user_variables = program.require_user_variables;
         for node in &program.nodes {

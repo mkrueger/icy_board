@@ -710,6 +710,8 @@ impl<'a> Parser<'a> {
         encoding: Encoding,
         workspace: &Workspace,
     ) -> Self {
+        let implicit_module = workspace.dependency_module(&file).map(ModuleDeclaration::implicit);
+        let in_module = implicit_module.is_some();
         let lex: Lexer = Lexer::new(file, workspace, text, encoding, error_reporter.clone());
         let lang_version = lex.lang_version();
         Parser {
@@ -727,9 +729,9 @@ impl<'a> Parser<'a> {
             got_funcs: false,
             in_function: false,
             types_predeclared: false,
-            module: None,
+            module: implicit_module,
             imports: Vec::new(),
-            in_module: false,
+            in_module,
         }
     }
 
@@ -883,7 +885,10 @@ impl<'a> Parser<'a> {
                 self.parse_module_start();
                 return None;
             }
-            if keyword.eq_ignore_ascii_case("ENDMODULE") && matches!(self.peek_after_current(1).as_slice(), [Some(Token::Eol | Token::Comment(_, _)) | None]) {
+            if keyword.eq_ignore_ascii_case("ENDMODULE")
+                && self.module.as_ref().is_some_and(|module| !module.is_implicit())
+                && matches!(self.peek_after_current(1).as_slice(), [Some(Token::Eol | Token::Comment(_, _)) | None])
+            {
                 self.parse_module_end();
                 return None;
             }
@@ -1026,7 +1031,7 @@ impl<'a> Parser<'a> {
 
     fn parse_module_start(&mut self) {
         let module_token = self.save_spanned_token();
-        if self.module.is_some() {
+        if self.module.as_ref().is_some_and(|module| !module.is_implicit()) {
             self.report_error(module_token.span, ParserErrorType::ModuleAlreadyDefined);
             return;
         }
@@ -1043,6 +1048,7 @@ impl<'a> Parser<'a> {
             name_token,
             endmodule_token: Spanned::new(Token::Identifier(Ascii::new("ENDMODULE".to_string())), 0..0),
             visibility_sections: Vec::new(),
+            implicit: false,
         });
         self.in_module = true;
     }
@@ -2160,7 +2166,7 @@ fn parse_ast_internal(
         }
     }
 
-    if parser.in_module {
+    if parser.in_module && parser.module.as_ref().is_some_and(|module| !module.is_implicit()) {
         parser
             .error_reporter
             .lock()
@@ -2266,6 +2272,7 @@ pub fn preparse_type_declarations(
             parser.parse_module_start();
         } else if parser.lang_version >= 400
             && matches!(parser.get_cur_token(), Some(Token::Identifier(ref name)) if name.eq_ignore_ascii_case("ENDMODULE"))
+            && parser.module.as_ref().is_some_and(|module| !module.is_implicit())
             && matches!(parser.peek_after_current(1).as_slice(), [Some(Token::Eol | Token::Comment(_, _)) | None])
         {
             parser.parse_module_end();

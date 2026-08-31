@@ -552,7 +552,8 @@ fn print_loose_config(file_name: &Path, arguments: &Cli, encoding: Encoding, mut
 }
 
 fn print_config(file_name: &Path, arguments: &Cli, encoding: Encoding) -> Res<()> {
-    let workspace = Workspace::load(file_name)?;
+    let mut workspace = Workspace::load(file_name)?;
+    workspace.resolve_dependencies()?;
     let runtime = arguments
         .runtime
         .or(workspace.package.runtime)
@@ -638,6 +639,7 @@ fn write_formatted(file: &Path, text: &str) -> Res<()> {
 }
 
 fn compile_files(arguments: &Cli, encoding: Encoding, workspace: &mut Workspace, out_file_name: &Path) -> Res<()> {
+    workspace.resolve_dependencies()?;
     apply_declared_language_version(workspace, encoding)?;
     apply_environment(workspace, arguments);
     let errors = Arc::new(Mutex::new(ErrorReporter::default()));
@@ -660,7 +662,7 @@ fn compile_files(arguments: &Cli, encoding: Encoding, workspace: &mut Workspace,
         match load_with_encoding(&src_file, encoding) {
             Ok(src) => {
                 let ast = parse_ast_with_predeclared_types(src_file.to_path_buf(), errors.clone(), &src, &reg, encoding, workspace);
-                if arguments.format || arguments.check {
+                if (arguments.format || arguments.check) && !workspace.is_dependency_file(&src_file) {
                     let mut backend = StringFormattingBackend::new(&src);
                     let mut visitor = FormattingVisitor::new(&mut backend, workspace.formatting());
                     visitor.format(&ast);

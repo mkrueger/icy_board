@@ -142,7 +142,8 @@ impl<'a> FormattingVisitor<'a> {
 
     /// Formats a whole file, which is where the top level starts at column zero.
     pub fn format(&mut self, ast: &Ast) {
-        if let Some(module) = &ast.module {
+        let explicit_module = ast.module.as_ref().filter(|module| !module.is_implicit());
+        if let Some(module) = explicit_module {
             self.indent(module.module_token.span.clone());
             self.inc_indent();
             for section in &module.visibility_sections {
@@ -151,15 +152,15 @@ impl<'a> FormattingVisitor<'a> {
             }
         }
         for import in &ast.imports {
-            let inside_module = ast.module.as_ref().is_some_and(|module| {
+            let inside_module = explicit_module.is_some_and(|module| {
                 import.import_token.span.start > module.module_token.span.start && import.import_token.span.start < module.endmodule_token.span.start
             });
-            if !inside_module && ast.module.is_some() {
+            if !inside_module && explicit_module.is_some() {
                 self.dec_indent();
             }
             self.backend.limit_blank_lines(import.import_token.span.start, self.options.max_blank_lines);
             self.indent(import.import_token.span.start..import.alias_token.span.end);
-            if !inside_module && ast.module.is_some() {
+            if !inside_module && explicit_module.is_some() {
                 self.inc_indent();
             }
         }
@@ -180,7 +181,7 @@ impl<'a> FormattingVisitor<'a> {
             }
             node.visit(self);
         }
-        if let Some(module) = &ast.module {
+        if let Some(module) = explicit_module {
             self.dec_indent();
             self.backend.limit_blank_lines(module.endmodule_token.span.start, self.options.max_blank_lines);
             self.indent(module.endmodule_token.span.clone());

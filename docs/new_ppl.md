@@ -154,6 +154,51 @@ One source file defines at most one module. Module and alias names are single PP
 identifiers. A package may contain ordinary application sources and module sources
 together.
 
+### Source libraries
+
+Packages can include modules from other PPL packages through path or Git
+dependencies in `ppl.toml`. A path is relative to the manifest containing the
+dependency:
+
+```toml
+[dependencies]
+terminal-ui = { path = "../terminal-ui" }
+```
+
+Git dependencies can follow the repository's default branch or select exactly
+one revision, branch or tag:
+
+```toml
+[dependencies]
+common = { git = "https://example.invalid/common-ppl.git", rev = "0123456789abcdef" }
+widgets = { git = "https://example.invalid/widgets-ppl.git", branch = "main" }
+themes = { git = "https://example.invalid/themes-ppl.git", tag = "v1.2.0" }
+```
+
+Each dependency must have a `ppl.toml` at its package root and sources below its
+`src` directory. Dependencies may have dependencies of their own. Git packages
+are checked out below `target/ppl-dependencies/git`; revision and tag checkouts
+are reused, while moving branches are refreshed when dependencies are resolved.
+The `git` executable must be available to the compiler and language server.
+
+Plain library sources are grouped into an implicit module named after the
+dependency entry. `AS` gives that module a source-local name in the consuming
+package:
+
+```PPL
+IMPORT themes AS MyTheme
+
+MyTheme.Apply()
+```
+
+This behaves as if the plain sources had been enclosed by `MODULE themes` and
+`ENDMODULE`; declarations from all plain source files form one namespace.
+`PUBLIC` and `PRIVATE` sections can be used without writing those delimiters.
+A library source that declares an explicit `MODULE` keeps that explicit module
+instead, allowing one package to provide additional named modules. Library
+packages should avoid top-level executable statements. Pin Git dependencies
+with `rev` when reproducible builds are required.
+
 ### Routine documentation
 
 A contiguous block of `;;;` comments documents the function, procedure or

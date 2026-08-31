@@ -938,6 +938,10 @@ impl Backend {
         if ws_file.exists()
             && let Ok(mut ws) = Workspace::load(ws_file)
         {
+            if let Err(err) = ws.resolve_dependencies() {
+                log::error!("Failed to resolve PPL dependencies: {err}");
+                return;
+            }
             // The manifest is explicit; the environment only fills in what it left open.
             ws.set_default_language_version(env_language_version());
             let errors = Arc::new(Mutex::new(ErrorReporter::default()));
@@ -965,7 +969,11 @@ impl Backend {
             let lowered = lower_modules(&asts.iter().collect::<Vec<_>>(), errors);
             // A file the manifest no longer names must not linger from an earlier read.
             self.workspace_map.clear();
-            for ast in &lowered {
+            for ast in lowered
+                .iter()
+                .filter(|ast| ast.module.is_some())
+                .chain(lowered.iter().filter(|ast| ast.module.is_none()))
+            {
                 semantic_visitor.errors.lock().unwrap().set_file_name(&ast.file_name);
                 ast.visit(&mut semantic_visitor);
             }
@@ -1127,7 +1135,11 @@ impl Backend {
                 let mut parsed = Vec::new();
                 semantic_visitor.set_modules(&asts.iter().map(|(_, ast)| ast).collect::<Vec<_>>());
                 let lowered = lower_modules(&asts.iter().map(|(_, ast)| ast).collect::<Vec<_>>(), errors);
-                for ast in &lowered {
+                for ast in lowered
+                    .iter()
+                    .filter(|ast| ast.module.is_some())
+                    .chain(lowered.iter().filter(|ast| ast.module.is_none()))
+                {
                     semantic_visitor.errors.lock().unwrap().set_file_name(&ast.file_name);
                     ast.visit(&mut semantic_visitor);
                 }

@@ -10,6 +10,13 @@ releases.
 
 ### Added
 
+- PPL package manifests support transitive source-library dependencies through
+  local `path` entries and Git repositories selected by `rev`, `branch` or
+  `tag`. Plain dependency sources form an implicit module named after the
+  dependency entry, so `IMPORT themes AS MyTheme` imports an entire library.
+  Dependency modules are compiled into the consuming PPE and are available to
+  language-server analysis.
+
 - PPL 4.00 adds compile-time `MODULE ... ENDMODULE` namespaces. Declarations
   are public by default, standalone `PUBLIC` and `PRIVATE` lines switch section
   visibility, and `IMPORT module AS alias` provides qualified access without

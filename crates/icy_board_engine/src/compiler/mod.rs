@@ -266,19 +266,27 @@ impl PPECompiler {
         for prg in asts {
             self.semantic_visitor.errors.lock().unwrap().set_file_name(&prg.file_name);
             let prg = prg.visit_mut(&mut transformer);
-            // println!("{}", prg);
-            self.semantic_visitor.set_loop_counters(transformer.take_loop_counters());
+            visted.push((prg, transformer.take_loop_counters()));
+        }
+        // Imported module declarations must be known before the root program is
+        // checked, but the root file must remain first when code is emitted.
+        for (prg, loop_counters) in visted
+            .iter()
+            .filter(|(program, _)| program.module.is_some())
+            .chain(visted.iter().filter(|(program, _)| program.module.is_none()))
+        {
+            self.semantic_visitor.errors.lock().unwrap().set_file_name(&prg.file_name);
+            self.semantic_visitor.set_loop_counters(loop_counters.clone());
             prg.visit(&mut self.semantic_visitor);
-            visted.push(prg);
         }
         self.semantic_visitor.finish();
 
-        for program in &mut visted {
+        for (program, _) in &mut visted {
             *program = program.visit_mut(&mut enum_lowering::EnumLoweringVisitor::new(&self.semantic_visitor.type_registry));
         }
 
         self.lookup_table = self.semantic_visitor.generate_variable_table();
-        for prg in visted {
+        for (prg, _) in visted {
             self.semantic_visitor.errors.lock().unwrap().set_file_name(&prg.file_name);
             for d in &prg.nodes {
                 match d {

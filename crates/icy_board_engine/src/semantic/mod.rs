@@ -842,7 +842,15 @@ impl SemanticVisitor {
                     crate::ast::AstNode::TopLevelStatement(_) | crate::ast::AstNode::Main(_) => {}
                 }
             }
-            self.module_exports.insert(module.name().clone(), exports);
+            let module_exports = self.module_exports.entry(module.name().clone()).or_default();
+            for export in exports {
+                if !module_exports
+                    .iter()
+                    .any(|existing| existing.name.eq_ignore_ascii_case(&export.name) && existing.kind == export.kind)
+                {
+                    module_exports.push(export);
+                }
+            }
         }
     }
 
