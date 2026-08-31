@@ -419,6 +419,7 @@ mod tests {
     use super::*;
     use crate::{
         compiler::PPECompiler,
+        executable::PPECommand,
         parser::{Encoding, ErrorReporter, UserTypeRegistry, parse_ast_with_predeclared_types, preparse_type_declarations},
     };
     use std::sync::{Arc, Mutex};
@@ -467,6 +468,29 @@ mod tests {
             .iter()
             .map(|error| format!("{}: {}", error.file_name.display(), error.error))
             .collect()
+    }
+
+    fn compile_workspace_commands(root: &Workspace) -> Vec<PPECommand> {
+        let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+        let registry = UserTypeRegistry::icy_board_registry();
+        let sources = root
+            .files()
+            .into_iter()
+            .map(|file| {
+                let source = fs::read_to_string(&file).unwrap();
+                preparse_type_declarations(file.clone(), errors.clone(), &source, &registry, Encoding::Utf8, root);
+                (file, source)
+            })
+            .collect::<Vec<_>>();
+        let asts = sources
+            .iter()
+            .map(|(file, source)| parse_ast_with_predeclared_types(file.clone(), errors.clone(), source, &registry, Encoding::Utf8, root))
+            .collect::<Vec<_>>();
+        let mut compiler = PPECompiler::new(root, registry, errors.clone());
+        compiler.compile(&asts.iter().collect::<Vec<_>>());
+        let messages = errors.lock().unwrap().errors.iter().map(|error| error.error.to_string()).collect::<Vec<_>>();
+        assert!(messages.is_empty(), "workspace should compile: {messages:?}");
+        compiler.get_script().statements.iter().map(|statement| statement.command.clone()).collect()
     }
 
     #[test]
@@ -712,5 +736,27 @@ mod tests {
 
         let messages = compile_workspace(&root);
         assert!(messages.is_empty(), "library module should compile: {messages:?}");
+    }
+
+    #[test]
+    fn library_global_initializers_run_before_the_root_program_ends() {
+        let temp = tempfile::tempdir().unwrap();
+        let library = package(&temp.path().join("values"), "values", BTreeMap::new());
+        fs::write(library.file_name.parent().unwrap().join("src/values.pps"), "INTEGER Answer = 42\n").unwrap();
+        let mut root = package(
+            &temp.path().join("application"),
+            "application",
+            BTreeMap::from([("values".to_string(), path_dependency("../values"))]),
+        );
+        fs::write(root.file_name.parent().unwrap().join("src/main.pps"), "IMPORT values AS V\nPRINTLN V.Answer\n").unwrap();
+        root.resolve_dependencies().unwrap();
+
+        let commands = compile_workspace_commands(&root);
+        let initializer = commands.iter().position(|command| matches!(command, PPECommand::Let(_, _))).unwrap();
+        let end = commands.iter().position(|command| matches!(command, PPECommand::End)).unwrap();
+        assert!(
+            initializer < end,
+            "library initializer at {initializer} is unreachable after program end at {end}"
+        );
     }
 }

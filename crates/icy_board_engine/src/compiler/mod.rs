@@ -289,32 +289,13 @@ impl PPECompiler {
         }
 
         self.lookup_table = self.semantic_visitor.generate_variable_table();
+        for (program, _) in visted.iter().filter(|(program, _)| program.module.is_some()) {
+            self.compile_program_statements(program);
+        }
         for (prg, _) in visted {
             self.semantic_visitor.errors.lock().unwrap().set_file_name(&prg.file_name);
-            for d in &prg.nodes {
-                match d {
-                    AstNode::Function(_func) => {}
-                    AstNode::Procedure(_proc) => {}
-                    AstNode::FunctionDeclaration(_func) => {}
-                    AstNode::ProcedureDeclaration(_proc) => {}
-                    // The layout is settled while parsing, nothing is emitted for it.
-                    AstNode::TypeDeclaration(_type_decl) => {}
-                    AstNode::EnumDeclaration(_enum_decl) => {}
-                    AstNode::TopLevelStatement(stmt) => {
-                        if let Statement::Block(block) = stmt {
-                            for s in optimize_statements(block.get_statements()) {
-                                self.compile_add_statement(&s);
-                            }
-                        } else {
-                            self.compile_add_statement(stmt);
-                        }
-                    }
-                    AstNode::Main(block) => {
-                        for s in optimize_statements(block.get_statements()) {
-                            self.compile_add_statement(&s);
-                        }
-                    }
-                }
+            if prg.module.is_none() {
+                self.compile_program_statements(&prg);
             }
 
             if self.commands.statements.is_empty() || self.commands.statements.last().unwrap().command != PPECommand::End {
@@ -324,6 +305,25 @@ impl PPECompiler {
             self.compile_functions(&prg);
         }
         self.fill_labels();
+    }
+
+    fn compile_program_statements(&mut self, program: &Ast) {
+        for node in &program.nodes {
+            match node {
+                AstNode::TopLevelStatement(Statement::Block(block)) | AstNode::Main(block) => {
+                    for statement in optimize_statements(block.get_statements()) {
+                        self.compile_add_statement(&statement);
+                    }
+                }
+                AstNode::TopLevelStatement(statement) => self.compile_add_statement(statement),
+                AstNode::Function(_)
+                | AstNode::Procedure(_)
+                | AstNode::FunctionDeclaration(_)
+                | AstNode::ProcedureDeclaration(_)
+                | AstNode::TypeDeclaration(_)
+                | AstNode::EnumDeclaration(_) => {}
+            }
+        }
     }
 
     fn compile_functions(&mut self, prg: &Ast) {
