@@ -8,9 +8,9 @@ use unicase::Ascii;
 use crate::{
     ast::{
         Ast, AstNode, AstVisitor, AstVisitorMut, Expression, FunctionDeclarationAstNode, FunctionImplementation, IdentifierExpression,
-        MemberReferenceExpression, ParameterSpecifier, ProcedureCallStatement, Statement, TypeDeclarationAstNode, VariableDeclarationStatement,
-        VariableSpecifier, Visibility, walk_function_declaration, walk_function_implementation, walk_procedure_declaration, walk_procedure_implementation,
-        walk_variable_declaration_statement,
+        MemberReferenceExpression, ModuleDeclaration, ParameterSpecifier, ProcedureCallStatement, Statement, TypeDeclarationAstNode,
+        VariableDeclarationStatement, VariableSpecifier, Visibility, walk_function_declaration, walk_function_implementation, walk_procedure_declaration,
+        walk_procedure_implementation, walk_variable_declaration_statement,
     },
     compiler::CompilationErrorType,
     parser::{
@@ -44,7 +44,7 @@ pub fn lower_modules(asts: &[&Ast], errors: Arc<Mutex<ErrorReporter>>) -> Vec<As
 
     for (module_index, ast) in asts.iter().enumerate() {
         let Some(module) = &ast.module else { continue };
-        report_module_statements(ast, module.name(), &errors);
+        validate_module_contents(ast, module, &errors);
         let existing = catalog.get(module.name());
         if existing.is_some() && !(module.is_implicit() && existing.is_some_and(|info| info.implicit)) {
             errors.lock().unwrap().report_error_file(
@@ -61,7 +61,7 @@ pub fn lower_modules(asts: &[&Ast], errors: Arc<Mutex<ErrorReporter>>) -> Vec<As
                 implicit: module.is_implicit(),
             })
             .symbols;
-        for (name, span, kind) in global_symbols(ast) {
+        for (name, span, kind) in global_symbols(ast, module) {
             let lowered = if kind == SymbolKind::Type {
                 UserTypeRegistry::module_type_name(module.name(), &name)
             } else {
@@ -199,29 +199,55 @@ impl AstVisitor<()> for TypeVisibilityValidator<'_> {
     }
 }
 
-/// A module is a namespace, so anything it would run would land in the program of
-/// whoever imports it, at a place that source never asked for.
-fn report_module_statements(ast: &Ast, module: &Ascii<String>, errors: &Arc<Mutex<ErrorReporter>>) {
+fn validate_module_contents(ast: &Ast, module: &ModuleDeclaration, errors: &Arc<Mutex<ErrorReporter>>) {
     for node in &ast.nodes {
-        let span = match node {
+        if matches!(node, AstNode::TopLevelStatement(Statement::Comment(_))) {
+            continue;
+        }
+        let item_span = match node {
+            AstNode::Function(value) => value.get_function_token().span.start..value.get_endfunc_token().span.end,
+            AstNode::Procedure(value) => value.get_procedure_token().span.start..value.get_endproc_token().span.end,
+            AstNode::FunctionDeclaration(value) => value.get_declare_token().span.clone(),
+            AstNode::ProcedureDeclaration(value) => value.get_declare_token().span.clone(),
+            AstNode::TypeDeclaration(value) => value.get_type_token().span.start..value.get_endtype_token().span.end,
+            AstNode::EnumDeclaration(value) => value.get_enum_token().span.start..value.get_endenum_token().span.end,
+            AstNode::TopLevelStatement(statement) => statement.get_span(),
             AstNode::Main(block) => block
                 .get_begin_token()
                 .map(|token| token.span.clone())
-                .or_else(|| block.get_statements().first().map(Statement::get_span)),
-            AstNode::TopLevelStatement(Statement::VariableDeclaration(_) | Statement::ConstDeclaration(_) | Statement::Comment(_)) => None,
-            AstNode::TopLevelStatement(statement) => Some(statement.get_span()),
-            _ => None,
+                .or_else(|| block.get_statements().first().map(Statement::get_span))
+                .unwrap_or_default(),
         };
-        if let Some(span) = span {
-            errors
-                .lock()
-                .unwrap()
-                .report_error_file(ast.file_name.clone(), span, CompilationErrorType::StatementInModule(module.to_string()));
+        if !module.is_implicit()
+            && !module.endmodule_token.span.is_empty()
+            && (item_span.start <= module.module_token.span.start || item_span.end >= module.endmodule_token.span.end)
+        {
+            errors.lock().unwrap().report_error_file(
+                ast.file_name.clone(),
+                item_span,
+                CompilationErrorType::ItemOutsideModule(module.name().to_string()),
+            );
+            continue;
+        }
+        let executable = match node {
+            AstNode::Main(_) => true,
+            AstNode::TopLevelStatement(statement) => !matches!(
+                statement,
+                Statement::VariableDeclaration(_) | Statement::ConstDeclaration(_) | Statement::Comment(_)
+            ),
+            _ => false,
+        };
+        if executable {
+            errors.lock().unwrap().report_error_file(
+                ast.file_name.clone(),
+                item_span,
+                CompilationErrorType::StatementInModule(module.name().to_string()),
+            );
         }
     }
 }
 
-fn global_symbols(ast: &Ast) -> Vec<(Ascii<String>, usize, SymbolKind)> {
+fn global_symbols(ast: &Ast, module: &ModuleDeclaration) -> Vec<(Ascii<String>, usize, SymbolKind)> {
     let mut result = Vec::new();
     for node in &ast.nodes {
         match node {
@@ -244,6 +270,9 @@ fn global_symbols(ast: &Ast) -> Vec<(Ascii<String>, usize, SymbolKind)> {
             }
             AstNode::TopLevelStatement(_) | AstNode::Main(_) => {}
         }
+    }
+    if !module.is_implicit() && !module.endmodule_token.span.is_empty() {
+        result.retain(|(_, offset, _)| *offset > module.module_token.span.start && *offset < module.endmodule_token.span.end);
     }
     result
 }
@@ -446,6 +475,32 @@ mod tests {
             ("main.pps", "IMPORT Greeter AS G\nG.Hello()\n"),
         ]);
         assert!(errors.lock().unwrap().errors.is_empty(), "public import should compile");
+    }
+
+    #[test]
+    fn declarations_after_endmodule_are_not_module_members() {
+        let errors = compile(&[
+            ("greeter.pps", "MODULE Greeter\nENDMODULE\nPROCEDURE Escaped()\nENDPROC\n"),
+            ("main.pps", "IMPORT Greeter AS G\nG.Escaped()\n"),
+        ]);
+        let messages = errors.lock().unwrap().errors.iter().map(|error| error.error.to_string()).collect::<Vec<_>>();
+        assert!(
+            messages.iter().any(|message| message.contains("outside MODULE Greeter")),
+            "declarations outside the module boundary must be rejected: {messages:?}"
+        );
+    }
+
+    #[test]
+    fn declarations_before_module_are_not_module_members() {
+        let errors = compile(&[
+            ("greeter.pps", "PROCEDURE Escaped()\nENDPROC\nMODULE Greeter\nENDMODULE\n"),
+            ("main.pps", "IMPORT Greeter AS G\nG.Escaped()\n"),
+        ]);
+        let messages = errors.lock().unwrap().errors.iter().map(|error| error.error.to_string()).collect::<Vec<_>>();
+        assert!(
+            messages.iter().any(|message| message.contains("outside MODULE Greeter")),
+            "declarations before the module boundary must be rejected: {messages:?}"
+        );
     }
 
     #[test]

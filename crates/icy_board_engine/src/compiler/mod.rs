@@ -71,6 +71,9 @@ pub enum CompilationErrorType {
     #[error("Module {0} may only declare; it has no program of its own to run")]
     StatementInModule(String),
 
+    #[error("Source item is outside MODULE {0}")]
+    ItemOutsideModule(String),
+
     #[error("SORT arguments should be one (1) dimensional arrays ({0})")]
     SortArgumentDimensionError(u8),
 
