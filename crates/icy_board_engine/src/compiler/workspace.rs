@@ -8,6 +8,7 @@ use std::{
 use semver::Version;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use unicase::Ascii;
 
 use crate::{
     Res,
@@ -76,6 +77,9 @@ pub struct Workspace {
     #[serde(skip)]
     dependency_modules: HashMap<PathBuf, String>,
 
+    #[serde(skip)]
+    dependency_imports: HashMap<PathBuf, HashMap<Ascii<String>, Ascii<String>>>,
+
     pub package: Package,
     pub compiler: Option<CompilerData>,
     pub data: Option<PackageData>,
@@ -100,6 +104,7 @@ impl Default for Workspace {
             hard_coded_files: None,
             dependency_files: HashSet::new(),
             dependency_modules: HashMap::new(),
+            dependency_imports: HashMap::new(),
         }
     }
 }
@@ -186,8 +191,22 @@ impl Workspace {
         let cache = root.join("target").join("ppl-dependencies").join("git");
         let mut files = self.files();
         let root_file_count = files.len();
+        let root_files = files.clone();
         let mut visited = HashSet::from([manifest.clone()]);
-        collect_dependency_files(&manifest, &self.dependencies, &cache, &mut visited, &mut files, &mut self.dependency_modules)?;
+        let mut package_modules = HashMap::new();
+        let root_imports = collect_dependency_files(
+            &manifest,
+            &self.dependencies,
+            &cache,
+            &mut visited,
+            &mut package_modules,
+            &mut files,
+            &mut self.dependency_modules,
+            &mut self.dependency_imports,
+        )?;
+        for file in root_files {
+            self.dependency_imports.insert(file, root_imports.clone());
+        }
         self.dependency_files = files[root_file_count..].iter().cloned().collect();
         self.hard_coded_files = Some(files);
         Ok(())
@@ -201,6 +220,10 @@ impl Workspace {
     /// implicit module when the file has no explicit `MODULE` declaration.
     pub fn dependency_module(&self, file: &Path) -> Option<&str> {
         self.dependency_modules.get(file).map(String::as_str)
+    }
+
+    pub fn dependency_imports(&self, file: &Path) -> Option<&HashMap<Ascii<String>, Ascii<String>>> {
+        self.dependency_imports.get(file)
     }
 
     pub fn runtime(&self) -> u16 {
@@ -234,27 +257,43 @@ fn collect_dependency_files(
     dependencies: &BTreeMap<String, Dependency>,
     cache: &Path,
     visited: &mut HashSet<PathBuf>,
+    package_modules: &mut HashMap<PathBuf, String>,
     files: &mut Vec<PathBuf>,
     dependency_modules: &mut HashMap<PathBuf, String>,
-) -> Res<()> {
+    dependency_imports: &mut HashMap<PathBuf, HashMap<Ascii<String>, Ascii<String>>>,
+) -> Res<HashMap<Ascii<String>, Ascii<String>>> {
     let owner_dir = owner_manifest
         .parent()
         .ok_or_else(|| format!("invalid package manifest path: {}", owner_manifest.display()))?;
+    let mut imports = HashMap::new();
     for (name, dependency) in dependencies {
         let package_dir = dependency.resolve(name, owner_dir, cache)?;
         let manifest = fs::canonicalize(package_dir.join("ppl.toml"))
             .map_err(|err| format!("dependency '{name}' has no readable ppl.toml at {}: {err}", package_dir.display()))?;
+        let next_module = package_modules.len();
+        let module = package_modules.entry(manifest.clone()).or_insert_with(|| format!("__LIB{next_module}")).clone();
+        imports.insert(Ascii::new(name.clone()), Ascii::new(module.clone()));
         if !visited.insert(manifest.clone()) {
             continue;
         }
         let workspace = Workspace::load(&manifest)?;
-        collect_dependency_files(&manifest, &workspace.dependencies, cache, visited, files, dependency_modules)?;
+        let package_imports = collect_dependency_files(
+            &manifest,
+            &workspace.dependencies,
+            cache,
+            visited,
+            package_modules,
+            files,
+            dependency_modules,
+            dependency_imports,
+        )?;
         for file in workspace.files() {
-            dependency_modules.insert(file.clone(), name.clone());
+            dependency_modules.insert(file.clone(), module.clone());
+            dependency_imports.insert(file.clone(), package_imports.clone());
             files.push(file);
         }
     }
-    Ok(())
+    Ok(imports)
 }
 
 impl Dependency {
@@ -404,6 +443,32 @@ mod tests {
         }
     }
 
+    fn compile_workspace(root: &Workspace) -> Vec<String> {
+        let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+        let registry = UserTypeRegistry::icy_board_registry();
+        let sources = root
+            .files()
+            .into_iter()
+            .map(|file| {
+                let source = fs::read_to_string(&file).unwrap();
+                preparse_type_declarations(file.clone(), errors.clone(), &source, &registry, Encoding::Utf8, root);
+                (file, source)
+            })
+            .collect::<Vec<_>>();
+        let asts = sources
+            .iter()
+            .map(|(file, source)| parse_ast_with_predeclared_types(file.clone(), errors.clone(), source, &registry, Encoding::Utf8, root))
+            .collect::<Vec<_>>();
+        PPECompiler::new(root, registry, errors.clone()).compile(&asts.iter().collect::<Vec<_>>());
+        errors
+            .lock()
+            .unwrap()
+            .errors
+            .iter()
+            .map(|error| format!("{}: {}", error.file_name.display(), error.error))
+            .collect()
+    }
+
     #[test]
     fn default_runtime_and_language_are_independent() {
         let workspace = Workspace::default();
@@ -463,6 +528,101 @@ mod tests {
         assert_eq!(vec!["main.pps", "common.pps", "library.pps"], names);
         assert!(!root.is_dependency_file(&root.files()[0]));
         assert!(root.is_dependency_file(&root.files()[1]));
+    }
+
+    #[test]
+    fn one_package_can_be_imported_under_two_dependency_names() {
+        let temp = tempfile::tempdir().unwrap();
+        let library = package(&temp.path().join("shared"), "shared", BTreeMap::new());
+        fs::write(library.file_name.parent().unwrap().join("src/shared.pps"), "PROCEDURE Hello()\nENDPROC\n").unwrap();
+        let mut root = package(
+            &temp.path().join("application"),
+            "application",
+            BTreeMap::from([
+                ("first".to_string(), path_dependency("../shared")),
+                ("second".to_string(), path_dependency("../shared")),
+            ]),
+        );
+        fs::write(
+            root.file_name.parent().unwrap().join("src/main.pps"),
+            "IMPORT first AS A\nIMPORT second AS B\nA.Hello()\nB.Hello()\n",
+        )
+        .unwrap();
+
+        root.resolve_dependencies().unwrap();
+        let messages = compile_workspace(&root);
+        assert!(messages.is_empty(), "both dependency names should resolve to the same package: {messages:?}");
+    }
+
+    #[test]
+    fn equal_transitive_dependency_names_do_not_merge_different_packages() {
+        let temp = tempfile::tempdir().unwrap();
+        let first_util = package(&temp.path().join("first-util"), "first-util", BTreeMap::new());
+        fs::write(
+            first_util.file_name.parent().unwrap().join("src/util.pps"),
+            "PROCEDURE Run()\n  PRINTLN \"first\"\nENDPROC\n",
+        )
+        .unwrap();
+        let second_util = package(&temp.path().join("second-util"), "second-util", BTreeMap::new());
+        fs::write(
+            second_util.file_name.parent().unwrap().join("src/util.pps"),
+            "PROCEDURE Run()\n  PRINTLN \"second\"\nENDPROC\n",
+        )
+        .unwrap();
+
+        let first = package(
+            &temp.path().join("first"),
+            "first",
+            BTreeMap::from([("util".to_string(), path_dependency("../first-util"))]),
+        );
+        fs::write(
+            first.file_name.parent().unwrap().join("src/first.pps"),
+            "IMPORT util AS U\nPROCEDURE Run()\n  U.Run()\nENDPROC\n",
+        )
+        .unwrap();
+        let second = package(
+            &temp.path().join("second"),
+            "second",
+            BTreeMap::from([("util".to_string(), path_dependency("../second-util"))]),
+        );
+        fs::write(
+            second.file_name.parent().unwrap().join("src/second.pps"),
+            "IMPORT util AS U\nPROCEDURE Run()\n  U.Run()\nENDPROC\n",
+        )
+        .unwrap();
+
+        let mut root = package(
+            &temp.path().join("application"),
+            "application",
+            BTreeMap::from([
+                ("first".to_string(), path_dependency("../first")),
+                ("second".to_string(), path_dependency("../second")),
+            ]),
+        );
+        fs::write(
+            root.file_name.parent().unwrap().join("src/main.pps"),
+            "IMPORT first AS A\nIMPORT second AS B\nA.Run()\nB.Run()\n",
+        )
+        .unwrap();
+
+        root.resolve_dependencies().unwrap();
+        let first_util_file = root
+            .files()
+            .into_iter()
+            .find(|file| file.starts_with(first_util.file_name.parent().unwrap()))
+            .unwrap();
+        let second_util_file = root
+            .files()
+            .into_iter()
+            .find(|file| file.starts_with(second_util.file_name.parent().unwrap()))
+            .unwrap();
+        assert_ne!(
+            root.dependency_module(&first_util_file),
+            root.dependency_module(&second_util_file),
+            "different transitive packages named util must have distinct module identities"
+        );
+        let messages = compile_workspace(&root);
+        assert!(messages.is_empty(), "manifest-local dependency names must stay scoped: {messages:?}");
     }
 
     #[test]
@@ -550,30 +710,7 @@ mod tests {
         .unwrap();
         root.resolve_dependencies().unwrap();
 
-        let errors = Arc::new(Mutex::new(ErrorReporter::default()));
-        let registry = UserTypeRegistry::icy_board_registry();
-        let sources = root
-            .files()
-            .into_iter()
-            .map(|file| {
-                let source = fs::read_to_string(&file).unwrap();
-                preparse_type_declarations(file.clone(), errors.clone(), &source, &registry, Encoding::Utf8, &root);
-                (file, source)
-            })
-            .collect::<Vec<_>>();
-        let asts = sources
-            .iter()
-            .map(|(file, source)| parse_ast_with_predeclared_types(file.clone(), errors.clone(), source, &registry, Encoding::Utf8, &root))
-            .collect::<Vec<_>>();
-        PPECompiler::new(&root, registry, errors.clone()).compile(&asts.iter().collect::<Vec<_>>());
-
-        let messages = errors
-            .lock()
-            .unwrap()
-            .errors
-            .iter()
-            .map(|error| format!("{}: {}", error.file_name.display(), error.error))
-            .collect::<Vec<_>>();
+        let messages = compile_workspace(&root);
         assert!(messages.is_empty(), "library module should compile: {messages:?}");
     }
 }

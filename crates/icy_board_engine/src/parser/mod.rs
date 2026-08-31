@@ -685,6 +685,7 @@ pub struct Parser<'a> {
     types_predeclared: bool,
     module: Option<ModuleDeclaration>,
     imports: Vec<ImportDeclaration>,
+    dependency_imports: HashMap<unicase::Ascii<String>, unicase::Ascii<String>>,
     in_module: bool,
 }
 static PROC_TOKEN: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("PROC".to_string()));
@@ -711,6 +712,7 @@ impl<'a> Parser<'a> {
         workspace: &Workspace,
     ) -> Self {
         let implicit_module = workspace.dependency_module(&file).map(ModuleDeclaration::implicit);
+        let dependency_imports = workspace.dependency_imports(&file).cloned().unwrap_or_default();
         let in_module = implicit_module.is_some();
         let lex: Lexer = Lexer::new(file, workspace, text, encoding, error_reporter.clone());
         let lang_version = lex.lang_version();
@@ -731,6 +733,7 @@ impl<'a> Parser<'a> {
             types_predeclared: false,
             module: implicit_module,
             imports: Vec::new(),
+            dependency_imports,
             in_module,
         }
     }
@@ -1093,7 +1096,12 @@ impl<'a> Parser<'a> {
             self.report_error(self.save_token_span(), ParserErrorType::InvalidImport);
             return;
         };
-        let module_token = self.save_spanned_token();
+        let mut module_token = self.save_spanned_token();
+        if let Token::Identifier(name) = &module_token.token
+            && let Some(module) = self.dependency_imports.get(name)
+        {
+            module_token.token = Token::Identifier(module.clone());
+        }
         self.next_token();
         let Some(Token::Identifier(as_name)) = self.get_cur_token() else {
             self.report_error(self.save_token_span(), ParserErrorType::InvalidImport);
