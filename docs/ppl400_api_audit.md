@@ -597,9 +597,9 @@ These are concrete inconsistencies found during the review:
 3. One language page says fixed arrays use parentheses at 4.00; another says the
    formatter/decompiler emits brackets and warns on parentheses. This is not just
    stale prose—it reflects the unresolved style decision called out above.
-4. Generated registry dumps currently omit array return rank in their printed
-   type, making `FindAll`, `Split`, `Notes`, `Contacts`, and board collections
-   look scalar. The dump should print rank before it becomes a review oracle.
+4. The registry dump now includes array rank, record fields, enum values,
+  writable flags, optional arguments, and static/member status. Representative
+  assertions keep those metadata categories present as the registry evolves.
 5. API prose has previously drifted on `ErrKind`, `ErrCode`, `HttpMethod`,
    `EditorMode`, input signatures, and checksum names. Enum values and signatures
    should be generated or tested against documentation.
@@ -611,10 +611,9 @@ These are concrete inconsistencies found during the review:
 | Priority | Action | Why |
 | :---: | :--- | :--- |
 | 1 | Decide fixed-array canonical syntax; recommendation: preserve `name(10)` and use brackets for indexing/dynamic rank. | Highest PPL-style impact. |
-| 2 | Extend the registry dump to show array rank, record fields, enum values, writable flags, optional arguments, and static/member status. | Prevents another stale API review. |
-| 3 | Add documentation checks/generated tables for signatures and enum values. | Current prose already contains contradictions. |
-| 4 | Add an `EventKind` applicability table and lifetime/mutability label to every object reference. | Prevents the most likely API misuse. |
-| 5 | Freeze IDs/opcodes only after the above decisions; keep pre-400 numbers untouched. | 4.00 can still be compacted before release, but not afterward. |
+| 2 | Add documentation checks/generated tables for signatures and enum values. | Current prose already contains contradictions. |
+| 3 | Add an `EventKind` applicability table and lifetime/mutability label to every object reference. | Prevents the most likely API misuse. |
+| 4 | Freeze IDs/opcodes only after the above decisions; keep pre-400 numbers untouched. | 4.00 can still be compacted before release, but not afterward. |
 
 ## Post-freeze restraint
 
