@@ -18,14 +18,21 @@ releases.
   `tag`. Plain dependency sources form an implicit module named after the
   dependency entry, so `IMPORT themes AS MyTheme` imports an entire library.
   Dependency modules are compiled into the consuming PPE and are available to
-  language-server analysis.
+  language-server analysis. Because a library is a module, it may only declare
+  variables, constants, types and routines; it has no program of its own to run,
+  and its own `;$LANGVERSION` applies to that library alone. Two packages that
+  depend on the same library, even under different aliases, share one compiled
+  copy instead of colliding, and a library's top-level initializers always run
+  before the importing program's own code.
 
 - PPL 4.00 adds compile-time `MODULE ... ENDMODULE` namespaces. Declarations
   are public by default, standalone `PUBLIC` and `PRIVATE` lines switch section
   visibility, and `IMPORT module AS alias` provides qualified access without
   changing the PPE runtime format. The compiler isolates equal declaration and
   type names across modules, and the language server highlights and completes
-  imported public APIs.
+  imported public APIs. A declaration placed before `MODULE` or after
+  `ENDMODULE` in the same file is rejected as outside the module rather than
+  silently joining it.
 
 - PPL 4.00 functions, procedures and `DECLARE` statements support Rust-style
   Markdown documentation through contiguous `;;;` comments. The language
