@@ -26,6 +26,10 @@ run_ppe_completed = Ausführung abgeschlossen - beliebige Taste zum Beenden
 option_not_read_yet = wird vom Board noch nicht ausgewertet
 option_imported_only = stammt aus dem PCBoard-Import und wird nicht ausgewertet
 
+# Anruf-Warteschirm
+call_wait_screen_sysop_page = SYSOP-RUF: Node { $node } - { $user } ({ $count } aktiv)
+call_wait_screen_unknown_caller = Unbekannter Anrufer
+
 
 yes=Ja
 no=Nein

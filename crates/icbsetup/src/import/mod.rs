@@ -702,6 +702,7 @@ impl PCBoardImporter {
             options: BoardOptions {
                 give_user_password_to_doors: false,
                 page_bell: true,
+                page_notification_command: String::new(),
                 alarm: false,
                 call_log: true,
                 log_caller_number: self.data.log_caller_number,

@@ -797,6 +797,11 @@ pub struct BoardOptions {
     #[serde(default)]
     pub page_bell: bool,
 
+    /// Optional shell command run when a caller starts paging the sysop.
+    /// Details are supplied through ICB_PAGE_NODE and ICB_PAGE_USER.
+    #[serde(default)]
+    pub page_notification_command: String,
+
     #[serde(default)]
     pub alarm: bool,
 
@@ -1317,6 +1322,7 @@ impl IcbConfig {
             options: BoardOptions {
                 give_user_password_to_doors: false,
                 page_bell: true,
+                page_notification_command: String::new(),
                 alarm: false,
                 call_log: true,
                 log_caller_number: false,

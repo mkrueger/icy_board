@@ -1379,6 +1379,7 @@ fn to_switches_dto(config: &IcbConfig) -> SwitchesSettingsDto {
         give_user_password_to_doors: config.options.give_user_password_to_doors,
         call_log: config.options.call_log,
         page_bell: config.options.page_bell,
+        page_notification_command: config.options.page_notification_command.clone(),
         alarm: config.options.alarm,
         log_caller_number: config.options.log_caller_number,
         log_connect_string: config.options.log_connect_string,
@@ -1402,6 +1403,7 @@ fn apply_switches_dto(config: &mut IcbConfig, dto: &SwitchesSettingsDto) -> Resu
     config.options.give_user_password_to_doors = dto.give_user_password_to_doors;
     config.options.call_log = dto.call_log;
     config.options.page_bell = dto.page_bell;
+    config.options.page_notification_command = dto.page_notification_command.clone();
     config.options.alarm = dto.alarm;
     config.options.log_caller_number = dto.log_caller_number;
     config.options.log_connect_string = dto.log_connect_string;
@@ -1483,6 +1485,12 @@ fn diff_switches(old: &SwitchesSettingsDto, new: &SwitchesSettingsDto) -> Vec<Fi
     );
     push_change(&mut c, "call_log", old.call_log.to_string(), new.call_log.to_string());
     push_change(&mut c, "page_bell", old.page_bell.to_string(), new.page_bell.to_string());
+    push_change(
+        &mut c,
+        "page_notification_command",
+        old.page_notification_command.clone(),
+        new.page_notification_command.clone(),
+    );
     push_change(&mut c, "alarm", old.alarm.to_string(), new.alarm.to_string());
     push_change(
         &mut c,

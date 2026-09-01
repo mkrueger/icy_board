@@ -35,7 +35,24 @@ Toggle call logging. If on, all calls are logged to icboard.log.
 
 Page Bell - On/Off
 ~~~~~~~~~~~~~~~~~~~
-Toggle the page bell. If on, the terminal bell will ring when a user pages sysop
+Toggle the page bell. If on, the terminal bell will ring when a user pages sysop.
+An active page also replaces the ready indicator with a red banner containing
+the node number and caller name.
+
+External Page Notification
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+``Page Notification Command`` under Configuration Options can run one trusted
+shell command whenever a page starts. Leave it empty to disable this feature.
+The board passes caller data as environment variables instead of substituting
+it into the command: ``ICB_PAGE_NODE`` contains the node number and
+``ICB_PAGE_USER`` contains the caller name. For example, on a Linux desktop::
+
+   notify-send "Icy Board" "Sysop page from $ICB_PAGE_USER on node $ICB_PAGE_NODE"
+
+The command runs asynchronously from the board root. It can therefore also
+invoke an administrator-owned script which sends a mail, webhook, ntfy, or
+other push notification. Failures are written to the board log and do not
+interrupt the caller's page.
 
 Alarm - On/Off
 ~~~~~~~~~~~~~~~~~~~~~~~

@@ -1952,6 +1952,14 @@ impl IcyBoardState {
     /// false when it rang out.
     pub async fn page_sysop(&mut self) -> Res<bool> {
         self.session.paged_sysop = true;
+        self.set_activity(NodeStatus::PagingSysop).await;
+        self.run_page_notification();
+        let result = self.page_sysop_inner().await;
+        self.set_activity(NodeStatus::Available).await;
+        result
+    }
+
+    async fn page_sysop_inner(&mut self) -> Res<bool> {
         self.display_text(IceText::Paging, display_flags::LFBEFORE).await?;
 
         for _i in 0..15 {
@@ -1970,6 +1978,7 @@ impl IcyBoardState {
                     return Ok(true);
                 }
                 if ch.source == KeySource::Sysop {
+                    self.set_activity(NodeStatus::ChatWithSysop).await;
                     self.chat().await?;
                     self.display_text(IceText::SysopChatEnded, display_flags::NEWLINE | display_flags::LFBEFORE)
                         .await?;
@@ -1979,6 +1988,43 @@ impl IcyBoardState {
         }
 
         Ok(false)
+    }
+
+    fn run_page_notification(&self) {
+        let board = self.board.clone();
+        let node = self.node + 1;
+        let user = self.session.user_name.clone();
+        tokio::spawn(async move {
+            let (command, root) = {
+                let board = board.lock().await;
+                (board.config.options.page_notification_command.trim().to_string(), board.root_path.clone())
+            };
+            if command.is_empty() {
+                return;
+            }
+
+            let mut shell = if cfg!(windows) {
+                let mut shell = tokio::process::Command::new("cmd");
+                shell.arg("/C");
+                shell
+            } else {
+                let mut shell = tokio::process::Command::new("sh");
+                shell.arg("-c");
+                shell
+            };
+            match shell
+                .arg(&command)
+                .current_dir(root)
+                .env("ICB_PAGE_NODE", node.to_string())
+                .env("ICB_PAGE_USER", &user)
+                .status()
+                .await
+            {
+                Ok(status) if status.success() => log::info!("Sysop page notification ran for node {node}."),
+                Ok(status) => log::error!("Sysop page notification for node {node} exited with {status}."),
+                Err(err) => log::error!("Could not run sysop page notification for node {node}: {err}"),
+            }
+        });
     }
 
     async fn chat(&mut self) -> Res<()> {

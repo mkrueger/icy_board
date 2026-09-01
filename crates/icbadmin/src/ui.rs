@@ -463,7 +463,10 @@ pub fn switches_page(settings: &SwitchesSettingsResponse, csrf: &str, notice: Op
 <fieldset><legend>Logging &amp; doors</legend>
 <div class="check-grid">
 {give_pw}{call_log}{page_bell}{alarm}{log_caller}{log_connect}{log_sec}
-</div></fieldset>"#,
+</div>
+{page_notification_command}
+<p class="hint">Optional trusted shell command. ICB_PAGE_NODE and ICB_PAGE_USER are provided as environment variables.</p>
+</fieldset>"#,
         options = options,
         gfx = checkbox("Default graphics at login", "default_graphics_at_login", s.default_graphics_at_login),
         non_gfx = checkbox("Non-graphics / disable colors", "non_graphics", s.non_graphics),
@@ -478,6 +481,13 @@ pub fn switches_page(settings: &SwitchesSettingsResponse, csrf: &str, notice: Op
         give_pw = checkbox("Give user password to doors", "give_user_password_to_doors", s.give_user_password_to_doors),
         call_log = checkbox("Caller log", "call_log", s.call_log),
         page_bell = checkbox("Page bell", "page_bell", s.page_bell),
+        page_notification_command = text_field(
+            "Page notification command",
+            "page_notification_command",
+            &s.page_notification_command,
+            512,
+            false,
+        ),
         alarm = checkbox("Alarm", "alarm", s.alarm),
         log_caller = checkbox("Log caller number", "log_caller_number", s.log_caller_number),
         log_connect = checkbox("Log connect string", "log_connect_string", s.log_connect_string),

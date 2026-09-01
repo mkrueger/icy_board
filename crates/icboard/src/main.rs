@@ -173,7 +173,7 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
             loop {
                 terminal.clear()?;
                 app.reset(&board).await;
-                match app.run(&mut terminal, &board, arguments.full_screen).await {
+                match app.run(&mut terminal, &board, &bbs, arguments.full_screen).await {
                     Ok(msg) => {
                         let launches_board_tool = matches!(&msg, CallWaitMessage::SystemManager | CallWaitMessage::Setup);
                         if launches_board_tool {

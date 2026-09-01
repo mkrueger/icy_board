@@ -281,6 +281,8 @@ pub struct SwitchesSettingsDto {
     #[serde(default)]
     pub page_bell: bool,
     #[serde(default)]
+    pub page_notification_command: String,
+    #[serde(default)]
     pub alarm: bool,
     #[serde(default)]
     pub log_caller_number: bool,

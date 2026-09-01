@@ -7,10 +7,10 @@ use std::{
 use crate::{Res, SHOW_TOTAL_STATS};
 use chrono::{Local, Timelike};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
-use icy_board_engine::icy_board::{IcyBoard, statistics::Statistics};
+use icy_board_engine::icy_board::{IcyBoard, bbs::BBS, state::NodeStatus, statistics::Statistics};
 use icy_board_tui::{
     app::get_screen_size,
-    get_text,
+    get_text, get_text_args,
     theme::{DOS_BLACK, DOS_BLUE, DOS_CYAN, DOS_LIGHT_GRAY, DOS_RED, DOS_WHITE},
 };
 use ratatui::{
@@ -60,6 +60,7 @@ pub struct CallWaitScreen {
     board_name: String,
     date_format: String,
     statistics: Statistics,
+    paging_alert: Option<String>,
     error_message: Option<String>,
 }
 
@@ -174,6 +175,7 @@ impl CallWaitScreen {
             board_name,
             date_format,
             statistics: Statistics::default(),
+            paging_alert: None,
             error_message: None,
         })
     }
@@ -211,7 +213,13 @@ impl CallWaitScreen {
         };
     }
 
-    pub async fn run<B: Backend>(&mut self, terminal: &mut Terminal<B>, board: &Arc<Mutex<IcyBoard>>, full_screen: bool) -> Res<CallWaitMessage>
+    pub async fn run<B: Backend>(
+        &mut self,
+        terminal: &mut Terminal<B>,
+        board: &Arc<Mutex<IcyBoard>>,
+        bbs: &Arc<Mutex<BBS>>,
+        full_screen: bool,
+    ) -> Res<CallWaitMessage>
     where
         B::Error: Send + Sync + 'static,
     {
@@ -220,6 +228,7 @@ impl CallWaitScreen {
 
         loop {
             self.statistics = board.lock().await.statistics.clone();
+            self.paging_alert = Self::paging_alert(board, bbs).await;
 
             if terminal.get_frame().area().width > 1 && terminal.get_frame().area().height > 1 {
                 terminal.draw(|frame| self.ui(frame, full_screen))?;
@@ -264,6 +273,33 @@ impl CallWaitScreen {
                 last_tick = Instant::now();
             }
         }
+    }
+
+    async fn paging_alert(board: &Arc<Mutex<IcyBoard>>, bbs: &Arc<Mutex<BBS>>) -> Option<String> {
+        let open_connections = bbs.lock().await.open_connections.clone();
+        let paging_nodes = {
+            let connections = open_connections.lock().await;
+            connections
+                .iter()
+                .flatten()
+                .filter(|node| matches!(node.status, NodeStatus::PagingSysop))
+                .map(|node| (node.node_number, node.cur_user))
+                .collect::<Vec<_>>()
+        };
+        let (node, cur_user) = *paging_nodes.first()?;
+        let user = {
+            let board = board.lock().await;
+            usize::try_from(cur_user)
+                .ok()
+                .and_then(|index| board.users.get(index))
+                .map(|user| user.get_name().clone())
+                .unwrap_or_else(|| get_text("call_wait_screen_unknown_caller"))
+        };
+        let mut args = std::collections::HashMap::new();
+        args.insert("node".to_string(), node.to_string());
+        args.insert("user".to_string(), user);
+        args.insert("count".to_string(), paging_nodes.len().to_string());
+        Some(get_text_args("call_wait_screen_sysop_page", args))
     }
 
     fn ui(&self, frame: &mut Frame, full_screen: bool) {
@@ -368,9 +404,19 @@ impl CallWaitScreen {
             text: DOS_BLACK,
             background: DOS_CYAN,
         };
-        PcbButton::new(get_text("call_wait_screen_sys_ready"))
-            .theme(stat_teme)
-            .render(area, frame.buffer_mut());
+        let (ready_text, ready_theme) = self.paging_alert.as_ref().map_or_else(
+            || (get_text("call_wait_screen_sys_ready"), stat_teme),
+            |alert| {
+                (
+                    alert.clone(),
+                    Theme {
+                        text: DOS_WHITE,
+                        background: DOS_RED,
+                    },
+                )
+            },
+        );
+        PcbButton::new(ready_text).theme(ready_theme).render(area, frame.buffer_mut());
         stats.y += 2;
         stats.height = stats.height.saturating_sub(2);
 
@@ -584,6 +630,7 @@ mod tests {
             board_name: "Test Board".into(),
             date_format: "%m/%d/%y".into(),
             statistics: Statistics::default(),
+            paging_alert: None,
             error_message: None,
         };
         screen.show_error("icbsetup exited with exit status: 7");
@@ -591,14 +638,37 @@ mod tests {
         let mut terminal = Terminal::new(backend).unwrap();
         terminal.draw(|frame| screen.ui(frame, false)).unwrap();
 
-        let text = terminal
-            .backend()
-            .buffer()
-            .content()
-            .iter()
-            .map(|cell| cell.symbol())
-            .collect::<String>();
+        let text = terminal.backend().buffer().content().iter().map(|cell| cell.symbol()).collect::<String>();
         assert!(text.contains("icbsetup exited with exit status: 7"));
         assert!(text.contains("Press any key to continue."));
+    }
+
+    #[test]
+    fn sysop_page_replaces_ready_indicator() {
+        let buttons = (0..15)
+            .map(|_| Button {
+                title: "Tool".into(),
+                description: "Description".into(),
+                message: CallWaitMessage::ToggleAlarm,
+            })
+            .collect();
+        let screen = CallWaitScreen {
+            x: 0,
+            y: 0,
+            selected: None,
+            buttons,
+            board_name: "Test Board".into(),
+            date_format: "%m/%d/%y".into(),
+            statistics: Statistics::default(),
+            paging_alert: Some("SYSOP PAGE: Node 2 - Alice (1 active)".into()),
+            error_message: None,
+        };
+        let backend = TestBackend::new(80, 25);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|frame| screen.ui(frame, false)).unwrap();
+
+        let text = terminal.backend().buffer().content().iter().map(|cell| cell.symbol()).collect::<String>();
+        assert!(text.contains("SYSOP PAGE: Node 2 - Alice (1 active)"));
+        assert!(!text.contains("System is Ready For Callers"));
     }
 }

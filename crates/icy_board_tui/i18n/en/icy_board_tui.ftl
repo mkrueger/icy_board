@@ -76,6 +76,8 @@ call_wait_screen_show_statistics=Show Statistics
 call_wait_screen_show_statistics_descr=Shows all Statistics for the system
 
 call_wait_screen_sys_ready = System is Ready For Callers
+call_wait_screen_sysop_page = SYSOP PAGE: Node { $node } - { $user } ({ $count } active)
+call_wait_screen_unknown_caller = Unknown caller
 call_wait_screen_last_caller = Last Caller:
 call_wait_screen_last_caller_none = None
 call_wait_screen_num_calls = Calls:
@@ -1662,6 +1664,18 @@ allow_handle_in_grpchat-help=
 call_log=Write a Caller Log
 call_log-status=Record every logon in the caller log
 call_log-help=The file is named under File Locations - System Files.
+
+page_notification_command=Page Notification Command
+page_notification_command-status=Shell command run once when a caller pages the Sysop
+page_notification_command-help=
+    # Page Notification Command
+
+    Optional trusted shell command run once when a caller begins paging. Leave
+    this empty to disable external notifications. The command receives the node
+    number in ICB_PAGE_NODE and the caller name in ICB_PAGE_USER.
+
+    For example, a Linux desktop may use:
+    notify-send "Icy Board" "Sysop page from $ICB_PAGE_USER on node $ICB_PAGE_NODE"
 
 log_caller_number=Log the Caller Number
 log_caller_number-status=Write the caller number of the session to the caller log

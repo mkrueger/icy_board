@@ -48,6 +48,18 @@ impl ConfigSwitches {
                 cfg_entry_bool!("log_caller_number", label_width, options, log_caller_number, lock),
                 cfg_entry_bool!("log_connect_string", label_width, options, log_connect_string, lock),
                 cfg_entry_bool!("log_security_level", label_width, options, log_security_level, lock),
+                ConfigEntry::Separator,
+                ConfigEntry::Item(
+                    ListItem::new(
+                        get_text("page_notification_command"),
+                        ListValue::Text(80, TextFlags::None, lock.config.options.page_notification_command.clone()),
+                    )
+                    .with_status(get_text("page_notification_command-status"))
+                    .with_label_width(label_width)
+                    .with_update_text_value(&|board, value| {
+                        board.lock().unwrap().config.options.page_notification_command = value;
+                    }),
+                ),
             ];
             ConfigMenu { obj: icy_board.clone(), entry }
         };

@@ -679,6 +679,7 @@ fn switches_from_form(form: &HashMap<String, String>) -> SwitchesSettingsDto {
         give_user_password_to_doors: checked(form, "give_user_password_to_doors"),
         call_log: checked(form, "call_log"),
         page_bell: checked(form, "page_bell"),
+        page_notification_command: text(form, "page_notification_command"),
         alarm: checked(form, "alarm"),
         log_caller_number: checked(form, "log_caller_number"),
         log_connect_string: checked(form, "log_connect_string"),
