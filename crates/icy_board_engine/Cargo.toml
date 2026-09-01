@@ -68,8 +68,13 @@ x86-native = { workspace = true }
 
 # interpreter deps
 [dev-dependencies]
+criterion = "0.8.2"
 pretty_assertions = "1"
 stopwatch = "0.0.7"
+
+[[bench]]
+name = "ppl_engine"
+harness = false
 
 [target.'cfg(not(windows))'.dependencies]
 # termion is not supported on Windows

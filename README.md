@@ -160,6 +160,29 @@ Icy Board is a small suite rather than one oversized executable:
 | `icbmailer` | FTN scan, poll and toss |
 | `pplc`, `ppld`, `ppl-lsp` | PPL compiler, decompiler and language server |
 
+## PPL engine benchmarks
+
+Criterion benchmarks cover parsing, compilation, PPE serialization, core value
+operations and VM execution. Run the complete suite or filter by group:
+
+```sh
+cargo bench -p icy_board_engine --bench ppl_engine
+cargo bench -p icy_board_engine --bench ppl_engine -- vm
+cargo bench -p icy_board_engine --bench ppl_engine -- values/string_concat
+```
+
+Save a baseline before changing an implementation and compare against it after
+the change:
+
+```sh
+cargo bench -p icy_board_engine --bench ppl_engine -- --save-baseline before
+cargo bench -p icy_board_engine --bench ppl_engine -- --baseline before
+```
+
+Reports and measurements are written below `target/criterion/`. Benchmark setup
+is excluded where possible; VM programs are compiled once and board/session
+fixtures are prepared outside the timed iteration.
+
 ## Documentation
 
 See [Native DOS doors](docs/native_dos_doors.md) for the experimental in-process

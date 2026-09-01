@@ -10,6 +10,11 @@ releases.
 
 ### Added
 
+- Criterion benchmarks cover PPL parsing, compilation, PPE serialization,
+  string and array value operations, and prepared VM execution. The dedicated
+  bench profile optimizes for speed, and named baselines support before/after
+  comparisons during performance work.
+
 - Display files can use native IcyDraw `.icy` screens and scripted `.icyanim`
   animations directly, without invoking the external `icy_play` utility.
 
