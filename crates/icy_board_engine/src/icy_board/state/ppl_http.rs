@@ -3,7 +3,7 @@ use std::{
     io::Write,
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{Arc, Mutex, MutexGuard},
     time::Duration,
 };
 
@@ -63,21 +63,29 @@ struct HttpRequestData {
     body: Vec<u8>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct PplHttpRequest {
-    request: HttpRequestData,
+    request: Mutex<HttpRequestData>,
 }
 
 impl PplHttpRequest {
     fn new(method: Method, url: String) -> Self {
         Self {
-            request: HttpRequestData {
+            request: Mutex::new(HttpRequestData {
                 method,
                 url,
                 headers: HeaderMap::new(),
                 body: Vec::new(),
-            },
+            }),
         }
+    }
+
+    fn request(&self) -> MutexGuard<'_, HttpRequestData> {
+        self.request.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
+    fn into_request(self) -> HttpRequestData {
+        self.request.into_inner().unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
     fn invalid() -> VariableValue {
@@ -603,7 +611,7 @@ impl UserDataValue for PplHttp {
     ) -> crate::Res<VariableValue> {
         let url = arguments.first().map(VariableValue::as_string).unwrap_or_default();
         if *name == *GET {
-            return Ok(send(vm, PplHttpRequest::new(Method::GET, url).request, None).await);
+            return Ok(send(vm, PplHttpRequest::new(Method::GET, url).into_request(), None).await);
         }
         if *name == *NEW {
             let method = match method_from_value(arguments.first().map_or(0, VariableValue::as_int)) {
@@ -620,7 +628,7 @@ impl UserDataValue for PplHttp {
         if *name == *DOWNLOAD {
             let file = arguments.get(1).map(VariableValue::as_string).unwrap_or_default();
             let path = vm.resolve_file(&file).await;
-            return Ok(send(vm, PplHttpRequest::new(Method::GET, url).request, Some(path)).await);
+            return Ok(send(vm, PplHttpRequest::new(Method::GET, url).into_request(), Some(path)).await);
         }
         Err(format!("Unknown HTTP function {name}").into())
     }
@@ -640,13 +648,13 @@ impl UserData for PplHttpRequest {
         registry.add_named_function(
             SET_HEADER.clone(),
             vec![("name", VariableType::String), ("value", VariableType::String)],
-            VariableType::UserData(HTTP_REQUEST_ID as u8),
+            VariableType::Boolean,
         );
         registry.add_named_function_with(
             SET_TEXT.clone(),
             vec![("text", VariableType::String), ("contentType", VariableType::String)],
             1,
-            VariableType::UserData(HTTP_REQUEST_ID as u8),
+            VariableType::Boolean,
         );
         registry.add_function(SEND.clone(), Vec::new(), VariableType::UserData(HTTP_RESPONSE_ID as u8));
     }
@@ -655,11 +663,12 @@ impl UserData for PplHttpRequest {
 #[async_trait(?Send)]
 impl UserDataValue for PplHttpRequest {
     fn get_property_value(&self, _vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
+        let request = self.request();
         if *name == *URL {
-            return Ok(VariableValue::new_string(self.request.url.clone()));
+            return Ok(VariableValue::new_string(request.url.clone()));
         }
         if *name == *METHOD {
-            return Ok(VariableValue::new_int(method_value(&self.request.method)));
+            return Ok(VariableValue::new_int(method_value(&request.method)));
         }
         Err(format!("Unknown HTTPREQUEST property {name}").into())
     }
@@ -681,21 +690,25 @@ impl UserDataValue for PplHttpRequest {
             let parsed_value = HeaderValue::from_str(&header_value);
             match (parsed_name, parsed_value) {
                 (Ok(header_name), Ok(header_value)) if !forbidden_header(&header_name) => {
-                    let mut request = self.request.clone();
+                    let mut request = self.request();
                     request.headers.insert(header_name, header_value);
                     vm.operation_succeeded();
-                    return Ok(PplHttpRequest { request }.value());
+                    return Ok(VariableValue::new_bool(true));
                 }
                 _ => {
                     vm.set_error(PplError::new(ERR_KIND_NET, ERR_INVALID, "invalid or restricted HTTP header"));
-                    return Ok(self.clone().value());
+                    return Ok(VariableValue::new_bool(false));
                 }
             }
         }
         if *name == *SET_TEXT {
-            if matches!(self.request.method, Method::GET | Method::HEAD) {
+            let bodyless = {
+                let request = self.request();
+                request.method == Method::GET || request.method == Method::HEAD
+            };
+            if bodyless {
                 vm.set_error(PplError::new(ERR_KIND_NET, ERR_INVALID, "HTTP GET and HEAD requests cannot carry a body"));
-                return Ok(self.clone().value());
+                return Ok(VariableValue::new_bool(false));
             }
             let text = arguments.first().map(VariableValue::as_string).unwrap_or_default();
             let content_type = arguments
@@ -704,16 +717,17 @@ impl UserDataValue for PplHttpRequest {
                 .unwrap_or_else(|| "text/plain; charset=utf-8".to_string());
             let Ok(content_type) = HeaderValue::from_str(&content_type) else {
                 vm.set_error(PplError::new(ERR_KIND_NET, ERR_INVALID, "invalid HTTP content type"));
-                return Ok(self.clone().value());
+                return Ok(VariableValue::new_bool(false));
             };
-            let mut request = self.request.clone();
+            let mut request = self.request();
             request.body = text.into_bytes();
             request.headers.insert(reqwest::header::CONTENT_TYPE, content_type);
             vm.operation_succeeded();
-            return Ok(PplHttpRequest { request }.value());
+            return Ok(VariableValue::new_bool(true));
         }
         if *name == *SEND {
-            return Ok(send(vm, self.request.clone(), None).await);
+            let request = self.request().clone();
+            return Ok(send(vm, request, None).await);
         }
         Err(format!("Unknown HTTPREQUEST function {name}").into())
     }

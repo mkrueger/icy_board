@@ -107,7 +107,7 @@ fn cross_origin_redirects_drop_script_headers() {
     let source = format!(
         r#"
 HttpRequest request = Http.New(HttpMethod.Get, "{origin}/redirect")
-request = request.SetHeader("X-Secret", "do-not-forward")
+request.SetHeader("X-Secret", "do-not-forward")
 HttpResponse response = request.Send()
 PRINT response.OK
 "#
@@ -165,8 +165,8 @@ fn a_request_can_send_text_and_safe_headers() {
     let source = format!(
         r#"
 HttpRequest request = Http.New(HttpMethod.Post, "{origin}/items")
-request = request.SetHeader("X-Token", "abc")
-request = request.SetText("hello", "text/plain")
+request.SetHeader("X-Token", "abc")
+request.SetText("hello", "text/plain")
 HttpResponse response = request.Send()
 PRINT response.Status, " ", response.Text()
 "#
@@ -180,32 +180,30 @@ PRINT response.Status, " ", response.Text()
 }
 
 #[test]
-fn request_builders_do_not_mutate_the_original_value() {
+fn request_mutation_is_visible_through_an_alias() {
     let response = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
-    let (origin, requests, server) = serve(vec![response.to_string(), response.to_string()]);
+    let (origin, requests, server) = serve(vec![response.to_string()]);
     let source = format!(
         r#"
-HttpRequest original = Http.New(HttpMethod.Get, "{origin}/items")
-HttpRequest copy = original.SetHeader("X-Copy", "yes")
-HttpResponse first = original.Send()
-HttpResponse second = copy.Send()
-PRINT first.OK, " ", second.OK
+HttpRequest request = Http.New(HttpMethod.Get, "{origin}/items")
+HttpRequest copy = request
+BOOLEAN changed = request.SetHeader("X-Alias", "yes")
+HttpResponse response = copy.Send()
+PRINT changed, " ", response.OK
 "#
     );
     assert_eq!("1 1", run_ppl_on(&source, |board| allow_origin(board, &origin)));
-    let original = requests.recv().unwrap().to_ascii_lowercase();
-    let copy = requests.recv().unwrap().to_ascii_lowercase();
-    assert!(!original.contains("x-copy"), "{original}");
-    assert!(copy.contains("x-copy: yes"), "{copy}");
+    let request = requests.recv().unwrap().to_ascii_lowercase();
+    assert!(request.contains("x-alias: yes"), "{request}");
     server.join().unwrap();
 }
 
 #[test]
 fn restricted_request_headers_are_rejected() {
     assert_eq!(
-        "1",
+        "0 1 1",
         run_ppl(
-            "HttpRequest request = Http.New(HttpMethod.Get, \"https://example.com\")\nrequest = request.SetHeader(\"Host\", \"internal\")\nPRINT Error.Last().Code = ErrCode.Invalid"
+            "HttpRequest request = Http.New(HttpMethod.Get, \"https://example.com\")\nBOOLEAN changed = request.SetHeader(\"Host\", \"internal\")\nPRINT changed, \" \", Error.Last().Kind = ErrKind.Net, \" \", Error.Last().Code = ErrCode.Invalid"
         )
     );
 }
@@ -217,13 +215,13 @@ fn set_text_is_rejected_on_bodyless_methods() {
     let source = format!(
         r#"
 HttpRequest req = Http.New(HttpMethod.Get, "{origin}/items")
-req = req.SetText("body", "text/plain")
+BOOLEAN changed = req.SetText("body", "text/plain")
 ERRCODE code = Error.Last().Code
 HttpResponse response = req.Send()
-PRINT code = ErrCode.Invalid, " ", response.OK
+PRINT changed, " ", code = ErrCode.Invalid, " ", response.OK
 "#
     );
-    assert_eq!("1 1", run_ppl_on(&source, |board| allow_origin(board, &origin)));
+    assert_eq!("0 1 1", run_ppl_on(&source, |board| allow_origin(board, &origin)));
     let sent = request.recv().unwrap();
     assert!(sent.starts_with("GET /items HTTP/1.1"), "{sent}");
     assert!(!sent.to_ascii_lowercase().contains("content-type"), "{sent}");

@@ -789,11 +789,13 @@ other character encodings report ``ErrKind.Net`` with ``ErrCode.Format``; use
 A request object supplies POST bodies and safe custom headers::
 
     HttpRequest request = Http.New(HttpMethod.Post, "https://api.example.com/items")
-    request = request.SetHeader("Accept", "application/json")
-    request = request.SetText(json, "application/json")
+    IF !request.SetHeader("Accept", "application/json") PRINTLN Error.Last().Message
+    IF !request.SetText(json, "application/json") PRINTLN Error.Last().Message
     HttpResponse response = request.Send()
 
-The builder functions return a new request and leave the receiver unchanged.
+The setter functions change the request and return ``TRUE`` on success. On
+failure they return ``FALSE``, leave it unchanged, and publish details through
+``Error.Last()``.
 The optional board policy selects ``disabled``, exact-origin ``allowlist``, or
 the default ``public`` destinations and sets body, timeout, redirect and
 concurrency limits. Every DNS

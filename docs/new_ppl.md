@@ -1338,16 +1338,18 @@ For a POST request or custom headers, build a request:
 
 ```PPL
 HttpRequest request = Http.New(HttpMethod.Post, "https://api.example.com/items")
-request = request.SetHeader("Accept", "application/json")
-request = request.SetText(json, "application/json")
+IF !request.SetHeader("Accept", "application/json") PRINTLN Error.Last().Message
+IF !request.SetText(json, "application/json") PRINTLN Error.Last().Message
 HttpResponse response = request.Send()
 ```
 
-The builder functions return a new request and leave the receiver unchanged.
-`HttpMethod` contains `Get`, `Head` and `Post`. `SetText()` needs a method that
-carries a body; on a `Get` or `Head` request it reports `ErrCode.Invalid` and
-leaves the request unchanged. Routing and hop-by-hop headers, including `Host`,
-`Content-Length`, `Connection` and `Transfer-Encoding`, cannot be set by a PPE.
+`SetHeader()` and `SetText()` change the request and return `TRUE` on success.
+On failure they return `FALSE`, leave the request unchanged, and publish details
+through `Error.Last()`. `HttpMethod` contains `Get`, `Head` and `Post`.
+`SetText()` needs a method that carries a body; on a `Get` or `Head` request it
+reports `ErrKind.Net` with `ErrCode.Invalid`. Routing and hop-by-hop headers,
+including `Host`, `Content-Length`, `Connection` and `Transfer-Encoding`, cannot
+be set by a PPE.
 
 No `[ppl_http]` section is required. The default policy is equivalent to:
 

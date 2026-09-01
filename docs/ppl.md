@@ -498,6 +498,8 @@ corrupt message data reports `ErrKind.Msg` with `ErrCode.Io` or
 | `Http.Get` | Static function | `Http.Get(url) : HttpResponse` | Makes a policy-controlled GET request |
 | `Http.Download` | Static function | `Http.Download(url, file) : HttpResponse` | Streams a successful response atomically to a file |
 | `Http.New` | Static function | `Http.New(method, url) : HttpRequest` | Builds a GET, HEAD or POST request |
+| `HttpRequest.SetHeader` | Function | `request.SetHeader(name, value) : BOOLEAN` | Changes one request header; failures are available through `Error.Last()` |
+| `HttpRequest.SetText` | Function | `request.SetText(text [, contentType]) : BOOLEAN` | Changes the UTF-8 request body; failures are available through `Error.Last()` |
 | `BYTES.ToBase64`, `Bytes.FromBase64` | Function | `value.ToBase64() : STRING`, `Bytes.FromBase64(text) : BYTES` | Binary-safe Base64 encoding and decoding; global aliases remain available |
 | `BYTES.GetChecksum` | Function | `value.GetChecksum(Checksum) : BYTES` | CRC32, MD5 or SHA-256 as raw bytes |
 | `BYTES.ToHex` | Function | `value.ToHex() : STRING` | Uppercase hexadecimal with leading zero bytes preserved |

@@ -229,11 +229,12 @@ preserve explicit resource release.
 The sector contains `HTTP`, `HTTPREQUEST` and `HTTPRESPONSE`, with `HttpMethod`
 as its enum.
 
-`Http.Get()` and `Http.Download()` cover simple calls. `Http.New()` creates an
-immutable-style request builder; `SetHeader()` and `SetText()` return the updated
-request, and `Send()` produces a typed response. `Valid` reports transport and
-body success, while `OK` means an HTTP status in the 200-299 range. This avoids
-turning a valid 404 response into a transport failure.
+`Http.Get()` and `Http.Download()` cover simple calls. `Http.New()` creates a
+mutable request; `SetHeader()` and `SetText()` change it in place and return
+`BOOLEAN`, and `Send()` produces a typed response. Failed changes leave the
+request unchanged and publish details through `Error.Last()`. `Valid` reports
+transport and body success, while `OK` means an HTTP status in the 200-299
+range. This avoids turning a valid 404 response into a transport failure.
 
 Security policy is board-owned rather than script-owned. Destination filtering,
 DNS pinning, redirect checks, limits and the optional origin allowlist are not

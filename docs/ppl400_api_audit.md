@@ -36,17 +36,14 @@ board concepts. The strongest additions are typed board snapshots, `Session`,
 records, enums, `FOREACH`, and a single terminal root. They remove magic numbers
 and configuration-file parsing without replacing PPL with another language.
 
-The design should **not be frozen unchanged**, however. Three items deserve a
+The design should **not be frozen unchanged**, however. Two items deserve a
 pre-freeze decision:
 
 1. Fixed arrays should keep classic `name(upperBound)` declarations as the
    canonical spelling. Square brackets are excellent for indexing and empty
    brackets are useful for dynamic arrays, but rewriting every fixed declaration
    to `name[upperBound]` needlessly makes PPL look like a different language.
-2. The immutable `HTTPREQUEST` builder is inconsistent with every other mutable
-   resource API. Either document it very prominently as a value builder or make
-   its mutators return `BOOLEAN` and modify the request.
-3. Reference documentation has drifted from the registry in several places.
+2. Reference documentation has drifted from the registry in several places.
    API generation or registry-backed checks should cover member signatures,
    return rank, enum values, and counts before freeze.
 
@@ -445,9 +442,9 @@ sysop policy.
 | `Http.Get(url)` | **GOOD** | Simple common case with typed response. |
 | `Http.Download(url, path)` | **GOOD** | Atomic streaming avoids a second body copy and belongs as a convenience operation. |
 | `Http.New(method, url)` | **GOOD** | Typed request construction; the method set is intentionally small. |
-| `Request.Method`, `Request.Url` | **GOOD** | Useful immutable builder state. |
-| `Request.SetHeader(name, value) -> HTTPREQUEST` | **BAD** | Returning a modified copy (`request = request.SetHeader(...)`) differs from mutable `Surface`, `Audio`, `User`, and other resource APIs. Before freeze, choose either explicit value-builder terminology (`WithHeader`) or in-place `SetHeader() -> BOOLEAN`. |
-| `Request.SetText(text, contentType) -> HTTPREQUEST` | **BAD** | Same naming/value-semantics mismatch. `WithText` would make immutable behavior honest if value building is retained. |
+| `Request.Method`, `Request.Url` | **GOOD** | Useful read-only request identity. |
+| `Request.SetHeader(name, value) -> BOOLEAN` | **GOOD** | Mutates the request directly, returns success, and publishes `ErrKind.Net` details through `Error.Last()` on failure. |
+| `Request.SetText(text [, contentType]) -> BOOLEAN` | **GOOD** | Uses the same simple mutation contract; invalid content types and bodyless methods leave the request unchanged. |
 | `Request.Send() -> HTTPRESPONSE` | **GOOD** | Natural terminal operation for the builder. |
 | `Response.Valid` | **GOOD** | Transport/body success, distinct from status. |
 | `Response.OK` | **GOOD** | Correctly means HTTP 2xx, so a valid 404 is representable. |
@@ -456,9 +453,9 @@ sysop policy.
 | `Text()` | **GOOD, document** | Strict UTF-8 is safe, but callers need a binary path. The current answer is `Save`/`Download`; state this prominently. |
 | `Save(path)` | **GOOD** | Useful for a retained body; correctly fails on streamed download responses that retain no body. |
 
-The `HTTPREQUEST` issue is not an argument for classes or promises. It is a
-small consistency choice: PPL methods named `Set...` look mutating everywhere
-else.
+`HTTPREQUEST` deliberately uses ordinary mutable state. This keeps sequential
+PPL code direct and makes methods named `Set...` behave consistently throughout
+the API.
 
 # Part VI — Text, regex, bytes, and utility member APIs
 
@@ -552,9 +549,9 @@ The overall three-layer convention should be frozen:
 3. `Error.Last()` explains the last fallible operation.
 
 Expected absence is not failure. This works especially well for invalid board
-indexes and sparse messages. The one unresolved inconsistency is property
-assignment: it cannot provide layer 1. Resolve or explicitly bless that exception
-before freezing writable object members.
+indexes and sparse messages. Property assignment is reserved for state whose
+assignment cannot fail operationally; fallible changes use methods returning
+`BOOLEAN`.
 
 # Part VIII — Consistency and PPL-style assessment
 
@@ -580,8 +577,6 @@ before freezing writable object members.
 - Rewriting fixed array declarations from parentheses to brackets changes an
   iconic PPL spelling without solving a remaining ambiguity. Brackets solve
   indexing ambiguity; they are not needed for fixed declarations.
-- Immutable request methods named `Set...` borrow a fluent value-builder style
-  that no other PPL resource uses.
 - A growing member API is useful for objects, strings, arrays, bytes, and regex,
   but should not become a campaign to replace the classic global/statement API.
 - `PresentRect` shows the limit of long positional calls. Future complex options
@@ -616,11 +611,10 @@ These are concrete inconsistencies found during the review:
 | Priority | Action | Why |
 | :---: | :--- | :--- |
 | 1 | Decide fixed-array canonical syntax; recommendation: preserve `name(10)` and use brackets for indexing/dynamic rank. | Highest PPL-style impact. |
-| 2 | Rename immutable request transforms to `WithHeader`/`WithText`, or make `Set...` mutate and return `BOOLEAN`. | Aligns naming with semantics and the rest of the API. |
-| 3 | Extend the registry dump to show array rank, record fields, enum values, writable flags, optional arguments, and static/member status. | Prevents another stale API review. |
-| 4 | Add documentation checks/generated tables for signatures and enum values. | Current prose already contains contradictions. |
-| 5 | Add an `EventKind` applicability table and lifetime/mutability label to every object reference. | Prevents the most likely API misuse. |
-| 6 | Freeze IDs/opcodes only after the above decisions; keep pre-400 numbers untouched. | 4.00 can still be compacted before release, but not afterward. |
+| 2 | Extend the registry dump to show array rank, record fields, enum values, writable flags, optional arguments, and static/member status. | Prevents another stale API review. |
+| 3 | Add documentation checks/generated tables for signatures and enum values. | Current prose already contains contradictions. |
+| 4 | Add an `EventKind` applicability table and lifetime/mutability label to every object reference. | Prevents the most likely API misuse. |
+| 5 | Freeze IDs/opcodes only after the above decisions; keep pre-400 numbers untouched. | 4.00 can still be compacted before release, but not afterward. |
 
 ## Post-freeze restraint
 
@@ -640,12 +634,11 @@ outgrown positional parameters.
 
 # Final verdict
 
-**Overall: GOOD, with three pre-freeze corrections.** PPL 4.00 modernizes the
+**Overall: GOOD, with two pre-freeze corrections.** PPL 4.00 modernizes the
 language without giving it a new identity. Its board model, typed values,
 collections, control flow, and terminal grouping are coherent. The main risks
 are not the large features; they are small consistency choices that accumulate:
-fixed-array spelling, immutable HTTP `Set...` methods, and stale handwritten API
-inventories.
+fixed-array spelling and stale handwritten API inventories.
 
 Preserve the procedural core, preserve old APIs, keep new board concepts typed,
 and require every future addition to answer four questions: who owns it, whether

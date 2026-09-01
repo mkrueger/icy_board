@@ -197,6 +197,7 @@ fn session_user_and_http_workflows_have_completion_documentation() {
             && (set_text.contains("UTF-8 body") || set_text.contains("UTF-8-Body")),
         "{set_text}"
     );
+    assert!(set_text.contains("FALSE") && set_text.contains("Error.Last()"), "{set_text}");
 
     let response_text = completion_documentation("HTTPRESPONSE response\nresponse.", "Text");
     assert!(
