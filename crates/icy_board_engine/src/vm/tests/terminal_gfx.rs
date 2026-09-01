@@ -38,13 +38,11 @@ fn a_surface_made_through_the_object_draws_the_same_way() {
 }
 
 #[test]
-fn pacing_reads_back_what_it_was_set_to() {
+fn set_pacing_enables_acknowledgements() {
     let output = run_ppl_with_input(
         r"
         Terminal.Gfx.Init(GfxBackend.Sixel, FALSE)
-        PrintLn Terminal.Gfx.Pacing
-        Terminal.Gfx.Pacing = TRUE
-        PrintLn Terminal.Gfx.Pacing
+        PrintLn Terminal.Gfx.SetPacing(TRUE)
         SURFACE s = Surface.New(2, 2)
         s.Present()
         Terminal.Gfx.Shutdown()
@@ -52,7 +50,7 @@ fn pacing_reads_back_what_it_was_set_to() {
         b"\x1b[1;1R",
     );
 
-    assert!(output.starts_with("0\n1\n\x1b[?1070h"), "{output:?}");
+    assert!(output.starts_with("1\n\x1b[?1070h"), "{output:?}");
     assert!(output.contains("\x1b]4;0;rgb:00/00/00;1;rgb:AA/00/00"), "{output:?}");
     assert!(output.ends_with("\x1b\\\x1b[0m"), "{output:?}");
     assert!(!output.contains("\x1b]104"), "{output:?}");
@@ -60,13 +58,12 @@ fn pacing_reads_back_what_it_was_set_to() {
 }
 
 #[test]
-fn a_writable_property_may_be_set_through_a_stored_object() {
+fn set_pacing_may_be_called_through_a_stored_object() {
     let output = run_ppl(
         r"
         Terminal.Gfx.Init(GfxBackend.Sixel, FALSE)
         GFX graphics = Terminal.Gfx
-        graphics.Pacing = TRUE
-        PrintLn graphics.Pacing
+        PrintLn graphics.SetPacing(TRUE)
         Terminal.Gfx.Shutdown()
         ",
     );
@@ -81,9 +78,21 @@ fn a_read_only_property_cannot_be_assigned() {
 }
 
 #[test]
-fn a_writable_property_checks_the_value_type() {
-    let errors = compile_errors("Terminal.Gfx.Pacing = GfxBackend.Sixel");
-    assert!(!errors.is_empty(), "an enum must not be assigned to a boolean property");
+fn pacing_is_not_a_property() {
+    assert!(!compile_errors("Terminal.Gfx.Pacing = TRUE").is_empty());
+    assert!(!compile_errors("PRINTLN Terminal.Gfx.Pacing").is_empty());
+}
+
+#[test]
+fn set_pacing_returns_false_and_reports_the_error() {
+    let output = run_ppl(
+        r#"
+        BOOLEAN changed = Terminal.Gfx.SetPacing(TRUE)
+        PRINTLN changed, " ", Error.Last().Kind = ErrKind.Gfx, " ", Error.Last().Code <> ErrCode.Ok
+        "#,
+    );
+
+    assert_eq!(output, "0 1 1\n");
 }
 
 #[test]

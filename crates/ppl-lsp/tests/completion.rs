@@ -297,7 +297,7 @@ fn bytes_and_checksum_completion_match_the_engine_surface() {
 fn runtime_400_objects_offer_their_registered_members() {
     for (source, expected) in [
         ("SURFACE value\nvalue.", &["Width", "SetPixel", "PresentRect"][..]),
-        ("AUDIO value\nvalue.", &["Valid", "Volume", "Play"][..]),
+        ("AUDIO value\nvalue.", &["Valid", "SetVolume", "Play"][..]),
         ("EVENT value\nvalue.", &["Kind", "Action", "LeftDown", "Ctrl"][..]),
         ("ERROR value\nvalue.", &["OK", "Message", "Channel"][..]),
         (
@@ -306,7 +306,7 @@ fn runtime_400_objects_offer_their_registered_members() {
         ),
         ("TERMINPUT value\nvalue.", &["Poll", "Wait", "KeyboardOn", "Release"][..]),
         ("TERMINAL value\nvalue.", &["Info", "Gfx", "Input"][..]),
-        ("GFX value\nvalue.", &["Init", "Backend", "Pacing"][..]),
+        ("GFX value\nvalue.", &["Init", "Backend", "SetPacing"][..]),
         ("BOARD value\nvalue.", &["Name", "SysopName", "NodeCount", "Conferences", "Users"][..]),
         ("SESSION value\nvalue.", &["Conference", "Area", "Directory", "User", "Node", "MinutesLeft"][..]),
         (
@@ -341,7 +341,7 @@ fn an_object_offers_only_its_own_members() {
 #[test]
 fn graphics_only_offers_session_control() {
     let items = complete("GFX value\nvalue.");
-    assert_eq!(items, vec!["Backend", "Init", "Pacing", "Shutdown"]);
+    assert_eq!(items, vec!["Backend", "Init", "SetPacing", "Shutdown"]);
 }
 
 #[test]

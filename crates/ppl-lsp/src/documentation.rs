@@ -299,7 +299,7 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
         return match member.to_ascii_lowercase().as_str() {
             "valid" => Some(fl!(LANGUAGE_LOADER, "hint-member-audio-valid")),
             "playing" => Some(fl!(LANGUAGE_LOADER, "hint-member-audio-playing")),
-            "volume" => Some(fl!(LANGUAGE_LOADER, "hint-member-audio-volume")),
+            "setvolume" => Some(fl!(LANGUAGE_LOADER, "hint-member-audio-set-volume")),
             "channel" => Some(fl!(LANGUAGE_LOADER, "hint-member-audio-channel")),
             "play" => Some(fl!(LANGUAGE_LOADER, "hint-member-audio-play")),
             "stop" => Some(fl!(LANGUAGE_LOADER, "hint-member-audio-stop")),
@@ -341,7 +341,7 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
             "init" => Some(fl!(LANGUAGE_LOADER, "hint-member-gfx-init")),
             "shutdown" => Some(fl!(LANGUAGE_LOADER, "hint-member-gfx-shutdown")),
             "backend" => Some(fl!(LANGUAGE_LOADER, "hint-member-gfx-backend")),
-            "pacing" => Some(fl!(LANGUAGE_LOADER, "hint-member-gfx-pacing")),
+            "setpacing" => Some(fl!(LANGUAGE_LOADER, "hint-member-gfx-set-pacing")),
             _ => None,
         };
     }
@@ -617,6 +617,7 @@ pub fn get_parameter_documentation(name: &str) -> Option<String> {
     let key = match name.to_ascii_lowercase().as_str() {
         "backend" => "hint-param-backend",
         "fullscreen" => "hint-param-fullscreen",
+        "enabled" => "hint-param-enabled",
         "top" => "hint-param-top",
         "bottom" => "hint-param-bottom",
         "left" => "hint-param-left",
@@ -631,6 +632,7 @@ pub fn get_parameter_documentation(name: &str) -> Option<String> {
         "looping" => "hint-param-looping",
         "durationms" => "hint-param-duration-ms",
         "targetvolume" => "hint-param-target-volume",
+        "volume" => "hint-param-volume",
         "font" => "hint-param-font",
         "file" => "hint-param-file",
         "password" => "hint-param-password",

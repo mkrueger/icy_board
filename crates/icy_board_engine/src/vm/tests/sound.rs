@@ -46,9 +46,9 @@ fn a_sound_object_carries_its_own_channel() {
         AUDIO music = Audio.Load("tone.wav")
         AUDIO effect = Audio.Load("tone.wav")
         PRINTLN music.Valid, ":", music.Channel, ":", effect.Channel
-        music.Volume = 70
+        PRINTLN music.SetVolume(70)
         music.Play(TRUE)
-        PRINTLN music.Playing, ":", music.Volume
+        PRINTLN music.Playing
         music.Fade(0, 250)
         music.Stop()
         PRINTLN music.Playing
@@ -62,11 +62,26 @@ fn a_sound_object_carries_its_own_channel() {
     // One upload is enough, because both objects name the same cached file.
     assert_eq!(output.matches("SyncTERM:C;S;").count(), 1, "{output:?}");
     assert!(output.contains("1:0:1\n"), "{output:?}");
+    assert!(output.contains("SyncTERM:A;Volume;C=2;"), "{output:?}");
     assert!(output.contains("Queue;C=2;S=2;L"), "{output:?}");
-    assert!(output.contains("1:70\n"), "{output:?}");
+    assert_eq!(output.matches("1\n").count(), 3, "{output:?}");
     assert!(output.contains("T=250"), "{output:?}");
     assert_eq!(output.matches("Flush;C=2;O=0").count(), 2, "{output:?}");
     assert!(output.ends_with("0\n"), "{output:?}");
+}
+
+#[test]
+fn set_volume_returns_false_and_reports_the_error() {
+    let output = run_ppl_with_input(
+        r#"
+        AUDIO missing = Audio.Load("missing.wav")
+        BOOLEAN changed = missing.SetVolume(50)
+        PRINTLN changed, " ", Error.Last().Kind = ErrKind.Audio, " ", Error.Last().Code = ErrCode.Invalid
+        "#,
+        b"",
+    );
+
+    assert!(output.ends_with("0 1 1\n"), "{output:?}");
 }
 
 #[test]

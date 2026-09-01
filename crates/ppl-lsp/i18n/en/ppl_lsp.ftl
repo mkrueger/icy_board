@@ -173,7 +173,7 @@ hint-member-macros-delete=Deletes one session-local recording. No terminal seque
 hint-member-macros-delete-all=Deletes all session-local recordings. No terminal sequence is sent.
 hint-member-audio-valid=Whether this value identifies a successfully loaded terminal audio channel.
 hint-member-audio-playing=Whether this loaded channel is currently tracked as active.
-hint-member-audio-volume=Current logical volume from 0 through 100. Assigning it sends a SyncTERM Audio `Volume` APC.
+hint-member-audio-set-volume=Sets the logical volume from 0 through 100 and returns whether it succeeded. On failure, `Error.Last()` provides `ErrKind.Audio`, an error code, message and channel.
 hint-member-audio-channel=Logical PPL channel 0–13; it maps to SyncTERM/CTerm channel 2–15.
 hint-member-audio-play=Starts playback; optional `looping` defaults to `FALSE`. <br><br>**Terminal protocol:** sends `APC SyncTERM:A;Load;S=slot;cache ST`, `…;Volume;C=channel;V=dB ST`, then `…;Queue;C=channel;S=slot[;L] ST`. Non-looping playback also sends `…;Update;C=channel ST`. Requires SyncTERM/CTerm audio APC support.
 hint-member-audio-stop=Stops this channel without freeing its data. <br><br>**Terminal protocol:** sends `APC SyncTERM:A;Flush;C=channel;O=0 ST` (`APC` = `ESC _`, `ST` = `ESC \`).
@@ -248,8 +248,9 @@ hint-member-gfx-shutdown=
     Ends the graphics session and restores normal text output.
     <br><br>**Terminal protocol:** fullscreen sends `CSI ? 80 h`, `CSI ? 7 h`, and `CSI ? 25 h`. After Sixel output it restores all 16 DOS colors with OSC 4, then sends SGR reset `CSI 0 m` and restores the board color.
 hint-member-gfx-backend=The selected read-only `GfxBackend`, or `None` when no graphics session is active.
-hint-member-gfx-pacing=Controls frame pacing. When true, presentation waits for terminal acknowledgement before sending another frame.
+hint-member-gfx-set-pacing=Enables or disables frame pacing and returns whether it succeeded. When enabled, presentation waits for terminal acknowledgement before sending another frame. On failure, `Error.Last()` provides details.
 hint-param-backend=Graphics backend to request; `Auto` chooses the best available backend.
+hint-param-enabled=Whether frame pacing should be enabled.
 hint-parameters-title=Parameters
 hint-param-optional=optional
 hint-param-fullscreen=Whether to clear the screen and switch the terminal into fullscreen graphics mode. Defaults to `TRUE`.
@@ -267,6 +268,7 @@ hint-param-slot=Target slot number.
 hint-param-looping=Whether playback restarts after reaching the end. Defaults to `FALSE`.
 hint-param-duration-ms=Fade duration in milliseconds.
 hint-param-target-volume=Final volume from 0 through 100.
+hint-param-volume=Volume from 0 through 100.
 hint-param-font=Terminal font number.
 hint-param-file=Board-relative source or destination file name.
 hint-param-password=New plain-text password to validate and store securely.

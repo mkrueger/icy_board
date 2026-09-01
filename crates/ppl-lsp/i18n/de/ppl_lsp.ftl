@@ -175,7 +175,7 @@ hint-member-macros-delete=Löscht einen sitzungslokalen Makroslot. Es wird keine
 hint-member-macros-delete-all=Löscht alle sitzungslokalen Makroslots. Es wird keine Terminalsequenz gesendet.
 hint-member-audio-valid=Gibt an, ob dieser Wert einen erfolgreich geladenen Terminal-Audiokanal bezeichnet.
 hint-member-audio-playing=Gibt an, ob dieser geladene Kanal momentan als aktiv verfolgt wird.
-hint-member-audio-volume=Aktuelle logische Lautstärke von 0 bis 100. Eine Zuweisung sendet eine SyncTERM-Audio-`Volume`-APC.
+hint-member-audio-set-volume=Setzt die logische Lautstärke von 0 bis 100 und gibt zurück, ob dies erfolgreich war. Bei einem Fehler liefert `Error.Last()` `ErrKind.Audio`, Fehlercode, Meldung und Kanal.
 hint-member-audio-channel=Logischer PPL-Kanal 0–13; er entspricht SyncTERM-/CTerm-Kanal 2–15.
 hint-member-audio-play=Startet die Wiedergabe; optionales `looping` ist standardmäßig `FALSE`. <br><br>**Terminalprotokoll:** sendet `APC SyncTERM:A;Load;S=slot;cache ST`, `…;Volume;C=channel;V=dB ST` und `…;Queue;C=channel;S=slot[;L] ST`. Ohne Schleife folgt `…;Update;C=channel ST`. Benötigt SyncTERM-/CTerm-Audio-APC.
 hint-member-audio-stop=Stoppt diesen Kanal, ohne seine Daten freizugeben. <br><br>**Terminalprotokoll:** sendet `APC SyncTERM:A;Flush;C=channel;O=0 ST` (`APC` = `ESC _`, `ST` = `ESC \`).
@@ -250,8 +250,9 @@ hint-member-gfx-shutdown=
     Beendet die Grafiksitzung und stellt die normale Textausgabe wieder her.
     <br><br>**Terminalprotokoll:** Vollbild sendet `CSI ? 80 h`, `CSI ? 7 h` und `CSI ? 25 h`. Nach Sixel-Ausgabe werden alle 16 DOS-Farben mit OSC 4 restauriert; danach folgen SGR-Reset `CSI 0 m` und die Boardfarbe.
 hint-member-gfx-backend=Das ausgewählte schreibgeschützte `GfxBackend`, oder `None`, wenn keine Grafiksitzung aktiv ist.
-hint-member-gfx-pacing=Steuert das Frame-Pacing. Bei true wartet die Ausgabe auf die Terminalbestätigung, bevor der nächste Frame gesendet wird.
+hint-member-gfx-set-pacing=Aktiviert oder deaktiviert das Frame-Pacing und gibt zurück, ob dies erfolgreich war. Bei Aktivierung wartet die Ausgabe auf die Terminalbestätigung, bevor der nächste Frame gesendet wird. Bei einem Fehler liefert `Error.Last()` Details.
 hint-param-backend=Angefordertes Grafik-Backend; `Auto` wählt das beste verfügbare Backend.
+hint-param-enabled=Gibt an, ob das Frame-Pacing aktiviert werden soll.
 hint-parameters-title=Parameter
 hint-param-optional=optional
 hint-param-fullscreen=Gibt an, ob der Bildschirm gelöscht und das Terminal in den Vollbild-Grafikmodus geschaltet wird. Standardwert ist `TRUE`.
@@ -269,6 +270,7 @@ hint-param-slot=Nummer des Zielslots.
 hint-param-looping=Gibt an, ob die Wiedergabe nach dem Ende erneut beginnt. Standardwert ist `FALSE`.
 hint-param-duration-ms=Dauer der Überblendung in Millisekunden.
 hint-param-target-volume=Ziellautstärke von 0 bis 100.
+hint-param-volume=Lautstärke von 0 bis 100.
 hint-param-font=Nummer der Terminalschriftart.
 hint-param-file=Board-relativer Name der Quell- oder Zieldatei.
 hint-param-password=Neues Klartextpasswort, das geprüft und sicher gespeichert wird.

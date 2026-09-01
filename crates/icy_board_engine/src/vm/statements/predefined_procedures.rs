@@ -3411,7 +3411,12 @@ pub(crate) async fn sound_set_volume(vm: &mut VirtualMachine<'_>, logical_channe
 }
 
 pub(crate) async fn sound_member(vm: &mut VirtualMachine<'_>, logical_channel: i32, name: &unicase::Ascii<String>, arguments: &[VariableValue]) -> Res<bool> {
-    use crate::icy_board::state::ppl_audio::{FADE, FREE, PLAY, STOP};
+    use crate::icy_board::state::ppl_audio::{FADE, FREE, PLAY, SET_VOLUME, STOP};
+
+    if *name == *SET_VOLUME {
+        let volume = arguments.first().map_or(0, VariableValue::as_int);
+        return sound_set_volume(vm, logical_channel, volume, 0).await;
+    }
 
     let Some(file) = vm.icy_board_state.ppl_audio_file(logical_channel).cloned() else {
         vm.set_error(PplError::new(ERR_KIND_SOUND, ERR_INVALID, "no sound is loaded").on_channel(logical_channel));
@@ -4448,12 +4453,14 @@ pub async fn gfxsetpacing(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<
     Ok(())
 }
 
-pub(crate) fn gfx_set_pacing(vm: &mut VirtualMachine<'_>, enabled: bool) {
+pub(crate) fn gfx_set_pacing(vm: &mut VirtualMachine<'_>, enabled: bool) -> bool {
     if let Some(graphics) = &mut vm.icy_board_state.ppl_graphics {
         graphics.pacing = enabled;
         vm.icy_board_state.gfx_error = 0;
+        true
     } else {
         vm.icy_board_state.gfx_error = 1;
+        false
     }
 }
 
@@ -4479,7 +4486,7 @@ pub(crate) async fn gfx_shutdown(vm: &mut VirtualMachine<'_>) -> Res<()> {
 
 /// Runs one `GFX` member.
 pub(crate) async fn gfx_member(vm: &mut VirtualMachine<'_>, name: &unicase::Ascii<String>, arguments: &[VariableValue]) -> Res<VariableValue> {
-    use crate::icy_board::state::ppl_gfx::{INIT, SHUTDOWN};
+    use crate::icy_board::state::ppl_gfx::{INIT, SET_PACING, SHUTDOWN};
 
     if *name == *INIT {
         let requested = arguments
@@ -4488,6 +4495,10 @@ pub(crate) async fn gfx_member(vm: &mut VirtualMachine<'_>, name: &unicase::Asci
         let fullscreen = arguments.get(1).is_none_or(VariableValue::as_bool);
         gfx_init(vm, requested, fullscreen).await?;
         return Ok(VariableValue::new_bool(vm.icy_board_state.gfx_error == 0));
+    }
+    if *name == *SET_PACING {
+        let enabled = arguments.first().is_some_and(VariableValue::as_bool);
+        return Ok(VariableValue::new_bool(gfx_set_pacing(vm, enabled)));
     }
     if *name == *SHUTDOWN {
         gfx_shutdown(vm).await?;

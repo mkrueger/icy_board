@@ -225,7 +225,7 @@ fn pacing_requests_an_acknowledgement_after_presenting() {
         r"
         Terminal.Gfx.Init(GfxBackend.Sixel, FALSE)
         SURFACE s = Surface.New(2, 2)
-        Terminal.Gfx.Pacing = TRUE
+        Terminal.Gfx.SetPacing(TRUE)
         s.Present()
         Terminal.Gfx.Shutdown()
         ",

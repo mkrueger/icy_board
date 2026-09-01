@@ -100,17 +100,15 @@ fn a_call_in_the_chain_cannot_be_assigned_through() {
 }
 
 #[test]
-fn a_writable_property_on_a_call_result_uses_its_setter() {
-    assert!(compile_errors("Audio.Load(\"missing\").Volume = 50").is_empty());
-    assert!(compile_errors("LET Audio.Load(\"missing\").Volume = 50").is_empty());
-    let output = run_ppl("Audio.Load(\"missing\").Volume = 50\nPrintLn \"alive\"");
-    assert!(output.ends_with("alive\n"), "{output:?}");
+fn a_setter_function_may_be_called_on_a_call_result() {
+    assert!(compile_errors("Audio.Load(\"missing\").SetVolume(50)").is_empty());
+    let output = run_ppl("PrintLn Audio.Load(\"missing\").SetVolume(50)");
+    assert!(output.ends_with("0\n"), "{output:?}");
 
-    let errors = compile_errors("Audio.Load(\"missing\").Volume = GfxBackend.Sixel");
+    let errors = compile_errors("Audio.Load(\"missing\").SetVolume(GfxBackend.Sixel)");
     assert_eq!(errors, vec!["Argument 1 expects Integer, got GfxBackend"]);
 
-    let errors = compile_errors("Audio.Load(\"missing\").Volume(50)");
-    assert_eq!(errors, vec!["Function not found (Volume)"]);
+    assert!(!compile_errors("Audio.Load(\"missing\").Volume = 50").is_empty());
 }
 
 #[test]

@@ -65,9 +65,9 @@ one convention, but each layer answers a different question:
 | `Valid` | Is this returned object usable? |
 | `Error.Last()` | What failed, in which sector and channel? |
 
-Property assignment cannot return a value, so writable properties such as
-`Terminal.Gfx.Pacing` and `Audio.Volume` report failure only through
-`Error.Last()`. That exception should remain explicit in their reference text.
+Fallible mutations use methods such as `Terminal.Gfx.SetPacing()` and
+`Audio.SetVolume()` rather than property assignment, so they can return
+`BOOLEAN` while publishing failure details through `Error.Last()`.
 
 **Recommendation:** freeze this model. New fallible APIs should always publish
 `Error.Last()` and also use the sector's local `BOOLEAN` or `Valid` convention.
@@ -200,7 +200,7 @@ flat globals:
 | :--- | :--- |
 | `Info` | Identity, dimensions and confirmed capabilities |
 | `Input` | Keyboard, physical-key and mouse events |
-| `Gfx` | Graphics backend and pacing |
+| `Gfx` | Graphics backend and `SetPacing()` control |
 | `Margins` | Horizontal and vertical scrolling regions |
 | `Palette` | DOS palette entries |
 | `Macros` | Terminal-resident macro slots |

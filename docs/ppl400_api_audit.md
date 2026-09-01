@@ -36,7 +36,7 @@ board concepts. The strongest additions are typed board snapshots, `Session`,
 records, enums, `FOREACH`, and a single terminal root. They remove magic numbers
 and configuration-file parsing without replacing PPL with another language.
 
-The design should **not be frozen unchanged**, however. Four items deserve a
+The design should **not be frozen unchanged**, however. Three items deserve a
 pre-freeze decision:
 
 1. Fixed arrays should keep classic `name(upperBound)` declarations as the
@@ -46,10 +46,7 @@ pre-freeze decision:
 2. The immutable `HTTPREQUEST` builder is inconsistent with every other mutable
    resource API. Either document it very prominently as a value builder or make
    its mutators return `BOOLEAN` and modify the request.
-3. Writable properties (`Gfx.Pacing`, `Audio.Volume`, and writable `User`
-   properties) can fail but cannot return success. This exception to the normal
-   `BOOLEAN` convention needs one firm rule and prominent documentation.
-4. Reference documentation has drifted from the registry in several places.
+3. Reference documentation has drifted from the registry in several places.
    API generation or registry-backed checks should cover member signatures,
    return rank, enum values, and counts before freeze.
 
@@ -398,7 +395,7 @@ stay, but the kind-to-field applicability table is release-blocking documentatio
 | :--- | :---: | :--- |
 | `Gfx.Init(backend [, fullscreen])` | **GOOD** | Typed backend, simple lifecycle, `BOOLEAN` result. |
 | `Gfx.Backend` | **GOOD** | Reports the selected backend after `Auto`. |
-| `Gfx.Pacing` writable property | **BAD** | It can fail but assignment cannot return success. Prefer `SetPacing(enabled) -> BOOLEAN`, or formally bless fallible properties and make `Error.Last()`-only behavior prominent everywhere. |
+| `Gfx.SetPacing(enabled)` | **GOOD** | Returns `BOOLEAN` and publishes failure details through `Error.Last()`, matching the shared fallible-operation convention. |
 | `Gfx.Shutdown()` | **GOOD** | Explicit lifecycle operation. |
 | `Surface.New(width, height)` | **GOOD** | Static constructor is clear. |
 | `Surface.Load(file)` | **GOOD** | Static resource constructor with `Valid` fallback. |
@@ -417,7 +414,7 @@ stay, but the kind-to-field applicability table is release-blocking documentatio
 | `Audio.Load(file)` | **GOOD** | Static constructor with invalid-object fallback. |
 | `Audio.StopAll()` | **GOOD** | Correctly static because it affects all PPE-owned channels. |
 | `Valid`, `Playing`, `Channel` | **GOOD** | Minimal observable state. |
-| `Volume` writable property | **BAD** | Same fallible-property inconsistency as `Gfx.Pacing`. Prefer `SetVolume(percent) -> BOOLEAN` or freeze a documented property rule. |
+| `SetVolume(percent)` | **GOOD** | Returns `BOOLEAN` and publishes `ErrKind.Audio`, code, message and channel through `Error.Last()` on failure. |
 | `Play([loop])`, `Stop()` | **GOOD** | Straightforward playback lifecycle. |
 | `Fade(percent, milliseconds)` | **GOOD** | Useful operation with `BOOLEAN` result. |
 | `Free()` | **GOOD** | Explicitly returns the bounded channel resource. |
@@ -590,8 +587,8 @@ before freezing writable object members.
 - `PresentRect` shows the limit of long positional calls. Future complex options
   should use a small record rather than ever-longer overloads, but only when a
   real second use case appears.
-- More writable properties would weaken the otherwise clear success convention.
-  Prefer methods returning `BOOLEAN` for fallible mutation.
+- Fallible mutation uses methods returning `BOOLEAN`; property assignment is
+  reserved for values whose assignment cannot fail operationally.
 
 # Part IX — Documentation and implementation findings
 
@@ -619,12 +616,11 @@ These are concrete inconsistencies found during the review:
 | Priority | Action | Why |
 | :---: | :--- | :--- |
 | 1 | Decide fixed-array canonical syntax; recommendation: preserve `name(10)` and use brackets for indexing/dynamic rank. | Highest PPL-style impact. |
-| 2 | Decide whether fallible writable properties are allowed; recommendation: prefer `SetPacing()` and `SetVolume()` returning `BOOLEAN`. | Restores one error convention. |
-| 3 | Rename immutable request transforms to `WithHeader`/`WithText`, or make `Set...` mutate and return `BOOLEAN`. | Aligns naming with semantics and the rest of the API. |
-| 4 | Extend the registry dump to show array rank, record fields, enum values, writable flags, optional arguments, and static/member status. | Prevents another stale API review. |
-| 5 | Add documentation checks/generated tables for signatures and enum values. | Current prose already contains contradictions. |
-| 6 | Add an `EventKind` applicability table and lifetime/mutability label to every object reference. | Prevents the most likely API misuse. |
-| 7 | Freeze IDs/opcodes only after the above decisions; keep pre-400 numbers untouched. | 4.00 can still be compacted before release, but not afterward. |
+| 2 | Rename immutable request transforms to `WithHeader`/`WithText`, or make `Set...` mutate and return `BOOLEAN`. | Aligns naming with semantics and the rest of the API. |
+| 3 | Extend the registry dump to show array rank, record fields, enum values, writable flags, optional arguments, and static/member status. | Prevents another stale API review. |
+| 4 | Add documentation checks/generated tables for signatures and enum values. | Current prose already contains contradictions. |
+| 5 | Add an `EventKind` applicability table and lifetime/mutability label to every object reference. | Prevents the most likely API misuse. |
+| 6 | Freeze IDs/opcodes only after the above decisions; keep pre-400 numbers untouched. | 4.00 can still be compacted before release, but not afterward. |
 
 ## Post-freeze restraint
 
@@ -644,12 +640,12 @@ outgrown positional parameters.
 
 # Final verdict
 
-**Overall: GOOD, with four pre-freeze corrections.** PPL 4.00 modernizes the
+**Overall: GOOD, with three pre-freeze corrections.** PPL 4.00 modernizes the
 language without giving it a new identity. Its board model, typed values,
 collections, control flow, and terminal grouping are coherent. The main risks
 are not the large features; they are small consistency choices that accumulate:
-fixed-array spelling, immutable `Set...` methods, fallible properties, and stale
-handwritten API inventories.
+fixed-array spelling, immutable HTTP `Set...` methods, and stale handwritten API
+inventories.
 
 Preserve the procedural core, preserve old APIs, keep new board concepts typed,
 and require every future addition to answer four questions: who owns it, whether

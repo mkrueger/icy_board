@@ -509,12 +509,14 @@ screen.Present()
 Terminal.Gfx.Shutdown()
 ```
 
-`Terminal.Gfx.Backend` reports the selected `GfxBackend`. `Pacing` is a writable
-`BOOLEAN`; when true, presentation waits for a terminal acknowledgement before
-sending another frame.
+`Terminal.Gfx.Backend` reports the selected `GfxBackend`.
+`SetPacing(enabled)` controls whether presentation waits for a terminal
+acknowledgement before sending another frame. It returns `TRUE` on success and
+`FALSE` when no graphics session is active; `Error.Last()` provides the failure
+details.
 
 ```PPL
-Terminal.Gfx.Pacing = TRUE
+IF !Terminal.Gfx.SetPacing(TRUE) PRINTLN Error.Last().Message
 ```
 
 `Rgb(red, green, blue[, alpha])` returns packed `0xRRGGBBAA`; components clamp
@@ -556,7 +558,7 @@ and takes an available channel. A cached file is not sent again.
 ```PPL
 AUDIO music = Audio.Load("music.opus")
 IF music.Valid THEN
-    music.Volume = 50
+	IF !music.SetVolume(50) PRINTLN Error.Last().Message
     music.Play(TRUE)
 ENDIF
 ```
@@ -564,7 +566,7 @@ ENDIF
 | Member | Purpose |
 | :--- | :--- |
 | `Valid`, `Playing`, `Channel` | Read-only state |
-| `Volume` | Playback volume in percent, writable |
+| `SetVolume(percent)` | Set playback volume and return whether it succeeded; failures update `Error.Last()` |
 | `Play([loop])`, `Stop()` | Start or stop playback |
 | `Fade(percent, milliseconds)` | Change volume over time |
 | `Free()` | Give the channel back |
