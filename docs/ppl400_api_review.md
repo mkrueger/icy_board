@@ -1,5 +1,9 @@
 # PPL 4.00 API review
 
+> **Note:** This is the earlier sector-level review. The current, registry-backed
+> itemized findings and pre-freeze recommendations are in the
+> [PPL 4.00 API and language audit](ppl400_api_audit.md).
+
 This reviews the API added by PPL language and runtime 4.00 on top of the
 PCBoard-compatible surface. It is split by responsibility so each sector can
 evolve without reopening unrelated parts of the API.

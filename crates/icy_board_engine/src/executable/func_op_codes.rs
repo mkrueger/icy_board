@@ -354,7 +354,7 @@ pub enum FuncOpCode {
     ArrayValueAt = -339,
     StringMid = -340,
     ToBytes = -341,
-    FromBytes = -342,
+    BytesToString = -342,
     BytesToHex = -343,
     BytesGetChecksum = -344,
 }
@@ -412,6 +412,7 @@ impl FuncOpCode {
                 | FuncOpCode::StringSplitLimit
                 | FuncOpCode::ArrayValueAt
                 | FuncOpCode::StringMid
+                | FuncOpCode::BytesToString
                 | FuncOpCode::BytesGetChecksum
                 | FuncOpCode::BytesToHex
         ) {
@@ -3398,11 +3399,11 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 356]> 
             signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {
-            name: "FromBytes",
+            name: "<bytes to string>",
             version: 400,
-            opcode: FuncOpCode::FromBytes,
+            opcode: FuncOpCode::BytesToString,
             return_type: VariableType::String,
-            args: Some(vec![ArgumentDefinition::new("value", VariableType::Bytes)]),
+            args: None,
             signature: FunctionSignature::FixedParameters(1),
         },
         FunctionDefinition {

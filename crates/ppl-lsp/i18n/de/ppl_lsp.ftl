@@ -1378,7 +1378,6 @@ hint-function-instrr=Gibt die Position ganz rechts von @2 in @1 `(1-LEN(@1))` od
 hint-function-base64enc=Kodiert die Bytes von @1 als Base64-Text. Ein String-Argument steuert seine UTF-8-Bytes bei.
 hint-function-base64dec=Dekodiert Base64-Text in @1 in einen Byte-Blob. Fehlerhafte Eingabeberichte `ErrCode.Format`.
 hint-function-tobytes=Die binäre Darstellung von @1 als Byte-Blob. Zeichenfolgen verwenden UTF-8; Numerische Skalare verwenden Little-Endian-Speicher mit fester Breite.
-hint-function-frombytes=Dekodiert den Byteblob @1 als UTF-8-Text. Ungültige Bytes melden `ErrCode.Format`.
 hint-statement-on-error=ON ERROR GOTO label | GOSUB-Label | Vorgehensweise | AUS – wohin ein fehlgeschlagener Vorgang das Programm sendet.
 hint-function-fdordaka=Gibt die Adresse zurück, auf die dieses Board antwortet, als zone:net/node mit dem Punkt
     angehängt, wenn ein solcher Datensatz vorhanden ist, oder eine leere Zeichenfolge, wenn kein solcher Datensatz vorhanden ist

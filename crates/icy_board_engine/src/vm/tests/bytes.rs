@@ -9,7 +9,7 @@ BYTES raw = ToBytes(text)
 STRING enc = Base64Enc(raw)
 BYTES dec = Base64Dec(enc)
 PRINTLN enc
-PRINTLN FromBytes(dec)
+PRINTLN dec.ToString()
 PRINTLN LEN(raw)
 "#,
     );
@@ -116,6 +116,12 @@ fn global_sha256_is_not_part_of_the_language() {
 }
 
 #[test]
+fn global_frombytes_is_not_part_of_the_language() {
+    let errors = compile_errors_with_runtime("PRINTLN FromBytes(ToBytes(\"abc\"))", 400);
+    assert!(!errors.is_empty());
+}
+
+#[test]
 fn bytes_print_as_uppercase_hex() {
     let output = run_ppl(
         r#";$LANGVERSION 400
@@ -133,7 +139,7 @@ fn decoding_bytes_that_are_not_utf8_reports_a_format_error() {
     let output = run_ppl(
         r#";$LANGVERSION 400
 BYTES raw = Base64Dec("/w==")
-STRING text = FromBytes(raw)
+STRING text = raw.ToString()
 PRINTLN "[", text, "] ", Error.Last().Kind = ErrKind.String, " ", Error.Last().Code = ErrCode.Format
 "#,
     );

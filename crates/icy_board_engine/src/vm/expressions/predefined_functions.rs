@@ -901,9 +901,9 @@ pub async fn tobytes(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 }
 
 /// Decode a binary blob as UTF-8 text; invalid bytes report ErrCode.Format.
-pub async fn frombytes(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+pub async fn bytes_to_string(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let value = vm.eval_expr(&args[0]).await?;
-    let Some(bytes) = bytes_from_value(vm, &value, "FromBytes") else {
+    let Some(bytes) = bytes_from_value(vm, &value, "Bytes.ToString") else {
         return Ok(VariableValue::new_string(String::new()));
     };
     match String::from_utf8(bytes) {
@@ -912,7 +912,7 @@ pub async fn frombytes(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Var
             Ok(VariableValue::new_string(text))
         }
         Err(_) => {
-            vm.set_error(PplError::new(ERR_KIND_STRING, ERR_FORMAT, "FromBytes: invalid UTF-8"));
+            vm.set_error(PplError::new(ERR_KIND_STRING, ERR_FORMAT, "Bytes.ToString: invalid UTF-8"));
             Ok(VariableValue::new_string(String::new()))
         }
     }

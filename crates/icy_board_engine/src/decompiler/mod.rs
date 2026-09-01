@@ -613,7 +613,7 @@ impl Decompiler {
                     FuncOpCode::StringTrimEndChars => Some("TrimEnd"),
                     FuncOpCode::StringMid => Some("Mid"),
                     FuncOpCode::BASE64ENC => Some("ToBase64"),
-                    FuncOpCode::FromBytes => Some("ToString"),
+                    FuncOpCode::BytesToString => Some("ToString"),
                     FuncOpCode::BytesToHex => Some("ToHex"),
                     FuncOpCode::BytesGetChecksum => Some("GetChecksum"),
                     _ => None,

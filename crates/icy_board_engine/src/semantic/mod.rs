@@ -369,7 +369,7 @@ fn bytes_member(name: &unicase::Ascii<String>, arguments: usize) -> Option<(Func
     let normalized = name.as_ref().to_ascii_lowercase();
     match (normalized.as_str(), arguments) {
         ("len", 0) => Some((FuncOpCode::LEN, VariableType::Integer)),
-        ("tostring", 0) => Some((FuncOpCode::FromBytes, VariableType::String)),
+        ("tostring", 0) => Some((FuncOpCode::BytesToString, VariableType::String)),
         ("tobase64", 0) => Some((FuncOpCode::BASE64ENC, VariableType::String)),
         ("tohex", 0) => Some((FuncOpCode::BytesToHex, VariableType::String)),
         ("getchecksum", 1) => Some((FuncOpCode::BytesGetChecksum, VariableType::Bytes)),

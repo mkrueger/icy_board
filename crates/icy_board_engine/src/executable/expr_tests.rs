@@ -1,7 +1,7 @@
 #[test]
 fn bytes_function_ids_are_compact() {
     assert_eq!(FuncOpCode::ToBytes as i16, -341);
-    assert_eq!(FuncOpCode::FromBytes as i16, -342);
+    assert_eq!(FuncOpCode::BytesToString as i16, -342);
     assert_eq!(FuncOpCode::BytesToHex as i16, -343);
     assert_eq!(FuncOpCode::BytesGetChecksum as i16, -344);
 

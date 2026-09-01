@@ -328,7 +328,7 @@ pub async fn run_function(opcode: FuncOpCode, arg: &mut VirtualMachine<'_>, argu
         FuncOpCode::BytesGetChecksum => predefined_functions::bytes_get_checksum(arg, arguments).await,
         FuncOpCode::BytesToHex => predefined_functions::bytes_to_hex(arg, arguments).await,
         FuncOpCode::ToBytes => predefined_functions::tobytes(arg, arguments).await,
-        FuncOpCode::FromBytes => predefined_functions::frombytes(arg, arguments).await,
+        FuncOpCode::BytesToString => predefined_functions::bytes_to_string(arg, arguments).await,
         FuncOpCode::Rgb | FuncOpCode::RgbAlpha => predefined_functions::rgb(arg, arguments).await,
         FuncOpCode::Terminal => predefined_functions::terminal(arg, arguments).await,
         FuncOpCode::Board => predefined_functions::board(arg, arguments).await,
