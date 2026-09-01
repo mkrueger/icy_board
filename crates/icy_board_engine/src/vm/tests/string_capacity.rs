@@ -19,6 +19,65 @@ PRINTLN "midlen=", long.Mid(0, 300).Len()
 }
 
 #[test]
+fn legacy_bigstr_is_limited_to_2048_unicode_characters() {
+    let output = run_ppl(
+        r#";$LANGVERSION 400
+BIGSTR text
+text = STRING.Repeat("ä", 3000)
+PRINTLN LEN(text)
+PRINTLN text = STRING.Repeat("ä", 2048)
+"#,
+    );
+
+    assert_eq!(output, "2048\n1\n");
+}
+
+#[test]
+fn ppl400_strings_keep_their_length_through_classic_functions_and_output() {
+    // Classic functions and statements still declare the legacy string types, so a
+    // 4.00 STRING has to survive a round trip through them untruncated.
+    let output = run_ppl(
+        r#";$LANGVERSION 400
+DECLARE FUNCTION Echo(STRING value) STRING
+STRING long = STRING.Repeat("x", 70000)
+PRINTLN "upper=", LEN(UPPER(long))
+PRINTLN "classic_mid=", LEN(MID(long, 1, 70000))
+PRINTLN "concat=", LEN(long + long)
+PRINTLN "roundtrip=", LEN(Echo(long))
+STRING printed = STRING.Repeat("y", 5000)
+PRINTLN LEN(printed)
+FUNCTION Echo(STRING value) STRING
+    RETURN value
+ENDFUNC
+"#,
+    );
+
+    assert_eq!(output, "upper=70000\nclassic_mid=70000\nconcat=140000\nroundtrip=70000\n5000\n");
+}
+
+#[test]
+fn ppl400_string_arrays_and_records_keep_long_values() {
+    let output = run_ppl(
+        r#";$LANGVERSION 400
+TYPE Item
+    STRING Text
+ENDTYPE
+STRING values(1)
+values(0) = STRING.Repeat("x", 70000)
+PRINTLN "array=", LEN(values(0))
+Item value
+value.Text = values(0)
+PRINTLN "record=", LEN(value.Text)
+STRING parts[]
+parts = STRING.Split(STRING.Repeat("x", 70000) + "," + "b", ",")
+PRINTLN "split=", LEN(parts[0])
+"#,
+    );
+
+    assert_eq!(output, "array=70000\nrecord=70000\nsplit=70000\n");
+}
+
+#[test]
 fn legacy_string_storage_matches_pcboard_256_character_capacity() {
     let output = run_ppl(
         r#";$LANGVERSION 340

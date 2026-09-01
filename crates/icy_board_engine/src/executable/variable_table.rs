@@ -153,7 +153,10 @@ impl VarHeader {
 /// its own fields too. A type can only name types declared before it, so this ends.
 pub fn create_record_value(type_id: u8, user_types: &[Vec<RecordField>]) -> Option<VariableValue> {
     let built_in_fields = match type_id as usize {
-        crate::parser::CONTACT_ID => Some(vec![RecordField::scalar(VariableType::BigStr), RecordField::scalar(VariableType::BigStr)]),
+        crate::parser::CONTACT_ID => Some(vec![
+            RecordField::scalar(VariableType::UnboundedString),
+            RecordField::scalar(VariableType::UnboundedString),
+        ]),
         _ => None,
     };
     let fields = if let Some(fields) = built_in_fields.as_ref() {
@@ -927,7 +930,10 @@ impl VariableTable {
                     Print("]".to_string()),
                 )
                 .unwrap();
-            } else if var.header.variable_type == VariableType::String || var.header.variable_type == VariableType::BigStr {
+            } else if matches!(
+                var.header.variable_type,
+                VariableType::String | VariableType::BigStr | VariableType::UnboundedString
+            ) {
                 execute!(
                     stdout(),
                     SetAttribute(Attribute::Bold),

@@ -7,14 +7,14 @@ use crate::{
 fn ppl400_string_record_fields_use_dynamic_storage() {
     let executable = compile(";$LANGVERSION 400\nTYPE Item\n STRING Text\n STRING Lines(1)\nENDTYPE\nItem value\nPRINT value.Text");
 
-    assert_eq!(VariableType::BigStr, executable.user_types[0][0].variable_type);
-    assert_eq!(VariableType::BigStr, executable.user_types[0][1].variable_type);
+    assert_eq!(VariableType::UnboundedString, executable.user_types[0][0].variable_type);
+    assert_eq!(VariableType::UnboundedString, executable.user_types[0][1].variable_type);
     assert_eq!(1, executable.user_types[0][1].dim);
     let direct = crate::executable::create_record_value(crate::parser::FIRST_USER_TYPE_ID as u8, &executable.user_types).unwrap();
     let GenericVariableData::Record(direct_fields) = direct.generic_data else {
         panic!("record factory did not initialize fields");
     };
-    assert_eq!(VariableType::BigStr, direct_fields[0].vtype);
+    assert_eq!(VariableType::UnboundedString, direct_fields[0].vtype);
     let record = executable
         .variable_table
         .get_entries()
@@ -24,7 +24,7 @@ fn ppl400_string_record_fields_use_dynamic_storage() {
     let GenericVariableData::Record(fields) = &record.value.generic_data else {
         panic!("record fields were not initialized");
     };
-    assert_eq!(VariableType::BigStr, fields[0].vtype);
+    assert_eq!(VariableType::UnboundedString, fields[0].vtype);
     assert_eq!(
         "70000|70000|70000",
         run_ppl(

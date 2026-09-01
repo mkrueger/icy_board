@@ -37,6 +37,7 @@ fn type_name(registry: &UserTypeRegistry, variable_type: VariableType) -> String
         VariableType::Long => "LONG".to_string(),
         VariableType::ULong => "ULONG".to_string(),
         VariableType::Bytes => "BYTES".to_string(),
+        VariableType::UnboundedString => "STRING".to_string(),
         VariableType::UserData(id) => registry
             .get_enum_from_id(id)
             .map(|definition| definition.name.to_string())

@@ -392,7 +392,7 @@ impl UserData for Conference {
     const EMPTY_VALUE: Option<fn() -> VariableValue> = Some(|| user_data_value(Conference::default(), crate::parser::CONFERENCE_ID));
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
-        registry.add_property(NAME.clone(), VariableType::String, false);
+        registry.add_property(NAME.clone(), VariableType::UnboundedString, false);
         registry.add_property(NUMBER.clone(), VariableType::Integer, false);
         registry.add_property(VALID.clone(), VariableType::Boolean, false);
         registry.add_property(ISPUBLIC.clone(), VariableType::Boolean, false);
@@ -433,7 +433,7 @@ pub static CAN_ATTACH: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::
 impl UserDataValue for Conference {
     fn get_property_value(&self, _vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
         if *name == *NAME {
-            return Ok(VariableValue::new_string(self.name.clone()));
+            return Ok(VariableValue::new_unbounded_string(self.name.clone()));
         }
         if *name == *NUMBER {
             return Ok(VariableValue::new_int(self.number as i32));

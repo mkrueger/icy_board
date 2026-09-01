@@ -172,50 +172,54 @@ impl UserData for PplRegex {
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         registry.add_property(VALID.clone(), VariableType::Boolean, false);
-        registry.add_property(PATTERN.clone(), VariableType::String, false);
+        registry.add_property(PATTERN.clone(), VariableType::UnboundedString, false);
         registry.add_named_static_function_with(
             COMPILE.clone(),
-            vec![("pattern", VariableType::String), ("options", VariableType::UserData(REGEX_OPTIONS_ENUM_ID))],
+            vec![("pattern", VariableType::UnboundedString), ("options", VariableType::UserData(REGEX_OPTIONS_ENUM_ID))],
             1,
             VariableType::UserData(REGEX_ID as u8),
         );
-        registry.add_named_static_function(ESCAPE.clone(), vec![("text", VariableType::String)], VariableType::String);
+        registry.add_named_static_function(ESCAPE.clone(), vec![("text", VariableType::UnboundedString)], VariableType::UnboundedString);
         registry.add_named_static_function_with(
             IS_VALID.clone(),
-            vec![("pattern", VariableType::String), ("options", VariableType::UserData(REGEX_OPTIONS_ENUM_ID))],
+            vec![("pattern", VariableType::UnboundedString), ("options", VariableType::UserData(REGEX_OPTIONS_ENUM_ID))],
             1,
             VariableType::Boolean,
         );
         registry.add_named_function_with(
             IS_MATCH.clone(),
-            vec![("text", VariableType::String), ("start", VariableType::Integer)],
+            vec![("text", VariableType::UnboundedString), ("start", VariableType::Integer)],
             1,
             VariableType::Boolean,
         );
         registry.add_named_function_with(
             FIND.clone(),
-            vec![("text", VariableType::String), ("start", VariableType::Integer)],
+            vec![("text", VariableType::UnboundedString), ("start", VariableType::Integer)],
             1,
             VariableType::UserData(REGEX_MATCH_ID as u8),
         );
         registry.add_named_array_function_with(
             FIND_ALL.clone(),
-            vec![("text", VariableType::String), ("start", VariableType::Integer), ("limit", VariableType::Integer)],
+            vec![("text", VariableType::UnboundedString), ("start", VariableType::Integer), ("limit", VariableType::Integer)],
             1,
             VariableType::UserData(REGEX_MATCH_ID as u8),
             1,
         );
         registry.add_named_function_with(
             REPLACE.clone(),
-            vec![("text", VariableType::String), ("replacement", VariableType::String), ("limit", VariableType::Integer)],
+            vec![
+                ("text", VariableType::UnboundedString),
+                ("replacement", VariableType::UnboundedString),
+                ("limit", VariableType::Integer),
+            ],
             2,
-            VariableType::String,
+            VariableType::UnboundedString,
         );
         registry.add_named_array_function_with(
             SPLIT.clone(),
-            vec![("text", VariableType::String), ("limit", VariableType::Integer)],
+            vec![("text", VariableType::UnboundedString), ("limit", VariableType::Integer)],
             1,
-            VariableType::String,
+            VariableType::UnboundedString,
             1,
         );
     }
@@ -228,7 +232,7 @@ impl UserDataValue for PplRegex {
             return Ok(VariableValue::new_bool(self.compiled.is_some()));
         }
         if *name == *PATTERN {
-            return Ok(VariableValue::new_string(self.pattern.clone()).convert_to(VariableType::BigStr));
+            return Ok(VariableValue::new_unbounded_string(self.pattern.clone()));
         }
         if *name == *OPTIONS {
             return Ok(VariableValue::new_int(self.options));
@@ -268,7 +272,7 @@ impl UserDataValue for PplRegex {
         }
         if *name == *ESCAPE {
             vm.operation_succeeded();
-            return Ok(VariableValue::new_string(regex::escape(&arguments[0].as_string())).convert_to(VariableType::BigStr));
+            return Ok(VariableValue::new_unbounded_string(regex::escape(&arguments[0].as_string())));
         }
         if *name == *IS_VALID {
             let options = arguments.get(1).map_or(0, VariableValue::as_int);
@@ -348,14 +352,14 @@ impl UserDataValue for PplRegex {
         if *name == *REPLACE {
             let Some(compiled) = &self.compiled else {
                 vm.set_error(PplError::new(ERR_KIND_REGEX, ERR_INVALID, self.error.clone()));
-                return Ok(VariableValue::new_string(String::new()).convert_to(VariableType::BigStr));
+                return Ok(VariableValue::new_unbounded_string(String::new()));
             };
             let text = arguments[0].as_string();
             let replacement = arguments[1].as_string();
             let limit = arguments.get(2).map_or(0, VariableValue::as_int);
             if limit < 0 {
                 vm.set_error(PplError::new(ERR_KIND_REGEX, ERR_INVALID, "REGEX.Replace limit cannot be negative"));
-                return Ok(VariableValue::new_string(String::new()).convert_to(VariableType::BigStr));
+                return Ok(VariableValue::new_unbounded_string(String::new()));
             }
             let replaced = if limit == 0 {
                 compiled.replace_all(&text, replacement.as_str())
@@ -368,21 +372,21 @@ impl UserDataValue for PplRegex {
                     crate::icy_board::state::ppl_error::ERR_LIMIT,
                     "REGEX.Replace result exceeds 16 MiB",
                 ));
-                return Ok(VariableValue::new_string(String::new()).convert_to(VariableType::BigStr));
+                return Ok(VariableValue::new_unbounded_string(String::new()));
             }
             vm.operation_succeeded();
-            return Ok(VariableValue::new_string(replaced.into_owned()).convert_to(VariableType::BigStr));
+            return Ok(VariableValue::new_unbounded_string(replaced.into_owned()));
         }
         if *name == *SPLIT {
             let Some(compiled) = &self.compiled else {
                 vm.set_error(PplError::new(ERR_KIND_REGEX, ERR_INVALID, self.error.clone()));
-                return Ok(VariableValue::new_vector(VariableType::BigStr, Vec::new()));
+                return Ok(VariableValue::new_vector(VariableType::UnboundedString, Vec::new()));
             };
             let text = arguments[0].as_string();
             let limit = arguments.get(1).map_or(0, VariableValue::as_int);
             if limit < 0 {
                 vm.set_error(PplError::new(ERR_KIND_REGEX, ERR_INVALID, "REGEX.Split limit cannot be negative"));
-                return Ok(VariableValue::new_vector(VariableType::BigStr, Vec::new()));
+                return Ok(VariableValue::new_vector(VariableType::UnboundedString, Vec::new()));
             }
             let parts: Vec<_> = if limit == 0 {
                 compiled.split(&text).map(str::to_string).collect()
@@ -391,10 +395,10 @@ impl UserDataValue for PplRegex {
             };
             vm.operation_succeeded();
             return Ok(VariableValue::new_vector(
-                VariableType::BigStr,
+                VariableType::UnboundedString,
                 parts
                     .into_iter()
-                    .map(|part| VariableValue::new_string(part).convert_to(VariableType::BigStr))
+                    .map(VariableValue::new_unbounded_string)
                     .collect(),
             ));
         }
@@ -411,18 +415,22 @@ impl UserData for PplRegexMatch {
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         registry.add_property(SUCCESS.clone(), VariableType::Boolean, false);
-        registry.add_property(VALUE.clone(), VariableType::String, false);
+        registry.add_property(VALUE.clone(), VariableType::UnboundedString, false);
         registry.add_property(START.clone(), VariableType::Integer, false);
         registry.add_property(LENGTH.clone(), VariableType::Integer, false);
         registry.add_property(GROUP_COUNT.clone(), VariableType::Integer, false);
-        registry.add_named_function(GROUP.clone(), vec![("index", VariableType::Integer)], VariableType::String);
-        registry.add_named_function(NAMED_GROUP.clone(), vec![("name", VariableType::String)], VariableType::String);
+        registry.add_named_function(GROUP.clone(), vec![("index", VariableType::Integer)], VariableType::UnboundedString);
+        registry.add_named_function(
+            NAMED_GROUP.clone(),
+            vec![("name", VariableType::UnboundedString)],
+            VariableType::UnboundedString,
+        );
         registry.add_named_function(GROUP_MATCHED.clone(), vec![("index", VariableType::Integer)], VariableType::Boolean);
-        registry.add_named_function(NAMED_GROUP_MATCHED.clone(), vec![("name", VariableType::String)], VariableType::Boolean);
+        registry.add_named_function(NAMED_GROUP_MATCHED.clone(), vec![("name", VariableType::UnboundedString)], VariableType::Boolean);
         registry.add_named_function(GROUP_START.clone(), vec![("index", VariableType::Integer)], VariableType::Integer);
-        registry.add_named_function(NAMED_GROUP_START.clone(), vec![("name", VariableType::String)], VariableType::Integer);
+        registry.add_named_function(NAMED_GROUP_START.clone(), vec![("name", VariableType::UnboundedString)], VariableType::Integer);
         registry.add_named_function(GROUP_LENGTH.clone(), vec![("index", VariableType::Integer)], VariableType::Integer);
-        registry.add_named_function(NAMED_GROUP_LENGTH.clone(), vec![("name", VariableType::String)], VariableType::Integer);
+        registry.add_named_function(NAMED_GROUP_LENGTH.clone(), vec![("name", VariableType::UnboundedString)], VariableType::Integer);
     }
 }
 
@@ -434,7 +442,9 @@ impl UserDataValue for PplRegexMatch {
             return Ok(VariableValue::new_bool(whole.is_some_and(|group| group.matched)));
         }
         if *name == *VALUE {
-            return Ok(VariableValue::new_string(whole.map(|group| group.value.clone()).unwrap_or_default()).convert_to(VariableType::BigStr));
+            return Ok(VariableValue::new_unbounded_string(
+                whole.map(|group| group.value.clone()).unwrap_or_default(),
+            ));
         }
         if *name == *START {
             return Ok(VariableValue::new_int(whole.map_or(-1, |group| group.start)));
@@ -466,7 +476,7 @@ impl UserDataValue for PplRegexMatch {
         let Some(group) = group else {
             vm.set_error(PplError::new(ERR_KIND_REGEX, ERR_INVALID, "REGEXMATCH group does not exist"));
             return Ok(if *name == *GROUP || *name == *NAMED_GROUP {
-                VariableValue::new_string(String::new()).convert_to(VariableType::BigStr)
+                VariableValue::new_unbounded_string(String::new())
             } else if *name == *GROUP_MATCHED || *name == *NAMED_GROUP_MATCHED {
                 VariableValue::new_bool(false)
             } else {
@@ -475,7 +485,7 @@ impl UserDataValue for PplRegexMatch {
         };
         vm.operation_succeeded();
         if *name == *GROUP || *name == *NAMED_GROUP {
-            return Ok(VariableValue::new_string(group.value.clone()).convert_to(VariableType::BigStr));
+            return Ok(VariableValue::new_unbounded_string(group.value.clone()));
         }
         if *name == *GROUP_MATCHED || *name == *NAMED_GROUP_MATCHED {
             return Ok(VariableValue::new_bool(group.matched));

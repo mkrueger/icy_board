@@ -9,7 +9,7 @@ fn contact_record_fields_use_dynamic_string_storage() {
     let crate::executable::GenericVariableData::Record(fields) = value.generic_data else {
         panic!("contact record fields were not initialized");
     };
-    assert!(fields.iter().all(|field| field.vtype == crate::executable::VariableType::BigStr));
+    assert!(fields.iter().all(|field| field.vtype == crate::executable::VariableType::UnboundedString));
 }
 
 #[test]

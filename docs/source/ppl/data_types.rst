@@ -59,7 +59,9 @@ Example::
 
 STRING
 ~~~~~~
-- **Size**: Variable length (up to 256 characters in PCBoard, unlimited in Icy Board)
+- **Size**: Up to 256 Unicode characters before language 400; unbounded in
+    language 400
+- **PPE type ID**: 7 before language 400; 24 in language 400
 - **Default value**: Empty string ("")
 - **Declaration**: ``STRING varname`` or ``STRING varname = "value"``
 

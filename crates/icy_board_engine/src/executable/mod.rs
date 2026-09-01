@@ -105,7 +105,7 @@ impl VariableNameGenerator {
         }
 
         let name = match decl.header.variable_type {
-            VariableType::String => {
+            VariableType::String | VariableType::UnboundedString => {
                 self.string_vars += 1;
                 format!("STR{:>03}", self.string_vars)
             }

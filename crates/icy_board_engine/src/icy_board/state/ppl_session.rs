@@ -48,7 +48,7 @@ impl UserData for PplSession {
         registry.add_property(AREA.clone(), VariableType::UserData(MESSAGE_AREA_ID as u8), false);
         registry.add_property(DIRECTORY.clone(), VariableType::UserData(FILE_DIRECTORY_ID as u8), false);
         for name in [&*USER_NAME, &*ALIAS_NAME, &*LANGUAGE] {
-            registry.add_property(name.clone(), VariableType::String, false);
+            registry.add_property(name.clone(), VariableType::UnboundedString, false);
         }
         for name in [&*SECURITY_LEVEL, &*NODE, &*MINUTES_LEFT, &*PAGE_LENGTH] {
             registry.add_property(name.clone(), VariableType::Integer, false);
@@ -98,9 +98,9 @@ impl UserDataValue for PplSession {
                 .is_some_and(|directories| directories.get(session.current_file_directory).is_some());
             user_data_value(directory, FILE_DIRECTORY_ID)
         } else if *name == *USER_NAME {
-            VariableValue::new_string(session.user_name.clone())
+            VariableValue::new_unbounded_string(session.user_name.clone())
         } else if *name == *ALIAS_NAME {
-            VariableValue::new_string(session.alias_name.clone())
+            VariableValue::new_unbounded_string(session.alias_name.clone())
         } else if *name == *SECURITY_LEVEL {
             VariableValue::new_int(i32::from(session.cur_security))
         } else if *name == *NODE {
@@ -111,7 +111,7 @@ impl UserDataValue for PplSession {
         } else if *name == *PAGE_LENGTH {
             VariableValue::new_int(i32::from(session.page_len))
         } else if *name == *LANGUAGE {
-            VariableValue::new_string(session.language.clone())
+            VariableValue::new_unbounded_string(session.language.clone())
         } else if *name == *IS_LOCAL {
             VariableValue::new_bool(session.is_local)
         } else if *name == *IS_SYSOP {

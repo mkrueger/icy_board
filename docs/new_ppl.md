@@ -293,8 +293,9 @@ The PPE must store each record layout, so any use of `TYPE` requires runtime
 ### String members
 
 At language 400 `STRING` is the string type and is not length-limited, so it is
-used throughout. `BIGSTR` is a deprecated alias kept only for older sources; the
-compiler warns when it is written at 400.
+used throughout. It has its own PPE type ID, separate from classic `STRING` and
+`BIGSTR`. `BIGSTR` remains a deprecated legacy type limited to 2048 Unicode
+characters; the compiler warns when it is written at 400.
 
 `STRING` values expose their common operations as members. This is the same
 operation as the classic global function where one exists, written with the

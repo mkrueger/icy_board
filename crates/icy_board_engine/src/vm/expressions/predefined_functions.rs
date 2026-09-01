@@ -93,7 +93,7 @@ pub async fn len(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableV
                 _ => 6, // always return 6 for passwords
             }
         }
-        GenericVariableData::None if str.vtype == VariableType::String || str.vtype == VariableType::BigStr => 0,
+        GenericVariableData::None if matches!(str.vtype, VariableType::String | VariableType::BigStr | VariableType::UnboundedString) => 0,
         _ => {
             log::warn!("len: called on invalid type: '{}'.", str.vtype);
             0
@@ -240,7 +240,7 @@ pub async fn string_mid(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Va
     let mut pos = vm.eval_expr(&args[1]).await?.as_int();
     let chars = vm.eval_expr(&args[2]).await?.as_int();
     if chars <= 0 {
-        return Ok(VariableValue::new_string(String::new()).convert_to(VariableType::BigStr));
+        return Ok(VariableValue::new_unbounded_string(String::new()));
     }
 
     let mut res = String::new();
@@ -256,7 +256,7 @@ pub async fn string_mid(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Va
     while res.chars().count() < chars as usize {
         res.push(' ');
     }
-    Ok(VariableValue::new_string(res).convert_to(VariableType::BigStr))
+    Ok(VariableValue::new_unbounded_string(res))
 }
 
 pub async fn left(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -438,35 +438,41 @@ pub async fn string_count(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<
 
 pub async fn string_trim(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let text = vm.eval_expr(&args[0]).await?.as_string();
-    Ok(VariableValue::new_string(text.trim().to_string()).convert_to(VariableType::BigStr))
+    Ok(VariableValue::new_unbounded_string(text.trim().to_string()))
 }
 
 pub async fn string_trim_start(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let text = vm.eval_expr(&args[0]).await?.as_string();
-    Ok(VariableValue::new_string(text.trim_start().to_string()).convert_to(VariableType::BigStr))
+    Ok(VariableValue::new_unbounded_string(text.trim_start().to_string()))
 }
 
 pub async fn string_trim_end(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let text = vm.eval_expr(&args[0]).await?.as_string();
-    Ok(VariableValue::new_string(text.trim_end().to_string()).convert_to(VariableType::BigStr))
+    Ok(VariableValue::new_unbounded_string(text.trim_end().to_string()))
 }
 
 pub async fn string_trim_chars(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let text = vm.eval_expr(&args[0]).await?.as_string();
     let characters = vm.eval_expr(&args[1]).await?.as_string();
-    Ok(VariableValue::new_string(text.trim_matches(|character| characters.contains(character)).to_string()).convert_to(VariableType::BigStr))
+    Ok(VariableValue::new_unbounded_string(
+        text.trim_matches(|character| characters.contains(character)).to_string(),
+    ))
 }
 
 pub async fn string_trim_start_chars(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let text = vm.eval_expr(&args[0]).await?.as_string();
     let characters = vm.eval_expr(&args[1]).await?.as_string();
-    Ok(VariableValue::new_string(text.trim_start_matches(|character| characters.contains(character)).to_string()).convert_to(VariableType::BigStr))
+    Ok(VariableValue::new_unbounded_string(
+        text.trim_start_matches(|character| characters.contains(character)).to_string(),
+    ))
 }
 
 pub async fn string_trim_end_chars(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let text = vm.eval_expr(&args[0]).await?.as_string();
     let characters = vm.eval_expr(&args[1]).await?.as_string();
-    Ok(VariableValue::new_string(text.trim_end_matches(|character| characters.contains(character)).to_string()).convert_to(VariableType::BigStr))
+    Ok(VariableValue::new_unbounded_string(
+        text.trim_end_matches(|character| characters.contains(character)).to_string(),
+    ))
 }
 
 pub async fn string_char_at(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -477,7 +483,7 @@ pub async fn string_char_at(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Re
         .and_then(|index| text.chars().nth(index))
         .map(|character| character.to_string())
         .unwrap_or_default();
-    Ok(VariableValue::new_string(character))
+    Ok(VariableValue::new_unbounded_string(character))
 }
 
 fn string_comparison_mode(vm: &mut VirtualMachine<'_>, value: i32) -> Option<bool> {
@@ -646,11 +652,11 @@ async fn string_split_values(vm: &mut VirtualMachine<'_>, args: &[PPEExpr], limi
     let separator = vm.eval_expr(&args[1]).await?.as_string();
     if separator.is_empty() {
         vm.set_error(PplError::new(ERR_KIND_STRING, ERR_INVALID, "STRING.Split separator cannot be empty"));
-        return Ok(VariableValue::new_vector(VariableType::BigStr, Vec::new()));
+        return Ok(VariableValue::new_vector(VariableType::UnboundedString, Vec::new()));
     }
     if limit < 0 {
         vm.set_error(PplError::new(ERR_KIND_STRING, ERR_INVALID, "STRING.Split limit cannot be negative"));
-        return Ok(VariableValue::new_vector(VariableType::BigStr, Vec::new()));
+        return Ok(VariableValue::new_vector(VariableType::UnboundedString, Vec::new()));
     }
     let parts: Vec<_> = if limit == 0 {
         text.split(&separator).map(str::to_string).collect()
@@ -659,10 +665,10 @@ async fn string_split_values(vm: &mut VirtualMachine<'_>, args: &[PPEExpr], limi
     };
     vm.operation_succeeded();
     Ok(VariableValue::new_vector(
-        VariableType::BigStr,
+        VariableType::UnboundedString,
         parts
             .into_iter()
-            .map(|part| VariableValue::new_string(part).convert_to(VariableType::BigStr))
+            .map(VariableValue::new_unbounded_string)
             .collect(),
     ))
 }
@@ -698,11 +704,11 @@ pub async fn string_join(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<V
     let separator = vm.eval_expr(&args[1]).await?.as_string();
     let GenericVariableData::Dim1(values) = array.generic_data else {
         vm.set_error(PplError::new(ERR_KIND_STRING, ERR_INVALID, "STRING.Join needs a one-dimensional string array"));
-        return Ok(VariableValue::new_string(String::new()).convert_to(VariableType::BigStr));
+        return Ok(VariableValue::new_unbounded_string(String::new()));
     };
     let joined = values.iter().map(VariableValue::as_string).collect::<Vec<_>>().join(&separator);
     vm.operation_succeeded();
-    Ok(VariableValue::new_string(joined).convert_to(VariableType::BigStr))
+    Ok(VariableValue::new_unbounded_string(joined))
 }
 
 pub async fn string_repeat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -710,18 +716,18 @@ pub async fn string_repeat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res
     let count = vm.eval_expr(&args[1]).await?.as_int();
     if count < 0 {
         vm.set_error(PplError::new(ERR_KIND_STRING, ERR_INVALID, "STRING.Repeat count cannot be negative"));
-        return Ok(VariableValue::new_string(String::new()).convert_to(VariableType::BigStr));
+        return Ok(VariableValue::new_unbounded_string(String::new()));
     }
     let Some(length) = text.len().checked_mul(count as usize) else {
         vm.set_error(PplError::new(ERR_KIND_STRING, ERR_LIMIT, "STRING.Repeat result is too large"));
-        return Ok(VariableValue::new_string(String::new()).convert_to(VariableType::BigStr));
+        return Ok(VariableValue::new_unbounded_string(String::new()));
     };
     if length > 16 * 1024 * 1024 {
         vm.set_error(PplError::new(ERR_KIND_STRING, ERR_LIMIT, "STRING.Repeat result exceeds 16 MiB"));
-        return Ok(VariableValue::new_string(String::new()).convert_to(VariableType::BigStr));
+        return Ok(VariableValue::new_unbounded_string(String::new()));
     }
     vm.operation_succeeded();
-    Ok(VariableValue::new_string(text.repeat(count as usize)).convert_to(VariableType::BigStr))
+    Ok(VariableValue::new_unbounded_string(text.repeat(count as usize)))
 }
 
 /// Returns a flag indicating if the user has aborted the display of information.
@@ -865,10 +871,10 @@ fn bytes_from_value(vm: &mut VirtualMachine<'_>, value: &VariableValue, operatio
 pub async fn base64enc(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let value = vm.eval_expr(&args[0]).await?;
     let Some(bytes) = bytes_from_value(vm, &value, "Base64Enc") else {
-        return Ok(VariableValue::new_string(String::new()));
+        return Ok(VariableType::UnboundedString.create_empty_value());
     };
     vm.operation_succeeded();
-    Ok(VariableValue::new_string(general_purpose::STANDARD.encode(bytes)))
+    Ok(VariableValue::new_unbounded_string(general_purpose::STANDARD.encode(bytes)))
 }
 
 pub async fn base64dec(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -904,16 +910,16 @@ pub async fn tobytes(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 pub async fn bytes_to_string(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let value = vm.eval_expr(&args[0]).await?;
     let Some(bytes) = bytes_from_value(vm, &value, "Bytes.ToString") else {
-        return Ok(VariableValue::new_string(String::new()));
+        return Ok(VariableType::UnboundedString.create_empty_value());
     };
     match String::from_utf8(bytes) {
         Ok(text) => {
             vm.operation_succeeded();
-            Ok(VariableValue::new_string(text))
+            Ok(VariableValue::new_unbounded_string(text))
         }
         Err(_) => {
             vm.set_error(PplError::new(ERR_KIND_STRING, ERR_FORMAT, "Bytes.ToString: invalid UTF-8"));
-            Ok(VariableValue::new_string(String::new()))
+            Ok(VariableType::UnboundedString.create_empty_value())
         }
     }
 }
@@ -940,14 +946,14 @@ pub async fn bytes_get_checksum(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -
 pub async fn bytes_to_hex(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let value = vm.eval_expr(&args[0]).await?;
     let Some(bytes) = bytes_from_value(vm, &value, "Bytes.ToHex") else {
-        return Ok(VariableValue::new_string(String::new()));
+        return Ok(VariableType::UnboundedString.create_empty_value());
     };
     let mut result = String::with_capacity(bytes.len() * 2);
     for byte in bytes {
         let _ = write!(result, "{byte:02X}");
     }
     vm.operation_succeeded();
-    Ok(VariableValue::new_string(result))
+    Ok(VariableValue::new_unbounded_string(result))
 }
 
 /// Trim specified characters from the end of a string

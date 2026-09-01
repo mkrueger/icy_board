@@ -59,7 +59,7 @@ impl UserData for PplBoard {
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         for name in [&*NAME, &*LOCATION, &*OPERATOR, &*SYSOP_NAME] {
-            registry.add_property(name.clone(), VariableType::String, false);
+            registry.add_property(name.clone(), VariableType::UnboundedString, false);
         }
         registry.add_property(NODES.clone(), VariableType::Integer, false);
         registry.add_array_property(CONFERENCES.clone(), VariableType::UserData(CONFERENCE_ID as u8), 1);
@@ -71,13 +71,13 @@ impl UserData for PplBoard {
 impl UserDataValue for PplBoard {
     fn get_property_value(&self, _vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
         let value = if *name == *NAME {
-            VariableValue::new_string(self.name.clone())
+            VariableValue::new_unbounded_string(self.name.clone())
         } else if *name == *LOCATION {
-            VariableValue::new_string(self.location.clone())
+            VariableValue::new_unbounded_string(self.location.clone())
         } else if *name == *OPERATOR {
-            VariableValue::new_string(self.operator.clone())
+            VariableValue::new_unbounded_string(self.operator.clone())
         } else if *name == *SYSOP_NAME {
-            VariableValue::new_string(self.sysop_name.clone())
+            VariableValue::new_unbounded_string(self.sysop_name.clone())
         } else if *name == *NODES {
             VariableValue::new_int(self.nodes)
         } else if *name == *CONFERENCES {

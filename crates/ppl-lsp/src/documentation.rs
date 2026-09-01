@@ -179,9 +179,10 @@ pub fn get_type_hover_for_version(var_type: VariableType, language_version: u16)
         VariableType::Integer => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-integer")),
         VariableType::Money => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-money")),
         VariableType::Float => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-float")),
-        VariableType::String if language_version >= 400 => {
-            get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-string-unbounded"))
-        }
+        VariableType::UnboundedString | VariableType::String if language_version >= 400 => get_sig_hint(
+            VariableType::UnboundedString.get_signature(),
+            fl!(LANGUAGE_LOADER, "hint-type-string-unbounded"),
+        ),
         VariableType::String => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-string")),
         VariableType::Time => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-time")),
         VariableType::Byte => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-byte")),

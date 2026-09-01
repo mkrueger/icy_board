@@ -1700,7 +1700,7 @@ async fn internal_fread(vm: &mut VirtualMachine<'_>, channel: i32, size: usize, 
     let result = vm.io.fread(channel, size)?;
 
     match val.get_type() {
-        VariableType::String | VariableType::BigStr => {
+        VariableType::String | VariableType::BigStr | VariableType::UnboundedString => {
             let mut vs = String::new();
             for c in result {
                 if c == 0 {
@@ -1841,7 +1841,7 @@ pub async fn fwriterec(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
 
 async fn internal_fwrite(vm: &mut VirtualMachine<'_>, channel: i32, val: VariableValue, size: usize) -> Res<()> {
     let mut v = match val.get_type() {
-        VariableType::String | VariableType::BigStr => val.as_string().as_bytes().to_vec(),
+        VariableType::String | VariableType::BigStr | VariableType::UnboundedString => val.as_string().as_bytes().to_vec(),
         VariableType::Boolean => {
             if val.as_bool() {
                 vec![1]
@@ -2243,7 +2243,7 @@ async fn write_tpa(vm: &mut VirtualMachine<'_>, args: &[PPEExpr], conference: Op
 
 pub async fn bitset(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let num_xp = vm.eval_expr(&args[0]).await?;
-    if num_xp.get_type() == VariableType::String || num_xp.get_type() == VariableType::BigStr || num_xp.get_dimensions() > 0 {
+    if matches!(num_xp.get_type(), VariableType::String | VariableType::BigStr | VariableType::UnboundedString) || num_xp.get_dimensions() > 0 {
         log::error!("bitset not supported on data type {}", num_xp.vtype);
         return Ok(());
     }
@@ -2257,7 +2257,7 @@ pub async fn bitset(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
 
 pub async fn bitclear(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let num_xp = vm.eval_expr(&args[0]).await?;
-    if num_xp.get_type() == VariableType::String || num_xp.get_type() == VariableType::BigStr || num_xp.get_dimensions() > 0 {
+    if matches!(num_xp.get_type(), VariableType::String | VariableType::BigStr | VariableType::UnboundedString) || num_xp.get_dimensions() > 0 {
         log::error!("bitclear not supported on data type {}", num_xp.vtype);
         return Ok(());
     }

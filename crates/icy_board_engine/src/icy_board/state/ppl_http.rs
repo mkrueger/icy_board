@@ -579,15 +579,15 @@ impl UserData for PplHttp {
     const STATIC_RECEIVER: Option<fn() -> VariableValue> = Some(PplHttp::value);
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
-        registry.add_named_static_function(GET.clone(), vec![("url", VariableType::String)], VariableType::UserData(HTTP_RESPONSE_ID as u8));
+        registry.add_named_static_function(GET.clone(), vec![("url", VariableType::UnboundedString)], VariableType::UserData(HTTP_RESPONSE_ID as u8));
         registry.add_named_static_function(
             NEW.clone(),
-            vec![("method", VariableType::UserData(HTTP_METHOD_ENUM_ID)), ("url", VariableType::String)],
+            vec![("method", VariableType::UserData(HTTP_METHOD_ENUM_ID)), ("url", VariableType::UnboundedString)],
             VariableType::UserData(HTTP_REQUEST_ID as u8),
         );
         registry.add_named_static_function(
             DOWNLOAD.clone(),
-            vec![("url", VariableType::String), ("file", VariableType::String)],
+            vec![("url", VariableType::UnboundedString), ("file", VariableType::UnboundedString)],
             VariableType::UserData(HTTP_RESPONSE_ID as u8),
         );
     }
@@ -643,16 +643,16 @@ impl UserData for PplHttpRequest {
     const STATIC_RECEIVER: Option<fn() -> VariableValue> = Some(PplHttpRequest::invalid);
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
-        registry.add_property(URL.clone(), VariableType::String, false);
+        registry.add_property(URL.clone(), VariableType::UnboundedString, false);
         registry.add_property(METHOD.clone(), VariableType::UserData(HTTP_METHOD_ENUM_ID), false);
         registry.add_named_function(
             SET_HEADER.clone(),
-            vec![("name", VariableType::String), ("value", VariableType::String)],
+            vec![("name", VariableType::UnboundedString), ("value", VariableType::UnboundedString)],
             VariableType::Boolean,
         );
         registry.add_named_function_with(
             SET_TEXT.clone(),
-            vec![("text", VariableType::String), ("contentType", VariableType::String)],
+            vec![("text", VariableType::UnboundedString), ("contentType", VariableType::UnboundedString)],
             1,
             VariableType::Boolean,
         );
@@ -665,7 +665,7 @@ impl UserDataValue for PplHttpRequest {
     fn get_property_value(&self, _vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
         let request = self.request();
         if *name == *URL {
-            return Ok(VariableValue::new_string(request.url.clone()));
+            return Ok(VariableValue::new_unbounded_string(request.url.clone()));
         }
         if *name == *METHOD {
             return Ok(VariableValue::new_int(method_value(&request.method)));
@@ -745,12 +745,12 @@ impl UserData for PplHttpResponse {
         registry.add_property(VALID.clone(), VariableType::Boolean, false);
         registry.add_property(OK.clone(), VariableType::Boolean, false);
         registry.add_property(STATUS.clone(), VariableType::Integer, false);
-        registry.add_property(FINAL_URL.clone(), VariableType::String, false);
+        registry.add_property(FINAL_URL.clone(), VariableType::UnboundedString, false);
         registry.add_property(SIZE.clone(), VariableType::Long, false);
-        registry.add_property(CONTENT_TYPE.clone(), VariableType::String, false);
-        registry.add_function(TEXT.clone(), Vec::new(), VariableType::String);
-        registry.add_named_function(HEADER.clone(), vec![("name", VariableType::String)], VariableType::String);
-        registry.add_named_function(SAVE.clone(), vec![("file", VariableType::String)], VariableType::Boolean);
+        registry.add_property(CONTENT_TYPE.clone(), VariableType::UnboundedString, false);
+        registry.add_function(TEXT.clone(), Vec::new(), VariableType::UnboundedString);
+        registry.add_named_function(HEADER.clone(), vec![("name", VariableType::UnboundedString)], VariableType::UnboundedString);
+        registry.add_named_function(SAVE.clone(), vec![("file", VariableType::UnboundedString)], VariableType::Boolean);
     }
 }
 
@@ -767,13 +767,13 @@ impl UserDataValue for PplHttpResponse {
             return Ok(VariableValue::new_int(i32::from(self.status)));
         }
         if *name == *FINAL_URL {
-            return Ok(VariableValue::new_string(self.final_url.clone()));
+            return Ok(VariableValue::new_unbounded_string(self.final_url.clone()));
         }
         if *name == *SIZE {
             return Ok(VariableValue::new_long(self.size as i64));
         }
         if *name == *CONTENT_TYPE {
-            return Ok(VariableValue::new_string(self.content_type()));
+            return Ok(VariableValue::new_unbounded_string(self.content_type()));
         }
         Err(format!("Unknown HTTPRESPONSE property {name}").into())
     }
@@ -791,27 +791,27 @@ impl UserDataValue for PplHttpResponse {
         if *name == *TEXT {
             if !self.valid {
                 vm.set_error(PplError::new(ERR_KIND_NET, ERR_INVALID, "invalid HTTP response has no body"));
-                return Ok(VariableValue::new_string(String::new()).convert_to(VariableType::BigStr));
+                return Ok(VariableValue::new_unbounded_string(String::new()));
             }
             let Some(body) = &self.body else {
                 vm.set_error(PplError::new(ERR_KIND_NET, ERR_INVALID, "HTTP response body was not retained"));
-                return Ok(VariableValue::new_string(String::new()).convert_to(VariableType::BigStr));
+                return Ok(VariableValue::new_unbounded_string(String::new()));
             };
             return match String::from_utf8(body.clone()) {
                 Ok(text) => {
                     vm.operation_succeeded();
-                    Ok(VariableValue::new_string(text).convert_to(VariableType::BigStr))
+                    Ok(VariableValue::new_unbounded_string(text))
                 }
                 Err(_) => {
                     vm.set_error(PplError::new(ERR_KIND_NET, ERR_FORMAT, "HTTP response body is not UTF-8"));
-                    Ok(VariableValue::new_string(String::new()).convert_to(VariableType::BigStr))
+                    Ok(VariableValue::new_unbounded_string(String::new()))
                 }
             };
         }
         if *name == *HEADER {
             let header = arguments.first().map(VariableValue::as_string).unwrap_or_default().to_ascii_lowercase();
             vm.operation_succeeded();
-            return Ok(VariableValue::new_string(self.headers.get(&header).cloned().unwrap_or_default()));
+            return Ok(VariableValue::new_unbounded_string(self.headers.get(&header).cloned().unwrap_or_default()));
         }
         if *name == *SAVE {
             if !self.valid {

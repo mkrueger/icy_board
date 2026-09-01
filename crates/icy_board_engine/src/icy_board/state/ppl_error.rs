@@ -105,7 +105,7 @@ impl UserData for PplError {
         registry.add_property(OK.clone(), VariableType::Boolean, false);
         registry.add_property(KIND.clone(), VariableType::UserData(ERR_KIND_ENUM_ID), false);
         registry.add_property(CODE.clone(), VariableType::UserData(ERR_CODE_ENUM_ID), false);
-        registry.add_property(MESSAGE.clone(), VariableType::String, false);
+        registry.add_property(MESSAGE.clone(), VariableType::UnboundedString, false);
         registry.add_property(CHANNEL.clone(), VariableType::Integer, false);
 
         registry.add_static_function(LAST.clone(), Vec::new(), VariableType::UserData(ERROR_ID as u8));
@@ -126,7 +126,7 @@ impl UserDataValue for PplError {
             return Ok(VariableValue::new_int(self.code));
         }
         if *name == *MESSAGE {
-            return Ok(VariableValue::new_string(self.message.clone()));
+            return Ok(VariableValue::new_unbounded_string(self.message.clone()));
         }
         if *name == *CHANNEL {
             return Ok(VariableValue::new_int(self.channel));

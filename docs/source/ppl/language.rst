@@ -585,7 +585,9 @@ String members
 ~~~~~~~~~~~~~~
 
 Language 400 exposes common operations directly on ``STRING`` values, which are
-not length-limited. ``BIGSTR`` is a deprecated alias kept only for older sources.
+not length-limited. It has its own PPE type ID, separate from classic ``STRING``
+and ``BIGSTR``. ``BIGSTR`` remains a deprecated legacy type limited to 2048
+Unicode characters.
 Positions in this member API are zero-based Unicode character positions and
 ``-1`` means no match. The classic ``INSTR`` and ``INSTRR`` functions remain
 1-based and return zero when no match is found:

@@ -170,7 +170,7 @@ fn test_variable_declariton() {
     check_ast_node(
         "STRING FOO[5]",
         &AstNode::TopLevelStatement(crate::ast::Statement::VariableDeclaration(VariableDeclarationStatement::empty(
-            VariableType::String,
+            VariableType::UnboundedString,
             vec![VariableSpecifier::empty(unicase::Ascii::new("FOO".to_string()), vec![5])],
         ))),
     );
@@ -266,6 +266,34 @@ fn error_member_ids_are_compact() {
     }
 }
 
+#[test]
+fn ppl400_api_uses_unbounded_strings_exclusively() {
+    let registry = UserTypeRegistry::icy_board_registry();
+    let legacy_string = |variable_type| matches!(variable_type, VariableType::String | VariableType::BigStr);
+
+    for (type_id, object) in &registry.types {
+        for (name, variable_type) in &object.fields {
+            assert!(!legacy_string(*variable_type), "object {type_id} field {name} uses {variable_type}");
+        }
+        for (name, function) in &object.functions {
+            assert!(!legacy_string(function.return_type), "object {type_id} function {name} returns {}", function.return_type);
+            for (index, variable_type) in function.parameters.iter().enumerate() {
+                assert!(!legacy_string(*variable_type), "object {type_id} function {name} parameter {index} uses {variable_type}");
+            }
+        }
+        for (name, procedure) in &object.procedures {
+            for (index, variable_type) in procedure.parameters.iter().enumerate() {
+                assert!(!legacy_string(*variable_type), "object {type_id} procedure {name} parameter {index} uses {variable_type}");
+            }
+        }
+    }
+
+    let contact = registry.get_record_type_from_id(super::CONTACT_ID as u8).unwrap();
+    for (name, field) in &contact.fields {
+        assert!(!legacy_string(field.variable_type), "CONTACT field {name} uses {}", field.variable_type);
+    }
+}
+
 /// A builtin enum takes a fixed id at the top of the space and a program's own enums
 /// grow down from below them, so adding one in the middle would move every id after it.
 #[test]
@@ -339,7 +367,7 @@ fn test_type_declaration() {
     let def = reg.get_user_type(&unicase::Ascii::new("EMPLOYEE".to_string())).unwrap();
     assert_eq!(super::FIRST_USER_TYPE_ID, def.id);
     assert_eq!(Some(0), def.field_index(&unicase::Ascii::new("name".to_string())));
-    assert_eq!(Some(VariableType::String), def.field_type(0));
+    assert_eq!(Some(VariableType::UnboundedString), def.field_type(0));
     assert_eq!(Some(VariableType::Integer), def.field_type(2));
     assert_eq!(Some(def.clone()), reg.get_user_type_from_id(def.id as u8));
 }

@@ -362,7 +362,9 @@ fn member_completion(visitor: &SemanticVisitor, path: &[String], language_versio
         let value = type_of_chain(visitor, path).is_some_and(|value| {
             matches!(
                 value,
-                icy_board_engine::executable::VariableType::String | icy_board_engine::executable::VariableType::BigStr
+                icy_board_engine::executable::VariableType::String
+                    | icy_board_engine::executable::VariableType::BigStr
+                    | icy_board_engine::executable::VariableType::UnboundedString
             )
         });
         if namespace || value {

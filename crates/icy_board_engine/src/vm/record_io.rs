@@ -175,7 +175,7 @@ fn unescape_text(value: &str) -> Result<String, String> {
 
 fn encode_text_scalar(value: &VariableValue) -> String {
     match value.vtype {
-        VariableType::String | VariableType::BigStr => escape_text(&value.as_string()),
+        VariableType::String | VariableType::BigStr | VariableType::UnboundedString => escape_text(&value.as_string()),
         VariableType::MessageAreaID => {
             let (conference, area) = value.as_msg_id();
             format!("{conference},{area}")
@@ -192,7 +192,7 @@ fn encode_text_scalar(value: &VariableValue) -> String {
 fn decode_text_scalar(template: &VariableValue, text: &str) -> Result<VariableValue, String> {
     let invalid = || format!("invalid {} value {text:?}", template.vtype);
     let data = match template.vtype {
-        VariableType::String | VariableType::BigStr => {
+        VariableType::String | VariableType::BigStr | VariableType::UnboundedString => {
             return Ok(VariableValue {
                 vtype: template.vtype,
                 data: VariableData::default(),
@@ -248,7 +248,7 @@ fn decode_text_scalar(template: &VariableValue, text: &str) -> Result<VariableVa
 
 fn encode_binary_scalar(value: &VariableValue, output: &mut Vec<u8>) {
     match value.vtype {
-        VariableType::String | VariableType::BigStr => {
+        VariableType::String | VariableType::BigStr | VariableType::UnboundedString => {
             let bytes = value.as_string().into_bytes();
             output.extend_from_slice(&(bytes.len() as u32).to_le_bytes());
             output.extend_from_slice(&bytes);
@@ -284,7 +284,7 @@ fn read_exact<const N: usize>(input: &mut Cursor<&[u8]>) -> Result<[u8; N], Stri
 
 fn decode_binary_scalar(template: &VariableValue, input: &mut Cursor<&[u8]>) -> Result<VariableValue, String> {
     let data = match template.vtype {
-        VariableType::String | VariableType::BigStr => {
+        VariableType::String | VariableType::BigStr | VariableType::UnboundedString => {
             let length = u32::from_le_bytes(read_exact(input)?) as usize;
             if length > MAX_RECORD_FRAME {
                 return Err("string exceeds the 16 MiB frame limit".to_string());
@@ -362,6 +362,7 @@ fn ensure_scalar_type(variable_type: VariableType) -> Result<(), String> {
         | VariableType::SByte
         | VariableType::SWord
         | VariableType::BigStr
+        | VariableType::UnboundedString
         | VariableType::Double
         | VariableType::DDate
         | VariableType::MessageAreaID

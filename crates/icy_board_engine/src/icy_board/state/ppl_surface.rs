@@ -155,7 +155,7 @@ impl UserData for PplSurface {
             vec![("width", VariableType::Integer), ("height", VariableType::Integer)],
             surface,
         );
-        registry.add_named_static_function(LOAD.clone(), vec![("file", VariableType::String)], surface);
+        registry.add_named_static_function(LOAD.clone(), vec![("file", VariableType::UnboundedString)], surface);
     }
 }
 

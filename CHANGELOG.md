@@ -116,6 +116,15 @@ releases.
 
 ### Changed
 
+- PPL 4.00 `STRING` now has its own serialized scalar type ID, 24, and remains
+  unbounded Unicode text. Classic type 7 `STRING` retains its 256-character
+  limit, while type 13 `BIGSTR` retains a 2048-character limit and is deprecated
+  in new 4.00 source. The legacy limits count Unicode characters in IcyBoard so
+  old character-oriented PPE logic behaves consistently with UTF-8 board data.
+  All PPL 4.00 scalar members, object fields, parameters and return values use
+  type 24 directly; types 7 and 13 remain confined to classic compatibility
+  surfaces.
+
 - The language server waits for typing to pause before reading a program again,
   and reads it on a thread of its own. A burst of keystrokes is answered once
   instead of once per key, and completion, hover and the outline no longer queue

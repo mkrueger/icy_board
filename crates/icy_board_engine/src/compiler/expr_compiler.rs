@@ -245,7 +245,13 @@ impl AstVisitor<PPEExpr> for ExpressionCompiler<'_> {
             if var.value.get_type() == VariableType::Function {
                 return PPEExpr::FunctionCall(var.header.id, arguments);
             }
-            if var.header.dim == 0 && matches!(var.header.variable_type, VariableType::String | VariableType::BigStr) && arguments.len() == 1 {
+            if var.header.dim == 0
+                && matches!(
+                    var.header.variable_type,
+                    VariableType::String | VariableType::BigStr | VariableType::UnboundedString
+                )
+                && arguments.len() == 1
+            {
                 return PPEExpr::PredefinedFunctionCall(
                     FuncOpCode::StringCharAt.get_definition(),
                     vec![PPEExpr::Value(var.header.id), arguments.into_iter().next().unwrap()],

@@ -197,79 +197,79 @@ pub const STRING_MEMBERS: &[ScalarMember] = &[
     ScalarMember {
         name: "Replace",
         arguments: 2..=2,
-        return_type: VariableType::String,
+        return_type: VariableType::UnboundedString,
         is_static: false,
     },
     ScalarMember {
         name: "Trim",
         arguments: 0..=1,
-        return_type: VariableType::String,
+        return_type: VariableType::UnboundedString,
         is_static: false,
     },
     ScalarMember {
         name: "TrimStart",
         arguments: 0..=1,
-        return_type: VariableType::String,
+        return_type: VariableType::UnboundedString,
         is_static: false,
     },
     ScalarMember {
         name: "TrimEnd",
         arguments: 0..=1,
-        return_type: VariableType::String,
+        return_type: VariableType::UnboundedString,
         is_static: false,
     },
     ScalarMember {
         name: "ToUpper",
         arguments: 0..=0,
-        return_type: VariableType::String,
+        return_type: VariableType::UnboundedString,
         is_static: false,
     },
     ScalarMember {
         name: "ToLower",
         arguments: 0..=0,
-        return_type: VariableType::String,
+        return_type: VariableType::UnboundedString,
         is_static: false,
     },
     ScalarMember {
         name: "Mid",
         arguments: 2..=2,
-        return_type: VariableType::String,
+        return_type: VariableType::UnboundedString,
         is_static: false,
     },
     ScalarMember {
         name: "Left",
         arguments: 1..=1,
-        return_type: VariableType::String,
+        return_type: VariableType::UnboundedString,
         is_static: false,
     },
     ScalarMember {
         name: "Right",
         arguments: 1..=1,
-        return_type: VariableType::String,
+        return_type: VariableType::UnboundedString,
         is_static: false,
     },
     ScalarMember {
         name: "Split",
         arguments: 1..=2,
-        return_type: VariableType::String,
+        return_type: VariableType::UnboundedString,
         is_static: false,
     },
     ScalarMember {
         name: "Join",
         arguments: 2..=2,
-        return_type: VariableType::String,
+        return_type: VariableType::UnboundedString,
         is_static: true,
     },
     ScalarMember {
         name: "Repeat",
         arguments: 2..=2,
-        return_type: VariableType::String,
+        return_type: VariableType::UnboundedString,
         is_static: true,
     },
     ScalarMember {
         name: "Split",
         arguments: 2..=3,
-        return_type: VariableType::String,
+        return_type: VariableType::UnboundedString,
         is_static: true,
     },
 ];
@@ -284,19 +284,19 @@ pub const BYTES_MEMBERS: &[ScalarMember] = &[
     ScalarMember {
         name: "ToString",
         arguments: 0..=0,
-        return_type: VariableType::String,
+        return_type: VariableType::UnboundedString,
         is_static: false,
     },
     ScalarMember {
         name: "ToBase64",
         arguments: 0..=0,
-        return_type: VariableType::String,
+        return_type: VariableType::UnboundedString,
         is_static: false,
     },
     ScalarMember {
         name: "ToHex",
         arguments: 0..=0,
-        return_type: VariableType::String,
+        return_type: VariableType::UnboundedString,
         is_static: false,
     },
     ScalarMember {
@@ -333,20 +333,20 @@ fn string_member(name: &unicase::Ascii<String>, arguments: usize) -> Option<(Fun
         ("count", 2) => Some((FuncOpCode::StringCountComparison, VariableType::Integer, &[])),
         ("equals", 1) => Some((FuncOpCode::StringEquals, VariableType::Boolean, &[])),
         ("equals", 2) => Some((FuncOpCode::StringEqualsComparison, VariableType::Boolean, &[])),
-        ("replace", 2) => Some((FuncOpCode::REPLACESTR, VariableType::String, &[])),
-        ("trim", 0) => Some((FuncOpCode::StringTrim, VariableType::String, &[])),
-        ("trim", 1) => Some((FuncOpCode::StringTrimChars, VariableType::String, &[])),
-        ("trimstart", 0) => Some((FuncOpCode::StringTrimStart, VariableType::String, &[])),
-        ("trimstart", 1) => Some((FuncOpCode::StringTrimStartChars, VariableType::String, &[])),
-        ("trimend", 0) => Some((FuncOpCode::StringTrimEnd, VariableType::String, &[])),
-        ("trimend", 1) => Some((FuncOpCode::StringTrimEndChars, VariableType::String, &[])),
-        ("toupper", 0) => Some((FuncOpCode::UPPER, VariableType::String, &[])),
-        ("tolower", 0) => Some((FuncOpCode::LOWER, VariableType::String, &[])),
-        ("split", 1) => Some((FuncOpCode::StringSplit, VariableType::String, &[])),
-        ("split", 2) => Some((FuncOpCode::StringSplitLimit, VariableType::String, &[])),
-        ("mid", 2) => Some((FuncOpCode::StringMid, VariableType::String, &[])),
-        ("left", 1) => Some((FuncOpCode::LEFT, VariableType::String, &[])),
-        ("right", 1) => Some((FuncOpCode::RIGHT, VariableType::String, &[])),
+        ("replace", 2) => Some((FuncOpCode::REPLACESTR, VariableType::UnboundedString, &[])),
+        ("trim", 0) => Some((FuncOpCode::StringTrim, VariableType::UnboundedString, &[])),
+        ("trim", 1) => Some((FuncOpCode::StringTrimChars, VariableType::UnboundedString, &[])),
+        ("trimstart", 0) => Some((FuncOpCode::StringTrimStart, VariableType::UnboundedString, &[])),
+        ("trimstart", 1) => Some((FuncOpCode::StringTrimStartChars, VariableType::UnboundedString, &[])),
+        ("trimend", 0) => Some((FuncOpCode::StringTrimEnd, VariableType::UnboundedString, &[])),
+        ("trimend", 1) => Some((FuncOpCode::StringTrimEndChars, VariableType::UnboundedString, &[])),
+        ("toupper", 0) => Some((FuncOpCode::UPPER, VariableType::UnboundedString, &[])),
+        ("tolower", 0) => Some((FuncOpCode::LOWER, VariableType::UnboundedString, &[])),
+        ("split", 1) => Some((FuncOpCode::StringSplit, VariableType::UnboundedString, &[])),
+        ("split", 2) => Some((FuncOpCode::StringSplitLimit, VariableType::UnboundedString, &[])),
+        ("mid", 2) => Some((FuncOpCode::StringMid, VariableType::UnboundedString, &[])),
+        ("left", 1) => Some((FuncOpCode::LEFT, VariableType::UnboundedString, &[])),
+        ("right", 1) => Some((FuncOpCode::RIGHT, VariableType::UnboundedString, &[])),
         _ => None,
     }
 }
@@ -369,9 +369,9 @@ fn bytes_member(name: &unicase::Ascii<String>, arguments: usize) -> Option<(Func
     let normalized = name.as_ref().to_ascii_lowercase();
     match (normalized.as_str(), arguments) {
         ("len", 0) => Some((FuncOpCode::LEN, VariableType::Integer)),
-        ("tostring", 0) => Some((FuncOpCode::BytesToString, VariableType::String)),
-        ("tobase64", 0) => Some((FuncOpCode::BASE64ENC, VariableType::String)),
-        ("tohex", 0) => Some((FuncOpCode::BytesToHex, VariableType::String)),
+        ("tostring", 0) => Some((FuncOpCode::BytesToString, VariableType::UnboundedString)),
+        ("tobase64", 0) => Some((FuncOpCode::BASE64ENC, VariableType::UnboundedString)),
+        ("tohex", 0) => Some((FuncOpCode::BytesToHex, VariableType::UnboundedString)),
         ("getchecksum", 1) => Some((FuncOpCode::BytesGetChecksum, VariableType::Bytes)),
         _ => None,
     }
@@ -383,7 +383,7 @@ fn string_type_name(expression: &Expression, lang_version: u16) -> bool {
     };
     matches!(
         crate::parser::built_in_type(identifier.get_identifier(), lang_version),
-        Some(VariableType::String | VariableType::BigStr)
+        Some(VariableType::String | VariableType::BigStr | VariableType::UnboundedString)
     )
 }
 
@@ -430,8 +430,8 @@ impl ArrayShape {
 
     fn same_layout(&self, other: &Self) -> bool {
         let compatible_elements = self.element_type == other.element_type
-            || (matches!(self.element_type, VariableType::String | VariableType::BigStr)
-                && matches!(other.element_type, VariableType::String | VariableType::BigStr));
+            || (matches!(self.element_type, VariableType::String | VariableType::BigStr | VariableType::UnboundedString)
+                && matches!(other.element_type, VariableType::String | VariableType::BigStr | VariableType::UnboundedString));
         compatible_elements && self.rank == other.rank && (self.resizable || self.bounds == other.bounds)
     }
 }
@@ -857,8 +857,6 @@ impl SemanticVisitor {
     pub(crate) fn storage_type(&self, source_type: VariableType) -> VariableType {
         if self.type_registry.is_enum_type(source_type) {
             VariableType::Integer
-        } else if self.lang_version >= 400 && source_type == VariableType::String {
-            VariableType::BigStr
         } else {
             source_type
         }
@@ -1778,6 +1776,7 @@ impl SemanticVisitor {
                 | VariableType::SByte
                 | VariableType::SWord
                 | VariableType::BigStr
+                | VariableType::UnboundedString
                 | VariableType::Double
                 | VariableType::DDate
                 | VariableType::MessageAreaID
@@ -2429,7 +2428,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             && self.lookup_variable(base.get_identifier()).is_none()
             && matches!(
                 crate::parser::built_in_type(base.get_identifier(), self.lang_version),
-                Some(VariableType::String | VariableType::BigStr)
+                Some(VariableType::String | VariableType::BigStr | VariableType::UnboundedString)
             )
         {
             self.member_receiver_type_lookup
@@ -2442,7 +2441,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 return VariableType::None;
             }
             return match member_reference_expression.get_identifier().as_ref().to_ascii_lowercase().as_str() {
-                "join" | "repeat" => VariableType::String,
+                "join" | "repeat" => VariableType::UnboundedString,
                 "split" => VariableType::None,
                 _ => {
                     self.errors.lock().unwrap().report_error(
@@ -2487,7 +2486,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             StaticReceiver::NotAType => member_reference_expression.get_expression().visit(self),
             StaticReceiver::Rejected => return VariableType::None,
         };
-        if matches!(t, VariableType::String | VariableType::BigStr)
+        if matches!(t, VariableType::String | VariableType::BigStr | VariableType::UnboundedString)
             && let Some(return_type) = string_member_type(member_reference_expression.get_identifier())
         {
             self.member_receiver_type_lookup
@@ -2802,11 +2801,11 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 self.function_type_lookup.insert(call.id, SemanticInfo::ArrayValueAt);
                 return shape.element_type;
             }
-            if matches!(receiver_type, VariableType::String | VariableType::BigStr) {
+            if matches!(receiver_type, VariableType::String | VariableType::BigStr | VariableType::UnboundedString) {
                 call.get_arguments()[0].visit(self);
                 self.function_type_lookup
                     .insert(call.id, SemanticInfo::ScalarMemberFunc(FuncOpCode::StringCharAt, &[]));
-                return VariableType::String;
+                return VariableType::UnboundedString;
             }
         }
         let outer_func_call = self.cur_func_call;
@@ -2829,7 +2828,10 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                             .get_arguments()
                             .first()
                             .and_then(|argument| self.array_shape(argument))
-                            .is_some_and(|shape| shape.rank == 1 && matches!(shape.element_type, VariableType::String | VariableType::BigStr));
+                            .is_some_and(|shape| {
+                                shape.rank == 1
+                                    && matches!(shape.element_type, VariableType::String | VariableType::BigStr | VariableType::UnboundedString)
+                            });
                         if !valid_array {
                             self.errors.lock().unwrap().report_error(
                                 call.get_arguments()[0].get_span(),
@@ -2838,7 +2840,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                         }
                         self.function_type_lookup
                             .insert(call.id, SemanticInfo::ScalarStaticFunc(FuncOpCode::StringJoin));
-                        return VariableType::String;
+                        return VariableType::UnboundedString;
                     }
                     "repeat" if call.get_arguments().len() == 2 => {
                         for argument in call.get_arguments() {
@@ -2846,7 +2848,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                         }
                         self.function_type_lookup
                             .insert(call.id, SemanticInfo::ScalarStaticFunc(FuncOpCode::StringRepeat));
-                        return VariableType::String;
+                        return VariableType::UnboundedString;
                     }
                     "split" if (2..=3).contains(&call.get_arguments().len()) => {
                         let argument_types: Vec<_> = call.get_arguments().iter().map(|argument| argument.visit(self)).collect();
@@ -2863,8 +2865,8 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                             );
                         }
                         self.function_type_lookup.insert(call.id, SemanticInfo::ScalarStaticFunc(opcode));
-                        self.member_array_returns.insert(call.id, (VariableType::String, 1));
-                        return VariableType::String;
+                        self.member_array_returns.insert(call.id, (VariableType::UnboundedString, 1));
+                        return VariableType::UnboundedString;
                     }
                     _ => {}
                 }
@@ -2892,7 +2894,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             } else {
                 member.get_expression().visit(self)
             };
-            if matches!(receiver_type, VariableType::String | VariableType::BigStr)
+            if matches!(receiver_type, VariableType::String | VariableType::BigStr | VariableType::UnboundedString)
                 && let Some((opcode, return_type, defaults)) = string_member(member.get_identifier(), call.get_arguments().len())
             {
                 let argument_types: Vec<_> = call.get_arguments().iter().map(|argument| argument.visit(self)).collect();
@@ -2931,7 +2933,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 }
                 self.function_type_lookup.insert(call.id, SemanticInfo::ScalarMemberFunc(opcode, defaults));
                 if matches!(opcode, FuncOpCode::StringSplit | FuncOpCode::StringSplitLimit) {
-                    self.member_array_returns.insert(call.id, (VariableType::String, 1));
+                    self.member_array_returns.insert(call.id, (VariableType::UnboundedString, 1));
                 }
                 return return_type;
             }
@@ -3223,7 +3225,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             found = true;
             res = r.variable_type;
             string_index = self.lang_version >= 400
-                && matches!(r.variable_type, VariableType::String | VariableType::BigStr)
+                && matches!(r.variable_type, VariableType::String | VariableType::BigStr | VariableType::UnboundedString)
                 && r.header.as_ref().unwrap().dim == 0
                 && indexer.get_arguments().len() == 1;
             r.usages.push((

@@ -121,8 +121,8 @@ fn contact_value(contact: &UserContact) -> VariableValue {
         vtype: VariableType::UserData(CONTACT_ID as u8),
         data: crate::executable::VariableData::default(),
         generic_data: crate::executable::GenericVariableData::Record(vec![
-            VariableValue::new_string(contact.service.clone()).convert_to(VariableType::BigStr),
-            VariableValue::new_string(contact.account.clone()).convert_to(VariableType::BigStr),
+            VariableValue::new_unbounded_string(contact.service.clone()),
+            VariableValue::new_unbounded_string(contact.account.clone()),
         ]),
     }
 }
@@ -188,10 +188,10 @@ impl UserData for PplUser {
             &*SYSOP_COMMENT,
             &*PROTOCOL,
         ] {
-            registry.add_property(name.clone(), VariableType::String, true);
+            registry.add_property(name.clone(), VariableType::UnboundedString, true);
         }
         for name in [&*NAME, &*LANGUAGE, &*DATE_FORMAT] {
-            registry.add_property(name.clone(), VariableType::String, false);
+            registry.add_property(name.clone(), VariableType::UnboundedString, false);
         }
         registry.add_property(VALID.clone(), VariableType::Boolean, false);
         registry.add_property(RECORD_NUMBER.clone(), VariableType::Integer, false);
@@ -228,18 +228,18 @@ impl UserData for PplUser {
         }
         registry.add_property(EDITOR_MODE.clone(), VariableType::UserData(EDITOR_MODE_ENUM_ID), true);
 
-        registry.add_array_property(NOTES.clone(), VariableType::String, 1);
+        registry.add_array_property(NOTES.clone(), VariableType::UnboundedString, 1);
         registry.add_array_property(CONTACTS.clone(), VariableType::UserData(CONTACT_ID as u8), 1);
-        registry.add_named_function(SET_PASSWORD.clone(), vec![("password", VariableType::String)], VariableType::Boolean);
+        registry.add_named_function(SET_PASSWORD.clone(), vec![("password", VariableType::UnboundedString)], VariableType::Boolean);
         registry.add_named_function(
             ADD_CONTACT.clone(),
-            vec![("service", VariableType::String), ("account", VariableType::String)],
+            vec![("service", VariableType::UnboundedString), ("account", VariableType::UnboundedString)],
             VariableType::Boolean,
         );
         registry.add_named_function(REMOVE_CONTACT.clone(), vec![("index", VariableType::Integer)], VariableType::Boolean);
         registry.add_named_function(
             SET_NOTE.clone(),
-            vec![("index", VariableType::Integer), ("text", VariableType::String)],
+            vec![("index", VariableType::Integer), ("text", VariableType::UnboundedString)],
             VariableType::Boolean,
         );
     }
@@ -257,7 +257,7 @@ impl UserDataValue for PplUser {
                 &no_user
             }
         };
-        let string = |value: &str| VariableValue::new_string(value.to_string());
+        let string = |value: &str| VariableValue::new_unbounded_string(value.to_string());
         let date = |value: &chrono::DateTime<chrono::Utc>| VariableValue::new_date(IcbDate::from_utc(value).to_pcboard_date());
 
         let value = if *name == *VALID {
@@ -329,7 +329,7 @@ impl UserDataValue for PplUser {
                     &user.custom_comment5,
                 ]
                 .into_iter()
-                .map(|note| VariableValue::new_string(note.clone()))
+                .map(|note| VariableValue::new_unbounded_string(note.clone()))
                 .collect(),
             )
         } else if *name == *PAGE_LENGTH {

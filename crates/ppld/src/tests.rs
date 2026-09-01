@@ -328,7 +328,7 @@ fn records_survive_decompilation() {
 }
 
 #[test]
-fn type13_storage_decompiles_as_string_in_ppl400() {
+fn unbounded_string_storage_decompiles_as_string_in_ppl400() {
     let source = ";$LANGVERSION 400\n\
                   TYPE Item\n\
                   STRING Text\n\
@@ -344,7 +344,7 @@ fn type13_storage_decompiles_as_string_in_ppl400() {
 
     let modern = decompile_to_text(executable.clone(), LAST_PPL_LANGUAGE_VERSION);
     assert!(modern.contains("STRING FIELD001"), "record field leaked storage type:\n{modern}");
-    assert!(modern.contains("STRING BSTR001"), "global leaked storage type:\n{modern}");
+    assert!(modern.contains("STRING STR001"), "global leaked storage type:\n{modern}");
     assert!(
         modern.contains("FUNCTION FUNC001(STRING PAR001) STRING"),
         "routine leaked storage type:\n{modern}"

@@ -226,11 +226,11 @@ impl UserData for Door {
     const TYPE_NAME: &'static str = "Door";
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
-        registry.add_property(NAME.clone(), VariableType::String, false);
+        registry.add_property(NAME.clone(), VariableType::UnboundedString, false);
         registry.add_property(NUMBER.clone(), VariableType::Integer, false);
         registry.add_property(VALID.clone(), VariableType::Boolean, false);
-        registry.add_property(DESCRIPTION.clone(), VariableType::String, false);
-        registry.add_property(PATH.clone(), VariableType::String, false);
+        registry.add_property(DESCRIPTION.clone(), VariableType::UnboundedString, false);
+        registry.add_property(PATH.clone(), VariableType::UnboundedString, false);
         registry.add_property(PASSWORD.clone(), VariableType::Password, false);
         registry.add_function(HAS_ACCESS.clone(), Vec::new(), VariableType::Boolean);
     }
@@ -240,7 +240,7 @@ impl UserData for Door {
 impl UserDataValue for Door {
     fn get_property_value(&self, _vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
         if *name == *NAME {
-            return Ok(VariableValue::new_string(self.name.clone()));
+            return Ok(VariableValue::new_unbounded_string(self.name.clone()));
         }
         if *name == *NUMBER {
             return Ok(VariableValue::new_int(self.number as i32));
@@ -249,10 +249,10 @@ impl UserDataValue for Door {
             return Ok(VariableValue::new_bool(self.valid));
         }
         if *name == *DESCRIPTION {
-            return Ok(VariableValue::new_string(self.description.clone()));
+            return Ok(VariableValue::new_unbounded_string(self.description.clone()));
         }
         if *name == *PATH {
-            return Ok(VariableValue::new_string(self.path.clone()));
+            return Ok(VariableValue::new_unbounded_string(self.path.clone()));
         }
         if *name == *PASSWORD {
             return Ok(VariableValue::new_password(crate::icy_board::user_base::Password::new_protected(

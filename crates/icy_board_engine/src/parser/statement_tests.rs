@@ -912,7 +912,7 @@ fn test_variable_declaration_statement() {
     check_statement(
         "String VAR001",
         &VariableDeclarationStatement::create_empty_statement(
-            VariableType::String,
+            VariableType::UnboundedString,
             vec![VariableSpecifier::empty(unicase::Ascii::new("VAR001".to_string()), vec![])],
         ),
     );

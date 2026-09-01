@@ -148,7 +148,7 @@ or generalized generics merely because callbacks and records now exist.
 | :--- | :---: | :--- |
 | 64-bit signed `LONG` | **GOOD, compatibility risk** | Needed for JAM message numbers and counters. It changes the pre-400 alias meaning, so the LSP rewrite from old `ToLong()` to `ToInteger()` is part of the compatibility contract. |
 | 64-bit unsigned `ULONG` | **GOOD** | Appropriate for cumulative byte/message counters. Avoid spreading unsigned arithmetic into APIs that do not need it. |
-| Unbounded language-400 `STRING`; deprecated `BIGSTR` alias | **GOOD, compatibility risk** | Removes arbitrary truncation. Keep the alias for old source and keep the warning version-specific. |
+| Unbounded language-400 `STRING` on type ID 24; deprecated legacy `BIGSTR` | **GOOD** | Preserves type 7 at 256 characters and type 13 at 2048 characters while giving modern text a distinct, unbounded representation. Keep the warning version-specific. |
 | `BYTES` scalar blob | **GOOD** | A compact binary value is better than pretending `BYTE[]` is efficient binary storage. Its value semantics fit PPL. |
 | Runtime-only masked `PASSWORD` | **GOOD** | Strong, focused safety improvement. It compares but cannot be declared, printed, or converted to reveal a secret. |
 | `MSGAREAID` plus `AreaId(conf, area)` | **GOOD** | Solves multi-conference addressing without changing old message-call signatures. |

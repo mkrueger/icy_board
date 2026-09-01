@@ -25,14 +25,14 @@ pub fn const_value_with_members(expr: &Expression, lookup: ConstantLookup<'_>, m
 
 /// The literal a value is written as, in the type its constant was declared with.
 pub fn const_expression(value: &VariableValue, variable_type: VariableType) -> Option<Expression> {
-    let value = if matches!(variable_type, VariableType::String | VariableType::BigStr) {
+    let value = if matches!(variable_type, VariableType::String | VariableType::BigStr | VariableType::UnboundedString) {
         value.clone()
     } else {
         value.clone().convert_to(variable_type)
     };
     let constant = match variable_type {
         VariableType::Boolean => Constant::Boolean(value.as_bool()),
-        VariableType::String | VariableType::BigStr => Constant::String(value.as_string()),
+        VariableType::String | VariableType::BigStr | VariableType::UnboundedString => Constant::String(value.as_string()),
         VariableType::Double | VariableType::Float => Constant::Double(value.as_double()),
         VariableType::Money => Constant::Money(value.as_int()),
         VariableType::Unsigned | VariableType::Byte | VariableType::Word | VariableType::DDate => {

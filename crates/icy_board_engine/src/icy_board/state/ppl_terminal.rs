@@ -51,7 +51,7 @@ impl UserData for PplTerminal {
         );
         registry.add_named_function(
             LOAD_FONT.clone(),
-            vec![("font", VariableType::Integer), ("file", VariableType::String)],
+            vec![("font", VariableType::Integer), ("file", VariableType::UnboundedString)],
             VariableType::Boolean,
         );
     }

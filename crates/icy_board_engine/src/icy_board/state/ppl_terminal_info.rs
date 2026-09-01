@@ -100,7 +100,7 @@ impl UserData for PplTerminalInfo {
     const TYPE_NAME: &'static str = "TermInfo";
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         for name in [&*PROGRAM, &*DEVICE_ATTRS, &*RIP_VERSION] {
-            registry.add_property(name.clone(), VariableType::String, false);
+            registry.add_property(name.clone(), VariableType::UnboundedString, false);
         }
         for name in [&*COLUMNS, &*ROWS, &*CTERM_LEVEL, &*CELL_WIDTH, &*CELL_HEIGHT, &*SCREEN_WIDTH, &*SCREEN_HEIGHT] {
             registry.add_property(name.clone(), VariableType::Integer, false);
@@ -126,9 +126,9 @@ impl UserData for PplTerminalInfo {
 impl UserDataValue for PplTerminalInfo {
     fn get_property_value(&self, _vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
         let value = if *name == *PROGRAM {
-            VariableValue::new_string(self.program.clone())
+            VariableValue::new_unbounded_string(self.program.clone())
         } else if *name == *DEVICE_ATTRS {
-            VariableValue::new_string(self.device_attrs.clone())
+            VariableValue::new_unbounded_string(self.device_attrs.clone())
         } else if *name == *COLUMNS {
             VariableValue::new_int(self.columns)
         } else if *name == *ROWS {
@@ -136,7 +136,7 @@ impl UserDataValue for PplTerminalInfo {
         } else if *name == *UTF8 {
             VariableValue::new_bool(self.utf8)
         } else if *name == *RIP_VERSION {
-            VariableValue::new_string(self.rip_version.clone())
+            VariableValue::new_unbounded_string(self.rip_version.clone())
         } else if *name == *CTERM_LEVEL {
             VariableValue::new_int(self.cterm_level)
         } else if *name == *SIXEL {

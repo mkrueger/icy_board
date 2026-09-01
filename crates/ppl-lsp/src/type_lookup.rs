@@ -84,7 +84,7 @@ pub fn type_of_name(visitor: &SemanticVisitor, name: &str) -> Option<VariableTyp
         fallback.get_or_insert(def.return_type);
     }
     if name == "STRING" {
-        return Some(VariableType::String);
+        return Some(VariableType::UnboundedString);
     }
     if name == "BIGSTR" {
         return Some(VariableType::BigStr);
@@ -110,7 +110,7 @@ pub fn static_type_of_name(visitor: &SemanticVisitor, name: &str) -> Option<Vari
 
 /// The type a field of `var_type` has.
 pub fn type_of_member(registry: &UserTypeRegistry, var_type: VariableType, member: &str) -> Option<VariableType> {
-    if matches!(var_type, VariableType::String | VariableType::BigStr) {
+    if matches!(var_type, VariableType::String | VariableType::BigStr | VariableType::UnboundedString) {
         return STRING_MEMBERS
             .iter()
             .find(|definition| !definition.is_static && definition.name.eq_ignore_ascii_case(member))
@@ -155,7 +155,7 @@ pub fn type_of_chain(visitor: &SemanticVisitor, path: &[String]) -> Option<Varia
 
 /// Everything that may follow a `.` on a value of this type.
 pub fn members_of(registry: &UserTypeRegistry, var_type: VariableType) -> Vec<Member> {
-    if matches!(var_type, VariableType::String | VariableType::BigStr) {
+    if matches!(var_type, VariableType::String | VariableType::BigStr | VariableType::UnboundedString) {
         return string_members(false);
     }
     if var_type == VariableType::Bytes {

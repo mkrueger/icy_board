@@ -88,6 +88,9 @@ pub enum VariableType {
     /// Contiguous, growable binary blob (`Vec<u8>`). Language extension (>=400) for binary data and fast I/O.
     Bytes,
 
+    /// Unbounded Unicode text used by PPL 4.00 STRING declarations.
+    UnboundedString,
+
     UserData(u8),
 }
 
@@ -124,6 +127,7 @@ impl From<VariableType> for u8 {
             VariableType::Long => 21,
             VariableType::ULong => 22,
             VariableType::Bytes => 23,
+            VariableType::UnboundedString => 24,
             VariableType::UserData(b) => b,
             VariableType::None => 255,
         }
@@ -136,6 +140,11 @@ impl VariableType {
             VariableType::String => VariableValue::new_string(String::new()),
             VariableType::BigStr => VariableValue {
                 vtype: VariableType::BigStr,
+                generic_data: GenericVariableData::String(String::new()),
+                ..Default::default()
+            },
+            VariableType::UnboundedString => VariableValue {
+                vtype: VariableType::UnboundedString,
                 generic_data: GenericVariableData::String(String::new()),
                 ..Default::default()
             },
@@ -170,6 +179,7 @@ impl VariableType {
             21 => VariableType::Long,
             22 => VariableType::ULong,
             23 => VariableType::Bytes,
+            24 => VariableType::UnboundedString,
             _ => VariableType::UserData(b),
         }
     }
@@ -200,6 +210,7 @@ impl VariableType {
             VariableType::Long => "LONG".to_string(),
             VariableType::ULong => "ULONG".to_string(),
             VariableType::Bytes => "BYTES".to_string(),
+            VariableType::UnboundedString => "STRING".to_string(),
             VariableType::UserData(u) => format!("USERDATA({u})"),
             VariableType::None => "NONE".to_string(),
         };
@@ -235,6 +246,7 @@ impl fmt::Display for VariableType {
             VariableType::Long => write!(f, "Long"),               // i64
             VariableType::ULong => write!(f, "ULong"),             // u64
             VariableType::Bytes => write!(f, "Bytes"),             // Vec<u8>
+            VariableType::UnboundedString => write!(f, "String"),
             VariableType::UserData(u) => write!(f, "UserData({u})"),
         }
     }
@@ -423,7 +435,7 @@ impl fmt::Display for VariableValue {
                 VariableType::SByte => write!(f, "{}", self.data.sbyte_value),
                 VariableType::SWord => write!(f, "{}", self.data.sword_value),
 
-                VariableType::String | VariableType::BigStr => {
+                VariableType::String | VariableType::BigStr | VariableType::UnboundedString => {
                     if let GenericVariableData::String(s) = &self.generic_data {
                         write!(f, "{s}")
                     } else {
@@ -480,7 +492,7 @@ impl PartialEq for VariableValue {
 
                 VariableType::Integer => self.as_int() == other.as_int(),
                 VariableType::Money => self.data.money_value == other.data.money_value,
-                VariableType::String | VariableType::BigStr => {
+                VariableType::String | VariableType::BigStr | VariableType::UnboundedString => {
                     /*log::info!(
                         "Comparing strings: '{}'({}) == '{}'({}) -> {}",
                         self.as_string(),
@@ -533,7 +545,12 @@ fn promote_to(l: VariableType, r: VariableType) -> VariableType {
     if l == r {
         return l;
     }
-    if matches!(l, VariableType::String | VariableType::BigStr) && matches!(r, VariableType::String | VariableType::BigStr) {
+    if matches!(l, VariableType::String | VariableType::BigStr | VariableType::UnboundedString)
+        && matches!(r, VariableType::String | VariableType::BigStr | VariableType::UnboundedString)
+    {
+        if l == VariableType::UnboundedString || r == VariableType::UnboundedString {
+            return VariableType::UnboundedString;
+        }
         return VariableType::BigStr;
     }
     if l == VariableType::Float || l == VariableType::Double || r == VariableType::Float || r == VariableType::Double {
@@ -582,7 +599,7 @@ impl Add<VariableValue> for VariableValue {
                     data.double_value = self.as_double() + other.as_double();
                 }
 
-                VariableType::String | VariableType::BigStr => {
+                VariableType::String | VariableType::BigStr | VariableType::UnboundedString => {
                     let mut new_string = self.as_string();
                     new_string.push_str(&other.as_string());
                     generic_data = GenericVariableData::String(new_string);
@@ -623,7 +640,7 @@ impl Sub<VariableValue> for VariableValue {
             VariableType::Boolean | VariableType::Date | VariableType::EDate | VariableType::Money | VariableType::Time | VariableType::DDate => {
                 dest_type = VariableType::Integer;
             }
-            VariableType::String | VariableType::BigStr => {
+            VariableType::String | VariableType::BigStr | VariableType::UnboundedString => {
                 let l = self.as_int();
                 let r = other.as_int();
                 return Self {
@@ -690,7 +707,7 @@ impl Mul<VariableValue> for VariableValue {
             VariableType::Boolean | VariableType::Date | VariableType::EDate | VariableType::Money | VariableType::Time | VariableType::DDate => {
                 dest_type = VariableType::Integer;
             }
-            VariableType::String | VariableType::BigStr => {
+            VariableType::String | VariableType::BigStr | VariableType::UnboundedString => {
                 let l = self.as_int();
                 let r = other.as_int();
                 return Self {
@@ -758,7 +775,7 @@ impl Div<VariableValue> for VariableValue {
             VariableType::Boolean | VariableType::Date | VariableType::EDate | VariableType::Money | VariableType::Time | VariableType::DDate => {
                 dest_type = VariableType::Integer;
             }
-            VariableType::String | VariableType::BigStr => {
+            VariableType::String | VariableType::BigStr | VariableType::UnboundedString => {
                 let l = self.as_int();
                 let r = other.as_int();
                 return Self {
@@ -847,7 +864,7 @@ impl Rem<VariableValue> for VariableValue {
                 dest_type = VariableType::Integer;
             }
 
-            VariableType::String | VariableType::BigStr => {
+            VariableType::String | VariableType::BigStr | VariableType::UnboundedString => {
                 let l = self.as_int();
                 let r = other.as_int();
                 return Self {
@@ -929,7 +946,7 @@ impl PartialOrd for VariableValue {
 
                 VariableType::Integer => Some(self.as_int().cmp(&other.as_int())),
                 VariableType::Money => Some(self.data.money_value.cmp(&other.data.money_value)),
-                VariableType::String | VariableType::BigStr => Some(self.as_string().cmp(&other.as_string())),
+                VariableType::String | VariableType::BigStr | VariableType::UnboundedString => Some(self.as_string().cmp(&other.as_string())),
 
                 VariableType::Time => Some(self.data.time_value.cmp(&other.data.time_value)),
                 VariableType::Float => self.as_float().partial_cmp(&other.as_float()),
@@ -994,7 +1011,7 @@ impl Neg for VariableValue {
             | VariableType::DDate => {
                 dest_type = VariableType::Integer;
             }
-            VariableType::String | VariableType::BigStr => {
+            VariableType::String | VariableType::BigStr | VariableType::UnboundedString => {
                 let l = self.as_int();
                 return Self {
                     vtype: VariableType::Integer,
@@ -1072,6 +1089,14 @@ impl VariableValue {
     pub fn new_string(s: String) -> Self {
         Self {
             vtype: VariableType::String,
+            data: VariableData::default(),
+            generic_data: GenericVariableData::String(s),
+        }
+    }
+
+    pub fn new_unbounded_string(s: String) -> Self {
+        Self {
+            vtype: VariableType::UnboundedString,
             data: VariableData::default(),
             generic_data: GenericVariableData::String(s),
         }
@@ -1293,7 +1318,7 @@ impl VariableValue {
             | VariableType::DDate => {
                 dest_type = VariableType::Integer;
             }
-            VariableType::String | VariableType::BigStr => {
+            VariableType::String | VariableType::BigStr | VariableType::UnboundedString => {
                 let l = self.as_int();
                 let r = other.as_int();
                 return Self {
@@ -1378,7 +1403,7 @@ impl VariableValue {
                 dest_type = VariableType::Integer;
             }
             VariableType::ULong => return self.clone(),
-            VariableType::String | VariableType::BigStr => {
+            VariableType::String | VariableType::BigStr | VariableType::UnboundedString => {
                 let l = self.as_int();
                 return Self {
                     vtype: VariableType::Integer,
@@ -1416,7 +1441,7 @@ impl VariableValue {
     ///
     /// Panics if .
     pub fn as_bool(&self) -> bool {
-        if self.vtype == VariableType::String || self.vtype == VariableType::BigStr {
+        if matches!(self.vtype, VariableType::String | VariableType::BigStr | VariableType::UnboundedString) {
             return self.as_int() != 0;
         }
         unsafe { self.data.unsigned_value != 0 }
@@ -1889,10 +1914,9 @@ impl VariableValue {
     /// Panics if .
     #[must_use]
     pub fn convert_to(self, convert_to_type: VariableType) -> VariableValue {
-        // BigStr is unbounded, so an identical-type conversion has nothing to do. A
-        // type-7 String still has to fall through: it may hold an untruncated value
-        // and needs the 256 char cap enforced on the way into its slot.
-        if self.vtype == convert_to_type && convert_to_type == VariableType::BigStr {
+        // The PPL 4.00 string is unbounded. Legacy strings still fall through so
+        // their character limits are enforced on every assignment.
+        if self.vtype == convert_to_type && convert_to_type == VariableType::UnboundedString {
             return self;
         }
         if convert_to_type == VariableType::Bytes {
@@ -1901,7 +1925,7 @@ impl VariableValue {
             }
             return VariableValue::new_bytes(self.to_bytes().unwrap_or_default());
         }
-        if matches!(convert_to_type, VariableType::String | VariableType::BigStr) {
+        if matches!(convert_to_type, VariableType::String | VariableType::BigStr | VariableType::UnboundedString) {
             match self.generic_data {
                 GenericVariableData::Dim1(values) => {
                     return VariableValue {
@@ -1945,6 +1969,10 @@ impl VariableValue {
                         if let Some((byte_index, _)) = value.char_indices().nth(256) {
                             value.truncate(byte_index);
                         }
+                    } else if convert_to_type == VariableType::BigStr
+                        && let Some((byte_index, _)) = value.char_indices().nth(2048)
+                    {
+                        value.truncate(byte_index);
                     }
                     return VariableValue {
                         vtype: convert_to_type,
@@ -1975,7 +2003,7 @@ impl VariableValue {
             }
             VariableType::Date => {
                 data.date_value = match self.vtype {
-                    VariableType::String | VariableType::BigStr => date_from_string(&self.as_string()),
+                    VariableType::String | VariableType::BigStr | VariableType::UnboundedString => date_from_string(&self.as_string()),
                     _ => self.as_int() as u32,
                 };
             }
@@ -1983,7 +2011,7 @@ impl VariableValue {
             // PCBoard does not read a date out of a string here, it answers 0.
             VariableType::EDate => {
                 data.edate_value = match self.vtype {
-                    VariableType::String | VariableType::BigStr => 0,
+                    VariableType::String | VariableType::BigStr | VariableType::UnboundedString => 0,
                     _ => self.as_int() as u32,
                 };
             }
@@ -1992,15 +2020,15 @@ impl VariableValue {
             }
             VariableType::Money => {
                 data.money_value = match self.vtype {
-                    VariableType::String | VariableType::BigStr => money_from_string(&self.as_string()),
+                    VariableType::String | VariableType::BigStr | VariableType::UnboundedString => money_from_string(&self.as_string()),
                     _ => self.as_int(),
                 };
             }
-            VariableType::String | VariableType::BigStr => unreachable!(),
+            VariableType::String | VariableType::BigStr | VariableType::UnboundedString => unreachable!(),
             VariableType::Bytes => unreachable!(),
             VariableType::Time => {
                 data.time_value = match self.vtype {
-                    VariableType::String | VariableType::BigStr => IcbTime::parse(&self.as_string()).to_pcboard_time(),
+                    VariableType::String | VariableType::BigStr | VariableType::UnboundedString => IcbTime::parse(&self.as_string()).to_pcboard_time(),
                     _ => self.as_int(),
                 };
             }
@@ -2025,7 +2053,7 @@ impl VariableValue {
             VariableType::DDate => {
                 // A DDATE holds the julian too; only its text form is CCYYMMDD.
                 data.ddate_value = match self.vtype {
-                    VariableType::String | VariableType::BigStr => ddate_from_string(&self.as_string()),
+                    VariableType::String | VariableType::BigStr | VariableType::UnboundedString => ddate_from_string(&self.as_string()),
                     _ => self.as_int(),
                 };
             }
@@ -2174,7 +2202,7 @@ fn full_year(date: &IcbDate) -> i32 {
 pub fn convert_to(var_type: VariableType, value: &VariableValue) -> VariableValue {
     let mut res = value.clone();
     res.vtype = var_type;
-    if var_type == VariableType::String || var_type == VariableType::BigStr {
+    if matches!(var_type, VariableType::String | VariableType::BigStr | VariableType::UnboundedString) {
         res.generic_data = GenericVariableData::String(value.as_string());
     }
     if var_type == VariableType::Password {
@@ -2229,17 +2257,47 @@ mod tests {
 
     #[test]
     fn string_conversion_matches_pcboard_capacity() {
-        let text = "x".repeat(300);
+        let text = "ä".repeat(3000);
 
-        assert_eq!(256, VariableValue::new_string(text.clone()).convert_to(VariableType::String).as_string().len());
         assert_eq!(
-            300,
-            VariableValue::new_string(text)
+            256,
+            VariableValue::new_string(text.clone())
+                .convert_to(VariableType::String)
+                .as_string()
+                .chars()
+                .count()
+        );
+        assert_eq!(
+            2048,
+            VariableValue::new_string(text.clone())
                 .convert_to(VariableType::BigStr)
                 .convert_to(VariableType::BigStr)
                 .as_string()
-                .len()
+                .chars()
+                .count()
         );
+        assert_eq!(
+            3000,
+            VariableValue::new_string(text)
+                .convert_to(VariableType::UnboundedString)
+                .as_string()
+                .chars()
+                .count()
+        );
+    }
+
+    #[test]
+    fn string_type_ids_and_version_mapping_are_stable() {
+        assert_eq!(7, u8::from(VariableType::String));
+        assert_eq!(13, u8::from(VariableType::BigStr));
+        assert_eq!(24, u8::from(VariableType::UnboundedString));
+        assert_eq!(VariableType::String, VariableType::from(7));
+        assert_eq!(VariableType::BigStr, VariableType::from(13));
+        assert_eq!(VariableType::UnboundedString, VariableType::from(24));
+
+        let name = Ascii::new("STRING".to_string());
+        assert_eq!(Some(VariableType::String), built_in_type(&name, 340));
+        assert_eq!(Some(VariableType::UnboundedString), built_in_type(&name, 400));
     }
 
     #[test]

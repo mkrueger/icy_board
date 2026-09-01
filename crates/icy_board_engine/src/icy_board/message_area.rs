@@ -217,13 +217,13 @@ impl UserData for MessageArea {
     const EMPTY_VALUE: Option<fn() -> VariableValue> = Some(|| user_data_value(MessageArea::default(), crate::parser::MESSAGE_AREA_ID));
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
-        registry.add_property(NAME.clone(), VariableType::String, false);
+        registry.add_property(NAME.clone(), VariableType::UnboundedString, false);
         registry.add_property(NUMBER.clone(), VariableType::Integer, false);
         registry.add_property(VALID.clone(), VariableType::Boolean, false);
         registry.add_property(IS_READ_ONLY.clone(), VariableType::Boolean, false);
         registry.add_property(ALLOW_ALIASES.clone(), VariableType::Boolean, false);
-        registry.add_property(QWK_NAME.clone(), VariableType::String, false);
-        registry.add_property(ECHO_TAG.clone(), VariableType::String, false);
+        registry.add_property(QWK_NAME.clone(), VariableType::UnboundedString, false);
+        registry.add_property(ECHO_TAG.clone(), VariableType::UnboundedString, false);
         registry.add_function(HAS_ACCESS.clone(), Vec::new(), VariableType::Boolean);
         registry.add_function(CAN_ENTER.clone(), Vec::new(), VariableType::Boolean);
         registry.add_function(CAN_ATTACH.clone(), Vec::new(), VariableType::Boolean);
@@ -234,7 +234,7 @@ impl UserData for MessageArea {
             FIND.clone(),
             vec![
             ("field", VariableType::UserData(crate::parser::MSG_FIELD_ENUM_ID)),
-            ("text", VariableType::String),
+            ("text", VariableType::UnboundedString),
             ("startMessage", VariableType::Long),
             ],
             2,
@@ -262,7 +262,7 @@ pub static FIND: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLo
 impl UserDataValue for MessageArea {
     fn get_property_value(&self, _vm: &crate::vm::VirtualMachine, name: &unicase::Ascii<String>) -> crate::Res<VariableValue> {
         if *name == *NAME {
-            return Ok(VariableValue::new_string(self.name.clone()));
+            return Ok(VariableValue::new_unbounded_string(self.name.clone()));
         }
         if *name == *NUMBER {
             return Ok(VariableValue::new_int(self.number as i32));
@@ -277,10 +277,10 @@ impl UserDataValue for MessageArea {
             return Ok(VariableValue::new_bool(self.allow_aliases));
         }
         if *name == *QWK_NAME {
-            return Ok(VariableValue::new_string(self.qwk_name.clone()));
+            return Ok(VariableValue::new_unbounded_string(self.qwk_name.clone()));
         }
         if *name == *ECHO_TAG {
-            return Ok(VariableValue::new_string(self.ftn_area_tag.clone()));
+            return Ok(VariableValue::new_unbounded_string(self.ftn_area_tag.clone()));
         }
         log::error!("Invalid user data call on MessageArea ({name})");
         Ok(VariableValue::new_int(-1))

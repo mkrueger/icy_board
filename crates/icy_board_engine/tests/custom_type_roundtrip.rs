@@ -60,7 +60,7 @@ fn custom_type_layouts_survive_the_ppe_round_trip() {
     let executable = compile("TYPE Inner\n  INTEGER Number\n  STRING Text\nENDTYPE\nTYPE Outer\n  Inner Value\n  BOOLEAN Flag\nENDTYPE\nOuter item\n");
     assert_eq!(
         vec![
-            vec![field(VariableType::Integer), field(VariableType::String)],
+            vec![field(VariableType::Integer), field(VariableType::UnboundedString)],
             vec![field(VariableType::UserData(100)), field(VariableType::Boolean)]
         ],
         executable.user_types
@@ -84,7 +84,7 @@ fn array_field_dimensions_survive_the_ppe_round_trip() {
                 cube_size: 0,
             },
             RecordField {
-                variable_type: VariableType::String,
+                variable_type: VariableType::UnboundedString,
                 dim: 2,
                 vector_size: 2,
                 matrix_size: 3,
@@ -128,7 +128,7 @@ fn loading_a_ppe_rebuilds_nested_record_defaults() {
     };
     assert_eq!(VariableType::Integer, inner[0].vtype);
     assert_eq!(0, inner[0].as_int());
-    assert_eq!(VariableType::String, inner[1].vtype);
+    assert_eq!(VariableType::UnboundedString, inner[1].vtype);
     assert_eq!("", inner[1].as_string());
 }
 

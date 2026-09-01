@@ -387,8 +387,8 @@ impl UserTypeRegistry {
             CONTACT_ID,
             "CONTACT",
             vec![
-                (unicase::Ascii::new("Service".to_string()), VariableType::String),
-                (unicase::Ascii::new("Account".to_string()), VariableType::String),
+                (unicase::Ascii::new("Service".to_string()), VariableType::UnboundedString),
+                (unicase::Ascii::new("Account".to_string()), VariableType::UnboundedString),
             ],
         );
         reg.register::<crate::icy_board::state::ppl_surface::PplSurface>(SURFACE_ID);
@@ -1536,6 +1536,7 @@ static BUILT_IN_TYPE_LOOKUP: std::sync::LazyLock<HashMap<unicase::Ascii<String>,
 static BUILT_IN_TYPES: &[(&str, VariableType, u16)] = &[
     ("INTEGER", VariableType::Integer, 100),
     ("STRING", VariableType::String, 100),
+    ("STRING", VariableType::UnboundedString, 400),
     ("BOOLEAN", VariableType::Boolean, 100),
     ("DATE", VariableType::Date, 100),
     ("TIME", VariableType::Time, 100),

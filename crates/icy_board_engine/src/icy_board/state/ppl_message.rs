@@ -113,7 +113,7 @@ impl UserData for PplMessage {
         registry.add_property(NUMBER.clone(), VariableType::Long, false);
         registry.add_property(VALID.clone(), VariableType::Boolean, false);
         for name in [&*FROM, &*TO, &*SUBJECT, &*STATUS] {
-            registry.add_property(name.clone(), VariableType::String, false);
+            registry.add_property(name.clone(), VariableType::UnboundedString, false);
         }
         registry.add_property(DATE.clone(), VariableType::Date, false);
         registry.add_property(TIME.clone(), VariableType::Time, false);
@@ -122,7 +122,7 @@ impl UserData for PplMessage {
         for name in [&*IS_PRIVATE, &*IS_READ, &*IS_DELETED, &*IS_ECHO, &*NEEDS_PASSWORD] {
             registry.add_property(name.clone(), VariableType::Boolean, false);
         }
-        registry.add_function(TEXT.clone(), Vec::new(), VariableType::String);
+        registry.add_function(TEXT.clone(), Vec::new(), VariableType::UnboundedString);
     }
 }
 
@@ -134,13 +134,13 @@ impl UserDataValue for PplMessage {
         } else if *name == *VALID {
             VariableValue::new_bool(self.valid)
         } else if *name == *FROM {
-            VariableValue::new_string(self.from.clone())
+            VariableValue::new_unbounded_string(self.from.clone())
         } else if *name == *TO {
-            VariableValue::new_string(self.to.clone())
+            VariableValue::new_unbounded_string(self.to.clone())
         } else if *name == *SUBJECT {
-            VariableValue::new_string(self.subject.clone())
+            VariableValue::new_unbounded_string(self.subject.clone())
         } else if *name == *STATUS {
-            VariableValue::new_string(self.status.clone())
+            VariableValue::new_unbounded_string(self.status.clone())
         } else if *name == *DATE {
             // A message that is not there has no date; zero is what prints as 00/00/00.
             let date = if self.valid {
@@ -189,7 +189,7 @@ impl UserDataValue for PplMessage {
         if *name == *TEXT {
             if !self.valid {
                 vm.operation_succeeded();
-                return Ok(VariableValue::new_string(String::new()));
+                return Ok(VariableValue::new_unbounded_string(String::new()));
             }
             let text = vm.with_message_base(&self.path, |base| match base.read_header(self.number) {
                 Ok(header) => base.read_message_text(&header).map(|text| Some(text.to_string())),
@@ -199,11 +199,11 @@ impl UserDataValue for PplMessage {
             return Ok(match text {
                 Ok(text) => {
                     vm.operation_succeeded();
-                    VariableValue::new_string(text.unwrap_or_default())
+                    VariableValue::new_unbounded_string(text.unwrap_or_default())
                 }
                 Err(error) => {
                     vm.set_error(message_error(&format!("can't read message {} from", self.number), &self.path, &error));
-                    VariableValue::new_string(String::new())
+                    VariableValue::new_unbounded_string(String::new())
                 }
             });
         }

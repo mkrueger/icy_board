@@ -276,10 +276,14 @@ impl Decompiler {
     }
 
     fn source_type(&self, variable_type: VariableType) -> VariableType {
-        if self.output_language_version >= 400 && variable_type == VariableType::BigStr {
+        if variable_type != VariableType::UnboundedString {
+            return variable_type;
+        }
+        // Older languages have no unbounded string, so BIGSTR is the widest they can spell.
+        if self.output_language_version >= 400 {
             VariableType::String
         } else {
-            variable_type
+            VariableType::BigStr
         }
     }
 
@@ -470,7 +474,7 @@ impl Decompiler {
                     IdentifierExpression::create_empty_expression(unicase::Ascii::new(entry.name.clone()))
                 } else if entry.entry_type == EntryType::Constant {
                     let constant = match entry.value.get_type() {
-                        VariableType::BigStr | VariableType::String => Constant::String(entry.value.as_string()),
+                        VariableType::BigStr | VariableType::String | VariableType::UnboundedString => Constant::String(entry.value.as_string()),
                         VariableType::Float => Constant::Double(entry.value.data.float_value as f64),
                         VariableType::Double => Constant::Double(entry.value.data.double_value),
                         VariableType::Boolean => Constant::Boolean(entry.value.as_bool()),

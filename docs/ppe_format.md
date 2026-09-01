@@ -104,13 +104,16 @@ trusted.
 | 7 | `STRING` | 18 | `TABLE` |
 | 8 | `TIME` | 19 | `MSGAREAID` |
 | 9 | `BYTE` | 20 | `PASSWORD` |
-| 10 | `WORD` | 255 | none |
+| 10 | `WORD` | 21 | `LONG` |
+| 22 | `ULONG` | 23 | `BYTES` |
+| 24 | `STRING` (4.00) | 255 | none |
 
-Everything from 21 upward is a user data type. IcyBoard's compact object range
-starts at 30 and includes board, session, user, messaging, terminal, media, HTTP
-and regex types. IDs from 100 upward are records a program declares with
-`TYPE`. Anything a reader does not know should be treated as an opaque user type
-rather than as a broken file.
+IDs 21 through 24 are PPL 4.00 scalar types. Type 24 is unbounded Unicode text;
+the source keyword remains `STRING`. IcyBoard's compact object range starts at
+30 and includes board, session, user, messaging, terminal, media, HTTP and regex
+types. IDs from 100 upward are records a program declares with `TYPE`. Anything
+a reader does not know should be treated as an opaque user type rather than as a
+broken file.
 
 ### Entry payload
 

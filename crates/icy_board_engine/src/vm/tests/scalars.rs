@@ -6,7 +6,7 @@ use crate::executable::{EntryType, VariableType};
 use super::{compile, compile_errors, run_ppl, run_ppl_on};
 
 #[test]
-fn ppl400_string_uses_bigstr_storage_without_changing_literal_encoding() {
+fn ppl400_string_uses_unbounded_storage_without_changing_literal_encoding() {
     let executable = compile(
         ";$LANGVERSION 400\nDECLARE FUNCTION Echo(STRING input) STRING\nSTRING text\nSTRING values[]\ntext = Echo(\"literal\")\nPRINT text, values.Len()\nFUNCTION Echo(STRING input) STRING\n STRING local\n local = input\n RETURN local\nENDFUNC",
     );
@@ -14,13 +14,13 @@ fn ppl400_string_uses_bigstr_storage_without_changing_literal_encoding() {
         .variable_table
         .get_entries()
         .iter()
-        .find(|entry| entry.header.variable_type == VariableType::BigStr && entry.header.dim == 0)
+        .find(|entry| entry.header.variable_type == VariableType::UnboundedString && entry.header.dim == 0)
         .unwrap();
     let values = executable
         .variable_table
         .get_entries()
         .iter()
-        .find(|entry| entry.header.variable_type == VariableType::BigStr && entry.header.dim == 1)
+        .find(|entry| entry.header.variable_type == VariableType::UnboundedString && entry.header.dim == 1)
         .unwrap();
     let literal = executable
         .variable_table
@@ -28,8 +28,8 @@ fn ppl400_string_uses_bigstr_storage_without_changing_literal_encoding() {
         .iter()
         .find(|entry| entry.value.as_string() == "literal")
         .unwrap();
-    assert_eq!(VariableType::BigStr, text.header.variable_type);
-    assert_eq!(VariableType::BigStr, values.header.variable_type);
+    assert_eq!(VariableType::UnboundedString, text.header.variable_type);
+    assert_eq!(VariableType::UnboundedString, values.header.variable_type);
     assert_eq!(VariableType::String, literal.header.variable_type);
     assert!(
         executable

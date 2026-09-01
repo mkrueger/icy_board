@@ -139,7 +139,7 @@ impl UserData for PplEvent {
         registry.add_property(KIND.clone(), VariableType::UserData(EVENT_KIND_ENUM_ID), false);
         registry.add_property(CODE.clone(), VariableType::Integer, false);
         registry.add_property(SCAN_CODE.clone(), VariableType::Integer, false);
-        registry.add_property(TEXT.clone(), VariableType::String, false);
+        registry.add_property(TEXT.clone(), VariableType::UnboundedString, false);
         registry.add_property(PRESSED.clone(), VariableType::Boolean, false);
         registry.add_property(X.clone(), VariableType::Integer, false);
         registry.add_property(Y.clone(), VariableType::Integer, false);
@@ -181,7 +181,7 @@ impl UserDataValue for PplEvent {
             return Ok(VariableValue::new_int(scan_code));
         }
         if *name == *TEXT {
-            return Ok(VariableValue::new_string(self.text.clone()));
+            return Ok(VariableValue::new_unbounded_string(self.text.clone()));
         }
         if *name == *PRESSED {
             return Ok(VariableValue::new_bool(self.pressed));
