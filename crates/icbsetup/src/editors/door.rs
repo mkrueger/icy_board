@@ -215,7 +215,7 @@ impl<'a> Page for DoorEditor<'a> {
             .set_cursor_position(frame);
 
         if let Some(edit_config) = &mut self.edit_config {
-            let area = area.inner(Margin { vertical: 7, horizontal: 3 });
+            let area = area.inner(Margin { vertical: 4, horizontal: 3 });
             Clear.render(area, frame.buffer_mut());
             let block = Block::new()
                 .title_alignment(Alignment::Center)
