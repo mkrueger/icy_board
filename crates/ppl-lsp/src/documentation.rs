@@ -325,9 +325,12 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
     if id == EVENT_ID as u8 {
         return match member.to_ascii_lowercase().as_str() {
             "kind" => Some(fl!(LANGUAGE_LOADER, "hint-member-event-kind")),
-            "code" | "scancode" | "text" | "pressed" | "repeated" => Some(fl!(LANGUAGE_LOADER, "hint-member-event-key")),
+            "code" | "text" => Some(fl!(LANGUAGE_LOADER, "hint-member-event-key")),
+            "scancode" => Some(fl!(LANGUAGE_LOADER, "hint-member-event-scan-code")),
+            "pressed" => Some(fl!(LANGUAGE_LOADER, "hint-member-event-pressed")),
+            "repeated" => Some(fl!(LANGUAGE_LOADER, "hint-member-event-repeated")),
             "x" | "y" | "pixels" => Some(fl!(LANGUAGE_LOADER, "hint-member-event-position")),
-            "button" | "action" | "wheelfx" | "wheely" | "wheelx" => Some(fl!(LANGUAGE_LOADER, "hint-member-event-mouse")),
+            "button" | "action" | "wheely" | "wheelx" => Some(fl!(LANGUAGE_LOADER, "hint-member-event-mouse")),
             "time" => Some(fl!(LANGUAGE_LOADER, "hint-member-event-time")),
             "channel" => Some(fl!(LANGUAGE_LOADER, "hint-member-event-channel")),
             "dropped" => Some(fl!(LANGUAGE_LOADER, "hint-member-event-dropped")),

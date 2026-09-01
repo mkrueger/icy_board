@@ -215,6 +215,37 @@ material.
 Every entry below is listed from the current registry. Equivalent, closely
 related properties are kept in one row only where they have the same contract.
 
+## Object lifetime and mutability labels
+
+These labels apply wherever the corresponding object appears in the reference.
+A snapshot/value does not track later changes, a live view reads current state,
+and a resource/controller remains active until explicit release or PPE cleanup.
+
+| Type | Lifetime | Mutability |
+| :--- | :--- | :--- |
+| `BOARD` | First-access snapshot for the PPE run | Read-only |
+| `CONFERENCE`, `DIRECTORY`, `DOOR` | Configured-entry snapshot | Read-only |
+| `AREA` | Configured-entry snapshot; message methods perform live I/O | Read-only |
+| `SESSION` | Live active-call view | Read-only |
+| `USER` | Live write-through caller view from `Session`; snapshot from `Board` | Caller view is selectively writable; board snapshot is read-only |
+| `CONTACT` | Value record in a snapshot array | Local record fields are writable |
+| `MSG` | Header snapshot; body loaded by `Text()` | Read-only |
+| `TERMINAL` | Live caller-terminal root | Methods mutate terminal state |
+| `TERMINFO` | Connection-time snapshot | Read-only |
+| `TERMINPUT` | PPE-owned input controller | Mutable through methods; cleanup releases it |
+| `EVENT` | Polled/waited value | Read-only |
+| `GFX` | Caller graphics-session controller | Mutable through methods |
+| `SURFACE` | PPE-owned graphics resource | Mutable through methods until `Free()`/cleanup |
+| `AUDIO` | PPE-owned channel resource | Mutable through methods until `Free()`/cleanup |
+| `MARGINS`, `PALETTE` | Live terminal-state controllers | Mutable through methods |
+| `MACROS` | PPE-owned terminal macro controller | Mutable through methods; cleanup removes definitions |
+| `HTTP` | Stateless root/factory | Static methods only |
+| `HTTPREQUEST` | Shared request state | Mutable through methods |
+| `HTTPRESPONSE` | Completed-request result snapshot | Read-only; `Save()` performs output |
+| `REGEX` | Compiled-pattern value | Read-only |
+| `REGEXMATCH` | Match-result value | Read-only |
+| `ERROR` | Published-error snapshot | Read-only; `Error.Clear()` changes VM state |
+
 ## `BOARD`
 
 Lifetime: board snapshot, initialized on first use and stable for the PPE run.
@@ -384,7 +415,24 @@ calling the global type `INFO` would be too generic.
 | `Time -> UNSIGNED` | **GOOD** | Monotonic connection time avoids wall-clock problems. |
 
 A tagged `EVENT` is more PPL-like than a hierarchy of event classes. It should
-stay, but the kind-to-field applicability table is release-blocking documentation.
+stay. A dash means the field has no meaning for that kind and returns its neutral
+fallback (`0`, `FALSE`, `""`, a `None` enum member, or `-1` for `Channel`).
+
+| Field | `None` | `Key` | `KeyEdge` | `Mouse` | `Overflow` | `Audio` |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| `Kind`, `Time` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `Code`, `Text` | — | ✓ | — | — | — | — |
+| `ScanCode` | — | — | ✓ | — | — | — |
+| `Pressed` | — | ✓ | ✓ | — | — | — |
+| `Repeated` | — | — | ✓ | — | — | — |
+| `Action`, `Button`, `X`, `Y`, `Pixels` | — | — | — | ✓ | — | — |
+| `WheelX`, `WheelY`, held-button fields | — | — | — | ✓ | — | — |
+| `Shift`, `Alt`, `Ctrl`, `Meta` | — | ✓ | — | ✓ | — | — |
+| `Dropped` | — | — | — | — | ✓ | — |
+| `Channel` | — | — | — | — | — | ✓ |
+
+The full field meanings and fallback contract are in
+[the language reference](new_ppl.md#input-and-events).
 
 ## `GFX` and `SURFACE`
 
@@ -600,10 +648,12 @@ These are concrete inconsistencies found during the review:
 4. The registry dump now includes array rank, record fields, enum values,
   writable flags, optional arguments, and static/member status. Representative
   assertions keep those metadata categories present as the registry evolves.
-5. API prose has previously drifted on `ErrKind`, `ErrCode`, `HttpMethod`,
+5. Every object now has a lifetime/mutability label, and `EVENT` has a complete
+  `EventKind` applicability table in the language reference and this audit.
+6. API prose has previously drifted on `ErrKind`, `ErrCode`, `HttpMethod`,
    `EditorMode`, input signatures, and checksum names. Enum values and signatures
    should be generated or tested against documentation.
-6. The global function count changed as bytes conversions were added. Counts in
+7. The global function count changed as bytes conversions were added. Counts in
    narrative reviews should either be generated or omitted.
 
 ## Recommended pre-freeze actions
@@ -612,8 +662,7 @@ These are concrete inconsistencies found during the review:
 | :---: | :--- | :--- |
 | 1 | Decide fixed-array canonical syntax; recommendation: preserve `name(10)` and use brackets for indexing/dynamic rank. | Highest PPL-style impact. |
 | 2 | Add documentation checks/generated tables for signatures and enum values. | Current prose already contains contradictions. |
-| 3 | Add an `EventKind` applicability table and lifetime/mutability label to every object reference. | Prevents the most likely API misuse. |
-| 4 | Freeze IDs/opcodes only after the above decisions; keep pre-400 numbers untouched. | 4.00 can still be compacted before release, but not afterward. |
+| 3 | Freeze IDs/opcodes only after the above decisions; keep pre-400 numbers untouched. | 4.00 can still be compacted before release, but not afterward. |
 
 ## Post-freeze restraint
 

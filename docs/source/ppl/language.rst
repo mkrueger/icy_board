@@ -292,6 +292,62 @@ Board objects
 use: objects that describe the board itself. The point is that a PPE no longer
 has to parse the board's config files to find out what is on it.
 
+Object lifetime and mutability
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+A snapshot does not track later changes, a live view reads current state, a
+resource/controller remains active until explicit release or PPE cleanup, and a
+value is copied like an ordinary PPL value.
+
+.. csv-table::
+   :header: "Type", "Lifetime", "Mutability"
+   :widths: 18, 42, 40
+
+   "``BOARD``", "First-access snapshot for the PPE run", "Read-only"
+   "``CONFERENCE``, ``DIRECTORY``, ``DOOR``", "Configured-entry snapshot", "Read-only"
+   "``AREA``", "Configured-entry snapshot; message methods perform live I/O", "Read-only"
+   "``SESSION``", "Live active-call view", "Read-only"
+   "``USER``", "Live caller view from ``Session``; snapshot from ``Board``", "Caller view selectively writable; board snapshot read-only"
+   "``CONTACT``", "Value record in a snapshot array", "Local record fields writable"
+   "``MSG``", "Header snapshot; ``Text()`` loads the body", "Read-only"
+   "``TERMINAL``", "Live caller-terminal root", "Methods change terminal state"
+   "``TERMINFO``", "Connection-time snapshot", "Read-only"
+   "``TERMINPUT``", "PPE-owned input controller", "Mutable through methods; released at cleanup"
+   "``EVENT``", "Polled/waited value", "Read-only"
+   "``GFX``", "Caller graphics-session controller", "Mutable through methods"
+   "``SURFACE``", "PPE-owned graphics resource", "Mutable until ``Free()`` or cleanup"
+   "``AUDIO``", "PPE-owned channel resource", "Mutable until ``Free()`` or cleanup"
+   "``MARGINS``, ``PALETTE``", "Live terminal-state controllers", "Mutable through methods"
+   "``MACROS``", "PPE-owned terminal macro controller", "Mutable through methods; definitions removed at cleanup"
+   "``HTTP``", "Stateless factory/root", "Static methods only"
+   "``HTTPREQUEST``", "Shared request state", "Mutable through ``SetHeader()`` and ``SetText()``"
+   "``HTTPRESPONSE``", "Completed-request result snapshot", "Read-only; ``Save()`` performs output"
+   "``REGEX``", "Compiled-pattern value", "Read-only"
+   "``REGEXMATCH``", "Match-result value", "Read-only"
+   "``ERROR``", "Published-error snapshot", "Read-only; ``Error.Clear()`` changes VM state"
+
+EVENT field applicability
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Check ``Event.Kind`` before reading a kind-specific field. A field not listed
+for that kind returns its neutral fallback: ``0``, ``FALSE``, an empty string,
+a ``None`` enum member, or ``-1`` for ``Channel``.
+
+.. csv-table::
+   :header: "Fields", "Applicable ``EventKind``", "Meaning"
+   :widths: 40, 25, 35
+
+   "``Kind``, ``Time``", "all kinds", "Discriminator and monotonic connection time"
+   "``Code``, ``Text``", "``Key``", "Translated Unicode/named key code and text"
+   "``ScanCode``", "``KeyEdge``", "Physical key code"
+   "``Pressed``", "``Key``, ``KeyEdge``", "Press/release state; translated keys are presses"
+   "``Repeated``", "``KeyEdge``", "Physical-key repeat flag"
+   "``Action``, ``Button``, ``X``, ``Y``, ``Pixels``", "``Mouse``", "Typed mouse action/button and position mode"
+   "``WheelX``, ``WheelY``, ``LeftDown``, ``MiddleDown``, ``RightDown``", "``Mouse``", "Wheel delta and held buttons"
+   "``Shift``, ``Alt``, ``Ctrl``, ``Meta``", "``Key``, ``Mouse``", "Modifiers supplied by translated keys or mouse reports"
+   "``Dropped``", "``Overflow``", "Number of queue entries lost"
+   "``Channel``", "``Audio``", "Finished sound channel"
+
 .. code-block:: PPL
 
     CONFERENCE conf = Session.Conference

@@ -220,9 +220,10 @@ generic, so this asymmetry is preferable to renaming them.
 enum variants use `0`. These values mirror protocol/runtime values: mouse button
 zero is `Left`, and graphics backend zero is `Auto`.
 
-**Assessment:** freeze with targeted documentation. Keep capabilities on
-`Terminal.Info`, state the event-kind applicability of conditional fields, and
-preserve explicit resource release.
+**Assessment:** freeze. Keep capabilities on `Terminal.Info` and preserve
+explicit resource release. The [object lifetime/mutability labels](new_ppl.md#object-lifetime-and-mutability)
+and [EventKind applicability table](new_ppl.md#input-and-events) are the
+reference contracts for future members.
 
 ## Sector 5: HTTP
 

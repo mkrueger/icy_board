@@ -246,8 +246,9 @@ fn event_wait_returns_an_empty_event_on_timeout() {
         PRINTLN e.Text
         PRINTLN e.Pressed
         PRINTLN e.Pixels
+        PRINTLN e.Button = MouseButton.None
         "#,
     );
 
-    assert_eq!(output, "0\n0\n\n0\n0\n");
+    assert_eq!(output, "0\n0\n\n0\n0\n1\n");
 }

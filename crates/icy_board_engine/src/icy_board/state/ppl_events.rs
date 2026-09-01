@@ -193,10 +193,11 @@ impl UserDataValue for PplEvent {
             return Ok(VariableValue::new_int(self.y));
         }
         if *name == *BUTTON {
-            return Ok(VariableValue::new_int(self.button));
+            let button = if self.event_type == EVENT_MOUSE { self.button } else { -1 };
+            return Ok(VariableValue::new_int(button));
         }
         if *name == *PIXELS {
-            return Ok(VariableValue::new_bool(self.pixels));
+            return Ok(VariableValue::new_bool(self.event_type == EVENT_MOUSE && self.pixels));
         }
         if *name == *REPEATED {
             return Ok(VariableValue::new_bool(self.repeated));

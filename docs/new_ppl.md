@@ -462,6 +462,41 @@ making a PPE parse Icy Board's TOML files. `Board` and `Session` are the way in:
 one for what the board is configured to be, one for the call in progress. The
 detailed member table follows below.
 
+### Object lifetime and mutability
+
+The label for each built-in object is part of its contract. A **snapshot** does
+not change after it is returned, a **live view** reads current board/session
+state, a **resource** remains usable until `Free()`/`Release()`/`Shutdown()` or
+PPE cleanup, and a **value** is copied like an ordinary PPL value.
+
+| Type | Lifetime | Mutability |
+| :--- | :--- | :--- |
+| `BOARD` | Snapshot created on first access; stable for the PPE run | Read-only |
+| `CONFERENCE` | Configured-entry snapshot | Read-only |
+| `AREA` | Configured-entry snapshot; message methods perform live I/O | Read-only |
+| `DIRECTORY` | Configured-entry snapshot | Read-only |
+| `DOOR` | Configured-entry snapshot | Read-only |
+| `SESSION` | Live view of the active call | Read-only; mutate caller data through `Session.User` |
+| `USER` | Live write-through view from `Session.User`; snapshot from `Board.Users` | Session user is writable where documented; board snapshots are read-only |
+| `CONTACT` | Value record copied in contact-array snapshots | Record fields are writable on the local copy |
+| `MSG` | Header snapshot; `Text()` loads the current stored body on demand | Read-only |
+| `TERMINAL` | Live root for the caller's terminal | Read-only properties; methods change terminal state |
+| `TERMINFO` | Connection-time snapshot | Read-only |
+| `TERMINPUT` | PPE-owned input controller, released at cleanup | Mutable through methods |
+| `EVENT` | Value returned by `Poll()`/`Wait()` | Read-only |
+| `GFX` | Caller graphics-session controller | Mutable through `Init()`, `SetPacing()` and `Shutdown()` |
+| `SURFACE` | PPE-owned graphics resource until `Free()` or cleanup | Mutable through drawing methods |
+| `AUDIO` | PPE-owned channel resource until `Free()` or cleanup | Mutable through playback methods |
+| `MARGINS` | Live terminal scrolling-region controller | Mutable through methods |
+| `PALETTE` | Live terminal palette controller | Mutable through methods |
+| `MACROS` | PPE-owned terminal macro controller | Mutable through methods |
+| `HTTP` | Stateless factory/root | Static methods only |
+| `HTTPREQUEST` | Shared request state until no PPL value names it | Mutable through `SetHeader()` and `SetText()` |
+| `HTTPRESPONSE` | Result snapshot from one completed request | Read-only; `Save()` performs output without changing the response |
+| `REGEX` | Compiled-pattern value | Read-only |
+| `REGEXMATCH` | Match-result value | Read-only |
+| `ERROR` | Snapshot returned by `Error.Last()` | Read-only; `Error.Clear()` changes the VM's published error, not an existing snapshot |
+
 ### Terminal multimedia
 
 Runtime 4.00 exposes terminal features through the `Terminal` object. The name
@@ -606,22 +641,25 @@ Terminal.Input.Release()
 `Motion` or `Wheel`.
 
 `Event.Kind` is an `EventKind`: `None`, `Key`, `KeyEdge`, `Mouse`, `Overflow` or
-`Audio`. Its read-only fields are:
+`Audio`. `Kind` must be checked before reading kind-specific fields. A dash means
+the field has no meaning for that kind and returns its neutral fallback (`0`,
+`FALSE`, `""`, `MouseAction.None`, `MouseButton.None`, or `-1` for `Channel`).
 
-| Field | Meaning |
-| :--- | :--- |
-| `Kind` | Event category |
-| `Code` | Unicode or named key code, zero for other kinds |
-| `ScanCode` | Physical key code of a `KeyEdge`, zero for other kinds |
-| `Text` | Translated key text; empty for other kinds |
-| `Pressed`, `Repeated` | Key press/release state |
-| `Action`, `Button` | Typed mouse action and button |
-| `X`, `Y`, `Pixels`, `WheelX`, `WheelY` | Mouse position and wheel movement |
-| `LeftDown`, `MiddleDown`, `RightDown` | Held mouse buttons |
-| `Shift`, `Alt`, `Ctrl`, `Meta` | Active modifiers |
-| `Channel` | Finished sound channel, otherwise `-1` |
-| `Dropped` | Overflow count, otherwise zero |
-| `Time` | Monotonic connection time in milliseconds |
+| Field | `None` | `Key` | `KeyEdge` | `Mouse` | `Overflow` | `Audio` | Meaning |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
+| `Kind` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | Event discriminator |
+| `Time` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | Monotonic connection time in milliseconds |
+| `Code`, `Text` | — | ✓ | — | — | — | — | Translated Unicode/named key code and text |
+| `ScanCode` | — | — | ✓ | — | — | — | Physical key code |
+| `Pressed` | — | ✓ | ✓ | — | — | — | `Key` is a press; `KeyEdge` distinguishes press/release |
+| `Repeated` | — | — | ✓ | — | — | — | Physical-key repeat flag |
+| `Action`, `Button` | — | — | — | ✓ | — | — | Typed mouse action and changed button |
+| `X`, `Y`, `Pixels` | — | — | — | ✓ | — | — | Mouse position and cell/pixel coordinate mode |
+| `WheelX`, `WheelY` | — | — | — | ✓ | — | — | Mouse wheel delta |
+| `LeftDown`, `MiddleDown`, `RightDown` | — | — | — | ✓ | — | — | Mouse buttons held at the event |
+| `Shift`, `Alt`, `Ctrl`, `Meta` | — | ✓ | — | ✓ | — | — | Active modifiers supplied by translated keys or mouse reports |
+| `Dropped` | — | — | — | — | ✓ | — | Number of queue entries lost before this event |
+| `Channel` | — | — | — | — | — | ✓ | Finished sound channel |
 
 ANSI navigation keys use `KEY_UP`, `KEY_HOME`, `KEY_PAGE_DOWN` and the other
 `KEY_*` constants in `Code`. Printable input uses its Unicode value.

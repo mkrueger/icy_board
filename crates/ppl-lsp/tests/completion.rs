@@ -207,6 +207,18 @@ fn session_user_and_http_workflows_have_completion_documentation() {
     );
 }
 
+#[test]
+fn event_fields_document_their_applicable_kind() {
+    let scan_code = completion_documentation("EVENT event\nevent.", "ScanCode");
+    assert!(scan_code.contains("EventKind.KeyEdge"), "{scan_code}");
+
+    let wheel_y = completion_documentation("EVENT event\nevent.", "WheelY");
+    assert!(wheel_y.contains("EventKind.Mouse"), "{wheel_y}");
+
+    let channel = completion_documentation("EVENT event\nevent.", "Channel");
+    assert!(channel.contains("EventKind.Audio"), "{channel}");
+}
+
 /// Snapshot arrays expose array members rather than their internal legacy getter.
 #[test]
 fn a_collection_does_not_offer_its_internal_getter() {
