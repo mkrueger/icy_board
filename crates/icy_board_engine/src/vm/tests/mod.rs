@@ -16,6 +16,7 @@ mod collection_bench;
 mod contacts;
 mod control_flow;
 mod dbase;
+mod differential_optimizer;
 mod display_pause;
 mod errors;
 mod events;

@@ -226,6 +226,7 @@ struct LabelDescriptor {
 
 pub struct PPECompiler {
     runtime: u16,
+    optimize: bool,
     lookup_table: LookupVariabeleTable,
     semantic_visitor: SemanticVisitor,
 
@@ -244,6 +245,7 @@ impl PPECompiler {
         Self {
             lookup_table: LookupVariabeleTable::default(),
             semantic_visitor,
+            optimize: true,
             cur_offset: 0,
             label_table: Vec::new(),
             label_lookup_table: HashMap::new(),
@@ -251,6 +253,14 @@ impl PPECompiler {
             runtime: workspace.runtime(),
             commands: PPEScript::default(),
         }
+    }
+
+    #[cfg(test)]
+    #[must_use]
+    pub(crate) fn with_optimization(mut self, optimize: bool) -> Self {
+        self.optimize = optimize;
+        self.semantic_visitor.set_control_flow_liveness(optimize);
+        self
     }
 
     pub fn get_script(&self) -> &PPEScript {
@@ -268,7 +278,7 @@ impl PPECompiler {
         let asts = lowered.iter().collect::<Vec<_>>();
         let mut visted = Vec::new();
         // One transformer for the whole package, so its generated labels stay unique across files.
-        let mut transformer = AstTransformationVisitor::new(true, self.semantic_visitor.type_registry.enums());
+        let mut transformer = AstTransformationVisitor::new(self.optimize, self.semantic_visitor.type_registry.enums());
         for prg in asts {
             self.semantic_visitor.errors.lock().unwrap().set_file_name(&prg.file_name);
             let prg = prg.visit_mut(&mut transformer);
@@ -314,9 +324,7 @@ impl PPECompiler {
         for node in &program.nodes {
             match node {
                 AstNode::TopLevelStatement(Statement::Block(block)) | AstNode::Main(block) => {
-                    for statement in optimize_statements(block.get_statements()) {
-                        self.compile_add_statement(&statement);
-                    }
+                    self.compile_statement_sequence(block.get_statements());
                 }
                 AstNode::TopLevelStatement(statement) => self.compile_add_statement(statement),
                 AstNode::Function(_)
@@ -340,9 +348,7 @@ impl PPECompiler {
                     self.lookup_table.variable_table.get_var_entry_mut(idx).value.data.procedure_value.start_offset = self.cur_offset as u16 * 2;
 
                     self.lookup_table.start_compile_function_body(proc.get_identifier());
-                    for s in &optimize_statements(proc.get_statements()) {
-                        self.compile_add_statement(s);
-                    }
+                    self.compile_statement_sequence(proc.get_statements());
                     self.lookup_table.end_compile_function_body();
 
                     self.commands.add_statement(&mut self.cur_offset, PPECommand::EndProc);
@@ -355,15 +361,25 @@ impl PPECompiler {
                     };
                     self.lookup_table.variable_table.get_var_entry_mut(idx).value.data.function_value.start_offset = self.cur_offset as u16 * 2;
                     self.lookup_table.start_compile_function_body(func.get_identifier());
-                    for s in &optimize_statements(func.get_statements()) {
-                        self.compile_add_statement(s);
-                    }
+                    self.compile_statement_sequence(func.get_statements());
                     self.lookup_table.end_compile_function_body();
 
                     self.commands.add_statement(&mut self.cur_offset, PPECommand::EndFunc);
                     self.commands.add_statement(&mut self.cur_offset, PPECommand::End);
                 }
                 _ => {}
+            }
+        }
+    }
+
+    fn compile_statement_sequence(&mut self, statements: &[Statement]) {
+        if self.optimize {
+            for statement in optimize_statements(statements) {
+                self.compile_add_statement(&statement);
+            }
+        } else {
+            for statement in statements {
+                self.compile_add_statement(statement);
             }
         }
     }

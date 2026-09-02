@@ -122,6 +122,11 @@ releases.
 
 ### Changed
 
+- Optimizer regression tests execute deterministic generated arithmetic,
+  branches, labels and routine calls with optimization both enabled and
+  disabled, then compare output, globals, errors, call-frame cleanup and file
+  side effects.
+
 - PPL semantic analysis now builds a call graph shared by the compiler and
   language server. The compiler removes routines, locals, globals and constants
   reachable only from dead code, and omits wholly unused record types while

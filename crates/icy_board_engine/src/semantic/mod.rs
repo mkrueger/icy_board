@@ -648,6 +648,7 @@ pub struct SemanticVisitor {
 
     cur_func_impl: Option<usize>,
     cur_func_call: u64,
+    control_flow_liveness: bool,
     references_are_reachable: bool,
 
     last_lookup_index: usize,
@@ -791,6 +792,11 @@ impl LookupVariabeleTable {
 }
 
 impl SemanticVisitor {
+    #[cfg(test)]
+    pub(crate) fn set_control_flow_liveness(&mut self, enabled: bool) {
+        self.control_flow_liveness = enabled;
+    }
+
     pub fn set_modules(&mut self, asts: &[&crate::ast::Ast]) {
         self.module_exports.clear();
         for ast in asts {
@@ -940,6 +946,7 @@ impl SemanticVisitor {
             function_return_value_spans: HashSet::new(),
             cur_func_call: 0,
             cur_func_impl: None,
+            control_flow_liveness: true,
             references_are_reachable: true,
             function_containers: Vec::new(),
             last_lookup_index: 0,
@@ -1651,6 +1658,12 @@ impl SemanticVisitor {
     }
 
     fn visit_statement_sequence(&mut self, statements: &[Statement]) -> bool {
+        if !self.control_flow_liveness {
+            for statement in statements {
+                statement.visit(self);
+            }
+            return true;
+        }
         let outer_reachability = self.references_are_reachable;
         let mut reachable = outer_reachability;
         for statement in statements {
