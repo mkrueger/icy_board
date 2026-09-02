@@ -87,6 +87,17 @@ fn workspace() -> Workspace {
     workspace
 }
 
+fn routine_source() -> String {
+    let mut source = String::from(";$LANGVERSION 400\nPRINT F0(1)\n");
+    for index in 0..500 {
+        let next = (index + 1) % 500;
+        source.push_str(&format!(
+            "FUNCTION F{index}(INTEGER value) INTEGER\n  INTEGER local = value\n  IF value > 0 RETURN F{next}(value - 1)\n  RETURN local\nENDFUNC\n"
+        ));
+    }
+    source
+}
+
 fn compile(source: &str) -> Executable {
     let errors = Arc::new(Mutex::new(ErrorReporter::default()));
     let registry = UserTypeRegistry::icy_board_registry();
@@ -100,12 +111,14 @@ fn compile(source: &str) -> Executable {
 
 fn parse_benchmarks(criterion: &mut Criterion) {
     let workspace = workspace();
+    let routine_source = routine_source();
     let mut group = criterion.benchmark_group("parse");
     for (name, source) in [
         ("arithmetic_loop", ARITHMETIC_SOURCE),
         ("function_calls", CALL_SOURCE),
         ("string_members", STRING_SOURCE),
         ("arrays_and_records", ARRAY_RECORD_SOURCE),
+        ("routines_500", routine_source.as_str()),
     ] {
         group.throughput(Throughput::Bytes(source.len() as u64));
         group.bench_function(name, |benchmark| {
@@ -146,12 +159,14 @@ fn compile_benchmarks(criterion: &mut Criterion) {
 
 fn compile_from_ast_benchmarks(criterion: &mut Criterion) {
     let workspace = workspace();
+    let routine_source = routine_source();
     let mut group = criterion.benchmark_group("compile_from_ast");
     for (name, source) in [
         ("arithmetic_loop", ARITHMETIC_SOURCE),
         ("function_calls", CALL_SOURCE),
         ("string_members", STRING_SOURCE),
         ("arrays_and_records", ARRAY_RECORD_SOURCE),
+        ("routines_500", routine_source.as_str()),
     ] {
         group.throughput(Throughput::Bytes(source.len() as u64));
         group.bench_function(name, |benchmark| {

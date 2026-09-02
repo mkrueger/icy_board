@@ -12,6 +12,38 @@ use crate::{
 use super::SemanticVisitor;
 
 #[test]
+fn references_in_one_file_share_their_source_path() {
+    let registry = UserTypeRegistry::default();
+    let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+    let workspace = Workspace::default();
+    let ast = parse_ast(
+        PathBuf::from("shared-path.pps"),
+        errors.clone(),
+        "INTEGER value\nvalue = 1\nPRINT value\n",
+        &registry,
+        Encoding::Utf8,
+        &workspace,
+    );
+    let mut visitor = SemanticVisitor::new(&workspace, errors, registry);
+    ast.visit(&mut visitor);
+    let references = visitor
+        .references
+        .iter()
+        .find_map(|(_, references)| {
+            references
+                .declaration
+                .as_ref()
+                .is_some_and(|(_, declaration)| declaration.token == "value")
+                .then_some(references)
+        })
+        .unwrap();
+    let declaration_path = &references.declaration.as_ref().unwrap().0;
+
+    assert_eq!(2, references.usages.len());
+    assert!(references.usages.iter().all(|(path, _)| Arc::ptr_eq(path, declaration_path)));
+}
+
+#[test]
 fn find_label_references() {
     find_references(
         r#"

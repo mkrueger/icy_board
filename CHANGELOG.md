@@ -122,6 +122,12 @@ releases.
 
 ### Changed
 
+- PPL parsing allocates routine documentation storage only when documentation is
+  present. Semantic references share one source path per file, avoid reporter
+  locks for path lookup, and generate variable tables without cloning all
+  routine containers. Routine-heavy parsing improved by about 7% and compilation
+  by about 17% in Criterion benchmarks.
+
 - PPL statement optimization now builds a basic-block control-flow graph instead
   of repeating whole-vector scans until the statement count stabilizes. CFG
   reachability also drives semantic call edges, while jump-chain compression,

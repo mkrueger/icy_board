@@ -13,24 +13,24 @@ pub fn get_reference(ast: &Ast, offset: usize, semantic_visitor: &SemanticVisito
     for (_, refs) in &semantic_visitor.references {
         if refs.contains_pos(&ast.file_name, offset) {
             if let Some((p, decl)) = &refs.declaration
-                && (include_self || !decl.span.contains(&offset) || p != &ast.file_name)
+                && (include_self || !decl.span.contains(&offset) || p.as_ref() != &ast.file_name)
             {
-                reference_list.push((p.clone(), decl.clone()));
+                reference_list.push((p.as_ref().clone(), decl.clone()));
             }
             if let Some((p, decl)) = &refs.implementation
-                && (include_self || !decl.span.contains(&offset) || p != &ast.file_name)
+                && (include_self || !decl.span.contains(&offset) || p.as_ref() != &ast.file_name)
             {
-                reference_list.push((p.clone(), decl.clone()));
+                reference_list.push((p.as_ref().clone(), decl.clone()));
             }
             for (p, r) in &refs.usages {
-                if include_self || !r.span.contains(&offset) || p != &ast.file_name {
-                    reference_list.push((p.clone(), r.clone()));
+                if include_self || !r.span.contains(&offset) || p.as_ref() != &ast.file_name {
+                    reference_list.push((p.as_ref().clone(), r.clone()));
                 }
             }
 
             for (p, r) in &refs.return_types {
-                if include_self || !r.span.contains(&offset) || p != &ast.file_name {
-                    reference_list.push((p.clone(), r.clone()));
+                if include_self || !r.span.contains(&offset) || p.as_ref() != &ast.file_name {
+                    reference_list.push((p.as_ref().clone(), r.clone()));
                 }
             }
 

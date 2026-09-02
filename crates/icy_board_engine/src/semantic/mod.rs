@@ -448,17 +448,17 @@ pub struct References {
 
     pub header: Option<VarHeader>,
 
-    pub declaration: Option<(PathBuf, Spanned<String>)>,
-    pub implementation: Option<(PathBuf, Spanned<String>)>,
-    pub return_types: Vec<(PathBuf, Spanned<String>)>,
+    pub declaration: Option<(Arc<PathBuf>, Spanned<String>)>,
+    pub implementation: Option<(Arc<PathBuf>, Spanned<String>)>,
+    pub return_types: Vec<(Arc<PathBuf>, Spanned<String>)>,
 
-    pub usages: Vec<(PathBuf, Spanned<String>)>,
+    pub usages: Vec<(Arc<PathBuf>, Spanned<String>)>,
 }
 
 impl References {
     pub fn contains_pos(&self, path: &PathBuf, offset: usize) -> bool {
         for (p, r) in &self.usages {
-            if p != path {
+            if p.as_ref() != path {
                 continue;
             }
             if r.span.contains(&offset) {
@@ -467,7 +467,7 @@ impl References {
         }
 
         for (p, r) in &self.return_types {
-            if p != path {
+            if p.as_ref() != path {
                 continue;
             }
 
@@ -477,7 +477,7 @@ impl References {
         }
 
         if let Some((p, decl)) = &self.implementation {
-            if p != path {
+            if p.as_ref() != path {
                 return false;
             }
             if decl.span.contains(&offset) {
@@ -485,7 +485,7 @@ impl References {
             }
         }
         if let Some((p, decl)) = &self.declaration {
-            if p != path {
+            if p.as_ref() != path {
                 return false;
             }
             decl.span.contains(&offset)
@@ -601,6 +601,7 @@ pub struct SemanticVisitor {
     pub type_registry: UserTypeRegistry,
 
     pub errors: Arc<Mutex<ErrorReporter>>,
+    current_file: Arc<PathBuf>,
     pub references: Vec<(ReferenceType, References)>,
     reference_owners: HashMap<usize, HashSet<Option<usize>>>,
     pub module_exports: HashMap<unicase::Ascii<String>, Vec<ModuleExport>>,
@@ -793,6 +794,11 @@ impl LookupVariabeleTable {
 }
 
 impl SemanticVisitor {
+    pub fn set_file_name(&mut self, file_name: &std::path::Path) {
+        self.current_file = Arc::new(file_name.to_path_buf());
+        self.errors.lock().unwrap().set_file_name(file_name);
+    }
+
     #[cfg(test)]
     pub(crate) fn set_control_flow_liveness(&mut self, enabled: bool) {
         self.control_flow_liveness = enabled;
@@ -917,10 +923,12 @@ impl SemanticVisitor {
     }
 
     pub fn new(workspace: &Workspace, errors: Arc<Mutex<ErrorReporter>>, type_registry: UserTypeRegistry) -> Self {
+        let current_file = Arc::new(errors.lock().unwrap().file_name().to_path_buf());
         let mut result = Self {
             lang_version: workspace.language_version(),
             runtime: workspace.runtime(),
             errors,
+            current_file,
             references: Vec::new(),
             reference_owners: HashMap::new(),
             module_exports: HashMap::new(),
@@ -1022,7 +1030,7 @@ impl SemanticVisitor {
             variable_table.push(entry);
         }
 
-        for f in &self.function_containers.clone() {
+        for f in &self.function_containers {
             if f.parameter_index.is_some() {
                 continue;
             }
@@ -1034,7 +1042,7 @@ impl SemanticVisitor {
                 r.variable_table_index = variable_table.variable_table.len() + 1;
             }
             let mut locals = 0;
-            for idx in f.local_variables.clone() {
+            for idx in f.local_variables.start..f.local_variables.end {
                 let is_live = self.reference_is_live(idx);
                 let (rt, _reference) = &self.references[idx];
                 if !matches!(rt, ReferenceType::Variable(_)) || !is_live {
@@ -1102,16 +1110,10 @@ impl SemanticVisitor {
                 variable_table.start_define_function_body(proc.get_identifier().clone());
             }
 
-            for idx in f.parameters.clone() {
+            for idx in f.parameters.start..f.parameters.end {
                 let storage_type = self.storage_type(self.references[idx].1.variable_type);
                 let (rt, r) = &mut self.references[idx];
                 if let ReferenceType::Function(func) = rt {
-                    for f in &mut self.function_containers {
-                        if f.id == *func {
-                            f.parameter_index = Some(variable_table.len());
-                            break;
-                        }
-                    }
                     r.variable_table_index = variable_table.len() + 1;
                     let mut new_entry = r.create_table_entry();
                     new_entry.entry_type = EntryType::Parameter;
@@ -1126,12 +1128,6 @@ impl SemanticVisitor {
                     continue;
                 }
                 if let ReferenceType::Procedure(func) = rt {
-                    for f in &mut self.function_containers {
-                        if f.id == *func {
-                            f.parameter_index = Some(variable_table.len());
-                            break;
-                        }
-                    }
                     r.variable_table_index = variable_table.len() + 1;
                     let mut new_entry = r.create_table_entry();
                     new_entry.entry_type = EntryType::Parameter;
@@ -1154,7 +1150,7 @@ impl SemanticVisitor {
                 variable_table.push(new_entry);
             }
 
-            for idx in f.local_variables.clone() {
+            for idx in f.local_variables.start..f.local_variables.end {
                 let is_live = self.reference_is_live(idx);
                 let (rt, r) = &self.references[idx];
                 if !matches!(rt, ReferenceType::Variable(_)) || !is_live {
@@ -1237,7 +1233,7 @@ impl SemanticVisitor {
                 header: None,
                 return_types: vec![],
                 declaration: Some((
-                    self.errors.lock().unwrap().file_name().to_path_buf(),
+                    self.current_file.clone(),
                     Spanned::new(identifier_token.token.to_string(), identifier_token.span.clone()),
                 )),
                 usages: vec![],
@@ -1253,7 +1249,7 @@ impl SemanticVisitor {
                     self.reference_owners.entry(index).or_default().insert(self.cur_func_impl);
                 }
                 r.1.usages.push((
-                    self.errors.lock().unwrap().file_name().to_path_buf(),
+                    self.current_file.clone(),
                     Spanned::new(identifier_token.token.to_string(), identifier_token.span.clone()),
                 ));
                 return;
@@ -1270,7 +1266,7 @@ impl SemanticVisitor {
                 variable_type,
                 variable_table_index: 0,
                 usages: vec![(
-                    self.errors.lock().unwrap().file_name().to_path_buf(),
+                    self.current_file.clone(),
                     Spanned::new(identifier_token.token.to_string(), identifier_token.span.clone()),
                 )],
             },
@@ -1328,10 +1324,7 @@ impl SemanticVisitor {
 
         for (_i, r) in &mut self.references.iter_mut().enumerate() {
             if r.0 == reftype {
-                r.1.declaration = Some((
-                    self.errors.lock().unwrap().file_name().to_path_buf(),
-                    Spanned::new(label_token.token.to_string(), span),
-                ));
+                r.1.declaration = Some((self.current_file.clone(), Spanned::new(label_token.token.to_string(), span)));
                 return;
             }
         }
@@ -1344,10 +1337,7 @@ impl SemanticVisitor {
                 implementation: None,
                 header: None,
                 return_types: vec![],
-                declaration: Some((
-                    self.errors.lock().unwrap().file_name().to_path_buf(),
-                    Spanned::new(label_token.token.to_string(), span),
-                )),
+                declaration: Some((self.current_file.clone(), Spanned::new(label_token.token.to_string(), span))),
                 usages: vec![],
             },
         ));
@@ -1642,10 +1632,10 @@ impl SemanticVisitor {
                 self.call_graph.add_call(self.cur_func_impl.map(SymbolId), SymbolId(idx));
             }
         }
-        self.references[idx].1.usages.push((
-            self.errors.lock().unwrap().file_name().to_path_buf(),
-            Spanned::new(identifier.token.to_string(), identifier.span.clone()),
-        ));
+        self.references[idx]
+            .1
+            .usages
+            .push((self.current_file.clone(), Spanned::new(identifier.token.to_string(), identifier.span.clone())));
     }
 
     pub fn reference_is_live(&self, reference: usize) -> bool {
@@ -1715,7 +1705,7 @@ impl SemanticVisitor {
                         .insert(unicase::Ascii::new(func.get_identifier().to_string()), id);
 
                     self.references[id].1.implementation = Some((
-                        self.errors.lock().unwrap().file_name().to_path_buf(),
+                        self.current_file.clone(),
                         Spanned::new(func.get_identifier().to_string(), func.get_identifier_token().span.clone()),
                     ));
                     self.function_containers.push(FunctionContainer {
@@ -1750,7 +1740,7 @@ impl SemanticVisitor {
                         .insert(unicase::Ascii::new(func.get_identifier().to_string()), id);
 
                     self.references[id].1.implementation = Some((
-                        self.errors.lock().unwrap().file_name().to_path_buf(),
+                        self.current_file.clone(),
                         Spanned::new(func.get_identifier().to_string(), func.get_identifier_token().span.clone()),
                     ));
                     self.function_containers.push(FunctionContainer {
@@ -2050,10 +2040,11 @@ impl SemanticVisitor {
             if matches!(rt, ReferenceType::Label(_)) {
                 if r.declaration.is_none() {
                     if let Some((file, span)) = r.usages.first() {
-                        self.errors
-                            .lock()
-                            .unwrap()
-                            .report_error_file(file.clone(), span.span.clone(), CompilationErrorType::LabelNotFound(span.token.clone()));
+                        self.errors.lock().unwrap().report_error_file(
+                            file.as_ref().clone(),
+                            span.span.clone(),
+                            CompilationErrorType::LabelNotFound(span.token.clone()),
+                        );
                     }
                 } else if r.usages.is_empty()
                     && let Some((file_name, declaration)) = &r.declaration
@@ -2062,7 +2053,7 @@ impl SemanticVisitor {
                         continue;
                     }
                     self.errors.lock().unwrap().report_warning_file(
-                        file_name.clone(),
+                        file_name.as_ref().clone(),
                         declaration.span.clone(),
                         CompilationWarningType::UnusedLabel(declaration.token.clone()),
                     );
@@ -2077,23 +2068,25 @@ impl SemanticVisitor {
             if r.variable_type == VariableType::Function || r.variable_type == VariableType::Procedure {
                 if r.implementation.is_none() {
                     self.errors.lock().unwrap().report_error_file(
-                        file.clone(),
+                        file.as_ref().clone(),
                         decl.span.clone(),
                         CompilationErrorType::MissingImplementation(decl.token.clone()),
                     );
                 }
                 if !self.call_graph.is_reachable(SymbolId(reference_index)) {
-                    self.errors
-                        .lock()
-                        .unwrap()
-                        .report_warning_file(file.clone(), decl.span.clone(), CompilationErrorType::UnusedFunction(decl.token.clone()));
+                    self.errors.lock().unwrap().report_warning_file(
+                        file.as_ref().clone(),
+                        decl.span.clone(),
+                        CompilationErrorType::UnusedFunction(decl.token.clone()),
+                    );
                 }
             } else if matches!(rt, ReferenceType::Variable(_)) && r.usages.is_empty() {
                 // The enclosing routine already reports variables used only in unreachable code.
-                self.errors
-                    .lock()
-                    .unwrap()
-                    .report_warning_file(file.clone(), decl.span.clone(), CompilationErrorType::UnusedVariable(decl.token.clone()));
+                self.errors.lock().unwrap().report_warning_file(
+                    file.as_ref().clone(),
+                    decl.span.clone(),
+                    CompilationErrorType::UnusedVariable(decl.token.clone()),
+                );
             }
         }
 
@@ -2122,7 +2115,10 @@ impl SemanticVisitor {
                     let vt: VariableType = argument.visit(self);
                     self.allow_routine_reference = previous;
                     if vt != VariableType::Function {
-                        self.errors.lock().unwrap().report_error(argument.get_span().clone(), CompilationErrorType::FunctionExpected);
+                        self.errors
+                            .lock()
+                            .unwrap()
+                            .report_error(argument.get_span().clone(), CompilationErrorType::FunctionExpected);
                     }
 
                     if vt == VariableType::Function {
@@ -2134,10 +2130,10 @@ impl SemanticVisitor {
                             FunctionDeclaration::Procedure(_) => false,
                         });
                         if !matches {
-                            self.errors.lock().unwrap().report_error(
-                                argument.get_span().clone(),
-                                CompilationErrorType::ParameterMismatch(argument.to_string()),
-                            );
+                            self.errors
+                                .lock()
+                                .unwrap()
+                                .report_error(argument.get_span().clone(), CompilationErrorType::ParameterMismatch(argument.to_string()));
                         }
                     }
                 }
@@ -2147,7 +2143,10 @@ impl SemanticVisitor {
                     let vt = argument.visit(self);
                     self.allow_routine_reference = previous;
                     if vt != VariableType::Procedure {
-                        self.errors.lock().unwrap().report_error(argument.get_span().clone(), CompilationErrorType::ProcedureExpected);
+                        self.errors
+                            .lock()
+                            .unwrap()
+                            .report_error(argument.get_span().clone(), CompilationErrorType::ProcedureExpected);
                     }
                     if vt == VariableType::Procedure {
                         let container = self.function_containers.iter().find(|container| container.id == self.last_lookup_index);
@@ -2156,10 +2155,10 @@ impl SemanticVisitor {
                             FunctionDeclaration::Function(_) => false,
                         });
                         if !matches {
-                            self.errors.lock().unwrap().report_error(
-                                argument.get_span().clone(),
-                                CompilationErrorType::ParameterMismatch(argument.to_string()),
-                            );
+                            self.errors
+                                .lock()
+                                .unwrap()
+                                .report_error(argument.get_span().clone(), CompilationErrorType::ParameterMismatch(argument.to_string()));
                         }
                     }
                 }
@@ -2461,10 +2460,8 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                     _ => {}
                 }
             }
-            r.usages.push((
-                self.errors.lock().unwrap().file_name().to_path_buf(),
-                Spanned::new(identifier.token.to_string(), identifier.span.clone()),
-            ));
+            r.usages
+                .push((self.current_file.clone(), Spanned::new(identifier.token.to_string(), identifier.span.clone())));
             r.variable_type
         } else {
             if self.lang_version < 350 || self.cur_func_call == 0 {
@@ -3302,7 +3299,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 && r.header.as_ref().unwrap().dim == 0
                 && indexer.get_arguments().len() == 1;
             r.usages.push((
-                self.errors.lock().unwrap().file_name().to_path_buf(),
+                self.current_file.clone(),
                 Spanned::new(indexer.get_identifier().to_string(), indexer.get_identifier_token().span.clone()),
             ));
             r.header.as_ref().unwrap().dim as usize
@@ -3450,7 +3447,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                     .report_warning(let_stmt.get_identifier_token().span.clone(), CompilationWarningType::CannotAssignToProcedure);
             } else if self.references[idx].1.variable_type == VariableType::Function {
                 self.references[idx].1.return_types.push((
-                    self.errors.lock().unwrap().file_name().to_path_buf(),
+                    self.current_file.clone(),
                     Spanned::new(let_stmt.get_identifier().to_string(), let_stmt.get_identifier_token().span.clone()),
                 ));
                 if let Some(container) = self.function_containers.iter().find(|container| container.id == idx)
@@ -3650,10 +3647,8 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             }
             let (_rt, r) = &mut self.references[idx];
             let identifier = for_stmt.get_identifier_token();
-            r.usages.push((
-                self.errors.lock().unwrap().file_name().to_path_buf(),
-                Spanned::new(identifier.token.to_string(), identifier.span.clone()),
-            ));
+            r.usages
+                .push((self.current_file.clone(), Spanned::new(identifier.token.to_string(), identifier.span.clone())));
         } else {
             self.errors.lock().unwrap().report_error(
                 for_stmt.get_identifier_token().span.clone(),
@@ -3776,7 +3771,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 variable_table_index: 0,
                 header: None,
                 declaration: Some((
-                    self.errors.lock().unwrap().file_name().to_path_buf(),
+                    self.current_file.clone(),
                     Spanned::new(
                         const_decl.get_identifier_token().token.to_string(),
                         const_decl.get_identifier_token().span.clone(),
@@ -3960,10 +3955,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
 
             let identifier = function.get_identifier_token();
             self.cur_func_impl = Some(idx);
-            self.references[idx].1.implementation = Some((
-                self.errors.lock().unwrap().file_name().to_path_buf(),
-                Spanned::new(identifier.token.to_string(), identifier.span.clone()),
-            ));
+            self.references[idx].1.implementation = Some((self.current_file.clone(), Spanned::new(identifier.token.to_string(), identifier.span.clone())));
             for cont in &mut self.function_containers {
                 if cont.id == idx {
                     let documentation = match &cont.functions {
@@ -4099,10 +4091,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             }
 
             let identifier = procedure.get_identifier_token();
-            self.references[idx].1.implementation = Some((
-                self.errors.lock().unwrap().file_name().to_path_buf(),
-                Spanned::new(identifier.token.to_string(), identifier.span.clone()),
-            ));
+            self.references[idx].1.implementation = Some((self.current_file.clone(), Spanned::new(identifier.token.to_string(), identifier.span.clone())));
             for cont in &mut self.function_containers {
                 if cont.id == idx {
                     let documentation = match &cont.functions {
@@ -4135,7 +4124,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             let id = self.add_declaration(VariableType::Procedure, procedure.get_identifier_token());
             self.global_lookup.variable_lookup.insert(procedure.get_identifier().clone(), id);
             self.references[id].1.implementation = Some((
-                self.errors.lock().unwrap().file_name().to_path_buf(),
+                self.current_file.clone(),
                 Spanned::new(
                     procedure.get_identifier_token().token.to_string(),
                     procedure.get_identifier_token().span.clone(),

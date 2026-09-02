@@ -288,7 +288,7 @@ impl PPECompiler {
         // One transformer for the whole package, so its generated labels stay unique across files.
         let mut transformer = AstTransformationVisitor::new(self.optimize, self.semantic_visitor.type_registry.enums());
         for prg in asts {
-            self.semantic_visitor.errors.lock().unwrap().set_file_name(&prg.file_name);
+            self.semantic_visitor.set_file_name(&prg.file_name);
             let prg = prg.visit_mut(&mut transformer);
             visted.push((prg, transformer.take_loop_counters()));
         }
@@ -299,7 +299,7 @@ impl PPECompiler {
             .filter(|(program, _)| program.module.is_some())
             .chain(visted.iter().filter(|(program, _)| program.module.is_none()))
         {
-            self.semantic_visitor.errors.lock().unwrap().set_file_name(&prg.file_name);
+            self.semantic_visitor.set_file_name(&prg.file_name);
             self.semantic_visitor.set_loop_counters(loop_counters.clone());
             prg.visit(&mut self.semantic_visitor);
         }
@@ -314,7 +314,7 @@ impl PPECompiler {
             self.compile_program_statements(program);
         }
         for (prg, _) in visted {
-            self.semantic_visitor.errors.lock().unwrap().set_file_name(&prg.file_name);
+            self.semantic_visitor.set_file_name(&prg.file_name);
             if prg.module.is_none() {
                 self.compile_program_statements(&prg);
             }
@@ -433,8 +433,7 @@ impl PPECompiler {
     }
 
     fn add_hir_command(&mut self, command: HirCommand) {
-        self.commands
-            .add_statement(&mut self.cur_offset, hir_lowering::lower_command(&command));
+        self.commands.add_statement(&mut self.cur_offset, hir_lowering::lower_command(&command));
         self.hir_program.commands.push(command);
     }
 

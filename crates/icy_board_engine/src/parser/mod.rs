@@ -2205,7 +2205,7 @@ fn attach_routine_documentation(input: &str, nodes: &mut [AstNode]) {
             _ => continue,
         };
 
-        let mut lines = Vec::new();
+        let mut lines: Option<Vec<String>> = None;
         let mut next_start = routine_start;
         let mut collect_comment = |comment: &CommentAstNode| {
             let token = comment.get_comment_token();
@@ -2219,7 +2219,9 @@ fn attach_routine_documentation(input: &str, nodes: &mut [AstNode]) {
             if !gap.chars().all(char::is_whitespace) || gap.matches('\n').count() > 1 {
                 return false;
             }
-            lines.push(documentation.strip_prefix(' ').unwrap_or(documentation).to_string());
+            lines
+                .get_or_insert_with(Vec::new)
+                .push(documentation.strip_prefix(' ').unwrap_or(documentation).to_string());
             next_start = token.span.start;
             true
         };
@@ -2244,9 +2246,7 @@ fn attach_routine_documentation(input: &str, nodes: &mut [AstNode]) {
             }
         }
 
-        if lines.is_empty() {
-            continue;
-        }
+        let Some(mut lines) = lines else { continue };
         lines.reverse();
         let documentation = lines.join("\n");
         match &mut nodes[routine_index] {

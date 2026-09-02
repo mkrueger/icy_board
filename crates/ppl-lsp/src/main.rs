@@ -974,7 +974,7 @@ impl Backend {
                 .filter(|ast| ast.module.is_some())
                 .chain(lowered.iter().filter(|ast| ast.module.is_none()))
             {
-                semantic_visitor.errors.lock().unwrap().set_file_name(&ast.file_name);
+                semantic_visitor.set_file_name(&ast.file_name);
                 ast.visit(&mut semantic_visitor);
             }
             for ast in asts {
@@ -1140,7 +1140,7 @@ impl Backend {
                     .filter(|ast| ast.module.is_some())
                     .chain(lowered.iter().filter(|ast| ast.module.is_none()))
                 {
-                    semantic_visitor.errors.lock().unwrap().set_file_name(&ast.file_name);
+                    semantic_visitor.set_file_name(&ast.file_name);
                     ast.visit(&mut semantic_visitor);
                 }
                 for (cur_uri, ast) in asts {
@@ -1396,7 +1396,7 @@ fn visible_names<'a>(visitor: &'a SemanticVisitor, file: &Path, offset: usize) -
         .enumerate()
         .filter_map(|(index, container)| {
             let (path, implementation) = visitor.references.get(container.id)?.1.implementation.as_ref()?;
-            (path == file).then_some((implementation.span.start, index))
+            (path.as_path() == file).then_some((implementation.span.start, index))
         })
         .collect();
     bodies.sort_unstable();
@@ -1426,7 +1426,7 @@ fn earlier_declaration(error: &(dyn std::error::Error + Send + Sync + 'static), 
             .token
             .trim_start_matches(':')
             .eq_ignore_ascii_case(taken)
-            .then(|| (path.clone(), declaration.span.clone()))
+            .then(|| (path.as_ref().clone(), declaration.span.clone()))
     })
 }
 

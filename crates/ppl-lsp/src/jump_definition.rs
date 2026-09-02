@@ -6,10 +6,10 @@ pub fn get_definition(ast: &Ast, visitor: &SemanticVisitor, offset: usize) -> Op
     for (_, refs) in &visitor.references {
         if refs.contains_pos(&ast.file_name, offset) {
             if let Some((path, decl)) = &refs.implementation {
-                return Some((path.clone(), decl.clone()));
+                return Some((path.as_ref().clone(), decl.clone()));
             }
             if let Some((path, decl)) = &refs.declaration {
-                return Some((path.clone(), decl.clone()));
+                return Some((path.as_ref().clone(), decl.clone()));
             }
         }
     }
