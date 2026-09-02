@@ -1041,7 +1041,7 @@ impl SemanticVisitor {
                 }
                 r.variable_table_index = variable_table.variable_table.len() + 1;
             }
-            let mut locals = 0;
+            let mut locals = 0usize;
             for idx in f.local_variables.start..f.local_variables.end {
                 let is_live = self.reference_is_live(idx);
                 let (rt, _reference) = &self.references[idx];
@@ -1051,8 +1051,26 @@ impl SemanticVisitor {
                 locals += 1;
             }
             let id = variable_table.variable_table.len() + 1;
+            let parameters = f.parameters.len();
+            if parameters > u8::MAX as usize {
+                let span = match &f.functions {
+                    FunctionDeclaration::Function(function) => function.get_identifier_token().span.clone(),
+                    FunctionDeclaration::Procedure(procedure) => procedure.get_identifier_token().span.clone(),
+                };
+                self.errors.lock().unwrap().report_error(
+                    span,
+                    CompilationErrorType::TooManyRoutineParameters(f.name.to_string(), parameters, u8::MAX as usize),
+                );
+            }
 
             if let FunctionDeclaration::Function(func) = &f.functions {
+                let maximum_locals = u8::MAX as usize - 1;
+                if locals > maximum_locals {
+                    self.errors.lock().unwrap().report_error(
+                        func.get_identifier_token().span.clone(),
+                        CompilationErrorType::TooManyRoutineLocals(f.name.to_string(), locals, maximum_locals),
+                    );
+                }
                 let header = VarHeader {
                     id: 0,
                     dim: 0,
@@ -1063,11 +1081,11 @@ impl SemanticVisitor {
                     flags: 0,
                 };
                 let function_value = FunctionValue {
-                    parameters: f.parameters.len() as u8,
-                    local_variables: locals + 1,
+                    parameters: parameters.min(u8::MAX as usize) as u8,
+                    local_variables: (locals + 1).min(u8::MAX as usize) as u8,
                     start_offset: 0,
                     first_var_id: id as i16,
-                    return_var: id as i16 + locals as i16 + f.parameters.len() as i16 + 1,
+                    return_var: (id + locals + parameters + 1) as i16,
                 };
                 variable_table.push(TableEntry::new(
                     f.name.to_string(),
@@ -1081,6 +1099,24 @@ impl SemanticVisitor {
                 ));
                 variable_table.start_define_function_body(func.get_identifier().clone());
             } else if let FunctionDeclaration::Procedure(proc) = &f.functions {
+                if let Some((index, _)) = proc
+                    .get_parameters()
+                    .iter()
+                    .enumerate()
+                    .skip(u16::BITS as usize)
+                    .find(|(_, parameter)| parameter.is_var())
+                {
+                    self.errors.lock().unwrap().report_error(
+                        proc.get_identifier_token().span.clone(),
+                        CompilationErrorType::VarParameterOutOfRange(f.name.to_string(), index + 1, u16::BITS as usize),
+                    );
+                }
+                if locals > u8::MAX as usize {
+                    self.errors.lock().unwrap().report_error(
+                        proc.get_identifier_token().span.clone(),
+                        CompilationErrorType::TooManyRoutineLocals(f.name.to_string(), locals, u8::MAX as usize),
+                    );
+                }
                 let header = VarHeader {
                     id: 0,
                     dim: 0,
@@ -1091,8 +1127,8 @@ impl SemanticVisitor {
                     flags: 0,
                 };
                 let procedure_value = ProcedureValue {
-                    parameters: f.parameters.len() as u8,
-                    local_variables: locals,
+                    parameters: parameters.min(u8::MAX as usize) as u8,
+                    local_variables: locals.min(u8::MAX as usize) as u8,
                     start_offset: 0,
                     first_var_id: id as i16,
                     pass_flags: proc.get_pass_flags(),
@@ -3857,8 +3893,8 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                     let pass_flags = f.get_pass_flags();
                     self.check_arg_types(f.get_parameters(), call.get_arguments());
 
-                    for i in 0..arg_count {
-                        if pass_flags & (1 << i) != 0 {
+                    for i in 0..arg_count.min(u16::BITS as usize) {
+                        if 1u16.checked_shl(i as u32).is_some_and(|mask| pass_flags & mask != 0) {
                             self.check_argument_is_variable(i, &call.get_arguments()[i]);
                         }
                     }

@@ -51,6 +51,24 @@ ENDPROC
 }
 
 #[test]
+fn by_value_parameters_beyond_the_var_mask_do_not_overflow() {
+    assert_eq!(
+        "42",
+        run_ppl(
+            r"
+INTEGER value = 1
+Change(value, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16)
+PRINT value
+
+PROCEDURE Change(VAR INTEGER target, INTEGER p1, INTEGER p2, INTEGER p3, INTEGER p4, INTEGER p5, INTEGER p6, INTEGER p7, INTEGER p8, INTEGER p9, INTEGER p10, INTEGER p11, INTEGER p12, INTEGER p13, INTEGER p14, INTEGER p15, INTEGER p16)
+    target = 42
+ENDPROC
+",
+        )
+    );
+}
+
+#[test]
 fn a_routine_parameter_can_be_forwarded() {
     assert_eq!(
         "7",

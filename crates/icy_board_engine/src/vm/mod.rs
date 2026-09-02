@@ -1128,7 +1128,7 @@ impl VirtualMachine<'_> {
                         let mut pass_values = Vec::new();
                         if pass_flags > 0 {
                             for i in 0..parameters {
-                                if (1 << i) & pass_flags != 0 {
+                                if 1u16.checked_shl(i as u32).is_some_and(|mask| mask & pass_flags != 0) {
                                     let id = first + i;
                                     let val = self.variable_table.get_value(id).clone();
                                     pass_values.push(val);
@@ -1151,7 +1151,7 @@ impl VirtualMachine<'_> {
 
                         if pass_flags > 0 {
                             for i in (0..parameters).rev() {
-                                if (1 << i) & pass_flags != 0 {
+                                if 1u16.checked_shl(i as u32).is_some_and(|mask| mask & pass_flags != 0) {
                                     let Some(val) = pass_values.pop() else {
                                         return Err(VMError::PassValueStackEmpty.into());
                                     };
@@ -1338,7 +1338,7 @@ impl VirtualMachine<'_> {
             let id = first + i;
             self.variable_table.set_value(id, value);
 
-            if (1 << i) & pass_flags != 0 {
+            if 1u16.checked_shl(i as u32).is_some_and(|mask| mask & pass_flags != 0) {
                 self.write_back_stack.push(arguments[i].clone());
             }
         }

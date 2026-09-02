@@ -948,7 +948,7 @@ impl Decompiler {
                     }
                     _ => {}
                 }
-                let is_var = pass_flags & (1 << i) != 0;
+                let is_var = 1u16.checked_shl(i as u32).is_some_and(|mask| pass_flags & mask != 0);
                 parameters.push(ParameterSpecifier::Variable(VariableParameterSpecifier::new(
                     if is_var {
                         Some(Spanned::create_empty(Token::Identifier(unicase::Ascii::new("VAR".to_string()))))

@@ -94,6 +94,21 @@ pub enum CompilationErrorType {
     #[error("A constant needs a value the compiler can work out")]
     ConstantValueExpected,
 
+    #[error("Compiled program is too large ({0} bytes; maximum is {1})")]
+    ProgramTooLarge(usize, usize),
+
+    #[error("Compiled program has too many declarations ({0}; maximum is {1})")]
+    TooManyDeclarations(usize, usize),
+
+    #[error("Routine {0} has too many parameters ({1}; maximum is {2})")]
+    TooManyRoutineParameters(String, usize, usize),
+
+    #[error("Routine {0} has too many local variables ({1}; maximum is {2})")]
+    TooManyRoutineLocals(String, usize, usize),
+
+    #[error("Procedure {0} has a VAR parameter at position {1}; the maximum supported position is {2}")]
+    VarParameterOutOfRange(String, usize, usize),
+
     #[error("Enum {0} has no member named {1}")]
     EnumMemberNotFound(String, String),
 
@@ -353,7 +368,8 @@ impl PPECompiler {
                         // unused procedure
                         continue;
                     };
-                    self.lookup_table.variable_table.get_var_entry_mut(idx).value.data.procedure_value.start_offset = self.cur_offset as u16 * 2;
+                    self.lookup_table.variable_table.get_var_entry_mut(idx).value.data.procedure_value.start_offset =
+                        u16::try_from(self.cur_offset.saturating_mul(2)).unwrap_or_default();
 
                     self.lookup_table.start_compile_function_body(proc.get_identifier());
                     self.compile_statement_sequence(proc.get_statements());
@@ -367,7 +383,8 @@ impl PPECompiler {
                         // unused function
                         continue;
                     };
-                    self.lookup_table.variable_table.get_var_entry_mut(idx).value.data.function_value.start_offset = self.cur_offset as u16 * 2;
+                    self.lookup_table.variable_table.get_var_entry_mut(idx).value.data.function_value.start_offset =
+                        u16::try_from(self.cur_offset.saturating_mul(2)).unwrap_or_default();
                     self.lookup_table.start_compile_function_body(func.get_identifier());
                     self.compile_statement_sequence(func.get_statements());
                     self.lookup_table.end_compile_function_body();
@@ -677,6 +694,20 @@ impl PPECompiler {
     ///
     /// This function will return an error if .
     pub fn create_executable(&self) -> Result<Executable, CompilationErrorType> {
+        let declaration_count = self.lookup_table.variable_table.len();
+        if declaration_count > i16::MAX as usize {
+            return Err(CompilationErrorType::TooManyDeclarations(declaration_count, i16::MAX as usize));
+        }
+        let script_size = self
+            .commands
+            .statements
+            .iter()
+            .map(|statement| statement.command.get_size())
+            .sum::<usize>()
+            .saturating_mul(2);
+        if script_size > i16::MAX as usize {
+            return Err(CompilationErrorType::ProgramTooLarge(script_size, i16::MAX as usize));
+        }
         let mut variable_table = self.lookup_table.variable_table.clone();
         variable_table.set_version(self.runtime);
         let definitions = self.semantic_visitor.type_registry.user_types();

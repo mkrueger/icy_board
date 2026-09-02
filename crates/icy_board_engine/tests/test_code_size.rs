@@ -109,3 +109,22 @@ fn test_the_emitted_code_does_not_grow() {
 
     panic!("emitted code size changed:\n{report}\nupdate EXPECTED_CODE_SIZE to:\n{table}");
 }
+
+#[test]
+fn oversized_programs_report_the_format_limit_instead_of_panicking() {
+    let source = format!("BEGIN\n{}END\nPROCEDURE Later()\nENDPROC\n", "PRINTLN 1\n".repeat(11_000));
+    let reg = UserTypeRegistry::default();
+    let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+    let workspace = Workspace::default();
+    let ast = parse_ast(PathBuf::from("oversized.pps"), errors.clone(), &source, &reg, Encoding::Utf8, &workspace);
+    let mut compiler = PPECompiler::new(&workspace, reg, errors.clone());
+
+    compiler.compile(&[&ast]);
+
+    assert!(!errors.lock().unwrap().has_errors());
+    assert!(matches!(
+        compiler.create_executable(),
+        Err(icy_board_engine::compiler::CompilationErrorType::ProgramTooLarge(size, max))
+            if size > max && max == i16::MAX as usize
+    ));
+}

@@ -89,6 +89,9 @@ pub enum ParserErrorType {
     #[error("Expected expression ({0})")]
     ExpressionExpected(Token),
 
+    #[error("Expression nesting exceeds the supported limit of {0}")]
+    ExpressionNestingTooDeep(usize),
+
     #[error("Expected statement")]
     StatementExpected,
 
@@ -687,7 +690,9 @@ pub struct Parser<'a> {
     imports: Vec<ImportDeclaration>,
     dependency_imports: HashMap<unicase::Ascii<String>, unicase::Ascii<String>>,
     in_module: bool,
+    expression_depth: usize,
 }
+const MAX_EXPRESSION_DEPTH: usize = 64;
 static PROC_TOKEN: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("PROC".to_string()));
 static FUNC_TOKEN: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("FUNC".to_string()));
 static ON_TOKEN: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("ON".to_string()));
@@ -735,6 +740,7 @@ impl<'a> Parser<'a> {
             imports: Vec::new(),
             dependency_imports,
             in_module,
+            expression_depth: 0,
         }
     }
 

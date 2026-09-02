@@ -714,7 +714,7 @@ impl VariableTable {
             super::PPECommand::ProcedureCall(id, args) => unsafe {
                 let flags = self.get_value(*id).data.procedure_value.pass_flags;
                 for (i, arg) in args.iter().enumerate() {
-                    if flags & (1 << i) != 0 {
+                    if 1u16.checked_shl(i as u32).is_some_and(|mask| flags & mask != 0) {
                         self.report_usage(arg);
                     }
                 }

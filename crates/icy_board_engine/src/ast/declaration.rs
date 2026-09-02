@@ -588,7 +588,7 @@ impl ProcedureDeclarationAstNode {
 
     pub fn get_pass_flags(&self) -> u16 {
         let mut flags = 0;
-        for (i, param) in self.parameters.iter().enumerate() {
+        for (i, param) in self.parameters.iter().take(u16::BITS as usize).enumerate() {
             if param.is_var() {
                 flags |= 1 << i;
             }

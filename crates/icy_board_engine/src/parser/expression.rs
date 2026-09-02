@@ -10,7 +10,20 @@ use crate::{
 
 impl Parser<'_> {
     pub fn parse_expression(&mut self) -> Option<Expression> {
-        self.parse_bool()
+        self.parse_nested(Self::parse_bool)
+    }
+
+    /// Runs one more level of expression recursion, so a source that nests deeper than
+    /// the parser can afford is reported instead of exhausting the stack.
+    fn parse_nested(&mut self, parse: impl FnOnce(&mut Self) -> Option<Expression>) -> Option<Expression> {
+        if self.expression_depth >= super::MAX_EXPRESSION_DEPTH {
+            self.report_error(self.save_token_span(), ParserErrorType::ExpressionNestingTooDeep(super::MAX_EXPRESSION_DEPTH));
+            return None;
+        }
+        self.expression_depth += 1;
+        let expression = parse(self);
+        self.expression_depth -= 1;
+        expression
     }
 
     fn parse_bool(&mut self) -> Option<Expression> {
@@ -100,7 +113,7 @@ impl Parser<'_> {
         if self.get_cur_token() == Some(Token::Add) {
             let token = self.save_spanned_token();
             self.next_token();
-            let expr = self.parse_unary();
+            let expr = self.parse_nested(Self::parse_unary);
             if let Some(e) = expr {
                 return Some(Expression::Unary(UnaryExpression::new(token, e)));
             }
@@ -108,7 +121,7 @@ impl Parser<'_> {
         if self.get_cur_token() == Some(Token::Sub) {
             let token = self.save_spanned_token();
             self.next_token();
-            let expr = self.parse_unary();
+            let expr = self.parse_nested(Self::parse_unary);
             if let Some(e) = expr {
                 return Some(Expression::Unary(UnaryExpression::new(token, e)));
             }
@@ -116,7 +129,7 @@ impl Parser<'_> {
         if self.get_cur_token() == Some(Token::Not) {
             let token = self.save_spanned_token();
             self.next_token();
-            let expr = self.parse_unary();
+            let expr = self.parse_nested(Self::parse_unary);
             if let Some(e) = expr {
                 return Some(Expression::Unary(UnaryExpression::new(token, e)));
             }
