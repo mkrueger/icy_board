@@ -342,6 +342,11 @@ releases.
   Their opcode slots were reclaimed rather than reserved, so the numbering has
   no beta holes left and PPEs built by an earlier beta must be rebuilt.
 
+### Fixed
+
+- Updated Tetris to use `Audio.SetVolume()`, taught editor grammar checks about
+  contextual module words, and completed Paint's pixel-mouse test handshake.
+
 ### Added
 
 - Added the runtime 4.02 `Board` and `Session` objects. `Board` is a snapshot of

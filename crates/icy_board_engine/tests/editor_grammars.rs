@@ -217,19 +217,25 @@ fn grammars_know_every_type_name() {
 /// Words a grammar colours as a keyword that the lexer does not reserve: THEN, DO,
 /// TO, STEP, IN and VAR are read as plain names, TRUE and FALSE are constants, END,
 /// EXIT and STOP are statements, ON, ERROR and OFF only mean something next to each
-/// other in ON ERROR, and the engine reads END FUNCTION as two tokens rather than as
-/// one word.
+/// other in ON ERROR, module syntax is contextual, and the engine reads END FUNCTION
+/// as two tokens rather than as one word.
 const COLOURED_BUT_NOT_RESERVED: &[&str] = &[
+    "AS",
     "DO",
     "END",
     "ENDFUNCTION",
+    "ENDMODULE",
     "ENDPROCEDURE",
     "ERROR",
     "EXIT",
     "FALSE",
     "IN",
+    "IMPORT",
+    "MODULE",
     "OFF",
     "ON",
+    "PRIVATE",
+    "PUBLIC",
     "STEP",
     "STOP",
     "THEN",

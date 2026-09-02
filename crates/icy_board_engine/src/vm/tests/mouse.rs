@@ -28,7 +28,7 @@ fn paint_demo_uses_pixel_mouse_and_preserves_quit_key() {
     let output = super::run_ppl_with_files_and_input(
         source,
         &[("paint_ui.png", include_bytes!("../../../../../ppe/paint/paint_ui.png"))],
-        b"\x1b[<1;4;7c\x1b[?1016;1$yq",
+        b"\x1b[<1;4;7c\x1b[?1016;1$y\x1b[<0;101;101Mq",
     );
 
     assert!(output.contains("Starting PPE Paint..."));

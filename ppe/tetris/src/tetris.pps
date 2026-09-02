@@ -59,11 +59,11 @@ InitShapes()
 InitColors()
 ClearBoard()
 
-music.Volume = 100
-rotateSound.Volume = 100
-lockSound.Volume = 100
-lineSound.Volume = 100
-gameOverSound.Volume = 100
+music.SetVolume(100)
+rotateSound.SetVolume(100)
+lockSound.SetVolume(100)
+lineSound.SetVolume(100)
+gameOverSound.SetVolume(100)
 music.Play(TRUE)
 
 score = 0
