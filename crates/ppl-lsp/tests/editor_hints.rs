@@ -27,6 +27,11 @@ fn routines_show_reference_count_code_lenses() {
     server.opened(uri, "DECLARE PROCEDURE Show()\nShow()\nPROCEDURE Show()\nENDPROC\n");
 
     let lenses = server.request("textDocument/codeLens", json!({"textDocument": {"uri": uri}}));
-    let titles: Vec<_> = lenses.as_array().unwrap().iter().map(|lens| lens["command"]["title"].as_str().unwrap()).collect();
+    let titles: Vec<_> = lenses
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|lens| lens["command"]["title"].as_str().unwrap())
+        .collect();
     assert!(titles.iter().any(|title| *title == "1 reference"), "{lenses}");
 }

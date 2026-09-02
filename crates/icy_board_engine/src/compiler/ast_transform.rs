@@ -523,23 +523,25 @@ impl AstVisitorMut for AstTransformationVisitor {
         self.local_constants = Some(HashMap::new());
         self.collect_local_bindings(function.get_parameters(), function.get_statements());
         self.collect_constants(function.get_statements(), true);
-        let res = AstNode::Function(FunctionImplementation::new(
-            function.id,
-            function.get_function_token().clone(),
-            Spanned {
-                span: function.get_identifier_token().span.clone(),
-                token: Token::Identifier(self.visit_identifier(function.get_identifier())),
-            },
-            function.get_leftpar_token().clone(),
-            function.get_parameters().iter().map(|arg| arg.visit_mut(self)).collect(),
-            function.get_rightpar_token().clone(),
-            function.get_return_type_token().clone(),
-            function.get_return_type(),
-            function.get_return_rank(),
-            function.get_statements().iter().map(|stmt| stmt.visit_mut(self)).collect(),
-            function.get_endfunc_token().clone(),
-        )
-        .with_documentation(function.get_documentation()));
+        let res = AstNode::Function(
+            FunctionImplementation::new(
+                function.id,
+                function.get_function_token().clone(),
+                Spanned {
+                    span: function.get_identifier_token().span.clone(),
+                    token: Token::Identifier(self.visit_identifier(function.get_identifier())),
+                },
+                function.get_leftpar_token().clone(),
+                function.get_parameters().iter().map(|arg| arg.visit_mut(self)).collect(),
+                function.get_rightpar_token().clone(),
+                function.get_return_type_token().clone(),
+                function.get_return_type(),
+                function.get_return_rank(),
+                function.get_statements().iter().map(|stmt| stmt.visit_mut(self)).collect(),
+                function.get_endfunc_token().clone(),
+            )
+            .with_documentation(function.get_documentation()),
+        );
 
         self.cur_function = None;
         self.local_constants = None;
@@ -551,20 +553,22 @@ impl AstVisitorMut for AstTransformationVisitor {
         self.local_constants = Some(HashMap::new());
         self.collect_local_bindings(procedure.get_parameters(), procedure.get_statements());
         self.collect_constants(procedure.get_statements(), true);
-        let res = AstNode::Procedure(ProcedureImplementation::new(
-            procedure.id,
-            procedure.get_procedure_token().clone(),
-            Spanned {
-                span: procedure.get_identifier_token().span.clone(),
-                token: Token::Identifier(self.visit_identifier(procedure.get_identifier())),
-            },
-            procedure.get_leftpar_token().clone(),
-            procedure.get_parameters().iter().map(|arg| arg.visit_mut(self)).collect(),
-            procedure.get_rightpar_token().clone(),
-            procedure.get_statements().iter().map(|stmt| stmt.visit_mut(self)).collect(),
-            procedure.get_endproc_token().clone(),
-        )
-        .with_documentation(procedure.get_documentation()));
+        let res = AstNode::Procedure(
+            ProcedureImplementation::new(
+                procedure.id,
+                procedure.get_procedure_token().clone(),
+                Spanned {
+                    span: procedure.get_identifier_token().span.clone(),
+                    token: Token::Identifier(self.visit_identifier(procedure.get_identifier())),
+                },
+                procedure.get_leftpar_token().clone(),
+                procedure.get_parameters().iter().map(|arg| arg.visit_mut(self)).collect(),
+                procedure.get_rightpar_token().clone(),
+                procedure.get_statements().iter().map(|stmt| stmt.visit_mut(self)).collect(),
+                procedure.get_endproc_token().clone(),
+            )
+            .with_documentation(procedure.get_documentation()),
+        );
         self.local_constants = None;
         self.local_bindings = None;
         res

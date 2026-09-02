@@ -334,9 +334,7 @@ impl ControlFlowGraph {
     }
 
     fn statement_is_reachable(&self, statement: usize) -> bool {
-        self.statement_blocks
-            .get(statement)
-            .is_some_and(|block| self.blocks[*block].reachable)
+        self.statement_blocks.get(statement).is_some_and(|block| self.blocks[*block].reachable)
     }
 }
 

@@ -26,7 +26,10 @@ fn every_preprocessor_directive_has_hover_help() {
     }
 
     let substitution = server.at("textDocument/hover", uri, 8, 10);
-    assert!(substitution["contents"]["value"].as_str().is_some_and(|text| text.contains(";#name")), "{substitution}");
+    assert!(
+        substitution["contents"]["value"].as_str().is_some_and(|text| text.contains(";#name")),
+        "{substitution}"
+    );
 }
 
 #[test]

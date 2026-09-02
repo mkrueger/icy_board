@@ -696,39 +696,43 @@ pub trait AstVisitorMut: Sized {
     }
 
     fn visit_procedure_declaration(&mut self, proc_decl: &ProcedureDeclarationAstNode) -> AstNode {
-        AstNode::ProcedureDeclaration(ProcedureDeclarationAstNode::new(
-            proc_decl.get_declare_token().clone(),
-            proc_decl.get_procedure_token().clone(),
-            Spanned {
-                span: proc_decl.get_identifier_token().span.clone(),
-                token: Token::Identifier(self.visit_identifier(proc_decl.get_identifier())),
-            },
-            proc_decl.get_leftpar_token().clone(),
-            proc_decl.get_parameters().iter().map(|param| param.visit_mut(self)).collect(),
-            proc_decl.get_rightpar_token().clone(),
+        AstNode::ProcedureDeclaration(
+            ProcedureDeclarationAstNode::new(
+                proc_decl.get_declare_token().clone(),
+                proc_decl.get_procedure_token().clone(),
+                Spanned {
+                    span: proc_decl.get_identifier_token().span.clone(),
+                    token: Token::Identifier(self.visit_identifier(proc_decl.get_identifier())),
+                },
+                proc_decl.get_leftpar_token().clone(),
+                proc_decl.get_parameters().iter().map(|param| param.visit_mut(self)).collect(),
+                proc_decl.get_rightpar_token().clone(),
+            )
+            .with_documentation(proc_decl.get_documentation()),
         )
-        .with_documentation(proc_decl.get_documentation()))
     }
 
     fn visit_enum_declaration(&mut self, enum_decl: &EnumDeclarationAstNode) -> AstNode {
         AstNode::EnumDeclaration(enum_decl.clone())
     }
     fn visit_function_declaration(&mut self, func_decl: &FunctionDeclarationAstNode) -> AstNode {
-        AstNode::FunctionDeclaration(FunctionDeclarationAstNode::new(
-            func_decl.get_declare_token().clone(),
-            func_decl.get_function_token().clone(),
-            Spanned {
-                span: func_decl.get_identifier_token().span.clone(),
-                token: Token::Identifier(self.visit_identifier(func_decl.get_identifier())),
-            },
-            func_decl.get_leftpar_token().clone(),
-            func_decl.get_parameters().iter().map(|param| param.visit_mut(self)).collect(),
-            func_decl.get_rightpar_token().clone(),
-            func_decl.get_return_type_token().clone(),
-            func_decl.get_return_type(),
-            func_decl.get_return_rank(),
+        AstNode::FunctionDeclaration(
+            FunctionDeclarationAstNode::new(
+                func_decl.get_declare_token().clone(),
+                func_decl.get_function_token().clone(),
+                Spanned {
+                    span: func_decl.get_identifier_token().span.clone(),
+                    token: Token::Identifier(self.visit_identifier(func_decl.get_identifier())),
+                },
+                func_decl.get_leftpar_token().clone(),
+                func_decl.get_parameters().iter().map(|param| param.visit_mut(self)).collect(),
+                func_decl.get_rightpar_token().clone(),
+                func_decl.get_return_type_token().clone(),
+                func_decl.get_return_type(),
+                func_decl.get_return_rank(),
+            )
+            .with_documentation(func_decl.get_documentation()),
         )
-        .with_documentation(func_decl.get_documentation()))
     }
 
     // visit implementations
@@ -738,23 +742,25 @@ pub trait AstVisitorMut: Sized {
     }
 
     fn visit_function_implementation(&mut self, function: &FunctionImplementation) -> AstNode {
-        AstNode::Function(FunctionImplementation::new(
-            function.id,
-            function.get_function_token().clone(),
-            Spanned {
-                span: function.get_identifier_token().span.clone(),
-                token: Token::Identifier(self.visit_identifier(function.get_identifier())),
-            },
-            function.get_leftpar_token().clone(),
-            function.get_parameters().iter().map(|arg| arg.visit_mut(self)).collect(),
-            function.get_rightpar_token().clone(),
-            function.get_return_type_token().clone(),
-            function.get_return_type(),
-            function.get_return_rank(),
-            function.get_statements().iter().map(|stmt| stmt.visit_mut(self)).collect(),
-            function.get_endfunc_token().clone(),
+        AstNode::Function(
+            FunctionImplementation::new(
+                function.id,
+                function.get_function_token().clone(),
+                Spanned {
+                    span: function.get_identifier_token().span.clone(),
+                    token: Token::Identifier(self.visit_identifier(function.get_identifier())),
+                },
+                function.get_leftpar_token().clone(),
+                function.get_parameters().iter().map(|arg| arg.visit_mut(self)).collect(),
+                function.get_rightpar_token().clone(),
+                function.get_return_type_token().clone(),
+                function.get_return_type(),
+                function.get_return_rank(),
+                function.get_statements().iter().map(|stmt| stmt.visit_mut(self)).collect(),
+                function.get_endfunc_token().clone(),
+            )
+            .with_documentation(function.get_documentation()),
         )
-        .with_documentation(function.get_documentation()))
     }
 
     fn visit_parameter_specifier(&mut self, param: &ParameterSpecifier) -> ParameterSpecifier {
@@ -762,20 +768,22 @@ pub trait AstVisitorMut: Sized {
     }
 
     fn visit_procedure_implementation(&mut self, procedure: &ProcedureImplementation) -> AstNode {
-        AstNode::Procedure(ProcedureImplementation::new(
-            procedure.id,
-            procedure.get_procedure_token().clone(),
-            Spanned {
-                span: procedure.get_identifier_token().span.clone(),
-                token: Token::Identifier(self.visit_identifier(procedure.get_identifier())),
-            },
-            procedure.get_leftpar_token().clone(),
-            procedure.get_parameters().iter().map(|arg| arg.visit_mut(self)).collect(),
-            procedure.get_rightpar_token().clone(),
-            procedure.get_statements().iter().map(|stmt| stmt.visit_mut(self)).collect(),
-            procedure.get_endproc_token().clone(),
+        AstNode::Procedure(
+            ProcedureImplementation::new(
+                procedure.id,
+                procedure.get_procedure_token().clone(),
+                Spanned {
+                    span: procedure.get_identifier_token().span.clone(),
+                    token: Token::Identifier(self.visit_identifier(procedure.get_identifier())),
+                },
+                procedure.get_leftpar_token().clone(),
+                procedure.get_parameters().iter().map(|arg| arg.visit_mut(self)).collect(),
+                procedure.get_rightpar_token().clone(),
+                procedure.get_statements().iter().map(|stmt| stmt.visit_mut(self)).collect(),
+                procedure.get_endproc_token().clone(),
+            )
+            .with_documentation(procedure.get_documentation()),
         )
-        .with_documentation(procedure.get_documentation()))
     }
 
     fn visit_ast(&mut self, program: &Ast) -> Ast {

@@ -37,9 +37,7 @@ impl Drop for DosSession {
 impl DosSession {
     pub async fn stop(&mut self) -> bool {
         self.cancel.store(true, Ordering::Release);
-        tokio::time::timeout(std::time::Duration::from_secs(5), &mut self.finished)
-            .await
-            .is_ok()
+        tokio::time::timeout(std::time::Duration::from_secs(5), &mut self.finished).await.is_ok()
     }
 }
 
@@ -258,17 +256,13 @@ pub fn validate_simple_command(source_directory: &Path, command: &str) -> Res<()
     if command.is_empty() || command.contains(['\r', '\n', ' ', '\t']) {
         return Ok(());
     }
-    let extension = Path::new(command)
-        .extension()
-        .and_then(|extension| extension.to_str())
-        .unwrap_or_default();
+    let extension = Path::new(command).extension().and_then(|extension| extension.to_str()).unwrap_or_default();
     if !matches!(extension.to_ascii_lowercase().as_str(), "bat" | "com" | "exe") {
         return Ok(());
     }
-    let found = std::fs::read_dir(source_directory)?.filter_map(Result::ok).any(|entry| {
-        entry.file_type().is_ok_and(|file_type| file_type.is_file())
-            && entry.file_name().to_string_lossy().eq_ignore_ascii_case(command)
-    });
+    let found = std::fs::read_dir(source_directory)?
+        .filter_map(Result::ok)
+        .any(|entry| entry.file_type().is_ok_and(|file_type| file_type.is_file()) && entry.file_name().to_string_lossy().eq_ignore_ascii_case(command));
     if found {
         Ok(())
     } else {
@@ -281,13 +275,7 @@ pub fn validate_simple_command(source_directory: &Path, command: &str) -> Res<()
     }
 }
 
-pub fn start_session(
-    image_path: &Path,
-    bios_path: &Path,
-    vga_bios_path: &Path,
-    memory_mb: u32,
-    max_runtime: std::time::Duration,
-) -> Res<DosSession> {
+pub fn start_session(image_path: &Path, bios_path: &Path, vga_bios_path: &Path, memory_mb: u32, max_runtime: std::time::Duration) -> Res<DosSession> {
     let image_path = image_path.to_path_buf();
     let bios_path = bios_path.to_path_buf();
     let vga_bios_path = vga_bios_path.to_path_buf();
@@ -403,14 +391,7 @@ mod tests {
             .map(std::time::Duration::from_secs)
             .unwrap_or_else(|| std::time::Duration::from_secs(30));
         inject_session_files(&session_image, &[], &run_batch).unwrap();
-        let mut session = start_session(
-            &session_image,
-            Path::new(&bios),
-            Path::new(&vga_bios),
-            8,
-            max_runtime,
-        )
-        .unwrap();
+        let mut session = start_session(&session_image, Path::new(&bios), Path::new(&vga_bios), 8, max_runtime).unwrap();
         let mut serial_output = Vec::new();
         let mut output_open = true;
         let result = tokio::time::timeout(std::time::Duration::from_secs(30), async {
@@ -427,7 +408,12 @@ mod tests {
             }
         })
         .await
-        .unwrap_or_else(|_| panic!("FreeDOS poweroff did not finish the DOS worker; serial={:?}", String::from_utf8_lossy(&serial_output)));
+        .unwrap_or_else(|_| {
+            panic!(
+                "FreeDOS poweroff did not finish the DOS worker; serial={:?}",
+                String::from_utf8_lossy(&serial_output)
+            )
+        });
         result.unwrap();
         if std::env::var_os("ICB_DOS_RUN_BATCH").is_some() {
             eprintln!("DOS serial output: {}", String::from_utf8_lossy(&serial_output));

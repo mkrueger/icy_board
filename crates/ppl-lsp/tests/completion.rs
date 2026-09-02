@@ -41,12 +41,20 @@ fn preprocessor_directives_and_variables_complete() {
     for name in ["LANGVERSION", "DEFINE", "IF", "ELSEIF", "ELIF", "ELSE", "ENDIF", "USEFUNCS"] {
         assert!(directives.contains(&name.to_string()), "{name}: {directives:?}");
     }
-    assert!(directive_items.iter().all(|item| item.filter_text.as_deref().is_some_and(|text| text.starts_with(";$"))));
+    assert!(
+        directive_items
+            .iter()
+            .all(|item| item.filter_text.as_deref().is_some_and(|text| text.starts_with(";$")))
+    );
 
     let substitution_items = complete_items(";#");
     let substitutions: Vec<_> = substitution_items.iter().map(|item| item.label.clone()).collect();
     assert_eq!(substitutions, vec!["VERSION", "RUNTIME", "LANGVERSION"]);
-    assert!(substitution_items.iter().all(|item| item.filter_text.as_deref().is_some_and(|text| text.starts_with(";#"))));
+    assert!(
+        substitution_items
+            .iter()
+            .all(|item| item.filter_text.as_deref().is_some_and(|text| text.starts_with(";#")))
+    );
 
     let expressions = complete(";$IF ");
     assert_eq!(expressions, vec!["VERSION", "RUNTIME", "LANGVERSION"]);
@@ -183,26 +191,33 @@ fn a_user_contact_offers_documented_record_fields() {
 #[test]
 fn session_user_and_http_workflows_have_completion_documentation() {
     let session_user = completion_documentation("Session.", "User");
-    assert!(session_user.contains("currently selected") || session_user.contains("aktuell") && session_user.contains("ausgewählt"), "{session_user}");
+    assert!(
+        session_user.contains("currently selected") || session_user.contains("aktuell") && session_user.contains("ausgewählt"),
+        "{session_user}"
+    );
 
     let contacts = completion_documentation("USER user\nuser.", "Contacts");
-    assert!((contacts.contains("100 entries") || contacts.contains("100 Einträgen")) && contacts.contains("AddContact"), "{contacts}");
+    assert!(
+        (contacts.contains("100 entries") || contacts.contains("100 Einträgen")) && contacts.contains("AddContact"),
+        "{contacts}"
+    );
 
     let http_get = completion_documentation("HTTP.", "Get");
-    assert!(http_get.contains("policy-controlled GET") || http_get.contains("richtliniengesteuerte GET"), "{http_get}");
+    assert!(
+        http_get.contains("policy-controlled GET") || http_get.contains("richtliniengesteuerte GET"),
+        "{http_get}"
+    );
 
     let set_text = completion_documentation("HTTPREQUEST request\nrequest.", "SetText");
     assert!(
-        (set_text.contains("GET and HEAD") || set_text.contains("GET- und HEAD"))
-            && (set_text.contains("UTF-8 body") || set_text.contains("UTF-8-Body")),
+        (set_text.contains("GET and HEAD") || set_text.contains("GET- und HEAD")) && (set_text.contains("UTF-8 body") || set_text.contains("UTF-8-Body")),
         "{set_text}"
     );
     assert!(set_text.contains("FALSE") && set_text.contains("Error.Last()"), "{set_text}");
 
     let response_text = completion_documentation("HTTPRESPONSE response\nresponse.", "Text");
     assert!(
-        (response_text.contains("strictly as UTF-8") || response_text.contains("strikt als UTF-8"))
-            && response_text.contains("ErrCode.Format"),
+        (response_text.contains("strictly as UTF-8") || response_text.contains("strikt als UTF-8")) && response_text.contains("ErrCode.Format"),
         "{response_text}"
     );
 }
@@ -303,7 +318,10 @@ fn bytes_and_checksum_completion_match_the_engine_surface() {
     assert!(to_hex.contains("leading zero bytes") || to_hex.contains("führende Nullbytes"), "{to_hex}");
 
     let checksum = completion_documentation(";$LANGVERSION 400\nBYTES data\ndata.", "GetChecksum");
-    assert!(checksum.contains("CRC32") && checksum.contains("MD5") && checksum.contains("SHA256") && checksum.contains("32"), "{checksum}");
+    assert!(
+        checksum.contains("CRC32") && checksum.contains("MD5") && checksum.contains("SHA256") && checksum.contains("32"),
+        "{checksum}"
+    );
 }
 
 #[test]
@@ -375,7 +393,10 @@ fn terminal_input_and_margins_completion_include_documentation() {
 
     let set_horizontal = completion_documentation(";$LANGVERSION 400\nTerminal.Margins.", "SetHorizontal");
     assert!(set_horizontal.contains("1-basiert") || set_horizontal.contains("1-based"), "{set_horizontal}");
-    assert!(set_horizontal.contains("CSI ? 69 h") && set_horizontal.contains("CSI left ; right s"), "{set_horizontal}");
+    assert!(
+        set_horizontal.contains("CSI ? 69 h") && set_horizontal.contains("CSI left ; right s"),
+        "{set_horizontal}"
+    );
 
     let mouse_on = completion_documentation(";$LANGVERSION 400\nTerminal.Input.", "MouseOn");
     assert!(mouse_on.contains("Tracking") || mouse_on.contains("tracking"), "{mouse_on}");
@@ -388,10 +409,7 @@ fn member_call_arguments_offer_qualified_enum_values() {
     assert_eq!(mouse_modes, vec!["MouseMode.Text", "MouseMode.Pixels"]);
 
     let tracking = complete(";$LANGVERSION 400\nTERMINPUT input\ninput.MouseOn(MouseMode.Text, ");
-    assert_eq!(
-        tracking,
-        vec!["MouseTracking.Buttons", "MouseTracking.Drag", "MouseTracking.All"]
-    );
+    assert_eq!(tracking, vec!["MouseTracking.Buttons", "MouseTracking.Drag", "MouseTracking.All"]);
 }
 
 #[test]

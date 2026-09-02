@@ -53,8 +53,9 @@ releases.
   forward/reverse search, containment, prefix/suffix tests, occurrence counting,
   replacement, trimming and case conversion. `Split` fills a dynamic string
   array while retaining empty fields, and static `STRING.Join()` and
-  `STRING.Repeat()` cover aggregation. Search positions remain 1-based Unicode
-  character positions, and string operation failures report `ErrKind.String`.
+  `STRING.Repeat()` cover aggregation. Member positions are zero-based Unicode
+  character positions and missing searches return `-1`; the classic global
+  functions remain 1-based. String operation failures report `ErrKind.String`.
 
 - PPL 4.00 records can be stored through existing file channels. `FGETREC` and
   `FPUTREC` use an escaped one-scalar-per-line format that leaves following
@@ -70,6 +71,30 @@ releases.
 
 - PPL 4.00 has basic math functions: `Sin`, `Cos`, `Tan`, `Atan`, `Log` (natural
   logarithm) and `Sqrt`, all taking and returning `DOUBLE`.
+
+- PPL 4.00 adds the growable `BYTES` type for binary data. `TOBYTES` converts
+  supported scalar values, `ToString()` decodes UTF-8, base64 functions operate
+  on bytes, and `GetChecksum()` supports CRC32, MD5 and SHA-256 with hexadecimal
+  output through `ToHex()`.
+
+- The PPL language server understands `;$DEFINE`, `;$IF`/`ELSEIF`/`ELSE`/
+  `ENDIF`, predefined substitutions and conditional source, with completion,
+  hover and semantic highlighting for preprocessor directives.
+
+- Telnet and SSH connections support an optional per-connection SOCKS5 proxy,
+  including username/password authentication and proxy error reporting.
+
+- Native DOS doors can run in an isolated FreeDOS environment on supported
+  hosts. Door sessions enforce configurable runtime limits, terminate wedged
+  processes and restore the caller cleanly when the DOS runtime exits.
+
+- The local call-waiting screen exposes Sysop paging controls and status, so a
+  waiting caller can request and cancel a page before the call is answered.
+
+- Added a Weather PPL 4.00 example using the HTTP, graphics and terminal APIs.
+
+- Expanded source-build documentation with bundled/system library variants and
+  macOS prerequisites.
 
 - PPL 4.00 has policy-controlled `Http`, `HttpRequest` and `HttpResponse`
   objects. Public HTTP and HTTPS destinations work by default; sysops may disable
@@ -121,6 +146,12 @@ releases.
   `MESSAGE` statement are unchanged, and writing a message is still theirs.
 
 ### Changed
+
+- PPL 4.00 arrays use square-bracket declarations and indexing. Empty brackets
+  declare dynamic vectors, matrices or cubes, functions can return dynamic
+  arrays, compatible whole-array assignment adopts the source bounds, and
+  declarations accept initializers. Parenthesized 4.00 array syntax remains
+  accepted with a migration warning.
 
 - PPL parsing allocates routine documentation storage only when documentation is
   present. Semantic references share one source path per file, avoid reporter
@@ -346,6 +377,23 @@ releases.
 
 - Updated Tetris to use `Audio.SetVolume()`, taught editor grammar checks about
   contextual module words, and completed Paint's pixel-mouse test handshake.
+
+- HTTP request bodies are retained with shared request values, while `SetText()`
+  rejects bodyless `GET` and `HEAD` methods with a structured error.
+- PPL decompilation preserves statement structure and source compatibility more
+  reliably, and PPE execution restores the caller's active colors correctly.
+- Explicit display-file extensions now take precedence over automatic
+  extension probing.
+- The local console follows negotiated terminal geometry while reserving the
+  final two rows for status, and screen snapshots preserve Unicode. The Sysop
+  monitor renders CP437 correctly and handles node disconnects without leaving
+  stale state.
+- Delayed terminal-position replies are discarded instead of becoming caller
+  input, and PCBoard import errors report the unresolved source path.
+- Online file matching no longer reports missing-file noise for matches that
+  intentionally refer to non-local entries.
+- The ICBSetup door editor is tall enough to show its complete form without
+  clipping fields.
 
 ### Added
 

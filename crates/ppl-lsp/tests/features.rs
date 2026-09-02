@@ -99,14 +99,8 @@ fn hover_over_a_variable_shows_its_type() {
 #[test]
 fn hover_over_a_user_constant_shows_type_name_and_value() {
     let source = ";$LANGVERSION 400\nCONST INTEGER BASE = 17\nCONST INTEGER OFFSET = BASE + 1\nPRINTLN OFFSET\n";
-    assert_eq!(
-        hover(source, "BASE +"),
-        Some("```PPL\nCONSTANT INTEGER BASE = 17\n```".to_string())
-    );
-    assert_eq!(
-        hover(source, "OFFSET\n"),
-        Some("```PPL\nCONSTANT INTEGER OFFSET = BASE + 1\n```".to_string())
-    );
+    assert_eq!(hover(source, "BASE +"), Some("```PPL\nCONSTANT INTEGER BASE = 17\n```".to_string()));
+    assert_eq!(hover(source, "OFFSET\n"), Some("```PPL\nCONSTANT INTEGER OFFSET = BASE + 1\n```".to_string()));
 }
 
 #[test]
@@ -186,11 +180,17 @@ PRINTLN Bytes.FromBase64("YWJj").ToString()
 
     let checksum = hover(source, "GetChecksum").unwrap();
     assert!(checksum.contains("BYTES BYTES.GetChecksum"), "{checksum}");
-    assert!(checksum.contains("CRC32") && checksum.contains("MD5") && checksum.contains("SHA256") && checksum.contains("32"), "{checksum}");
+    assert!(
+        checksum.contains("CRC32") && checksum.contains("MD5") && checksum.contains("SHA256") && checksum.contains("32"),
+        "{checksum}"
+    );
 
     let from_base64 = hover(source, "FromBase64").unwrap();
     assert!(from_base64.contains("BYTES BYTES.FromBase64"), "{from_base64}");
-    assert!(from_base64.contains("malformed input") || from_base64.contains("Ungültige Eingabe"), "{from_base64}");
+    assert!(
+        from_base64.contains("malformed input") || from_base64.contains("Ungültige Eingabe"),
+        "{from_base64}"
+    );
 }
 
 #[test]

@@ -58,7 +58,10 @@ pub fn type_of_name(visitor: &SemanticVisitor, name: &str) -> Option<VariableTyp
     let name = unicase::Ascii::new(name.to_string());
 
     for (reference_type, reference) in &visitor.references {
-        if !matches!(reference_type, ReferenceType::Variable(_) | ReferenceType::Constant(_) | ReferenceType::Function(_)) {
+        if !matches!(
+            reference_type,
+            ReferenceType::Variable(_) | ReferenceType::Constant(_) | ReferenceType::Function(_)
+        ) {
             continue;
         }
         let declared = reference
@@ -98,12 +101,14 @@ pub fn type_of_name(visitor: &SemanticVisitor, name: &str) -> Option<VariableTyp
 pub fn static_type_of_name(visitor: &SemanticVisitor, name: &str) -> Option<VariableType> {
     let identifier = unicase::Ascii::new(name.to_string());
     let shadowed = visitor.references.iter().any(|(reference_type, reference)| {
-        matches!(reference_type, ReferenceType::Variable(_) | ReferenceType::Constant(_) | ReferenceType::Function(_))
-            && reference
-                .declaration
-                .as_ref()
-                .or(reference.implementation.as_ref())
-                .is_some_and(|(_, declaration)| unicase::Ascii::new(declaration.token.clone()) == identifier)
+        matches!(
+            reference_type,
+            ReferenceType::Variable(_) | ReferenceType::Constant(_) | ReferenceType::Function(_)
+        ) && reference
+            .declaration
+            .as_ref()
+            .or(reference.implementation.as_ref())
+            .is_some_and(|(_, declaration)| unicase::Ascii::new(declaration.token.clone()) == identifier)
     });
     (!shadowed).then(|| visitor.type_registry.get_board_object(&identifier)).flatten()
 }
@@ -289,12 +294,7 @@ pub fn member_parameters(registry: &UserTypeRegistry, receiver: VariableType, me
     };
     let object = registry.get_type_from_id(id)?;
     if let Some(function) = object.functions.get(member) {
-        return Some(named_parameters(
-            registry,
-            &function.parameters,
-            &function.parameter_names,
-            function.required,
-        ));
+        return Some(named_parameters(registry, &function.parameters, &function.parameter_names, function.required));
     }
     object
         .procedures

@@ -57,10 +57,7 @@ fn documentation_comments_attach_to_routines() {
         declaration.and_then(ProcedureDeclarationAstNode::get_documentation),
         Some("Summary.\n\n# Arguments")
     );
-    assert_eq!(
-        implementation.and_then(|node| node.get_documentation()),
-        Some("Implementation summary.")
-    );
+    assert_eq!(implementation.and_then(|node| node.get_documentation()), Some("Implementation summary."));
 }
 
 #[test]
@@ -276,14 +273,24 @@ fn ppl400_api_uses_unbounded_strings_exclusively() {
             assert!(!legacy_string(*variable_type), "object {type_id} field {name} uses {variable_type}");
         }
         for (name, function) in &object.functions {
-            assert!(!legacy_string(function.return_type), "object {type_id} function {name} returns {}", function.return_type);
+            assert!(
+                !legacy_string(function.return_type),
+                "object {type_id} function {name} returns {}",
+                function.return_type
+            );
             for (index, variable_type) in function.parameters.iter().enumerate() {
-                assert!(!legacy_string(*variable_type), "object {type_id} function {name} parameter {index} uses {variable_type}");
+                assert!(
+                    !legacy_string(*variable_type),
+                    "object {type_id} function {name} parameter {index} uses {variable_type}"
+                );
             }
         }
         for (name, procedure) in &object.procedures {
             for (index, variable_type) in procedure.parameters.iter().enumerate() {
-                assert!(!legacy_string(*variable_type), "object {type_id} procedure {name} parameter {index} uses {variable_type}");
+                assert!(
+                    !legacy_string(*variable_type),
+                    "object {type_id} procedure {name} parameter {index} uses {variable_type}"
+                );
             }
         }
     }

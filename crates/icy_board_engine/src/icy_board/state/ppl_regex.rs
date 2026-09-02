@@ -175,14 +175,20 @@ impl UserData for PplRegex {
         registry.add_property(PATTERN.clone(), VariableType::UnboundedString, false);
         registry.add_named_static_function_with(
             COMPILE.clone(),
-            vec![("pattern", VariableType::UnboundedString), ("options", VariableType::UserData(REGEX_OPTIONS_ENUM_ID))],
+            vec![
+                ("pattern", VariableType::UnboundedString),
+                ("options", VariableType::UserData(REGEX_OPTIONS_ENUM_ID)),
+            ],
             1,
             VariableType::UserData(REGEX_ID as u8),
         );
         registry.add_named_static_function(ESCAPE.clone(), vec![("text", VariableType::UnboundedString)], VariableType::UnboundedString);
         registry.add_named_static_function_with(
             IS_VALID.clone(),
-            vec![("pattern", VariableType::UnboundedString), ("options", VariableType::UserData(REGEX_OPTIONS_ENUM_ID))],
+            vec![
+                ("pattern", VariableType::UnboundedString),
+                ("options", VariableType::UserData(REGEX_OPTIONS_ENUM_ID)),
+            ],
             1,
             VariableType::Boolean,
         );
@@ -200,7 +206,11 @@ impl UserData for PplRegex {
         );
         registry.add_named_array_function_with(
             FIND_ALL.clone(),
-            vec![("text", VariableType::UnboundedString), ("start", VariableType::Integer), ("limit", VariableType::Integer)],
+            vec![
+                ("text", VariableType::UnboundedString),
+                ("start", VariableType::Integer),
+                ("limit", VariableType::Integer),
+            ],
             1,
             VariableType::UserData(REGEX_MATCH_ID as u8),
             1,
@@ -396,10 +406,7 @@ impl UserDataValue for PplRegex {
             vm.operation_succeeded();
             return Ok(VariableValue::new_vector(
                 VariableType::UnboundedString,
-                parts
-                    .into_iter()
-                    .map(VariableValue::new_unbounded_string)
-                    .collect(),
+                parts.into_iter().map(VariableValue::new_unbounded_string).collect(),
             ));
         }
         Err(format!("Unknown REGEX function {name}").into())
@@ -426,7 +433,11 @@ impl UserData for PplRegexMatch {
             VariableType::UnboundedString,
         );
         registry.add_named_function(GROUP_MATCHED.clone(), vec![("index", VariableType::Integer)], VariableType::Boolean);
-        registry.add_named_function(NAMED_GROUP_MATCHED.clone(), vec![("name", VariableType::UnboundedString)], VariableType::Boolean);
+        registry.add_named_function(
+            NAMED_GROUP_MATCHED.clone(),
+            vec![("name", VariableType::UnboundedString)],
+            VariableType::Boolean,
+        );
         registry.add_named_function(GROUP_START.clone(), vec![("index", VariableType::Integer)], VariableType::Integer);
         registry.add_named_function(NAMED_GROUP_START.clone(), vec![("name", VariableType::UnboundedString)], VariableType::Integer);
         registry.add_named_function(GROUP_LENGTH.clone(), vec![("index", VariableType::Integer)], VariableType::Integer);
@@ -442,9 +453,7 @@ impl UserDataValue for PplRegexMatch {
             return Ok(VariableValue::new_bool(whole.is_some_and(|group| group.matched)));
         }
         if *name == *VALUE {
-            return Ok(VariableValue::new_unbounded_string(
-                whole.map(|group| group.value.clone()).unwrap_or_default(),
-            ));
+            return Ok(VariableValue::new_unbounded_string(whole.map(|group| group.value.clone()).unwrap_or_default()));
         }
         if *name == *START {
             return Ok(VariableValue::new_int(whole.map_or(-1, |group| group.start)));

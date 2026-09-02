@@ -107,7 +107,11 @@ impl UserData for PplSurface {
         );
         registry.add_named_function(
             BLIT.clone(),
-            vec![("source", surface), ("destinationX", VariableType::Integer), ("destinationY", VariableType::Integer)],
+            vec![
+                ("source", surface),
+                ("destinationX", VariableType::Integer),
+                ("destinationY", VariableType::Integer),
+            ],
             VariableType::Boolean,
         );
         registry.add_named_function(
@@ -133,15 +137,15 @@ impl UserData for PplSurface {
         registry.add_named_function_with(
             PRESENT_RECT.clone(),
             vec![
-            ("sourceX", VariableType::Integer),
-            ("sourceY", VariableType::Integer),
-            ("sourceWidth", VariableType::Integer),
-            ("sourceHeight", VariableType::Integer),
-            ("column", VariableType::Integer),
-            ("row", VariableType::Integer),
-            ("destinationWidth", VariableType::Integer),
-            ("destinationHeight", VariableType::Integer),
-            ("flip", VariableType::Integer),
+                ("sourceX", VariableType::Integer),
+                ("sourceY", VariableType::Integer),
+                ("sourceWidth", VariableType::Integer),
+                ("sourceHeight", VariableType::Integer),
+                ("column", VariableType::Integer),
+                ("row", VariableType::Integer),
+                ("destinationWidth", VariableType::Integer),
+                ("destinationHeight", VariableType::Integer),
+                ("flip", VariableType::Integer),
             ],
             4,
             VariableType::Boolean,
@@ -150,11 +154,7 @@ impl UserData for PplSurface {
         registry.add_function(UNPIN.clone(), Vec::new(), VariableType::Boolean);
         registry.add_function(FREE.clone(), Vec::new(), VariableType::Boolean);
 
-        registry.add_named_static_function(
-            NEW.clone(),
-            vec![("width", VariableType::Integer), ("height", VariableType::Integer)],
-            surface,
-        );
+        registry.add_named_static_function(NEW.clone(), vec![("width", VariableType::Integer), ("height", VariableType::Integer)], surface);
         registry.add_named_static_function(LOAD.clone(), vec![("file", VariableType::UnboundedString)], surface);
     }
 }

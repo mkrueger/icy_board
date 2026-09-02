@@ -579,7 +579,11 @@ impl UserData for PplHttp {
     const STATIC_RECEIVER: Option<fn() -> VariableValue> = Some(PplHttp::value);
 
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
-        registry.add_named_static_function(GET.clone(), vec![("url", VariableType::UnboundedString)], VariableType::UserData(HTTP_RESPONSE_ID as u8));
+        registry.add_named_static_function(
+            GET.clone(),
+            vec![("url", VariableType::UnboundedString)],
+            VariableType::UserData(HTTP_RESPONSE_ID as u8),
+        );
         registry.add_named_static_function(
             NEW.clone(),
             vec![("method", VariableType::UserData(HTTP_METHOD_ENUM_ID)), ("url", VariableType::UnboundedString)],

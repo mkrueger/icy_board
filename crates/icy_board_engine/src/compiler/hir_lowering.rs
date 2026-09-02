@@ -9,16 +9,13 @@ pub fn lower_expression(expression: &HirExpr) -> PPEExpr {
         HirExpr::Variable(id) => PPEExpr::Value(id.0),
         HirExpr::Constant(id) => PPEExpr::Value(id.0),
         HirExpr::RoutineReference(id) => PPEExpr::RoutineReference(id.0),
-        HirExpr::RecordLiteral(type_id, fields) => PPEExpr::RecordLiteral(
-            type_id.0,
-            fields.iter().map(|(member, value)| (member.0, lower_expression(value))).collect(),
-        ),
+        HirExpr::RecordLiteral(type_id, fields) => {
+            PPEExpr::RecordLiteral(type_id.0, fields.iter().map(|(member, value)| (member.0, lower_expression(value))).collect())
+        }
         HirExpr::Member(base, member) => PPEExpr::Member(Box::new(lower_expression(base)), member.0),
-        HirExpr::IndexedMember(base, member, dimensions) => PPEExpr::IndexedMember(
-            Box::new(lower_expression(base)),
-            member.0,
-            dimensions.iter().map(lower_expression).collect(),
-        ),
+        HirExpr::IndexedMember(base, member, dimensions) => {
+            PPEExpr::IndexedMember(Box::new(lower_expression(base)), member.0, dimensions.iter().map(lower_expression).collect())
+        }
         HirExpr::Unary(op, expression) => PPEExpr::UnaryExpression(*op, Box::new(lower_expression(expression))),
         HirExpr::Binary(op, left, right) => PPEExpr::BinaryExpression(*op, Box::new(lower_expression(left)), Box::new(lower_expression(right))),
         HirExpr::Dim(variable, dimensions) => PPEExpr::Dim(variable.0, dimensions.iter().map(lower_expression).collect()),
@@ -26,11 +23,9 @@ pub fn lower_expression(expression: &HirExpr) -> PPEExpr {
             PPEExpr::PredefinedFunctionCall(opcode.get_definition(), arguments.iter().map(lower_expression).collect())
         }
         HirExpr::FunctionCall(routine, arguments) => PPEExpr::FunctionCall(routine.0, arguments.iter().map(lower_expression).collect()),
-        HirExpr::MemberCall(receiver, arguments, member) => PPEExpr::MemberFunctionCall(
-            Box::new(lower_expression(receiver)),
-            arguments.iter().map(lower_expression).collect(),
-            member.0,
-        ),
+        HirExpr::MemberCall(receiver, arguments, member) => {
+            PPEExpr::MemberFunctionCall(Box::new(lower_expression(receiver)), arguments.iter().map(lower_expression).collect(), member.0)
+        }
     }
 }
 
@@ -54,9 +49,7 @@ pub fn lower_command(command: &HirCommand) -> PPECommand {
         }
         HirCommand::Let(target, value) => PPECommand::Let(Box::new(lower_expression(target)), Box::new(lower_expression(value))),
         HirCommand::MemberCall(expression) => PPECommand::MemberCall(Box::new(lower_expression(expression))),
-        HirCommand::PredefinedCall(opcode, arguments) => {
-            PPECommand::PredefinedCall(opcode.get_definition(), arguments.iter().map(lower_expression).collect())
-        }
+        HirCommand::PredefinedCall(opcode, arguments) => PPECommand::PredefinedCall(opcode.get_definition(), arguments.iter().map(lower_expression).collect()),
         HirCommand::ProcedureCall(routine, arguments) => PPECommand::ProcedureCall(routine.0, arguments.iter().map(lower_expression).collect()),
         HirCommand::ForEach(variable, collection, end) => PPECommand::ForEach(variable.0, Box::new(lower_expression(collection)), end.0),
         HirCommand::NextForEach(start) => PPECommand::NextForEach(start.0),

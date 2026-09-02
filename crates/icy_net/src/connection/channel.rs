@@ -76,10 +76,7 @@ impl Connection for ChannelConnection {
     }
 
     async fn send(&mut self, buf: &[u8]) -> crate::Result<()> {
-        self.tx
-            .as_ref()
-            .ok_or(crate::NetError::ConnectionClosed)?
-            .send(buf.to_vec())?;
+        self.tx.as_ref().ok_or(crate::NetError::ConnectionClosed)?.send(buf.to_vec())?;
         Ok(())
     }
 

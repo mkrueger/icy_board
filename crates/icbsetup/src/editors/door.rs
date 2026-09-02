@@ -346,18 +346,18 @@ impl<'a> Page for DoorEditor<'a> {
                                                 list.lock().unwrap()[*i].path = value;
                                             }),
                                     ),
-                                        ConfigEntry::Item(
-                                            ListItem::new(
-                                                get_text("door_editor_security"),
-                                                ListValue::Security(action.securiy_level.clone(), action.securiy_level.to_string()),
-                                            )
-                                            .with_label_width(16)
-                                            .with_update_sec_value(
-                                                &|(i, list): &(usize, Arc<Mutex<DoorList>>), value: SecurityExpression| {
-                                                    list.lock().unwrap()[*i].securiy_level = value;
-                                                },
-                                            ),
+                                    ConfigEntry::Item(
+                                        ListItem::new(
+                                            get_text("door_editor_security"),
+                                            ListValue::Security(action.securiy_level.clone(), action.securiy_level.to_string()),
+                                        )
+                                        .with_label_width(16)
+                                        .with_update_sec_value(
+                                            &|(i, list): &(usize, Arc<Mutex<DoorList>>), value: SecurityExpression| {
+                                                list.lock().unwrap()[*i].securiy_level = value;
+                                            },
                                         ),
+                                    ),
                                     ConfigEntry::Item(
                                         ListItem::new(
                                             get_text("door_editor_door_type"),
@@ -391,28 +391,28 @@ impl<'a> Page for DoorEditor<'a> {
                                                 list.lock().unwrap()[*i].use_shell_execute = value;
                                             }),
                                     ),
-                                        ConfigEntry::Item(
-                                            ListItem::new(
-                                                get_text("door_editor_drop_file"),
-                                                ListValue::ComboBox(ComboBox {
-                                                    cur_value: ComboBoxValue::new(action.drop_file.to_string(), format!("{:?}", action.drop_file)),
-                                                    selected_item: 0,
-                                                    is_edit_open: false,
-                                                    first_item: 0,
-                                                    values: DropFile::iter()
-                                                        .map(|drop_file| ComboBoxValue::new(drop_file.to_string(), format!("{drop_file:?}")))
-                                                        .collect(),
-                                                }),
-                                            )
-                                            .with_label_width(16)
-                                            .with_update_combobox_value(
-                                                &|(i, list): &(usize, Arc<Mutex<DoorList>>), value: &ComboBox| {
-                                                    if let Some(drop_file) = DropFile::iter().find(|drop_file| format!("{drop_file:?}") == value.cur_value.value) {
-                                                        list.lock().unwrap()[*i].drop_file = drop_file;
-                                                    }
-                                                },
-                                            ),
+                                    ConfigEntry::Item(
+                                        ListItem::new(
+                                            get_text("door_editor_drop_file"),
+                                            ListValue::ComboBox(ComboBox {
+                                                cur_value: ComboBoxValue::new(action.drop_file.to_string(), format!("{:?}", action.drop_file)),
+                                                selected_item: 0,
+                                                is_edit_open: false,
+                                                first_item: 0,
+                                                values: DropFile::iter()
+                                                    .map(|drop_file| ComboBoxValue::new(drop_file.to_string(), format!("{drop_file:?}")))
+                                                    .collect(),
+                                            }),
+                                        )
+                                        .with_label_width(16)
+                                        .with_update_combobox_value(
+                                            &|(i, list): &(usize, Arc<Mutex<DoorList>>), value: &ComboBox| {
+                                                if let Some(drop_file) = DropFile::iter().find(|drop_file| format!("{drop_file:?}") == value.cur_value.value) {
+                                                    list.lock().unwrap()[*i].drop_file = drop_file;
+                                                }
+                                            },
                                         ),
+                                    ),
                                     ConfigEntry::Item(
                                         ListItem::new("DOS command".to_string(), ListValue::Text(60, TextFlags::None, action.dos_command.clone()))
                                             .with_label_width(16)
@@ -428,14 +428,11 @@ impl<'a> Page for DoorEditor<'a> {
                                             }),
                                     ),
                                     ConfigEntry::Item(
-                                        ListItem::new(
-                                            "DOS max seconds".to_string(),
-                                            ListValue::U32(action.dos_max_runtime_seconds, 0, 86400),
-                                        )
-                                        .with_label_width(16)
-                                        .with_update_u32_value(&|(i, list): &(usize, Arc<Mutex<DoorList>>), value: u32| {
-                                            list.lock().unwrap()[*i].dos_max_runtime_seconds = value;
-                                        }),
+                                        ListItem::new("DOS max seconds".to_string(), ListValue::U32(action.dos_max_runtime_seconds, 0, 86400))
+                                            .with_label_width(16)
+                                            .with_update_u32_value(&|(i, list): &(usize, Arc<Mutex<DoorList>>), value: u32| {
+                                                list.lock().unwrap()[*i].dos_max_runtime_seconds = value;
+                                            }),
                                     ),
                                 ],
                             });
@@ -496,7 +493,13 @@ mod tests {
         editor.handle_key_press(key(KeyCode::Enter));
 
         let entries = &editor.edit_config.as_ref().unwrap().entry;
-        assert_eq!(entries.iter().filter(|entry| matches!(entry, ConfigEntry::Item(item) if matches!(item.value, ListValue::Security(..)))).count(), 1);
+        assert_eq!(
+            entries
+                .iter()
+                .filter(|entry| matches!(entry, ConfigEntry::Item(item) if matches!(item.value, ListValue::Security(..))))
+                .count(),
+            1
+        );
         let drop_files = entries.iter().find_map(|entry| match entry {
             ConfigEntry::Item(item) => match &item.value {
                 ListValue::ComboBox(combo) if combo.values.len() == DropFile::iter().count() => Some(combo),

@@ -34,7 +34,12 @@ impl UserData for PplGfx {
         let backend = VariableType::UserData(crate::parser::GFX_BACKEND_ENUM_ID);
         registry.add_property(BACKEND.clone(), backend, false);
 
-        registry.add_named_function_with(INIT.clone(), vec![("backend", backend), ("fullscreen", VariableType::Boolean)], 0, VariableType::Boolean);
+        registry.add_named_function_with(
+            INIT.clone(),
+            vec![("backend", backend), ("fullscreen", VariableType::Boolean)],
+            0,
+            VariableType::Boolean,
+        );
         registry.add_named_function(SET_PACING.clone(), vec![("enabled", VariableType::Boolean)], VariableType::Boolean);
         registry.add_function(SHUTDOWN.clone(), Vec::new(), VariableType::Boolean);
     }

@@ -51,10 +51,7 @@ fn a_missing_routine_is_reported_as_an_error() {
 fn a_missing_routine_argument_is_reported_without_stopping_analysis() {
     let (mut server, _) = Server::ready();
     let uri = "file:///tmp/missing-argument.pps";
-    server.open(
-        uri,
-        "PROCEDURE FooBar(INTEGER a)\n  PRINTLN a\nENDPROC\nBEGIN\n  FooBar()\nEND\n",
-    );
+    server.open(uri, "PROCEDURE FooBar(INTEGER a)\n  PRINTLN a\nENDPROC\nBEGIN\n  FooBar()\nEND\n");
 
     let errors = messages(&Value::Array(of_severity(&server.diagnostics(uri), 1)));
     assert!(errors.iter().any(|message| message == "Not enough arguments passed (FooBar:0:1)"), "{errors:?}");

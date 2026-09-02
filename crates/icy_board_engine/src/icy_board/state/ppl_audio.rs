@@ -67,7 +67,11 @@ impl UserData for PplAudio {
         );
         registry.add_function(FREE.clone(), Vec::new(), VariableType::Boolean);
 
-        registry.add_named_static_function(LOAD.clone(), vec![("file", VariableType::UnboundedString)], VariableType::UserData(AUDIO_ID as u8));
+        registry.add_named_static_function(
+            LOAD.clone(),
+            vec![("file", VariableType::UnboundedString)],
+            VariableType::UserData(AUDIO_ID as u8),
+        );
         registry.add_static_function(STOP_ALL.clone(), Vec::new(), VariableType::Boolean);
     }
 }

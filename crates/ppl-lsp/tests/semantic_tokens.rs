@@ -119,7 +119,9 @@ fn every_routine_parameter_usage_keeps_parameter_highlighting() {
             .count();
         assert_eq!(usages, expected_usages, "{name} usages are not parameters: {tokens:?}");
         assert!(
-            !tokens.iter().any(|(text, token_type, modifiers)| text == name && *token_type == VARIABLE && *modifiers == 0),
+            !tokens
+                .iter()
+                .any(|(text, token_type, modifiers)| text == name && *token_type == VARIABLE && *modifiers == 0),
             "{name} has variable-highlighted usages: {tokens:?}"
         );
     }
@@ -176,7 +178,10 @@ fn preprocessor_directives_and_variables_have_semantic_kinds() {
         assert!(tokens.contains(&(directive.to_string(), DIRECTIVE, 0)), "{directive}: {tokens:?}");
     }
     for name in ["FEATURE", "RUNTIME"] {
-        assert!(tokens.iter().any(|token| token == &(name.to_string(), CONSTANT, READONLY)), "{name}: {tokens:?}");
+        assert!(
+            tokens.iter().any(|token| token == &(name.to_string(), CONSTANT, READONLY)),
+            "{name}: {tokens:?}"
+        );
     }
     assert!(tokens.contains(&(";#".to_string(), DIRECTIVE, 0)), "{tokens:?}");
 }

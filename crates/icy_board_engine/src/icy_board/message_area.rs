@@ -233,9 +233,9 @@ impl UserData for MessageArea {
         registry.add_named_function_with(
             FIND.clone(),
             vec![
-            ("field", VariableType::UserData(crate::parser::MSG_FIELD_ENUM_ID)),
-            ("text", VariableType::UnboundedString),
-            ("startMessage", VariableType::Long),
+                ("field", VariableType::UserData(crate::parser::MSG_FIELD_ENUM_ID)),
+                ("text", VariableType::UnboundedString),
+                ("startMessage", VariableType::Long),
             ],
             2,
             VariableType::UserData(MSG_ID as u8),

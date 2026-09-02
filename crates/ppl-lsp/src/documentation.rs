@@ -1,11 +1,11 @@
 use i18n_embed_fl::fl;
 use icy_board_engine::executable::{FuncOpCode, FunctionDefinition, OpCode, Signature, StatementDefinition, VariableType};
 use icy_board_engine::parser::{
-    AUDIO_ID, BOARD_ID, CHECKSUM_ENUM_ID, CONFERENCE_ID, CONTACT_ID, DOOR_ID, EDITOR_MODE_ENUM_ID, ERROR_ID, ERR_CODE_ENUM_ID, ERR_KIND_ENUM_ID, EVENT_ID,
-    EVENT_KIND_ENUM_ID, FILE_DIRECTORY_ID, GFX_BACKEND_ENUM_ID, GFX_ID, HTTP_ID, HTTP_METHOD_ENUM_ID, HTTP_REQUEST_ID, HTTP_RESPONSE_ID, MACROS_ID,
-    MARGINS_ID, MESSAGE_AREA_ID, MOUSE_ACTION_ENUM_ID, MOUSE_BUTTON_ENUM_ID, MOUSE_MODE_ENUM_ID, MOUSE_TRACKING_ENUM_ID, MSG_FIELD_ENUM_ID, MSG_ID,
-    PALETTE_ID, REGEX_ID, REGEX_MATCH_ID, REGEX_OPTIONS_ENUM_ID, SESSION_ID, STRING_COMPARISON_ENUM_ID, SURFACE_ID, TERMINAL_ID, TERM_INFO_ID,
-    TERM_INPUT_ID, USER_ID, UserTypeRegistry,
+    AUDIO_ID, BOARD_ID, CHECKSUM_ENUM_ID, CONFERENCE_ID, CONTACT_ID, DOOR_ID, EDITOR_MODE_ENUM_ID, ERR_CODE_ENUM_ID, ERR_KIND_ENUM_ID, ERROR_ID, EVENT_ID,
+    EVENT_KIND_ENUM_ID, FILE_DIRECTORY_ID, GFX_BACKEND_ENUM_ID, GFX_ID, HTTP_ID, HTTP_METHOD_ENUM_ID, HTTP_REQUEST_ID, HTTP_RESPONSE_ID, MACROS_ID, MARGINS_ID,
+    MESSAGE_AREA_ID, MOUSE_ACTION_ENUM_ID, MOUSE_BUTTON_ENUM_ID, MOUSE_MODE_ENUM_ID, MOUSE_TRACKING_ENUM_ID, MSG_FIELD_ENUM_ID, MSG_ID, PALETTE_ID, REGEX_ID,
+    REGEX_MATCH_ID, REGEX_OPTIONS_ENUM_ID, SESSION_ID, STRING_COMPARISON_ENUM_ID, SURFACE_ID, TERM_INFO_ID, TERM_INPUT_ID, TERMINAL_ID, USER_ID,
+    UserTypeRegistry,
 };
 use std::fmt::Write as _;
 use tower_lsp::lsp_types::{Hover, HoverContents, MarkupContent, MarkupKind};
@@ -147,18 +147,22 @@ pub fn get_type_hover_for_version(var_type: VariableType, language_version: u16)
             get_sig_hint(Signature::new("HTTPRESPONSE".to_string()), fl!(LANGUAGE_LOADER, "hint-type-http-response"))
         }
         VariableType::UserData(id) if id == GFX_ID as u8 => get_sig_hint(Signature::new("GFX".to_string()), fl!(LANGUAGE_LOADER, "hint-type-gfx")),
-        VariableType::UserData(id) if id == SURFACE_ID as u8 => {
-            get_sig_hint(Signature::new("SURFACE".to_string()), fl!(LANGUAGE_LOADER, "hint-type-surface"))
-        }
+        VariableType::UserData(id) if id == SURFACE_ID as u8 => get_sig_hint(Signature::new("SURFACE".to_string()), fl!(LANGUAGE_LOADER, "hint-type-surface")),
         VariableType::UserData(id) if id == GFX_BACKEND_ENUM_ID => {
             get_sig_hint(Signature::new("GFXBACKEND".to_string()), fl!(LANGUAGE_LOADER, "hint-type-gfx-backend"))
         }
         VariableType::UserData(id) if id == CHECKSUM_ENUM_ID => {
             get_sig_hint(Signature::new("CHECKSUM".to_string()), fl!(LANGUAGE_LOADER, "hint-type-checksum"))
         }
-        VariableType::UserData(id) if id == TERMINAL_ID as u8 => get_sig_hint(Signature::new("TERMINAL".to_string()), fl!(LANGUAGE_LOADER, "hint-type-terminal")),
-        VariableType::UserData(id) if id == TERM_INFO_ID as u8 => get_sig_hint(Signature::new("TERMINFO".to_string()), fl!(LANGUAGE_LOADER, "hint-type-terminfo")),
-        VariableType::UserData(id) if id == TERM_INPUT_ID as u8 => get_sig_hint(Signature::new("TERMINPUT".to_string()), fl!(LANGUAGE_LOADER, "hint-type-terminput")),
+        VariableType::UserData(id) if id == TERMINAL_ID as u8 => {
+            get_sig_hint(Signature::new("TERMINAL".to_string()), fl!(LANGUAGE_LOADER, "hint-type-terminal"))
+        }
+        VariableType::UserData(id) if id == TERM_INFO_ID as u8 => {
+            get_sig_hint(Signature::new("TERMINFO".to_string()), fl!(LANGUAGE_LOADER, "hint-type-terminfo"))
+        }
+        VariableType::UserData(id) if id == TERM_INPUT_ID as u8 => {
+            get_sig_hint(Signature::new("TERMINPUT".to_string()), fl!(LANGUAGE_LOADER, "hint-type-terminput"))
+        }
         VariableType::UserData(id) if id == MARGINS_ID as u8 => get_sig_hint(Signature::new("MARGINS".to_string()), fl!(LANGUAGE_LOADER, "hint-type-margins")),
         VariableType::UserData(id) if id == PALETTE_ID as u8 => get_sig_hint(Signature::new("PALETTE".to_string()), fl!(LANGUAGE_LOADER, "hint-type-palette")),
         VariableType::UserData(id) if id == MACROS_ID as u8 => get_sig_hint(Signature::new("MACROS".to_string()), fl!(LANGUAGE_LOADER, "hint-type-macros")),
@@ -166,12 +170,32 @@ pub fn get_type_hover_for_version(var_type: VariableType, language_version: u16)
         VariableType::UserData(id) if id == ERROR_ID as u8 => get_sig_hint(Signature::new("ERROR".to_string()), fl!(LANGUAGE_LOADER, "hint-type-error")),
         VariableType::UserData(id) if id == EVENT_ID as u8 => get_sig_hint(Signature::new("EVENT".to_string()), fl!(LANGUAGE_LOADER, "hint-type-event")),
         VariableType::UserData(id) if id == MSG_ID as u8 => get_sig_hint(Signature::new("MSG".to_string()), fl!(LANGUAGE_LOADER, "hint-type-msg")),
-        VariableType::UserData(id) if id == CONFERENCE_ID as u8 => get_sig_hint(Signature::new("CONFERENCE".to_string()), fl!(LANGUAGE_LOADER, "hint-type-conference")),
+        VariableType::UserData(id) if id == CONFERENCE_ID as u8 => {
+            get_sig_hint(Signature::new("CONFERENCE".to_string()), fl!(LANGUAGE_LOADER, "hint-type-conference"))
+        }
         VariableType::UserData(id) if id == MESSAGE_AREA_ID as u8 => get_sig_hint(Signature::new("AREA".to_string()), fl!(LANGUAGE_LOADER, "hint-type-area")),
-        VariableType::UserData(id) if id == FILE_DIRECTORY_ID as u8 => get_sig_hint(Signature::new("DIRECTORY".to_string()), fl!(LANGUAGE_LOADER, "hint-type-directory")),
+        VariableType::UserData(id) if id == FILE_DIRECTORY_ID as u8 => {
+            get_sig_hint(Signature::new("DIRECTORY".to_string()), fl!(LANGUAGE_LOADER, "hint-type-directory"))
+        }
         VariableType::UserData(id) if id == DOOR_ID as u8 => get_sig_hint(Signature::new("DOOR".to_string()), fl!(LANGUAGE_LOADER, "hint-type-door")),
         VariableType::UserData(id) if id == CONTACT_ID as u8 => get_sig_hint(Signature::new("CONTACT".to_string()), fl!(LANGUAGE_LOADER, "hint-type-contact")),
-        VariableType::UserData(id) if matches!(id, EVENT_KIND_ENUM_ID | MOUSE_ACTION_ENUM_ID | MOUSE_BUTTON_ENUM_ID | MOUSE_MODE_ENUM_ID | MOUSE_TRACKING_ENUM_ID | ERR_KIND_ENUM_ID | ERR_CODE_ENUM_ID | EDITOR_MODE_ENUM_ID | MSG_FIELD_ENUM_ID | HTTP_METHOD_ENUM_ID | REGEX_OPTIONS_ENUM_ID | STRING_COMPARISON_ENUM_ID) => {
+        VariableType::UserData(id)
+            if matches!(
+                id,
+                EVENT_KIND_ENUM_ID
+                    | MOUSE_ACTION_ENUM_ID
+                    | MOUSE_BUTTON_ENUM_ID
+                    | MOUSE_MODE_ENUM_ID
+                    | MOUSE_TRACKING_ENUM_ID
+                    | ERR_KIND_ENUM_ID
+                    | ERR_CODE_ENUM_ID
+                    | EDITOR_MODE_ENUM_ID
+                    | MSG_FIELD_ENUM_ID
+                    | HTTP_METHOD_ENUM_ID
+                    | REGEX_OPTIONS_ENUM_ID
+                    | STRING_COMPARISON_ENUM_ID
+            ) =>
+        {
             get_sig_hint(Signature::new("ENUM".to_string()), fl!(LANGUAGE_LOADER, "hint-type-enum-400"))
         }
         VariableType::Date => get_sig_hint(var_type.get_signature(), fl!(LANGUAGE_LOADER, "hint-type-date")),
@@ -482,9 +506,7 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
     }
     if id == MOUSE_BUTTON_ENUM_ID {
         return match member.to_ascii_lowercase().as_str() {
-            "none" | "left" | "middle" | "right" | "wheelup" | "wheeldown" | "wheelleft" | "wheelright" => {
-                Some(fl!(LANGUAGE_LOADER, "hint-enum-mouse-button"))
-            }
+            "none" | "left" | "middle" | "right" | "wheelup" | "wheeldown" | "wheelleft" | "wheelright" => Some(fl!(LANGUAGE_LOADER, "hint-enum-mouse-button")),
             _ => None,
         };
     }
@@ -686,11 +708,7 @@ pub fn optional_parameter_label() -> String {
     fl!(LANGUAGE_LOADER, "hint-param-optional")
 }
 
-pub fn get_member_documentation_with_parameters(
-    registry: &UserTypeRegistry,
-    receiver: VariableType,
-    member: &unicase::Ascii<String>,
-) -> Option<String> {
+pub fn get_member_documentation_with_parameters(registry: &UserTypeRegistry, receiver: VariableType, member: &unicase::Ascii<String>) -> Option<String> {
     let mut documentation = get_member_documentation(receiver, member.as_ref()).unwrap_or_default();
     let VariableType::UserData(id) = receiver else {
         return (!documentation.is_empty()).then_some(documentation);
@@ -832,18 +850,15 @@ pub fn get_keyword_hover(keyword: &str) -> Option<Hover> {
         _ => return None,
     };
     let usage = keyword_usage(&keyword)?;
-    documentation.push_str(&format!(
-        "\n\n**{}**\n\n```PPL\n{usage}\n```",
-        fl!(LANGUAGE_LOADER, "hint-keyword-usage")
-    ));
+    documentation.push_str(&format!("\n\n**{}**\n\n```PPL\n{usage}\n```", fl!(LANGUAGE_LOADER, "hint-keyword-usage")));
     get_sig_hint(Signature::new(name.to_string()), documentation)
 }
 
 fn keyword_usage(keyword: &str) -> Option<&'static str> {
     match keyword {
-        "if" | "elseif" | "else" | "endif" => Some(
-            "IF condition THEN\n    statements\nELSEIF otherCondition THEN\n    statements\nELSE\n    statements\nENDIF\n\nIF condition statement",
-        ),
+        "if" | "elseif" | "else" | "endif" => {
+            Some("IF condition THEN\n    statements\nELSEIF otherCondition THEN\n    statements\nELSE\n    statements\nENDIF\n\nIF condition statement")
+        }
         "let" => Some("LET variable = expression\nvariable = expression"),
         "while" | "endwhile" => Some("WHILE condition DO\n    statements\nENDWHILE\n\nWHILE condition statement"),
         "for" | "next" | "endfor" => Some("FOR variable = start TO stop [STEP increment]\n    statements\nNEXT [variable]"),
@@ -852,27 +867,19 @@ fn keyword_usage(keyword: &str) -> Option<&'static str> {
         "return" => Some("RETURN [expression]"),
         "gosub" => Some("GOSUB label"),
         "goto" => Some("GOTO label"),
-        "select" | "case" | "default" | "endselect" => Some(
-            "SELECT CASE expression\n    CASE value1, value2, first..last\n        statements\n    DEFAULT\n        statements\nENDSELECT",
-        ),
-        "declare" => Some(
-            "DECLARE FUNCTION name(TYPE parameter, ...) TYPE\nDECLARE PROCEDURE name(TYPE parameter, ...)",
-        ),
-        "function" | "endfunc" => Some(
-            "FUNCTION name(TYPE parameter, ...) TYPE\n    statements\n    RETURN expression\nENDFUNC",
-        ),
-        "procedure" | "endproc" => Some(
-            "PROCEDURE name(TYPE parameter, VAR TYPE output, ...)\n    statements\nENDPROC",
-        ),
+        "select" | "case" | "default" | "endselect" => {
+            Some("SELECT CASE expression\n    CASE value1, value2, first..last\n        statements\n    DEFAULT\n        statements\nENDSELECT")
+        }
+        "declare" => Some("DECLARE FUNCTION name(TYPE parameter, ...) TYPE\nDECLARE PROCEDURE name(TYPE parameter, ...)"),
+        "function" | "endfunc" => Some("FUNCTION name(TYPE parameter, ...) TYPE\n    statements\n    RETURN expression\nENDFUNC"),
+        "procedure" | "endproc" => Some("PROCEDURE name(TYPE parameter, VAR TYPE output, ...)\n    statements\nENDPROC"),
         "repeat" | "until" => Some("REPEAT\n    statements\nUNTIL condition"),
         "loop" | "endloop" => Some("LOOP\n    statements\n    IF condition BREAK\nENDLOOP"),
         "const" => Some("CONST TYPE name = constantExpression"),
         "enum" | "endenum" => Some("ENUM Name\n    First\n    Second = 5\n    Third\nENDENUM"),
         "type" | "endtype" => Some("TYPE Name\n    TYPE field\n    TYPE values(bound)\nENDTYPE"),
         "begin" => Some("BEGIN\n    statements\nEND"),
-        "onerror" => Some(
-            "ON ERROR GOTO label\nON ERROR GOSUB label\nON ERROR Handler\nON ERROR OFF",
-        ),
+        "onerror" => Some("ON ERROR GOTO label\nON ERROR GOSUB label\nON ERROR Handler\nON ERROR OFF"),
         "foreach" | "endforeach" => Some("FOREACH value IN collection\n    statements\nENDFOREACH"),
         "exit" => Some("EXIT"),
         _ => None,
@@ -1410,10 +1417,9 @@ mod test {
     use icy_board_engine::{
         executable::{FUNCTION_DEFINITIONS, FunctionSignature, STATEMENT_DEFINITIONS, VariableType},
         parser::{
-            BOARD_ID, CHECKSUM_ENUM_ID, EDITOR_MODE_ENUM_ID, ERR_CODE_ENUM_ID, ERR_KIND_ENUM_ID, EVENT_KIND_ENUM_ID, GFX_BACKEND_ENUM_ID, GFX_ID,
-            HTTP_ID, HTTP_METHOD_ENUM_ID, HTTP_REQUEST_ID, HTTP_RESPONSE_ID, MOUSE_ACTION_ENUM_ID, MOUSE_BUTTON_ENUM_ID, MOUSE_MODE_ENUM_ID,
-            MOUSE_TRACKING_ENUM_ID, MSG_FIELD_ENUM_ID, REGEX_OPTIONS_ENUM_ID, SESSION_ID, STRING_COMPARISON_ENUM_ID, SURFACE_ID, USER_ID,
-            UserTypeRegistry,
+            BOARD_ID, CHECKSUM_ENUM_ID, EDITOR_MODE_ENUM_ID, ERR_CODE_ENUM_ID, ERR_KIND_ENUM_ID, EVENT_KIND_ENUM_ID, GFX_BACKEND_ENUM_ID, GFX_ID, HTTP_ID,
+            HTTP_METHOD_ENUM_ID, HTTP_REQUEST_ID, HTTP_RESPONSE_ID, MOUSE_ACTION_ENUM_ID, MOUSE_BUTTON_ENUM_ID, MOUSE_MODE_ENUM_ID, MOUSE_TRACKING_ENUM_ID,
+            MSG_FIELD_ENUM_ID, REGEX_OPTIONS_ENUM_ID, SESSION_ID, STRING_COMPARISON_ENUM_ID, SURFACE_ID, USER_ID, UserTypeRegistry,
         },
     };
 
@@ -1432,7 +1438,10 @@ mod test {
 
     #[test]
     fn classic_signatures_are_ppl_highlighted_code() {
-        let definition = STATEMENT_DEFINITIONS.iter().find(|definition| definition.name.eq_ignore_ascii_case("ANSIPOS")).unwrap();
+        let definition = STATEMENT_DEFINITIONS
+            .iter()
+            .find(|definition| definition.name.eq_ignore_ascii_case("ANSIPOS"))
+            .unwrap();
         let hover = super::get_statement_hover(definition).unwrap();
         let tower_lsp::lsp_types::HoverContents::Markup(content) = hover.contents else {
             panic!("expected markdown hover");
@@ -1449,7 +1458,10 @@ mod test {
         };
         assert!(content.value.starts_with("```PPL\nCONSTANT BOOLEAN TRUE = 1h\n```"), "{}", content.value);
 
-        let key = icy_board_engine::ast::constant::BUILTIN_CONSTS.iter().find(|constant| constant.name == "KEY_ESCAPE").unwrap();
+        let key = icy_board_engine::ast::constant::BUILTIN_CONSTS
+            .iter()
+            .find(|constant| constant.name == "KEY_ESCAPE")
+            .unwrap();
         let hover = super::get_const_hover(key).expect("every predefined constant has a tooltip");
         let tower_lsp::lsp_types::HoverContents::Markup(content) = hover.contents else {
             panic!("expected markdown hover");
@@ -1484,7 +1496,12 @@ mod test {
                 panic!("expected markdown hover for {}", keyword.name);
             };
             assert!(content.value.starts_with("```PPL\n"), "{}", keyword.name);
-            assert!(content.value.contains("\n```PPL\n"), "missing usage syntax for {}: {}", keyword.name, content.value);
+            assert!(
+                content.value.contains("\n```PPL\n"),
+                "missing usage syntax for {}: {}",
+                keyword.name,
+                content.value
+            );
         }
         let exit = super::get_keyword_hover("EXIT").unwrap();
         let tower_lsp::lsp_types::HoverContents::Markup(exit) = exit.contents else {
@@ -1653,7 +1670,10 @@ mod test {
                     "{type_name}.{member} has unnamed parameters"
                 );
                 for name in &function.parameter_names {
-                    assert!(super::get_parameter_documentation(name).is_some(), "{type_name}.{member} parameter {name} is undocumented");
+                    assert!(
+                        super::get_parameter_documentation(name).is_some(),
+                        "{type_name}.{member} parameter {name} is undocumented"
+                    );
                 }
             }
             for (member, procedure) in &object.procedures {
@@ -1663,7 +1683,10 @@ mod test {
                     "{type_name}.{member} has unnamed parameters"
                 );
                 for name in &procedure.parameter_names {
-                    assert!(super::get_parameter_documentation(name).is_some(), "{type_name}.{member} parameter {name} is undocumented");
+                    assert!(
+                        super::get_parameter_documentation(name).is_some(),
+                        "{type_name}.{member} parameter {name} is undocumented"
+                    );
                 }
             }
         }
