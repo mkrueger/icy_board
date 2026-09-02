@@ -1,0 +1,5 @@
+[env]
+RUST_TEST_THREADS = { value = "4", force = false }
+
+[alias]
+test-low = ["test", "--jobs", "4"]

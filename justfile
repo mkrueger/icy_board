@@ -1,6 +1,10 @@
 build:
   cargo build
 
+# Keeps local test runs responsive; override either value for faster or quieter runs.
+test jobs="4" threads="4":
+  cargo test --workspace --no-fail-fast --jobs {{jobs}} -- --test-threads {{threads}}
+
 # Installs the language server and sets up every editor found.
 setup-editor target="all":
   tools/setup-editor.sh {{target}}
