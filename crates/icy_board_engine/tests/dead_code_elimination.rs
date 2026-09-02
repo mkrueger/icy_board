@@ -5,7 +5,8 @@ use std::{
 
 use icy_board_engine::{
     compiler::{PPECompiler, workspace::Workspace},
-    executable::{EntryType, Executable, RecordField, VariableType},
+    executable::{EntryType, Executable, PPECommand, RecordField, VariableType},
+    hir::{HirCommand, LabelId},
     parser::{Encoding, ErrorReporter, FIRST_USER_TYPE_ID, UserTypeRegistry, parse_ast},
 };
 
@@ -35,6 +36,37 @@ fn routine_names(executable: &Executable) -> Vec<String> {
         .filter(|entry| matches!(entry.entry_type, EntryType::Function | EntryType::Procedure))
         .map(|entry| entry.get_name().to_string())
         .collect()
+}
+
+#[test]
+fn resolved_hir_keeps_typed_ids_until_ppe_lowering() {
+    let registry = UserTypeRegistry::icy_board_registry();
+    let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+    let workspace = Workspace::default();
+    let source = "INTEGER marker\nGOTO Start\n:Other\nmarker = 1\n:Start\nRun()\nPROCEDURE Run()\nENDPROC\n";
+    let ast = parse_ast(PathBuf::from("hir.pps"), errors.clone(), source, &registry, Encoding::Utf8, &workspace);
+    let mut compiler = PPECompiler::new(&workspace, registry, errors.clone());
+    compiler.compile(&[&ast]);
+    assert!(!errors.lock().unwrap().has_errors());
+
+    assert!(matches!(compiler.get_hir_program().commands[0], HirCommand::Goto(LabelId(0))));
+    let routine_id = compiler
+        .get_hir_program()
+        .commands
+        .iter()
+        .find_map(|command| match command {
+            HirCommand::ProcedureCall(routine, arguments) if arguments.is_empty() => Some(*routine),
+            _ => None,
+        })
+        .unwrap();
+    assert!(
+        compiler
+            .get_script()
+            .statements
+            .iter()
+            .any(|statement| matches!(statement.command, PPECommand::ProcedureCall(id, ref arguments) if id == routine_id.0 && arguments.is_empty()))
+    );
+    assert!(matches!(compiler.get_script().statements[0].command, PPECommand::Goto(offset) if offset > 0));
 }
 
 #[test]

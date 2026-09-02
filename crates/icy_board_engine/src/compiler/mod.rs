@@ -2,6 +2,7 @@ pub use ast_transform::*;
 use workspace::Workspace;
 pub mod ast_transform;
 mod enum_lowering;
+mod hir_lowering;
 mod modules;
 pub use modules::lower_modules;
 pub mod optimizer;
@@ -15,7 +16,8 @@ use thiserror::Error;
 
 use crate::{
     ast::{Ast, AstNode, Expression, OnErrorMode, Statement},
-    executable::{Executable, ExpressionNegator, OnErrorTarget, OpCode, PPECommand, PPEExpr, PPEScript, RecordField, VariableType},
+    executable::{Executable, OpCode, PPECommand, PPEScript, RecordField, VariableType},
+    hir::{CallId, CodeOffset, HirCommand, HirErrorTarget, HirExpr, HirProgram, LabelId, RoutineId, VariableId},
     parser::{
         ErrorReporter, UserTypeRegistry,
         lexer::{Spanned, Token},
@@ -23,7 +25,7 @@ use crate::{
     semantic::{LookupVariabeleTable, SemanticInfo, SemanticVisitor},
 };
 
-use self::expr_compiler::ExpressionCompiler;
+use self::expr_compiler::HirExpressionResolver;
 
 pub mod expr_compiler;
 pub mod workspace;
@@ -236,6 +238,7 @@ pub struct PPECompiler {
     label_lookup_table: HashMap<unicase::Ascii<String>, usize>,
     foreach_stack: Vec<(usize, usize)>,
 
+    hir_program: HirProgram,
     commands: PPEScript,
 }
 
@@ -251,6 +254,7 @@ impl PPECompiler {
             label_lookup_table: HashMap::new(),
             foreach_stack: Vec::new(),
             runtime: workspace.runtime(),
+            hir_program: HirProgram::default(),
             commands: PPEScript::default(),
         }
     }
@@ -265,6 +269,10 @@ impl PPECompiler {
 
     pub fn get_script(&self) -> &PPEScript {
         &self.commands
+    }
+
+    pub fn get_hir_program(&self) -> &HirProgram {
+        &self.hir_program
     }
 
     /// .
@@ -311,8 +319,8 @@ impl PPECompiler {
                 self.compile_program_statements(&prg);
             }
 
-            if self.commands.statements.is_empty() || self.commands.statements.last().unwrap().command != PPECommand::End {
-                self.commands.add_statement(&mut self.cur_offset, PPECommand::End);
+            if !matches!(self.hir_program.commands.last(), Some(HirCommand::End)) {
+                self.add_hir_command(HirCommand::End);
             }
 
             self.compile_functions(&prg);
@@ -351,8 +359,8 @@ impl PPECompiler {
                     self.compile_statement_sequence(proc.get_statements());
                     self.lookup_table.end_compile_function_body();
 
-                    self.commands.add_statement(&mut self.cur_offset, PPECommand::EndProc);
-                    self.commands.add_statement(&mut self.cur_offset, PPECommand::End);
+                    self.add_hir_command(HirCommand::EndProcedure);
+                    self.add_hir_command(HirCommand::End);
                 }
                 AstNode::Function(func) => {
                     let Some(idx) = self.lookup_table.lookup_variable_index(func.get_identifier()) else {
@@ -364,8 +372,8 @@ impl PPECompiler {
                     self.compile_statement_sequence(func.get_statements());
                     self.lookup_table.end_compile_function_body();
 
-                    self.commands.add_statement(&mut self.cur_offset, PPECommand::EndFunc);
-                    self.commands.add_statement(&mut self.cur_offset, PPECommand::End);
+                    self.add_hir_command(HirCommand::EndFunction);
+                    self.add_hir_command(HirCommand::End);
                 }
                 _ => {}
             }
@@ -404,46 +412,52 @@ impl PPECompiler {
                 return;
             };
             let variable = self.lookup_table.variable_table.get_var_entry(variable_index).header.id;
-            let collection = self.comp_expr(foreach_stmt.get_collection());
+            let collection = self.resolve_expr(foreach_stmt.get_collection());
             let end_label = self.label_table.len();
             self.label_table.push(LabelDescriptor { offset: None });
-            let command = PPECommand::ForEach(variable, Box::new(collection), end_label);
-            let body_start = (self.cur_offset + command.get_size()) * 2;
-            self.commands.add_statement(&mut self.cur_offset, command);
+            let command = HirCommand::ForEach(VariableId(variable), collection, LabelId(end_label));
+            let body_start = (self.cur_offset + hir_lowering::lower_command(&command).get_size()) * 2;
+            self.add_hir_command(command);
             self.foreach_stack.push((body_start, end_label));
             for statement in foreach_stmt.get_statements() {
                 self.compile_add_statement(statement);
             }
             self.foreach_stack.pop();
-            self.commands.add_statement(&mut self.cur_offset, PPECommand::NextForEach(body_start));
+            self.add_hir_command(HirCommand::NextForEach(CodeOffset(body_start)));
             self.label_table[end_label].offset = Some(self.cur_offset);
             return;
         }
-        if let Some(stmt) = self.compile_statement(stmt) {
-            self.commands.add_statement(&mut self.cur_offset, stmt);
+        if let Some(command) = self.compile_statement(stmt) {
+            self.add_hir_command(command);
         }
     }
 
-    fn compile_statement(&mut self, s: &Statement) -> Option<PPECommand> {
+    fn add_hir_command(&mut self, command: HirCommand) {
+        self.commands
+            .add_statement(&mut self.cur_offset, hir_lowering::lower_command(&command));
+        self.hir_program.commands.push(command);
+    }
+
+    fn compile_statement(&mut self, s: &Statement) -> Option<HirCommand> {
         match s {
-            Statement::Return(_) => Some(PPECommand::Return),
-            Statement::Gosub(gosub_stmt) => Some(PPECommand::Gosub(self.get_label_index(gosub_stmt.get_label_token()))),
-            Statement::Goto(goto_stmt) => Some(PPECommand::Goto(self.get_label_index(goto_stmt.get_label_token()))),
+            Statement::Return(_) => Some(HirCommand::Return),
+            Statement::Gosub(gosub_stmt) => Some(HirCommand::Gosub(LabelId(self.get_label_index(gosub_stmt.get_label_token())))),
+            Statement::Goto(goto_stmt) => Some(HirCommand::Goto(LabelId(self.get_label_index(goto_stmt.get_label_token())))),
             Statement::OnError(on_error_stmt) => {
                 let target = match on_error_stmt.get_mode() {
-                    OnErrorMode::Off => OnErrorTarget::Off,
-                    OnErrorMode::Goto => OnErrorTarget::Goto(self.get_label_index(on_error_stmt.get_target_token())),
-                    OnErrorMode::Gosub => OnErrorTarget::Gosub(self.get_label_index(on_error_stmt.get_target_token())),
+                    OnErrorMode::Off => HirErrorTarget::Off,
+                    OnErrorMode::Goto => HirErrorTarget::Goto(LabelId(self.get_label_index(on_error_stmt.get_target_token()))),
+                    OnErrorMode::Gosub => HirErrorTarget::Gosub(LabelId(self.get_label_index(on_error_stmt.get_target_token()))),
                     OnErrorMode::Procedure => {
                         let name = on_error_stmt.get_target()?;
                         let Some(decl_idx) = self.lookup_variable_index(name) else {
                             log::error!("Error handler procedure not found: {name}");
                             return None;
                         };
-                        OnErrorTarget::Procedure(decl_idx)
+                        HirErrorTarget::Procedure(RoutineId(decl_idx))
                     }
                 };
-                Some(PPECommand::OnError(target))
+                Some(HirCommand::OnError(target))
             }
             Statement::Label(label) => {
                 self.set_label_offset(label.get_label_token());
@@ -454,8 +468,11 @@ impl PPECompiler {
                     panic!("Invalid if statement without goto.");
                 };
 
-                let cond_buffer = self.comp_expr(if_stmt.get_condition()).visit_mut(&mut ExpressionNegator::default());
-                Some(PPECommand::IfNot(Box::new(cond_buffer), self.get_label_index(goto_stmt.get_label_token())))
+                let condition = self.resolve_expr(if_stmt.get_condition());
+                Some(HirCommand::ConditionalGoto(
+                    condition,
+                    LabelId(self.get_label_index(goto_stmt.get_label_token())),
+                ))
             }
 
             // The value took the place of the name before this point, so nothing is left to emit.
@@ -474,19 +491,16 @@ impl PPECompiler {
                         && !matches!(
                             member.get_expression(),
                             crate::ast::Expression::FunctionCall(call)
-                                if matches!(self.semantic_visitor.function_type_lookup.get(&call.id), Some(SemanticInfo::IndexedRecordField(_)))
+                                if matches!(self.semantic_visitor.function_type_lookup.get(&CallId(call.id)), Some(SemanticInfo::IndexedRecordField(_)))
                         )
                     {
-                        let PPEExpr::Member(base, member_id) = self.comp_expr(target) else {
+                        let HirExpr::Member(base, member_id) = self.resolve_expr(target) else {
                             return None;
                         };
-                        let value = self.comp_expr(let_smt.get_value_expression());
-                        return Some(PPECommand::MemberCall(Box::new(PPEExpr::MemberFunctionCall(base, vec![value], member_id))));
+                        let value = self.resolve_expr(let_smt.get_value_expression());
+                        return Some(HirCommand::MemberCall(HirExpr::MemberCall(base, vec![value], member_id)));
                     }
-                    return Some(PPECommand::Let(
-                        Box::new(self.comp_expr(target)),
-                        Box::new(self.comp_expr(let_smt.get_value_expression())),
-                    ));
+                    return Some(HirCommand::Let(self.resolve_expr(target), self.resolve_expr(let_smt.get_value_expression())));
                 }
                 if self
                     .semantic_visitor
@@ -494,7 +508,7 @@ impl PPECompiler {
                     .contains_key(&let_smt.get_identifier_token().span.start)
                 {
                     let base = crate::ast::Expression::Identifier(crate::ast::IdentifierExpression::new(let_smt.get_identifier_token().clone()));
-                    let mut variable = base.visit(&mut crate::compiler::expr_compiler::ExpressionCompiler { compiler: self });
+                    let mut variable = self.resolve_expr(&base);
                     for member_token in let_smt.get_members() {
                         let Token::Identifier(member) = &member_token.token else {
                             return None;
@@ -502,13 +516,13 @@ impl PPECompiler {
                         let type_id = self.semantic_visitor.user_type_lookup.get(&member_token.span.start)?;
                         let registry = self.semantic_visitor.type_registry.get_type_from_id(*type_id)?;
                         let member_id = registry.member_id_lookup.get(member).copied()?;
-                        variable = PPEExpr::Member(Box::new(variable), member_id);
+                        variable = HirExpr::member(variable, member_id);
                     }
-                    let value = self.comp_expr(let_smt.get_value_expression());
-                    let PPEExpr::Member(base, member_id) = variable else {
+                    let value = self.resolve_expr(let_smt.get_value_expression());
+                    let HirExpr::Member(base, member_id) = variable else {
                         return None;
                     };
-                    return Some(PPECommand::MemberCall(Box::new(PPEExpr::MemberFunctionCall(base, vec![value], member_id))));
+                    return Some(HirCommand::MemberCall(HirExpr::MemberCall(base, vec![value], member_id)));
                 }
                 let Some(decl_idx) = self.lookup_variable_index(var_name) else {
                     log::error!("Variable not found: {var_name}");
@@ -539,14 +553,14 @@ impl PPECompiler {
                 let variable_type = decl.header.variable_type;
                 let dim = decl.header.dim;
                 let variable = if dim == 0 || whole_dynamic_array {
-                    PPEExpr::Value(decl_id)
+                    HirExpr::variable(decl_id)
                 } else {
                     let mut arguments = Vec::new();
                     for arg in let_smt.get_arguments() {
-                        let expr_buffer = self.comp_expr(arg);
+                        let expr_buffer = self.resolve_expr(arg);
                         arguments.push(expr_buffer);
                     }
-                    PPEExpr::Dim(decl_id, arguments)
+                    HirExpr::dim(decl_id, arguments)
                 };
                 let mut variable = variable;
                 let mut member_type = variable_type;
@@ -564,45 +578,42 @@ impl PPECompiler {
                             return None;
                         };
                         member_type = definition.field_type(field).unwrap_or(VariableType::None);
-                        variable = PPEExpr::Member(Box::new(variable), field);
+                        variable = HirExpr::member(variable, field);
                     } else {
                         let registry = self.semantic_visitor.type_registry.get_type_from_id(type_id)?;
                         let field = registry.member_id_lookup.get(member).copied()?;
                         member_type = registry.fields.get(member).copied().unwrap_or(VariableType::None);
-                        variable = PPEExpr::Member(Box::new(variable), field);
+                        variable = HirExpr::member(variable, field);
                     }
                 }
-                let value = self.comp_expr(let_smt.get_value_expression());
+                let value = self.resolve_expr(let_smt.get_value_expression());
 
-                Some(PPECommand::Let(Box::new(variable), Box::new(value)))
+                Some(HirCommand::Let(variable, value))
             }
             Statement::MemberCall(call_stmt) => {
                 // `a.Redim(10)` is `REDIM a, 10`, so it compiles to the statement rather
                 // than to a member call.
                 if let Expression::FunctionCall(call) = call_stmt.get_expression()
-                    && let Some(SemanticInfo::ArrayMemberProc(opcode)) = self.semantic_visitor.function_type_lookup.get(&call.id).cloned()
+                    && let Some(SemanticInfo::ArrayMemberProc(opcode)) = self.semantic_visitor.function_type_lookup.get(&CallId(call.id)).cloned()
                     && let Expression::MemberReference(member) = call.get_expression()
                 {
-                    let mut arguments = vec![self.comp_expr(member.get_expression())];
+                    let mut arguments = vec![self.resolve_expr(member.get_expression())];
                     for arg in call.get_arguments() {
-                        arguments.push(self.comp_expr(arg));
+                        arguments.push(self.resolve_expr(arg));
                     }
-                    return Some(PPECommand::PredefinedCall(opcode.get_definition(), arguments));
+                    return Some(HirCommand::PredefinedCall(opcode, arguments));
                 }
-                Some(PPECommand::MemberCall(Box::new(self.comp_expr(call_stmt.get_expression()))))
+                Some(HirCommand::MemberCall(self.resolve_expr(call_stmt.get_expression())))
             }
             Statement::PredifinedCall(call_stmt) => {
                 let def = call_stmt.get_func();
                 let mut arguments = Vec::new();
                 for arg in call_stmt.get_arguments() {
-                    let expr_buffer = self.comp_expr(arg);
+                    let expr_buffer = self.resolve_expr(arg);
                     arguments.push(expr_buffer);
                 }
 
-                Some(PPECommand::PredefinedCall(
-                    def.opcode.get_definition(), // to de-alias aliases
-                    arguments,
-                ))
+                Some(HirCommand::PredefinedCall(def.opcode, arguments))
             }
             Statement::Call(call_stmt) => {
                 let Some(decl_idx) = self.lookup_variable_index(call_stmt.get_identifier()) else {
@@ -611,7 +622,7 @@ impl PPECompiler {
                 };
                 let mut arguments = Vec::new();
                 for arg in call_stmt.get_arguments() {
-                    let expr_buffer = self.comp_expr(arg);
+                    let expr_buffer = self.resolve_expr(arg);
                     arguments.push(expr_buffer);
                 }
 
@@ -621,17 +632,14 @@ impl PPECompiler {
                     if !Self::check_arg_count(len, arguments.len(), call_stmt.get_identifier_token()) {
                         return None;
                     }
-                    Some(PPECommand::ProcedureCall(decl.header.id, arguments))
+                    Some(HirCommand::ProcedureCall(RoutineId(decl.header.id), arguments))
                 } else if decl.header.variable_type == VariableType::Function {
                     let len = unsafe { decl.value.data.function_value.parameters as usize };
                     if !Self::check_arg_count(len, arguments.len(), call_stmt.get_identifier_token()) {
                         return None;
                     }
 
-                    Some(PPECommand::PredefinedCall(
-                        OpCode::EVAL.get_definition(),
-                        vec![PPEExpr::FunctionCall(decl.header.id, arguments)],
-                    ))
+                    Some(HirCommand::PredefinedCall(OpCode::EVAL, vec![HirExpr::function(decl.header.id, arguments)]))
                 } else {
                     log::error!("Invalid call to variable: {}", call_stmt.get_identifier());
                     None
@@ -639,8 +647,8 @@ impl PPECompiler {
             }
             Statement::While(_) => panic!("While not allowed in output AST."),
             Statement::Block(_) => panic!("Block not handled by compile statement."),
-            Statement::Continue(_) => self.foreach_stack.last().map(|(start, _)| PPECommand::NextForEach(*start)),
-            Statement::Break(_) => self.foreach_stack.last().map(|(_, end)| PPECommand::Goto(*end)),
+            Statement::Continue(_) => self.foreach_stack.last().map(|(start, _)| HirCommand::NextForEach(CodeOffset(*start))),
+            Statement::Break(_) => self.foreach_stack.last().map(|(_, end)| HirCommand::Goto(LabelId(*end))),
             Statement::IfThen(_) => panic!("if then not allowed in output AST."),
             Statement::WhileDo(_) => panic!("do while not allowed in output AST."),
             Statement::RepeatUntil(_) => panic!("repeat until not allowed in output AST."),
@@ -749,8 +757,8 @@ impl PPECompiler {
         })
     }
 
-    fn comp_expr(&mut self, expr: &Expression) -> PPEExpr {
-        expr.visit(&mut ExpressionCompiler { compiler: self })
+    fn resolve_expr(&mut self, expr: &Expression) -> HirExpr {
+        expr.visit(&mut HirExpressionResolver { compiler: self })
     }
 
     fn get_label_index(&mut self, label_token: &Spanned<Token>) -> usize {

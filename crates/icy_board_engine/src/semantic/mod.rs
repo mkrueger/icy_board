@@ -19,6 +19,7 @@ use crate::{
         FuncOpCode, FunctionDefinition, FunctionValue, GenericVariableData, OpCode, ProcedureValue, StatementSignature, TableEntry, USER_VARIABLES, VarHeader,
         VariableData, VariableTable, VariableType, VariableValue,
     },
+    hir::{CallId, SymbolId},
     parser::{
         self, ErrorReporter, FIRST_BOARD_OBJECT_LANGUAGE_VERSION, ParserErrorType, UserTypeRegistry,
         lexer::{Spanned, Token},
@@ -616,9 +617,9 @@ pub struct SemanticVisitor {
     /// Maps a type name a static member was called on -> that type's id.
     pub static_receiver_lookup: HashMap<usize, u8>,
 
-    pub function_type_lookup: HashMap<u64, SemanticInfo>,
+    pub function_type_lookup: HashMap<CallId, SemanticInfo>,
     pub call_graph: CallGraph,
-    member_array_returns: HashMap<u64, (VariableType, u8)>,
+    member_array_returns: HashMap<CallId, (VariableType, u8)>,
 
     pub require_user_variables: bool,
     allow_routine_reference: bool,
@@ -1027,7 +1028,7 @@ impl SemanticVisitor {
             }
             {
                 let (_rt, r) = &mut self.references[f.id];
-                if !self.call_graph.is_reachable(f.id) {
+                if !self.call_graph.is_reachable(SymbolId(f.id)) {
                     continue;
                 }
                 r.variable_table_index = variable_table.variable_table.len() + 1;
@@ -1200,7 +1201,7 @@ impl SemanticVisitor {
             variable_table.add_constant(c);
         }
         for f in &self.function_containers {
-            if !self.call_graph.is_reachable(f.id) {
+            if !self.call_graph.is_reachable(SymbolId(f.id)) {
                 continue;
             }
             for c in &f.lookup.constants {
@@ -1501,7 +1502,7 @@ impl SemanticVisitor {
             }
             Expression::Parens(parens) => self.array_shape(parens.get_expression()),
             Expression::FunctionCall(call) => {
-                if let Some((element_type, rank)) = self.member_array_returns.get(&call.id).copied() {
+                if let Some((element_type, rank)) = self.member_array_returns.get(&CallId(call.id)).copied() {
                     return Some(ArrayShape {
                         element_type,
                         rank,
@@ -1510,7 +1511,7 @@ impl SemanticVisitor {
                         field_name: None,
                     });
                 }
-                let SemanticInfo::FunctionReference(index) = self.function_type_lookup.get(&call.id)? else {
+                let SemanticInfo::FunctionReference(index) = self.function_type_lookup.get(&CallId(call.id))? else {
                     return None;
                 };
                 let FunctionDeclaration::Function(function) = &self.function_containers[*index].functions else {
@@ -1606,7 +1607,7 @@ impl SemanticVisitor {
             Expression::MemberReference(member) => self.is_assignable_explicit_target(member.get_expression()),
             Expression::FunctionCall(call) => {
                 if matches!(
-                    self.function_type_lookup.get(&call.id),
+                    self.function_type_lookup.get(&CallId(call.id)),
                     Some(SemanticInfo::IndexedRecordField(_) | SemanticInfo::VariableReference(_))
                 ) {
                     return true;
@@ -1638,7 +1639,7 @@ impl SemanticVisitor {
         if self.references_are_reachable {
             self.reference_owners.entry(idx).or_default().insert(self.cur_func_impl);
             if matches!(self.references[idx].0, ReferenceType::Function(_) | ReferenceType::Procedure(_)) {
-                self.call_graph.add_call(self.cur_func_impl, idx);
+                self.call_graph.add_call(self.cur_func_impl.map(SymbolId), SymbolId(idx));
             }
         }
         self.references[idx].1.usages.push((
@@ -1648,13 +1649,15 @@ impl SemanticVisitor {
     }
 
     pub fn reference_is_live(&self, reference: usize) -> bool {
-        self.reference_owners
-            .get(&reference)
-            .is_some_and(|owners| owners.iter().any(|owner| owner.is_none_or(|routine| self.call_graph.is_reachable(routine))))
+        self.reference_owners.get(&reference).is_some_and(|owners| {
+            owners
+                .iter()
+                .any(|owner| owner.is_none_or(|routine| self.call_graph.is_reachable(SymbolId(routine))))
+        })
     }
 
     pub fn routine_is_reachable(&self, reference: usize) -> bool {
-        self.call_graph.is_reachable(reference)
+        self.call_graph.is_reachable(SymbolId(reference))
     }
 
     fn visit_statement_sequence(&mut self, statements: &[Statement]) -> bool {
@@ -1831,7 +1834,7 @@ impl SemanticVisitor {
         }
 
         if let Expression::FunctionCall(a) = expr
-            && let Some(SemanticInfo::VariableReference(_)) = self.function_type_lookup.get(&a.id)
+            && let Some(SemanticInfo::VariableReference(_)) = self.function_type_lookup.get(&CallId(a.id))
         {
             return;
         }
@@ -2136,7 +2139,7 @@ impl SemanticVisitor {
                         CompilationErrorType::MissingImplementation(decl.token.clone()),
                     );
                 }
-                if !self.call_graph.is_reachable(reference_index) {
+                if !self.call_graph.is_reachable(SymbolId(reference_index)) {
                     self.errors
                         .lock()
                         .unwrap()
@@ -2464,7 +2467,8 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 .max_by_key(|definition| definition.version)
                 .unwrap_or(&FUNCTION_DEFINITIONS[predef[0]]);
             if self.cur_func_call > 0 {
-                self.function_type_lookup.insert(self.cur_func_call, SemanticInfo::PredefFunctionGroup(predef));
+                self.function_type_lookup
+                    .insert(CallId(self.cur_func_call), SemanticInfo::PredefFunctionGroup(predef));
             } else {
                 self.errors.lock().unwrap().report_error(
                     identifier.get_identifier_token().span.clone(),
@@ -2483,7 +2487,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             }
             if self.references_are_reachable {
                 if matches!(self.references[idx].0, ReferenceType::Function(_) | ReferenceType::Procedure(_)) {
-                    self.call_graph.add_call(self.cur_func_impl, idx);
+                    self.call_graph.add_call(self.cur_func_impl.map(SymbolId), SymbolId(idx));
                 }
                 self.reference_owners.entry(idx).or_default().insert(self.cur_func_impl);
             }
@@ -2491,9 +2495,11 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             let identifier = identifier.get_identifier_token();
             if self.cur_func_call > 0 {
                 if let ReferenceType::Function(func_idx) = rt {
-                    self.function_type_lookup.insert(self.cur_func_call, SemanticInfo::FunctionReference(*func_idx));
+                    self.function_type_lookup
+                        .insert(CallId(self.cur_func_call), SemanticInfo::FunctionReference(*func_idx));
                 } else if let ReferenceType::Variable(func_idx) = rt {
-                    self.function_type_lookup.insert(self.cur_func_call, SemanticInfo::VariableReference(*func_idx));
+                    self.function_type_lookup
+                        .insert(CallId(self.cur_func_call), SemanticInfo::VariableReference(*func_idx));
                 }
             } else {
                 match rt {
@@ -2888,7 +2894,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                     self.check_expr_arg_range(*arguments.start(), *arguments.end(), given, call.get_expression());
                     return VariableType::None;
                 }
-                self.function_type_lookup.insert(call.id, SemanticInfo::ArrayMemberProc(*opcode));
+                self.function_type_lookup.insert(CallId(call.id), SemanticInfo::ArrayMemberProc(*opcode));
                 return VariableType::None;
             }
         }
@@ -2910,7 +2916,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                     self.add_constant(&Constant::Integer(*value, crate::ast::constant::NumberFormat::Default));
                 }
                 self.function_type_lookup
-                    .insert(call.id, SemanticInfo::ArrayMemberFunc(array_member.opcode, filled_in));
+                    .insert(CallId(call.id), SemanticInfo::ArrayMemberFunc(array_member.opcode, filled_in));
                 return array_member.return_type;
             }
         }
@@ -2924,13 +2930,13 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 && shape.rank == 1
             {
                 call.get_arguments()[0].visit(self);
-                self.function_type_lookup.insert(call.id, SemanticInfo::ArrayValueAt);
+                self.function_type_lookup.insert(CallId(call.id), SemanticInfo::ArrayValueAt);
                 return shape.element_type;
             }
             if matches!(receiver_type, VariableType::String | VariableType::BigStr | VariableType::UnboundedString) {
                 call.get_arguments()[0].visit(self);
                 self.function_type_lookup
-                    .insert(call.id, SemanticInfo::ScalarMemberFunc(FuncOpCode::StringCharAt, &[]));
+                    .insert(CallId(call.id), SemanticInfo::ScalarMemberFunc(FuncOpCode::StringCharAt, &[]));
                 return VariableType::UnboundedString;
             }
         }
@@ -2964,7 +2970,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                             );
                         }
                         self.function_type_lookup
-                            .insert(call.id, SemanticInfo::ScalarStaticFunc(FuncOpCode::StringJoin));
+                            .insert(CallId(call.id), SemanticInfo::ScalarStaticFunc(FuncOpCode::StringJoin));
                         return VariableType::UnboundedString;
                     }
                     "repeat" if call.get_arguments().len() == 2 => {
@@ -2972,7 +2978,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                             argument.visit(self);
                         }
                         self.function_type_lookup
-                            .insert(call.id, SemanticInfo::ScalarStaticFunc(FuncOpCode::StringRepeat));
+                            .insert(CallId(call.id), SemanticInfo::ScalarStaticFunc(FuncOpCode::StringRepeat));
                         return VariableType::UnboundedString;
                     }
                     "split" if (2..=3).contains(&call.get_arguments().len()) => {
@@ -2989,8 +2995,8 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                                 CompilationErrorType::ArgumentTypeMismatch(3, "INTEGER".to_string(), self.source_type_name(actual)),
                             );
                         }
-                        self.function_type_lookup.insert(call.id, SemanticInfo::ScalarStaticFunc(opcode));
-                        self.member_array_returns.insert(call.id, (VariableType::UnboundedString, 1));
+                        self.function_type_lookup.insert(CallId(call.id), SemanticInfo::ScalarStaticFunc(opcode));
+                        self.member_array_returns.insert(CallId(call.id), (VariableType::UnboundedString, 1));
                         return VariableType::UnboundedString;
                     }
                     _ => {}
@@ -3006,7 +3012,8 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 && call.get_arguments().len() == 1
             {
                 call.get_arguments()[0].visit(self);
-                self.function_type_lookup.insert(call.id, SemanticInfo::ScalarStaticFunc(FuncOpCode::BASE64DEC));
+                self.function_type_lookup
+                    .insert(CallId(call.id), SemanticInfo::ScalarStaticFunc(FuncOpCode::BASE64DEC));
                 return VariableType::Bytes;
             }
 
@@ -3056,9 +3063,10 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                         CompilationErrorType::BuiltinNeedsRuntime(format!("STRING.{}", member.get_identifier()), opcode.minimum_runtime()),
                     );
                 }
-                self.function_type_lookup.insert(call.id, SemanticInfo::ScalarMemberFunc(opcode, defaults));
+                self.function_type_lookup
+                    .insert(CallId(call.id), SemanticInfo::ScalarMemberFunc(opcode, defaults));
                 if matches!(opcode, FuncOpCode::StringSplit | FuncOpCode::StringSplitLimit) {
-                    self.member_array_returns.insert(call.id, (VariableType::UnboundedString, 1));
+                    self.member_array_returns.insert(CallId(call.id), (VariableType::UnboundedString, 1));
                 }
                 return return_type;
             }
@@ -3073,7 +3081,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                         CompilationErrorType::ArgumentTypeMismatch(1, "Checksum".to_string(), self.source_type_name(actual)),
                     );
                 }
-                self.function_type_lookup.insert(call.id, SemanticInfo::ScalarMemberFunc(opcode, &[]));
+                self.function_type_lookup.insert(CallId(call.id), SemanticInfo::ScalarMemberFunc(opcode, &[]));
                 return return_type;
             }
 
@@ -3094,7 +3102,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                     self.add_constant(&Constant::Integer(*value, crate::ast::constant::NumberFormat::Default));
                 }
                 self.function_type_lookup
-                    .insert(call.id, SemanticInfo::ArrayMemberFunc(array_member.opcode, filled_in));
+                    .insert(CallId(call.id), SemanticInfo::ArrayMemberFunc(array_member.opcode, filled_in));
                 return array_member.return_type;
             }
 
@@ -3109,7 +3117,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                     self.check_expr_arg_range(*arguments.start(), *arguments.end(), given, call.get_expression());
                     return VariableType::None;
                 }
-                self.function_type_lookup.insert(call.id, SemanticInfo::ArrayMemberProc(*opcode));
+                self.function_type_lookup.insert(CallId(call.id), SemanticInfo::ArrayMemberProc(*opcode));
                 return VariableType::None;
             }
 
@@ -3136,7 +3144,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                         ),
                     );
                 }
-                self.function_type_lookup.insert(call.id, SemanticInfo::IndexedRecordField(member_id));
+                self.function_type_lookup.insert(CallId(call.id), SemanticInfo::IndexedRecordField(member_id));
                 return field.variable_type;
             }
 
@@ -3185,7 +3193,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 }
                 let expected = registry.fields.get(member.get_identifier()).copied().unwrap_or(VariableType::None);
                 self.check_member_arg_types(&[expected], call.get_arguments());
-                self.function_type_lookup.insert(call.id, SemanticInfo::MemberSetterCall(member_id));
+                self.function_type_lookup.insert(CallId(call.id), SemanticInfo::MemberSetterCall(member_id));
                 return VariableType::None;
             }
             // A record field indexed like `rec.field(1)` is not a member call; the variable path below takes it.
@@ -3193,9 +3201,9 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 if let Some((member_id, required, parameters, return_type, return_rank)) = self.member_function_signature(user_type, member.get_identifier()) {
                     self.check_expr_arg_range(required, parameters.len(), call.get_arguments().len(), call.get_expression());
                     self.check_member_arg_types(&parameters, call.get_arguments());
-                    self.function_type_lookup.insert(call.id, SemanticInfo::MemberFunctionCall(member_id));
+                    self.function_type_lookup.insert(CallId(call.id), SemanticInfo::MemberFunctionCall(member_id));
                     if return_rank > 0 {
-                        self.member_array_returns.insert(call.id, (return_type, return_rank));
+                        self.member_array_returns.insert(CallId(call.id), (return_type, return_rank));
                     }
                     return return_type;
                 }
@@ -3210,7 +3218,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             }
         }
 
-        match self.function_type_lookup.get(&call.id).cloned() {
+        match self.function_type_lookup.get(&CallId(call.id)).cloned() {
             Some(SemanticInfo::FunctionReference(idx)) => {
                 let declaration = self.function_containers[idx].functions.clone();
                 let arg_count = if let FunctionDeclaration::Function(f) = &declaration {
@@ -3266,7 +3274,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                             );
                             return res;
                         }
-                        self.function_type_lookup.insert(call.id, SemanticInfo::PredefinedFunc(def.opcode));
+                        self.function_type_lookup.insert(CallId(call.id), SemanticInfo::PredefinedFunc(def.opcode));
                         if def.opcode != FuncOpCode::Len_Dim {
                             for argument in call.get_arguments() {
                                 self.reject_bare_array_value(argument);

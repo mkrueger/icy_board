@@ -48,6 +48,7 @@ pub mod datetime;
 pub mod decompiler;
 pub mod executable;
 pub mod formatting;
+pub mod hir;
 pub mod parser;
 pub mod search_patterns;
 pub mod semantic;

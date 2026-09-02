@@ -122,6 +122,11 @@ releases.
 
 ### Changed
 
+- PPL code generation now resolves expressions into a typed HIR before lowering
+  them to PPE expressions. Stable symbol and call IDs are shared with semantic
+  analysis and the call graph, and repeated argument/member resolution during
+  code generation has been removed.
+
 - Optimizer regression tests execute deterministic generated arithmetic,
   branches, labels and routine calls with optimization both enabled and
   disabled, then compare output, globals, errors, call-frame cleanup and file
