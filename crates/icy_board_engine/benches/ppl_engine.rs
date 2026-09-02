@@ -143,6 +143,38 @@ fn compile_benchmarks(criterion: &mut Criterion) {
     group.finish();
 }
 
+fn compile_from_ast_benchmarks(criterion: &mut Criterion) {
+    let workspace = workspace();
+    let mut group = criterion.benchmark_group("compile_from_ast");
+    for (name, source) in [
+        ("arithmetic_loop", ARITHMETIC_SOURCE),
+        ("function_calls", CALL_SOURCE),
+        ("string_members", STRING_SOURCE),
+        ("arrays_and_records", ARRAY_RECORD_SOURCE),
+    ] {
+        group.throughput(Throughput::Bytes(source.len() as u64));
+        group.bench_function(name, |benchmark| {
+            benchmark.iter_batched(
+                || {
+                    let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+                    let registry = UserTypeRegistry::icy_board_registry();
+                    let ast = parse_ast(PathBuf::from("benchmark.pps"), errors.clone(), source, &registry, Encoding::Utf8, &workspace);
+                    assert!(!errors.lock().unwrap().has_errors());
+                    (errors, registry, ast)
+                },
+                |(errors, registry, ast)| {
+                    let mut compiler = PPECompiler::new(&workspace, registry, errors.clone());
+                    compiler.compile(&[&ast]);
+                    assert!(!errors.lock().unwrap().has_errors());
+                    black_box(compiler.create_executable().expect("benchmark source must compile"))
+                },
+                BatchSize::SmallInput,
+            );
+        });
+    }
+    group.finish();
+}
+
 fn ppe_format_benchmarks(criterion: &mut Criterion) {
     let executable = compile(ARRAY_RECORD_SOURCE);
     let bytes = executable.to_buffer().expect("benchmark executable must serialize");
@@ -249,6 +281,7 @@ criterion_group!(
     benches,
     parse_benchmarks,
     compile_benchmarks,
+    compile_from_ast_benchmarks,
     ppe_format_benchmarks,
     value_benchmarks,
     vm_benchmarks

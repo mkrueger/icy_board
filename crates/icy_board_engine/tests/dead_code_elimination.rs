@@ -69,6 +69,103 @@ ENDPROC
 }
 
 #[test]
+fn references_between_a_jump_and_its_target_do_not_keep_code_alive() {
+    let executable = compile(
+        r#";$LANGVERSION 400
+INTEGER deadGlobal
+GOTO Skip
+Dead()
+deadGlobal = 1
+:Skip
+PRINT 1
+
+PROCEDURE Dead()
+    PRINT 2
+ENDPROC
+"#,
+    );
+
+    assert!(routine_names(&executable).is_empty());
+    assert!(!executable.variable_table.get_entries().iter().any(|entry| entry.get_name() == "deadGlobal"));
+}
+
+#[test]
+fn unreachable_calls_inside_a_reachable_routine_do_not_keep_their_targets_alive() {
+    let executable = compile(
+        r#";$LANGVERSION 400
+Entry()
+
+PROCEDURE Entry()
+    GOTO Skip
+    Dead()
+    :Skip
+ENDPROC
+
+PROCEDURE Dead()
+    PRINT 2
+ENDPROC
+"#,
+    );
+
+    assert_eq!(vec!["Entry"], routine_names(&executable));
+}
+
+#[test]
+fn a_label_jumped_into_from_reachable_code_keeps_its_block_alive() {
+    let executable = compile(
+        r#";$LANGVERSION 400
+INTEGER flag
+IF flag = 1 GOTO Target
+GOTO Skip
+WHILE flag = 3 DO
+    :Target
+    Alive()
+ENDWHILE
+:Skip
+PRINT 2
+
+PROCEDURE Alive()
+    PRINT 3
+ENDPROC
+"#,
+    );
+
+    // The optimizer flattens blocks before dropping code, so it keeps this call - liveness must too.
+    assert_eq!(vec!["Alive"], routine_names(&executable));
+}
+
+#[test]
+fn a_constant_false_branch_does_not_keep_its_callee_alive() {
+    let executable = compile(
+        r#";$LANGVERSION 400
+IF 1 = 0 Dead()
+PRINT 1
+
+PROCEDURE Dead()
+    PRINT 2
+ENDPROC
+"#,
+    );
+
+    assert!(routine_names(&executable).is_empty());
+}
+
+#[test]
+fn a_constant_true_branch_keeps_its_callee_alive() {
+    let executable = compile(
+        r#";$LANGVERSION 400
+IF 1 = 1 Live()
+
+PROCEDURE Live()
+    PRINT 1
+ENDPROC
+"#,
+    );
+
+    assert_eq!(vec!["Live"], routine_names(&executable));
+}
+
+#[test]
 fn recursive_reachable_routines_are_emitted() {
     let executable = compile(
         r#";$LANGVERSION 400

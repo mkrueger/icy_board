@@ -9,11 +9,11 @@ use crate::{
     ast::{
         AstVisitor, CommentAstNode, ConstDeclarationStatement, Constant, ConstantExpression, EnumDeclarationAstNode, Expression, FunctionCallExpression,
         FunctionDeclarationAstNode, FunctionImplementation, GosubStatement, GotoStatement, IdentifierExpression, LabelStatement, LetStatement, OnErrorMode,
-        OnErrorStatement, ParameterSpecifier, PredefinedCallStatement, ProcedureCallStatement, ProcedureDeclarationAstNode, ProcedureImplementation,
-        TypeDeclarationAstNode, VariableDeclarationStatement, VariableParameterSpecifier, const_value_with_members, walk_function_implementation,
-        walk_indexer_expression, walk_predefined_call_statement, walk_procedure_call_statement, walk_procedure_implementation,
+        OnErrorStatement, ParameterSpecifier, PredefinedCallStatement, ProcedureCallStatement, ProcedureDeclarationAstNode, ProcedureImplementation, Statement,
+        TypeDeclarationAstNode, VariableDeclarationStatement, VariableParameterSpecifier, const_value_with_members, walk_indexer_expression,
+        walk_predefined_call_statement, walk_procedure_call_statement,
     },
-    compiler::{CompilationErrorType, CompilationWarningType, user_data::UserDataMemberRegistry, workspace::Workspace},
+    compiler::{CompilationErrorType, CompilationWarningType, optimizer::constant_boolean, user_data::UserDataMemberRegistry, workspace::Workspace},
     executable::{
         EntryType, FIRST_RECORD_LITERAL_RUNTIME, FIRST_ROUTINE_REFERENCE_RUNTIME, FIRST_STATIC_MEMBER_RUNTIME, FIRST_TYPE_TABLE_RUNTIME, FUNCTION_DEFINITIONS,
         FuncOpCode, FunctionDefinition, FunctionValue, GenericVariableData, OpCode, ProcedureValue, StatementSignature, TableEntry, USER_VARIABLES, VarHeader,
@@ -648,6 +648,7 @@ pub struct SemanticVisitor {
 
     cur_func_impl: Option<usize>,
     cur_func_call: u64,
+    references_are_reachable: bool,
 
     last_lookup_index: usize,
 }
@@ -939,6 +940,7 @@ impl SemanticVisitor {
             function_return_value_spans: HashSet::new(),
             cur_func_call: 0,
             cur_func_impl: None,
+            references_are_reachable: true,
             function_containers: Vec::new(),
             last_lookup_index: 0,
         };
@@ -1239,7 +1241,9 @@ impl SemanticVisitor {
     fn add_reference(&mut self, reftype: ReferenceType, variable_type: VariableType, identifier_token: &Spanned<parser::lexer::Token>) {
         for (index, r) in &mut self.references.iter_mut().enumerate() {
             if r.0 == reftype {
-                self.reference_owners.entry(index).or_default().insert(self.cur_func_impl);
+                if self.references_are_reachable {
+                    self.reference_owners.entry(index).or_default().insert(self.cur_func_impl);
+                }
                 r.1.usages.push((
                     self.errors.lock().unwrap().file_name().to_path_buf(),
                     Spanned::new(identifier_token.token.to_string(), identifier_token.span.clone()),
@@ -1263,7 +1267,9 @@ impl SemanticVisitor {
                 )],
             },
         ));
-        self.reference_owners.entry(self.references.len() - 1).or_default().insert(self.cur_func_impl);
+        if self.references_are_reachable {
+            self.reference_owners.entry(self.references.len() - 1).or_default().insert(self.cur_func_impl);
+        }
     }
 
     fn add_label_usage(&mut self, label_token: &Spanned<Token>) {
@@ -1622,9 +1628,11 @@ impl SemanticVisitor {
     }
 
     fn add_reference_to(&mut self, identifier: &Spanned<Token>, idx: usize) {
-        self.reference_owners.entry(idx).or_default().insert(self.cur_func_impl);
-        if matches!(self.references[idx].0, ReferenceType::Function(_) | ReferenceType::Procedure(_)) {
-            self.call_graph.add_call(self.cur_func_impl, idx);
+        if self.references_are_reachable {
+            self.reference_owners.entry(idx).or_default().insert(self.cur_func_impl);
+            if matches!(self.references[idx].0, ReferenceType::Function(_) | ReferenceType::Procedure(_)) {
+                self.call_graph.add_call(self.cur_func_impl, idx);
+            }
         }
         self.references[idx].1.usages.push((
             self.errors.lock().unwrap().file_name().to_path_buf(),
@@ -1640,6 +1648,73 @@ impl SemanticVisitor {
 
     pub fn routine_is_reachable(&self, reference: usize) -> bool {
         self.call_graph.is_reachable(reference)
+    }
+
+    fn visit_statement_sequence(&mut self, statements: &[Statement]) -> bool {
+        let outer_reachability = self.references_are_reachable;
+        let mut reachable = outer_reachability;
+        for statement in statements {
+            // The optimizer flattens nested blocks before it drops unreachable code, so any
+            // label - even one inside a block nothing falls into - is a jump target again.
+            if matches!(statement, Statement::Label(_)) {
+                reachable = true;
+            }
+            if let Statement::Block(block) = statement {
+                self.references_are_reachable = reachable;
+                reachable = self.visit_statement_sequence(block.get_statements());
+            } else {
+                self.visit_flow_statement(statement, reachable);
+                if reachable && Self::statement_ends_flow(statement) {
+                    reachable = false;
+                }
+            }
+        }
+        self.references_are_reachable = outer_reachability;
+        reachable
+    }
+
+    fn visit_flow_statement(&mut self, statement: &Statement, reachable: bool) {
+        let previous = self.references_are_reachable;
+        self.references_are_reachable = reachable;
+        match statement {
+            Statement::Block(block) => {
+                self.visit_statement_sequence(block.get_statements());
+            }
+            Statement::If(if_statement) => {
+                if_statement.get_condition().visit(self);
+                self.reject_bare_array_value(if_statement.get_condition());
+                let branch_reachable = constant_boolean(if_statement.get_condition()).map_or(reachable, |taken| reachable && taken);
+                self.visit_flow_statement(if_statement.get_statement(), branch_reachable);
+            }
+            _ => {
+                statement.visit(self);
+            }
+        }
+        self.references_are_reachable = previous;
+    }
+
+    fn statement_ends_flow(statement: &Statement) -> bool {
+        match statement {
+            Statement::Goto(_) | Statement::Return(_) => true,
+            Statement::PredifinedCall(call) => matches!(call.get_func().opcode, OpCode::END | OpCode::STOP | OpCode::RETURN),
+            Statement::Block(block) => Self::statement_sequence_ends_flow(block.get_statements()),
+            Statement::If(if_statement) => {
+                constant_boolean(if_statement.get_condition()) == Some(true) && Self::statement_ends_flow(if_statement.get_statement())
+            }
+            _ => false,
+        }
+    }
+
+    fn statement_sequence_ends_flow(statements: &[Statement]) -> bool {
+        let mut reachable = true;
+        for statement in statements {
+            if matches!(statement, Statement::Label(_)) {
+                reachable = true;
+            } else if reachable && Self::statement_ends_flow(statement) {
+                reachable = false;
+            }
+        }
+        !reachable
     }
 
     fn add_parameters(&mut self, parameters: &[ParameterSpecifier]) {
@@ -2152,6 +2227,11 @@ impl SemanticVisitor {
 }
 
 impl AstVisitor<VariableType> for SemanticVisitor {
+    fn visit_main(&mut self, main: &crate::ast::BlockStatement) -> VariableType {
+        self.visit_statement_sequence(main.get_statements());
+        VariableType::None
+    }
+
     fn visit_unary_expression(&mut self, unary: &crate::ast::UnaryExpression) -> VariableType {
         let result = unary.get_expression().visit(self);
         self.reject_bare_array_value(unary.get_expression());
@@ -2388,10 +2468,12 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 self.function_return_value_spans.insert(identifier.get_identifier_token().span.start);
                 return function.get_return_type();
             }
-            if matches!(self.references[idx].0, ReferenceType::Function(_) | ReferenceType::Procedure(_)) {
-                self.call_graph.add_call(self.cur_func_impl, idx);
+            if self.references_are_reachable {
+                if matches!(self.references[idx].0, ReferenceType::Function(_) | ReferenceType::Procedure(_)) {
+                    self.call_graph.add_call(self.cur_func_impl, idx);
+                }
+                self.reference_owners.entry(idx).or_default().insert(self.cur_func_impl);
             }
-            self.reference_owners.entry(idx).or_default().insert(self.cur_func_impl);
             let (rt, r) = &mut self.references[idx];
             let identifier = identifier.get_identifier_token();
             if self.cur_func_call > 0 {
@@ -3244,7 +3326,9 @@ impl AstVisitor<VariableType> for SemanticVisitor {
         let mut res = VariableType::None;
         let mut string_index = false;
         let arg_count = if let Some(idx) = self.lookup_variable(indexer.get_identifier()) {
-            self.reference_owners.entry(idx).or_default().insert(self.cur_func_impl);
+            if self.references_are_reachable {
+                self.reference_owners.entry(idx).or_default().insert(self.cur_func_impl);
+            }
             let (rt, r) = &mut self.references[idx];
             if matches!(rt, ReferenceType::Function(_)) {
                 self.errors.lock().unwrap().report_error(
@@ -3603,7 +3687,9 @@ impl AstVisitor<VariableType> for SemanticVisitor {
 
     fn visit_for_statement(&mut self, for_stmt: &crate::ast::ForStatement) -> VariableType {
         if let Some(idx) = self.lookup_variable(for_stmt.get_identifier()) {
-            self.reference_owners.entry(idx).or_default().insert(self.cur_func_impl);
+            if self.references_are_reachable {
+                self.reference_owners.entry(idx).or_default().insert(self.cur_func_impl);
+            }
             let (_rt, r) = &mut self.references[idx];
             let identifier = for_stmt.get_identifier_token();
             r.usages.push((
@@ -3987,7 +4073,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
         let end_parameter = self.references.len();
 
         let start_locals = self.references.len();
-        walk_function_implementation(self, function);
+        self.visit_statement_sequence(function.get_statements());
         let end_locals = self.references.len();
         let lookup = self.end_parse_function_body().unwrap();
         self.cur_func_impl = None;
@@ -4119,7 +4205,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
         let end_parameter = self.references.len();
 
         let start_locals = self.references.len();
-        walk_procedure_implementation(self, procedure);
+        self.visit_statement_sequence(procedure.get_statements());
         let end_locals = self.references.len();
         let lookup = self.end_parse_function_body().unwrap();
         self.cur_func_impl = None;

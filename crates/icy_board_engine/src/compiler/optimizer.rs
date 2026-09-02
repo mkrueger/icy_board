@@ -3,6 +3,16 @@ use crate::{
     executable::OpCode,
 };
 
+pub(crate) fn constant_boolean(expression: &Expression) -> Option<bool> {
+    match expression {
+        Expression::Const(constant) => match constant.get_constant_value() {
+            Constant::Boolean(value) => Some(*value),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
 /// Flattens the nested blocks that the lowering leaves behind and then tidies up the
 /// control flow: a branch whose condition is already decided loses the test, a jump to
 /// the statement that follows it is dropped, and so is everything that no jump and no
@@ -61,13 +71,10 @@ fn resolve_decided_conditions(statements: &mut [Statement]) {
         let Statement::If(if_stmt) = statement else {
             continue;
         };
-        let Expression::Const(constant) = if_stmt.get_condition() else {
+        let Some(taken) = constant_boolean(if_stmt.get_condition()) else {
             continue;
         };
-        let Constant::Boolean(taken) = constant.get_constant_value() else {
-            continue;
-        };
-        *statement = if *taken { if_stmt.get_statement().clone() } else { Statement::Empty };
+        *statement = if taken { if_stmt.get_statement().clone() } else { Statement::Empty };
     }
 }
 

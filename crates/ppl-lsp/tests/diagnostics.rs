@@ -83,6 +83,22 @@ ENDPROC
 }
 
 #[test]
+fn unreachable_statements_are_still_checked_for_errors() {
+    let (mut server, _) = Server::ready();
+    let uri = "file:///tmp/unreachable-error.pps";
+    server.open(
+        uri,
+        r#"GOTO Done
+PRINT missingValue
+:Done
+"#,
+    );
+
+    let errors = messages(&Value::Array(of_severity(&server.diagnostics(uri), 1)));
+    assert!(errors.iter().any(|message| message.contains("missingValue")), "{errors:?}");
+}
+
+#[test]
 fn editing_a_program_takes_its_diagnostics_back() {
     let (mut server, _) = Server::ready();
     let uri = "file:///tmp/edited.pps";

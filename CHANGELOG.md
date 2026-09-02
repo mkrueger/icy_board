@@ -13,7 +13,8 @@ releases.
 - Criterion benchmarks cover PPL parsing, compilation, PPE serialization,
   string and array value operations, and prepared VM execution. The dedicated
   bench profile optimizes for speed, and named baselines support before/after
-  comparisons during performance work.
+  comparisons during performance work. Compilation measurements distinguish
+  the complete source pipeline from work performed after parsing.
 
 - Display files can use native IcyDraw `.icy` screens and scripted `.icyanim`
   animations directly, without invoking the external `icy_play` utility.
@@ -124,7 +125,9 @@ releases.
 - PPL semantic analysis now builds a call graph shared by the compiler and
   language server. The compiler removes routines, locals, globals and constants
   reachable only from dead code, and omits wholly unused record types while
-  preserving every field and its order in retained record layouts.
+  preserving every field and its order in retained record layouts. References
+  in statically unreachable statements no longer keep code alive, while those
+  statements are still checked for diagnostics.
 
 - PPL execution avoids deep-cloning commands and whole collections in hot loops,
   moves routine frames instead of copying them, and shares string and array
