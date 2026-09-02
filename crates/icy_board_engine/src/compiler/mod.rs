@@ -8,7 +8,7 @@ pub mod optimizer;
 pub mod user_data;
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     sync::{Arc, Mutex},
 };
 use thiserror::Error;
@@ -656,11 +656,46 @@ impl PPECompiler {
     pub fn create_executable(&self) -> Result<Executable, CompilationErrorType> {
         let mut variable_table = self.lookup_table.variable_table.clone();
         variable_table.set_version(self.runtime);
-        let user_types: Vec<Vec<RecordField>> = self
-            .semantic_visitor
-            .type_registry
-            .user_types()
+        let definitions = self.semantic_visitor.type_registry.user_types();
+        let mut used_types = HashSet::new();
+        for entry in variable_table.get_entries() {
+            if let VariableType::UserData(type_id) = entry.header.variable_type
+                && self.semantic_visitor.type_registry.get_user_type_from_id(type_id).is_some()
+            {
+                used_types.insert(type_id);
+            }
+        }
+        for statement in &self.commands.statements {
+            statement.command.collect_user_types(&mut used_types);
+        }
+        loop {
+            let previous = used_types.len();
+            for definition in &definitions {
+                if !used_types.contains(&(definition.id as u8)) {
+                    continue;
+                }
+                for (_, field) in &definition.fields {
+                    if let VariableType::UserData(type_id) = field.variable_type
+                        && self.semantic_visitor.type_registry.get_user_type_from_id(type_id).is_some()
+                    {
+                        used_types.insert(type_id);
+                    }
+                }
+            }
+            if used_types.len() == previous {
+                break;
+            }
+        }
+        let remap: HashMap<u8, u8> = definitions
             .iter()
+            .filter(|definition| used_types.contains(&(definition.id as u8)))
+            .enumerate()
+            .map(|(index, definition)| (definition.id as u8, (crate::parser::FIRST_USER_TYPE_ID + index) as u8))
+            .collect();
+        variable_table.remap_user_types(&remap);
+        let user_types: Vec<Vec<RecordField>> = definitions
+            .iter()
+            .filter(|definition| used_types.contains(&(definition.id as u8)))
             .map(|definition| {
                 definition
                     .fields
@@ -668,17 +703,33 @@ impl PPECompiler {
                     .map(|(_, field)| {
                         let mut field = *field;
                         field.variable_type = self.semantic_visitor.storage_type(field.variable_type);
+                        if let VariableType::UserData(type_id) = field.variable_type
+                            && let Some(new_id) = remap.get(&type_id)
+                        {
+                            field.variable_type = VariableType::UserData(*new_id);
+                        }
                         field
                     })
                     .collect()
             })
             .collect();
         variable_table.fill_in_records(&user_types);
+        let script_buffer = if remap.iter().all(|(old_id, new_id)| old_id == new_id) {
+            self.commands.serialize()
+        } else {
+            let mut script_buffer = Vec::new();
+            for statement in &self.commands.statements {
+                let mut command = statement.command.clone();
+                command.remap_user_types(&remap);
+                command.serialize(&mut script_buffer);
+            }
+            script_buffer
+        };
         Ok(Executable {
             runtime: self.runtime,
             variable_table,
             user_types,
-            script_buffer: self.commands.serialize(),
+            script_buffer,
         })
     }
 

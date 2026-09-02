@@ -57,7 +57,8 @@ fn compile_diagnostics(source: &str, runtime: u16) -> Vec<String> {
 
 #[test]
 fn custom_type_layouts_survive_the_ppe_round_trip() {
-    let executable = compile("TYPE Inner\n  INTEGER Number\n  STRING Text\nENDTYPE\nTYPE Outer\n  Inner Value\n  BOOLEAN Flag\nENDTYPE\nOuter item\n");
+    let executable =
+        compile("TYPE Inner\n  INTEGER Number\n  STRING Text\nENDTYPE\nTYPE Outer\n  Inner Value\n  BOOLEAN Flag\nENDTYPE\nOuter item\nPRINT item.Flag\n");
     assert_eq!(
         vec![
             vec![field(VariableType::Integer), field(VariableType::UnboundedString)],
@@ -73,7 +74,7 @@ fn custom_type_layouts_survive_the_ppe_round_trip() {
 
 #[test]
 fn array_field_dimensions_survive_the_ppe_round_trip() {
-    let executable = compile("TYPE Rec\n  INTEGER Vector(10)\n  STRING Matrix(2, 3)\n  BOOLEAN Cube(1, 2, 3)\nENDTYPE\nRec item\n");
+    let executable = compile("TYPE Rec\n  INTEGER Vector(10)\n  STRING Matrix(2, 3)\n  BOOLEAN Cube(1, 2, 3)\nENDTYPE\nRec item\nPRINT item.Vector(0)\n");
     assert_eq!(
         vec![vec![
             RecordField {
@@ -185,7 +186,7 @@ fn a_record_filled_to_the_byte_limit_round_trips() {
     for i in 0..MAX_TYPE_FIELDS {
         let _ = writeln!(source, "  INTEGER Field{i}");
     }
-    source.push_str("ENDTYPE\nWide item\n");
+    source.push_str("ENDTYPE\nWide item\nPRINT item.Field0\n");
 
     let executable = compile(&source);
     assert_eq!(MAX_TYPE_FIELDS, executable.user_types[0].len());

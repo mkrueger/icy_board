@@ -419,6 +419,17 @@ pub struct VariableTable {
 }
 
 impl VariableTable {
+    pub(crate) fn remap_user_types(&mut self, remap: &std::collections::HashMap<u8, u8>) {
+        for entry in &mut self.entries {
+            if let VariableType::UserData(type_id) = entry.header.variable_type
+                && let Some(new_id) = remap.get(&type_id)
+            {
+                entry.header.variable_type = VariableType::UserData(*new_id);
+            }
+            entry.value.remap_user_types(remap);
+        }
+    }
+
     pub fn len(&self) -> usize {
         self.entries.len()
     }

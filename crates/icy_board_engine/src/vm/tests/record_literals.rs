@@ -43,6 +43,25 @@ fn ppl400_string_record_fields_use_dynamic_storage() {
 }
 
 #[test]
+fn record_literals_follow_pruned_type_ids() {
+    assert_eq!(
+        "7",
+        run_ppl(
+            r#";$LANGVERSION 400
+TYPE Dead
+    INTEGER Gone
+ENDTYPE
+TYPE Live
+    INTEGER Number
+ENDTYPE
+Live value = Live { Number = 7 }
+PRINT value.Number
+"#,
+        )
+    );
+}
+
+#[test]
 fn ppl400_string_array_record_literals_preserve_shape_and_long_elements() {
     assert_eq!(
         "2|70000|tail",

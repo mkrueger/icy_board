@@ -179,6 +179,56 @@ impl OnErrorTarget {
 }
 
 impl PPECommand {
+    pub(crate) fn collect_user_types(&self, types: &mut std::collections::HashSet<u8>) {
+        match self {
+            PPECommand::IfNot(expression, _) | PPECommand::MemberCall(expression) | PPECommand::ForEach(_, expression, _) => {
+                expression.collect_user_types(types);
+            }
+            PPECommand::ProcedureCall(_, arguments) | PPECommand::PredefinedCall(_, arguments) => {
+                for argument in arguments {
+                    argument.collect_user_types(types);
+                }
+            }
+            PPECommand::Let(target, value) => {
+                target.collect_user_types(types);
+                value.collect_user_types(types);
+            }
+            PPECommand::End
+            | PPECommand::Return
+            | PPECommand::Goto(_)
+            | PPECommand::Gosub(_)
+            | PPECommand::EndFunc
+            | PPECommand::EndProc
+            | PPECommand::Stop
+            | PPECommand::OnError(_)
+            | PPECommand::NextForEach(_) => {}
+        }
+    }
+
+    pub(crate) fn remap_user_types(&mut self, remap: &HashMap<u8, u8>) {
+        match self {
+            PPECommand::IfNot(expression, _) | PPECommand::MemberCall(expression) | PPECommand::ForEach(_, expression, _) => expression.remap_user_types(remap),
+            PPECommand::ProcedureCall(_, arguments) | PPECommand::PredefinedCall(_, arguments) => {
+                for argument in arguments {
+                    argument.remap_user_types(remap);
+                }
+            }
+            PPECommand::Let(target, value) => {
+                target.remap_user_types(remap);
+                value.remap_user_types(remap);
+            }
+            PPECommand::End
+            | PPECommand::Return
+            | PPECommand::Goto(_)
+            | PPECommand::Gosub(_)
+            | PPECommand::EndFunc
+            | PPECommand::EndProc
+            | PPECommand::Stop
+            | PPECommand::OnError(_)
+            | PPECommand::NextForEach(_) => {}
+        }
+    }
+
     /// .
     ///
     /// # Panics
@@ -406,6 +456,64 @@ impl fmt::Display for PPEExpr {
 }
 
 impl PPEExpr {
+    pub(crate) fn collect_user_types(&self, types: &mut std::collections::HashSet<u8>) {
+        match self {
+            PPEExpr::RecordLiteral(type_id, fields) => {
+                types.insert(*type_id);
+                for (_, value) in fields {
+                    value.collect_user_types(types);
+                }
+            }
+            PPEExpr::Member(expression, _) | PPEExpr::UnaryExpression(_, expression) => expression.collect_user_types(types),
+            PPEExpr::IndexedMember(expression, _, dimensions) | PPEExpr::MemberFunctionCall(expression, dimensions, _) => {
+                expression.collect_user_types(types);
+                for dimension in dimensions {
+                    dimension.collect_user_types(types);
+                }
+            }
+            PPEExpr::BinaryExpression(_, left, right) => {
+                left.collect_user_types(types);
+                right.collect_user_types(types);
+            }
+            PPEExpr::Dim(_, dimensions) | PPEExpr::PredefinedFunctionCall(_, dimensions) | PPEExpr::FunctionCall(_, dimensions) => {
+                for dimension in dimensions {
+                    dimension.collect_user_types(types);
+                }
+            }
+            PPEExpr::Invalid | PPEExpr::Value(_) | PPEExpr::RoutineReference(_) => {}
+        }
+    }
+
+    pub(crate) fn remap_user_types(&mut self, remap: &HashMap<u8, u8>) {
+        match self {
+            PPEExpr::RecordLiteral(type_id, fields) => {
+                if let Some(new_id) = remap.get(type_id) {
+                    *type_id = *new_id;
+                }
+                for (_, value) in fields {
+                    value.remap_user_types(remap);
+                }
+            }
+            PPEExpr::Member(expression, _) | PPEExpr::UnaryExpression(_, expression) => expression.remap_user_types(remap),
+            PPEExpr::IndexedMember(expression, _, dimensions) | PPEExpr::MemberFunctionCall(expression, dimensions, _) => {
+                expression.remap_user_types(remap);
+                for dimension in dimensions {
+                    dimension.remap_user_types(remap);
+                }
+            }
+            PPEExpr::BinaryExpression(_, left, right) => {
+                left.remap_user_types(remap);
+                right.remap_user_types(remap);
+            }
+            PPEExpr::Dim(_, dimensions) | PPEExpr::PredefinedFunctionCall(_, dimensions) | PPEExpr::FunctionCall(_, dimensions) => {
+                for dimension in dimensions {
+                    dimension.remap_user_types(remap);
+                }
+            }
+            PPEExpr::Invalid | PPEExpr::Value(_) | PPEExpr::RoutineReference(_) => {}
+        }
+    }
+
     /// .
     ///
     /// # Panics

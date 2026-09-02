@@ -62,6 +62,27 @@ fn an_unused_variable_is_reported_as_a_warning() {
 }
 
 #[test]
+fn routines_referenced_only_from_dead_code_are_reported_as_unused() {
+    let (mut server, _) = Server::ready();
+    let uri = "file:///tmp/dead-routines.pps";
+    server.open(
+        uri,
+        r#"PROCEDURE Dead()
+    Helper()
+ENDPROC
+
+PROCEDURE Helper()
+ENDPROC
+"#,
+    );
+
+    let diagnostics = server.diagnostics(uri);
+    let warnings = messages(&Value::Array(of_severity(&diagnostics, 2)));
+    assert!(warnings.iter().any(|message| message.contains("Dead")), "{warnings:?}");
+    assert!(warnings.iter().any(|message| message.contains("Helper")), "{warnings:?}");
+}
+
+#[test]
 fn editing_a_program_takes_its_diagnostics_back() {
     let (mut server, _) = Server::ready();
     let uri = "file:///tmp/edited.pps";

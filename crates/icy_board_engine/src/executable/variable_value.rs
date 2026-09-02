@@ -1051,6 +1051,37 @@ impl Neg for VariableValue {
 
 #[allow(clippy::needless_pass_by_value)]
 impl VariableValue {
+    pub(crate) fn remap_user_types(&mut self, remap: &std::collections::HashMap<u8, u8>) {
+        if let VariableType::UserData(type_id) = self.vtype
+            && let Some(new_id) = remap.get(&type_id)
+        {
+            self.vtype = VariableType::UserData(*new_id);
+        }
+        match &mut self.generic_data {
+            GenericVariableData::Dim1(values) => {
+                for value in std::sync::Arc::make_mut(values) {
+                    value.remap_user_types(remap);
+                }
+            }
+            GenericVariableData::Dim2(values) => {
+                for value in std::sync::Arc::make_mut(values).iter_mut().flatten() {
+                    value.remap_user_types(remap);
+                }
+            }
+            GenericVariableData::Dim3(values) => {
+                for value in std::sync::Arc::make_mut(values).iter_mut().flatten().flatten() {
+                    value.remap_user_types(remap);
+                }
+            }
+            GenericVariableData::Record(fields) => {
+                for field in fields {
+                    field.remap_user_types(remap);
+                }
+            }
+            _ => {}
+        }
+    }
+
     /// The same value emptied out, keeping the fields a record is made of.
     #[must_use]
     pub fn emptied(&self) -> VariableValue {

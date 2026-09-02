@@ -25,8 +25,11 @@ use crate::{
     },
 };
 
+pub mod call_graph;
 #[cfg(test)]
 mod find_references_tests;
+
+use call_graph::CallGraph;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ReferenceType {
@@ -598,6 +601,7 @@ pub struct SemanticVisitor {
 
     pub errors: Arc<Mutex<ErrorReporter>>,
     pub references: Vec<(ReferenceType, References)>,
+    reference_owners: HashMap<usize, HashSet<Option<usize>>>,
     pub module_exports: HashMap<unicase::Ascii<String>, Vec<ModuleExport>>,
 
     /// Maps member references -> user type IDs
@@ -613,6 +617,7 @@ pub struct SemanticVisitor {
     pub static_receiver_lookup: HashMap<usize, u8>,
 
     pub function_type_lookup: HashMap<u64, SemanticInfo>,
+    pub call_graph: CallGraph,
     member_array_returns: HashMap<u64, (VariableType, u8)>,
 
     pub require_user_variables: bool,
@@ -909,6 +914,7 @@ impl SemanticVisitor {
             runtime: workspace.runtime(),
             errors,
             references: Vec::new(),
+            reference_owners: HashMap::new(),
             module_exports: HashMap::new(),
             type_registry,
 
@@ -919,6 +925,7 @@ impl SemanticVisitor {
             instance_provider_lookup: HashMap::new(),
             static_receiver_lookup: HashMap::new(),
             function_type_lookup: HashMap::new(),
+            call_graph: CallGraph::default(),
             member_array_returns: HashMap::new(),
 
             global_lookup: VariableLookups::default(),
@@ -976,12 +983,13 @@ impl SemanticVisitor {
         let mut variables: Vec<usize> = self.global_lookup.variable_lookup.values().copied().collect();
         variables.sort_unstable();
         for i in variables {
+            let is_live = self.reference_is_live(i);
             let storage_type = self.storage_type(self.references[i].1.variable_type);
             let (rt, r) = &mut self.references[i];
             if !matches!(rt, ReferenceType::Variable(_)) {
                 continue;
             }
-            if r.usages.is_empty() {
+            if !is_live {
                 continue;
             }
 
@@ -1010,15 +1018,16 @@ impl SemanticVisitor {
             }
             {
                 let (_rt, r) = &mut self.references[f.id];
-                if r.usages.is_empty() {
+                if !self.call_graph.is_reachable(f.id) {
                     continue;
                 }
                 r.variable_table_index = variable_table.variable_table.len() + 1;
             }
             let mut locals = 0;
             for idx in f.local_variables.clone() {
-                let (rt, _r) = &self.references[idx];
-                if !matches!(rt, ReferenceType::Variable(_)) {
+                let is_live = self.reference_is_live(idx);
+                let (rt, _reference) = &self.references[idx];
+                if !matches!(rt, ReferenceType::Variable(_)) || !is_live {
                     continue;
                 }
                 locals += 1;
@@ -1136,8 +1145,9 @@ impl SemanticVisitor {
             }
 
             for idx in f.local_variables.clone() {
+                let is_live = self.reference_is_live(idx);
                 let (rt, r) = &self.references[idx];
-                if !matches!(rt, ReferenceType::Variable(_)) {
+                if !matches!(rt, ReferenceType::Variable(_)) || !is_live {
                     continue;
                 }
                 let mut new_entry = r.create_table_entry_as(self.storage_type(r.variable_type));
@@ -1181,8 +1191,7 @@ impl SemanticVisitor {
             variable_table.add_constant(c);
         }
         for f in &self.function_containers {
-            let (_rt, r) = &mut self.references[f.id];
-            if r.usages.is_empty() {
+            if !self.call_graph.is_reachable(f.id) {
                 continue;
             }
             for c in &f.lookup.constants {
@@ -1228,8 +1237,9 @@ impl SemanticVisitor {
     }
 
     fn add_reference(&mut self, reftype: ReferenceType, variable_type: VariableType, identifier_token: &Spanned<parser::lexer::Token>) {
-        for (_i, r) in &mut self.references.iter_mut().enumerate() {
+        for (index, r) in &mut self.references.iter_mut().enumerate() {
             if r.0 == reftype {
+                self.reference_owners.entry(index).or_default().insert(self.cur_func_impl);
                 r.1.usages.push((
                     self.errors.lock().unwrap().file_name().to_path_buf(),
                     Spanned::new(identifier_token.token.to_string(), identifier_token.span.clone()),
@@ -1253,6 +1263,7 @@ impl SemanticVisitor {
                 )],
             },
         ));
+        self.reference_owners.entry(self.references.len() - 1).or_default().insert(self.cur_func_impl);
     }
 
     fn add_label_usage(&mut self, label_token: &Spanned<Token>) {
@@ -1611,10 +1622,24 @@ impl SemanticVisitor {
     }
 
     fn add_reference_to(&mut self, identifier: &Spanned<Token>, idx: usize) {
+        self.reference_owners.entry(idx).or_default().insert(self.cur_func_impl);
+        if matches!(self.references[idx].0, ReferenceType::Function(_) | ReferenceType::Procedure(_)) {
+            self.call_graph.add_call(self.cur_func_impl, idx);
+        }
         self.references[idx].1.usages.push((
             self.errors.lock().unwrap().file_name().to_path_buf(),
             Spanned::new(identifier.token.to_string(), identifier.span.clone()),
         ));
+    }
+
+    pub fn reference_is_live(&self, reference: usize) -> bool {
+        self.reference_owners
+            .get(&reference)
+            .is_some_and(|owners| owners.iter().any(|owner| owner.is_none_or(|routine| self.call_graph.is_reachable(routine))))
+    }
+
+    pub fn routine_is_reachable(&self, reference: usize) -> bool {
+        self.call_graph.is_reachable(reference)
     }
 
     fn add_parameters(&mut self, parameters: &[ParameterSpecifier]) {
@@ -1986,7 +2011,8 @@ impl SemanticVisitor {
     }
 
     pub fn finish(&mut self) {
-        for (rt, r) in &mut self.references.iter() {
+        self.call_graph.finish();
+        for (reference_index, (rt, r)) in self.references.iter().enumerate() {
             if matches!(rt, ReferenceType::Label(_)) {
                 if r.declaration.is_none() {
                     if let Some((file, span)) = r.usages.first() {
@@ -2022,13 +2048,14 @@ impl SemanticVisitor {
                         CompilationErrorType::MissingImplementation(decl.token.clone()),
                     );
                 }
-                if r.usages.is_empty() {
+                if !self.call_graph.is_reachable(reference_index) {
                     self.errors
                         .lock()
                         .unwrap()
                         .report_warning_file(file.clone(), decl.span.clone(), CompilationErrorType::UnusedFunction(decl.token.clone()));
                 }
             } else if matches!(rt, ReferenceType::Variable(_)) && r.usages.is_empty() {
+                // The enclosing routine already reports variables used only in unreachable code.
                 self.errors
                     .lock()
                     .unwrap()
@@ -2042,8 +2069,8 @@ impl SemanticVisitor {
                 if user_var.runtime_version > self.runtime {
                     continue;
                 }
-                for (_rype, r) in &self.references {
-                    if !r.usages.is_empty() && r.usages[0].1.token == user_var.name {
+                for (reference_index, (_reference_type, reference)) in self.references.iter().enumerate() {
+                    if self.reference_is_live(reference_index) && reference.usages.first().is_some_and(|(_, usage)| usage.token == user_var.name) {
                         self.require_user_variables = true;
                         break;
                     }
@@ -2361,6 +2388,10 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 self.function_return_value_spans.insert(identifier.get_identifier_token().span.start);
                 return function.get_return_type();
             }
+            if matches!(self.references[idx].0, ReferenceType::Function(_) | ReferenceType::Procedure(_)) {
+                self.call_graph.add_call(self.cur_func_impl, idx);
+            }
+            self.reference_owners.entry(idx).or_default().insert(self.cur_func_impl);
             let (rt, r) = &mut self.references[idx];
             let identifier = identifier.get_identifier_token();
             if self.cur_func_call > 0 {
@@ -2829,8 +2860,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                             .first()
                             .and_then(|argument| self.array_shape(argument))
                             .is_some_and(|shape| {
-                                shape.rank == 1
-                                    && matches!(shape.element_type, VariableType::String | VariableType::BigStr | VariableType::UnboundedString)
+                                shape.rank == 1 && matches!(shape.element_type, VariableType::String | VariableType::BigStr | VariableType::UnboundedString)
                             });
                         if !valid_array {
                             self.errors.lock().unwrap().report_error(
@@ -3214,6 +3244,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
         let mut res = VariableType::None;
         let mut string_index = false;
         let arg_count = if let Some(idx) = self.lookup_variable(indexer.get_identifier()) {
+            self.reference_owners.entry(idx).or_default().insert(self.cur_func_impl);
             let (rt, r) = &mut self.references[idx];
             if matches!(rt, ReferenceType::Function(_)) {
                 self.errors.lock().unwrap().report_error(
@@ -3572,6 +3603,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
 
     fn visit_for_statement(&mut self, for_stmt: &crate::ast::ForStatement) -> VariableType {
         if let Some(idx) = self.lookup_variable(for_stmt.get_identifier()) {
+            self.reference_owners.entry(idx).or_default().insert(self.cur_func_impl);
             let (_rt, r) = &mut self.references[idx];
             let identifier = for_stmt.get_identifier_token();
             r.usages.push((
@@ -4079,6 +4111,8 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             });
         }
 
+        let procedure_id = self.lookup_variable(procedure.get_identifier());
+        self.cur_func_impl = procedure_id;
         self.start_parse_function_body();
         let start_parameter = self.references.len();
         self.add_parameters(procedure.get_parameters());
@@ -4088,6 +4122,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
         walk_procedure_implementation(self, procedure);
         let end_locals = self.references.len();
         let lookup = self.end_parse_function_body().unwrap();
+        self.cur_func_impl = None;
 
         for f in &mut self.function_containers {
             if f.name == procedure.get_identifier() {
