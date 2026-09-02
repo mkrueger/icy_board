@@ -110,6 +110,26 @@ fn a_routine_rejects_a_record_where_it_needs_a_scalar() {
 }
 
 #[test]
+fn a_procedure_call_with_a_missing_argument_is_reported_without_panicking() {
+    let errors = diagnostics("PROCEDURE FooBar(INTEGER a)\n  PRINTLN a\nENDPROC\nBEGIN\n  FooBar()\nEND\n");
+    assert!(errors.iter().any(|e| e == "Not enough arguments passed (FooBar:0:1)"), "{errors:?}");
+}
+
+#[test]
+fn missing_callable_arguments_are_reported_without_panicking() {
+    let sources = [
+        "PROCEDURE Apply(PROCEDURE callback())\nENDPROC\nBEGIN\n  Apply()\nEND\n",
+        "PROCEDURE Apply(FUNCTION callback() INTEGER)\nENDPROC\nBEGIN\n  Apply()\nEND\n",
+        "FUNCTION AddOne(INTEGER value) INTEGER\n  RETURN value + 1\nENDFUNC\nBEGIN\n  PRINTLN AddOne()\nEND\n",
+    ];
+
+    for source in sources {
+        let errors = diagnostics(source);
+        assert!(errors.iter().any(|e| e.contains("Not enough arguments passed")), "{errors:?}");
+    }
+}
+
+#[test]
 fn arithmetic_on_records_is_rejected() {
     let errors = diagnostics("TYPE Rec\n  INTEGER v\nENDTYPE\nRec first\nRec second\nINTEGER n\nn = first + second\n");
     assert!(errors.iter().any(|e| e == "Operator + is not defined for custom types"), "{errors:?}");

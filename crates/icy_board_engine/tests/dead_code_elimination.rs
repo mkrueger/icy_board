@@ -43,13 +43,13 @@ fn resolved_hir_keeps_typed_ids_until_ppe_lowering() {
     let registry = UserTypeRegistry::icy_board_registry();
     let errors = Arc::new(Mutex::new(ErrorReporter::default()));
     let workspace = Workspace::default();
-    let source = "INTEGER marker\nGOTO Start\n:Other\nmarker = 1\n:Start\nRun()\nPROCEDURE Run()\nENDPROC\n";
+    let source = "INTEGER marker\nIF marker = 0 GOTO Start\nmarker = 1\n:Start\nRun()\nPROCEDURE Run()\nENDPROC\n";
     let ast = parse_ast(PathBuf::from("hir.pps"), errors.clone(), source, &registry, Encoding::Utf8, &workspace);
     let mut compiler = PPECompiler::new(&workspace, registry, errors.clone());
     compiler.compile(&[&ast]);
     assert!(!errors.lock().unwrap().has_errors());
 
-    assert!(matches!(compiler.get_hir_program().commands[0], HirCommand::Goto(LabelId(0))));
+    assert!(matches!(compiler.get_hir_program().commands[0], HirCommand::ConditionalGoto(_, LabelId(0))));
     let routine_id = compiler
         .get_hir_program()
         .commands
@@ -66,7 +66,7 @@ fn resolved_hir_keeps_typed_ids_until_ppe_lowering() {
             .iter()
             .any(|statement| matches!(statement.command, PPECommand::ProcedureCall(id, ref arguments) if id == routine_id.0 && arguments.is_empty()))
     );
-    assert!(matches!(compiler.get_script().statements[0].command, PPECommand::Goto(offset) if offset > 0));
+    assert!(matches!(compiler.get_script().statements[0].command, PPECommand::IfNot(_, offset) if offset > 0));
 }
 
 #[test]
@@ -119,6 +119,25 @@ ENDPROC
 
     assert!(routine_names(&executable).is_empty());
     assert!(!executable.variable_table.get_entries().iter().any(|entry| entry.get_name() == "deadGlobal"));
+}
+
+#[test]
+fn a_call_under_an_unreferenced_label_does_not_keep_its_target_alive() {
+    let executable = compile(
+        r#";$LANGVERSION 400
+GOTO Live
+:DeadBlock
+Dead()
+:Live
+PRINT 1
+
+PROCEDURE Dead()
+    PRINT 2
+ENDPROC
+"#,
+    );
+
+    assert!(routine_names(&executable).is_empty());
 }
 
 #[test]

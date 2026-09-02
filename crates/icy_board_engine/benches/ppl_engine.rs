@@ -6,7 +6,8 @@ use std::{
 
 use criterion::{BatchSize, Criterion, Throughput, criterion_group, criterion_main};
 use icy_board_engine::{
-    compiler::{PPECompiler, workspace::Workspace},
+    ast::{GotoStatement, LabelStatement},
+    compiler::{PPECompiler, optimizer::optimize_statements, workspace::Workspace},
     executable::{Executable, VariableType, VariableValue},
     icy_board::{
         IcyBoard,
@@ -175,6 +176,26 @@ fn compile_from_ast_benchmarks(criterion: &mut Criterion) {
     group.finish();
 }
 
+fn optimizer_benchmarks(criterion: &mut Criterion) {
+    const BLOCKS: usize = 500;
+    let label = |index| unicase::Ascii::new(format!("L{index}"));
+    let final_label = label(BLOCKS);
+    let mut statements = Vec::with_capacity(BLOCKS * 2 + 2);
+    statements.push(GotoStatement::create_empty_statement(final_label.clone()));
+    for index in 0..BLOCKS {
+        statements.push(LabelStatement::create_empty_statement(label(index)));
+        statements.push(GotoStatement::create_empty_statement(final_label.clone()));
+    }
+    statements.push(LabelStatement::create_empty_statement(final_label));
+
+    let mut group = criterion.benchmark_group("optimizer");
+    group.throughput(Throughput::Elements(BLOCKS as u64));
+    group.bench_function("cfg_cascading_dead_jumps_500", |benchmark| {
+        benchmark.iter(|| black_box(optimize_statements(black_box(&statements))))
+    });
+    group.finish();
+}
+
 fn ppe_format_benchmarks(criterion: &mut Criterion) {
     let executable = compile(ARRAY_RECORD_SOURCE);
     let bytes = executable.to_buffer().expect("benchmark executable must serialize");
@@ -282,6 +303,7 @@ criterion_group!(
     parse_benchmarks,
     compile_benchmarks,
     compile_from_ast_benchmarks,
+    optimizer_benchmarks,
     ppe_format_benchmarks,
     value_benchmarks,
     vm_benchmarks

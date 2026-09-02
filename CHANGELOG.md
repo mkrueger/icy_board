@@ -122,6 +122,11 @@ releases.
 
 ### Changed
 
+- PPL statement optimization now builds a basic-block control-flow graph instead
+  of repeating whole-vector scans until the statement count stabilizes. CFG
+  reachability also drives semantic call edges, while jump-chain compression,
+  predecessor tracking and `GOSUB`/`ON ERROR` edges preserve runtime behavior.
+
 - PPL code generation now resolves expressions into a typed HIR before lowering
   them to PPE expressions. Stable symbol and call IDs are shared with semantic
   analysis and the call graph, and repeated argument/member resolution during

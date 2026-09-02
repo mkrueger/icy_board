@@ -13,7 +13,7 @@ use crate::{
         TypeDeclarationAstNode, VariableDeclarationStatement, VariableParameterSpecifier, const_value_with_members, walk_indexer_expression,
         walk_predefined_call_statement, walk_procedure_call_statement,
     },
-    compiler::{CompilationErrorType, CompilationWarningType, optimizer::constant_boolean, user_data::UserDataMemberRegistry, workspace::Workspace},
+    compiler::{CompilationErrorType, CompilationWarningType, optimizer::statement_reachability, user_data::UserDataMemberRegistry, workspace::Workspace},
     executable::{
         EntryType, FIRST_RECORD_LITERAL_RUNTIME, FIRST_ROUTINE_REFERENCE_RUNTIME, FIRST_STATIC_MEMBER_RUNTIME, FIRST_TYPE_TABLE_RUNTIME, FUNCTION_DEFINITIONS,
         FuncOpCode, FunctionDefinition, FunctionValue, GenericVariableData, OpCode, ProcedureValue, StatementSignature, TableEntry, USER_VARIABLES, VarHeader,
@@ -1668,69 +1668,12 @@ impl SemanticVisitor {
             return true;
         }
         let outer_reachability = self.references_are_reachable;
-        let mut reachable = outer_reachability;
-        for statement in statements {
-            // The optimizer flattens nested blocks before it drops unreachable code, so any
-            // label - even one inside a block nothing falls into - is a jump target again.
-            if matches!(statement, Statement::Label(_)) {
-                reachable = true;
-            }
-            if let Statement::Block(block) = statement {
-                self.references_are_reachable = reachable;
-                reachable = self.visit_statement_sequence(block.get_statements());
-            } else {
-                self.visit_flow_statement(statement, reachable);
-                if reachable && Self::statement_ends_flow(statement) {
-                    reachable = false;
-                }
-            }
+        for (statement, reachable) in statement_reachability(statements) {
+            self.references_are_reachable = outer_reachability && reachable;
+            statement.visit(self);
         }
         self.references_are_reachable = outer_reachability;
-        reachable
-    }
-
-    fn visit_flow_statement(&mut self, statement: &Statement, reachable: bool) {
-        let previous = self.references_are_reachable;
-        self.references_are_reachable = reachable;
-        match statement {
-            Statement::Block(block) => {
-                self.visit_statement_sequence(block.get_statements());
-            }
-            Statement::If(if_statement) => {
-                if_statement.get_condition().visit(self);
-                self.reject_bare_array_value(if_statement.get_condition());
-                let branch_reachable = constant_boolean(if_statement.get_condition()).map_or(reachable, |taken| reachable && taken);
-                self.visit_flow_statement(if_statement.get_statement(), branch_reachable);
-            }
-            _ => {
-                statement.visit(self);
-            }
-        }
-        self.references_are_reachable = previous;
-    }
-
-    fn statement_ends_flow(statement: &Statement) -> bool {
-        match statement {
-            Statement::Goto(_) | Statement::Return(_) => true,
-            Statement::PredifinedCall(call) => matches!(call.get_func().opcode, OpCode::END | OpCode::STOP | OpCode::RETURN),
-            Statement::Block(block) => Self::statement_sequence_ends_flow(block.get_statements()),
-            Statement::If(if_statement) => {
-                constant_boolean(if_statement.get_condition()) == Some(true) && Self::statement_ends_flow(if_statement.get_statement())
-            }
-            _ => false,
-        }
-    }
-
-    fn statement_sequence_ends_flow(statements: &[Statement]) -> bool {
-        let mut reachable = true;
-        for statement in statements {
-            if matches!(statement, Statement::Label(_)) {
-                reachable = true;
-            } else if reachable && Self::statement_ends_flow(statement) {
-                reachable = false;
-            }
-        }
-        !reachable
+        true
     }
 
     fn add_parameters(&mut self, parameters: &[ParameterSpecifier]) {
@@ -2171,18 +2114,15 @@ impl SemanticVisitor {
     }
 
     fn check_arg_types(&mut self, call_parameters: &[ParameterSpecifier], arguments: &[Expression]) {
-        for i in 0..call_parameters.len() {
-            match &call_parameters[i] {
+        for (i, (call_parameter, argument)) in call_parameters.iter().zip(arguments).enumerate() {
+            match call_parameter {
                 ParameterSpecifier::Function(f) => {
                     let previous = self.allow_routine_reference;
                     self.allow_routine_reference = true;
-                    let vt: VariableType = arguments[i].visit(self);
+                    let vt: VariableType = argument.visit(self);
                     self.allow_routine_reference = previous;
                     if vt != VariableType::Function {
-                        self.errors
-                            .lock()
-                            .unwrap()
-                            .report_error(arguments[i].get_span().clone(), CompilationErrorType::FunctionExpected);
+                        self.errors.lock().unwrap().report_error(argument.get_span().clone(), CompilationErrorType::FunctionExpected);
                     }
 
                     if vt == VariableType::Function {
@@ -2195,8 +2135,8 @@ impl SemanticVisitor {
                         });
                         if !matches {
                             self.errors.lock().unwrap().report_error(
-                                arguments[i].get_span().clone(),
-                                CompilationErrorType::ParameterMismatch(arguments[i].to_string()),
+                                argument.get_span().clone(),
+                                CompilationErrorType::ParameterMismatch(argument.to_string()),
                             );
                         }
                     }
@@ -2204,13 +2144,10 @@ impl SemanticVisitor {
                 ParameterSpecifier::Procedure(p) => {
                     let previous = self.allow_routine_reference;
                     self.allow_routine_reference = true;
-                    let vt = arguments[i].visit(self);
+                    let vt = argument.visit(self);
                     self.allow_routine_reference = previous;
                     if vt != VariableType::Procedure {
-                        self.errors
-                            .lock()
-                            .unwrap()
-                            .report_error(arguments[i].get_span().clone(), CompilationErrorType::ProcedureExpected);
+                        self.errors.lock().unwrap().report_error(argument.get_span().clone(), CompilationErrorType::ProcedureExpected);
                     }
                     if vt == VariableType::Procedure {
                         let container = self.function_containers.iter().find(|container| container.id == self.last_lookup_index);
@@ -2220,19 +2157,19 @@ impl SemanticVisitor {
                         });
                         if !matches {
                             self.errors.lock().unwrap().report_error(
-                                arguments[i].get_span().clone(),
-                                CompilationErrorType::ParameterMismatch(arguments[i].to_string()),
+                                argument.get_span().clone(),
+                                CompilationErrorType::ParameterMismatch(argument.to_string()),
                             );
                         }
                     }
                 }
                 ParameterSpecifier::Variable(parameter) => {
                     let expected = parameter.get_variable_type();
-                    let actual = arguments[i].visit(self);
-                    self.reject_bare_array_value(&arguments[i]);
+                    let actual = argument.visit(self);
+                    self.reject_bare_array_value(argument);
                     if expected != actual && (matches!(expected, VariableType::UserData(_)) || matches!(actual, VariableType::UserData(_))) {
                         self.errors.lock().unwrap().report_error(
-                            arguments[i].get_span(),
+                            argument.get_span(),
                             CompilationErrorType::ArgumentTypeMismatch(i + 1, self.source_type_name(expected), self.source_type_name(actual)),
                         );
                     }
