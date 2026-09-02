@@ -117,7 +117,7 @@ PRINT n
     time(
         "FOREACH, collection held in a variable",
         r#"
-AREAS list = Board.Conferences[0].Areas
+AREA list[] = Board.Conferences[0].Areas
 INTEGER n
 AREA a
 FOREACH a IN list
@@ -136,7 +136,7 @@ fn walk_every_conference() {
     time(
         "FOREACH over the conferences",
         r#"
-CONFERENCES list = Board.Conferences
+CONFERENCE list[] = Board.Conferences
 INTEGER n
 CONFERENCE c
 FOREACH c IN list

@@ -8,7 +8,13 @@ use criterion::{BatchSize, Criterion, Throughput, criterion_group, criterion_mai
 use icy_board_engine::{
     compiler::{PPECompiler, workspace::Workspace},
     executable::{Executable, VariableType, VariableValue},
-    icy_board::{IcyBoard, bbs::BBS, state::IcyBoardState},
+    icy_board::{
+        IcyBoard,
+        bbs::BBS,
+        conferences::Conference,
+        message_area::{AreaList, MessageArea},
+        state::IcyBoardState,
+    },
     parser::{Encoding, ErrorReporter, UserTypeRegistry, parse_ast},
     vm::{io::DiskIO, run},
 };
@@ -56,6 +62,22 @@ NEXT
 FOR i = 0 TO 999
     total = total + items[i].Number + items[i].Name.Len()
 NEXT
+"#;
+
+const ARRAY_FOREACH_SOURCE: &str = r#";$LANGVERSION 400
+INTEGER values[9999]
+INTEGER value, total
+FOREACH value IN values
+    total = total + value
+ENDFOREACH
+"#;
+
+const OBJECT_FOREACH_SOURCE: &str = r#";$LANGVERSION 400
+AREA area
+INTEGER total
+FOREACH area IN Board.Conferences[0].Areas
+    total = total + area.Number
+ENDFOREACH
 "#;
 
 fn workspace() -> Workspace {
@@ -165,12 +187,22 @@ fn value_benchmarks(criterion: &mut Criterion) {
             BatchSize::SmallInput,
         );
     });
+    group.throughput(Throughput::Elements(4096));
+    group.bench_function("array_clone_4k", |benchmark| {
+        benchmark.iter(|| black_box(black_box(&array).clone()));
+    });
     group.finish();
 }
 
-async fn vm_state(root: &Path) -> (IcyBoardState, DiskIO) {
+async fn vm_state(root: &Path, areas: usize) -> (IcyBoardState, DiskIO) {
     let bbs = Arc::new(tokio::sync::Mutex::new(BBS::new(1)));
-    let board = IcyBoard::new();
+    let mut board = IcyBoard::new();
+    if areas > 0 {
+        board.conferences.push(Conference {
+            areas: Some(Arc::new(AreaList::new((0..areas).map(|_| MessageArea::default()).collect()))),
+            ..Default::default()
+        });
+    }
     let node = bbs.lock().await.create_new_node(ConnectionType::Channel).await;
     let node_state = bbs.lock().await.open_connections.clone();
     let (_peer, connection) = ChannelConnection::create_pair();
@@ -186,17 +218,19 @@ fn vm_benchmarks(criterion: &mut Criterion) {
     let mut group = criterion.benchmark_group("vm");
     group.sample_size(20);
 
-    for (name, source, operations) in [
-        ("integer_loop_100k", ARITHMETIC_SOURCE, 100_000),
-        ("function_calls_25k", CALL_SOURCE, 25_000),
-        ("string_members_1k", STRING_SOURCE, 1_000),
-        ("array_record_access_2k", ARRAY_RECORD_SOURCE, 2_000),
+    for (name, source, operations, areas) in [
+        ("integer_loop_100k", ARITHMETIC_SOURCE, 100_000, 0),
+        ("function_calls_25k", CALL_SOURCE, 25_000, 0),
+        ("string_members_1k", STRING_SOURCE, 1_000, 0),
+        ("array_record_access_2k", ARRAY_RECORD_SOURCE, 2_000, 0),
+        ("array_foreach_10k", ARRAY_FOREACH_SOURCE, 10_000, 0),
+        ("object_foreach_2k", OBJECT_FOREACH_SOURCE, 2_000, 2_000),
     ] {
         let executable = compile(source);
         group.throughput(Throughput::Elements(operations));
         group.bench_function(name, |benchmark| {
             benchmark.iter_batched(
-                || runtime.block_on(vm_state(root.path())),
+                || runtime.block_on(vm_state(root.path(), areas)),
                 |(mut state, mut io)| {
                     black_box(
                         runtime

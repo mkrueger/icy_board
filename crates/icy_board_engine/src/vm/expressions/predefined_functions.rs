@@ -370,10 +370,10 @@ fn char_offset(text: &str, index: i32) -> Option<usize> {
 }
 
 pub async fn string_find_from(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let text = vm.eval_expr(&args[0]).await?.as_string();
-    let search = vm.eval_expr(&args[1]).await?.as_string();
+    let text = vm.eval_expr(&args[0]).await?;
+    let search = vm.eval_expr(&args[1]).await?;
     let start = vm.eval_expr(&args[2]).await?.as_int();
-    string_find_values(&text, &search, start)
+    string_find_values(text.as_str().unwrap_or_default(), search.as_str().unwrap_or_default(), start)
 }
 
 fn string_find_values(text: &str, search: &str, start: i32) -> Res<VariableValue> {
@@ -437,8 +437,8 @@ pub async fn string_count(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<
 }
 
 pub async fn string_trim(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let text = vm.eval_expr(&args[0]).await?.as_string();
-    Ok(VariableValue::new_unbounded_string(text.trim().to_string()))
+    let text = vm.eval_expr(&args[0]).await?;
+    Ok(VariableValue::new_unbounded_string(text.as_str().unwrap_or_default().trim().to_string()))
 }
 
 pub async fn string_trim_start(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -666,10 +666,7 @@ async fn string_split_values(vm: &mut VirtualMachine<'_>, args: &[PPEExpr], limi
     vm.operation_succeeded();
     Ok(VariableValue::new_vector(
         VariableType::UnboundedString,
-        parts
-            .into_iter()
-            .map(VariableValue::new_unbounded_string)
-            .collect(),
+        parts.into_iter().map(VariableValue::new_unbounded_string).collect(),
     ))
 }
 

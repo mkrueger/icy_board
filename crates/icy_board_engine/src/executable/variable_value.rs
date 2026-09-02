@@ -140,12 +140,12 @@ impl VariableType {
             VariableType::String => VariableValue::new_string(String::new()),
             VariableType::BigStr => VariableValue {
                 vtype: VariableType::BigStr,
-                generic_data: GenericVariableData::String(String::new()),
+                generic_data: GenericVariableData::String(std::sync::Arc::new(String::new())),
                 ..Default::default()
             },
             VariableType::UnboundedString => VariableValue {
                 vtype: VariableType::UnboundedString,
-                generic_data: GenericVariableData::String(String::new()),
+                generic_data: GenericVariableData::String(std::sync::Arc::new(String::new())),
                 ..Default::default()
             },
             VariableType::Bytes => VariableValue::new_bytes(Vec::new()),
@@ -320,14 +320,14 @@ impl fmt::Debug for VariableData {
 pub enum GenericVariableData {
     #[default]
     None,
-    String(String),
+    String(std::sync::Arc<String>),
 
     /// Contiguous binary payload for `VariableType::Bytes`.
     Bytes(Vec<u8>),
 
-    Dim1(Vec<VariableValue>),
-    Dim2(Vec<Vec<VariableValue>>),
-    Dim3(Vec<Vec<Vec<VariableValue>>>),
+    Dim1(std::sync::Arc<Vec<VariableValue>>),
+    Dim2(std::sync::Arc<Vec<Vec<VariableValue>>>),
+    Dim3(std::sync::Arc<Vec<Vec<Vec<VariableValue>>>>),
 
     Table(PPLTable),
 
@@ -369,7 +369,7 @@ impl GenericVariableData {
                     log::error!("Creating a large array of size: {vector_size} elements - probably file is corrupt.");
                     return None;
                 }
-                Some(GenericVariableData::Dim1(vec![base_value; vector_size + 1]))
+                Some(GenericVariableData::Dim1(std::sync::Arc::new(vec![base_value; vector_size + 1])))
             }
             2 => {
                 if vector_size * matrix_size > MAX_ARRAY_SIZE {
@@ -381,7 +381,10 @@ impl GenericVariableData {
                     );
                     return None;
                 }
-                Some(GenericVariableData::Dim2(vec![vec![base_value; matrix_size + 1]; vector_size + 1]))
+                Some(GenericVariableData::Dim2(std::sync::Arc::new(vec![
+                    vec![base_value; matrix_size + 1];
+                    vector_size + 1
+                ])))
             }
             3 => {
                 if vector_size * matrix_size * cube_size > MAX_ARRAY_SIZE {
@@ -394,10 +397,13 @@ impl GenericVariableData {
                     );
                     return None;
                 }
-                Some(GenericVariableData::Dim3(vec![
-                    vec![vec![base_value; cube_size + 1]; matrix_size + 1];
+                Some(GenericVariableData::Dim3(std::sync::Arc::new(vec![
+                    vec![
+                        vec![base_value; cube_size + 1];
+                        matrix_size + 1
+                    ];
                     vector_size + 1
-                ]))
+                ])))
             }
             _ => panic!("Invalid dimension: {dim}"),
         }
@@ -602,7 +608,7 @@ impl Add<VariableValue> for VariableValue {
                 VariableType::String | VariableType::BigStr | VariableType::UnboundedString => {
                     let mut new_string = self.as_string();
                     new_string.push_str(&other.as_string());
-                    generic_data = GenericVariableData::String(new_string);
+                    generic_data = GenericVariableData::String(std::sync::Arc::new(new_string));
                 }
 
                 VariableType::Byte => {
@@ -1057,22 +1063,24 @@ impl VariableValue {
             GenericVariableData::Dim1(values) => VariableValue {
                 vtype: self.vtype,
                 data: VariableData::default(),
-                generic_data: GenericVariableData::Dim1(values.iter().map(VariableValue::emptied).collect()),
+                generic_data: GenericVariableData::Dim1(std::sync::Arc::new(values.iter().map(VariableValue::emptied).collect())),
             },
             GenericVariableData::Dim2(values) => VariableValue {
                 vtype: self.vtype,
                 data: VariableData::default(),
-                generic_data: GenericVariableData::Dim2(values.iter().map(|row| row.iter().map(VariableValue::emptied).collect()).collect()),
+                generic_data: GenericVariableData::Dim2(std::sync::Arc::new(
+                    values.iter().map(|row| row.iter().map(VariableValue::emptied).collect()).collect(),
+                )),
             },
             GenericVariableData::Dim3(values) => VariableValue {
                 vtype: self.vtype,
                 data: VariableData::default(),
-                generic_data: GenericVariableData::Dim3(
+                generic_data: GenericVariableData::Dim3(std::sync::Arc::new(
                     values
                         .iter()
                         .map(|plane| plane.iter().map(|row| row.iter().map(VariableValue::emptied).collect()).collect())
                         .collect(),
-                ),
+                )),
             },
             _ => self.vtype.create_empty_value(),
         }
@@ -1090,7 +1098,7 @@ impl VariableValue {
         Self {
             vtype: VariableType::String,
             data: VariableData::default(),
-            generic_data: GenericVariableData::String(s),
+            generic_data: GenericVariableData::String(std::sync::Arc::new(s)),
         }
     }
 
@@ -1098,7 +1106,7 @@ impl VariableValue {
         Self {
             vtype: VariableType::UnboundedString,
             data: VariableData::default(),
-            generic_data: GenericVariableData::String(s),
+            generic_data: GenericVariableData::String(std::sync::Arc::new(s)),
         }
     }
 
@@ -1236,7 +1244,7 @@ impl VariableValue {
         Self {
             vtype: variable_type,
             data: VariableData::default(),
-            generic_data: GenericVariableData::Dim1(vec),
+            generic_data: GenericVariableData::Dim1(std::sync::Arc::new(vec)),
         }
     }
 
@@ -1244,7 +1252,7 @@ impl VariableValue {
         Self {
             vtype: variable_type,
             data: VariableData::default(),
-            generic_data: GenericVariableData::Dim2(vec),
+            generic_data: GenericVariableData::Dim2(std::sync::Arc::new(vec)),
         }
     }
 
@@ -1252,7 +1260,7 @@ impl VariableValue {
         Self {
             vtype: variable_type,
             data: VariableData::default(),
-            generic_data: GenericVariableData::Dim3(vec),
+            generic_data: GenericVariableData::Dim3(std::sync::Arc::new(vec)),
         }
     }
 
@@ -1694,6 +1702,14 @@ impl VariableValue {
         self.as_word() as i16
     }
 
+    pub fn as_str(&self) -> Option<&str> {
+        match &self.generic_data {
+            GenericVariableData::String(value) => Some(value.as_str()),
+            GenericVariableData::Password(Password::PlainText(value)) => Some(value),
+            _ => None,
+        }
+    }
+
     /// .
     ///
     /// # Panics
@@ -1702,7 +1718,7 @@ impl VariableValue {
     pub fn as_string(&self) -> String {
         unsafe {
             match &self.generic_data {
-                GenericVariableData::String(s) => s.clone(),
+                GenericVariableData::String(s) => s.as_ref().clone(),
                 GenericVariableData::Bytes(data) => bytes_to_hex(data),
                 GenericVariableData::Password(p) => match p {
                     Password::PlainText(s) => s.clone(),
@@ -1842,9 +1858,9 @@ impl VariableValue {
 
     pub fn get_array_value_mut(&mut self, dim_1: usize, dim_2: usize, dim_3: usize) -> Option<&mut VariableValue> {
         match &mut self.generic_data {
-            GenericVariableData::Dim1(data) => data.get_mut(dim_1),
-            GenericVariableData::Dim2(data) => data.get_mut(dim_1)?.get_mut(dim_2),
-            GenericVariableData::Dim3(data) => data.get_mut(dim_1)?.get_mut(dim_2)?.get_mut(dim_3),
+            GenericVariableData::Dim1(data) => std::sync::Arc::make_mut(data).get_mut(dim_1),
+            GenericVariableData::Dim2(data) => std::sync::Arc::make_mut(data).get_mut(dim_1)?.get_mut(dim_2),
+            GenericVariableData::Dim3(data) => std::sync::Arc::make_mut(data).get_mut(dim_1)?.get_mut(dim_2)?.get_mut(dim_3),
             _ => None,
         }
     }
@@ -1859,6 +1875,7 @@ impl VariableValue {
                 return Err(Box::new(VMError::GenericDataNotSet));
             }
             GenericVariableData::Dim1(data) => {
+                let data = std::sync::Arc::make_mut(data);
                 if dim1 < data.len() {
                     data[dim1] = val.convert_to(self.vtype);
                 } else {
@@ -1866,6 +1883,7 @@ impl VariableValue {
                 }
             }
             GenericVariableData::Dim2(data) => {
+                let data = std::sync::Arc::make_mut(data);
                 if dim1 < data.len() && dim2 < data[dim1].len() {
                     data[dim1][dim2] = val.convert_to(self.vtype);
                 } else if dim1 < data.len() {
@@ -1875,6 +1893,7 @@ impl VariableValue {
                 }
             }
             GenericVariableData::Dim3(data) => {
+                let data = std::sync::Arc::make_mut(data);
                 if dim1 < data.len() && dim2 < data[dim1].len() && dim3 < data[dim1][dim2].len() {
                     data[dim1][dim2][dim3] = val.convert_to(self.vtype);
                 } else if dim1 < data.len() {
@@ -1891,6 +1910,7 @@ impl VariableValue {
                 if self.vtype == VariableType::String {
                     if let Some(ch) = val.as_string().chars().next() {
                         if let GenericVariableData::String(s) = &mut self.generic_data {
+                            let s = std::sync::Arc::make_mut(s);
                             let mut v: Vec<char> = s.chars().collect();
                             v.resize(dim1 + 1, ' ');
                             v[dim1] = ch;
@@ -1928,28 +1948,33 @@ impl VariableValue {
         if matches!(convert_to_type, VariableType::String | VariableType::BigStr | VariableType::UnboundedString) {
             match self.generic_data {
                 GenericVariableData::Dim1(values) => {
+                    let values = std::sync::Arc::unwrap_or_clone(values);
                     return VariableValue {
                         vtype: convert_to_type,
-                        generic_data: GenericVariableData::Dim1(values.into_iter().map(|value| value.convert_to(convert_to_type)).collect()),
+                        generic_data: GenericVariableData::Dim1(std::sync::Arc::new(
+                            values.into_iter().map(|value| value.convert_to(convert_to_type)).collect(),
+                        )),
                         ..Default::default()
                     };
                 }
                 GenericVariableData::Dim2(values) => {
+                    let values = std::sync::Arc::unwrap_or_clone(values);
                     return VariableValue {
                         vtype: convert_to_type,
-                        generic_data: GenericVariableData::Dim2(
+                        generic_data: GenericVariableData::Dim2(std::sync::Arc::new(
                             values
                                 .into_iter()
                                 .map(|row| row.into_iter().map(|value| value.convert_to(convert_to_type)).collect())
                                 .collect(),
-                        ),
+                        )),
                         ..Default::default()
                     };
                 }
                 GenericVariableData::Dim3(values) => {
+                    let values = std::sync::Arc::unwrap_or_clone(values);
                     return VariableValue {
                         vtype: convert_to_type,
-                        generic_data: GenericVariableData::Dim3(
+                        generic_data: GenericVariableData::Dim3(std::sync::Arc::new(
                             values
                                 .into_iter()
                                 .map(|plane| {
@@ -1959,7 +1984,7 @@ impl VariableValue {
                                         .collect()
                                 })
                                 .collect(),
-                        ),
+                        )),
                         ..Default::default()
                     };
                 }
@@ -1976,7 +2001,7 @@ impl VariableValue {
                     }
                     return VariableValue {
                         vtype: convert_to_type,
-                        generic_data: GenericVariableData::String(value),
+                        generic_data: GenericVariableData::String(std::sync::Arc::new(value)),
                         ..Default::default()
                     };
                 }
@@ -2203,7 +2228,7 @@ pub fn convert_to(var_type: VariableType, value: &VariableValue) -> VariableValu
     let mut res = value.clone();
     res.vtype = var_type;
     if matches!(var_type, VariableType::String | VariableType::BigStr | VariableType::UnboundedString) {
-        res.generic_data = GenericVariableData::String(value.as_string());
+        res.generic_data = GenericVariableData::String(std::sync::Arc::new(value.as_string()));
     }
     if var_type == VariableType::Password {
         if let GenericVariableData::Password(p) = &value.generic_data {
@@ -2246,6 +2271,17 @@ mod tests {
     fn bytes_compare_by_content_not_identity() {
         assert_eq!(VariableValue::new_bytes(vec![1, 2, 3]), VariableValue::new_bytes(vec![1, 2, 3]));
         assert_ne!(VariableValue::new_bytes(vec![1, 2, 3]), VariableValue::new_bytes(vec![1, 2, 4]));
+    }
+
+    #[test]
+    fn cloned_arrays_detach_on_write() {
+        let original = VariableValue::new_vector(VariableType::Integer, vec![VariableValue::new_int(1), VariableValue::new_int(2)]);
+        let mut clone = original.clone();
+
+        clone.set_array_value(0, 0, 0, VariableValue::new_int(9)).unwrap();
+
+        assert_eq!(1, original.get_array_value(0, 0, 0).as_int());
+        assert_eq!(9, clone.get_array_value(0, 0, 0).as_int());
     }
 
     #[test]

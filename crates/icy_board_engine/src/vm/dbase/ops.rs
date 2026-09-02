@@ -40,7 +40,7 @@ pub async fn dcreate(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<bool>
     };
 
     let mut fields = Vec::new();
-    for spec in &specs {
+    for spec in specs.iter() {
         let spec = spec.as_string();
         if spec.trim().is_empty() {
             continue;

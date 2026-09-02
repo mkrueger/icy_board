@@ -71,8 +71,13 @@ where
     E: FnMut(&VariableValue),
 {
     match &value.generic_data {
-        GenericVariableData::Record(values) | GenericVariableData::Dim1(values) => {
+        GenericVariableData::Record(values) => {
             for value in values {
+                walk_encode(value, leaf)?;
+            }
+        }
+        GenericVariableData::Dim1(values) => {
+            for value in values.iter() {
                 walk_encode(value, leaf)?;
             }
         }
@@ -101,14 +106,16 @@ where
 {
     let generic_data = match &template.generic_data {
         GenericVariableData::Record(values) => GenericVariableData::Record(values.iter().map(|value| map_shape(value, scalar)).collect::<Result<_, _>>()?),
-        GenericVariableData::Dim1(values) => GenericVariableData::Dim1(values.iter().map(|value| map_shape(value, scalar)).collect::<Result<_, _>>()?),
-        GenericVariableData::Dim2(values) => GenericVariableData::Dim2(
+        GenericVariableData::Dim1(values) => GenericVariableData::Dim1(std::sync::Arc::new(
+            values.iter().map(|value| map_shape(value, scalar)).collect::<Result<_, _>>()?,
+        )),
+        GenericVariableData::Dim2(values) => GenericVariableData::Dim2(std::sync::Arc::new(
             values
                 .iter()
                 .map(|row| row.iter().map(|value| map_shape(value, scalar)).collect::<Result<_, _>>())
                 .collect::<Result<_, _>>()?,
-        ),
-        GenericVariableData::Dim3(values) => GenericVariableData::Dim3(
+        )),
+        GenericVariableData::Dim3(values) => GenericVariableData::Dim3(std::sync::Arc::new(
             values
                 .iter()
                 .map(|plane| {
@@ -118,7 +125,7 @@ where
                         .collect::<Result<_, _>>()
                 })
                 .collect::<Result<_, _>>()?,
-        ),
+        )),
         GenericVariableData::None | GenericVariableData::String(_) => return scalar(template),
         _ => return Err(format!("{} cannot be read from a record file", template.vtype)),
     };
@@ -196,7 +203,7 @@ fn decode_text_scalar(template: &VariableValue, text: &str) -> Result<VariableVa
             return Ok(VariableValue {
                 vtype: template.vtype,
                 data: VariableData::default(),
-                generic_data: GenericVariableData::String(unescape_text(text)?),
+                generic_data: GenericVariableData::String(std::sync::Arc::new(unescape_text(text)?)),
             });
         }
         VariableType::Boolean => VariableData::from_bool(match text {
@@ -295,7 +302,7 @@ fn decode_binary_scalar(template: &VariableValue, input: &mut Cursor<&[u8]>) -> 
             return Ok(VariableValue {
                 vtype: template.vtype,
                 data: VariableData::default(),
-                generic_data: GenericVariableData::String(text),
+                generic_data: GenericVariableData::String(std::sync::Arc::new(text)),
             });
         }
         VariableType::Boolean => {

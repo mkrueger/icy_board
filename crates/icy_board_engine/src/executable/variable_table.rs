@@ -129,9 +129,9 @@ impl VarHeader {
     pub fn create_generic_data(&self) -> Option<GenericVariableData> {
         if self.flags & VARIABLE_FLAG_DYNAMIC_ARRAY != 0 {
             return match self.dim {
-                1 => Some(GenericVariableData::Dim1(Vec::new())),
-                2 => Some(GenericVariableData::Dim2(Vec::new())),
-                3 => Some(GenericVariableData::Dim3(Vec::new())),
+                1 => Some(GenericVariableData::Dim1(std::sync::Arc::new(Vec::new()))),
+                2 => Some(GenericVariableData::Dim2(std::sync::Arc::new(Vec::new()))),
+                3 => Some(GenericVariableData::Dim3(std::sync::Arc::new(Vec::new()))),
                 _ => None,
             };
         }
@@ -480,7 +480,7 @@ impl VariableTable {
                         for c in &buf[i..(i + string_length - 1)] {
                             str.push(CP437_TO_UNICODE[*c as usize]);
                         }
-                        Some(GenericVariableData::String(str))
+                        Some(GenericVariableData::String(std::sync::Arc::new(str)))
                     };
                     variable = VariableValue {
                         vtype: VariableType::String,

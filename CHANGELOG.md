@@ -121,6 +121,11 @@ releases.
 
 ### Changed
 
+- PPL execution avoids deep-cloning commands and whole collections in hot loops,
+  moves routine frames instead of copying them, and shares string and array
+  storage until mutation. `FOREACH` uses constant-time multidimensional indexing,
+  while array and string assignments retain value semantics through copy-on-write.
+
 - PPL 4.00 `STRING` now has its own serialized scalar type ID, 24, and remains
   unbounded Unicode text. Classic type 7 `STRING` retains its 256-character
   limit, while type 13 `BIGSTR` retains a 2048-character limit and is deprecated

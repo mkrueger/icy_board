@@ -565,7 +565,7 @@ impl VariableLookups {
     pub fn add_constant(&mut self, constant: &Constant) {
         let value = constant.get_value();
         if let GenericVariableData::String(str) = &value.generic_data {
-            if self.string_lookup_table.insert(str.clone()) {
+            if self.string_lookup_table.insert(str.as_ref().clone()) {
                 self.constants.push(constant.clone());
             }
         } else {
@@ -725,7 +725,7 @@ impl LookupVariabeleTable {
         let value = constant.get_value();
 
         if let GenericVariableData::String(str) = &value.generic_data {
-            if let Some(id) = self.string_lookup_table.get(str) {
+            if let Some(id) = self.string_lookup_table.get(str.as_str()) {
                 return *id;
             }
         } else {
@@ -748,7 +748,7 @@ impl LookupVariabeleTable {
     fn add_constant(&mut self, constant: &Constant) {
         let value = constant.get_value();
         if let GenericVariableData::String(str) = &value.generic_data {
-            if self.string_lookup_table.contains_key(str) {
+            if self.string_lookup_table.contains_key(str.as_str()) {
                 return;
             }
         } else {
@@ -774,7 +774,7 @@ impl LookupVariabeleTable {
         let entry = TableEntry::new(format!("CONST_{}", const_num + 1), header, value.clone(), EntryType::Constant);
         let id = self.push(entry);
         if let GenericVariableData::String(str) = value.generic_data {
-            self.string_lookup_table.insert(str, id);
+            self.string_lookup_table.insert(std::sync::Arc::unwrap_or_clone(str), id);
         } else {
             unsafe {
                 let key = (constant.get_var_type(), value.data.u64_value);

@@ -30,6 +30,7 @@ use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::Arc;
 use thiserror::Error;
 
 pub mod expressions;
@@ -218,6 +219,7 @@ pub struct VirtualMachine<'a> {
     pub variable_table: VariableTable,
 
     pub script: PPEScript,
+    commands: Vec<Arc<PPECommand>>,
     pub cur_ptr: usize,
     pub is_running: bool,
     /// Set by STOP, which gives up on a program rather than ending it.
@@ -288,6 +290,7 @@ impl<'a> VirtualMachine<'a> {
             type_registry,
             return_addresses: Vec::new(),
             script: PPEScript::default(),
+            commands: Vec::new(),
             io,
             is_running: true,
             aborted: false,
@@ -602,11 +605,15 @@ impl VirtualMachine<'_> {
         }
     }
 
-    #[async_recursion(?Send)]
     pub async fn eval_expr(&mut self, expr: &PPEExpr) -> Res<VariableValue> {
         if let Some(value) = self.eval_expr_sync(expr) {
             return Ok(value);
         }
+        self.eval_expr_async(expr).await
+    }
+
+    #[async_recursion(?Send)]
+    async fn eval_expr_async(&mut self, expr: &PPEExpr) -> Res<VariableValue> {
         match expr {
             PPEExpr::Invalid => Err(VMError::InternalVMError.into()),
             PPEExpr::Value(id) | PPEExpr::RoutineReference(id) => Ok(decay_array(self.variable_table.get_value(*id).clone())),
@@ -787,13 +794,13 @@ impl VirtualMachine<'_> {
 
     #[async_recursion(?Send)]
     async fn run(&mut self) -> Res<()> {
-        let max_ptr = self.script.statements.len();
+        let max_ptr = self.commands.len();
         while !self.fpclear && self.is_running && self.cur_ptr < max_ptr {
             let p = self.cur_ptr;
             self.cur_ptr += 1;
-            let c = self.script.statements[p].command.clone();
+            let command = self.commands[p].clone();
             // log::info!("{p}: {c}");
-            self.execute_statement(&c).await?;
+            self.execute_statement(&command).await?;
             self.check_error_trap()?;
         }
         Ok(())
@@ -1137,7 +1144,7 @@ impl VirtualMachine<'_> {
                                     return Err(VMError::PushPopStackEmpty.into());
                                 };
                                 if id != return_var_id {
-                                    self.variable_table.set_value(id, value);
+                                    *self.variable_table.get_value_mut(id) = value;
                                 }
                             }
                         }
@@ -1239,11 +1246,11 @@ impl VirtualMachine<'_> {
             }
             PPECommand::ForEach(variable, collection, end) => {
                 let collection = self.eval_array_operand(collection).await?;
-                let count = self.foreach_element_count(&collection).await?;
+                let count = Self::foreach_element_count(&collection);
                 if count == 0 {
                     self.goto(*end)?;
                 } else {
-                    let element = self.foreach_element_at(&collection, 0).await?;
+                    let element = Self::foreach_element_at(&collection, 0);
                     self.variable_table.set_value(*variable, element);
                     let body_start = self.script.statements.get(self.cur_ptr).map_or(*end, |statement| statement.span.start * 2);
                     self.foreach_stack.push(ForEachFrame {
@@ -1269,8 +1276,7 @@ impl VirtualMachine<'_> {
                 } else {
                     let variable = frame.variable;
                     let index = frame.index;
-                    let collection = frame.collection.clone();
-                    let element = self.foreach_element_at(&collection, index).await?;
+                    let element = Self::foreach_element_at(&frame.collection, index);
                     self.variable_table.set_value(variable, element);
                     self.goto(*start)?;
                 }
@@ -1280,25 +1286,34 @@ impl VirtualMachine<'_> {
         Ok(())
     }
 
-    async fn foreach_element_count(&mut self, collection: &VariableValue) -> Res<usize> {
-        let count = match &collection.generic_data {
+    fn foreach_element_count(collection: &VariableValue) -> usize {
+        match &collection.generic_data {
             GenericVariableData::Dim1(items) => items.len(),
             GenericVariableData::Dim2(items) => items.iter().map(Vec::len).sum(),
             GenericVariableData::Dim3(items) => items.iter().flatten().map(Vec::len).sum(),
             _ => 1,
-        };
-        Ok(count)
+        }
     }
 
-    async fn foreach_element_at(&mut self, collection: &VariableValue, index: usize) -> Res<VariableValue> {
+    fn foreach_element_at(collection: &VariableValue, index: usize) -> VariableValue {
         let element = match &collection.generic_data {
             GenericVariableData::Dim1(items) => items.get(index).cloned(),
-            GenericVariableData::Dim2(items) => items.iter().flatten().nth(index).cloned(),
-            GenericVariableData::Dim3(items) => items.iter().flatten().flatten().nth(index).cloned(),
+            GenericVariableData::Dim2(items) => items.first().and_then(|row| {
+                let columns = row.len();
+                (columns > 0).then(|| items.get(index / columns)?.get(index % columns).cloned()).flatten()
+            }),
+            GenericVariableData::Dim3(items) => items.first().and_then(|plane| {
+                let rows = plane.len();
+                let columns = plane.first()?.len();
+                let plane_size = rows.checked_mul(columns)?;
+                (plane_size > 0)
+                    .then(|| items.get(index / plane_size)?.get(index % plane_size / columns)?.get(index % columns).cloned())
+                    .flatten()
+            }),
             _ if index == 0 => Some(collection.clone()),
             _ => None,
         };
-        Ok(element.unwrap_or_else(|| collection.vtype.create_empty_value()))
+        element.unwrap_or_else(|| collection.vtype.create_empty_value())
     }
 
     fn cleanup_foreach_for_jump(&mut self, target: usize) {
@@ -1314,10 +1329,13 @@ impl VirtualMachine<'_> {
 
     #[allow(clippy::needless_range_loop)]
     async fn prepare_call(&mut self, locals: usize, parameters: usize, first: usize, arguments: &[PPEExpr], pass_flags: u16) -> Res<()> {
+        let mut values = Vec::with_capacity(parameters);
+        for argument in arguments.iter().take(parameters) {
+            values.push(self.eval_expr(argument).await?);
+        }
         self.save_call_frame(locals, parameters, first);
-        for i in 0..parameters {
+        for (i, value) in values.into_iter().enumerate() {
             let id = first + i;
-            let value = self.eval_expr(&arguments[i]).await?;
             self.variable_table.set_value(id, value);
 
             if (1 << i) & pass_flags != 0 {
@@ -1342,8 +1360,9 @@ impl VirtualMachine<'_> {
         for i in 0..(locals + parameters) {
             let id = first + i;
             if self.variable_table.get_var_entry(id).header.flags & 0x1 == 0x0 {
-                let val = self.variable_table.get_value(id).clone();
-                self.call_local_value_stack.push(val);
+                let empty = self.variable_table.get_value(id).emptied();
+                let value = std::mem::replace(self.variable_table.get_value_mut(id), empty);
+                self.call_local_value_stack.push(value);
             }
         }
     }
@@ -1372,8 +1391,8 @@ impl VirtualMachine<'_> {
     }
 
     fn goto(&mut self, label: usize) -> Result<(), VMError> {
-        if let Some(label) = self.label_table.get(&label) {
-            self.cur_ptr = *label;
+        if let Some(statement) = self.label_table.get(&label) {
+            self.cur_ptr = *statement;
             Ok(())
         } else {
             Err(VMError::LabelNotFound(label))
@@ -1543,9 +1562,10 @@ pub async fn run<P: AsRef<Path>>(file_name: &P, prg: &Executable, io: &mut dyn P
     match PPEScript::from_ppe_file(prg) {
         Ok(script) => {
             let mut label_table = HashMap::new();
-            for (i, stmt) in script.statements.iter().enumerate() {
-                label_table.insert(stmt.span.start * 2, i);
+            for (index, statement) in script.statements.iter().enumerate() {
+                label_table.insert(statement.span.start * 2, index);
             }
+            let commands = script.statements.iter().map(|statement| Arc::new(statement.command.clone())).collect();
             let user = if let Some(user) = &icy_board_state.session.current_user {
                 user.clone()
             } else {
@@ -1557,6 +1577,7 @@ pub async fn run<P: AsRef<Path>>(file_name: &P, prg: &Executable, io: &mut dyn P
 
             let mut vm = VirtualMachine::new(file_name, &reg, io, icy_board_state);
             vm.script = script;
+            vm.commands = commands;
             vm.variable_table = prg.variable_table.clone();
             vm.label_table = label_table;
             vm.user_types = prg.user_types.clone();
