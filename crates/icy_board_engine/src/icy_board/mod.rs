@@ -645,6 +645,9 @@ impl IcyBoard {
         // Line 94
         pcb_dat.board_name.clone_from(&self.config.board.name);
 
+        // Lines 97-106
+        pcb_dat.func_keys.clone_from(&self.config.func_keys);
+
         // Line 108
         pcb_dat.num_conf = self.conferences.len() as i32 - 1;
 

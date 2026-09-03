@@ -1606,6 +1606,7 @@ mod layout_tests {
         assert_eq!(d.modem.modem_init, "55");
         assert_eq!(d.kbd_timeout, 89);
         assert_eq!(d.board_name, "94");
+        assert_eq!(d.func_keys, ["97", "98", "99", "100", "101", "102", "103", "104", "105", "106"]);
         assert_eq!(d.max_msg_lines, 109);
         assert_eq!(d.stop_free_space, 120);
         assert_eq!(d.user_levels.cmd_a, 121);
@@ -1621,5 +1622,20 @@ mod layout_tests {
         assert_eq!(d.sysop_security.see_all_return_receipt_messages, 254);
         assert_eq!(d.peak_days, "310");
         assert_eq!(d.holidays_file, "311");
+    }
+
+    #[test]
+    fn function_keys_survive_pcboard_data_serialization() {
+        let dir = std::env::temp_dir().join(format!("pcbdat-function-keys-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("pcboard.dat");
+        let mut data = PcbBoardData::default();
+        data.func_keys = std::array::from_fn(|index| format!("macro {}^M", index + 1));
+        std::fs::write(&path, data.serialize(crate::parser::Encoding::CP437)).unwrap();
+
+        let imported = PcbBoardData::import_pcboard(&path).unwrap();
+
+        std::fs::remove_dir_all(dir).unwrap();
+        assert_eq!(imported.func_keys, data.func_keys);
     }
 }

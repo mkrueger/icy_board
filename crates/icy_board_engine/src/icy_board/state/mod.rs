@@ -2057,6 +2057,27 @@ impl IcyBoardState {
         }
     }
 
+    async fn run_sysop_function_key(&mut self, index: usize) -> Res<()> {
+        let definition = self.get_board().await.config.func_keys.get(index).cloned().unwrap_or_default();
+        if definition.len() > 1 {
+            let value = &definition[1..];
+            if definition.starts_with('!') {
+                let path = PathBuf::from(value.replace('\\', "/"));
+                let path = self.get_board().await.resolve_file(&path);
+                self.run_ppe(&path, None).await?;
+                return Ok(());
+            }
+            if definition.starts_with('%') {
+                let path = PathBuf::from(value.replace('\\', "/"));
+                let path = self.get_board().await.resolve_file(&path);
+                let text = fs::read(path)?.into_iter().map(|byte| CP437_TO_UNICODE[byte as usize]).collect::<String>();
+                self.stuff_keyboard_buffer(&text, true)?;
+                return Ok(());
+            }
+        }
+        self.stuff_keyboard_buffer(&definition, true)
+    }
+
     pub fn search_init(&mut self, pattern: String, case_sensitive: bool) -> bool {
         match PatternExpr::parse(&pattern) {
             Ok(pattern) => {
@@ -3165,6 +3186,7 @@ impl IcyBoardState {
         self.get_char_with_timeout(target, Duration::from_millis(100)).await
     }
 
+    #[async_recursion(?Send)]
     async fn get_char_with_timeout(&mut self, target: TerminalTarget, wait: Duration) -> Res<Option<KeyChar>> {
         self.drain_raw_input();
         self.drain_stale_protocol_input();
@@ -3214,7 +3236,7 @@ impl IcyBoardState {
                 bbs_channel = state.bbs_channel.take();
             } else {
                 log::error!("Node {} not found", self.node);
-                return Err(Box::new(IcyBoardError::NodeNotFound(self.node)));
+                return Err(IcyBoardError::NodeNotFound(self.node).into());
             }
         }
 
@@ -3240,6 +3262,16 @@ impl IcyBoardState {
                         }
                         Some(BBSMessage::SysopLogin) => {
                             self.print_sysop_screen().await?;
+                        }
+                        Some(BBSMessage::StartSysopChat) => {
+                            self.set_activity(NodeStatus::ChatWithSysop).await;
+                            self.chat().await?;
+                            self.display_text(IceText::SysopChatEnded, display_flags::NEWLINE | display_flags::LFBEFORE)
+                                .await?;
+                            self.set_activity(NodeStatus::Available).await;
+                        }
+                        Some(BBSMessage::RunSysopFunctionKey(index)) => {
+                            self.run_sysop_function_key(index).await?;
                         }
                         Some(BBSMessage::Broadcast(msg)) => {
                             self.show_broadcast(msg).await?;
@@ -3310,6 +3342,16 @@ impl IcyBoardState {
                     match msg {
                         Some(BBSMessage::SysopLogin) => {
                             self.print_sysop_screen().await?;
+                        }
+                        Some(BBSMessage::StartSysopChat) => {
+                            self.set_activity(NodeStatus::ChatWithSysop).await;
+                            self.chat().await?;
+                            self.display_text(IceText::SysopChatEnded, display_flags::NEWLINE | display_flags::LFBEFORE)
+                                .await?;
+                            self.set_activity(NodeStatus::Available).await;
+                        }
+                        Some(BBSMessage::RunSysopFunctionKey(index)) => {
+                            self.run_sysop_function_key(index).await?;
                         }
                         Some(BBSMessage::Broadcast(msg)) => {
                             self.show_broadcast(msg).await?;
@@ -4319,6 +4361,19 @@ mod screen_tests {
 
             assert_eq!(state.session.term_caps.reported_term_size, (132, 43));
             assert_eq!(state.session.term_caps.term_size, (80, 25));
+        });
+    }
+
+    #[test]
+    fn sysop_function_key_stuffs_text_and_expands_control_characters() {
+        tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
+            let (mut state, _peer) = graphics_state().await;
+            state.get_board().await.config.func_keys[0] = "HELLO^M".to_string();
+
+            state.run_sysop_function_key(0).await.unwrap();
+
+            let stuffed = state.char_buffer.drain(..).map(|key| key.ch).collect::<String>();
+            assert_eq!(stuffed, "HELLO\r");
         });
     }
 

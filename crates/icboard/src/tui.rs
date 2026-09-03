@@ -45,6 +45,22 @@ pub(crate) const STATUS_ROWS: u16 = 2;
 /// bar keeps the last of them, so the board scrolls in what is left.
 pub(crate) const LOCAL_SCREEN_SIZE: (u16, u16) = (80, 25 - STATUS_ROWS);
 
+#[derive(Debug, PartialEq)]
+enum SysopHotkey {
+    Chat,
+    FunctionKey(usize),
+}
+
+fn sysop_hotkey(key: crossterm::event::KeyEvent, sysop_mode: bool) -> Option<SysopHotkey> {
+    match key.code {
+        KeyCode::F(number) if key.modifiers.contains(KeyModifiers::SHIFT) && (1..=10).contains(&number) => {
+            Some(SysopHotkey::FunctionKey(usize::from(number - 1)))
+        }
+        KeyCode::F(10) if sysop_mode => Some(SysopHotkey::Chat),
+        _ => None,
+    }
+}
+
 pub struct Tui {
     sysop_mode: bool,
     screen: Arc<std::sync::Mutex<TextScreen>>,
@@ -156,6 +172,13 @@ impl Tui {
     async fn disconnect_local_session(&self) -> Res<()> {
         let _ = self.tx.send(SendData::Disconnect).await;
         Ok(())
+    }
+
+    async fn send_bbs_message(&self, bbs: &Arc<Mutex<BBS>>, message: BBSMessage) {
+        let channel = bbs.lock().await.bbs_channels.get(self.node).and_then(Clone::clone);
+        if let Some(channel) = channel {
+            let _ = channel.send(message).await;
+        }
     }
 
     pub async fn sysop_mode(bbs: &Arc<Mutex<BBS>>, node: usize) -> Res<Option<Self>> {
@@ -276,23 +299,29 @@ impl Tui {
                                 _ => {}
                             }
                         } else {
-                            match key.code {
-                                KeyCode::Char(c) => self.add_input(c.to_string().chars()).await?,
-                                KeyCode::Enter => self.add_input("\r".chars()).await?,
-                                KeyCode::Backspace => self.add_input("\x08".chars()).await?,
-                                KeyCode::Esc => self.add_input("\x1B".chars()).await?,
-                                KeyCode::Tab => self.add_input("\x09".chars()).await?,
-                                KeyCode::Delete => self.add_input("\x7F".chars()).await?,
-                                KeyCode::Insert => self.add_input("\x1B[2~".chars()).await?,
-                                KeyCode::Home => self.add_input("\x1B[H".chars()).await?,
-                                KeyCode::End => self.add_input("\x1B[F".chars()).await?,
-                                KeyCode::Up => self.add_input("\x1B[A".chars()).await?,
-                                KeyCode::Down => self.add_input("\x1B[B".chars()).await?,
-                                KeyCode::Right => self.add_input("\x1B[C".chars()).await?,
-                                KeyCode::Left => self.add_input("\x1B[D".chars()).await?,
-                                KeyCode::PageUp => self.add_input("\x1B[V".chars()).await?,
-                                KeyCode::PageDown => self.add_input("\x1B[U".chars()).await?,
-                                _ => {}
+                            match sysop_hotkey(key, self.sysop_mode) {
+                                Some(SysopHotkey::FunctionKey(index)) => {
+                                    self.send_bbs_message(bbs, BBSMessage::RunSysopFunctionKey(index)).await;
+                                }
+                                Some(SysopHotkey::Chat) => self.send_bbs_message(bbs, BBSMessage::StartSysopChat).await,
+                                None => match key.code {
+                                    KeyCode::Char(c) => self.add_input(c.to_string().chars()).await?,
+                                    KeyCode::Enter => self.add_input("\r".chars()).await?,
+                                    KeyCode::Backspace => self.add_input("\x08".chars()).await?,
+                                    KeyCode::Esc => self.add_input("\x1B".chars()).await?,
+                                    KeyCode::Tab => self.add_input("\x09".chars()).await?,
+                                    KeyCode::Delete => self.add_input("\x7F".chars()).await?,
+                                    KeyCode::Insert => self.add_input("\x1B[2~".chars()).await?,
+                                    KeyCode::Home => self.add_input("\x1B[H".chars()).await?,
+                                    KeyCode::End => self.add_input("\x1B[F".chars()).await?,
+                                    KeyCode::Up => self.add_input("\x1B[A".chars()).await?,
+                                    KeyCode::Down => self.add_input("\x1B[B".chars()).await?,
+                                    KeyCode::Right => self.add_input("\x1B[C".chars()).await?,
+                                    KeyCode::Left => self.add_input("\x1B[D".chars()).await?,
+                                    KeyCode::PageUp => self.add_input("\x1B[V".chars()).await?,
+                                    KeyCode::PageDown => self.add_input("\x1B[U".chars()).await?,
+                                    _ => {}
+                                },
                             }
                         }
                     }
@@ -937,6 +966,16 @@ mod sixel_tests {
     fn local_status_help_uses_alt_x_and_leaves_escape_to_the_session() {
         assert!(STATUS_HELP.contains("ALT-X=Exit"));
         assert!(!STATUS_HELP.contains("ESC"));
+    }
+
+    #[test]
+    fn f10_starts_chat_but_shift_f10_runs_the_configured_macro() {
+        let f10 = crossterm::event::KeyEvent::new(KeyCode::F(10), KeyModifiers::NONE);
+        let shift_f10 = crossterm::event::KeyEvent::new(KeyCode::F(10), KeyModifiers::SHIFT);
+
+        assert_eq!(sysop_hotkey(f10, true), Some(SysopHotkey::Chat));
+        assert_eq!(sysop_hotkey(f10, false), None);
+        assert_eq!(sysop_hotkey(shift_f10, true), Some(SysopHotkey::FunctionKey(9)));
     }
 
     #[tokio::test]
