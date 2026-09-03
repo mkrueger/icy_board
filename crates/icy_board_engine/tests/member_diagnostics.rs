@@ -193,7 +193,7 @@ fn a_string_member_without_a_call_is_reported() {
     for source in ["STRING s\nPRINTLN s.ToLower\n", "STRING s\nPRINTLN s.Len\n", "STRING s\ns = s.Trim\n"] {
         let errors = diagnostics(source);
         assert!(
-            errors.iter().any(|error| error.contains("has to be called with '()'")),
+            errors.iter().any(|error| error.starts_with("Function used as variable")),
             "{source:?} -> {errors:?}"
         );
     }
@@ -219,7 +219,7 @@ fn a_board_object_routine_without_a_call_is_reported() {
     for source in ["PRINTLN Terminal.BeginUpdate\n", "PRINTLN Terminal.SetFont\n"] {
         let errors = diagnostics(source);
         assert!(
-            errors.iter().any(|error| error.contains("has to be called with '()'")),
+            errors.iter().any(|error| error.starts_with("Function used as variable")),
             "{source:?} -> {errors:?}"
         );
     }

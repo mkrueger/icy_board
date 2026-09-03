@@ -2694,7 +2694,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             if !is_called {
                 self.errors.lock().unwrap().report_error(
                     member_reference_expression.get_identifier_token().span.clone(),
-                    CompilationErrorType::MemberNeedsCall(member_reference_expression.get_identifier().to_string()),
+                    CompilationErrorType::FunctionUsedAsVariable(member_reference_expression.get_identifier().to_string()),
                 );
                 return VariableType::None;
             }
@@ -2708,7 +2708,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             if !is_called {
                 self.errors.lock().unwrap().report_error(
                     member_reference_expression.get_identifier_token().span.clone(),
-                    CompilationErrorType::MemberNeedsCall(member_reference_expression.get_identifier().to_string()),
+                    CompilationErrorType::FunctionUsedAsVariable(member_reference_expression.get_identifier().to_string()),
                 );
                 return VariableType::None;
             }
@@ -2741,7 +2741,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                         if !is_called {
                             self.errors.lock().unwrap().report_error(
                                 member_reference_expression.get_identifier_token().span.clone(),
-                                CompilationErrorType::MemberNeedsCall(name.to_string()),
+                                CompilationErrorType::FunctionUsedAsVariable(name.to_string()),
                             );
                             return VariableType::None;
                         }
@@ -2754,7 +2754,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                         if !is_called {
                             self.errors.lock().unwrap().report_error(
                                 member_reference_expression.get_identifier_token().span.clone(),
-                                CompilationErrorType::MemberNeedsCall(name.to_string()),
+                                CompilationErrorType::FunctionUsedAsVariable(name.to_string()),
                             );
                             return VariableType::None;
                         }
