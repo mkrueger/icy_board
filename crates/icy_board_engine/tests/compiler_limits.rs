@@ -96,3 +96,37 @@ fn too_many_declarations_are_rejected_before_ids_wrap() {
             if count > max && max == i16::MAX as usize
     ));
 }
+
+#[test]
+fn assigning_to_a_builtin_constant_is_reported_instead_of_panicking() {
+    for source in ["AUTO = 1\n", "AUTO.Field = 1\n", "NOCLEAR = TRUE\n"] {
+        let errors = diagnostics(source);
+        assert!(
+            errors.iter().any(|error| error.contains("built-in constant and can't be assigned to")),
+            "{source:?} -> {errors:?}"
+        );
+    }
+}
+
+#[test]
+fn indexing_a_routine_is_reported_instead_of_panicking() {
+    for source in [
+        "PROCEDURE P()\nENDPROC\nBEGIN\n  PRINTLN P[1]\nEND\n",
+        "DECLARE PROCEDURE Q(INTEGER a)\nBEGIN\n  PRINTLN Q[1]\nEND\n",
+        "FUNCTION F() INTEGER\n  RETURN 0\nENDFUNC\nBEGIN\n  PRINTLN F[1]\nEND\n",
+    ] {
+        let errors = diagnostics(source);
+        assert!(
+            errors.iter().any(|error| error.starts_with("Indexer called on function or procedure")),
+            "{source:?} -> {errors:?}"
+        );
+    }
+}
+
+#[test]
+fn internal_pseudo_statements_are_not_callable_from_source() {
+    for source in ["PCALL 1\n", "STATIC x\n", "PLACEHOLDER\n"] {
+        let errors = diagnostics(source);
+        assert!(!errors.is_empty(), "{source:?} was accepted");
+    }
+}

@@ -9,9 +9,10 @@ test jobs="4" threads="4":
 setup-editor target="all":
   tools/setup-editor.sh {{target}}
 
-# Fuzzes a PPE binary trust boundary. Needs nightly + cargo-fuzz; the corpus is
-# temporary, so a run leaves nothing behind in the working tree.
-# Targets: ppe_load, ppe_decompile, ppe_structured, ppe_roundtrip, ppe_disassemble.
+# Fuzzes a PPE binary or PPL source trust boundary. Needs nightly + cargo-fuzz;
+# the corpus is temporary, so a run leaves nothing behind in the working tree.
+# Binary targets: ppe_load, ppe_decompile, ppe_structured, ppe_roundtrip, ppe_disassemble.
+# Source targets: ppl_parse, ppl_compile.
 fuzz target="ppe_load" seconds="60":
   #!/usr/bin/env bash
   set -euo pipefail
@@ -21,6 +22,7 @@ fuzz target="ppe_load" seconds="60":
     crates/ppld/test_data \
     crates/icy_board_engine/tests/test_ppe \
     crates/icy_board_engine/tests/test_data \
+    ppe \
     -- -max_total_time={{seconds}} -max_len=262140 -timeout=15 -close_fd_mask=3
 
 build_ppe: build

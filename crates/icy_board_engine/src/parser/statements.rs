@@ -6,7 +6,7 @@ use crate::{
         OnErrorMode, OnErrorStatement, PredefinedCallStatement, ProcedureCallStatement, RepeatUntilStatement, ReturnStatement, SelectStatement, Statement,
         VariableDeclarationStatement, WhileDoStatement, WhileStatement,
     },
-    executable::{OpCode, StatementDefinition},
+    executable::{OpCode, StatementDefinition, StatementSignature},
     parser::ParserErrorType,
 };
 
@@ -637,6 +637,18 @@ impl Parser<'_> {
     ///
     /// Panics if .
     pub fn parse_statement(&mut self) -> Option<Statement> {
+        if self.statement_depth >= super::MAX_STATEMENT_DEPTH {
+            self.report_error(self.save_token_span(), ParserErrorType::StatementNestingTooDeep(super::MAX_STATEMENT_DEPTH));
+            self.next_token();
+            return None;
+        }
+        self.statement_depth += 1;
+        let statement = self.parse_nested_statement();
+        self.statement_depth -= 1;
+        statement
+    }
+
+    fn parse_nested_statement(&mut self) -> Option<Statement> {
         match self.get_cur_token() {
             Some(Token::Eol) => {
                 self.next_token();
@@ -948,6 +960,16 @@ impl Parser<'_> {
         self.parse_call_after_identifier(identifier, id_token)
     }
 
+    /// A built-in constant reaches the call parser as well, and it names a value rather than a
+    /// storage location, so it must never end up as the target of an assignment.
+    fn is_assignable_target(&mut self, id_token: &Spanned<Token>) -> bool {
+        if matches!(id_token.token, Token::Identifier(_)) {
+            return true;
+        }
+        self.report_error(id_token.span.clone(), ParserErrorType::ConstantIsNotAssignable(id_token.token.clone()));
+        false
+    }
+
     fn parse_call_after_identifier(&mut self, identifier: &unicase::Ascii<String>, id_token: Spanned<Token>) -> Option<Statement> {
         if self.get_cur_token() == Some(Token::Dot) {
             // The same member chain an expression would parse, so a call may stand
@@ -966,6 +988,9 @@ impl Parser<'_> {
         }
 
         if is_assign_token(self.get_cur_token()) {
+            if !self.is_assignable_target(&id_token) {
+                return None;
+            }
             let eq_token = self.save_spanned_token();
             self.next_token();
             let Some(value_expression) = self.parse_expression() else {
@@ -1018,7 +1043,9 @@ impl Parser<'_> {
                 )));
             }
         }
-        if let Some(def) = StatementDefinition::get_statement_definition(identifier) {
+        // A definition without a signature describes an internal opcode the code generator emits
+        // itself, so a source identifier that happens to match one is not a call to it.
+        if let Some(def) = StatementDefinition::get_statement_definition(identifier).filter(|def| def.sig != StatementSignature::Invalid) {
             let mut params = Vec::new();
             while self.get_cur_token() != Some(Token::Eol) && !matches!(self.get_cur_token(), Some(Token::Comment(_, _))) && self.cur_token.is_some() {
                 let Some(value) = self.parse_expression() else {
@@ -1120,6 +1147,9 @@ impl Parser<'_> {
                 self.next_token();
             }
             if is_assign_token(self.get_cur_token()) {
+                if !self.is_assignable_target(&id_token) {
+                    return None;
+                }
                 let eq_token = self.save_spanned_token();
                 self.next_token();
                 let Some(value_expression) = self.parse_expression() else {
@@ -1152,6 +1182,9 @@ impl Parser<'_> {
     fn parse_member_assignment(&mut self, let_token: Option<Spanned<Token>>, id_token: Spanned<Token>, expression: Expression) -> Option<Statement> {
         if !is_assign_token(self.get_cur_token()) {
             self.report_error(self.save_token_span(), ParserErrorType::EqTokenExpected(self.save_token()));
+            return None;
+        }
+        if !self.is_assignable_target(&id_token) {
             return None;
         }
         let eq_token = self.save_spanned_token();

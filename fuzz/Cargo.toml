@@ -46,5 +46,19 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "ppl_parse"
+path = "fuzz_targets/ppl_parse.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "ppl_compile"
+path = "fuzz_targets/ppl_compile.rs"
+test = false
+doc = false
+bench = false
+
 [workspace]
 members = ["."]

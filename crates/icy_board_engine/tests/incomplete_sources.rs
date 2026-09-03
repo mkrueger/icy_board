@@ -108,3 +108,21 @@ fn a_long_unary_chain_reports_an_error_instead_of_overflowing_the_stack() {
         )
     }));
 }
+
+#[test]
+fn deeply_nested_blocks_report_an_error_instead_of_overflowing_the_stack() {
+    let depth = 5_000;
+    let source = format!("{}PRINTLN 1\n{}", "IF (TRUE) THEN\n".repeat(depth), "ENDIF\n".repeat(depth));
+    let workspace = Workspace::default();
+    let registry = UserTypeRegistry::icy_board_registry();
+    let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+
+    parse_ast(PathBuf::from("test.pps"), errors.clone(), &source, &registry, Encoding::Utf8, &workspace);
+
+    assert!(errors.lock().unwrap().errors.iter().any(|error| {
+        matches!(
+            error.error.downcast_ref::<icy_board_engine::parser::ParserErrorType>(),
+            Some(icy_board_engine::parser::ParserErrorType::StatementNestingTooDeep(64))
+        )
+    }));
+}

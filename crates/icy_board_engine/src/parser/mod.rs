@@ -92,6 +92,9 @@ pub enum ParserErrorType {
     #[error("Expression nesting exceeds the supported limit of {0}")]
     ExpressionNestingTooDeep(usize),
 
+    #[error("Statement nesting exceeds the supported limit of {0}")]
+    StatementNestingTooDeep(usize),
+
     #[error("Expected statement")]
     StatementExpected,
 
@@ -103,6 +106,9 @@ pub enum ParserErrorType {
 
     #[error("Unexpected identifier ({0})")]
     UnknownIdentifier(String),
+
+    #[error("'{0}' is a built-in constant and can't be assigned to")]
+    ConstantIsNotAssignable(Token),
 
     #[error("Expected number ({0})")]
     NumberExpected(Token),
@@ -691,8 +697,10 @@ pub struct Parser<'a> {
     dependency_imports: HashMap<unicase::Ascii<String>, unicase::Ascii<String>>,
     in_module: bool,
     expression_depth: usize,
+    statement_depth: usize,
 }
 const MAX_EXPRESSION_DEPTH: usize = 64;
+const MAX_STATEMENT_DEPTH: usize = 64;
 static PROC_TOKEN: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("PROC".to_string()));
 static FUNC_TOKEN: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("FUNC".to_string()));
 static ON_TOKEN: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("ON".to_string()));
@@ -741,6 +749,7 @@ impl<'a> Parser<'a> {
             dependency_imports,
             in_module,
             expression_depth: 0,
+            statement_depth: 0,
         }
     }
 

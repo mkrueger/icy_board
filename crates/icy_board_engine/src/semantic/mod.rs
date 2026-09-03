@@ -3380,7 +3380,8 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 self.reference_owners.entry(idx).or_default().insert(self.cur_func_impl);
             }
             let (rt, r) = &mut self.references[idx];
-            if matches!(rt, ReferenceType::Function(_)) {
+            if matches!(rt, ReferenceType::Function(_)) || r.header.is_none() {
+                // A routine or a label carries no variable header, so an indexer has nothing to address.
                 self.errors.lock().unwrap().report_error(
                     indexer.get_identifier_token().span.clone(),
                     CompilationErrorType::IndexerCalledOnFunction(indexer.get_identifier().to_string()),
