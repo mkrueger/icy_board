@@ -517,7 +517,7 @@ the API.
 | `Count` | **GOOD** | Non-overlapping count is useful; empty-search behavior must stay specified. |
 | `Equals` | **GOOD** | Mainly justified by `StringComparison`; ordinary `=` remains the simple case. |
 | `Replace` | **GOOD** | Expected value transformation. |
-| `Mid`, `Left`, `Right` | **GOOD, document** | Member `Mid` is zero-based while classic `MID` is one-based; this is the sharpest string compatibility edge. |
+| `Substring`, `Left`, `Right` | **GOOD** | `Substring` clearly distinguishes the zero-based member operation from the one-based classic `MID`. |
 | `Trim`, `TrimStart`, `TrimEnd` | **GOOD** | Optional character sets avoid a proliferation of functions. |
 | `ToUpper`, `ToLower` | **GOOD** | Conventional transformations. |
 | `STRING.Join(array, separator)` | **GOOD** | Correctly static because no one string owns the array. |

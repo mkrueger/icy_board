@@ -323,7 +323,7 @@ PRINTLN text.Trim().ToUpper().Replace("TWO", "THREE")
 | `Count(search [, comparison])` | `INTEGER` | Non-overlapping occurrence count |
 | `Equals(other [, comparison])` | `BOOLEAN` | String equality |
 | `Replace(search, replacement)` | `STRING` | Replace every substring match |
-| `Mid(start, length)` | `STRING` | Substring of `length` characters from zero-based `start` |
+| `Substring(start, length)` | `STRING` | Substring of `length` characters from zero-based `start` |
 | `Left(count)`, `Right(count)` | `STRING` | Leftmost or rightmost `count` characters |
 | `Trim([characters])` | `STRING` | Trim whitespace, or the supplied characters, at both ends |
 | `TrimStart([characters])`, `TrimEnd([characters])` | `STRING` | Trim one end |
@@ -340,8 +340,8 @@ Positions in the PPL 400 member API are zero-based Unicode character positions;
 `-1` means no match. Searches are case-sensitive. An empty search string is not
 considered a match and has a count of zero. `Find` and `FindLast` are the
 zero-based member forms of the classic `INSTR` and `INSTRR`, which remain 1-based
-and return zero when no match is found. `Mid` is likewise the zero-based member
-form of the 1-based classic `MID`; `Left` and `Right` are count-based and behave
+and return zero when no match is found. `Substring` is the zero-based member
+alternative to the 1-based classic `MID`; `Left` and `Right` are count-based and behave
 exactly like the classic functions. `Remove` and `Insert` use the same
 zero-based positions. `ToInt` is the member form of the classic `S2I`. A single
 character is also reachable through zero-based indexing (`text[0]`).

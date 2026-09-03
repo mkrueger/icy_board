@@ -2,20 +2,20 @@ use super::run_ppl;
 
 #[test]
 fn ppl400_substring_members_are_zero_based_and_unbounded() {
-    // Mid is zero-based, unlike the one-based classic MID; Left/Right mirror the classics.
+    // Substring is zero-based, unlike the one-based classic MID; Left/Right mirror the classics.
     let output = run_ppl(
         r#";$LANGVERSION 400
 STRING text = "abcdef"
-PRINTLN "mid=[", text.Mid(1, 3), "]"
+PRINTLN "substring=[", text.Substring(1, 3), "]"
 PRINTLN "classic=[", MID(text, 1, 3), "]"
 PRINTLN "left=[", text.Left(3), "]"
 PRINTLN "right=[", text.Right(2), "]"
 STRING long = STRING.Repeat("x", 300)
-PRINTLN "midlen=", long.Mid(0, 300).Len()
+PRINTLN "substring_len=", long.Substring(0, 300).Len()
 "#,
     );
 
-    assert_eq!(output, "mid=[bcd]\nclassic=[abc]\nleft=[abc]\nright=[ef]\nmidlen=300\n");
+    assert_eq!(output, "substring=[bcd]\nclassic=[abc]\nleft=[abc]\nright=[ef]\nsubstring_len=300\n");
 }
 
 #[test]

@@ -234,8 +234,8 @@ pub async fn mid(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableV
     Ok(VariableValue::new_string(res))
 }
 
-/// `str.Mid(start, len)`: the PPL 400 member form of `MID`, with a zero-based start.
-pub async fn string_mid(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+/// `str.Substring(start, len)`: a zero-based substring operation for PPL 400.
+pub async fn string_substring(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let str = vm.eval_expr(&args[0]).await?.as_string();
     let mut pos = vm.eval_expr(&args[1]).await?.as_int();
     let chars = vm.eval_expr(&args[2]).await?.as_int();

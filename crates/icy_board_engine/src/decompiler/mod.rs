@@ -618,7 +618,7 @@ impl Decompiler {
                     FuncOpCode::StringTrimChars => Some("Trim"),
                     FuncOpCode::StringTrimStartChars => Some("TrimStart"),
                     FuncOpCode::StringTrimEndChars => Some("TrimEnd"),
-                    FuncOpCode::StringMid => Some("Mid"),
+                    FuncOpCode::StringSubstring => Some("Substring"),
                     FuncOpCode::StringPadLeft | FuncOpCode::StringPadLeftChar => Some("PadLeft"),
                     FuncOpCode::StringPadRight | FuncOpCode::StringPadRightChar => Some("PadRight"),
                     FuncOpCode::StringRemove => Some("Remove"),

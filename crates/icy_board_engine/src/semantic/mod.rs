@@ -235,7 +235,7 @@ pub const STRING_MEMBERS: &[ScalarMember] = &[
         is_static: false,
     },
     ScalarMember {
-        name: "Mid",
+        name: "Substring",
         arguments: 2..=2,
         return_type: VariableType::UnboundedString,
         is_static: false,
@@ -396,7 +396,7 @@ fn string_member(name: &unicase::Ascii<String>, arguments: usize) -> Option<(Fun
         ("tolower", 0) => Some((FuncOpCode::LOWER, VariableType::UnboundedString, &[])),
         ("split", 1) => Some((FuncOpCode::StringSplit, VariableType::UnboundedString, &[])),
         ("split", 2) => Some((FuncOpCode::StringSplitLimit, VariableType::UnboundedString, &[])),
-        ("mid", 2) => Some((FuncOpCode::StringMid, VariableType::UnboundedString, &[])),
+        ("substring", 2) => Some((FuncOpCode::StringSubstring, VariableType::UnboundedString, &[])),
         ("left", 1) => Some((FuncOpCode::LEFT, VariableType::UnboundedString, &[])),
         ("right", 1) => Some((FuncOpCode::RIGHT, VariableType::UnboundedString, &[])),
         ("padleft", 1) => Some((FuncOpCode::StringPadLeft, VariableType::UnboundedString, &[])),

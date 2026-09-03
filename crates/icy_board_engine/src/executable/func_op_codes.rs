@@ -352,7 +352,7 @@ pub enum FuncOpCode {
     StringSplit = -337,
     StringSplitLimit = -338,
     ArrayValueAt = -339,
-    StringMid = -340,
+    StringSubstring = -340,
     ToBytes = -341,
     BytesToString = -342,
     BytesToHex = -343,
@@ -421,7 +421,7 @@ impl FuncOpCode {
                 | FuncOpCode::StringSplit
                 | FuncOpCode::StringSplitLimit
                 | FuncOpCode::ArrayValueAt
-                | FuncOpCode::StringMid
+                | FuncOpCode::StringSubstring
                 | FuncOpCode::BytesToString
                 | FuncOpCode::BytesGetChecksum
                 | FuncOpCode::BytesToHex
@@ -3403,9 +3403,9 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 366]> 
             signature: FunctionSignature::FixedParameters(2),
         },
         FunctionDefinition {
-            name: "<string mid>",
+            name: "<string substring>",
             version: 400,
-            opcode: FuncOpCode::StringMid,
+            opcode: FuncOpCode::StringSubstring,
             return_type: VariableType::UnboundedString,
             args: None,
             signature: FunctionSignature::FixedParameters(3),

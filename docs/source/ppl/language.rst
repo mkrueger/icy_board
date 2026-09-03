@@ -614,12 +614,12 @@ The instance members are ``Len()``,
 ``Contains(search [, comparison])``, ``StartsWith(prefix [, comparison])``,
 ``EndsWith(suffix [, comparison])``, ``Count(search [, comparison])``,
 ``Equals(other [, comparison])``, ``Replace(search, replacement)``,
-``Mid(start, length)``, ``Left(count)``, ``Right(count)``,
+``Substring(start, length)``, ``Left(count)``, ``Right(count)``,
 ``Trim([characters])``, ``TrimStart([characters])``,
 ``TrimEnd([characters])``, ``ToUpper()`` and ``ToLower()``,
 ``PadLeft(width [, char])``, ``PadRight(width [, char])``,
 ``Remove(start, length)``, ``Insert(index, value)``, ``Reverse()``,
-``ToInt([base])``, ``ToMixedCase()`` and ``StripATX()``. ``Mid`` is zero-based,
+``ToInt([base])``, ``ToMixedCase()`` and ``StripATX()``. ``Substring`` is zero-based,
 unlike the 1-based classic ``MID``; ``Left`` and ``Right`` mirror the classic
 functions. ``Remove`` and ``Insert`` use the same zero-based positions.
 ``PadLeft``/``PadRight`` pad with a space unless a single-character ``char``
