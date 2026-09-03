@@ -8,6 +8,7 @@ use criterion::{BatchSize, Criterion, Throughput, criterion_group, criterion_mai
 use icy_board_engine::{
     ast::{GotoStatement, LabelStatement},
     compiler::{PPECompiler, optimizer::optimize_statements, workspace::Workspace},
+    crypt::{decode_rle, decrypt_chunks, encode_rle, encrypt_chunks},
     executable::{Executable, VariableType, VariableValue},
     icy_board::{
         IcyBoard,
@@ -230,6 +231,66 @@ fn ppe_format_benchmarks(criterion: &mut Criterion) {
     group.finish();
 }
 
+fn crypt_benchmarks(criterion: &mut Criterion) {
+    const DATA_LEN: usize = 32 * 1024;
+    let data: Vec<u8> = (0..DATA_LEN).map(|index| if index % 5 == 0 { index as u8 } else { 0 }).collect();
+    let encoded = encode_rle(&data);
+    let mut encrypted = data.clone();
+    encrypt_chunks(&mut encrypted, 340, false);
+    let mut encrypted_v300 = data.clone();
+    encrypt_chunks(&mut encrypted_v300, 300, false);
+
+    let mut group = criterion.benchmark_group("crypt");
+    group.throughput(Throughput::Bytes(DATA_LEN as u64));
+    group.bench_function("encrypt_chunks_v300_32k", |benchmark| {
+        benchmark.iter_batched(
+            || data.clone(),
+            |mut input| {
+                encrypt_chunks(&mut input, 300, false);
+                black_box(input)
+            },
+            BatchSize::SmallInput,
+        );
+    });
+    group.bench_function("decrypt_chunks_v300_32k", |benchmark| {
+        benchmark.iter_batched(
+            || encrypted_v300.clone(),
+            |mut input| {
+                decrypt_chunks(&mut input, 300, false);
+                black_box(input)
+            },
+            BatchSize::SmallInput,
+        );
+    });
+    group.bench_function("encrypt_chunks_v340_32k", |benchmark| {
+        benchmark.iter_batched(
+            || data.clone(),
+            |mut input| {
+                encrypt_chunks(&mut input, 340, false);
+                black_box(input)
+            },
+            BatchSize::SmallInput,
+        );
+    });
+    group.bench_function("decrypt_chunks_v340_32k", |benchmark| {
+        benchmark.iter_batched(
+            || encrypted.clone(),
+            |mut input| {
+                decrypt_chunks(&mut input, 340, false);
+                black_box(input)
+            },
+            BatchSize::SmallInput,
+        );
+    });
+    group.bench_function("encode_rle_32k", |benchmark| {
+        benchmark.iter(|| black_box(encode_rle(black_box(&data))));
+    });
+    group.bench_function("decode_rle_32k", |benchmark| {
+        benchmark.iter(|| black_box(decode_rle(black_box(&encoded))));
+    });
+    group.finish();
+}
+
 fn value_benchmarks(criterion: &mut Criterion) {
     let left = VariableValue::new_unbounded_string("ä".repeat(4096));
     let right = VariableValue::new_unbounded_string("x".repeat(4096));
@@ -320,6 +381,7 @@ criterion_group!(
     compile_from_ast_benchmarks,
     optimizer_benchmarks,
     ppe_format_benchmarks,
+    crypt_benchmarks,
     value_benchmarks,
     vm_benchmarks
 );

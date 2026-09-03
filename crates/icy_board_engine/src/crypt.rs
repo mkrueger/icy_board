@@ -67,23 +67,25 @@ fn encrypt2(block: &mut [u8]) {
     let size = block.len() as i32;
     let mut seed = 0xDB24;
     let mut rotate_count = 0;
-    let mut dx = size >> 1;
-    let mut i = 0;
-    while dx > 0 {
-        let cur_word = (block[i + 1] as u16) << 8 | block[i] as u16;
-        let dl = dx as u16 & 0xFF;
-        rotate_count = (seed & 0xFF) + (dl & 0xFF);
-        let tmp = dl | dl << 8;
-        let outx = u16::rotate_left(cur_word ^ seed ^ tmp, rotate_count as u32);
-        block[i] = outx as u8;
-        i += 1;
-        block[i] = (outx >> 8) as u8;
-        i += 1;
-        seed = outx;
-        dx -= 1;
+    unsafe {
+        // Only ever accessed via `read_unaligned`/`write_unaligned` below.
+        #[allow(clippy::cast_ptr_alignment)]
+        let mut p = block.as_mut_ptr().cast::<u16>();
+        let mut x = size >> 1;
+        while x > 0 {
+            let dl = x as u16 & 0xFF;
+            rotate_count = (seed & 0xFF) + dl;
+            let repeated_dl = dl | dl << 8;
+            let out = u16::rotate_left(p.read_unaligned() ^ seed ^ repeated_dl, rotate_count as u32);
+            p.write_unaligned(out);
+            seed = out;
+            x -= 1;
+            p = p.add(1);
+        }
     }
 
     if size % 2 == 1 {
+        let i = block.len() - 1;
         block[i] = u8::rotate_left(block[i], (rotate_count & 0xFF) as u32) ^ (seed as u8);
     }
 }
