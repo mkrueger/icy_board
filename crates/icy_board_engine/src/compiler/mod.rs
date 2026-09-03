@@ -217,6 +217,9 @@ pub enum CompilationErrorType {
     #[error("'{0}' belongs to the type itself, so it cannot be reached through a value")]
     StaticMemberOnValue(String),
 
+    #[error("'{0}' is a function, so it needs '()' to be called")]
+    MemberNeedsCall(String),
+
     #[error("Internal error ({0})")]
     InternalError(String),
 

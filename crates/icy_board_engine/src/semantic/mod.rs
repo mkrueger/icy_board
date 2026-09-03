@@ -717,6 +717,10 @@ pub struct SemanticVisitor {
     /// cost 2^n.
     receiver_types: HashMap<usize, VariableType>,
 
+    /// The member reference a call is about to resolve, so the reference can tell whether it was
+    /// written on its own.
+    callee_member: Option<usize>,
+
     last_lookup_index: usize,
 }
 
@@ -1019,6 +1023,7 @@ impl SemanticVisitor {
             function_return_value_spans: HashSet::new(),
             cur_func_call: 0,
             receiver_types: HashMap::new(),
+            callee_member: None,
             cur_func_impl: None,
             control_flow_liveness: true,
             references_are_reachable: true,
@@ -2594,6 +2599,8 @@ impl AstVisitor<VariableType> for SemanticVisitor {
     }
 
     fn visit_member_reference_expression(&mut self, member_reference_expression: &crate::ast::MemberReferenceExpression) -> VariableType {
+        // Taken rather than read, so the receiver walked below sees it cleared.
+        let is_called = self.callee_member.take() == Some(member_reference_expression.get_identifier_token().span.start);
         if let Expression::Identifier(base) = member_reference_expression.get_expression()
             && let Some(definition) = self.type_registry.get_enum(base.get_identifier())
         {
@@ -2683,6 +2690,14 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 );
                 return VariableType::None;
             }
+            // Every string member is a function, so a bare one leaves codegen nothing to lower.
+            if !is_called {
+                self.errors.lock().unwrap().report_error(
+                    member_reference_expression.get_identifier_token().span.clone(),
+                    CompilationErrorType::MemberNeedsCall(member_reference_expression.get_identifier().to_string()),
+                );
+                return VariableType::None;
+            }
             return return_type;
         }
         if t == VariableType::Bytes
@@ -2690,6 +2705,13 @@ impl AstVisitor<VariableType> for SemanticVisitor {
         {
             self.member_receiver_type_lookup
                 .insert(member_reference_expression.get_identifier_token().span.start, t);
+            if !is_called {
+                self.errors.lock().unwrap().report_error(
+                    member_reference_expression.get_identifier_token().span.clone(),
+                    CompilationErrorType::MemberNeedsCall(member_reference_expression.get_identifier().to_string()),
+                );
+                return VariableType::None;
+            }
             return return_type;
         }
         if let VariableType::UserData(d) = t {
@@ -2995,7 +3017,11 @@ impl AstVisitor<VariableType> for SemanticVisitor {
         }
         let outer_func_call = self.cur_func_call;
         self.cur_func_call = call.id;
+        if let Expression::MemberReference(member) = call.get_expression() {
+            self.callee_member = Some(member.get_identifier_token().span.start);
+        }
         call.get_expression().visit(self);
+        self.callee_member = None;
         self.cur_func_call = outer_func_call;
 
         // A member call is decided by the receiver's type, whatever expression produced it.

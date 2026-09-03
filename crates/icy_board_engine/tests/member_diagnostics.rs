@@ -185,3 +185,28 @@ fn a_member_on_something_that_is_not_an_object_is_reported() {
     let errors = diagnostics("INTEGER i\nPRINTLN i.Name\n");
     assert!(errors.iter().any(|e| e == "Member not found"), "{errors:?}");
 }
+
+/// Every string and bytes member is a function. A bare one used to type-check and then reach the
+/// code generator with nothing to lower, which wrote an invalid expression into the executable.
+#[test]
+fn a_string_member_without_a_call_is_reported() {
+    for source in ["STRING s\nPRINTLN s.ToLower\n", "STRING s\nPRINTLN s.Len\n", "STRING s\ns = s.Trim\n"] {
+        let errors = diagnostics(source);
+        assert!(
+            errors.iter().any(|error| error.contains("is a function, so it needs '()' to be called")),
+            "{source:?} -> {errors:?}"
+        );
+    }
+}
+
+#[test]
+fn a_called_string_member_is_still_accepted() {
+    for source in [
+        "STRING s\nPRINTLN s.ToLower()\n",
+        "STRING s\nPRINTLN s.Len()\n",
+        "STRING s\nPRINTLN s.ToLower().Trim()\n",
+        "STRING s\nPRINTLN s.Find(\"a\")\n",
+    ] {
+        assert!(diagnostics(source).is_empty(), "{source:?}");
+    }
+}
