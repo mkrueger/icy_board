@@ -849,8 +849,12 @@ writes a retained body; ``Http.Download(url, path)`` streams a successful body
 through a temporary file and commits it only after completion.
 
 ``Text()`` decodes strictly as UTF-8 and returns a ``STRING``. Binary bodies and
-other character encodings report ``ErrKind.Net`` with ``ErrCode.Format``; use
-``Download()`` or ``Save()`` when text decoding is not appropriate.
+other character encodings report ``ErrKind.Net`` with ``ErrCode.Format``;
+``Bytes()`` returns the same body as ``BYTES`` without interpreting it, and
+``Download()`` or ``Save()`` write it to a file instead.
+
+``HttpMethod`` offers ``Get``, ``Head``, ``Post``, ``Put``, ``Delete`` and
+``Patch``. Only ``Get`` and ``Head`` are refused a body.
 
 A request object supplies POST bodies and safe custom headers::
 

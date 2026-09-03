@@ -1374,12 +1374,23 @@ properties are `Status`, `FinalUrl`, `Size` and `ContentType`. `Save(path)`
 writes a body already held by a response. `Http.Download(url, path)` streams a
 successful response through a temporary file and replaces the destination only
 after the complete body arrives. Its successful response reports status and
-size but does not retain another copy of the body; calling `Text()` or `Save()`
-on that response reports `ErrCode.Invalid`.
+size but does not retain another copy of the body; calling `Text()`, `Bytes()`
+or `Save()` on that response reports `ErrCode.Invalid`.
 
 `Text()` decodes the body strictly as UTF-8 and returns a `STRING`. A body in any
-other character encoding reports `ErrKind.Net` with `ErrCode.Format`; use
-`Download()` or `Save()` when the response is binary or not UTF-8.
+other character encoding reports `ErrKind.Net` with `ErrCode.Format`. `Bytes()`
+returns the same body as `BYTES` without interpreting it, which is what an
+image, an archive or any other binary answer needs:
+
+```PPL
+HttpResponse response = Http.Get("https://example.com/logo.png")
+BYTES image = response.Bytes()
+PRINTLN image.Len(), " bytes, SHA-256 ", image.GetChecksum(Checksum.SHA256).ToHex()
+```
+
+Use `Download()` or `Save()` instead when the body should reach a file without
+passing through memory. Both `Text()` and `Bytes()` report `ErrCode.Invalid`
+when the response never retained a body.
 
 For a POST request or custom headers, build a request:
 
@@ -1392,7 +1403,8 @@ HttpResponse response = request.Send()
 
 `SetHeader()` and `SetText()` change the request and return `TRUE` on success.
 On failure they return `FALSE`, leave the request unchanged, and publish details
-through `Error.Last()`. `HttpMethod` contains `Get`, `Head` and `Post`.
+through `Error.Last()`. `HttpMethod` contains `Get`, `Head`, `Post`, `Put`,
+`Delete` and `Patch`.
 `SetText()` needs a method that carries a body; on a `Get` or `Head` request it
 reports `ErrKind.Net` with `ErrCode.Invalid`. Routing and hop-by-hop headers,
 including `Host`, `Content-Length`, `Connection` and `Transfer-Encoding`, cannot

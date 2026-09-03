@@ -41,6 +41,7 @@ member_name!(FINAL_URL, "FinalUrl");
 member_name!(SIZE, "Size");
 member_name!(CONTENT_TYPE, "ContentType");
 member_name!(TEXT, "Text");
+member_name!(BYTES, "Bytes");
 member_name!(HEADER, "Header");
 member_name!(SAVE, "Save");
 member_name!(URL, "Url");
@@ -590,17 +591,21 @@ fn method_from_value(value: i32) -> Result<Method, HttpFailure> {
         0 => Ok(Method::GET),
         1 => Ok(Method::HEAD),
         2 => Ok(Method::POST),
+        3 => Ok(Method::PUT),
+        4 => Ok(Method::DELETE),
+        5 => Ok(Method::PATCH),
         _ => Err(HttpFailure::new(ERR_UNSUPPORTED, format!("unsupported HTTP method {value}"))),
     }
 }
 
 fn method_value(method: &Method) -> i32 {
-    if *method == Method::HEAD {
-        1
-    } else if *method == Method::POST {
-        2
-    } else {
-        0
+    match *method {
+        Method::HEAD => 1,
+        Method::POST => 2,
+        Method::PUT => 3,
+        Method::DELETE => 4,
+        Method::PATCH => 5,
+        _ => 0,
     }
 }
 
@@ -868,6 +873,7 @@ impl UserData for PplHttpResponse {
         registry.add_property(SIZE.clone(), VariableType::Long, false);
         registry.add_property(CONTENT_TYPE.clone(), VariableType::UnboundedString, false);
         registry.add_function(TEXT.clone(), Vec::new(), VariableType::UnboundedString);
+        registry.add_function(BYTES.clone(), Vec::new(), VariableType::Bytes);
         registry.add_named_function(HEADER.clone(), vec![("name", VariableType::UnboundedString)], VariableType::UnboundedString);
         registry.add_named_function(SAVE.clone(), vec![("file", VariableType::UnboundedString)], VariableType::Boolean);
     }
@@ -926,6 +932,18 @@ impl UserDataValue for PplHttpResponse {
                     Ok(VariableValue::new_unbounded_string(String::new()))
                 }
             };
+        }
+        if *name == *BYTES {
+            if !self.valid {
+                vm.set_error(PplError::new(ERR_KIND_NET, ERR_INVALID, "invalid HTTP response has no body"));
+                return Ok(VariableValue::new_bytes(Vec::new()));
+            }
+            let Some(body) = &self.body else {
+                vm.set_error(PplError::new(ERR_KIND_NET, ERR_INVALID, "HTTP response body was not retained"));
+                return Ok(VariableValue::new_bytes(Vec::new()));
+            };
+            vm.operation_succeeded();
+            return Ok(VariableValue::new_bytes(body.clone()));
         }
         if *name == *HEADER {
             let header = arguments.first().map(VariableValue::as_string).unwrap_or_default().to_ascii_lowercase();

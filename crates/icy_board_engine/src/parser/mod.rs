@@ -589,7 +589,11 @@ impl UserTypeRegistry {
         self.register_enum(EDITOR_MODE_ENUM_ID, "EditorMode", &[("Yes", 0), ("No", 1), ("Ask", 2)]);
         // The values are the `HDR_*` constants, so naming one is a way of writing the number.
         self.register_enum(MSG_FIELD_ENUM_ID, "MsgField", &[("To", 0x07), ("From", 0x0B), ("Subject", 0x0C)]);
-        self.register_enum(HTTP_METHOD_ENUM_ID, "HttpMethod", &[("Get", 0), ("Head", 1), ("Post", 2)]);
+        self.register_enum(
+            HTTP_METHOD_ENUM_ID,
+            "HttpMethod",
+            &[("Get", 0), ("Head", 1), ("Post", 2), ("Put", 3), ("Delete", 4), ("Patch", 5)],
+        );
         self.register_enum(
             REGEX_OPTIONS_ENUM_ID,
             "RegexOptions",

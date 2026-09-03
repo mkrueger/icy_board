@@ -375,3 +375,62 @@ PRINT added, " ", Error.Last().Kind = ErrKind.Net, " ", Error.Last().Code = ErrC
         )
     );
 }
+
+#[test]
+fn put_delete_and_patch_reach_the_wire_and_keep_their_bodies() {
+    let response = "HTTP/1.1 204 No Content\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+    let (origin, requests, server) = serve(vec![response.to_string(), response.to_string(), response.to_string()]);
+    let source = format!(
+        r#"
+HttpRequest put = Http.New(HttpMethod.Put, "{origin}/item")
+put.SetText("replaced", "text/plain")
+put.Send()
+HttpRequest patch = Http.New(HttpMethod.Patch, "{origin}/item")
+patch.SetForm("field", "new value")
+patch.Send()
+HttpRequest remove = Http.New(HttpMethod.Delete, "{origin}/item")
+HttpResponse response = remove.Send()
+PRINT response.Status, " ", put.Method = HttpMethod.Put, " ", remove.Method = HttpMethod.Delete
+"#
+    );
+    assert_eq!("204 1 1", run_ppl_on(&source, |board| allow_origin(board, &origin)));
+    let sent = requests.recv().unwrap();
+    assert!(sent.starts_with("PUT /item HTTP/1.1"), "{sent}");
+    assert!(sent.ends_with("\r\n\r\nreplaced"), "{sent}");
+    let sent = requests.recv().unwrap();
+    assert!(sent.starts_with("PATCH /item HTTP/1.1"), "{sent}");
+    assert!(sent.ends_with("\r\n\r\nfield=new+value"), "{sent}");
+    let sent = requests.recv().unwrap();
+    assert!(sent.starts_with("DELETE /item HTTP/1.1"), "{sent}");
+    server.join().unwrap();
+}
+
+#[test]
+fn a_binary_response_body_is_reachable_as_bytes() {
+    let response = "HTTP/1.1 200 OK\r\nContent-Length: 4\r\nConnection: close\r\n\r\nPK\u{3}\u{4}";
+    let (origin, _request, server) = serve(vec![response.to_string()]);
+    let source = format!(
+        r#"
+HttpResponse response = Http.Get("{origin}/archive")
+BYTES raw = response.Bytes()
+PRINT raw.Len(), " ", raw.ToHex(), " ", raw.ToBase64(), " ", Error.Last().OK
+"#
+    );
+    assert_eq!("4 504B0304 UEsDBA== 1", run_ppl_on(&source, |board| allow_origin(board, &origin)));
+    server.join().unwrap();
+}
+
+#[test]
+fn bytes_reports_a_body_that_was_never_retained() {
+    assert_eq!(
+        "0 1",
+        run_ppl(
+            r#"
+HttpResponse response = Http.Get("file:///not-http")
+Error.Clear()
+BYTES raw = response.Bytes()
+PRINT raw.Len(), " ", Error.Last().Code = ErrCode.Invalid
+"#
+        )
+    );
+}

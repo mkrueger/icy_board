@@ -553,7 +553,7 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
     }
     if id == HTTP_METHOD_ENUM_ID {
         return match member.to_ascii_lowercase().as_str() {
-            "get" | "head" | "post" => Some(fl!(LANGUAGE_LOADER, "hint-enum-http-method")),
+            "get" | "head" | "post" | "put" | "delete" | "patch" => Some(fl!(LANGUAGE_LOADER, "hint-enum-http-method")),
             _ => None,
         };
     }
@@ -601,6 +601,7 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
         return match member.to_ascii_lowercase().as_str() {
             "valid" | "ok" | "status" | "finalurl" | "size" | "contenttype" => Some(fl!(LANGUAGE_LOADER, "hint-http-response-property")),
             "text" => Some(fl!(LANGUAGE_LOADER, "hint-http-response-text")),
+            "bytes" => Some(fl!(LANGUAGE_LOADER, "hint-http-response-bytes")),
             "header" => Some(fl!(LANGUAGE_LOADER, "hint-http-response-header")),
             "save" => Some(fl!(LANGUAGE_LOADER, "hint-http-response-save")),
             _ => None,

@@ -10,6 +10,12 @@ releases.
 
 ### Added
 
+- `HttpMethod` gained `Put`, `Delete` and `Patch`, so a PPE can update and
+  remove REST resources instead of only creating and reading them.
+  `HttpResponse.Bytes()` returns a retained body as `BYTES` without decoding
+  it, which makes images, archives and checksums reachable without a detour
+  through the file system.
+
 - `HttpRequest.SetForm(name, value)` appends one percent-encoded
   `application/x-www-form-urlencoded` field and sets that content type, so a
   form POST no longer has to be assembled by hand. `Http.UrlEncode(text [,
