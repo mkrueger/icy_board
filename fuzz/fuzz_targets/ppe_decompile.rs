@@ -2,7 +2,7 @@
 
 use icy_board_engine::{
     decompiler::decompile,
-    executable::{Executable, LAST_PPL_LANGUAGE_VERSION, PPEScript},
+    executable::{Executable, PPEScript, SUPPORTED_PPL_LANGUAGE_VERSIONS},
 };
 use libfuzzer_sys::fuzz_target;
 
@@ -15,6 +15,9 @@ fuzz_target!(|data: &[u8]| {
         return;
     };
     let _ = PPEScript::from_ppe_file(&executable);
-    let _ = decompile(executable.clone(), true, LAST_PPL_LANGUAGE_VERSION);
-    let _ = decompile(executable, false, LAST_PPL_LANGUAGE_VERSION);
+
+    // Reconstruction reads the language version, so let the file pick one.
+    let lang_version = SUPPORTED_PPL_LANGUAGE_VERSIONS[bytes[0] as usize % SUPPORTED_PPL_LANGUAGE_VERSIONS.len()];
+    let _ = decompile(executable.clone(), true, lang_version);
+    let _ = decompile(executable, false, lang_version);
 });

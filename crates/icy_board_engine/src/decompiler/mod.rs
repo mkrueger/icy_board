@@ -159,8 +159,12 @@ impl Decompiler {
             let statement = &self.script.statements[self.cur_ptr];
             let byte_offset = statement.span.start * 2;
 
-            if let Some(func) = self.function_lookup.get(&byte_offset) {
-                self.parse_function(*func);
+            // A body without a table entry is decompiled as plain statements, otherwise
+            // there would be nothing here to move the cursor on.
+            if let Some(func) = self.function_lookup.get(&byte_offset).copied()
+                && self.executable.variable_table.try_get_entry(func).is_some()
+            {
+                self.parse_function(func);
                 continue;
             }
 

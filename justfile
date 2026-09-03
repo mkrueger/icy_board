@@ -11,15 +11,17 @@ setup-editor target="all":
 
 # Fuzzes a PPE binary trust boundary. Needs nightly + cargo-fuzz; the corpus is
 # temporary, so a run leaves nothing behind in the working tree.
+# Targets: ppe_load, ppe_decompile, ppe_structured, ppe_roundtrip, ppe_disassemble.
 fuzz target="ppe_load" seconds="60":
   #!/usr/bin/env bash
   set -euo pipefail
   corpus="$(mktemp -d)"
   trap 'rm -rf "$corpus"' EXIT
   cargo +nightly fuzz run {{target}} "$corpus" \
+    crates/ppld/test_data \
     crates/icy_board_engine/tests/test_ppe \
     crates/icy_board_engine/tests/test_data \
-    -- -max_total_time={{seconds}} -max_len=262140 -timeout=5
+    -- -max_total_time={{seconds}} -max_len=262140 -timeout=15 -close_fd_mask=3
 
 build_ppe: build
   target/debug/pplc ppe/cnfn.pps

@@ -39,5 +39,12 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "ppe_disassemble"
+path = "fuzz_targets/ppe_disassemble.rs"
+test = false
+doc = false
+bench = false
+
 [workspace]
 members = ["."]
