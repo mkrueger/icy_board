@@ -180,6 +180,46 @@ PRINT response.Status, " ", response.Text()
 }
 
 #[test]
+fn a_request_can_send_bytes_with_default_and_explicit_content_types() {
+    let response = "HTTP/1.1 204 No Content\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+    let (origin, requests, server) = serve(vec![response.to_string(), response.to_string()]);
+    let source = format!(
+        r#"
+BYTES data = Bytes.FromBase64("AH8=")
+HttpRequest first = Http.New(HttpMethod.Post, "{origin}/default")
+BOOLEAN defaultSet = first.SetBytes(data)
+first.Send()
+HttpRequest second = Http.New(HttpMethod.Put, "{origin}/explicit")
+BOOLEAN explicitSet = second.SetBytes(data, "image/x-test")
+HttpResponse response = second.Send()
+PRINT defaultSet, " ", explicitSet, " ", response.Status
+"#
+    );
+    assert_eq!("1 1 204", run_ppl_on(&source, |board| allow_origin(board, &origin)));
+    let sent = requests.recv().unwrap();
+    assert!(sent.to_ascii_lowercase().contains("content-type: application/octet-stream"), "{sent:?}");
+    assert!(sent.ends_with("\r\n\r\n\0\u{7f}"), "{sent:?}");
+    let sent = requests.recv().unwrap();
+    assert!(sent.to_ascii_lowercase().contains("content-type: image/x-test"), "{sent:?}");
+    assert!(sent.ends_with("\r\n\r\n\0\u{7f}"), "{sent:?}");
+    server.join().unwrap();
+}
+
+#[test]
+fn set_bytes_is_rejected_on_bodyless_methods() {
+    assert_eq!(
+        "0 1 1",
+        run_ppl(
+            r#"
+HttpRequest request = Http.New(HttpMethod.Head, "https://example.com")
+BOOLEAN changed = request.SetBytes(Bytes.FromBase64("AA=="))
+PRINT changed, " ", Error.Last().Kind = ErrKind.Net, " ", Error.Last().Code = ErrCode.Invalid
+"#
+        )
+    );
+}
+
+#[test]
 fn request_mutation_is_visible_through_an_alias() {
     let response = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
     let (origin, requests, server) = serve(vec![response.to_string()]);
@@ -357,6 +397,24 @@ HttpRequest request = Http.New(HttpMethod.Post, "https://example.com")
 BOOLEAN text = request.SetText("{}", "application/json")
 BOOLEAN form = request.SetForm("token", "secret")
 PRINT text, " ", form, " ", Error.Last().Code = ErrCode.Invalid
+"#
+        )
+    );
+}
+
+#[test]
+fn set_form_matches_the_complete_media_type_case_insensitively() {
+    assert_eq!(
+        "1 1 1 0 1",
+        run_ppl(
+            r#"
+HttpRequest valid = Http.New(HttpMethod.Post, "https://example.com")
+BOOLEAN validText = valid.SetText("first=one", "Application/X-Www-Form-Urlencoded; charset=UTF-8")
+BOOLEAN validForm = valid.SetForm("second", "two")
+HttpRequest invalid = Http.New(HttpMethod.Post, "https://example.com")
+BOOLEAN invalidText = invalid.SetText("first=one", "application/x-www-form-urlencoded-evil")
+BOOLEAN invalidForm = invalid.SetForm("second", "two")
+PRINT validText, " ", validForm, " ", invalidText, " ", invalidForm, " ", Error.Last().Code = ErrCode.Invalid
 "#
         )
     );

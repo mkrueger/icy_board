@@ -500,7 +500,7 @@ PPE cleanup, and a **value** is copied like an ordinary PPL value.
 | `PALETTE` | Live terminal palette controller | Mutable through methods |
 | `MACROS` | PPE-owned terminal macro controller | Mutable through methods |
 | `HTTP` | Stateless factory/root | Static methods only |
-| `HTTPREQUEST` | Shared request state until no PPL value names it | Mutable through `SetHeader()`, `SetText()` and `SetForm()` |
+| `HTTPREQUEST` | Shared request state until no PPL value names it | Mutable through `SetHeader()`, `SetText()`, `SetBytes()` and `SetForm()` |
 | `HTTPRESPONSE` | Result snapshot from one completed request | Read-only; `Save()` performs output without changing the response |
 | `REGEX` | Compiled-pattern value | Read-only |
 | `REGEXMATCH` | Match-result value | Read-only |
@@ -1401,7 +1401,8 @@ IF !request.SetText(json, "application/json") PRINTLN Error.Last().Message
 HttpResponse response = request.Send()
 ```
 
-`SetHeader()` and `SetText()` change the request and return `TRUE` on success.
+`SetHeader()`, `SetText()`, `SetBytes()` and `SetForm()` change the request and
+return `TRUE` on success.
 On failure they return `FALSE`, leave the request unchanged, and publish details
 through `Error.Last()`. `HttpMethod` contains `Get`, `Head`, `Post`, `Put`,
 `Delete` and `Patch`.
@@ -1411,7 +1412,12 @@ including `Host`, `Content-Length`, `Connection` and `Transfer-Encoding`, cannot
 be set by a PPE.
 
 `SetText()` sends its argument verbatim, which is what JSON, XML and plain text
-need. An `application/x-www-form-urlencoded` body is different: every value has
+need. `SetBytes(data [, contentType])` sends a `BYTES` value without text
+conversion and defaults its content type to `application/octet-stream`. Both
+setters replace any existing body and content type, and both reject `Get` and
+`Head` requests.
+
+An `application/x-www-form-urlencoded` body is different: every value has
 to be percent-encoded so that a `&` or `=` inside it cannot be mistaken for a
 separator. `SetForm()` does that for one field and appends it to the body:
 

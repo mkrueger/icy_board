@@ -14,7 +14,8 @@ releases.
   remove REST resources instead of only creating and reading them.
   `HttpResponse.Bytes()` returns a retained body as `BYTES` without decoding
   it, which makes images, archives and checksums reachable without a detour
-  through the file system.
+  through the file system. `HttpRequest.SetBytes()` sends a binary request body
+  without converting it to text and defaults to `application/octet-stream`.
 
 - `HttpRequest.SetForm(name, value)` appends one percent-encoded
   `application/x-www-form-urlencoded` field and sets that content type, so a

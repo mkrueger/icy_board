@@ -48,6 +48,7 @@ member_name!(URL, "Url");
 member_name!(METHOD, "Method");
 member_name!(SET_HEADER, "SetHeader");
 member_name!(SET_TEXT, "SetText");
+member_name!(SET_BYTES, "SetBytes");
 member_name!(SET_FORM, "SetForm");
 member_name!(SEND, "Send");
 
@@ -743,6 +744,12 @@ impl UserData for PplHttpRequest {
             1,
             VariableType::Boolean,
         );
+        registry.add_named_function_with(
+            SET_BYTES.clone(),
+            vec![("data", VariableType::Bytes), ("contentType", VariableType::UnboundedString)],
+            1,
+            VariableType::Boolean,
+        );
         registry.add_named_function(
             SET_FORM.clone(),
             vec![("name", VariableType::UnboundedString), ("value", VariableType::UnboundedString)],
@@ -817,6 +824,29 @@ impl UserDataValue for PplHttpRequest {
             vm.operation_succeeded();
             return Ok(VariableValue::new_bool(true));
         }
+        if *name == *SET_BYTES {
+            let bodyless = {
+                let request = self.request();
+                request.method == Method::GET || request.method == Method::HEAD
+            };
+            if bodyless {
+                vm.set_error(PplError::new(ERR_KIND_NET, ERR_INVALID, "HTTP GET and HEAD requests cannot carry a body"));
+                return Ok(VariableValue::new_bool(false));
+            }
+            let content_type = arguments
+                .get(1)
+                .map(VariableValue::as_string)
+                .unwrap_or_else(|| "application/octet-stream".to_string());
+            let Ok(content_type) = HeaderValue::from_str(&content_type) else {
+                vm.set_error(PplError::new(ERR_KIND_NET, ERR_INVALID, "invalid HTTP content type"));
+                return Ok(VariableValue::new_bool(false));
+            };
+            let mut request = self.request();
+            request.body = arguments.first().map_or_else(Vec::new, |value| value.as_byte_slice().to_vec());
+            request.headers.insert(reqwest::header::CONTENT_TYPE, content_type);
+            vm.operation_succeeded();
+            return Ok(VariableValue::new_bool(true));
+        }
         if *name == *SET_FORM {
             let field = arguments.first().map(VariableValue::as_string).unwrap_or_default();
             let value = arguments.get(1).map(VariableValue::as_string).unwrap_or_default();
@@ -829,7 +859,9 @@ impl UserDataValue for PplHttpRequest {
             let is_form = request
                 .headers
                 .get(reqwest::header::CONTENT_TYPE)
-                .is_some_and(|value| value.as_bytes().starts_with(FORM_CONTENT_TYPE.as_bytes()));
+                .and_then(|value| value.to_str().ok())
+                .and_then(|value| value.split(';').next())
+                .is_some_and(|value| value.trim().eq_ignore_ascii_case(FORM_CONTENT_TYPE));
             let existing = if is_form {
                 String::from_utf8(request.body.clone()).ok()
             } else if request.body.is_empty() {

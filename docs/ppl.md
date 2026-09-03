@@ -501,6 +501,7 @@ corrupt message data reports `ErrKind.Msg` with `ErrCode.Io` or
 | `Http.UrlEncode`, `Http.UrlDecode` | Static function | `Http.UrlEncode(text [, form]) : STRING`, `Http.UrlDecode(text [, form]) : STRING` | Percent-encodes one field or URL component; `form` defaults to `TRUE` |
 | `HttpRequest.SetHeader` | Function | `request.SetHeader(name, value) : BOOLEAN` | Changes one request header; failures are available through `Error.Last()` |
 | `HttpRequest.SetText` | Function | `request.SetText(text [, contentType]) : BOOLEAN` | Changes the UTF-8 request body; failures are available through `Error.Last()` |
+| `HttpRequest.SetBytes` | Function | `request.SetBytes(data [, contentType]) : BOOLEAN` | Changes the binary request body; defaults to `application/octet-stream` |
 | `HttpRequest.SetForm` | Function | `request.SetForm(name, value) : BOOLEAN` | Appends one encoded form field and sets the form content type |
 | `HttpResponse.Bytes` | Function | `response.Bytes() : BYTES` | Retained response body without text decoding |
 | `BYTES.ToBase64`, `Bytes.FromBase64` | Function | `value.ToBase64() : STRING`, `Bytes.FromBase64(text) : BYTES` | Binary-safe Base64 encoding and decoding; global aliases remain available |

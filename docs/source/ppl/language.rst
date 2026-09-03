@@ -320,7 +320,7 @@ value is copied like an ordinary PPL value.
    "``MARGINS``, ``PALETTE``", "Live terminal-state controllers", "Mutable through methods"
    "``MACROS``", "PPE-owned terminal macro controller", "Mutable through methods; definitions removed at cleanup"
    "``HTTP``", "Stateless factory/root", "Static methods only"
-   "``HTTPREQUEST``", "Shared request state", "Mutable through ``SetHeader()``, ``SetText()`` and ``SetForm()``"
+    "``HTTPREQUEST``", "Shared request state", "Mutable through ``SetHeader()``, ``SetText()``, ``SetBytes()`` and ``SetForm()``"
    "``HTTPRESPONSE``", "Completed-request result snapshot", "Read-only; ``Save()`` performs output"
    "``REGEX``", "Compiled-pattern value", "Read-only"
    "``REGEXMATCH``", "Match-result value", "Read-only"
@@ -868,7 +868,11 @@ failure they return ``FALSE``, leave it unchanged, and publish details through
 ``Error.Last()``.
 
 ``SetText()`` sends its argument verbatim, which is what JSON and XML need. For
-an ``application/x-www-form-urlencoded`` body every value has to be
+``SetBytes(data [, contentType])`` sends a ``BYTES`` value without text
+conversion and defaults its content type to ``application/octet-stream``.
+Both setters replace the existing body and content type.
+
+For an ``application/x-www-form-urlencoded`` body every value has to be
 percent-encoded instead, so that a ``&`` or ``=`` inside it cannot be mistaken
 for a separator. ``SetForm(name, value)`` encodes one field, appends it to the
 body and sets that content type::
