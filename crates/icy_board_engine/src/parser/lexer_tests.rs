@@ -161,6 +161,23 @@ fn test_identifier() {
 }
 
 #[test]
+fn test_unicode_spans_use_character_offsets() {
+    let src = "; ä\nA¢B";
+    let mut lex = Lexer::new(
+        PathBuf::from("."),
+        &Workspace::default(),
+        src,
+        Encoding::Utf8,
+        Arc::new(Mutex::new(ErrorReporter::default())),
+    );
+
+    assert_eq!(Some(Token::Comment(CommentType::SingleLineSemicolon, " ä".to_string())), lex.next_token());
+    assert_eq!(0..4, lex.span());
+    assert_eq!(Some(Token::Identifier(unicase::Ascii::new("A¢B".to_string()))), lex.next_token());
+    assert_eq!(4..7, lex.span());
+}
+
+#[test]
 fn test_constants() {
     assert_eq!(Token::Const(Constant::Integer(123, NumberFormat::Default)), get_token("123"));
     assert_eq!(Token::Const(Constant::Integer(100, NumberFormat::ColorCode)), get_token("@X64"));

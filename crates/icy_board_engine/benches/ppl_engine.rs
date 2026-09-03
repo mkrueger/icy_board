@@ -17,7 +17,7 @@ use icy_board_engine::{
         message_area::{AreaList, MessageArea},
         state::IcyBoardState,
     },
-    parser::{Encoding, ErrorReporter, UserTypeRegistry, parse_ast},
+    parser::{Encoding, ErrorReporter, UserTypeRegistry, lexer::Lexer, parse_ast},
     vm::{io::DiskIO, run},
 };
 use icy_net::{ConnectionType, channel::ChannelConnection};
@@ -99,6 +99,16 @@ fn routine_source() -> String {
     source
 }
 
+fn directive_source() -> String {
+    let mut source = String::from(";$LANGVERSION 400\n;$DEFINE ENABLED = 1\n");
+    for index in 0..500 {
+        source.push_str(&format!(
+            "; ordinary comment {index}\n;$IF ENABLED\nSTRING value{index} = \"text {index}\"\n;$ELSE\nSTRING skipped{index} = \"ignored\"\n;$ENDIF\n"
+        ));
+    }
+    source
+}
+
 fn compile(source: &str) -> Executable {
     let errors = Arc::new(Mutex::new(ErrorReporter::default()));
     let registry = UserTypeRegistry::icy_board_registry();
@@ -139,6 +149,30 @@ fn parse_benchmarks(criterion: &mut Criterion) {
                 },
                 BatchSize::SmallInput,
             );
+        });
+    }
+    group.finish();
+}
+
+fn lexer_benchmarks(criterion: &mut Criterion) {
+    let workspace = workspace();
+    let routine_source = routine_source();
+    let directive_source = directive_source();
+    let mut group = criterion.benchmark_group("lexer");
+    for (name, source) in [("routines_500", routine_source.as_str()), ("directives_500", directive_source.as_str())] {
+        group.throughput(Throughput::Bytes(source.len() as u64));
+        group.bench_function(name, |benchmark| {
+            benchmark.iter(|| {
+                let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+                let mut lexer = Lexer::new(PathBuf::from("benchmark.pps"), &workspace, black_box(source), Encoding::Utf8, errors.clone());
+                let mut token_count = 0usize;
+                while let Some(token) = lexer.next_token() {
+                    black_box(token);
+                    token_count += 1;
+                }
+                assert!(!errors.lock().unwrap().has_errors());
+                black_box(token_count)
+            });
         });
     }
     group.finish();
@@ -191,6 +225,7 @@ fn compile_from_ast_benchmarks(criterion: &mut Criterion) {
     }
     group.finish();
 }
+
 
 fn optimizer_benchmarks(criterion: &mut Criterion) {
     const BLOCKS: usize = 500;
@@ -376,6 +411,7 @@ fn vm_benchmarks(criterion: &mut Criterion) {
 
 criterion_group!(
     benches,
+    lexer_benchmarks,
     parse_benchmarks,
     compile_benchmarks,
     compile_from_ast_benchmarks,

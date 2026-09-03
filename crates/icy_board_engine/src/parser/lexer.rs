@@ -431,10 +431,12 @@ pub struct Lexer {
     lookup_table: &'static HashMap<unicase::Ascii<String>, Token>,
     define_table: HashMap<unicase::Ascii<String>, Constant>,
     lang_version: u16,
-    text: Vec<char>,
+    text: Arc<str>,
 
     errors: Arc<Mutex<ErrorReporter>>,
     lexer_state: LexerState,
+    byte_start: usize,
+    byte_end: usize,
     token_start: usize,
     token_end: usize,
     /// True while the last read ran into the end of the file, so that putting it
@@ -565,9 +567,11 @@ impl Lexer {
             lookup_table: token_lookup_table(lang_version),
             lang_version,
             define_table,
-            text: text.chars().collect(),
+            text: Arc::from(text),
             lexer_state: LexerState::AfterEol,
             errors,
+            byte_start: 0,
+            byte_end: 0,
             token_start: 0,
             token_end: 0,
             read_past_end: false,
@@ -596,16 +600,22 @@ impl Lexer {
 
     #[inline]
     fn next_ch(&mut self) -> Option<char> {
-        if self.token_end >= self.text.len() {
+        if self.byte_end >= self.text.len() {
             self.read_past_end = true;
             None
         } else {
-            let t = self.text[self.token_end];
+            let byte = self.text.as_bytes()[self.byte_end];
+            let t = if byte.is_ascii() {
+                byte as char
+            } else {
+                self.text[self.byte_end..].chars().next().unwrap()
+            };
             // Some files take that as end of file char.
             if t == '\x1A' {
                 self.read_past_end = true;
                 return None;
             }
+            self.byte_end += t.len_utf8();
             self.token_end += 1;
             self.read_past_end = false;
             Some(t)
@@ -617,6 +627,11 @@ impl Lexer {
         if self.read_past_end {
             self.read_past_end = false;
             return;
+        }
+        if self.text.as_bytes()[self.byte_end - 1].is_ascii() {
+            self.byte_end -= 1;
+        } else {
+            self.byte_end = self.text[..self.byte_end].char_indices().next_back().unwrap().0;
         }
         self.token_end -= 1;
     }
@@ -1185,7 +1200,7 @@ impl Lexer {
             }
         }
 
-        let identifier = unicase::Ascii::new(self.text[self.token_start..self.token_end].iter().collect::<String>());
+        let identifier = unicase::Ascii::new(self.text[self.byte_start..self.byte_end].to_string());
         if self.lang_version >= 400 && identifier == "BIGSTR" {
             self.errors
                 .lock()
@@ -1233,14 +1248,14 @@ impl Lexer {
         let mut nest = 0usize;
 
         loop {
-            if self.token_end >= self.text.len() {
+            if self.byte_end >= self.text.len() {
                 break;
             }
-            let mut line_chars: Vec<char> = Vec::new();
+            let mut line = String::new();
             let mut first_non_ws: Option<char> = None;
 
             while let Some(ch) = self.next_ch() {
-                line_chars.push(ch);
+                line.push(ch);
                 if ch == '\n' {
                     break;
                 }
@@ -1248,33 +1263,32 @@ impl Lexer {
                     first_non_ws = Some(ch);
                 }
             }
-            if line_chars.is_empty() {
+            if line.is_empty() {
                 break;
             }
 
-            let line_str: String = line_chars.iter().collect();
             let is_comment_line = matches!(first_non_ws, Some(';' | '\'' | '*'));
 
             if !is_comment_line {
-                collected.push_str(&line_str);
+                collected.push_str(&line);
                 continue;
             }
 
             // Extract directive body (after first marker)
-            let marker_pos = line_str.find(|c: char| !c.is_whitespace()).unwrap_or(0);
-            let after_marker = &line_str[marker_pos + 1..];
+            let marker_pos = line.find(|c: char| !c.is_whitespace()).unwrap_or(0);
+            let after_marker = &line[marker_pos + 1..];
             let upper = after_marker.trim_start().to_ascii_uppercase();
 
             // Nested IF
             if directive_len(&upper, "$IF").is_some() {
                 nest += 1;
-                collected.push_str(&line_str);
+                collected.push_str(&line);
                 continue;
             }
 
             // ENDIF
             if directive_len(&upper, "$ENDIF").is_some() {
-                collected.push_str(&line_str);
+                collected.push_str(&line);
                 if nest == 0 {
                     self.if_stack.pop();
                     break;
@@ -1296,7 +1310,7 @@ impl Lexer {
                     if let Some(frame) = self.if_stack.last() { !frame.taken } else { false }
                 };
 
-                collected.push_str(&line_str);
+                collected.push_str(&line);
                 if activating {
                     if let Some(f) = self.if_stack.last_mut() {
                         f.taken = true;
@@ -1307,7 +1321,7 @@ impl Lexer {
             }
 
             // Any other comment line in skipped region
-            collected.push_str(&line_str);
+            collected.push_str(&line);
         }
 
         // Return as a normal comment (NOT BlockComment) with the original marker type.
@@ -1320,7 +1334,7 @@ impl Lexer {
             '*' => CommentType::SingleLineStar,
             _ => CommentType::SingleLineQuote,
         };
-        let mut comment = Vec::new();
+        let mut comment = String::new();
         while let Some(ch2) = self.next_ch() {
             if ch2 == '\n' {
                 break;
@@ -1332,7 +1346,7 @@ impl Lexer {
         }
         self.lexer_state = LexerState::AfterEol;
 
-        let raw = comment.iter().collect::<String>();
+        let raw = comment;
         let upper = raw.trim_start().to_ascii_uppercase();
 
         if upper.starts_with("$INCLUDE:") {
@@ -1543,6 +1557,7 @@ impl Lexer {
         let ch;
         loop {
             self.token_start = self.token_end;
+            self.byte_start = self.byte_end;
             if let Some(next_ch) = self.next_ch() {
                 if next_ch != ' ' && next_ch != '\t' {
                     ch = next_ch;
@@ -1661,7 +1676,7 @@ impl Lexer {
                     got_non_ws = true;
                 }
 
-                let identifier = unicase::Ascii::new(self.text[self.token_start + 1 + label_start..self.token_end].iter().collect::<String>());
+                let identifier = unicase::Ascii::new(self.text[self.byte_start + 1 + label_start..self.byte_end].to_string());
                 Some(Token::Label(identifier))
             }
             '(' => Some(Token::LPar),
@@ -1844,7 +1859,6 @@ impl Lexer {
                 )))
             }
             '$' => {
-                let mut identifier = String::new();
                 let mut is_last = false;
                 loop {
                     let Some(ch) = self.next_ch() else {
@@ -1854,12 +1868,11 @@ impl Lexer {
                     if !ch.is_ascii_digit() && ch != '.' {
                         break;
                     }
-                    identifier.push(ch);
                 }
                 if !is_last {
                     self.put_back();
                 }
-                let Ok(r) = identifier.parse::<f64>() else {
+                let Ok(r) = self.text[self.byte_start + 1..self.byte_end].parse::<f64>() else {
                     self.errors
                         .lock()
                         .unwrap()
@@ -1914,7 +1927,7 @@ impl Lexer {
                 if ch.is_ascii_digit() {
                     self.lexer_state = LexerState::BeyondEOL;
                     // ... (rest of numeric handling unchanged) ...
-                    let start = self.token_start;
+                    let start = self.byte_start;
                     let mut cur_ch = ch;
                     while let Some(ch) = self.next_ch() {
                         cur_ch = ch;
@@ -1924,7 +1937,7 @@ impl Lexer {
                                 break;
                             }
                             'D' | 'd' => {
-                                let r = self.text[start..self.token_end - 1].iter().collect::<String>().parse::<i32>();
+                                let r = self.text[start..self.byte_end - 1].parse::<i32>();
                                 match r {
                                     Ok(i) => {
                                         return Some(Token::Const(Constant::Integer(i, NumberFormat::Dec)));
@@ -1932,39 +1945,33 @@ impl Lexer {
                                     Err(r) => {
                                         self.errors.lock().unwrap().report_warning(
                                             self.token_start..self.token_end,
-                                            LexingErrorType::InvalidInteger(
-                                                r.to_string(),
-                                                self.text[self.token_start..self.token_end].iter().collect::<String>(),
-                                            ),
+                                            LexingErrorType::InvalidInteger(r.to_string(), self.text[self.byte_start..self.byte_end].to_string()),
                                         );
                                         return Some(Token::Const(Constant::Integer(-1, NumberFormat::Default)));
                                     }
                                 }
                             }
                             'H' | 'h' => {
-                                let literal = self.text[start..self.token_end - 1].iter().collect::<String>();
-                                let r = i32::from_str_radix(&literal, 16);
+                                let literal = &self.text[start..self.byte_end - 1];
+                                let r = i32::from_str_radix(literal, 16);
                                 match r {
                                     Ok(i) => {
                                         return Some(Token::Const(Constant::Integer(i, NumberFormat::Hex)));
                                     }
                                     Err(r) => {
-                                        if let Ok(i) = u64::from_str_radix(&literal, 16) {
+                                        if let Ok(i) = u64::from_str_radix(literal, 16) {
                                             return Some(Token::Const(Constant::Unsigned(i, NumberFormat::Hex)));
                                         }
                                         self.errors.lock().unwrap().report_warning(
                                             self.token_start..self.token_end,
-                                            LexingErrorType::InvalidInteger(
-                                                r.to_string(),
-                                                self.text[self.token_start..self.token_end].iter().collect::<String>(),
-                                            ),
+                                            LexingErrorType::InvalidInteger(r.to_string(), self.text[self.byte_start..self.byte_end].to_string()),
                                         );
                                         return Some(Token::Const(Constant::Integer(-1, NumberFormat::Default)));
                                     }
                                 }
                             }
                             'O' | 'o' => {
-                                let r = i32::from_str_radix(&self.text[start..self.token_end - 1].iter().collect::<String>(), 8);
+                                let r = i32::from_str_radix(&self.text[start..self.byte_end - 1], 8);
                                 match r {
                                     Ok(i) => {
                                         return Some(Token::Const(Constant::Integer(i, NumberFormat::Octal)));
@@ -1972,10 +1979,7 @@ impl Lexer {
                                     Err(r) => {
                                         self.errors.lock().unwrap().report_warning(
                                             self.token_start..self.token_end,
-                                            LexingErrorType::InvalidInteger(
-                                                r.to_string(),
-                                                self.text[self.token_start..self.token_end].iter().collect::<String>(),
-                                            ),
+                                            LexingErrorType::InvalidInteger(r.to_string(), self.text[self.byte_start..self.byte_end].to_string()),
                                         );
                                         return Some(Token::Const(Constant::Integer(-1, NumberFormat::Default)));
                                     }
@@ -1989,7 +1993,7 @@ impl Lexer {
                                     self.put_back();
                                 }
 
-                                let r = i32::from_str_radix(&self.text[start..self.token_end - 1].iter().collect::<String>(), 2);
+                                let r = i32::from_str_radix(&self.text[start..self.byte_end - 1], 2);
 
                                 match r {
                                     Ok(i) => {
@@ -1998,10 +2002,7 @@ impl Lexer {
                                     Err(r) => {
                                         self.errors.lock().unwrap().report_warning(
                                             self.token_start..self.token_end,
-                                            LexingErrorType::InvalidInteger(
-                                                r.to_string(),
-                                                self.text[self.token_start..self.token_end].iter().collect::<String>(),
-                                            ),
+                                            LexingErrorType::InvalidInteger(r.to_string(), self.text[self.byte_start..self.byte_end].to_string()),
                                         );
 
                                         return Some(Token::Const(Constant::Integer(-1, NumberFormat::Default)));
@@ -2015,7 +2016,7 @@ impl Lexer {
                             break;
                         }
                     }
-                    let mut end = self.token_end;
+                    let mut end = self.byte_end;
                     if cur_ch == '.' {
                         let mut found_dot_dot = false;
                         if let Some(ch) = self.next_ch() {
@@ -2043,8 +2044,8 @@ impl Lexer {
                             if !is_last {
                                 self.put_back();
                             }
-                            end = self.token_end;
-                            let r = self.text[start..end].iter().collect::<String>().parse::<f64>();
+                            end = self.byte_end;
+                            let r = self.text[start..end].parse::<f64>();
                             match r {
                                 Ok(f) => {
                                     return Some(Token::Const(Constant::Double(f)));
@@ -2052,7 +2053,7 @@ impl Lexer {
                                 Err(r) => {
                                     self.errors.lock().unwrap().report_warning(
                                         self.token_start..self.token_end,
-                                        LexingErrorType::InvalidInteger(r.to_string(), self.text[self.token_start..self.token_end].iter().collect::<String>()),
+                                        LexingErrorType::InvalidInteger(r.to_string(), self.text[self.byte_start..self.byte_end].to_string()),
                                     );
                                     return Some(Token::Const(Constant::Double(-1.0)));
                                 }
@@ -2060,7 +2061,7 @@ impl Lexer {
                         }
                     }
 
-                    let r = self.text[start..end].iter().collect::<String>().parse::<i64>();
+                    let r = self.text[start..end].parse::<i64>();
                     match r {
                         Ok(i) => {
                             if i32::try_from(i).is_ok() {
@@ -2071,13 +2072,13 @@ impl Lexer {
                             }
                         }
                         Err(r) => {
-                            let r2 = self.text[start..end].iter().collect::<String>().parse::<u64>();
+                            let r2 = self.text[start..end].parse::<u64>();
                             if let Ok(i) = r2 {
                                 return Some(Token::Const(Constant::Unsigned(i, NumberFormat::Default)));
                             }
                             self.errors.lock().unwrap().report_warning(
                                 self.token_start..self.token_end,
-                                LexingErrorType::InvalidInteger(r.to_string(), self.text[self.token_start..self.token_end].iter().collect::<String>()),
+                                LexingErrorType::InvalidInteger(r.to_string(), self.text[self.byte_start..self.byte_end].to_string()),
                             );
                             return Some(Token::Const(Constant::Integer(-1, NumberFormat::Default)));
                         }
