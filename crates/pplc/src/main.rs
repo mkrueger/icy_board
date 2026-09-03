@@ -104,6 +104,11 @@ lazy_static::lazy_static! {
 
 static COLOR: OnceLock<bool> = OnceLock::new();
 
+/// How many lines a file may have before `--check` stops showing the formatting difference line
+/// by line. The diff costs one table entry per pair of lines, so a bigger file buys a report
+/// nobody reads with gigabytes of memory.
+const MAX_DIFF_LINES: usize = 8192;
+
 /// Colour helps someone looking at a terminal and is noise everywhere else - a
 /// pipe, a log or an editor's output pane shows the escapes themselves.
 fn decide_color(arguments: &Cli) -> bool {
@@ -674,6 +679,18 @@ fn compile_files(arguments: &Cli, encoding: Encoding, workspace: &mut Workspace,
                         let formatted_text = backend.apply();
                         let mut last_line = 0;
                         if arguments.check {
+                            // diff::lines builds a table as wide and as tall as the two files
+                            // have lines, so a large file that needs formatting would ask for
+                            // gigabytes. Past that size the file is only reported as differing.
+                            if src.lines().count().max(formatted_text.lines().count()) > MAX_DIFF_LINES {
+                                exit_code = 1;
+                                println!("Diff in {} (too large to show line by line)", src_file.display());
+                                asts.push((ast, src));
+                                if check_errors(errors.clone(), arguments, &asts) {
+                                    std::process::exit(1);
+                                }
+                                continue;
+                            }
                             let lines = diff::lines(&src, &formatted_text);
                             if lines.iter().any(|l| matches!(l, diff::Result::Left(_) | diff::Result::Right(_))) {
                                 exit_code = 1;
@@ -817,30 +834,33 @@ fn check_errors(errors: std::sync::Arc<std::sync::Mutex<icy_board_engine::parser
             cache.push((format!("{}", ast.file_name.display()), txt));
         }
 
+        // ariadne indexes the whole source the first time it is asked for a line, so the cache
+        // is built once here. Rebuilding it per diagnostic re-read every file for every message,
+        // which a source with many errors turned into gigabytes of work.
+        let mut source_cache = ariadne::sources(cache);
+
         // let file_name = file_name.to_string_lossy().to_string();
         let config = ariadne::Config::default().with_color(colored());
         for err in &errors.lock().unwrap().errors {
             error_count += 1;
-            let cache = ariadne::sources(cache.clone());
             Report::build(ReportKind::Error, (format!("{}", err.file_name.display()), err.span.clone()))
                 .with_config(config)
                 .with_message(format!("{}", err.error))
                 .with_label(Label::new((format!("{}", err.file_name.display()), err.span.clone())).with_color(ariadne::Color::Red))
                 .finish()
-                .print(cache)
+                .print(&mut source_cache)
                 .unwrap();
         }
 
         if !arguments.nowarnings {
             for err in &errors.lock().unwrap().warnings {
                 warning_count += 1;
-                let cache = ariadne::sources(cache.clone());
                 Report::build(ReportKind::Warning, (err.file_name.to_string_lossy().to_string(), err.span.clone()))
                     .with_config(config)
                     .with_message(format!("{}", err.error))
                     .with_label(Label::new((err.file_name.to_string_lossy().to_string(), err.span.clone())).with_color(ariadne::Color::Yellow))
                     .finish()
-                    .print(cache)
+                    .print(&mut source_cache)
                     .unwrap();
             }
             println!("{} errors, {} warnings", error_count, warning_count);

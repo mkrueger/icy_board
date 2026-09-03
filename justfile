@@ -12,7 +12,8 @@ setup-editor target="all":
 # Fuzzes a PPE binary or PPL source trust boundary. Needs nightly + cargo-fuzz;
 # the corpus is temporary, so a run leaves nothing behind in the working tree.
 # Binary targets: ppe_load, ppe_decompile, ppe_structured, ppe_roundtrip, ppe_disassemble.
-# Source targets: ppl_parse, ppl_compile.
+# Source targets: ppl_parse, ppl_compile, ppl_generated, ppl_truncate, ppl_format_roundtrip.
+# The memory caps keep a runaway input from taking the machine down with it.
 fuzz target="ppe_load" seconds="60":
   #!/usr/bin/env bash
   set -euo pipefail
@@ -23,7 +24,8 @@ fuzz target="ppe_load" seconds="60":
     crates/icy_board_engine/tests/test_ppe \
     crates/icy_board_engine/tests/test_data \
     ppe \
-    -- -max_total_time={{seconds}} -max_len=262140 -timeout=15 -close_fd_mask=3
+    -- -max_total_time={{seconds}} -max_len=262140 -timeout=15 -close_fd_mask=3 \
+       -dict=fuzz/dictionaries/ppl.dict -rss_limit_mb=2048 -malloc_limit_mb=1024
 
 build_ppe: build
   target/debug/pplc ppe/cnfn.pps

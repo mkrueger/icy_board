@@ -712,6 +712,11 @@ pub struct SemanticVisitor {
     control_flow_liveness: bool,
     references_are_reachable: bool,
 
+    /// The type of a receiver a member reference already walked. A call and the member
+    /// reference inside it both need it, and walking it twice made a chain like `a[i][j][k]`
+    /// cost 2^n.
+    receiver_types: HashMap<usize, VariableType>,
+
     last_lookup_index: usize,
 }
 
@@ -1013,6 +1018,7 @@ impl SemanticVisitor {
             allowed_routine_reference_spans: HashSet::new(),
             function_return_value_spans: HashSet::new(),
             cur_func_call: 0,
+            receiver_types: HashMap::new(),
             cur_func_impl: None,
             control_flow_liveness: true,
             references_are_reachable: true,
@@ -1982,6 +1988,24 @@ impl SemanticVisitor {
 
     /// A board object's type name standing in for something with members: the type's own
     /// static members, or its one instance. A variable of the same name shadows the type.
+    /// Walks the receiver of a member reference and remembers what it produced.
+    ///
+    /// The member reference and the call wrapped around it both ask for the receiver's type, so
+    /// without this a chain like `a[i][j][k]` walks its head once per level. An identifier is
+    /// cheap and its result depends on `cur_func_call`, so only the nesting cases are kept.
+    fn visit_receiver(&mut self, receiver: &Expression, member_token: &Spanned<Token>) -> VariableType {
+        if matches!(receiver, Expression::Identifier(_)) {
+            return receiver.visit(self);
+        }
+        let key = member_token.span.start;
+        if let Some(cached) = self.receiver_types.get(&key) {
+            return *cached;
+        }
+        let receiver_type = receiver.visit(self);
+        self.receiver_types.insert(key, receiver_type);
+        receiver_type
+    }
+
     fn static_receiver(&mut self, expr: &Expression, member: &unicase::Ascii<String>) -> StaticReceiver {
         let Expression::Identifier(base) = expr else {
             return StaticReceiver::NotAType;
@@ -2638,13 +2662,13 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             && self.array_shape(member_reference_expression.get_expression()).is_some()
             && (array_member(member_reference_expression.get_identifier()).is_some() || array_procedure(member_reference_expression.get_identifier()).is_some())
         {
-            member_reference_expression.get_expression().visit(self);
+            self.visit_receiver(member_reference_expression.get_expression(), member_reference_expression.get_identifier_token());
             return array_member(member_reference_expression.get_identifier()).map_or(VariableType::None, |member| member.return_type);
         }
 
         let t = match receiver {
             StaticReceiver::Instance(type_id) | StaticReceiver::StaticMember(type_id) => VariableType::UserData(type_id),
-            StaticReceiver::NotAType => member_reference_expression.get_expression().visit(self),
+            StaticReceiver::NotAType => self.visit_receiver(member_reference_expression.get_expression(), member_reference_expression.get_identifier_token()),
             StaticReceiver::Rejected => return VariableType::None,
         };
         if matches!(t, VariableType::String | VariableType::BigStr | VariableType::UnboundedString)
@@ -2906,7 +2930,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
         if let Expression::MemberReference(member) = call.get_expression()
             && let Some((_, opcode, arguments)) = array_procedure(member.get_identifier())
         {
-            member.get_expression().visit(self);
+            self.visit_receiver(member.get_expression(), member.get_identifier_token());
             if let Some(shape) = self.array_shape(member.get_expression()) {
                 for argument in call.get_arguments() {
                     argument.visit(self);
@@ -2930,7 +2954,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
         if let Expression::MemberReference(member) = call.get_expression()
             && let Some(array_member) = array_member(member.get_identifier())
         {
-            member.get_expression().visit(self);
+            self.visit_receiver(member.get_expression(), member.get_identifier_token());
             if self.array_shape(member.get_expression()).is_some() {
                 for argument in call.get_arguments() {
                     argument.visit(self);
@@ -2954,7 +2978,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             && member.get_identifier().as_ref() == "<get>"
             && call.get_arguments().len() == 1
         {
-            let receiver_type = member.get_expression().visit(self);
+            let receiver_type = self.visit_receiver(member.get_expression(), member.get_identifier_token());
             if let Some(shape) = self.array_shape(member.get_expression())
                 && shape.rank == 1
             {
@@ -3053,7 +3077,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             let receiver_type = if registered_type_receiver {
                 VariableType::None
             } else {
-                member.get_expression().visit(self)
+                self.visit_receiver(member.get_expression(), member.get_identifier_token())
             };
             if matches!(receiver_type, VariableType::String | VariableType::BigStr | VariableType::UnboundedString)
                 && let Some((opcode, return_type, defaults)) = string_member(member.get_identifier(), call.get_arguments().len())

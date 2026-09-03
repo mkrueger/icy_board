@@ -130,3 +130,47 @@ fn internal_pseudo_statements_are_not_callable_from_source() {
         assert!(!errors.is_empty(), "{source:?} was accepted");
     }
 }
+
+/// A member reference and the call around it both want the receiver's type. While each of them
+/// walked it separately a chain of `n` links cost `3^n`, which a 60 byte source turned into an
+/// out of memory kill. The duplicated walks are counted here through the diagnostics they repeat.
+#[test]
+fn a_nested_indexer_walks_each_receiver_once() {
+    let depth = 12;
+    let source = format!("INTEGER arr(5)\nPRINTLN arr{}\n", "[1]".repeat(depth));
+    let repeated = diagnostics(&source).iter().filter(|error| *error == "Member not found").count();
+
+    assert_eq!(repeated, depth - 1, "expected one diagnostic per link, not one per walk");
+}
+
+#[test]
+fn a_long_member_chain_reports_an_error_instead_of_overflowing_the_stack() {
+    let source = format!("INTEGER arr(5)\nPRINTLN arr{}\n", "[1]".repeat(70));
+    let errors = diagnostics(&source);
+
+    assert!(
+        errors.iter().any(|error| error == "Expression nesting exceeds the supported limit of 64"),
+        "{errors:?}"
+    );
+}
+
+/// A left associative chain costs the parser no recursion, so the nesting guard never saw it
+/// while the tree it built was deep enough to end the walk over it on the stack.
+#[test]
+fn a_long_operator_chain_reports_an_error_instead_of_overflowing_the_stack() {
+    let source = format!("PRINTLN {}\n", vec!["1"; 20_000].join(" + "));
+    let errors = diagnostics(&source);
+
+    assert!(
+        errors.iter().any(|error| error == "Expression nesting exceeds the supported limit of 1024"),
+        "{:?}",
+        &errors[..errors.len().min(3)]
+    );
+}
+
+#[test]
+fn an_operator_chain_a_source_might_really_write_is_still_accepted() {
+    let source = format!("PRINTLN {}\n", vec!["1"; 512].join(" + "));
+
+    assert!(diagnostics(&source).is_empty());
+}

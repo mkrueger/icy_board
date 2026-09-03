@@ -701,6 +701,10 @@ pub struct Parser<'a> {
 }
 const MAX_EXPRESSION_DEPTH: usize = 64;
 const MAX_STATEMENT_DEPTH: usize = 64;
+/// A left associative operator chain is read in a loop, so it costs the parser no recursion
+/// while the tree it builds is as deep as the chain is long. Everything that later walks that
+/// tree does recurse, so the chain gets a bound far above what a source realistically writes.
+const MAX_OPERATOR_CHAIN: usize = 1024;
 static PROC_TOKEN: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("PROC".to_string()));
 static FUNC_TOKEN: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("FUNC".to_string()));
 static ON_TOKEN: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("ON".to_string()));

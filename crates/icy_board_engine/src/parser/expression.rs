@@ -26,9 +26,25 @@ impl Parser<'_> {
         expression
     }
 
+    /// Counts one more link of a left associative operator chain. The loops that read those
+    /// chains cost the parser no recursion, but the tree they build is as deep as the chain is
+    /// long and everything that walks it later does recurse.
+    fn take_operator_link(&mut self, links: &mut usize) -> bool {
+        *links += 1;
+        if *links > super::MAX_OPERATOR_CHAIN {
+            self.report_error(self.save_token_span(), ParserErrorType::ExpressionNestingTooDeep(super::MAX_OPERATOR_CHAIN));
+            return false;
+        }
+        true
+    }
+
     fn parse_bool(&mut self) -> Option<Expression> {
         let mut expr = self.parse_comparison()?;
+        let mut links = 0;
         while self.get_cur_token() == Some(Token::Or) || self.get_cur_token() == Some(Token::And) {
+            if !self.take_operator_link(&mut links) {
+                return None;
+            }
             let op_token = self.save_spanned_token();
             self.next_token();
             let right = self.parse_comparison();
@@ -43,6 +59,7 @@ impl Parser<'_> {
 
     fn parse_comparison(&mut self) -> Option<Expression> {
         let mut expr = self.parse_term()?;
+        let mut links = 0;
         while self.get_cur_token() == Some(Token::Greater)
             || self.get_cur_token() == Some(Token::GreaterEq)
             || self.get_cur_token() == Some(Token::Lower)
@@ -50,6 +67,9 @@ impl Parser<'_> {
             || self.get_cur_token() == Some(Token::Eq)
             || self.get_cur_token() == Some(Token::NotEq)
         {
+            if !self.take_operator_link(&mut links) {
+                return None;
+            }
             let op_token = self.save_spanned_token();
             self.next_token();
             let right = self.parse_term();
@@ -65,7 +85,11 @@ impl Parser<'_> {
 
     fn parse_term(&mut self) -> Option<Expression> {
         let mut expr = self.parse_factor()?;
+        let mut links = 0;
         while self.get_cur_token() == Some(Token::Add) || self.get_cur_token() == Some(Token::Sub) {
+            if !self.take_operator_link(&mut links) {
+                return None;
+            }
             let op_token = self.save_spanned_token();
             self.next_token();
             let right = self.parse_factor();
@@ -81,7 +105,11 @@ impl Parser<'_> {
 
     fn parse_factor(&mut self) -> Option<Expression> {
         let mut expr = self.parse_pow()?;
+        let mut links = 0;
         while self.get_cur_token() == Some(Token::Mul) || self.get_cur_token() == Some(Token::Div) || self.get_cur_token() == Some(Token::Mod) {
+            if !self.take_operator_link(&mut links) {
+                return None;
+            }
             let op_token = self.save_spanned_token();
             self.next_token();
             let right = self.parse_pow();
@@ -96,7 +124,11 @@ impl Parser<'_> {
 
     fn parse_pow(&mut self) -> Option<Expression> {
         let mut expr = self.parse_unary()?;
+        let mut links = 0;
         while self.get_cur_token() == Some(Token::PoW) {
+            if !self.take_operator_link(&mut links) {
+                return None;
+            }
             let op_token = self.save_spanned_token();
             self.next_token();
             let right = self.parse_unary();
@@ -200,7 +232,17 @@ impl Parser<'_> {
     /// of its own, and any member in the chain may be called.
     pub(super) fn parse_member_chain(&mut self, expr: Expression) -> Option<Expression> {
         let mut expr = expr;
+        // The chain is read in a loop but nests one level per link, so it needs the same
+        // bound the recursive part of the parser keeps.
+        let mut links = 0;
         loop {
+            if matches!(self.get_cur_token(), Some(Token::Dot | Token::LBracket)) {
+                links += 1;
+                if links > super::MAX_EXPRESSION_DEPTH {
+                    self.report_error(self.save_token_span(), ParserErrorType::ExpressionNestingTooDeep(super::MAX_EXPRESSION_DEPTH));
+                    return None;
+                }
+            }
             if self.get_cur_token() == Some(Token::Dot) {
                 let dot_token: super::lexer::Spanned<Token> = self.save_spanned_token();
                 self.next_token();

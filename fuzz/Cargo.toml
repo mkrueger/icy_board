@@ -10,6 +10,14 @@ cargo-fuzz = true
 [dependencies]
 libfuzzer-sys = "0.4"
 icy_board_engine = { path = "../crates/icy_board_engine" }
+arbitrary = { version = "1", features = ["derive"] }
+
+[lib]
+name = "icy_board_fuzz"
+path = "src/lib.rs"
+test = false
+doc = false
+bench = false
 
 [[bin]]
 name = "ppe_load"
@@ -56,6 +64,27 @@ bench = false
 [[bin]]
 name = "ppl_compile"
 path = "fuzz_targets/ppl_compile.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "ppl_generated"
+path = "fuzz_targets/ppl_generated.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "ppl_format_roundtrip"
+path = "fuzz_targets/ppl_format_roundtrip.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "ppl_truncate"
+path = "fuzz_targets/ppl_truncate.rs"
 test = false
 doc = false
 bench = false
