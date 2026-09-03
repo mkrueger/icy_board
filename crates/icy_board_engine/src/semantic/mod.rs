@@ -2738,12 +2738,26 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                             );
                             return VariableType::None;
                         }
+                        if !is_called {
+                            self.errors.lock().unwrap().report_error(
+                                member_reference_expression.get_identifier_token().span.clone(),
+                                CompilationErrorType::MemberNeedsCall(name.to_string()),
+                            );
+                            return VariableType::None;
+                        }
                         self.user_type_lookup.insert(member_reference_expression.get_identifier_token().span.start, d);
                         return function.return_type;
                     }
                 }
                 for name in t.procedures.keys() {
                     if name == member_reference_expression.get_identifier() {
+                        if !is_called {
+                            self.errors.lock().unwrap().report_error(
+                                member_reference_expression.get_identifier_token().span.clone(),
+                                CompilationErrorType::MemberNeedsCall(name.to_string()),
+                            );
+                            return VariableType::None;
+                        }
                         self.user_type_lookup.insert(member_reference_expression.get_identifier_token().span.start, d);
                         return VariableType::None;
                     }
