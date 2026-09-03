@@ -300,7 +300,8 @@ impl Executable {
 
         let code_data: &mut [u8] = &mut buffer[i..];
         let decrypted_data;
-        let data: &[u8] = if version > 300 {
+        // 3.00 is written encrypted and run length encoded, so it has to be read that way too.
+        let data: &[u8] = if version >= 300 {
             let use_rle = real_size != code_size;
             decrypt_chunks(code_data, version, use_rle);
             if use_rle {
@@ -411,6 +412,37 @@ impl Default for Executable {
             variable_table: VariableTable::default(),
             user_types: Vec::new(),
             script_buffer: Vec::new(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::executable::OpCode;
+
+    /// Every runtime the compiler can emit has to be readable again, and 3.00 is the
+    /// first one that is written encrypted.
+    #[test]
+    fn every_supported_runtime_survives_a_write_and_a_read() {
+        for runtime in super::super::SUPPORTED_PPE_VERSIONS.iter().copied() {
+            let script_buffer = vec![OpCode::END as i16; 2048];
+            let mut executable = Executable {
+                runtime,
+                script_buffer: script_buffer.clone(),
+                ..Executable::default()
+            };
+            executable.variable_table.set_version(runtime);
+
+            let mut bytes = executable
+                .to_buffer()
+                .unwrap_or_else(|error| panic!("runtime {runtime} does not write: {error}"));
+            let Ok(reloaded) = Executable::from_buffer(&mut bytes, false) else {
+                panic!("runtime {runtime} does not load again");
+            };
+
+            assert_eq!(runtime, reloaded.runtime, "runtime {runtime} changed");
+            assert_eq!(script_buffer, reloaded.script_buffer, "runtime {runtime} lost its script");
         }
     }
 }

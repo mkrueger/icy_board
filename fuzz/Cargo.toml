@@ -32,5 +32,12 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "ppe_roundtrip"
+path = "fuzz_targets/ppe_roundtrip.rs"
+test = false
+doc = false
+bench = false
+
 [workspace]
 members = ["."]
