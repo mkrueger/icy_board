@@ -681,10 +681,13 @@ fn compile_files(arguments: &Cli, encoding: Encoding, workspace: &mut Workspace,
                         if arguments.check {
                             // diff::lines builds a table as wide and as tall as the two files
                             // have lines, so a large file that needs formatting would ask for
-                            // gigabytes. Past that size the file is only reported as differing.
+                            // gigabytes. Past that size the file is only reported as differing,
+                            // which the texts themselves answer without building the table.
                             if src.lines().count().max(formatted_text.lines().count()) > MAX_DIFF_LINES {
-                                exit_code = 1;
-                                println!("Diff in {} (too large to show line by line)", src_file.display());
+                                if src != formatted_text {
+                                    exit_code = 1;
+                                    println!("Diff in {} (too large to show line by line)", src_file.display());
+                                }
                                 asts.push((ast, src));
                                 if check_errors(errors.clone(), arguments, &asts) {
                                     std::process::exit(1);

@@ -89,5 +89,19 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "ppl_preprocess"
+path = "fuzz_targets/ppl_preprocess.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "ppl_mutate"
+path = "fuzz_targets/ppl_mutate.rs"
+test = false
+doc = false
+bench = false
+
 [workspace]
 members = ["."]

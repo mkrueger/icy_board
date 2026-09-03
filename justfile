@@ -12,7 +12,8 @@ setup-editor target="all":
 # Fuzzes a PPE binary or PPL source trust boundary. Needs nightly + cargo-fuzz;
 # the corpus is temporary, so a run leaves nothing behind in the working tree.
 # Binary targets: ppe_load, ppe_decompile, ppe_structured, ppe_roundtrip, ppe_disassemble.
-# Source targets: ppl_parse, ppl_compile, ppl_generated, ppl_truncate, ppl_format_roundtrip.
+# Source targets: ppl_parse, ppl_compile, ppl_generated, ppl_truncate, ppl_format_roundtrip,
+#                 ppl_preprocess, ppl_mutate.
 # The memory caps keep a runaway input from taking the machine down with it.
 fuzz target="ppe_load" seconds="60":
   #!/usr/bin/env bash

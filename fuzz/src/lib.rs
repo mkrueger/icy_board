@@ -452,6 +452,291 @@ fn render_boundary(kind: &BoundaryKind, depth: usize) -> String {
     }
 }
 
+/// Real sources, so a mutation starts from something the parser already accepts instead of from
+/// bytes it rejects in the first token.
+const SEEDS: &[&str] = &[
+    include_str!("../../crates/icy_board_engine/tests/test_data/if_then.pps"),
+    include_str!("../../crates/icy_board_engine/tests/test_data/function_test.pps"),
+    include_str!("../../crates/icy_board_engine/tests/test_data/local_variables.pps"),
+    include_str!("../../crates/icy_board_engine/tests/test_data/by_ref_parameter.pps"),
+    include_str!("../../crates/icy_board_engine/tests/test_data/bitfunctions.pps"),
+    include_str!("../../ppe/script2.pps"),
+];
+
+/// The pieces a mutation swaps in. Keeping them to things PPL already means lets a damaged source
+/// stay parseable far enough to reach the compiler.
+const REPLACEMENTS: &[&str] = &[
+    "",
+    "1",
+    "0",
+    "-1",
+    "\"\"",
+    "TRUE",
+    "AUTO",
+    "PCALL",
+    "STATIC",
+    "END",
+    "ENDIF",
+    "ENDPROC",
+    "BEGIN",
+    "(",
+    ")",
+    "[",
+    "]",
+    ",",
+    ".",
+    "=",
+    "+",
+    "PRINTLN",
+    "INTEGER",
+    "PROCEDURE",
+    "GOTO",
+    "obj.Field",
+    "arr[1]",
+    "999999999999999999999",
+];
+
+#[derive(Debug, Arbitrary)]
+pub enum Edit {
+    /// Swaps one line for another piece of PPL.
+    ReplaceLine {
+        line: u16,
+        text: u8,
+    },
+    DeleteLine {
+        line: u16,
+    },
+    /// Repeats a line, which is how an unbalanced block usually appears.
+    DuplicateLine {
+        line: u16,
+    },
+    SwapLines {
+        line: u16,
+        other: u16,
+    },
+    InsertLine {
+        line: u16,
+        text: u8,
+    },
+    /// Appends to a line so a statement gains a suffix it was not written with.
+    AppendToLine {
+        line: u16,
+        text: u8,
+    },
+    /// Grows a chain in place, which random editing almost never manages.
+    RepeatFragment {
+        line: u16,
+        fragment: u8,
+        times: u8,
+    },
+    TruncateLine {
+        line: u16,
+        keep: u8,
+    },
+}
+
+const FRAGMENTS: &[&str] = &["[1]", ".Field", "(1)", " + 1", "!", "(", ")"];
+
+#[derive(Debug, Arbitrary)]
+pub struct MutatedSource {
+    pub seed: u8,
+    pub language: u8,
+    pub edits: Vec<Edit>,
+}
+
+impl MutatedSource {
+    pub fn language_version(&self) -> u16 {
+        SUPPORTED_PPL_LANGUAGE_VERSIONS[self.language as usize % SUPPORTED_PPL_LANGUAGE_VERSIONS.len()]
+    }
+
+    pub fn render(&self) -> String {
+        let seed = SEEDS[self.seed as usize % SEEDS.len()];
+        let mut lines: Vec<String> = seed.lines().map(ToString::to_string).collect();
+
+        for edit in self.edits.iter().take(64) {
+            if lines.is_empty() {
+                lines.push(String::new());
+            }
+            let index = |line: &u16| *line as usize % lines.len();
+            match edit {
+                Edit::ReplaceLine { line, text } => {
+                    let at = index(line);
+                    lines[at] = pick(REPLACEMENTS, *text).to_string();
+                }
+                Edit::DeleteLine { line } => {
+                    let at = index(line);
+                    lines.remove(at);
+                }
+                Edit::DuplicateLine { line } => {
+                    let at = index(line);
+                    let copy = lines[at].clone();
+                    lines.insert(at, copy);
+                }
+                Edit::SwapLines { line, other } => {
+                    let (a, b) = (index(line), index(other));
+                    lines.swap(a, b);
+                }
+                Edit::InsertLine { line, text } => {
+                    let at = index(line);
+                    lines.insert(at, pick(REPLACEMENTS, *text).to_string());
+                }
+                Edit::AppendToLine { line, text } => {
+                    let at = index(line);
+                    let addition = pick(REPLACEMENTS, *text).to_string();
+                    lines[at].push_str(&addition);
+                }
+                Edit::RepeatFragment { line, fragment, times } => {
+                    let at = index(line);
+                    let repeat = DEPTHS[*times as usize % DEPTHS.len()].min(4096);
+                    let addition = pick(FRAGMENTS, *fragment).repeat(repeat);
+                    lines[at].push_str(&addition);
+                }
+                Edit::TruncateLine { line, keep } => {
+                    let at = index(line);
+                    let mut keep = (*keep as usize).min(lines[at].len());
+                    while keep > 0 && !lines[at].is_char_boundary(keep) {
+                        keep -= 1;
+                    }
+                    lines[at].truncate(keep);
+                }
+            }
+            if lines.iter().map(String::len).sum::<usize>() > MAX_SOURCE_LEN {
+                break;
+            }
+        }
+
+        lines.join("\n")
+    }
+}
+
+/// A directive the lexer acts on before the parser ever sees a token. They carry state of their
+/// own in the conditional stack, and a `$DEFINE` value re-enters the parser, so they are worth
+/// arranging in ways a source would not.
+#[derive(Debug, Arbitrary)]
+pub enum Directive {
+    If(u8),
+    ElseIf(u8),
+    Else,
+    EndIf,
+    Define(u8, u8),
+    DefineNoValue(u8),
+    UseFuncs,
+    LangVersion(u8),
+    Include(u8),
+    Statement,
+    /// A directive spelled the way a source might get it slightly wrong.
+    Malformed(u8),
+}
+
+const PREPROC_CONDITIONS: &[&str] = &[
+    "TRUE",
+    "FALSE",
+    "1",
+    "0",
+    "-1",
+    "",
+    "NAME",
+    "NAME = 1",
+    "NAME > 0",
+    "1 + 1",
+    "(((1)))",
+    "!TRUE",
+    "\"text\"",
+    "1 / 0",
+    "$",
+    "NAME NAME",
+];
+
+const DEFINE_VALUES: &[&str] = &[
+    "1",
+    "0",
+    "TRUE",
+    "FALSE",
+    "-2147483648",
+    "2147483647",
+    "\"text\"",
+    "1 + 1",
+    "NAME",
+    "",
+    "1 1",
+    "NAME + 1",
+];
+
+const DEFINE_NAMES: &[&str] = &["NAME", "OTHER", "_x", "1bad", "with space", "", "NAME2", "TRUE"];
+
+const MALFORMED_DIRECTIVES: &[&str] = &[
+    ";$",
+    ";$IF",
+    ";$ELSEIF",
+    ";$ENDIF extra",
+    ";$IFDEF NAME",
+    ";$UNKNOWN",
+    ";$LANGVERSION",
+    ";$LANGVERSION 99999",
+    ";$LANGVERSION -1",
+    ";$INCLUDE:",
+    ";$INCLUDE:../../../etc/passwd",
+    ";$DEFINE",
+];
+
+#[derive(Debug, Arbitrary)]
+pub enum Preprocessed {
+    /// Directives in whatever order the mutator picked, balanced or not.
+    Mixed { language: u8, directives: Vec<Directive> },
+    /// One conditional nested to a depth from the table, with the closers left off when asked.
+    NestedConditional { language: u8, depth: u8, closed: bool },
+}
+
+impl Preprocessed {
+    pub fn language_version(&self) -> u16 {
+        let index = match self {
+            Preprocessed::Mixed { language, .. } | Preprocessed::NestedConditional { language, .. } => *language,
+        };
+        SUPPORTED_PPL_LANGUAGE_VERSIONS[index as usize % SUPPORTED_PPL_LANGUAGE_VERSIONS.len()]
+    }
+
+    pub fn render(&self) -> String {
+        match self {
+            Preprocessed::Mixed { directives, .. } => render_directives(directives),
+            Preprocessed::NestedConditional { depth, closed, .. } => {
+                let depth = DEPTHS[*depth as usize % DEPTHS.len()];
+                let mut source = ";$DEFINE NAME = 1\n".to_string();
+                source.push_str(&";$IF NAME\nPRINTLN 1\n".repeat(depth));
+                if *closed {
+                    source.push_str(&";$ENDIF\n".repeat(depth));
+                }
+                source
+            }
+        }
+    }
+}
+
+fn render_directives(directives: &[Directive]) -> String {
+    let mut source = String::new();
+    for directive in directives {
+        if source.len() >= MAX_SOURCE_LEN {
+            break;
+        }
+        match directive {
+            Directive::If(condition) => source.push_str(&format!(";$IF {}\n", pick(PREPROC_CONDITIONS, *condition))),
+            Directive::ElseIf(condition) => source.push_str(&format!(";$ELSEIF {}\n", pick(PREPROC_CONDITIONS, *condition))),
+            Directive::Else => source.push_str(";$ELSE\n"),
+            Directive::EndIf => source.push_str(";$ENDIF\n"),
+            Directive::Define(name, value) => source.push_str(&format!(";$DEFINE {} = {}\n", pick(DEFINE_NAMES, *name), pick(DEFINE_VALUES, *value))),
+            Directive::DefineNoValue(name) => source.push_str(&format!(";$DEFINE {}\n", pick(DEFINE_NAMES, *name))),
+            Directive::UseFuncs => source.push_str(";$USEFUNCS\n"),
+            Directive::LangVersion(version) => source.push_str(&format!(";$LANGVERSION {}\n", u16::from(*version) * 10)),
+            Directive::Include(path) => source.push_str(&format!(";$INCLUDE:{}\n", pick(&["a.pps", "../a.pps", "/etc/passwd", ""], *path))),
+            Directive::Statement => source.push_str("PRINTLN NAME\n"),
+            Directive::Malformed(index) => {
+                source.push_str(pick(MALFORMED_DIRECTIVES, *index));
+                source.push('\n');
+            }
+        }
+    }
+    source
+}
+
 /// A diagnostic an editor cannot point at is a defect of its own, and a span outside the source is
 /// what makes the renderer in pplc panic rather than print.
 pub fn check_diagnostic_spans(reporter: &ErrorReporter, source: &str, file_name: &Path) {

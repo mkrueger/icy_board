@@ -210,3 +210,23 @@ fn print_config_formats_are_mutually_exclusive() {
     let output = pplc().args(["--print-config", "--print-config-json", "ignored.pps"]).output().unwrap();
     assert_eq!(output.status.code(), Some(2));
 }
+
+/// Past the size where the line by line diff is skipped, --check still has to say whether the
+/// file differs rather than assume it does because the formatter produced edits.
+#[test]
+fn a_large_already_formatted_source_passes() {
+    let source = (0..20_000).map(|index| format!("PRINTLN {index}\n")).collect::<String>();
+    let (code, text) = check(&source);
+
+    assert_eq!(code, 0, "{}", &text[..text.len().min(400)]);
+    assert!(!text.contains("Diff in"), "{}", &text[..text.len().min(400)]);
+}
+
+#[test]
+fn a_large_unformatted_source_is_reported_without_the_line_by_line_diff() {
+    let source = (0..20_000).map(|index| format!("   PRINTLN {index}\n")).collect::<String>();
+    let (code, text) = check(&source);
+
+    assert_eq!(code, 1, "{}", &text[..text.len().min(400)]);
+    assert!(text.contains("too large to show line by line"), "{}", &text[..text.len().min(400)]);
+}
