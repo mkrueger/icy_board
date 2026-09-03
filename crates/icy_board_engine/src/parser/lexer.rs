@@ -29,8 +29,8 @@ pub enum LexingErrorType {
     #[error("Unexpected end of file in string")]
     UnexpectedEOFInString,
 
-    #[error("Error loading include file '{0}': {1}")]
-    ErrorLoadingIncludeFile(String, String),
+    #[error("'{0}' is not a PPL directive - put the file in the package's src directory instead")]
+    UnsupportedDirective(String),
 
     #[error("Can't find parent of path {0}")]
     PathError(String),
@@ -441,8 +441,6 @@ pub struct Lexer {
     /// back does not step over a character that was never read.
     read_past_end: bool,
     if_stack: Vec<IfFrame>,
-
-    include_lexer: Option<Box<Lexer>>,
 }
 
 /// A word the language reserves, and the version that reserved it.
@@ -573,7 +571,6 @@ impl Lexer {
             token_start: 0,
             token_end: 0,
             read_past_end: false,
-            include_lexer: None,
             if_stack: Vec::new(),
         };
         if let Some(defines) = workspace.compiler.as_ref().and_then(|compiler| compiler.defines.as_ref()) {
@@ -1339,6 +1336,11 @@ impl Lexer {
         let upper = raw.trim_start().to_ascii_uppercase();
 
         if upper.starts_with("$INCLUDE:") {
+            // PCBoard never had it, so a source that uses it is quietly missing whatever it named.
+            self.errors
+                .lock()
+                .unwrap()
+                .report_error(self.token_start..self.token_end, LexingErrorType::UnsupportedDirective("$INCLUDE".to_string()));
             return self.next_token();
         }
         if upper.starts_with("$USEFUNCS") {
@@ -1537,16 +1539,6 @@ impl Lexer {
         }
     }
     pub fn next_token(&mut self) -> Option<Token> {
-        // Handle include files first
-        if let Some(lexer) = &mut self.include_lexer {
-            let result = lexer.next_token();
-            if let Some(token) = result {
-                return Some(token);
-            }
-            self.check_eof();
-            self.include_lexer = None;
-        }
-
         // Now process normal tokens (we're in an active region or no conditionals)
         let ch;
         loop {

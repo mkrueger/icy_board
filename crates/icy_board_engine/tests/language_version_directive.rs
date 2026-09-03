@@ -44,3 +44,17 @@ fn the_declared_version_reaches_the_keywords() {
     let errors = diagnostics(";$LANGVERSION 350\nEXIT\n");
     assert!(!errors.is_empty(), "EXIT should not be a statement for 350");
 }
+
+/// PCBoard had no `$INCLUDE`, so a source that uses it is quietly missing whatever it named and
+/// has to be told rather than compiled as if the line were a comment.
+#[test]
+fn an_include_directive_is_reported_as_unsupported() {
+    let errors = diagnostics(";$INCLUDE:common.pps\nPRINTLN 1\n");
+
+    assert!(errors.iter().any(|error| error.contains("'$INCLUDE' is not a PPL directive")), "{errors:?}");
+}
+
+#[test]
+fn a_comment_that_merely_starts_with_a_dollar_is_still_a_comment() {
+    assert!(diagnostics(";$5 discount applies\nPRINTLN 1\n").is_empty());
+}
