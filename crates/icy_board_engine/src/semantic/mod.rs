@@ -73,6 +73,9 @@ pub struct SemanticVisitor {
     // labels
     label_count: usize,
     label_lookup_table: NameTableLookup,
+    label_reference_lookup: HashMap<usize, usize>,
+    predefined_function_reference_lookup: HashMap<i16, usize>,
+    predefined_procedure_reference_lookup: HashMap<i16, usize>,
 
     // variables
     global_lookup: VariableLookups,
@@ -254,6 +257,9 @@ impl SemanticVisitor {
 
             label_count: 0,
             label_lookup_table: HashMap::new(),
+            label_reference_lookup: HashMap::new(),
+            predefined_function_reference_lookup: HashMap::new(),
+            predefined_procedure_reference_lookup: HashMap::new(),
             user_type_lookup: HashMap::new(),
             member_receiver_type_lookup: HashMap::new(),
             instance_provider_lookup: HashMap::new(),
@@ -701,6 +707,18 @@ impl SemanticVisitor {
         None
     }
 
+    fn routine_container(&self, reference: usize) -> Option<&FunctionContainer> {
+        let container = self.routine_container_index(reference)?;
+        self.function_containers.get(container)
+    }
+
+    fn routine_container_index(&self, reference: usize) -> Option<usize> {
+        match self.references.get(reference)?.0 {
+            ReferenceType::Function(container) | ReferenceType::Procedure(container) => Some(container),
+            _ => None,
+        }
+    }
+
     fn visit_statement_sequence(&mut self, statements: &[Statement]) -> bool {
         if !self.control_flow_liveness {
             for statement in statements {
@@ -1082,7 +1100,7 @@ impl SemanticVisitor {
                     }
 
                     if vt == VariableType::Function {
-                        let container = self.function_containers.iter().find(|container| container.id == self.last_lookup_index);
+                        let container = self.routine_container(self.last_lookup_index);
                         let matches = container.is_some_and(|container| match &container.functions {
                             FunctionDeclaration::Function(declaration) => {
                                 f.get_return_type() == declaration.get_return_type() && parameter_lists_match(f.get_parameters(), declaration.get_parameters())
@@ -1109,7 +1127,7 @@ impl SemanticVisitor {
                             .report_error(argument.get_span().clone(), CompilationErrorType::ProcedureExpected);
                     }
                     if vt == VariableType::Procedure {
-                        let container = self.function_containers.iter().find(|container| container.id == self.last_lookup_index);
+                        let container = self.routine_container(self.last_lookup_index);
                         let matches = container.is_some_and(|container| match &container.functions {
                             FunctionDeclaration::Procedure(declaration) => parameter_lists_match(p.get_parameters(), declaration.get_parameters()),
                             FunctionDeclaration::Function(_) => false,

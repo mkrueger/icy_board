@@ -35,20 +35,19 @@ impl SemanticVisitor {
     }
 
     pub(super) fn add_reference(&mut self, reference_type: ReferenceType, variable_type: VariableType, identifier_token: &Spanned<Token>) {
-        for (index, reference) in self.references.iter_mut().enumerate() {
-            if reference.0 == reference_type {
-                if self.references_are_reachable {
-                    self.reference_owners.entry(index).or_default().insert(self.cur_func_impl);
-                }
-                reference.1.usages.push((
-                    self.current_file.clone(),
-                    Spanned::new(identifier_token.token.to_string(), identifier_token.span.clone()),
-                ));
-                return;
+        if let Some(index) = self.reference_index(&reference_type) {
+            if self.references_are_reachable {
+                self.reference_owners.entry(index).or_default().insert(self.cur_func_impl);
             }
+            self.references[index].1.usages.push((
+                self.current_file.clone(),
+                Spanned::new(identifier_token.token.to_string(), identifier_token.span.clone()),
+            ));
+            return;
         }
+        let index = self.references.len();
         self.references.push((
-            reference_type,
+            reference_type.clone(),
             References {
                 declaration: None,
                 implementation: None,
@@ -62,8 +61,33 @@ impl SemanticVisitor {
                 )],
             },
         ));
+        self.index_reference(&reference_type, index);
         if self.references_are_reachable {
-            self.reference_owners.entry(self.references.len() - 1).or_default().insert(self.cur_func_impl);
+            self.reference_owners.entry(index).or_default().insert(self.cur_func_impl);
+        }
+    }
+
+    fn reference_index(&self, reference_type: &ReferenceType) -> Option<usize> {
+        match reference_type {
+            ReferenceType::Label(id) => self.label_reference_lookup.get(id).copied(),
+            ReferenceType::PredefinedFunc(opcode) => self.predefined_function_reference_lookup.get(&(*opcode as i16)).copied(),
+            ReferenceType::PredefinedProc(opcode) => self.predefined_procedure_reference_lookup.get(&(*opcode as i16)).copied(),
+            _ => None,
+        }
+    }
+
+    fn index_reference(&mut self, reference_type: &ReferenceType, index: usize) {
+        match reference_type {
+            ReferenceType::Label(id) => {
+                self.label_reference_lookup.insert(*id, index);
+            }
+            ReferenceType::PredefinedFunc(opcode) => {
+                self.predefined_function_reference_lookup.insert(*opcode as i16, index);
+            }
+            ReferenceType::PredefinedProc(opcode) => {
+                self.predefined_procedure_reference_lookup.insert(*opcode as i16, index);
+            }
+            _ => {}
         }
     }
 
@@ -93,14 +117,14 @@ impl SemanticVisitor {
         }
 
         let index = if let Some(index) = self.label_lookup_table.get_mut(identifier) {
-            for reference in &mut self.references {
-                if reference.0 == ReferenceType::Label(*index) && reference.1.declaration.is_some() {
-                    self.errors
-                        .lock()
-                        .unwrap()
-                        .report_error(label_token.span.clone(), CompilationErrorType::LabelAlreadyDefined(identifier.to_string()));
-                    return;
-                }
+            if let Some(reference) = self.label_reference_lookup.get(index).copied()
+                && self.references[reference].1.declaration.is_some()
+            {
+                self.errors
+                    .lock()
+                    .unwrap()
+                    .report_error(label_token.span.clone(), CompilationErrorType::LabelAlreadyDefined(identifier.to_string()));
+                return;
             }
             *index
         } else {
@@ -111,13 +135,12 @@ impl SemanticVisitor {
         let reference_type = ReferenceType::Label(index);
         let span = label_token.span.start + 1..label_token.span.end;
 
-        for reference in &mut self.references {
-            if reference.0 == reference_type {
-                reference.1.declaration = Some((self.current_file.clone(), Spanned::new(label_token.token.to_string(), span)));
-                return;
-            }
+        if let Some(reference) = self.label_reference_lookup.get(&index).copied() {
+            self.references[reference].1.declaration = Some((self.current_file.clone(), Spanned::new(label_token.token.to_string(), span)));
+            return;
         }
 
+        let reference_index = self.references.len();
         self.references.push((
             reference_type,
             References {
@@ -130,6 +153,7 @@ impl SemanticVisitor {
                 usages: vec![],
             },
         ));
+        self.label_reference_lookup.insert(index, reference_index);
     }
 
     pub(super) fn add_reference_to(&mut self, identifier: &Spanned<Token>, index: usize) {

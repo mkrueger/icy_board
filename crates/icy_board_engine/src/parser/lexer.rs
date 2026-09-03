@@ -367,8 +367,13 @@ struct IfFrame {
     taken: bool,
 }
 
-fn directive_len(upper: &str, directive: &str) -> Option<usize> {
-    let rest = upper.strip_prefix(directive)?;
+fn strip_ascii_prefix<'a>(text: &'a str, prefix: &str) -> Option<&'a str> {
+    let candidate = text.get(..prefix.len())?;
+    candidate.eq_ignore_ascii_case(prefix).then(|| &text[prefix.len()..])
+}
+
+fn directive_len(text: &str, directive: &str) -> Option<usize> {
+    let rest = strip_ascii_prefix(text, directive)?;
     (rest.is_empty() || rest.starts_with(char::is_whitespace)).then_some(directive.len())
 }
 
@@ -396,8 +401,7 @@ pub fn scan_language_version_directives(text: &str) -> Vec<LanguageVersionDirect
 
         if let Some(body) = trimmed.strip_prefix([';', '\'', '*']) {
             let body = body.trim_start();
-            let upper = body.to_ascii_uppercase();
-            if let Some(len) = directive_len(&upper, "$LANGVERSION") {
+            if let Some(len) = directive_len(body, "$LANGVERSION") {
                 let value = body[len..].trim().to_string();
                 let version = value.parse::<u16>().ok().filter(|v| SUPPORTED_PPL_LANGUAGE_VERSIONS.contains(v));
                 directives.push(LanguageVersionDirective {
@@ -422,13 +426,13 @@ pub fn scan_language_version(text: &str) -> Option<u16> {
     scan_language_version_directives(text).into_iter().find(|d| d.in_header).and_then(|d| d.version)
 }
 
-fn elseif_directive_len(upper: &str) -> Option<usize> {
-    directive_len(upper, "$ELSEIF").or_else(|| directive_len(upper, "$ELIF"))
+fn elseif_directive_len(text: &str) -> Option<usize> {
+    directive_len(text, "$ELSEIF").or_else(|| directive_len(text, "$ELIF"))
 }
 
 #[derive(Clone)]
 pub struct Lexer {
-    lookup_table: &'static HashMap<unicase::Ascii<String>, Token>,
+    lookup_table: &'static TokenLookupTable,
     define_table: HashMap<unicase::Ascii<String>, Constant>,
     lang_version: u16,
     text: Arc<str>,
@@ -504,7 +508,21 @@ pub const KEYWORDS: &[Keyword] = &[
 ];
 
 /// One table per version that reserves a word, in ascending order.
-static TOKEN_LOOKUP_TABLES: std::sync::LazyLock<Vec<(u16, HashMap<unicase::Ascii<String>, Token>)>> = std::sync::LazyLock::new(|| {
+type TokenLookupTable = HashMap<u64, Vec<(&'static str, Token)>>;
+
+fn ascii_fingerprint(text: &str) -> u64 {
+    const OFFSET_BASIS: u64 = 0xcbf2_9ce4_8422_2325;
+    const PRIME: u64 = 0x0000_0100_0000_01b3;
+
+    text.bytes()
+        .fold(OFFSET_BASIS, |hash, byte| (hash ^ u64::from(byte.to_ascii_lowercase())).wrapping_mul(PRIME))
+}
+
+fn insert_lookup_token(table: &mut TokenLookupTable, name: &'static str, token: Token) {
+    table.entry(ascii_fingerprint(name)).or_default().push((name, token));
+}
+
+static TOKEN_LOOKUP_TABLES: std::sync::LazyLock<Vec<(u16, TokenLookupTable)>> = std::sync::LazyLock::new(|| {
     let mut versions: Vec<u16> = KEYWORDS.iter().map(|keyword| keyword.since).collect();
     versions.sort_unstable();
     versions.dedup();
@@ -512,22 +530,21 @@ static TOKEN_LOOKUP_TABLES: std::sync::LazyLock<Vec<(u16, HashMap<unicase::Ascii
     versions
         .into_iter()
         .map(|version| {
-            let mut m: HashMap<unicase::Ascii<String>, Token> = KEYWORDS
-                .iter()
-                .filter(|keyword| keyword.since <= version)
-                .map(|keyword| (unicase::Ascii::new(keyword.name.to_string()), keyword.token.clone()))
-                .collect();
+            let mut table = TokenLookupTable::new();
+            for keyword in KEYWORDS.iter().filter(|keyword| keyword.since <= version) {
+                insert_lookup_token(&mut table, keyword.name, keyword.token.clone());
+            }
 
             for c in &BUILTIN_CONSTS {
-                m.insert(unicase::Ascii::new(c.name.to_string()), Token::Const(Constant::Builtin(c)));
+                insert_lookup_token(&mut table, c.name, Token::Const(Constant::Builtin(c)));
             }
-            (version, m)
+            (version, table)
         })
         .collect()
 });
 
 /// The words a source of this language version may not use as a name.
-fn token_lookup_table(lang_version: u16) -> &'static HashMap<unicase::Ascii<String>, Token> {
+fn token_lookup_table(lang_version: u16) -> &'static TokenLookupTable {
     let tables = &*TOKEN_LOOKUP_TABLES;
     let index = tables.partition_point(|(version, _)| *version <= lang_version).saturating_sub(1);
     &tables[index].1
@@ -1200,17 +1217,22 @@ impl Lexer {
             }
         }
 
-        let identifier = unicase::Ascii::new(self.text[self.byte_start..self.byte_end].to_string());
-        if self.lang_version >= 400 && identifier == "BIGSTR" {
+        let identifier = &self.text[self.byte_start..self.byte_end];
+        if self.lang_version >= 400 && identifier.eq_ignore_ascii_case("BIGSTR") {
             self.errors
                 .lock()
                 .unwrap()
                 .report_warning(self.token_start..self.token_end, LexingErrorType::BigStrDeprecated);
         }
-        if !open_bracket && let Some(token) = self.lookup_table.get(&identifier) {
+        if !open_bracket
+            && let Some(token) = self
+                .lookup_table
+                .get(&ascii_fingerprint(identifier))
+                .and_then(|bucket| bucket.iter().find_map(|(name, token)| name.eq_ignore_ascii_case(identifier).then_some(token)))
+        {
             return Some(token.clone());
         }
-        Some(Token::Identifier(identifier))
+        Some(Token::Identifier(unicase::Ascii::new(identifier.to_string())))
     }
 
     fn read_define(&mut self) -> Option<Token> {
@@ -1277,17 +1299,17 @@ impl Lexer {
             // Extract directive body (after first marker)
             let marker_pos = line.find(|c: char| !c.is_whitespace()).unwrap_or(0);
             let after_marker = &line[marker_pos + 1..];
-            let upper = after_marker.trim_start().to_ascii_uppercase();
+            let directive = after_marker.trim_start();
 
             // Nested IF
-            if directive_len(&upper, "$IF").is_some() {
+            if directive_len(directive, "$IF").is_some() {
                 nest += 1;
                 collected.push_str(&line);
                 continue;
             }
 
             // ENDIF
-            if directive_len(&upper, "$ENDIF").is_some() {
+            if directive_len(directive, "$ENDIF").is_some() {
                 collected.push_str(&line);
                 if nest == 0 {
                     self.if_stack.pop();
@@ -1298,8 +1320,8 @@ impl Lexer {
             }
 
             // At root level, sibling directives might activate or also be skipped
-            let elseif_len = elseif_directive_len(&upper);
-            if nest == 0 && (elseif_len.is_some() || directive_len(&upper, "$ELSE").is_some()) {
+            let elseif_len = elseif_directive_len(directive);
+            if nest == 0 && (elseif_len.is_some() || directive_len(directive, "$ELSE").is_some()) {
                 let activating = if let Some(len) = elseif_len {
                     let already_taken = self.if_stack.last().is_some_and(|frame| frame.taken);
                     let expr_src = &after_marker[after_marker.find('$').unwrap() + len..];
@@ -1347,9 +1369,9 @@ impl Lexer {
         self.lexer_state = LexerState::AfterEol;
 
         let raw = comment;
-        let upper = raw.trim_start().to_ascii_uppercase();
+        let directive = raw.trim_start();
 
-        if upper.starts_with("$INCLUDE:") {
+        if strip_ascii_prefix(directive, "$INCLUDE:").is_some() {
             // PCBoard never had it, so a source that uses it is quietly missing whatever it named.
             self.errors
                 .lock()
@@ -1357,12 +1379,12 @@ impl Lexer {
                 .report_error(self.token_start..self.token_end, LexingErrorType::UnsupportedDirective("$INCLUDE".to_string()));
             return self.next_token();
         }
-        if upper.starts_with("$USEFUNCS") {
+        if strip_ascii_prefix(directive, "$USEFUNCS").is_some() {
             return Some(Token::UseFuncs(cmt_type, raw));
         }
 
         // $IF
-        if let Some(len) = directive_len(&upper, "$IF") {
+        if let Some(len) = directive_len(directive, "$IF") {
             let expr_src = &raw[raw.find('$').unwrap() + len..];
             let cond = self.eval_preproc_bool(expr_src);
             self.if_stack.push(IfFrame { taken: cond });
@@ -1373,7 +1395,7 @@ impl Lexer {
         }
 
         // $ELSEIF
-        if let Some(len) = elseif_directive_len(&upper) {
+        if let Some(len) = elseif_directive_len(directive) {
             if self.if_stack.is_empty() {
                 self.errors
                     .lock()
@@ -1400,7 +1422,7 @@ impl Lexer {
         }
 
         // $ELSE
-        if directive_len(&upper, "$ELSE").is_some() {
+        if directive_len(directive, "$ELSE").is_some() {
             if self.if_stack.is_empty() {
                 self.errors
                     .lock()
@@ -1424,7 +1446,7 @@ impl Lexer {
         }
 
         // $ENDIF: return as normal single-line comment, do NOT absorb earlier
-        if directive_len(&upper, "$ENDIF").is_some() {
+        if directive_len(directive, "$ENDIF").is_some() {
             if self.if_stack.pop().is_none() {
                 self.errors
                     .lock()
@@ -1434,7 +1456,7 @@ impl Lexer {
             return Some(Token::Comment(cmt_type, raw));
         }
 
-        if let Some(len) = directive_len(&upper, "$DEFINE") {
+        if let Some(len) = directive_len(directive, "$DEFINE") {
             let define_src = raw[raw.find('$').unwrap() + len..].trim();
             self.handle_define(define_src);
             return self.next_token();

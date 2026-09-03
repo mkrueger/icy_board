@@ -1285,7 +1285,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                         .report_error(on_error.get_target_token().span.clone(), CompilationErrorType::ProcedureExpected);
                     return VariableType::None;
                 }
-                if let Some(container) = self.function_containers.iter().find(|p| p.name == *name)
+                if let Some(container) = self.routine_container(idx)
                     && let FunctionDeclaration::Procedure(procedure) = &container.functions.clone()
                 {
                     let parameters = procedure.get_parameters();
@@ -1377,7 +1377,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                     self.current_file.clone(),
                     Spanned::new(let_stmt.get_identifier().to_string(), let_stmt.get_identifier_token().span.clone()),
                 ));
-                if let Some(container) = self.function_containers.iter().find(|container| container.id == idx)
+                if let Some(container) = self.routine_container(idx)
                     && let FunctionDeclaration::Function(function) = &container.functions
                 {
                     target_type = function.get_return_type();
@@ -1759,7 +1759,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             }
 
             if matches!(self.references[idx].0, ReferenceType::Function(_)) {
-                let f = self.function_containers.iter().find(|p| p.name == call.get_identifier()).unwrap();
+                let f = self.routine_container(idx).unwrap();
                 if let FunctionDeclaration::Function(f) = &f.functions.clone() {
                     let param_count = f.get_parameters().len();
                     let arg_count = call.get_arguments().len();
@@ -1773,7 +1773,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             }
 
             if matches!(self.references[idx].0, ReferenceType::Procedure(_)) {
-                let func_container = self.function_containers.iter().find(|p| p.name == call.get_identifier()).unwrap();
+                let func_container = self.routine_container(idx).unwrap();
 
                 if let FunctionDeclaration::Procedure(f) = &func_container.functions.clone() {
                     let arg_count = call.get_arguments().len();
@@ -1883,43 +1883,40 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             let identifier = function.get_identifier_token();
             self.cur_func_impl = Some(idx);
             self.references[idx].1.implementation = Some((self.current_file.clone(), Spanned::new(identifier.token.to_string(), identifier.span.clone())));
-            for cont in &mut self.function_containers {
-                if cont.id == idx {
-                    let documentation = match &cont.functions {
-                        FunctionDeclaration::Function(declaration) => declaration.get_documentation(),
-                        FunctionDeclaration::Procedure(declaration) => declaration.get_documentation(),
-                    }
-                    .or_else(|| function.get_documentation())
-                    .map(str::to_owned);
-                    if let FunctionDeclaration::Function(func) = &cont.functions {
-                        if func.get_parameters().len() != function.get_parameters().len() {
-                            self.errors.lock().unwrap().report_error(
-                                function.get_identifier_token().span.clone(),
-                                CompilationErrorType::ParameterMismatch(function.get_identifier().to_string()),
-                            );
-                        }
-                        if func.get_return_type() != function.get_return_type() || func.get_return_rank() != function.get_return_rank() {
-                            self.errors.lock().unwrap().report_error(
-                                function.get_return_type_token().span.clone(),
-                                CompilationErrorType::ReturnTypeMismatch(function.get_identifier().to_string()),
-                            );
-                        } // may've been wrongly added as procedure before - get's corrected.
-                    } else if let FunctionDeclaration::Procedure(func) = &cont.functions
-                        && func.get_parameters().len() != function.get_parameters().len()
-                    {
-                        self.errors.lock().unwrap().report_error(
-                            function.get_identifier_token().span.clone(),
-                            CompilationErrorType::ParameterMismatch(function.get_identifier().to_string()),
-                        );
-                    }
-                    cont.functions = FunctionDeclaration::Function(
-                        FunctionDeclarationAstNode::empty(function.get_identifier().clone(), function.get_parameters().clone(), function.get_return_type())
-                            .with_return_rank(function.get_return_rank())
-                            .with_documentation(documentation.as_deref()),
-                    );
-                    break;
-                }
+            let container_index = self.routine_container_index(idx).unwrap();
+            let cont = &mut self.function_containers[container_index];
+            let documentation = match &cont.functions {
+                FunctionDeclaration::Function(declaration) => declaration.get_documentation(),
+                FunctionDeclaration::Procedure(declaration) => declaration.get_documentation(),
             }
+            .or_else(|| function.get_documentation())
+            .map(str::to_owned);
+            if let FunctionDeclaration::Function(func) = &cont.functions {
+                if func.get_parameters().len() != function.get_parameters().len() {
+                    self.errors.lock().unwrap().report_error(
+                        function.get_identifier_token().span.clone(),
+                        CompilationErrorType::ParameterMismatch(function.get_identifier().to_string()),
+                    );
+                }
+                if func.get_return_type() != function.get_return_type() || func.get_return_rank() != function.get_return_rank() {
+                    self.errors.lock().unwrap().report_error(
+                        function.get_return_type_token().span.clone(),
+                        CompilationErrorType::ReturnTypeMismatch(function.get_identifier().to_string()),
+                    );
+                } // may've been wrongly added as procedure before - get's corrected.
+            } else if let FunctionDeclaration::Procedure(func) = &cont.functions
+                && func.get_parameters().len() != function.get_parameters().len()
+            {
+                self.errors.lock().unwrap().report_error(
+                    function.get_identifier_token().span.clone(),
+                    CompilationErrorType::ParameterMismatch(function.get_identifier().to_string()),
+                );
+            }
+            cont.functions = FunctionDeclaration::Function(
+                FunctionDeclarationAstNode::empty(function.get_identifier().clone(), function.get_parameters().clone(), function.get_return_type())
+                    .with_return_rank(function.get_return_rank())
+                    .with_documentation(documentation.as_deref()),
+            );
         } else if self.lang_version < 350 {
             self.errors.lock().unwrap().report_error(
                 function.get_identifier_token().span.clone(),
@@ -1944,6 +1941,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             });
         }
 
+        let function_id = self.cur_func_impl.unwrap();
         self.start_parse_function_body();
         let start_parameter = self.references.len();
         self.add_parameters(function.get_parameters());
@@ -1955,14 +1953,11 @@ impl AstVisitor<VariableType> for SemanticVisitor {
         let lookup = self.end_parse_function_body().unwrap();
         self.cur_func_impl = None;
 
-        for f in &mut self.function_containers {
-            if f.name == function.get_identifier() {
-                f.lookup = lookup;
-                f.parameters = start_parameter..end_parameter;
-                f.local_variables = start_locals..end_locals;
-                break;
-            }
-        }
+        let container_index = self.routine_container_index(function_id).unwrap();
+        let container = &mut self.function_containers[container_index];
+        container.lookup = lookup;
+        container.parameters = start_parameter..end_parameter;
+        container.local_variables = start_locals..end_locals;
         VariableType::None
     }
 
@@ -2019,29 +2014,26 @@ impl AstVisitor<VariableType> for SemanticVisitor {
 
             let identifier = procedure.get_identifier_token();
             self.references[idx].1.implementation = Some((self.current_file.clone(), Spanned::new(identifier.token.to_string(), identifier.span.clone())));
-            for cont in &mut self.function_containers {
-                if cont.id == idx {
-                    let documentation = match &cont.functions {
-                        FunctionDeclaration::Function(declaration) => declaration.get_documentation(),
-                        FunctionDeclaration::Procedure(declaration) => declaration.get_documentation(),
-                    }
-                    .or_else(|| procedure.get_documentation())
-                    .map(str::to_owned);
-                    if let FunctionDeclaration::Procedure(func) = &cont.functions
-                        && func.get_parameters().len() != procedure.get_parameters().len()
-                    {
-                        self.errors.lock().unwrap().report_error(
-                            procedure.get_identifier_token().span.clone(),
-                            CompilationErrorType::ParameterMismatch(procedure.get_identifier().to_string()),
-                        );
-                    }
-                    cont.functions = FunctionDeclaration::Procedure(
-                        ProcedureDeclarationAstNode::empty(procedure.get_identifier().clone(), procedure.get_parameters().clone())
-                            .with_documentation(documentation.as_deref()),
-                    );
-                    break;
-                }
+            let container_index = self.routine_container_index(idx).unwrap();
+            let cont = &mut self.function_containers[container_index];
+            let documentation = match &cont.functions {
+                FunctionDeclaration::Function(declaration) => declaration.get_documentation(),
+                FunctionDeclaration::Procedure(declaration) => declaration.get_documentation(),
             }
+            .or_else(|| procedure.get_documentation())
+            .map(str::to_owned);
+            if let FunctionDeclaration::Procedure(func) = &cont.functions
+                && func.get_parameters().len() != procedure.get_parameters().len()
+            {
+                self.errors.lock().unwrap().report_error(
+                    procedure.get_identifier_token().span.clone(),
+                    CompilationErrorType::ParameterMismatch(procedure.get_identifier().to_string()),
+                );
+            }
+            cont.functions = FunctionDeclaration::Procedure(
+                ProcedureDeclarationAstNode::empty(procedure.get_identifier().clone(), procedure.get_parameters().clone())
+                    .with_documentation(documentation.as_deref()),
+            );
         } else if self.lang_version < 350 {
             self.errors.lock().unwrap().report_error(
                 procedure.get_identifier_token().span.clone(),
@@ -2084,23 +2076,19 @@ impl AstVisitor<VariableType> for SemanticVisitor {
         let lookup = self.end_parse_function_body().unwrap();
         self.cur_func_impl = None;
 
-        for f in &mut self.function_containers {
-            if f.name == procedure.get_identifier() {
-                if let FunctionDeclaration::Procedure(decl) = &f.functions
-                    && decl.get_parameters().len() != procedure.get_parameters().len()
-                {
-                    self.errors.lock().unwrap().report_error(
-                        procedure.get_identifier_token().span.clone(),
-                        CompilationErrorType::ParameterMismatch(procedure.get_identifier().to_string()),
-                    );
-                }
-                f.lookup = lookup;
-
-                f.parameters = start_parameter..end_parameter;
-                f.local_variables = start_locals..end_locals;
-                break;
-            }
+        let container_index = self.routine_container_index(procedure_id.unwrap()).unwrap();
+        let container = &mut self.function_containers[container_index];
+        if let FunctionDeclaration::Procedure(decl) = &container.functions
+            && decl.get_parameters().len() != procedure.get_parameters().len()
+        {
+            self.errors.lock().unwrap().report_error(
+                procedure.get_identifier_token().span.clone(),
+                CompilationErrorType::ParameterMismatch(procedure.get_identifier().to_string()),
+            );
         }
+        container.lookup = lookup;
+        container.parameters = start_parameter..end_parameter;
+        container.local_variables = start_locals..end_locals;
         VariableType::None
     }
 

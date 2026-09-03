@@ -18,6 +18,7 @@ use icy_board_engine::{
         state::IcyBoardState,
     },
     parser::{Encoding, ErrorReporter, UserTypeRegistry, lexer::Lexer, parse_ast},
+    semantic::SemanticVisitor,
     vm::{io::DiskIO, run},
 };
 use icy_net::{ConnectionType, channel::ChannelConnection};
@@ -99,12 +100,48 @@ fn routine_source() -> String {
     source
 }
 
+fn reference_source() -> String {
+    let mut source = String::from(";$LANGVERSION 400\n");
+    for index in 0..500 {
+        source.push_str(&format!("GOTO L{index}\n:L{index}\nPRINT {index}\n"));
+    }
+    source
+}
+
 fn directive_source() -> String {
     let mut source = String::from(";$LANGVERSION 400\n;$DEFINE ENABLED = 1\n");
     for index in 0..500 {
         source.push_str(&format!(
             "; ordinary comment {index}\n;$IF ENABLED\nSTRING value{index} = \"text {index}\"\n;$ELSE\nSTRING skipped{index} = \"ignored\"\n;$ENDIF\n"
         ));
+    }
+    source
+}
+
+fn identifier_source() -> String {
+    let mut source = String::new();
+    for index in 0..10_000 {
+        source.push_str(&format!("identifier{index}\n"));
+    }
+    source
+}
+
+fn keyword_source() -> String {
+    "IF\n".repeat(10_000)
+}
+
+fn comment_source() -> String {
+    let mut source = String::new();
+    for index in 0..1_000 {
+        source.push_str(&format!("; ordinary benchmark comment {index}\n"));
+    }
+    source
+}
+
+fn number_source() -> String {
+    let mut source = String::new();
+    for index in 0..10_000 {
+        source.push_str(&format!("{index}\n"));
     }
     source
 }
@@ -158,8 +195,19 @@ fn lexer_benchmarks(criterion: &mut Criterion) {
     let workspace = workspace();
     let routine_source = routine_source();
     let directive_source = directive_source();
+    let identifier_source = identifier_source();
+    let keyword_source = keyword_source();
+    let comment_source = comment_source();
+    let number_source = number_source();
     let mut group = criterion.benchmark_group("lexer");
-    for (name, source) in [("routines_500", routine_source.as_str()), ("directives_500", directive_source.as_str())] {
+    for (name, source) in [
+        ("routines_500", routine_source.as_str()),
+        ("directives_500", directive_source.as_str()),
+        ("identifiers_10000", identifier_source.as_str()),
+        ("keywords_10000", keyword_source.as_str()),
+        ("comments_1000", comment_source.as_str()),
+        ("numbers_10000", number_source.as_str()),
+    ] {
         group.throughput(Throughput::Bytes(source.len() as u64));
         group.bench_function(name, |benchmark| {
             benchmark.iter(|| {
@@ -226,6 +274,36 @@ fn compile_from_ast_benchmarks(criterion: &mut Criterion) {
     group.finish();
 }
 
+fn semantic_benchmarks(criterion: &mut Criterion) {
+    let workspace = workspace();
+    let routine_source = routine_source();
+    let reference_source = reference_source();
+    let mut group = criterion.benchmark_group("semantic");
+    for (name, source) in [("routines_500", routine_source.as_str()), ("references_500", reference_source.as_str())] {
+        group.throughput(Throughput::Bytes(source.len() as u64));
+        group.bench_function(name, |benchmark| {
+            benchmark.iter_batched(
+                || {
+                    let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+                    let registry = UserTypeRegistry::icy_board_registry();
+                    let ast = parse_ast(PathBuf::from("benchmark.pps"), errors.clone(), source, &registry, Encoding::Utf8, &workspace);
+                    assert!(!errors.lock().unwrap().has_errors());
+                    (errors, registry, ast)
+                },
+                |(errors, registry, ast)| {
+                    let mut visitor = SemanticVisitor::new(&workspace, errors.clone(), registry);
+                    visitor.set_modules(&[&ast]);
+                    ast.visit(&mut visitor);
+                    visitor.finish();
+                    assert!(!errors.lock().unwrap().has_errors());
+                    black_box(visitor)
+                },
+                BatchSize::SmallInput,
+            );
+        });
+    }
+    group.finish();
+}
 
 fn optimizer_benchmarks(criterion: &mut Criterion) {
     const BLOCKS: usize = 500;
@@ -415,6 +493,7 @@ criterion_group!(
     parse_benchmarks,
     compile_benchmarks,
     compile_from_ast_benchmarks,
+    semantic_benchmarks,
     optimizer_benchmarks,
     ppe_format_benchmarks,
     crypt_benchmarks,
