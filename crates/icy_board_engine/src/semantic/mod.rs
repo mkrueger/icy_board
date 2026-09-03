@@ -276,6 +276,54 @@ pub const STRING_MEMBERS: &[ScalarMember] = &[
         return_type: VariableType::UnboundedString,
         is_static: true,
     },
+    ScalarMember {
+        name: "PadLeft",
+        arguments: 1..=2,
+        return_type: VariableType::UnboundedString,
+        is_static: false,
+    },
+    ScalarMember {
+        name: "PadRight",
+        arguments: 1..=2,
+        return_type: VariableType::UnboundedString,
+        is_static: false,
+    },
+    ScalarMember {
+        name: "Remove",
+        arguments: 2..=2,
+        return_type: VariableType::UnboundedString,
+        is_static: false,
+    },
+    ScalarMember {
+        name: "Insert",
+        arguments: 2..=2,
+        return_type: VariableType::UnboundedString,
+        is_static: false,
+    },
+    ScalarMember {
+        name: "Reverse",
+        arguments: 0..=0,
+        return_type: VariableType::UnboundedString,
+        is_static: false,
+    },
+    ScalarMember {
+        name: "ToInt",
+        arguments: 0..=1,
+        return_type: VariableType::Integer,
+        is_static: false,
+    },
+    ScalarMember {
+        name: "ToMixedCase",
+        arguments: 0..=0,
+        return_type: VariableType::UnboundedString,
+        is_static: false,
+    },
+    ScalarMember {
+        name: "StripATX",
+        arguments: 0..=0,
+        return_type: VariableType::UnboundedString,
+        is_static: false,
+    },
 ];
 
 pub const BYTES_MEMBERS: &[ScalarMember] = &[
@@ -351,6 +399,17 @@ fn string_member(name: &unicase::Ascii<String>, arguments: usize) -> Option<(Fun
         ("mid", 2) => Some((FuncOpCode::StringMid, VariableType::UnboundedString, &[])),
         ("left", 1) => Some((FuncOpCode::LEFT, VariableType::UnboundedString, &[])),
         ("right", 1) => Some((FuncOpCode::RIGHT, VariableType::UnboundedString, &[])),
+        ("padleft", 1) => Some((FuncOpCode::StringPadLeft, VariableType::UnboundedString, &[])),
+        ("padleft", 2) => Some((FuncOpCode::StringPadLeftChar, VariableType::UnboundedString, &[])),
+        ("padright", 1) => Some((FuncOpCode::StringPadRight, VariableType::UnboundedString, &[])),
+        ("padright", 2) => Some((FuncOpCode::StringPadRightChar, VariableType::UnboundedString, &[])),
+        ("remove", 2) => Some((FuncOpCode::StringRemove, VariableType::UnboundedString, &[])),
+        ("insert", 2) => Some((FuncOpCode::StringInsert, VariableType::UnboundedString, &[])),
+        ("reverse", 0) => Some((FuncOpCode::StringReverse, VariableType::UnboundedString, &[])),
+        ("toint", 0) => Some((FuncOpCode::StringToInt, VariableType::Integer, &[10])),
+        ("toint", 1) => Some((FuncOpCode::StringToInt, VariableType::Integer, &[])),
+        ("tomixedcase", 0) => Some((FuncOpCode::StringToMixedCase, VariableType::UnboundedString, &[])),
+        ("stripatx", 0) => Some((FuncOpCode::StringStripAtx, VariableType::UnboundedString, &[])),
         _ => None,
     }
 }

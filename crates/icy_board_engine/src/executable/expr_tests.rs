@@ -10,6 +10,39 @@ fn bytes_function_ids_are_compact() {
 }
 
 #[test]
+fn string_member_function_ids_are_compact_after_bytes() {
+    assert_eq!(FuncOpCode::StringPadLeft as i16, -345);
+    assert_eq!(FuncOpCode::StringPadLeftChar as i16, -346);
+    assert_eq!(FuncOpCode::StringPadRight as i16, -347);
+    assert_eq!(FuncOpCode::StringPadRightChar as i16, -348);
+    assert_eq!(FuncOpCode::StringRemove as i16, -349);
+    assert_eq!(FuncOpCode::StringInsert as i16, -350);
+    assert_eq!(FuncOpCode::StringReverse as i16, -351);
+    assert_eq!(FuncOpCode::StringToInt as i16, -352);
+    assert_eq!(FuncOpCode::StringToMixedCase as i16, -353);
+    assert_eq!(FuncOpCode::StringStripAtx as i16, -354);
+    assert_eq!(crate::executable::LAST_FUNC, -354);
+
+    for (opcode, arity) in [
+        (FuncOpCode::StringPadLeft, 2),
+        (FuncOpCode::StringPadLeftChar, 3),
+        (FuncOpCode::StringPadRight, 2),
+        (FuncOpCode::StringPadRightChar, 3),
+        (FuncOpCode::StringRemove, 3),
+        (FuncOpCode::StringInsert, 3),
+        (FuncOpCode::StringReverse, 1),
+        (FuncOpCode::StringToInt, 2),
+        (FuncOpCode::StringToMixedCase, 1),
+        (FuncOpCode::StringStripAtx, 1),
+    ] {
+        let arguments: Vec<_> = (1..=arity).map(PPEExpr::Value).collect();
+        let mut expected: Vec<_> = (1..=arity).flat_map(|id| [id as i16, 0]).collect();
+        expected.push(opcode as i16);
+        test_serialize(&PPEExpr::PredefinedFunctionCall(opcode.get_definition(), arguments), &expected);
+    }
+}
+
+#[test]
 fn string_member_function_ids_are_compact() {
     assert_eq!(FuncOpCode::StringFindFrom as i16, -314);
     assert_eq!(FuncOpCode::StringFindLastFrom as i16, -315);

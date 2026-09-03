@@ -486,6 +486,87 @@ pub async fn string_char_at(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Re
     Ok(VariableValue::new_unbounded_string(character))
 }
 
+/// Pads `text` up to `width` Unicode characters with `pad_char`; returns `text` unchanged if it is already that long.
+fn pad_string(text: String, width: i32, pad_char: char, left: bool) -> String {
+    let len = text.chars().count() as i32;
+    if width <= len {
+        return text;
+    }
+    let padding: String = std::iter::repeat(pad_char).take((width - len) as usize).collect();
+    if left { format!("{padding}{text}") } else { format!("{text}{padding}") }
+}
+
+pub async fn string_pad_left(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let text = vm.eval_expr(&args[0]).await?.as_string();
+    let width = vm.eval_expr(&args[1]).await?.as_int();
+    Ok(VariableValue::new_unbounded_string(pad_string(text, width, ' ', true)))
+}
+
+pub async fn string_pad_left_char(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let text = vm.eval_expr(&args[0]).await?.as_string();
+    let width = vm.eval_expr(&args[1]).await?.as_int();
+    let pad_char = vm.eval_expr(&args[2]).await?.as_string().chars().next().unwrap_or(' ');
+    Ok(VariableValue::new_unbounded_string(pad_string(text, width, pad_char, true)))
+}
+
+pub async fn string_pad_right(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let text = vm.eval_expr(&args[0]).await?.as_string();
+    let width = vm.eval_expr(&args[1]).await?.as_int();
+    Ok(VariableValue::new_unbounded_string(pad_string(text, width, ' ', false)))
+}
+
+pub async fn string_pad_right_char(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let text = vm.eval_expr(&args[0]).await?.as_string();
+    let width = vm.eval_expr(&args[1]).await?.as_int();
+    let pad_char = vm.eval_expr(&args[2]).await?.as_string().chars().next().unwrap_or(' ');
+    Ok(VariableValue::new_unbounded_string(pad_string(text, width, pad_char, false)))
+}
+
+/// `str.Remove(start, length)`: removes up to `length` zero-based characters starting at `start`.
+pub async fn string_remove(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let text = vm.eval_expr(&args[0]).await?.as_string();
+    let start = vm.eval_expr(&args[1]).await?.as_int();
+    let length = vm.eval_expr(&args[2]).await?.as_int();
+    let chars: Vec<char> = text.chars().collect();
+    if start < 0 || length <= 0 || start as usize >= chars.len() {
+        return Ok(VariableValue::new_unbounded_string(chars.into_iter().collect()));
+    }
+    let start = start as usize;
+    let end = chars.len().min(start + length as usize);
+    let mut result: Vec<char> = chars[..start].to_vec();
+    result.extend_from_slice(&chars[end..]);
+    Ok(VariableValue::new_unbounded_string(result.into_iter().collect()))
+}
+
+/// `str.Insert(index, value)`: inserts `value` at the zero-based `index`, clamped to the string's length.
+pub async fn string_insert(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let text = vm.eval_expr(&args[0]).await?.as_string();
+    let index = vm.eval_expr(&args[1]).await?.as_int();
+    let value = vm.eval_expr(&args[2]).await?.as_string();
+    let chars: Vec<char> = text.chars().collect();
+    let index = index.clamp(0, chars.len() as i32) as usize;
+    let mut result: String = chars[..index].iter().collect();
+    result.push_str(&value);
+    result.extend(chars[index..].iter().copied());
+    Ok(VariableValue::new_unbounded_string(result))
+}
+
+pub async fn string_reverse(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let text = vm.eval_expr(&args[0]).await?.as_string();
+    Ok(VariableValue::new_unbounded_string(text.chars().rev().collect()))
+}
+
+pub async fn string_to_int(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let src = vm.eval_expr(&args[0]).await?.as_string();
+    let base = vm.eval_expr(&args[1]).await?.as_int();
+    Ok(VariableValue::new_int(parse_radix(&src, base)))
+}
+
+pub async fn string_to_mixed_case(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let text = vm.eval_expr(&args[0]).await?.as_string();
+    Ok(VariableValue::new_unbounded_string(fix_casing(text)))
+}
+
 fn string_comparison_mode(vm: &mut VirtualMachine<'_>, value: i32) -> Option<bool> {
     match value {
         0 => Some(false),
@@ -792,6 +873,16 @@ pub async fn strip(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variabl
 /// A string without any @X codes
 pub async fn stripatx(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let str = vm.eval_expr(&args[0]).await?.as_string();
+    Ok(VariableValue::new_string(strip_atx_codes(str)))
+}
+
+/// `str.StripATX()`: the PPL 400 member form of `STRIPATX`.
+pub async fn string_stripatx(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let str = vm.eval_expr(&args[0]).await?.as_string();
+    Ok(VariableValue::new_unbounded_string(strip_atx_codes(str)))
+}
+
+fn strip_atx_codes(str: String) -> String {
     let mut res = String::new();
     let mut state = 0;
     let mut ch1 = 'A';
@@ -837,7 +928,7 @@ pub async fn stripatx(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
             }
         }
     }
-    Ok(VariableValue::new_string(res))
+    res
 }
 
 pub async fn replacestr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -1410,17 +1501,11 @@ pub async fn i2s(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableV
     Ok(VariableValue::new_string(s))
 }
 
-/// Convert a string in a specified number base to an integer.
-/// # Arguments
-///  * `src` - A string value to convert to an integer.
-///  * `base` - The base to use for the conversion. 2 <= base <= 36
-/// # Returns
-///  An integer representation of `s` in the specified base.
-pub async fn s2i(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let src = vm.eval_expr(&args[0]).await?.as_string();
-    let base = vm.eval_expr(&args[1]).await?.as_int() as u32;
+/// Parses `src` in the given `base` (2..=36); stops at the first non-digit and returns 0 for an invalid base or empty input.
+fn parse_radix(src: &str, base: i32) -> i32 {
+    let base = base as u32;
     if !(2..=36).contains(&base) || src.is_empty() {
-        return Ok(VariableValue::new_int(0));
+        return 0;
     }
     let mut acc: u32 = 0;
     for ch in src.chars() {
@@ -1429,7 +1514,19 @@ pub async fn s2i(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableV
             None => break,
         }
     }
-    Ok(VariableValue::new_int(acc as i32))
+    acc as i32
+}
+
+/// Convert a string in a specified number base to an integer.
+/// # Arguments
+///  * `src` - A string value to convert to an integer.
+///  * `base` - The base to use for the conversion. 2 <= base <= 36
+/// # Returns
+///  An integer representation of `s` in the specified base.
+pub async fn s2i(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
+    let src = vm.eval_expr(&args[0]).await?.as_string();
+    let base = vm.eval_expr(&args[1]).await?.as_int();
+    Ok(VariableValue::new_int(parse_radix(&src, base)))
 }
 pub async fn carrier(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_int(vm.icy_board_state.get_bps()))

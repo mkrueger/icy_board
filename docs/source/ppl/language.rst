@@ -616,10 +616,18 @@ The instance members are ``Len()``,
 ``Equals(other [, comparison])``, ``Replace(search, replacement)``,
 ``Mid(start, length)``, ``Left(count)``, ``Right(count)``,
 ``Trim([characters])``, ``TrimStart([characters])``,
-``TrimEnd([characters])``, ``ToUpper()`` and ``ToLower()``. ``Mid`` is zero-based,
+``TrimEnd([characters])``, ``ToUpper()`` and ``ToLower()``,
+``PadLeft(width [, char])``, ``PadRight(width [, char])``,
+``Remove(start, length)``, ``Insert(index, value)``, ``Reverse()``,
+``ToInt([base])``, ``ToMixedCase()`` and ``StripATX()``. ``Mid`` is zero-based,
 unlike the 1-based classic ``MID``; ``Left`` and ``Right`` mirror the classic
-functions. Transformations return ``STRING``; a language 400 ``STRING`` has no
-length limit, so chaining does not truncate.
+functions. ``Remove`` and ``Insert`` use the same zero-based positions.
+``PadLeft``/``PadRight`` pad with a space unless a single-character ``char``
+is given, and leave the string unchanged if it is already ``width`` or longer.
+``ToInt`` is the member form of the classic ``S2I``, base 10 by default, base
+2..=36 otherwise; an invalid base or empty string returns 0. Transformations
+return ``STRING``; a language 400 ``STRING`` has no length limit, so chaining
+does not truncate.
 
 ``StringComparison.Ordinal`` is the default. Pass
 ``StringComparison.OrdinalIgnoreCase`` as the last argument for Unicode-aware,

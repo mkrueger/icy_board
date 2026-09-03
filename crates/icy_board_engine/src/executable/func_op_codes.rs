@@ -357,9 +357,19 @@ pub enum FuncOpCode {
     BytesToString = -342,
     BytesToHex = -343,
     BytesGetChecksum = -344,
+    StringPadLeft = -345,
+    StringPadLeftChar = -346,
+    StringPadRight = -347,
+    StringPadRightChar = -348,
+    StringRemove = -349,
+    StringInsert = -350,
+    StringReverse = -351,
+    StringToInt = -352,
+    StringToMixedCase = -353,
+    StringStripAtx = -354,
 }
 
-pub const LAST_FUNC: i16 = -344;
+pub const LAST_FUNC: i16 = -354;
 
 impl FuncOpCode {
     pub fn get_definition(self) -> &'static FunctionDefinition {
@@ -415,6 +425,16 @@ impl FuncOpCode {
                 | FuncOpCode::BytesToString
                 | FuncOpCode::BytesGetChecksum
                 | FuncOpCode::BytesToHex
+                | FuncOpCode::StringPadLeft
+                | FuncOpCode::StringPadLeftChar
+                | FuncOpCode::StringPadRight
+                | FuncOpCode::StringPadRightChar
+                | FuncOpCode::StringRemove
+                | FuncOpCode::StringInsert
+                | FuncOpCode::StringReverse
+                | FuncOpCode::StringToInt
+                | FuncOpCode::StringToMixedCase
+                | FuncOpCode::StringStripAtx
         ) {
             400
         } else {
@@ -481,7 +501,7 @@ impl FunctionDefinition {
         }
     }
 }
-pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 356]> = std::sync::LazyLock::new(|| {
+pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 366]> = std::sync::LazyLock::new(|| {
     [
         FunctionDefinition {
             name: "END",
@@ -3421,6 +3441,86 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 356]> 
             return_type: VariableType::Bytes,
             args: None,
             signature: FunctionSignature::FixedParameters(2),
+        },
+        FunctionDefinition {
+            name: "<string pad left>",
+            version: 400,
+            opcode: FuncOpCode::StringPadLeft,
+            return_type: VariableType::UnboundedString,
+            args: None,
+            signature: FunctionSignature::FixedParameters(2),
+        },
+        FunctionDefinition {
+            name: "<string pad left char>",
+            version: 400,
+            opcode: FuncOpCode::StringPadLeftChar,
+            return_type: VariableType::UnboundedString,
+            args: None,
+            signature: FunctionSignature::FixedParameters(3),
+        },
+        FunctionDefinition {
+            name: "<string pad right>",
+            version: 400,
+            opcode: FuncOpCode::StringPadRight,
+            return_type: VariableType::UnboundedString,
+            args: None,
+            signature: FunctionSignature::FixedParameters(2),
+        },
+        FunctionDefinition {
+            name: "<string pad right char>",
+            version: 400,
+            opcode: FuncOpCode::StringPadRightChar,
+            return_type: VariableType::UnboundedString,
+            args: None,
+            signature: FunctionSignature::FixedParameters(3),
+        },
+        FunctionDefinition {
+            name: "<string remove>",
+            version: 400,
+            opcode: FuncOpCode::StringRemove,
+            return_type: VariableType::UnboundedString,
+            args: None,
+            signature: FunctionSignature::FixedParameters(3),
+        },
+        FunctionDefinition {
+            name: "<string insert>",
+            version: 400,
+            opcode: FuncOpCode::StringInsert,
+            return_type: VariableType::UnboundedString,
+            args: None,
+            signature: FunctionSignature::FixedParameters(3),
+        },
+        FunctionDefinition {
+            name: "<string reverse>",
+            version: 400,
+            opcode: FuncOpCode::StringReverse,
+            return_type: VariableType::UnboundedString,
+            args: None,
+            signature: FunctionSignature::FixedParameters(1),
+        },
+        FunctionDefinition {
+            name: "<string to int>",
+            version: 400,
+            opcode: FuncOpCode::StringToInt,
+            return_type: VariableType::Integer,
+            args: None,
+            signature: FunctionSignature::FixedParameters(2),
+        },
+        FunctionDefinition {
+            name: "<string to mixed case>",
+            version: 400,
+            opcode: FuncOpCode::StringToMixedCase,
+            return_type: VariableType::UnboundedString,
+            args: None,
+            signature: FunctionSignature::FixedParameters(1),
+        },
+        FunctionDefinition {
+            name: "<string strip atx>",
+            version: 400,
+            opcode: FuncOpCode::StringStripAtx,
+            return_type: VariableType::UnboundedString,
+            args: None,
+            signature: FunctionSignature::FixedParameters(1),
         },
         // ALIASES (need to be last in the list)
         FunctionDefinition {
