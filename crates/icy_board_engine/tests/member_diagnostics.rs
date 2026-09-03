@@ -211,12 +211,52 @@ fn a_called_string_member_is_still_accepted() {
     }
 }
 
+#[test]
+fn specialized_members_without_a_call_are_reported() {
+    for source in [
+        "PRINTLN STRING.Join\n",
+        "PRINTLN STRING.Split\n",
+        "PRINTLN BYTES.FromBase64\n",
+        "BYTES b\nPRINTLN b.ToHex\n",
+        "INTEGER arr[3]\nPRINTLN arr.Len\n",
+        "INTEGER arr[3]\nPRINTLN arr.Redim\n",
+    ] {
+        let errors = diagnostics(source);
+        assert!(
+            errors.iter().any(|error| error.starts_with("Function used as variable")),
+            "{source:?} -> {errors:?}"
+        );
+    }
+}
+
+#[test]
+fn called_specialized_members_are_still_accepted() {
+    for source in [
+        "STRING parts[1]\nPRINTLN STRING.Join(parts, \",\")\n",
+        "STRING parts[1]\nPRINTLN STRING.Split(\"a,b\", \",\").Len()\n",
+        "PRINTLN BYTES.FromBase64(\"YQ==\")\n",
+        "BYTES b\nPRINTLN b.ToHex()\n",
+        "INTEGER arr[3]\nPRINTLN arr.Len()\n",
+        "INTEGER arr[3]\narr.Redim(5)\n",
+    ] {
+        assert!(diagnostics(source).is_empty(), "{source:?}");
+    }
+}
+
+#[test]
+fn an_array_procedure_cannot_be_used_as_a_value() {
+    for source in ["INTEGER arr[3]\nPRINTLN arr.Redim(5)\n", "INTEGER arr[3]\nPRINTLN IIF(TRUE, 1, arr.Redim(5))\n"] {
+        let errors = diagnostics(source);
+        assert!(errors.iter().any(|error| error == "Procedure used as function"), "{source:?} -> {errors:?}");
+    }
+}
+
 /// A board object member reads as a value only where it is a property. A function or a procedure
 /// written without its call reached code generation as a plain member read, which left one that
 /// takes arguments with none at all.
 #[test]
 fn a_board_object_routine_without_a_call_is_reported() {
-    for source in ["PRINTLN Terminal.BeginUpdate\n", "PRINTLN Terminal.SetFont\n"] {
+    for source in ["PRINTLN Terminal.BeginUpdate\n", "PRINTLN Terminal.SetFont\n", "PRINTLN Audio.StopAll\n"] {
         let errors = diagnostics(source);
         assert!(
             errors.iter().any(|error| error.starts_with("Function used as variable")),
@@ -230,4 +270,10 @@ fn a_board_object_property_is_still_read_without_a_call() {
     assert!(diagnostics("PRINTLN Terminal.Info\n").is_empty());
     assert!(diagnostics("PRINTLN Terminal.BeginUpdate()\n").is_empty());
     assert!(diagnostics("PRINTLN Terminal.SetFont(1)\n").is_empty());
+    assert!(diagnostics("PRINTLN Audio.StopAll()\n").is_empty());
+    assert!(
+        diagnostics("PRINTLN Terminal.Info()\n")
+            .iter()
+            .any(|error| error.starts_with("Function not found"))
+    );
 }

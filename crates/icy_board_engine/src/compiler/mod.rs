@@ -220,7 +220,7 @@ pub enum CompilationErrorType {
     #[error("Internal error ({0})")]
     InternalError(String),
 
-    #[error("Undeclared procedure was used as function.")]
+    #[error("Procedure used as function")]
     ProcedureUsedAsFunction,
 }
 
