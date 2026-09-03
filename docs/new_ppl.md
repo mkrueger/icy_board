@@ -500,7 +500,7 @@ PPE cleanup, and a **value** is copied like an ordinary PPL value.
 | `PALETTE` | Live terminal palette controller | Mutable through methods |
 | `MACROS` | PPE-owned terminal macro controller | Mutable through methods |
 | `HTTP` | Stateless factory/root | Static methods only |
-| `HTTPREQUEST` | Shared request state until no PPL value names it | Mutable through `SetHeader()` and `SetText()` |
+| `HTTPREQUEST` | Shared request state until no PPL value names it | Mutable through `SetHeader()`, `SetText()` and `SetForm()` |
 | `HTTPRESPONSE` | Result snapshot from one completed request | Read-only; `Save()` performs output without changing the response |
 | `REGEX` | Compiled-pattern value | Read-only |
 | `REGEXMATCH` | Match-result value | Read-only |
@@ -1397,6 +1397,34 @@ through `Error.Last()`. `HttpMethod` contains `Get`, `Head` and `Post`.
 reports `ErrKind.Net` with `ErrCode.Invalid`. Routing and hop-by-hop headers,
 including `Host`, `Content-Length`, `Connection` and `Transfer-Encoding`, cannot
 be set by a PPE.
+
+`SetText()` sends its argument verbatim, which is what JSON, XML and plain text
+need. An `application/x-www-form-urlencoded` body is different: every value has
+to be percent-encoded so that a `&` or `=` inside it cannot be mistaken for a
+separator. `SetForm()` does that for one field and appends it to the body:
+
+```PPL
+HttpRequest request = Http.New(HttpMethod.Post, "https://api.pushover.net/1/messages.json")
+request.SetForm("token", token)
+request.SetForm("user", user)
+request.SetForm("message", "SYSOP wants to chat")
+HttpResponse response = request.Send()
+```
+
+Each call appends one `name=value` pair, encodes both sides, and sets
+`Content-Type: application/x-www-form-urlencoded`. Repeated names are kept, as
+an HTML form would send them. `SetForm()` refuses a `Get` or `Head` request, and
+refuses to append to a body that `SetText()` wrote with a different content
+type, so a form body and a JSON body can never be mixed by accident.
+
+`Http.UrlEncode(text)` and `Http.UrlDecode(text)` expose the same encoding for
+everything `SetForm()` does not cover, such as building a query string. Encode
+single values only, never a whole `name=value&...` string, because the
+separators must stay unencoded. The optional second argument selects the
+dialect: `TRUE`, the default, follows the form rules where a space is `+`, while
+`FALSE` follows RFC 3986 where a space is `%20` and a `+` is literal. Text is
+encoded as UTF-8 one byte at a time, so `ä` becomes `%C3%A4`. `UrlDecode()`
+replaces byte sequences that are not valid UTF-8 rather than reporting them.
 
 No `[ppl_http]` section is required. The default policy is equivalent to:
 

@@ -582,6 +582,8 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
             "get" => Some(fl!(LANGUAGE_LOADER, "hint-http-get")),
             "new" => Some(fl!(LANGUAGE_LOADER, "hint-http-new")),
             "download" => Some(fl!(LANGUAGE_LOADER, "hint-http-download")),
+            "urlencode" => Some(fl!(LANGUAGE_LOADER, "hint-http-url-encode")),
+            "urldecode" => Some(fl!(LANGUAGE_LOADER, "hint-http-url-decode")),
             _ => None,
         };
     }
@@ -590,6 +592,7 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
             "url" | "method" => Some(fl!(LANGUAGE_LOADER, "hint-http-request-property")),
             "setheader" => Some(fl!(LANGUAGE_LOADER, "hint-http-request-set-header")),
             "settext" => Some(fl!(LANGUAGE_LOADER, "hint-http-request-set-text")),
+            "setform" => Some(fl!(LANGUAGE_LOADER, "hint-http-request-set-form")),
             "send" => Some(fl!(LANGUAGE_LOADER, "hint-http-request-send")),
             _ => None,
         };
@@ -671,6 +674,7 @@ pub fn get_parameter_documentation(name: &str) -> Option<String> {
         "name" => "hint-param-name",
         "value" => "hint-param-value",
         "contenttype" => "hint-param-content-type",
+        "form" => "hint-param-form",
         "pattern" => "hint-param-pattern",
         "options" => "hint-param-options",
         "start" => "hint-param-start",

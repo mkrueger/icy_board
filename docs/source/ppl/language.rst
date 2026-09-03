@@ -320,7 +320,7 @@ value is copied like an ordinary PPL value.
    "``MARGINS``, ``PALETTE``", "Live terminal-state controllers", "Mutable through methods"
    "``MACROS``", "PPE-owned terminal macro controller", "Mutable through methods; definitions removed at cleanup"
    "``HTTP``", "Stateless factory/root", "Static methods only"
-   "``HTTPREQUEST``", "Shared request state", "Mutable through ``SetHeader()`` and ``SetText()``"
+   "``HTTPREQUEST``", "Shared request state", "Mutable through ``SetHeader()``, ``SetText()`` and ``SetForm()``"
    "``HTTPRESPONSE``", "Completed-request result snapshot", "Read-only; ``Save()`` performs output"
    "``REGEX``", "Compiled-pattern value", "Read-only"
    "``REGEXMATCH``", "Match-result value", "Read-only"
@@ -862,6 +862,25 @@ A request object supplies POST bodies and safe custom headers::
 The setter functions change the request and return ``TRUE`` on success. On
 failure they return ``FALSE``, leave it unchanged, and publish details through
 ``Error.Last()``.
+
+``SetText()`` sends its argument verbatim, which is what JSON and XML need. For
+an ``application/x-www-form-urlencoded`` body every value has to be
+percent-encoded instead, so that a ``&`` or ``=`` inside it cannot be mistaken
+for a separator. ``SetForm(name, value)`` encodes one field, appends it to the
+body and sets that content type::
+
+    HttpRequest request = Http.New(HttpMethod.Post, "https://api.example.com/messages")
+    request.SetForm("title", "SYSOP wants to chat")
+    request.SetForm("message", text)
+    HttpResponse response = request.Send()
+
+``Http.UrlEncode(text)`` and ``Http.UrlDecode(text)`` expose the same encoding
+for everything ``SetForm()`` does not cover, such as query strings. Encode
+single values only, never a whole ``name=value&...`` string. The optional second
+argument selects the dialect: ``TRUE``, the default, follows the form rules
+where a space is ``+``, while ``FALSE`` follows RFC 3986 where a space is
+``%20``.
+
 The optional board policy selects ``disabled``, exact-origin ``allowlist``, or
 the default ``public`` destinations and sets body, timeout, redirect and
 concurrency limits. Every DNS

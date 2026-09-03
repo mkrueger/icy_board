@@ -10,6 +10,14 @@ releases.
 
 ### Added
 
+- `HttpRequest.SetForm(name, value)` appends one percent-encoded
+  `application/x-www-form-urlencoded` field and sets that content type, so a
+  form POST no longer has to be assembled by hand. `Http.UrlEncode(text [,
+  form])` and `Http.UrlDecode(text [, form])` expose the same encoding for query
+  strings and for reading form-encoded replies; the optional argument selects
+  between form rules, where a space is `+`, and RFC 3986 rules, where it is
+  `%20`.
+
 - Criterion benchmarks cover PPL parsing, compilation, PPE serialization,
   string and array value operations, and prepared VM execution. The dedicated
   bench profile optimizes for speed, and named baselines support before/after

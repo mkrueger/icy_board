@@ -8,6 +8,7 @@ use std::{
 };
 
 use async_trait::async_trait;
+use percent_encoding::{AsciiSet, CONTROLS, percent_decode_str, utf8_percent_encode};
 use reqwest::{
     Method, StatusCode, Url,
     header::{HeaderMap, HeaderName, HeaderValue, LOCATION},
@@ -31,6 +32,8 @@ macro_rules! member_name {
 member_name!(GET, "Get");
 member_name!(NEW, "New");
 member_name!(DOWNLOAD, "Download");
+member_name!(URL_ENCODE, "UrlEncode");
+member_name!(URL_DECODE, "UrlDecode");
 member_name!(VALID, "Valid");
 member_name!(OK, "OK");
 member_name!(STATUS, "Status");
@@ -44,7 +47,59 @@ member_name!(URL, "Url");
 member_name!(METHOD, "Method");
 member_name!(SET_HEADER, "SetHeader");
 member_name!(SET_TEXT, "SetText");
+member_name!(SET_FORM, "SetForm");
 member_name!(SEND, "Send");
+
+const FORM_CONTENT_TYPE: &str = "application/x-www-form-urlencoded";
+
+/// Everything outside the RFC 3986 unreserved set (`ALPHA / DIGIT / -._~`).
+const URI_COMPONENT: &AsciiSet = &CONTROLS
+    .add(b' ')
+    .add(b'!')
+    .add(b'"')
+    .add(b'#')
+    .add(b'$')
+    .add(b'%')
+    .add(b'&')
+    .add(b'\'')
+    .add(b'(')
+    .add(b')')
+    .add(b'*')
+    .add(b'+')
+    .add(b',')
+    .add(b'/')
+    .add(b':')
+    .add(b';')
+    .add(b'<')
+    .add(b'=')
+    .add(b'>')
+    .add(b'?')
+    .add(b'@')
+    .add(b'[')
+    .add(b'\\')
+    .add(b']')
+    .add(b'^')
+    .add(b'`')
+    .add(b'{')
+    .add(b'|')
+    .add(b'}')
+    .add(b'\x7f');
+
+fn url_encode(text: &str, form: bool) -> String {
+    if form {
+        form_urlencoded::byte_serialize(text.as_bytes()).collect()
+    } else {
+        utf8_percent_encode(text, URI_COMPONENT).to_string()
+    }
+}
+
+fn url_decode(text: &str, form: bool) -> String {
+    if form {
+        percent_decode_str(&text.replace('+', " ")).decode_utf8_lossy().into_owned()
+    } else {
+        percent_decode_str(text).decode_utf8_lossy().into_owned()
+    }
+}
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct PplHttp;
@@ -594,6 +649,18 @@ impl UserData for PplHttp {
             vec![("url", VariableType::UnboundedString), ("file", VariableType::UnboundedString)],
             VariableType::UserData(HTTP_RESPONSE_ID as u8),
         );
+        registry.add_named_static_function_with(
+            URL_ENCODE.clone(),
+            vec![("text", VariableType::UnboundedString), ("form", VariableType::Boolean)],
+            1,
+            VariableType::UnboundedString,
+        );
+        registry.add_named_static_function_with(
+            URL_DECODE.clone(),
+            vec![("text", VariableType::UnboundedString), ("form", VariableType::Boolean)],
+            1,
+            VariableType::UnboundedString,
+        );
     }
 }
 
@@ -634,6 +701,17 @@ impl UserDataValue for PplHttp {
             let path = vm.resolve_file(&file).await;
             return Ok(send(vm, PplHttpRequest::new(Method::GET, url).into_request(), Some(path)).await);
         }
+        if *name == *URL_ENCODE || *name == *URL_DECODE {
+            let text = arguments.first().map(VariableValue::as_string).unwrap_or_default();
+            let form = arguments.get(1).is_none_or(VariableValue::as_bool);
+            vm.operation_succeeded();
+            let encoded = if *name == *URL_ENCODE {
+                url_encode(&text, form)
+            } else {
+                url_decode(&text, form)
+            };
+            return Ok(VariableValue::new_unbounded_string(encoded));
+        }
         Err(format!("Unknown HTTP function {name}").into())
     }
 
@@ -658,6 +736,11 @@ impl UserData for PplHttpRequest {
             SET_TEXT.clone(),
             vec![("text", VariableType::UnboundedString), ("contentType", VariableType::UnboundedString)],
             1,
+            VariableType::Boolean,
+        );
+        registry.add_named_function(
+            SET_FORM.clone(),
+            vec![("name", VariableType::UnboundedString), ("value", VariableType::UnboundedString)],
             VariableType::Boolean,
         );
         registry.add_function(SEND.clone(), Vec::new(), VariableType::UserData(HTTP_RESPONSE_ID as u8));
@@ -726,6 +809,38 @@ impl UserDataValue for PplHttpRequest {
             let mut request = self.request();
             request.body = text.into_bytes();
             request.headers.insert(reqwest::header::CONTENT_TYPE, content_type);
+            vm.operation_succeeded();
+            return Ok(VariableValue::new_bool(true));
+        }
+        if *name == *SET_FORM {
+            let field = arguments.first().map(VariableValue::as_string).unwrap_or_default();
+            let value = arguments.get(1).map(VariableValue::as_string).unwrap_or_default();
+            let mut request = self.request();
+            if request.method == Method::GET || request.method == Method::HEAD {
+                drop(request);
+                vm.set_error(PplError::new(ERR_KIND_NET, ERR_INVALID, "HTTP GET and HEAD requests cannot carry a body"));
+                return Ok(VariableValue::new_bool(false));
+            }
+            let is_form = request
+                .headers
+                .get(reqwest::header::CONTENT_TYPE)
+                .is_some_and(|value| value.as_bytes().starts_with(FORM_CONTENT_TYPE.as_bytes()));
+            let existing = if is_form {
+                String::from_utf8(request.body.clone()).ok()
+            } else if request.body.is_empty() {
+                Some(String::new())
+            } else {
+                None
+            };
+            let Some(existing) = existing else {
+                drop(request);
+                vm.set_error(PplError::new(ERR_KIND_NET, ERR_INVALID, "request already carries a body that is not form data"));
+                return Ok(VariableValue::new_bool(false));
+            };
+            request.body = form_urlencoded::Serializer::new(existing).append_pair(&field, &value).finish().into_bytes();
+            request
+                .headers
+                .insert(reqwest::header::CONTENT_TYPE, HeaderValue::from_static(FORM_CONTENT_TYPE));
             vm.operation_succeeded();
             return Ok(VariableValue::new_bool(true));
         }

@@ -299,3 +299,79 @@ fn a_failed_download_preserves_the_existing_file() {
     );
     server.join().unwrap();
 }
+
+#[test]
+fn url_encoding_defaults_to_the_form_dialect_and_round_trips() {
+    assert_eq!(
+        "[a+b%26c%3Dd] [a%20b%26c%3Dd] [a b&c=d] [a b&c=d] [%2B] [+]",
+        run_ppl(
+            r#"
+STRING raw = "a b&c=d"
+PRINT "[", Http.UrlEncode(raw), "] [", Http.UrlEncode(raw, FALSE), "]"
+PRINT " [", Http.UrlDecode(Http.UrlEncode(raw)), "] [", Http.UrlDecode(Http.UrlEncode(raw, FALSE), FALSE), "]"
+PRINT " [", Http.UrlEncode("+"), "] [", Http.UrlDecode("%2B"), "]"
+"#
+        )
+    );
+}
+
+#[test]
+fn url_encoding_keeps_unreserved_characters_and_encodes_utf8_per_byte() {
+    assert_eq!(
+        "[-_.%7EAZaz09] [-_.~AZaz09] [%C3%A4] [\u{e4}]",
+        run_ppl(
+            r#"STRING raw = "-_.~AZaz09"
+PRINT "[", Http.UrlEncode(raw), "] [", Http.UrlEncode(raw, FALSE), "] [", Http.UrlEncode("ä"), "] [", Http.UrlDecode("%C3%A4"), "]""#
+        )
+    );
+}
+
+#[test]
+fn set_form_accumulates_encoded_pairs_and_sets_the_content_type() {
+    let response = "HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok";
+    let (origin, request, server) = serve(vec![response.to_string()]);
+    let source = format!(
+        r#"
+HttpRequest request = Http.New(HttpMethod.Post, "{origin}/messages")
+BOOLEAN added = request.SetForm("token", "secret")
+added = added & request.SetForm("title", "SYSOP wants to chat")
+added = added & request.SetForm("message", "a&b=c")
+HttpResponse response = request.Send()
+PRINT added, " ", response.OK
+"#
+    );
+    assert_eq!("1 1", run_ppl_on(&source, |board| allow_origin(board, &origin)));
+    let sent = request.recv().unwrap();
+    assert!(sent.to_ascii_lowercase().contains("content-type: application/x-www-form-urlencoded"), "{sent}");
+    assert!(sent.ends_with("\r\n\r\ntoken=secret&title=SYSOP+wants+to+chat&message=a%26b%3Dc"), "{sent}");
+    server.join().unwrap();
+}
+
+#[test]
+fn set_form_refuses_to_append_to_a_body_it_did_not_write() {
+    assert_eq!(
+        "1 0 1",
+        run_ppl(
+            r#"
+HttpRequest request = Http.New(HttpMethod.Post, "https://example.com")
+BOOLEAN text = request.SetText("{}", "application/json")
+BOOLEAN form = request.SetForm("token", "secret")
+PRINT text, " ", form, " ", Error.Last().Code = ErrCode.Invalid
+"#
+        )
+    );
+}
+
+#[test]
+fn set_form_is_rejected_on_bodyless_methods() {
+    assert_eq!(
+        "0 1 1",
+        run_ppl(
+            r#"
+HttpRequest request = Http.New(HttpMethod.Get, "https://example.com")
+BOOLEAN added = request.SetForm("token", "secret")
+PRINT added, " ", Error.Last().Kind = ErrKind.Net, " ", Error.Last().Code = ErrCode.Invalid
+"#
+        )
+    );
+}
