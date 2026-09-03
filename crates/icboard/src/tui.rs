@@ -23,7 +23,7 @@ use crossterm::{
 };
 use icy_board_engine::icy_board::{
     IcyBoard, IcyBoardError,
-    bbs::{BBS, BBSMessage},
+    bbs::{BBS, BBSMessage, SysopCommand},
     state::{GraphicsMode, NodeState, PPEExecute},
 };
 use icy_board_tui::{
@@ -49,14 +49,46 @@ pub(crate) const LOCAL_SCREEN_SIZE: (u16, u16) = (80, 25 - STATUS_ROWS);
 enum SysopHotkey {
     Chat,
     FunctionKey(usize),
+    Command(SysopCommand),
+    ToggleDisplay,
 }
 
 fn sysop_hotkey(key: crossterm::event::KeyEvent, sysop_mode: bool) -> Option<SysopHotkey> {
+    if let KeyCode::F(number) = key.code
+        && key.modifiers.contains(KeyModifiers::SHIFT)
+        && (1..=10).contains(&number)
+    {
+        return Some(SysopHotkey::FunctionKey(usize::from(number - 1)));
+    }
+    if !sysop_mode {
+        return None;
+    }
+    if key.modifiers.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) {
+        return match key.code {
+            KeyCode::F(1) => Some(SysopHotkey::Command(SysopCommand::DecreaseTime)),
+            KeyCode::F(2) => Some(SysopHotkey::Command(SysopCommand::IncreaseTime)),
+            KeyCode::F(9) => Some(SysopHotkey::Command(SysopCommand::DecreaseSecurity)),
+            KeyCode::F(10) => Some(SysopHotkey::Command(SysopCommand::IncreaseSecurity)),
+            _ => None,
+        };
+    }
     match key.code {
-        KeyCode::F(number) if key.modifiers.contains(KeyModifiers::SHIFT) && (1..=10).contains(&number) => {
-            Some(SysopHotkey::FunctionKey(usize::from(number - 1)))
-        }
-        KeyCode::F(10) if sysop_mode => Some(SysopHotkey::Chat),
+        KeyCode::F(1) => Some(SysopHotkey::Command(SysopCommand::TogglePrivileges)),
+        KeyCode::F(2) => Some(SysopHotkey::Command(SysopCommand::LockCaller)),
+        KeyCode::F(4) => Some(SysopHotkey::Command(SysopCommand::TogglePageBell)),
+        KeyCode::F(7) => Some(SysopHotkey::Command(SysopCommand::ToggleAlarm)),
+        KeyCode::F(8) => Some(SysopHotkey::Command(SysopCommand::DisconnectCaller)),
+        KeyCode::F(9) => Some(SysopHotkey::ToggleDisplay),
+        KeyCode::F(10) => Some(SysopHotkey::Chat),
+        _ => None,
+    }
+}
+
+fn confirmation_prompt(command: SysopCommand) -> Option<&'static str> {
+    match command {
+        SysopCommand::TogglePrivileges => Some("Grant or remove SysOp privileges? Y/N"),
+        SysopCommand::LockCaller => Some("Lock out and disconnect caller? Y/N"),
+        SysopCommand::DisconnectCaller => Some("Disconnect caller? Y/N"),
         _ => None,
     }
 }
@@ -76,6 +108,8 @@ pub struct Tui {
     rendered_image_context: Option<(ratatui::layout::Size, bool, icy_engine::Size)>,
     host_mouse_capture: bool,
     host_pixel_mouse: bool,
+    display_visible: bool,
+    pending_confirmation: Option<SysopCommand>,
 }
 
 struct RenderedImage {
@@ -159,6 +193,8 @@ impl Tui {
             rendered_image_context: None,
             host_mouse_capture: false,
             host_pixel_mouse: false,
+            display_visible: true,
+            pending_confirmation: None,
         })
     }
 
@@ -222,6 +258,8 @@ impl Tui {
             rendered_image_context: None,
             host_mouse_capture: false,
             host_pixel_mouse: false,
+            display_visible: true,
+            pending_confirmation: None,
         }))
     }
 
@@ -264,7 +302,38 @@ impl Tui {
                 redraw = true;
                 match event::read()? {
                     Event::Key(key) if key.kind == KeyEventKind::Press => {
-                        if key.modifiers.contains(KeyModifiers::ALT) {
+                        if !self.display_visible
+                            && !(key.code == KeyCode::F(9) && !key.modifiers.intersects(KeyModifiers::SHIFT | KeyModifiers::CONTROL | KeyModifiers::ALT))
+                        {
+                            self.display_visible = true;
+                        }
+                        if let Some(command) = self.pending_confirmation {
+                            match key.code {
+                                KeyCode::Char('y' | 'Y') => {
+                                    self.pending_confirmation = None;
+                                    self.send_bbs_message(bbs, BBSMessage::RunSysopCommand(command)).await;
+                                }
+                                KeyCode::Char('n' | 'N') | KeyCode::Esc => self.pending_confirmation = None,
+                                _ => {}
+                            }
+                        } else if let Some(hotkey) = sysop_hotkey(key, self.sysop_mode) {
+                            match hotkey {
+                                SysopHotkey::FunctionKey(index) => {
+                                    self.send_bbs_message(bbs, BBSMessage::RunSysopFunctionKey(index)).await;
+                                }
+                                SysopHotkey::Command(command) => {
+                                    if confirmation_prompt(command).is_some() {
+                                        self.pending_confirmation = Some(command);
+                                    } else {
+                                        self.send_bbs_message(bbs, BBSMessage::RunSysopCommand(command)).await;
+                                    }
+                                }
+                                SysopHotkey::ToggleDisplay => {
+                                    self.display_visible = !self.display_visible;
+                                }
+                                SysopHotkey::Chat => self.send_bbs_message(bbs, BBSMessage::StartSysopChat).await,
+                            }
+                        } else if key.modifiers.contains(KeyModifiers::ALT) {
                             match key.code {
                                 KeyCode::Char('h') => {
                                     self.status_bar = (self.status_bar + 1) % 4;
@@ -299,29 +368,23 @@ impl Tui {
                                 _ => {}
                             }
                         } else {
-                            match sysop_hotkey(key, self.sysop_mode) {
-                                Some(SysopHotkey::FunctionKey(index)) => {
-                                    self.send_bbs_message(bbs, BBSMessage::RunSysopFunctionKey(index)).await;
-                                }
-                                Some(SysopHotkey::Chat) => self.send_bbs_message(bbs, BBSMessage::StartSysopChat).await,
-                                None => match key.code {
-                                    KeyCode::Char(c) => self.add_input(c.to_string().chars()).await?,
-                                    KeyCode::Enter => self.add_input("\r".chars()).await?,
-                                    KeyCode::Backspace => self.add_input("\x08".chars()).await?,
-                                    KeyCode::Esc => self.add_input("\x1B".chars()).await?,
-                                    KeyCode::Tab => self.add_input("\x09".chars()).await?,
-                                    KeyCode::Delete => self.add_input("\x7F".chars()).await?,
-                                    KeyCode::Insert => self.add_input("\x1B[2~".chars()).await?,
-                                    KeyCode::Home => self.add_input("\x1B[H".chars()).await?,
-                                    KeyCode::End => self.add_input("\x1B[F".chars()).await?,
-                                    KeyCode::Up => self.add_input("\x1B[A".chars()).await?,
-                                    KeyCode::Down => self.add_input("\x1B[B".chars()).await?,
-                                    KeyCode::Right => self.add_input("\x1B[C".chars()).await?,
-                                    KeyCode::Left => self.add_input("\x1B[D".chars()).await?,
-                                    KeyCode::PageUp => self.add_input("\x1B[V".chars()).await?,
-                                    KeyCode::PageDown => self.add_input("\x1B[U".chars()).await?,
-                                    _ => {}
-                                },
+                            match key.code {
+                                KeyCode::Char(c) => self.add_input(c.to_string().chars()).await?,
+                                KeyCode::Enter => self.add_input("\r".chars()).await?,
+                                KeyCode::Backspace => self.add_input("\x08".chars()).await?,
+                                KeyCode::Esc => self.add_input("\x1B".chars()).await?,
+                                KeyCode::Tab => self.add_input("\x09".chars()).await?,
+                                KeyCode::Delete => self.add_input("\x7F".chars()).await?,
+                                KeyCode::Insert => self.add_input("\x1B[2~".chars()).await?,
+                                KeyCode::Home => self.add_input("\x1B[H".chars()).await?,
+                                KeyCode::End => self.add_input("\x1B[F".chars()).await?,
+                                KeyCode::Up => self.add_input("\x1B[A".chars()).await?,
+                                KeyCode::Down => self.add_input("\x1B[B".chars()).await?,
+                                KeyCode::Right => self.add_input("\x1B[C".chars()).await?,
+                                KeyCode::Left => self.add_input("\x1B[D".chars()).await?,
+                                KeyCode::PageUp => self.add_input("\x1B[V".chars()).await?,
+                                KeyCode::PageDown => self.add_input("\x1B[U".chars()).await?,
+                                _ => {}
                             }
                         }
                     }
@@ -362,21 +425,23 @@ impl Tui {
         let view_height = screen.buffer.terminal_state.height().max(0) as u16;
         let (area, status_area) = terminal_layout(frame.area(), (view_width, view_height));
 
-        for y in 0..area.height as i32 {
-            for x in 0..area.width as i32 {
-                let c = screen.char_at((x, y + screen.first_visible_line()).into());
-                let mut fg = c.attribute.foreground();
-                if c.attribute.is_bold() {
-                    fg += 8;
+        if self.display_visible {
+            for y in 0..area.height as i32 {
+                for x in 0..area.width as i32 {
+                    let c = screen.char_at((x, y + screen.first_visible_line()).into());
+                    let mut fg = c.attribute.foreground();
+                    if c.attribute.is_bold() {
+                        fg += 8;
+                    }
+                    let fg = screen.palette().rgb(fg);
+                    let bg = screen.palette().rgb(c.attribute.background());
+                    let mut s: Style = Style::new().bg(Color::Rgb(bg.0, bg.1, bg.2)).fg(Color::Rgb(fg.0, fg.1, fg.2));
+                    if c.attribute.is_blinking() {
+                        s = s.slow_blink();
+                    }
+                    let span = Span::from(screen.buffer.buffer_type.convert_to_unicode(c.ch).to_string()).style(s);
+                    frame.buffer_mut().set_span(area.x + x as u16, area.y + y as u16, &span, 1);
                 }
-                let fg = screen.palette().rgb(fg);
-                let bg = screen.palette().rgb(c.attribute.background());
-                let mut s: Style = Style::new().bg(Color::Rgb(bg.0, bg.1, bg.2)).fg(Color::Rgb(fg.0, fg.1, fg.2));
-                if c.attribute.is_blinking() {
-                    s = s.slow_blink();
-                }
-                let span = Span::from(screen.buffer.buffer_type.convert_to_unicode(c.ch).to_string()).style(s);
-                frame.buffer_mut().set_span(area.x + x as u16, area.y + y as u16, &span, 1);
             }
         }
         if let Some(status_area) = status_area {
@@ -384,11 +449,11 @@ impl Tui {
         }
         let pos: icy_engine::Position = screen.caret.position();
         let cursor_y = pos.y - screen.first_visible_line();
-        if pos.x >= 0 && pos.x < i32::from(area.width) && cursor_y >= 0 && cursor_y < i32::from(area.height) {
+        if self.display_visible && pos.x >= 0 && pos.x < i32::from(area.width) && cursor_y >= 0 && cursor_y < i32::from(area.height) {
             frame.set_cursor_position((area.x + pos.x as u16, area.y + cursor_y as u16));
         }
 
-        for image in &self.rendered_images {
+        for image in self.rendered_images.iter().filter(|_| self.display_visible) {
             let image_y = i32::from(area.y) + image.position.y - screen.first_visible_line();
             if image_y < i32::from(area.y) || image.position.x < 0 {
                 continue;
@@ -455,6 +520,16 @@ impl Tui {
 
     fn draw_statusbar(&self, frame: &mut Frame, area: Rect, status_bar_info: StatusBarInfo) {
         frame.buffer_mut().set_style(area, Style::new().bg(DOS_LIGHT_GRAY));
+
+        if let Some(prompt) = self.pending_confirmation.and_then(confirmation_prompt) {
+            frame.render_widget(
+                Paragraph::new(prompt)
+                    .alignment(Alignment::Center)
+                    .style(Style::new().fg(DOS_WHITE).bg(DOS_RED)),
+                area,
+            );
+            return;
+        }
 
         match self.status_bar {
             0 => {
@@ -969,13 +1044,47 @@ mod sixel_tests {
     }
 
     #[test]
-    fn f10_starts_chat_but_shift_f10_runs_the_configured_macro() {
-        let f10 = crossterm::event::KeyEvent::new(KeyCode::F(10), KeyModifiers::NONE);
-        let shift_f10 = crossterm::event::KeyEvent::new(KeyCode::F(10), KeyModifiers::SHIFT);
+    fn pcboard_function_keys_map_to_nodespy_actions() {
+        let plain = [
+            Some(SysopHotkey::Command(SysopCommand::TogglePrivileges)),
+            Some(SysopHotkey::Command(SysopCommand::LockCaller)),
+            None,
+            Some(SysopHotkey::Command(SysopCommand::TogglePageBell)),
+            None,
+            None,
+            Some(SysopHotkey::Command(SysopCommand::ToggleAlarm)),
+            Some(SysopHotkey::Command(SysopCommand::DisconnectCaller)),
+            Some(SysopHotkey::ToggleDisplay),
+            Some(SysopHotkey::Chat),
+        ];
+        for (index, expected) in plain.into_iter().enumerate() {
+            let key = crossterm::event::KeyEvent::new(KeyCode::F((index + 1) as u8), KeyModifiers::NONE);
+            assert_eq!(sysop_hotkey(key, true), expected);
+        }
 
-        assert_eq!(sysop_hotkey(f10, true), Some(SysopHotkey::Chat));
+        for number in 1..=10 {
+            let key = crossterm::event::KeyEvent::new(KeyCode::F(number), KeyModifiers::SHIFT);
+            assert_eq!(sysop_hotkey(key, true), Some(SysopHotkey::FunctionKey(usize::from(number - 1))));
+        }
+    }
+
+    #[test]
+    fn pcboard_control_and_alt_function_keys_adjust_time_and_security() {
+        let commands = [
+            (1, SysopCommand::DecreaseTime),
+            (2, SysopCommand::IncreaseTime),
+            (9, SysopCommand::DecreaseSecurity),
+            (10, SysopCommand::IncreaseSecurity),
+        ];
+        for modifiers in [KeyModifiers::CONTROL, KeyModifiers::ALT] {
+            for (number, command) in commands {
+                let key = crossterm::event::KeyEvent::new(KeyCode::F(number), modifiers);
+                assert_eq!(sysop_hotkey(key, true), Some(SysopHotkey::Command(command)));
+            }
+        }
+
+        let f10 = crossterm::event::KeyEvent::new(KeyCode::F(10), KeyModifiers::NONE);
         assert_eq!(sysop_hotkey(f10, false), None);
-        assert_eq!(sysop_hotkey(shift_f10, true), Some(SysopHotkey::FunctionKey(9)));
     }
 
     #[tokio::test]

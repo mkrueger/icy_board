@@ -6,12 +6,26 @@ use crate::icy_board::state::user_commands::groupchat::{GroupChatEvent, GroupCha
 
 use super::state::NodeState;
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum SysopCommand {
+    TogglePrivileges,
+    LockCaller,
+    TogglePageBell,
+    ToggleAlarm,
+    DisconnectCaller,
+    DecreaseTime,
+    IncreaseTime,
+    DecreaseSecurity,
+    IncreaseSecurity,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum BBSMessage {
     SysopLogin,
     SysopLogout,
     StartSysopChat,
     RunSysopFunctionKey(usize),
+    RunSysopCommand(SysopCommand),
     Broadcast(String),
     /// Show the text and drop the caller - sent when an event is about to run.
     Shutdown(String),

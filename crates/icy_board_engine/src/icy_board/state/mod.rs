@@ -87,7 +87,7 @@ mod option_tests {
 
 use super::{
     IcyBoard,
-    bbs::{BBS, BBSMessage},
+    bbs::{BBS, BBSMessage, SysopCommand},
     commands::{AutoRun, Command, CommandAction, CommandType},
     conferences::Conference,
     events::{self, EventWindow},
@@ -241,6 +241,8 @@ pub struct Session {
     pub current_user: Option<User>,
     pub cur_user_id: i32,
     pub cur_security: u8,
+    /// Session-only delta applied by the local SysOp function keys.
+    pub temporary_security_adjustment: i16,
     pub subscription_expired: bool,
     pub cur_groups: Vec<String>,
     pub language: String,
@@ -337,6 +339,7 @@ impl Session {
             current_user: None,
             cur_user_id: -1,
             cur_security: 0,
+            temporary_security_adjustment: 0,
             subscription_expired: false,
             caller_number: 0,
             cur_groups: Vec::new(),
@@ -1075,7 +1078,8 @@ impl IcyBoardState {
         } else {
             user.security_level
         } as i32;
-        let adjusted = (base + self.session.current_conference.add_conference_security).clamp(0, u8::MAX as i32) as u8;
+        let adjusted = (base + self.session.current_conference.add_conference_security + i32::from(self.session.temporary_security_adjustment))
+            .clamp(0, u8::MAX as i32) as u8;
         if adjusted == self.session.cur_security {
             return;
         }
@@ -2076,6 +2080,84 @@ impl IcyBoardState {
             }
         }
         self.stuff_keyboard_buffer(&definition, true)
+    }
+
+    async fn run_sysop_command(&mut self, command: SysopCommand) -> Res<()> {
+        match command {
+            SysopCommand::TogglePrivileges => {
+                let sysop_level = self.get_board().await.config.sysop_command_level.sysop;
+                let adjustment = self.session.temporary_security_adjustment;
+                let base_security = (i16::from(self.session.cur_security) - adjustment).clamp(0, i16::from(u8::MAX)) as u8;
+                if adjustment != 0 && self.session.cur_security >= sysop_level {
+                    self.session.cur_security = base_security;
+                    self.session.temporary_security_adjustment = 0;
+                    self.display_text(IceText::SysopLevelRemoved, display_flags::NEWLINE | display_flags::LFBEFORE)
+                        .await?;
+                } else if self.session.cur_security < sysop_level {
+                    self.session.cur_security = sysop_level;
+                    self.session.temporary_security_adjustment = i16::from(sysop_level) - i16::from(base_security);
+                    self.display_text(IceText::SysopLevelGranted, display_flags::NEWLINE | display_flags::LFBEFORE)
+                        .await?;
+                }
+            }
+            SysopCommand::LockCaller => {
+                if let Some(user) = &mut self.session.current_user {
+                    user.security_level = 0;
+                }
+                self.session.cur_security = 0;
+                self.persist_current_user().await?;
+                self.display_text(IceText::AutoDisconnectNow, display_flags::NEWLINE | display_flags::LFBEFORE)
+                    .await?;
+                self.shutdown_connections().await;
+            }
+            SysopCommand::TogglePageBell => {
+                let enabled = self.get_board().await.config.options.page_bell;
+                self.get_board().await.config.options.page_bell = !enabled;
+            }
+            SysopCommand::ToggleAlarm => {
+                let enabled = self.get_board().await.config.options.alarm;
+                self.get_board().await.config.options.alarm = !enabled;
+            }
+            SysopCommand::DisconnectCaller => {
+                self.display_text(IceText::AutoDisconnectNow, display_flags::NEWLINE | display_flags::LFBEFORE)
+                    .await?;
+                self.shutdown_connections().await;
+            }
+            SysopCommand::DecreaseTime => {
+                if let Some(remaining) = self.minutes_left() {
+                    self.session.time_limit = self.session.time_limit.saturating_sub(if remaining < 10 { 1 } else { 5 });
+                }
+            }
+            SysopCommand::IncreaseTime => {
+                if self.minutes_left().is_some_and(|remaining| remaining < 1435) {
+                    self.session.time_limit = self.session.time_limit.saturating_add(5);
+                }
+            }
+            SysopCommand::DecreaseSecurity | SysopCommand::IncreaseSecurity => {
+                let current = self.session.cur_security;
+                let levels = self.get_board().await.sec_levels.iter().map(|level| level.security).collect::<Vec<_>>();
+                let target = match command {
+                    SysopCommand::IncreaseSecurity => levels.into_iter().find(|level| *level > current),
+                    SysopCommand::DecreaseSecurity => {
+                        let mut previous = 0;
+                        levels.into_iter().find_map(|level| {
+                            if level >= current {
+                                Some(previous)
+                            } else {
+                                previous = level;
+                                None
+                            }
+                        })
+                    }
+                    _ => unreachable!(),
+                };
+                if let Some(target) = target {
+                    self.session.temporary_security_adjustment += i16::from(target) - i16::from(current);
+                    self.session.cur_security = target;
+                }
+            }
+        }
+        Ok(())
     }
 
     pub fn search_init(&mut self, pattern: String, case_sensitive: bool) -> bool {
@@ -3273,6 +3355,9 @@ impl IcyBoardState {
                         Some(BBSMessage::RunSysopFunctionKey(index)) => {
                             self.run_sysop_function_key(index).await?;
                         }
+                        Some(BBSMessage::RunSysopCommand(command)) => {
+                            self.run_sysop_command(command).await?;
+                        }
                         Some(BBSMessage::Broadcast(msg)) => {
                             self.show_broadcast(msg).await?;
                         }
@@ -3352,6 +3437,9 @@ impl IcyBoardState {
                         }
                         Some(BBSMessage::RunSysopFunctionKey(index)) => {
                             self.run_sysop_function_key(index).await?;
+                        }
+                        Some(BBSMessage::RunSysopCommand(command)) => {
+                            self.run_sysop_command(command).await?;
                         }
                         Some(BBSMessage::Broadcast(msg)) => {
                             self.show_broadcast(msg).await?;
@@ -4374,6 +4462,69 @@ mod screen_tests {
 
             let stuffed = state.char_buffer.drain(..).map(|key| key.ch).collect::<String>();
             assert_eq!(stuffed, "HELLO\r");
+        });
+    }
+
+    #[test]
+    fn sysop_time_keys_preserve_unlimited_sessions_and_use_pcboard_steps() {
+        tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
+            let (mut state, _peer) = graphics_state().await;
+            state.session.time_limit = 0;
+
+            state.run_sysop_command(SysopCommand::IncreaseTime).await.unwrap();
+            state.run_sysop_command(SysopCommand::DecreaseTime).await.unwrap();
+            assert_eq!(state.session.time_limit, 0);
+
+            state.session.login_date = Utc::now();
+            state.session.time_limit = 20;
+            state.run_sysop_command(SysopCommand::DecreaseTime).await.unwrap();
+            assert_eq!(state.session.time_limit, 15);
+            state.session.time_limit = 9;
+            state.run_sysop_command(SysopCommand::DecreaseTime).await.unwrap();
+            assert_eq!(state.session.time_limit, 8);
+            state.run_sysop_command(SysopCommand::IncreaseTime).await.unwrap();
+            assert_eq!(state.session.time_limit, 13);
+        });
+    }
+
+    #[test]
+    fn sysop_security_keys_follow_pcboard_file_order() {
+        tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
+            let (mut state, _peer) = graphics_state().await;
+            state.get_board().await.sec_levels.levels = [10, 20, 30]
+                .into_iter()
+                .map(|security| crate::icy_board::sec_levels::SecurityLevel {
+                    security,
+                    ..Default::default()
+                })
+                .collect();
+
+            state.session.cur_security = 15;
+            state.run_sysop_command(SysopCommand::IncreaseSecurity).await.unwrap();
+            assert_eq!(state.session.cur_security, 20);
+            state.run_sysop_command(SysopCommand::DecreaseSecurity).await.unwrap();
+            assert_eq!(state.session.cur_security, 10);
+            state.run_sysop_command(SysopCommand::DecreaseSecurity).await.unwrap();
+            assert_eq!(state.session.cur_security, 0);
+
+            state.session.cur_security = 40;
+            state.run_sysop_command(SysopCommand::DecreaseSecurity).await.unwrap();
+            assert_eq!(state.session.cur_security, 40);
+        });
+    }
+
+    #[test]
+    fn conference_security_keeps_the_temporary_sysop_adjustment() {
+        tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
+            let (mut state, _peer) = graphics_state().await;
+            state.session.current_user.as_mut().unwrap().security_level = 10;
+            state.session.current_conference.add_conference_security = 5;
+            state.session.temporary_security_adjustment = 20;
+            state.session.cur_security = 10;
+
+            state.apply_conference_security().await;
+
+            assert_eq!(state.session.cur_security, 35);
         });
     }
 
