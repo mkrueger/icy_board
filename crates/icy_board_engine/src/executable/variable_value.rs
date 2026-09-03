@@ -1544,6 +1544,34 @@ impl VariableValue {
         }
     }
 
+    /// The same as [`VariableValue::as_int`], for a value a corrupt PPE may have typed
+    /// as something that has no integer form at all.
+    pub fn try_as_int(&self) -> Option<i32> {
+        if matches!(self.generic_data, GenericVariableData::String(_)) {
+            return Some(self.as_int());
+        }
+        match self.vtype {
+            VariableType::Boolean
+            | VariableType::Unsigned
+            | VariableType::Long
+            | VariableType::ULong
+            | VariableType::Date
+            | VariableType::DDate
+            | VariableType::EDate
+            | VariableType::Integer
+            | VariableType::Money
+            | VariableType::Float
+            | VariableType::Double
+            | VariableType::Time
+            | VariableType::Byte
+            | VariableType::Word
+            | VariableType::SByte
+            | VariableType::SWord
+            | VariableType::MessageAreaID => Some(self.as_int()),
+            _ => None,
+        }
+    }
+
     pub fn as_unsigned(&self) -> u64 {
         if let GenericVariableData::String(s) = &self.generic_data {
             let mut res = 0;

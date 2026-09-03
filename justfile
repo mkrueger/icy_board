@@ -9,6 +9,18 @@ test jobs="4" threads="4":
 setup-editor target="all":
   tools/setup-editor.sh {{target}}
 
+# Fuzzes a PPE binary trust boundary. Needs nightly + cargo-fuzz; the corpus is
+# temporary, so a run leaves nothing behind in the working tree.
+fuzz target="ppe_load" seconds="60":
+  #!/usr/bin/env bash
+  set -euo pipefail
+  corpus="$(mktemp -d)"
+  trap 'rm -rf "$corpus"' EXIT
+  cargo +nightly fuzz run {{target}} "$corpus" \
+    crates/icy_board_engine/tests/test_ppe \
+    crates/icy_board_engine/tests/test_data \
+    -- -max_total_time={{seconds}} -max_len=262140 -timeout=5
+
 build_ppe: build
   target/debug/pplc ppe/cnfn.pps
   target/debug/pplc ppe/area.pps

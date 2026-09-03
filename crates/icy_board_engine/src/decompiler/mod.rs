@@ -474,15 +474,18 @@ impl Decompiler {
                     IdentifierExpression::create_empty_expression(unicase::Ascii::new(entry.name.clone()))
                 } else if entry.entry_type == EntryType::Constant {
                     let constant = match entry.value.get_type() {
-                        VariableType::BigStr | VariableType::String | VariableType::UnboundedString => Constant::String(entry.value.as_string()),
-                        VariableType::Float => Constant::Double(entry.value.data.float_value as f64),
-                        VariableType::Double => Constant::Double(entry.value.data.double_value),
-                        VariableType::Boolean => Constant::Boolean(entry.value.as_bool()),
-                        VariableType::Unsigned => Constant::Unsigned(entry.value.data.unsigned_value, NumberFormat::Default),
+                        VariableType::BigStr | VariableType::String | VariableType::UnboundedString => Some(Constant::String(entry.value.as_string())),
+                        VariableType::Float => Some(Constant::Double(entry.value.data.float_value as f64)),
+                        VariableType::Double => Some(Constant::Double(entry.value.data.double_value)),
+                        VariableType::Boolean => Some(Constant::Boolean(entry.value.as_bool())),
+                        VariableType::Unsigned => Some(Constant::Unsigned(entry.value.data.unsigned_value, NumberFormat::Default)),
                         //VariableType::Integer |
-                        _ => Constant::Integer(entry.value.as_int(), NumberFormat::Default),
+                        _ => entry.value.try_as_int().map(|value| Constant::Integer(value, NumberFormat::Default)),
                     };
-                    ConstantExpression::create_empty_expression(constant)
+                    match constant {
+                        Some(constant) => ConstantExpression::create_empty_expression(constant),
+                        None => IdentifierExpression::create_empty_expression(unicase::Ascii::new(entry.name.clone())),
+                    }
                 } else {
                     IdentifierExpression::create_empty_expression(unicase::Ascii::new(entry.name.clone()))
                 }
@@ -755,7 +758,8 @@ impl Decompiler {
                     Expression::Identifier(id) => (id.get_identifier().clone(), Vec::new()),
                     Expression::Indexer(f) => (unicase::Ascii::new(f.get_identifier().to_string()), f.get_arguments().clone()),
 
-                    x => panic!("Invalid expression {x:?}"),
+                    // A corrupt PPE can name something that is not a variable as the target.
+                    _ => return CommentAstNode::create_empty_statement(" Invalid assignment target".to_string()),
                 };
                 let mut value_expr = self.decompile_expression(expr);
 
@@ -834,11 +838,16 @@ impl Decompiler {
     }
 
     fn get_variable_name(&self, p: usize) -> unicase::Ascii<String> {
-        unicase::Ascii::new(self.executable.variable_table.get_var_entry(p).name.clone())
+        match self.executable.variable_table.try_get_entry(p) {
+            Some(entry) => unicase::Ascii::new(entry.name.clone()),
+            None => unicase::Ascii::new(format!("VAR{p:03}")),
+        }
     }
 
     fn parse_function(&mut self, func: usize) {
-        let entry = self.executable.variable_table.get_var_entry(func).clone();
+        let Some(entry) = self.executable.variable_table.try_get_entry(func).cloned() else {
+            return;
+        };
         let mut func_body = self.generate_local_variable_declarations(&entry);
         while self.cur_ptr < self.script.statements.len() {
             let statement = &self.script.statements[self.cur_ptr];
@@ -901,7 +910,9 @@ impl Decompiler {
             let end = start + entry.value.data.function_value.local_variables as usize;
 
             for i in start..end {
-                let local_var = self.executable.variable_table.get_var_entry(i);
+                let Some(local_var) = self.executable.variable_table.try_get_entry(i) else {
+                    break;
+                };
                 if local_var.entry_type == EntryType::LocalVariable {
                     let source_type = self.source_type(local_var.header.variable_type);
                     decl.push(generate_variable_declaration(local_var, self.type_token(source_type), source_type));
@@ -931,7 +942,9 @@ impl Decompiler {
             }
 
             for i in 0..to {
-                let param = self.executable.variable_table.get_var_entry(first_var + 1 + i);
+                let Some(param) = self.executable.variable_table.try_get_entry(first_var + 1 + i) else {
+                    break;
+                };
                 let mut dimensions = Vec::new();
                 match param.header.dim {
                     1 => {
@@ -1060,8 +1073,14 @@ impl PPEVisitor<()> for VariableConstantVisitor<'_> {
     fn visit_dim_expression(&mut self, id: usize, dim: &[PPEExpr]) {
         // Changes CONST[expr] to VAR[expr]
         // There are some files out there that try to change the entry typ to constant for DIM variables
-        if self.executable.variable_table.get_var_entry(id).entry_type == EntryType::Constant {
-            self.executable.variable_table.get_var_entry_mut(id).entry_type = EntryType::Variable;
+        if self
+            .executable
+            .variable_table
+            .try_get_entry(id)
+            .is_some_and(|entry| entry.entry_type == EntryType::Constant)
+            && let Some(entry) = self.executable.variable_table.try_get_entry_mut(id)
+        {
+            entry.entry_type = EntryType::Variable;
         }
         for d in dim {
             d.visit(self);
@@ -1115,10 +1134,15 @@ impl PPEVisitor<()> for VariableConstantVisitor<'_> {
         match def.sig {
             crate::executable::StatementSignature::SpecialCaseSort => {
                 // Ensure that #1 sort argument is a variable
-                if let PPEExpr::Value(id) = &arguments[0]
-                    && self.executable.variable_table.get_var_entry(*id).entry_type == EntryType::Constant
+                if let Some(PPEExpr::Value(id)) = arguments.first()
+                    && self
+                        .executable
+                        .variable_table
+                        .try_get_entry(*id)
+                        .is_some_and(|entry| entry.entry_type == EntryType::Constant)
+                    && let Some(entry) = self.executable.variable_table.try_get_entry_mut(*id)
                 {
-                    self.executable.variable_table.get_var_entry_mut(*id).entry_type = EntryType::Variable;
+                    entry.entry_type = EntryType::Variable;
                 }
             }
             crate::executable::StatementSignature::Invalid

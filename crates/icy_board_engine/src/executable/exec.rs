@@ -11,7 +11,7 @@ use crate::{
     parser::{FIRST_USER_TYPE_ID, MAX_TYPE_FIELDS, MAX_USER_TYPES, is_user_declared_type},
 };
 
-use super::{FIRST_TYPE_TABLE_RUNTIME, LAST_PPE_RUNTIME, RecordField, VariableTable, VariableType};
+use super::{FIRST_TYPE_TABLE_RUNTIME, LAST_PPE_RUNTIME, RecordField, VariableTable, VariableType, variable_table::MAX_DESERIALIZED_ARRAY_ELEMENTS};
 
 const TYPE_TABLE_FORMAT: u8 = 1;
 const RECORD_FIELD_SIZE: usize = 8;
@@ -74,6 +74,9 @@ pub enum ExecutableError {
 
     #[error("Type {0} field {1} has invalid array dimensions")]
     InvalidTypeFieldDimensions(usize, usize),
+
+    #[error("PPE variable arrays need {0} elements; loading is limited to {1}")]
+    ArrayAllocationTooLarge(usize, usize),
 }
 
 #[derive(Clone)]
@@ -113,6 +116,63 @@ impl Executable {
                     }
                 }
             }
+        }
+        Ok(())
+    }
+
+    /// How many values one instance of each record type allocates, so a corrupt type
+    /// table cannot ask a loaded file for an unbounded amount of memory.
+    fn record_footprints(user_types: &[Vec<RecordField>]) -> Result<Vec<usize>, ExecutableError> {
+        let mut footprints: Vec<usize> = Vec::with_capacity(user_types.len());
+        for (index, fields) in user_types.iter().enumerate() {
+            let type_id = FIRST_USER_TYPE_ID + index;
+            let mut total = 0usize;
+            for (field_index, field) in fields.iter().enumerate() {
+                let elements = field.element_count().ok_or(ExecutableError::InvalidTypeFieldDimensions(type_id, field_index))?;
+                let per_element = match field.variable_type {
+                    VariableType::UserData(field_type_id) if is_user_declared_type(field_type_id) => footprints
+                        .get(field_type_id as usize - FIRST_USER_TYPE_ID)
+                        .copied()
+                        .ok_or(ExecutableError::InvalidTypeReference(type_id, field_type_id))?,
+                    _ => 1,
+                };
+                total = elements
+                    .checked_mul(per_element)
+                    .and_then(|values| total.checked_add(values))
+                    .filter(|total| *total <= MAX_DESERIALIZED_ARRAY_ELEMENTS)
+                    .ok_or(ExecutableError::ArrayAllocationTooLarge(
+                        total.saturating_add(elements),
+                        MAX_DESERIALIZED_ARRAY_ELEMENTS,
+                    ))?;
+            }
+            footprints.push(total.max(1));
+        }
+        Ok(footprints)
+    }
+
+    fn validate_record_allocation(variable_table: &VariableTable, user_types: &[Vec<RecordField>]) -> Result<(), ExecutableError> {
+        let footprints = Self::record_footprints(user_types)?;
+        let mut total = 0usize;
+        for entry in variable_table.get_entries() {
+            let VariableType::UserData(type_id) = entry.header.variable_type else {
+                continue;
+            };
+            if !is_user_declared_type(type_id) {
+                continue;
+            }
+            let footprint = footprints
+                .get(type_id as usize - FIRST_USER_TYPE_ID)
+                .copied()
+                .ok_or(ExecutableError::MissingTypeDefinition(type_id))?;
+            let elements = entry.header.allocated_elements().unwrap_or(usize::MAX).max(1);
+            total = elements
+                .checked_mul(footprint)
+                .and_then(|values| total.checked_add(values))
+                .filter(|total| *total <= MAX_DESERIALIZED_ARRAY_ELEMENTS)
+                .ok_or(ExecutableError::ArrayAllocationTooLarge(
+                    total.saturating_add(footprint),
+                    MAX_DESERIALIZED_ARRAY_ELEMENTS,
+                ))?;
         }
         Ok(())
     }
@@ -205,6 +265,7 @@ impl Executable {
             }
             Self::validate_user_types(&user_types)?;
             Self::validate_variable_types(&variable_table, &user_types)?;
+            Self::validate_record_allocation(&variable_table, &user_types)?;
             variable_table.fill_in_records(&user_types);
         }
         let Some(code_size_bytes) = buffer.get(i..i + 2) else {

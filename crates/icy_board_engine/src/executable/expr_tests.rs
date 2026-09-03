@@ -74,7 +74,7 @@ fn string_member_function_ids_are_compact() {
 }
 use crate::executable::{EntryType, FunctionValue, VariableType, VariableValue};
 
-use super::{DeserializationErrorType, Executable, FUNCTION_DEFINITIONS, FuncOpCode, PPEExpr, TableEntry};
+use super::{DeserializationErrorType, Executable, FUNCTION_DEFINITIONS, FuncOpCode, FunctionSignature, PPEExpr, TableEntry};
 
 #[test]
 fn test_value_serialization() {
@@ -248,6 +248,21 @@ fn truncated_routine_reference_is_rejected() {
         DeserializationErrorType::IndexOutOfBounds,
         super::PPEDeserializer::default().deserialize_expression(&executable).unwrap_err()
     );
+}
+
+#[test]
+fn an_invalid_function_opcode_does_not_grow_the_expression_stack_forever() {
+    // END and CPAR never reach the signature, they are answered before it is read.
+    let index = FUNCTION_DEFINITIONS
+        .iter()
+        .position(|definition| matches!(definition.signature, FunctionSignature::Invalid) && !matches!(definition.opcode, FuncOpCode::END | FuncOpCode::CPAR))
+        .expect("no function opcode has an invalid signature");
+    let executable = Executable {
+        script_buffer: vec![-(index as i16)],
+        ..Executable::default()
+    };
+
+    assert!(super::PPEDeserializer::default().deserialize_expression(&executable).is_ok());
 }
 
 fn malformed_expression_executable() -> Executable {

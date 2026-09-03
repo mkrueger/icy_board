@@ -73,7 +73,12 @@ pub enum DeserializationErrorType {
 
     #[error("Invalid if condition expression ({0:04X})")]
     IfConditionInvalid(usize),
+
+    #[error("Expression nesting exceeds the supported limit of {0}")]
+    ExpressionNestingTooDeep(usize),
 }
+
+const MAX_EXPRESSION_DEPTH: usize = 64;
 
 #[derive(Default)]
 pub struct PPEDeserializer {
@@ -82,6 +87,7 @@ pub struct PPEDeserializer {
 
     stmt_offset: usize,
     expr_offset: usize,
+    expression_depth: usize,
     pub bugged_offsets: HashMap<usize, Vec<DeserializationErrorType>>,
 }
 
@@ -91,6 +97,14 @@ impl PPEDeserializer {
     }
     pub fn expr_span(&self) -> Range<usize> {
         self.expr_offset..self.offset
+    }
+
+    fn read_word(&mut self, executable: &Executable) -> Result<i16, DeserializationErrorType> {
+        let Some(&word) = executable.script_buffer.get(self.offset) else {
+            return Err(DeserializationErrorType::IndexOutOfBounds);
+        };
+        self.offset += 1;
+        Ok(word)
     }
 
     /// .
@@ -143,45 +157,38 @@ impl PPEDeserializer {
                 let Some(expr) = self.deserialize_expression(executable)? else {
                     return Err(DeserializationErrorType::IfConditionInvalid(self.offset));
                 };
-                let label = executable.script_buffer[self.offset] as usize;
-                self.offset += 1;
+                let label = self.read_word(executable)? as usize;
                 Ok(Some(PPECommand::IfNot(Box::new(expr), label)))
             }
             OpCode::ForEach => {
-                let variable = executable.script_buffer[self.offset] as usize;
-                self.offset += 1;
+                let variable = self.read_word(executable)? as usize;
                 let Some(collection) = self.deserialize_expression(executable)? else {
                     return Err(DeserializationErrorType::NoExpression);
                 };
-                let end = executable.script_buffer[self.offset] as usize;
-                self.offset += 1;
+                let end = self.read_word(executable)? as usize;
                 Ok(Some(PPECommand::ForEach(variable, Box::new(collection), end)))
             }
             OpCode::NextForEach => {
-                let start = executable.script_buffer[self.offset] as usize;
-                self.offset += 1;
+                let start = self.read_word(executable)? as usize;
                 Ok(Some(PPECommand::NextForEach(start)))
             }
             OpCode::GOSUB => {
-                let label = executable.script_buffer[self.offset] as usize;
-                self.offset += 1;
+                let label = self.read_word(executable)? as usize;
                 Ok(Some(PPECommand::Gosub(label)))
             }
             OpCode::GOTO => {
-                let label = executable.script_buffer[self.offset] as usize;
-                self.offset += 1;
+                let label = self.read_word(executable)? as usize;
                 Ok(Some(PPECommand::Goto(label)))
             }
             OpCode::OnError => {
-                let mode = executable.script_buffer[self.offset];
-                let target = executable.script_buffer[self.offset + 1] as usize;
-                self.offset += 2;
+                let mode = self.read_word(executable)?;
+                let target = self.read_word(executable)? as usize;
                 Ok(Some(PPECommand::OnError(super::commands::OnErrorTarget::decode(mode, target))))
             }
             OpCode::PCALL => {
                 // TODO: implement read var correctld ?
-                let proc_id = executable.script_buffer[self.offset] as usize;
-                self.offset += 2;
+                let proc_id = self.read_word(executable)? as usize;
+                let _argument_separator = self.read_word(executable)?;
 
                 let Some(var) = executable.variable_table.try_get_entry(proc_id) else {
                     return Err(DeserializationErrorType::NoVTableEntry(proc_id));
@@ -214,18 +221,17 @@ impl PPEDeserializer {
                 let (var_idx, argument_count) = match def.sig {
                     crate::executable::StatementSignature::ArgumentsWithVariable(var_idx, argument_count) => (var_idx, argument_count),
                     crate::executable::StatementSignature::VariableArguments(var_idx, _, _) => {
-                        let argument_count = executable.script_buffer[self.offset];
-                        assert!(argument_count >= 0, "negative argument count");
-                        self.offset += 1;
+                        let argument_count = self.read_word(executable)?;
+                        if argument_count < 0 {
+                            return Err(DeserializationErrorType::InvalidStatementSignature);
+                        }
 
                         let mut arguments = Vec::new();
                         for i in 0..argument_count {
                             let expr = if i + 1 == var_idx as i16 {
-                                let expr = PPEExpr::Value(executable.script_buffer[self.offset] as usize);
-                                self.offset += 1;
-                                expr
+                                PPEExpr::Value(self.read_word(executable)? as usize)
                             } else {
-                                self.deserialize_expression(executable)?.unwrap()
+                                self.deserialize_expression(executable)?.ok_or(DeserializationErrorType::NoExpression)?
                             };
                             arguments.push(expr);
                         }
@@ -233,10 +239,9 @@ impl PPEDeserializer {
                     }
                     crate::executable::StatementSignature::SpecialCaseSort => {
                         let arguments = vec![
-                            PPEExpr::Value(executable.script_buffer[self.offset] as usize),
-                            PPEExpr::Value(executable.script_buffer[self.offset + 1] as usize),
+                            PPEExpr::Value(self.read_word(executable)? as usize),
+                            PPEExpr::Value(self.read_word(executable)? as usize),
                         ];
-                        self.offset += 2;
 
                         return Ok(Some(PPECommand::PredefinedCall(def, arguments)));
                     }
@@ -249,26 +254,27 @@ impl PPEDeserializer {
                     }
                     crate::executable::StatementSignature::SpecialCaseDcreate => {
                         let arguments = vec![
-                            self.deserialize_expression(executable)?.unwrap(),
-                            self.deserialize_expression(executable)?.unwrap(),
-                            self.deserialize_expression(executable)?.unwrap(),
-                            PPEExpr::Value(executable.script_buffer[self.offset] as usize),
+                            self.deserialize_expression(executable)?.ok_or(DeserializationErrorType::NoExpression)?,
+                            self.deserialize_expression(executable)?.ok_or(DeserializationErrorType::NoExpression)?,
+                            self.deserialize_expression(executable)?.ok_or(DeserializationErrorType::NoExpression)?,
+                            PPEExpr::Value(self.read_word(executable)? as usize),
                         ];
-                        self.offset += 1;
                         return Ok(Some(PPECommand::PredefinedCall(def, arguments)));
                     }
                     super::StatementSignature::SpecialCaseDlockg => {
                         let mut arguments = vec![
-                            self.deserialize_expression(executable)?.unwrap(),
-                            PPEExpr::Value(executable.script_buffer[self.offset] as usize),
+                            self.deserialize_expression(executable)?.ok_or(DeserializationErrorType::NoExpression)?,
+                            PPEExpr::Value(self.read_word(executable)? as usize),
                         ];
-                        self.offset += 1;
-                        arguments.push(self.deserialize_expression(executable)?.unwrap());
+                        arguments.push(self.deserialize_expression(executable)?.ok_or(DeserializationErrorType::NoExpression)?);
                         return Ok(Some(PPECommand::PredefinedCall(def, arguments)));
                     }
                     crate::executable::StatementSignature::SpecialCasePop => {
-                        let count = executable.script_buffer[self.offset] as usize;
-                        self.offset += 1;
+                        let count = self.read_word(executable)?;
+                        if count < 0 {
+                            return Err(DeserializationErrorType::InvalidStatementSignature);
+                        }
+                        let count = count as usize;
                         let mut arguments = Vec::new();
                         for _ in 0..count {
                             arguments.push(self.read_variable_expression(executable)?.ok_or(DeserializationErrorType::NoExpression)?);
@@ -285,7 +291,7 @@ impl PPEDeserializer {
                     let expr = if i + 1 == var_idx {
                         self.read_variable_expression(executable)?.ok_or(DeserializationErrorType::NoExpression)?
                     } else {
-                        self.deserialize_expression(executable)?.unwrap()
+                        self.deserialize_expression(executable)?.ok_or(DeserializationErrorType::NoExpression)?
                     };
                     arguments.push(expr);
                 }
@@ -301,6 +307,16 @@ impl PPEDeserializer {
     ///
     /// This function will return an error if .
     pub fn deserialize_expression(&mut self, executable: &Executable) -> Result<Option<PPEExpr>, DeserializationErrorType> {
+        if self.expression_depth >= MAX_EXPRESSION_DEPTH {
+            return Err(DeserializationErrorType::ExpressionNestingTooDeep(MAX_EXPRESSION_DEPTH));
+        }
+        self.expression_depth += 1;
+        let result = self.deserialize_expression_inner(executable);
+        self.expression_depth -= 1;
+        result
+    }
+
+    fn deserialize_expression_inner(&mut self, executable: &Executable) -> Result<Option<PPEExpr>, DeserializationErrorType> {
         self.expr_offset = self.offset;
 
         loop {
@@ -468,8 +484,12 @@ impl PPEDeserializer {
                     continue;
                 }
 
-                let func = -id as usize;
-                let func_def = &FUNCTION_DEFINITIONS[func];
+                let Some(func) = id.checked_neg().map(|id| id as usize) else {
+                    return Err(DeserializationErrorType::InvalidExpressionStackState);
+                };
+                let Some(func_def) = FUNCTION_DEFINITIONS.get(func) else {
+                    return Err(DeserializationErrorType::InvalidExpressionStackState);
+                };
                 match func_def.signature {
                     FunctionSignature::UnaryOp => {
                         self.offset += 1;
@@ -502,6 +522,8 @@ impl PPEDeserializer {
                         }
                     }
                     FunctionSignature::Invalid => {
+                        // Consuming the opcode keeps a corrupt PPE from repeating this word forever.
+                        self.offset += 1;
                         self.push_expr(PPEExpr::PredefinedFunctionCall(func_def, vec![]));
                     }
                     FunctionSignature::FixedParameters(count) => {

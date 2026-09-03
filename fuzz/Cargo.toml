@@ -1,0 +1,36 @@
+[package]
+name = "icy_board-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+icy_board_engine = { path = "../crates/icy_board_engine" }
+
+[[bin]]
+name = "ppe_load"
+path = "fuzz_targets/ppe_load.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "ppe_decompile"
+path = "fuzz_targets/ppe_decompile.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "ppe_structured"
+path = "fuzz_targets/ppe_structured.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]
+members = ["."]

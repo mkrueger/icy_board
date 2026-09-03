@@ -17,6 +17,7 @@ use crate::{
 use super::{ExecutableError, GenericVariableData, LAST_PPE_RUNTIME, PPEExpr, PPEScript, VariableData, VariableNameGenerator, VariableType, VariableValue};
 
 pub const VARIABLE_FLAG_DYNAMIC_ARRAY: u8 = 0x01;
+pub(crate) const MAX_DESERIALIZED_ARRAY_ELEMENTS: usize = 1_000_000;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct RecordField {
@@ -76,6 +77,16 @@ impl Display for VarHeader {
 }
 
 impl VarHeader {
+    pub(crate) fn allocated_elements(&self) -> Option<usize> {
+        if self.flags & VARIABLE_FLAG_DYNAMIC_ARRAY != 0 || self.dim == 0 {
+            return Some(0);
+        }
+        let bounds = [self.vector_size, self.matrix_size, self.cube_size];
+        bounds[..self.dim as usize]
+            .iter()
+            .try_fold(1usize, |count, bound| count.checked_mul(bound.checked_add(1)?))
+    }
+
     /// .
     ///
     /// # Errors
@@ -449,8 +460,12 @@ impl VariableTable {
     /// This function will return an error if .
     pub fn deserialize(version: u16, buf: &mut [u8]) -> Res<(usize, Self)> {
         let mut i = 0;
-        let max_var = u16::from_le_bytes((buf[i..=(i + 1)]).try_into()?) as usize;
+        let Some(max_var_bytes) = buf.get(i..i + 2) else {
+            return Err(Box::new(ExecutableError::BufferTooShort(buf.len())));
+        };
+        let max_var = u16::from_le_bytes(max_var_bytes.try_into()?) as usize;
         i += 2;
+        let mut allocated_elements = 0usize;
 
         let mut result = vec![TableEntry::default(); max_var];
         if max_var == 0 {
@@ -465,10 +480,28 @@ impl VariableTable {
         }
         let mut var_count = max_var as i32 - 1;
         while var_count >= 0 {
-            decrypt_chunks(&mut (buf[i..(i + 11)]), version, false);
-            let cur_block = &buf[i..(i + 11)];
+            let Some(header_end) = i.checked_add(11) else {
+                return Err(Box::new(ExecutableError::BufferTooShort(buf.len())));
+            };
+            let Some(cur_block) = buf.get_mut(i..header_end) else {
+                return Err(Box::new(ExecutableError::BufferTooShort(buf.len())));
+            };
+            decrypt_chunks(cur_block, version, false);
             i += 11;
-            let header = VarHeader::from_bytes(cur_block)?;
+            let header = VarHeader::from_bytes(&buf[i - 11..i])?;
+            let elements = header
+                .allocated_elements()
+                .ok_or(ExecutableError::ArrayAllocationTooLarge(usize::MAX, MAX_DESERIALIZED_ARRAY_ELEMENTS))?;
+            let total_elements = allocated_elements
+                .checked_add(elements)
+                .ok_or(ExecutableError::ArrayAllocationTooLarge(usize::MAX, MAX_DESERIALIZED_ARRAY_ELEMENTS))?;
+            if total_elements > MAX_DESERIALIZED_ARRAY_ELEMENTS {
+                return Err(Box::new(ExecutableError::ArrayAllocationTooLarge(
+                    total_elements,
+                    MAX_DESERIALIZED_ARRAY_ELEMENTS,
+                )));
+            }
+            allocated_elements = total_elements;
 
             if header.id > max_var {
                 log::warn!("Variable count exceeds maximum: {} ({})", header.id, max_var);
@@ -481,14 +514,25 @@ impl VariableTable {
             let entry_type;
             match header.variable_type {
                 VariableType::String => {
-                    let string_length = u16::from_le_bytes((buf[i..=i + 1]).try_into()?) as usize;
+                    let Some(length_bytes) = buf.get(i..i + 2) else {
+                        return Err(Box::new(ExecutableError::BufferTooShort(buf.len())));
+                    };
+                    let string_length = u16::from_le_bytes(length_bytes.try_into()?) as usize;
                     i += 2;
-                    decrypt_chunks(&mut (buf[i..(i + string_length)]), version, false);
+                    let Some(string_end) = i.checked_add(string_length) else {
+                        return Err(Box::new(ExecutableError::BufferTooShort(buf.len())));
+                    };
+                    let Some(string_bytes) = buf.get_mut(i..string_end) else {
+                        return Err(Box::new(ExecutableError::BufferTooShort(buf.len())));
+                    };
+                    decrypt_chunks(string_bytes, version, false);
                     let generic_data = if header.dim > 0 {
                         header.create_generic_data()
                     } else {
+                        // The stored length counts the terminating NUL, an empty constant has none.
+                        let text_end = if string_length > 0 { string_end - 1 } else { i };
                         let mut str = String::new();
-                        for c in &buf[i..(i + string_length - 1)] {
+                        for c in &buf[i..text_end] {
                             str.push(CP437_TO_UNICODE[*c as usize]);
                         }
                         Some(GenericVariableData::String(std::sync::Arc::new(str)))
@@ -498,7 +542,7 @@ impl VariableTable {
                         generic_data: generic_data.unwrap_or(GenericVariableData::None),
                         ..Default::default()
                     };
-                    i += string_length;
+                    i = string_end;
                     entry_type = EntryType::Constant;
                 }
 
@@ -506,11 +550,16 @@ impl VariableTable {
                     if version <= 100 {
                         return Err(Box::new(ExecutableError::FunctionsNotSupported(version)));
                     }
+                    let block_size = if version < 340 { 12 } else { 10 };
+                    let Some(block_end) = i.checked_add(block_size) else {
+                        return Err(Box::new(ExecutableError::BufferTooShort(buf.len())));
+                    };
+                    let Some(block) = buf.get_mut(i..block_end) else {
+                        return Err(Box::new(ExecutableError::BufferTooShort(buf.len())));
+                    };
+                    decrypt_chunks(block, version, false);
                     if version < 340 {
-                        decrypt_chunks(&mut buf[i..(i + 12)], version, false);
                         i += 2; // SKIP VTABLE - seems ot get stored by accident.
-                    } else {
-                        decrypt_chunks(&mut buf[i..(i + 10)], version, false);
                     }
 
                     let cur_buf = &buf[i..(i + 10)];
@@ -537,6 +586,9 @@ impl VariableTable {
 
                 _ => {
                     if version <= 100 {
+                        if i.checked_add(8).is_none_or(|end| end > buf.len()) {
+                            return Err(Box::new(ExecutableError::BufferTooShort(buf.len())));
+                        }
                         i += 2; // SKIP VTABLE - seems to get stored by accident.
                         let vtype: VariableType = VariableType::from_byte(buf[i]);
                         if vtype != header.variable_type {
@@ -569,11 +621,16 @@ impl VariableTable {
                         };
                         i += 4;
                     } else {
+                        let block_size = if version < 340 { 12 } else { 10 };
+                        let Some(block_end) = i.checked_add(block_size) else {
+                            return Err(Box::new(ExecutableError::BufferTooShort(buf.len())));
+                        };
+                        let Some(block) = buf.get_mut(i..block_end) else {
+                            return Err(Box::new(ExecutableError::BufferTooShort(buf.len())));
+                        };
+                        decrypt_chunks(block, version, false);
                         if version < 340 {
-                            decrypt_chunks(&mut buf[i..(i + 12)], version, false);
                             i += 2; // SKIP VTABLE - seems to get stored by accident.
-                        } else {
-                            decrypt_chunks(&mut buf[i..(i + 10)], version, false);
                         }
 
                         // check variable type
@@ -610,9 +667,23 @@ impl VariableTable {
             let cur = result[k].clone();
             match cur.header.variable_type {
                 VariableType::Function => unsafe {
-                    let ret = (cur.value.data.function_value.return_var as usize).saturating_sub(1);
-                    let last = cur.value.data.function_value.local_variables as usize + ret;
-                    if cur.value.data.function_value.start_offset > 0 {
+                    let function = cur.value.data.function_value;
+                    // A routine with no start offset owns nothing, so its ids are never read.
+                    if function.start_offset > 0 {
+                        if function.first_var_id < 0 || function.return_var < 0 {
+                            return Err(Box::new(ExecutableError::InvalidVariableIndexInTable(usize::MAX, result.len())));
+                        }
+                        let ret = (function.return_var as usize).saturating_sub(1);
+                        let owned_end = (function.first_var_id as usize)
+                            .checked_add(function.parameters as usize)
+                            .and_then(|end| end.checked_add(function.local_variables as usize))
+                            .ok_or(ExecutableError::InvalidVariableIndexInTable(usize::MAX, result.len()))?;
+                        let last = (function.local_variables as usize)
+                            .checked_add(ret)
+                            .ok_or(ExecutableError::InvalidVariableIndexInTable(usize::MAX, result.len()))?;
+                        if owned_end > result.len() || last > result.len() {
+                            return Err(Box::new(ExecutableError::InvalidVariableIndexInTable(owned_end.max(last), result.len())));
+                        }
                         for (j, i) in (cur.value.data.function_value.first_var_id as usize..last).enumerate() {
                             let fvar = &mut result[i];
                             if i == ret {
@@ -624,11 +695,19 @@ impl VariableTable {
                     }
                 },
                 VariableType::Procedure => unsafe {
+                    let procedure = cur.value.data.procedure_value;
                     let mut j = 0;
-                    let last = cur.value.data.procedure_value.local_variables as usize
-                        + cur.value.data.procedure_value.parameters as usize
-                        + cur.value.data.procedure_value.first_var_id as usize;
-                    if cur.value.data.procedure_value.start_offset > 0 {
+                    if procedure.start_offset > 0 {
+                        if procedure.first_var_id < 0 {
+                            return Err(Box::new(ExecutableError::InvalidVariableIndexInTable(usize::MAX, result.len())));
+                        }
+                        let last = (procedure.first_var_id as usize)
+                            .checked_add(procedure.parameters as usize)
+                            .and_then(|end| end.checked_add(procedure.local_variables as usize))
+                            .ok_or(ExecutableError::InvalidVariableIndexInTable(usize::MAX, result.len()))?;
+                        if last > result.len() {
+                            return Err(Box::new(ExecutableError::InvalidVariableIndexInTable(last, result.len())));
+                        }
                         (cur.value.data.procedure_value.first_var_id as usize..last).for_each(|i| {
                             let fvar = &mut result[i];
                             if j < cur.value.data.procedure_value.parameters as usize {
@@ -785,7 +864,7 @@ impl VariableTable {
     }
 
     pub fn try_get_value(&self, id: usize) -> Option<&VariableValue> {
-        if id > self.entries.len() {
+        if id == 0 || id > self.entries.len() {
             return None;
         }
         Some(self.get_value(id))
