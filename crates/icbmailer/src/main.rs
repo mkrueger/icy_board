@@ -294,7 +294,7 @@ fn toss(board: &mut IcyBoard) -> Res<()> {
     let report = toss_inbound(&board.ftn, &echo_areas(board), &target)?;
 
     println!(
-        "{} message(s) tossed, {} netmail, {} duplicate(s) dropped",
+        "{} echomail message(s) tossed, {} netmail, {} duplicate(s) dropped",
         report.imported, report.netmail, report.duplicates
     );
     if report.passed_through > 0 {
@@ -302,6 +302,9 @@ fn toss(board: &mut IcyBoard) -> Res<()> {
     }
     if report.orphans > 0 {
         println!("  {} packet(s) for another system left in the inbound", report.orphans);
+    }
+    for (recipient, count) in &report.unknown_netmail {
+        print_unknown_netmail_advice(board, recipient, *count);
     }
     for (tag, count) in &report.unknown {
         println!("  {} message(s) arrived for {}, which no area carries", count, tag);
@@ -311,6 +314,44 @@ fn toss(board: &mut IcyBoard) -> Res<()> {
     }
     register_new_areas(board, &report)?;
     Ok(())
+}
+
+fn print_unknown_netmail_advice(board: &IcyBoard, recipient: &str, count: usize) {
+    let sysop = &board.config.sysop.name;
+    println!(
+        "  WARNING: {} netmail message(s) for {:?} stored in {}",
+        count,
+        recipient,
+        board.ftn.bad_netmail.display()
+    );
+    if sysop.is_empty() {
+        println!("    Reason: Secure Netmail is enabled, but the board has no sysop name and no user name matches this recipient.");
+    } else {
+        println!(
+            "    Reason: Secure Netmail is enabled, but this recipient matches neither the configured sysop {:?} nor an Icy Board user name.",
+            sysop
+        );
+    }
+    if board.ftn.options.sysop_change {
+        if sysop.is_empty() {
+            println!("    Fix: configure a sysop name, use an existing user's exact name, or disable Secure Netmail (options.secure = false in ftn.toml).");
+        } else {
+            println!(
+                "    Fix: address the mail to {:?} or \"Sysop\", use an existing user's exact name, or disable Secure Netmail (options.secure = false in ftn.toml).",
+                sysop
+            );
+        }
+    } else if sysop.is_empty() {
+        println!(
+            "    Fix: configure a sysop name, use an existing user's exact name, enable Deliver To Sysop (options.sysop_change = true), or disable Secure Netmail (options.secure = false in ftn.toml)."
+        );
+    } else {
+        println!(
+            "    Fix: address the mail to {:?}, use an existing user's exact name, enable Deliver To Sysop (options.sysop_change = true) and address it to \"Sysop\", or disable Secure Netmail (options.secure = false in ftn.toml).",
+            sysop
+        );
+    }
+    println!("    Recipient matching ignores letter case, but spelling and spaces must otherwise match.");
 }
 
 /// An area the tosser created for a tag nobody carried is of no use until a

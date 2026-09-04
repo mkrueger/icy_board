@@ -31,9 +31,9 @@ setup needs. The usual order is scan, poll, toss.
 
 There are two kinds of mail. **Echomail** is public: it belongs to an area,
 every system carrying that area gets a copy, and it lands in the message base
-you tied to that area. **Netmail** is addressed to one person; Icy Board does
-not yet know which user that is, so all of it lands in one base for you to
-read.
+you tied to that area. **Netmail** is addressed to one person and normally
+lands in one base for the sysop to read. With secure netmail enabled, mail for
+an unknown recipient is kept in a separate base.
 
 
 The configuration file
@@ -49,7 +49,12 @@ link are configured.
    inbound = "ftn/inbound"
    outbound = "ftn/outbound"
    netmail = "ftn/netmail"
+   bad_netmail = "ftn/badmail"
    origin = "My Board * bbs.example.org"
+
+   [options]
+   secure = false
+   sysop_change = true
 
    [[aka]]
    address = "21:1/100"
@@ -75,6 +80,12 @@ Paths
 
 ``netmail``
    The message base arriving netmail is written to.
+
+``bad_netmail``
+   Where netmail for an unknown recipient is written while ``options.secure``
+   is enabled. A recipient is known only when its name matches the configured
+   sysop name or an Icy Board user name, ignoring letter case. This check is
+   based on the recipient name, not the FTN destination address.
 
 All three are relative to the board directory and are created for you.
 
@@ -118,6 +129,20 @@ you, or a downlink you feed.
 ``poll_minutes``
    Reserved for a scheduler that does not exist yet. Zero, the default, means
    the link is called only when you ask for it.
+
+Netmail options
+~~~~~~~~~~~~~~~
+
+``secure``
+   Keep netmail for unknown recipient names in ``bad_netmail``. Turn this off
+   to accept all incoming netmail into ``netmail``. Matching ignores letter
+   case, but spelling and spaces must otherwise match. If a message is kept
+   apart, the toss output shows the received name, the configured sysop name,
+   the destination base, and the settings that can fix it.
+
+``sysop_change``
+   Treat the conventional recipient ``Sysop`` as the configured sysop name.
+   This is enabled by default.
 
 
 Tying message areas to echos
@@ -180,7 +205,9 @@ running commentary.
    Messages carrying an id already seen in that area are dropped as
    duplicates; the same message reaching you over two paths is normal in
    fidonet. A file that cannot be read is left where it is and reported, so
-   nothing is lost to a truncated download.
+   nothing is lost to a truncated download. When secure netmail is enabled,
+   the summary also names unknown recipients whose mail was stored in the
+   bad-netmail base.
 
 ``show``
    Prints what is inside a packet or a bundle. ``-t`` prints the message text

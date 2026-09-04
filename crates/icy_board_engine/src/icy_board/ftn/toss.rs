@@ -53,6 +53,10 @@ pub struct TossReport {
     pub duplicates: usize,
     pub netmail: usize,
 
+    /// Recipient names that secure netmail did not recognize, and how many
+    /// messages were kept apart for each one.
+    pub unknown_netmail: BTreeMap<String, usize>,
+
     /// Tags that arrived for areas this board does not carry, and how many
     /// messages came with each of them.
     pub unknown: BTreeMap<String, usize>,
@@ -201,12 +205,16 @@ impl Tosser<'_> {
             message.to = self.target.sysop.clone();
         }
         let known = message.to.eq_ignore_ascii_case(&self.target.sysop) || self.target.users.iter().any(|name| name.eq_ignore_ascii_case(&message.to));
-        let base = if self.config.options.secure && !known {
+        let unknown = self.config.options.secure && !known;
+        let base = if unknown {
             self.config.bad_netmail.clone()
         } else {
             self.config.netmail.clone()
         };
         self.import(&message, &base, false, report)?;
+        if unknown {
+            *report.unknown_netmail.entry(message.to.clone()).or_default() += 1;
+        }
         report.netmail += 1;
         Ok(())
     }
@@ -889,6 +897,7 @@ mod tests {
         let report = toss_inbound(&config, &[], &target).unwrap();
 
         assert_eq!(report.netmail, 2);
+        assert_eq!(report.unknown_netmail.get("Nobody Here"), Some(&1));
         assert_eq!(JamMessageBase::open(&config.bad_netmail).unwrap().active_messages(), 1);
         let base = JamMessageBase::open(&config.netmail).unwrap();
         assert_eq!(base.read_header(1).unwrap().to().unwrap().to_string(), "The Sysop");

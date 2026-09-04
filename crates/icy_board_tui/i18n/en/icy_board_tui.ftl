@@ -3803,7 +3803,11 @@ ftn_mail_label=Netmail
 
 ftn_secure=Secure Netmail
 ftn_secure-status=Keep netmail for an unknown name apart
-ftn_secure-help=Netmail addressed to a name no user carries goes to a base of its own instead of the netmail the sysop reads.
+ftn_secure-help=
+    Netmail addressed to a name that matches neither the configured sysop nor
+    an Icy Board user goes to the Unknown Netmail base. Matching ignores letter
+    case, but spelling and spaces must otherwise match. Mail addressed to
+    "Sysop" matches when Deliver To Sysop is enabled.
 
 ftn_sysop_change=Deliver To Sysop
 ftn_sysop_change-status=Netmail to "Sysop" goes to the name the sysop reads under
