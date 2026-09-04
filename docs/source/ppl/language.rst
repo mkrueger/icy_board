@@ -660,6 +660,24 @@ array, so use ``Len()`` for its byte count and conversion members for text::
     PRINTLN raw.ToHex()        ; 00FF
     PRINTLN raw.ToBase64()     ; AP8=
 
+Binary file channels preserve the blob without text conversion. ``FREAD``
+requires exactly the requested byte count; a short read stores an empty
+``BYTES`` and sets ``FERR(channel)``. ``FWRITE`` writes the complete blob and
+pads it with zero bytes when its ``size`` argument is larger. ``FDREAD`` and
+``FDWRITE`` do the same through the default channels selected by ``FDEFIN`` and
+``FDEFOUT``::
+
+    BYTES source = Bytes.FromBase64("AEEAf/8=")
+    FCREATE 1, "binary.dat", O_WR, S_DN
+    FWRITE 1, source, source.Len()
+    FCLOSE 1
+
+    BYTES target
+    FOPEN 1, "binary.dat", O_RD, S_DN
+    FREAD 1, target, 5
+    FCLOSE 1
+    PRINTLN target.ToHex()     ; 0041007FFF
+
 ``FromBase64`` accepts padded and unpadded Base64 and ignores ASCII whitespace,
 which permits MIME-wrapped input. Invalid input returns empty ``BYTES`` and
 reports ``ErrKind.String`` with ``ErrCode.Format``. ``ToString()`` performs

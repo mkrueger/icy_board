@@ -1311,6 +1311,25 @@ PRINTLN LEN(raw)         ' 7
 PRINTLN raw.ToString()   ' Grüße
 ```
 
+Binary file channels read and write `BYTES` without text conversion. `FREAD`
+requires exactly the requested number of bytes; a short read stores an empty
+blob and sets `FERR(channel)`. `FWRITE` writes the complete blob and pads it
+with zero bytes when `size` is larger. `FDREAD` and `FDWRITE` provide the same
+operations through the channels selected by `FDEFIN` and `FDEFOUT`.
+
+```PPL
+BYTES source = Bytes.FromBase64("AEEAf/8=")
+FCREATE 1, "binary.dat", O_WR, S_DN
+FWRITE 1, source, source.Len()
+FCLOSE 1
+
+BYTES target
+FOPEN 1, "binary.dat", O_RD, S_DN
+FREAD 1, target, 5
+FCLOSE 1
+PRINTLN target.ToHex()   ' 0041007FFF
+```
+
 ## Encoding and digest functions (4.00)
 
 `BASE64ENC(value)` encodes a `BYTES` blob as base64 text. A string argument is

@@ -176,3 +176,58 @@ fn reading_a_word_from_a_file_with_one_byte_left_does_not_end_the_ppe() {
     );
     assert_eq!(output, "w=0 err=1\nstill running\n");
 }
+
+#[test]
+fn bytes_round_trip_through_binary_file_channels() {
+    let output = run_ppl(
+        r#";$LANGVERSION 400
+        BYTES source = Bytes.FromBase64("AEEAf/8=")
+        FCREATE 1, "binary.dat", O_WR, S_DN
+        FWRITE 1, source, source.Len()
+        FCLOSE 1
+
+        BYTES target
+        FOPEN 1, "binary.dat", O_RD, S_DN
+        FREAD 1, target, 5
+        FCLOSE 1
+        PRINTLN target.ToHex()
+    "#,
+    );
+    assert_eq!(output, "0041007FFF\n");
+}
+
+#[test]
+fn bytes_round_trip_through_default_binary_channels() {
+    let output = run_ppl(
+        r#";$LANGVERSION 400
+        BYTES source = Bytes.FromBase64("AP8Q")
+        FCREATE 2, "binary.dat", O_WR, S_DN
+        FDEFOUT 2
+        FDWRITE source, source.Len()
+        FCLOSE 2
+
+        BYTES target
+        FOPEN 3, "binary.dat", O_RD, S_DN
+        FDEFIN 3
+        FDREAD target, 3
+        FCLOSE 3
+        PRINTLN target.ToHex()
+    "#,
+    );
+    assert_eq!(output, "00FF10\n");
+}
+
+#[test]
+fn a_short_bytes_read_returns_empty_and_sets_the_error_flag() {
+    let output = run_ppl_with_files(
+        r#";$LANGVERSION 400
+        BYTES target = Bytes.FromBase64("/w==")
+        FOPEN 1, "binary.dat", O_RD, S_DN
+        FREAD 1, target, 3
+        PRINTLN target.Len(), " ", FERR(1)
+        FCLOSE 1
+    "#,
+        &[("binary.dat", &[0, 1])],
+    );
+    assert_eq!(output, "0 1\n");
+}

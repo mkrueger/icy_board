@@ -1700,6 +1700,9 @@ async fn internal_fread(vm: &mut VirtualMachine<'_>, channel: i32, size: usize, 
     let result = vm.io.fread(channel, size)?;
 
     match val.get_type() {
+        VariableType::Bytes => {
+            vm.set_variable(arg, VariableValue::new_bytes(result)).await?;
+        }
         VariableType::String | VariableType::BigStr | VariableType::UnboundedString => {
             let mut vs = String::new();
             for c in result {
@@ -1841,6 +1844,7 @@ pub async fn fwriterec(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()>
 
 async fn internal_fwrite(vm: &mut VirtualMachine<'_>, channel: i32, val: VariableValue, size: usize) -> Res<()> {
     let mut v = match val.get_type() {
+        VariableType::Bytes => val.as_byte_slice().to_vec(),
         VariableType::String | VariableType::BigStr | VariableType::UnboundedString => val.as_string().as_bytes().to_vec(),
         VariableType::Boolean => {
             if val.as_bool() {
