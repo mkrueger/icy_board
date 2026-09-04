@@ -141,6 +141,19 @@ fn test_parens() {
 }
 
 #[test]
+fn a_legacy_group_closed_with_another_kind_is_reported() {
+    let warnings = lex_warnings(";$LANGVERSION 330\nPRINTLN values(0]\n");
+    assert!(warnings.iter().any(|warning| warning.contains("'(' is closed with ']'")), "{warnings:?}");
+}
+
+#[test]
+fn legacy_brackets_that_match_are_not_reported() {
+    // They are parentheses there, so a balanced pair means exactly what it says.
+    let warnings = lex_warnings(";$LANGVERSION 330\nPRINTLN values[0]\nPRINTLN other(1)\n");
+    assert!(warnings.is_empty(), "{warnings:?}");
+}
+
+#[test]
 fn test_identifier() {
     assert_eq!(Token::Identifier(unicase::Ascii::new("PRINT".to_string())), get_token("PRINT"));
 

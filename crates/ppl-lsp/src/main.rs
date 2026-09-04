@@ -157,7 +157,7 @@ impl LanguageServer for Backend {
                 code_lens_provider: Some(CodeLensOptions { resolve_provider: Some(false) }),
                 inlay_hint_provider: Some(OneOf::Left(true)),
                 code_action_provider: Some(CodeActionProviderCapability::Options(CodeActionOptions {
-                    code_action_kinds: Some(vec![CodeActionKind::QUICKFIX, UPGRADE_ACTION_KIND]),
+                    code_action_kinds: Some(vec![CodeActionKind::QUICKFIX, UPGRADE_ACTION_KIND, FIX_ALL_ACTION_KIND]),
                     work_done_progress_options: Default::default(),
                     resolve_provider: None,
                 })),
@@ -248,6 +248,7 @@ impl LanguageServer for Backend {
         };
         let mut actions = Vec::new();
         let mut braces: Option<Vec<(usize, usize)>> = None;
+        let mut parentheses: Option<Vec<(usize, usize)>> = None;
         let mut replaced_pairs = HashSet::new();
         for diagnostic in params.context.diagnostics {
             if !wanted(&params.context.only, &CodeActionKind::QUICKFIX) {
@@ -271,8 +272,8 @@ impl LanguageServer for Backend {
                     let Some(offset) = position_to_offset(&rope, diagnostic.range.start) else {
                         continue;
                     };
-                    let pairs = braces.get_or_insert_with(|| brace_pairs(&rope));
-                    let Some((key, edits)) = brace_pair_edits(&rope, pairs, offset, diagnostic.range) else {
+                    let pairs = braces.get_or_insert_with(|| delimiter_pairs(&rope, '{', '}'));
+                    let Some((key, edits)) = delimiter_pair_edits(&rope, pairs, offset, diagnostic.range, '{', ("(", ")")) else {
                         continue;
                     };
                     // Both halves report themselves, but the pair is one change.
@@ -280,6 +281,19 @@ impl LanguageServer for Backend {
                         continue;
                     }
                     ("Replace braces with parentheses", uri.clone(), edits)
+                }
+                "ppl.array-parentheses" => {
+                    let Some(offset) = position_to_offset(&rope, diagnostic.range.start) else {
+                        continue;
+                    };
+                    let pairs = parentheses.get_or_insert_with(|| delimiter_pairs(&rope, '(', ')'));
+                    let Some((key, edits)) = delimiter_pair_edits(&rope, pairs, offset, diagnostic.range, '(', ("[", "]")) else {
+                        continue;
+                    };
+                    if !replaced_pairs.insert(key) {
+                        continue;
+                    }
+                    ("Replace parentheses with brackets", uri.clone(), edits)
                 }
                 "ppl.obsolete-pow" => ("Replace ** with ^", uri.clone(), vec![TextEdit::new(diagnostic.range, "^".to_string())]),
                 "ppl.deprecated-bigstr" => (
@@ -331,7 +345,7 @@ impl LanguageServer for Backend {
                     };
                     ("Create missing routine implementation", uri.clone(), vec![edit])
                 }
-                "ppl.unknown-identifier" | "ppl.unknown-enum-member" | "ppl.unknown-record-field" | "ppl.next-identifier-mismatch" => {
+                "ppl.unknown-identifier" | "ppl.unknown-enum-member" | "ppl.unknown-record-field" | "ppl.next-identifier-mismatch" | "ppl.mixed-brackets" => {
                     let Some(replacement) = diagnostic.data.as_ref().and_then(|data| data.get("replacement")).and_then(Value::as_str) else {
                         continue;
                     };
@@ -405,6 +419,12 @@ impl LanguageServer for Backend {
             if let Some(action) = upgrade_action(&uri, &rope, language_version) {
                 actions.push(action);
             }
+        }
+        if wanted(&params.context.only, &FIX_ALL_ACTION_KIND)
+            && let Ok(path) = uri.to_file_path()
+            && let Ok(Some(action)) = self.get_ast(&uri, |ast, visitor| bracket_fix_all_action(&uri, &rope, &path, visitor, ast.language_version))
+        {
+            actions.push(action);
         }
         Ok((!actions.is_empty()).then_some(actions))
     }
@@ -688,6 +708,81 @@ const LAST_LEGACY_LANGUAGE_VERSION: u16 = 330;
 
 const UPGRADE_ACTION_KIND: CodeActionKind = CodeActionKind::new("source.upgrade.ppl");
 
+const FIX_ALL_ACTION_KIND: CodeActionKind = CodeActionKind::new("source.fixAll.ppl");
+
+/// Every bracket the file wants rewritten. Below 3.50 that is only a group closed with
+/// a kind other than the one that opened it; from 4.00 on it is an array indexed with
+/// parentheses, which cannot be told from a call.
+fn bracket_fix_all_action(uri: &Url, rope: &Rope, path: &Path, visitor: &SemanticVisitor, language_version: u16) -> Option<CodeActionOrCommand> {
+    let legacy = language_version < 350;
+    let mut mismatches: Vec<(core::ops::Range<usize>, &'static str)> = Vec::new();
+    let mut array_parentheses = Vec::new();
+    {
+        let reporter = visitor.errors.lock().unwrap();
+        for entry in &reporter.warnings {
+            if entry.file_name != path {
+                continue;
+            }
+            if legacy {
+                if let Some(LexingErrorType::MixedDelimiters(open, _)) = entry.error.downcast_ref::<LexingErrorType>() {
+                    let partner = match open {
+                        '[' => "]",
+                        '{' => "}",
+                        _ => ")",
+                    };
+                    mismatches.push((entry.span.clone(), partner));
+                }
+            } else if matches!(entry.error.downcast_ref::<ParserWarningType>(), Some(ParserWarningType::ArrayBracketsRequired))
+                || matches!(
+                    entry.error.downcast_ref::<CompilationWarningType>(),
+                    Some(CompilationWarningType::ArrayBracketsRequired)
+                )
+            {
+                array_parentheses.push(entry.span.clone());
+            }
+        }
+    }
+
+    let mut edits: Vec<TextEdit> = Vec::new();
+    if legacy {
+        for (span, partner) in mismatches {
+            let range = Range::new(offset_to_position(span.start, rope)?, offset_to_position(span.end, rope)?);
+            edits.push(TextEdit::new(range, partner.to_string()));
+        }
+    } else {
+        let pairs = delimiter_pairs(rope, '(', ')');
+        let mut replaced_pairs = HashSet::new();
+        for span in array_parentheses {
+            let reported = Range::new(offset_to_position(span.start, rope)?, offset_to_position(span.end, rope)?);
+            let Some((key, pair_edits)) = delimiter_pair_edits(rope, &pairs, span.start, reported, '(', ("[", "]")) else {
+                continue;
+            };
+            if replaced_pairs.insert(key) {
+                edits.extend(pair_edits);
+            }
+        }
+    }
+    if edits.is_empty() {
+        return None;
+    }
+    edits.sort_by_key(|edit| (edit.range.start.line, edit.range.start.character));
+
+    let title = if legacy {
+        "Close all groups with their own kind"
+    } else {
+        "Index all arrays with brackets"
+    };
+    Some(CodeActionOrCommand::CodeAction(CodeAction {
+        title: title.to_string(),
+        kind: Some(FIX_ALL_ACTION_KIND),
+        edit: Some(WorkspaceEdit {
+            changes: Some(HashMap::from([(uri.clone(), edits)])),
+            ..WorkspaceEdit::default()
+        }),
+        ..CodeAction::default()
+    }))
+}
+
 fn wanted(only: &Option<Vec<CodeActionKind>>, kind: &CodeActionKind) -> bool {
     match only {
         None => true,
@@ -774,6 +869,16 @@ fn legacy_upgrade_edits(path: &Path, rope: &Rope, language_version: u16) -> Opti
     let mut visitor = LegacyStatementVisitor { edits: Vec::new() };
     ast.visit(&mut visitor);
     rewrites.extend(visitor.edits);
+    // A legacy bracket is a parenthesis; the upgraded language would read it as indexing.
+    if ast.language_version < 350 {
+        for (offset, ch) in code_chars(rope) {
+            match ch {
+                '[' => rewrites.push((offset..offset + 1, "(")),
+                ']' => rewrites.push((offset..offset + 1, ")")),
+                _ => {}
+            }
+        }
+    }
     if rewrites.is_empty() {
         return None;
     }
@@ -1275,6 +1380,7 @@ fn diagnostic_details(
         match warning {
             ParserWarningType::ProcedureClosedWithEndFunc => "ppl.procedure-closed-with-endfunc",
             ParserWarningType::FunctionClosedWithEndProc => "ppl.function-closed-with-endproc",
+            ParserWarningType::ArrayBracketsRequired => "ppl.array-parentheses",
             ParserWarningType::NextIdentifierInvalid(expected, _) => {
                 data = Some(serde_json::json!({"replacement": expected.to_string()}));
                 "ppl.next-identifier-mismatch"
@@ -1289,12 +1395,22 @@ fn diagnostic_details(
                 Some('}') => "ppl.obsolete-brace-close",
                 _ => return (None, None),
             },
+            LexingErrorType::MixedDelimiters(open, _) => {
+                let partner = match open {
+                    '[' => "]",
+                    '{' => "}",
+                    _ => ")",
+                };
+                data = Some(serde_json::json!({"replacement": partner}));
+                "ppl.mixed-brackets"
+            }
             LexingErrorType::PowWillGetRemoved => "ppl.obsolete-pow",
             _ => return (None, None),
         }
     } else if let Some(warning) = error.downcast_ref::<CompilationWarningType>() {
         match warning {
             CompilationWarningType::UnusedLabel(_) => "ppl.unused-label",
+            CompilationWarningType::ArrayBracketsRequired => "ppl.array-parentheses",
             _ => return (None, None),
         }
     } else if let Some(error) = error.downcast_ref::<CompilationErrorType>() {
@@ -1700,11 +1816,10 @@ fn implementation_stub_edit(rope: &Rope, line: u32) -> Option<TextEdit> {
     Some(TextEdit::new(Range::new(at, at), format!("{separator}{header}\n{terminator}\n")))
 }
 
-/// Every brace pair a source holds, ignoring what only looks like one inside a
-/// string or a comment.
-fn brace_pairs(rope: &Rope) -> Vec<(usize, usize)> {
-    let mut pairs = Vec::new();
-    let mut open = Vec::new();
+/// The characters that are code, so that what only looks like a delimiter inside a
+/// string or a comment is left alone.
+fn code_chars(rope: &Rope) -> Vec<(usize, char)> {
+    let mut result = Vec::new();
     let mut quoted = false;
     let mut commented = false;
     let mut at_line_start = true;
@@ -1729,16 +1844,26 @@ fn brace_pairs(rope: &Rope) -> Vec<(usize, usize)> {
             '"' => quoted = true,
             ';' | '\'' => commented = true,
             '*' if at_line_start => commented = true,
-            '{' => open.push(offset),
-            '}' => {
-                if let Some(start) = open.pop() {
-                    pairs.push((start, offset));
-                }
-            }
-            _ => {}
+            _ => result.push((offset, ch)),
         }
         if !ch.is_whitespace() {
             at_line_start = false;
+        }
+    }
+    result
+}
+
+/// Every `open`/`close` pair a source holds.
+fn delimiter_pairs(rope: &Rope, open: char, close: char) -> Vec<(usize, usize)> {
+    let mut pairs = Vec::new();
+    let mut nesting = Vec::new();
+    for (offset, ch) in code_chars(rope) {
+        if ch == open {
+            nesting.push(offset);
+        } else if ch == close
+            && let Some(start) = nesting.pop()
+        {
+            pairs.push((start, offset));
         }
     }
     pairs
@@ -1748,21 +1873,26 @@ fn single_char_range(rope: &Rope, offset: usize) -> Option<Range> {
     Some(Range::new(offset_to_position(offset, rope)?, offset_to_position(offset + 1, rope)?))
 }
 
-fn brace_pair_edits(rope: &Rope, pairs: &[(usize, usize)], offset: usize, reported: Range) -> Option<(usize, Vec<TextEdit>)> {
+/// Rewrites the pair `offset` belongs to, keyed by its opening offset so that a
+/// delimiter and its partner do not ask for the same change twice.
+fn delimiter_pair_edits(
+    rope: &Rope,
+    pairs: &[(usize, usize)],
+    offset: usize,
+    reported: Range,
+    open: char,
+    replacement: (&str, &str),
+) -> Option<(usize, Vec<TextEdit>)> {
     let Some((start, end)) = pairs.iter().find(|(start, end)| *start == offset || *end == offset) else {
-        // A brace whose partner is missing is still worth turning into what it means.
-        let replacement = match rope.get_char(offset)? {
-            '{' => "(",
-            '}' => ")",
-            _ => return None,
-        };
-        return Some((offset, vec![TextEdit::new(reported, replacement.to_string())]));
+        // A delimiter whose partner is missing is still worth turning into what it means.
+        let half = if rope.get_char(offset)? == open { replacement.0 } else { replacement.1 };
+        return Some((offset, vec![TextEdit::new(reported, half.to_string())]));
     };
     Some((
         *start,
         vec![
-            TextEdit::new(single_char_range(rope, *start)?, "(".to_string()),
-            TextEdit::new(single_char_range(rope, *end)?, ")".to_string()),
+            TextEdit::new(single_char_range(rope, *start)?, replacement.0.to_string()),
+            TextEdit::new(single_char_range(rope, *end)?, replacement.1.to_string()),
         ],
     ))
 }

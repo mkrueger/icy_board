@@ -41,6 +41,9 @@ pub enum LexingErrorType {
     #[error("Don't use braces, they will get another meaning in the future. Use '(', ')' instead.")]
     DontUseBraces,
 
+    #[error("'{0}' is closed with '{1}' - before PPL 3.50 every bracket kind is a parenthesis, so this only looks like indexing")]
+    MixedDelimiters(char, char),
+
     #[error("BIGSTR is deprecated in PPL 4.00; use STRING instead")]
     BigStrDeprecated,
 
@@ -446,6 +449,9 @@ pub struct Lexer {
     /// True while the last read ran into the end of the file, so that putting it
     /// back does not step over a character that was never read.
     read_past_end: bool,
+    /// Which spelling opened each group still being read. Below 3.50 all three kinds
+    /// lex to the same token, so this is the only place their difference survives.
+    legacy_delimiters: Vec<char>,
     if_stack: Vec<IfFrame>,
 }
 
@@ -592,6 +598,7 @@ impl Lexer {
             token_start: 0,
             token_end: 0,
             read_past_end: false,
+            legacy_delimiters: Vec::new(),
             if_stack: Vec::new(),
         };
         if let Some(defines) = workspace.compiler.as_ref().and_then(|compiler| compiler.defines.as_ref()) {
@@ -604,6 +611,34 @@ impl Lexer {
 
     pub fn span(&self) -> std::ops::Range<usize> {
         self.token_start..self.token_end
+    }
+
+    fn open_legacy_delimiter(&mut self, open: char) {
+        if self.lang_version < 350 {
+            self.legacy_delimiters.push(open);
+        }
+    }
+
+    /// Before 3.50 a group may be closed with any of the three kinds, which reads as
+    /// indexing without being it. Only that mismatch is worth a word.
+    fn close_legacy_delimiter(&mut self, close: char) {
+        if self.lang_version >= 350 {
+            return;
+        }
+        let Some(open) = self.legacy_delimiters.pop() else {
+            return;
+        };
+        let partner = match open {
+            '[' => ']',
+            '{' => '}',
+            _ => ')',
+        };
+        if partner != close {
+            self.errors
+                .lock()
+                .unwrap()
+                .report_warning(self.token_start..self.token_end, LexingErrorType::MixedDelimiters(open, close));
+        }
     }
 
     /// The version the file declared for itself, or the one the workspace asked for.
@@ -1701,10 +1736,17 @@ impl Lexer {
                 let identifier = unicase::Ascii::new(self.text[self.byte_start + 1 + label_start..self.byte_end].to_string());
                 Some(Token::Label(identifier))
             }
-            '(' => Some(Token::LPar),
-            ')' => Some(Token::RPar),
+            '(' => {
+                self.open_legacy_delimiter('(');
+                Some(Token::LPar)
+            }
+            ')' => {
+                self.close_legacy_delimiter(')');
+                Some(Token::RPar)
+            }
             '[' => {
                 if self.lang_version < 350 {
+                    self.open_legacy_delimiter('[');
                     Some(Token::LPar)
                 } else {
                     Some(Token::LBracket)
@@ -1712,6 +1754,7 @@ impl Lexer {
             }
             ']' => {
                 if self.lang_version < 350 {
+                    self.close_legacy_delimiter(']');
                     Some(Token::RPar)
                 } else {
                     Some(Token::RBracket)
@@ -1723,6 +1766,7 @@ impl Lexer {
                         .lock()
                         .unwrap()
                         .report_warning(self.token_start..self.token_end, LexingErrorType::DontUseBraces);
+                    self.open_legacy_delimiter('{');
                     Some(Token::LPar)
                 } else {
                     Some(Token::LBrace)
@@ -1734,6 +1778,7 @@ impl Lexer {
                         .lock()
                         .unwrap()
                         .report_warning(self.token_start..self.token_end, LexingErrorType::DontUseBraces);
+                    self.close_legacy_delimiter('}');
                     Some(Token::RPar)
                 } else {
                     Some(Token::RBrace)

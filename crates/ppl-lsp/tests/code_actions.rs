@@ -118,6 +118,73 @@ fn nested_braces_are_replaced_pair_by_pair() {
 }
 
 #[test]
+fn a_group_closed_with_another_bracket_kind_can_be_fixed() {
+    let (mut server, _) = Server::ready();
+    let uri = "file:///tmp/mixed-brackets.pps";
+    // Before 3.50 every kind is a parenthesis, so only the mismatch is worth saying.
+    server.open(uri, ";$LANGVERSION 330\nINTEGER values(10)\nPRINTLN values(0]\n");
+    let diagnostics = server.diagnostics(uri);
+    let actions = actions(&mut server, uri, diagnostics.clone());
+
+    let action = actions
+        .as_array()
+        .and_then(|actions| actions.iter().find(|action| action["title"] == "Replace with )"))
+        .unwrap_or_else(|| panic!("diagnostics={diagnostics}, actions={actions}"));
+    assert_eq!(action["diagnostics"][0]["code"], "ppl.mixed-brackets");
+    let edit = &action["edit"]["changes"][uri][0];
+    assert_eq!(edit["newText"], ")");
+    assert_eq!(edit["range"]["start"], json!({"line": 2, "character": 16}));
+}
+
+#[test]
+fn brackets_that_match_are_left_alone_before_350() {
+    let (mut server, _) = Server::ready();
+    let uri = "file:///tmp/matching-brackets.pps";
+    server.open(uri, ";$LANGVERSION 330\nINTEGER values(10)\nPRINTLN values[0]\n");
+    let diagnostics = server.diagnostics(uri);
+
+    assert!(
+        !diagnostics.as_array().unwrap().iter().any(|d| d["code"] == "ppl.mixed-brackets"),
+        "a bracket is simply a parenthesis there: {diagnostics}"
+    );
+}
+
+#[test]
+fn an_array_indexed_with_parentheses_can_take_brackets() {
+    let (mut server, _) = Server::ready();
+    let uri = "file:///tmp/array-parentheses.pps";
+    server.open(uri, ";$LANGVERSION 400\nINTEGER values[10]\nPRINTLN values(0)\n");
+    let diagnostics = server.diagnostics(uri);
+    let actions = actions(&mut server, uri, diagnostics.clone());
+
+    let action = actions
+        .as_array()
+        .and_then(|actions| actions.iter().find(|action| action["title"] == "Replace parentheses with brackets"))
+        .unwrap_or_else(|| panic!("diagnostics={diagnostics}, actions={actions}"));
+    let edits = action["edit"]["changes"][uri].as_array().unwrap();
+    assert_eq!(edits.len(), 2, "{edits:?}");
+    assert_eq!(edits[0]["newText"], "[");
+    assert_eq!(edits[1]["newText"], "]");
+}
+
+#[test]
+fn every_array_parenthesis_can_be_replaced_at_once() {
+    let (mut server, _) = Server::ready();
+    let uri = "file:///tmp/array-parentheses-all.pps";
+    server.open(uri, ";$LANGVERSION 400\nINTEGER values[10]\nPRINTLN values(0)\nPRINTLN values(1)\n");
+    let diagnostics = server.diagnostics(uri);
+    let actions = actions(&mut server, uri, diagnostics.clone());
+
+    let action = actions
+        .as_array()
+        .and_then(|actions| actions.iter().find(|action| action["title"] == "Index all arrays with brackets"))
+        .unwrap_or_else(|| panic!("diagnostics={diagnostics}, actions={actions}"));
+    assert_eq!(action["kind"], "source.fixAll.ppl");
+    let edits = action["edit"]["changes"][uri].as_array().unwrap();
+    assert_eq!(edits.len(), 4, "both accesses are two edits each: {edits:?}");
+}
+
+#[test]
 fn an_obsolete_power_operator_can_be_replaced() {
     let (mut server, _) = Server::ready();
     let uri = "file:///tmp/power.pps";
