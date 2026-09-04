@@ -8,6 +8,21 @@ use super::{ErrorHandler, ReturnAddress, VMError, VirtualMachine};
 impl VirtualMachine<'_> {
     #[allow(clippy::needless_range_loop)]
     pub(super) async fn prepare_call(&mut self, locals: usize, parameters: usize, first: usize, arguments: &[PPEExpr], pass_flags: u16) -> Res<()> {
+        if parameters <= 1 {
+            let value = match (parameters, arguments.first()) {
+                (1, Some(argument)) => Some(self.eval_expr(argument).await?),
+                _ => None,
+            };
+            self.save_call_frame(locals, parameters, first);
+            if let Some(value) = value {
+                self.variable_table.set_value(first, value);
+                if pass_flags & 1 != 0 {
+                    self.write_back_stack.push(arguments[0].clone());
+                }
+            }
+            return Ok(());
+        }
+
         let mut values = Vec::with_capacity(parameters);
         for argument in arguments.iter().take(parameters) {
             values.push(self.eval_expr(argument).await?);
@@ -44,8 +59,15 @@ impl VirtualMachine<'_> {
     }
 
     pub(super) fn goto(&mut self, label: usize) -> Result<(), VMError> {
+        if let Some((cached_label, statement)) = self.last_jump
+            && cached_label == label
+        {
+            self.cur_ptr = statement;
+            return Ok(());
+        }
         if let Some(statement) = self.label_table.get(&label) {
             self.cur_ptr = *statement;
+            self.last_jump = Some((label, *statement));
             Ok(())
         } else {
             Err(VMError::LabelNotFound(label))

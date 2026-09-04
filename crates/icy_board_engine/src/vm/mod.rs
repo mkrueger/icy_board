@@ -118,6 +118,7 @@ pub struct VirtualMachine<'a> {
     pub user_types: Vec<Vec<crate::executable::RecordField>>,
 
     pub label_table: HashMap<usize, usize>,
+    last_jump: Option<(usize, usize)>,
     pub push_pop_stack: Vec<VariableValue>,
     foreach_stack: Vec<ForEachFrame>,
 
@@ -179,6 +180,7 @@ impl<'a> VirtualMachine<'a> {
             variable_table: VariableTable::default(),
             cur_ptr: 0,
             label_table: HashMap::new(),
+            last_jump: None,
             call_local_value_stack: Vec::new(),
             write_back_stack: Vec::new(),
             user_types: Vec::new(),
@@ -868,8 +870,14 @@ impl VirtualMachine<'_> {
                         }
 
                         // get write back values
+                        let single_pass_value = if pass_flags.count_ones() == 1 {
+                            let parameter = pass_flags.trailing_zeros() as usize;
+                            (parameter < parameters).then(|| self.variable_table.get_value(first + parameter).clone())
+                        } else {
+                            None
+                        };
                         let mut pass_values = Vec::new();
-                        if pass_flags > 0 {
+                        if pass_flags > 0 && single_pass_value.is_none() {
                             for i in 0..parameters {
                                 if 1u16.checked_shl(i as u32).is_some_and(|mask| mask & pass_flags != 0) {
                                     let id = first + i;
@@ -892,7 +900,13 @@ impl VirtualMachine<'_> {
                             }
                         }
 
-                        if pass_flags > 0 {
+                        if let Some(value) = single_pass_value {
+                            if let Some(argument_expr) = self.write_back_stack.pop() {
+                                self.set_variable(&argument_expr, value).await?;
+                            } else {
+                                return Err(VMError::WriteBackStackEmpty.into());
+                            }
+                        } else if pass_flags > 0 {
                             for i in (0..parameters).rev() {
                                 if 1u16.checked_shl(i as u32).is_some_and(|mask| mask & pass_flags != 0) {
                                     let Some(val) = pass_values.pop() else {

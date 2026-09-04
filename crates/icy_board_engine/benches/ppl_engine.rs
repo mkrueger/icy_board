@@ -96,6 +96,32 @@ PROCEDURE AddOne(VAR INTEGER value)
 ENDPROC
 "#;
 
+const PROCEDURE_NO_ARGS_SOURCE: &str = r#";$LANGVERSION 400
+DECLARE PROCEDURE Tick()
+INTEGER i, total
+FOR i = 1 TO 25000
+    Tick()
+    total = total + 1
+NEXT
+IF total = 2147483647 STOP
+
+PROCEDURE Tick()
+ENDPROC
+"#;
+
+const PROCEDURE_VALUE_SOURCE: &str = r#";$LANGVERSION 400
+DECLARE PROCEDURE Consume(INTEGER value)
+INTEGER i, total
+FOR i = 1 TO 25000
+    total = total + 1
+    Consume(total)
+NEXT
+IF total = 2147483647 STOP
+
+PROCEDURE Consume(INTEGER value)
+ENDPROC
+"#;
+
 const STRING_SOURCE: &str = r#";$LANGVERSION 400
 STRING text = STRING.Repeat("x", 4096)
 INTEGER i, total
@@ -573,6 +599,8 @@ fn vm_benchmarks(criterion: &mut Criterion) {
         ("function_calls_no_args_25k", CALL_NO_ARGS_SOURCE, 25_000, 0),
         ("function_calls_25k", CALL_SOURCE, 25_000, 0),
         ("function_calls_locals_25k", CALL_LOCALS_SOURCE, 25_000, 0),
+        ("procedure_calls_no_args_25k", PROCEDURE_NO_ARGS_SOURCE, 25_000, 0),
+        ("procedure_calls_value_25k", PROCEDURE_VALUE_SOURCE, 25_000, 0),
         ("procedure_calls_var_25k", CALL_VAR_SOURCE, 25_000, 0),
         ("conversions_100k", CONVERSION_SOURCE, 100_000, 0),
         ("string_members_1k", STRING_SOURCE, 1_000, 0),
