@@ -17,7 +17,7 @@ use jamjam::{
 use serde::{Deserialize, Serialize};
 
 use super::{
-    FtnAka, FtnConfig, FtnLink, bundle,
+    Context, FtnAka, FtnConfig, FtnLink, bundle,
     packet::{self, PackedMessage, Packet, PacketHeader},
 };
 use std::fmt::Write as _;
@@ -91,8 +91,8 @@ pub fn toss_inbound(config: &FtnConfig, areas: &AreaMap, target: &TossTarget) ->
     };
 
     let mut files = Vec::new();
-    for entry in fs::read_dir(&config.inbound)? {
-        let entry = entry?;
+    for entry in fs::read_dir(&config.inbound).context(|| format!("Cannot read the inbound {}", config.inbound.display()))? {
+        let entry = entry.context(|| format!("Cannot read the inbound {}", config.inbound.display()))?;
         if entry.file_type()?.is_file() {
             files.push(entry.path());
         }
@@ -111,7 +111,7 @@ pub fn toss_inbound(config: &FtnConfig, areas: &AreaMap, target: &TossTarget) ->
             continue;
         };
         match result {
-            Ok(true) => fs::remove_file(&file)?,
+            Ok(true) => fs::remove_file(&file).context(|| format!("Cannot remove {} now that it has been tossed", file.display()))?,
             // Mail for somebody else stays where it is, and so does what could
             // not be read. Throwing away mail nobody has seen is worse than
             // asking the sysop to look at it.
@@ -135,26 +135,54 @@ struct Tosser<'a> {
 
 impl Tosser<'_> {
     fn bundle(&mut self, file: &Path, report: &mut TossReport) -> Res<bool> {
-        let work = tempfile::tempdir_in(&self.config.inbound)?;
+        let work = tempfile::tempdir_in(&self.config.inbound).context(|| {
+            format!(
+                "Cannot create a working directory in the inbound {} to unpack {}",
+                self.config.inbound.display(),
+                file.display()
+            )
+        })?;
         let mut done = true;
-        for packet in bundle::unpack(file, work.path())? {
-            let Some(name) = packet.file_name().and_then(|name| name.to_str()).map(str::to_ascii_lowercase) else {
+        for path in bundle::unpack(file, work.path())? {
+            let Some(name) = path.file_name().and_then(|name| name.to_str()).map(str::to_ascii_lowercase) else {
                 continue;
             };
             if !bundle::is_packet(&name) {
-                log::warn!("{} carries {}, which is not mail", file.display(), name);
+                log::warn!(
+                    "{} carries {}, which is not a packet. The bundle is left in the inbound so the file can be inspected or recovered by hand",
+                    file.display(),
+                    name
+                );
+                done = false;
                 continue;
             }
-            done &= self.packet(&packet, report)?;
+            // The unpacked packet lives in a working directory, so its own path
+            // would name a file the sysop can no longer look at.
+            let bytes = fs::read(&path).context(|| format!("Cannot read {} unpacked from the bundle {}", name, file.display()))?;
+            let packet = Packet::read(&bytes).context(|| format!("Cannot read {} out of the bundle {}", name, file.display()))?;
+            done &= self.toss_packet(packet, &format!("{} out of {}", name, file.display()), report)?;
         }
         Ok(done)
     }
 
     fn packet(&mut self, file: &Path, report: &mut TossReport) -> Res<bool> {
-        let mut packet = Packet::load(file)?;
+        let packet = Packet::load(file)?;
+        let name = file.display().to_string();
+        self.toss_packet(packet, &name, report)
+    }
+
+    /// `where_from` names the mail the way the sysop met it, which is the
+    /// bundle for a packet that only ever existed while it was being unpacked.
+    fn toss_packet(&mut self, mut packet: Packet, where_from: &str, report: &mut TossReport) -> Res<bool> {
         self.complete(&mut packet.header.orig);
         self.complete(&mut packet.header.dest);
         if !self.config.options.process_orphan && !self.config.akas.is_empty() && !self.config.answers_to(&packet.header.dest) {
+            log::warn!(
+                "{} is addressed to {} and this board answers to {}, so it is left in the inbound. Add that address as an aka, or turn on Toss Orphans to read mail meant for another system",
+                where_from,
+                packet.header.dest,
+                self.config.akas.iter().map(FtnAka::to_5d).collect::<Vec<_>>().join(", ")
+            );
             report.orphans += 1;
             return Ok(false);
         }
@@ -378,12 +406,12 @@ impl OpenBases {
 
 fn open_base(path: &Path) -> Res<JamMessageBase> {
     if path.with_extension("jhr").exists() {
-        return Ok(JamMessageBase::open(path)?);
+        return JamMessageBase::open(path).context(|| format!("Cannot open the message base {}", path.display()));
     }
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)?;
+        fs::create_dir_all(parent).context(|| format!("Cannot create the directory {} the message base belongs in", parent.display()))?;
     }
-    Ok(JamMessageBase::create(path)?)
+    JamMessageBase::create(path).context(|| format!("Cannot create the message base {}", path.display()))
 }
 
 /// The lines a message carries for the machines rather than for the reader.
@@ -460,12 +488,19 @@ impl ScanState {
         if !path.exists() {
             return Ok(Self::default());
         }
-        Ok(toml::from_str(&fs::read_to_string(path)?)?)
+        let text = fs::read_to_string(&path).context(|| format!("Cannot read {}, which holds how far the last scan got", path.display()))?;
+        toml::from_str(&text).context(|| {
+            format!(
+                "Cannot read {}, which holds how far the last scan got. Deleting it makes the next scan start from where the bases stand now",
+                path.display()
+            )
+        })
     }
 
     fn save(&self, config: &FtnConfig) -> Res<()> {
-        fs::create_dir_all(&config.outbound)?;
-        fs::write(Self::path(config), toml::to_string_pretty(self)?)?;
+        fs::create_dir_all(&config.outbound).context(|| format!("Cannot create the outbound {}", config.outbound.display()))?;
+        let path = Self::path(config);
+        fs::write(&path, toml::to_string_pretty(self)?).context(|| format!("Cannot write {}, which holds how far this scan got", path.display()))?;
         Ok(())
     }
 }
@@ -501,7 +536,7 @@ pub fn scan_outbound(config: &FtnConfig, areas: &AreaMap, now: &NaiveDateTime) -
         if subscribers.is_empty() || !path.with_extension("jhr").exists() {
             continue;
         }
-        let mut base = JamMessageBase::open(path)?;
+        let mut base = JamMessageBase::open(path).context(|| format!("Cannot open the message base {} carrying {}", path.display(), tag))?;
         let high = base.highest_message_number();
         let Some(last) = state.exported.get(tag).copied() else {
             // Nothing was ever sent out of this area, and handing a link the
@@ -535,10 +570,12 @@ pub fn scan_outbound(config: &FtnConfig, areas: &AreaMap, now: &NaiveDateTime) -
                 header.sub_fields.push(MessageSubfield::new(SubfieldType::MsgID, BString::from(id.as_str())));
                 // The id is written back so that a reply arriving for it
                 // still finds the message it belongs to.
-                raw::update_header(&mut base, number, &header)?;
+                raw::update_header(&mut base, number, &header).context(|| format!("Cannot stamp message {number} of {tag} with a message id"))?;
                 id
             };
-            let text = base.read_message_text(&header)?;
+            let text = base
+                .read_message_text(&header)
+                .context(|| format!("Cannot read message {number} of {tag} out of {}", path.display()))?;
             let message = PackedMessage {
                 orig: aka.address,
                 dest: EchomailAddress::default(),
@@ -584,7 +621,7 @@ pub fn scan_outbound(config: &FtnConfig, areas: &AreaMap, now: &NaiveDateTime) -
 /// Puts what is waiting for one link into a bundle of its own.
 fn deliver(config: &FtnConfig, link: &FtnLink, aka: &FtnAka, mut messages: Vec<PackedMessage>, now: &NaiveDateTime) -> Res<PathBuf> {
     let directory = config.outbound_for(link);
-    fs::create_dir_all(&directory)?;
+    fs::create_dir_all(&directory).context(|| format!("Cannot create the outbound {} of {}", directory.display(), link.to_5d()))?;
 
     for message in &mut messages {
         message.orig = aka.address;
@@ -593,11 +630,11 @@ fn deliver(config: &FtnConfig, link: &FtnLink, aka: &FtnAka, mut messages: Vec<P
     let mut packet = Packet::new(PacketHeader::new(aka.address, link.address, *now, &link.password));
     packet.messages = messages;
 
-    let work = tempfile::tempdir_in(&directory)?;
+    let work = tempfile::tempdir_in(&directory).context(|| format!("Cannot create a working directory in the outbound {}", directory.display()))?;
     let written = work.path().join(bundle::packet_name(now));
-    packet.save(&written)?;
+    packet.save(&written).context(|| format!("Cannot pack the mail waiting for {}", link.to_5d()))?;
     let name = bundle::next_bundle(&directory, &aka.address, &link.address, now)?;
-    bundle::pack(&[written], &name)?;
+    bundle::pack(&[written], &name).context(|| format!("Cannot bundle the mail waiting for {}", link.to_5d()))?;
     Ok(name)
 }
 
@@ -942,6 +979,43 @@ mod tests {
 
         assert_eq!(report.failed.len(), 1);
         assert!(broken.exists());
+        assert!(report.failed[0].1.contains("12345678.pkt"), "{}", report.failed[0].1);
+        assert!(report.failed[0].1.contains("not all here"), "{}", report.failed[0].1);
+    }
+
+    #[test]
+    fn test_a_broken_packet_inside_a_bundle_is_reported_under_the_name_it_arrived_as() {
+        let directory = tempfile::tempdir().unwrap();
+        let config = config(directory.path());
+        fs::create_dir_all(&config.inbound).unwrap();
+        let loose = directory.path().join("00000001.pkt");
+        fs::write(&loose, b"not a packet at all").unwrap();
+        let arrived = config.inbound.join("0000ff9d.su0");
+        bundle::pack(&[loose], &arrived).unwrap();
+
+        let report = toss(&config, &[]);
+
+        assert_eq!(report.failed.len(), 1);
+        let complaint = &report.failed[0].1;
+        assert!(complaint.contains("00000001.pkt"), "{complaint}");
+        assert!(complaint.contains("0000ff9d.su0"), "{complaint}");
+        assert!(arrived.exists());
+    }
+
+    #[test]
+    fn test_a_bundle_with_an_unexpected_file_is_kept_for_the_sysop() {
+        let directory = tempfile::tempdir().unwrap();
+        let config = config(directory.path());
+        fs::create_dir_all(&config.inbound).unwrap();
+        let unexpected = directory.path().join("readme.txt");
+        fs::write(&unexpected, b"not packed mail").unwrap();
+        let arrived = config.inbound.join("0000ff9d.su0");
+        bundle::pack(&[unexpected], &arrived).unwrap();
+
+        let report = toss(&config, &[]);
+
+        assert!(report.failed.is_empty());
+        assert!(arrived.exists());
     }
 
     #[test]

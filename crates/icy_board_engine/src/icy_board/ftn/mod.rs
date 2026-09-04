@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 
 use super::IcyBoardSerializer;
+use crate::Res;
 
 pub mod bundle;
 pub mod packet;
@@ -13,6 +14,18 @@ pub mod toss;
 
 /// The port fidonet technology networks reserved for binkp.
 pub const DEFAULT_BINKP_PORT: u16 = icy_net::binkp::DEFAULT_PORT;
+
+/// A failure in the file system or in a parser says what went wrong but not
+/// which mail it was busy with, and that is the half the sysop needs.
+pub(crate) trait Context<T> {
+    fn context(self, what: impl FnOnce() -> String) -> Res<T>;
+}
+
+impl<T, E: Into<Box<dyn std::error::Error + Send + Sync>>> Context<T> for Result<T, E> {
+    fn context(self, what: impl FnOnce() -> String) -> Res<T> {
+        self.map_err(|err| format!("{}: {}", what(), err.into()).into())
+    }
+}
 
 /// One of the addresses this board answers to. A board that joined more than
 /// one network has one of these per network.

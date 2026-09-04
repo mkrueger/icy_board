@@ -3,7 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use super::FtnConfig;
+use super::{Context, FtnConfig, FtnLink};
 
 type Res<T> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
@@ -19,8 +19,8 @@ pub fn entries(config: &FtnConfig) -> Res<Vec<PathBuf>> {
             continue;
         }
         let mut waiting = Vec::new();
-        for entry in fs::read_dir(&directory)? {
-            let entry = entry?;
+        for entry in fs::read_dir(&directory).context(|| format!("Cannot read the outbound {} of {}", directory.display(), link.to_5d()))? {
+            let entry = entry.context(|| format!("Cannot read the outbound {} of {}", directory.display(), link.to_5d()))?;
             if entry.file_type()?.is_file() {
                 waiting.push(entry.path());
             }
@@ -38,15 +38,28 @@ pub fn add(config: &FtnConfig, address: &str, file: &Path) -> Res<PathBuf> {
         .iter()
         .find(|link| link.address.to_string().eq_ignore_ascii_case(address) || link.to_5d().eq_ignore_ascii_case(address))
     else {
-        return Err(format!("No link is configured for {address}").into());
+        let known: Vec<String> = config.links.iter().map(FtnLink::to_5d).collect();
+        return Err(if known.is_empty() {
+            format!("Nothing can be sent to {address}: ftn.toml configures no links at all").into()
+        } else {
+            format!(
+                "Nothing can be sent to {address}: no link answers to that address. Configured are {}",
+                known.join(", ")
+            )
+            .into()
+        });
     };
     let Some(name) = file.file_name() else {
-        return Err(format!("{} is not a file that can be sent", file.display()).into());
+        return Err(format!(
+            "{} cannot be sent: a file to hand over needs a name, and this path ends in a directory",
+            file.display()
+        )
+        .into());
     };
     let directory = config.outbound_for(link);
-    fs::create_dir_all(&directory)?;
+    fs::create_dir_all(&directory).context(|| format!("Cannot create the outbound {} of {}", directory.display(), link.to_5d()))?;
     let target = directory.join(name);
-    fs::copy(file, &target)?;
+    fs::copy(file, &target).context(|| format!("Cannot copy {} into the outbound of {}", file.display(), link.to_5d()))?;
     Ok(target)
 }
 
@@ -61,7 +74,7 @@ pub fn remove(config: &FtnConfig, record: usize) -> Res<bool> {
     let Some(file) = get(config, record)? else {
         return Ok(false);
     };
-    fs::remove_file(file)?;
+    fs::remove_file(&file).context(|| format!("Cannot remove {} from the outbound", file.display()))?;
     Ok(true)
 }
 

@@ -171,7 +171,12 @@ fn load(config: &Path) -> Res<IcyBoard> {
     let mut board = IcyBoard::load(&config)?;
     board.resolve_paths();
     if !board.ftn.is_configured() {
-        return Err(format!("{} lists no ftn address, so there is nothing to introduce this board as", config.display()).into());
+        return Err(format!(
+            "{} lists no ftn address, so there is nothing to introduce this board as. Add an [[aka]] block with the node number your \
+             coordinator gave you to the ftn file named by ftn_file, or fill it in under Message Networking in ICBSetup",
+            config.display()
+        )
+        .into());
     }
     Ok(board)
 }
@@ -272,7 +277,13 @@ async fn poll_link(ftn: &FtnConfig, identity: &BinkpIdentity, link: &FtnLink, ke
     for path in &result.batch.sent {
         println!("  delivered {}", path.display());
         if !keep {
-            fs::remove_file(path)?;
+            fs::remove_file(path).map_err(|err| {
+                format!(
+                    "{} accepted {}, but it could not be removed from the outbound: {err}. Remove it by hand before polling again, or it may be offered twice",
+                    link.to_5d(),
+                    path.display()
+                )
+            })?;
         }
     }
     for path in &result.batch.skipped {
@@ -287,6 +298,20 @@ fn answers_to(link: &FtnLink, wanted: &str) -> bool {
 }
 
 fn toss(board: &mut IcyBoard) -> Res<()> {
+    if !board.ftn.options.process_in {
+        return Err("Inbound processing is disabled, so no received mail was read. Turn on Process Inbound under Message Networking in ICBSetup, or set options.process_in = true in ftn.toml".into());
+    }
+    if !board.ftn.inbound.exists() {
+        println!("No inbound directory at {}; there is no received mail to toss", board.ftn.inbound.display());
+        return Ok(());
+    }
+    if !board.ftn.inbound.is_dir() {
+        return Err(format!(
+            "The configured inbound {} is not a directory. Change the Inbound path in ICBSetup or remove the file occupying that path",
+            board.ftn.inbound.display()
+        )
+        .into());
+    }
     let target = TossTarget {
         sysop: board.config.sysop.name.clone(),
         users: board.users.iter().map(|user| user.get_name().to_string()).collect(),
@@ -301,13 +326,19 @@ fn toss(board: &mut IcyBoard) -> Res<()> {
         println!("  {} message(s) handed on in {} bundle(s)", report.passed_through, report.bundles.len());
     }
     if report.orphans > 0 {
-        println!("  {} packet(s) for another system left in the inbound", report.orphans);
+        println!(
+            "  {} packet(s) addressed to another system left in the inbound. Run with -v to see which address they name; add it as an aka, or turn on Toss Orphans to read them anyway",
+            report.orphans
+        );
     }
     for (recipient, count) in &report.unknown_netmail {
         print_unknown_netmail_advice(board, recipient, *count);
     }
     for (tag, count) in &report.unknown {
-        println!("  {} message(s) arrived for {}, which no area carries", count, tag);
+        println!(
+            "  {} message(s) arrived for {}, which no area carries. Set ftn_area_tag = \"{}\" on the area that should hold it, or turn on Add Unknown Areas",
+            count, tag, tag
+        );
     }
     for (file, err) in &report.failed {
         println!("  left in the inbound, {}: {}", file.display(), err);
@@ -379,6 +410,12 @@ fn register_new_areas(board: &mut IcyBoard, report: &TossReport) -> Res<()> {
 }
 
 fn scan(board: &IcyBoard) -> Res<()> {
+    if !board.ftn.options.process_out {
+        return Err("Outbound scanning is disabled, so no locally written mail was packed. Turn on Scan Outbound under Message Networking in ICBSetup, or set options.process_out = true in ftn.toml".into());
+    }
+    if board.ftn.links.is_empty() {
+        return Err("No mail can be scanned because ftn.toml configures no links. Add the uplink or downlink under Message Networking in ICBSetup".into());
+    }
     let report = scan_outbound(&board.ftn, &echo_areas(board), &chrono::Local::now().naive_local())?;
 
     println!("{} message(s) packed into {} bundle(s)", report.exported, report.bundles.len());
@@ -423,9 +460,13 @@ fn outbound_files(directory: &Path) -> Res<Vec<PathBuf>> {
     if !directory.is_dir() {
         return Ok(files);
     }
-    for entry in fs::read_dir(directory)? {
-        let entry = entry?;
-        if entry.file_type()?.is_file() {
+    for entry in fs::read_dir(directory).map_err(|err| format!("Cannot read the outbound {}: {err}", directory.display()))? {
+        let entry = entry.map_err(|err| format!("Cannot read an entry in the outbound {}: {err}", directory.display()))?;
+        if entry
+            .file_type()
+            .map_err(|err| format!("Cannot inspect {} in the outbound: {err}", entry.path().display()))?
+            .is_file()
+        {
             files.push(entry.path());
         }
     }

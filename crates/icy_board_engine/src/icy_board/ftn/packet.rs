@@ -10,6 +10,8 @@ use jamjam::util::echomail::EchomailAddress;
 use std::fmt::Write as _;
 use thiserror::Error;
 
+use super::Context;
+
 /// A packet is a stream of messages, terminated where the next message type
 /// would be.
 pub const MESSAGE_TYPE: u16 = 2;
@@ -43,13 +45,19 @@ pub mod attribute {
 
 #[derive(Error, Debug)]
 pub enum PacketError {
-    #[error("Packet ends in the middle of a {0}")]
+    #[error(
+        "Packet ends in the middle of a {0}, so it is not all here. \
+         A transfer that was cut short leaves a packet like this; polling the link again fetches it whole"
+    )]
     Truncated(&'static str),
 
-    #[error("Not a fidonet packet: type field says {0}, not 2")]
+    #[error(
+        "Not a fidonet packet: the type field says {0} where every packet since FTS-0001 says 2. \
+         Either the file is not mail at all, or its first bytes were lost"
+    )]
     NotAPacket(u16),
 
-    #[error("Message {0} in the packet is of type {1}, not 2")]
+    #[error("Message {0} of the packet says it is of type {1} where a packed message says 2, so the packet cannot be read past that point")]
     UnknownMessageType(usize, u16),
 }
 
@@ -223,12 +231,13 @@ impl PackedMessage {
             return Err(PacketError::UnknownMessageType(0, message_type).into());
         }
 
-        let orig_node = input.read_u16::<LittleEndian>()?;
-        let dest_node = input.read_u16::<LittleEndian>()?;
-        let orig_net = input.read_u16::<LittleEndian>()?;
-        let dest_net = input.read_u16::<LittleEndian>()?;
-        let attributes = input.read_u16::<LittleEndian>()?;
-        let cost = input.read_u16::<LittleEndian>()?;
+        let mut read_header_word = || input.read_u16::<LittleEndian>().map_err(|_| PacketError::Truncated("message header"));
+        let orig_node = read_header_word()?;
+        let dest_node = read_header_word()?;
+        let orig_net = read_header_word()?;
+        let dest_net = read_header_word()?;
+        let attributes = read_header_word()?;
+        let cost = read_header_word()?;
 
         let mut stamp = [0u8; 20];
         input.read_exact(&mut stamp).map_err(|_| PacketError::Truncated("message header"))?;
@@ -331,7 +340,7 @@ impl Packet {
         let zone_of = (header.orig.zone, header.dest.zone);
 
         let mut messages = Vec::new();
-        while let Some(message) = PackedMessage::read(&mut input, zone_of).map_err(|err| number(err, messages.len()))? {
+        while let Some(message) = PackedMessage::read(&mut input, zone_of).map_err(|err| number(err, messages.len() + 1))? {
             messages.push(message);
         }
         Ok(Self { header, messages })
@@ -348,11 +357,13 @@ impl Packet {
     }
 
     pub fn load(path: &Path) -> Res<Self> {
-        Self::read(&fs::read(path)?)
+        let bytes = fs::read(path).context(|| format!("Cannot read the packet {}", path.display()))?;
+        Self::read(&bytes).context(|| format!("Cannot read the packet {}", path.display()))
     }
 
     pub fn save(&self, path: &Path) -> Res<()> {
-        fs::write(path, self.to_bytes()?)?;
+        let bytes = self.to_bytes().context(|| format!("Cannot build the packet {}", path.display()))?;
+        fs::write(path, bytes).context(|| format!("Cannot write the packet {}", path.display()))?;
         Ok(())
     }
 }
@@ -362,9 +373,10 @@ fn number(error: Box<dyn std::error::Error + Send + Sync>, index: usize) -> Box<
     match error.downcast::<PacketError>() {
         Ok(packet_error) => match *packet_error {
             PacketError::UnknownMessageType(_, message_type) => PacketError::UnknownMessageType(index, message_type).into(),
+            other @ PacketError::Truncated(_) => format!("Message {index} of the packet cannot be read: {other}").into(),
             other => other.into(),
         },
-        Err(other) => other,
+        Err(other) => format!("Message {index} of the packet cannot be read: {other}").into(),
     }
 }
 
@@ -558,6 +570,17 @@ mod tests {
 
         assert!(Packet::read(&bytes[..PacketHeader::SIZE - 1]).is_err());
         assert!(Packet::read(&bytes[..bytes.len() - 3]).is_err());
+    }
+
+    #[test]
+    fn test_a_message_cut_off_inside_its_header_says_which_message_is_incomplete() {
+        let bytes = packet().to_bytes().unwrap();
+
+        let err = Packet::read(&bytes[..PacketHeader::SIZE + 3]).unwrap_err().to_string();
+
+        assert!(err.contains("Message 1"), "{err}");
+        assert!(err.contains("message header"), "{err}");
+        assert!(err.contains("not all here"), "{err}");
     }
 
     #[test]

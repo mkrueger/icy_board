@@ -9,6 +9,8 @@ use jamjam::util::echomail::EchomailAddress;
 use thiserror::Error;
 use zip::write::SimpleFileOptions;
 
+use super::Context;
+
 type Res<T> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
 /// Two characters of the weekday the bundle was made on, followed by one
@@ -21,10 +23,13 @@ const COUNTERS: &[u8] = b"0123456789abcdefghijklmnopqrstuvwxyz";
 
 #[derive(Error, Debug)]
 pub enum BundleError {
-    #[error("No free bundle name left for today")]
-    NoFreeName,
+    #[error(
+        "All 36 bundle names for {weekday} are taken in {directory}, so nothing more can be packed for {link} today. \
+         Poll the link so the bundles waiting there are delivered and removed, or move them out of the way by hand."
+    )]
+    NoFreeName { directory: String, link: String, weekday: String },
 
-    #[error("The bundle carries a name that is not a name: {0}")]
+    #[error("{0} cannot go into a bundle: a file to be packed needs a plain name without a directory part")]
     UnsafeName(String),
 }
 
@@ -52,7 +57,12 @@ pub fn next_bundle(directory: &Path, from: &EchomailAddress, to: &EchomailAddres
             return Ok(candidate);
         }
     }
-    Err(BundleError::NoFreeName.into())
+    Err(BundleError::NoFreeName {
+        directory: directory.display().to_string(),
+        link: to.to_string(),
+        weekday: when.weekday().to_string(),
+    }
+    .into())
 }
 
 /// Packets are named after the moment they were built, so that a link with more
@@ -82,39 +92,56 @@ pub fn is_packet(name: &str) -> bool {
 /// by an arcmail bundle for long enough that nothing else is expected.
 pub fn pack(files: &[PathBuf], into: &Path) -> Res<()> {
     if let Some(parent) = into.parent() {
-        fs::create_dir_all(parent)?;
+        fs::create_dir_all(parent).context(|| format!("Cannot create the directory {} the bundle is written to", parent.display()))?;
     }
-    let mut zip = zip::ZipWriter::new(File::create(into)?);
+    let mut zip = zip::ZipWriter::new(File::create(into).context(|| format!("Cannot create the bundle {}", into.display()))?);
     for path in files {
         let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
             return Err(BundleError::UnsafeName(path.display().to_string()).into());
         };
-        zip.start_file(name, SimpleFileOptions::default())?;
-        zip.write_all(&fs::read(path)?)?;
+        let contents = fs::read(path).context(|| format!("Cannot read {}, which was to go into the bundle {}", path.display(), into.display()))?;
+        zip.start_file(name, SimpleFileOptions::default())
+            .context(|| format!("Cannot add {} to the bundle {}", name, into.display()))?;
+        zip.write_all(&contents)
+            .context(|| format!("Cannot write {} into the bundle {}", name, into.display()))?;
     }
-    zip.finish()?;
+    zip.finish().context(|| format!("Cannot finish the bundle {}", into.display()))?;
     Ok(())
 }
 
 /// Unpacks a bundle that arrived from the network, which means every name in it
 /// is a claim and not a fact.
 pub fn unpack(bundle: &Path, into: &Path) -> Res<Vec<PathBuf>> {
-    fs::create_dir_all(into)?;
-    let mut archive = zip::ZipArchive::new(File::open(bundle)?)?;
+    fs::create_dir_all(into).context(|| format!("Cannot create the directory {} the bundle is unpacked into", into.display()))?;
+    let file = File::open(bundle).context(|| format!("Cannot open the bundle {}", bundle.display()))?;
+    let mut archive = zip::ZipArchive::new(file).context(|| {
+        format!(
+            "{} is not a readable arcmail bundle. A bundle is a zip archive, so this is either a half finished transfer or a file the link named like mail without it being mail",
+            bundle.display()
+        )
+    })?;
     let mut unpacked = Vec::new();
     for index in 0..archive.len() {
-        let mut entry = archive.by_index(index)?;
+        let mut entry = archive
+            .by_index(index)
+            .context(|| format!("Cannot read entry {} of the bundle {}", index + 1, bundle.display()))?;
         if entry.is_dir() {
             continue;
         }
         let Some(name) = safe_name(entry.name()) else {
-            log::warn!("Refusing {} out of {}", entry.name(), bundle.display());
+            log::warn!(
+                "Refusing {} out of {}: an entry naming a directory would be unpacked outside the inbound",
+                entry.name(),
+                bundle.display()
+            );
             continue;
         };
-        let path = into.join(name);
+        let path = into.join(&name);
         let mut contents = Vec::new();
-        entry.read_to_end(&mut contents)?;
-        fs::write(&path, contents)?;
+        entry
+            .read_to_end(&mut contents)
+            .context(|| format!("Cannot unpack {} out of the bundle {}", name, bundle.display()))?;
+        fs::write(&path, contents).context(|| format!("Cannot write {} unpacked from {}", path.display(), bundle.display()))?;
         unpacked.push(path);
     }
     Ok(unpacked)
@@ -209,5 +236,32 @@ mod tests {
         assert_eq!(unpacked.len(), 1);
         assert_eq!(unpacked[0].file_name().unwrap(), "good.pkt");
         assert!(!directory.path().join("escaped.pkt").exists());
+    }
+
+    #[test]
+    fn test_a_file_that_is_not_an_archive_is_refused_by_name() {
+        let directory = tempfile::tempdir().unwrap();
+        let bundle = directory.path().join("0000ff9d.su0");
+        fs::write(&bundle, b"half a download").unwrap();
+
+        let err = unpack(&bundle, &directory.path().join("in")).unwrap_err().to_string();
+
+        assert!(err.contains("0000ff9d.su0"), "{err}");
+        assert!(err.contains("not a readable arcmail bundle"), "{err}");
+    }
+
+    #[test]
+    fn test_running_out_of_bundle_names_says_which_link_and_day() {
+        let directory = tempfile::tempdir().unwrap();
+        let (from, to) = (address("21:1/100"), address("21:1/1"));
+        for _ in 0..COUNTERS.len() {
+            let name = next_bundle(directory.path(), &from, &to, &sunday()).unwrap();
+            fs::write(&name, b"").unwrap();
+        }
+
+        let err = next_bundle(directory.path(), &from, &to, &sunday()).unwrap_err().to_string();
+
+        assert!(err.contains("21:1/1"), "{err}");
+        assert!(err.contains("Sun"), "{err}");
     }
 }
