@@ -334,7 +334,7 @@ pub enum GenericVariableData {
     Password(crate::icy_board::user_base::Password),
 
     /// The fields of a value whose type the program declared with TYPE/ENDTYPE.
-    Record(Vec<VariableValue>),
+    Record(std::sync::Arc<Vec<VariableValue>>),
 
     /// The object a member expression reads, kept alive by the values that name it.
     UserData(std::sync::Arc<dyn crate::compiler::user_data::UserDataValue>),
@@ -1074,7 +1074,7 @@ impl VariableValue {
                 }
             }
             GenericVariableData::Record(fields) => {
-                for field in fields {
+                for field in std::sync::Arc::make_mut(fields) {
                     field.remap_user_types(remap);
                 }
             }
@@ -1089,7 +1089,7 @@ impl VariableValue {
             GenericVariableData::Record(fields) => VariableValue {
                 vtype: self.vtype,
                 data: VariableData::default(),
-                generic_data: GenericVariableData::Record(fields.iter().map(VariableValue::emptied).collect()),
+                generic_data: GenericVariableData::Record(std::sync::Arc::new(fields.iter().map(VariableValue::emptied).collect())),
             },
             GenericVariableData::Dim1(values) => VariableValue {
                 vtype: self.vtype,

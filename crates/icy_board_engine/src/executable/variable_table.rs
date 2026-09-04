@@ -204,7 +204,7 @@ pub fn create_record_value(type_id: u8, user_types: &[Vec<RecordField>]) -> Opti
     Some(VariableValue {
         vtype: VariableType::UserData(type_id),
         data: crate::executable::VariableData::default(),
-        generic_data: GenericVariableData::Record(values),
+        generic_data: GenericVariableData::Record(std::sync::Arc::new(values)),
     })
 }
 

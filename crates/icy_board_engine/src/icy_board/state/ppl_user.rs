@@ -120,10 +120,10 @@ fn contact_value(contact: &UserContact) -> VariableValue {
     VariableValue {
         vtype: VariableType::UserData(CONTACT_ID as u8),
         data: crate::executable::VariableData::default(),
-        generic_data: crate::executable::GenericVariableData::Record(vec![
+        generic_data: crate::executable::GenericVariableData::Record(std::sync::Arc::new(vec![
             VariableValue::new_unbounded_string(contact.service.clone()),
             VariableValue::new_unbounded_string(contact.account.clone()),
-        ]),
+        ])),
     }
 }
 

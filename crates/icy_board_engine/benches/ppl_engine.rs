@@ -2,6 +2,7 @@ use std::{
     hint::black_box,
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
+    time::Duration,
 };
 
 use criterion::{BatchSize, Criterion, Throughput, criterion_group, criterion_main};
@@ -9,7 +10,7 @@ use icy_board_engine::{
     ast::{GotoStatement, LabelStatement},
     compiler::{PPECompiler, optimizer::optimize_statements, workspace::Workspace},
     crypt::{decode_rle, decrypt_chunks, encode_rle, encrypt_chunks},
-    executable::{Executable, VariableType, VariableValue},
+    executable::{Executable, GenericVariableData, VariableData, VariableType, VariableValue},
     icy_board::{
         IcyBoard,
         bbs::BBS,
@@ -28,6 +29,14 @@ INTEGER i, total
 FOR i = 1 TO 100000
     total = total + i
 NEXT
+IF total = 2147483647 STOP
+"#;
+
+const CONTROL_FLOW_SOURCE: &str = r#";$LANGVERSION 400
+INTEGER i
+FOR i = 1 TO 100000
+NEXT
+IF i = 2147483647 STOP
 "#;
 
 const CALL_SOURCE: &str = r#";$LANGVERSION 400
@@ -36,10 +45,55 @@ INTEGER i, total
 FOR i = 1 TO 25000
     total = AddOne(total)
 NEXT
+IF total = 2147483647 STOP
 
 FUNCTION AddOne(INTEGER value) INTEGER
     RETURN value + 1
 ENDFUNC
+"#;
+
+const CALL_NO_ARGS_SOURCE: &str = r#";$LANGVERSION 400
+DECLARE FUNCTION One() INTEGER
+INTEGER i, total
+FOR i = 1 TO 25000
+    total = total + One()
+NEXT
+IF total = 2147483647 STOP
+
+FUNCTION One() INTEGER
+    RETURN 1
+ENDFUNC
+"#;
+
+const CALL_LOCALS_SOURCE: &str = r#";$LANGVERSION 400
+DECLARE FUNCTION AddLocals(INTEGER value) INTEGER
+INTEGER i, total
+FOR i = 1 TO 25000
+    total = AddLocals(total)
+NEXT
+IF total = 2147483647 STOP
+
+FUNCTION AddLocals(INTEGER value) INTEGER
+    INTEGER a, b, c, d
+    a = value + 1
+    b = a
+    c = b
+    d = c
+    RETURN d
+ENDFUNC
+"#;
+
+const CALL_VAR_SOURCE: &str = r#";$LANGVERSION 400
+DECLARE PROCEDURE AddOne(VAR INTEGER value)
+INTEGER i, total
+FOR i = 1 TO 25000
+    AddOne(total)
+NEXT
+IF total = 2147483647 STOP
+
+PROCEDURE AddOne(VAR INTEGER value)
+    value = value + 1
+ENDPROC
 "#;
 
 const STRING_SOURCE: &str = r#";$LANGVERSION 400
@@ -49,6 +103,40 @@ FOR i = 1 TO 1000
     total = total + text.Find("xyz")
     text = text.Trim()
 NEXT
+IF total + text.Len() = 2147483647 STOP
+"#;
+
+const STRING_SLICE_SOURCE: &str = r#";$LANGVERSION 400
+STRING text = STRING.Repeat("ä", 4096)
+INTEGER i, total
+FOR i = 1 TO 1000
+    total = total + LEFT(text, 2048).Len() + RIGHT(text, 2048).Len()
+NEXT
+IF total = 2147483647 STOP
+"#;
+
+const CONVERSION_SOURCE: &str = r#";$LANGVERSION 400
+INTEGER i, total
+FOR i = 1 TO 100000
+    total = TOINTEGER(total + 1)
+NEXT
+IF total = 2147483647 STOP
+"#;
+
+const RECORD_COPY_SOURCE: &str = r#";$LANGVERSION 400
+TYPE Item
+    INTEGER A, B, C, D, E, F, G, H
+    STRING Name
+ENDTYPE
+Item source, target
+INTEGER i, total
+source.A = 1
+source.Name = "record"
+FOR i = 1 TO 10000
+    target = source
+    total = total + target.A
+NEXT
+IF total = 2147483647 STOP
 "#;
 
 const ARRAY_RECORD_SOURCE: &str = r#";$LANGVERSION 400
@@ -65,14 +153,20 @@ NEXT
 FOR i = 0 TO 999
     total = total + items[i].Number + items[i].Name.Len()
 NEXT
+IF total = 2147483647 STOP
 "#;
 
 const ARRAY_FOREACH_SOURCE: &str = r#";$LANGVERSION 400
-INTEGER values[9999]
-INTEGER value, total
+INTEGER values[]
+INTEGER i, value, total
+values.Redim(9999)
+FOR i = 0 TO 9999
+    values[i] = i
+NEXT
 FOREACH value IN values
     total = total + value
 ENDFOREACH
+IF total = 2147483647 STOP
 "#;
 
 const OBJECT_FOREACH_SOURCE: &str = r#";$LANGVERSION 400
@@ -81,6 +175,7 @@ INTEGER total
 FOREACH area IN Board.Conferences[0].Areas
     total = total + area.Number
 ENDFOREACH
+IF total = 2147483647 STOP
 "#;
 
 fn workspace() -> Workspace {
@@ -410,6 +505,13 @@ fn value_benchmarks(criterion: &mut Criterion) {
     let mut array = VariableType::UnboundedString.create_empty_value();
     array.redim(1, 4096, 0, 0);
     let value = VariableValue::new_unbounded_string("value".to_string());
+    let record = VariableValue {
+        vtype: VariableType::UserData(100),
+        data: VariableData::default(),
+        generic_data: GenericVariableData::Record(Arc::new(
+            (0..32).map(|index| VariableValue::new_unbounded_string(format!("field {index}"))).collect(),
+        )),
+    };
     let mut group = criterion.benchmark_group("values");
 
     group.throughput(Throughput::Bytes(16 * 1024));
@@ -432,6 +534,10 @@ fn value_benchmarks(criterion: &mut Criterion) {
     group.throughput(Throughput::Elements(4096));
     group.bench_function("array_clone_4k", |benchmark| {
         benchmark.iter(|| black_box(black_box(&array).clone()));
+    });
+    group.throughput(Throughput::Elements(32));
+    group.bench_function("record_clone_32", |benchmark| {
+        benchmark.iter(|| black_box(black_box(&record).clone()));
     });
     group.finish();
 }
@@ -459,13 +565,21 @@ fn vm_benchmarks(criterion: &mut Criterion) {
     let file_name = root.path().join("benchmark.ppe");
     let mut group = criterion.benchmark_group("vm");
     group.sample_size(20);
+    group.measurement_time(Duration::from_secs(7));
 
     for (name, source, operations, areas) in [
+        ("control_flow_100k", CONTROL_FLOW_SOURCE, 100_000, 0),
         ("integer_loop_100k", ARITHMETIC_SOURCE, 100_000, 0),
+        ("function_calls_no_args_25k", CALL_NO_ARGS_SOURCE, 25_000, 0),
         ("function_calls_25k", CALL_SOURCE, 25_000, 0),
+        ("function_calls_locals_25k", CALL_LOCALS_SOURCE, 25_000, 0),
+        ("procedure_calls_var_25k", CALL_VAR_SOURCE, 25_000, 0),
+        ("conversions_100k", CONVERSION_SOURCE, 100_000, 0),
         ("string_members_1k", STRING_SOURCE, 1_000, 0),
+        ("string_slice_unicode_1k", STRING_SLICE_SOURCE, 1_000, 0),
         ("array_record_access_2k", ARRAY_RECORD_SOURCE, 2_000, 0),
-        ("array_foreach_10k", ARRAY_FOREACH_SOURCE, 10_000, 0),
+        ("record_copy_10k", RECORD_COPY_SOURCE, 10_000, 0),
+        ("array_foreach_10k", ARRAY_FOREACH_SOURCE, 20_000, 0),
         ("object_foreach_2k", OBJECT_FOREACH_SOURCE, 2_000, 2_000),
     ] {
         let executable = compile(source);

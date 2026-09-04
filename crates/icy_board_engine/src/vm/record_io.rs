@@ -72,7 +72,7 @@ where
 {
     match &value.generic_data {
         GenericVariableData::Record(values) => {
-            for value in values {
+            for value in values.iter() {
                 walk_encode(value, leaf)?;
             }
         }
@@ -105,7 +105,9 @@ where
     F: FnMut(&VariableValue) -> Result<VariableValue, String>,
 {
     let generic_data = match &template.generic_data {
-        GenericVariableData::Record(values) => GenericVariableData::Record(values.iter().map(|value| map_shape(value, scalar)).collect::<Result<_, _>>()?),
+        GenericVariableData::Record(values) => GenericVariableData::Record(std::sync::Arc::new(
+            values.iter().map(|value| map_shape(value, scalar)).collect::<Result<_, _>>()?,
+        )),
         GenericVariableData::Dim1(values) => GenericVariableData::Dim1(std::sync::Arc::new(
             values.iter().map(|value| map_shape(value, scalar)).collect::<Result<_, _>>()?,
         )),
@@ -390,7 +392,7 @@ mod tests {
         let record = |field| VariableValue {
             vtype: VariableType::UserData(crate::parser::FIRST_USER_TYPE_ID as u8),
             data: VariableData::default(),
-            generic_data: GenericVariableData::Record(vec![field]),
+            generic_data: GenericVariableData::Record(std::sync::Arc::new(vec![field])),
         };
 
         let source = record(value);
@@ -415,7 +417,7 @@ mod tests {
         let template = VariableValue {
             vtype: VariableType::UserData(crate::parser::FIRST_USER_TYPE_ID as u8),
             data: VariableData::default(),
-            generic_data: GenericVariableData::Record(vec![VariableValue::new_bool(false)]),
+            generic_data: GenericVariableData::Record(std::sync::Arc::new(vec![VariableValue::new_bool(false)])),
         };
 
         assert_eq!(decode_binary(&template, &[2]).unwrap_err(), "invalid BOOLEAN value 2");

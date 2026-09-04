@@ -98,7 +98,7 @@ pub struct VirtualMachine<'a> {
     pub variable_table: VariableTable,
 
     pub script: PPEScript,
-    commands: Vec<Arc<PPECommand>>,
+    commands: Arc<[PPECommand]>,
     pub cur_ptr: usize,
     pub is_running: bool,
     /// Set by STOP, which gives up on a program rather than ending it.
@@ -169,7 +169,7 @@ impl<'a> VirtualMachine<'a> {
             type_registry,
             return_addresses: Vec::new(),
             script: PPEScript::default(),
-            commands: Vec::new(),
+            commands: Arc::from([]),
             io,
             is_running: true,
             aborted: false,
@@ -501,6 +501,7 @@ impl VirtualMachine<'_> {
                 let GenericVariableData::Record(values) = &mut value.generic_data else {
                     return Err(VMError::InternalVMError.into());
                 };
+                let values = Arc::make_mut(values);
                 for (field_id, expression) in fields {
                     let field = values.get(*field_id).ok_or(VMError::InvalidMemberId(*type_id, *field_id))?;
                     let field_type = field.vtype;
@@ -673,13 +674,13 @@ impl VirtualMachine<'_> {
 
     #[async_recursion(?Send)]
     async fn run(&mut self) -> Res<()> {
-        let max_ptr = self.commands.len();
+        let commands = Arc::clone(&self.commands);
+        let max_ptr = commands.len();
         while !self.fpclear && self.is_running && self.cur_ptr < max_ptr {
             let p = self.cur_ptr;
             self.cur_ptr += 1;
-            let command = self.commands[p].clone();
             // log::info!("{p}: {c}");
-            self.execute_statement(&command).await?;
+            self.execute_statement(&commands[p]).await?;
             self.check_error_trap()?;
         }
         Ok(())
@@ -801,6 +802,7 @@ impl VirtualMachine<'_> {
                     let GenericVariableData::Record(fields) = &mut target.generic_data else {
                         return Err(VMError::NoUserTypeBase.into());
                     };
+                    let fields = Arc::make_mut(fields);
                     target = match step {
                         ResolvedLValuePathStep::Member(member_id) => fields.get_mut(member_id).ok_or(VMError::InternalVMError)?,
                         ResolvedLValuePathStep::IndexedMember(member_id, first, second, third) => fields
@@ -1079,7 +1081,7 @@ pub async fn run<P: AsRef<Path>>(file_name: &P, prg: &Executable, io: &mut dyn P
             for (index, statement) in script.statements.iter().enumerate() {
                 label_table.insert(statement.span.start * 2, index);
             }
-            let commands = script.statements.iter().map(|statement| Arc::new(statement.command.clone())).collect();
+            let commands = script.statements.iter().map(|statement| statement.command.clone()).collect::<Vec<_>>().into();
             let user = if let Some(user) = &icy_board_state.session.current_user {
                 user.clone()
             } else {

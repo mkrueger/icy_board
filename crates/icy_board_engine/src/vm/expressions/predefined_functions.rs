@@ -260,27 +260,26 @@ pub async fn string_substring(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> 
 }
 
 pub async fn left(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let mut chars = vm.eval_expr(&args[1]).await?.as_int();
+    let chars = vm.eval_expr(&args[1]).await?.as_int();
     if chars <= 0 {
         return Ok(VariableValue::new_string(String::new()));
     }
-    let str = vm.eval_expr(&args[0]).await?.as_string().chars().collect::<Vec<_>>();
-    let mut res = String::new();
-    if chars > 0 {
-        if chars < str.len() as i32 {
-            str.iter().take(chars as usize).for_each(|c| res.push(*c));
-        } else {
-            for c in &str {
-                res.push(*c);
-            }
-            chars -= str.len() as i32;
-            while chars > 0 {
-                res.push(' ');
-                chars -= 1;
-            }
+    let text = vm.eval_expr(&args[0]).await?.as_string();
+    let requested = chars as usize;
+    let mut end = text.len();
+    let mut actual = 0;
+    for (index, _) in text.char_indices() {
+        if actual == requested {
+            end = index;
+            break;
         }
+        actual += 1;
     }
-    Ok(VariableValue::new_string(res))
+    let mut result = text[..end].to_string();
+    if requested > actual {
+        result.extend(std::iter::repeat_n(' ', requested - actual));
+    }
+    Ok(VariableValue::new_string(result))
 }
 
 pub async fn right(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -288,18 +287,20 @@ pub async fn right(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variabl
     if chars <= 0 {
         return Ok(VariableValue::new_string(String::new()));
     }
-    let mut chars = chars as usize;
-
-    let mut res = String::new();
-    let str = vm.eval_expr(&args[0]).await?.as_string().chars().collect::<Vec<_>>();
-    if chars > 0 {
-        while chars > str.len() {
-            res.push(' ');
-            chars -= 1;
-        }
-        str.iter().rev().take(chars).rev().for_each(|c| res.push(*c));
+    let requested = chars as usize;
+    let text = vm.eval_expr(&args[0]).await?.as_string();
+    let mut start = text.len();
+    let mut actual = 0;
+    for (index, _) in text.char_indices().rev().take(requested) {
+        start = index;
+        actual += 1;
     }
-    Ok(VariableValue::new_string(res))
+    let mut result = String::new();
+    if requested > actual {
+        result.extend(std::iter::repeat_n(' ', requested - actual));
+    }
+    result.push_str(&text[start..]);
+    Ok(VariableValue::new_string(result))
 }
 
 pub async fn space(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -771,7 +772,9 @@ pub async fn array_value_at(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Re
         return Ok(VariableValue {
             vtype: array.vtype,
             data: crate::executable::VariableData::default(),
-            generic_data: GenericVariableData::Record(definition.fields.iter().map(|(_, field)| field.variable_type.create_empty_value()).collect()),
+            generic_data: GenericVariableData::Record(std::sync::Arc::new(
+                definition.fields.iter().map(|(_, field)| field.variable_type.create_empty_value()).collect(),
+            )),
         });
     }
     Ok(array.vtype.create_empty_value())
@@ -2057,67 +2060,67 @@ pub async fn pagestat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
 }
 
 pub async fn tobigstr(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm.eval_expr(&args[0]).await?.clone().convert_to(VariableType::BigStr))
+    Ok(vm.eval_expr(&args[0]).await?.convert_to(VariableType::BigStr))
 }
 
 pub async fn toboolean(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm.eval_expr(&args[0]).await?.clone().convert_to(VariableType::Boolean))
+    Ok(vm.eval_expr(&args[0]).await?.convert_to(VariableType::Boolean))
 }
 
 pub async fn tobyte(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm.eval_expr(&args[0]).await?.clone().convert_to(VariableType::Byte))
+    Ok(vm.eval_expr(&args[0]).await?.convert_to(VariableType::Byte))
 }
 
 pub async fn todate(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm.eval_expr(&args[0]).await?.clone().convert_to(VariableType::Date))
+    Ok(vm.eval_expr(&args[0]).await?.convert_to(VariableType::Date))
 }
 
 pub async fn todreal(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm.eval_expr(&args[0]).await?.clone().convert_to(VariableType::Double))
+    Ok(vm.eval_expr(&args[0]).await?.convert_to(VariableType::Double))
 }
 
 pub async fn toedate(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm.eval_expr(&args[0]).await?.clone().convert_to(VariableType::EDate))
+    Ok(vm.eval_expr(&args[0]).await?.convert_to(VariableType::EDate))
 }
 
 pub async fn tointeger(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm.eval_expr(&args[0]).await?.clone().convert_to(VariableType::Integer))
+    Ok(vm.eval_expr(&args[0]).await?.convert_to(VariableType::Integer))
 }
 
 pub async fn tomoney(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm.eval_expr(&args[0]).await?.clone().convert_to(VariableType::Money))
+    Ok(vm.eval_expr(&args[0]).await?.convert_to(VariableType::Money))
 }
 
 pub async fn toreal(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm.eval_expr(&args[0]).await?.clone().convert_to(VariableType::Float))
+    Ok(vm.eval_expr(&args[0]).await?.convert_to(VariableType::Float))
 }
 
 pub async fn tosbyte(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm.eval_expr(&args[0]).await?.clone().convert_to(VariableType::SByte))
+    Ok(vm.eval_expr(&args[0]).await?.convert_to(VariableType::SByte))
 }
 
 pub async fn tosword(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm.eval_expr(&args[0]).await?.clone().convert_to(VariableType::SWord))
+    Ok(vm.eval_expr(&args[0]).await?.convert_to(VariableType::SWord))
 }
 
 pub async fn totime(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm.eval_expr(&args[0]).await?.clone().convert_to(VariableType::Time))
+    Ok(vm.eval_expr(&args[0]).await?.convert_to(VariableType::Time))
 }
 
 pub async fn tounsigned(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm.eval_expr(&args[0]).await?.clone().convert_to(VariableType::Unsigned))
+    Ok(vm.eval_expr(&args[0]).await?.convert_to(VariableType::Unsigned))
 }
 
 pub async fn tolong(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm.eval_expr(&args[0]).await?.clone().convert_to(VariableType::Long))
+    Ok(vm.eval_expr(&args[0]).await?.convert_to(VariableType::Long))
 }
 
 pub async fn toulong(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm.eval_expr(&args[0]).await?.clone().convert_to(VariableType::ULong))
+    Ok(vm.eval_expr(&args[0]).await?.convert_to(VariableType::ULong))
 }
 
 pub async fn toword(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm.eval_expr(&args[0]).await?.clone().convert_to(VariableType::Word))
+    Ok(vm.eval_expr(&args[0]).await?.convert_to(VariableType::Word))
 }
 
 pub async fn mixed(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -2461,7 +2464,7 @@ pub async fn dnext(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Variabl
     Ok(VariableValue::new_int(dbase::ops::dnext(vm, args).await?))
 }
 pub async fn toddate(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    Ok(vm.eval_expr(&args[0]).await?.clone().convert_to(VariableType::DDate))
+    Ok(vm.eval_expr(&args[0]).await?.convert_to(VariableType::DDate))
 }
 pub async fn dcloseall(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     Ok(VariableValue::new_bool(dbase::ops::dcloseall(vm, args).await?))

@@ -1,6 +1,6 @@
 use crate::Res;
 use crate::ast::constant::STACK_LIMIT;
-use crate::executable::{GenericVariableData, PPEExpr, VariableType, VariableValue};
+use crate::executable::{PPEExpr, VariableValue};
 use crate::icy_board::state::ppl_error::{ERR_KIND_STACK, ERR_STACK, PplError};
 
 use super::{ErrorHandler, ReturnAddress, VMError, VirtualMachine};
@@ -21,8 +21,6 @@ impl VirtualMachine<'_> {
                 self.write_back_stack.push(arguments[i].clone());
             }
         }
-        self.init_call_locals(locals, parameters, first);
-
         Ok(())
     }
 
@@ -32,7 +30,6 @@ impl VirtualMachine<'_> {
         for (i, value) in arguments.into_iter().take(parameters).enumerate() {
             self.variable_table.set_value(first + i, value);
         }
-        self.init_call_locals(locals, parameters, first);
     }
 
     fn save_call_frame(&mut self, locals: usize, parameters: usize, first: usize) {
@@ -42,29 +39,6 @@ impl VirtualMachine<'_> {
                 let empty = self.variable_table.get_value(id).emptied();
                 let value = std::mem::replace(self.variable_table.get_value_mut(id), empty);
                 self.call_local_value_stack.push(value);
-            }
-        }
-    }
-
-    fn init_call_locals(&mut self, locals: usize, parameters: usize, first: usize) {
-        for i in 0..locals {
-            let id = first + parameters + i;
-            let (flags, vtype) = {
-                let header = &self.variable_table.get_var_entry(id).header;
-                (header.flags, header.variable_type)
-            };
-            if (flags & 0x1) == 0x0 {
-                let entry = self.variable_table.get_var_entry(id);
-                // A record keeps the fields its type declares, emptied out again.
-                let val = if matches!(vtype, VariableType::UserData(type_id) if crate::parser::is_user_declared_type(type_id) || type_id as usize == crate::parser::CONTACT_ID)
-                {
-                    entry.value.emptied()
-                } else {
-                    let mut val = vtype.create_empty_value();
-                    val.generic_data = entry.header.create_generic_data().unwrap_or(GenericVariableData::None);
-                    val
-                };
-                self.variable_table.set_value(id, val);
             }
         }
     }
