@@ -1420,8 +1420,8 @@ IF !request.SetText(json, "application/json") PRINTLN Error.Last().Message
 HttpResponse response = request.Send()
 ```
 
-`SetHeader()`, `SetText()`, `SetBytes()` and `SetForm()` change the request and
-return `TRUE` on success.
+`SetQuery()`, `SetHeader()`, `SetText()`, `SetBytes()` and `SetForm()` change
+the request and return `TRUE` on success.
 On failure they return `FALSE`, leave the request unchanged, and publish details
 through `Error.Last()`. `HttpMethod` contains `Get`, `Head`, `Post`, `Put`,
 `Delete` and `Patch`.
@@ -1430,11 +1430,14 @@ reports `ErrKind.Net` with `ErrCode.Invalid`. Routing and hop-by-hop headers,
 including `Host`, `Content-Length`, `Connection` and `Transfer-Encoding`, cannot
 be set by a PPE.
 
-`SetText()` sends its argument verbatim, which is what JSON, XML and plain text
-need. `SetBytes(data [, contentType])` sends a `BYTES` value without text
-conversion and defaults its content type to `application/octet-stream`. Both
-setters replace any existing body and content type, and both reject `Get` and
-`Head` requests.
+`SetQuery(name, value)` replaces every query parameter with that decoded name,
+preserves unrelated parameters and the URL fragment, and encodes the new name
+and value automatically with RFC 3986 rules. `SetText()` sends its argument
+verbatim, which is what JSON, XML and plain text need; do not URL- or
+form-encode those bodies. `SetBytes(data [, contentType])` sends a `BYTES` value
+without text conversion and defaults its content type to
+`application/octet-stream`. Both body setters replace any existing body and
+content type, and both reject `Get` and `Head` requests.
 
 An `application/x-www-form-urlencoded` body is different: every value has
 to be percent-encoded so that a `&` or `=` inside it cannot be mistaken for a
@@ -1454,14 +1457,15 @@ an HTML form would send them. `SetForm()` refuses a `Get` or `Head` request, and
 refuses to append to a body that `SetText()` wrote with a different content
 type, so a form body and a JSON body can never be mixed by accident.
 
-`Http.UrlEncode(text)` and `Http.UrlDecode(text)` expose the same encoding for
-everything `SetForm()` does not cover, such as building a query string. Encode
-single values only, never a whole `name=value&...` string, because the
-separators must stay unencoded. The optional second argument selects the
-dialect: `TRUE`, the default, follows the form rules where a space is `+`, while
-`FALSE` follows RFC 3986 where a space is `%20` and a `+` is literal. Text is
-encoded as UTF-8 one byte at a time, so `ä` becomes `%C3%A4`. `UrlDecode()`
-replaces byte sequences that are not valid UTF-8 rather than reporting them.
+`Http.UrlEncode(text)` and `Http.UrlDecode(text)` handle one URL component with
+RFC 3986 rules, where a space is `%20` and a `+` is literal.
+`Http.FormEncode(text)` and `Http.FormDecode(text)` handle one
+`application/x-www-form-urlencoded` field, where a space is `+`. `SetForm()`
+already applies the form encoding automatically. Encode single values only,
+never a whole `name=value&...` string, because the separators must stay
+unencoded. Text is encoded as UTF-8 one byte at a time, so `ä` becomes
+`%C3%A4`. Both decode functions replace byte sequences that are not valid UTF-8
+rather than reporting them.
 
 No `[ppl_http]` section is required. The default policy is equivalent to:
 

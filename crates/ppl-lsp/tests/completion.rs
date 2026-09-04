@@ -208,6 +208,17 @@ fn session_user_and_http_workflows_have_completion_documentation() {
         "{http_get}"
     );
 
+    let url_encode = completion_documentation("HTTP.", "UrlEncode");
+    assert!(url_encode.contains("RFC 3986"), "{url_encode}");
+    let form_encode = completion_documentation("HTTP.", "FormEncode");
+    assert!(form_encode.contains("SetForm()") && form_encode.contains('+'), "{form_encode}");
+
+    let set_query = completion_documentation("HTTPREQUEST request\nrequest.", "SetQuery");
+    assert!(
+        set_query.contains("RFC 3986") && (set_query.contains("fragment") || set_query.contains("Fragment")),
+        "{set_query}"
+    );
+
     let set_text = completion_documentation("HTTPREQUEST request\nrequest.", "SetText");
     assert!(
         (set_text.contains("GET and HEAD") || set_text.contains("GET- und HEAD")) && (set_text.contains("UTF-8 body") || set_text.contains("UTF-8-Body")),

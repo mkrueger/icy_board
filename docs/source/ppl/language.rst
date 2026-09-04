@@ -883,10 +883,13 @@ A request object supplies POST bodies and safe custom headers::
 
 The setter functions change the request and return ``TRUE`` on success. On
 failure they return ``FALSE``, leave it unchanged, and publish details through
-``Error.Last()``.
+``Error.Last()``. ``SetQuery(name, value)`` replaces every query parameter with
+that decoded name, preserves unrelated parameters and the URL fragment, and
+encodes the new name and value automatically with RFC 3986 rules.
 
 ``SetText()`` sends its argument verbatim, which is what JSON and XML need. For
-``SetBytes(data [, contentType])`` sends a ``BYTES`` value without text
+these bodies no URL or form encoding is needed. ``SetBytes(data [,
+contentType])`` sends a ``BYTES`` value without text
 conversion and defaults its content type to ``application/octet-stream``.
 Both setters replace the existing body and content type.
 
@@ -900,12 +903,13 @@ body and sets that content type::
     request.SetForm("message", text)
     HttpResponse response = request.Send()
 
-``Http.UrlEncode(text)`` and ``Http.UrlDecode(text)`` expose the same encoding
-for everything ``SetForm()`` does not cover, such as query strings. Encode
-single values only, never a whole ``name=value&...`` string. The optional second
-argument selects the dialect: ``TRUE``, the default, follows the form rules
-where a space is ``+``, while ``FALSE`` follows RFC 3986 where a space is
-``%20``.
+``Http.UrlEncode(text)`` and ``Http.UrlDecode(text)`` handle one URL component
+with RFC 3986 rules, where a space is ``%20`` and a ``+`` is literal.
+``Http.FormEncode(text)`` and ``Http.FormDecode(text)`` handle one
+``application/x-www-form-urlencoded`` field, where a space is ``+``.
+``SetForm()`` already applies the form encoding automatically. Encode single
+values only, never a whole ``name=value&...`` string, because separators must
+stay unencoded.
 
 The optional board policy selects ``disabled``, exact-origin ``allowlist``, or
 the default ``public`` destinations and sets body, timeout, redirect and

@@ -584,12 +584,15 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
             "download" => Some(fl!(LANGUAGE_LOADER, "hint-http-download")),
             "urlencode" => Some(fl!(LANGUAGE_LOADER, "hint-http-url-encode")),
             "urldecode" => Some(fl!(LANGUAGE_LOADER, "hint-http-url-decode")),
+            "formencode" => Some(fl!(LANGUAGE_LOADER, "hint-http-form-encode")),
+            "formdecode" => Some(fl!(LANGUAGE_LOADER, "hint-http-form-decode")),
             _ => None,
         };
     }
     if id == HTTP_REQUEST_ID as u8 {
         return match member.to_ascii_lowercase().as_str() {
             "url" | "method" => Some(fl!(LANGUAGE_LOADER, "hint-http-request-property")),
+            "setquery" => Some(fl!(LANGUAGE_LOADER, "hint-http-request-set-query")),
             "setheader" => Some(fl!(LANGUAGE_LOADER, "hint-http-request-set-header")),
             "settext" => Some(fl!(LANGUAGE_LOADER, "hint-http-request-set-text")),
             "setbytes" => Some(fl!(LANGUAGE_LOADER, "hint-http-request-set-bytes")),
@@ -677,7 +680,6 @@ pub fn get_parameter_documentation(name: &str) -> Option<String> {
         "value" => "hint-param-value",
         "contenttype" => "hint-param-content-type",
         "data" => "hint-param-data",
-        "form" => "hint-param-form",
         "pattern" => "hint-param-pattern",
         "options" => "hint-param-options",
         "start" => "hint-param-start",

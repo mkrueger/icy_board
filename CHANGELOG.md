@@ -19,11 +19,11 @@ releases.
 
 - `HttpRequest.SetForm(name, value)` appends one percent-encoded
   `application/x-www-form-urlencoded` field and sets that content type, so a
-  form POST no longer has to be assembled by hand. `Http.UrlEncode(text [,
-  form])` and `Http.UrlDecode(text [, form])` expose the same encoding for query
-  strings and for reading form-encoded replies; the optional argument selects
-  between form rules, where a space is `+`, and RFC 3986 rules, where it is
-  `%20`.
+  form POST no longer has to be assembled by hand. `Http.UrlEncode(text)` and
+  `Http.UrlDecode(text)` handle RFC 3986 URL components, while
+  `Http.FormEncode(text)` and `Http.FormDecode(text)` expose form encoding for
+  query strings and form-encoded replies. `HttpRequest.SetQuery(name, value)`
+  updates one query parameter and performs the URL encoding automatically.
 
 - Criterion benchmarks cover PPL parsing, compilation, PPE serialization,
   string and array value operations, and prepared VM execution. The dedicated

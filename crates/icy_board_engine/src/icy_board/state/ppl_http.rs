@@ -34,6 +34,8 @@ member_name!(NEW, "New");
 member_name!(DOWNLOAD, "Download");
 member_name!(URL_ENCODE, "UrlEncode");
 member_name!(URL_DECODE, "UrlDecode");
+member_name!(FORM_ENCODE, "FormEncode");
+member_name!(FORM_DECODE, "FormDecode");
 member_name!(VALID, "Valid");
 member_name!(OK, "OK");
 member_name!(STATUS, "Status");
@@ -46,6 +48,7 @@ member_name!(HEADER, "Header");
 member_name!(SAVE, "Save");
 member_name!(URL, "Url");
 member_name!(METHOD, "Method");
+member_name!(SET_QUERY, "SetQuery");
 member_name!(SET_HEADER, "SetHeader");
 member_name!(SET_TEXT, "SetText");
 member_name!(SET_BYTES, "SetBytes");
@@ -87,20 +90,37 @@ const URI_COMPONENT: &AsciiSet = &CONTROLS
     .add(b'}')
     .add(b'\x7f');
 
-fn url_encode(text: &str, form: bool) -> String {
-    if form {
-        form_urlencoded::byte_serialize(text.as_bytes()).collect()
-    } else {
-        utf8_percent_encode(text, URI_COMPONENT).to_string()
-    }
+fn url_encode(text: &str) -> String {
+    utf8_percent_encode(text, URI_COMPONENT).to_string()
 }
 
-fn url_decode(text: &str, form: bool) -> String {
-    if form {
-        percent_decode_str(&text.replace('+', " ")).decode_utf8_lossy().into_owned()
-    } else {
-        percent_decode_str(text).decode_utf8_lossy().into_owned()
-    }
+fn url_decode(text: &str) -> String {
+    percent_decode_str(text).decode_utf8_lossy().into_owned()
+}
+
+fn form_encode(text: &str) -> String {
+    form_urlencoded::byte_serialize(text.as_bytes()).collect()
+}
+
+fn form_decode(text: &str) -> String {
+    percent_decode_str(&text.replace('+', " ")).decode_utf8_lossy().into_owned()
+}
+
+fn set_query_parameter(url: &str, name: &str, value: &str) -> Result<String, String> {
+    let mut url = Url::parse(url).map_err(|error| error.to_string())?;
+    let mut parts = url
+        .query()
+        .into_iter()
+        .flat_map(|query| query.split('&'))
+        .filter(|part| {
+            let encoded_name = part.split_once('=').map_or(*part, |(name, _)| name);
+            url_decode(encoded_name) != name
+        })
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    parts.push(format!("{}={}", url_encode(name), url_encode(value)));
+    url.set_query(Some(&parts.join("&")));
+    Ok(url.into())
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -655,16 +675,16 @@ impl UserData for PplHttp {
             vec![("url", VariableType::UnboundedString), ("file", VariableType::UnboundedString)],
             VariableType::UserData(HTTP_RESPONSE_ID as u8),
         );
-        registry.add_named_static_function_with(
-            URL_ENCODE.clone(),
-            vec![("text", VariableType::UnboundedString), ("form", VariableType::Boolean)],
-            1,
+        registry.add_named_static_function(URL_ENCODE.clone(), vec![("text", VariableType::UnboundedString)], VariableType::UnboundedString);
+        registry.add_named_static_function(URL_DECODE.clone(), vec![("text", VariableType::UnboundedString)], VariableType::UnboundedString);
+        registry.add_named_static_function(
+            FORM_ENCODE.clone(),
+            vec![("text", VariableType::UnboundedString)],
             VariableType::UnboundedString,
         );
-        registry.add_named_static_function_with(
-            URL_DECODE.clone(),
-            vec![("text", VariableType::UnboundedString), ("form", VariableType::Boolean)],
-            1,
+        registry.add_named_static_function(
+            FORM_DECODE.clone(),
+            vec![("text", VariableType::UnboundedString)],
             VariableType::UnboundedString,
         );
     }
@@ -707,14 +727,17 @@ impl UserDataValue for PplHttp {
             let path = vm.resolve_file(&file).await;
             return Ok(send(vm, PplHttpRequest::new(Method::GET, url).into_request(), Some(path)).await);
         }
-        if *name == *URL_ENCODE || *name == *URL_DECODE {
+        if *name == *URL_ENCODE || *name == *URL_DECODE || *name == *FORM_ENCODE || *name == *FORM_DECODE {
             let text = arguments.first().map(VariableValue::as_string).unwrap_or_default();
-            let form = arguments.get(1).is_none_or(VariableValue::as_bool);
             vm.operation_succeeded();
             let encoded = if *name == *URL_ENCODE {
-                url_encode(&text, form)
+                url_encode(&text)
+            } else if *name == *URL_DECODE {
+                url_decode(&text)
+            } else if *name == *FORM_ENCODE {
+                form_encode(&text)
             } else {
-                url_decode(&text, form)
+                form_decode(&text)
             };
             return Ok(VariableValue::new_unbounded_string(encoded));
         }
@@ -733,6 +756,11 @@ impl UserData for PplHttpRequest {
     fn register_members<F: UserDataMemberRegistry>(registry: &mut F) {
         registry.add_property(URL.clone(), VariableType::UnboundedString, false);
         registry.add_property(METHOD.clone(), VariableType::UserData(HTTP_METHOD_ENUM_ID), false);
+        registry.add_named_function(
+            SET_QUERY.clone(),
+            vec![("name", VariableType::UnboundedString), ("value", VariableType::UnboundedString)],
+            VariableType::Boolean,
+        );
         registry.add_named_function(
             SET_HEADER.clone(),
             vec![("name", VariableType::UnboundedString), ("value", VariableType::UnboundedString)],
@@ -782,6 +810,24 @@ impl UserDataValue for PplHttpRequest {
         name: &unicase::Ascii<String>,
         arguments: &[VariableValue],
     ) -> crate::Res<VariableValue> {
+        if *name == *SET_QUERY {
+            let parameter_name = arguments.first().map(VariableValue::as_string).unwrap_or_default();
+            let parameter_value = arguments.get(1).map(VariableValue::as_string).unwrap_or_default();
+            let mut request = self.request();
+            match set_query_parameter(&request.url, &parameter_name, &parameter_value) {
+                Ok(url) => {
+                    request.url = url;
+                    drop(request);
+                    vm.operation_succeeded();
+                    return Ok(VariableValue::new_bool(true));
+                }
+                Err(error) => {
+                    drop(request);
+                    vm.set_error(PplError::new(ERR_KIND_NET, ERR_INVALID, format!("invalid HTTP URL: {error}")));
+                    return Ok(VariableValue::new_bool(false));
+                }
+            }
+        }
         if *name == *SET_HEADER {
             let header_name = arguments.first().map(VariableValue::as_string).unwrap_or_default();
             let header_value = arguments.get(1).map(VariableValue::as_string).unwrap_or_default();

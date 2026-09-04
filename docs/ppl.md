@@ -498,7 +498,9 @@ corrupt message data reports `ErrKind.Msg` with `ErrCode.Io` or
 | `Http.Get` | Static function | `Http.Get(url) : HttpResponse` | Makes a policy-controlled GET request |
 | `Http.Download` | Static function | `Http.Download(url, file) : HttpResponse` | Streams a successful response atomically to a file |
 | `Http.New` | Static function | `Http.New(method, url) : HttpRequest` | Builds a GET, HEAD, POST, PUT, DELETE or PATCH request |
-| `Http.UrlEncode`, `Http.UrlDecode` | Static function | `Http.UrlEncode(text [, form]) : STRING`, `Http.UrlDecode(text [, form]) : STRING` | Percent-encodes one field or URL component; `form` defaults to `TRUE` |
+| `Http.UrlEncode`, `Http.UrlDecode` | Static function | `Http.UrlEncode(text) : STRING`, `Http.UrlDecode(text) : STRING` | Encodes or decodes one RFC 3986 URL component |
+| `Http.FormEncode`, `Http.FormDecode` | Static function | `Http.FormEncode(text) : STRING`, `Http.FormDecode(text) : STRING` | Encodes or decodes one `application/x-www-form-urlencoded` field |
+| `HttpRequest.SetQuery` | Function | `request.SetQuery(name, value) : BOOLEAN` | Replaces one query parameter and encodes its name and value automatically |
 | `HttpRequest.SetHeader` | Function | `request.SetHeader(name, value) : BOOLEAN` | Changes one request header; failures are available through `Error.Last()` |
 | `HttpRequest.SetText` | Function | `request.SetText(text [, contentType]) : BOOLEAN` | Changes the UTF-8 request body; failures are available through `Error.Last()` |
 | `HttpRequest.SetBytes` | Function | `request.SetBytes(data [, contentType]) : BOOLEAN` | Changes the binary request body; defaults to `application/octet-stream` |

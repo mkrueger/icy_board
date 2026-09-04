@@ -179,6 +179,13 @@ fn dump_api() {
     assert!(output.contains("RECORD CONTACT (id 34)\n  FIELD Service: STRING\n  FIELD Account: STRING"));
     assert!(output.contains("PROPERTY Alias: STRING [writable]"));
     assert!(output.contains("FUNCTION New(method: HttpMethod, url: STRING) -> HttpRequest [static]"));
+    assert!(output.contains("FUNCTION UrlEncode(text: STRING) -> STRING [static]"));
+    assert!(output.contains("FUNCTION UrlDecode(text: STRING) -> STRING [static]"));
+    assert!(output.contains("FUNCTION FormEncode(text: STRING) -> STRING [static]"));
+    assert!(output.contains("FUNCTION FormDecode(text: STRING) -> STRING [static]"));
+    assert!(!output.contains("UrlEncode(text: STRING, [form: BOOLEAN])"));
+    assert!(!output.contains("UrlDecode(text: STRING, [form: BOOLEAN])"));
+    assert!(output.contains("FUNCTION SetQuery(name: STRING, value: STRING) -> BOOLEAN [member]"));
     assert!(output.contains("FUNCTION SetText(text: STRING, [contentType: STRING]) -> BOOLEAN [member]"));
     assert!(output.contains("ENUM GfxBackend (id 250)\n  VALUE None = -1\n  VALUE Auto = 0"));
 }

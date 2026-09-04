@@ -341,15 +341,16 @@ fn a_failed_download_preserves_the_existing_file() {
 }
 
 #[test]
-fn url_encoding_defaults_to_the_form_dialect_and_round_trips() {
+fn url_and_form_encoding_are_explicit_and_round_trip() {
     assert_eq!(
-        "[a+b%26c%3Dd] [a%20b%26c%3Dd] [a b&c=d] [a b&c=d] [%2B] [+]",
+        "[a+b%26c%3Dd] [a%20b%26c%3Dd] [a b&c=d] [a b&c=d] [%2B] [+] [+] [ ]",
         run_ppl(
             r#"
 STRING raw = "a b&c=d"
-PRINT "[", Http.UrlEncode(raw), "] [", Http.UrlEncode(raw, FALSE), "]"
-PRINT " [", Http.UrlDecode(Http.UrlEncode(raw)), "] [", Http.UrlDecode(Http.UrlEncode(raw, FALSE), FALSE), "]"
-PRINT " [", Http.UrlEncode("+"), "] [", Http.UrlDecode("%2B"), "]"
+PRINT "[", Http.FormEncode(raw), "] [", Http.UrlEncode(raw), "]"
+PRINT " [", Http.FormDecode(Http.FormEncode(raw)), "] [", Http.UrlDecode(Http.UrlEncode(raw)), "]"
+PRINT " [", Http.FormEncode("+"), "] [", Http.FormDecode("%2B"), "]"
+PRINT " [", Http.UrlDecode("+"), "] [", Http.FormDecode("+"), "]"
 "#
         )
     );
@@ -361,7 +362,41 @@ fn url_encoding_keeps_unreserved_characters_and_encodes_utf8_per_byte() {
         "[-_.%7EAZaz09] [-_.~AZaz09] [%C3%A4] [\u{e4}]",
         run_ppl(
             r#"STRING raw = "-_.~AZaz09"
-PRINT "[", Http.UrlEncode(raw), "] [", Http.UrlEncode(raw, FALSE), "] [", Http.UrlEncode("ä"), "] [", Http.UrlDecode("%C3%A4"), "]""#
+PRINT "[", Http.FormEncode(raw), "] [", Http.UrlEncode(raw), "] [", Http.UrlEncode("ä"), "] [", Http.UrlDecode("%C3%A4"), "]""#
+        )
+    );
+}
+
+#[test]
+fn url_encoding_no_longer_accepts_a_boolean_dialect_switch() {
+    assert!(!compile_errors("PRINT Http.UrlEncode(\"a b\", TRUE)").is_empty());
+    assert!(!compile_errors("PRINT Http.UrlDecode(\"a+b\", TRUE)").is_empty());
+}
+
+#[test]
+fn set_query_replaces_matching_parameters_and_preserves_the_rest() {
+    assert_eq!(
+        "1 [https://example.com/search?keep=1&q=hello%20world%26more#section]",
+        run_ppl(
+            r#"
+HttpRequest request = Http.New(HttpMethod.Get, "https://example.com/search?keep=1&q=old&q=older#section")
+BOOLEAN changed = request.SetQuery("q", "hello world&more")
+PRINT changed, " [", request.Url, "]"
+"#
+        )
+    );
+}
+
+#[test]
+fn set_query_rejects_an_invalid_url_without_changing_it() {
+    assert_eq!(
+        "0 [not a URL] 1 1",
+        run_ppl(
+            r#"
+HttpRequest request = Http.New(HttpMethod.Get, "not a URL")
+BOOLEAN changed = request.SetQuery("q", "value")
+PRINT changed, " [", request.Url, "] ", Error.Last().Kind = ErrKind.Net, " ", Error.Last().Code = ErrCode.Invalid
+"#
         )
     );
 }
