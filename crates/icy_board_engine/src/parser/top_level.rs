@@ -9,7 +9,7 @@ use crate::{
 };
 
 use super::{
-    Encoding, ErrorReporter, Parser, ParserErrorType, UserTypeRegistry,
+    Encoding, ErrorReporter, FIRST_MODULE_LANGUAGE_VERSION, Parser, ParserErrorType, UserTypeRegistry,
     lexer::{CommentType, Token},
 };
 
@@ -157,18 +157,18 @@ pub fn preparse_type_declarations(
     let mut parser = Parser::new(file_name, scratch, user_types, input, encoding, workspace);
     parser.next_token();
     while parser.cur_token.is_some() {
-        if parser.lang_version >= 400
+        if parser.lang_version >= FIRST_MODULE_LANGUAGE_VERSION
             && matches!(parser.get_cur_token(), Some(Token::Identifier(ref name)) if name.eq_ignore_ascii_case("MODULE"))
             && matches!(parser.peek_after_current(1).as_slice(), [Some(Token::Identifier(_))])
         {
             parser.parse_module_start();
-        } else if parser.lang_version >= 400
+        } else if parser.lang_version >= FIRST_MODULE_LANGUAGE_VERSION
             && matches!(parser.get_cur_token(), Some(Token::Identifier(ref name)) if name.eq_ignore_ascii_case("ENDMODULE"))
             && parser.module.as_ref().is_some_and(|module| !module.is_implicit())
             && matches!(parser.peek_after_current(1).as_slice(), [Some(Token::Eol | Token::Comment(_, _)) | None])
         {
             parser.parse_module_end();
-        } else if parser.lang_version >= 400
+        } else if parser.lang_version >= FIRST_MODULE_LANGUAGE_VERSION
             && matches!(parser.get_cur_token(), Some(Token::Identifier(ref name)) if name.eq_ignore_ascii_case("IMPORT"))
             && matches!(parser.peek_after_current(2).as_slice(), [Some(Token::Identifier(_)), Some(Token::Identifier(as_name))] if as_name.eq_ignore_ascii_case("AS"))
         {

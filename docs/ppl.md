@@ -247,6 +247,16 @@ because `values(0)` and a call to a function named `values` are written
 identically, which the old language simply lived with. Brackets say which one is
 meant, and they are the recommended form in new code.
 
+PCBoard accepted `[ ]` and `{ }` before, but only as further spellings of `( )`,
+so `values[0]` was read as `values(0)` and even `values(0]` was legal. From 350
+on each kind has one job:
+
+| | Used for |
+| :--- | :--- |
+| `( )` | Grouping, call arguments, and array declarations |
+| `[ ]` | Indexing |
+| `{ }` | Array initializers |
+
 #### Compound assignment
 
 ```PPL
@@ -297,6 +307,43 @@ At language version 350 and above, `QUIT` is no longer a synonym for `BREAK` and
 own. Sources that used the aliases need the modern spelling. They were rare in
 practice.
 
+#### CONST and ENUM
+
+`CONST` names a value the compiler works out and `ENUM` groups related integer
+values under a type and a namespace. Both are gone before anything is emitted -
+the name is replaced by its value, an enum is stored as `INTEGER` - so the PPE is
+the one the value written out by hand would produce, whatever runtime it targets.
+See the language reference for the full rules.
+
+#### What 350 breaks
+
+* `QUIT` and `LOOP` are no longer aliases for `BREAK` and `CONTINUE`.
+* `.` is a token, so it can no longer appear in an identifier.
+* `[ ]` and `{ }` are no longer spellings of `( )`, so a source that opened with
+  one kind and closed with another no longer parses.
+* `CONST` is a keyword, so a 3.40 source may still have a variable called
+  `const` while a 3.50 source may not.
+* `ENUM` and `ENDENUM` are keywords, so a 3.40 source may still use those names
+  as identifiers.
+
+### Language version 400
+
+400 is where the language stops being bound by what PCBoard 15.4 could express.
+A PPE built at runtime 400 will not load on an original PCBoard.
+
+Runtime 400 is the IcyBoard-only format. It carries the type table custom types
+need, the routine-reference marker and the record-literal opcode.
+
+#### More work for brackets and braces
+
+350 already gave each bracket kind one job. 400 adds a use to each of the two
+new ones: `[ ]` after a type declares a dynamic array, as in `STRING lines[]`,
+and `{ }` after a record type name writes a record literal, as in
+`Point { X = 1, Y = 2 }`.
+
+Indexing with `( )` is still accepted for compatibility, but new code should
+index with `[ ]`.
+
 #### Functions and procedures as parameters
 
 A procedure or function can be declared as a parameter:
@@ -313,46 +360,9 @@ complete signature: routine kind, argument types and dimensions, `VAR` flags and
 the return type of a function. A routine parameter can be passed on to another
 routine. Outside such an argument position a bare routine name is still an error.
 
-Routine references need runtime 400 because 4.00 adds the bytecode marker that
-distinguishes a routine value from a call to that routine.
-
-#### CONST and ENUM
-
-`CONST` names a value the compiler works out and `ENUM` groups related integer
-values under a type and a namespace. Both are gone before anything is emitted -
-the name is replaced by its value, an enum is stored as `INTEGER` - so the PPE is
-the one the value written out by hand would produce, whatever runtime it targets.
-See the language reference for the full rules.
-
-#### What 350 breaks
-
-* `QUIT` and `LOOP` are no longer aliases for `BREAK` and `CONTINUE`.
-* `.` is a token, so it can no longer appear in an identifier.
-* `CONST` is a keyword, so a 3.40 source may still have a variable called
-  `const` while a 3.50 source may not.
-* `ENUM` and `ENDENUM` are keywords, so a 3.40 source may still use those names
-  as identifiers.
-
-### Language version 400
-
-400 is where the language stops being bound by what PCBoard 15.4 could express.
-A PPE built at runtime 400 will not load on an original PCBoard.
-
-Runtime 400 is the IcyBoard-only format. It carries the type table custom types
-need, the routine-reference marker and the record-literal opcode.
-
-#### Parentheses, brackets and braces
-
-400 gives each bracket kind one job:
-
-| | Used for |
-| :--- | :--- |
-| `( )` | Grouping, call arguments, and array declarations |
-| `[ ]` | Indexing |
-| `{ }` | Array initializers |
-
-Indexing with `( )` is still accepted for compatibility, but new code should
-index with `[ ]`.
+This is language 400 because it is not syntax that lowers to old instructions:
+4.00 adds the bytecode marker that distinguishes a routine value from a call to
+that routine, so a routine reference needs runtime 400 as well.
 
 #### Board objects
 

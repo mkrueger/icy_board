@@ -61,6 +61,23 @@ fn documentation_comments_attach_to_routines() {
 }
 
 #[test]
+fn documentation_comments_need_no_language_version() {
+    let registry = UserTypeRegistry::default();
+    let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+    let mut workspace = Workspace::default();
+    workspace.package.runtime = Some(330);
+    let source = ";;; Classic summary.\nPROCEDURE Show()\nENDPROC\n";
+    let ast = parse_ast(PathBuf::from("test.pps"), errors.clone(), source, &registry, Encoding::Utf8, &workspace);
+
+    let documentation = ast.nodes.iter().find_map(|node| match node {
+        AstNode::Procedure(implementation) => implementation.get_documentation(),
+        _ => None,
+    });
+    assert_eq!(documentation, Some("Classic summary."));
+    assert!(errors.lock().unwrap().errors.is_empty(), "a doc comment is a comment at every version");
+}
+
+#[test]
 fn a_file_can_use_a_type_declared_in_a_later_file() {
     let registry = UserTypeRegistry::default();
     let errors = Arc::new(Mutex::new(ErrorReporter::default()));
@@ -536,4 +553,26 @@ fn test_type_is_not_a_keyword_before_400() {
     parser.next_token();
     parser.parse_ast_node().unwrap();
     assert!(errors.lock().unwrap().errors.is_empty());
+}
+
+#[test]
+fn a_routine_parameter_is_not_accepted_before_400() {
+    let reg = UserTypeRegistry::icy_board_registry();
+    let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+    let mut workspace = Workspace::default();
+    workspace.package.runtime = Some(350);
+    let mut parser: Parser<'_> = Parser::new(
+        PathBuf::from("."),
+        errors.clone(),
+        &reg,
+        "PROCEDURE Apply(PROCEDURE action())\nENDPROC\n",
+        Encoding::Utf8,
+        &workspace,
+    );
+    parser.next_token();
+    parser.parse_ast_node();
+    assert!(
+        !errors.lock().unwrap().errors.is_empty(),
+        "a passed routine is a runtime 400 reference, so 3.50 must not parse it"
+    );
 }

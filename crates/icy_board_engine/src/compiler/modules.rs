@@ -542,11 +542,18 @@ mod tests {
     }
 
     #[test]
-    fn module_syntax_requires_language_400() {
+    fn module_syntax_requires_language_350() {
         let errors = compile(&[("main.pps", ";$LANGVERSION 350\nMODULE Legacy\nENDMODULE\n")]);
+        let messages = errors.lock().unwrap().errors.iter().map(|error| error.error.to_string()).collect::<Vec<_>>();
+        assert!(messages.is_empty(), "modules are erased while compiling, so 3.50 is enough: {messages:?}");
+    }
+
+    #[test]
+    fn module_syntax_is_not_enabled_for_pcboard_languages() {
+        let errors = compile(&[("main.pps", ";$LANGVERSION 330\nMODULE Legacy\nENDMODULE\n")]);
         assert!(
             !errors.lock().unwrap().errors.is_empty(),
-            "module syntax must not be enabled before language 4.00"
+            "module syntax must not be enabled before language 3.50"
         );
     }
 

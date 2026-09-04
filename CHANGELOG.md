@@ -46,7 +46,7 @@ releases.
   copy instead of colliding, and a library's top-level initializers always run
   before the importing program's own code.
 
-- PPL 4.00 adds compile-time `MODULE ... ENDMODULE` namespaces. Declarations
+- PPL 3.50 adds compile-time `MODULE ... ENDMODULE` namespaces. Declarations
   are public by default, standalone `PUBLIC` and `PRIVATE` lines switch section
   visibility, and `IMPORT module AS alias` provides qualified access without
   changing the PPE runtime format. The compiler isolates equal declaration and
@@ -55,9 +55,11 @@ releases.
   `ENDMODULE` in the same file is rejected as outside the module rather than
   silently joining it.
 
-- PPL 4.00 functions, procedures and `DECLARE` statements support Rust-style
-  Markdown documentation through contiguous `;;;` comments. The language
-  server shows the documentation in hover, completion and signature help.
+- Functions, procedures and `DECLARE` statements support Rust-style Markdown
+  documentation through contiguous `;;;` comments. Such a block stays an
+  ordinary comment to the compiler, so it needs no language version and reaches
+  no PPE. The language server shows the documentation in hover, completion and
+  signature help.
 
 - PPL 4.00 adds compiled `REGEX`, `REGEXMATCH` and `REGEXMATCHES` objects for
   Unicode-aware matching, numbered and named captures, bounded collection,

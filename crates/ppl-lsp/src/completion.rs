@@ -26,12 +26,12 @@ pub enum ImCompleteCompletionItem {
 /// them their meaning. EXIT is the statement END used to be.
 const CONTEXTUAL_WORDS: &[(&str, u16)] = &[
     ("EXIT", 400),
-    ("MODULE", 400),
-    ("ENDMODULE", 400),
-    ("IMPORT", 400),
-    ("AS", 400),
-    ("PUBLIC", 400),
-    ("PRIVATE", 400),
+    ("MODULE", 350),
+    ("ENDMODULE", 350),
+    ("IMPORT", 350),
+    ("AS", 350),
+    ("PUBLIC", 350),
+    ("PRIVATE", 350),
 ];
 
 const PREPROCESSOR_DIRECTIVES: &[&str] = &["LANGVERSION", "DEFINE", "IF", "ELSEIF", "ELIF", "ELSE", "ENDIF", "USEFUNCS"];

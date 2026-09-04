@@ -105,6 +105,14 @@ pub const CHECKSUM_ENUM_ID: u8 = 242;
 /// The board objects are ours, so no `PCBoard` language knows their names.
 pub const FIRST_BOARD_OBJECT_LANGUAGE_VERSION: u16 = 400;
 
+/// Modules, imports and visibility sections are erased while compiling, so they are
+/// available as soon as the source opts into a language of ours.
+pub const FIRST_MODULE_LANGUAGE_VERSION: u16 = 350;
+
+/// A passed routine stays a routine reference in the PPE, so only runtime 4.00 can
+/// carry it and the syntax belongs to the language of the same name.
+pub const FIRST_ROUTINE_PARAMETER_LANGUAGE_VERSION: u16 = 400;
+
 /// Types a program declares itself start here, so the board can keep adding
 /// objects of its own below without ever running into them.
 pub const FIRST_USER_TYPE_ID: usize = 100;

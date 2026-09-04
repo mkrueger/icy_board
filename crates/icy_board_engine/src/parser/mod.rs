@@ -89,7 +89,7 @@ impl<'a> Parser<'a> {
 
     fn parse_ast_node(&mut self) -> Option<AstNode> {
         let cur_token = self.cur_token.clone()?;
-        if self.lang_version >= 400
+        if self.lang_version >= FIRST_MODULE_LANGUAGE_VERSION
             && let Token::Identifier(keyword) = &cur_token.token
         {
             if keyword.eq_ignore_ascii_case("MODULE") && matches!(self.peek_after_current(1).as_slice(), [Some(Token::Identifier(_))]) {
@@ -595,7 +595,7 @@ impl<'a> Parser<'a> {
                 return ParameterSpecifier::Variable(VariableParameterSpecifier::new(None, func_token, VariableType::Integer, None));
             }
 
-            if self.lang_version >= 350 {
+            if self.lang_version >= FIRST_ROUTINE_PARAMETER_LANGUAGE_VERSION {
                 if let Some(Token::Function) = self.get_cur_token() {
                     parameters.push(self.parse_function_parameter_specifier());
                     if self.get_cur_token() == Some(Token::Comma) {
@@ -677,7 +677,7 @@ impl<'a> Parser<'a> {
                 return ParameterSpecifier::Variable(VariableParameterSpecifier::new(None, proc_token, VariableType::Integer, None));
             }
 
-            if self.lang_version >= 350 {
+            if self.lang_version >= FIRST_ROUTINE_PARAMETER_LANGUAGE_VERSION {
                 if let Some(Token::Function) = self.get_cur_token() {
                     parameters.push(self.parse_function_parameter_specifier());
                     if self.get_cur_token() == Some(Token::Comma) {
@@ -963,7 +963,7 @@ impl Parser<'_> {
 
             let mut var_token = None;
 
-            if self.lang_version >= 350 {
+            if self.lang_version >= FIRST_ROUTINE_PARAMETER_LANGUAGE_VERSION {
                 if let Some(Token::Function) = self.get_cur_token() {
                     parameters.push(self.parse_function_parameter_specifier());
                     if self.get_cur_token() == Some(Token::Comma) {
@@ -1089,7 +1089,7 @@ impl Parser<'_> {
 
                     return None;
                 }
-                if self.lang_version >= 350 {
+                if self.lang_version >= FIRST_ROUTINE_PARAMETER_LANGUAGE_VERSION {
                     if let Some(Token::Function) = self.get_cur_token() {
                         parameters.push(self.parse_function_parameter_specifier());
                         if self.get_cur_token() == Some(Token::Comma) {

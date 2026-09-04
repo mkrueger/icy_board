@@ -19,9 +19,8 @@ format, so 4.00 is what a PPE targets whenever it uses anything below.
 | Optional parentheses | 350 | any compatible runtime | `IF condition THEN`, `WHILE condition ...` |
 | Typed constants | 350 | any compatible runtime | `CONST`, erased to its value during compilation |
 | Nominal integer enums | 350 | any compatible runtime | `ENUM ... ENDENUM`, scoped members such as `Color.Red` |
-| Routine parameters | 350 | 400 | Pass a matching function or procedure as a checked callable value |
-| Routine documentation | 400 | any compatible runtime | Markdown `;;;` comments shown by editor hover, completion and signature help |
-| Compile-time modules | 400 | any compatible runtime | `MODULE`, visibility sections and `IMPORT ... AS ...` namespaces |
+| Compile-time modules | 350 | any compatible runtime | `MODULE`, visibility sections and `IMPORT ... AS ...` namespaces |
+| Routine parameters | 400 | 400 | Pass a matching function or procedure as a checked callable value |
 | Main-program block | 400 | 400 | Real `BEGIN ... END`; `EXIT` replaces the old terminating use of `END` |
 | Board objects and member calls | 400 | 400 | `CONFERENCE`, `DIRECTORY`, `AREA`, `DOOR`, `PASSWORD`, `Board`, `Session` |
 | Message-area identifiers | 400 | 400 | `MSGAREAID` and `AreaId(conf, area)` |
@@ -39,13 +38,42 @@ compiler collects routine signatures before generating code, so `DECLARE` is
 optional at every language version. `RETURN expression` is likewise accepted
 when compiling classic source. In both cases the generated PPE uses ordinary
 old instructions; declarations that disagree with implementations are errors.
+Routine documentation is not in the table either, for the same reason.
+
+## Routine documentation
+
+A contiguous block of `;;;` comments documents the function, procedure or
+`DECLARE` statement immediately below it. The text is Markdown and follows the
+usual Rust documentation style for summaries, headings, lists and fenced PPL
+examples:
+
+```PPL
+;;; Draws one item in the visible list.
+;;;
+;;; # Arguments
+;;;
+;;; - `item` - Zero-based item index.
+;;; - `row` - Screen row where the item is drawn.
+PROCEDURE DrawRow(INTEGER item, INTEGER row)
+	PRINTLN item, row
+ENDPROC
+```
+
+One optional space after `;;;` is removed; other Markdown indentation is
+preserved. A blank line or ordinary comment breaks attachment. When both a
+`DECLARE` statement and its implementation have documentation, the declaration
+is canonical.
+
+A `;;;` block is an ordinary comment to the compiler, so it needs no language
+version and changes no PPE: the text never reaches the file. It is read by the
+language server, which shows it in hover, completion and signature help, and a
+source written for any language version can carry it.
 
 ## Language version 3.50
 
-3.50 is mostly syntax that lowers to classic PPE instructions, so constants,
-enums, loops, initializers, brackets and compound assignments can target an old
-runtime. Passing a routine is the exception because only runtime 4.00 can mark
-a routine reference as a value.
+3.50 is syntax that lowers to classic PPE instructions, so constants, enums,
+loops, initializers, brackets, compound assignments and modules can target an
+old runtime.
 
 ### Initializers and indexing
 
@@ -58,7 +86,9 @@ values[0] += count
 
 The brace initializer declares the array and determines its size. Parenthesis
 indexing remains valid for old source; brackets are recommended because they
-cannot be mistaken for a function call.
+cannot be mistaken for a function call. Below 350 all three bracket kinds were
+merely other ways of writing `( )`, so this is where they gain a meaning of
+their own rather than where they first parse.
 
 ### Loops
 
@@ -94,23 +124,6 @@ Constants are typed compile-time expressions. Enums are nominal integer types:
 members are scoped below the enum name, and two different enum types cannot be
 mixed merely because their stored numbers match. Both are erased before the PPE
 is written, so a decompiler can recover the value but not the source name.
-
-### Functions and procedures as parameters
-
-```PPL
-PROCEDURE Apply(PROCEDURE action(), FUNCTION check(INTEGER n) BOOLEAN)
-	IF check(1) action()
-ENDPROC
-```
-
-The compiler checks routine kind, parameter types and dimensions, `VAR` flags
-and function return type. A routine parameter is callable and can be passed on
-to another routine. The callable reference needs runtime 4.00.
-
-## Language version 4.00
-
-4.00 adds syntax and board APIs that do not exist on PCBoard. A runtime 4.00 PPE
-therefore targets Icy Board rather than the original board.
 
 ### Modules and imports
 
@@ -204,30 +217,23 @@ library is a module, its sources declare rather than run, and a `;$LANGVERSION`
 a library states applies to that library alone. Pin Git dependencies with `rev`
 when reproducible builds are required.
 
-### Routine documentation
+## Language version 4.00
 
-A contiguous block of `;;;` comments documents the function, procedure or
-`DECLARE` statement immediately below it. The text is Markdown and follows the
-usual Rust documentation style for summaries, headings, lists and fenced PPL
-examples:
+4.00 adds syntax and board APIs that do not exist on PCBoard. A runtime 4.00 PPE
+therefore targets Icy Board rather than the original board.
+
+### Functions and procedures as parameters
 
 ```PPL
-;;; Draws one item in the visible list.
-;;;
-;;; # Arguments
-;;;
-;;; - `item` - Zero-based item index.
-;;; - `row` - Screen row where the item is drawn.
-PROCEDURE DrawRow(INTEGER item, INTEGER row)
-	PRINTLN item, row
+PROCEDURE Apply(PROCEDURE action(), FUNCTION check(INTEGER n) BOOLEAN)
+	IF check(1) action()
 ENDPROC
 ```
 
-One optional space after `;;;` is removed; other Markdown indentation is
-preserved. A blank line or ordinary comment breaks attachment. When both a
-`DECLARE` statement and its implementation have documentation, the declaration
-is canonical. Documentation is source metadata and does not change the PPE
-runtime format.
+The compiler checks routine kind, parameter types and dimensions, `VAR` flags
+and function return type. A routine parameter is callable and can be passed on
+to another routine. The callable reference is stored in the PPE, so it needs
+runtime 4.00.
 
 ### Blocks and program exit
 
@@ -863,8 +869,8 @@ adds:
 - a routine-reference marker for functions and procedures passed as values
 - a record-literal opcode carrying type and field identifiers
 
-A language 350 source needs runtime 400 when it passes routines; all its other
-additions can lower to an older compatible runtime.
+A language 350 source lowers to an older compatible runtime; runtime 400 is only
+needed once a source uses something the list above adds.
 
 For the full rules, limits, diagnostics and compatibility breaks, see
 [PPL](ppl.md#the-ppl-40-language). The sections below are the library and
