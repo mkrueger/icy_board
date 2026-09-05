@@ -8,6 +8,7 @@ use super::IcyBoardSerializer;
 use crate::Res;
 
 pub mod bundle;
+pub mod freq;
 pub mod packet;
 pub mod queue;
 pub mod toss;
@@ -298,6 +299,10 @@ pub struct FtnConfig {
     #[serde(default)]
     pub options: FtnOptions,
 
+    /// What this board hands out when a node asks for a file.
+    #[serde(default)]
+    pub freq: freq::FtnFreq,
+
     #[serde(rename = "aka", default)]
     pub akas: Vec<FtnAka>,
 
@@ -383,6 +388,7 @@ impl Default for FtnConfig {
             new_areas: Self::default_new_areas(),
             origin: String::new(),
             options: FtnOptions::default(),
+            freq: freq::FtnFreq::default(),
         }
     }
 }
@@ -471,6 +477,17 @@ mod tests {
         config.options.make_response = true;
         config.options.area_fix_forwarding = true;
         config.options.auto_add_passthru = true;
+        config.freq.enabled = true;
+        config.freq.paths.push(freq::FreqPath {
+            path: PathBuf::from("files/freq"),
+            password: "secret".to_string(),
+        });
+        config.freq.magic.push(freq::FreqMagic {
+            name: "FILES".to_string(),
+            file: PathBuf::from("files/list.zip"),
+            password: String::new(),
+        });
+        config.freq.deny.push(EchomailAddress::parse("21:1/666").unwrap());
         let text = toml::to_string(&config).unwrap();
         assert_eq!(toml::from_str::<FtnConfig>(&text).unwrap(), config);
     }

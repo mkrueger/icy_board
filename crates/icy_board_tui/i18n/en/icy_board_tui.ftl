@@ -3760,6 +3760,85 @@ fido_menu_addresses=System Address
 fido_menu_directories=File & Directory Configuration
 fido_menu_origin=Default Origin
 fido_menu_routing=Routing Configuration
+fido_menu_freq_paths=FREQ Path List
+fido_menu_freq_restrictions=FREQ Restrictions
+fido_menu_freq_magic=FREQ Magic Names
+fido_menu_freq_deny=FREQ Deny Nodelist
+
+fido_freq_title=Fido FREQ restrictions
+fido_freq_enabled=Answer File Requests
+fido_freq_enabled-status=Whether a node may ask this board for files
+fido_freq_enabled-help=
+    # Answer File Requests
+
+    A file request names files instead of downloading them through the board.
+    While this is off, requests are left where they are and nothing is sent.
+
+fido_freq_session_kbytes=Session Max Bytes
+fido_freq_session_kbytes-status=How much one request may take away, in kilobytes (0=unlimited)
+fido_freq_session_kbytes-help=
+    # Session Max Bytes
+
+    A request stops once the files it asked for reach this size. PCBoard named
+    the field bytes but counted it in kilobytes, and so does this one, so the
+    figure a board was set to keeps its meaning after an import.
+
+fido_freq_daily_kbytes=Daily Max Bytes
+fido_freq_daily_kbytes-status=How much one node may take away each day, in kilobytes (0=unlimited)
+fido_freq_daily_kbytes-help=
+    # Daily Max Bytes
+
+    All requests from one node count toward this limit until the date changes.
+    Like the session figure it is counted in kilobytes.
+
+fido_freq_path_title=FREQ Path Configuration
+fido_freq_path_editor=FREQ Path
+fido_freq_header_path=Path
+fido_freq_header_password=Password
+fido_freq_header_file=File
+fido_freq_header_magic=Magic Name
+fido_freq_header_node=Node
+
+fido_freq_path=Path
+fido_freq_path-status=A directory requests may be answered from
+fido_freq_path-help=
+    # Path
+
+    Only what lies directly in one of these directories can be asked for. A
+    request naming anything else, or trying to reach out of them, is refused.
+
+fido_freq_password=Password
+fido_freq_password-status=Password a node must give to reach this (BLANK=open to all)
+fido_freq_password-help=
+    # Password
+
+    While this is set, only a request carrying the same password is answered
+    from here. A node writes it after the file name.
+
+fido_freq_magic_title=Fidonet Magic Names Editor
+fido_freq_magic_editor=FREQ Magic Name
+fido_freq_magic=Magic Name
+fido_freq_magic-status=The name a node asks for
+fido_freq_magic-help=
+    # Magic Name
+
+    A name that stands for a file of your choosing, so the asking side never
+    has to know what the file is really called. FILES and NODEDIFF are the
+    names fidonet expects.
+
+fido_freq_file=File
+fido_freq_file-status=The file the magic name hands out
+
+fido_freq_deny_title=FREQ Deny Nodelist Configuration
+fido_freq_deny_editor=Denied Node
+fido_freq_node=Node
+fido_freq_node-status=A node that gets nothing it asks for
+fido_freq_node-help=
+    # Node
+
+    The address of a node whose requests are always refused, whatever it asks
+    for and whatever password it brings.
+
 
 fido_processing_title=Fido Processing Configuration
 

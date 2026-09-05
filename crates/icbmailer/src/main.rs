@@ -12,6 +12,7 @@ use icy_board_engine::{
         ftn::{
             FtnConfig, FtnLink, FtnLogLevel,
             bundle::{is_bundle, unpack},
+            freq,
             packet::Packet,
             toss::{EchoArea, TossReport, scan_outbound, toss_inbound},
         },
@@ -279,6 +280,11 @@ async fn poll_link(ftn: &FtnConfig, identity: &BinkpIdentity, link: &FtnLink, ke
         if result.remote.secure { "" } else { " (unsecure session)" }
     );
     for path in &result.batch.received {
+        let path = if path.extension().is_some_and(|extension| extension.eq_ignore_ascii_case("req")) {
+            freq::identify_received(path, &link.address)?
+        } else {
+            path.clone()
+        };
         println!("  received {}", path.display());
     }
     for path in &result.batch.sent {
@@ -355,6 +361,7 @@ fn toss(board: &mut IcyBoard) -> Res<()> {
     for (file, err) in &report.failed {
         println!("  left in the inbound, {}: {}", file.display(), err);
     }
+    serve_requests(board)?;
     register_link_updates(board, &report)?;
     register_new_areas(board, &report)?;
     Ok(())
@@ -390,6 +397,29 @@ fn print_untrusted_netmail_advice(board: &IcyBoard, source: &str, count: usize) 
         "    Fix: add [[link]] address = \"{}\" for a node you trust, or disable Secure Netmail (options.secure = false).",
         source
     );
+}
+
+/// Puts what the nodes asked for into their outbound, so the next session
+/// carries it.
+fn serve_requests(board: &IcyBoard) -> Res<()> {
+    let report = freq::serve(&board.ftn)?;
+    if report.requests == 0 && report.unknown.is_empty() && report.failed.is_empty() {
+        return Ok(());
+    }
+    println!("  {} file request(s), {} file(s) put in an outbound", report.requests, report.served);
+    for (wanted, why) in &report.refused {
+        println!("  {} was not sent: {}", wanted, why);
+    }
+    for name in &report.unknown {
+        println!(
+            "  {} was left alone because no configured link answers to the node that wrote it. Add that node under Message Networking > Node Configuration",
+            name
+        );
+    }
+    for (file, err) in &report.failed {
+        println!("  left in the inbound, {}: {}", file.display(), err);
+    }
+    Ok(())
 }
 
 /// An area the tosser created for a tag nobody carried is of no use until a

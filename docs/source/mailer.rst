@@ -272,6 +272,43 @@ so exporting it as echomail would put private mail in a bundle for every
 downlink that carries the tag. The scanner refuses such an area and says so.
 
 
+File requests
+-------------
+
+A node can ask for files by name instead of downloading them through the board.
+Turn this on under ``FREQ Restrictions`` and set ``Session Max Bytes`` and
+``Daily Max Bytes``. Both are counted in kilobytes, which is what PCBoard did
+behind a field it named bytes, so an imported figure keeps its meaning. The
+daily figure is kept per node and reset when the date changes; zero leaves
+either limit open. The two are read from ``PCBFIDO.CFG`` on import.
+
+PCBoard also restricted connection time and modem baud rate. A binkp request is
+answered from a file already received on disk, so neither figure describes
+anything in this mailer. Its Allowed Nodes choice is represented by requiring
+the requester to be a configured link. The rest is configured on three lists
+next to the restrictions.
+
+``FREQ Path Configuration`` names the directories a request may be answered
+from. Only what lies directly in one of them can be asked for: a requested name
+is matched against the directory listing and never becomes a path of its own,
+so a request cannot reach anywhere else. A path may carry a password, and a
+node then writes it after the file name.
+
+``FREQ Magic Names`` map a name to a file of your choosing, so the asking side
+never has to know what the file is really called. ``FILES`` and ``NODEDIFF``
+are the names fidonet expects.
+
+``FREQ Deny Nodelist`` names the nodes whose requests are always refused.
+
+A request arrives as a ``.REQ`` file named after the net and node that wrote
+it. On receipt the mailer binds it to the full address of the binkp session, so
+the remote cannot claim another node merely by choosing its file name. What it
+asks for is copied into that node's outbound and goes out in the next session,
+which means only a configured link can be answered. PCBoard told nodes apart
+by whether the nodelist listed them; there is no nodelist here, so a request
+from a node that is not a link is reported and left alone.
+
+
 Running the mailer
 ------------------
 

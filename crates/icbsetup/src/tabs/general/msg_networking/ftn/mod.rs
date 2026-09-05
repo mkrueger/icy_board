@@ -12,6 +12,7 @@ use icy_board_tui::{
 use ratatui::{Frame, layout::Rect};
 
 mod addresses;
+mod freq;
 mod nodes;
 mod options;
 mod routes;
@@ -34,6 +35,10 @@ impl FidoConfiguration {
                 MenuItem::new(4, 'E', get_text("fido_menu_directories")),
                 MenuItem::new(5, 'F', get_text("fido_menu_origin")),
                 MenuItem::new(6, 'G', get_text("fido_menu_routing")),
+                MenuItem::new(7, 'H', get_text("fido_menu_freq_paths")),
+                MenuItem::new(8, 'I', get_text("fido_menu_freq_restrictions")),
+                MenuItem::new(9, 'J', get_text("fido_menu_freq_magic")),
+                MenuItem::new(10, 'K', get_text("fido_menu_freq_deny")),
             ]))
             .with_center_title(get_text("fido_config_title")),
             icy_board,
@@ -66,6 +71,10 @@ impl Page for FidoConfiguration {
                 4 => PageMessage::OpenSubPage(Box::new(options::directories(board))),
                 5 => PageMessage::OpenSubPage(Box::new(options::origin(board))),
                 6 => PageMessage::OpenSubPage(Box::new(routes::RoutingConfiguration::new(board))),
+                7 => PageMessage::OpenSubPage(Box::new(freq::FreqPathList::new(board))),
+                8 => PageMessage::OpenSubPage(Box::new(options::freq(board))),
+                9 => PageMessage::OpenSubPage(Box::new(freq::FreqMagicNames::new(board))),
+                10 => PageMessage::OpenSubPage(Box::new(freq::FreqDenyList::new(board))),
                 _ => PageMessage::None,
             };
         }

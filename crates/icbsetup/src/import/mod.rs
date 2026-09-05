@@ -16,7 +16,11 @@ use icy_board_engine::{
         conferences::ConferenceBase,
         events::{BoardEvent, EventList, EventMode},
         file_directory::DirectoryList,
-        ftn::{FtnConfig, FtnOptions},
+        freq::{PcbFreqDeny, PcbFreqInfo, PcbFreqMagic, PcbFreqPath},
+        ftn::{
+            FtnConfig, FtnOptions,
+            freq::{FreqMagic, FreqPath, FtnFreq},
+        },
         group_list::GroupList,
         icb_config::{
             BoardInformation, BoardOptions, ColorConfiguration, ConfigPaths, DEFAULT_PCBOARD_DATE_FORMAT, DisplayNewsBehavior, IcbColor, IcbConfig,
@@ -795,6 +799,7 @@ impl PCBoardImporter {
                 log_level: icy_board_engine::icy_board::ftn::FtnLogLevel::from_pcboard(self.data.fido_log_level),
             },
             origin: self.data.origin.trim().to_string(),
+            freq: self.load_freq(),
             ..FtnConfig::default()
         };
         let ftn_path = self.output_directory.join(&icb_cfg.paths.ftn_file);
@@ -864,16 +869,22 @@ impl PCBoardImporter {
         Ok(())
     }
 
-    /// The origin lines PCBoard keeps in `ORIGINS.DAT`, resolved to the
-    /// conferences each of them speaks for.
-    fn load_fido_origins(&mut self) -> HashMap<u16, String> {
-        let mut result = HashMap::new();
+    /// One of the files PCBoard keeps beside its fido configuration. `FidoLoc`
+    /// names a file in that directory, so the name is cut off.
+    fn fido_file(&self, name: &str) -> PathBuf {
         let directory = self.data.fido_loc.replace('\\', "/");
         let directory = match directory.rfind('/') {
             Some(cut) => &directory[..=cut],
             None => "",
         };
-        let path = self.try_resolve_file(&format!("{directory}ORIGINS.DAT"));
+        self.try_resolve_file(&format!("{directory}{name}"))
+    }
+
+    /// The origin lines PCBoard keeps in `ORIGINS.DAT`, resolved to the
+    /// conferences each of them speaks for.
+    fn load_fido_origins(&mut self) -> HashMap<u16, String> {
+        let mut result = HashMap::new();
+        let path = self.fido_file("ORIGINS.DAT");
         if !path.exists() {
             return result;
         }
@@ -889,6 +900,72 @@ impl PCBoardImporter {
                 self.logger.log(&format!("Can't read origin lines from {}: {}", path.display(), err));
             }
         }
+        result
+    }
+
+    /// What PCBoard hands out on a file request, from the three lists it keeps
+    /// that in and the limits in `PCBFIDO.CFG`.
+    fn load_freq(&mut self) -> FtnFreq {
+        let mut result = FtnFreq::default();
+        let config = self.fido_file("PCBFIDO.CFG");
+        if config.exists() {
+            match PcbFreqInfo::import_pcboard(&config) {
+                // The two size fields are named bytes but counted in kilobytes.
+                Ok(Some(info)) => {
+                    result.limits.session_bytes = u64::from(info.session_kbytes) * 1024;
+                    result.limits.daily_bytes = u64::from(info.daily_kbytes) * 1024;
+                }
+                Ok(None) => self
+                    .logger
+                    .log(&format!("{} holds no FREQ restrictions, keeping the defaults", config.display())),
+                Err(err) => self.logger.log(&format!("Can't read FREQ restrictions from {}: {}", config.display(), err)),
+            }
+        }
+        let paths = self.fido_file("FREQPATH.DAT");
+        if paths.exists() {
+            match PcbFreqPath::import_pcboard(&paths) {
+                Ok(entries) => {
+                    result.paths = entries
+                        .into_iter()
+                        .map(|entry| FreqPath {
+                            path: self.resolve_file(&entry.path),
+                            password: entry.password,
+                        })
+                        .collect();
+                }
+                Err(err) => self.logger.log(&format!("Can't read FREQ paths from {}: {}", paths.display(), err)),
+            }
+        }
+        let magic = self.fido_file("MAGICNAM.DAT");
+        if magic.exists() {
+            match PcbFreqMagic::import_pcboard(&magic) {
+                Ok(entries) => {
+                    result.magic = entries
+                        .into_iter()
+                        .map(|entry| FreqMagic {
+                            name: entry.name,
+                            file: self.resolve_file(&entry.file),
+                            password: entry.password,
+                        })
+                        .collect();
+                }
+                Err(err) => self.logger.log(&format!("Can't read FREQ magic names from {}: {}", magic.display(), err)),
+            }
+        }
+        let deny = self.fido_file("FREQDENY.DAT");
+        if deny.exists() {
+            match PcbFreqDeny::import_pcboard(&deny) {
+                Ok(entries) => {
+                    result.deny = entries
+                        .into_iter()
+                        .map(|entry| EchomailAddress::new(entry.zone, entry.net, entry.node, entry.point))
+                        .collect();
+                }
+                Err(err) => self.logger.log(&format!("Can't read the FREQ deny list from {}: {}", deny.display(), err)),
+            }
+        }
+        // PCBoard answered requests whenever paths were configured.
+        result.enabled = !result.paths.is_empty() || !result.magic.is_empty();
         result
     }
 

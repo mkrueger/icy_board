@@ -10,6 +10,13 @@ releases.
 
 ### Added
 
+- File requests are answered, which PCBoard configured on four screens and
+  this board now offers under the same names: a FREQ path list, restrictions,
+  magic names and a deny list. A requested name is matched against the listing
+  of a configured path and never becomes a path of its own, so a request cannot
+  reach outside what was offered. `FREQPATH.DAT`, `MAGICNAM.DAT`,
+  `FREQDENY.DAT` and the restrictions in `PCBFIDO.CFG` are read on import.
+
 - Netmail written on this board is packed and sent. It used to arrive and stay:
   a reply reached the message base and never left it. The scanner takes what
   names a destination and has not gone yet, sends it to that node when it is a

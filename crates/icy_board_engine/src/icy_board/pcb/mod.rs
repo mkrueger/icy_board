@@ -14,6 +14,7 @@ use self::{
 
 use super::{IcyBoardError, icb_text::IcbTextFile, lookup_case_insensitive};
 
+pub mod freq;
 pub mod origins;
 pub mod pcbconferences;
 pub mod pcboard_data;

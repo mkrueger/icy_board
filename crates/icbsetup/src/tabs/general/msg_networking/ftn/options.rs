@@ -193,3 +193,47 @@ pub fn origin(icy_board: Arc<Mutex<IcyBoard>>) -> FtnOptionPage {
     };
     page("fido_origin_title", &icy_board, entry)
 }
+
+pub fn freq(icy_board: Arc<Mutex<IcyBoard>>) -> FtnOptionPage {
+    let entry = {
+        let lock = icy_board.lock().unwrap();
+        let width = 38;
+        vec![
+            ConfigEntry::Item(
+                ListItem::new(get_text("fido_freq_enabled"), ListValue::Bool(lock.ftn.freq.enabled))
+                    .with_status(get_text("fido_freq_enabled-status"))
+                    .with_help(get_text("fido_freq_enabled-help"))
+                    .with_label_width(width)
+                    .with_update_bool_value(&|board: &Arc<Mutex<IcyBoard>>, value: bool| {
+                        board.lock().unwrap().ftn.freq.enabled = value;
+                    }),
+            ),
+            ConfigEntry::Separator,
+            ConfigEntry::Item(
+                ListItem::new(
+                    get_text("fido_freq_session_kbytes"),
+                    ListValue::U32((lock.ftn.freq.limits.session_bytes / 1024) as u32, 0, u32::MAX),
+                )
+                .with_status(get_text("fido_freq_session_kbytes-status"))
+                .with_help(get_text("fido_freq_session_kbytes-help"))
+                .with_label_width(width)
+                .with_update_u32_value(&|board: &Arc<Mutex<IcyBoard>>, value: u32| {
+                    board.lock().unwrap().ftn.freq.limits.session_bytes = u64::from(value) * 1024;
+                }),
+            ),
+            ConfigEntry::Item(
+                ListItem::new(
+                    get_text("fido_freq_daily_kbytes"),
+                    ListValue::U32((lock.ftn.freq.limits.daily_bytes / 1024) as u32, 0, u32::MAX),
+                )
+                .with_status(get_text("fido_freq_daily_kbytes-status"))
+                .with_help(get_text("fido_freq_daily_kbytes-help"))
+                .with_label_width(width)
+                .with_update_u32_value(&|board: &Arc<Mutex<IcyBoard>>, value: u32| {
+                    board.lock().unwrap().ftn.freq.limits.daily_bytes = u64::from(value) * 1024;
+                }),
+            ),
+        ]
+    };
+    page("fido_freq_title", &icy_board, entry)
+}
