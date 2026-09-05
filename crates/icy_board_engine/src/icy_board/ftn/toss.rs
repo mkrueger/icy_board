@@ -716,6 +716,18 @@ impl ScanState {
 #[derive(Debug, Default)]
 pub struct ScanReport {
     pub exported: usize,
+
+    /// Netmail messages written here and packed for their destination.
+    pub netmail: usize,
+
+    /// Netmail that names no destination, and netmail no link can carry,
+    /// by message number.
+    pub unaddressed: Vec<u32>,
+    pub undeliverable: Vec<(u32, String)>,
+
+    /// Tags whose area is the netmail base, which must never leave as echomail.
+    pub refused: Vec<String>,
+
     pub bundles: Vec<PathBuf>,
 }
 
@@ -732,6 +744,12 @@ pub fn scan_outbound(config: &FtnConfig, areas: &AreaMap, now: &NaiveDateTime) -
     for area in areas {
         let (tag, path) = (&area.tag, &area.path);
         if tag.is_empty() {
+            continue;
+        }
+        // Netmail is addressed to one node, so handing it to everyone who
+        // carries a tag would put private mail in front of every downlink.
+        if *path == config.netmail || *path == config.bad_netmail {
+            report.refused.push(tag.clone());
             continue;
         }
         let subscribers: Vec<usize> = config
@@ -839,8 +857,141 @@ pub fn scan_outbound(config: &FtnConfig, areas: &AreaMap, now: &NaiveDateTime) -
             .push(deliver_to(config, queue_link, destination.address, packet_dest, aka, messages, now)?);
     }
 
+    scan_netmail(config, &mut state, &mut report, now)?;
     state.save(config)?;
     Ok(report)
+}
+
+/// The link a netmail leaves through: the node itself when it is one of ours,
+/// the next hop when a route names one, and the first node we can call
+/// otherwise, which for a point is its boss.
+fn netmail_route(config: &FtnConfig, dest: &EchomailAddress) -> Option<usize> {
+    if let Some(index) = config.links.iter().position(|link| link.address == *dest) {
+        return Some(index);
+    }
+    if config.options.enable_routing
+        && let Some((_, via)) = config.route_for(dest)
+    {
+        return Some(via);
+    }
+    let mut reachable = (0..config.links.len()).filter(|index| !config.links[*index].host.is_empty());
+    let only = reachable.next()?;
+    reachable.next().is_none().then_some(only)
+}
+
+/// Packs the netmail written here for the node it is addressed to. Everything
+/// the tosser imported carries `MSG_TYPENET`, so what is left is what was
+/// written on this board.
+fn scan_netmail(config: &FtnConfig, state: &mut ScanState, report: &mut ScanReport, now: &NaiveDateTime) -> Res<()> {
+    if !config.netmail.with_extension("jhr").exists() {
+        return Ok(());
+    }
+    let mut base = JamMessageBase::open(&config.netmail).context(|| format!("Cannot open the netmail base {}", config.netmail.display()))?;
+
+    let mut waiting: BTreeMap<usize, Vec<(u32, PackedMessage)>> = BTreeMap::new();
+    for number in base.lowest_message_number()..=base.highest_message_number() {
+        let Ok(mut header) = base.read_header(number) else {
+            continue;
+        };
+        if header.is_deleted() || header.attributes & (attributes::MSG_TYPENET | attributes::MSG_SENT) != 0 {
+            continue;
+        }
+        let Some(dest) = subfield(&header, SubfieldType::AddressD).and_then(|address| EchomailAddress::parse(&address)) else {
+            report.unaddressed.push(number);
+            continue;
+        };
+        let Some(index) = netmail_route(config, &dest) else {
+            report.undeliverable.push((number, dest.to_string()));
+            continue;
+        };
+        let Some(aka) = config.aka_for(&config.links[index]).cloned() else {
+            report.undeliverable.push((number, dest.to_string()));
+            continue;
+        };
+
+        let msgid = if let Some(id) = subfield(&header, SubfieldType::MsgID) {
+            id
+        } else {
+            state.serial = state.serial.wrapping_add(1);
+            let id = format!("{} {:08x}", aka.address, state.serial);
+            header.msgid_crc = JamMessageBase::crc(&BString::from(id.as_str()));
+            header.sub_fields.push(MessageSubfield::new(SubfieldType::MsgID, BString::from(id.as_str())));
+            raw::update_header(&mut base, number, &header).context(|| format!("Cannot stamp netmail {number} with a message id"))?;
+            id
+        };
+        let text = base
+            .read_message_text(&header)
+            .context(|| format!("Cannot read netmail {number} out of {}", config.netmail.display()))?;
+
+        let mut attributes = packet::attribute::PRIVATE;
+        for (jam, packed) in [
+            (attributes::MSG_CRASH, packet::attribute::CRASH),
+            (attributes::MSG_FILEATTACH, packet::attribute::FILE_ATTACHED),
+            (attributes::MSG_FILEREQUEST, packet::attribute::FILE_REQUEST),
+            (attributes::MSG_RECEIPTREQ, packet::attribute::RETURN_RECEIPT_REQUEST),
+            (attributes::MSG_KILLSENT, packet::attribute::KILL_SENT),
+        ] {
+            if header.attributes & jam != 0 {
+                attributes |= packed;
+            }
+        }
+
+        waiting.entry(index).or_default().push((
+            number,
+            PackedMessage {
+                orig: aka.address,
+                dest,
+                attributes,
+                cost: 0,
+                written: chrono::DateTime::from_timestamp(header.date_written as i64, 0).unwrap_or_default().naive_utc(),
+                to: header.to().map(std::string::ToString::to_string).unwrap_or_default(),
+                from: header.from().map(std::string::ToString::to_string).unwrap_or_default(),
+                subject: header.subject().map(std::string::ToString::to_string).unwrap_or_default(),
+                text: netmail_text(&msgid, subfield(&header, SubfieldType::ReplyID).as_deref(), &text.to_string()),
+            },
+        ));
+    }
+
+    for (index, messages) in waiting {
+        let link = &config.links[index];
+        let Some(aka) = config.aka_for(link) else {
+            continue;
+        };
+        let mut packet = Packet::new(PacketHeader::new(aka.address, link.address, *now, &link.packet_password));
+        packet.messages = messages.iter().map(|(_, message)| message.clone()).collect();
+        report.bundles.push(deliver_packet(config, link, packet, now)?);
+
+        for (number, _) in messages {
+            let Ok(mut header) = base.read_header(number) else {
+                continue;
+            };
+            // A node that asked for its mail back gets it once and then it goes.
+            if header.attributes & attributes::MSG_KILLSENT != 0 {
+                base.delete_message(number)
+                    .context(|| format!("Cannot remove netmail {number} after sending it"))?;
+            } else {
+                header.attributes |= attributes::MSG_SENT;
+                raw::update_header(&mut base, number, &header).context(|| format!("Cannot mark netmail {number} as sent"))?;
+            }
+            report.netmail += 1;
+        }
+    }
+    Ok(())
+}
+
+/// Netmail names no area and travels no echo, so it carries neither an
+/// `AREA:` line nor a seen-by trail.
+fn netmail_text(msgid: &str, reply: Option<&str>, body: &str) -> String {
+    let mut text = format!("\x01MSGID: {msgid}\r");
+    if let Some(reply) = reply {
+        let _ = write!(text, "\x01REPLY: {reply}\r");
+    }
+    let _ = write!(text, "\x01PID: {}\r", product());
+    text.push_str(&body.replace("\r\n", "\n").replace('\n', "\r"));
+    if !text.ends_with('\r') {
+        text.push('\r');
+    }
+    text
 }
 
 /// Puts what is waiting for one link into a bundle of its own.
@@ -1593,6 +1744,160 @@ mod tests {
         base.write_jhr_header().unwrap();
         let report = scan_outbound(&config, &areas, &when()).unwrap();
         assert_eq!(report.exported, 1);
+    }
+
+    /// The address a netmail is going to is the one its reply carries, so the
+    /// scanner reads it back out of the header the tosser wrote.
+    fn netmail_for(dest: &str, killsent: bool) -> JamMessage {
+        let mut flags = attributes::MSG_PRIVATE;
+        if killsent {
+            flags |= attributes::MSG_KILLSENT;
+        }
+        JamMessage::default()
+            .with_from(BString::from("Sysop"))
+            .with_to(BString::from("Remote Sysop"))
+            .with_subject(BString::from("Re: Hello"))
+            .with_attributes(flags)
+            .with_text(BString::from("Answer"))
+            .with_sub_field(MessageSubfield::new(SubfieldType::AddressD, BString::from(dest)))
+    }
+
+    #[test]
+    fn test_netmail_written_here_is_packed_for_the_node_it_is_addressed_to() {
+        let directory = tempfile::tempdir().unwrap();
+        let config = config(directory.path());
+        let mut base = open_base(&config.netmail).unwrap();
+        base.write_message(&netmail_for("21:1/1", false)).unwrap();
+        base.write_jhr_header().unwrap();
+
+        let report = scan_outbound(&config, &[], &when()).unwrap();
+
+        assert_eq!(report.netmail, 1);
+        assert_eq!(report.bundles.len(), 1);
+        let unpacked = tempfile::tempdir().unwrap();
+        let packets = bundle::unpack(&report.bundles[0], unpacked.path()).unwrap();
+        let packet = Packet::load(&packets[0]).unwrap();
+        let message = &packet.messages[0];
+        assert_eq!(message.dest, address("21:1/1"));
+        assert!(!message.is_echomail(), "{:?}", message.text);
+        assert_eq!(message.attributes & packet::attribute::PRIVATE, packet::attribute::PRIVATE);
+        assert!(message.text.contains("\x01MSGID: 21:1/100 "), "{:?}", message.text);
+    }
+
+    #[test]
+    fn test_netmail_is_only_sent_once() {
+        let directory = tempfile::tempdir().unwrap();
+        let config = config(directory.path());
+        let mut base = open_base(&config.netmail).unwrap();
+        base.write_message(&netmail_for("21:1/1", false)).unwrap();
+        base.write_jhr_header().unwrap();
+
+        assert_eq!(scan_outbound(&config, &[], &when()).unwrap().netmail, 1);
+        let again = scan_outbound(&config, &[], &when()).unwrap();
+
+        assert_eq!(again.netmail, 0);
+        assert!(again.bundles.is_empty());
+    }
+
+    /// What the tosser imported carries `MSG_TYPENET`, and sending it back out
+    /// would return every message to the node it came from.
+    #[test]
+    fn test_netmail_that_came_in_from_the_network_is_not_sent_back_out() {
+        let directory = tempfile::tempdir().unwrap();
+        let config = config(directory.path());
+        let mut netmail = message("FSX_GEN", "");
+        netmail.text = "Hello\r".to_string();
+        drop_packet_from(&config, "21:1/1", vec![netmail]);
+        toss(&config, &[]);
+
+        let report = scan_outbound(&config, &[], &when()).unwrap();
+
+        assert_eq!(report.netmail, 0);
+        assert!(report.bundles.is_empty());
+    }
+
+    #[test]
+    fn test_netmail_asking_to_be_killed_is_gone_once_it_is_sent() {
+        let directory = tempfile::tempdir().unwrap();
+        let config = config(directory.path());
+        let mut base = open_base(&config.netmail).unwrap();
+        base.write_message(&netmail_for("21:1/1", true)).unwrap();
+        base.write_jhr_header().unwrap();
+
+        let report = scan_outbound(&config, &[], &when()).unwrap();
+
+        assert_eq!(report.netmail, 1);
+        assert_eq!(JamMessageBase::open(&config.netmail).unwrap().active_messages(), 0);
+    }
+
+    #[test]
+    fn test_netmail_without_a_destination_stays_where_it_is() {
+        let directory = tempfile::tempdir().unwrap();
+        let config = config(directory.path());
+        let mut base = open_base(&config.netmail).unwrap();
+        base.write_message(&JamMessage::default().with_text(BString::from("Nowhere"))).unwrap();
+        base.write_jhr_header().unwrap();
+
+        let report = scan_outbound(&config, &[], &when()).unwrap();
+
+        assert_eq!(report.unaddressed, vec![1]);
+        assert!(report.bundles.is_empty());
+    }
+
+    /// A point hands everything to its boss, so mail for a stranger still goes.
+    #[test]
+    fn test_netmail_for_a_node_we_do_not_know_leaves_through_the_first_link() {
+        let directory = tempfile::tempdir().unwrap();
+        let config = config(directory.path());
+        let mut base = open_base(&config.netmail).unwrap();
+        base.write_message(&netmail_for("21:99/99", false)).unwrap();
+        base.write_jhr_header().unwrap();
+
+        let report = scan_outbound(&config, &[], &when()).unwrap();
+
+        assert_eq!(report.netmail, 1);
+        let unpacked = tempfile::tempdir().unwrap();
+        let packets = bundle::unpack(&report.bundles[0], unpacked.path()).unwrap();
+        let packet = Packet::load(&packets[0]).unwrap();
+        assert_eq!(packet.header.dest, address("21:1/1"));
+        assert_eq!(packet.messages[0].dest, address("21:99/99"));
+    }
+
+    #[test]
+    fn test_netmail_for_an_unknown_node_needs_a_route_when_several_links_are_reachable() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut config = config(directory.path());
+        config.links.push(FtnLink {
+            address: address("21:2/1"),
+            domain: "fsxnet".to_string(),
+            host: "other.example".to_string(),
+            ..Default::default()
+        });
+        let mut base = open_base(&config.netmail).unwrap();
+        base.write_message(&netmail_for("21:99/99", false)).unwrap();
+        base.write_jhr_header().unwrap();
+
+        let report = scan_outbound(&config, &[], &when()).unwrap();
+
+        assert_eq!(report.netmail, 0);
+        assert_eq!(report.undeliverable, vec![(1, "21:99/99".to_string())]);
+        assert!(report.bundles.is_empty());
+    }
+
+    /// Handing the netmail base a tag would put private mail in a bundle for
+    /// every downlink that carries it.
+    #[test]
+    fn test_an_area_pointing_at_the_netmail_base_is_never_exported_as_echomail() {
+        let directory = tempfile::tempdir().unwrap();
+        let config = config(directory.path());
+        let mut base = open_base(&config.netmail).unwrap();
+        base.write_message(&netmail_for("21:1/1", false)).unwrap();
+        base.write_jhr_header().unwrap();
+
+        let report = scan_outbound(&config, &[EchoArea::new("FSX_GEN", config.netmail.clone())], &when()).unwrap();
+
+        assert_eq!(report.refused, vec!["FSX_GEN".to_string()]);
+        assert_eq!(report.exported, 0);
     }
 
     #[test]

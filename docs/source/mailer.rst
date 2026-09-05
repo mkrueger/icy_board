@@ -248,6 +248,30 @@ hands its origin to all of its areas, so the same messages leave the board with
 the same origin they did before.
 
 
+Netmail
+-------
+
+Netmail is addressed to a single node instead of an echo. What arrives is
+written to the base named by ``netmail`` in ``ftn.toml``, and mail from a node
+that is not a configured link goes to ``bad_netmail`` while ``secure`` is on.
+
+Scanning packs the netmail written here for its destination. A message is taken
+when it names a destination address and has not been sent yet; replying to a
+message that came in from the network keeps that address, which is where the
+destination comes from. The node it leaves through is the destination itself
+when that is a configured link, the next hop when a route names one, and
+otherwise the only link that can be called, which for a point is its boss. A
+board with several reachable links needs a route for every other destination;
+the mailer does not choose one arbitrarily.
+
+A sent message is marked so it is packed only once. One that asks to be killed
+once sent is removed from the base instead.
+
+Do not give the netmail base a ``Fido Area Tag``. Netmail belongs to one node,
+so exporting it as echomail would put private mail in a bundle for every
+downlink that carries the tag. The scanner refuses such an area and says so.
+
+
 Running the mailer
 ------------------
 

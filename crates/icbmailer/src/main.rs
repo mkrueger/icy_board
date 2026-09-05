@@ -429,6 +429,24 @@ fn scan(board: &IcyBoard) -> Res<()> {
     let report = scan_outbound(&board.ftn, &echo_areas(board), &chrono::Local::now().naive_local())?;
 
     println!("{} message(s) packed into {} bundle(s)", report.exported, report.bundles.len());
+    if report.netmail > 0 {
+        println!("  {} netmail message(s) sent on their way", report.netmail);
+    }
+    for number in &report.unaddressed {
+        println!(
+            "  Netmail {} names no destination address and stays put. Reply to a message that came in from the network, so the address it carries is kept",
+            number
+        );
+    }
+    for (number, address) in &report.undeliverable {
+        println!("  Netmail {} is addressed to {}, which no link carries and no route reaches", number, address);
+    }
+    for tag in &report.refused {
+        println!(
+            "  Area {} points at the netmail base and was left alone. Netmail is addressed to one node, so clear its Fido Area Tag",
+            tag
+        );
+    }
     for bundle in &report.bundles {
         println!("  {}", bundle.display());
     }

@@ -10,6 +10,16 @@ releases.
 
 ### Added
 
+- Netmail written on this board is packed and sent. It used to arrive and stay:
+  a reply reached the message base and never left it. The scanner takes what
+  names a destination and has not gone yet, sends it to that node when it is a
+  link, through the next hop when a route names one, and otherwise through the
+  only link that can be called. A board with several reachable links needs a
+  route rather than having one picked for it. Sent mail is marked so it goes
+  once, and mail asking to be killed once sent is removed. An area pointing at
+  the netmail base is refused rather than exported as echomail to every
+  downlink.
+
 - A message area can carry its own Fido origin line, set as `Fido Origin` in
   the area editor. Echomail written there leaves the board with that line
   instead of the board-wide one, which is how PCBoard's origin conference
