@@ -656,6 +656,11 @@ pub struct IcyBoardState {
     pub saved_cmd: String,
     pub file_bases: HashMap<PathBuf, Arc<Mutex<FileBase>>>,
 
+    /// Set by the actions that close a menu and read by the menu loop: one
+    /// leaves the innermost menu, the other every menu on top of it.
+    pub(crate) quit_menu: bool,
+    pub(crate) exit_menus: bool,
+
     /// The files being displayed right now, innermost last.
     displayed_files: Vec<PathBuf>,
     /// How many PPEs are running on top of each other.
@@ -820,6 +825,8 @@ impl IcyBoardState {
             display_current_menu: true,
             saved_cmd: String::new(),
             autorun_times: HashMap::new(),
+            quit_menu: false,
+            exit_menus: false,
             file_bases: HashMap::new(),
             displayed_files: Vec::new(),
             ppe_nesting: 0,

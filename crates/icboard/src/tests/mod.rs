@@ -55,6 +55,7 @@ mod cmd_who;
 mod cmd_x;
 mod cmd_y;
 
+mod command_actions;
 mod display_file;
 mod login_options;
 mod statistics;

@@ -1,13 +1,15 @@
 use async_recursion::async_recursion;
+use std::path::PathBuf;
 use tokio::time::{Instant, sleep};
 
 use crate::{
     Res,
     icy_board::{
-        IcyBoardError, IcyBoardSerializer,
+        IcyBoardSerializer,
         commands::{ActionTrigger, AutoRun, Command, CommandAction, CommandType},
         icb_text::IceText,
         menu::{Menu, MenuType},
+        read_with_encoding_detection,
         security_expr::SecurityExpression,
         state::{control_codes, functions::display_flags},
     },
@@ -78,6 +80,13 @@ impl IcyBoardState {
         self.autorun_commands(mnu, AutoRun::FirstCmd, 0).await?;
         let menu_start_time = Instant::now();
         while !self.session.request_logoff {
+            if self.exit_menus {
+                return Ok(());
+            }
+            if self.quit_menu {
+                self.quit_menu = false;
+                return Ok(());
+            }
             self.autorun_commands(mnu, AutoRun::Every, 0).await?;
             self.display_file_with_error(&mnu.display_file, false).await?;
             let mut x = current_item + 1;
@@ -152,6 +161,8 @@ impl IcyBoardState {
         if file.with_extension("mnu").is_file() {
             let mnu = Menu::load(&file.with_extension("mnu"))?;
             self.run_menu(&mnu).await?;
+            // Whatever asked to leave every menu has been obeyed by now.
+            self.exit_menus = false;
             return Ok(());
         }
         self.session.disp_options.no_change();
@@ -171,10 +182,121 @@ impl IcyBoardState {
         Ok(true)
     }
 
+    /// Puts text into the keyboard for the board to read as if the caller had
+    /// typed it, which is what the stuffing actions are for. Text that does not
+    /// end a line of its own would sit in the input field unanswered.
+    fn stuff_typed_text(&mut self, text: &str, visible: bool) -> Res<()> {
+        let text = text.trim_end_matches(['\r', '\n']);
+        if text.is_empty() {
+            return Ok(());
+        }
+        self.stuff_keyboard_buffer(text, visible)?;
+        if !text.to_ascii_uppercase().ends_with("^M") {
+            self.stuff_keyboard_buffer("\r", false)?;
+        }
+        Ok(())
+    }
+
     async fn run_action(&mut self, command: &Command, cmd_action: &CommandAction, check_security: bool) -> Res<()> {
         match cmd_action.command_type {
-            CommandType::StuffText => {
+            // A menu option kept in place but turned off.
+            CommandType::Disabled | CommandType::DisableMenuOption => {}
+            CommandType::Menu => {
+                let file = self.resolve_path(&PathBuf::from(&cmd_action.parameter));
+                let file = file.with_extension("mnu");
+                if !file.is_file() {
+                    log::error!(
+                        "Command {} opens the menu {}, which is not there",
+                        command.keyword,
+                        file.display()
+                    );
+                    self.display_text(IceText::InvalidEntry, display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER)
+                        .await?;
+                    return Ok(());
+                }
+                let mnu = Menu::load(&file)?;
+                self.run_menu(&mnu).await?;
+            }
+            CommandType::QuitMenu => {
+                self.quit_menu = true;
+            }
+            CommandType::ExitMenus => {
+                self.exit_menus = true;
+            }
+            CommandType::Script => {
+                let sec = self.session.user_command_level.cmd_s.clone();
+                if check_security && !self.check_sec("S", &sec).await? {
+                    return Ok(());
+                }
+                let surveys = self.session.current_conference.surveys.clone().unwrap_or_default();
+                let number = cmd_action.parameter.trim().parse::<usize>().unwrap_or_default();
+                if let Some(survey) = number.checked_sub(1).and_then(|index| surveys.get(index)).cloned() {
+                    self.start_survey(&survey).await?;
+                } else {
+                    log::error!(
+                        "Command {} takes script {}, which the conference {} does not have",
+                        command.keyword,
+                        cmd_action.parameter,
+                        self.session.current_conference.name
+                    );
+                    self.session.op_text.clone_from(&cmd_action.parameter);
+                    self.display_text(IceText::InvalidSelection, display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER)
+                        .await?;
+                }
+            }
+            CommandType::Conference => {
+                let sec = self.session.user_command_level.cmd_j.clone();
+                if check_security && !self.check_sec("J", &sec).await? {
+                    return Ok(());
+                }
                 self.session.push_tokens(&cmd_action.parameter);
+                self.join_conference_cmd().await?;
+            }
+            CommandType::DisplayDir => {
+                let sec = self.session.user_command_level.cmd_f.clone();
+                if check_security && !self.check_sec("F", &sec).await? {
+                    return Ok(());
+                }
+                self.session.push_tokens(&cmd_action.parameter);
+                self.show_file_directories_cmd().await?;
+            }
+            CommandType::DisplayFile => {
+                let file = self.resolve_path(&PathBuf::from(&cmd_action.parameter));
+                self.display_file(&file).await?;
+            }
+            CommandType::StuffText => {
+                self.stuff_typed_text(&cmd_action.parameter, true)?;
+            }
+            CommandType::StuffTextSilent => {
+                self.stuff_typed_text(&cmd_action.parameter, false)?;
+            }
+            CommandType::StuffTextAndExitMenu => {
+                self.stuff_typed_text(&cmd_action.parameter, true)?;
+                self.exit_menus = true;
+            }
+            CommandType::StuffTextAndExitMenuSilent => {
+                self.stuff_typed_text(&cmd_action.parameter, false)?;
+                self.exit_menus = true;
+            }
+            CommandType::StuffFile | CommandType::StuffFileSilent => {
+                let file = self.resolve_path(&PathBuf::from(&cmd_action.parameter));
+                match read_with_encoding_detection(&file) {
+                    Ok(text) => {
+                        let visible = cmd_action.command_type == CommandType::StuffFile;
+                        self.stuff_typed_text(&text, visible)?;
+                    }
+                    Err(err) => {
+                        log::error!("Command {} stuffs {}, which cannot be read: {}", command.keyword, file.display(), err);
+                    }
+                }
+            }
+            CommandType::Command => {
+                self.session.push_tokens(&cmd_action.parameter);
+                self.run_single_command(true).await?;
+            }
+            CommandType::GlobalCommand => {
+                self.session.push_tokens(&cmd_action.parameter);
+                self.run_single_command(false).await?;
             }
             CommandType::GotoXY => {
                 let pos = crate::icy_board::commands::Position::parse(&cmd_action.parameter);
@@ -672,9 +794,6 @@ impl IcyBoardState {
                 }
                 // AREA
                 self.area_change_command().await?;
-            }
-            _ => {
-                return Err(Box::new(IcyBoardError::UnknownAction(format!("{:?}", cmd_action.command_type))));
             }
         }
         Ok(())

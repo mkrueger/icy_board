@@ -75,9 +75,6 @@ pub enum IcyBoardError {
     #[error("invalid user.inf record size: '{0}' expected {1} got {2}")]
     InvalidUserInfRecordSize(&'static str, usize, usize),
 
-    #[error("Can't run action ({0})")]
-    UnknownAction(String),
-
     #[error("Thread crashed. See output.log for details.")]
     ThreadCrashed,
 

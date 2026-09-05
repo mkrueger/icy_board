@@ -434,6 +434,22 @@ releases.
   parameter naming no door of the conference says which one it missed, and an
   empty parameter asks the way `OPEN` does.
 
+- Every other action a command or menu option can have is carried out as well.
+  Sixteen of them were named in the setup and in the MNU format but never
+  reached the board, and each answered `Can't run action`. `Menu` opens the menu
+  it names, `QuitMenu` and `ExitMenus` leave one or all of them, `Conference`
+  joins, `DisplayDir` lists a directory, `DisplayFile` shows a file, `Script`
+  takes a survey by number, `Command` and `GlobalCommand` run a command, and
+  `Disabled` is left alone rather than treated as a failure. The dispatcher no
+  longer has a catch-all, so a new action cannot be forgotten again.
+
+- Text a command stuffs is typed into the board instead of being dropped. The
+  four `StuffText` actions and both `StuffFile` ones put their text in the token
+  list, which is cleared as soon as the command ends, so nothing ever acted on
+  it - an imported `CMD.LST`, which is a keyword standing for what the caller
+  would have typed, did nothing at all. The text goes into the keyboard now, and
+  the silent variants leave it off the screen.
+
 - Replying to a message addresses the answer to whoever wrote it. The reply
   went to the original recipient instead, so answering a message addressed to
   somebody else sent it back to that same person. A reply to netmail now also
