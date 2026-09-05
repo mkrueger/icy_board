@@ -147,7 +147,9 @@ pub struct FtnOptions {
     /// for all of them. A busy area makes that list long.
     pub msgs_to_track: u32,
 
-    /// Netmail for a name nobody here carries goes to a base of its own.
+    /// Netmail from a node that is not configured as a link goes to a base of
+    /// its own. `PCBoard` represented trusted FTN nodes as `~FIDO~` users; links
+    /// are their Icy Board equivalent.
     pub secure: bool,
 
     /// Netmail addressed to "Sysop" is handed to the name the sysop reads
@@ -210,8 +212,8 @@ pub struct FtnConfig {
     #[serde(default = "FtnConfig::default_netmail")]
     pub netmail: PathBuf,
 
-    /// Where netmail for a name this board does not carry goes when
-    /// `options.secure` is set.
+    /// Where netmail from an unconfigured node goes when `options.secure` is
+    /// set.
     #[serde(default = "FtnConfig::default_bad_netmail")]
     pub bad_netmail: PathBuf,
 

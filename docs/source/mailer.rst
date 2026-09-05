@@ -82,10 +82,9 @@ Paths
    The message base arriving netmail is written to.
 
 ``bad_netmail``
-   Where netmail for an unknown recipient is written while ``options.secure``
-   is enabled. A recipient is known only when its name matches the configured
-   sysop name or an Icy Board user name, ignoring letter case. This check is
-   based on the recipient name, not the FTN destination address.
+   Where netmail from an unconfigured FTN node is written while
+   ``options.secure`` is enabled. The packet's origin address must match a
+   ``[[link]]`` address. Recipient names are not part of this check.
 
 All three are relative to the board directory and are created for you.
 
@@ -134,11 +133,11 @@ Netmail options
 ~~~~~~~~~~~~~~~
 
 ``secure``
-   Keep netmail for unknown recipient names in ``bad_netmail``. Turn this off
-   to accept all incoming netmail into ``netmail``. Matching ignores letter
-   case, but spelling and spaces must otherwise match. If a message is kept
-   apart, the toss output shows the received name, the configured sysop name,
-   the destination base, and the settings that can fix it.
+   Keep netmail from nodes not configured as links in ``bad_netmail``. This is
+   the equivalent of PCBoard accepting secure netmail only from ``~FIDO~`` node
+   records. Turn this off to accept netmail from every source. If a message is
+   kept apart, the toss output shows its source address, destination base, and
+   the settings that can fix it.
 
 ``sysop_change``
    Treat the conventional recipient ``Sysop`` as the configured sysop name.

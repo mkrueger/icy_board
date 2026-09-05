@@ -3802,12 +3802,11 @@ ftn_pass_thru-help=A hub feeds its downlinks areas it does not read itself. The 
 ftn_mail_label=Netmail
 
 ftn_secure=Secure Netmail
-ftn_secure-status=Keep netmail for an unknown name apart
+ftn_secure-status=Keep netmail from an unconfigured node apart
 ftn_secure-help=
-    Netmail addressed to a name that matches neither the configured sysop nor
-    an Icy Board user goes to the Unknown Netmail base. Matching ignores letter
-    case, but spelling and spaces must otherwise match. Mail addressed to
-    "Sysop" matches when Deliver To Sysop is enabled.
+    Netmail from a packet whose originating FTN address does not match a
+    configured link goes to the Unknown Netmail base. This mirrors PCBoard's
+    ~FIDO~ node records: the sender's node is checked, not the recipient name.
 
 ftn_sysop_change=Deliver To Sysop
 ftn_sysop_change-status=Netmail to "Sysop" goes to the name the sysop reads under

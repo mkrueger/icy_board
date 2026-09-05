@@ -314,7 +314,6 @@ fn toss(board: &mut IcyBoard) -> Res<()> {
     }
     let target = TossTarget {
         sysop: board.config.sysop.name.clone(),
-        users: board.users.iter().map(|user| user.get_name().to_string()).collect(),
     };
     let report = toss_inbound(&board.ftn, &echo_areas(board), &target)?;
 
@@ -331,8 +330,8 @@ fn toss(board: &mut IcyBoard) -> Res<()> {
             report.orphans
         );
     }
-    for (recipient, count) in &report.unknown_netmail {
-        print_unknown_netmail_advice(board, recipient, *count);
+    for (source, count) in &report.untrusted_netmail {
+        print_untrusted_netmail_advice(board, source, *count);
     }
     for (tag, count) in &report.unknown {
         println!(
@@ -347,42 +346,18 @@ fn toss(board: &mut IcyBoard) -> Res<()> {
     Ok(())
 }
 
-fn print_unknown_netmail_advice(board: &IcyBoard, recipient: &str, count: usize) {
-    let sysop = &board.config.sysop.name;
+fn print_untrusted_netmail_advice(board: &IcyBoard, source: &str, count: usize) {
     println!(
-        "  WARNING: {} netmail message(s) for {:?} stored in {}",
+        "  WARNING: {} netmail message(s) from unconfigured node {} stored in {}",
         count,
-        recipient,
+        source,
         board.ftn.bad_netmail.display()
     );
-    if sysop.is_empty() {
-        println!("    Reason: Secure Netmail is enabled, but the board has no sysop name and no user name matches this recipient.");
-    } else {
-        println!(
-            "    Reason: Secure Netmail is enabled, but this recipient matches neither the configured sysop {:?} nor an Icy Board user name.",
-            sysop
-        );
-    }
-    if board.ftn.options.sysop_change {
-        if sysop.is_empty() {
-            println!("    Fix: configure a sysop name, use an existing user's exact name, or disable Secure Netmail (options.secure = false in ftn.toml).");
-        } else {
-            println!(
-                "    Fix: address the mail to {:?} or \"Sysop\", use an existing user's exact name, or disable Secure Netmail (options.secure = false in ftn.toml).",
-                sysop
-            );
-        }
-    } else if sysop.is_empty() {
-        println!(
-            "    Fix: configure a sysop name, use an existing user's exact name, enable Deliver To Sysop (options.sysop_change = true), or disable Secure Netmail (options.secure = false in ftn.toml)."
-        );
-    } else {
-        println!(
-            "    Fix: address the mail to {:?}, use an existing user's exact name, enable Deliver To Sysop (options.sysop_change = true) and address it to \"Sysop\", or disable Secure Netmail (options.secure = false in ftn.toml).",
-            sysop
-        );
-    }
-    println!("    Recipient matching ignores letter case, but spelling and spaces must otherwise match.");
+    println!("    Reason: Secure Netmail is enabled, but the packet origin does not match any [[link]] address in ftn.toml.");
+    println!(
+        "    Fix: add [[link]] address = \"{}\" for a node you trust, or disable Secure Netmail (options.secure = false).",
+        source
+    );
 }
 
 /// An area the tosser created for a tag nobody carried is of no use until a

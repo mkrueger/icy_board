@@ -41,9 +41,6 @@ pub type AreaMap = [(String, PathBuf)];
 pub struct TossTarget {
     /// The name netmail addressed to the sysop is delivered under.
     pub sysop: String,
-
-    /// Every name this board would hand netmail to.
-    pub users: Vec<String>,
 }
 
 /// What one run over the inbound left behind.
@@ -53,9 +50,9 @@ pub struct TossReport {
     pub duplicates: usize,
     pub netmail: usize,
 
-    /// Recipient names that secure netmail did not recognize, and how many
-    /// messages were kept apart for each one.
-    pub unknown_netmail: BTreeMap<String, usize>,
+    /// Unconfigured source nodes that sent netmail, and how many messages were
+    /// kept apart for each one.
+    pub untrusted_netmail: BTreeMap<String, usize>,
 
     /// Tags that arrived for areas this board does not carry, and how many
     /// messages came with each of them.
@@ -192,7 +189,7 @@ impl Tosser<'_> {
                     let tag = tag.to_string();
                     self.echomail(message, &tag, &packet.header.orig, report)?;
                 }
-                None => self.netmail(message, report)?,
+                None => self.netmail(message, &packet.header.orig, report)?,
             }
         }
         Ok(true)
@@ -227,21 +224,21 @@ impl Tosser<'_> {
         Ok(())
     }
 
-    fn netmail(&mut self, message: &PackedMessage, report: &mut TossReport) -> Res<()> {
+    fn netmail(&mut self, message: &PackedMessage, source: &EchomailAddress, report: &mut TossReport) -> Res<()> {
         let mut message = message.clone();
         if self.config.options.sysop_change && !self.target.sysop.is_empty() && message.to.eq_ignore_ascii_case("sysop") {
             message.to = self.target.sysop.clone();
         }
-        let known = message.to.eq_ignore_ascii_case(&self.target.sysop) || self.target.users.iter().any(|name| name.eq_ignore_ascii_case(&message.to));
-        let unknown = self.config.options.secure && !known;
-        let base = if unknown {
+        let trusted = self.config.links.iter().any(|link| link.address == *source);
+        let untrusted = self.config.options.secure && !trusted;
+        let base = if untrusted {
             self.config.bad_netmail.clone()
         } else {
             self.config.netmail.clone()
         };
         self.import(&message, &base, false, report)?;
-        if unknown {
-            *report.unknown_netmail.entry(message.to.clone()).or_default() += 1;
+        if untrusted {
+            *report.untrusted_netmail.entry(source.to_string()).or_default() += 1;
         }
         report.netmail += 1;
         Ok(())
@@ -793,7 +790,11 @@ mod tests {
     }
 
     fn drop_packet(config: &FtnConfig, messages: Vec<PackedMessage>) {
-        let mut packet = Packet::new(PacketHeader::new(address("21:1/1"), address("21:1/100"), when(), ""));
+        drop_packet_from(config, "21:1/1", messages);
+    }
+
+    fn drop_packet_from(config: &FtnConfig, source: &str, messages: Vec<PackedMessage>) {
+        let mut packet = Packet::new(PacketHeader::new(address(source), address("21:1/100"), when(), ""));
         packet.messages = messages;
         fs::create_dir_all(&config.inbound).unwrap();
         packet.save(&config.inbound.join(bundle::packet_name(&when()))).unwrap();
@@ -916,28 +917,23 @@ mod tests {
     }
 
     #[test]
-    fn test_netmail_for_a_name_nobody_carries_is_kept_apart_on_a_secure_board() {
+    fn test_netmail_from_an_unconfigured_node_is_kept_apart_on_a_secure_board() {
         let directory = tempfile::tempdir().unwrap();
         let mut config = config(directory.path());
         config.options.secure = true;
-        let mut stranger = message("FSX_GEN", "");
-        stranger.text = "Who are you\r".to_string();
-        stranger.to = "Nobody Here".to_string();
-        let mut known = stranger.clone();
-        known.to = "Sysop".to_string();
-        drop_packet(&config, vec![stranger, known]);
+        let mut netmail = message("FSX_GEN", "");
+        netmail.text = "Who are you\r".to_string();
+        netmail.to = "The Sysop".to_string();
+        drop_packet_from(&config, "21:1/2", vec![netmail]);
 
         let target = TossTarget {
             sysop: "The Sysop".to_string(),
-            users: Vec::new(),
         };
         let report = toss_inbound(&config, &[], &target).unwrap();
 
-        assert_eq!(report.netmail, 2);
-        assert_eq!(report.unknown_netmail.get("Nobody Here"), Some(&1));
+        assert_eq!(report.netmail, 1);
+        assert_eq!(report.untrusted_netmail.get("21:1/2"), Some(&1));
         assert_eq!(JamMessageBase::open(&config.bad_netmail).unwrap().active_messages(), 1);
-        let base = JamMessageBase::open(&config.netmail).unwrap();
-        assert_eq!(base.read_header(1).unwrap().to().unwrap().to_string(), "The Sysop");
     }
 
     #[test]
