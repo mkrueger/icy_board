@@ -19,6 +19,14 @@ use std::fmt::Write as _;
 /// How much of a file goes into one data frame.
 pub const DATA_BLOCK_SIZE: usize = 16384;
 
+/// What a file being received is called until it is all there.
+const PARTIAL_PREFIX: &str = "binkp-";
+const PARTIAL_SUFFIX: &str = ".tmp";
+
+/// How long such a file is left alone before it counts as what a session that
+/// was killed off left behind. A transfer running right now is far younger.
+const PARTIAL_LIFETIME: Duration = Duration::from_secs(24 * 60 * 60);
+
 /// The characters FTS-1026 5.4 lets a file name carry unescaped.
 const SAFE: &str = "!\"#$%&'()*+,-./:;<=>?@[]^_`{|}~";
 
@@ -106,7 +114,7 @@ impl Receiving {
     /// arrived, so a session that breaks off cannot leave half a bundle where
     /// the tosser would read it as whole.
     async fn start(inbound: &Path, info: FileInfo, name: &str) -> crate::Result<Self> {
-        let partial = tempfile::Builder::new().prefix("binkp-").suffix(".tmp").tempfile_in(inbound)?;
+        let partial = tempfile::Builder::new().prefix(PARTIAL_PREFIX).suffix(PARTIAL_SUFFIX).tempfile_in(inbound)?;
         let handle = File::from_std(partial.reopen()?);
         Ok(Self {
             info,
@@ -128,6 +136,34 @@ impl Receiving {
         self.partial.persist(&target).map_err(|error| error.error)?;
         Ok(target)
     }
+}
+
+/// Clears away the working files of sessions that were killed off. Nothing
+/// here is worth failing a transfer over, so what cannot be read is left.
+async fn remove_stale_partials(inbound: &Path) {
+    let Ok(mut entries) = tokio::fs::read_dir(inbound).await else {
+        return;
+    };
+    while let Ok(Some(entry)) = entries.next_entry().await {
+        let path = entry.path();
+        if !is_partial(&path) {
+            continue;
+        }
+        let stale = match entry.metadata().await.and_then(|metadata| metadata.modified()) {
+            Ok(modified) => modified.elapsed().is_ok_and(|age| age >= PARTIAL_LIFETIME),
+            Err(_) => false,
+        };
+        if stale {
+            log::info!("binkp: removing {}, which a session that did not finish left behind", path.display());
+            let _ = tokio::fs::remove_file(&path).await;
+        }
+    }
+}
+
+fn is_partial(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name.starts_with(PARTIAL_PREFIX) && name.ends_with(PARTIAL_SUFFIX))
 }
 
 /// A name the inbound does not hold yet. Mail still waiting to be tossed must
@@ -153,6 +189,7 @@ fn free_name(target: &Path) -> Option<PathBuf> {
 /// their end of batch and every file has been accounted for.
 pub async fn transfer_batch(connection: &mut dyn Connection, outbound: Vec<OutboundFile>, inbound: &Path, timeout: Duration) -> crate::Result<BatchResult> {
     tokio::fs::create_dir_all(inbound).await?;
+    remove_stale_partials(inbound).await;
 
     let mut reader = FrameReader::new();
     let mut result = BatchResult::default();
@@ -523,6 +560,35 @@ mod tests {
         assert_eq!(std::fs::read(inbound.join("mail.su0")).unwrap(), b"still waiting to be tossed");
         assert_eq!(result.received, vec![inbound.join("mail-1.su0")]);
         assert_eq!(std::fs::read(inbound.join("mail-1.su0")).unwrap(), b"fresh");
+    }
+
+    /// A working file is only rubbish once no session can still be writing to it.
+    #[tokio::test]
+    async fn test_the_working_file_of_a_session_that_was_killed_is_cleared_away() {
+        let directory = tempfile::tempdir().unwrap();
+        let inbound = directory.path().join("in");
+        std::fs::create_dir_all(&inbound).unwrap();
+
+        let stale = inbound.join("binkp-fromlastweek.tmp");
+        std::fs::write(&stale, b"half a bundle").unwrap();
+        let times = std::fs::FileTimes::new().set_modified(std::time::SystemTime::now() - Duration::from_secs(48 * 60 * 60));
+        std::fs::File::options().write(true).open(&stale).unwrap().set_times(times).unwrap();
+
+        let running = inbound.join("binkp-rightnow.tmp");
+        std::fs::write(&running, b"a session may still be writing this").unwrap();
+        let waiting = inbound.join("mail.su0");
+        std::fs::write(&waiting, b"waiting to be tossed").unwrap();
+
+        let (mut ours, mut peer) = ChannelConnection::create_pair();
+        tokio::spawn(async move {
+            Frame::command(BinkpCommand::Eob, "").send(&mut peer).await.unwrap();
+            read_until(&mut peer, BinkpCommand::Eob).await;
+        });
+        transfer_batch(&mut ours, Vec::new(), &inbound, timeout()).await.unwrap();
+
+        assert!(!stale.exists(), "what a session long gone left behind is rubbish");
+        assert!(running.exists(), "what one may still be writing to is not");
+        assert!(waiting.exists(), "and mail waiting to be tossed is never touched");
     }
 
     #[tokio::test]
