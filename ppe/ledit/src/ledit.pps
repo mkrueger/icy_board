@@ -1,360 +1,382 @@
-DECLARE PROCEDURE PROC001(INTEGER PAR001, INTEGER PAR002, INTEGER PAR003, VAR STRING PAR004)
-STRING STR001
-STRING STR003(200)
-STRING STR004
-STRING STR005
-STRING STR006
-STRING STR007
-STRING STR008
-INTEGER INT001
-INTEGER INT002
-INTEGER i
-INTEGER j
-STRING STR009
-STRING STR010
-STRING STR011
-STRING STR012
-STRING STR013
+;$LANGVERSION 400
 
-STR001 = ""
-STR009 = "@X03"
-STR010 = "@X0B"
-STR011 = "@X09"
-STR012 = "@X02"
-STR013 = "@X0E"
-GOSUB LABEL008
-STR008 = ""
-PROC001(35, 12, 24, STR008)
-STR008 = UPPER(STR008)
-STR005 = STR008
-IF (UPPER(STR005) = "SYSOP") STR008 = UPPER(READLINE(PCBDAT(), 2))
+CONST INTEGER MAX_LINES = 200
+CONST INTEGER EDIT_WIDTH = 76
+CONST INTEGER FIRST_EDIT_ROW = 5
+CONST INTEGER LAST_EDIT_ROW = 22
+CONST INTEGER VISIBLE_LINES = LAST_EDIT_ROW - FIRST_EDIT_ROW + 1
 
-IF (LEN(STR008) = 0) THEN
-    STR008 = "ALL"
-    PRINT "@X0BALL"
-    STR005 = "ALL"
-ENDIF
+STRING lines[199]
+INTEGER lineCount = 1
+INTEGER cursorLine = 0
+INTEGER cursorColumn = 0
+INTEGER firstVisible = 0
+BOOLEAN editing = TRUE
+BOOLEAN saveMessage = FALSE
+TERMINPUT input = Terminal.Input
 
-IF (STR008 <> "ALL" & U_RECNUM(STR008) = -1) THEN
-    CLS 
-    PRINT "@X0BU@X03ser not found@X02"
-    DELAY 2
-    END 
-ENDIF
+BEGIN
+    STRING recipient, subject, privacy
 
-STR008 = ""
-PROC001(35, 13, 24, STR008)
-STR006 = STR008
-IF (STR008 = "") THEN
-    CLS 
-    PRINT "@X0BM@X03essage aborted@X02."
-    DELAY 2
-    END 
-ENDIF
+    DrawAddressScreen()
+    recipient = ReadField(35, 12, 24).Trim()
 
-ANSIPOS 51, 14
-STR008 = ""
-STR007 = "N"
-IF (STR005 <> "ALL") THEN
-    INPUTYN "", STR008, @X09
-    IF (STR008 = "Y") STR007 = "R"
-
-ENDIF
-
-FOR i = 1 TO 200 
-    STR003(i) = "               "
-NEXT
-
-GOSUB LABEL009
-ANSIPOS 9, 2
-PRINT "@X1F" + STR005
-ANSIPOS 9, 3
-PRINT "@X1F" + STR006
-i = 0
-PRINT "@X0E"
-ANSIPOS 2, 5
-WHILE (STR004 <> CHR(19)) DO
-    IF (GETX() < 2) ANSIPOS 2, GETY()
-
-    STR004 = ""
-    WHILE (STR004 = "") STR004 = INKEY()
-
-    IF (GETX() > 78) THEN
-        ANSIPOS 2, GETY() + 1
+    IF recipient.Equals("SYSOP", StringComparison.OrdinalIgnoreCase) THEN
+        recipient = Board.SysopName
+    ENDIF
+    IF recipient = "" THEN
+        recipient = "ALL"
+        ANSIPOS 35, 12
+        COLOR @X0B
+        PRINT recipient
     ENDIF
 
-    IF (STR004 = "UP") ANSIPOS GETX(), GETY() - 1
-
-    IF (STR004 = "DOWN") ANSIPOS GETX(), GETY() + 1
-
-    IF (STR004 = "LEFT") ANSIPOS GETX() - 1, GETY()
-
-    IF (STR004 = "RIGHT") ANSIPOS GETX() + 1, GETY()
-
-    IF (STR004 = "HOME") ANSIPOS 2, GETY()
-
-    IF (STR004 = "END") ANSIPOS 78, GETY()
-
-    IF (GETX() > 78) THEN
-        ANSIPOS 2, GETY() + 1
+    IF !recipient.Equals("ALL", StringComparison.OrdinalIgnoreCase) & U_RecNum(recipient) = -1 THEN
+        input.Release()
+        CLS
+        PRINTLN "@X0BU@X03ser not found@X02."
+        DELAY 2
+        EXIT
     ENDIF
 
-    IF (GETX() < 2) THEN
-        ANSIPOS 78, GETY() - 1
+    subject = ReadField(35, 13, 24).Trim()
+    IF subject = "" THEN
+        input.Release()
+        CLS
+        PRINTLN "@X0BM@X03essage aborted@X02."
+        DELAY 2
+        EXIT
     ENDIF
 
-    IF (GETY() < 5) THEN
-        INT001 = GETX() - 1
-        IF (i > 0) THEN
-            i = i - 1
-            FOR j = 5 TO 22 
-                IF (STR003[j - 4 + i] <> STR003[j - 3 + i]) THEN
-                    ANSIPOS 2, j
-                    PRINT LEFT(STR003[j - 4 + i], 77)
-                ENDIF
+    privacy = "N"
+    IF !recipient.Equals("ALL", StringComparison.OrdinalIgnoreCase) THEN
+        privacy = ReadYesNo(51, 14)
+    ENDIF
 
-            NEXT
-
+    DrawEditor(recipient, subject)
+    WHILE editing DO
+        EVENT keyEvent = input.Wait(-1)
+        IF keyEvent.Kind = EventKind.Key THEN
+            HandleKey(keyEvent)
         ENDIF
+    ENDWHILE
 
-        ANSIPOS INT001 + 1, 5
+    input.Release()
+    IF !saveMessage THEN
+        CLS
+        PRINTLN "@X0BM@X03essage aborted@X02."
+        DELAY 2
+        EXIT
     ENDIF
 
-    IF (GETY() > 22) THEN
-        INT001 = GETX() - 1
-        IF (i + 19 < 100) THEN
-            i = i + 1
-            j = 5
-            WHILE (j <= 22) DO
-                IF (STR003[j - 4 + i] <> STR003[j - 5 + i]) THEN
-                    ANSIPOS 2, j
-                    PRINT LEFT(STR003[j - 4 + i], 77)
-                ENDIF
-
-                j = j + 1
-            ENDWHILE
-
-        ENDIF
-
-        ANSIPOS INT001 + 1, 22
+    STRING tempFile = PPEPath() + "ledit.tmp"
+    IF WriteMessageFile(tempFile) THEN
+        STRING status = "N"
+        IF privacy = "Y" status = "R"
+        MESSAGE CurConf(), recipient, Session.UserName, subject, status, Date(), FALSE, FALSE, tempFile
+        DELETE tempFile
+    ELSE
+        CLS
+        PRINTLN "@X0BC@X03ould not create the temporary message file@X02."
+        DELAY 2
     ENDIF
-
-    IF (STR004 = CHR(13)) THEN
-        ANSIPOS 2, GETY() + 1
-    ENDIF
-
-    IF (STR004 = CHR(8) & GETX() > 2) THEN
-        INT001 = GETX() - 1
-        INT002 = GETY() + i
-        PRINT CHR(8) + " " + CHR(8)
-        STR003(INT002 - 4) = LEFT(STR003[INT002 - 4], INT001 - 2) + " " + MID(STR003[INT002 - 4], INT001, LEN(STR003[INT002 - 4]) - 1)
-    ENDIF
-
-    IF (GETX() < 2) ANSIPOS 2, GETY()
-
-    GOSUB LABEL004
-    INT001 = GETX() - 1
-    INT002 = GETY() + i
-    IF (STR004 <> "" & STR004 <> CHR(19) & STR004 <> CHR(1)) THEN
-        PRINT STR004
-        INT001 = GETX() - 1
-        INT002 = GETY() + i
-        STR003(INT002 - 4) = LEFT(STR003[INT002 - 4], INT001 - 2) + STR004 + MID(STR003[INT002 - 4], INT001, LEN(STR003[INT002 - 4]) - 1)
-    ENDIF
-
-    IF (ASC(STR004) = 1) END 
-
-ENDWHILE
-
-GOTO LABEL005
-
-:LABEL004
-IF (STR004 = CHR(13)) STR004 = ""
-
-IF (STR004 = CHR(8)) STR004 = ""
-
-IF (STR004 = CHR(9)) STR004 = ""
-
-IF (STR004 = CHR(10)) STR004 = ""
-
-IF (STR004 = CHR(7)) STR004 = ""
-
-IF (STR004 = CHR(11)) STR004 = ""
-
-IF (LEN(STR004) > 1) STR004 = ""
-
-RETURN 
-
-:LABEL005
-INT001 = 1
-i = 1
-:LABEL006
-IF (i <= 100) THEN
-    IF (STR003[i] <> "               ") INT001 = i
-
-    i = i + 1
-    GOTO LABEL006
-ENDIF
-
-FCREATE 1, "C:\MSG.TMP", O_WR, S_DB
-i = 1
-:LABEL007
-IF (i <= INT001) THEN
-    FPUTLN 1, STR003[i]
-    i = i + 1
-    GOTO LABEL007
-ENDIF
-
-FCLOSE 1
-MESSAGE CURCONF(), STR005, U_NAME(), STR006, STR007, DATE(), FALSE, FALSE, "C:\MSG.TMP"
-END 
 END
 
-:LABEL008
-PRINTLN "@POFF@@CLS@[0m[37C[1;35mWrite a"
-PRINTLN "    [45m█▀▀▀░▀▀▀▀▀▀[40m█ [45m█▀▀▀░▀▀▀█[0m [1;35;45m█▀▀▀░▀▀▀█[0m [1;35;45m█▀▀▀░▀▀▀█[0m [1;35;45m█▀▀▀░▀▀▀[40m█ [45m█▀▀▀░▀▀▀█[0m [1;35;45m█▀▀▀░▀▀▀█[0m"
-PRINTLN "    [1;35;45m█   ░[0m [1;35;45m█[0m  [1;35;45m  ░[0m [1;35;45m█   ░[0m [1;35;45m▄▄█[0m [1;35;45m█   ░[0m [1;35;45m▄▄█[0m [1;35;45m█   ░[0m [1;35;45m▄▄█[0m [1;35;45m█   ░[0m [1;35;45m  ░[0m [1;35;45m█   ░[0m "
-PRINTLN "[1A[63C[1;35;45m▄▄█[0m [1;35;45m█   ░[0m [1;35;45m▄▄█[0m"
-PRINTLN "    [1;35;45m▓   ▒[0m [1;35;45m▓[0m  [1;35;45m░ ▒[0m [1;35;45m▓   ▒[0m     [1;35;45m▓   ▒[0m     [1;35;45m▓   ▒[0m     [1;35;45m▓   ▒[0m [1;35;45m░ ▒[0m [1;35;45m▓   ▒[0m     [1;35;45m▓   ▒[0m"
-PRINTLN "    [1;35;45m▒   ▒[0m [1;35;45m▒[0m  [1;35;45m▒ ▒[0m [1;35;45m▒   ▒▄▄[0m   [1;35m▀▀▀▀▀▀[45m▀▀▓[0m [1;35m▀▀▀▀▀▀[45m▀▀▓[0m [1;35;45m▒   ▒[0m [1;35;45m▒ ▒[0m [1;35;45m▒   ▒[0m [1;35;45m▀▀█[0m [1;35;45m▒   ▒▄▄[0m"
-PRINTLN "    [1;35;45m▒   ▓[0m    [1;35;45m░ ▓[0m [1;35;45m▒   ▓[0m     [1;35;45m▒   ▓[0m [1;35;45m  ▒[0m [1;35;45m▒   ▓[0m [1;35;45m  ▒[0m [1;35;45m▒   ▓[40m▀[45m░ ▓[0m [1;35;45m▒   ▓[0m  [1;35;45m ░[0m [1;35;45m▒   "
-PRINTLN "[1A[71C▓[0m"
-PRINTLN "    [1;35;45m░   ▓[0m    [1;35;45m▒ ▓[0m [1;35;45m░   ▓[0m [1;35;45m▀▀█[0m [1;35;45m░   ▓[0m [1;35;45m  ░[0m [1;35;45m░   ▓[0m [1;35;45m  ░[0m [1;35;45m░   ▓[0m [1;35;45m▒ ▓[0m [1;35;45m░   ▓[0m  [1;35;45m ▒[0m"
-PRINTLN "[1A[66C [1;35;45m░   ▓[0m [1;35;45m▀▀█[0m"
-PRINTLN "    [1;35;45m░▄▄▄█[0m    [1;35;45m▄▄[40m█ [45m░▄▄▄█▄▄▄█[0m [1;35;45m░▄▄▄█▄▄▄█[0m [1;35;45m░▄▄▄█▄▄▄█[0m [1;35;45m░▄▄▄█[0m [1;35;45m▄▄[40m█ [45m░▄▄▄█▄▄▄▓[0m [1;35;45m░▄▄▄█▄▄▄█[0m"
-PRINTLN ""
-PRINTLN ""
-PRINTLN "[15C[0;34m┌────────[1m───[0;34m───────────────[1m───[0;34m────────────[1m──┐"
-PRINTLN "[15C│ [0mT[1mo [34m(Enter=ALL) : [0m························ [1;34m│"
-PRINTLN "[15C│ [0mS[1mubject[8C[34m: [0m························ [0;34m│"
-PRINTLN "[15C│     [0mI[1ms this message private [34m([0mY[1;34m/[0mN[1;34m)? ( )    [0;34m│"
-PRINTLN "[15C└──────────[1m──────────────[0;34m───────────────────┘"
-PRINTLN ""
-PRINTLN ""
-PRINTLN ""
-PRINTLN ""
-PRINTLN ""
-PRINTLN ""
-PRINT "[51C[0;31mLiQUiD Edit 1.0 by S∩b ZΣr()[0m"
-RETURN 
+;;; Reads a single-line field using the modern terminal event API.
+FUNCTION ReadField(INTEGER x, INTEGER y, INTEGER width) STRING
+    STRING value = ""
+    BOOLEAN reading = TRUE
 
-:LABEL009
-PRINTLN "[0;1;33m[2J[0;34m┌────────[1m─────────────────────────[0;34m────────────────────────────────────────────┐"
-PRINTLN "│[1;37;44mTo   :                                              L[0;44mi[1mQU[0;44mi[1mD Edit V1.0         [0;34m│"
-PRINTLN "│[1;37;44mSubj :                                     Str+A - Abort  Str+S - Save & Quit[0;34m│"
-PRINTLN "├────────────────────────────────────────────────────────────────────────────[1m─┤"
-PRINTLN "[0;34m│[77C[1m│"
-PRINTLN "[0;34m│[77C[1m│"
-PRINTLN "[0;34m│[77C│"
-PRINTLN "│[77C│"
-PRINTLN "│[77C│"
-PRINTLN "│[77C│"
-PRINTLN "│[77C│"
-PRINTLN "│[77C│"
-PRINTLN "│[77C│"
-PRINTLN "│[77C│"
-PRINTLN "│[77C│"
-PRINTLN "[1m│[77C[0;34m│"
-PRINTLN "[1m│[77C[0;34m│"
-PRINTLN "[1m│[77C[0;34m│"
-PRINTLN "[1m│[77C[0;34m│"
-PRINTLN "[1m│[77C│"
-PRINTLN "│[77C│"
-PRINTLN "[0;34m│[77C[1m│"
-PRINT "[0;34m└──────────────────────────────[1m───────────────[0;34m──────────────────────────────[1m──┘"
+    ANSIPOS x, y
+    COLOR @X07
+    PRINT STRING.Repeat("·", width)
+    ANSIPOS x, y
 
-RETURN 
-END 
+    WHILE reading DO
+        EVENT keyEvent = input.Wait(-1)
+        IF keyEvent.Kind <> EventKind.Key CONTINUE
 
-PROCEDURE PROC001(INTEGER PAR001, INTEGER PAR002, INTEGER PAR003, VAR STRING PAR004)
-    INTEGER LOC001
-    INTEGER k
-    INTEGER LOC003
-    STRING LOC006
-    ANSIPOS PAR001, PAR002
-    LOC001 = PAR001 + PAR003
-    PRINT "@X07"
-    FOR k = 1 TO PAR003 
-        PRINT "·"
-    NEXT
+        IF (keyEvent.Code = KEY_ENTER) THEN
+            reading = FALSE
+        ELSEIF (keyEvent.Code = KEY_BACKSPACE) THEN
+            IF (value.Len() > 0) THEN
+                value = value.Left(value.Len() - 1)
+                ANSIPOS x + value.Len(), y
+                COLOR @X07
+                PRINT "·"
+                ANSIPOS x + value.Len(), y
+            ENDIF
+        ELSEIF (keyEvent.Code = KEY_ESCAPE) THEN
+            value = ""
+            reading = FALSE
+        ELSEIF (keyEvent.Text.Len() = 1 & Asc(keyEvent.Text) >= 32 & value.Len() < width) THEN
+            STRING character = keyEvent.Text
+            IF value = "" | value.EndsWith(" ") character = character.ToUpper()
+            value += character
+            PrintInputCharacter(character)
+        ENDIF
+    ENDWHILE
 
-    ANSIPOS PAR001, PAR002
-    PAR004 = ""
-    :LABEL010
-    LOC006 = ""
-    WHILE (LOC006 = "") LOC006 = INKEY()
+    RETURN value
+ENDFUNC
 
-    IF (PAR004 = "") LOC006 = UPPER(LOC006)
+FUNCTION ReadYesNo(INTEGER x, INTEGER y) STRING
+    ANSIPOS x, y
+    COLOR @X09
+    PRINT "N"
 
-    IF (RIGHT(PAR004, 1) = " ") LOC006 = UPPER(LOC006)
+    LOOP
+        EVENT keyEvent = input.Wait(-1)
+        IF keyEvent.Kind <> EventKind.Key CONTINUE
+        STRING answer = keyEvent.Text.ToUpper()
+        IF (answer = "Y" | answer = "N") THEN
+            ANSIPOS x, y
+            PRINT answer
+            RETURN answer
+        ENDIF
+        IF keyEvent.Code = KEY_ENTER | keyEvent.Code = KEY_ESCAPE RETURN "N"
+    ENDLOOP
+ENDFUNC
 
-    GOSUB LABEL012
-    IF (LOC006 <> CHR(8) & GETX() < LOC001 & LOC006 <> CHR(13)) PAR004 = PAR004 + LOC006
-
-    IF (LOC006 <> CHR(13) & LOC006 <> CHR(8) & GETX() < LOC001) THEN
-        GOSUB LABEL013
+PROCEDURE PrintInputCharacter(STRING character)
+    INTEGER code = Asc(character)
+    IF (code >= 48 & code <= 57) THEN
+        COLOR @X09
+    ELSEIF (code >= 65 & code <= 90) THEN
+        COLOR @X0B
+    ELSEIF (code >= 97 & code <= 122) THEN
+        COLOR @X03
+    ELSEIF (code > 127) THEN
+        COLOR @X0E
+    ELSE
+        COLOR @X02
     ENDIF
-
-    IF (LOC006 = CHR(8) & GETX() > PAR001) GOSUB LABEL011
-
-    IF (LOC006 <> CHR(13)) THEN
-        GOTO LABEL010
-        :LABEL011
-        PAR004 = LEFT(PAR004, LEN(PAR004) - 1)
-        PRINT CHR(8)
-        PRINT "@X07·"
-        PRINT CHR(8)
-        RETURN 
-        :LABEL012
-        IF (LOC006 = CHR(9)) LOC006 = ""
-
-        IF (LOC006 = CHR(10)) LOC006 = ""
-
-        IF (LOC006 = CHR(7)) LOC006 = ""
-
-        IF (LOC006 = CHR(11)) LOC006 = ""
-
-        IF (LOC006 = "LEFT") LOC006 = ""
-
-        IF (LOC006 = "BADKEY") LOC006 = ""
-
-        IF (LOC006 = "RIGHT") LOC006 = ""
-
-        IF (LOC006 = "HOME") LOC006 = ""
-
-        IF (LOC006 = "UP") LOC006 = ""
-
-        IF (LOC006 = "DEL") LOC006 = ""
-
-        IF (LOC006 = "END") LOC006 = ""
-
-        IF (LOC006 = "PGDN") LOC006 = ""
-
-        IF (LOC006 = "PGUP") LOC006 = ""
-
-        IF (LOC006 = "INS") LOC006 = ""
-
-        IF (LOC006 = "DOWN") LOC006 = ""
-
-        RETURN 
-        :LABEL013
-        LOC003 = ASC(LOC006)
-        IF (LOC003 < 48) PRINT STR012 + LOC006
-
-        IF (LOC003 < 65 & LOC003 > 57) PRINT STR012 + LOC006
-
-        IF (LOC003 > 47 & LOC003 < 58) PRINT STR011 + LOC006
-
-        IF (LOC003 > 64 & LOC003 < 91) PRINT STR010 + LOC006
-
-        IF (LOC003 > 96 & LOC003 < 123) PRINT STR009 + LOC006
-
-        IF (LOC003 > 128) PRINT STR013 + LOC006
-
-        RETURN 
-    ENDIF
-
-    STR008 = PAR004
+    PRINT character
 ENDPROC
 
+PROCEDURE HandleKey(EVENT keyEvent)
+    STRING key = keyEvent.Text
+    STRING upperKey = key.ToUpper()
 
+    IF (keyEvent.Code = 19 | (keyEvent.Ctrl & upperKey = "S")) THEN
+        saveMessage = TRUE
+        editing = FALSE
+        RETURN
+    ENDIF
+    IF (keyEvent.Code = 1 | (keyEvent.Ctrl & upperKey = "A") | keyEvent.Code = KEY_ESCAPE) THEN
+        saveMessage = FALSE
+        editing = FALSE
+        RETURN
+    ENDIF
+
+    IF (keyEvent.Code = KEY_UP) THEN
+        MoveVertical(-1)
+    ELSEIF (keyEvent.Code = KEY_DOWN) THEN
+        MoveVertical(1)
+    ELSEIF (keyEvent.Code = KEY_LEFT) THEN
+        MoveLeft()
+    ELSEIF (keyEvent.Code = KEY_RIGHT) THEN
+        MoveRight()
+    ELSEIF (keyEvent.Code = KEY_HOME) THEN
+        cursorColumn = 0
+    ELSEIF (keyEvent.Code = KEY_END) THEN
+        cursorColumn = lines[cursorLine].Len()
+    ELSEIF (keyEvent.Code = KEY_PAGE_UP) THEN
+        MoveVertical(0 - VISIBLE_LINES)
+    ELSEIF (keyEvent.Code = KEY_PAGE_DOWN) THEN
+        MoveVertical(VISIBLE_LINES)
+    ELSEIF (keyEvent.Code = KEY_ENTER) THEN
+        SplitLine()
+    ELSEIF (keyEvent.Code = KEY_BACKSPACE) THEN
+        Backspace()
+    ELSEIF (keyEvent.Code = KEY_DELETE) THEN
+        DeleteCharacter()
+    ELSEIF (!keyEvent.Ctrl & key.Len() = 1 & Asc(key) >= 32) THEN
+        InsertCharacter(key)
+    ENDIF
+
+    KeepCursorVisible()
+    PositionCursor()
+ENDPROC
+
+PROCEDURE MoveVertical(INTEGER amount)
+    cursorLine += amount
+    IF cursorLine < 0 cursorLine = 0
+    IF cursorLine >= lineCount cursorLine = lineCount - 1
+    IF cursorColumn > lines[cursorLine].Len() cursorColumn = lines[cursorLine].Len()
+ENDPROC
+
+PROCEDURE MoveLeft()
+    IF (cursorColumn > 0) THEN
+        cursorColumn -= 1
+    ELSEIF (cursorLine > 0) THEN
+        cursorLine -= 1
+        cursorColumn = lines[cursorLine].Len()
+    ENDIF
+ENDPROC
+
+PROCEDURE MoveRight()
+    IF (cursorColumn < lines[cursorLine].Len()) THEN
+        cursorColumn += 1
+    ELSEIF (cursorLine + 1 < lineCount) THEN
+        cursorLine += 1
+        cursorColumn = 0
+    ENDIF
+ENDPROC
+
+PROCEDURE InsertCharacter(STRING character)
+    IF lines[cursorLine].Len() >= EDIT_WIDTH RETURN
+    lines[cursorLine] = Left(lines[cursorLine], cursorColumn) + character + Mid(lines[cursorLine], cursorColumn + 1, EDIT_WIDTH)
+    cursorColumn += 1
+    DrawTextRow(cursorLine)
+ENDPROC
+
+PROCEDURE SplitLine()
+    IF lineCount >= MAX_LINES RETURN
+
+    INTEGER index = lineCount
+    WHILE index > cursorLine + 1 DO
+        lines[index] = lines[index - 1]
+        index -= 1
+    ENDWHILE
+    lines[cursorLine + 1] = Mid(lines[cursorLine], cursorColumn + 1, lines[cursorLine].Len() - cursorColumn)
+    lines[cursorLine] = lines[cursorLine].Left(cursorColumn)
+    lineCount += 1
+    cursorLine += 1
+    cursorColumn = 0
+    KeepCursorVisible()
+    DrawVisibleLines()
+ENDPROC
+
+PROCEDURE Backspace()
+    IF cursorColumn > 0 THEN
+        lines[cursorLine] = Left(lines[cursorLine], cursorColumn - 1) + Mid(lines[cursorLine], cursorColumn + 1, EDIT_WIDTH)
+        cursorColumn -= 1
+        DrawTextRow(cursorLine)
+        RETURN
+    ENDIF
+    IF cursorLine = 0 RETURN
+    IF lines[cursorLine - 1].Len() + lines[cursorLine].Len() > EDIT_WIDTH RETURN
+
+    cursorColumn = lines[cursorLine - 1].Len()
+    lines[cursorLine - 1] += lines[cursorLine]
+    RemoveLine(cursorLine)
+    cursorLine -= 1
+    KeepCursorVisible()
+    DrawVisibleLines()
+ENDPROC
+
+PROCEDURE DeleteCharacter()
+    IF cursorColumn < lines[cursorLine].Len() THEN
+        lines[cursorLine] = Left(lines[cursorLine], cursorColumn) + Mid(lines[cursorLine], cursorColumn + 2, EDIT_WIDTH)
+        DrawTextRow(cursorLine)
+        RETURN
+    ENDIF
+    IF cursorLine + 1 >= lineCount RETURN
+    IF lines[cursorLine].Len() + lines[cursorLine + 1].Len() > EDIT_WIDTH RETURN
+
+    lines[cursorLine] += lines[cursorLine + 1]
+    RemoveLine(cursorLine + 1)
+    DrawVisibleLines()
+ENDPROC
+
+PROCEDURE RemoveLine(INTEGER line)
+    INTEGER index = line
+    WHILE index + 1 < lineCount DO
+        lines[index] = lines[index + 1]
+        index += 1
+    ENDWHILE
+    lineCount -= 1
+    lines[lineCount] = ""
+ENDPROC
+
+PROCEDURE KeepCursorVisible()
+    INTEGER oldFirst = firstVisible
+    IF cursorLine < firstVisible firstVisible = cursorLine
+    IF cursorLine >= firstVisible + VISIBLE_LINES firstVisible = cursorLine - VISIBLE_LINES + 1
+    IF oldFirst <> firstVisible DrawVisibleLines()
+ENDPROC
+
+PROCEDURE PositionCursor()
+    ANSIPOS cursorColumn + 2, FIRST_EDIT_ROW + cursorLine - firstVisible
+ENDPROC
+
+PROCEDURE DrawVisibleLines()
+    INTEGER row
+    FOR row = 0 TO VISIBLE_LINES - 1
+        DrawTextRow(firstVisible + row)
+    NEXT
+ENDPROC
+
+PROCEDURE DrawTextRow(INTEGER line)
+    INTEGER screenRow = FIRST_EDIT_ROW + line - firstVisible
+    IF screenRow < FIRST_EDIT_ROW | screenRow > LAST_EDIT_ROW RETURN
+
+    STRING text = ""
+    IF line < lineCount text = lines[line]
+    IF text.Len() < EDIT_WIDTH text += Space(EDIT_WIDTH - text.Len())
+    ANSIPOS 2, screenRow
+    COLOR @X0E
+    PRINT text.Left(EDIT_WIDTH)
+ENDPROC
+
+FUNCTION WriteMessageFile(STRING fileName) BOOLEAN
+    FCREATE 1, fileName, O_WR, S_DN
+    IF !Error.Last().OK RETURN FALSE
+
+    INTEGER lastLine = lineCount - 1
+    WHILE lastLine > 0 & lines[lastLine] = "" DO
+        lastLine -= 1
+    ENDWHILE
+
+    INTEGER index
+    FOR index = 0 TO lastLine
+        FPUTLN 1, lines[index]
+        IF !Error.Last().OK THEN
+            FCLOSE 1
+            RETURN FALSE
+        ENDIF
+    NEXT
+    FCLOSE 1
+    RETURN Error.Last().OK
+ENDFUNC
+
+PROCEDURE DrawAddressScreen()
+    CLS
+    COLOR @X0D
+    PRINTLN "                         Write a LiQUiD message"
+    PRINTLN
+    PRINTLN "               +----------------------------------------------+"
+    PRINTLN "               |                                              |"
+    PRINTLN "               |                                              |"
+    PRINTLN "               |                                              |"
+    PRINTLN "               +----------------------------------------------+"
+    PRINTLN
+    PRINTLN
+    PRINTLN
+    PRINTLN "               | To (Enter=ALL) : ........................ |"
+    PRINTLN "               | Subject        : ........................ |"
+    PRINTLN "               | Private (Y/N)  : ( )                      |"
+    COLOR @X07
+ENDPROC
+
+PROCEDURE DrawEditor(STRING recipient, STRING subject)
+    CLS
+    COLOR @X0B
+    STRING border = "+" + STRING.Repeat("-", EDIT_WIDTH) + "+"
+    PRINTLN border
+    PRINTLN "| To   : ", Left(recipient + Space(56), 56), "LiQUiD Edit |"
+    PRINTLN "| Subj : ", Left(subject + Space(51), 51), "^A Abort ^S Save |"
+    PRINTLN border
+    INTEGER row
+    FOR row = FIRST_EDIT_ROW TO LAST_EDIT_ROW
+        ANSIPOS 1, row
+        PRINT "|"
+        ANSIPOS 78, row
+        PRINT "|"
+    NEXT
+    ANSIPOS 1, LAST_EDIT_ROW + 1
+    PRINT border
+    DrawVisibleLines()
+    PositionCursor()
+ENDPROC
