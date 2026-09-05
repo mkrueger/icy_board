@@ -10,6 +10,16 @@ releases.
 
 ### Added
 
+- Files that arrive with a `.TIC` are tossed into the file directory carrying
+  their area. They used to be announced as being tossed and then left in the
+  inbound, because nothing here read a TIC at all. A directory says which echo
+  it carries with `Fido Area Tag` in the directory editor, and one named after
+  the echo is found by that name. The file is registered in the directory's file
+  base with the description the TIC brought, a `Replaces` mask removes what the
+  new file supersedes, and a file whose size or checksum does not match what was
+  announced stays in the inbound rather than being handed to users. `Pw` is
+  checked against a link's new `tic_password`.
+
 - File requests are answered, which PCBoard configured on four screens and
   this board now offers under the same names: a FREQ path list, restrictions,
   magic names and a deny list. A requested name is matched against the listing

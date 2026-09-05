@@ -3989,6 +3989,7 @@ dependencies = [
  "chrono",
  "chumsky",
  "codepages",
+ "crc32fast",
  "creditcard",
  "criterion",
  "crossterm 0.29.0",

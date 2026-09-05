@@ -11,6 +11,7 @@ pub mod bundle;
 pub mod freq;
 pub mod packet;
 pub mod queue;
+pub mod tic;
 pub mod toss;
 
 /// The port fidonet technology networks reserved for binkp.
@@ -113,6 +114,12 @@ pub struct FtnLink {
     #[serde(skip_serializing_if = "String::is_empty")]
     pub area_fix_password: String,
 
+    /// The password a `.TIC` from this node has to carry. Empty means the file
+    /// echos are taken as they come.
+    #[serde(default)]
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub tic_password: String,
+
     /// Zero means the link is polled only when the sysop asks for it.
     #[serde(default)]
     pub poll_minutes: u32,
@@ -151,6 +158,7 @@ impl Default for FtnLink {
             password: String::new(),
             packet_password: String::new(),
             area_fix_password: String::new(),
+            tic_password: String::new(),
             poll_minutes: 0,
             areas: Vec::new(),
         }

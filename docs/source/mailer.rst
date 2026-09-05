@@ -315,6 +315,43 @@ by whether the nodelist listed them; there is no nodelist here, so a request
 from a node that is not a link is reported and left alone.
 
 
+File echos
+----------
+
+A file echo distributes files the way an echo distributes messages. Each file
+arrives with a ``.TIC`` beside it that names the area it belongs to, the size
+and checksum it should have, and the description users are to read.
+
+Say which file directory carries a tag with ``Fido Area Tag`` in the directory
+editor of its conference, which writes ``ftn_area_tag`` into ``dir.toml``:
+
+.. code-block:: toml
+
+   [[area]]
+   name = "R24 Nodelists"
+   path = "conferences/fido/files/r24nodel"
+   ftn_area_tag = "R24NODEL"
+
+A directory that was named after the echo itself needs no tag; the tosser falls
+back to the directory name when nothing carries the tag.
+
+``toss`` puts each file into the directory carrying its area, registers it in
+that directory's file base and stores the TIC description, which is marked so a
+later ``icbfile scan`` does not replace it with whatever the archive holds. A
+``Replaces`` mask removes what the new file supersedes, which is how a nodelist
+area stays one file long.
+
+A file is only taken when it is all there: the announced size and CRC must
+match what arrived, or both files stay in the inbound with a note saying so. A
+tag no directory carries is reported and waits, so nothing is lost while the
+directory is still being set up. Set ``tic_password`` on a link to require the
+password its TICs carry, and with ``secure`` on, a TIC from a node that is not a
+configured link is refused.
+
+Files are not passed on to downlinks; this board is a leaf of a file echo, not
+a hub of one.
+
+
 Running the mailer
 ------------------
 

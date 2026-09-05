@@ -14,6 +14,7 @@ use icy_board_engine::{
             bundle::{is_bundle, unpack},
             freq,
             packet::Packet,
+            tic::{FileArea, toss_tics},
             toss::{EchoArea, TossReport, scan_outbound, toss_inbound},
         },
         message_area::MessageArea,
@@ -361,6 +362,7 @@ fn toss(board: &mut IcyBoard) -> Res<()> {
     for (file, err) in &report.failed {
         println!("  left in the inbound, {}: {}", file.display(), err);
     }
+    toss_files(board)?;
     serve_requests(board)?;
     register_link_updates(board, &report)?;
     register_new_areas(board, &report)?;
@@ -397,6 +399,48 @@ fn print_untrusted_netmail_advice(board: &IcyBoard, source: &str, count: usize) 
         "    Fix: add [[link]] address = \"{}\" for a node you trust, or disable Secure Netmail (options.secure = false).",
         source
     );
+}
+
+/// Puts the files that arrived with a `.TIC` into the directories that carry
+/// their area.
+fn toss_files(board: &IcyBoard) -> Res<()> {
+    let report = toss_tics(&board.ftn, &file_areas(board))?;
+    for (file, area) in &report.arrived {
+        println!("  {} put into {}", file, area);
+    }
+    for name in &report.replaced {
+        println!("  {} was replaced and removed", name);
+    }
+    for (tag, count) in &report.unknown {
+        println!(
+            "  {} file(s) arrived for {}, which no file directory carries. Set Fido Area Tag = \"{}\" on the directory that should hold them",
+            count, tag, tag
+        );
+    }
+    for (file, err) in &report.failed {
+        println!("  left in the inbound, {}: {}", file.display(), err);
+    }
+    Ok(())
+}
+
+/// The file directories that take part in the network, told apart by the tag
+/// they carry there. A directory named after the echo is found by that name.
+fn file_areas(board: &IcyBoard) -> Vec<FileArea> {
+    let mut areas = Vec::new();
+    for conference in board.conferences.iter() {
+        let Some(list) = &conference.directories else {
+            continue;
+        };
+        for directory in list.iter() {
+            areas.push(FileArea {
+                tag: directory.ftn_area_tag.clone(),
+                name: directory.name.clone(),
+                path: directory.path.clone(),
+                metadata_path: directory.metadata_path.clone(),
+            });
+        }
+    }
+    areas
 }
 
 /// Puts what the nodes asked for into their outbound, so the next session

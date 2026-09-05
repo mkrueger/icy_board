@@ -118,10 +118,11 @@ pub fn toss_inbound(config: &FtnConfig, areas: &AreaMap) -> Res<TossReport> {
         let Some(name) = file.file_name().and_then(|name| name.to_str()).map(str::to_ascii_lowercase) else {
             continue;
         };
-        log::info!("Tossing {}", file.display());
         let result = if bundle::is_bundle(&name) {
+            log::info!("Tossing {}", file.display());
             tosser.bundle(&file, &mut report)
         } else if bundle::is_packet(&name) {
+            log::info!("Tossing {}", file.display());
             tosser.packet(&file, &mut report)
         } else {
             continue;

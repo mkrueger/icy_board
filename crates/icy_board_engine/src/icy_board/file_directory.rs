@@ -78,6 +78,12 @@ pub struct FileDirectory {
     #[serde(default)]
     pub sort_direction: SortDirection,
 
+    /// The tag a file echo carries in the network, matched against the `Area`
+    /// line of an arriving TIC. Empty leaves the directory out of the network.
+    #[serde(default)]
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub ftn_area_tag: String,
+
     #[serde(default)]
     #[serde(skip_serializing_if = "is_false")]
     pub has_new_files: bool,
@@ -187,6 +193,7 @@ impl PCBoardRecordImporter<FileDirectory> for DirectoryList {
             sort_order,
             sort_direction,
             password: Password::default(),
+            ftn_area_tag: String::new(),
 
             has_new_files: false,
             is_free: false,

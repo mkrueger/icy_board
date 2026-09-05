@@ -131,7 +131,7 @@ fn is_plain_name(wanted: &str) -> bool {
 
 /// `*` stands for any run of characters and `?` for one, which is what a node
 /// on the other side of a request expects.
-fn matches_mask(name: &str, mask: &str) -> bool {
+pub(super) fn matches_mask(name: &str, mask: &str) -> bool {
     let name: Vec<char> = name.to_ascii_uppercase().chars().collect();
     let mask: Vec<char> = mask.to_ascii_uppercase().chars().collect();
     let (mut n, mut m) = (0, 0);

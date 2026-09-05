@@ -252,6 +252,18 @@ impl<'a> Page for DirsEditor<'a> {
                             ),
                             ConfigEntry::Item(
                                 ListItem::new(
+                                    get_text("dirs_edit_fido_tag"),
+                                    ListValue::Text(32, TextFlags::None, item.ftn_area_tag.to_string()),
+                                )
+                                .with_status(get_text("dirs_edit_fido_tag-status"))
+                                .with_help(get_text("dirs_edit_fido_tag-help"))
+                                .with_label_width(16)
+                                .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<DirectoryList>>), value: String| {
+                                    list.lock().unwrap()[*i].ftn_area_tag = value.to_ascii_uppercase();
+                                }),
+                            ),
+                            ConfigEntry::Item(
+                                ListItem::new(
                                     get_text("dirs_edit_sort"),
                                     ListValue::ComboBox(ComboBox {
                                         cur_value: ComboBoxValue::new(format!("{:?}", item.sort_order), format!("{:?}", item.sort_order)),

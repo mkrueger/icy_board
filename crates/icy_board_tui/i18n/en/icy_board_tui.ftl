@@ -3275,6 +3275,16 @@ dirs_edit_password-help=
     A password callers must give before this directory opens, which protects it
     without giving anybody a higher security level.
 
+dirs_edit_fido_tag=Fido Area Tag
+dirs_edit_fido_tag-status=The file echo tag this directory carries (BLANK=local directory)
+dirs_edit_fido_tag-help=
+    # Fido Area Tag
+
+    The name this file directory has in the Fido technology network, such as
+    R24NODEL. A file arriving with a TIC that names this tag is put here. Leave
+    it blank for a directory that takes part in no file echo; a directory whose
+    name is the tag itself is found by that name.
+
 dirs_edit_sort=Sort
 dirs_edit_sort-status=Sort
 dirs_edit_sort-help=
