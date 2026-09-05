@@ -284,13 +284,22 @@ The five that were left out, and why:
 The `[options]` table is not counted in the totals at the top of this file,
 which are about `icboard.toml`.
 
-### The UUCP block — 22 options, a whole missing feature
+### The UUCP block — 22 options, a feature that is not coming back
 
 `uucp_*`, `organization`, `comp_bat_file`, `de_comp_bat_file`. This is
 PCBoard's Usenet and internet mail gateway: newsgroups appear as conferences,
-mail is exchanged over UUCP. Porting the options makes no sense; porting the
-*feature* over NNTP and SMTP instead of UUCP might, and that is a roadmap
-question rather than a configuration one.
+mail is exchanged over UUCP by calling a feed site and swapping spooled
+batches. The protocol has no live sites left, so the options describe nothing
+that could be reached, and they are not implemented.
+
+The conference side of it survives: `ConferenceType` still knows the internet
+mail and newsgroup kinds, an import keeps them, and the message editor still
+asks for a newsgroup and a follow-up in such a conference. What is missing is
+only a transport. Should one ever be wanted it would be NNTP and SMTP rather
+than UUCP, and none of these options would describe it.
+
+The fields are still read from and written back to `PCBOARD.DAT`, so a board
+converted here and returned keeps them.
 
 ### Options with a home the importer does not fill
 

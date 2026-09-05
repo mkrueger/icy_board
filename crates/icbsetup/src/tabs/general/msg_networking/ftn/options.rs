@@ -98,6 +98,16 @@ pub fn processing(icy_board: Arc<Mutex<IcyBoard>>) -> FtnOptionPage {
             number!("fido_default_zone", width, u16::MAX as u32, default_zone, u16, lock),
             number!("fido_default_net", width, u16::MAX as u32, default_net, u16, lock),
             ConfigEntry::Item(
+                ListItem::new(get_text("fido_origin"), ListValue::Text(60, TextFlags::None, lock.ftn.origin.clone()))
+                    .with_status(get_text("fido_origin-status"))
+                    .with_help(get_text("fido_origin-help"))
+                    .with_label_width(width)
+                    .with_update_text_value(&|board: &Arc<Mutex<IcyBoard>>, value: String| {
+                        board.lock().unwrap().ftn.origin = value;
+                    }),
+            ),
+            ConfigEntry::Separator,
+            ConfigEntry::Item(
                 ListItem::new(
                     get_text("fido_log_level"),
                     ListValue::ComboBox(ComboBox {
@@ -172,26 +182,11 @@ pub fn directories(icy_board: Arc<Mutex<IcyBoard>>) -> FtnOptionPage {
             path!("fido_outbound", width, outbound, lock),
             path!("fido_netmail", width, netmail, lock),
             path!("fido_bad_netmail", width, bad_netmail, lock),
+            path!("fido_bad_packets", width, bad_packets, lock),
             path!("fido_new_areas", width, new_areas, lock),
         ]
     };
     page("fido_directory_title", &icy_board, entry)
-}
-
-pub fn origin(icy_board: Arc<Mutex<IcyBoard>>) -> FtnOptionPage {
-    let entry = {
-        let lock = icy_board.lock().unwrap();
-        vec![ConfigEntry::Item(
-            ListItem::new(get_text("fido_origin"), ListValue::Text(60, TextFlags::None, lock.ftn.origin.clone()))
-                .with_status(get_text("fido_origin-status"))
-                .with_help(get_text("fido_origin-help"))
-                .with_label_width(12)
-                .with_update_text_value(&|board: &Arc<Mutex<IcyBoard>>, value: String| {
-                    board.lock().unwrap().ftn.origin = value;
-                }),
-        )]
-    };
-    page("fido_origin_title", &icy_board, entry)
 }
 
 pub fn freq(icy_board: Arc<Mutex<IcyBoard>>) -> FtnOptionPage {

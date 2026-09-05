@@ -3768,7 +3768,6 @@ fido_menu_tosser=Tosser Configuration
 fido_menu_nodes=Node Configuration
 fido_menu_addresses=System Address
 fido_menu_directories=File & Directory Configuration
-fido_menu_origin=Default Origin
 fido_menu_routing=Routing Configuration
 fido_menu_freq_paths=FREQ Path List
 fido_menu_freq_restrictions=FREQ Restrictions
@@ -4076,8 +4075,6 @@ fido_node_areas-help=
     The echo tags this node carries. Mail written here is offered to a node only
     for the areas it asked for, and to every node that asked. Leave it empty and
     the node gets no echomail.
-
-fido_origin_title=Fidonet Default Origin
 
 fido_origin=Origin
 fido_origin-status=The line appended to echomail written in an area that names no origin of its own

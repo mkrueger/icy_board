@@ -25,7 +25,6 @@ impl MsgNetworking {
             page: IcbSetupMenuUI::new(SelectMenu::new(vec![
                 MenuItem::new(0, 'A', get_text("msg_networking_qwk")),
                 MenuItem::new(1, 'B', get_text("msg_networking_ftn")),
-                MenuItem::new(2, 'C', "UUCP TODO".to_string()),
             ]))
             .with_center_title(get_text("msg_networking_title")),
             icy_board,
