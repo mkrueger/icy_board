@@ -19,6 +19,11 @@ releases.
   the outbound before what it arrived in is removed. A bundle that could not be
   written left the tosser having already thrown the only copy away.
 
+- A file arriving over binkp is written under a working name and only takes the
+  name it was offered as once it is complete. A session that broke off used to
+  leave a partial bundle that the next toss read as a whole one, and a file
+  named like one still waiting in the inbound overwrote it.
+
 ### Added
 
 - Files that arrive with a `.TIC` are tossed into the file directory carrying

@@ -62,6 +62,9 @@ pub enum NetError {
     #[error("{0}: cannot parse args")]
     BinkpBadArgument(String, String),
 
+    #[error("The inbound already holds {0} and every name beside it, so the file that just arrived has nowhere to go")]
+    BinkpNoFreeName(String),
+
     #[error("Binkp session timed out")]
     BinkpTimeout,
 }

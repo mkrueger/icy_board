@@ -3,6 +3,7 @@ use std::{
     time::Duration,
 };
 
+use tempfile::TempPath;
 use tokio::{
     fs::File,
     io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
@@ -92,9 +93,60 @@ struct Sending {
 
 struct Receiving {
     info: FileInfo,
-    path: PathBuf,
+    /// The name the file is meant to end up under once it is all there.
+    target: PathBuf,
+    /// Where the bytes go until then. Dropping this removes the partial file.
+    partial: TempPath,
     handle: File,
     written: u64,
+}
+
+impl Receiving {
+    /// A file is written under a name of its own until the last octet has
+    /// arrived, so a session that breaks off cannot leave half a bundle where
+    /// the tosser would read it as whole.
+    async fn start(inbound: &Path, info: FileInfo, name: &str) -> crate::Result<Self> {
+        let partial = tempfile::Builder::new().prefix("binkp-").suffix(".tmp").tempfile_in(inbound)?;
+        let handle = File::from_std(partial.reopen()?);
+        Ok(Self {
+            info,
+            target: inbound.join(name),
+            partial: partial.into_temp_path(),
+            handle,
+            written: 0,
+        })
+    }
+
+    /// Puts the finished file under the name it was offered as, which is where
+    /// the tosser looks for it.
+    async fn store(mut self) -> crate::Result<PathBuf> {
+        self.handle.flush().await?;
+        let Some(target) = free_name(&self.target) else {
+            return Err(NetError::BinkpNoFreeName(self.target.display().to_string()).into());
+        };
+        drop(self.handle);
+        self.partial.persist(&target).map_err(|error| error.error)?;
+        Ok(target)
+    }
+}
+
+/// A name the inbound does not hold yet. Mail still waiting to be tossed must
+/// not be replaced by a file that happens to be called the same, and the
+/// extension is kept so that what arrives is still recognised as a bundle.
+fn free_name(target: &Path) -> Option<PathBuf> {
+    if !target.exists() {
+        return Some(target.to_path_buf());
+    }
+    let stem = target.file_stem()?.to_string_lossy().to_string();
+    let extension = target.extension().map(|extension| extension.to_string_lossy().to_string());
+    (1..100).find_map(|counter| {
+        let name = match &extension {
+            Some(extension) => format!("{stem}-{counter}.{extension}"),
+            None => format!("{stem}-{counter}"),
+        };
+        let candidate = target.with_file_name(name);
+        (!candidate.exists()).then_some(candidate)
+    })
 }
 
 /// Runs the file transfer stage of FTS-1026 6.2 until both sides have sent
@@ -127,10 +179,13 @@ pub async fn transfer_batch(connection: &mut dyn Connection, outbound: Vec<Outbo
                         current.handle.write_all(&data).await?;
                         current.written += data.len() as u64;
                         if current.written >= current.info.size {
-                            current.handle.flush().await?;
-                            Frame::command(BinkpCommand::Got, current.info.to_argument(None)).send(connection).await?;
-                            result.received.push(current.path.clone());
-                            receiving = None;
+                            // The remote may only be told the file arrived once
+                            // it is somewhere the next run will find it.
+                            let current = receiving.take().unwrap();
+                            let info = current.info.clone();
+                            let path = current.store().await?;
+                            Frame::command(BinkpCommand::Got, info.to_argument(None)).send(connection).await?;
+                            result.received.push(path);
                         }
                     }
                 }
@@ -150,18 +205,14 @@ pub async fn transfer_batch(connection: &mut dyn Connection, outbound: Vec<Outbo
                         Frame::command(BinkpCommand::Skip, info.to_argument(None)).send(connection).await?;
                         continue;
                     };
-                    let path = inbound.join(&name);
-                    let handle = File::create(&path).await?;
-                    if info.size == 0 {
+                    let current = Receiving::start(inbound, info, &name).await?;
+                    if current.info.size == 0 {
+                        let info = current.info.clone();
+                        let path = current.store().await?;
                         Frame::command(BinkpCommand::Got, info.to_argument(None)).send(connection).await?;
                         result.received.push(path);
                     } else {
-                        receiving = Some(Receiving {
-                            info,
-                            path,
-                            handle,
-                            written: 0,
-                        });
+                        receiving = Some(current);
                     }
                 }
 
@@ -419,6 +470,59 @@ mod tests {
 
         assert_eq!(result.received, vec![inbound.join("mail bundle.su0")]);
         assert_eq!(tokio::fs::read(inbound.join("mail bundle.su0")).await.unwrap(), b"hello");
+    }
+
+    #[tokio::test]
+    async fn test_a_file_that_never_arrived_in_full_leaves_nothing_behind() {
+        let directory = tempfile::tempdir().unwrap();
+        let inbound = directory.path().join("in");
+        let (mut ours, mut peer) = ChannelConnection::create_pair();
+        tokio::spawn(async move {
+            let info = FileInfo {
+                name: "mail.su0".to_string(),
+                size: 5000,
+                time: 1234,
+            };
+            Frame::command(BinkpCommand::File, info.to_argument(Some(0))).send(&mut peer).await.unwrap();
+            Frame::Data(b"half of it".to_vec()).send(&mut peer).await.unwrap();
+            Frame::command(BinkpCommand::Eob, "").send(&mut peer).await.unwrap();
+            // Hold the connection so the batch has to give up on its own.
+            tokio::time::sleep(Duration::from_secs(30)).await;
+        });
+
+        let result = transfer_batch(&mut ours, Vec::new(), &inbound, Duration::from_millis(200)).await;
+
+        assert!(result.is_err(), "a file that stopped half way cannot end the batch");
+        assert!(!inbound.join("mail.su0").exists(), "half a bundle must not be left for the tosser");
+        assert_eq!(std::fs::read_dir(&inbound).unwrap().count(), 0, "and the working file must be gone too");
+    }
+
+    /// The name keeps its extension, so what arrives is still read as a bundle.
+    #[tokio::test]
+    async fn test_a_file_does_not_replace_one_that_is_still_waiting_to_be_tossed() {
+        let directory = tempfile::tempdir().unwrap();
+        let inbound = directory.path().join("in");
+        std::fs::create_dir_all(&inbound).unwrap();
+        std::fs::write(inbound.join("mail.su0"), b"still waiting to be tossed").unwrap();
+
+        let (mut ours, mut peer) = ChannelConnection::create_pair();
+        tokio::spawn(async move {
+            let info = FileInfo {
+                name: "mail.su0".to_string(),
+                size: 5,
+                time: 1234,
+            };
+            Frame::command(BinkpCommand::File, info.to_argument(Some(0))).send(&mut peer).await.unwrap();
+            Frame::Data(b"fresh".to_vec()).send(&mut peer).await.unwrap();
+            Frame::command(BinkpCommand::Eob, "").send(&mut peer).await.unwrap();
+            read_until(&mut peer, BinkpCommand::Got).await;
+        });
+
+        let result = transfer_batch(&mut ours, Vec::new(), &inbound, timeout()).await.unwrap();
+
+        assert_eq!(std::fs::read(inbound.join("mail.su0")).unwrap(), b"still waiting to be tossed");
+        assert_eq!(result.received, vec![inbound.join("mail-1.su0")]);
+        assert_eq!(std::fs::read(inbound.join("mail-1.su0")).unwrap(), b"fresh");
     }
 
     #[tokio::test]
