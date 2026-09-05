@@ -714,7 +714,7 @@ impl IcyBoard {
         // The fido block, lines 173-177, 232-236 and 336-347. PCBoard keeps the
         // addresses and the links in the files under FidoLoc, only the options
         // that steer the tosser are in here.
-        pcb_dat.enable_fido = self.ftn.is_configured();
+        pcb_dat.enable_fido = self.ftn.options.enabled;
         pcb_dat.fido_process_in = self.ftn.options.process_in;
         pcb_dat.fido_process_out = self.ftn.options.process_out;
         pcb_dat.fido_process_orphan = self.ftn.options.process_orphan;
@@ -729,7 +729,7 @@ impl IcyBoard {
         pcb_dat.fido_enable_pass_thru = self.ftn.options.pass_thru;
         pcb_dat.fido_default_zone = self.ftn.options.default_zone as i32;
         pcb_dat.fido_default_net = self.ftn.options.default_net as i32;
-        pcb_dat.fido_log_level = self.ftn.options.verbose_log as i32;
+        pcb_dat.fido_log_level = self.ftn.options.log_level.to_pcboard();
 
         // Line 296 (to prevent \0 char)
         pcb_dat.uucp_high_ascii = 'N';

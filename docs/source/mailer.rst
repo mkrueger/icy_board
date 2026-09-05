@@ -53,8 +53,10 @@ link are configured.
    origin = "My Board * bbs.example.org"
 
    [options]
+   enabled = true
    secure = false
    sysop_change = true
+   log_level = "normal"
 
    [[aka]]
    address = "21:1/100"
@@ -120,6 +122,13 @@ you, or a downlink you feed.
    answers a challenge with it, so it cannot be stored hashed the way user
    passwords are. Keep the file readable by the board account only.
 
+``packet_password``
+   The eight characters a packet from this link has to carry, and the ones
+   packets sent to it are stamped with. A packet claiming this link's address
+   without them is left in the inbound rather than tossed. Leave it out and
+   packets are taken as they come, which is what `PCBoard` did when the field
+   on the ``~FIDO~`` user record was blank.
+
 ``areas``
    The echo tags this link carries. Mail written here is offered to a link
    only for the areas it asked for, and to every link that asked. Leave it
@@ -129,6 +138,19 @@ you, or a downlink you feed.
    Reserved for a scheduler that does not exist yet. Zero, the default, means
    the link is called only when you ask for it.
 
+Processing options
+~~~~~~~~~~~~~~~~~~
+
+``enabled``
+   Master switch for Fido processing. Turning it off stops polling, importing
+   and exporting without losing addresses, nodes or paths. Existing
+   configurations which do not name the option default to enabled.
+
+``log_level``
+   ``normal`` reports warnings and errors, ``detailed`` also reports regular
+   mailer activity, and ``debug`` includes packet and protocol details. The
+   command-line ``-v`` switch temporarily selects debug for that run.
+
 Netmail options
 ~~~~~~~~~~~~~~~
 
@@ -137,11 +159,13 @@ Netmail options
    the equivalent of PCBoard accepting secure netmail only from ``~FIDO~`` node
    records. Turn this off to accept netmail from every source. If a message is
    kept apart, the toss output shows its source address, destination base, and
-   the settings that can fix it.
+   the settings that can fix it. The source address is only a claim the packet
+   makes, so set ``packet_password`` on a link that matters.
 
 ``sysop_change``
-   Treat the conventional recipient ``Sysop`` as the configured sysop name.
-   This is enabled by default.
+   Change the conventional recipient ``Sysop`` to ``FIDO_SYSOP`` on import.
+   This keeps generic Fido mail from setting the board sysop's mail-waiting
+   flag, matching PCBoard. This is enabled by default.
 
 
 Tying message areas to echos

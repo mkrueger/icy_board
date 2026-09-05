@@ -3733,134 +3733,215 @@ command_editor_command_type=Command Type
 
 msg_networking_title=Message Networking
 msg_networking_qwk=QWK Settings
-msg_networking_ftn=FidoNet Settings
+msg_networking_ftn=Fido Configuration
 
-ftn_settings_title=FidoNet Settings
+fido_config_title=Fido Configuration
 
-ftn_run_label=Mailer and Tosser
+fido_menu_processing=Fido Configuration
+fido_menu_tosser=Tosser Configuration
+fido_menu_nodes=Node Configuration
+fido_menu_addresses=System Address
+fido_menu_directories=File & Directory Configuration
+fido_menu_origin=Origin
 
-ftn_process_in=Toss Inbound
-ftn_process_in-status=Read the mail waiting in the inbound
-ftn_process_in-help=When this is off nothing is read out of the inbound, which is how a board is taken out of the network without losing what arrives.
+fido_processing_title=Fido Processing Configuration
 
-ftn_process_out=Scan Outbound
-ftn_process_out-status=Pack what was written here for the links
-ftn_process_out-help=When this is off nothing written on this board leaves it.
+fido_enabled=Enable Fido Processing
+fido_enabled-status=Take this board on or off the Fido network
+fido_enabled-help=
+    # Enable Fido Processing
 
-ftn_process_orphan=Toss Orphans
-ftn_process_orphan-status=Read packets addressed to another system
-ftn_process_orphan-help=A hub reads mail that is not addressed to it, a leaf node has no business doing so. Packets for somebody else are left in the inbound while this is off.
+    Turns polling, importing and exporting on or off without losing the system
+    addresses, node configuration or paths.
 
-ftn_dial_out=Call Links
-ftn_dial_out-status=Allow this board to call the links
-ftn_dial_out-help=A board that is only ever called leaves this off.
+fido_import_after_xfer=Import Immediately After File Transfers
+fido_import_after_xfer-status=Toss the inbound when a call has ended
+fido_import_after_xfer-help=What the link handed over is read into the message bases straight away instead of waiting for the next toss.
 
-ftn_import_after_xfer=Toss After Call
-ftn_import_after_xfer-status=Toss the inbound when a call has ended
-ftn_import_after_xfer-help=What the link handed over is read into the message bases straight away instead of waiting for the next toss.
+fido_process_in=Allow Node to Process Incoming Packets
+fido_process_in-status=Read the mail waiting in the inbound
+fido_process_in-help=When this is off nothing is read out of the inbound, which is how a board is taken out of the network without losing what arrives.
 
-ftn_verbose_log=Verbose Log
-ftn_verbose_log-status=Say what the mailer is doing, not only what went wrong
-ftn_verbose_log-help=
-    # Verbose Log
+fido_process_out=Allow Node to Export Mail
+fido_process_out-status=Pack what was written here for the links
+fido_process_out-help=When this is off nothing written on this board leaves it.
 
-    Records what the mailer does, not only what failed. Worth turning on while
-    a new link is being set up, and off again once it runs.
+fido_dial_out=Allow Node to Dial Out
+fido_dial_out-status=Allow this board to call the links
+fido_dial_out-help=A board that is only ever called leaves this off.
 
-ftn_dupes_label=Duplicates
+fido_process_orphan=Process Orphan Packets
+fido_process_orphan-status=Read packets addressed to another system
+fido_process_orphan-help=A hub reads mail that is not addressed to it, a leaf node has no business doing so. Packets for somebody else are left in the inbound while this is off.
 
-ftn_check_dupe_msg_id=Check Message ID
-ftn_check_dupe_msg_id-status=Drop a message whose id was seen in the area before
-ftn_check_dupe_msg_id-help=A message travels several ways through a network and arrives more than once. The message id is what tells the copies apart.
+fido_log_level=Fido Logging Level
+fido_log_level-status=How much of the mailer's operation is reported
+fido_log_level-help=
+    # Fido Logging Level
 
-ftn_check_dupe_path=Check Path
-ftn_check_dupe_path-status=Drop a message whose path already names this board
-ftn_check_dupe_path-help=A message that has been here before has come back the long way around, which the id check misses when the message carries no id.
+    Normal reports warnings and errors. Detailed also reports regular mailer
+    activity. Debug includes protocol details and is useful while diagnosing a
+    new or failing node.
 
-ftn_msgs_to_track=Messages Tracked
-ftn_msgs_to_track-status=How far back the duplicate check looks, 0 for the whole area
-ftn_msgs_to_track-help=A busy area holds a long list of message ids, and reading all of them costs time on every run.
+fido_log_level_normal=Normal
+fido_log_level_detailed=Detailed
+fido_log_level_debug=Debug
 
-ftn_areas_label=Areas
+fido_default_zone=Default Zone
+fido_default_zone-status=The zone a two dimensional packet is completed with
+fido_default_zone-help=An old packet leaves the zone at zero and only the sysop knows which network it meant.
 
-ftn_auto_add=Add Unknown Areas
-ftn_auto_add-status=Make an area out of a tag no area carries
-ftn_auto_add-help=Without this a message for an unknown tag is counted and dropped.
-
-ftn_auto_add_conference=Add To Conference
-ftn_auto_add_conference-status=The conference an area added that way belongs to
-ftn_auto_add_conference-help=
-    # Add To Conference
-
-    The conference that receives areas the tosser adds by itself, so newly
-    offered areas end up somewhere known instead of at random.
-
-ftn_pass_thru=Pass Through
-ftn_pass_thru-status=Hand an area on without storing it here
-ftn_pass_thru-help=A hub feeds its downlinks areas it does not read itself. The message is offered to every link that asked for the tag and has not seen it yet.
-
-ftn_mail_label=Netmail
-
-ftn_secure=Secure Netmail
-ftn_secure-status=Keep netmail from an unconfigured node apart
-ftn_secure-help=
-    Netmail from a packet whose originating FTN address does not match a
-    configured link goes to the Unknown Netmail base. This mirrors PCBoard's
-    ~FIDO~ node records: the sender's node is checked, not the recipient name.
-
-ftn_sysop_change=Deliver To Sysop
-ftn_sysop_change-status=Netmail to "Sysop" goes to the name the sysop reads under
-ftn_sysop_change-help=
-    # Deliver To Sysop
-
-    Netmail addressed to "Sysop" is handed to the name the sysop actually reads
-    under, so mail from other systems is not left for a caller nobody reads as.
-
-ftn_default_zone=Default Zone
-ftn_default_zone-status=The zone a two dimensional packet is completed with
-ftn_default_zone-help=An old packet leaves the zone at zero and only the sysop knows which network it meant.
-
-ftn_default_net=Default Net
-ftn_default_net-status=The net a two dimensional packet is completed with
-ftn_default_net-help=
+fido_default_net=Default Net
+fido_default_net-status=The net a two dimensional packet is completed with
+fido_default_net-help=
     # Default Net
 
     The net number used to complete an address that arrives without one, which
     older two dimensional packets do.
 
-ftn_paths_label=Directories
+fido_tosser_title=Fido Tosser Configuration
 
-ftn_inbound=Inbound
-ftn_inbound-status=Where a call drops what it received
-ftn_inbound-help=
-    # Inbound
+fido_check_dupe_path=Check for Dupes using Message Path
+fido_check_dupe_path-status=Drop a message whose path already names this board
+fido_check_dupe_path-help=A message that has been here before has come back the long way around, which the id check misses when the message carries no id.
+
+fido_check_dupe_msg_id=Check for Dupes using MSGID
+fido_check_dupe_msg_id-status=Drop a message whose id was seen in the area before
+fido_check_dupe_msg_id-help=A message travels several ways through a network and arrives more than once. The message id is what tells the copies apart.
+
+fido_msgs_to_track=Number of Messages to Track for Dupes
+fido_msgs_to_track-status=How far back the duplicate check looks, 0 for the whole area
+fido_msgs_to_track-help=A busy area holds a long list of message ids, and reading all of them costs time on every run.
+
+fido_auto_add=Auto Add Fido Areas
+fido_auto_add-status=Make an area out of a tag no area carries
+fido_auto_add-help=Without this a message for an unknown tag is counted and dropped.
+
+fido_auto_add_conference=Add To Conference
+fido_auto_add_conference-status=The conference an area added that way belongs to
+fido_auto_add_conference-help=
+    # Add To Conference
+
+    The conference that receives areas the tosser adds by itself, so newly
+    offered areas end up somewhere known instead of at random.
+
+fido_pass_thru=Enable PassThru's
+fido_pass_thru-status=Hand an area on without storing it here
+fido_pass_thru-help=A hub feeds its downlinks areas it does not read itself. The message is offered to every link that asked for the tag and has not seen it yet.
+
+fido_secure=Secure Netmail
+fido_secure-status=Keep netmail from an unconfigured node apart
+fido_secure-help=
+    Netmail from a packet whose originating FTN address does not match a
+    configured node goes to the Secure Netmail base. This mirrors PCBoard's
+    ~FIDO~ node records: the sender's node is checked, not the recipient name.
+    An address is only what the packet claims, so give a node that matters a
+    packet password under Node Configuration.
+
+fido_sysop_change=Change SYSOP to FIDO_SYSOP on Import
+fido_sysop_change-status=Keep generic SYSOP mail from setting the board sysop's waiting flag
+fido_sysop_change-help=
+    # Change SYSOP to FIDO_SYSOP
+
+    Fido mail often comes in generically addressed to SYSOP. Re-addressing it to
+    FIDO_SYSOP avoids setting the board sysop's mail-waiting flag in echo areas.
+
+fido_directory_title=Fido Directory Configuration
+
+fido_inbound=Incoming Packets
+fido_inbound-status=Where a call drops what it received
+fido_inbound-help=
+    # Incoming Packets
 
     The directory where a call leaves what it brought, until the tosser reads it
     into the message bases.
 
-ftn_outbound=Outbound
-ftn_outbound-status=Where mail waits for the next call
-ftn_outbound-help=
-    # Outbound
+fido_outbound=Outgoing Packets
+fido_outbound-status=Where mail waits for the next call
+fido_outbound-help=
+    # Outgoing Packets
 
-    The directory where mail waits for the next call to a link. Anything sitting
+    The directory where mail waits for the next call to a node. Anything sitting
     here has not been delivered yet.
 
-ftn_netmail=Netmail Base
-ftn_netmail-status=The message base arriving netmail is written to
-ftn_netmail-help=
+fido_netmail=Netmail Base
+fido_netmail-status=The message base arriving netmail is written to
+fido_netmail-help=
     # Netmail Base
 
     The message base that arriving netmail is written to, the private mail
     between systems rather than the echoed conferences.
 
-ftn_bad_netmail=Unknown Netmail
-ftn_bad_netmail-status=Where netmail for an unknown name goes
-ftn_bad_netmail-help=Only used while Secure Netmail is on.
+fido_bad_netmail=Secure Netmail Base
+fido_bad_netmail-status=Where netmail from an unconfigured node goes
+fido_bad_netmail-help=Only used while Secure Netmail is on.
 
-ftn_new_areas=New Areas
-ftn_new_areas-status=Where the base of an added area is created
-ftn_new_areas-help=Only used while Add Unknown Areas is on.
+fido_new_areas=New Areas
+fido_new_areas-status=Where the base of an added area is created
+fido_new_areas-help=Only used while Auto Add Fido Areas is on.
+
+fido_address_title=Fidonet Address Configuration
+fido_address_editor=Address
+fido_address_header_node=Node
+fido_address_header_primary=Primary
+fido_address_header_domain=Domain
+
+fido_address_node=Node
+fido_address_node-status=One address this board answers to, as zone:net/node[.point]
+
+fido_address_domain=Domain
+fido_address_domain-status=The network the address belongs to, sent after an '@' in binkp
+
+fido_node_title=Fidonet Node Configuration
+fido_node_editor=Node
+fido_node_header_node=Node
+fido_node_header_host=Host
+fido_node_header_areas=Areas
+
+fido_node_node=Node
+fido_node_node-status=The address of the system to exchange mail with
+
+fido_node_domain=Domain
+fido_node_domain-status=The network this node belongs to
+
+fido_node_host=Host
+fido_node_host-status=Where to call the node
+
+fido_node_port=Port
+fido_node_port-status=The binkp port, 24554 unless the node says otherwise
+
+fido_node_password=Session Password
+fido_node_password-status=What the node expects to hear when a call is made
+
+fido_node_packet_password=Packet Password
+fido_node_packet_password-status=The eight characters a packet from this node has to carry
+fido_node_packet_password-help=
+    # Packet Password
+
+    The eight characters a packet from this node has to carry, and the ones
+    packets sent to it are stamped with. A packet claiming this node's address
+    without them is left in the inbound. Leave it empty and packets are taken as
+    they come, which is what PCBoard did when the ~FIDO~ record had no password.
+
+fido_node_areas=Areas
+fido_node_areas-status=The echo tags this node carries, separated by spaces
+fido_node_areas-help=
+    # Areas
+
+    The echo tags this node carries. Mail written here is offered to a node only
+    for the areas it asked for, and to every node that asked. Leave it empty and
+    the node gets no echomail.
+
+fido_origin_title=Fidonet Origin Configuration
+
+fido_origin=Origin
+fido_origin-status=The line appended to every echomail message written here
+fido_origin-help=
+    # Origin
+
+    The line appended to every echomail message written on this board. Custom in
+    fidonet is the board name and how to reach it, and some networks insist on
+    one, so set it before scanning for the first time.
 
 qwk_settings_title=QWK Settings
 

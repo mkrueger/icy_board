@@ -10,10 +10,10 @@ use icy_board_engine::{
     icy_board::{
         IcyBoard, IcyBoardSerializer,
         ftn::{
-            FtnConfig, FtnLink,
+            FtnConfig, FtnLink, FtnLogLevel,
             bundle::{is_bundle, unpack},
             packet::Packet,
-            toss::{TossReport, TossTarget, scan_outbound, toss_inbound},
+            toss::{TossReport, scan_outbound, toss_inbound},
         },
         message_area::MessageArea,
     },
@@ -132,7 +132,7 @@ async fn main() {
             Err(err) => Err(err),
         },
         Command::Show(arguments) => {
-            set_up_logging(false);
+            set_up_logging(FtnLogLevel::Normal);
             show(&arguments.file, arguments.text)
         }
         Command::Toss(arguments) => match load_and_log(&arguments.config, arguments.verbose) {
@@ -154,12 +154,16 @@ async fn main() {
 /// `ftn.toml` that says how much of it the sysop wants to see.
 fn load_and_log(config: &Path, verbose: bool) -> Res<IcyBoard> {
     let board = load(config)?;
-    set_up_logging(verbose || board.ftn.options.verbose_log);
+    set_up_logging(if verbose { FtnLogLevel::Debug } else { board.ftn.options.log_level });
     Ok(board)
 }
 
-fn set_up_logging(verbose: bool) {
-    let level = if verbose { log::LevelFilter::Debug } else { log::LevelFilter::Warn };
+fn set_up_logging(level: FtnLogLevel) {
+    let level = match level {
+        FtnLogLevel::Normal => log::LevelFilter::Warn,
+        FtnLogLevel::Detailed => log::LevelFilter::Info,
+        FtnLogLevel::Debug => log::LevelFilter::Debug,
+    };
     let _ = fern::Dispatch::new()
         .format(|out, message, record| out.finish(format_args!("{}: {}", record.level(), message)))
         .level(level)
@@ -203,6 +207,9 @@ fn list_links(config: &Path) -> Res<()> {
 }
 
 async fn poll_links(board: &mut IcyBoard, address: Option<&str>, keep: bool) -> Res<()> {
+    if !board.ftn.options.enabled {
+        return Err("Fido processing is disabled. Enable it under Message Networking > Fido Configuration in ICBSetup".into());
+    }
     if !board.ftn.options.dial_out {
         return Err("This board is set not to call out, see dial_out in ftn.toml".into());
     }
@@ -298,6 +305,9 @@ fn answers_to(link: &FtnLink, wanted: &str) -> bool {
 }
 
 fn toss(board: &mut IcyBoard) -> Res<()> {
+    if !board.ftn.options.enabled {
+        return Err("Fido processing is disabled. Enable it under Message Networking > Fido Configuration in ICBSetup".into());
+    }
     if !board.ftn.options.process_in {
         return Err("Inbound processing is disabled, so no received mail was read. Turn on Process Inbound under Message Networking in ICBSetup, or set options.process_in = true in ftn.toml".into());
     }
@@ -312,10 +322,7 @@ fn toss(board: &mut IcyBoard) -> Res<()> {
         )
         .into());
     }
-    let target = TossTarget {
-        sysop: board.config.sysop.name.clone(),
-    };
-    let report = toss_inbound(&board.ftn, &echo_areas(board), &target)?;
+    let report = toss_inbound(&board.ftn, &echo_areas(board))?;
 
     println!(
         "{} echomail message(s) tossed, {} netmail, {} duplicate(s) dropped",
@@ -385,6 +392,9 @@ fn register_new_areas(board: &mut IcyBoard, report: &TossReport) -> Res<()> {
 }
 
 fn scan(board: &IcyBoard) -> Res<()> {
+    if !board.ftn.options.enabled {
+        return Err("Fido processing is disabled. Enable it under Message Networking > Fido Configuration in ICBSetup".into());
+    }
     if !board.ftn.options.process_out {
         return Err("Outbound scanning is disabled, so no locally written mail was packed. Turn on Scan Outbound under Message Networking in ICBSetup, or set options.process_out = true in ftn.toml".into());
     }

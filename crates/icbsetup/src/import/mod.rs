@@ -594,11 +594,7 @@ impl PCBoardImporter {
                 command_file,
                 statistics_file,
                 group_file,
-                ftn_file: if self.data.enable_fido {
-                    PathBuf::from("main/ftn.toml")
-                } else {
-                    PathBuf::new()
-                },
+                ftn_file: PathBuf::from("main/ftn.toml"),
 
                 trashcan_upload_files,
                 trashcan_user,
@@ -771,34 +767,33 @@ impl PCBoardImporter {
         // The addresses and the links live in the files under FidoLoc, which
         // are in no documented format; what PCBOARD.DAT holds is the set of
         // decisions the tosser makes, and those carry over.
-        if self.data.enable_fido {
-            let ftn = FtnConfig {
-                options: FtnOptions {
-                    process_in: self.data.fido_process_in,
-                    process_out: self.data.fido_process_out,
-                    process_orphan: self.data.fido_process_orphan,
-                    dial_out: self.data.fido_dial_out,
-                    import_after_xfer: self.data.fido_import_after_xfer,
-                    check_dupe_msg_id: self.data.fido_check_dupe_msg_id,
-                    check_dupe_path: self.data.fido_check_dupe_path,
-                    msgs_to_track: self.data.fido_num_msgs_to_track.max(0) as u32,
-                    secure: self.data.fido_secure,
-                    sysop_change: self.data.fido_sysop_change,
-                    auto_add: self.data.fido_auto_add,
-                    auto_add_conference: 0,
-                    pass_thru: self.data.fido_enable_pass_thru,
-                    default_zone: self.data.fido_default_zone.clamp(0, u16::MAX as i32) as u16,
-                    default_net: self.data.fido_default_net.clamp(0, u16::MAX as i32) as u16,
-                    verbose_log: self.data.fido_log_level != 0,
-                },
-                ..FtnConfig::default()
-            };
-            let ftn_path = self.output_directory.join(&icb_cfg.paths.ftn_file);
-            if let Some(parent) = ftn_path.parent() {
-                fs::create_dir_all(parent)?;
-            }
-            ftn.save(&ftn_path)?;
+        let ftn = FtnConfig {
+            options: FtnOptions {
+                enabled: self.data.enable_fido,
+                process_in: self.data.fido_process_in,
+                process_out: self.data.fido_process_out,
+                process_orphan: self.data.fido_process_orphan,
+                dial_out: self.data.fido_dial_out,
+                import_after_xfer: self.data.fido_import_after_xfer,
+                check_dupe_msg_id: self.data.fido_check_dupe_msg_id,
+                check_dupe_path: self.data.fido_check_dupe_path,
+                msgs_to_track: self.data.fido_num_msgs_to_track.max(0) as u32,
+                secure: self.data.fido_secure,
+                sysop_change: self.data.fido_sysop_change,
+                auto_add: self.data.fido_auto_add,
+                auto_add_conference: 0,
+                pass_thru: self.data.fido_enable_pass_thru,
+                default_zone: self.data.fido_default_zone.clamp(0, u16::MAX as i32) as u16,
+                default_net: self.data.fido_default_net.clamp(0, u16::MAX as i32) as u16,
+                log_level: icy_board_engine::icy_board::ftn::FtnLogLevel::from_pcboard(self.data.fido_log_level),
+            },
+            ..FtnConfig::default()
+        };
+        let ftn_path = self.output_directory.join(&icb_cfg.paths.ftn_file);
+        if let Some(parent) = ftn_path.parent() {
+            fs::create_dir_all(parent)?;
         }
+        ftn.save(&ftn_path)?;
 
         let destination = self.output_directory.join(icy_board_engine::DEFAULT_ICYBOARD_FILE);
         self.output.start_action(format!("Create main configuration {}…", destination.display()));

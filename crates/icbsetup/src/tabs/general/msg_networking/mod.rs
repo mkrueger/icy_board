@@ -51,7 +51,7 @@ impl Page for MsgNetworking {
         if let Some(selected) = opt {
             return match selected {
                 0 => PageMessage::OpenSubPage(Box::new(qwk::QwkSettings::new(self.icy_board.clone()))),
-                1 => PageMessage::OpenSubPage(Box::new(ftn::FtnSettings::new(self.icy_board.clone()))),
+                1 => PageMessage::OpenSubPage(Box::new(ftn::FidoConfiguration::new(self.icy_board.clone()))),
                 _ => PageMessage::None,
             };
         }

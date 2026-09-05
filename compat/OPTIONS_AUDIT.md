@@ -243,12 +243,12 @@ kept in the files under `FidoLoc`, in no documented format, so those cannot be
 imported; what `PCBOARD.DAT` holds is the set of decisions the tosser and the
 mailer make, and those now live in the `[options]` table of `ftn.toml`. They
 are read by the tosser and by `icbmailer`, they are editable under ICBSetup →
-Message Networking → FidoNet Settings, the importer fills them in and the
+Message Networking → Fido Configuration, the importer fills them in and the
 `PCBOARD.DAT` exporter writes them back out.
 
 | `PCBOARD.DAT` | `ftn.toml` |
 | --- | --- |
-| `enable_fido` | the presence of `paths.ftn_file` in `icboard.toml` |
+| `enable_fido` | `options.enabled` |
 | `fido_process_in` | `options.process_in` |
 | `fido_process_out` | `options.process_out` |
 | `fido_process_orphan` | `options.process_orphan` |
@@ -263,7 +263,7 @@ Message Networking → FidoNet Settings, the importer fills them in and the
 | `fido_enable_pass_thru` | `options.pass_thru` |
 | `fido_default_zone` | `options.default_zone` |
 | `fido_default_net` | `options.default_net` |
-| `fido_log_level` | `options.verbose_log` |
+| `fido_log_level` | `options.log_level` (`0` normal, `1..3` detailed, higher values debug) |
 
 The nine that were left out, and why:
 

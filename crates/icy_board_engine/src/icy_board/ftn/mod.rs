@@ -15,6 +15,33 @@ pub mod toss;
 /// The port fidonet technology networks reserved for binkp.
 pub const DEFAULT_BINKP_PORT: u16 = icy_net::binkp::DEFAULT_PORT;
 
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum FtnLogLevel {
+    #[default]
+    Normal,
+    Detailed,
+    Debug,
+}
+
+impl FtnLogLevel {
+    pub fn from_pcboard(value: i32) -> Self {
+        match value {
+            ..=0 => Self::Normal,
+            1..=3 => Self::Detailed,
+            _ => Self::Debug,
+        }
+    }
+
+    pub fn to_pcboard(self) -> i32 {
+        match self {
+            Self::Normal => 0,
+            Self::Detailed => 3,
+            Self::Debug => 6,
+        }
+    }
+}
+
 /// A failure in the file system or in a parser says what went wrong but not
 /// which mail it was busy with, and that is the half the sysop needs.
 pub(crate) trait Context<T> {
@@ -73,6 +100,13 @@ pub struct FtnLink {
     #[serde(skip_serializing_if = "String::is_empty")]
     pub password: String,
 
+    /// The eight characters a packet from this link has to carry, which
+    /// `PCBoard` kept on the `~FIDO~` user record. Empty means the packets are
+    /// taken as they come, the same as leaving that field blank there.
+    #[serde(default)]
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub packet_password: String,
+
     /// Zero means the link is polled only when the sysop asks for it.
     #[serde(default)]
     pub poll_minutes: u32,
@@ -109,6 +143,7 @@ impl Default for FtnLink {
             host: String::new(),
             port: DEFAULT_BINKP_PORT,
             password: String::new(),
+            packet_password: String::new(),
             poll_minutes: 0,
             areas: Vec::new(),
         }
@@ -120,6 +155,9 @@ impl Default for FtnLink {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct FtnOptions {
+    /// Keep the complete configuration while taking this board off the network.
+    pub enabled: bool,
+
     /// Read what is waiting in the inbound.
     pub process_in: bool,
 
@@ -171,13 +209,14 @@ pub struct FtnOptions {
     pub default_zone: u16,
     pub default_net: u16,
 
-    /// Say what the mailer is doing rather than only what went wrong.
-    pub verbose_log: bool,
+    /// How much of the mailer's operation is written to the log.
+    pub log_level: FtnLogLevel,
 }
 
 impl Default for FtnOptions {
     fn default() -> Self {
         Self {
+            enabled: true,
             process_in: true,
             process_out: true,
             process_orphan: false,
@@ -193,7 +232,7 @@ impl Default for FtnOptions {
             pass_thru: false,
             default_zone: 0,
             default_net: 0,
-            verbose_log: false,
+            log_level: FtnLogLevel::Normal,
         }
     }
 }
@@ -357,19 +396,48 @@ mod tests {
 
     #[test]
     fn test_a_filled_config_survives_a_round_trip_through_toml() {
-        let config = FtnConfig {
+        let mut config = FtnConfig {
             origin: "Icy Board".to_string(),
             akas: vec![aka("21:1/100", "fsxnet")],
             links: vec![FtnLink {
                 host: "hub.example.org".to_string(),
                 password: "secret".to_string(),
+                packet_password: "pktpass".to_string(),
                 poll_minutes: 30,
                 ..link("21:1/1", "fsxnet")
             }],
             ..Default::default()
         };
+        config.options.log_level = FtnLogLevel::Debug;
         let text = toml::to_string(&config).unwrap();
         assert_eq!(toml::from_str::<FtnConfig>(&text).unwrap(), config);
+    }
+
+    #[test]
+    fn test_an_existing_config_defaults_to_enabled_normal_logging() {
+        let config: FtnConfig = toml::from_str(
+            r#"
+            inbound = "ftn/inbound"
+            outbound = "ftn/outbound"
+            "#,
+        )
+        .unwrap();
+
+        assert!(config.options.enabled);
+        assert_eq!(config.options.log_level, FtnLogLevel::Normal);
+    }
+
+    #[test]
+    fn test_pcboard_log_levels_map_to_meaningful_groups() {
+        assert_eq!(FtnLogLevel::from_pcboard(0), FtnLogLevel::Normal);
+        assert_eq!(FtnLogLevel::from_pcboard(-1), FtnLogLevel::Normal);
+        assert_eq!(FtnLogLevel::from_pcboard(1), FtnLogLevel::Detailed);
+        assert_eq!(FtnLogLevel::from_pcboard(3), FtnLogLevel::Detailed);
+        assert_eq!(FtnLogLevel::from_pcboard(6), FtnLogLevel::Debug);
+        assert_eq!(FtnLogLevel::from_pcboard(255), FtnLogLevel::Debug);
+        assert_eq!(FtnLogLevel::Normal.to_pcboard(), 0);
+        assert_eq!(FtnLogLevel::Detailed.to_pcboard(), 3);
+        assert_eq!(FtnLogLevel::Debug.to_pcboard(), 6);
     }
 
     #[test]

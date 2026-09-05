@@ -36,13 +36,6 @@ fn product() -> String {
 /// network and the message base it is stored in.
 pub type AreaMap = [(String, PathBuf)];
 
-/// What the tosser needs to know about the board that `ftn.toml` does not say.
-#[derive(Debug, Default)]
-pub struct TossTarget {
-    /// The name netmail addressed to the sysop is delivered under.
-    pub sysop: String,
-}
-
 /// What one run over the inbound left behind.
 #[derive(Debug, Default)]
 pub struct TossReport {
@@ -74,14 +67,13 @@ pub struct TossReport {
 }
 
 /// Reads everything waiting in the inbound into the message bases.
-pub fn toss_inbound(config: &FtnConfig, areas: &AreaMap, target: &TossTarget) -> Res<TossReport> {
+pub fn toss_inbound(config: &FtnConfig, areas: &AreaMap) -> Res<TossReport> {
     let mut report = TossReport::default();
-    if !config.options.process_in || !config.inbound.is_dir() {
+    if !config.options.enabled || !config.options.process_in || !config.inbound.is_dir() {
         return Ok(report);
     }
     let mut tosser = Tosser {
         config,
-        target,
         lookup: areas.iter().map(|(tag, path)| (tag.to_uppercase(), path.clone())).collect(),
         bases: OpenBases::new(config.options.msgs_to_track),
         forward: vec![Vec::new(); config.links.len()],
@@ -100,6 +92,7 @@ pub fn toss_inbound(config: &FtnConfig, areas: &AreaMap, target: &TossTarget) ->
         let Some(name) = file.file_name().and_then(|name| name.to_str()).map(str::to_ascii_lowercase) else {
             continue;
         };
+        log::info!("Tossing {}", file.display());
         let result = if bundle::is_bundle(&name) {
             tosser.bundle(&file, &mut report)
         } else if bundle::is_packet(&name) {
@@ -122,7 +115,6 @@ pub fn toss_inbound(config: &FtnConfig, areas: &AreaMap, target: &TossTarget) ->
 
 struct Tosser<'a> {
     config: &'a FtnConfig,
-    target: &'a TossTarget,
     lookup: HashMap<String, PathBuf>,
     bases: OpenBases,
 
@@ -173,6 +165,23 @@ impl Tosser<'_> {
     fn toss_packet(&mut self, mut packet: Packet, where_from: &str, report: &mut TossReport) -> Res<bool> {
         self.complete(&mut packet.header.orig);
         self.complete(&mut packet.header.dest);
+        log::debug!(
+            "{} contains {} message(s), from {} to {}",
+            where_from,
+            packet.messages.len(),
+            packet.header.orig,
+            packet.header.dest
+        );
+        if let Some(link) = self.config.links.iter().find(|link| link.address == packet.header.orig)
+            && !link.packet_password.is_empty()
+            && !packet_password_matches(&link.packet_password, &packet.header.password)
+        {
+            return Err(format!(
+                "{} claims to come from {}, but its packet password is not the one packet_password names for that link. Correct it in ftn.toml, or clear it to take the packets as they come",
+                where_from, packet.header.orig
+            )
+            .into());
+        }
         if !self.config.options.process_orphan && !self.config.akas.is_empty() && !self.config.answers_to(&packet.header.dest) {
             log::warn!(
                 "{} is addressed to {} and this board answers to {}, so it is left in the inbound. Add that address as an aka, or turn on Toss Orphans to read mail meant for another system",
@@ -183,13 +192,17 @@ impl Tosser<'_> {
             report.orphans += 1;
             return Ok(false);
         }
-        for message in &packet.messages {
+        for incoming in &packet.messages {
+            let mut message = incoming.clone();
+            if self.config.options.sysop_change && message.to.eq_ignore_ascii_case("sysop") {
+                message.to = "FIDO_SYSOP".to_string();
+            }
             match message.area() {
                 Some(tag) => {
                     let tag = tag.to_string();
-                    self.echomail(message, &tag, &packet.header.orig, report)?;
+                    self.echomail(&message, &tag, &packet.header.orig, report)?;
                 }
-                None => self.netmail(message, &packet.header.orig, report)?,
+                None => self.netmail(&message, &packet.header.orig, report)?,
             }
         }
         Ok(true)
@@ -225,10 +238,6 @@ impl Tosser<'_> {
     }
 
     fn netmail(&mut self, message: &PackedMessage, source: &EchomailAddress, report: &mut TossReport) -> Res<()> {
-        let mut message = message.clone();
-        if self.config.options.sysop_change && !self.target.sysop.is_empty() && message.to.eq_ignore_ascii_case("sysop") {
-            message.to = self.target.sysop.clone();
-        }
         let trusted = self.config.links.iter().any(|link| link.address == *source);
         let untrusted = self.config.options.secure && !trusted;
         let base = if untrusted {
@@ -236,7 +245,7 @@ impl Tosser<'_> {
         } else {
             self.config.netmail.clone()
         };
-        self.import(&message, &base, false, report)?;
+        self.import(message, &base, false, report)?;
         if untrusted {
             *report.untrusted_netmail.entry(source.to_string()).or_default() += 1;
         }
@@ -317,6 +326,13 @@ impl Tosser<'_> {
         }
         Ok(())
     }
+}
+
+/// The field holds eight characters, and a mailer pads what it writes there
+/// with spaces or with nuls.
+fn packet_password_matches(configured: &str, received: &str) -> bool {
+    let configured: String = configured.trim_end().chars().take(8).collect();
+    configured.trim_end().eq_ignore_ascii_case(received.trim_end())
 }
 
 fn to_jam(message: &PackedMessage, kludges: &Kludges, echo: bool) -> JamMessage {
@@ -517,7 +533,7 @@ pub struct ScanReport {
 /// that asked for the area it was written in.
 pub fn scan_outbound(config: &FtnConfig, areas: &AreaMap, now: &NaiveDateTime) -> Res<ScanReport> {
     let mut report = ScanReport::default();
-    if !config.options.process_out || config.links.is_empty() {
+    if !config.options.enabled || !config.options.process_out || config.links.is_empty() {
         return Ok(report);
     }
     let mut state = ScanState::load(config)?;
@@ -545,6 +561,7 @@ pub fn scan_outbound(config: &FtnConfig, areas: &AreaMap, now: &NaiveDateTime) -
             state.exported.insert(tag.clone(), high);
             continue;
         };
+        log::info!("Scanning {} from message {} through {}", tag, last.saturating_add(1), high);
 
         // The area is fed by whatever address answers for the first link that
         // carries it, because one message can only have one origin.
@@ -628,7 +645,7 @@ fn deliver(config: &FtnConfig, link: &FtnLink, aka: &FtnAka, mut messages: Vec<P
         message.orig = aka.address;
         message.dest = link.address;
     }
-    let mut packet = Packet::new(PacketHeader::new(aka.address, link.address, *now, &link.password));
+    let mut packet = Packet::new(PacketHeader::new(aka.address, link.address, *now, &link.packet_password));
     packet.messages = messages;
 
     let work = tempfile::tempdir_in(&directory).context(|| format!("Cannot create a working directory in the outbound {}", directory.display()))?;
@@ -777,7 +794,7 @@ mod tests {
     }
 
     fn toss(config: &FtnConfig, areas: &AreaMap) -> TossReport {
-        toss_inbound(config, areas, &TossTarget::default()).unwrap()
+        toss_inbound(config, areas).unwrap()
     }
 
     fn message(area: &str, text: &str) -> PackedMessage {
@@ -798,7 +815,11 @@ mod tests {
     }
 
     fn drop_packet_from(config: &FtnConfig, source: &str, messages: Vec<PackedMessage>) {
-        let mut packet = Packet::new(PacketHeader::new(address(source), address("21:1/100"), when(), ""));
+        drop_packet_from_with_password(config, source, "", messages);
+    }
+
+    fn drop_packet_from_with_password(config: &FtnConfig, source: &str, password: &str, messages: Vec<PackedMessage>) {
+        let mut packet = Packet::new(PacketHeader::new(address(source), address("21:1/100"), when(), password));
         packet.messages = messages;
         fs::create_dir_all(&config.inbound).unwrap();
         packet.save(&config.inbound.join(bundle::packet_name(&when()))).unwrap();
@@ -821,6 +842,21 @@ mod tests {
         assert_eq!(header.from().unwrap().to_string(), "Someone");
         assert_eq!(subfield(&header, SubfieldType::MsgID).unwrap(), "21:1/2 11223344");
         assert!(fs::read_dir(&config.inbound).unwrap().next().is_none());
+    }
+
+    #[test]
+    fn test_disabled_fido_processing_leaves_inbound_untouched() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut config = config(directory.path());
+        config.options.enabled = false;
+        drop_packet(&config, vec![message("FSX_GEN", "Body\r")]);
+        let areas = vec![("FSX_GEN".to_string(), directory.path().join("general"))];
+
+        let report = toss(&config, &areas);
+
+        assert_eq!(report.imported, 0);
+        assert!(fs::read_dir(&config.inbound).unwrap().next().is_some());
+        assert!(!areas[0].1.with_extension("jhr").exists());
     }
 
     #[test]
@@ -930,14 +966,76 @@ mod tests {
         netmail.to = "The Sysop".to_string();
         drop_packet_from(&config, "21:1/2", vec![netmail]);
 
-        let target = TossTarget {
-            sysop: "The Sysop".to_string(),
-        };
-        let report = toss_inbound(&config, &[], &target).unwrap();
+        let report = toss_inbound(&config, &[]).unwrap();
 
         assert_eq!(report.netmail, 1);
         assert_eq!(report.untrusted_netmail.get("21:1/2"), Some(&1));
         assert_eq!(JamMessageBase::open(&config.bad_netmail).unwrap().active_messages(), 1);
+    }
+
+    #[test]
+    fn test_secure_netmail_from_a_configured_link_goes_to_netmail() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut config = config(directory.path());
+        config.options.secure = true;
+        config.links[0].packet_password = "Correct Password".to_string();
+        let mut netmail = message("FSX_GEN", "");
+        netmail.text = "Hello\r".to_string();
+        drop_packet_from_with_password(&config, "21:1/1", "correct ", vec![netmail]);
+
+        let report = toss(&config, &[]);
+
+        assert!(report.untrusted_netmail.is_empty());
+        assert_eq!(JamMessageBase::open(&config.netmail).unwrap().active_messages(), 1);
+        assert!(!config.bad_netmail.exists());
+    }
+
+    #[test]
+    fn test_a_configured_links_wrong_packet_password_leaves_the_packet_in_inbound() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut config = config(directory.path());
+        config.links[0].packet_password = "correct password".to_string();
+        let mut netmail = message("FSX_GEN", "");
+        netmail.text = "Hello\r".to_string();
+        drop_packet_from_with_password(&config, "21:1/1", "wrong", vec![netmail]);
+
+        let report = toss(&config, &[]);
+
+        assert_eq!(report.failed.len(), 1);
+        assert!(report.failed[0].1.contains("packet password"), "{}", report.failed[0].1);
+        assert!(fs::read_dir(&config.inbound).unwrap().next().is_some());
+        assert!(!config.netmail.exists());
+    }
+
+    #[test]
+    fn test_a_packet_password_padded_out_to_the_field_still_matches() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut config = config(directory.path());
+        config.links[0].packet_password = "secret".to_string();
+        let mut netmail = message("FSX_GEN", "");
+        netmail.text = "Hello\r".to_string();
+        drop_packet_from_with_password(&config, "21:1/1", "secret  ", vec![netmail]);
+
+        let report = toss(&config, &[]);
+
+        assert!(report.failed.is_empty(), "{:?}", report.failed);
+        assert_eq!(JamMessageBase::open(&config.netmail).unwrap().active_messages(), 1);
+    }
+
+    #[test]
+    fn test_a_link_without_a_packet_password_takes_the_packets_as_they_come() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut config = config(directory.path());
+        // The session password is not the packet password, so it must not be checked.
+        config.links[0].password = "binkp secret".to_string();
+        let mut netmail = message("FSX_GEN", "");
+        netmail.text = "Hello\r".to_string();
+        drop_packet_from_with_password(&config, "21:1/1", "", vec![netmail]);
+
+        let report = toss(&config, &[]);
+
+        assert!(report.failed.is_empty(), "{:?}", report.failed);
+        assert_eq!(JamMessageBase::open(&config.netmail).unwrap().active_messages(), 1);
     }
 
     #[test]
@@ -966,6 +1064,30 @@ mod tests {
         let base = JamMessageBase::open(&config.netmail).unwrap();
         assert_eq!(base.active_messages(), 1);
         assert!(base.read_header(1).unwrap().is_private());
+    }
+
+    #[test]
+    fn test_sysop_is_changed_to_fido_sysop_on_import() {
+        let directory = tempfile::tempdir().unwrap();
+        let config = config(directory.path());
+        let echo_path = directory.path().join("general");
+        let areas = vec![("FSX_GEN".to_string(), echo_path.clone())];
+        let mut echo = message("FSX_GEN", "Body\r");
+        echo.to = "Sysop".to_string();
+        let mut netmail = message("FSX_GEN", "");
+        netmail.to = "Sysop".to_string();
+        netmail.text = "Private\r".to_string();
+        drop_packet(&config, vec![echo, netmail]);
+
+        let report = toss(&config, &areas);
+
+        assert_eq!(report.imported, 1);
+        assert_eq!(report.netmail, 1);
+        assert_eq!(JamMessageBase::open(&echo_path).unwrap().read_header(1).unwrap().to().unwrap(), b"FIDO_SYSOP");
+        assert_eq!(
+            JamMessageBase::open(&config.netmail).unwrap().read_header(1).unwrap().to().unwrap(),
+            b"FIDO_SYSOP"
+        );
     }
 
     #[test]
@@ -1047,6 +1169,24 @@ mod tests {
         base.write_jhr_header().unwrap();
         let report = scan_outbound(&config, &areas, &when()).unwrap();
         assert_eq!(report.exported, 1);
+    }
+
+    #[test]
+    fn test_disabled_fido_processing_does_not_scan_outbound() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut config = config(directory.path());
+        config.options.enabled = false;
+        let path = directory.path().join("bases/general");
+        let areas = vec![("FSX_GEN".to_string(), path.clone())];
+        let mut base = open_base(&path).unwrap();
+        base.write_message(&JamMessage::default().with_text(BString::from("first"))).unwrap();
+        base.write_jhr_header().unwrap();
+
+        let report = scan_outbound(&config, &areas, &when()).unwrap();
+
+        assert_eq!(report.exported, 0);
+        assert!(report.bundles.is_empty());
+        assert!(!config.outbound.exists());
     }
 
     #[test]
