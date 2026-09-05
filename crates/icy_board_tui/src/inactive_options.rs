@@ -150,13 +150,7 @@ pub const UNREAD_OPTIONS: &[UnreadOption] = &[
         section: "sysop_sec",
         option: "read_all_comments",
         kind: Unread::NotReadYet,
-        note: "always granted to whoever passes the sysop level",
-    },
-    UnreadOption {
-        section: "sysop_sec",
-        option: "read_all_mail",
-        kind: Unread::NotReadYet,
-        note: "always granted to whoever passes the sysop level",
+        note: "a comment is ordinary receiver-only mail here, so read_all_mail decides",
     },
     UnreadOption {
         section: "sysop_sec",
