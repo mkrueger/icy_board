@@ -1,5 +1,8 @@
-use jamjam::jam::JamMessageBase;
-use jamjam::jam::attributes;
+use bstr::BString;
+use jamjam::jam::{
+    JamMessageBase, attributes,
+    msg_header::{JamMessageHeader, MessageSubfield, SubfieldType},
+};
 
 use crate::icy_board::commands::CommandType;
 use crate::icy_board::state::functions::MASK_ALPHA;
@@ -11,6 +14,25 @@ use crate::icy_board::{
     },
 };
 use crate::{Res, icy_board::state::IcyBoardState};
+
+fn reply_details(header: &JamMessageHeader) -> (String, String, u32, Vec<MessageSubfield>) {
+    let to = header.from().map(ToString::to_string).unwrap_or_default();
+    let subject = header.subject().map(ToString::to_string).unwrap_or_default();
+    let mut attributes = header.attributes & attributes::MSG_PRIVATE;
+    if header.attributes & attributes::MSG_TYPENET != 0 {
+        attributes |= attributes::MSG_PRIVATE;
+    }
+    let mut fields = Vec::new();
+    for field in &header.sub_fields {
+        let kind = match field.field_type() {
+            SubfieldType::Address0 => SubfieldType::AddressD,
+            SubfieldType::MsgID => SubfieldType::ReplyID,
+            _ => continue,
+        };
+        fields.push(MessageSubfield::new(kind, BString::from(field.content().to_vec())));
+    }
+    (to, subject, attributes, fields)
+}
 
 impl IcyBoardState {
     pub async fn get_ret_receipt(&mut self) -> Res<bool> {
@@ -77,15 +99,12 @@ impl IcyBoardState {
 
             let mut subject = String::new();
             let mut to = String::new();
+            let mut msg_attributes = 0;
+            let mut sub_fields = Vec::new();
 
             if let Ok(base) = JamMessageBase::open(msg_base) {
                 if let Ok(msg) = base.read_header(msg_number) {
-                    if let Some(s) = msg.to() {
-                        to = s.to_string();
-                    }
-                    if let Some(s) = msg.subject() {
-                        subject = s.to_string();
-                    }
+                    (to, subject, msg_attributes, sub_fields) = reply_details(&msg);
                 } else {
                     self.display_text(IceText::NoMailFound, display_flags::NEWLINE | display_flags::LFBEFORE)
                         .await?;
@@ -107,7 +126,9 @@ impl IcyBoardState {
                 new_subject = subject;
             }
             let ret_receipt = self.get_ret_receipt().await?;
-            let msg_attributes = if ret_receipt { attributes::MSG_RECEIPTREQ } else { 0 };
+            if ret_receipt {
+                msg_attributes |= attributes::MSG_RECEIPTREQ;
+            }
 
             self.write_message(
                 self.session.current_conference_number as i32,
@@ -117,11 +138,52 @@ impl IcyBoardState {
                 msg_attributes,
                 None,
                 None,
-                Vec::new(),
+                sub_fields,
                 IceText::SavingMessage,
             )
             .await?;
             return Ok(());
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_netmail_reply_goes_back_to_its_sender_and_keeps_the_network_thread() {
+        let mut header = JamMessageHeader {
+            attributes: attributes::MSG_TYPENET | attributes::MSG_PRIVATE,
+            ..Default::default()
+        };
+        header
+            .sub_fields
+            .push(MessageSubfield::new(SubfieldType::SenderName, BString::from("Remote Sysop")));
+        header
+            .sub_fields
+            .push(MessageSubfield::new(SubfieldType::RecvName, BString::from("Local Sysop")));
+        header.sub_fields.push(MessageSubfield::new(SubfieldType::Subject, BString::from("Hello")));
+        header.sub_fields.push(MessageSubfield::new(SubfieldType::Address0, BString::from("21:1/2")));
+        header
+            .sub_fields
+            .push(MessageSubfield::new(SubfieldType::MsgID, BString::from("21:1/2 abcdef01")));
+
+        let (to, subject, reply_attributes, fields) = reply_details(&header);
+
+        assert_eq!(to, "Remote Sysop");
+        assert_eq!(subject, "Hello");
+        assert_ne!(reply_attributes & attributes::MSG_PRIVATE, 0);
+        assert_eq!(reply_attributes & attributes::MSG_TYPENET, 0);
+        assert!(
+            fields
+                .iter()
+                .any(|field| field.field_type() == SubfieldType::AddressD && field.content() == "21:1/2")
+        );
+        assert!(
+            fields
+                .iter()
+                .any(|field| field.field_type() == SubfieldType::ReplyID && field.content() == "21:1/2 abcdef01")
+        );
     }
 }

@@ -399,6 +399,11 @@ releases.
 
 ### Fixed
 
+- Replying to a message addresses the answer to whoever wrote it. The reply
+  went to the original recipient instead, so answering a message addressed to
+  somebody else sent it back to that same person. A reply to netmail now also
+  keeps the address and message id it is answering.
+
 - Updated Tetris to use `Audio.SetVolume()`, taught editor grammar checks about
   contextual module words, and completed Paint's pixel-mouse test handshake.
 
