@@ -285,8 +285,9 @@ either limit open. The two are read from ``PCBFIDO.CFG`` on import.
 PCBoard also restricted connection time and modem baud rate. A binkp request is
 answered from a file already received on disk, so neither figure describes
 anything in this mailer. Its Allowed Nodes choice is represented by requiring
-the requester to be a configured link. The rest is configured on three lists
-next to the restrictions.
+the requester to be a configured link. An import that finds any of these says
+what it left behind, so a board that was open to every node is not narrowed
+without a word. The rest is configured on three lists next to the restrictions.
 
 ``FREQ Path Configuration`` names the directories a request may be answered
 from. Only what lies directly in one of them can be asked for: a requested name

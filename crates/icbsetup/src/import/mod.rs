@@ -85,6 +85,35 @@ fn imported_metadata_path(output: &str, index: usize) -> PathBuf {
     PathBuf::from(output).join(format!("dir{index:02}"))
 }
 
+/// The FREQ restrictions that describe a modem session or a nodelist, neither
+/// of which a binkp mailer has. Naming them beats letting a board quietly
+/// hand out more, or less, than it used to.
+fn freq_restrictions_left_behind(info: &PcbFreqInfo) -> Vec<String> {
+    let mut notes = Vec::new();
+    if info.session_minutes != 0 || info.daily_minutes != 0 {
+        notes.push(format!(
+            "FREQ time limits ({} minutes per session, {} per day) were not carried over: a request is answered from a file already on disk, so there is no transfer to time. The byte limits still apply.",
+            info.session_minutes, info.daily_minutes
+        ));
+    }
+    if info.min_baud != 0 {
+        notes.push(format!(
+            "The FREQ minimum baud rate of {} was not carried over: sessions run over TCP and have no carrier speed.",
+            info.min_baud
+        ));
+    }
+    if info.allowed_nodes == 'A' {
+        notes.push(
+            "FREQ was open to every node. Only configured links can be answered here, because nothing else has an outbound to put files in, so add the nodes that should keep their access under Message Networking > Node Configuration.".to_string(),
+        );
+    } else if matches!(info.allowed_nodes, 'N' | 'L') {
+        notes.push(
+            "FREQ access was decided by the nodelist. There is no nodelist here, so a request is answered when it comes from a configured link.".to_string(),
+        );
+    }
+    notes
+}
+
 fn unresolved_configured_path_warning(file: &str, resolved_file: &Path) -> String {
     format!(
         "Can't resolve configured path '{}' (looked for '{}'); keeping the original value.",
@@ -914,6 +943,10 @@ impl PCBoardImporter {
                 Ok(Some(info)) => {
                     result.limits.session_bytes = u64::from(info.session_kbytes) * 1024;
                     result.limits.daily_bytes = u64::from(info.daily_kbytes) * 1024;
+                    for note in freq_restrictions_left_behind(&info) {
+                        self.output.warning(note.clone());
+                        self.logger.log(&note);
+                    }
                 }
                 Ok(None) => self
                     .logger
@@ -2152,5 +2185,45 @@ mod import_error_tests {
         assert!(message.contains(r"D:\PCB\GEN\PCBTEXT"));
         assert!(message.contains(&resolved.display().to_string()));
         assert!(message.contains("Verify that --map points to the existing PCBoard installation"));
+    }
+
+    /// A board that let every node ask becomes stricter here, which is worth a
+    /// word rather than a surprise.
+    #[test]
+    fn opening_freq_to_every_node_is_reported_as_narrowed() {
+        let notes = freq_restrictions_left_behind(&PcbFreqInfo {
+            allowed_nodes: 'A',
+            ..Default::default()
+        });
+
+        assert_eq!(notes.len(), 1);
+        assert!(notes[0].contains("Only configured links"), "{}", notes[0]);
+    }
+
+    #[test]
+    fn freq_limits_that_describe_a_modem_are_reported_once_each() {
+        let notes = freq_restrictions_left_behind(&PcbFreqInfo {
+            session_minutes: 30,
+            daily_minutes: 60,
+            min_baud: 2400,
+            allowed_nodes: 'U',
+            ..Default::default()
+        });
+
+        assert_eq!(notes.len(), 2);
+        assert!(notes[0].contains("30 minutes per session"), "{}", notes[0]);
+        assert!(notes[1].contains("2400"), "{}", notes[1]);
+    }
+
+    #[test]
+    fn freq_restrictions_a_binkp_mailer_can_keep_say_nothing() {
+        let notes = freq_restrictions_left_behind(&PcbFreqInfo {
+            session_kbytes: 1024,
+            daily_kbytes: 4096,
+            allowed_nodes: 'U',
+            ..Default::default()
+        });
+
+        assert!(notes.is_empty(), "{notes:?}");
     }
 }
