@@ -27,6 +27,7 @@ use self::{
     message_area::AreaList,
     pcbconferences::{PcbAdditionalConferenceHeader, PcbConferenceHeader, PcbLegacyConferenceHeader},
     pcboard_data::PcbBoardData,
+    qwknet::QwkNetworkConfig,
     sec_levels::SecurityLevelDefinitions,
     statistics::Statistics,
     user_base::UserBase,
@@ -53,6 +54,7 @@ pub mod menu;
 pub mod message_area;
 pub mod path_check;
 pub mod pcb;
+pub mod qwknet;
 pub mod sec_levels;
 pub mod security_expr;
 pub mod state;
@@ -124,6 +126,7 @@ pub struct IcyBoard {
     pub statistics: Statistics,
     pub commands: CommandList,
     pub ftn: FtnConfig,
+    pub qwknet: QwkNetworkConfig,
     pub events: EventList,
     pub ppl_http_service: std::sync::Arc<state::ppl_http::PplHttpService>,
 }
@@ -146,6 +149,7 @@ impl IcyBoard {
             statistics: Statistics::default(),
             groups: GroupList::default(),
             ftn: FtnConfig::default(),
+            qwknet: QwkNetworkConfig::default(),
             events: EventList::default(),
             ppl_http_service: std::sync::Arc::new(state::ppl_http::PplHttpService::default()),
         }
@@ -187,6 +191,7 @@ impl IcyBoard {
         self.config.paths.pwrd_sec_level_file = get_path(&self.root_path, &self.config.paths.pwrd_sec_level_file);
         self.config.paths.statistics_file = get_path(&self.root_path, &self.config.paths.statistics_file);
         self.config.paths.ftn_file = get_path(&self.root_path, &self.config.paths.ftn_file);
+        self.config.paths.qwknet_file = get_path(&self.root_path, &self.config.paths.qwknet_file);
 
         self.config.event.event_file = get_path(&self.root_path, &self.config.event.event_file);
 
@@ -389,6 +394,19 @@ impl IcyBoard {
             }
         };
 
+        let qwknet = if config.paths.qwknet_file.as_os_str().is_empty() {
+            QwkNetworkConfig::default()
+        } else {
+            let load_path = get_path(parent_path, &config.paths.qwknet_file);
+            match QwkNetworkConfig::load(&load_path) {
+                Ok(qwknet) => qwknet,
+                Err(e) => {
+                    log::error!("Error loading QWKnet config: {} from {}, generating default.", e, load_path.display());
+                    QwkNetworkConfig::default()
+                }
+            }
+        };
+
         let events = if config.event.event_file.as_os_str().is_empty() {
             EventList::default()
         } else {
@@ -428,6 +446,7 @@ impl IcyBoard {
             statistics,
             groups,
             ftn,
+            qwknet,
             events,
             ppl_http_service: std::sync::Arc::new(state::ppl_http::PplHttpService::default()),
         };
@@ -545,6 +564,9 @@ impl IcyBoard {
         if !self.config.paths.ftn_file.as_os_str().is_empty() {
             self.ftn.save(&self.resolve_file(&self.config.paths.ftn_file))?;
         }
+        if !self.config.paths.qwknet_file.as_os_str().is_empty() {
+            self.qwknet.save(&self.resolve_file(&self.config.paths.qwknet_file))?;
+        }
         Ok(())
     }
 
@@ -554,7 +576,8 @@ impl IcyBoard {
         let config = toml::to_string(&self.config).unwrap_or_default();
         let conferences = toml::to_string(&self.conferences).unwrap_or_default();
         let ftn = toml::to_string(&self.ftn).unwrap_or_default();
-        format!("{config}\n{conferences}\n{ftn}")
+        let qwknet = toml::to_string(&self.qwknet).unwrap_or_default();
+        format!("{config}\n{conferences}\n{ftn}\n{qwknet}")
     }
 
     pub fn save_userbase(&mut self) -> Res<()> {

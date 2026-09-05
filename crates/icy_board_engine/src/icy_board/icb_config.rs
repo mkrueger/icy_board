@@ -567,6 +567,9 @@ pub struct ConfigPaths {
     #[serde(default)]
     pub ftn_file: PathBuf,
 
+    /// name and location of the QWK network configuration
+    #[serde(default)]
+    pub qwknet_file: PathBuf,
     /// home directory for user files
     pub user_file: PathBuf,
 
@@ -1224,6 +1227,7 @@ impl IcbConfig {
                 statistics_file: PathBuf::new(),
                 group_file: PathBuf::new(),
                 ftn_file: PathBuf::new(),
+                qwknet_file: PathBuf::new(),
 
                 logon_survey: PathBuf::new(),
                 logon_answer: PathBuf::new(),

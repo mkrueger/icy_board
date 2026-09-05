@@ -19,6 +19,7 @@ use icy_board_engine::{
             toss::{EchoArea, TossReport, scan_outbound, toss_inbound},
         },
         message_area::MessageArea,
+        qwknet,
     },
 };
 use icy_net::binkp::{BinkpIdentity, PollRequest};
@@ -26,7 +27,7 @@ use icy_net::binkp::{BinkpIdentity, PollRequest};
 mod zconnect_experiment;
 
 #[derive(FromArgs)]
-/// Exchange fidonet mail with the systems listed in ftn.toml
+/// Exchange FTN and QWKnet mail with configured systems
 struct Cli {
     /// print the version and exit
     #[argh(switch)]
@@ -44,6 +45,58 @@ enum Command {
     Scan(Scan),
     Show(Show),
     Toss(Toss),
+    QwkLinks(QwkLinks),
+    QwkPoll(QwkPoll),
+    QwkScan(QwkScan),
+    QwkToss(QwkToss),
+}
+
+#[derive(FromArgs)]
+#[argh(subcommand, name = "qwk-links")]
+/// list configured QWKnet hubs
+struct QwkLinks {
+    #[argh(positional)]
+    /// path/file name of the icyboard.toml configuration file
+    config: PathBuf,
+}
+
+#[derive(FromArgs)]
+#[argh(subcommand, name = "qwk-poll")]
+/// scan, exchange and import mail for a QWKnet hub
+struct QwkPoll {
+    #[argh(positional)]
+    /// path/file name of the icyboard.toml configuration file
+    config: PathBuf,
+
+    #[argh(positional)]
+    /// hub ID, every hub when left out
+    hub: Option<String>,
+}
+
+#[derive(FromArgs)]
+#[argh(subcommand, name = "qwk-scan")]
+/// create REP packets from locally written messages
+struct QwkScan {
+    #[argh(positional)]
+    /// path/file name of the icyboard.toml configuration file
+    config: PathBuf,
+
+    #[argh(positional)]
+    /// hub ID, every hub when left out
+    hub: Option<String>,
+}
+
+#[derive(FromArgs)]
+#[argh(subcommand, name = "qwk-toss")]
+/// import QWK packets waiting in the inbound directory
+struct QwkToss {
+    #[argh(positional)]
+    /// path/file name of the icyboard.toml configuration file
+    config: PathBuf,
+
+    #[argh(positional)]
+    /// hub ID, every hub when left out
+    hub: Option<String>,
 }
 
 #[derive(FromArgs)]
@@ -146,6 +199,13 @@ async fn main() {
             Ok(board) => scan(&board),
             Err(err) => Err(err),
         },
+        Command::QwkLinks(arguments) => load_qwk(&arguments.config).and_then(|board| qwk_links(&board)),
+        Command::QwkScan(arguments) => load_qwk(&arguments.config).and_then(|board| qwk_scan(&board, arguments.hub.as_deref())),
+        Command::QwkToss(arguments) => load_qwk(&arguments.config).and_then(|board| qwk_toss(&board, arguments.hub.as_deref())),
+        Command::QwkPoll(arguments) => match load_qwk(&arguments.config) {
+            Ok(board) => qwk_poll(&board, arguments.hub.as_deref()).await,
+            Err(err) => Err(err),
+        },
     };
     if let Err(err) = result {
         eprintln!("{}", err);
@@ -186,6 +246,102 @@ fn load(config: &Path) -> Res<IcyBoard> {
         .into());
     }
     Ok(board)
+}
+
+fn load_qwk(config: &Path) -> Res<IcyBoard> {
+    let mut board = IcyBoard::load(&config)?;
+    board.resolve_paths();
+    if board.config.paths.qwknet_file.as_os_str().is_empty() {
+        return Err("No qwknet_file is configured in icyboard.toml".into());
+    }
+    if !board.qwknet.enabled {
+        return Err("QWKnet processing is disabled in qwknet.toml".into());
+    }
+    board.qwknet.validate()?;
+    Ok(board)
+}
+
+fn selected_hubs<'a>(board: &'a IcyBoard, wanted: Option<&str>) -> Res<Vec<&'a qwknet::QwkHub>> {
+    let hubs: Vec<_> = board
+        .qwknet
+        .hubs
+        .iter()
+        .filter(|hub| wanted.is_none_or(|wanted| hub.id.eq_ignore_ascii_case(wanted)))
+        .collect();
+    if hubs.is_empty() {
+        return Err(match wanted {
+            Some(wanted) => format!("No QWKnet hub named {wanted} is configured").into(),
+            None => "No QWKnet hubs are configured".into(),
+        });
+    }
+    Ok(hubs)
+}
+
+fn qwk_links(board: &IcyBoard) -> Res<()> {
+    for hub in selected_hubs(board, None)? {
+        println!("{:<8} {:<32} {} area(s)", hub.id, hub.host, hub.areas.len());
+    }
+    Ok(())
+}
+
+fn qwk_scan(board: &IcyBoard, wanted: Option<&str>) -> Res<()> {
+    for hub in selected_hubs(board, wanted)? {
+        let report = qwknet::scan(&board.qwknet, &board.root_path, &hub.id)?;
+        match report.packet {
+            Some(packet) => println!("{}: {} message(s), {}", hub.id, report.messages, packet.display()),
+            None => println!("{}: no new messages", hub.id),
+        }
+    }
+    Ok(())
+}
+
+fn qwk_toss(board: &IcyBoard, wanted: Option<&str>) -> Res<()> {
+    let inbound = board.qwknet.inbound.clone();
+    let inbound = if inbound.is_absolute() { inbound } else { board.root_path.join(inbound) };
+    if !inbound.is_dir() {
+        return Ok(());
+    }
+    for hub in selected_hubs(board, wanted)? {
+        let mut packets: Vec<_> = fs::read_dir(&inbound)?
+            .filter_map(Result::ok)
+            .map(|entry| entry.path())
+            .filter(|path| path.extension().is_some_and(|extension| extension.eq_ignore_ascii_case("qwk")))
+            .filter(|path| {
+                path.file_stem().and_then(|stem| stem.to_str()).is_some_and(|stem| {
+                    stem.eq_ignore_ascii_case(&hub.id) || stem.to_ascii_uppercase().starts_with(&format!("{}.", hub.id.to_ascii_uppercase()))
+                })
+            })
+            .collect();
+        packets.sort();
+        for packet in packets {
+            let report = qwknet::toss(&board.qwknet, &board.root_path, &hub.id, &packet)?;
+            println!(
+                "{}: {} imported, {} duplicate(s), {} loop(s), {} unknown conference(s)",
+                hub.id, report.imported, report.duplicates, report.loops, report.unknown_conferences
+            );
+            fs::remove_file(packet)?;
+        }
+    }
+    Ok(())
+}
+
+async fn qwk_poll(board: &IcyBoard, wanted: Option<&str>) -> Res<()> {
+    for hub in selected_hubs(board, wanted)? {
+        let scanned = qwknet::scan(&board.qwknet, &board.root_path, &hub.id)?;
+        if scanned.messages > 0 {
+            println!("{}: packed {} message(s)", hub.id, scanned.messages);
+        }
+        let report = qwknet::poll(&board.qwknet, &board.root_path, &hub.id).await?;
+        if report.uploaded {
+            println!("{}: REP packet uploaded", hub.id);
+        }
+        if report.downloaded.is_some() {
+            println!("{}: QWK packet downloaded", hub.id);
+        } else {
+            println!("{}: no mail waiting", hub.id);
+        }
+    }
+    qwk_toss(board, wanted)
 }
 
 fn list_links(config: &Path) -> Res<()> {
