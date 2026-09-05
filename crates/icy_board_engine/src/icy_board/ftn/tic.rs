@@ -173,9 +173,7 @@ fn toss_tic(config: &FtnConfig, areas: &[FileArea], path: &Path, report: &mut Ti
         .into());
     };
 
-    let size = fs::metadata(&source)
-        .context(|| format!("Cannot look at {}", source.display()))?
-        .len();
+    let size = fs::metadata(&source).context(|| format!("Cannot look at {}", source.display()))?.len();
     if let Some(announced) = tic.size
         && announced != size
     {
@@ -343,7 +341,12 @@ mod tests {
         let directory = tempfile::tempdir().unwrap();
         let config = config(directory.path());
         let areas = vec![area(directory.path(), "R24NODEL")];
-        let tic = arrive(&config, "NODELR24.Z54", b"nodelist", "Area R24NODEL\r\nDesc Nodelist of the day\r\nFrom 21:1/1\r\n");
+        let tic = arrive(
+            &config,
+            "NODELR24.Z54",
+            b"nodelist",
+            "Area R24NODEL\r\nDesc Nodelist of the day\r\nFrom 21:1/1\r\n",
+        );
 
         let report = toss_tics(&config, &areas).unwrap();
 

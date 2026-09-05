@@ -205,11 +205,7 @@ impl IcyBoardState {
                 let file = self.resolve_path(&PathBuf::from(&cmd_action.parameter));
                 let file = file.with_extension("mnu");
                 if !file.is_file() {
-                    log::error!(
-                        "Command {} opens the menu {}, which is not there",
-                        command.keyword,
-                        file.display()
-                    );
+                    log::error!("Command {} opens the menu {}, which is not there", command.keyword, file.display());
                     self.display_text(IceText::InvalidEntry, display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER)
                         .await?;
                     return Ok(());
@@ -240,8 +236,11 @@ impl IcyBoardState {
                         self.session.current_conference.name
                     );
                     self.session.op_text.clone_from(&cmd_action.parameter);
-                    self.display_text(IceText::InvalidSelection, display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER)
-                        .await?;
+                    self.display_text(
+                        IceText::InvalidSelection,
+                        display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER,
+                    )
+                    .await?;
                 }
             }
             CommandType::Conference => {
