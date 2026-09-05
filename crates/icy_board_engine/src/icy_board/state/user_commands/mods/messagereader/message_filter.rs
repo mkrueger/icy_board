@@ -25,6 +25,8 @@ pub struct MessageFilter {
     text: Option<Regex>,
     /// The reader's own name and alias, upper cased.
     own_names: Vec<String>,
+    /// `PCBoard`'s `SEC_READALLMAIL`, which opens receiver-only mail to the sysop.
+    may_read_all_mail: bool,
 }
 
 impl Default for MessageFilter {
@@ -42,12 +44,13 @@ impl Default for MessageFilter {
             thread_subject: None,
             text: None,
             own_names: Vec::new(),
+            may_read_all_mail: true,
         }
     }
 }
 
 impl MessageFilter {
-    pub fn new(cmd: &ReadCommand, session: &Session) -> Self {
+    pub fn new(cmd: &ReadCommand, session: &Session, may_read_all_mail: bool) -> Self {
         let mut own_names = vec![session.user_name.to_ascii_uppercase()];
         if !session.alias_name.is_empty() {
             own_names.push(session.alias_name.to_ascii_uppercase());
@@ -66,6 +69,7 @@ impl MessageFilter {
             // The regex itself lives on the session so found text gets highlighted.
             text: if cmd.do_text_search { session.search_pattern.clone() } else { None },
             own_names,
+            may_read_all_mail,
         }
     }
 
@@ -80,6 +84,9 @@ impl MessageFilter {
     }
 
     pub fn matches(&self, header: &JamMessageHeader, body: &str, last_read: u32) -> bool {
+        if !self.may_read(header) {
+            return false;
+        }
         let to = field(header.to());
         let from = field(header.from());
         let subject = field(header.subject());
@@ -116,6 +123,12 @@ impl MessageFilter {
             }
         }
         true
+    }
+
+    /// `readstatus` in `PCBoard`: a receiver-only message belongs to its two ends,
+    /// and to whoever may read all mail.
+    pub fn may_read(&self, header: &JamMessageHeader) -> bool {
+        !header.is_private() || self.may_read_all_mail || self.is_own(&field(header.to())) || self.is_own(&field(header.from()))
     }
 
     fn is_own(&self, name: &str) -> bool {
@@ -183,6 +196,25 @@ mod tests {
         let filter = filter(|_| {});
         assert!(filter.is_empty());
         assert!(filter.matches(&header("ALL", "SYSOP", "Hello"), "body", 0));
+    }
+
+    #[test]
+    fn a_receiver_only_message_belongs_to_its_two_ends() {
+        let private = |to: &str, from: &str| {
+            let mut header = header(to, from, "Hello");
+            header.attributes |= jamjam::jam::attributes::MSG_PRIVATE;
+            header
+        };
+        let reader = |f: &mut MessageFilter| {
+            f.may_read_all_mail = false;
+            f.own_names = vec!["TEST USER".to_string()];
+        };
+
+        assert!(!filter(reader).matches(&private("SOMEONE ELSE", "REMOTE USER"), "body", 0));
+        assert!(filter(reader).matches(&private("TEST USER", "REMOTE USER"), "body", 0));
+        assert!(filter(reader).matches(&private("REMOTE USER", "TEST USER"), "body", 0));
+        assert!(filter(|f| f.may_read_all_mail = true).matches(&private("SOMEONE ELSE", "REMOTE USER"), "body", 0));
+        assert!(filter(reader).matches(&header("SOMEONE ELSE", "REMOTE USER", "Hello"), "body", 0));
     }
 
     #[test]

@@ -13,7 +13,10 @@ use crate::{
         state::{
             NodeStatus,
             functions::display_flags,
-            user_commands::mods::messagereader::read_command::{self, ReadLoop},
+            user_commands::mods::messagereader::{
+                message_filter::MessageFilter,
+                read_command::{self, ReadLoop},
+            },
         },
     },
     vm::TerminalTarget,
@@ -98,6 +101,14 @@ impl IcyBoardState {
         ctx.quick_scan = true;
         let mut cmd = read_command::parse(&tokens, ReadLoop::Outside, &ctx);
         read_command::finalize(&mut cmd);
+        let may_read_all_mail = self
+            .get_board()
+            .await
+            .config
+            .sysop_command_level
+            .read_all_mail
+            .session_can_access(&self.session);
+        let filter = MessageFilter::new(&cmd, &self.session, may_read_all_mail);
 
         let Some(range) = cmd.numbers.first() else {
             self.display_text(IceText::InvalidEntry, display_flags::NEWLINE).await?;
@@ -126,6 +137,9 @@ impl IcyBoardState {
         self.set_color(TerminalTarget::Both, IcbColor::dos_light_cyan()).await?;
         for i in number..=high {
             if let Ok(header) = message_base.read_header(i) {
+                if !filter.may_read(&header) {
+                    continue;
+                }
                 // Only the header scan lists what has been killed.
                 if header.is_deleted() && !header_scan {
                     continue;

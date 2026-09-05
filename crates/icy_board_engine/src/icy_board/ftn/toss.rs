@@ -320,7 +320,11 @@ impl Tosser<'_> {
 }
 
 fn to_jam(message: &PackedMessage, kludges: &Kludges, echo: bool) -> JamMessage {
-    let mut flags = if echo { attributes::MSG_TYPEECHO } else { attributes::MSG_TYPENET };
+    let mut flags = if echo {
+        attributes::MSG_TYPEECHO
+    } else {
+        attributes::MSG_TYPENET | attributes::MSG_PRIVATE
+    };
     for (packed, jam) in [
         (packet::attribute::PRIVATE, attributes::MSG_PRIVATE),
         (packet::attribute::CRASH, attributes::MSG_CRASH),
@@ -961,6 +965,7 @@ mod tests {
         assert_eq!(report.netmail, 1);
         let base = JamMessageBase::open(&config.netmail).unwrap();
         assert_eq!(base.active_messages(), 1);
+        assert!(base.read_header(1).unwrap().is_private());
     }
 
     #[test]

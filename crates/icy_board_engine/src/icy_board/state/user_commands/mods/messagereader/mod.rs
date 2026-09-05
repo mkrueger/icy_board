@@ -333,7 +333,14 @@ impl IcyBoardState {
             } else {
                 self.stop_search();
             }
-            let filter = MessageFilter::new(&cmd, &self.session);
+            let may_read_all_mail = self
+                .get_board()
+                .await
+                .config
+                .sysop_command_level
+                .read_all_mail
+                .session_can_access(&self.session);
+            let filter = MessageFilter::new(&cmd, &self.session, may_read_all_mail);
 
             for range in cmd.numbers.clone() {
                 let (first, last) = self.clamp_range(range, low_number, high_number);
