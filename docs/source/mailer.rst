@@ -222,6 +222,22 @@ Mail for a tag no board area claims is counted and reported by the tosser but
 not stored, so a mistyped tag shows up as an unknown area rather than
 disappearing.
 
+Importing an area list
+~~~~~~~~~~~~~~~~~~~~~~
+
+Networks commonly publish a text file such as ``FIDONET.NA`` whose lines name
+an echomail tag and the title callers should see. In the AREA.LST editor press
+``F2 Import``, enter the list and the directory below which its JAM bases
+should live, then press ``F2`` again to load the preview. Space selects or
+clears one entry; Enter adds those selected to the editor.
+
+Both ``TAG Description`` and ``TAG,Description`` forms are accepted. Blank
+lines and lines beginning with ``;`` or ``#`` are comments. Tags already in
+the AREA.LST are skipped without changing them, and when a generated message
+base path is already in use the new area gets a numbered path instead. The
+import changes only the editor: leave with Escape and choose Save to write it,
+or discard the changes as usual.
+
 
 The origin line
 ---------------

@@ -3334,6 +3334,32 @@ dirs_download_sec-help=
 
 area_editor_title=AREA.LST Editor - { $conference }
 area_editor_edit_title=Edit Area
+area_editor_key_help=↑ Up  ↓ Down  INS New  F2 Import  ⌫ Delete  PgUp/Dn Move  ␛ Back
+
+area_import_title=Import Area List
+area_import_file=Area List File
+area_import_file-status=FIDONET.NA or another network's .NA area list
+area_import_file-help=
+    # Area List File
+
+    A text file whose non-comment lines start with an echomail tag followed by
+    the name callers should see. FIDONET.NA and network-specific .NA files use
+    this form.
+
+area_import_directory=Base Directory
+area_import_directory-status=Where the imported JAM message bases will live
+area_import_directory-help=
+    # Base Directory
+
+    Every selected tag gets a safe, lower-case path below this directory.
+    Existing paths and tags are never overwritten.
+
+area_import_load_help=F2 Load  ␛ Back
+area_import_preview_title=Select Areas to Import
+area_import_preview_help=↑/↓ Move  Space Select  Enter Import  ␛ Back
+area_import_empty=The file contains no valid area entries.
+area_import_failed=The area list could not be read: { $error }
+area_import_done=Imported { $count } message area(s). Save the AREA.LST editor to keep them.
 
 area_editor_name=Name
 area_editor_name-status=Name

@@ -10,6 +10,11 @@ releases.
 
 ### Added
 
+- The AREA.LST editor imports `FIDONET.NA` and other networks' `.NA` area
+  lists. It previews every tag and name, lets the sysop select what to take,
+  skips tags already present, and chooses a new path rather than overwriting
+  an existing message base.
+
 - A nodelist can be read, and a link configured without a host of its own is
   looked up in it. The host and port come from its `IBN` flag, falling back to
   the address `INA` gives, so those two no longer have to be copied by hand.
