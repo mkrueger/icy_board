@@ -288,6 +288,35 @@ hand. Nothing is deleted: the packet is kept for the sysop, and a second one of
 the same name does not overwrite the first.
 
 
+The nodelist
+------------
+
+Every fidonet network publishes a list of the systems in it. Point ``nodelist``
+at that file and a link configured without a ``host`` of its own is looked up
+there, so its host and port do not have to be copied by hand:
+
+.. code-block:: toml
+
+   nodelist = "ftn/nodelist.361"
+
+   [[link]]
+   address = "21:1/100"
+   domain = "fsxnet"
+
+The host and port come from the node's ``IBN`` flag. ``IBN`` on its own means
+binkp on the default port at whatever address ``INA`` gives, and it may name a
+host, a port, or both, including a bracketed IPv6 address. A node marked
+``Hold`` or ``Down`` is not called, even when an old line still carries
+``IBN``. A node the list does not say takes binkp is reported and skipped, and
+so is one the list does not hold at all; in either case entering a host by hand
+still works.
+
+The file is read as it stands. Nothing is compiled beforehand, and the weekly
+list can simply replace the one before it. An address is not written on the
+line that describes a system: it follows from the ``Zone``, ``Region``,
+``Host`` and ``Hub`` lines above it, which is why the whole file is read.
+
+
 File requests
 -------------
 

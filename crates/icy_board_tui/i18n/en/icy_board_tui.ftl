@@ -4005,8 +4005,7 @@ fido_bad_netmail=Secure Netmail Base
 fido_bad_netmail-status=Where netmail from an unconfigured node goes
 fido_bad_netmail-help=Only used while Secure Netmail is on.
 
-fido_bad_packets=Dir to store Bad Packets
-fido_bad_packets-status=Where a packet that could not be read is put aside
+fido_bad_packets=Dir to store Bad Packetsfido_bad_packets-status=Where a packet that could not be read is put aside
 fido_bad_packets-help=
     # Dir to store Bad Packets
 
@@ -4018,6 +4017,18 @@ fido_bad_packets-help=
 fido_new_areas=New Areas
 fido_new_areas-status=Where the base of an added area is created
 fido_new_areas-help=Only used while Auto Add Fido Areas is on.
+
+fido_nodelist=Nodelist
+fido_nodelist-status=The nodelist this board looks systems up in (BLANK=none)
+fido_nodelist-help=
+    # Nodelist
+
+    The list every fidonet network publishes of the systems in it. A node that
+    is configured without a host of its own is looked up here, so its host and
+    port do not have to be copied by hand.
+
+    Point it at the list itself, not at a compiled index; it is read as it
+    stands. Leave it empty and every node has to name its own host.
 
 fido_address_title=Fidonet Address Configuration
 fido_address_editor=Address

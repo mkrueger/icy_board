@@ -10,6 +10,12 @@ releases.
 
 ### Added
 
+- A nodelist can be read, and a link configured without a host of its own is
+  looked up in it. The host and port come from its `IBN` flag, falling back to
+  the address `INA` gives, so those two no longer have to be copied by hand.
+  The file is read as it stands, so nothing has to be compiled first. Point
+  `nodelist` in `ftn.toml` at it, or set it under Message Networking.
+
 - A packet the tosser cannot read is moved to the directory named by
   `bad_packets` and the report says where it went. It stayed in the inbound
   before, so every later run tried it again and complained about it again,

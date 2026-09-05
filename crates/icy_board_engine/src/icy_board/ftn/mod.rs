@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use jamjam::util::echomail::EchomailAddress;
 use serde::{Deserialize, Serialize};
@@ -9,6 +9,7 @@ use crate::Res;
 
 pub mod bundle;
 pub mod freq;
+pub mod nodelist;
 pub mod packet;
 pub mod queue;
 pub mod tic;
@@ -16,6 +17,10 @@ pub mod toss;
 
 /// The port fidonet technology networks reserved for binkp.
 pub const DEFAULT_BINKP_PORT: u16 = icy_net::binkp::DEFAULT_PORT;
+
+fn path_is_empty(path: &Path) -> bool {
+    path.as_os_str().is_empty()
+}
 
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -299,6 +304,12 @@ pub struct FtnConfig {
     #[serde(default = "FtnConfig::default_bad_packets")]
     pub bad_packets: PathBuf,
 
+    /// The nodelist this board looks systems up in. Empty when there is none,
+    /// and then a link has to name its own host.
+    #[serde(default)]
+    #[serde(skip_serializing_if = "path_is_empty")]
+    pub nodelist: PathBuf,
+
     /// Where the base of an area added by `options.auto_add` is created.
     #[serde(default = "FtnConfig::default_new_areas")]
     pub new_areas: PathBuf,
@@ -403,6 +414,7 @@ impl Default for FtnConfig {
             netmail: Self::default_netmail(),
             bad_netmail: Self::default_bad_netmail(),
             bad_packets: Self::default_bad_packets(),
+            nodelist: PathBuf::new(),
             new_areas: Self::default_new_areas(),
             origin: String::new(),
             options: FtnOptions::default(),
@@ -473,6 +485,7 @@ mod tests {
     fn test_a_filled_config_survives_a_round_trip_through_toml() {
         let mut config = FtnConfig {
             origin: "Icy Board".to_string(),
+            nodelist: PathBuf::from("ftn/nodelist.361"),
             akas: vec![aka("21:1/100", "fsxnet")],
             links: vec![FtnLink {
                 host: "hub.example.org".to_string(),

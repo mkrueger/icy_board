@@ -13,6 +13,7 @@ use icy_board_engine::{
             FtnConfig, FtnLink, FtnLogLevel,
             bundle::{is_bundle, unpack},
             freq,
+            nodelist::Nodelist,
             packet::Packet,
             tic::{FileArea, toss_tics},
             toss::{EchoArea, TossReport, scan_outbound, toss_inbound},
@@ -189,7 +190,9 @@ fn load(config: &Path) -> Res<IcyBoard> {
 
 fn list_links(config: &Path) -> Res<()> {
     let board = load(config)?;
-    for link in &board.ftn.links {
+    let mut links = board.ftn.links.clone();
+    look_up_hosts(&board, &mut links)?;
+    for link in &links {
         let waiting = outbound_files(&board.ftn.outbound_for(link))?;
         let bytes: u64 = waiting.iter().filter_map(|path| path.metadata().ok()).map(|data| data.len()).sum();
         println!(
@@ -215,7 +218,7 @@ async fn poll_links(board: &mut IcyBoard, address: Option<&str>, keep: bool) -> 
     if !board.ftn.options.dial_out {
         return Err("This board is set not to call out, see dial_out in ftn.toml".into());
     }
-    let selected: Vec<FtnLink> = match address {
+    let mut selected: Vec<FtnLink> = match address {
         Some(wanted) => board.ftn.links.iter().filter(|link| answers_to(link, wanted)).cloned().collect(),
         None => board.ftn.links.clone(),
     };
@@ -225,10 +228,19 @@ async fn poll_links(board: &mut IcyBoard, address: Option<&str>, keep: bool) -> 
             None => "No links configured".into(),
         });
     }
+    look_up_hosts(board, &mut selected)?;
 
     let mut failed = 0;
     let mut received = false;
     for link in &selected {
+        if link.host.is_empty() {
+            eprintln!(
+                "{} has no host. Enter one under Message Networking > Node Configuration, or configure a nodelist that lists it with an IBN flag",
+                link.to_5d()
+            );
+            failed += 1;
+            continue;
+        }
         match poll_link(&board.ftn, &identity_for(board, link)?, link, keep).await {
             Ok(files) => received |= files,
             Err(err) => {
@@ -242,6 +254,33 @@ async fn poll_links(board: &mut IcyBoard, address: Option<&str>, keep: bool) -> 
     }
     if failed > 0 {
         return Err(format!("{} of the calls did not get through", failed).into());
+    }
+    Ok(())
+}
+
+/// A link that names no host of its own is looked up in the nodelist.
+fn look_up_hosts(board: &IcyBoard, links: &mut [FtnLink]) -> Res<()> {
+    if board.ftn.nodelist.as_os_str().is_empty() || !links.iter().any(|link| link.host.is_empty()) {
+        return Ok(());
+    }
+    let list = Nodelist::load(&board.ftn.nodelist)?;
+    for link in links.iter_mut().filter(|link| link.host.is_empty()) {
+        let Some(entry) = list.find(&link.address) else {
+            println!("{} names no host and the nodelist does not list it", link.to_5d());
+            continue;
+        };
+        match entry.binkp_address() {
+            Some((host, port)) => {
+                println!("{} is {} at {}:{}, from the nodelist", link.to_5d(), entry.name, host, port);
+                link.host = host;
+                link.port = port;
+            }
+            None => println!(
+                "{} is {} in the nodelist, which does not say it takes binkp. Enter a host by hand if it does",
+                link.to_5d(),
+                entry.name
+            ),
+        }
     }
     Ok(())
 }

@@ -183,6 +183,7 @@ pub fn directories(icy_board: Arc<Mutex<IcyBoard>>) -> FtnOptionPage {
             path!("fido_netmail", width, netmail, lock),
             path!("fido_bad_netmail", width, bad_netmail, lock),
             path!("fido_bad_packets", width, bad_packets, lock),
+            path!("fido_nodelist", width, nodelist, lock),
             path!("fido_new_areas", width, new_areas, lock),
         ]
     };
