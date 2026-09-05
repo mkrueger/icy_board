@@ -281,6 +281,7 @@ impl ConferenceBase {
                 qwk_name: "General".to_string(),
                 qwk_conference_number: 0,
                 ftn_area_tag: String::new(),
+                ftn_origin: String::new(),
                 is_read_only: d.read_only,
                 allow_aliases: d.allow_aliases,
                 req_level_to_list: SecurityExpression::from_req_security(d.req_level_to_enter),

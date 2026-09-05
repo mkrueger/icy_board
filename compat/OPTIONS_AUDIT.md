@@ -269,6 +269,7 @@ Message Networking → Fido Configuration, the importer fills them in and the
 | `fido_default_zone` | `options.default_zone` |
 | `fido_default_net` | `options.default_net` |
 | `fido_log_level` | `options.log_level` (`0` normal, `1..3` detailed, higher values debug) |
+| `origin` | `origin`, the board wide origin line. `ORIGINS.DAT` names one per conference range, and each of those conferences hands its origin to the `ftn_origin` of its areas |
 
 The five that were left out, and why:
 

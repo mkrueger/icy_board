@@ -394,6 +394,7 @@ Member               Type              Description
 ``AllowAliases``     ``BOOLEAN``       Whether a caller may post under an alias
 ``QwkName``          ``STRING``        The name this area carries in a QWK packet
 ``EchoTag``          ``STRING``        The FTN tag, empty when the area is local
+``EchoOrigin``       ``STRING``        The origin line, empty when the board wide one applies
 ``HasAccess()``      ``BOOLEAN``       Whether the current caller may list it
 ``CanEnter()``       ``BOOLEAN``       Whether the current caller may join it
 ``CanAttach()``      ``BOOLEAN``       Whether the current caller may save an attachment

@@ -3337,6 +3337,22 @@ area_editor_qwk_name-status=QWK Name (BLANK=Use Name)
 area_editor_qwk_name-help=
     Area name as it appears in QWK packets.
 
+area_editor_fido_tag=Fido Area Tag
+area_editor_fido_tag-status=The echomail tag this area carries (BLANK=local area)
+area_editor_fido_tag-help=
+    # Fido Area Tag
+
+    The name this area has in the Fido technology network, such as FSX_GEN.
+    Leave it blank for an area that is kept local to this board.
+
+area_editor_fido_origin=Fido Origin
+area_editor_fido_origin-status=Origin for this area (BLANK=use the board-wide origin)
+area_editor_fido_origin-help=
+    # Fido Origin
+
+    The origin line used for echomail written in this area. Leave it blank to
+    use the board-wide origin from Fido Configuration.
+
 area_editor_file=File
 area_editor_file-status=File
 area_editor_file-help=
@@ -3742,7 +3758,7 @@ fido_menu_tosser=Tosser Configuration
 fido_menu_nodes=Node Configuration
 fido_menu_addresses=System Address
 fido_menu_directories=File & Directory Configuration
-fido_menu_origin=Origin
+fido_menu_origin=Origin Conference Range
 fido_menu_routing=Routing Configuration
 
 fido_processing_title=Fido Processing Configuration
@@ -3965,13 +3981,17 @@ fido_node_areas-help=
 fido_origin_title=Fidonet Origin Configuration
 
 fido_origin=Origin
-fido_origin-status=The line appended to every echomail message written here
+fido_origin-status=The line appended to echomail written in an area that names no origin of its own
 fido_origin-help=
     # Origin
 
     The line appended to every echomail message written on this board. Custom in
     fidonet is the board name and how to reach it, and some networks insist on
     one, so set it before scanning for the first time.
+
+    PCBoard tied an origin to a range of conferences. Here an area can carry its
+    own by setting `ftn_origin` in its `area.toml`, and this line is what the
+    rest of the board uses.
 
 fido_route_title=Fidonet Routing Configuration
 fido_route_editor=Route

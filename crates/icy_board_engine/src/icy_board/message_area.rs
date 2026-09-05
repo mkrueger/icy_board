@@ -54,6 +54,12 @@ pub struct MessageArea {
     #[serde(skip_serializing_if = "String::is_empty")]
     pub ftn_area_tag: String,
 
+    /// Takes the place of the board wide origin line on echomail written here,
+    /// empty when that one applies.
+    #[serde(default)]
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub ftn_origin: String,
+
     pub path: PathBuf,
     pub is_read_only: bool,
     pub allow_aliases: bool,
@@ -224,6 +230,7 @@ impl UserData for MessageArea {
         registry.add_property(ALLOW_ALIASES.clone(), VariableType::Boolean, false);
         registry.add_property(QWK_NAME.clone(), VariableType::UnboundedString, false);
         registry.add_property(ECHO_TAG.clone(), VariableType::UnboundedString, false);
+        registry.add_property(ECHO_ORIGIN.clone(), VariableType::UnboundedString, false);
         registry.add_function(HAS_ACCESS.clone(), Vec::new(), VariableType::Boolean);
         registry.add_function(CAN_ENTER.clone(), Vec::new(), VariableType::Boolean);
         registry.add_function(CAN_ATTACH.clone(), Vec::new(), VariableType::Boolean);
@@ -250,6 +257,7 @@ pub static IS_READ_ONLY: std::sync::LazyLock<unicase::Ascii<String>> = std::sync
 pub static ALLOW_ALIASES: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("AllowAliases".to_string()));
 pub static QWK_NAME: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("QwkName".to_string()));
 pub static ECHO_TAG: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("EchoTag".to_string()));
+pub static ECHO_ORIGIN: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("EchoOrigin".to_string()));
 pub static HAS_ACCESS: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("HasAccess".to_string()));
 pub static CAN_ENTER: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("CanEnter".to_string()));
 pub static CAN_ATTACH: std::sync::LazyLock<unicase::Ascii<String>> = std::sync::LazyLock::new(|| unicase::Ascii::new("CanAttach".to_string()));
@@ -281,6 +289,9 @@ impl UserDataValue for MessageArea {
         }
         if *name == *ECHO_TAG {
             return Ok(VariableValue::new_unbounded_string(self.ftn_area_tag.clone()));
+        }
+        if *name == *ECHO_ORIGIN {
+            return Ok(VariableValue::new_unbounded_string(self.ftn_origin.clone()));
         }
         log::error!("Invalid user data call on MessageArea ({name})");
         Ok(VariableValue::new_int(-1))

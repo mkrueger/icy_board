@@ -10,6 +10,13 @@ releases.
 
 ### Added
 
+- A message area can carry its own Fido origin line, set as `Fido Origin` in
+  the area editor. Echomail written there leaves the board with that line
+  instead of the board-wide one, which is how PCBoard's origin conference
+  ranges are honoured; `ORIGINS.DAT` is read on import and handed to the areas
+  of the conferences each entry names. `AREA` gained `EchoOrigin` so a PPE can
+  read it.
+
 - `HttpMethod` gained `Put`, `Delete` and `Patch`, so a PPE can update and
   remove REST resources instead of only creating and reading them.
   `HttpResponse.Bytes()` returns a retained body as `BYTES` without decoding

@@ -27,6 +27,7 @@ use icy_board_engine::{
         login_server::LoginServer,
         menu::Menu,
         message_area::AreaList,
+        origins::PcbOrigin,
         pcbconferences::{PcbAdditionalConferenceHeader, PcbConferenceHeader},
         pcboard_data::PcbBoardData,
         read_with_encoding_detection,
@@ -548,7 +549,7 @@ impl PCBoardImporter {
             color_configuration,
             board: BoardInformation {
                 name: self.data.board_name.clone(),
-                location: self.data.origin.clone(),
+                location: String::new(),
                 operator: String::new(),
                 notice: String::new(),
                 capabilities: String::new(),
@@ -793,6 +794,7 @@ impl PCBoardImporter {
                 default_net: self.data.fido_default_net.clamp(0, u16::MAX as i32) as u16,
                 log_level: icy_board_engine::icy_board::ftn::FtnLogLevel::from_pcboard(self.data.fido_log_level),
             },
+            origin: self.data.origin.trim().to_string(),
             ..FtnConfig::default()
         };
         let ftn_path = self.output_directory.join(&icb_cfg.paths.ftn_file);
@@ -862,6 +864,34 @@ impl PCBoardImporter {
         Ok(())
     }
 
+    /// The origin lines PCBoard keeps in `ORIGINS.DAT`, resolved to the
+    /// conferences each of them speaks for.
+    fn load_fido_origins(&mut self) -> HashMap<u16, String> {
+        let mut result = HashMap::new();
+        let directory = self.data.fido_loc.replace('\\', "/");
+        let directory = match directory.rfind('/') {
+            Some(cut) => &directory[..=cut],
+            None => "",
+        };
+        let path = self.try_resolve_file(&format!("{directory}ORIGINS.DAT"));
+        if !path.exists() {
+            return result;
+        }
+        match PcbOrigin::import_pcboard(&path) {
+            Ok(origins) => {
+                for origin in origins {
+                    for conference in origin.conferences {
+                        result.insert(conference, origin.origin.clone());
+                    }
+                }
+            }
+            Err(err) => {
+                self.logger.log(&format!("Can't read origin lines from {}: {}", path.display(), err));
+            }
+        }
+        result
+    }
+
     fn convert_conferences(&mut self, conference_file: &str, new_rel_name: &str) -> Res<PathBuf> {
         self.output.start_action("Convert conferences…".into());
 
@@ -893,6 +923,7 @@ impl PCBoardImporter {
         self.stats.conferences = conferences.len();
 
         let mut conf_base = ConferenceBase::import_pcboard(&self.output_directory, &conferences, &add_conferences);
+        let origins = self.load_fido_origins();
         for (i, conf) in conf_base.iter_mut().enumerate() {
             let output = if i == 0 { "conferences/main".to_string() } else { format!("conferences/{i}") };
             let destination = self.output_directory.join(&output);
@@ -930,8 +961,12 @@ impl PCBoardImporter {
 
             match AreaList::load(&destination.join("area.toml")) {
                 Ok(mut list) => {
+                    let origin = u16::try_from(i).ok().and_then(|number| origins.get(&number));
                     for area in list.iter_mut() {
                         area.path = self.convert_message_base(&destination, &output, &area.path)?;
+                        if let Some(origin) = origin {
+                            area.ftn_origin.clone_from(origin);
+                        }
                     }
                     // An area without a message base is one the board can only stumble over.
                     list.retain(|area| !area.path.as_os_str().is_empty());

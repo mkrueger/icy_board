@@ -31,6 +31,7 @@ fn seed_conference(board: &mut crate::icy_board::IcyBoard) {
             allow_aliases: true,
             qwk_name: "GENERAL".to_string(),
             ftn_area_tag: "FIDO.GENERAL".to_string(),
+            ftn_origin: "Just this area".to_string(),
             req_level_to_save_attach: SecurityExpression::from_req_security(20),
             ..Default::default()
         }]))),
@@ -99,12 +100,13 @@ fn an_area_reports_how_it_is_configured() {
         AREA area = Board.Conferences[0].Areas[0]
         PrintLn area.IsReadOnly, " ", area.AllowAliases
         PrintLn "[", area.QwkName, "] [", area.EchoTag, "]"
+        PrintLn "[", area.EchoOrigin, "]"
         PrintLn area.HasAccess(), " ", area.CanEnter(), " ", area.CanAttach()
         "#,
         seed_conference,
     );
 
-    assert_eq!(output, "1 1\n[GENERAL] [FIDO.GENERAL]\n1 1 0\n");
+    assert_eq!(output, "1 1\n[GENERAL] [FIDO.GENERAL]\n[Just this area]\n1 1 0\n");
 }
 
 /// A local area has no echo tag, which is how a PPE tells the two apart.

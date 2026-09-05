@@ -13,7 +13,7 @@ use icy_board_engine::{
             FtnConfig, FtnLink, FtnLogLevel,
             bundle::{is_bundle, unpack},
             packet::Packet,
-            toss::{TossReport, scan_outbound, toss_inbound},
+            toss::{EchoArea, TossReport, scan_outbound, toss_inbound},
         },
         message_area::MessageArea,
     },
@@ -437,7 +437,7 @@ fn scan(board: &IcyBoard) -> Res<()> {
 
 /// The areas that take part in the network, told apart by the tag they carry
 /// there. An area without a tag is one this board keeps to itself.
-fn echo_areas(board: &IcyBoard) -> Vec<(String, PathBuf)> {
+fn echo_areas(board: &IcyBoard) -> Vec<EchoArea> {
     let mut areas = Vec::new();
     for conference in board.conferences.iter() {
         let Some(list) = &conference.areas else {
@@ -445,7 +445,11 @@ fn echo_areas(board: &IcyBoard) -> Vec<(String, PathBuf)> {
         };
         for area in list.iter() {
             if !area.ftn_area_tag.is_empty() {
-                areas.push((area.ftn_area_tag.clone(), area.path.clone()));
+                areas.push(EchoArea {
+                    tag: area.ftn_area_tag.clone(),
+                    path: area.path.clone(),
+                    origin: area.ftn_origin.clone(),
+                });
             }
         }
     }

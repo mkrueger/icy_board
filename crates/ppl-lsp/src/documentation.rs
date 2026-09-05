@@ -437,7 +437,7 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
     if id == MESSAGE_AREA_ID as u8 {
         return match member.to_ascii_lowercase().as_str() {
             "name" | "number" | "valid" => Some(fl!(LANGUAGE_LOADER, "hint-member-area-identity")),
-            "isreadonly" | "allowaliases" | "qwkname" | "echotag" => Some(fl!(LANGUAGE_LOADER, "hint-member-area-options")),
+            "isreadonly" | "allowaliases" | "qwkname" | "echotag" | "echoorigin" => Some(fl!(LANGUAGE_LOADER, "hint-member-area-options")),
             "hasaccess" | "canenter" | "canattach" => Some(fl!(LANGUAGE_LOADER, "hint-member-area-access")),
             "highmsg" | "lowmsg" => Some(fl!(LANGUAGE_LOADER, "hint-member-area-range")),
             "read" => Some(fl!(LANGUAGE_LOADER, "hint-member-area-read")),

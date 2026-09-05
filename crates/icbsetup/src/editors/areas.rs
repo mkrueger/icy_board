@@ -216,6 +216,8 @@ impl<'a> Page for MessageAreasEditor<'a> {
                             entry: vec![
                                 ConfigEntry::Item(
                                     ListItem::new(get_text("area_editor_name"), ListValue::Text(25, TextFlags::None, item.name.to_string()))
+                                        .with_status(get_text("area_editor_name-status"))
+                                        .with_help(get_text("area_editor_name-help"))
                                         .with_label_width(16)
                                         .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<AreaList>>), value: String| {
                                             list.lock().unwrap()[*i].name = value;
@@ -226,13 +228,41 @@ impl<'a> Page for MessageAreasEditor<'a> {
                                         get_text("area_editor_qwk_name"),
                                         ListValue::Text(25, TextFlags::None, item.qwk_name.to_string()),
                                     )
+                                    .with_status(get_text("area_editor_qwk_name-status"))
+                                    .with_help(get_text("area_editor_qwk_name-help"))
                                     .with_label_width(16)
                                     .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<AreaList>>), value: String| {
                                         list.lock().unwrap()[*i].qwk_name = value;
                                     }),
                                 ),
                                 ConfigEntry::Item(
+                                    ListItem::new(
+                                        get_text("area_editor_fido_tag"),
+                                        ListValue::Text(32, TextFlags::None, item.ftn_area_tag.to_string()),
+                                    )
+                                    .with_status(get_text("area_editor_fido_tag-status"))
+                                    .with_help(get_text("area_editor_fido_tag-help"))
+                                    .with_label_width(16)
+                                    .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<AreaList>>), value: String| {
+                                        list.lock().unwrap()[*i].ftn_area_tag = value.to_ascii_uppercase();
+                                    }),
+                                ),
+                                ConfigEntry::Item(
+                                    ListItem::new(
+                                        get_text("area_editor_fido_origin"),
+                                        ListValue::Text(70, TextFlags::None, item.ftn_origin.to_string()),
+                                    )
+                                    .with_status(get_text("area_editor_fido_origin-status"))
+                                    .with_help(get_text("area_editor_fido_origin-help"))
+                                    .with_label_width(16)
+                                    .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<AreaList>>), value: String| {
+                                        list.lock().unwrap()[*i].ftn_origin = value;
+                                    }),
+                                ),
+                                ConfigEntry::Item(
                                     ListItem::new(get_text("area_editor_file"), ListValue::Path(item.path.clone()))
+                                        .with_status(get_text("area_editor_file-status"))
+                                        .with_help(get_text("area_editor_file-help"))
                                         .with_label_width(16)
                                         .with_update_path_value(&|(i, list): &(usize, Arc<Mutex<AreaList>>), value: PathBuf| {
                                             list.lock().unwrap()[*i].path = value;
@@ -240,6 +270,8 @@ impl<'a> Page for MessageAreasEditor<'a> {
                                 ),
                                 ConfigEntry::Item(
                                     ListItem::new(get_text("area_editor_is_readonly"), ListValue::Bool(item.is_read_only))
+                                        .with_status(get_text("area_editor_is_readonly-status"))
+                                        .with_help(get_text("area_editor_is_readonly-help"))
                                         .with_label_width(16)
                                         .with_update_bool_value(&|(i, list): &(usize, Arc<Mutex<AreaList>>), value: bool| {
                                             list.lock().unwrap()[*i].is_read_only = value;
@@ -247,6 +279,8 @@ impl<'a> Page for MessageAreasEditor<'a> {
                                 ),
                                 ConfigEntry::Item(
                                     ListItem::new(get_text("area_editor_allow_aliases"), ListValue::Bool(item.allow_aliases))
+                                        .with_status(get_text("area_editor_allow_aliases-status"))
+                                        .with_help(get_text("area_editor_allow_aliases-help"))
                                         .with_label_width(16)
                                         .with_update_bool_value(&|(i, list): &(usize, Arc<Mutex<AreaList>>), value: bool| {
                                             list.lock().unwrap()[*i].allow_aliases = value;
@@ -257,6 +291,8 @@ impl<'a> Page for MessageAreasEditor<'a> {
                                         get_text("area_editor_list_sec"),
                                         ListValue::Security(item.req_level_to_list.clone(), item.req_level_to_list.to_string()),
                                     )
+                                    .with_status(get_text("area_editor_list_sec-status"))
+                                    .with_help(get_text("area_editor_list_sec-help"))
                                     .with_label_width(16)
                                     .with_update_sec_value(
                                         &|(i, list): &(usize, Arc<Mutex<AreaList>>), value: SecurityExpression| {
@@ -269,6 +305,8 @@ impl<'a> Page for MessageAreasEditor<'a> {
                                         get_text("area_editor_enter_sec"),
                                         ListValue::Security(item.req_level_to_enter.clone(), item.req_level_to_enter.to_string()),
                                     )
+                                    .with_status(get_text("area_editor_enter_sec-status"))
+                                    .with_help(get_text("area_editor_enter_sec-help"))
                                     .with_label_width(16)
                                     .with_update_sec_value(
                                         &|(i, list): &(usize, Arc<Mutex<AreaList>>), value: SecurityExpression| {
@@ -281,6 +319,8 @@ impl<'a> Page for MessageAreasEditor<'a> {
                                         get_text("area_editor_attach_sec"),
                                         ListValue::Security(item.req_level_to_save_attach.clone(), item.req_level_to_save_attach.to_string()),
                                     )
+                                    .with_status(get_text("area_editor_attach_sec-status"))
+                                    .with_help(get_text("area_editor_attach_sec-help"))
                                     .with_label_width(16)
                                     .with_update_sec_value(
                                         &|(i, list): &(usize, Arc<Mutex<AreaList>>), value: SecurityExpression| {
@@ -293,9 +333,11 @@ impl<'a> Page for MessageAreasEditor<'a> {
                                         get_text("area_editor_qwk_number"),
                                         ListValue::U32(item.qwk_conference_number as u32, 0, u16::MAX as u32),
                                     )
+                                    .with_status(get_text("area_editor_qwk_number-status"))
+                                    .with_help(get_text("area_editor_qwk_number-help"))
                                     .with_label_width(16)
-                                    .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<AreaList>>), value: String| {
-                                        list.lock().unwrap()[*i].qwk_name = value;
+                                    .with_update_u32_value(&|(i, list): &(usize, Arc<Mutex<AreaList>>), value: u32| {
+                                        list.lock().unwrap()[*i].qwk_conference_number = value as u16;
                                     }),
                                 ),
                             ],

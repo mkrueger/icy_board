@@ -34,7 +34,26 @@ fn product() -> String {
 
 /// One area of the board as the tosser sees it: the tag it carries in the
 /// network and the message base it is stored in.
-pub type AreaMap = [(String, PathBuf)];
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct EchoArea {
+    pub tag: String,
+    pub path: PathBuf,
+
+    /// Takes the place of the board wide origin line, empty when that one applies.
+    pub origin: String,
+}
+
+impl EchoArea {
+    pub fn new(tag: impl Into<String>, path: impl Into<PathBuf>) -> Self {
+        Self {
+            tag: tag.into(),
+            path: path.into(),
+            origin: String::new(),
+        }
+    }
+}
+
+pub type AreaMap = [EchoArea];
 
 /// What one run over the inbound left behind.
 #[derive(Debug, Default)]
@@ -79,7 +98,7 @@ pub fn toss_inbound(config: &FtnConfig, areas: &AreaMap) -> Res<TossReport> {
     }
     let mut tosser = Tosser {
         config,
-        lookup: areas.iter().map(|(tag, path)| (tag.to_uppercase(), path.clone())).collect(),
+        lookup: areas.iter().map(|area| (area.tag.to_uppercase(), area.path.clone())).collect(),
         bases: OpenBases::new(config.options.msgs_to_track),
         forward: vec![Vec::new(); config.links.len()],
         link_areas: config.links.iter().map(|link| link.areas.clone()).collect(),
@@ -710,7 +729,8 @@ pub fn scan_outbound(config: &FtnConfig, areas: &AreaMap, now: &NaiveDateTime) -
     let mut state = ScanState::load(config)?;
     let mut waiting: Vec<Vec<PackedMessage>> = vec![Vec::new(); config.links.len()];
 
-    for (tag, path) in areas {
+    for area in areas {
+        let (tag, path) = (&area.tag, &area.path);
         if tag.is_empty() {
             continue;
         }
@@ -738,6 +758,11 @@ pub fn scan_outbound(config: &FtnConfig, areas: &AreaMap, now: &NaiveDateTime) -
         // carries it, because one message can only have one origin.
         let Some(aka) = config.aka_for(&config.links[subscribers[0]]).cloned() else {
             continue;
+        };
+        let origin = if area.origin.is_empty() {
+            config.origin.as_str()
+        } else {
+            area.origin.as_str()
         };
 
         for number in (last + 1)..=high {
@@ -779,7 +804,7 @@ pub fn scan_outbound(config: &FtnConfig, areas: &AreaMap, now: &NaiveDateTime) -
                     &msgid,
                     subfield(&header, SubfieldType::ReplyID).as_deref(),
                     &text.to_string(),
-                    config,
+                    origin,
                     &aka,
                     &subscribers.iter().map(|index| config.links[*index].address).collect::<Vec<_>>(),
                 ),
@@ -869,7 +894,7 @@ fn subfield(header: &jamjam::jam::msg_header::JamMessageHeader, kind: SubfieldTy
 
 /// Builds what the other side gets to see: the area, the kludges that say where
 /// the message came from, the message itself, and the trail it has travelled.
-fn exported_text(tag: &str, msgid: &str, reply: Option<&str>, body: &str, config: &FtnConfig, aka: &FtnAka, links: &[EchomailAddress]) -> String {
+fn exported_text(tag: &str, msgid: &str, reply: Option<&str>, body: &str, origin: &str, aka: &FtnAka, links: &[EchomailAddress]) -> String {
     let mut text = format!("AREA:{}\r\x01MSGID: {}\r", tag.to_uppercase(), msgid);
     if let Some(reply) = reply {
         let _ = write!(text, "\x01REPLY: {reply}\r");
@@ -880,7 +905,7 @@ fn exported_text(tag: &str, msgid: &str, reply: Option<&str>, body: &str, config
         text.push('\r');
     }
     if !body.contains(" * Origin:") {
-        let _ = write!(text, "\r--- {}\r * Origin: {} ({})\r", product(), config.origin, aka.address);
+        let _ = write!(text, "\r--- {}\r * Origin: {} ({})\r", product(), origin, aka.address);
     }
 
     let mut seen: Vec<(u16, u16)> = links.iter().map(|link| (link.net, link.node)).collect();
@@ -1032,14 +1057,14 @@ mod tests {
     fn test_a_message_from_a_packet_lands_in_the_area_that_carries_its_tag() {
         let directory = tempfile::tempdir().unwrap();
         let config = config(directory.path());
-        let areas = vec![("FSX_GEN".to_string(), directory.path().join("bases/general"))];
+        let areas = vec![EchoArea::new("FSX_GEN", directory.path().join("bases/general"))];
         drop_packet(&config, vec![message("FSX_GEN", "\x01MSGID: 21:1/2 11223344\rBody\r")]);
 
         let report = toss(&config, &areas);
 
         assert_eq!(report.imported, 1);
         assert!(report.failed.is_empty());
-        let base = JamMessageBase::open(&areas[0].1).unwrap();
+        let base = JamMessageBase::open(&areas[0].path).unwrap();
         let header = base.read_header(1).unwrap();
         assert_eq!(base.read_message_text(&header).unwrap().to_string(), "Body");
         assert_eq!(header.from().unwrap().to_string(), "Someone");
@@ -1053,20 +1078,20 @@ mod tests {
         let mut config = config(directory.path());
         config.options.enabled = false;
         drop_packet(&config, vec![message("FSX_GEN", "Body\r")]);
-        let areas = vec![("FSX_GEN".to_string(), directory.path().join("general"))];
+        let areas = vec![EchoArea::new("FSX_GEN", directory.path().join("general"))];
 
         let report = toss(&config, &areas);
 
         assert_eq!(report.imported, 0);
         assert!(fs::read_dir(&config.inbound).unwrap().next().is_some());
-        assert!(!areas[0].1.with_extension("jhr").exists());
+        assert!(!areas[0].path.with_extension("jhr").exists());
     }
 
     #[test]
     fn test_the_same_message_id_is_only_imported_once() {
         let directory = tempfile::tempdir().unwrap();
         let config = config(directory.path());
-        let areas = vec![("FSX_GEN".to_string(), directory.path().join("bases/general"))];
+        let areas = vec![EchoArea::new("FSX_GEN", directory.path().join("bases/general"))];
         let twice = message("FSX_GEN", "\x01MSGID: 21:1/2 11223344\rBody\r");
         drop_packet(&config, vec![twice.clone(), twice]);
 
@@ -1081,7 +1106,7 @@ mod tests {
         let directory = tempfile::tempdir().unwrap();
         let mut config = config(directory.path());
         config.options.check_dupe_msg_id = false;
-        let areas = vec![("FSX_GEN".to_string(), directory.path().join("bases/general"))];
+        let areas = vec![EchoArea::new("FSX_GEN", directory.path().join("bases/general"))];
         let twice = message("FSX_GEN", "\x01MSGID: 21:1/2 11223344\rBody\r");
         drop_packet(&config, vec![twice.clone(), twice]);
 
@@ -1096,7 +1121,7 @@ mod tests {
         let directory = tempfile::tempdir().unwrap();
         let mut config = config(directory.path());
         config.options.check_dupe_path = true;
-        let areas = vec![("FSX_GEN".to_string(), directory.path().join("bases/general"))];
+        let areas = vec![EchoArea::new("FSX_GEN", directory.path().join("bases/general"))];
         drop_packet(&config, vec![message("FSX_GEN", "Body\r\x01PATH: 1/2 100\r")]);
 
         let report = toss(&config, &areas);
@@ -1109,7 +1134,7 @@ mod tests {
     fn test_a_packet_for_another_system_is_left_alone_unless_orphans_are_wanted() {
         let directory = tempfile::tempdir().unwrap();
         let config = config(directory.path());
-        let areas = vec![("FSX_GEN".to_string(), directory.path().join("bases/general"))];
+        let areas = vec![EchoArea::new("FSX_GEN", directory.path().join("bases/general"))];
         let mut packet = Packet::new(PacketHeader::new(address("21:1/1"), address("21:1/200"), when(), ""));
         packet.messages = vec![message("FSX_GEN", "Body\r")];
         fs::create_dir_all(&config.inbound).unwrap();
@@ -1348,7 +1373,7 @@ mod tests {
         request.subject = "secret".to_string();
         request.text = "+FSX_GEN\r%LIST\r".to_string();
         drop_packet(&config, vec![request]);
-        let areas = vec![("FSX_GEN".to_string(), directory.path().join("general"))];
+        let areas = vec![EchoArea::new("FSX_GEN", directory.path().join("general"))];
 
         let report = toss(&config, &areas);
 
@@ -1375,7 +1400,7 @@ mod tests {
         request.text = "+FSX_GEN\r".to_string();
         drop_packet(&config, vec![request]);
 
-        let report = toss(&config, &[("FSX_GEN".to_string(), directory.path().join("general"))]);
+        let report = toss(&config, &[EchoArea::new("FSX_GEN", directory.path().join("general"))]);
 
         assert_eq!(report.area_fix, 1);
         assert!(report.link_updates.is_empty());
@@ -1411,7 +1436,7 @@ mod tests {
         request.text = "%+ALL\r".to_string();
         drop_packet(&config, vec![request]);
 
-        let report = toss(&config, &[("FSX_GEN".to_string(), directory.path().join("general"))]);
+        let report = toss(&config, &[EchoArea::new("FSX_GEN", directory.path().join("general"))]);
 
         assert_eq!(report.link_updates.get(&0), Some(&vec!["FSX_GEN".to_string(), "PASSTHRU_ONLY".to_string()]));
     }
@@ -1427,7 +1452,7 @@ mod tests {
         request.text = "%LIST\r".to_string();
         drop_packet(&config, vec![request]);
 
-        let report = toss(&config, &[("FSX_GEN".to_string(), directory.path().join("general"))]);
+        let report = toss(&config, &[EchoArea::new("FSX_GEN", directory.path().join("general"))]);
 
         assert_eq!(report.area_fix, 1);
         assert!(report.link_updates.is_empty());
@@ -1470,7 +1495,7 @@ mod tests {
         let directory = tempfile::tempdir().unwrap();
         let config = config(directory.path());
         let echo_path = directory.path().join("general");
-        let areas = vec![("FSX_GEN".to_string(), echo_path.clone())];
+        let areas = vec![EchoArea::new("FSX_GEN", echo_path.clone())];
         let mut echo = message("FSX_GEN", "Body\r");
         echo.to = "Sysop".to_string();
         let mut netmail = message("FSX_GEN", "");
@@ -1559,7 +1584,7 @@ mod tests {
         let mut base = open_base(&path).unwrap();
         base.write_message(&JamMessage::default().with_text(BString::from("old"))).unwrap();
         base.write_jhr_header().unwrap();
-        let areas = vec![("FSX_GEN".to_string(), path.clone())];
+        let areas = vec![EchoArea::new("FSX_GEN", path.clone())];
 
         let report = scan_outbound(&config, &areas, &when()).unwrap();
         assert_eq!(report.exported, 0);
@@ -1576,7 +1601,7 @@ mod tests {
         let mut config = config(directory.path());
         config.options.enabled = false;
         let path = directory.path().join("bases/general");
-        let areas = vec![("FSX_GEN".to_string(), path.clone())];
+        let areas = vec![EchoArea::new("FSX_GEN", path.clone())];
         let mut base = open_base(&path).unwrap();
         base.write_message(&JamMessage::default().with_text(BString::from("first"))).unwrap();
         base.write_jhr_header().unwrap();
@@ -1596,7 +1621,7 @@ mod tests {
         let mut base = open_base(&path).unwrap();
         base.write_message(&JamMessage::default().with_text(BString::from("first"))).unwrap();
         base.write_jhr_header().unwrap();
-        let areas = vec![("FSX_GEN".to_string(), path.clone())];
+        let areas = vec![EchoArea::new("FSX_GEN", path.clone())];
         scan_outbound(&config, &areas, &when()).unwrap();
 
         base.write_message(
@@ -1626,6 +1651,28 @@ mod tests {
     }
 
     #[test]
+    fn test_an_areas_own_origin_takes_the_place_of_the_board_wide_one() {
+        let directory = tempfile::tempdir().unwrap();
+        let config = config(directory.path());
+        let path = directory.path().join("bases/general");
+        let mut base = open_base(&path).unwrap();
+        base.write_message(&JamMessage::default().with_text(BString::from("first"))).unwrap();
+        base.write_jhr_header().unwrap();
+        let mut areas = vec![EchoArea::new("FSX_GEN", path.clone())];
+        areas[0].origin = "Just this area".to_string();
+        scan_outbound(&config, &areas, &when()).unwrap();
+
+        base.write_message(&JamMessage::default().with_text(BString::from("Body"))).unwrap();
+        base.write_jhr_header().unwrap();
+        let report = scan_outbound(&config, &areas, &when()).unwrap();
+
+        let unpacked = tempfile::tempdir().unwrap();
+        let packets = bundle::unpack(&report.bundles[0], unpacked.path()).unwrap();
+        let text = &Packet::load(&packets[0]).unwrap().messages[0].text;
+        assert!(text.contains(" * Origin: Just this area (21:1/100)\r"), "{text:?}");
+    }
+
+    #[test]
     fn test_outbound_echomail_can_be_routed_through_a_next_hop() {
         let directory = tempfile::tempdir().unwrap();
         let mut config = config(directory.path());
@@ -1643,7 +1690,7 @@ mod tests {
             via: address("21:1/1"),
         });
         let path = directory.path().join("bases/general");
-        let areas = vec![("FSX_GEN".to_string(), path.clone())];
+        let areas = vec![EchoArea::new("FSX_GEN", path.clone())];
         let mut base = open_base(&path).unwrap();
         base.write_message(&JamMessage::default().with_text(BString::from("first"))).unwrap();
         base.write_jhr_header().unwrap();
@@ -1665,7 +1712,7 @@ mod tests {
         let directory = tempfile::tempdir().unwrap();
         let config = config(directory.path());
         let path = directory.path().join("bases/general");
-        let areas = vec![("FSX_GEN".to_string(), path.clone())];
+        let areas = vec![EchoArea::new("FSX_GEN", path.clone())];
         {
             let mut base = open_base(&path).unwrap();
             base.write_message(&JamMessage::default().with_text(BString::from("first"))).unwrap();

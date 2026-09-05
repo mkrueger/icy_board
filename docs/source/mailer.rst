@@ -202,8 +202,9 @@ Tying message areas to echos
 ----------------------------
 
 An echo has a *tag*, an upper-case name like ``FSX_GEN`` that every system in
-the network uses for it. Set ``ftn_area_tag`` on the message area that should
-carry it, in the ``area.toml`` of the conference:
+the network uses for it. Set ``Fido Area Tag`` on the message area that should
+carry it, in the area editor of its conference, which writes ``ftn_area_tag``
+into the ``area.toml``:
 
 .. code-block:: toml
 
@@ -220,6 +221,31 @@ of it, and nothing arrives in it.
 Mail for a tag no board area claims is counted and reported by the tosser but
 not stored, so a mistyped tag shows up as an unknown area rather than
 disappearing.
+
+
+The origin line
+---------------
+
+Every echomail message leaving this board carries an origin line naming the
+board and the address it can be reached at. The board-wide text is the
+``Origin`` under ``Message Networking > Fido Configuration``, written as
+``origin`` in ``ftn.toml``.
+
+An area can say something else by naming its own ``Fido Origin`` in the area
+editor, which is written as ``ftn_origin``:
+
+.. code-block:: toml
+
+   [[area]]
+   name = "German Chatter"
+   path = "german"
+   ftn_area_tag = "FSX_GER"
+   ftn_origin = "Icy Board, now in German (fsxnet.example)"
+
+PCBoard kept these in ``ORIGINS.DAT``, where one origin named a range of
+conferences such as ``1-200 203 250-100``. On import each of those conferences
+hands its origin to all of its areas, so the same messages leave the board with
+the same origin they did before.
 
 
 Running the mailer
