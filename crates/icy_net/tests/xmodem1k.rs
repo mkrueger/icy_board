@@ -179,3 +179,30 @@ async fn test_recv_xmodem1k_exact_block() {
     assert_eq!(loaded_data.len(), 1024);
     assert_eq!(loaded_data, orig_data);
 }
+
+#[tokio::test]
+async fn xmodem_1k_g_falls_back_to_ack_mode_when_receiver_sends_c() {
+    let (mut sender_conn, mut receiver_conn) = TestConnection::create_pair();
+    let mut file = NamedTempFile::new().unwrap();
+    file.write_all(b"fallback").unwrap();
+
+    let receiver = tokio::spawn(async move {
+        receiver_conn.send(b"C").await.unwrap();
+        let mut block = vec![0u8; 133];
+        receiver_conn.read_exact(&mut block).await.unwrap();
+
+        tokio::task::yield_now().await;
+        let mut pending = [0u8; 1];
+        assert_eq!(receiver_conn.try_read(&mut pending).await.unwrap(), 0, "C requests ACK-based transmission");
+
+        receiver_conn.send(&[ACK]).await.unwrap();
+        receiver_conn.read_exact(&mut pending).await.unwrap();
+        assert_eq!(pending[0], EOT);
+        receiver_conn.send(&[ACK]).await.unwrap();
+    });
+
+    let mut protocol = XYmodem::new(XYModemVariant::XModem1kG);
+    let state = test_sender(&mut sender_conn, &mut protocol, &[file.path().to_path_buf()]).await;
+    receiver.await.unwrap();
+    assert_eq!(state.send_state.finished_files.len(), 1);
+}

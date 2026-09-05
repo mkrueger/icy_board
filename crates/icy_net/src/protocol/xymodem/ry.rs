@@ -1,10 +1,9 @@
-use std::io::Write;
-use std::time::Duration;
+use std::{io::Write, path::PathBuf, time::Duration};
 
 use tempfile::NamedTempFile;
 use tokio::time::timeout;
 
-use super::{Checksum, XYModemConfiguration, constants::DEFAULT_BLOCK_LENGTH, err::XYModemError, get_checksum, remove_cpm_eof};
+use super::{Checksum, XYModemConfiguration, constants::DEFAULT_BLOCK_LENGTH, err::XYModemError, get_checksum, remove_cpm_eof, truncate_to_file_size};
 use crate::{
     Connection,
     crc::get_crc16,
@@ -19,6 +18,9 @@ const READ_TIMEOUT: Duration = Duration::from_secs(3);
 
 /// Maximum number of retries before giving up
 const MAX_RETRIES: usize = 5;
+
+/// Section 7.2 gives up on a block after ten unsuccessful attempts.
+const MAX_ERRORS: usize = 10;
 
 #[derive(Debug)]
 pub enum RecvState {
@@ -36,7 +38,9 @@ pub struct Ry {
     errors: usize,
     recv_state: RecvState,
     cur_out_file: Option<NamedTempFile>,
+    pending_finished_file: Option<PathBuf>,
     last_block_len: usize,
+    expected_block_num: u8,
 }
 
 impl Ry {
@@ -46,7 +50,9 @@ impl Ry {
             recv_state: RecvState::None,
             errors: 0,
             last_block_len: 0,
+            expected_block_num: 1,
             cur_out_file: None,
+            pending_finished_file: None,
         }
     }
 
@@ -108,16 +114,18 @@ impl Ry {
                 if start == SOH {
                     transfer_state.recieve_state.log_info("Received SOH - 128 byte blocks");
                     if self.configuration.is_ymodem() {
-                        self.recv_state = RecvState::ReadYModemHeader(0);
+                        self.recv_state = RecvState::ReadYModemHeader(retries);
                     } else {
                         self.cur_out_file = Some(NamedTempFile::new()?);
                         transfer_state.recieve_state.file_name = String::new();
+                        self.expected_block_num = 1;
                         self.recv_state = RecvState::ReadBlock(DEFAULT_BLOCK_LENGTH, 0);
                     }
                 } else if start == STX {
                     transfer_state.recieve_state.log_info("Received STX - 1024 byte blocks");
                     self.cur_out_file = Some(NamedTempFile::new()?);
                     transfer_state.recieve_state.file_name = String::new();
+                    self.expected_block_num = 1;
                     self.recv_state = RecvState::ReadBlock(EXT_BLOCK_LENGTH, 0);
                 } else {
                     transfer_state
@@ -150,24 +158,51 @@ impl Ry {
 
                 let chksum_size = if let Checksum::CRC16 = self.configuration.checksum_mode { 2 } else { 1 };
                 let mut block = vec![0; 2 + len + chksum_size];
-                com.read_exact(&mut block).await?;
+                match timeout(READ_TIMEOUT, com.read_exact(&mut block)).await {
+                    Ok(result) => result?,
+                    Err(_) => {
+                        self.cancel(com).await?;
+                        return Err(XYModemError::Timeout.into());
+                    }
+                }
 
                 if block[0] != block[1] ^ 0xFF {
                     transfer_state
                         .recieve_state
                         .log_error(format!("Block number check failed: {:02X} != {:02X}^FF", block[0], block[1]));
-                    com.send(&[NAK]).await?;
                     self.errors += 1;
-                    self.recv_state = RecvState::StartReceive(0);
+                    if self.configuration.is_streaming() {
+                        self.cancel(com).await?;
+                        return Err(XYModemError::TooManyRetriesSendingHeader.into());
+                    }
+                    com.send(&[NAK]).await?;
+                    self.recv_state = RecvState::StartReceive(retries + 1);
                     return Ok(());
+                }
+
+                if block[0] != 0 {
+                    transfer_state
+                        .recieve_state
+                        .log_error(format!("YModem file header used block number {} instead of 0", block[0]));
+                    self.cancel(com).await?;
+                    return Err(XYModemError::OutOfSyncBlock(0, block[0]).into());
                 }
 
                 let block = &block[2..];
                 if !self.check_crc(block) {
                     transfer_state.recieve_state.log_error("YModem header CRC/checksum verification failed");
                     self.errors += 1;
+                    if self.configuration.is_streaming() {
+                        self.cancel(com).await?;
+                        return Err(XYModemError::TooManyRetriesSendingHeader.into());
+                    }
+                    if retries >= MAX_ERRORS {
+                        self.cancel(com).await?;
+                        return Err(XYModemError::TooManyRetriesSendingHeader.into());
+                    }
                     com.send(&[NAK]).await?;
-                    self.recv_state = RecvState::ReadYModemHeader(retries + 1);
+                    // The retransmission starts with a fresh SOH byte.
+                    self.recv_state = RecvState::StartReceive(retries + 1);
                     return Ok(());
                 }
 
@@ -179,11 +214,12 @@ impl Ry {
                 }
 
                 let file_name = str_from_null_terminated_utf8_unchecked(block);
-                let num = str_from_null_terminated_utf8_unchecked(&block[(file_name.len() + 1)..]).to_string();
-                let file_size = if let Ok(file_size) = num.parse::<u64>() {
+                let metadata = str_from_null_terminated_utf8_unchecked(&block[(file_name.len() + 1)..]);
+                let size = metadata.split_ascii_whitespace().next().unwrap_or_default();
+                let file_size = if let Ok(file_size) = size.parse::<u64>() {
                     file_size
                 } else {
-                    transfer_state.recieve_state.log_warning(format!("Could not parse file size: '{}'", num));
+                    transfer_state.recieve_state.log_warning(format!("Could not parse file size: '{}'", size));
                     0
                 };
 
@@ -193,10 +229,17 @@ impl Ry {
                 transfer_state.recieve_state.file_name = file_name;
                 transfer_state.recieve_state.file_size = file_size;
                 self.cur_out_file = Some(NamedTempFile::new()?);
+                self.expected_block_num = 1;
 
                 if self.configuration.is_ymodem() {
-                    transfer_state.recieve_state.log_info("Sending ACK+C for YModem data blocks");
-                    com.send(&[ACK, b'C']).await?;
+                    let start_byte = self.start_byte();
+                    if self.configuration.is_streaming() {
+                        transfer_state.recieve_state.log_info("Sending G for YModem-G data blocks");
+                        com.send(&[start_byte]).await?;
+                    } else {
+                        transfer_state.recieve_state.log_info("Sending ACK+C for YModem data blocks");
+                        com.send(&[ACK, start_byte]).await?;
+                    }
                 } else {
                     com.send(&[ACK]).await?;
                 }
@@ -235,7 +278,17 @@ impl Ry {
 
                         if let Some(named_file) = self.cur_out_file.take() {
                             let path = &named_file.keep()?.1;
-                            remove_cpm_eof(path, self.last_block_len)?;
+                            // A stated length tells the block padding from data that ends in 0x1A.
+                            if transfer_state.recieve_state.file_size > 0 {
+                                let received = path.metadata()?.len();
+                                if received < transfer_state.recieve_state.file_size {
+                                    self.cancel(com).await?;
+                                    return Err(XYModemError::IncompleteFile(transfer_state.recieve_state.file_size, received).into());
+                                }
+                                truncate_to_file_size(path, transfer_state.recieve_state.file_size)?;
+                            } else {
+                                remove_cpm_eof(path, self.last_block_len)?;
+                            }
 
                             let file_info = if !transfer_state.recieve_state.file_name.is_empty() {
                                 format!(
@@ -246,19 +299,25 @@ impl Ry {
                                 format!("{} bytes", transfer_state.recieve_state.cur_bytes_transfered)
                             };
                             transfer_state.recieve_state.log_info(format!("File transfer complete: {}", file_info));
-                            transfer_state.recieve_state.finish_file(path.clone());
+                            self.pending_finished_file = Some(path.clone());
                         } else {
                             transfer_state.recieve_state.log_error("No file open when EOT received");
                             return Err(XYModemError::NoFileOpen.into());
                         }
 
-                        if self.configuration.is_ymodem() {
+                        if self.configuration.is_streaming() {
+                            transfer_state.recieve_state.log_info("Acknowledging YModem-G EOT and requesting the next file");
+                            com.send(&[ACK, b'G']).await?;
+                            self.finish_received_file(transfer_state);
+                            self.recv_state = RecvState::StartReceive(0);
+                        } else if self.configuration.is_ymodem() {
                             transfer_state.recieve_state.log_info("Sending NAK for YModem EOT confirmation");
                             com.send(&[NAK]).await?;
                             self.recv_state = RecvState::ReadBlockStart(1, 0);
                         } else {
                             transfer_state.recieve_state.log_info("XModem transfer complete");
                             com.send(&[ACK]).await?;
+                            self.finish_received_file(transfer_state);
                             self.recv_state = RecvState::None;
                             transfer_state.is_finished = true;
                         }
@@ -285,9 +344,13 @@ impl Ry {
                         Err(_) => {
                             transfer_state
                                 .recieve_state
-                                .log_warning("Timeout waiting for second EOT, assuming transfer complete");
-                            self.recv_state = RecvState::None;
-                            transfer_state.is_finished = true;
+                                .log_warning(format!("Timeout waiting for second EOT (retry {})", retries + 1));
+                            if retries >= MAX_RETRIES {
+                                self.cancel(com).await?;
+                                return Err(XYModemError::Timeout.into());
+                            }
+                            com.send(&[NAK]).await?;
+                            self.recv_state = RecvState::ReadBlockStart(1, retries + 1);
                             return Ok(());
                         }
                     };
@@ -295,14 +358,15 @@ impl Ry {
                         transfer_state
                             .recieve_state
                             .log_warning(format!("Expected second EOT but received: 0x{:02X}", eot));
-                        self.recv_state = RecvState::None;
-                        return Ok(());
+                        self.cancel(com).await?;
+                        return Err(XYModemError::InvalidResponse(eot).into());
                     }
                     transfer_state.recieve_state.log_info("Second EOT confirmed");
 
                     if self.configuration.is_ymodem() {
                         transfer_state.recieve_state.log_info("Ready for next file in batch");
-                        com.send(&[ACK, b'C']).await?;
+                        com.send(&[ACK, self.start_byte()]).await?;
+                        self.finish_received_file(transfer_state);
                     } else {
                         com.send(&[ACK]).await?;
                     }
@@ -320,7 +384,13 @@ impl Ry {
 
                 let chksum_size = if let Checksum::CRC16 = self.configuration.checksum_mode { 2 } else { 1 };
                 let mut block = vec![0; 2 + len + chksum_size];
-                com.read_exact(&mut block).await?;
+                match timeout(READ_TIMEOUT, com.read_exact(&mut block)).await {
+                    Ok(result) => result?,
+                    Err(_) => {
+                        self.cancel(com).await?;
+                        return Err(XYModemError::Timeout.into());
+                    }
+                }
 
                 let block_num = block[0];
                 let block_num_inv = block[1];
@@ -330,8 +400,13 @@ impl Ry {
                         "Block number verification failed: {:02X} != {:02X}^FF (block {})",
                         block_num, block_num_inv, block_num
                     ));
-                    com.send(&[NAK]).await?;
                     self.errors += 1;
+
+                    if self.configuration.is_streaming() {
+                        self.cancel(com).await?;
+                        return Err(XYModemError::OutOfSyncBlock(block_num, block_num_inv ^ 0xFF).into());
+                    }
+                    com.send(&[NAK]).await?;
 
                     let start = match timeout(READ_TIMEOUT, com.read_u8()).await {
                         Ok(Ok(byte)) => byte,
@@ -362,9 +437,39 @@ impl Ry {
                         self.errors + 1
                     ));
                     self.errors += 1;
+                    if self.configuration.is_streaming() {
+                        transfer_state.recieve_state.log_error("Streaming transfer cannot retransmit, aborting");
+                        self.cancel(com).await?;
+                        return Err(XYModemError::TooManyRetriesReadingBlock.into());
+                    }
+                    if self.errors > MAX_ERRORS {
+                        transfer_state.recieve_state.log_error("Too many block errors, aborting");
+                        self.cancel(com).await?;
+                        return Err(XYModemError::TooManyRetriesReadingBlock.into());
+                    }
                     com.send(&[NAK]).await?;
                     self.recv_state = RecvState::ReadBlockStart(0, retries + 1);
                     return Ok(());
+                }
+
+                // Section 7.3.2: the block is the expected one, a repeat of the one before it,
+                // or the transfer has lost synchronisation for good.
+                if block_num == self.expected_block_num.wrapping_sub(1) {
+                    transfer_state
+                        .recieve_state
+                        .log_warning(format!("Block {} arrived twice, the acknowledgement for it was lost", block_num));
+                    if !self.configuration.is_streaming() {
+                        com.send(&[ACK]).await?;
+                    }
+                    self.recv_state = RecvState::ReadBlockStart(0, 0);
+                    return Ok(());
+                }
+                if block_num != self.expected_block_num {
+                    transfer_state
+                        .recieve_state
+                        .log_error(format!("Expected block {} but received {}, aborting", self.expected_block_num, block_num));
+                    self.cancel(com).await?;
+                    return Err(XYModemError::OutOfSyncBlock(self.expected_block_num, block_num).into());
                 }
 
                 self.last_block_len = len;
@@ -376,6 +481,7 @@ impl Ry {
                     transfer_state.recieve_state.log_error("No file open for writing block data");
                     return Err(XYModemError::NoFileOpen.into());
                 }
+                self.expected_block_num = self.expected_block_num.wrapping_add(1);
 
                 if !self.configuration.is_streaming() {
                     com.send(&[ACK]).await?;
@@ -389,6 +495,12 @@ impl Ry {
     pub async fn cancel(&mut self, com: &mut dyn Connection) -> crate::Result<()> {
         self.recv_state = RecvState::None;
         super::cancel_xymodem_transfer(com).await
+    }
+
+    fn finish_received_file(&mut self, transfer_state: &mut TransferState) {
+        if let Some(path) = self.pending_finished_file.take() {
+            transfer_state.recieve_state.finish_file(path);
+        }
     }
 
     pub async fn recv(&mut self, com: &mut dyn Connection) -> crate::Result<()> {
@@ -406,6 +518,11 @@ impl Ry {
             com.send(&[NAK]).await?;
         }
         Ok(1)
+    }
+
+    /// What the receiver asks the next file with; section 6 wants a G for a streaming batch.
+    fn start_byte(&self) -> u8 {
+        if self.configuration.is_streaming() { b'G' } else { b'C' }
     }
 
     fn check_crc(&self, block: &[u8]) -> bool {

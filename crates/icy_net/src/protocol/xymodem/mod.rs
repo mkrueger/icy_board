@@ -181,6 +181,17 @@ impl XYModemConfiguration {
     }
 }
 
+/// YMODEM's block 0 states the exact length, which tells the block padding from real data.
+pub fn truncate_to_file_size<P: AsRef<Path>>(file_name: P, file_size: u64) -> crate::Result<u64> {
+    let f = OpenOptions::new().write(true).open(&file_name)?;
+    let len = f.metadata()?.len();
+    if len <= file_size {
+        return Ok(len);
+    }
+    f.set_len(file_size)?;
+    Ok(file_size)
+}
+
 pub fn remove_cpm_eof<P: AsRef<Path>>(file_name: P, max_len: usize) -> crate::Result<u64> {
     let mut buf = vec![0; max_len];
 

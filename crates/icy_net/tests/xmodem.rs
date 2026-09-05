@@ -2,7 +2,7 @@ use std::{fs, io::Write, path::PathBuf};
 
 use icy_net::{
     Connection,
-    protocol::{XYModemVariant, XYmodem},
+    protocol::{Protocol, XYModemVariant, XYmodem},
 };
 use pretty_assertions::assert_eq;
 use tempfile::NamedTempFile;
@@ -398,4 +398,109 @@ async fn test_read_u8_with_delayed_data() {
 
     assert!(result.is_ok(), "read_u8 should complete when data arrives");
     assert_eq!(result.unwrap().unwrap(), 0x42);
+}
+
+const CAN: u8 = 0x18;
+
+fn checksum_block(block_num: u8, payload: &[u8]) -> Vec<u8> {
+    let mut data = payload.to_vec();
+    data.resize(128, 0x1A);
+    let mut packet = vec![SOH, block_num, !block_num];
+    packet.extend_from_slice(&data);
+    packet.push(data.iter().fold(0u8, |acc, b| acc.wrapping_add(*b)));
+    packet
+}
+
+/// Section 7.3.2: a repeat of the previous block only means our ACK was lost.
+#[tokio::test]
+async fn a_repeated_block_is_acknowledged_but_stored_only_once() {
+    let (mut sender_conn, mut receiver_conn) = TestConnection::create_pair();
+    let payload = vec![7u8; 8];
+    let block = checksum_block(1, &payload);
+
+    tokio::spawn(async move {
+        let mut buf = [0u8; 1];
+        sender_conn.read(&mut buf).await.unwrap();
+
+        sender_conn.send(&block).await.unwrap();
+        sender_conn.read(&mut buf).await.unwrap();
+        assert_eq!(buf[0], ACK);
+
+        // The sender never saw that ACK, so it sends the very same block again.
+        sender_conn.send(&block).await.unwrap();
+        sender_conn.read(&mut buf).await.unwrap();
+        assert_eq!(buf[0], ACK, "a repeated block still has to be acknowledged");
+
+        sender_conn.send(&[EOT]).await.unwrap();
+        sender_conn.read(&mut buf).await.unwrap();
+    });
+
+    let mut protocol = XYmodem::new(XYModemVariant::XModem);
+    let state = test_receiver(&mut receiver_conn, &mut protocol).await;
+
+    let received = fs::read(&state.recieve_state.finished_files[0].1).unwrap();
+    assert_eq!(received, payload, "the repeated block must not be stored a second time");
+}
+
+/// Section 7.3.2: any other block number is a fatal loss of synchronisation.
+#[tokio::test]
+async fn a_block_out_of_sequence_cancels_the_transfer() {
+    let (mut sender_conn, mut receiver_conn) = TestConnection::create_pair();
+
+    let cancelled = tokio::spawn(async move {
+        let mut buf = [0u8; 1];
+        sender_conn.read(&mut buf).await.unwrap();
+
+        sender_conn.send(&checksum_block(1, &[1, 2, 3])).await.unwrap();
+        sender_conn.read(&mut buf).await.unwrap();
+        assert_eq!(buf[0], ACK);
+
+        // Block 2 was lost on the way, so block 3 arrives out of sequence.
+        sender_conn.send(&checksum_block(3, &[4, 5, 6])).await.unwrap();
+        sender_conn.read(&mut buf).await.unwrap();
+        buf[0]
+    });
+
+    let mut protocol = XYmodem::new(XYModemVariant::XModem);
+    let mut state = Protocol::initiate_recv(&mut protocol, &mut receiver_conn).await.unwrap();
+    let mut result = Ok(());
+    while !state.is_finished && result.is_ok() {
+        result = Protocol::update_transfer(&mut protocol, &mut receiver_conn, &mut state).await;
+    }
+
+    assert!(result.is_err(), "a gap in the block numbers has to end the transfer");
+    assert_eq!(cancelled.await.unwrap(), CAN, "the receiver announces the abort with CAN");
+}
+
+#[tokio::test]
+async fn a_nak_retransmits_the_identical_data_block() {
+    let (mut sender_conn, mut receiver_conn) = TestConnection::create_pair();
+    let data = b"the same block must come back".to_vec();
+
+    let receiver = tokio::spawn(async move {
+        receiver_conn.send(b"C").await.unwrap();
+
+        let mut first = vec![0u8; 133];
+        receiver_conn.read_exact(&mut first).await.unwrap();
+        receiver_conn.send(&[NAK]).await.unwrap();
+
+        let mut repeated = vec![0u8; 133];
+        receiver_conn.read_exact(&mut repeated).await.unwrap();
+        assert_eq!(repeated, first, "a NAK must repeat the block byte for byte");
+        receiver_conn.send(&[ACK]).await.unwrap();
+
+        let mut eot = [0u8; 1];
+        receiver_conn.read_exact(&mut eot).await.unwrap();
+        assert_eq!(eot[0], EOT);
+        receiver_conn.send(&[ACK]).await.unwrap();
+    });
+
+    let mut file = NamedTempFile::new().unwrap();
+    file.write_all(&data).unwrap();
+    let mut protocol = XYmodem::new(XYModemVariant::XModemCRC);
+    let state = test_sender(&mut sender_conn, &mut protocol, &[file.path().to_path_buf()]).await;
+
+    receiver.await.unwrap();
+    assert_eq!(state.send_state.total_bytes_transfered, data.len() as u64);
+    assert_eq!(state.send_state.finished_files.len(), 1);
 }

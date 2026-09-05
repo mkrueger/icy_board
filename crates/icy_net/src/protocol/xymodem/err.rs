@@ -20,8 +20,17 @@ pub enum XYModemError {
     #[error("too many retries reading block")]
     TooManyRetriesReadingBlock,
 
+    #[error("expected block {0} but got {1}")]
+    OutOfSyncBlock(u8, u8),
+
+    #[error("file is incomplete: expected {0} bytes but received {1}")]
+    IncompleteFile(u64, u64),
+
     #[error("no file open")]
     NoFileOpen,
+
+    #[error("no block available for retransmission")]
+    NoPendingBlock,
 
     #[error("invalid response received: {0}")]
     InvalidResponse(u8),

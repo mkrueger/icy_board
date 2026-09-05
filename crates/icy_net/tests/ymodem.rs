@@ -2,7 +2,7 @@ use std::{fs, io::Write, path::PathBuf};
 
 use icy_net::{
     Connection,
-    protocol::{XYModemVariant, XYmodem},
+    protocol::{Protocol, XYModemVariant, XYmodem},
 };
 use pretty_assertions::assert_eq;
 use tempfile::NamedTempFile;
@@ -14,6 +14,7 @@ const SOH: u8 = 0x01;
 const EOT: u8 = 0x04;
 const ACK: u8 = 0x06;
 const NAK: u8 = 0x15;
+const CAN: u8 = 0x18;
 
 // CRC16 calculation helper (XMODEM CRC-16)
 fn crc16(data: &[u8]) -> u16 {
@@ -94,6 +95,9 @@ async fn test_send_ymodem() {
         receiver_conn.read(&mut eot_buf).await.unwrap();
         assert_eq!(eot_buf[0], EOT);
         received.push(EOT);
+        receiver_conn.send(&[NAK]).await.unwrap();
+        receiver_conn.read(&mut eot_buf).await.unwrap();
+        assert_eq!(eot_buf[0], EOT);
         receiver_conn.send(&[ACK]).await.unwrap();
 
         // Send 'C' for end of batch
@@ -247,6 +251,8 @@ async fn test_ymodem_multiple_files() {
         // First file EOT
         let mut eot_buf = [0u8; 1];
         receiver_conn.read(&mut eot_buf).await.unwrap();
+        receiver_conn.send(&[NAK]).await.unwrap();
+        receiver_conn.read(&mut eot_buf).await.unwrap();
         receiver_conn.send(&[ACK]).await.unwrap();
 
         // Second file header
@@ -260,6 +266,8 @@ async fn test_ymodem_multiple_files() {
         receiver_conn.send(&[ACK]).await.unwrap();
 
         // Second file EOT
+        receiver_conn.read(&mut eot_buf).await.unwrap();
+        receiver_conn.send(&[NAK]).await.unwrap();
         receiver_conn.read(&mut eot_buf).await.unwrap();
         receiver_conn.send(&[ACK]).await.unwrap();
 
@@ -299,13 +307,15 @@ async fn test_ymodem_large_file() {
         // Request data transfer
         receiver_conn.send(b"C").await.unwrap();
 
-        // 3 data blocks (300 bytes = 3 * 128 byte blocks)
-        for _ in 0..3 {
-            receiver_conn.read(&mut buf).await.unwrap();
-            receiver_conn.send(&[ACK]).await.unwrap();
-        }
+        // YMODEM sends this as one 1024-byte STX block.
+        let mut data_block = vec![0u8; 1029];
+        receiver_conn.read_exact(&mut data_block).await.unwrap();
+        assert_eq!(data_block[0], 0x02);
+        receiver_conn.send(&[ACK]).await.unwrap();
 
         // EOT
+        receiver_conn.read(&mut eot_buf).await.unwrap();
+        receiver_conn.send(&[NAK]).await.unwrap();
         receiver_conn.read(&mut eot_buf).await.unwrap();
         receiver_conn.send(&[ACK]).await.unwrap();
 
@@ -319,4 +329,263 @@ async fn test_ymodem_large_file() {
 
     assert_eq!(state.send_state.finished_files.len(), 1);
     assert_eq!(state.send_state.total_bytes_transfered, data.len() as u64);
+}
+
+fn crc_block(header: u8, block_num: u8, payload: &[u8], block_len: usize, pad: u8) -> Vec<u8> {
+    let mut data = payload.to_vec();
+    data.resize(block_len, pad);
+    let mut packet = vec![header, block_num, !block_num];
+    packet.extend_from_slice(&data);
+    let crc = crc16(&data);
+    packet.push((crc >> 8) as u8);
+    packet.push((crc & 0xFF) as u8);
+    packet
+}
+
+fn ymodem_header(name: &str, size: usize) -> Vec<u8> {
+    let mut info = Vec::new();
+    info.extend_from_slice(name.as_bytes());
+    info.push(0);
+    info.extend_from_slice(format!("{size} 1700000000 100644").as_bytes());
+    crc_block(SOH, 0, &info, 128, 0)
+}
+
+/// Section 5: the stated length lets the receiver discard the padding, preserving
+/// the exact contents even when the file itself ends in 0x1A.
+#[tokio::test]
+async fn the_stated_length_keeps_a_file_that_ends_in_the_pad_byte() {
+    let (mut sender_conn, mut receiver_conn) = TestConnection::create_pair();
+    let payload = vec![b'a', b'b', 0x1A, 0x1A];
+
+    let header = ymodem_header("padded.bin", payload.len());
+    let data_block = crc_block(SOH, 1, &payload, 128, 0x1A);
+
+    tokio::spawn(async move {
+        let mut buf = [0u8; 1];
+        sender_conn.read(&mut buf).await.unwrap();
+
+        sender_conn.send(&header).await.unwrap();
+        sender_conn.read(&mut buf).await.unwrap(); // ACK
+        sender_conn.read(&mut buf).await.unwrap(); // C
+
+        sender_conn.send(&data_block).await.unwrap();
+        sender_conn.read(&mut buf).await.unwrap(); // ACK
+
+        sender_conn.send(&[EOT]).await.unwrap();
+        sender_conn.read(&mut buf).await.unwrap(); // NAK
+        sender_conn.send(&[EOT]).await.unwrap();
+        sender_conn.read(&mut buf).await.unwrap(); // ACK
+        sender_conn.read(&mut buf).await.unwrap(); // C
+
+        sender_conn.send(&crc_block(SOH, 0, &[0], 128, 0)).await.unwrap();
+        sender_conn.read(&mut buf).await.unwrap(); // ACK
+    });
+
+    let mut protocol = XYmodem::new(XYModemVariant::YModem);
+    let state = test_receiver(&mut receiver_conn, &mut protocol).await;
+
+    let received = fs::read(&state.recieve_state.finished_files[0].1).unwrap();
+    assert_eq!(received, payload, "trailing 0x1A bytes of the file itself must survive");
+}
+
+/// Section 6, figure 8: a streaming batch is driven by G, not by C.
+#[tokio::test]
+async fn a_streaming_batch_asks_for_the_next_block_with_g() {
+    let (mut sender_conn, mut receiver_conn) = TestConnection::create_pair();
+    let payload = vec![3u8; 16];
+
+    let header = ymodem_header("stream.bin", payload.len());
+    let data_block = crc_block(SOH, 1, &payload, 128, 0x1A);
+
+    let start_bytes = tokio::spawn(async move {
+        let mut buf = [0u8; 1];
+        sender_conn.read(&mut buf).await.unwrap();
+        let initial = buf[0];
+
+        sender_conn.send(&header).await.unwrap();
+        sender_conn.read(&mut buf).await.unwrap();
+        let after_header = buf[0];
+
+        // Streaming means the data block is not acknowledged.
+        sender_conn.send(&data_block).await.unwrap();
+        sender_conn.send(&[EOT]).await.unwrap();
+        sender_conn.read(&mut buf).await.unwrap(); // ACK
+        assert_eq!(buf[0], ACK);
+        sender_conn.read(&mut buf).await.unwrap();
+        let next_file = buf[0];
+
+        sender_conn.send(&crc_block(SOH, 0, &[0], 128, 0)).await.unwrap();
+        sender_conn.read(&mut buf).await.unwrap();
+        (initial, after_header, next_file)
+    });
+
+    let mut protocol = XYmodem::new(XYModemVariant::YModemG);
+    let state = test_receiver(&mut receiver_conn, &mut protocol).await;
+
+    let (initial, after_header, next_file) = start_bytes.await.unwrap();
+    assert_eq!(initial, b'G', "the batch is opened with G");
+    assert_eq!(after_header, b'G', "the file header is answered directly with G");
+    assert_eq!(next_file, b'G', "the next file is requested with G");
+
+    let received = fs::read(&state.recieve_state.finished_files[0].1).unwrap();
+    assert_eq!(received, payload);
+}
+
+#[tokio::test]
+async fn a_nak_retransmits_the_same_ymodem_file_header() {
+    let (mut sender_conn, mut receiver_conn) = TestConnection::create_pair();
+
+    let mut first_file = NamedTempFile::new().unwrap();
+    first_file.write_all(b"first").unwrap();
+    let mut second_file = NamedTempFile::new().unwrap();
+    second_file.write_all(b"second").unwrap();
+
+    let receiver = tokio::spawn(async move {
+        receiver_conn.send(b"C").await.unwrap();
+
+        let mut first_header = vec![0u8; 133];
+        receiver_conn.read_exact(&mut first_header).await.unwrap();
+        receiver_conn.send(&[NAK]).await.unwrap();
+
+        let mut repeated_header = vec![0u8; 133];
+        receiver_conn.read_exact(&mut repeated_header).await.unwrap();
+        assert_eq!(repeated_header, first_header, "a NAK must not advance to the next file");
+
+        receiver_conn.send(&[ACK, b'C']).await.unwrap();
+        let mut block = vec![0u8; 133];
+        receiver_conn.read_exact(&mut block).await.unwrap();
+        receiver_conn.send(&[ACK]).await.unwrap();
+        let mut eot = [0u8; 1];
+        receiver_conn.read_exact(&mut eot).await.unwrap();
+        receiver_conn.send(&[NAK]).await.unwrap();
+        receiver_conn.read_exact(&mut eot).await.unwrap();
+        receiver_conn.send(&[ACK, b'C']).await.unwrap();
+
+        let mut second_header = vec![0u8; 133];
+        receiver_conn.read_exact(&mut second_header).await.unwrap();
+        assert_ne!(second_header, first_header, "the second file follows only after the first completed");
+
+        receiver_conn.send(&[ACK, b'C']).await.unwrap();
+        receiver_conn.read_exact(&mut block).await.unwrap();
+        receiver_conn.send(&[ACK]).await.unwrap();
+        receiver_conn.read_exact(&mut eot).await.unwrap();
+        receiver_conn.send(&[NAK]).await.unwrap();
+        receiver_conn.read_exact(&mut eot).await.unwrap();
+        receiver_conn.send(&[ACK, b'C']).await.unwrap();
+
+        receiver_conn.read_exact(&mut block).await.unwrap();
+        receiver_conn.send(&[ACK]).await.unwrap();
+    });
+
+    let mut protocol = XYmodem::new(XYModemVariant::YModem);
+    let state = test_sender(
+        &mut sender_conn,
+        &mut protocol,
+        &[first_file.path().to_path_buf(), second_file.path().to_path_buf()],
+    )
+    .await;
+
+    receiver.await.unwrap();
+    assert_eq!(state.send_state.finished_files.len(), 2);
+}
+
+#[tokio::test]
+async fn a_bad_ymodem_header_is_retried_from_its_soh() {
+    let (mut sender_conn, mut receiver_conn) = TestConnection::create_pair();
+    let good_header = ymodem_header("retry.bin", 3);
+    let mut bad_header = good_header.clone();
+    *bad_header.last_mut().unwrap() ^= 1;
+    let data = crc_block(SOH, 1, &[1, 2, 3], 128, 0x1A);
+
+    tokio::spawn(async move {
+        let mut response = [0u8; 1];
+        sender_conn.read_exact(&mut response).await.unwrap();
+        sender_conn.send(&bad_header).await.unwrap();
+        sender_conn.read_exact(&mut response).await.unwrap();
+        assert_eq!(response[0], NAK);
+
+        sender_conn.send(&good_header).await.unwrap();
+        sender_conn.read_exact(&mut response).await.unwrap();
+        assert_eq!(response[0], ACK);
+        sender_conn.read_exact(&mut response).await.unwrap();
+        assert_eq!(response[0], b'C');
+
+        sender_conn.send(&data).await.unwrap();
+        sender_conn.read_exact(&mut response).await.unwrap();
+        sender_conn.send(&[EOT]).await.unwrap();
+        sender_conn.read_exact(&mut response).await.unwrap();
+        sender_conn.send(&[EOT]).await.unwrap();
+        sender_conn.read_exact(&mut response).await.unwrap();
+        sender_conn.read_exact(&mut response).await.unwrap();
+        sender_conn.send(&crc_block(SOH, 0, &[0], 128, 0)).await.unwrap();
+        sender_conn.read_exact(&mut response).await.unwrap();
+    });
+
+    let mut protocol = XYmodem::new(XYModemVariant::YModem);
+    let state = test_receiver(&mut receiver_conn, &mut protocol).await;
+    assert_eq!(fs::read(&state.recieve_state.finished_files[0].1).unwrap(), [1, 2, 3]);
+}
+
+#[tokio::test]
+async fn ymodem_g_sender_uses_the_streaming_handshake() {
+    let (mut sender_conn, mut receiver_conn) = TestConnection::create_pair();
+    let mut file = NamedTempFile::new().unwrap();
+    file.write_all(b"streaming").unwrap();
+
+    let receiver = tokio::spawn(async move {
+        receiver_conn.send(b"G").await.unwrap();
+        let mut block = vec![0u8; 133];
+        receiver_conn.read_exact(&mut block).await.unwrap();
+        assert_eq!(block[0], SOH);
+        assert_eq!(block[1], 0);
+
+        receiver_conn.send(b"G").await.unwrap();
+        receiver_conn.read_exact(&mut block).await.unwrap();
+        assert_eq!(block[1], 1);
+
+        let mut eot = [0u8; 1];
+        receiver_conn.read_exact(&mut eot).await.unwrap();
+        assert_eq!(eot[0], EOT);
+        receiver_conn.send(&[ACK, b'G']).await.unwrap();
+
+        receiver_conn.read_exact(&mut block).await.unwrap();
+        assert_eq!(block[1], 0);
+        assert_eq!(block[3], 0);
+        receiver_conn.send(&[ACK]).await.unwrap();
+    });
+
+    let mut protocol = XYmodem::new(XYModemVariant::YModemG);
+    let state = test_sender(&mut sender_conn, &mut protocol, &[file.path().to_path_buf()]).await;
+    receiver.await.unwrap();
+    assert_eq!(state.send_state.finished_files.len(), 1);
+}
+
+#[tokio::test]
+async fn a_ymodem_g_crc_error_aborts_with_can() {
+    let (mut sender_conn, mut receiver_conn) = TestConnection::create_pair();
+    let header = ymodem_header("broken.bin", 3);
+    let mut data = crc_block(SOH, 1, &[1, 2, 3], 128, 0x1A);
+    *data.last_mut().unwrap() ^= 1;
+
+    let sender = tokio::spawn(async move {
+        let mut response = [0u8; 1];
+        sender_conn.read_exact(&mut response).await.unwrap();
+        assert_eq!(response[0], b'G');
+        sender_conn.send(&header).await.unwrap();
+        sender_conn.read_exact(&mut response).await.unwrap();
+        assert_eq!(response[0], b'G');
+        sender_conn.send(&data).await.unwrap();
+        sender_conn.read_exact(&mut response).await.unwrap();
+        response[0]
+    });
+
+    let mut protocol = XYmodem::new(XYModemVariant::YModemG);
+    let mut state = protocol.initiate_recv(&mut receiver_conn).await.unwrap();
+    let mut result = Ok(());
+    while result.is_ok() {
+        result = protocol.update_transfer(&mut receiver_conn, &mut state).await;
+    }
+
+    assert!(result.is_err());
+    assert_eq!(sender.await.unwrap(), CAN);
 }
