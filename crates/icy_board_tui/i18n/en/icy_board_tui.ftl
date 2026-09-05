@@ -3883,11 +3883,12 @@ fido_new_areas-help=Only used while Auto Add Fido Areas is on.
 fido_address_title=Fidonet Address Configuration
 fido_address_editor=Address
 fido_address_header_node=Node
-fido_address_header_primary=Primary
+fido_address_header_primary=Default
 fido_address_header_domain=Domain
 
 fido_address_node=Node
 fido_address_node-status=One address this board answers to, as zone:net/node[.point]
+fido_address_invalid=Enter a complete address with a non-zero zone, net and node
 
 fido_address_domain=Domain
 fido_address_domain-status=The network the address belongs to, sent after an '@' in binkp

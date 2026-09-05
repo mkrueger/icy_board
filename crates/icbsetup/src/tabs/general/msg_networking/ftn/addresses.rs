@@ -23,10 +23,17 @@ pub struct SystemAddresses<'a> {
     icy_board: Arc<Mutex<IcyBoard>>,
     edit_config_state: ConfigMenuState,
     edit_config: Option<ConfigMenu<(usize, Arc<Mutex<IcyBoard>>)>>,
+    pending_insert: Option<usize>,
+    validation_error: Arc<Mutex<Option<String>>>,
+}
+
+fn is_usable_aka(address: &EchomailAddress) -> bool {
+    address.zone != 0 && address.net != 0 && address.node != 0
 }
 
 impl<'a> SystemAddresses<'a> {
     pub fn new(icy_board: Arc<Mutex<IcyBoard>>) -> Self {
+        let validation_error = Arc::new(Mutex::new(None));
         let content_length = icy_board.lock().unwrap().ftn.akas.len();
         let board = icy_board.clone();
         let insert_table = InsertTable {
@@ -56,6 +63,8 @@ impl<'a> SystemAddresses<'a> {
             icy_board,
             edit_config: None,
             edit_config_state: ConfigMenuState::default(),
+            pending_insert: None,
+            validation_error,
         }
     }
 
@@ -65,16 +74,26 @@ impl<'a> SystemAddresses<'a> {
         let Some(aka) = board.ftn.akas.get(selected) else {
             return;
         };
+        *self.validation_error.lock().unwrap() = (!is_usable_aka(&aka.address)).then(|| get_text("fido_address_invalid"));
         let entry = vec![
             ConfigEntry::Item(
                 ListItem::new(get_text("fido_address_node"), ListValue::Text(24, TextFlags::None, aka.address.to_string()))
                     .with_status(get_text("fido_address_node-status"))
                     .with_label_width(10)
-                    .with_update_text_value(&|(i, board): &(usize, Arc<Mutex<IcyBoard>>), value: String| {
-                        // A half typed address is kept as it was rather than reset to 0:0/0.
-                        if let Some(address) = EchomailAddress::parse(&value) {
-                            board.lock().unwrap().ftn.akas[*i].address = address;
-                        }
+                    .with_update_value({
+                        let validation_error = self.validation_error.clone();
+                        Box::new(move |(i, board): &(usize, Arc<Mutex<IcyBoard>>), value: &ListValue| {
+                            let ListValue::Text(_, _, value) = value else {
+                                return;
+                            };
+                            match EchomailAddress::parse(value).filter(is_usable_aka) {
+                                Some(address) => {
+                                    board.lock().unwrap().ftn.akas[*i].address = address;
+                                    *validation_error.lock().unwrap() = None;
+                                }
+                                None => *validation_error.lock().unwrap() = Some(get_text("fido_address_invalid")),
+                            }
+                        })
                     }),
             ),
             ConfigEntry::Item(
@@ -150,13 +169,30 @@ impl<'a> Page for SystemAddresses<'a> {
     }
 
     fn request_status(&self) -> ResultState {
-        ResultState::default()
+        match self.validation_error.lock().unwrap().clone() {
+            Some(error) => ResultState::status_line(error),
+            None => ResultState::default(),
+        }
     }
 
     fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
         if let Some(edit_config) = &mut self.edit_config {
             let res = edit_config.handle_key_press(key, &mut self.edit_config_state);
             if res.edit_msg == icy_board_tui::config_menu::EditMessage::Close {
+                if let Some(index) = self.pending_insert.take()
+                    && self
+                        .icy_board
+                        .lock()
+                        .unwrap()
+                        .ftn
+                        .akas
+                        .get(index)
+                        .is_some_and(|aka| !is_usable_aka(&aka.address))
+                {
+                    self.icy_board.lock().unwrap().ftn.akas.remove(index);
+                    self.insert_table.content_length -= 1;
+                }
+                *self.validation_error.lock().unwrap() = None;
                 self.edit_config = None;
             }
             return PageMessage::None;
@@ -167,8 +203,16 @@ impl<'a> Page for SystemAddresses<'a> {
             KeyCode::PageUp => self.move_up(),
             KeyCode::PageDown => self.move_down(),
             KeyCode::Insert => {
-                self.icy_board.lock().unwrap().ftn.akas.push(FtnAka::default());
+                let index = {
+                    let mut board = self.icy_board.lock().unwrap();
+                    let index = board.ftn.akas.len();
+                    board.ftn.akas.push(FtnAka::default());
+                    index
+                };
                 self.insert_table.content_length += 1;
+                self.insert_table.table_state.select(Some(index));
+                self.pending_insert = Some(index);
+                self.open_editor(index);
             }
             KeyCode::Delete => {
                 if let Some(selected) = self.insert_table.table_state.selected()
@@ -188,5 +232,18 @@ impl<'a> Page for SystemAddresses<'a> {
             }
         }
         PageMessage::None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_system_aka_needs_a_zone_net_and_node() {
+        assert!(!is_usable_aka(&EchomailAddress::parse("0:0/0").unwrap()));
+        assert!(!is_usable_aka(&EchomailAddress::parse("1:2/0").unwrap()));
+        assert!(is_usable_aka(&EchomailAddress::parse("1:2/3").unwrap()));
+        assert!(is_usable_aka(&EchomailAddress::parse("1:2/3.4").unwrap()));
     }
 }
