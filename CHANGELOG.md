@@ -8,6 +8,14 @@ releases.
 
 ## [Unreleased]
 
+### Added
+
+- A packet the tosser cannot read is moved to the directory named by
+  `bad_packets` and the report says where it went. It stayed in the inbound
+  before, so every later run tried it again and complained about it again,
+  which buried the mail that did arrive. PCBoard kept such a directory for the
+  same reason.
+
 ### Fixed
 
 - Echomail for a point is no longer discarded as already travelled merely

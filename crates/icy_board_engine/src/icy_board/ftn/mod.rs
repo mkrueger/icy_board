@@ -294,6 +294,11 @@ pub struct FtnConfig {
     #[serde(default = "FtnConfig::default_bad_netmail")]
     pub bad_netmail: PathBuf,
 
+    /// Where a packet the tosser cannot read is put aside, so it stops being
+    /// retried and reported on every run.
+    #[serde(default = "FtnConfig::default_bad_packets")]
+    pub bad_packets: PathBuf,
+
     /// Where the base of an area added by `options.auto_add` is created.
     #[serde(default = "FtnConfig::default_new_areas")]
     pub new_areas: PathBuf,
@@ -340,6 +345,10 @@ impl FtnConfig {
 
     fn default_bad_netmail() -> PathBuf {
         PathBuf::from("ftn/badmail")
+    }
+
+    fn default_bad_packets() -> PathBuf {
+        PathBuf::from("ftn/badpkt")
     }
 
     fn default_new_areas() -> PathBuf {
@@ -393,6 +402,7 @@ impl Default for FtnConfig {
             outbound: PathBuf::from("ftn/outbound"),
             netmail: Self::default_netmail(),
             bad_netmail: Self::default_bad_netmail(),
+            bad_packets: Self::default_bad_packets(),
             new_areas: Self::default_new_areas(),
             origin: String::new(),
             options: FtnOptions::default(),

@@ -277,6 +277,17 @@ so exporting it as echomail would put private mail in a bundle for every
 downlink that carries the tag. The scanner refuses such an area and says so.
 
 
+Packets that cannot be read
+---------------------------
+
+A packet the tosser cannot make sense of is moved to ``bad_packets`` and named
+in the report along with the reason. A wrong packet password and a damaged file
+are the usual causes. Leaving it in the inbound would mean trying it again on
+every run, so the one failure would repeat until somebody removed the file by
+hand. Nothing is deleted: the packet is kept for the sysop, and a second one of
+the same name does not overwrite the first.
+
+
 File requests
 -------------
 

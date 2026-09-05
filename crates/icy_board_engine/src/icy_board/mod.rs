@@ -195,6 +195,7 @@ impl IcyBoard {
         self.ftn.outbound = get_path(&self.root_path, &self.ftn.outbound);
         self.ftn.netmail = get_path(&self.root_path, &self.ftn.netmail);
         self.ftn.bad_netmail = get_path(&self.root_path, &self.ftn.bad_netmail);
+        self.ftn.bad_packets = get_path(&self.root_path, &self.ftn.bad_packets);
         self.ftn.new_areas = get_path(&self.root_path, &self.ftn.new_areas);
 
         // Trashcan files

@@ -359,8 +359,11 @@ fn toss(board: &mut IcyBoard) -> Res<()> {
             count, tag, tag
         );
     }
-    for (file, err) in &report.failed {
-        println!("  left in the inbound, {}: {}", file.display(), err);
+    for (file, err, put_aside) in &report.failed {
+        match put_aside {
+            Some(target) => println!("  {} could not be read and was moved to {}: {}", file.display(), target.display(), err),
+            None => println!("  left in the inbound, {}: {}", file.display(), err),
+        }
     }
     toss_files(board)?;
     serve_requests(board)?;

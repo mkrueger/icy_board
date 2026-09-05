@@ -84,7 +84,9 @@ pub struct TossReport {
     /// The bundles the passed through mail was packed into.
     pub bundles: Vec<PathBuf>,
 
-    pub failed: Vec<(PathBuf, String)>,
+    /// What could not be read, why, and where it was put aside. A packet that
+    /// stayed in the inbound would be retried and reported on every run.
+    pub failed: Vec<(PathBuf, String, Option<PathBuf>)>,
 
     /// Area subscriptions changed by `AreaFix`, keyed by link index.
     pub link_updates: BTreeMap<usize, Vec<String>>,
@@ -130,11 +132,13 @@ pub fn toss_inbound(config: &FtnConfig, areas: &AreaMap) -> Res<TossReport> {
         };
         match result {
             Ok(true) => tossed.push(file),
-            // Mail for somebody else stays where it is, and so does what could
-            // not be read. Throwing away mail nobody has seen is worse than
-            // asking the sysop to look at it.
+            // Mail for somebody else stays where it is. Throwing away mail
+            // nobody has seen is worse than asking the sysop to look at it.
             Ok(false) => {}
-            Err(err) => report.failed.push((file, err.to_string())),
+            Err(err) => {
+                let put_aside = set_aside(config, &file);
+                report.failed.push((file, err.to_string(), put_aside));
+            }
         }
     }
     // What is handed on or routed exists nowhere but in memory until this has
@@ -144,6 +148,24 @@ pub fn toss_inbound(config: &FtnConfig, areas: &AreaMap) -> Res<TossReport> {
         fs::remove_file(&file).context(|| format!("Cannot remove {} now that it has been tossed", file.display()))?;
     }
     Ok(report)
+}
+
+/// Puts a packet the tosser could not read out of the inbound so the next run
+/// does not stumble over it again. Failing to move it is not worth losing the
+/// error that caused it, so the sysop is told where it still is.
+fn set_aside(config: &FtnConfig, file: &Path) -> Option<PathBuf> {
+    let name = file.file_name()?;
+    if fs::create_dir_all(&config.bad_packets).is_err() {
+        return None;
+    }
+    let mut target = config.bad_packets.join(name);
+    for attempt in 1..1000 {
+        if !target.exists() {
+            break;
+        }
+        target = config.bad_packets.join(format!("{}.{attempt}", name.to_string_lossy()));
+    }
+    fs::rename(file, &target).ok().map(|()| target)
 }
 
 struct Tosser<'a> {
@@ -1175,6 +1197,7 @@ mod tests {
             outbound: directory.join("outbound"),
             netmail: directory.join("netmail"),
             bad_netmail: directory.join("badmail"),
+            bad_packets: directory.join("badpkt"),
             new_areas: directory.join("areas"),
             origin: "A board".to_string(),
             akas: vec![FtnAka {
@@ -1382,7 +1405,7 @@ mod tests {
 
         assert_eq!(report.failed.len(), 1);
         assert!(report.failed[0].1.contains("straight back"));
-        assert!(fs::read_dir(&config.inbound).unwrap().next().is_some());
+        assert!(report.failed[0].2.as_ref().is_some_and(|target| target.exists()));
     }
 
     #[test]
@@ -1519,7 +1542,8 @@ mod tests {
 
         assert_eq!(report.failed.len(), 1);
         assert!(report.failed[0].1.contains("packet password"), "{}", report.failed[0].1);
-        assert!(fs::read_dir(&config.inbound).unwrap().next().is_some());
+        // The packet is kept, but out of the way of the next run.
+        assert!(report.failed[0].2.as_ref().is_some_and(|target| target.exists()));
         assert!(!config.netmail.exists());
     }
 
@@ -1737,7 +1761,7 @@ mod tests {
     }
 
     #[test]
-    fn test_a_packet_that_cannot_be_read_is_kept_for_the_sysop() {
+    fn test_a_packet_that_cannot_be_read_is_put_aside_for_the_sysop() {
         let directory = tempfile::tempdir().unwrap();
         let config = config(directory.path());
         fs::create_dir_all(&config.inbound).unwrap();
@@ -1747,9 +1771,30 @@ mod tests {
         let report = toss(&config, &[]);
 
         assert_eq!(report.failed.len(), 1);
-        assert!(broken.exists());
+        // It is out of the inbound so the next run does not stumble over it.
+        assert!(!broken.exists());
+        assert_eq!(report.failed[0].2, Some(config.bad_packets.join("12345678.pkt")));
+        assert!(config.bad_packets.join("12345678.pkt").exists());
         assert!(report.failed[0].1.contains("12345678.pkt"), "{}", report.failed[0].1);
         assert!(report.failed[0].1.contains("not all here"), "{}", report.failed[0].1);
+    }
+
+    /// Two nodes can send a packet of the same name, and the second must not
+    /// overwrite the evidence of the first.
+    #[test]
+    fn test_a_second_bad_packet_of_the_same_name_keeps_the_first() {
+        let directory = tempfile::tempdir().unwrap();
+        let config = config(directory.path());
+        fs::create_dir_all(&config.inbound).unwrap();
+        fs::write(config.inbound.join("12345678.pkt"), b"first broken packet").unwrap();
+        toss(&config, &[]);
+        fs::write(config.inbound.join("12345678.pkt"), b"second broken packet").unwrap();
+
+        let report = toss(&config, &[]);
+
+        assert_eq!(report.failed[0].2, Some(config.bad_packets.join("12345678.pkt.1")));
+        assert_eq!(fs::read(config.bad_packets.join("12345678.pkt")).unwrap(), b"first broken packet");
+        assert_eq!(fs::read(config.bad_packets.join("12345678.pkt.1")).unwrap(), b"second broken packet");
     }
 
     #[test]
@@ -1768,7 +1813,8 @@ mod tests {
         let complaint = &report.failed[0].1;
         assert!(complaint.contains("00000001.pkt"), "{complaint}");
         assert!(complaint.contains("0000ff9d.su0"), "{complaint}");
-        assert!(arrived.exists());
+        assert!(!arrived.exists());
+        assert!(config.bad_packets.join("0000ff9d.su0").exists());
     }
 
     #[test]
