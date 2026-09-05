@@ -307,7 +307,7 @@ impl Tosser<'_> {
             return self.import(message, &path, true, report);
         }
         if self.config.options.auto_add {
-            let path = self.config.new_areas.join(tag.to_lowercase());
+            let path = self.config.new_areas.join(auto_area_name(tag)?);
             self.lookup.insert(tag.to_uppercase(), path.clone());
             report.added.insert(tag.to_uppercase(), path.clone());
             return self.import(message, &path, true, report);
@@ -515,8 +515,10 @@ impl Tosser<'_> {
             .enumerate()
             .filter(|(index, link)| {
                 self.link_areas[*index].iter().any(|area| area.eq_ignore_ascii_case(tag))
-                    && (link.address.net, link.address.node) != (from.net, from.node)
-                    && !seen.contains(&(link.address.net, link.address.node))
+                    && link.address != *from
+                    // A point cannot be represented by a two-dimensional
+                    // SEEN-BY entry; its boss being listed says nothing about it.
+                    && (link.address.point != 0 || !seen.contains(&(link.address.net, link.address.node)))
             })
             .map(|(index, _)| index)
             .collect();
@@ -553,6 +555,23 @@ impl Tosser<'_> {
         }
         Ok(())
     }
+}
+
+/// Tags are network input, not paths. JAM replaces a base's extension, so
+/// even ordinary dotted tags need escaping to keep their bases distinct.
+fn auto_area_name(tag: &str) -> Res<String> {
+    if tag.is_empty() || tag.contains(['/', '\\', ':']) || tag.chars().any(char::is_control) || matches!(tag, "." | "..") {
+        return Err(format!("Cannot auto-add invalid echo tag {tag:?}").into());
+    }
+    let mut name = String::new();
+    for byte in tag.to_lowercase().bytes() {
+        if byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-') {
+            name.push(byte as char);
+        } else {
+            let _ = write!(name, "%{byte:02x}");
+        }
+    }
+    Ok(name)
 }
 
 /// The field holds eight characters, and a mailer pads what it writes there
@@ -1101,14 +1120,18 @@ fn exported_text(tag: &str, msgid: &str, reply: Option<&str>, body: &str, origin
         let _ = write!(text, "\r--- {}\r * Origin: {} ({})\r", product(), origin, aka.address);
     }
 
-    let mut seen: Vec<(u16, u16)> = links.iter().map(|link| (link.net, link.node)).collect();
-    seen.push((aka.address.net, aka.address.node));
+    let mut seen: Vec<(u16, u16)> = links.iter().filter(|link| link.point == 0).map(|link| (link.net, link.node)).collect();
+    if aka.address.point == 0 {
+        seen.push((aka.address.net, aka.address.node));
+    }
     seen.sort_unstable();
     seen.dedup();
     for line in fold(&seen.iter().map(|(net, node)| format!("{net}/{node}")).collect::<Vec<_>>()) {
         let _ = write!(text, "SEEN-BY: {line}\r");
     }
-    let _ = write!(text, "\x01PATH: {}/{}\r", aka.address.net, aka.address.node);
+    if aka.address.point == 0 {
+        let _ = write!(text, "\x01PATH: {}/{}\r", aka.address.net, aka.address.node);
+    }
     text
 }
 
@@ -1136,14 +1159,18 @@ fn fold(entries: &[String]) -> Vec<String> {
 fn handed_on_text(text: &str, aka: &FtnAka, links: &[EchomailAddress]) -> String {
     let mut out = text.trim_end_matches('\r').to_string();
     out.push('\r');
-    let mut seen: Vec<(u16, u16)> = links.iter().map(|link| (link.net, link.node)).collect();
-    seen.push((aka.address.net, aka.address.node));
+    let mut seen: Vec<(u16, u16)> = links.iter().filter(|link| link.point == 0).map(|link| (link.net, link.node)).collect();
+    if aka.address.point == 0 {
+        seen.push((aka.address.net, aka.address.node));
+    }
     seen.sort_unstable();
     seen.dedup();
     for line in fold(&seen.iter().map(|(net, node)| format!("{net}/{node}")).collect::<Vec<_>>()) {
         let _ = write!(out, "SEEN-BY: {line}\r");
     }
-    let _ = write!(out, "\x01PATH: {}/{}\r", aka.address.net, aka.address.node);
+    if aka.address.point == 0 {
+        let _ = write!(out, "\x01PATH: {}/{}\r", aka.address.net, aka.address.node);
+    }
     out
 }
 
@@ -1472,6 +1499,102 @@ mod tests {
 
         assert!(err.contains("outbound"), "{err}");
         assert!(arrived.exists(), "mail that was never written must not be thrown away");
+    }
+
+    #[test]
+    fn test_auto_add_rejects_tags_that_are_paths() {
+        for tag in ["../escaped", "/tmp/escaped", "..\\escaped", "", "C:escaped"] {
+            let directory = tempfile::tempdir().unwrap();
+            let mut config = config(directory.path());
+            config.options.auto_add = true;
+            drop_packet(&config, vec![message(tag, "Body\r")]);
+
+            let report = toss(&config, &[]);
+
+            assert_eq!(report.imported, 0, "{tag:?}");
+            assert_eq!(report.failed.len(), 1, "{tag:?}");
+            assert!(report.failed[0].2.as_ref().unwrap().exists());
+            assert!(report.added.is_empty());
+            assert!(!directory.path().join("escaped.jhr").exists());
+        }
+    }
+
+    #[test]
+    fn test_auto_added_dotted_tags_have_distinct_message_bases() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut config = config(directory.path());
+        config.options.auto_add = true;
+        let tags = ["RU.LINUX", "RU.WINDOWS", "RU%2ELINUX"];
+        drop_packet(&config, tags.iter().map(|tag| message(tag, "Body\r")).collect());
+
+        let report = toss(&config, &[]);
+
+        assert_eq!(report.imported, 3);
+        let paths: HashSet<_> = report.added.values().map(|path| path.with_extension("jhr")).collect();
+        assert_eq!(paths.len(), 3, "JAM replaces extensions; dotted tags must not share a base");
+        for path in report.added.values() {
+            assert_eq!(path.parent(), Some(config.new_areas.as_path()));
+            assert_eq!(JamMessageBase::open(path).unwrap().active_messages(), 1);
+        }
+    }
+
+    #[test]
+    fn test_a_points_outgoing_path_does_not_impersonate_its_boss() {
+        let aka = FtnAka {
+            address: address("21:1/100.1"),
+            domain: "fsxnet".to_string(),
+        };
+        let text = exported_text("FSX_GEN", "21:1/100.1 1", None, "Body", "Point", &aka, &[address("21:1/100")]);
+        assert!(Kludges::split(&text).path.is_empty(), "a boss would reject its own PATH as a loop");
+        let passed = handed_on_text("AREA:FSX_GEN\rBody\r", &aka, &[address("21:1/100.2")]);
+        assert!(Kludges::split(&passed).path.is_empty());
+        assert!(seen_by(&passed).is_empty(), "points are not 2D SEEN-BY nodes");
+    }
+
+    #[test]
+    fn test_passthru_delivers_to_sibling_points_even_when_the_boss_is_seen() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut config = config(directory.path());
+        config.options.pass_thru = true;
+        config.links = ["21:1/100.1", "21:1/100.2"]
+            .iter()
+            .map(|addr| FtnLink {
+                address: address(addr),
+                areas: vec!["FSX_GEN".to_string()],
+                ..Default::default()
+            })
+            .collect();
+        drop_packet_from(&config, "21:1/100.1", vec![message("FSX_GEN", "Body\rSEEN-BY: 1/100\r")]);
+
+        let report = toss(&config, &[]);
+
+        assert_eq!(report.passed_through, 1);
+        assert_eq!(report.bundles.len(), 1);
+        assert!(report.bundles[0].starts_with(config.outbound_for(&config.links[1])));
+    }
+
+    #[test]
+    fn test_deleted_local_echomail_is_not_exported() {
+        let directory = tempfile::tempdir().unwrap();
+        let config = config(directory.path());
+        let path = directory.path().join("general");
+        let mut base = open_base(&path).unwrap();
+        let areas = vec![EchoArea::new("FSX_GEN", path)];
+        scan_outbound(&config, &areas, &when()).unwrap();
+        base.write_message(
+            &JamMessage::default()
+                .with_text(BString::from("withdrawn"))
+                .with_attributes(attributes::MSG_LOCAL),
+        )
+        .unwrap();
+        base.write_jhr_header().unwrap();
+        base.delete_message(1).unwrap();
+        base.write_jhr_header().unwrap();
+
+        let report = scan_outbound(&config, &areas, &when()).unwrap();
+
+        assert_eq!(report.exported, 0);
+        assert!(report.bundles.is_empty());
     }
 
     #[test]

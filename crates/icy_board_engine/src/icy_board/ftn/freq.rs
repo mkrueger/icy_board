@@ -217,7 +217,7 @@ fn requester(stem: &str) -> Option<(u16, u16)> {
 }
 
 fn identified_requester(stem: &str) -> Option<EchomailAddress> {
-    if stem.len() != 20 || !stem.starts_with('z') || &stem[5..6] != "n" || &stem[10..11] != "f" || &stem[15..16] != "p" {
+    if stem.len() != 20 || !stem.is_ascii() || !stem.starts_with('z') || &stem[5..6] != "n" || &stem[10..11] != "f" || &stem[15..16] != "p" {
         return None;
     }
     Some(EchomailAddress::new(
@@ -241,6 +241,10 @@ pub fn identify_received(path: &Path, node: &EchomailAddress) -> Res<PathBuf> {
             .append(true)
             .open(&target)
             .context(|| format!("Cannot append to the request {}", target.display()))?;
+        // The preceding request need not end in a newline. Empty lines are
+        // ignored when answering, so an extra separator is harmless.
+        file.write_all(b"\r\n")
+            .context(|| format!("Cannot separate requests in {}", target.display()))?;
         file.write_all(&request)
             .context(|| format!("Cannot append {} to {}", path.display(), target.display()))?;
         fs::remove_file(path).context(|| format!("Cannot remove the merged request {}", path.display()))?;
@@ -552,6 +556,62 @@ mod tests {
         assert_eq!(identified.file_name().unwrap(), "z0015n0001f0064p0003.req");
         assert_eq!(identified_requester(identified.file_stem().unwrap().to_str().unwrap()), Some(address));
         assert!(!offered.exists());
+    }
+
+    #[test]
+    fn test_an_identified_requester_rejects_unicode_at_byte_boundaries() {
+        for boundary in [5, 10, 15] {
+            let mut stem = "z0015n0001f0064p0003".to_string();
+            // Keep the expected byte length, but put a multi-byte character
+            // across each separator's byte boundary.
+            stem.replace_range(boundary - 1..boundary + 1, "é");
+            assert_eq!(stem.len(), 20);
+            assert_eq!(identified_requester(&stem), None, "{stem}");
+        }
+    }
+
+    #[test]
+    fn test_merged_received_requests_keep_a_line_boundary() {
+        for ending in ["", "\n", "\r\n", "\r"] {
+            let directory = tempfile::tempdir().unwrap();
+            offer(directory.path(), "A.ZIP", "first");
+            offer(directory.path(), "B.ZIP", "second");
+            let mut config = FtnConfig {
+                inbound: directory.path().join("inbound"),
+                outbound: directory.path().join("outbound"),
+                freq: freq(directory.path()),
+                ..FtnConfig::default()
+            };
+            config.options.enabled = true;
+            config.links.push(FtnLink {
+                address: EchomailAddress::new(21, 1, 1, 0),
+                ..Default::default()
+            });
+            fs::create_dir_all(&config.inbound).unwrap();
+            let first = config.inbound.join("first.req");
+            let second = config.inbound.join("second.req");
+            fs::write(&first, format!("A.ZIP{ending}")).unwrap();
+            fs::write(&second, "B.ZIP").unwrap();
+
+            let identified = identify_received(&first, &config.links[0].address).unwrap();
+            assert_eq!(identify_received(&second, &config.links[0].address).unwrap(), identified);
+            assert!(!first.exists());
+            assert!(!second.exists());
+            let merged = fs::read_to_string(&identified).unwrap();
+            let lines: Vec<_> = merged.lines().map(str::trim).filter(|line| !line.is_empty()).collect();
+            assert_eq!(lines, vec!["A.ZIP", "B.ZIP"], "ending={ending:?}");
+
+            let report = serve(&config).unwrap();
+
+            assert!(report.failed.is_empty(), "{:?}", report.failed);
+            assert!(report.refused.is_empty(), "{:?}", report.refused);
+            assert_eq!(report.requests, 1);
+            assert_eq!(report.served, 2, "ending={ending:?}");
+            let outbound = config.outbound_for(&config.links[0]);
+            assert_eq!(fs::read_to_string(outbound.join("A.ZIP")).unwrap(), "first");
+            assert_eq!(fs::read_to_string(outbound.join("B.ZIP")).unwrap(), "second");
+            assert!(!identified.exists());
+        }
     }
 
     #[test]

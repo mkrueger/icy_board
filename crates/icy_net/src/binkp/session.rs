@@ -117,6 +117,9 @@ pub async fn originate_session(connection: &mut dyn Connection, identity: &Binkp
             }
 
             Frame::Command(BinkpCommand::Ok, argument) => {
+                if !answered {
+                    return abort(connection, NetError::BinkpUnexpectedFrame("M_OK before M_ADR/M_PWD".to_string())).await;
+                }
                 remote.secure = !password.is_empty() && argument.trim() != "non-secure";
                 return Ok(remote);
             }
@@ -296,6 +299,14 @@ mod tests {
         });
         let error = originate_session(&mut ours, &identity(), "", "").await.unwrap_err();
         assert!(error.to_string().contains("Too many servers"));
+    }
+
+    #[tokio::test]
+    async fn test_ok_before_the_remote_address_does_not_bypass_identity_check() {
+        let (mut ours, mut peer) = ChannelConnection::create_pair();
+        Frame::command(BinkpCommand::Ok, "secure").send(&mut peer).await.unwrap();
+        let result = originate_session(&mut ours, &identity(), "21:1/1@fsxnet", "secret").await;
+        assert!(result.is_err(), "M_OK must not bypass the called-system check and password exchange");
     }
 
     #[test]

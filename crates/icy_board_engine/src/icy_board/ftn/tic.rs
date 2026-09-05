@@ -133,26 +133,24 @@ fn toss_tic(config: &FtnConfig, areas: &[FileArea], path: &Path, report: &mut Ti
     }
 
     let link = tic.from.and_then(|from| config.links.iter().find(|link| link.address == from));
-    if let Some(from) = tic.from {
-        if config.options.secure && link.is_none() {
-            return Err(format!(
-                "{} says it comes from {}, which is not a configured link. Add that node under Message Networking > Node Configuration, or turn off Secure Netmail to take file echos from anyone",
-                path.display(),
-                from
-            )
-            .into());
-        }
-        if let Some(link) = link
-            && !link.tic_password.is_empty()
-            && !link.tic_password.eq_ignore_ascii_case(tic.password.trim())
-        {
-            return Err(format!(
-                "{} carries a password that is not the one tic_password names for {}. Correct it in ftn.toml, or clear it to take file echos as they come",
-                path.display(),
-                from
-            )
-            .into());
-        }
+    if config.options.secure && link.is_none() {
+        return Err(format!(
+            "{} has no configured source link (FROM: {}). Add that node under Message Networking > Node Configuration and supply a valid FROM, or turn off Secure Netmail to take file echos from anyone",
+            path.display(),
+            tic.from.map(|from| from.to_string()).unwrap_or_else(|| "missing or malformed".to_string())
+        )
+        .into());
+    }
+    if let Some(link) = link
+        && !link.tic_password.is_empty()
+        && !link.tic_password.eq_ignore_ascii_case(tic.password.trim())
+    {
+        return Err(format!(
+            "{} carries a password that is not the one tic_password names for {}. Correct it in ftn.toml, or clear it to take file echos as they come",
+            path.display(),
+            link.address
+        )
+        .into());
     }
 
     let Some(area) = areas
@@ -209,6 +207,22 @@ fn toss_tic(config: &FtnConfig, areas: &[FileArea], path: &Path, report: &mut Ti
     };
     let mut base = FileBase::open(&area.path, &metadata_path).context(|| format!("Cannot open the file base of {}", area.name))?;
 
+    move_file(&source, &target)?;
+
+    // A file that came before is registered with what it looked like then.
+    if base.contains_name(&tic.file) {
+        base.remove_file(&target)
+            .context(|| format!("Cannot take the earlier {} out of the file base of {}", tic.file, area.name))?;
+    }
+    base.add_file(&target, Vec::new())
+        .context(|| format!("Cannot add {} to the file base of {}", tic.file, area.name))?;
+    if !tic.description.is_empty() {
+        base.set_description(&target, &tic.description)
+            .context(|| format!("Cannot store the description of {} in the file base of {}", tic.file, area.name))?;
+    }
+
+    // Keep superseded files until the replacement and its metadata are in place.
+    // A failed move or indexing operation must not discard the previous version.
     if !tic.replaces.is_empty() {
         let superseded: Vec<String> = base
             .iter()
@@ -222,20 +236,6 @@ fn toss_tic(config: &FtnConfig, areas: &[FileArea], path: &Path, report: &mut Ti
                 .context(|| format!("Cannot take {} out of the file base of {}", name, area.name))?;
             report.replaced.push(name);
         }
-    }
-
-    move_file(&source, &target)?;
-
-    // A file that came before is registered with what it looked like then.
-    if base.contains_name(&tic.file) {
-        base.remove_file(&target)
-            .context(|| format!("Cannot take the earlier {} out of the file base of {}", tic.file, area.name))?;
-    }
-    base.add_file(&target, Vec::new())
-        .context(|| format!("Cannot add {} to the file base of {}", tic.file, area.name))?;
-    if !tic.description.is_empty() {
-        base.set_description(&target, &tic.description)
-            .context(|| format!("Cannot store the description of {} in the file base of {}", tic.file, area.name))?;
     }
 
     report.arrived.push((tic.file.clone(), area.name.clone()));
@@ -435,21 +435,125 @@ mod tests {
         assert_eq!(report.replaced, vec!["NODELR24.Z53".to_string()]);
         assert!(!areas[0].path.join("NODELR24.Z53").exists());
         assert!(areas[0].path.join("NODELR24.Z54").exists());
+        let base = FileBase::open(&areas[0].path, areas[0].path.join("dir")).unwrap();
+        assert!(!base.contains_name("NODELR24.Z53"));
+        assert!(base.contains_name("NODELR24.Z54"));
     }
 
     #[test]
-    fn test_a_file_echo_with_the_wrong_password_is_refused() {
+    fn test_a_failed_replacement_move_preserves_the_superseded_file_and_entry() {
         let directory = tempfile::tempdir().unwrap();
-        let mut config = config(directory.path());
-        config.links[0].tic_password = "secret".to_string();
+        let config = config(directory.path());
         let areas = vec![area(directory.path(), "R24NODEL")];
-        arrive(&config, "NODELR24.Z54", b"nodelist", "Area R24NODEL\r\nFrom 21:1/1\r\nPw wrong\r\n");
+        let old = areas[0].path.join("NODELR24.Z53");
+        let target = areas[0].path.join("NODELR24.Z54");
+        fs::create_dir_all(&target).unwrap();
+        fs::write(&old, b"yesterday").unwrap();
+        let old_id = {
+            let mut base = FileBase::open(&areas[0].path, areas[0].path.join("dir")).unwrap();
+            base.set_description(&old, "Yesterday's nodelist").unwrap();
+            base.iter().find(|header| header.name == "NODELR24.Z53").unwrap().id
+        };
+        let tic = arrive(&config, "NODELR24.Z54", b"nodelist", "Area R24NODEL\r\nFrom 21:1/1\r\nReplaces NODELR24.*\r\n");
 
         let report = toss_tics(&config, &areas).unwrap();
 
         assert_eq!(report.failed.len(), 1);
-        assert!(report.failed[0].1.contains("tic_password"), "{}", report.failed[0].1);
-        assert!(!areas[0].path.join("NODELR24.Z54").exists());
+        assert!(report.failed[0].1.contains("Cannot put"), "{}", report.failed[0].1);
+        assert!(report.arrived.is_empty());
+        assert!(report.replaced.is_empty());
+        assert!(tic.exists());
+        assert_eq!(fs::read(config.inbound.join("NODELR24.Z54")).unwrap(), b"nodelist");
+        assert!(target.is_dir());
+        assert_eq!(fs::read(&old).unwrap(), b"yesterday");
+        let mut base = FileBase::open(&areas[0].path, areas[0].path.join("dir")).unwrap();
+        assert_eq!(base.iter().find(|header| header.name == "NODELR24.Z53").unwrap().id, old_id);
+        assert_eq!(base.description(&old).unwrap().as_deref(), Some("Yesterday's nodelist"));
+        assert!(!base.contains_name("NODELR24.Z54"));
+    }
+
+    #[test]
+    fn test_a_file_echo_with_the_wrong_password_is_refused() {
+        for secure in [false, true] {
+            for password in ["", "Pw wrong\r\n"] {
+                let directory = tempfile::tempdir().unwrap();
+                let mut config = config(directory.path());
+                config.options.secure = secure;
+                config.links[0].tic_password = "secret".to_string();
+                let areas = vec![area(directory.path(), "R24NODEL")];
+                let tic = arrive(&config, "NODELR24.Z54", b"nodelist", &format!("Area R24NODEL\r\nFrom 21:1/1\r\n{password}"));
+
+                let report = toss_tics(&config, &areas).unwrap();
+
+                assert_eq!(report.failed.len(), 1, "secure={secure}, password={password:?}");
+                assert!(report.failed[0].1.contains("tic_password"), "{}", report.failed[0].1);
+                assert!(report.arrived.is_empty());
+                assert!(tic.exists());
+                assert!(config.inbound.join("NODELR24.Z54").exists());
+                assert!(!areas[0].path.join("NODELR24.Z54").exists());
+            }
+        }
+    }
+
+    #[test]
+    fn test_a_secure_file_echo_requires_a_valid_from_even_with_a_password() {
+        for from in ["", "From not-an-address\r\n"] {
+            for password in ["", "Pw secret\r\n"] {
+                let directory = tempfile::tempdir().unwrap();
+                let mut config = config(directory.path());
+                config.options.secure = true;
+                config.links[0].tic_password = "secret".to_string();
+                let areas = vec![area(directory.path(), "R24NODEL")];
+                let lines = format!("Area R24NODEL\r\n{from}{password}");
+                assert!(Tic::parse(&lines).from.is_none());
+                let tic = arrive(&config, "NODELR24.Z54", b"nodelist", &lines);
+
+                let report = toss_tics(&config, &areas).unwrap();
+
+                assert_eq!(report.failed.len(), 1, "from={from:?}, password={password:?}");
+                assert!(report.failed[0].1.contains("configured source link"), "{}", report.failed[0].1);
+                assert!(report.arrived.is_empty());
+                assert!(tic.exists());
+                assert!(config.inbound.join("NODELR24.Z54").exists());
+                assert!(!areas[0].path.join("NODELR24.Z54").exists());
+            }
+        }
+    }
+
+    #[test]
+    fn test_a_non_secure_file_echo_does_not_require_a_configured_from() {
+        for from in ["", "From not-an-address\r\n", "From 21:99/99\r\n"] {
+            let directory = tempfile::tempdir().unwrap();
+            let mut config = config(directory.path());
+            config.options.secure = false;
+            config.links[0].tic_password = "secret".to_string();
+            let areas = vec![area(directory.path(), "R24NODEL")];
+            let tic = arrive(&config, "NODELR24.Z54", b"nodelist", &format!("Area R24NODEL\r\n{from}"));
+
+            let report = toss_tics(&config, &areas).unwrap();
+
+            assert!(report.failed.is_empty(), "from={from:?}: {:?}", report.failed);
+            assert_eq!(report.arrived.len(), 1);
+            assert!(!tic.exists());
+            assert_eq!(fs::read(areas[0].path.join("NODELR24.Z54")).unwrap(), b"nodelist");
+        }
+    }
+
+    #[test]
+    fn test_a_secure_file_echo_accepts_a_configured_from_and_matching_password() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut config = config(directory.path());
+        config.options.secure = true;
+        config.links[0].tic_password = "secret".to_string();
+        let areas = vec![area(directory.path(), "R24NODEL")];
+        let tic = arrive(&config, "NODELR24.Z54", b"nodelist", "Area R24NODEL\r\nFrom 21:1/1\r\nPw SECRET\r\n");
+
+        let report = toss_tics(&config, &areas).unwrap();
+
+        assert!(report.failed.is_empty(), "{:?}", report.failed);
+        assert_eq!(report.arrived.len(), 1);
+        assert!(!tic.exists());
+        assert_eq!(fs::read(areas[0].path.join("NODELR24.Z54")).unwrap(), b"nodelist");
     }
 
     #[test]
