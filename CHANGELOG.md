@@ -16,6 +16,11 @@ releases.
   which buried the mail that did arrive. PCBoard kept such a directory for the
   same reason.
 
+- An import takes the board's location from the profile PCBoard introduced
+  itself with over `EMSI_DAT`, which is the only place it kept one.
+  `PCBOARD.DAT` has no such field, so the location used to come out empty and
+  a binkp session announced nothing.
+
 ### Fixed
 
 - Echomail for a point is no longer discarded as already travelled merely

@@ -16,7 +16,7 @@ use icy_board_engine::{
         conferences::ConferenceBase,
         events::{BoardEvent, EventList, EventMode},
         file_directory::DirectoryList,
-        freq::{PcbFreqDeny, PcbFreqInfo, PcbFreqMagic, PcbFreqPath},
+        freq::{PcbEmsiProfile, PcbFreqDeny, PcbFreqInfo, PcbFreqMagic, PcbFreqPath},
         ftn::{
             FtnConfig, FtnOptions,
             freq::{FreqMagic, FreqPath, FtnFreq},
@@ -500,6 +500,7 @@ impl PCBoardImporter {
             color_configuration.file_new_file = IcbColor::Dos(color_file[start + 18]);
         }
 
+        let mailer_profile = self.load_mailer_profile();
         let mut icb_cfg = IcbConfig {
             sysop: SysopInformation {
                 name: self.data.sysop_info.sysop.clone(),
@@ -582,7 +583,9 @@ impl PCBoardImporter {
             color_configuration,
             board: BoardInformation {
                 name: self.data.board_name.clone(),
-                location: String::new(),
+                // PCBOARD.DAT has no location; the mailer profile is where
+                // PCBoard kept the city a caller and a link are told.
+                location: mailer_profile.city.clone(),
                 operator: String::new(),
                 notice: String::new(),
                 capabilities: String::new(),
@@ -930,6 +933,34 @@ impl PCBoardImporter {
             }
         }
         result
+    }
+
+    /// The profile a mailer introduces this board with. Binkp carries the same
+    /// names, so what PCBoard put in its `EMSI_DAT` handshake is not lost.
+    fn load_mailer_profile(&mut self) -> PcbEmsiProfile {
+        let path = self.fido_file("PCBFIDO.CFG");
+        if !path.exists() {
+            return PcbEmsiProfile::default();
+        }
+        match PcbEmsiProfile::import_pcboard(&path) {
+            Ok(Some(profile)) => {
+                if !profile.phone.is_empty() || !profile.flags.is_empty() {
+                    let note = format!(
+                        "The mailer profile named a phone number ({}) and flags ({}); a binkp session announces neither, so they were left behind.",
+                        if profile.phone.is_empty() { "none" } else { &profile.phone },
+                        if profile.flags.is_empty() { "none" } else { &profile.flags }
+                    );
+                    self.output.warning(note.clone());
+                    self.logger.log(&note);
+                }
+                profile
+            }
+            Ok(None) => PcbEmsiProfile::default(),
+            Err(err) => {
+                self.logger.log(&format!("Can't read the mailer profile from {}: {}", path.display(), err));
+                PcbEmsiProfile::default()
+            }
+        }
     }
 
     /// What PCBoard hands out on a file request, from the three lists it keeps

@@ -1,6 +1,7 @@
 //! Reads the three FREQ files `PCBoard` keeps beside its fido configuration:
 //! the paths a request may be answered from, the magic names, and the nodes
-//! that get nothing.
+//! that get nothing. `PCBFIDO.CFG`, which holds the request limits and the
+//! profile a mailer introduces the board with, is read here too.
 
 use std::path::Path;
 
@@ -31,6 +32,19 @@ const ADDRESS_RECORD_LEN: usize = 8 + 3 + 1 + 70 + RESERVED_LEN;
 const DIRECTORIES_LEN: usize = 9 * MAXFLEN;
 const EMSI_DATA_LEN: usize = 60 + 30 + 30 + 50 + 10 + 50;
 const FREQ_INFO_OFFSET: usize = HEADER_LEN + DIRECTORIES_LEN + EMSI_DATA_LEN;
+const EMSI_DATA_OFFSET: usize = HEADER_LEN + DIRECTORIES_LEN;
+
+/// What a mailer says about this board when it calls. `PCBoard` filled an
+/// `EMSI_DAT` handshake with it; binkp carries the same three names.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct PcbEmsiProfile {
+    pub bbs_name: String,
+    pub city: String,
+    pub sysop: String,
+    pub phone: String,
+    pub baud: String,
+    pub flags: String,
+}
 const FREQ_INFO_LEN: usize = 15;
 
 /// The limits of the `Fido FREQ restrictions` screen. `PCBoard` names the two
@@ -90,6 +104,23 @@ fn word(bytes: &[u8], at: usize) -> u16 {
 
 fn long(bytes: &[u8], at: usize) -> u32 {
     u32::from_le_bytes([bytes[at], bytes[at + 1], bytes[at + 2], bytes[at + 3]])
+}
+
+impl PcbEmsiProfile {
+    pub fn import_pcboard(path: &Path) -> Res<Option<PcbEmsiProfile>> {
+        let data = std::fs::read(path)?;
+        let Some(record) = data.get(EMSI_DATA_OFFSET..EMSI_DATA_OFFSET + EMSI_DATA_LEN) else {
+            return Ok(None);
+        };
+        Ok(Some(PcbEmsiProfile {
+            bbs_name: field(&record[..60]),
+            city: field(&record[60..90]),
+            sysop: field(&record[90..120]),
+            phone: field(&record[120..170]),
+            baud: field(&record[170..180]),
+            flags: field(&record[180..230]),
+        }))
+    }
 }
 
 impl PcbFreqInfo {
@@ -288,5 +319,28 @@ mod tests {
         std::fs::write(&path, [3u8, 0]).unwrap();
 
         assert_eq!(PcbFreqInfo::import_pcboard(&path).unwrap(), None);
+        assert_eq!(PcbEmsiProfile::import_pcboard(&path).unwrap(), None);
+    }
+
+    #[test]
+    fn test_the_profile_is_read_from_where_pcbfido_keeps_it() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("PCBFIDO.CFG");
+        let mut data = vec![0u8; EMSI_DATA_OFFSET];
+        data[0] = 3;
+        let mut profile = vec![0u8; EMSI_DATA_LEN];
+        for (text, at) in [("Icy Board", 0), ("Bonn, Germany", 60), ("Mike Krueger", 90), ("-Unpublished-", 120)] {
+            profile[at..at + text.len()].copy_from_slice(text.as_bytes());
+        }
+        data.extend(profile);
+        std::fs::write(&path, data).unwrap();
+
+        let read = PcbEmsiProfile::import_pcboard(&path).unwrap().unwrap();
+
+        assert_eq!(read.bbs_name, "Icy Board");
+        // The city sits before the sysop, whatever order the screen shows.
+        assert_eq!(read.city, "Bonn, Germany");
+        assert_eq!(read.sysop, "Mike Krueger");
+        assert_eq!(read.phone, "-Unpublished-");
     }
 }
