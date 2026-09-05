@@ -1517,7 +1517,7 @@ pub async fn message(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let to = if to.is_empty() { caller.clone() } else { to };
     let from = if from.is_empty() { caller } else { from };
 
-    let mut attributes = 0;
+    let mut attributes = jam_attributes::MSG_LOCAL;
     if sec.trim().to_ascii_uppercase().starts_with('R') {
         attributes |= jam_attributes::MSG_PRIVATE;
     }

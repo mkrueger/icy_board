@@ -787,10 +787,9 @@ pub fn scan_outbound(config: &FtnConfig, areas: &AreaMap, now: &NaiveDateTime) -
             let Ok(mut header) = base.read_header(number) else {
                 continue;
             };
-            // A message that came in from the network carries the echo flag and
-            // one written here does not, which is what stops mail going back
-            // the way it came.
-            if header.attributes & attributes::MSG_TYPEECHO != 0 {
+            // Only what was written on this board goes out, which is what stops
+            // mail going back the way it came.
+            if !written_here(header.attributes) {
                 continue;
             }
             let msgid = if let Some(id) = subfield(&header, SubfieldType::MsgID) {
@@ -879,9 +878,15 @@ fn netmail_route(config: &FtnConfig, dest: &EchomailAddress) -> Option<usize> {
     reachable.next().is_none().then_some(only)
 }
 
-/// Packs the netmail written here for the node it is addressed to. Everything
-/// the tosser imported carries `MSG_TYPENET`, so what is left is what was
-/// written on this board.
+/// Mail this board originated rather than took in from the network. A message
+/// entered here is marked local, by the board itself and by an offline editor
+/// such as `GoldED`; what the tosser imported is not. Mail from before the mark
+/// was written carries neither the echo nor the net type and counts as ours.
+fn written_here(attributes: u32) -> bool {
+    attributes & attributes::MSG_LOCAL != 0 || attributes & (attributes::MSG_TYPEECHO | attributes::MSG_TYPENET) == 0
+}
+
+/// Packs the netmail written here for the node it is addressed to.
 fn scan_netmail(config: &FtnConfig, state: &mut ScanState, report: &mut ScanReport, now: &NaiveDateTime) -> Res<()> {
     if !config.netmail.with_extension("jhr").exists() {
         return Ok(());
@@ -893,7 +898,7 @@ fn scan_netmail(config: &FtnConfig, state: &mut ScanState, report: &mut ScanRepo
         let Ok(mut header) = base.read_header(number) else {
             continue;
         };
-        if header.is_deleted() || header.attributes & (attributes::MSG_TYPENET | attributes::MSG_SENT) != 0 {
+        if header.is_deleted() || header.attributes & attributes::MSG_SENT != 0 || !written_here(header.attributes) {
             continue;
         }
         let Some(dest) = subfield(&header, SubfieldType::AddressD).and_then(|address| EchomailAddress::parse(&address)) else {
@@ -1799,7 +1804,49 @@ mod tests {
         assert!(again.bundles.is_empty());
     }
 
-    /// What the tosser imported carries `MSG_TYPENET`, and sending it back out
+    /// An offline editor writes into the netmail base itself and marks what it
+    /// wrote there as netmail, the same way the tosser marks what it imported.
+    /// The local flag is what tells the two apart.
+    #[test]
+    fn test_netmail_an_offline_editor_wrote_here_is_sent() {
+        let directory = tempfile::tempdir().unwrap();
+        let config = config(directory.path());
+        let mut base = open_base(&config.netmail).unwrap();
+        let written = netmail_for("21:1/1", false).with_attributes(attributes::MSG_LOCAL | attributes::MSG_PRIVATE | attributes::MSG_TYPENET);
+        base.write_message(&written).unwrap();
+        base.write_jhr_header().unwrap();
+
+        let report = scan_outbound(&config, &[], &when()).unwrap();
+
+        assert_eq!(report.netmail, 1);
+        assert_eq!(report.bundles.len(), 1);
+    }
+
+    /// An offline reader writes into an echo area the same way, so a message
+    /// entered there is not one that came back around.
+    #[test]
+    fn test_echomail_an_offline_editor_wrote_here_is_sent() {
+        let directory = tempfile::tempdir().unwrap();
+        let config = config(directory.path());
+        let path = directory.path().join("bases/general");
+        let mut base = open_base(&path).unwrap();
+        base.write_message(&JamMessage::default().with_text(BString::from("old"))).unwrap();
+        base.write_jhr_header().unwrap();
+        let areas = vec![EchoArea::new("FSX_GEN", path.clone())];
+        assert_eq!(scan_outbound(&config, &areas, &when()).unwrap().exported, 0);
+
+        base.write_message(
+            &JamMessage::default()
+                .with_text(BString::from("new"))
+                .with_attributes(attributes::MSG_LOCAL | attributes::MSG_TYPEECHO),
+        )
+        .unwrap();
+        base.write_jhr_header().unwrap();
+
+        assert_eq!(scan_outbound(&config, &areas, &when()).unwrap().exported, 1);
+    }
+
+    /// What the tosser imported is not marked local, and sending it back out
     /// would return every message to the node it came from.
     #[test]
     fn test_netmail_that_came_in_from_the_network_is_not_sent_back_out() {

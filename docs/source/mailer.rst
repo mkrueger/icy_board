@@ -267,6 +267,11 @@ the mailer does not choose one arbitrarily.
 A sent message is marked so it is packed only once. One that asks to be killed
 once sent is removed from the base instead.
 
+Mail written here is told from mail that came in by the local mark every
+message carries. The board sets it on what a user or the sysop writes, and an
+offline editor such as GoldED sets it on what is entered through it, so netmail
+written into the base with an outside editor is packed as well.
+
 Do not give the netmail base a ``Fido Area Tag``. Netmail belongs to one node,
 so exporting it as echomail would put private mail in a bundle for every
 downlink that carries the tag. The scanner refuses such an area and says so.

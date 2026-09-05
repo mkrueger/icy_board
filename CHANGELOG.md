@@ -25,7 +25,9 @@ releases.
   route rather than having one picked for it. Sent mail is marked so it goes
   once, and mail asking to be killed once sent is removed. An area pointing at
   the netmail base is refused rather than exported as echomail to every
-  downlink.
+  downlink. What was written here is told from what came in by the local mark
+  every message carries, so mail entered with an offline editor such as GoldED
+  goes out as well.
 
 - A message area can carry its own Fido origin line, set as `Fido Origin` in
   the area editor. Echomail written there leaves the board with that line

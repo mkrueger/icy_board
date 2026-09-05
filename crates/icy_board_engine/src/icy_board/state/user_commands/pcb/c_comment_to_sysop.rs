@@ -36,7 +36,9 @@ fn make_message(
         .with_to(BString::from(recipient))
         .with_subject(BString::from(editor.subj.clone()))
         .with_date_time(Utc::now())
-        .with_attributes(attributes)
+        // The mark is what tells the scanner this message was written here and
+        // has yet to go out, rather than having come in from the network.
+        .with_attributes(attributes | jamjam::jam::attributes::MSG_LOCAL)
         .with_text(BString::from(text));
     if let Some(password) = password {
         msg = msg.with_password(&BString::from(password.clone()));
