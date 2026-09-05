@@ -141,6 +141,7 @@ pub fn tosser(icy_board: Arc<Mutex<IcyBoard>>) -> FtnOptionPage {
         let lock = icy_board.lock().unwrap();
         let width = 38;
         vec![
+            flag!("fido_enable_routing", width, enable_routing, lock),
             flag!("fido_secure", width, secure, lock),
             flag!("fido_sysop_change", width, sysop_change, lock),
             ConfigEntry::Separator,
@@ -149,6 +150,12 @@ pub fn tosser(icy_board: Arc<Mutex<IcyBoard>>) -> FtnOptionPage {
             number!("fido_msgs_to_track", width, 100_000, msgs_to_track, u32, lock),
             ConfigEntry::Separator,
             flag!("fido_pass_thru", width, pass_thru, lock),
+            flag!("fido_make_response", width, make_response, lock),
+            flag!("fido_area_fix_forwarding", width, area_fix_forwarding, lock),
+            flag!("fido_auto_add_passthru", width, auto_add_passthru, lock),
+            flag!("fido_re_address", width, re_address, lock),
+            flag!("fido_route_echo_mail", width, route_echo_mail, lock),
+            ConfigEntry::Separator,
             flag!("fido_auto_add", width, auto_add, lock),
             number!("fido_auto_add_conference", width, u16::MAX as u32, auto_add_conference, usize, lock),
         ]

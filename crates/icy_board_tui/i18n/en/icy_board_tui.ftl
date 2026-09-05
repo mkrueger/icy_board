@@ -3743,6 +3743,7 @@ fido_menu_nodes=Node Configuration
 fido_menu_addresses=System Address
 fido_menu_directories=File & Directory Configuration
 fido_menu_origin=Origin
+fido_menu_routing=Routing Configuration
 
 fido_processing_title=Fido Processing Configuration
 
@@ -3801,6 +3802,10 @@ fido_default_net-help=
 
 fido_tosser_title=Fido Tosser Configuration
 
+fido_enable_routing=Enable Inbound Routing
+fido_enable_routing-status=Route packets addressed to another system
+fido_enable_routing-help=Uses Routing Configuration to place a packet in its next-hop node's outbound instead of importing it here.
+
 fido_check_dupe_path=Check for Dupes using Message Path
 fido_check_dupe_path-status=Drop a message whose path already names this board
 fido_check_dupe_path-help=A message that has been here before has come back the long way around, which the id check misses when the message carries no id.
@@ -3828,6 +3833,26 @@ fido_auto_add_conference-help=
 fido_pass_thru=Enable PassThru's
 fido_pass_thru-status=Hand an area on without storing it here
 fido_pass_thru-help=A hub feeds its downlinks areas it does not read itself. The message is offered to every link that asked for the tag and has not seen it yet.
+
+fido_make_response=Generate Response Messages
+fido_make_response-status=Send AreaFix results and failures back by netmail
+fido_make_response-help=AreaFix commands are still processed while this is off, but no result netmail is generated.
+
+fido_area_fix_forwarding=Enable AreaFix Forwarding
+fido_area_fix_forwarding-status=Forward unknown AreaFix subscriptions to an upstream node
+fido_area_fix_forwarding-help=The first other configured node receives the forwarded request. Put the uplink before downlinks in Node Configuration.
+
+fido_auto_add_passthru=Auto Add Fido Areas as PassThru's
+fido_auto_add_passthru-status=Create a passthru subscription for an unknown AreaFix tag
+fido_auto_add_passthru-help=Requires Enable PassThru's. The tag is added to the requesting node without creating a local message base.
+
+fido_re_address=Re-Address Routed Packets
+fido_re_address-status=Address a routed packet to its next-hop node
+fido_re_address-help=Without this the original final destination remains in the packet header. The bundle is still queued for the next hop.
+
+fido_route_echo_mail=Route Echo Mail
+fido_route_echo_mail-status=Use Routing Configuration for outbound echo packets
+fido_route_echo_mail-help=When a destination node has a route, its echomail bundle is placed in the next-hop node's outbound.
 
 fido_secure=Secure Netmail
 fido_secure-status=Keep netmail from an unconfigured node apart
@@ -3924,6 +3949,10 @@ fido_node_packet_password-help=
     without them is left in the inbound. Leave it empty and packets are taken as
     they come, which is what PCBoard did when the ~FIDO~ record had no password.
 
+fido_node_areafix_password=AreaFix Password
+fido_node_areafix_password-status=Password expected in AreaFix request subjects from this node
+fido_node_areafix_password-help=Leave empty to accept an empty AreaFix subject. This is separate from the binkp session and packet passwords.
+
 fido_node_areas=Areas
 fido_node_areas-status=The echo tags this node carries, separated by spaces
 fido_node_areas-help=
@@ -3943,6 +3972,16 @@ fido_origin-help=
     The line appended to every echomail message written on this board. Custom in
     fidonet is the board name and how to reach it, and some networks insist on
     one, so set it before scanning for the first time.
+
+fido_route_title=Fidonet Routing Configuration
+fido_route_editor=Route
+fido_route_header_destination=Destination
+fido_route_header_via=Via
+fido_route_destination=Destination
+fido_route_destination-status=Final FTN address matched by this route
+fido_route_via=Via Node
+fido_route_via-status=Configured node which receives the packet as its next hop
+fido_route_via-help=The address must also exist in Node Configuration.
 
 qwk_settings_title=QWK Settings
 

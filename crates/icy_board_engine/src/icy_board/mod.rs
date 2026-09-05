@@ -725,8 +725,13 @@ impl IcyBoard {
         pcb_dat.fido_num_msgs_to_track = self.ftn.options.msgs_to_track.min(i32::MAX as u32) as i32;
         pcb_dat.fido_secure = self.ftn.options.secure;
         pcb_dat.fido_sysop_change = self.ftn.options.sysop_change;
-        pcb_dat.fido_auto_add = self.ftn.options.auto_add;
+        pcb_dat.fido_auto_add = self.ftn.options.auto_add_passthru;
         pcb_dat.fido_enable_pass_thru = self.ftn.options.pass_thru;
+        pcb_dat.fido_enable_routing = self.ftn.options.enable_routing;
+        pcb_dat.fido_route_echo_mail = self.ftn.options.route_echo_mail;
+        pcb_dat.fido_re_address = self.ftn.options.re_address;
+        pcb_dat.fido_make_response = self.ftn.options.make_response;
+        pcb_dat.fido_enable_area_fix = self.ftn.options.area_fix_forwarding;
         pcb_dat.fido_default_zone = self.ftn.options.default_zone as i32;
         pcb_dat.fido_default_net = self.ftn.options.default_net as i32;
         pcb_dat.fido_log_level = self.ftn.options.log_level.to_pcboard();

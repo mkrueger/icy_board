@@ -174,7 +174,7 @@ fn set_up_logging(level: FtnLogLevel) {
 fn load(config: &Path) -> Res<IcyBoard> {
     let mut board = IcyBoard::load(&config)?;
     board.resolve_paths();
-    if !board.ftn.is_configured() {
+    if board.ftn.options.enabled && !board.ftn.is_configured() {
         return Err(format!(
             "{} lists no ftn address, so there is nothing to introduce this board as. Add an [[aka]] block with the node number your \
              coordinator gave you to the ftn file named by ftn_file, or fill it in under Message Networking in ICBSetup",
@@ -329,7 +329,13 @@ fn toss(board: &mut IcyBoard) -> Res<()> {
         report.imported, report.netmail, report.duplicates
     );
     if report.passed_through > 0 {
-        println!("  {} message(s) handed on in {} bundle(s)", report.passed_through, report.bundles.len());
+        println!("  {} echomail message(s) handed on", report.passed_through);
+    }
+    if report.routed > 0 {
+        println!("  {} packet(s) routed to the next hop", report.routed);
+    }
+    if report.area_fix > 0 {
+        println!("  {} AreaFix request(s) processed", report.area_fix);
     }
     if report.orphans > 0 {
         println!(
@@ -349,7 +355,26 @@ fn toss(board: &mut IcyBoard) -> Res<()> {
     for (file, err) in &report.failed {
         println!("  left in the inbound, {}: {}", file.display(), err);
     }
+    register_link_updates(board, &report)?;
     register_new_areas(board, &report)?;
+    Ok(())
+}
+
+fn register_link_updates(board: &mut IcyBoard, report: &TossReport) -> Res<()> {
+    if report.link_updates.is_empty() {
+        return Ok(());
+    }
+    let path = board.config.paths.ftn_file.clone();
+    let mut stored = FtnConfig::load(&path)?;
+    for (index, areas) in &report.link_updates {
+        if let Some(link) = board.ftn.links.get_mut(*index) {
+            link.areas.clone_from(areas);
+        }
+        if let Some(link) = stored.links.get_mut(*index) {
+            link.areas.clone_from(areas);
+        }
+    }
+    stored.save(&path)?;
     Ok(())
 }
 

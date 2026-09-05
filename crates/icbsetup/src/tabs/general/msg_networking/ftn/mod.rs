@@ -14,6 +14,7 @@ use ratatui::{Frame, layout::Rect};
 mod addresses;
 mod nodes;
 mod options;
+mod routes;
 
 /// `PCBoard` reached the whole fidonet setup from one menu, and a sysop coming
 /// from there looks for these names in this order.
@@ -32,6 +33,7 @@ impl FidoConfiguration {
                 MenuItem::new(3, 'D', get_text("fido_menu_addresses")),
                 MenuItem::new(4, 'E', get_text("fido_menu_directories")),
                 MenuItem::new(5, 'F', get_text("fido_menu_origin")),
+                MenuItem::new(6, 'G', get_text("fido_menu_routing")),
             ]))
             .with_center_title(get_text("fido_config_title")),
             icy_board,
@@ -63,6 +65,7 @@ impl Page for FidoConfiguration {
                 3 => PageMessage::OpenSubPage(Box::new(addresses::SystemAddresses::new(board))),
                 4 => PageMessage::OpenSubPage(Box::new(options::directories(board))),
                 5 => PageMessage::OpenSubPage(Box::new(options::origin(board))),
+                6 => PageMessage::OpenSubPage(Box::new(routes::RoutingConfiguration::new(board))),
                 _ => PageMessage::None,
             };
         }

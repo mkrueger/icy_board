@@ -134,6 +134,10 @@ you, or a downlink you feed.
    only for the areas it asked for, and to every link that asked. Leave it
    empty and the link gets no echomail.
 
+``area_fix_password``
+   The password expected as the first word of AreaFix request subjects from
+   this node. An empty value accepts an empty subject.
+
 ``poll_minutes``
    Reserved for a scheduler that does not exist yet. Zero, the default, means
    the link is called only when you ask for it.
@@ -150,6 +154,32 @@ Processing options
    ``normal`` reports warnings and errors, ``detailed`` also reports regular
    mailer activity, and ``debug`` includes packet and protocol details. The
    command-line ``-v`` switch temporarily selects debug for that run.
+
+Routing
+~~~~~~~
+
+Exact destination routes name a configured node as their next hop::
+
+   [[route]]
+   destination = "2:240/6000"
+   via = "2:240/5853"
+
+``enable_routing`` moves incoming packets for a routed destination to that
+node's outbound. ``re_address`` changes the routed packet header to the next
+hop; without it the final destination remains in the header. With
+``route_echo_mail`` the same route table is used for echomail exported to a
+configured destination node.
+
+AreaFix
+~~~~~~~
+
+Netmail to ``AREAFIX`` from a configured node accepts ``+TAG``, ``-TAG``,
+``%+ALL``, ``%-ALL``, ``%LIST``, ``%QUERY`` and ``%HELP``. Successful changes
+update that node's ``areas`` list in ``ftn.toml``. ``make_response`` sends a
+result message back. ``auto_add_passthru`` allows an unknown tag to be added as
+a passthru subscription while ``pass_thru`` is enabled. Otherwise,
+``area_fix_forwarding`` passes an unknown subscription request to the first
+other configured node, so place the uplink before downlinks.
 
 Netmail options
 ~~~~~~~~~~~~~~~

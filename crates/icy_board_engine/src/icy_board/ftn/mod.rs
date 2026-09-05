@@ -107,6 +107,11 @@ pub struct FtnLink {
     #[serde(skip_serializing_if = "String::is_empty")]
     pub packet_password: String,
 
+    /// Password expected in the subject of `AreaFix` netmail from this node.
+    #[serde(default)]
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub area_fix_password: String,
+
     /// Zero means the link is polled only when the sysop asks for it.
     #[serde(default)]
     pub poll_minutes: u32,
@@ -144,6 +149,7 @@ impl Default for FtnLink {
             port: DEFAULT_BINKP_PORT,
             password: String::new(),
             packet_password: String::new(),
+            area_fix_password: String::new(),
             poll_minutes: 0,
             areas: Vec::new(),
         }
@@ -190,8 +196,7 @@ pub struct FtnOptions {
     /// are their Icy Board equivalent.
     pub secure: bool,
 
-    /// Netmail addressed to "Sysop" is handed to the name the sysop reads
-    /// under, which is what the rest of the board delivers to.
+    /// Fido mail addressed to "Sysop" is changed to `FIDO_SYSOP` on import.
     pub sysop_change: bool,
 
     /// A tag no area carries becomes an area of its own instead of being
@@ -204,6 +209,24 @@ pub struct FtnOptions {
     /// A tag no area carries is passed on to the links that asked for it. A
     /// hub feeds an area it does not read itself this way.
     pub pass_thru: bool,
+
+    /// Route packets addressed to another system through `routes`.
+    pub enable_routing: bool,
+
+    /// Apply routes when exporting echomail to a configured node.
+    pub route_echo_mail: bool,
+
+    /// Address a routed packet to its next hop rather than its final system.
+    pub re_address: bool,
+
+    /// Generate `AreaFix` result and failure netmail.
+    pub make_response: bool,
+
+    /// Forward unknown `AreaFix` subscriptions to an upstream node.
+    pub area_fix_forwarding: bool,
+
+    /// Turn unknown `AreaFix` subscriptions into passthru areas.
+    pub auto_add_passthru: bool,
 
     /// The zone and net a two dimensional packet header is completed with.
     pub default_zone: u16,
@@ -230,6 +253,12 @@ impl Default for FtnOptions {
             auto_add: false,
             auto_add_conference: 0,
             pass_thru: false,
+            enable_routing: false,
+            route_echo_mail: false,
+            re_address: false,
+            make_response: false,
+            area_fix_forwarding: false,
+            auto_add_passthru: false,
             default_zone: 0,
             default_net: 0,
             log_level: FtnLogLevel::Normal,
@@ -274,6 +303,21 @@ pub struct FtnConfig {
 
     #[serde(rename = "link", default)]
     pub links: Vec<FtnLink>,
+
+    #[serde(rename = "route", default)]
+    pub routes: Vec<FtnRoute>,
+}
+
+#[serde_as]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+pub struct FtnRoute {
+    /// Final packet destination matched by this route.
+    #[serde_as(as = "DisplayFromStr")]
+    pub destination: EchomailAddress,
+
+    /// Configured link that receives the packet as its next hop.
+    #[serde_as(as = "DisplayFromStr")]
+    pub via: EchomailAddress,
 }
 
 impl FtnConfig {
@@ -313,6 +357,12 @@ impl FtnConfig {
         !self.akas.is_empty()
     }
 
+    pub fn route_for(&self, destination: &EchomailAddress) -> Option<(&FtnRoute, usize)> {
+        let route = self.routes.iter().find(|route| route.destination == *destination)?;
+        let link = self.links.iter().position(|link| link.address == route.via)?;
+        Some((route, link))
+    }
+
     /// Mail waits in a directory of its own per link, because a flat outbound
     /// would offer every bundle to every system that calls.
     pub fn outbound_for(&self, link: &FtnLink) -> PathBuf {
@@ -325,6 +375,7 @@ impl Default for FtnConfig {
         Self {
             akas: Vec::new(),
             links: Vec::new(),
+            routes: Vec::new(),
             inbound: PathBuf::from("ftn/inbound"),
             outbound: PathBuf::from("ftn/outbound"),
             netmail: Self::default_netmail(),
@@ -403,12 +454,23 @@ mod tests {
                 host: "hub.example.org".to_string(),
                 password: "secret".to_string(),
                 packet_password: "pktpass".to_string(),
+                area_fix_password: "afixpass".to_string(),
                 poll_minutes: 30,
                 ..link("21:1/1", "fsxnet")
+            }],
+            routes: vec![FtnRoute {
+                destination: EchomailAddress::parse("21:1/200").unwrap(),
+                via: EchomailAddress::parse("21:1/1").unwrap(),
             }],
             ..Default::default()
         };
         config.options.log_level = FtnLogLevel::Debug;
+        config.options.enable_routing = true;
+        config.options.route_echo_mail = true;
+        config.options.re_address = true;
+        config.options.make_response = true;
+        config.options.area_fix_forwarding = true;
+        config.options.auto_add_passthru = true;
         let text = toml::to_string(&config).unwrap();
         assert_eq!(toml::from_str::<FtnConfig>(&text).unwrap(), config);
     }

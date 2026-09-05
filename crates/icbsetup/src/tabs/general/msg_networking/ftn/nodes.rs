@@ -122,6 +122,18 @@ impl<'a> NodeConfiguration<'a> {
                 }),
             ),
             ConfigEntry::Item(
+                ListItem::new(
+                    get_text("fido_node_areafix_password"),
+                    ListValue::Text(32, TextFlags::Password, link.area_fix_password.clone()),
+                )
+                .with_status(get_text("fido_node_areafix_password-status"))
+                .with_help(get_text("fido_node_areafix_password-help"))
+                .with_label_width(width)
+                .with_update_text_value(&|(i, board): &(usize, Arc<Mutex<IcyBoard>>), value: String| {
+                    board.lock().unwrap().ftn.links[*i].area_fix_password = value;
+                }),
+            ),
+            ConfigEntry::Item(
                 ListItem::new(get_text("fido_node_areas"), ListValue::Text(60, TextFlags::None, link.areas.join(" ")))
                     .with_status(get_text("fido_node_areas-status"))
                     .with_help(get_text("fido_node_areas-help"))

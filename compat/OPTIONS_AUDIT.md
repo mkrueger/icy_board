@@ -259,23 +259,23 @@ Message Networking → Fido Configuration, the importer fills them in and the
 | `fido_num_msgs_to_track` | `options.msgs_to_track` |
 | `fido_secure` | `options.secure`, with `bad_netmail` for the base |
 | `fido_sysop_change` | `options.sysop_change` |
-| `fido_auto_add` | `options.auto_add`, with `new_areas` for the bases |
+| `fido_auto_add` | `options.auto_add_passthru` |
 | `fido_enable_pass_thru` | `options.pass_thru` |
+| `fido_enable_routing` | `options.enable_routing`, with `[[route]]` entries |
+| `fido_route_echo_mail` | `options.route_echo_mail` |
+| `fido_re_address` | `options.re_address` |
+| `fido_make_response` | `options.make_response` |
+| `fido_enable_area_fix` | `options.area_fix_forwarding` |
 | `fido_default_zone` | `options.default_zone` |
 | `fido_default_net` | `options.default_net` |
 | `fido_log_level` | `options.log_level` (`0` normal, `1..3` detailed, higher values debug) |
 
-The nine that were left out, and why:
+The five that were left out, and why:
 
 | Option | Why not |
 | --- | --- |
-| `fido_enable_area_fix` | AreaFix, subscribing to an area by netmail, is a feature of its own that does not exist here. A flag for it would switch nothing on |
-| `fido_make_response` | The responses it means are AreaFix replies and return receipts, and neither exists |
 | `fido_crash_sec` | Nothing lets a user write netmail here, so there is nobody to refuse the crash flag to |
 | `fido_create_msg` | `*.MSG` is the DOS one file per message netmail format. The netmail base here is JAM |
-| `fido_enable_routing` | Routing netmail on behalf of a system that is not a direct link needs a route table this board does not have |
-| `fido_route_echo_mail` | The same for echomail. `pass_thru` covers the part of it a leaf or a small hub needs |
-| `fido_re_address` | Rewriting the addresses of a routed packet only matters once routing exists |
 | `fido_pkt_freq` | Nothing runs the tosser on a timer. `icbmailer` is started by the sysop or by cron |
 | `fido_export_freq`, `fido_mail_freq` | The same, and each link already carries its own `poll_minutes` |
 
