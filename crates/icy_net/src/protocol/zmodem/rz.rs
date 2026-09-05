@@ -361,15 +361,22 @@ impl Rz {
     }
 
     async fn handle_header(&mut self, com: &mut dyn Connection, transfer_state: &mut TransferState, header: Header) -> crate::Result<bool> {
-        self.use_crc32 = matches!(header.header_type, HeaderType::Bin32 | HeaderType::Hex);
+        // A data subpacket following a HEX header always uses CRC-16 (section 7.3.3).
+        self.use_crc32 = matches!(header.header_type, HeaderType::Bin32);
         match header.frame_type {
             ZFrameType::SInit => {
                 transfer_state.recieve_state.log_info("ZSINIT received, reading attention sequence".to_string());
+                self.sender_flags = header.f0();
+                if self.sender_flags & super::zsinit_flag::TESCCTL != 0 {
+                    self.can_esc_control = true;
+                }
+                if self.sender_flags & super::zsinit_flag::TESC8 != 0 {
+                    self.escape_8th_bit = true;
+                }
                 let pck = read_subpacket(com, self.block_length, self.use_crc32, self.can_esc_control).await;
                 match pck {
                     Ok(attn_seq) => {
                         self.attn_seq = attn_seq.0;
-                        self.sender_flags = header.f0();
 
                         // Log sender flags
                         let mut flags = Vec::new();
@@ -466,15 +473,15 @@ impl Rz {
                                 _ => {}
                             }
                             self.errors += 1;
-                            // Optionally send attention before RPOS
+                            // Optionally send attention before requesting ZFILE again
                             if kind == "decode" && !self.attn_seq.is_empty() {
                                 let _ = com.send(&self.attn_seq).await;
                             }
                             // Purge stray bytes before requesting file header again
                             let _ = self.purge(com).await;
-                            Header::from_number(ZFrameType::RPos, transfer_state.recieve_state.cur_bytes_transfered as u32)
-                                .write(com, HeaderType::Hex, self.can_esc_control)
-                                .await?;
+                            // ZRPOS would accept the file and start data transfer;
+                            // ZNAK asks the sender to repeat the damaged ZFILE block.
+                            Header::empty(ZFrameType::Nak).write(com, HeaderType::Hex, self.can_esc_control).await?;
                             // If we exceed threshold, abort
                             if self.errors > 10 {
                                 transfer_state
@@ -506,14 +513,11 @@ impl Rz {
                     Ordering::Greater => {
                         transfer_state
                             .recieve_state
-                            .log_warning(format!("Sender offset {} is behind our position {}, truncating file", offset, len));
-                        if let Some(named_file) = self.cur_out_file.take() {
-                            named_file.as_file().set_len(offset as u64)?;
-                            transfer_state.recieve_state.cur_bytes_transfered = offset as u64;
-                            self.cur_out_file = Some(named_file);
-                        } else {
-                            return Err(ZModemError::NoFileOpen.into());
-                        }
+                            .log_warning(format!("Sender offset {} is behind our position {}, requesting resync", offset, len));
+                        Header::from_number(ZFrameType::RPos, len as u32)
+                            .write(com, HeaderType::Hex, self.can_esc_control)
+                            .await?;
+                        return Ok(false);
                     }
 
                     Ordering::Less => {
@@ -541,12 +545,11 @@ impl Rz {
 
                 if transfer_state.recieve_state.cur_bytes_transfered != expected_size {
                     transfer_state.recieve_state.log_warning(format!(
-                        "File size mismatch! Expected {}, got {}. Requesting missing data.",
+                        "File size mismatch! Expected {}, got {}. Ignoring stale ZEOF.",
                         expected_size, transfer_state.recieve_state.cur_bytes_transfered
                     ));
-                    Header::from_number(ZFrameType::RPos, transfer_state.recieve_state.cur_bytes_transfered as u32)
-                        .write(com, HeaderType::Hex, self.can_esc_control)
-                        .await?;
+                    // A replacement ZDATA may already be in flight after the
+                    // preceding ZRPOS, so section 8.2 requires this to be ignored.
                     return Ok(false);
                 }
 
@@ -676,7 +679,12 @@ pub async fn read_subpacket(com: &mut dyn Connection, block_length: usize, use_c
     let mut data = Vec::with_capacity(block_length);
     loop {
         match read_zdle_byte(com, escape_ctrl_chars).await? {
-            ZModemResult::Ok(b) => data.push(b),
+            ZModemResult::Ok(b) => {
+                if data.len() >= block_length {
+                    return Err(ZModemError::SubpacketOverflow(data.len() + 1, block_length).into());
+                }
+                data.push(b);
+            }
             ZModemResult::CrcCheckRequested(first_byte, frame_ends, zack_requested) => match check_crc(com, use_crc32, &data, first_byte).await {
                 Ok(_) => {
                     return Ok((data, frame_ends, zack_requested));
@@ -734,10 +742,7 @@ pub async fn read_zdle_byte(com: &mut dyn Connection, escape_ctrl_chars: bool) -
                             if c & 0x60 == 0x40 {
                                 return Ok(ZModemResult::Ok(c ^ 0x40));
                             }
-                            // Reference implementation only logs and discards illegal ZDLE sequences.
-                            // Treat as recoverable: drop byte and keep reading instead of bailing out.
-                            log::warn!("Illegal ZDLE sequence byte 0x{:02X}, dropping", c);
-                            continue; // keep consuming until we see a valid terminator or data byte
+                            return Err(ZModemError::InvalidSubpacket(c).into());
                         }
                     }
                 }

@@ -152,11 +152,11 @@ impl Header {
         let mut res = Vec::new();
         match header_type {
             HeaderType::Bin => {
-                res.extend_from_slice(&[ZPAD, ZDLE, ZBIN, self.frame_type as u8]);
+                res.extend_from_slice(&[ZPAD, ZDLE, ZBIN]);
                 let mut raw = Vec::with_capacity(1 + self.data.len());
                 raw.push(self.frame_type as u8);
                 raw.extend_from_slice(&self.data);
-                // Append escaped data bytes
+                append_zdle_encoded(&mut res, &[self.frame_type as u8], escape_ctrl_chars);
                 append_zdle_encoded(&mut res, &self.data, escape_ctrl_chars);
                 // Compute CRC16 on raw body
                 let crc16 = get_crc16_buggy(&raw);
@@ -164,10 +164,11 @@ impl Header {
             }
 
             HeaderType::Bin32 => {
-                res.extend_from_slice(&[ZPAD, ZDLE, ZBIN32, self.frame_type as u8]);
+                res.extend_from_slice(&[ZPAD, ZDLE, ZBIN32]);
                 let mut raw = Vec::with_capacity(1 + self.data.len());
                 raw.push(self.frame_type as u8);
                 raw.extend_from_slice(&self.data);
+                append_zdle_encoded(&mut res, &[self.frame_type as u8], escape_ctrl_chars);
                 append_zdle_encoded(&mut res, &self.data, escape_ctrl_chars);
                 let crc32 = get_crc32(&raw);
                 append_zdle_encoded(&mut res, &u32::to_le_bytes(crc32), escape_ctrl_chars);

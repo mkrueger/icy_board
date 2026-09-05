@@ -15,7 +15,7 @@ use crate::{
     protocol::{Header, HeaderType, TransferState, ZCRCE, ZCRCG, ZFrameType, Zmodem, zfile_flag, zmodem::err::ZModemError},
 };
 
-use super::{ZCRCQ, ZCRCW};
+use super::ZCRCW;
 
 #[derive(Debug, PartialEq)]
 pub enum SendState {
@@ -23,6 +23,7 @@ pub enum SendState {
     SendZRQInit,
     SendZDATA,
     SendDataPackages,
+    AwaitDataAck,
     SendNextFile,
     ZEOFSentAwaitZRINIT,
 }
@@ -175,6 +176,7 @@ impl Sz {
                     .await?;
                 self.state = SendState::SendDataPackages;
             }
+            SendState::AwaitDataAck => {}
             SendState::SendDataPackages => {
                 if self.cur_buf.is_none() {
                     return Ok(());
@@ -202,10 +204,10 @@ impl Sz {
 
                 let crc_byte = if is_last_block {
                     ZCRCE // Last block always uses ZCRCE
-                } else if self.nonstop {
+                } else if self.nonstop && self.can_receive_data_during_io() {
                     ZCRCG // Streaming mode
                 } else {
-                    ZCRCQ // Expect ACK
+                    ZCRCW // Wait for ACK before sending the next subpacket
                 };
 
                 let p = self.encode_subpacket(crc_byte, &block[..bytes_read]);
@@ -218,6 +220,8 @@ impl Sz {
                         .await?;
                     self.state = SendState::ZEOFSentAwaitZRINIT;
                     self.retries = 0;
+                } else if crc_byte == ZCRCW {
+                    self.state = SendState::AwaitDataAck;
                 }
             }
 
@@ -369,19 +373,21 @@ impl Sz {
 
                 if self.can_esc_control() {
                     transfer_state.send_state.log_info("Sending ZSINIT for escape control".to_string());
-                    let header = Header::from_flags(ZFrameType::SInit, super::zrinit_flag::ESCCTL, 0, 0, 0);
+                    let header = Header::from_flags(ZFrameType::SInit, 0, 0, 0, super::zsinit_flag::TESCCTL);
                     let data = vec![0]; // Empty attention string
                     let mut packet = header.build(HeaderType::Hex, self.can_esc_control());
-                    packet.extend_from_slice(&self.encode_subpacket(ZCRCW, &data));
+                    // A subpacket following a HEX header always uses CRC-16.
+                    packet.extend_from_slice(&Zmodem::encode_subpacket_crc16(ZCRCW, &data, self.can_esc_control()));
                     com.send(&packet).await?;
 
-                    // Wait for ZACK
-                    if let Ok(Some(ack)) = Header::read(com, &mut self.can_count).await
-                        && ack.frame_type != ZFrameType::Ack
-                    {
-                        transfer_state
-                            .send_state
-                            .log_warning(format!("Expected ZACK after ZSINIT, got {:?}", ack.frame_type));
+                    match Header::read(com, &mut self.can_count).await? {
+                        Some(ack) if ack.frame_type == ZFrameType::Ack => {}
+                        Some(ack) => {
+                            return Err(ZModemError::GenericError(format!("expected ZACK after ZSINIT, got {:?}", ack.frame_type)).into());
+                        }
+                        None => {
+                            return Err(ZModemError::GenericError("expected ZACK after ZSINIT".to_string()).into());
+                        }
                     }
                 }
                 self.state = SendState::SendNextFile;
@@ -402,18 +408,26 @@ impl Sz {
                     cur.seek(std::io::SeekFrom::Start(transfer_state.send_state.cur_bytes_transfered))?;
                 }
 
-                self.state = SendState::SendZDATA;
-
-                if let SendState::SendDataPackages = self.state
-                    && self.package_len > 512
-                {
+                if matches!(self.state, SendState::SendDataPackages | SendState::AwaitDataAck) && self.package_len > 512 {
                     transfer_state
                         .send_state
                         .log_info(format!("Reducing packet size from {} to {}", self.package_len, self.package_len / 2));
-                    //reinit transfer.
                     self.package_len /= 2;
-                    self.state = SendState::SendZRQInit;
-                    return Ok(());
+                }
+                self.state = SendState::SendZDATA;
+            }
+
+            ZFrameType::Ack => {
+                if self.state == SendState::AwaitDataAck {
+                    let acknowledged = res.number() as u64;
+                    if acknowledged == transfer_state.send_state.cur_bytes_transfered {
+                        self.state = SendState::SendZDATA;
+                    } else {
+                        transfer_state.send_state.log_warning(format!(
+                            "Ignoring ZACK for offset {}; current offset is {}",
+                            acknowledged, transfer_state.send_state.cur_bytes_transfered
+                        ));
+                    }
                 }
             }
 
@@ -445,6 +459,7 @@ impl Sz {
     }
 
     async fn send_zfile(&mut self, com: &mut dyn Connection, transfer_state: &mut TransferState, mut tries: i32) -> crate::Result<()> {
+        transfer_state.send_state.reset_cur_transfer();
         loop {
             // Replace recursion with a loop
             if self.cur_buf.is_none() {
@@ -534,7 +549,6 @@ impl Sz {
             }
         }
 
-        transfer_state.send_state.reset_cur_transfer();
         Ok(())
     }
 

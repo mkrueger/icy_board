@@ -58,7 +58,7 @@ async fn test_zmodem_simple_send() {
 
     // Prepare a temp file
     let mut f = NamedTempFile::new().unwrap();
-    let data = vec![1u8, 2, 5, 10];
+    let data = vec![1u8, 2, 5, 10, 11, 12, 13, 14, 15, 16];
     f.write_all(&data).unwrap();
     let path = f.path().to_path_buf();
 
@@ -66,7 +66,7 @@ async fn test_zmodem_simple_send() {
     let (mut a, mut b) = TestConnection::create_pair();
 
     // Instantiate protocol sender
-    let mut z = Zmodem::new(1024);
+    let mut z = Zmodem::new(4);
 
     // Spawn sender task
     let sender_handle = tokio::spawn(async move {
@@ -87,6 +87,7 @@ async fn test_zmodem_simple_send() {
     let mut saw_eof = false;
     let mut saw_fin = false;
     let mut injected_handshake = false;
+    let mut received_data = Vec::new();
 
     // Give sender time to start
     tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
@@ -121,8 +122,14 @@ async fn test_zmodem_simple_send() {
                     }
                 }
                 ZFrameType::SInit => {
+                    assert_eq!(
+                        header.f0(),
+                        icy_net::protocol::zmodem::constants::zsinit_flag::TESCCTL,
+                        "ZSINIT escape request belongs in ZF0"
+                    );
                     // Read the attention string subpacket (usually empty or minimal)
-                    let (_attn_data, last, _) = read_subpacket(&mut b, 1024, true, false).await.expect("read ZSINIT subpacket");
+                    // Data following a HEX header is always protected by CRC-16.
+                    let (_attn_data, last, _) = read_subpacket(&mut b, 1024, false, true).await.expect("read ZSINIT subpacket");
                     assert!(last, "ZSINIT subpacket should be last");
 
                     // Send ZACK to acknowledge ZSINIT
@@ -149,13 +156,13 @@ async fn test_zmodem_simple_send() {
                 ZFrameType::Data => {
                     // Read the data subpacket
                     let (payload, last, zack) = read_subpacket(&mut b, 1024, true, false).await.expect("read data subpacket");
-                    assert!(last, "Expect single subpacket for tiny test data");
-                    assert_eq!(payload, data);
+                    assert!(last, "ZCRCW/ZCRCE should end each segmented data frame");
+                    received_data.extend_from_slice(&payload);
                     saw_data = true;
 
                     // Only send ACK if the subpacket explicitly requested it (ZCRCQ or ZCRCW).
                     if zack {
-                        Header::empty(ZFrameType::Ack)
+                        Header::from_number(ZFrameType::Ack, received_data.len() as u32)
                             .write(&mut b, HeaderType::Hex, false)
                             .await
                             .expect("write ACK after data");
@@ -195,6 +202,7 @@ async fn test_zmodem_simple_send() {
     assert!(state.is_finished, "Transfer should be finished");
     assert!(saw_file, "File header not observed");
     assert!(saw_data, "Data frame not observed");
+    assert_eq!(received_data, data, "Segmented transfer payload mismatch");
     assert!(saw_eof, "EOF frame not observed");
     assert!(saw_fin, "FIN frame not observed");
 }
@@ -259,6 +267,110 @@ async fn header_bin32_escctl_crc32_roundtrip() {
     assert_eq!(read.f2(), 0x11);
     assert_eq!(read.f1(), 0x13);
     assert_eq!(read.f0(), 0x40);
+}
+
+#[test]
+fn binary_header_escapes_frame_type_with_escctl() {
+    use icy_net::protocol::{Header, HeaderType, ZBIN32, ZDLE, ZFrameType, ZPAD};
+
+    let built = Header::empty(ZFrameType::Data).build(HeaderType::Bin32, true);
+    assert_eq!(&built[..5], &[ZPAD, ZDLE, ZBIN32, ZDLE, (ZFrameType::Data as u8) ^ 0x40]);
+}
+
+#[test]
+fn escctl_protects_cr_after_parity_at_sign() {
+    use icy_net::protocol::ZDLE;
+    use icy_net::protocol::zmodem::append_zdle_encoded;
+
+    let mut encoded = Vec::new();
+    append_zdle_encoded(&mut encoded, &[0xC0, b'\r'], true);
+    assert_eq!(encoded, vec![0xC0, ZDLE, b'\r' ^ 0x40]);
+}
+
+#[tokio::test]
+async fn malformed_or_oversized_subpackets_are_rejected() {
+    use icy_net::protocol::zmodem::read_zdle_bytes;
+    use icy_net::protocol::{ZCRCE, ZDLE};
+
+    let (mut invalid_conn, mut invalid_feeder) = TestConnection::create_pair();
+    invalid_feeder.send(&[ZDLE, b'z']).await.unwrap();
+    assert!(read_subpacket(&mut invalid_conn, 16, true, false).await.is_err());
+
+    let (mut oversized_conn, mut oversized_feeder) = TestConnection::create_pair();
+    oversized_feeder.send(b"abcd").await.unwrap();
+    assert!(read_subpacket(&mut oversized_conn, 3, true, false).await.is_err());
+
+    let (mut header_conn, mut header_feeder) = TestConnection::create_pair();
+    header_feeder.send(&[ZDLE, ZCRCE]).await.unwrap();
+    assert!(read_zdle_bytes(&mut header_conn, 1).await.is_err());
+}
+
+#[tokio::test]
+async fn sender_preserves_nonzero_zrpos_resume_offset() {
+    use icy_net::protocol::{Header, HeaderType, Protocol, ZFrameType};
+    use std::io::Write;
+    use tempfile::NamedTempFile;
+
+    let mut file = NamedTempFile::new().unwrap();
+    let data = b"resume payload".to_vec();
+    file.write_all(&data).unwrap();
+    let path = file.path().to_path_buf();
+    let resume_offset = 7u32;
+
+    let (mut sender_conn, mut receiver_conn) = TestConnection::create_pair();
+    let mut protocol = Zmodem::new(1024);
+    let sender = tokio::spawn(async move {
+        let mut state = protocol.initiate_send(&mut sender_conn, &[path]).await.unwrap();
+        while !state.is_finished {
+            protocol.update_transfer(&mut sender_conn, &mut state).await.unwrap();
+            tokio::task::yield_now().await;
+        }
+    });
+
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        let mut can_count = 0;
+        loop {
+            let header = Header::read(&mut receiver_conn, &mut can_count).await.unwrap().unwrap();
+            match header.frame_type {
+                ZFrameType::RQInit => {
+                    let caps = icy_net::protocol::zmodem::constants::zrinit_flag::CANFC32 | icy_net::protocol::zmodem::constants::zrinit_flag::CANOVIO;
+                    Header::from_flags(ZFrameType::RIinit, 0, 0, 0, caps)
+                        .write(&mut receiver_conn, HeaderType::Hex, false)
+                        .await
+                        .unwrap();
+                }
+                ZFrameType::File => {
+                    read_subpacket(&mut receiver_conn, 1024, true, false).await.unwrap();
+                    Header::from_number(ZFrameType::RPos, resume_offset)
+                        .write(&mut receiver_conn, HeaderType::Hex, false)
+                        .await
+                        .unwrap();
+                }
+                ZFrameType::Data => {
+                    assert_eq!(header.number(), resume_offset);
+                    let (payload, last, _) = read_subpacket(&mut receiver_conn, 1024, true, false).await.unwrap();
+                    assert!(last);
+                    assert_eq!(payload, data[resume_offset as usize..]);
+                }
+                ZFrameType::Eof => {
+                    assert_eq!(header.number(), data.len() as u32);
+                    Header::empty(ZFrameType::RIinit)
+                        .write(&mut receiver_conn, HeaderType::Hex, false)
+                        .await
+                        .unwrap();
+                }
+                ZFrameType::Fin => {
+                    Header::empty(ZFrameType::Fin).write(&mut receiver_conn, HeaderType::Hex, false).await.unwrap();
+                    break;
+                }
+                other => panic!("unexpected frame during resume test: {other:?}"),
+            }
+        }
+    })
+    .await
+    .expect("resume transfer timed out");
+
+    sender.await.unwrap();
 }
 
 /// Regression test: Verify the complete ZRQINIT -> ZRINIT handshake works.

@@ -80,7 +80,7 @@ pub fn append_zdle_encoded(v: &mut Vec<u8>, data: &[u8], escape_ctl_chars: bool)
                 v.extend_from_slice(&[ZDLE, *b ^ 0x40]);
             }
             CR | CR_0X80 => {
-                if escape_ctl_chars && last == b'@' {
+                if escape_ctl_chars && (last & 0x7F) == b'@' {
                     v.extend_from_slice(&[ZDLE, *b ^ 0x40]);
                 } else {
                     v.push(*b);
@@ -100,11 +100,13 @@ pub fn append_zdle_encoded(v: &mut Vec<u8>, data: &[u8], escape_ctl_chars: bool)
 }
 
 pub async fn read_zdle_bytes(com: &mut dyn Connection, length: usize) -> crate::Result<Vec<u8>> {
-    let mut data = Vec::new();
+    let mut data = Vec::with_capacity(length);
     for _ in 0..length {
-        let c = read_zdle_byte(com, false).await?;
-        if let rz::ZModemResult::Ok(b) = c {
-            data.push(b);
+        match read_zdle_byte(com, false).await? {
+            rz::ZModemResult::Ok(b) => data.push(b),
+            rz::ZModemResult::CrcCheckRequested(marker, _, _) => {
+                return Err(ZModemError::InvalidSubpacket(marker).into());
+            }
         }
     }
     Ok(data)
