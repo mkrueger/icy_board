@@ -2,7 +2,13 @@ use std::sync::{Arc, Mutex};
 
 use crossterm::event::{KeyCode, KeyEvent};
 use icy_board_engine::icy_board::{IcyBoard, menu::Menu};
-use icy_board_tui::{config_menu::ResultState, insert_table::InsertTable, pcb_line::get_styled_pcb_line, tab_page::TabPage, theme::get_tui_theme};
+use icy_board_tui::{
+    config_menu::ResultState,
+    insert_table::{Column, InsertTable},
+    pcb_line::get_styled_pcb_line,
+    tab_page::TabPage,
+    theme::get_tui_theme,
+};
 use ratatui::{
     Frame,
     layout::{Margin, Rect},
@@ -26,15 +32,15 @@ impl<'a> CommandsTab<'a> {
         let insert_table = InsertTable {
             scroll_state: ScrollbarState::default().content_length(len),
             table_state: TableState::default().with_selected(0),
-            headers: vec!["   ".to_string(), "Keyword".to_string(), "Display".to_string()],
+            columns: vec![Column::new("Keyword").with_width(20), Column::new("Display")],
+            numbered: true,
             get_content: Box::new(move |_table, i, j| {
                 if let Ok(mnu2) = mnu2.lock()
                     && *i < mnu2.commands.len()
                 {
                     return match j {
-                        0 => Line::from(format!("{})", i + 1)),
-                        1 => Line::from(mnu2.commands[*i].keyword.clone()),
-                        2 => get_styled_pcb_line(&mnu2.commands[*i].display),
+                        0 => Line::from(mnu2.commands[*i].keyword.clone()),
+                        1 => get_styled_pcb_line(&mnu2.commands[*i].display),
                         _ => Line::from("".to_string()),
                     };
                 }

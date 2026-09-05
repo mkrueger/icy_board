@@ -17,7 +17,7 @@ use icy_board_tui::{
     BORDER_SET,
     config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, TextFlags},
     get_text, get_text_args,
-    insert_table::InsertTable,
+    insert_table::{Column, InsertTable},
     save_changes_dialog::SaveChangesDialog,
     tab_page::{Page, PageMessage},
     theme::get_tui_theme,
@@ -51,19 +51,18 @@ impl<'a> MessageAreasEditor<'a> {
         let insert_table = InsertTable {
             scroll_state,
             table_state: TableState::default().with_selected(0),
-            headers: vec![
-                "".to_string(),
-                format!("{:<20}", get_text("dirs_table_name_header")),
-                get_text("dirs_table_path_header"),
+            columns: vec![
+                Column::new(get_text("dirs_table_name_header")).with_width(20),
+                Column::new(get_text("dirs_table_path_header")),
             ],
+            numbered: true,
             get_content: Box::new(move |_table, i, j| {
                 if *i >= dl2.lock().unwrap().len() {
                     return Line::from("".to_string());
                 }
                 match j {
-                    0 => Line::from(format!("{})", *i + 1)),
-                    1 => Line::from(dl2.lock().unwrap()[*i].name.to_string()),
-                    2 => Line::from(format!("{}", dl2.lock().unwrap()[*i].path.display())),
+                    0 => Line::from(dl2.lock().unwrap()[*i].name.to_string()),
+                    1 => Line::from(format!("{}", dl2.lock().unwrap()[*i].path.display())),
                     _ => Line::from("".to_string()),
                 }
             }),

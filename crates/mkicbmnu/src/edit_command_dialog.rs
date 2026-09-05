@@ -13,7 +13,7 @@ use icy_board_engine::{
 };
 use icy_board_tui::{
     config_menu::{ComboBox, ComboBoxValue, ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, TextFlags},
-    insert_table::InsertTable,
+    insert_table::{Column, InsertTable},
     pcb_line::{get_styled_pcb_line, get_styled_pcb_line_with_highlight},
     position_editor::PositionEditor,
     theme::get_tui_theme,
@@ -199,7 +199,8 @@ impl<'a> EditCommandDialog<'a> {
         let insert_table = InsertTable {
             scroll_state: ScrollbarState::default().content_length(command_arc.lock().unwrap().actions.len()),
             table_state: TableState::default().with_selected(0),
-            headers: vec!["Command Type    ".to_string(), "Parameter".to_string()],
+            columns: vec![Column::new("Command Type").with_width(20), Column::new("Parameter")],
+            numbered: false,
             get_content: Box::new(move |_table, i, j| {
                 if *i >= cmd2.lock().unwrap().actions.len() {
                     return Line::from("".to_string());

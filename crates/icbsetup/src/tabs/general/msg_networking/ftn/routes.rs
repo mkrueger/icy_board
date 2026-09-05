@@ -5,7 +5,7 @@ use icy_board_engine::icy_board::{IcyBoard, ftn::FtnRoute};
 use icy_board_tui::{
     config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, ResultState, TextFlags},
     get_text,
-    insert_table::InsertTable,
+    insert_table::{Column, InsertTable},
     tab_page::{Page, PageMessage},
     theme::get_tui_theme,
 };
@@ -32,7 +32,11 @@ impl<'a> RoutingConfiguration<'a> {
             table: InsertTable {
                 scroll_state: ScrollbarState::default().content_length(content_length),
                 table_state: TableState::default().with_selected(0),
-                headers: vec![get_text("fido_route_header_destination"), get_text("fido_route_header_via")],
+                columns: vec![
+                    Column::new(get_text("fido_route_header_destination")).with_width(28),
+                    Column::new(get_text("fido_route_header_via")),
+                ],
+                numbered: true,
                 get_content: Box::new(move |_table, i, j| {
                     let board = content.lock().unwrap();
                     let Some(route) = board.ftn.routes.get(*i) else {

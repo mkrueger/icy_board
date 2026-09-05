@@ -11,7 +11,7 @@ use icy_board_engine::icy_board::{
 use icy_board_tui::{
     config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, ResultState, TextFlags},
     get_text,
-    insert_table::InsertTable,
+    insert_table::{Column, InsertTable},
     tab_page::{Page, PageMessage},
     theme::get_tui_theme,
 };
@@ -26,7 +26,7 @@ use ratatui::{
 /// The three FREQ lists differ only in their columns and in the fields the
 /// editor offers, so the frame around them is written once.
 macro_rules! freq_list {
-    ($name:ident, $title:expr, $editor_title:expr, $list:ident, $new:expr, $headers:expr, $column:expr, $entries:expr) => {
+    ($name:ident, $title:expr, $editor_title:expr, $list:ident, $new:expr, $columns:expr, $column:expr, $entries:expr) => {
         pub struct $name<'a> {
             table: InsertTable<'a>,
             board: Arc<Mutex<IcyBoard>>,
@@ -42,7 +42,8 @@ macro_rules! freq_list {
                     table: InsertTable {
                         scroll_state: ScrollbarState::default().content_length(content_length),
                         table_state: TableState::default().with_selected(0),
-                        headers: $headers(),
+                        columns: $columns(),
+                        numbered: true,
                         get_content: Box::new(move |_table, i, j| {
                             let board = content.lock().unwrap();
                             match board.ftn.freq.$list.get(*i) {
@@ -156,7 +157,10 @@ freq_list!(
     "fido_freq_path_editor",
     paths,
     FreqPath::default(),
-    || vec![format!("{:<64}", get_text("fido_freq_header_path")), get_text("fido_freq_header_password")],
+    || vec![
+        Column::new(get_text("fido_freq_header_path")).with_width(57),
+        Column::new(get_text("fido_freq_header_password")),
+    ],
     |entry: &FreqPath, column: usize| match column {
         0 => entry.path.display().to_string(),
         1 => entry.password.clone(),
@@ -191,9 +195,9 @@ freq_list!(
     magic,
     FreqMagic::default(),
     || vec![
-        get_text("fido_freq_header_magic"),
-        get_text("fido_freq_header_file"),
-        get_text("fido_freq_header_password"),
+        Column::new(get_text("fido_freq_header_magic")).with_width(22),
+        Column::new(get_text("fido_freq_header_file")).with_width(31),
+        Column::new(get_text("fido_freq_header_password")),
     ],
     |entry: &FreqMagic, column: usize| match column {
         0 => entry.name.clone(),
@@ -236,7 +240,7 @@ freq_list!(
     "fido_freq_deny_editor",
     deny,
     EchomailAddress::default(),
-    || vec![get_text("fido_freq_header_node")],
+    || vec![Column::new(get_text("fido_freq_header_node"))],
     |entry: &EchomailAddress, column: usize| match column {
         0 => entry.to_string(),
         _ => String::new(),

@@ -14,7 +14,7 @@ use icy_board_engine::{
 use icy_board_tui::{
     config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, TextFlags},
     get_text,
-    insert_table::InsertTable,
+    insert_table::{Column, InsertTable},
     save_changes_dialog::SaveChangesDialog,
     tab_page::{Page, PageMessage},
     theme::get_tui_theme,
@@ -122,11 +122,12 @@ impl<'a> SecurityLevelEditor<'a> {
         let insert_table = InsertTable {
             scroll_state,
             table_state: TableState::default().with_selected(0),
-            headers: vec![
-                get_text("sec_level_header_security"),
-                get_text("sec_level_header_description"),
-                get_text("sec_level_header_time"),
+            columns: vec![
+                Column::new(get_text("sec_level_header_security")).with_width(12),
+                Column::new(get_text("sec_level_header_description")).with_width(40),
+                Column::new(get_text("sec_level_header_time")),
             ],
+            numbered: true,
             get_content: Box::new(move |_table, i, j| {
                 if *i >= cmd2.lock().unwrap().len() {
                     return Line::from("".to_string());

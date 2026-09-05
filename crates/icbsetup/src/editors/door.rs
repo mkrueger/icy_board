@@ -16,7 +16,7 @@ use icy_board_engine::{
 use icy_board_tui::{
     config_menu::{ComboBox, ComboBoxValue, ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, TextFlags},
     get_text, get_text_args,
-    insert_table::InsertTable,
+    insert_table::{Column, InsertTable},
     save_changes_dialog::SaveChangesDialog,
     tab_page::{Page, PageMessage},
     theme::get_tui_theme,
@@ -107,11 +107,12 @@ impl<'a> DoorEditor<'a> {
         let insert_table = InsertTable {
             scroll_state,
             table_state: TableState::default().with_selected(0),
-            headers: vec![
-                format!("{:<15}", get_text("doors_editor_header_door")),
-                format!("{:<33}", get_text("doors_editor_header_description")),
-                get_text("doors_editor_header_type"),
+            columns: vec![
+                Column::new(get_text("doors_editor_header_door")).with_width(15),
+                Column::new(get_text("doors_editor_header_description")).with_width(33),
+                Column::new(get_text("doors_editor_header_type")),
             ],
+            numbered: true,
             get_content: Box::new(move |_table, i, j| {
                 if *i >= cmd2.lock().unwrap().len() {
                     return Line::from("".to_string());

@@ -5,7 +5,7 @@ use icy_board_engine::icy_board::{IcyBoard, ftn::FtnLink};
 use icy_board_tui::{
     config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, ResultState, TextFlags},
     get_text,
-    insert_table::InsertTable,
+    insert_table::{Column, InsertTable},
     tab_page::{Page, PageMessage},
     theme::get_tui_theme,
 };
@@ -32,11 +32,12 @@ impl<'a> NodeConfiguration<'a> {
         let insert_table = InsertTable {
             scroll_state: ScrollbarState::default().content_length(content_length),
             table_state: TableState::default().with_selected(0),
-            headers: vec![
-                get_text("fido_node_header_node"),
-                get_text("fido_node_header_host"),
-                get_text("fido_node_header_areas"),
+            columns: vec![
+                Column::new(get_text("fido_node_header_node")).with_width(24),
+                Column::new(get_text("fido_node_header_host")).with_width(34),
+                Column::new(get_text("fido_node_header_areas")),
             ],
+            numbered: true,
             get_content: Box::new(move |_table, i, j| {
                 let board = board.lock().unwrap();
                 let Some(link) = board.ftn.links.get(*i) else {

@@ -16,7 +16,7 @@ use icy_board_engine::{
 use icy_board_tui::{
     config_menu::{ComboBox, ComboBoxValue, ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, TextFlags},
     get_text,
-    insert_table::InsertTable,
+    insert_table::{Column, InsertTable},
     save_changes_dialog::SaveChangesDialog,
     tab_page::{Page, PageMessage},
     theme::get_tui_theme,
@@ -50,27 +50,26 @@ impl<'a> CommandsEditor<'a> {
         let insert_table = InsertTable {
             scroll_state,
             table_state: TableState::default().with_selected(0),
-            headers: vec![
-                "#".to_string(),
-                get_text("command_editor_header_command"),
-                get_text("command_editor_header_action"),
-                get_text("command_editor_header_parameter"),
+            columns: vec![
+                Column::new(get_text("command_editor_header_command")).with_width(20),
+                Column::new(get_text("command_editor_header_action")).with_width(24),
+                Column::new(get_text("command_editor_header_parameter")),
             ],
+            numbered: true,
             get_content: Box::new(move |_table, i, j| {
                 if let Ok(mnu2) = mnu2.lock()
                     && *i < mnu2.commands.len()
                 {
                     return match j {
-                        0 => Line::from(format!("{})", i + 1)),
-                        1 => Line::from(mnu2.commands[*i].keyword.clone()),
-                        2 => {
+                        0 => Line::from(mnu2.commands[*i].keyword.clone()),
+                        1 => {
                             if let Some(act) = mnu2.commands[*i].actions.first() {
                                 Line::from(act.command_type.to_string())
                             } else {
                                 Line::from("No Action")
                             }
                         }
-                        3 => {
+                        2 => {
                             if let Some(act) = mnu2.commands[*i].actions.first() {
                                 Line::from(act.parameter.to_string())
                             } else {

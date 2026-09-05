@@ -14,7 +14,7 @@ use icy_board_engine::{
 use icy_board_tui::{
     config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, TextFlags},
     get_text,
-    insert_table::InsertTable,
+    insert_table::{Column, InsertTable},
     save_changes_dialog::SaveChangesDialog,
     tab_page::{Page, PageMessage},
     theme::get_tui_theme,
@@ -52,25 +52,24 @@ impl<'a> LanguageListEditor<'a> {
         let insert_table = InsertTable {
             scroll_state,
             table_state: TableState::default().with_selected(0),
-            headers: vec![
-                "".to_string(),
-                get_text("lang_editor_header_language"),
-                get_text("lang_editor_header_ext"),
-                get_text("lang_editor_header_locale"),
-                get_text("lang_editor_header_yes"),
-                get_text("lang_editor_header_no"),
+            columns: vec![
+                Column::new(get_text("lang_editor_header_language")).with_width(30),
+                Column::new(get_text("lang_editor_header_ext")).with_width(10),
+                Column::new(get_text("lang_editor_header_locale")).with_width(10),
+                Column::new(get_text("lang_editor_header_yes")).with_width(6),
+                Column::new(get_text("lang_editor_header_no")),
             ],
+            numbered: true,
             get_content: Box::new(move |_table, i, j| {
                 if *i >= dl2.lock().unwrap().len() {
                     return Line::from("".to_string());
                 }
                 match j {
-                    0 => Line::from(format!("{})", *i + 1)),
-                    1 => Line::from(dl2.lock().unwrap()[*i].description.to_string()),
-                    2 => Line::from(dl2.lock().unwrap()[*i].extension.to_string()),
-                    3 => Line::from(dl2.lock().unwrap()[*i].locale.to_string()),
-                    4 => Line::from(format!("{}", dl2.lock().unwrap()[*i].yes_char)),
-                    5 => Line::from(format!("{}", dl2.lock().unwrap()[*i].no_char)),
+                    0 => Line::from(dl2.lock().unwrap()[*i].description.to_string()),
+                    1 => Line::from(dl2.lock().unwrap()[*i].extension.to_string()),
+                    2 => Line::from(dl2.lock().unwrap()[*i].locale.to_string()),
+                    3 => Line::from(format!("{}", dl2.lock().unwrap()[*i].yes_char)),
+                    4 => Line::from(format!("{}", dl2.lock().unwrap()[*i].no_char)),
                     _ => Line::from("".to_string()),
                 }
             }),

@@ -16,7 +16,7 @@ use icy_board_engine::{
 use icy_board_tui::{
     config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue},
     get_text, get_text_args,
-    insert_table::InsertTable,
+    insert_table::{Column, InsertTable},
     save_changes_dialog::SaveChangesDialog,
     tab_page::{Page, PageMessage},
     theme::get_tui_theme,
@@ -50,19 +50,18 @@ impl<'a> SurveyEditor<'a> {
             scroll_state,
             table_state: TableState::default().with_selected(0),
 
-            headers: vec![
-                "".to_string(),
-                format!("{:<30}", get_text("survey_editor_editor_header_question")),
-                format!("{:<30}", get_text("survey_editor_editor_header_answer")),
+            columns: vec![
+                Column::new(get_text("survey_editor_editor_header_question")).with_width(30),
+                Column::new(get_text("survey_editor_editor_header_answer")),
             ],
+            numbered: true,
             get_content: Box::new(move |_table, i, j| {
                 if *i >= cmd2.lock().unwrap().len() {
                     return Line::from("".to_string());
                 }
                 match j {
-                    0 => Line::from(format!("{})", *i + 1)),
-                    1 => Line::from(format!("{}", cmd2.lock().unwrap()[*i].survey_file.display())),
-                    2 => Line::from(format!("{}", cmd2.lock().unwrap()[*i].answer_file.display())),
+                    0 => Line::from(format!("{}", cmd2.lock().unwrap()[*i].survey_file.display())),
+                    1 => Line::from(format!("{}", cmd2.lock().unwrap()[*i].answer_file.display())),
                     _ => Line::from("".to_string()),
                 }
             }),

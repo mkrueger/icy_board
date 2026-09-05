@@ -14,7 +14,7 @@ use icy_board_engine::{
 use icy_board_tui::{
     config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, TextFlags},
     get_text,
-    insert_table::InsertTable,
+    insert_table::{Column, InsertTable},
     save_changes_dialog::SaveChangesDialog,
     tab_page::{Page, PageMessage},
     theme::get_tui_theme,
@@ -55,7 +55,12 @@ impl<'a> ProtocolEditor<'a> {
         let insert_table = InsertTable {
             scroll_state,
             table_state: TableState::default().with_selected(0),
-            headers: vec![get_text("protocol_editor_header_char_code"), get_text("protocol_editor_header_description")],
+            columns: vec![
+                Column::new(get_text("protocol_editor_header_char_code")).with_width(12),
+                Column::new(get_text("protocol_editor_header_description")),
+            ],
+            // PCBSETUP keys protocols by their letter instead of numbering them.
+            numbered: false,
             get_content: Box::new(move |_table, i, j| {
                 if *i >= cmd2.lock().unwrap().len() {
                     return Line::from("".to_string());

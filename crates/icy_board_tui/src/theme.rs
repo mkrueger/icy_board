@@ -119,7 +119,8 @@ impl Theme {
             text_field_filler_char: ' ',
             table: dos_attribute_style(colors[5]),
             table_inactive: dos_attribute_style(colors[8]),
-            table_header: dos_attribute_style(colors[2]),
+            // PCBSETUP prints list headers in the display-only color, not in the heading color.
+            table_header: dos_attribute_style(colors[13]),
             help_box: dos_attribute_style(colors[15]),
             help_header: dos_attribute_style(colors[16]),
             swatch: false,
@@ -169,7 +170,7 @@ pub static CLASSIC_THEME: Theme = Theme {
 
     table: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_GREEN),
     table_inactive: Style::new().bg(DOS_BLACK).fg(DOS_DARK_GRAY),
-    table_header: Style::new().bg(DOS_BLACK).fg(DOS_WHITE),
+    table_header: Style::new().bg(DOS_BLACK).fg(DOS_LIGHT_GRAY),
 
     help_box: Style::new().bg(DOS_GREEN).fg(DOS_BLACK),
     help_header: Style::new().bg(DOS_GREEN).fg(DOS_YELLOW),

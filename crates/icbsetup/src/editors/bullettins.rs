@@ -16,7 +16,7 @@ use icy_board_engine::{
 use icy_board_tui::{
     config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, TextFlags},
     get_text,
-    insert_table::InsertTable,
+    insert_table::{Column, InsertTable},
     save_changes_dialog::SaveChangesDialog,
     tab_page::{Page, PageMessage},
     theme::get_tui_theme,
@@ -56,14 +56,14 @@ impl<'a> BullettinsEditor<'a> {
         let insert_table = InsertTable {
             scroll_state,
             table_state: TableState::default().with_selected(0),
-            headers: vec!["".to_string(), "Bullettin".to_string()],
+            columns: vec![Column::new("Bullettin")],
+            numbered: true,
             get_content: Box::new(move |_table, i, j| {
                 if *i >= cmd2.lock().unwrap().len() {
                     return Line::from("".to_string());
                 }
                 match j {
-                    0 => Line::from(format!("{})", *i + 1)),
-                    1 => Line::from(format!("{}", cmd2.lock().unwrap()[*i].path.display())),
+                    0 => Line::from(format!("{}", cmd2.lock().unwrap()[*i].path.display())),
                     _ => Line::from("".to_string()),
                 }
             }),
