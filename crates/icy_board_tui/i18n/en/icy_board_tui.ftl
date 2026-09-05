@@ -3758,7 +3758,7 @@ fido_menu_tosser=Tosser Configuration
 fido_menu_nodes=Node Configuration
 fido_menu_addresses=System Address
 fido_menu_directories=File & Directory Configuration
-fido_menu_origin=Origin Conference Range
+fido_menu_origin=Default Origin
 fido_menu_routing=Routing Configuration
 
 fido_processing_title=Fido Processing Configuration
@@ -3978,7 +3978,7 @@ fido_node_areas-help=
     for the areas it asked for, and to every node that asked. Leave it empty and
     the node gets no echomail.
 
-fido_origin_title=Fidonet Origin Configuration
+fido_origin_title=Fidonet Default Origin
 
 fido_origin=Origin
 fido_origin-status=The line appended to echomail written in an area that names no origin of its own
@@ -3989,9 +3989,9 @@ fido_origin-help=
     fidonet is the board name and how to reach it, and some networks insist on
     one, so set it before scanning for the first time.
 
-    PCBoard tied an origin to a range of conferences. Here an area can carry its
-    own by setting `ftn_origin` in its `area.toml`, and this line is what the
-    rest of the board uses.
+    PCBoard listed an origin per range of conferences here. An area carries its
+    own instead, as Fido Origin in the area editor, and this is the line every
+    area that names none of its own uses.
 
 fido_route_title=Fidonet Routing Configuration
 fido_route_editor=Route

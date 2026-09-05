@@ -228,8 +228,8 @@ The origin line
 
 Every echomail message leaving this board carries an origin line naming the
 board and the address it can be reached at. The board-wide text is the
-``Origin`` under ``Message Networking > Fido Configuration``, written as
-``origin`` in ``ftn.toml``.
+``Default Origin`` under ``Message Networking > Fido Configuration``, written
+as ``origin`` in ``ftn.toml``.
 
 An area can say something else by naming its own ``Fido Origin`` in the area
 editor, which is written as ``ftn_origin``:
