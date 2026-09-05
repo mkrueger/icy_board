@@ -15,6 +15,10 @@ releases.
   rescan report every message as a duplicate, remove the inbound bundle and
   leave automatically added areas without message bases.
 
+- Mail that is handed on to a downlink or routed to the next hop is written to
+  the outbound before what it arrived in is removed. A bundle that could not be
+  written left the tosser having already thrown the only copy away.
+
 ### Added
 
 - Files that arrive with a `.TIC` are tossed into the file directory carrying

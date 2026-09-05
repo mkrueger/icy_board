@@ -114,6 +114,7 @@ pub fn toss_inbound(config: &FtnConfig, areas: &AreaMap) -> Res<TossReport> {
     }
     files.sort();
 
+    let mut tossed = Vec::new();
     for file in files {
         let Some(name) = file.file_name().and_then(|name| name.to_str()).map(str::to_ascii_lowercase) else {
             continue;
@@ -128,7 +129,7 @@ pub fn toss_inbound(config: &FtnConfig, areas: &AreaMap) -> Res<TossReport> {
             continue;
         };
         match result {
-            Ok(true) => fs::remove_file(&file).context(|| format!("Cannot remove {} now that it has been tossed", file.display()))?,
+            Ok(true) => tossed.push(file),
             // Mail for somebody else stays where it is, and so does what could
             // not be read. Throwing away mail nobody has seen is worse than
             // asking the sysop to look at it.
@@ -136,7 +137,12 @@ pub fn toss_inbound(config: &FtnConfig, areas: &AreaMap) -> Res<TossReport> {
             Err(err) => report.failed.push((file, err.to_string())),
         }
     }
+    // What is handed on or routed exists nowhere but in memory until this has
+    // written it, so what it came out of has to outlive that.
     tosser.send_on(&mut report)?;
+    for file in tossed {
+        fs::remove_file(&file).context(|| format!("Cannot remove {} now that it has been tossed", file.display()))?;
+    }
     Ok(report)
 }
 
@@ -1423,6 +1429,26 @@ mod tests {
         assert_eq!(report.duplicates, 0);
         let path = report.added.get("NEW_ECHO").unwrap();
         assert_eq!(JamMessageBase::open(path).unwrap().active_messages(), 1);
+    }
+
+    #[test]
+    fn test_mail_to_be_handed_on_stays_until_the_bundle_holding_it_is_written() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut config = config(directory.path());
+        config.options.pass_thru = true;
+        config.links[0].areas.push("FSX_BBS".to_string());
+        let mut packet = Packet::new(PacketHeader::new(address("21:2/2"), address("21:1/100"), when(), ""));
+        packet.messages = vec![message("FSX_BBS", "Body\r")];
+        fs::create_dir_all(&config.inbound).unwrap();
+        let arrived = config.inbound.join(bundle::packet_name(&when()));
+        packet.save(&arrived).unwrap();
+        // A file where the outbound belongs leaves the bundle nowhere to go.
+        fs::write(&config.outbound, b"not a directory").unwrap();
+
+        let err = toss_inbound(&config, &[]).unwrap_err().to_string();
+
+        assert!(err.contains("outbound"), "{err}");
+        assert!(arrived.exists(), "mail that was never written must not be thrown away");
     }
 
     #[test]
