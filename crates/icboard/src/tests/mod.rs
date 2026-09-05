@@ -35,6 +35,7 @@ mod cmd_b;
 mod cmd_bye;
 mod cmd_c;
 mod cmd_d;
+mod cmd_door;
 mod cmd_e;
 mod cmd_file_lists;
 mod cmd_g;

@@ -102,12 +102,19 @@ impl IcyBoardState {
         if !open_access.session_can_access(&self.session) {
             return Ok(false);
         }
+        self.run_named_door(name).await
+    }
+
+    /// Runs the door whose name `name` begins, matched as a prefix the way
+    /// `searchdoorlist` does. Returns false when no door answers to the name.
+    pub async fn run_named_door(&mut self, name: &str) -> Res<bool> {
         let Some(doors) = self.session.current_conference.doors.clone() else {
             return Ok(false);
         };
         let needle = name.to_uppercase();
         for (i, door) in doors.doors.iter().enumerate() {
             if door.name.to_uppercase().starts_with(&needle) {
+                self.set_activity(NodeStatus::RunningDoor).await;
                 self.run_door(&doors, door, i).await?;
                 return Ok(true);
             }

@@ -428,6 +428,12 @@ releases.
 
 ### Fixed
 
+- A command whose action is `Door` opens the door its parameter names, so a
+  door can be reached by a keyword of its own instead of only through `OPEN`.
+  The action was never carried out and answered `Can't run action (Door)`. A
+  parameter naming no door of the conference says which one it missed, and an
+  empty parameter asks the way `OPEN` does.
+
 - Replying to a message addresses the answer to whoever wrote it. The reply
   went to the original recipient instead, so answering a message addressed to
   somebody else sent it back to that same person. A reply to netmail now also

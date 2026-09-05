@@ -443,6 +443,26 @@ impl IcyBoardState {
                 // DOOR/OPEN
                 self.open_door().await?;
             }
+            CommandType::Door => {
+                let sec = self.session.user_command_level.cmd_open_door.clone();
+                if check_security && !self.check_sec("DOOR", &sec).await? {
+                    return Ok(());
+                }
+                // The door the action names, which is what a menu entry of type 4 selects.
+                if cmd_action.parameter.is_empty() {
+                    self.open_door().await?;
+                } else if !self.run_named_door(&cmd_action.parameter).await? {
+                    log::warn!(
+                        "Command {} opens the door {}, which the conference {} does not offer",
+                        command.keyword,
+                        cmd_action.parameter,
+                        self.session.current_conference.name
+                    );
+                    self.session.op_text.clone_from(&cmd_action.parameter);
+                    self.display_text(IceText::InvalidDOOR, display_flags::NEWLINE | display_flags::LFBEFORE | display_flags::LFAFTER)
+                        .await?;
+                }
+            }
             CommandType::TestFile => {
                 let sec = self.session.user_command_level.cmd_test_file.clone();
                 if check_security && !self.check_sec("TEST", &sec).await? {
