@@ -8,6 +8,13 @@ releases.
 
 ## [Unreleased]
 
+### Fixed
+
+- Echomail for a point is no longer discarded as already travelled merely
+  because its two-dimensional `PATH` names the point's boss. This could make a
+  rescan report every message as a duplicate, remove the inbound bundle and
+  leave automatically added areas without message bases.
+
 ### Added
 
 - Files that arrive with a `.TIC` are tossed into the file directory carrying

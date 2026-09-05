@@ -464,7 +464,15 @@ impl Tosser<'_> {
 
     /// A message whose path already names this board has been here before.
     fn travelled_here(&self, path: &[String]) -> bool {
-        let mine: HashSet<(u16, u16)> = self.config.akas.iter().map(|aka| (aka.address.net, aka.address.node)).collect();
+        // PATH is two-dimensional. Treating a point as its boss would reject
+        // every message the boss sends on to that point as already travelled.
+        let mine: HashSet<(u16, u16)> = self
+            .config
+            .akas
+            .iter()
+            .filter(|aka| aka.address.point == 0)
+            .map(|aka| (aka.address.net, aka.address.node))
+            .collect();
         path.iter().flat_map(|line| nodes(line)).any(|node| mine.contains(&node))
     }
 
@@ -1383,6 +1391,37 @@ mod tests {
         assert_eq!(report.imported, 1);
         assert!(report.unknown.is_empty());
         let path = report.added.get("FSX_BBS").unwrap();
+        assert_eq!(JamMessageBase::open(path).unwrap().active_messages(), 1);
+    }
+
+    #[test]
+    fn test_a_point_does_not_mistake_its_boss_in_path_for_itself() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut config = config(directory.path());
+        config.options.auto_add = true;
+        config.options.check_dupe_path = true;
+        config.akas[0].address = address("2:240/5853.2");
+        config.links[0].address = address("2:240/5853");
+
+        let mut packet = Packet::new(PacketHeader::new(address("2:240/5853"), address("2:240/5853.2"), when(), ""));
+        packet.messages = vec![PackedMessage {
+            orig: address("2:240/5853"),
+            dest: address("2:240/5853.2"),
+            written: when(),
+            to: "All".to_string(),
+            from: "Someone".to_string(),
+            subject: "Rescanned mail".to_string(),
+            text: "AREA:NEW_ECHO\rBody\r\x01PATH: 240/5853\r".to_string(),
+            ..Default::default()
+        }];
+        fs::create_dir_all(&config.inbound).unwrap();
+        packet.save(&config.inbound.join(bundle::packet_name(&when()))).unwrap();
+
+        let report = toss(&config, &[]);
+
+        assert_eq!(report.imported, 1);
+        assert_eq!(report.duplicates, 0);
+        let path = report.added.get("NEW_ECHO").unwrap();
         assert_eq!(JamMessageBase::open(path).unwrap().active_messages(), 1);
     }
 
