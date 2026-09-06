@@ -11,7 +11,7 @@ use std::{
 use crate::{
     Res,
     datetime::{IcbDate, IcbTime},
-    executable::{PPEExpr, VariableType, VariableValue},
+    executable::{GenericVariableData, PPEExpr, VariableType, VariableValue},
     icy_board::{
         ftn::queue,
         icb_config::IcbColor,
@@ -2081,7 +2081,17 @@ pub async fn sort(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
         }
     }
 
-    let vs = array.get_vector_size() + 1;
+    let runtime400 = vm.variable_table.get_version() >= 400;
+    let vs = if runtime400 {
+        // SORT accepts vectors. Read the count directly: an empty dynamic
+        // vector has no upper bound, so get_vector_size() would underflow.
+        let GenericVariableData::Dim1(values) = &array.generic_data else {
+            return Err(Box::new(VMError::InternalVMError));
+        };
+        values.len()
+    } else {
+        array.get_vector_size() + 1
+    };
     let dim = array.get_dimensions();
     let mut target_indices = (0..vs).collect::<Vec<usize>>();
     for i in 0..vs {
@@ -2094,9 +2104,19 @@ pub async fn sort(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
         }
     }
     let indices = vm.variable_table.get_value_mut(indices_idx);
-    indices.redim(dim, vs, 0, 0);
-    for (i, target_index) in target_indices.iter().enumerate() {
-        indices.set_array_value(i, 0, 0, VariableValue::new_int(*target_index as i32))?;
+    if runtime400 {
+        // Construct from elements rather than passing a count as a REDIM
+        // upper bound. This also represents an empty result without a dummy 0.
+        *indices = VariableValue::new_vector(
+            VariableType::Integer,
+            target_indices.into_iter().map(|index| VariableValue::new_int(index as i32)).collect(),
+        );
+    } else {
+        // Preserve the existing pre-400 sizing until checked against PCBoard.
+        indices.redim(dim, vs, 0, 0);
+        for (i, target_index) in target_indices.iter().enumerate() {
+            indices.set_array_value(i, 0, 0, VariableValue::new_int(*target_index as i32))?;
+        }
     }
     Ok(())
 }

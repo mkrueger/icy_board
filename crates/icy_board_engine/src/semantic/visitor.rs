@@ -1088,7 +1088,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
 
         match self.function_type_lookup.get(&CallId(call.id)).cloned() {
             Some(SemanticInfo::FunctionReference(idx)) => {
-                let declaration = self.function_containers[idx].functions.clone();
+                let declaration = self.call_signature(idx);
                 let arg_count = if let FunctionDeclaration::Function(f) = &declaration {
                     res = f.get_return_type();
                     self.check_arg_types(f.get_parameters(), call.get_arguments());
@@ -1768,8 +1768,8 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             }
 
             if matches!(self.references[idx].0, ReferenceType::Function(_)) {
-                let f = self.routine_container(idx).unwrap();
-                if let FunctionDeclaration::Function(f) = &f.functions.clone() {
+                let signature = self.call_signature(self.routine_container_index(idx).unwrap());
+                if let FunctionDeclaration::Function(f) = &signature {
                     let param_count = f.get_parameters().len();
                     let arg_count = call.get_arguments().len();
                     let identifier_token = call.get_identifier_token();
@@ -1782,9 +1782,9 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             }
 
             if matches!(self.references[idx].0, ReferenceType::Procedure(_)) {
-                let func_container = self.routine_container(idx).unwrap();
+                let signature = self.call_signature(self.routine_container_index(idx).unwrap());
 
-                if let FunctionDeclaration::Procedure(f) = &func_container.functions.clone() {
+                if let FunctionDeclaration::Procedure(f) = &signature {
                     let arg_count = call.get_arguments().len();
                     let par_len = f.get_parameters().len();
 
@@ -1866,6 +1866,16 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 let (ref_kind, refs) = &mut self.references[idx];
                 match ref_kind.clone() {
                     ReferenceType::Procedure(container_idx) => {
+                        if self.lang_version >= 400
+                            && let FunctionDeclaration::Procedure(declaration) = &self.function_containers[container_idx].functions
+                            && !declaration.get_declare_token().span.is_empty()
+                        {
+                            self.errors
+                                .lock()
+                                .unwrap()
+                                .report_error(function.get_identifier_token().span.clone(), CompilationErrorType::ProcedureUsedAsFunction);
+                            return VariableType::None;
+                        }
                         // Switch the reference kind.
                         *ref_kind = ReferenceType::Function(container_idx);
                         // Update semantic type.
@@ -1901,13 +1911,13 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             .or_else(|| function.get_documentation())
             .map(str::to_owned);
             if let FunctionDeclaration::Function(func) = &cont.functions {
-                if !super::symbols::declaration_parameters_match(func.get_parameters(), function.get_parameters()) {
+                if !super::symbols::declaration_parameters_match(self.lang_version, func.get_parameters(), function.get_parameters()) {
                     self.errors.lock().unwrap().report_error(
                         function.get_identifier_token().span.clone(),
                         CompilationErrorType::ParameterMismatch(function.get_identifier().to_string()),
                     );
                 }
-                if func.get_return_type() != function.get_return_type() || func.get_return_rank() != function.get_return_rank() {
+                if self.lang_version >= 400 && (func.get_return_type() != function.get_return_type() || func.get_return_rank() != function.get_return_rank()) {
                     self.errors.lock().unwrap().report_error(
                         function.get_return_type_token().span.clone(),
                         CompilationErrorType::ReturnTypeMismatch(function.get_identifier().to_string()),
@@ -2033,7 +2043,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             .or_else(|| procedure.get_documentation())
             .map(str::to_owned);
             if let FunctionDeclaration::Procedure(func) = &cont.functions
-                && !super::symbols::declaration_parameters_match(func.get_parameters(), procedure.get_parameters())
+                && !super::symbols::declaration_parameters_match(self.lang_version, func.get_parameters(), procedure.get_parameters())
             {
                 self.errors.lock().unwrap().report_error(
                     procedure.get_identifier_token().span.clone(),
@@ -2117,6 +2127,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
     fn visit_ast(&mut self, program: &crate::ast::Ast) -> VariableType {
         // Each file says which language it was read as, so the checks follow it.
         self.lang_version = program.language_version;
+        self.collect_legacy_call_signatures(program);
         // A routine may be called before the file gets to it, so every signature is
         // registered first - the same thing an explicit DECLARE does. A routine that
         // has one is left to it, so its own checks still run.

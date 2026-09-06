@@ -8,13 +8,13 @@ use unicase::Ascii;
 use crate::{
     ast::{
         Ast, AstNode, AstVisitor, AstVisitorMut, Expression, FunctionDeclarationAstNode, FunctionImplementation, IdentifierExpression,
-        MemberReferenceExpression, ModuleDeclaration, ParameterSpecifier, ProcedureCallStatement, Statement, TypeDeclarationAstNode,
+        MemberReferenceExpression, ModuleDeclaration, ParameterSpecifier, ProcedureCallStatement, ProcedureImplementation, Statement, TypeDeclarationAstNode,
         VariableDeclarationStatement, VariableSpecifier, Visibility, walk_function_declaration, walk_function_implementation, walk_procedure_declaration,
         walk_procedure_implementation, walk_variable_declaration_statement,
     },
     compiler::CompilationErrorType,
     parser::{
-        ErrorReporter, UserTypeRegistry,
+        ErrorReporter, ParserErrorType, UserTypeRegistry,
         lexer::{Spanned, Token},
     },
 };
@@ -75,7 +75,7 @@ pub fn lower_modules(asts: &[&Ast], errors: Arc<Mutex<ErrorReporter>>, registry:
         }
     }
 
-    let lowered: Vec<Ast> = asts
+    let mut lowered: Vec<Ast> = asts
         .iter()
         .map(|ast| {
             let own = ast
@@ -119,7 +119,94 @@ pub fn lower_modules(asts: &[&Ast], errors: Arc<Mutex<ErrorReporter>>, registry:
         })
         .collect();
     validate_module_initializers(asts, &lowered, registry, &errors);
+    normalize_legacy_routine_kinds(&mut lowered, &errors);
     lowered
+}
+
+/// PPLC 3.40 lets an explicit PROCEDURE declaration determine the kind of a
+/// FUNCTION implementation, but not the reverse. Parameter types and VAR modes
+/// still come from the implementation, just as for ordinary procedures.
+/// Run after module qualification and initializer validation: the latter pairs
+/// source and lowered nodes, and compiler and LSP must see the same routine kind.
+fn normalize_legacy_routine_kinds(asts: &mut [Ast], errors: &Arc<Mutex<ErrorReporter>>) {
+    let declarations: HashSet<_> = asts
+        .iter()
+        .flat_map(|ast| &ast.nodes)
+        .filter_map(|node| match node {
+            AstNode::ProcedureDeclaration(declaration) if !declaration.get_declare_token().span.is_empty() => Some(declaration.get_identifier().clone()),
+            _ => None,
+        })
+        .collect();
+    for ast in asts.iter_mut().filter(|ast| ast.language_version < 400) {
+        for node in &mut ast.nodes {
+            let AstNode::Function(function) = node else { continue };
+            if declarations.contains(function.get_identifier()) {
+                *node = AstNode::Procedure(
+                    ProcedureImplementation::new(
+                        function.id,
+                        Spanned::new(Token::Procedure, function.get_function_token().span.clone()),
+                        function.get_identifier_token().clone(),
+                        function.get_leftpar_token().clone(),
+                        function.get_parameters().clone(),
+                        function.get_rightpar_token().clone(),
+                        function
+                            .get_statements()
+                            .iter()
+                            .map(|statement| {
+                                statement.visit_mut(&mut LegacyProcedureReturns {
+                                    identifier: function.get_identifier_token(),
+                                })
+                            })
+                            .collect(),
+                        Spanned::new(Token::EndProc, function.get_endfunc_token().span.clone()),
+                    )
+                    .with_documentation(function.get_documentation()),
+                );
+            } else {
+                // The parser defers only legacy implementation headers. Genuine
+                // functions still cannot have direct VAR parameters.
+                for parameter in function.get_parameters() {
+                    if let ParameterSpecifier::Variable(parameter) = parameter
+                        && let Some(token) = parameter.get_var_token()
+                    {
+                        errors
+                            .lock()
+                            .unwrap()
+                            .report_error_file(ast.file_name.clone(), token.span.clone(), ParserErrorType::VarNotAllowedInFunctions);
+                    }
+                }
+            }
+        }
+    }
+}
+
+struct LegacyProcedureReturns<'a> {
+    identifier: &'a Spanned<Token>,
+}
+
+impl AstVisitorMut for LegacyProcedureReturns<'_> {
+    fn visit_return_statement(&mut self, statement: &crate::ast::ReturnStatement) -> Statement {
+        let return_statement = Statement::Return(crate::ast::ReturnStatement::new(statement.get_return_token().clone(), None));
+        if let Some(expression) = statement.get_expression() {
+            // Preserve the existing RETURN-expression extension as a routine-name
+            // assignment plus RETURN. There is no result slot; the VM discards the
+            // assigned value after evaluating the expression for its side effects.
+            return Statement::Block(crate::ast::BlockStatement::empty(vec![
+                Statement::Let(crate::ast::LetStatement::new(
+                    None,
+                    Spanned::new(self.identifier.token.clone(), statement.get_return_token().span.clone()),
+                    None,
+                    Vec::new(),
+                    None,
+                    Vec::new(),
+                    Spanned::create_empty(Token::Eq),
+                    expression.clone(),
+                )),
+                return_statement,
+            ]));
+        }
+        return_statement
+    }
 }
 
 /// Check before optimization or initializer lowering can hide a runtime read or

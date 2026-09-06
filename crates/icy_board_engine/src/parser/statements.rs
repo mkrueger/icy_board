@@ -1195,6 +1195,23 @@ impl Parser<'_> {
             return None;
         };
 
+        let root_is_board_object = match &id_token.token {
+            Token::Identifier(identifier) => self.type_registry.get_board_object(identifier).is_some(),
+            _ => false,
+        };
+        // A bracketed record field is an indexed storage path, not a <set>
+        // method. Normalize only assignment candidates; semantic analysis still
+        // decides whether each call really indexes a record field. In particular,
+        // this must not turn string characters or API properties into storage.
+        if !root_is_board_object
+            && let Some(target) = indexed_member_assignment_target(&expression)
+            && let Some(members) = assignable_indexed_member_chain(&target)
+        {
+            return Some(Statement::Let(
+                LetStatement::new(let_token, id_token, None, Vec::new(), None, members, eq_token, value_expression).with_target_expression(target),
+            ));
+        }
+
         if let Expression::FunctionCall(call) = &expression
             && let Expression::MemberReference(member) = call.get_expression()
             && member.get_identifier().as_str() == "<get>"
@@ -1235,15 +1252,6 @@ impl Parser<'_> {
                 value_expression,
             )));
         }
-        let root_is_board_object = match &id_token.token {
-            Token::Identifier(identifier) => self.type_registry.get_board_object(identifier).is_some(),
-            _ => false,
-        };
-        if !root_is_board_object && let Some(members) = assignable_indexed_member_chain(&expression) {
-            return Some(Statement::Let(
-                LetStatement::new(let_token, id_token, None, Vec::new(), None, members, eq_token, value_expression).with_target_expression(expression),
-            ));
-        }
         if !matches!(expression, Expression::MemberReference(_)) {
             self.report_error(eq_token.span, ParserErrorType::InvalidToken(eq_token.token));
             return None;
@@ -1270,6 +1278,40 @@ fn assignable_member_chain(expression: &Expression) -> Option<Vec<Spanned<Token>
     }
     members.reverse();
     Some(members)
+}
+
+/// Uses the existing `rec.field(index)` AST for bracketed assignment paths.
+/// A second index on an element (e.g. `rec.strings[0][1]`) is not a record
+/// field index and keeps the ordinary getter/setter diagnostics instead.
+fn indexed_member_assignment_target(expression: &Expression) -> Option<Expression> {
+    match expression {
+        Expression::Identifier(_) | Expression::Indexer(_) => Some(expression.clone()),
+        Expression::MemberReference(member) => Some(Expression::MemberReference(MemberReferenceExpression::new(
+            indexed_member_assignment_target(member.get_expression())?,
+            member.get_dot_token().clone(),
+            member.get_identifier_token().clone(),
+        ))),
+        Expression::FunctionCall(call) => {
+            if let Expression::MemberReference(member) = call.get_expression()
+                && member.get_identifier().as_str() == "<get>"
+            {
+                if !matches!(member.get_expression(), Expression::MemberReference(_)) {
+                    return None;
+                }
+                return Some(Expression::FunctionCall(FunctionCallExpression::new(
+                    indexed_member_assignment_target(member.get_expression())?,
+                    member.get_dot_token().clone(),
+                    call.get_arguments().clone(),
+                    call.get_rpar_token().clone(),
+                )));
+            }
+            Some(Expression::FunctionCall(call.preserving_id(
+                indexed_member_assignment_target(call.get_expression())?,
+                call.get_arguments().clone(),
+            )))
+        }
+        _ => None,
+    }
 }
 
 fn assignable_indexed_member_chain(expression: &Expression) -> Option<Vec<Spanned<Token>>> {

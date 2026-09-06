@@ -1072,6 +1072,7 @@ impl Backend {
             let mut semantic_visitor = SemanticVisitor::new(&ws, errors.clone(), registry);
             semantic_visitor.set_modules(&asts.iter().collect::<Vec<_>>());
             let lowered = lower_modules(&asts.iter().collect::<Vec<_>>(), errors, &semantic_visitor.type_registry);
+            semantic_visitor.prepare_legacy_call_signatures(&lowered.iter().collect::<Vec<_>>());
             // A file the manifest no longer names must not linger from an earlier read.
             self.workspace_map.clear();
             for ast in lowered
@@ -1240,6 +1241,7 @@ impl Backend {
                 let mut parsed = Vec::new();
                 semantic_visitor.set_modules(&asts.iter().map(|(_, ast)| ast).collect::<Vec<_>>());
                 let lowered = lower_modules(&asts.iter().map(|(_, ast)| ast).collect::<Vec<_>>(), errors, &semantic_visitor.type_registry);
+                semantic_visitor.prepare_legacy_call_signatures(&lowered.iter().collect::<Vec<_>>());
                 for ast in lowered
                     .iter()
                     .filter(|ast| ast.module.is_some())
@@ -1277,6 +1279,7 @@ impl Backend {
             let mut semantic_visitor = SemanticVisitor::new(&workspace, errors.clone(), registry);
             semantic_visitor.set_modules(&[&ast]);
             let lowered = lower_modules(&[&ast], errors, &semantic_visitor.type_registry);
+            semantic_visitor.prepare_legacy_call_signatures(&lowered.iter().collect::<Vec<_>>());
             lowered[0].visit(&mut semantic_visitor);
             semantic_visitor.finish();
 

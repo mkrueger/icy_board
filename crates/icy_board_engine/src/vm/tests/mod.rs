@@ -7,6 +7,8 @@
 
 #![cfg(test)]
 
+mod array_parameters;
+mod array_sort;
 mod array_type_checks;
 mod array_values;
 mod arrays;
@@ -29,6 +31,7 @@ mod forward_calls;
 mod graphics;
 mod http;
 mod hyperlinks;
+mod legacy_array_parameters;
 mod long;
 mod margins;
 mod masks;
@@ -41,6 +44,7 @@ mod mouse;
 mod nested_records;
 mod palette;
 mod ppe_paths;
+mod record_array_brackets;
 mod record_io;
 mod record_literals;
 mod records;

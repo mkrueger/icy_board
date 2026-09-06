@@ -29,9 +29,12 @@ pub(super) fn parameter_lists_match(expected: &[ParameterSpecifier], actual: &[P
             .all(|(expected, actual)| parameter_signature_matches(expected, actual))
 }
 
-/// Keep the legacy DECLARE rules for ordinary parameters, but validate complete
-/// callback signatures before the implementation replaces the declaration.
-pub(super) fn declaration_parameters_match(expected: &[ParameterSpecifier], actual: &[ParameterSpecifier]) -> bool {
+/// PPL 4.00 requires complete signatures; legacy ordinary parameters remain
+/// permissive while callbacks retain their complete signature checks.
+pub(super) fn declaration_parameters_match(language: u16, expected: &[ParameterSpecifier], actual: &[ParameterSpecifier]) -> bool {
+    if language >= 400 {
+        return parameter_lists_match(expected, actual);
+    }
     expected.len() == actual.len()
         && expected.iter().zip(actual).all(|(expected, actual)| {
             matches!((expected, actual), (ParameterSpecifier::Variable(_), ParameterSpecifier::Variable(_))) || parameter_signature_matches(expected, actual)
@@ -51,7 +54,7 @@ fn parameter_signature_matches(expected: &ParameterSpecifier, actual: &Parameter
                             .get_dimensions()
                             .iter()
                             .zip(actual.get_dimensions())
-                            .all(|(expected, actual)| expected.get_dimension() == actual.get_dimension())
+                            .all(|(expected, actual)| expected.is_dynamic() == actual.is_dynamic() && expected.get_dimension() == actual.get_dimension())
                 }
                 (None, None) => true,
                 _ => false,

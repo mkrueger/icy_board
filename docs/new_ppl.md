@@ -37,8 +37,41 @@ Several compiler improvements are deliberately **not** tied to 3.50. The
 compiler collects routine signatures before generating code, so `DECLARE` is
 optional at every language version. `RETURN expression` is likewise accepted
 when compiling classic source. In both cases the generated PPE uses ordinary
-old instructions; declarations that disagree with implementations are errors.
+old instructions. Whether an authored declaration must match its implementation
+depends on the source language, as described below.
 Routine documentation is not in the table either, for the same reason.
+
+## DECLARE contracts and language versions
+
+In **language 400**, an explicit `DECLARE` must match its implementation:
+routine kind, parameter count, parameter types (including nominal enum/record
+identity), `VAR` modes, array ranks, exact bounds and dynamic markers are
+checked. Function return type and rank must match too. These checks recurse
+through callback signatures; parameter names are irrelevant. In particular,
+`INTEGER values[]` and `INTEGER values[0]` are different declarations. This
+signature check does not prevent a whole-array argument from supplying its
+current bounds at call time. `DECLARE` remains optional.
+
+In **languages below 400**, the PPLC-compatible contract is deliberately
+permissive: parameter count must match, but implementation parameter types,
+`VAR` modes, dimensions and function result type win over the declaration.
+An explicit `DECLARE PROCEDURE` may have a `FUNCTION` implementation, which
+is normalized to a procedure with no function result slot; the reverse is
+rejected. Even in this special case, `VAR` comes from the **implementation**,
+not the declaration. This does not allow `VAR` on a genuine function.
+
+The compiler and language server collect legacy implementation signatures
+package-wide after module qualification and routine-kind normalization, before
+checking calls, including calls whose implementation is in another file.
+Strictness follows source language, not the output format: language 340 or 350
+targeting runtime 400 still uses the legacy contract. Modern features retain
+their separate runtime requirements.
+
+The [DECLARE audit](../compat/DECLARE_AUDIT.md) gives the exact evidence scope:
+23 authored probes against original PPLC 3.40, with IcyBoard legacy compiler
+coverage for language/runtime 340/340, 340/400 and 350/400. It does not claim
+identical diagnostics, byte-identical PPEs or compatibility with every original
+compiler version.
 
 ## Routine documentation
 
@@ -1670,6 +1703,59 @@ array. Local dynamic arrays start empty on each routine call and retain separate
 storage across recursive calls. An array function that exits without assigning
 its result returns an empty array, not the result of a previous call.
 
+Routine parameters can also declare an array rank. In language 4.00 this
+requires runtime 4.00; the argument must be an array with a compatible element
+type and the same rank, not a scalar or one array element.
+
+```PPL
+PROCEDURE Inspect(INTEGER values[])
+	PRINTLN values.Len()
+ENDPROC
+
+PROCEDURE ReplaceValues(VAR INTEGER values[])
+	INTEGER replacement[] = { 7, 8 }
+	values = replacement
+ENDPROC
+```
+
+Value parameters receive independent array values (copy-on-write), including
+the argument's current bounds. Array-returning calls, record array fields and
+read-only array properties can be passed by value. Changing or redimensioning
+the parameter does not change the caller's array. Parameters declared with
+initial bounds, such as `INTEGER values[10]`, also adopt the argument's bounds;
+they are not fixed-shape record fields.
+
+`VAR` array parameters take writable array variables and copy their final value
+and bounds back on return. As with existing `VAR` parameters, this is
+copy-in/copy-out, not shared-reference aliasing: arguments are evaluated
+left-to-right, and aliased parameters are written back in reverse parameter
+order. The first parameter therefore wins when the same array variable is
+passed more than once. Array-valued calls, read-only properties and record
+array fields are not writable variable arguments for `VAR`.
+
+Whole-array formals carry PPE variable-header flag `0x04`
+(`VARIABLE_FLAG_ARRAY_PARAMETER`), independent of static `0x01` and dynamic
+storage `0x02`. **Recompile unreleased 4.00 programs using array parameters**:
+unmarked formals now explicitly retain the classic calling convention. There
+is no compatibility shim to infer which convention an older beta PPE intended;
+see the [PPE format](ppe_format.md#entry-header--11-bytes).
+
+Legacy formal arrays are different, even on runtime 400. An implementation
+formal such as `INTEGER values(3)` retains rank 1 and upper bound 3 in its
+header, without `0x04`; a scalar actual goes into element zero. Only that
+element is saved/restored and copied back for `VAR`; the tail persists between
+calls and across recursion. These execution rules are derived from PCBoard
+source and covered by nine IcyBoard VM tests, not by an original-runtime run
+of the DECLARE probes. Earlier N1–N4 notes must not be read as requiring legacy
+headers to be flattened to `dim = 0`.
+
+Below language 400, rank-2/3 implementation formals are rejected at the raw
+dimension comma, even if the body does not use them. Multidimensional
+`DECLARE` formals remain accepted and do not determine implementation shape;
+ordinary multidimensional arrays are unaffected. The
+[audit](../compat/DECLARE_AUDIT.md) distinguishes the original rank-2 compiler
+probes from generated rank-3 parser coverage and source-derived runtime rules.
+
 Existing 4.00 source that declares arrays with parentheses is
 accepted with a migration warning; newly formatted and decompiled 4.00 source
 always writes square brackets. Older language versions retain the classic
@@ -1704,6 +1790,15 @@ redimensioned. Array-valued record fields have the fixed
 bounds stored in their record type and cannot use either spelling of `REDIM`.
 `Len()` reports the element count; after `Redim(20)`, it returns 21 and valid
 indices are 0 through 20. Empty dynamic arrays report zero.
+
+Record array elements can be assigned with square brackets, including nested
+record paths and compound assignments such as `item.rows[0].value += 1`.
+This does not make read-only object properties or string-character indices
+writable.
+
+In runtime 4.00, `SORT values, indices` produces exactly one index for every
+element of the input vector. An empty vector produces an empty index vector;
+there is no trailing default index. Existing pre-4.00 PPE behavior is unchanged.
 
 ## `CONST` Declaration (3.50)
 

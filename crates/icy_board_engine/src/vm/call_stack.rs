@@ -1,21 +1,70 @@
 use crate::Res;
 use crate::ast::constant::STACK_LIMIT;
-use crate::executable::{PPEExpr, VariableValue};
+use crate::executable::{PPEExpr, VariableValue, variable_table::VARIABLE_FLAG_ARRAY_PARAMETER};
 use crate::icy_board::state::ppl_error::{ERR_KIND_STACK, ERR_STACK, PplError};
 
 use super::{ErrorHandler, ReturnAddress, VMError, VirtualMachine};
 
 impl VirtualMachine<'_> {
+    pub(super) fn is_legacy_array_parameter(&self, parameter: usize) -> bool {
+        let header = &self.variable_table.get_var_entry(parameter).header;
+        header.dim > 0
+            && !matches!(
+                header.variable_type,
+                crate::executable::VariableType::Function | crate::executable::VariableType::Procedure
+            )
+            && !(self.variable_table.get_version() >= 400 && header.flags & VARIABLE_FLAG_ARRAY_PARAMETER != 0)
+    }
+
+    pub(super) fn call_parameter_value(&self, parameter: usize) -> VariableValue {
+        let value = self.variable_table.get_value(parameter);
+        if self.is_legacy_array_parameter(parameter) {
+            value.get_array_value(0, 0, 0)
+        } else {
+            value.clone()
+        }
+    }
+
+    pub(super) fn set_call_parameter(&mut self, parameter: usize, value: VariableValue) {
+        if self.is_legacy_array_parameter(parameter) {
+            // SCREXEC assigns through *varLst[id]->data: only element zero,
+            // never the parameter array's storage or its persistent tail.
+            if let Some(target) = self.variable_table.get_value_mut(parameter).get_array_value_mut(0, 0, 0) {
+                *target = super::decay_array(value).convert_to(target.vtype);
+            }
+        } else {
+            self.variable_table.set_value(parameter, value);
+        }
+    }
+
+    /// The destination parameter header determines whether an argument is an
+    /// array value. Routine-reference headers also use dim, but for arity.
+    async fn eval_call_argument(&mut self, parameter: usize, argument: &PPEExpr) -> Res<VariableValue> {
+        let header = &self.variable_table.get_var_entry(parameter).header;
+        if self.variable_table.get_version() >= 400
+            && header.dim > 0
+            && header.flags & VARIABLE_FLAG_ARRAY_PARAMETER != 0
+            && !matches!(
+                header.variable_type,
+                crate::executable::VariableType::Function | crate::executable::VariableType::Procedure
+            )
+        {
+            self.eval_array_operand(argument).await
+        } else {
+            self.eval_expr(argument).await
+        }
+    }
+
     #[allow(clippy::needless_range_loop)]
     pub(super) async fn prepare_call(&mut self, locals: usize, parameters: usize, first: usize, arguments: &[PPEExpr], pass_flags: u16) -> Res<()> {
         if parameters <= 1 {
             let value = match (parameters, arguments.first()) {
-                (1, Some(argument)) => Some(self.eval_expr(argument).await?),
+                (1, Some(argument)) => Some(self.eval_call_argument(first, argument).await?),
                 _ => None,
             };
             self.save_call_frame(locals, parameters, first);
             if let Some(value) = value {
-                self.variable_table.set_value(first, value);
+                self.set_call_parameter(first, value);
                 if pass_flags & 1 != 0 {
                     self.write_back_stack.push(arguments[0].clone());
                 }
@@ -24,13 +73,13 @@ impl VirtualMachine<'_> {
         }
 
         let mut values = Vec::with_capacity(parameters);
-        for argument in arguments.iter().take(parameters) {
-            values.push(self.eval_expr(argument).await?);
+        for (i, argument) in arguments.iter().take(parameters).enumerate() {
+            values.push(self.eval_call_argument(first + i, argument).await?);
         }
         self.save_call_frame(locals, parameters, first);
         for (i, value) in values.into_iter().enumerate() {
             let id = first + i;
-            self.variable_table.set_value(id, value);
+            self.set_call_parameter(id, value);
 
             if 1u16.checked_shl(i as u32).is_some_and(|mask| mask & pass_flags != 0) {
                 self.write_back_stack.push(arguments[i].clone());
@@ -43,13 +92,19 @@ impl VirtualMachine<'_> {
     pub(super) fn prepare_call_with_values(&mut self, locals: usize, parameters: usize, first: usize, arguments: Vec<VariableValue>) {
         self.save_call_frame(locals, parameters, first);
         for (i, value) in arguments.into_iter().take(parameters).enumerate() {
-            self.variable_table.set_value(first + i, value);
+            self.set_call_parameter(first + i, value);
         }
     }
 
     fn save_call_frame(&mut self, locals: usize, parameters: usize, first: usize) {
         for i in 0..(locals + parameters) {
             let id = first + i;
+            if i < parameters && self.is_legacy_array_parameter(id) {
+                // stkinit/stkclean save and restore only parameter element zero;
+                // initLocals starts after the parameters, so tails are not reset.
+                self.call_local_value_stack.push(self.call_parameter_value(id));
+                continue;
+            }
             let entry = self.variable_table.get_var_entry(id);
             if entry.header.flags & crate::executable::variable_table::VARIABLE_FLAG_STATIC == 0 {
                 let empty =

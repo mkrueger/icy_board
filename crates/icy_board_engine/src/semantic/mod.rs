@@ -93,6 +93,9 @@ pub struct SemanticVisitor {
 
     // constants
     pub function_containers: Vec<FunctionContainer>,
+    /// PPLC pass 2 checks calls against implementation parameters, not DECLARE
+    /// hints. Keep the original declaration separately for the count check.
+    legacy_call_signatures: HashMap<unicase::Ascii<String>, FunctionDeclaration>,
 
     cur_func_impl: Option<usize>,
     cur_func_call: u64,
@@ -196,6 +199,46 @@ impl SemanticVisitor {
         }
     }
 
+    /// Collect from the qualified, normalized package before visiting any file.
+    /// Legacy DECLARE only provides the arity; call checking needs the definition
+    /// even when it is in a later file. Strict declarations remain untouched.
+    pub fn prepare_legacy_call_signatures(&mut self, asts: &[&crate::ast::Ast]) {
+        self.legacy_call_signatures.clear();
+        for ast in asts {
+            self.collect_legacy_call_signatures(ast);
+        }
+    }
+
+    fn collect_legacy_call_signatures(&mut self, ast: &crate::ast::Ast) {
+        if ast.language_version >= 400 {
+            return;
+        }
+        for node in &ast.nodes {
+            let (name, signature) = match node {
+                crate::ast::AstNode::Function(function) => (
+                    function.get_identifier(),
+                    FunctionDeclaration::Function(
+                        crate::ast::FunctionDeclarationAstNode::empty(
+                            function.get_identifier().clone(),
+                            function.get_parameters().clone(),
+                            function.get_return_type(),
+                        )
+                        .with_return_rank(function.get_return_rank()),
+                    ),
+                ),
+                crate::ast::AstNode::Procedure(procedure) => (
+                    procedure.get_identifier(),
+                    FunctionDeclaration::Procedure(crate::ast::ProcedureDeclarationAstNode::empty(
+                        procedure.get_identifier().clone(),
+                        procedure.get_parameters().clone(),
+                    )),
+                ),
+                _ => continue,
+            };
+            self.legacy_call_signatures.insert(name.clone(), signature);
+        }
+    }
+
     pub(crate) fn storage_type(&self, source_type: VariableType) -> VariableType {
         if self.type_registry.is_enum_type(source_type) {
             VariableType::Integer
@@ -287,6 +330,7 @@ impl SemanticVisitor {
             control_flow_liveness: true,
             references_are_reachable: true,
             function_containers: Vec::new(),
+            legacy_call_signatures: HashMap::new(),
             last_lookup_index: 0,
         };
         for user_var in USER_VARIABLES.iter() {
@@ -510,6 +554,7 @@ impl SemanticVisitor {
                 if !matches!(rt, ReferenceType::Variable(_)) {
                     continue;
                 }
+                r.variable_table_index = variable_table.len() + 1;
                 let mut new_entry = r.create_table_entry_as(storage_type);
                 new_entry.entry_type = EntryType::Parameter;
                 variable_table.push(new_entry);
@@ -517,11 +562,13 @@ impl SemanticVisitor {
 
             for idx in f.local_variables.start..f.local_variables.end {
                 let is_live = self.reference_is_live(idx);
-                let (rt, r) = &self.references[idx];
+                let storage_type = self.storage_type(self.references[idx].1.variable_type);
+                let (rt, r) = &mut self.references[idx];
                 if !matches!(rt, ReferenceType::Variable(_)) || !is_live {
                     continue;
                 }
-                let mut new_entry = r.create_table_entry_as(self.storage_type(r.variable_type));
+                r.variable_table_index = variable_table.len() + 1;
+                let mut new_entry = r.create_table_entry_as(storage_type);
                 new_entry.entry_type = EntryType::LocalVariable;
                 variable_table.push(new_entry);
             }
@@ -714,6 +761,16 @@ impl SemanticVisitor {
         self.function_containers.get(container)
     }
 
+    fn call_signature(&self, container: usize) -> FunctionDeclaration {
+        let routine = &self.function_containers[container];
+        if self.lang_version < 400
+            && let Some(signature) = self.legacy_call_signatures.get(&routine.name)
+        {
+            return signature.clone();
+        }
+        routine.functions.clone()
+    }
+
     fn routine_container_index(&self, reference: usize) -> Option<usize> {
         match self.references.get(reference)?.0 {
             ReferenceType::Function(container) | ReferenceType::Procedure(container) => Some(container),
@@ -741,15 +798,33 @@ impl SemanticVisitor {
         for (i, param) in parameters.iter().enumerate() {
             match param {
                 ParameterSpecifier::Variable(param) => {
-                    let id = self.add_declaration(param.get_variable_type(), param.get_variable().as_ref().unwrap().get_identifier_token());
+                    let variable = param.get_variable().as_ref().unwrap();
+                    let rank = variable.get_dimensions().len() as u8;
+                    let array_parameter = self.lang_version >= 400 && rank > 0;
+                    if array_parameter && self.runtime < 400 {
+                        self.errors.lock().unwrap().report_error(
+                            variable.get_identifier_token().span.clone(),
+                            CompilationErrorType::BuiltinNeedsRuntime("Array parameters".to_string(), 400),
+                        );
+                    }
+                    let dynamic = array_parameter && variable.get_dimensions()[0].is_dynamic();
+                    let id = self.add_declaration(param.get_variable_type(), variable.get_identifier_token());
                     self.references[id].1.header = Some(VarHeader {
                         id,
                         variable_type: param.get_variable_type(),
-                        dim: 0,
-                        vector_size: 0,
-                        matrix_size: 0,
-                        cube_size: 0,
-                        flags: 0,
+                        dim: rank,
+                        vector_size: if rank == 0 || dynamic { 0 } else { variable.get_vector_size() },
+                        matrix_size: if rank == 0 || dynamic { 0 } else { variable.get_matrix_size() },
+                        cube_size: if rank == 0 || dynamic { 0 } else { variable.get_cube_size() },
+                        flags: if dynamic {
+                            crate::executable::variable_table::VARIABLE_FLAG_DYNAMIC_ARRAY
+                        } else {
+                            0
+                        } | if array_parameter {
+                            crate::executable::variable_table::VARIABLE_FLAG_ARRAY_PARAMETER
+                        } else {
+                            0
+                        },
                     });
 
                     self.local_variable_lookup
@@ -1145,6 +1220,18 @@ impl SemanticVisitor {
                 ParameterSpecifier::Variable(parameter) => {
                     let expected = parameter.get_variable_type();
                     let actual = argument.visit(self);
+                    let rank = parameter.get_variable().as_ref().map_or(0, |variable| variable.get_dimensions().len() as u8);
+                    if self.lang_version >= 400 && rank > 0 {
+                        let shape = arrays::ArrayShape {
+                            element_type: expected,
+                            rank,
+                            bounds: [0; 3],
+                            resizable: true,
+                            field_name: None,
+                        };
+                        self.check_array_target_assignment(&shape, argument, &argument.get_span());
+                        continue;
+                    }
                     self.reject_bare_array_value(argument);
                     if expected != actual && (matches!(expected, VariableType::UserData(_)) || matches!(actual, VariableType::UserData(_))) {
                         self.errors.lock().unwrap().report_error(

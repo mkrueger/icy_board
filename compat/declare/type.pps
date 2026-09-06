@@ -1,0 +1,6 @@
+DECLARE PROCEDURE Work(INTEGER value)
+Work("abc")
+END
+PROCEDURE Work(STRING value)
+PRINTLN value
+ENDPROC

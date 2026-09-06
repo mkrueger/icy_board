@@ -51,6 +51,35 @@ releases.
   rejected by the compiler and language server before optimization, for explicit
   and implicit library modules. Routine-local initialization remains unrestricted.
 
+- PPL 4.00 array parameters preserve rank, contents and bounds through direct,
+  recursive and callback calls. Value parameters are independent copies;
+  `VAR` array parameters copy their final value and bounds back to the caller.
+  Recompile unreleased 4.00 PPEs using array parameters: variable-header flag
+  `0x04` now distinguishes whole-array formals from classic element-zero
+  parameters, independently of static `0x01` and dynamic-storage `0x02`.
+  Unmarked legacy formals keep their rank/bounds and element-zero save/restore
+  and copyback behavior, including persistent tails and runtime-400 targets;
+  there is no compatibility shim for ambiguous older beta PPEs.
+
+- `DECLARE` matching follows the source language. Below 400, implementation
+  parameter types, `VAR` modes, dimensions and function result types take
+  precedence; parameter counts must still match. A declared procedure may be
+  implemented with `FUNCTION`, retaining the implementation's `VAR` modes but
+  emitting a procedure without a result slot; the reverse is rejected.
+  Multidimensional implementation formals fail at the dimension comma even
+  when unused, while multidimensional declarations remain accepted. Compiler
+  and LSP call checks collect normalized implementation signatures package-wide.
+  Language 400 strictly checks kind, count, types, `VAR`, ranks, bounds, dynamic
+  markers and function return type/rank, recursively through callbacks; names
+  are irrelevant. See the [DECLARE audit](compat/DECLARE_AUDIT.md) for the 23
+  authored PPLC 3.40 compiler probes and the separate source-derived runtime
+  evidence, rather than a claim of universal or byte-identical compatibility.
+
+- Record array fields accept square-bracket assignments and compound updates,
+  including nested paths, without weakening read-only property checks.
+- Runtime 4.00 `SORT` handles empty arrays without panicking and produces
+  exactly one index per input element rather than appending a spurious zero.
+
 - PPL 4.00 dynamic arrays now have per-call local storage and fresh function
   results, including recursion. Whole-array assignments copy all elements and
   adopt bounds; brace initializers preserve explicit dynamic declarations.

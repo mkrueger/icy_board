@@ -18,6 +18,9 @@ use super::{ExecutableError, GenericVariableData, LAST_PPE_RUNTIME, PPEExpr, PPE
 
 pub const VARIABLE_FLAG_STATIC: u8 = 0x01;
 pub const VARIABLE_FLAG_DYNAMIC_ARRAY: u8 = 0x02;
+/// Runtime-400 whole-array parameter. Unmarked parameter arrays keep PCBoard's
+/// element-zero calling convention, including on a runtime-400 target.
+pub const VARIABLE_FLAG_ARRAY_PARAMETER: u8 = 0x04;
 pub(crate) const MAX_DESERIALIZED_ARRAY_ELEMENTS: usize = 1_000_000;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

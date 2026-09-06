@@ -726,6 +726,13 @@ impl VirtualMachine<'_> {
     async fn set_variable(&mut self, variable: &PPEExpr, value: VariableValue) -> Res<()> {
         match variable {
             PPEExpr::Value(id) => {
+                // Classic assignments to routine descriptors discard scalar values.
+                // The caller has already evaluated the RHS, including side effects.
+                // Keep same-kind routine references assignable (also in runtime 400).
+                let target_type = self.variable_table.get_var_entry(*id).header.variable_type;
+                if matches!(target_type, VariableType::Function | VariableType::Procedure) && value.get_type() != target_type {
+                    return Ok(());
+                }
                 // Writing a bare array without subscripts reaches its first element,
                 // the way reading one does; replacing it would drop the other elements.
                 let target = self.variable_table.get_value(*id);
@@ -880,7 +887,7 @@ impl VirtualMachine<'_> {
                         // get write back values
                         let single_pass_value = if pass_flags.count_ones() == 1 {
                             let parameter = pass_flags.trailing_zeros() as usize;
-                            (parameter < parameters).then(|| self.variable_table.get_value(first + parameter).clone())
+                            (parameter < parameters).then(|| self.call_parameter_value(first + parameter))
                         } else {
                             None
                         };
@@ -889,7 +896,7 @@ impl VirtualMachine<'_> {
                             for i in 0..parameters {
                                 if 1u16.checked_shl(i as u32).is_some_and(|mask| mask & pass_flags != 0) {
                                     let id = first + i;
-                                    let val = self.variable_table.get_value(id).clone();
+                                    let val = self.call_parameter_value(id);
                                     pass_values.push(val);
                                 }
                             }
@@ -898,12 +905,19 @@ impl VirtualMachine<'_> {
                         // write back locals + parameters
                         for i in (0..(locals + parameters)).rev() {
                             let id = first + i;
-                            if self.variable_table.get_var_entry(id).header.flags & crate::executable::variable_table::VARIABLE_FLAG_STATIC == 0 {
+                            let legacy_parameter = i < parameters && self.is_legacy_array_parameter(id);
+                            if legacy_parameter
+                                || self.variable_table.get_var_entry(id).header.flags & crate::executable::variable_table::VARIABLE_FLAG_STATIC == 0
+                            {
                                 let Some(value) = self.call_local_value_stack.pop() else {
                                     return Err(VMError::PushPopStackEmpty.into());
                                 };
                                 if id != return_var_id {
-                                    *self.variable_table.get_value_mut(id) = value;
+                                    if legacy_parameter {
+                                        self.set_call_parameter(id, value);
+                                    } else {
+                                        *self.variable_table.get_value_mut(id) = value;
+                                    }
                                 }
                             }
                         }

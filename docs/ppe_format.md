@@ -90,15 +90,41 @@ The header is encrypted on its own, separately from the payload that follows it.
 A dimension count above 3 is treated as corrupt and clamped to 3 rather than
 trusted.
 
-Flag `0x01` retains the static call-frame behavior. In runtime 4.00 only,
-`0x02` marks dynamic array storage: the initial value has the declared rank but
-zero elements, rather than allocating from the stored upper bounds. The flags
-are independent; dynamic storage does not make a local variable static.
-Pre-4.00 readers do not interpret `0x02` as dynamic storage.
+| Flag | Symbol | Meaning |
+| :--- | :--- | :--- |
+| `0x01` | `VARIABLE_FLAG_STATIC` | Static call-frame behavior for locals. |
+| `0x02` | `VARIABLE_FLAG_DYNAMIC_ARRAY` | Runtime-400 dynamic storage: retain declared rank, initially allocate zero elements rather than the stored upper bounds. |
+| `0x04` | `VARIABLE_FLAG_ARRAY_PARAMETER` | Runtime-400 whole-array formal: transfer the array value and its current bounds at calls. |
 
-The unpublished 4.00 implementation previously reused `0x01` for dynamic
-arrays. Recompile those beta PPEs with the corrected compiler; this does not
-change the classic PCBoard PPE formats.
+These flags are independent. A bounded language-400 array formal normally has
+`0x04`; a dynamic array formal has `0x06`. Dynamic storage does not make a local
+static, and it does not by itself select whole-array parameter passing.
+Pre-4.00 runtimes do not interpret `0x02` as dynamic storage or `0x04` as the
+modern array calling convention. The latter applies to ordinary array formals,
+not function/procedure reference headers, whose dimension field encodes arity.
+
+For marked array formals on runtime 400 or newer, value parameters receive an
+independent array including current bounds; procedure `VAR` parameters also
+copy back the final array and bounds. The procedure descriptor's `pass_flags`
+still selects which arguments are `VAR`; header flag `0x04` does not replace
+that bitmask.
+
+**Unmarked formal arrays use the classic element-zero convention, including
+on runtime 400.** Their implementation rank and bounds remain in the header;
+they are not flattened to `dim = 0`. A scalar actual is assigned to element
+zero, only that element is saved/restored and copied back for `VAR`, and the
+tail persists between calls and through recursion. Source languages below 400
+emit these unmarked formals even when targeting runtime 400. Rank or runtime
+alone therefore cannot distinguish classic and whole-array parameters.
+The [DECLARE audit](../compat/DECLARE_AUDIT.md) separates original-compiler
+header evidence from these source-derived runtime semantics and IcyBoard tests.
+
+**Recompile unreleased 4.00 PPEs using array parameters.** Earlier unmarked
+whole-array formals cannot be distinguished from classic parameters, and no
+compatibility shim guesses their intended calling convention. The unpublished
+4.00 implementation also previously reused `0x01` for dynamic arrays; recompile
+those affected beta PPEs as well. Neither correction changes classic PCBoard
+PPE formats.
 
 ### Type byte
 

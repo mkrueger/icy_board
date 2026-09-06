@@ -1,0 +1,8 @@
+DECLARE PROCEDURE Work(INTEGER value)
+INTEGER value
+value = 1
+Work(value + 1)
+END
+PROCEDURE Work(VAR INTEGER value)
+value = 9
+ENDPROC

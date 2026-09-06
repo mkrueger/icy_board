@@ -311,6 +311,7 @@ impl PPECompiler {
         self.semantic_visitor.set_modules(asts);
         let lowered = modules::lower_modules(asts, self.semantic_visitor.errors.clone(), &self.semantic_visitor.type_registry);
         let asts = lowered.iter().collect::<Vec<_>>();
+        self.semantic_visitor.prepare_legacy_call_signatures(&asts);
         // Before introducing typed receiver temporaries, resolve whether a member
         // belongs to a value record or a reference object. Probe diagnostics are
         // discarded: the transformed AST receives the normal, authoritative check.
@@ -320,6 +321,7 @@ impl PPECompiler {
         if asts.iter().any(|program| AstTransformationVisitor::needs_compound_receiver_types(program)) {
             std::mem::swap(&mut self.compound_type_probe.type_registry, &mut self.semantic_visitor.type_registry);
             self.compound_type_probe.set_modules(&asts);
+            self.compound_type_probe.prepare_legacy_call_signatures(&asts);
             for program in asts
                 .iter()
                 .filter(|program| program.module.is_some())

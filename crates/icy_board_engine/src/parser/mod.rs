@@ -819,6 +819,10 @@ impl Parser<'_> {
     ///
     /// Panics if .
     pub fn parse_var_info(&mut self, can_be_empty: bool) -> Option<VariableSpecifier> {
+        self.parse_var_info_inner(can_be_empty, false)
+    }
+
+    fn parse_var_info_inner(&mut self, can_be_empty: bool, implementation_parameter: bool) -> Option<VariableSpecifier> {
         if can_be_empty && (matches!(self.get_cur_token(), Some(Token::Comma)) || matches!(self.get_cur_token(), Some(Token::RPar))) {
             return None;
         }
@@ -883,6 +887,17 @@ impl Parser<'_> {
             self.next_token();
 
             while let Some(Token::Comma) = &self.get_cur_token() {
+                if implementation_parameter && self.lang_version < 400 && dimensions.len() == 1 {
+                    // PPLC splits implementation formals at raw commas, so it
+                    // cannot parse a second dimension. DECLARE and callback
+                    // signatures use separate paths and must remain unaffected.
+                    // Consume the full specifier for recovery without losing
+                    // later parameters or reporting cascading header errors.
+                    self.error_reporter
+                        .lock()
+                        .unwrap()
+                        .report_error(self.save_token_span(), ParserErrorType::MissingCloseParens(Token::Comma));
+                }
                 self.next_token();
                 let Some(Token::Const(Constant::Integer(_, _))) = self.get_cur_token() else {
                     self.report_error(self.lex.span(), ParserErrorType::NumberExpected(self.save_token()));
@@ -1116,7 +1131,7 @@ impl Parser<'_> {
                 }
 
                 if let Some((var_type, type_token)) = self.parse_variable_type() {
-                    let info = self.parse_var_info(false);
+                    let info = self.parse_var_info_inner(false, true);
                     parameters.push(ParameterSpecifier::Variable(VariableParameterSpecifier::new(
                         var_token, type_token, var_type, info,
                     )));
@@ -1216,16 +1231,25 @@ impl Parser<'_> {
                         continue;
                     }
                 }
+                let mut var_token = None;
                 if let Some(Token::Identifier(id)) = self.get_cur_token()
                     && id == Ascii::new("VAR".to_string())
                 {
-                    self.report_error(self.lex.span(), ParserErrorType::VarNotAllowedInFunctions);
+                    if self.lang_version >= 400 {
+                        self.report_error(self.lex.span(), ParserErrorType::VarNotAllowedInFunctions);
+                    } else {
+                        // A legacy FUNCTION implementation may belong to an explicit
+                        // DECLARE PROCEDURE. Module lowering resolves that distinction.
+                        var_token = Some(self.save_spanned_token());
+                    }
                     self.next_token();
                 }
 
                 if let Some((var_type, type_token)) = self.parse_variable_type() {
-                    let info = self.parse_var_info(false);
-                    parameters.push(ParameterSpecifier::Variable(VariableParameterSpecifier::new(None, type_token, var_type, info)));
+                    let info = self.parse_var_info_inner(false, true);
+                    parameters.push(ParameterSpecifier::Variable(VariableParameterSpecifier::new(
+                        var_token, type_token, var_type, info,
+                    )));
                 } else {
                     self.report_error(self.lex.span(), ParserErrorType::TypeExpected(self.save_token()));
                     return None;

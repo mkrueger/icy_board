@@ -37,6 +37,14 @@ behavior is what the probe is testing.
 When several inputs have the same filename stem, their collected artifacts get
 a short path-derived suffix so one result cannot overwrite another.
 
+The [DECLARE compatibility audit](DECLARE_AUDIT.md) records 23 authored probes
+against PPLC 3.40: legacy implementation-signature precedence, multidimensional
+formal syntax, and the stricter language-400 contract. It separates compiler
+logs and decoded signatures from source-derived array-call semantics and
+IcyBoard regression tests; it is not a claim of universal or byte-identical
+compatibility. It also documents the runtime-400 whole-array parameter flag and
+the recompile requirement for affected unreleased PPEs.
+
 The lower-level invocation is:
 
 ```sh
