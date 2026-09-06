@@ -192,7 +192,7 @@ impl NodeMonitoringScreen {
         let now = Local::now();
         let mut footer = get_text("icbmoni_footer");
         if let Some(i) = self.table_state.selected()
-            && infos[i].is_some()
+            && infos.get(i).is_some_and(Option::is_some)
         {
             footer = get_text("icbmoni_on_note_footer")
         }
@@ -215,7 +215,8 @@ impl NodeMonitoringScreen {
             .borders(Borders::ALL);
         b.render(area, frame.buffer_mut());
         let extra_lines = if web_admin.is_some() { 2usize } else { 0 };
-        let bottom_len = (connections.len() + extra_lines).max(5) as u16 + 1;
+        // One separator row plus the top/bottom margins; keep the footer free.
+        let bottom_len = (connections.len() + extra_lines + 3).max(6).min(usize::from(area.height)) as u16;
         let vertical = Layout::vertical([Constraint::Fill(1), Constraint::Length(bottom_len)]);
         let [node_area, connections_area] = vertical.areas(area);
         self.render_table(frame, node_area, infos);
@@ -224,31 +225,29 @@ impl NodeMonitoringScreen {
     }
 
     fn render_connections(&self, frame: &mut Frame, connections_area: Rect, connections: &[Connection], web_admin: Option<&WebAdminInfo>) {
-        let mut area = connections_area.inner(Margin { vertical: 1, horizontal: 1 });
-        Line::from("═".repeat(area.width as usize))
-            .style(Style::new().fg(DOS_YELLOW))
-            .centered()
-            .render(area, frame.buffer_mut());
-        area.y += 1;
+        let area = connections_area.intersection(frame.area()).inner(Margin { vertical: 1, horizontal: 1 });
+        let mut lines = vec![Line::from("═".repeat(area.width as usize)).style(Style::new().fg(DOS_YELLOW))];
 
         for con in connections {
-            let text = format!("{} on {}", con.name, con.endpoint);
-            let text = Text::from(text);
-            text.render(area, frame.buffer_mut());
-            area.y += 1;
+            lines.push(Line::from(format!("{} on {}", con.name, con.endpoint)).style(Style::new().fg(DOS_LIGHT_GRAY)));
         }
 
         if let Some(admin) = web_admin {
             let mut args = HashMap::new();
             args.insert("url".to_string(), admin.url.clone());
             let url_line = get_text_args("icbmoni_web_admin_url", args);
-            Text::from(url_line).style(Style::new().fg(DOS_LIGHT_CYAN)).render(area, frame.buffer_mut());
-            area.y += 1;
+            lines.push(Line::from(url_line).style(Style::new().fg(DOS_LIGHT_CYAN)));
 
             let mut args = HashMap::new();
             args.insert("token".to_string(), admin.token.clone());
             let token_line = get_text_args("icbmoni_web_admin_token", args);
-            Text::from(token_line).style(Style::new().fg(DOS_LIGHT_CYAN)).render(area, frame.buffer_mut());
+            lines.push(Line::from(token_line).style(Style::new().fg(DOS_LIGHT_CYAN)));
+        }
+
+        // Text::render styles its whole rectangle, not just the written glyphs.
+        // Render each line into a single bounded row so cyan cannot reach the footer.
+        for (line, row) in lines.into_iter().zip(area.rows()) {
+            line.render(row, frame.buffer_mut());
         }
     }
     fn render_table(&mut self, frame: &mut Frame, area: Rect, infos: &[Option<Info>]) {
@@ -293,43 +292,43 @@ impl NodeMonitoringScreen {
                 };*/
 
                 Row::new(vec![
-                    Cell::from(format!("{:<3}", i + 1)),
+                    Cell::from((i + 1).to_string()),
                     Cell::from(activity),
                     Cell::from(user_name),
                     Cell::from(format!("{:?}", state.connection_type)),
                 ])
             } else {
                 Row::new(vec![
-                    Cell::from(format!("{:<3}", i + 1)),
+                    Cell::from((i + 1).to_string()),
                     Cell::from(get_text("icbmoni_no_caller")),
                     Cell::from(""),
                     Cell::from(""),
                 ])
             }
         });
-        let bar = " █ ";
+        let number_width = self.nodes.max(infos.len()).to_string().len().max(2) as u16;
         let table = Table::new(
             rows,
             [
-                // + 1 is for padding.
-                Constraint::Length(4),
-                Constraint::Min(15),
-                Constraint::Min(25),
-                Constraint::Min(20),
+                Constraint::Length(number_width),
+                Constraint::Fill(3),
+                Constraint::Fill(2),
+                // Longest protocol name: SecureWebsocket.
+                Constraint::Length(15),
             ],
         )
         .header(header)
-        .highlight_symbol(Text::from(vec!["".into(), bar.into(), bar.into(), "".into()]))
+        .column_spacing(1)
         .row_highlight_style(Style::default().fg(DOS_BLUE).bg(DOS_LIGHT_GRAY))
         .style(Style::default().fg(DOS_YELLOW).bg(DOS_BLUE))
-        .highlight_spacing(HighlightSpacing::Always);
+        .highlight_spacing(HighlightSpacing::Never);
         let mut area = area.inner(Margin { vertical: 1, horizontal: 1 });
-        area.width -= 1;
+        area.width = area.width.saturating_sub(1);
         frame.render_stateful_widget(table, area, &mut self.table_state);
     }
 
-    fn render_scrollbar(&mut self, frame: &mut Frame, _area: Rect) {
-        let area = frame.area().inner(Margin { vertical: 1, horizontal: 0 });
+    fn render_scrollbar(&mut self, frame: &mut Frame, area: Rect) {
+        let area = area.inner(Margin { vertical: 1, horizontal: 0 });
         let mut scroll_state = self
             .scroll_state
             .position(self.table_state.offset())
@@ -346,5 +345,125 @@ impl NodeMonitoringScreen {
             area,
             &mut scroll_state,
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ratatui::backend::TestBackend;
+
+    fn screen(nodes: usize) -> NodeMonitoringScreen {
+        NodeMonitoringScreen {
+            nodes,
+            scroll_state: ScrollbarState::default().content_length(nodes),
+            table_state: TableState::default().with_selected(0),
+        }
+    }
+
+    fn row(buffer: &Buffer, y: u16) -> String {
+        (0..buffer.area.width).map(|x| buffer[(x, y)].symbol()).collect()
+    }
+
+    fn admin() -> WebAdminInfo {
+        WebAdminInfo {
+            url: "http://127.0.0.1:8787/".into(),
+            token: "test-token".into(),
+        }
+    }
+
+    #[test]
+    fn status_and_long_protocol_fit_at_80_columns() {
+        let mut screen = screen(2);
+        let infos = [
+            None,
+            Some(Info {
+                user_activity: "Kein Anrufer auf diesem Node".into(),
+                cur_user: Some("Test Benutzer".into()),
+                connection_type: ConnectionType::SecureWebsocket,
+            }),
+        ];
+        let mut terminal = Terminal::new(TestBackend::new(80, 25)).unwrap();
+        terminal.draw(|frame| screen.ui(frame, &infos, &[], None, false)).unwrap();
+        let buffer = terminal.backend().buffer();
+        assert!(row(buffer, 2).contains(&get_text("icbmoni_no_caller")));
+        let active = row(buffer, 3);
+        for text in ["Kein Anrufer auf diesem Node", "Test Benutzer", "SecureWebsocket"] {
+            assert!(active.contains(text), "missing {text}: {active}");
+        }
+        let header = row(buffer, 1);
+        let gap = header.find(&get_text("icbmoni_status_header")).unwrap() - header.find('#').unwrap();
+        assert!(gap <= 4, "excessive gap between node and status: {header}");
+    }
+
+    #[test]
+    fn web_admin_color_does_not_reach_the_bottom_border() {
+        let mut screen = screen(1);
+        let connections = [Connection {
+            name: "Telnet".into(),
+            endpoint: ":1337".into(),
+        }];
+        let mut terminal = Terminal::new(TestBackend::new(80, 25)).unwrap();
+        terminal.draw(|frame| screen.ui(frame, &[None], &connections, Some(&admin()), false)).unwrap();
+        let buffer = terminal.backend().buffer();
+        for x in 0..80 {
+            assert_eq!(buffer[(x, 24)].fg, DOS_YELLOW, "bottom border color at column {x}");
+        }
+        assert!(row(buffer, 23).contains("test-token"));
+    }
+
+    #[test]
+    fn all_connections_and_admin_lines_fit_above_the_footer() {
+        let mut screen = screen(1);
+        let connections: Vec<_> = ["Telnet", "SSH", "Websocket"]
+            .into_iter()
+            .map(|name| Connection {
+                name: name.into(),
+                endpoint: "localhost:1234".into(),
+            })
+            .collect();
+        let mut terminal = Terminal::new(TestBackend::new(80, 25)).unwrap();
+        terminal.draw(|frame| screen.ui(frame, &[None], &connections, Some(&admin()), false)).unwrap();
+        let buffer = terminal.backend().buffer();
+        let text = (0..24).map(|y| row(buffer, y)).collect::<Vec<_>>().join("\n");
+        for expected in [
+            "Telnet on localhost:1234",
+            "SSH on localhost:1234",
+            "Websocket on localhost:1234",
+            "http://127.0.0.1:8787/",
+            "test-token",
+        ] {
+            assert!(text.contains(expected), "missing {expected}");
+        }
+    }
+
+    #[test]
+    fn connection_lines_never_paint_outside_their_inner_area() {
+        let screen = screen(0);
+        let connections = [Connection {
+            name: "Telnet".into(),
+            endpoint: ":1337".into(),
+        }];
+        for height in 0..9 {
+            let mut terminal = Terminal::new(TestBackend::new(100, 30)).unwrap();
+            let area = Rect::new(10, 5, 70, height);
+            let inner = area.inner(Margin { vertical: 1, horizontal: 1 });
+            terminal
+                .draw(|frame| {
+                    let bounds = frame.area();
+                    frame.buffer_mut().set_style(bounds, Style::new().fg(DOS_YELLOW).bg(DOS_BLUE));
+                    screen.render_connections(frame, area, &connections, Some(&admin()));
+                })
+                .unwrap();
+            let buffer = terminal.backend().buffer();
+            for y in 0..30 {
+                for x in 0..100 {
+                    if !inner.contains(Position::new(x, y)) {
+                        assert_eq!(buffer[(x, y)].fg, DOS_YELLOW, "color outside height {height} at {x},{y}");
+                        assert_eq!(buffer[(x, y)].symbol(), " ", "text outside height {height} at {x},{y}");
+                    }
+                }
+            }
+        }
     }
 }

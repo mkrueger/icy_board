@@ -18,7 +18,7 @@ impl FileTransfers {
     pub fn new(icy_board: Arc<Mutex<IcyBoard>>) -> Self {
         let menu = {
             let lock = icy_board.lock().unwrap();
-            let label_with = 31;
+            let label_with = 36;
             let entry = vec![
                 ConfigEntry::Separator,
                 cfg_entry_bool!("disallow_batch_uploads", label_with, file_transfer, disallow_batch_uploads, lock),
@@ -50,5 +50,34 @@ impl Page for FileTransfers {
     }
     fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
         self.menu.handle_key_press(key)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ratatui::{Terminal, backend::TestBackend};
+
+    #[test]
+    fn transfer_labels_are_fully_visible_at_80_columns() {
+        let mut page = FileTransfers::new(Arc::new(Mutex::new(IcyBoard::default())));
+        let mut terminal = Terminal::new(TestBackend::new(80, 25)).unwrap();
+        terminal.draw(|frame| page.render(frame, frame.area())).unwrap();
+        let buffer = terminal.backend().buffer();
+        let rows: Vec<String> = (0..25).map(|y| (0..80).map(|x| buffer[(x, y)].symbol()).collect()).collect();
+        for key in [
+            "disallow_batch_uploads",
+            "promote_to_batch_transfers",
+            "upload_credit_time",
+            "upload_credit_bytes",
+            "display_uploader",
+            "strip_colors_in_descriptions",
+            "verify_files_uploaded",
+            "disable_drive_size_check",
+            "stop_uploads_free_space",
+        ] {
+            let label = get_text(key);
+            assert!(rows.iter().any(|row| row.contains(&label)), "clipped label: {label}");
+        }
     }
 }

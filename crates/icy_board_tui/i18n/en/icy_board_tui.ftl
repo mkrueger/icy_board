@@ -2528,6 +2528,11 @@ conf_cmd_lst_file-help=
     command list.
 
 conf_sort_loc_label={"              "}Sort  Name/Loc METADATA             Location of Uploads
+conf_upload_sort_header=Sort.
+conf_upload_metadata_header=Name/Loc METADATA
+conf_upload_location_header=Upload Location
+conf_menu_display_header=Menu Display
+conf_menu_list_header=Path/Name of List File
 
 conf_pub_upld=Public  Upld
 conf_pub_upld-status=Public Upld
@@ -3585,6 +3590,13 @@ doors_editor_key_help_door=↑ Up  ↓ Down  F2/INS New  ␡ Delete  Tab Edit BB
 doors_editor_header_door=Door
 doors_editor_header_description=Description
 doors_editor_header_type=Type
+doors_editor_bbslink_credentials=BBSLink credentials
+doors_editor_system_code=System Code
+doors_editor_auth_code=Auth Code
+doors_editor_scheme_code=Scheme Code
+door_editor_dos_command=DOS command
+door_editor_dos_memory=DOS memory MB
+door_editor_dos_max_seconds=DOS max seconds
 
 door_editor_name=Name
 door_editor_name-status=Name

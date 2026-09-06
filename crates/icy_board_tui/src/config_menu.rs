@@ -486,7 +486,7 @@ impl<T> ListItem<T> {
             }
         };
 
-        a + (self.label_width as usize) + 3
+        a + if self.title.is_empty() { 0 } else { self.label_width as usize + 3 }
     }
 
     fn render_value(&self, area: Rect, frame: &mut Frame) {
@@ -561,7 +561,7 @@ impl<T> ListItem<T> {
                 let area = Rect {
                     x: area.x,
                     y: area.y,
-                    width: 6,
+                    width: area.width.min(6),
                     height: 1,
                 };
                 Text::from(str.clone()).style(get_tui_theme().value).render(area, frame.buffer_mut());
@@ -730,7 +730,7 @@ impl<T> ListItem<T> {
                 let area = Rect {
                     x: area.x,
                     y: area.y,
-                    width: 6,
+                    width: area.width.min(6),
                     height: 1,
                 };
                 let field = TextField::new().with_value(str.clone());
@@ -1140,6 +1140,26 @@ pub struct ConfigMenuState {
 }
 
 impl<T> ConfigMenu<T> {
+    /// Align top-level single-column items to the longest label in terminal
+    /// cells, preserving their existing minimum widths. Tables are unchanged.
+    pub fn with_aligned_labels(mut self) -> Self {
+        let width = self
+            .entry
+            .iter()
+            .filter_map(|entry| match entry {
+                ConfigEntry::Item(item) => Some(item.label_width.max(ratatui::text::Line::raw(&item.title).width() as u16)),
+                _ => None,
+            })
+            .max()
+            .unwrap_or(0);
+        for entry in &mut self.entry {
+            if let ConfigEntry::Item(item) = entry {
+                item.label_width = width;
+            }
+        }
+        self
+    }
+
     pub fn render(&mut self, area: Rect, frame: &mut Frame, state: &mut ConfigMenuState) {
         let mut y = 0;
         let mut x = 0;
@@ -1351,7 +1371,7 @@ impl<T> ConfigMenu<T> {
                         }
 
                         // Calculate value area
-                        let value_x = left_area.x + item.label_width + 3;
+                        let value_x = left_area.x + if item.title.is_empty() { 0 } else { item.label_width + 3 };
                         let value_width = if item.edit_width > 0 {
                             item.edit_width
                         } else {
@@ -1365,9 +1385,12 @@ impl<T> ConfigMenu<T> {
                             y: left_area.y,
                             width: value_width,
                             height: 1,
-                        };
+                        }
+                        .intersection(area);
 
-                        if *i == state.selected && display_editor && item.editable {
+                        if right_area.width == 0 {
+                            // Keep the item navigable without drawing outside the viewport.
+                        } else if *i == state.selected && display_editor && item.editable {
                             if !item.render_editor(val, right_area, frame) {
                                 return false;
                             }
@@ -1650,6 +1673,37 @@ impl<'a, T> Iterator for ConfigMenuIter<'a, T> {
 mod tests {
     use super::*;
     use ratatui::{Terminal, backend::TestBackend, buffer::Buffer};
+
+    #[test]
+    fn compact_security_fields_stay_inside_their_area() {
+        let mut item: ListItem<()> = ListItem::new("Security".to_string(), ListValue::Security(SecurityExpression::default(), "110".to_string()));
+        let mut terminal = Terminal::new(TestBackend::new(16, 3)).unwrap();
+        for width in [3, 4, 6] {
+            let area = Rect::new(2, 1, width, 1);
+            for editing in [false, true] {
+                terminal
+                    .draw(|frame| {
+                        if editing {
+                            assert!(item.render_editor(&(), area, frame));
+                        } else {
+                            item.render_value(area, frame);
+                        }
+                    })
+                    .unwrap();
+                let actual = terminal.backend().buffer();
+                let blank = Buffer::empty(actual.area);
+                for y in 0..3 {
+                    for x in 0..16 {
+                        if !area.contains((x, y).into()) {
+                            assert_eq!(actual[(x, y)], blank[(x, y)], "security field escaped {area:?}, editing={editing}");
+                        }
+                    }
+                }
+                let visible: String = (2..5).map(|x| actual[(x, 1)].symbol()).collect();
+                assert_eq!(visible, "110");
+            }
+        }
+    }
 
     fn scrolling_menu() -> ConfigMenu<()> {
         ConfigMenu {

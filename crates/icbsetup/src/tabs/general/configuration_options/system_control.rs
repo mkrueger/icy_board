@@ -26,7 +26,7 @@ impl SystemControl {
     pub fn new(icy_board: Arc<Mutex<IcyBoard>>) -> Self {
         let menu = {
             let lock = icy_board.lock().unwrap();
-            let label_width = 31;
+            let label_width = 36;
             let cur_method = lock.config.system_control.password_storage_method;
 
             let entry = vec![
@@ -94,5 +94,36 @@ impl Page for SystemControl {
     }
     fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
         self.menu.handle_key_press(key)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ratatui::{Terminal, backend::TestBackend};
+
+    #[test]
+    fn system_control_labels_are_fully_visible_at_80_columns() {
+        let mut page = SystemControl::new(Arc::new(Mutex::new(IcyBoard::default())));
+        let mut terminal = Terminal::new(TestBackend::new(80, 25)).unwrap();
+        terminal.draw(|frame| page.render(frame, frame.area())).unwrap();
+        let buffer = terminal.backend().buffer();
+        let rows: Vec<String> = (0..25).map(|y| (0..80).map(|x| buffer[(x, y)].symbol()).collect()).collect();
+        for key in [
+            "disable_ns_logon",
+            "is_multi_lingual",
+            "allow_alias_change",
+            "is_closed_board",
+            "enforce_daily_time_limit",
+            "enforce_transfer_limits",
+            "allow_password_failure_comment",
+            "password_storage_method",
+            "guard_logoff",
+            "confirm_caller_name",
+            "reread_sec_level_on_join",
+        ] {
+            let label = get_text(key);
+            assert!(rows.iter().any(|row| row.contains(&label)), "clipped label: {label}");
+        }
     }
 }

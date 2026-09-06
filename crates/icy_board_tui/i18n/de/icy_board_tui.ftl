@@ -2220,6 +2220,11 @@ conf_cmd_lst_file-help=
     Zusätzliche Befehle nur für diese Konferenz,
     ergänzend zur boardweiten Befehlsliste.
 conf_sort_loc_label={"              "}Sort. Name/Pfad METADATA            Uploadverzeichnis
+conf_upload_sort_header=Sort.
+conf_upload_metadata_header=Name/Pfad METADATA
+conf_upload_location_header=Uploadverzeichnis
+conf_menu_display_header=Menüanzeige
+conf_menu_list_header=Pfad/Name der Listendatei
 conf_pub_upld=Öffentl. Upload
 conf_pub_upld-status=Öffentlicher Upload
 conf_pub_upld-help=
@@ -3129,6 +3134,13 @@ doors_editor_key_help_door=↑ Auf  ↓ Ab  F2/INS Neu  ␡ Löschen  Tab BBSLIN
 doors_editor_header_door=Door
 doors_editor_header_description=Beschreibung
 doors_editor_header_type=Typ
+doors_editor_bbslink_credentials=BBSLink-Zugangsdaten
+doors_editor_system_code=Systemcode
+doors_editor_auth_code=Authentifizierungscode
+doors_editor_scheme_code=Schemacode
+door_editor_dos_command=DOS-Befehl
+door_editor_dos_memory=DOS-Speicher (MB)
+door_editor_dos_max_seconds=DOS-Zeitlimit (Sek.)
 door_editor_name=Name
 door_editor_name-status=Name
 door_editor_name-help=

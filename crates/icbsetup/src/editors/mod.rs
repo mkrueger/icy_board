@@ -12,9 +12,19 @@ pub mod surveys;
 use std::path::Path;
 
 use icy_board_tui::{
+    config_menu::ConfigMenu,
     get_text_args,
     tab_page::{InfoState, PageMessage},
 };
+
+/// Align a single-column editor to its longest translated label, measured in
+/// terminal cells rather than UTF-8 bytes. Keep the existing minimum width.
+fn align_editor_labels<T>(menu: ConfigMenu<T>) -> ConfigMenu<T> {
+    menu.with_aligned_labels()
+}
+
+#[cfg(test)]
+mod layout_tests;
 
 pub fn save_file(path: &Path, save: impl FnOnce() -> icy_board_engine::Res<()>) -> PageMessage {
     let result = path

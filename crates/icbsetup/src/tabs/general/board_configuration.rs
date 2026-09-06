@@ -16,18 +16,19 @@ pub struct BoardConfiguration {
 
 impl BoardConfiguration {
     pub fn new(icy_board: Arc<Mutex<IcyBoard>>) -> Self {
+        let label_width = 16;
         let menu = {
             let icy_board2 = icy_board.clone();
             let lock: std::sync::MutexGuard<'_, IcyBoard> = icy_board.lock().unwrap();
             let sysop_info: Vec<ConfigEntry<Arc<Mutex<IcyBoard>>>> = vec![
                 ConfigEntry::Separator,
-                cfg_entry_text!("board_name", 13, 45, board, name, lock),
+                cfg_entry_text!("board_name", label_width, 45, board, name, lock),
                 ConfigEntry::Separator,
-                cfg_entry_bool!("allow_iemsi", 13, board, allow_iemsi, lock),
-                cfg_entry_text!("board_iemsi_location", 13, 54, board, location, lock),
-                cfg_entry_text!("board_iemsi_operator", 13, 30, board, operator, lock),
-                cfg_entry_text!("board_iemsi_notice", 13, 30, board, notice, lock),
-                cfg_entry_text!("board_iemsi_caps", 13, 30, board, capabilities, lock),
+                cfg_entry_bool!("allow_iemsi", label_width, board, allow_iemsi, lock),
+                cfg_entry_text!("board_iemsi_location", label_width, 54, board, location, lock),
+                cfg_entry_text!("board_iemsi_operator", label_width, 30, board, operator, lock),
+                cfg_entry_text!("board_iemsi_notice", label_width, 30, board, notice, lock),
+                cfg_entry_text!("board_iemsi_caps", label_width, 30, board, capabilities, lock),
                 ConfigEntry::Separator,
                 ConfigEntry::Item(
                     ListItem::new(
@@ -49,7 +50,7 @@ impl BoardConfiguration {
                     )
                     .with_status(get_text("date_format-status"))
                     .with_help(get_text("date_format-help"))
-                    .with_label_width(14)
+                    .with_label_width(label_width)
                     .with_update_value(Box::new(|board: &Arc<Mutex<IcyBoard>>, value: &ListValue| {
                         let ListValue::ValueList(val, _) = value else {
                             return;
@@ -57,7 +58,7 @@ impl BoardConfiguration {
                         board.lock().unwrap().config.board.date_format = val.clone()
                     })),
                 ),
-                cfg_entry_u16!("board_node_num", 14, 1, 256, board, num_nodes, lock),
+                cfg_entry_u16!("board_node_num", label_width, 1, 256, board, num_nodes, lock),
                 ConfigEntry::Separator,
                 cfg_entry_bool!("who_include_city", 33, board, who_include_city, lock),
                 cfg_entry_bool!("who_show_alias", 33, board, who_show_alias, lock),
@@ -126,5 +127,33 @@ impl Page for BoardConfiguration {
     }
     fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
         self.menu.handle_key_press(key)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ratatui::{Terminal, backend::TestBackend};
+
+    #[test]
+    fn upper_labels_are_fully_visible_at_80_columns() {
+        let mut page = BoardConfiguration::new(Arc::new(Mutex::new(IcyBoard::default())));
+        let mut terminal = Terminal::new(TestBackend::new(80, 25)).unwrap();
+        terminal.draw(|frame| page.render(frame, frame.area())).unwrap();
+        let buffer = terminal.backend().buffer();
+        let rows: Vec<String> = (0..25).map(|y| (0..80).map(|x| buffer[(x, y)].symbol()).collect()).collect();
+        for key in [
+            "board_name",
+            "allow_iemsi",
+            "board_iemsi_location",
+            "board_iemsi_operator",
+            "board_iemsi_notice",
+            "board_iemsi_caps",
+            "date_format",
+            "board_node_num",
+        ] {
+            let label = get_text(key);
+            assert!(rows.iter().any(|row| row.contains(&label)), "clipped label: {label}");
+        }
     }
 }

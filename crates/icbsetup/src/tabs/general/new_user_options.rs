@@ -19,9 +19,9 @@ impl NewUserOptions {
         let menu = {
             let lock = icy_board.lock().unwrap();
 
-            let label_width = 22;
-            let table_width_left = 16;
-            let table_width_right = 18;
+            let label_width = 40;
+            let table_width_left = 24;
+            let table_width_right = 24;
 
             let entry: Vec<ConfigEntry<Arc<Mutex<IcyBoard>>>> = vec![
                 ConfigEntry::Separator,
@@ -35,7 +35,7 @@ impl NewUserOptions {
                 ConfigEntry::Table(
                     2,
                     vec![
-                        cfg_entry_bool!("ask_city_or_state", table_width_left, new_user_settings, ask_city_or_state, lock, 12),
+                        cfg_entry_bool!("ask_city_or_state", table_width_left, new_user_settings, ask_city_or_state, lock),
                         cfg_entry_bool!("ask_address", table_width_right, new_user_settings, ask_address, lock),
                         cfg_entry_bool!("ask_verification", table_width_left, new_user_settings, ask_verification, lock),
                         cfg_entry_bool!("ask_bus_data_phone", table_width_right, new_user_settings, ask_business_phone, lock),
@@ -72,5 +72,39 @@ impl Page for NewUserOptions {
     }
     fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
         self.menu.handle_key_press(key)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_user_labels_fit_at_80_columns() {
+        crate::tabs::general::layout_tests::assert_labels_fit(
+            NewUserOptions::new(Arc::new(Mutex::new(IcyBoard::default()))),
+            &[
+                "new_user_security_level",
+                "allow_one_name_users",
+                "new_user_groups",
+                "auto_register_conferences",
+                "ask_city_or_state",
+                "ask_address",
+                "ask_verification",
+                "ask_bus_data_phone",
+                "ask_home_phone",
+                "ask_comment",
+                "ask_clr_msg",
+                "ask_fse",
+                "ask_xfer_protocol",
+                "ask_date_format",
+                "ask_alias",
+                "ask_gender",
+                "ask_birthdate",
+                "ask_email",
+                "ask_web_address",
+                "ask_use_short_descr",
+            ],
+        );
     }
 }

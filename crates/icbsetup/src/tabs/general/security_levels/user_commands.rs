@@ -18,8 +18,8 @@ impl UserCommands {
     pub fn new(icy_board: Arc<Mutex<IcyBoard>>) -> Self {
         let menu = {
             let lock = icy_board.lock().unwrap();
-            let label_width = 22;
-            let entry = vec![
+            let label_width = 31;
+            let mut entry = vec![
                 ConfigEntry::Table(
                     2,
                     vec![
@@ -59,6 +59,18 @@ impl UserCommands {
                 cfg_entry_sec_level!("user_sec_batch_file_transfer", 42, user_command_level, batch_file_transfer, lock),
                 cfg_entry_sec_level!("user_sec_edit_own_messages", 42, user_command_level, edit_own_messages, lock),
             ];
+            // Two columns, including separators and four-cell security editors,
+            // fit inside an 80-column page without shortening translated labels.
+            if let ConfigEntry::Table(_, commands) = &mut entry[0] {
+                *commands = std::mem::take(commands)
+                    .into_iter()
+                    .enumerate()
+                    .map(|(index, command)| match command {
+                        ConfigEntry::Item(item) => ConfigEntry::Item(item.with_label_width(if index % 2 == 0 { 31 } else { 28 }).with_edit_width(4)),
+                        other => other,
+                    })
+                    .collect();
+            }
             ConfigMenu { obj: icy_board.clone(), entry }
         };
 
@@ -77,5 +89,51 @@ impl Page for UserCommands {
     }
     fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
         self.menu.handle_key_press(key)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn user_command_labels_fit_at_80_columns() {
+        crate::tabs::general::layout_tests::assert_labels_fit(
+            UserCommands::new(Arc::new(Mutex::new(IcyBoard::default()))),
+            &[
+                "user_sec_cmd_a",
+                "user_sec_cmd_b",
+                "user_sec_cmd_c",
+                "user_sec_cmd_d",
+                "user_sec_cmd_e",
+                "user_sec_cmd_f",
+                "user_sec_cmd_h",
+                "user_sec_cmd_i",
+                "user_sec_cmd_j",
+                "user_sec_cmd_k",
+                "user_sec_cmd_l",
+                "user_sec_cmd_m",
+                "user_sec_cmd_n",
+                "user_sec_cmd_o",
+                "user_sec_cmd_p",
+                "user_sec_cmd_q",
+                "user_sec_cmd_r",
+                "user_sec_cmd_s",
+                "user_sec_cmd_t",
+                "user_sec_cmd_u",
+                "user_sec_cmd_v",
+                "user_sec_cmd_w",
+                "user_sec_cmd_x",
+                "user_sec_cmd_y",
+                "user_sec_cmd_z",
+                "user_sec_cmd_chat",
+                "user_sec_cmd_open_door",
+                "user_sec_cmd_test_file",
+                "user_sec_cmd_show_user_list",
+                "user_sec_cmd_who",
+                "user_sec_batch_file_transfer",
+                "user_sec_edit_own_messages",
+            ],
+        );
     }
 }

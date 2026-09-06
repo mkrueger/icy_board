@@ -64,33 +64,42 @@ impl<'a> DoorEditor<'a> {
         }
 
         let DoorServerAccount::BBSLink(bbs_link) = &door_list_orig.accounts[0];
-        let l = 16;
+        let l = 22;
         let items = vec![ConfigEntry::Group(
-            "BBSLink credentials".to_string(),
+            get_text("doors_editor_bbslink_credentials"),
             vec![
                 ConfigEntry::Item(
-                    ListItem::new("System Code".to_string(), ListValue::Text(25, TextFlags::None, bbs_link.system_code.clone()))
-                        .with_label_width(l)
-                        .with_update_text_value(&|list: &Arc<Mutex<DoorList>>, value: String| {
-                            let DoorServerAccount::BBSLink(bbs_link) = &mut list.lock().unwrap().accounts[0];
-                            bbs_link.system_code = value;
-                        }),
+                    ListItem::new(
+                        get_text("doors_editor_system_code"),
+                        ListValue::Text(25, TextFlags::None, bbs_link.system_code.clone()),
+                    )
+                    .with_label_width(l)
+                    .with_update_text_value(&|list: &Arc<Mutex<DoorList>>, value: String| {
+                        let DoorServerAccount::BBSLink(bbs_link) = &mut list.lock().unwrap().accounts[0];
+                        bbs_link.system_code = value;
+                    }),
                 ),
                 ConfigEntry::Item(
-                    ListItem::new("Auth Code".to_string(), ListValue::Text(25, TextFlags::None, bbs_link.auth_code.clone()))
-                        .with_label_width(l)
-                        .with_update_text_value(&|list: &Arc<Mutex<DoorList>>, value: String| {
-                            let DoorServerAccount::BBSLink(bbs_link) = &mut list.lock().unwrap().accounts[0];
-                            bbs_link.auth_code = value;
-                        }),
+                    ListItem::new(
+                        get_text("doors_editor_auth_code"),
+                        ListValue::Text(25, TextFlags::None, bbs_link.auth_code.clone()),
+                    )
+                    .with_label_width(l)
+                    .with_update_text_value(&|list: &Arc<Mutex<DoorList>>, value: String| {
+                        let DoorServerAccount::BBSLink(bbs_link) = &mut list.lock().unwrap().accounts[0];
+                        bbs_link.auth_code = value;
+                    }),
                 ),
                 ConfigEntry::Item(
-                    ListItem::new("Scheme Code".to_string(), ListValue::Text(25, TextFlags::None, bbs_link.sheme_code.clone()))
-                        .with_label_width(l)
-                        .with_update_text_value(&|list: &Arc<Mutex<DoorList>>, value: String| {
-                            let DoorServerAccount::BBSLink(bbs_link) = &mut list.lock().unwrap().accounts[0];
-                            bbs_link.sheme_code = value;
-                        }),
+                    ListItem::new(
+                        get_text("doors_editor_scheme_code"),
+                        ListValue::Text(25, TextFlags::None, bbs_link.sheme_code.clone()),
+                    )
+                    .with_label_width(l)
+                    .with_update_text_value(&|list: &Arc<Mutex<DoorList>>, value: String| {
+                        let DoorServerAccount::BBSLink(bbs_link) = &mut list.lock().unwrap().accounts[0];
+                        bbs_link.sheme_code = value;
+                    }),
                 ),
             ],
         )];
@@ -306,7 +315,7 @@ impl<'a> Page for DoorEditor<'a> {
                             let Some(action) = cmd.get(selected_item) else {
                                 return PageMessage::None;
                             };
-                            self.edit_config = Some(ConfigMenu {
+                            self.edit_config = Some(super::align_editor_labels(ConfigMenu {
                                 obj: (selected_item, self.door_list.clone()),
                                 entry: vec![
                                     ConfigEntry::Item(
@@ -415,28 +424,38 @@ impl<'a> Page for DoorEditor<'a> {
                                         ),
                                     ),
                                     ConfigEntry::Item(
-                                        ListItem::new("DOS command".to_string(), ListValue::Text(60, TextFlags::None, action.dos_command.clone()))
-                                            .with_label_width(16)
-                                            .with_update_text_value(&|(i, list): &(usize, Arc<Mutex<DoorList>>), value: String| {
+                                        ListItem::new(
+                                            get_text("door_editor_dos_command"),
+                                            ListValue::Text(60, TextFlags::None, action.dos_command.clone()),
+                                        )
+                                        .with_label_width(16)
+                                        .with_update_text_value(
+                                            &|(i, list): &(usize, Arc<Mutex<DoorList>>), value: String| {
                                                 list.lock().unwrap()[*i].dos_command = value;
-                                            }),
+                                            },
+                                        ),
                                     ),
                                     ConfigEntry::Item(
-                                        ListItem::new("DOS memory MB".to_string(), ListValue::U32(action.dos_memory_mb, 1, 512))
+                                        ListItem::new(get_text("door_editor_dos_memory"), ListValue::U32(action.dos_memory_mb, 1, 512))
                                             .with_label_width(16)
                                             .with_update_u32_value(&|(i, list): &(usize, Arc<Mutex<DoorList>>), value: u32| {
                                                 list.lock().unwrap()[*i].dos_memory_mb = value;
                                             }),
                                     ),
                                     ConfigEntry::Item(
-                                        ListItem::new("DOS max seconds".to_string(), ListValue::U32(action.dos_max_runtime_seconds, 0, 86400))
-                                            .with_label_width(16)
-                                            .with_update_u32_value(&|(i, list): &(usize, Arc<Mutex<DoorList>>), value: u32| {
+                                        ListItem::new(
+                                            get_text("door_editor_dos_max_seconds"),
+                                            ListValue::U32(action.dos_max_runtime_seconds, 0, 86400),
+                                        )
+                                        .with_label_width(16)
+                                        .with_update_u32_value(
+                                            &|(i, list): &(usize, Arc<Mutex<DoorList>>), value: u32| {
                                                 list.lock().unwrap()[*i].dos_max_runtime_seconds = value;
-                                            }),
+                                            },
+                                        ),
                                     ),
                                 ],
-                            });
+                            }));
                         } else {
                             self.insert_table.handle_key_press(key).unwrap();
                         }

@@ -465,7 +465,7 @@ impl<'a> Page for MessageAreasEditor<'a> {
                         let Some(item) = cmd.get(selected_item) else {
                             return PageMessage::None;
                         };
-                        self.edit_config = Some(ConfigMenu {
+                        self.edit_config = Some(super::align_editor_labels(ConfigMenu {
                             obj: (selected_item, self.area_list.clone()),
                             entry: vec![
                                 ConfigEntry::Item(
@@ -595,7 +595,7 @@ impl<'a> Page for MessageAreasEditor<'a> {
                                     }),
                                 ),
                             ],
-                        });
+                        }));
                     } else {
                         self.insert_table.handle_key_press(key).unwrap();
                     }

@@ -85,7 +85,8 @@ impl ICBConfigMenuUI {
         let area = Rect {
             x: disp_area.x + 3,
             y: area.y + 3,
-            width: disp_area.width - 3,
+            // Keep the menu's clearing pass and scrollbar inside the border.
+            width: disp_area.width.saturating_sub(5),
             height: area.height - 4,
         };
         self.menu.render(area, frame, &mut self.state);

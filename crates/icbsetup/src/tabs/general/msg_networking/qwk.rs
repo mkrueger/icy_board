@@ -18,7 +18,7 @@ impl QwkSettings {
     pub fn new(icy_board: Arc<Mutex<IcyBoard>>) -> Self {
         let menu = {
             let lock = icy_board.lock().unwrap();
-            let label_width = 14;
+            let label_width = 22;
             let sysop_info: Vec<icy_board_tui::config_menu::ConfigEntry<Arc<Mutex<IcyBoard>>>> = vec![
                 ConfigEntry::Separator,
                 ConfigEntry::Label(get_text("qwk_bbs_label")),
@@ -53,5 +53,27 @@ impl Page for QwkSettings {
     }
     fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
         self.menu.handle_key_press(key)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn qwk_labels_fit_at_80_columns() {
+        crate::tabs::general::layout_tests::assert_labels_fit(
+            QwkSettings::new(Arc::new(Mutex::new(IcyBoard::default()))),
+            &[
+                "qwk_bbs_name",
+                "qwk_bbs_city_and_state",
+                "qwk_bbs_phone_number",
+                "qwk_bbs_sysop_name",
+                "qwk_bbs_id",
+                "qwk_welcome_screen",
+                "qwk_goodbye_screen",
+                "qwk_news_sceen",
+            ],
+        );
     }
 }

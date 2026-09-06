@@ -32,6 +32,9 @@ mod security_levels;
 mod subscription_information;
 mod sysop_information;
 
+#[cfg(test)]
+mod layout_tests;
+
 use crate::VERSION;
 
 pub struct GeneralTab {

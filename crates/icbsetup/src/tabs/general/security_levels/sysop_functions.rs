@@ -18,7 +18,7 @@ impl SysopFunctions {
     pub fn new(icy_board: Arc<Mutex<IcyBoard>>) -> Self {
         let menu = {
             let lock = icy_board.lock().unwrap();
-            let label_width = 28;
+            let label_width = 36;
             let entry: Vec<ConfigEntry<Arc<Mutex<IcyBoard>>>> = vec![
                 ConfigEntry::Separator,
                 cfg_entry_sec_level!("sysop_sec_1_view_caller_log", label_width, sysop_command_level, sec_1_view_caller_log, lock),
@@ -72,5 +72,33 @@ impl Page for SysopFunctions {
     }
     fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
         self.menu.handle_key_press(key)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sysop_labels_fit_at_80_columns() {
+        crate::tabs::general::layout_tests::assert_labels_fit(
+            SysopFunctions::new(Arc::new(Mutex::new(IcyBoard::default()))),
+            &[
+                "sysop_sec_1_view_caller_log",
+                "sysop_sec_2_view_usr_list",
+                "sysop_sec_3_pack_renumber_msg",
+                "sysop_sec_4_recover_deleted_msg",
+                "sysop_sec_5_list_message_hdr",
+                "sysop_sec_6_view_any_file",
+                "sysop_sec_7_user_maint",
+                "sysop_sec_8_pack_usr_file",
+                "sysop_sec_9_exit_to_dos",
+                "sysop_sec_10_shelled_dos_func",
+                "sysop_sec_11_view_other_nodes",
+                "sysop_sec_12_logoff_alt_node",
+                "sysop_sec_13_view_alt_node_callers",
+                "sysop_sec_14_drop_alt_node_to_dos",
+            ],
+        );
     }
 }
