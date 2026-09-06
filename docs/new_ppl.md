@@ -18,7 +18,7 @@ format, so 4.00 is what a PPE targets whenever it uses anything below.
 | Post-test and infinite loops | 350 | any compatible runtime | `REPEAT ... UNTIL`, `LOOP ... ENDLOOP` |
 | Optional parentheses | 350 | any compatible runtime | `IF condition THEN`, `WHILE condition ...` |
 | Typed constants | 350 | any compatible runtime | `CONST`, erased to its value during compilation |
-| Nominal integer enums | 350 | any compatible runtime | `ENUM ... ENDENUM`, scoped members such as `Color.Red` |
+| Closed nominal enums | 350 | 400 for storage and checked conversion | `ENUM ... ENDENUM`, scoped members such as `Color.Red`; member constants alone can target classic runtimes |
 | Compile-time modules | 350 | any compatible runtime | `MODULE`, visibility sections and `IMPORT ... AS ...` namespaces |
 | Routine parameters | 400 | 400 | Pass a matching function or procedure as a checked callable value |
 | Main-program block | 400 | 400 | Real `BEGIN ... END`; `EXIT` replaces the old terminating use of `END` |
@@ -67,6 +67,11 @@ Strictness follows source language, not the output format: language 340 or 350
 targeting runtime 400 still uses the legacy contract. Modern features retain
 their separate runtime requirements.
 
+Enums are an IcyBoard extension, not part of the DOS contract. From language
+350 onward, enum parameters must match their declaration in nominal type,
+`VAR`, rank and bounds; enum result types must match too. Classic parameter
+types retain the legacy rules above.
+
 The [DECLARE audit](../compat/DECLARE_AUDIT.md) gives the exact evidence scope:
 23 authored probes against original PPLC 3.40, with IcyBoard legacy compiler
 coverage for language/runtime 340/340, 340/400 and 350/400. It does not claim
@@ -104,9 +109,10 @@ source written for any language version can carry it.
 
 ## Language version 3.50
 
-3.50 is syntax that lowers to classic PPE instructions, so constants, enums,
-loops, initializers, brackets, compound assignments and modules can target an
-old runtime.
+Most 3.50 syntax lowers to classic PPE instructions: constants, loops,
+initializers, brackets, compound assignments and modules can target an old
+runtime. Enum member constants can too; closed enum storage and checked
+conversions require runtime 400, equally for language 350 and 400.
 
 ### Initializers and indexing
 
@@ -158,10 +164,11 @@ ENDENUM
 Color selected = Color.Green
 ```
 
-Constants are typed compile-time expressions. Enums are nominal integer types:
+Constants are typed compile-time expressions. Enums are closed nominal integer types:
 members are scoped below the enum name, and two different enum types cannot be
-mixed merely because their stored numbers match. Both are erased before the PPE
-is written, so a decompiler can recover the value but not the source name.
+mixed merely because their stored numbers match. Their first declared member
+is the default, even when its value is not zero. The PPE stores enum domains,
+but not source names; the decompiler synthesizes names for user enums.
 
 ### Modules and imports
 
@@ -476,9 +483,11 @@ and `REGEX.IsValid(pattern [, options])`. A compiled value exposes `Valid`,
 `FindAll(text [, start [, limit]]) -> REGEXMATCH[]`,
 `Replace(text, replacement [, limit])` and `Split(text [, limit]) -> STRING[]`.
 
-`RegexOptions` flags are `None`, `IgnoreCase`, `MultiLine`,
-`DotMatchesNewLine`, `IgnoreWhitespace`, `SwapGreed` and `Ascii`; flags may be
-combined with `|`. Matching is Unicode-aware unless `Ascii` is selected.
+`RegexOptions` members are `None`, `IgnoreCase`, `MultiLine`,
+`DotMatchesNewLine`, `IgnoreWhitespace`, `SwapGreed` and `Ascii`. Every
+combination is also a named member: join selected option names in that order
+with `And`, for example `RegexOptions.IgnoreCaseAndMultiLine`. Enum arithmetic
+with `|` is not allowed. Matching is Unicode-aware unless `Ascii` is selected.
 Positions, match collections and capture groups are zero-based. A missing match
 or unmatched capture has start position `-1`. Group zero is the complete match.
 
@@ -1834,7 +1843,7 @@ belongs to 3.50.
 ## `ENUM ... ENDENUM` Declaration (3.50)
 
 ### Function
-Defines a compile-time integer type and its named values.
+Defines a closed nominal integer type and its named values.
 
 ### Syntax
 ```PPL
@@ -1854,11 +1863,36 @@ live under the enum name, so `Color.Green` is valid and `Green` alone is not.
 
 Enums are nominal: different enums and plain integers cannot be assigned to or
 compared with each other. Equality and inequality are supported; arithmetic and
-bitflag behavior are not. A `FOR` may count over an enum, since the loop writes
-its own comparison and step, and its start and end value must be of the enum's
-type. Enum variables, arrays, routine parameters and return
-values, and record fields are stored as `INTEGER` in the PPE. The type and names
-therefore cost nothing at runtime and cannot be recovered by the decompiler.
+bitflag behavior are not. Numeric `FOR` counters cannot be enums. These rules
+apply uniformly from language 350 onward, including built-in enums.
+
+An enum must have at least one member. Its **first declared member** is the
+default, not necessarily zero or the smallest value. This includes scalar
+variables, array elements, omitted record fields, fresh routine locals and
+function result slots. Array allocation and resizing use the same default.
+Aliases with the same numeric value are permitted.
+
+Use `Color(number)` to explicitly convert an `INTEGER` to `Color`. A known
+invalid constant is a compilation error; a dynamic value outside the declared
+domain raises a runtime error without assigning an invalid value. Use
+`TOINTEGER(color)` in the other direction. Arithmetic must operate on the
+explicit integer representation. Untyped output statements such as `POP` and
+`FREAD` cannot write directly into enums: read into an `INTEGER` temporary and
+convert explicitly. Printing enum values continues to show their numeric value.
+
+Typed record I/O supports enum fields (including nested records and arrays):
+text records use decimal integers and binary records use signed little-endian
+32-bit values. `FGetRec` and `FReadRec` validate membership while decoding;
+an invalid field reports a file-format error and leaves the destination record
+unchanged.
+
+Enum variables, arrays, parameters, function results and record fields retain
+their nominal type in runtime 400 PPEs, along with the ordered numeric domain.
+Storage and checked conversions require runtime 400 even in language 350;
+enum declarations and member constants alone can still target classic runtimes.
+The decompiler reconstructs user enum declarations with synthetic type/member
+names and preserves defaults and checked conversions. Original names are not
+stored. Recompile older beta PPEs to obtain these closed-enum guarantees.
 
 ## `BEGIN ... END` Block (4.00)
 

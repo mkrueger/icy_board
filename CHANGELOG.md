@@ -310,6 +310,16 @@ releases.
 
 ### Changed
 
+- Enums are closed nominal types consistently from language 3.50 onward.
+  Uninitialized values, array elements, record fields and fresh routine locals
+  and results use the first declared member. `EnumName(integer)` checks domain
+  membership; `TOINTEGER(value)` converts back explicitly. Numeric enum `FOR`
+  counters, arithmetic and untyped output writes are rejected. Enum storage
+  and checked conversion now require runtime 4.00, which retains numeric domains
+  for validation and decompiler roundtrips. Recompile older beta PPEs for these
+  guarantees. Regex option combinations use named members such as
+  `RegexOptions.IgnoreCaseAndMultiLine`, not bitwise enum expressions.
+
 - PPL 4.00 arrays use square-bracket declarations and indexing. Empty brackets
   declare dynamic vectors, matrices or cubes, functions can return dynamic
   arrays, compatible whole-array assignment adopts the source bounds, and

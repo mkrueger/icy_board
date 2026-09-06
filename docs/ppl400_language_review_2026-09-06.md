@@ -218,6 +218,12 @@ widersprüchliche Verträge still zu akzeptieren.
 
 ### V2 · Enums sind nominal, aber nicht auf benannte Werte beschränkt
 
+**Inzwischen behoben:** Enums sind ab ihrer Einführung in Sprache 350
+einheitlich geschlossen. Erster deklarierter Wert als Default, geprüfte
+explizite Konvertierungen und keine numerischen Enum-FOR-Zähler. Runtime 400
+speichert die Wertemenge; Compiler, VM und Decompiler erhalten den Vertrag.
+Die folgenden Beobachtungen beschreiben den Stand vor dieser Änderung.
+
 Bei `ENUM Color` mit `Red = 1` und `Green = 3` gilt:
 
 - Ein nicht initialisiertes `Color value` hat den Wert `0`; Vergleiche mit
@@ -237,6 +243,10 @@ passender Initialisierungsregel und ohne numerischen Enum-FOR. Nur `FOR` zu
 verbieten würde den unbenannten Defaultwert nicht lösen.
 
 ### V3 · Flags sollten eine Typeigenschaft sein
+
+**Entscheidung:** Kein neuer Flags-Typ. Auch `RegexOptions` ist geschlossen;
+Kombinationen sind benannte Mitglieder wie `IgnoreCaseAndMultiLine`. Die
+nachfolgend beschriebene Sonderausnahme für bitweise Operatoren ist entfernt.
 
 Die [Operatorprüfung](../crates/icy_board_engine/src/semantic/visitor.rs#L186-L192)
 erlaubt `&` und `|` speziell für die ID von `RegexOptions`, nicht allgemein

@@ -207,8 +207,8 @@ nothing is read - they shipped before records existed and have no type table at
 all.
 
 ```text
-u8                  type-table format, currently 1
-u8                  number of types
+u8                  type-table format: 1 (records), 2 (records and enums)
+u8                  number of record types
   u8                number of fields
     u8              field type
     u8              dimensions, 0 to 3
@@ -216,6 +216,28 @@ u8                  number of types
     u16             matrix upper bound
     u16             cube upper bound
 ```
+
+Format 2 appends the closed enum domains after the record layouts:
+
+```text
+u8                  number of enum domains
+  u8                enum type id
+  u16               number of members (nonzero)
+    i32             member value, in declaration order
+```
+
+The first member is the default for scalars, array elements, record fields and
+routine-local/result resets. Duplicate numeric values (aliases) are allowed;
+duplicate enum ids, empty domains and record/enum id collisions are rejected.
+Enum ids are retained in variable and field headers instead of being erased to
+`INTEGER`. Assignments and checked casts validate membership before publishing
+a value. Source language 350 and 400 share this representation; both require
+runtime 400 for enum storage and checked conversion. Old beta PPEs with erased
+enum storage need recompilation; their domains cannot be inferred from integers.
+
+`EnumName(integer)` compiles to the internal `EnumCast(type_id, integer)`
+function. The decompiler restores source casts and synthesizes user enum and
+member names; built-in names are reused when the complete ordered domain matches.
 
 Both counts fit in a byte: ids run 100 to 255, so there can be no more than 156
 types, and a record is capped at 255 fields for exactly this reason. The field
@@ -232,12 +254,13 @@ the bounds in a variable header: ``Values(10)`` has dimension 1 and vector bound
 zero. The loader rejects dimensions above 3, nonzero inactive bounds and shapes
 whose element count exceeds the runtime array limit.
 
-The table stores field **layouts** and nothing source-specific:
+The table stores field **layouts** and ordered enum domains, not source names:
 
 * No type name and no field name. The format keeps no variable, routine or label
   names either — the decompiler makes those up. Custom types are treated the same
   way, so no source identifier reaches a shipped PPE.
-* No initializer. Every element begins with its type's empty value.
+* No initializer. Every element begins with its type's empty value; for enums
+  this is the first declared member, not necessarily zero.
 
 The table is written plain. It is not encrypted and not packed.
 
