@@ -571,6 +571,10 @@ pub struct ConfigPaths {
     #[serde(default)]
     pub qwknet_file: PathBuf,
 
+    /// name and location of the ZCONNECT network configuration
+    #[serde(default)]
+    pub zconnect_file: PathBuf,
+
     /// home directory for user files
     pub user_file: PathBuf,
 
@@ -1335,6 +1339,7 @@ impl IcbConfig {
                 group_file: PathBuf::new(),
                 ftn_file: PathBuf::new(),
                 qwknet_file: PathBuf::new(),
+                zconnect_file: PathBuf::new(),
 
                 logon_survey: PathBuf::new(),
                 logon_answer: PathBuf::new(),

@@ -25,7 +25,7 @@ use icy_board_engine::{
 };
 use icy_net::binkp::{BinkpIdentity, PollRequest};
 
-mod zconnect_experiment;
+mod zconnect;
 
 #[cfg(test)]
 mod cli_tests;
@@ -60,6 +60,34 @@ enum Command {
     QwkScan(QwkScan),
     #[command(name = "qwk-toss")]
     QwkToss(QwkToss),
+    #[command(name = "zconnect-links", about = text("icbmailer", "zconnect-links-about"))]
+    ZconnectLinks(ZconnectOptions),
+    #[command(name = "zconnect-scan", about = text("icbmailer", "zconnect-scan-about"))]
+    ZconnectScan(ZconnectOptions),
+    #[command(name = "zconnect-toss", about = text("icbmailer", "zconnect-toss-about"))]
+    ZconnectToss(ZconnectOptions),
+    #[command(name = "zconnect-poll", about = text("icbmailer", "zconnect-poll-about"))]
+    ZconnectPoll(ZconnectOptions),
+    #[command(name = "zconnect-ack", about = text("icbmailer", "zconnect-ack-about"))]
+    ZconnectAck(ZconnectAck),
+}
+
+#[derive(Args)]
+struct ZconnectOptions {
+    #[arg(value_name = "config", help = text("icbmailer", "config"))]
+    config: PathBuf,
+
+    #[arg(value_name = "link", help = text("icbmailer", "zconnect-link"))]
+    link: Option<String>,
+}
+
+#[derive(Args)]
+struct ZconnectAck {
+    #[arg(value_name = "config", help = text("icbmailer", "config"))]
+    config: PathBuf,
+
+    #[arg(value_name = "link", help = text("icbmailer", "zconnect-ack-link"))]
+    link: String,
 }
 
 #[derive(Args)]
@@ -186,6 +214,14 @@ async fn main() {
         Command::QwkToss(arguments) => load_qwk(&arguments.config).and_then(|board| qwk_toss(&board, arguments.hub.as_deref())),
         Command::QwkPoll(arguments) => match load_qwk(&arguments.config) {
             Ok(board) => qwk_poll(&board, arguments.hub.as_deref()).await,
+            Err(err) => Err(err),
+        },
+        Command::ZconnectLinks(arguments) => zconnect::load(&arguments.config).and_then(|board| zconnect::links(&board, arguments.link.as_deref())),
+        Command::ZconnectScan(arguments) => zconnect::load(&arguments.config).and_then(|board| zconnect::scan(&board, arguments.link.as_deref())),
+        Command::ZconnectToss(arguments) => zconnect::load(&arguments.config).and_then(|board| zconnect::toss(&board, arguments.link.as_deref())),
+        Command::ZconnectAck(arguments) => zconnect::load(&arguments.config).and_then(|board| zconnect::ack(&board, &arguments.link)),
+        Command::ZconnectPoll(arguments) => match zconnect::load(&arguments.config) {
+            Ok(board) => zconnect::poll(&board, arguments.link.as_deref()).await,
             Err(err) => Err(err),
         },
     };

@@ -32,6 +32,7 @@ use self::{
     statistics::Statistics,
     user_base::UserBase,
     xfer_protocols::SupportedProtocols,
+    zconnect::ZconnectConfig,
 };
 
 pub mod bbs;
@@ -68,6 +69,7 @@ pub mod upload_quarantine;
 pub mod user_base;
 pub mod user_maintenance;
 pub mod xfer_protocols;
+pub mod zconnect;
 
 pub use pcb::*;
 
@@ -131,6 +133,7 @@ pub struct IcyBoard {
     pub commands: CommandList,
     pub ftn: FtnConfig,
     pub qwknet: QwkNetworkConfig,
+    pub zconnect: ZconnectConfig,
     pub events: EventList,
     pub ppl_http_service: std::sync::Arc<state::ppl_http::PplHttpService>,
 }
@@ -154,6 +157,7 @@ impl IcyBoard {
             groups: GroupList::default(),
             ftn: FtnConfig::default(),
             qwknet: QwkNetworkConfig::default(),
+            zconnect: ZconnectConfig::default(),
             events: EventList::default(),
             ppl_http_service: std::sync::Arc::new(state::ppl_http::PplHttpService::default()),
         }
@@ -196,6 +200,7 @@ impl IcyBoard {
         self.config.paths.statistics_file = get_path(&self.root_path, &self.config.paths.statistics_file);
         self.config.paths.ftn_file = get_path(&self.root_path, &self.config.paths.ftn_file);
         self.config.paths.qwknet_file = get_path(&self.root_path, &self.config.paths.qwknet_file);
+        self.config.paths.zconnect_file = get_path(&self.root_path, &self.config.paths.zconnect_file);
 
         self.config.upload_processing.advertisement_file_rules = get_path(&self.root_path, &self.config.upload_processing.advertisement_file_rules);
         self.config.upload_processing.advertisement_description_rules =
@@ -417,6 +422,14 @@ impl IcyBoard {
             }
         };
 
+        // A configured network file must not silently become an empty default:
+        // saving that default could overwrite a damaged but recoverable setup.
+        let zconnect = if config.paths.zconnect_file.as_os_str().is_empty() {
+            ZconnectConfig::default()
+        } else {
+            ZconnectConfig::load(&get_path(parent_path, &config.paths.zconnect_file))?
+        };
+
         let events = if config.event.event_file.as_os_str().is_empty() {
             EventList::default()
         } else {
@@ -457,6 +470,7 @@ impl IcyBoard {
             groups,
             ftn,
             qwknet,
+            zconnect,
             events,
             ppl_http_service: std::sync::Arc::new(state::ppl_http::PplHttpService::default()),
         };
@@ -577,6 +591,9 @@ impl IcyBoard {
         if !self.config.paths.qwknet_file.as_os_str().is_empty() {
             self.qwknet.save(&self.resolve_file(&self.config.paths.qwknet_file))?;
         }
+        if !self.config.paths.zconnect_file.as_os_str().is_empty() {
+            self.zconnect.save(&self.resolve_file(&self.config.paths.zconnect_file))?;
+        }
         Ok(())
     }
 
@@ -587,7 +604,8 @@ impl IcyBoard {
         let conferences = toml::to_string(&self.conferences).unwrap_or_default();
         let ftn = toml::to_string(&self.ftn).unwrap_or_default();
         let qwknet = toml::to_string(&self.qwknet).unwrap_or_default();
-        format!("{config}\n{conferences}\n{ftn}\n{qwknet}")
+        let zconnect = toml::to_string(&self.zconnect).unwrap_or_default();
+        format!("{config}\n{conferences}\n{ftn}\n{qwknet}\n{zconnect}")
     }
 
     pub fn save_userbase(&mut self) -> Res<()> {
@@ -1292,6 +1310,69 @@ mod tests {
         board.conferences.push(crate::icy_board::conferences::Conference::default());
 
         assert_ne!(board.settings_fingerprint(), before);
+    }
+
+    #[test]
+    fn zconnect_settings_save_reload_and_path_resolution() {
+        let root = tempfile::tempdir().unwrap();
+        let mut board = IcyBoard::default();
+        board.root_path = root.path().into();
+        board.file_name = root.path().join("icyboard.toml");
+        board.config.paths.conferences = "conferences.toml".into();
+        board.config.paths.user_file = "users.toml".into();
+        board.config.paths.icbtext = "icbtext.toml".into();
+        board.config.paths.zconnect_file = "zconnect.toml".into();
+        let before = board.settings_fingerprint();
+        board.zconnect.enabled = true;
+        board.zconnect.local_system = "local.example.org".into();
+        board.zconnect.links.push(zconnect::ZconnectLink {
+            id: "PEER".into(),
+            host: "peer.example.org".into(),
+            remote_system: "Remote BBS".into(),
+            password: "test-password".into(),
+            areas: vec![zconnect::ZconnectArea {
+                remote_board: "/PUBLIC/TEST".into(),
+                local_area: "messages/test".into(),
+                read_only: true,
+            }],
+            ..Default::default()
+        });
+        assert_ne!(board.settings_fingerprint(), before);
+        board.save_userbase().unwrap();
+        icb_text::DEFAULT_DISPLAY_TEXT.save(&root.path().join("icbtext.toml")).unwrap();
+        board.save().unwrap();
+        let mut loaded = IcyBoard::load(&board.file_name).unwrap();
+        assert_eq!(loaded.zconnect, board.zconnect);
+        for _ in 0..2 {
+            loaded.resolve_paths();
+            assert_eq!(loaded.config.paths.zconnect_file, root.path().join("zconnect.toml"));
+            assert_eq!(loaded.zconnect.links[0].areas[0].local_area, PathBuf::from("messages/test"));
+        }
+        loaded.save().unwrap();
+        assert_eq!(IcyBoard::load(&board.file_name).unwrap().zconnect, board.zconnect);
+        fs::write(root.path().join("zconnect.toml"), "invalid = [").unwrap();
+        assert!(
+            IcyBoard::load(&board.file_name).is_err(),
+            "a broken network file must not be silently replaced with defaults"
+        );
+    }
+
+    #[test]
+    fn zconnect_is_optional_for_old_board_configuration() {
+        let board = IcyBoard::default();
+        let config = toml::to_string(&board.config).unwrap();
+        let old_config = config
+            .lines()
+            .filter(|line| !line.starts_with("zconnect_file ="))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let loaded: IcbConfig = toml::from_str(&old_config).unwrap();
+        assert!(loaded.paths.zconnect_file.as_os_str().is_empty());
+        let mut board = IcyBoard::default();
+        board.root_path = "/test/board".into();
+        board.resolve_paths();
+        assert!(board.config.paths.zconnect_file.as_os_str().is_empty());
+        assert!(!board.zconnect.enabled);
     }
 
     #[test]

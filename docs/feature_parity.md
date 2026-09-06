@@ -46,6 +46,7 @@ If something is missing just let me know.
 | File Bases  | 90% | SQLite base with the metadata the archives do not carry, long file names, archives read through unarc-rs |
 | Mail Bases | 80% | JAM base, search, QWK and an FTN leaf; netmail still lands in one dump base |
 | FTN Mailer | 70% | Leaf/point scan, poll and toss over BinkP work; no answering side, AreaFix, per-user netmail or setup UI for AKA/links |
+| ZCONNECT networking | Limited leaf support | Public text import/export, ZIP/ZMODEM outbound polling, retry checkpoints and setup UI; no private-mail gateway or listener. External peer interoperability remains unverified; see [ZCONNECT](zconnect.md). |
 | Up/Download  | 90%  | Commands need to be checked for 100% parity, but protocols should work |
 | Statistics | 80%  | Board and caller activity, daily rollover and per-file download counts work; PCBoard's per-node statistics are not modelled |
 | Help Files | 80%  | Every command reaches a help file, the German set is 20 of 52 | 

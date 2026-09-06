@@ -338,7 +338,7 @@ impl ZConnectHeaderBlock {
     }
 
     pub fn acer(&self, index: usize) -> Option<&Vec<Acer>> {
-        self.acer.get(&index)
+        self.acer.get(&index).or_else(|| self.acer.get(&usize::MAX))
     }
 
     pub fn add_acer(&mut self, index: usize, compressor: Acer) {
@@ -360,14 +360,14 @@ impl ZConnectHeaderBlock {
     }
 
     pub fn protocols(&self, index: usize) -> Option<&Vec<TransferProtocol>> {
-        self.protocols.get(&index)
+        self.protocols.get(&index).or_else(|| self.protocols.get(&usize::MAX))
     }
     pub fn add_protocol(&mut self, index: usize, protocol: TransferProtocol) {
         self.protocols.entry(index).or_default().push(protocol);
     }
 
     pub fn crypt(&self, index: usize) -> Option<&Vec<Crypt>> {
-        self.crypt.get(&index)
+        self.crypt.get(&index).or_else(|| self.crypt.get(&usize::MAX))
     }
     pub fn add_crypt(&mut self, index: usize, crypt: Crypt) {
         self.crypt.entry(index).or_default().push(crypt);
@@ -388,14 +388,14 @@ impl ZConnectHeaderBlock {
     }
 
     pub fn mailer(&self, index: usize) -> Option<&Vec<Mailer>> {
-        self.mailer.get(&index)
+        self.mailer.get(&index).or_else(|| self.mailer.get(&usize::MAX))
     }
     pub fn add_mailer(&mut self, index: usize, mailer: Mailer) {
         self.mailer.entry(index).or_default().push(mailer);
     }
 
     pub fn mailformat(&self, index: usize) -> Option<&Vec<Mailformat>> {
-        self.mailformat.get(&index)
+        self.mailformat.get(&index).or_else(|| self.mailformat.get(&usize::MAX))
     }
     pub fn add_mailformat(&mut self, index: usize, mailformat: Mailformat) {
         self.mailformat.entry(index).or_default().push(mailformat);
@@ -436,7 +436,7 @@ impl ZConnectBlock for ZConnectHeaderBlock {
         lines.push(format!("Port:{}", self.port + 1));
 
         for (i, p) in self.phone.iter() {
-            lines.push(format!("Tel:{} {}", i + 1, p));
+            lines.push(format!("Tel:{} {}", i.wrapping_add(1), p));
         }
         lines.push(format!("Domain:{}", self.domains.join(";")));
         if let Some(maps) = &self.maps {
@@ -444,17 +444,17 @@ impl ZConnectBlock for ZConnectHeaderBlock {
         }
 
         for (i, iso2) in self.iso2.iter() {
-            lines.push(format!("ISO2:{} {}", i + 1, iso2));
+            lines.push(format!("ISO2:{} {}", i.wrapping_add(1), iso2));
         }
 
         for (i, iso3) in self.iso3.iter() {
-            lines.push(format!("ISO3:{} {}", i + 1, iso3));
+            lines.push(format!("ISO3:{} {}", i.wrapping_add(1), iso3));
         }
 
         for (i, comp) in self.acer.iter() {
             lines.push(format!(
                 "Arc:{} {}",
-                i + 1,
+                i.wrapping_add(1),
                 comp.iter().map(|c| c.to_string()).collect::<Vec<String>>().join(";")
             ));
         }
@@ -462,7 +462,7 @@ impl ZConnectBlock for ZConnectHeaderBlock {
         for (i, prot) in self.protocols.iter() {
             lines.push(format!(
                 "Proto:{} {}",
-                i + 1,
+                i.wrapping_add(1),
                 prot.iter().map(|c| c.to_string()).collect::<Vec<String>>().join(";")
             ));
         }
@@ -478,7 +478,7 @@ impl ZConnectBlock for ZConnectHeaderBlock {
         for (i, crypt) in self.crypt.iter() {
             lines.push(format!(
                 "Crypt:{} {}",
-                i + 1,
+                i.wrapping_add(1),
                 crypt.iter().map(|c| c.to_string()).collect::<Vec<String>>().join(";")
             ));
         }
@@ -494,7 +494,7 @@ impl ZConnectBlock for ZConnectHeaderBlock {
         for (i, mailer) in self.mailer.iter() {
             lines.push(format!(
                 "Mailer:{} {}",
-                i + 1,
+                i.wrapping_add(1),
                 mailer.iter().map(|c| c.to_string()).collect::<Vec<String>>().join(";")
             ));
         }
@@ -502,7 +502,7 @@ impl ZConnectBlock for ZConnectHeaderBlock {
         for (i, mailformat) in self.mailformat.iter() {
             lines.push(format!(
                 "Mailformat:{} {}",
-                i + 1,
+                i.wrapping_add(1),
                 mailformat.iter().map(|c| c.to_string()).collect::<Vec<String>>().join(";")
             ));
         }
@@ -514,17 +514,26 @@ impl ZConnectBlock for ZConnectHeaderBlock {
     }
 
     fn parse_cmd(&mut self, command: &str, parameter: String) -> crate::Result<()> {
+        // Port 0 means all ports; retain the existing zero-based public API.
+        // Validate before the individual parsers so no network input can panic.
+        if matches!(command, "TEL" | "ISO2" | "ISO3" | "ARC" | "PROTO" | "CRYPT" | "MAILER" | "MAILFORMAT") {
+            let (port, value) = parameter.split_once(' ').ok_or("Missing ZCONNECT port/value")?;
+            let _: usize = port.parse()?;
+            if value.trim().is_empty() {
+                return Err("Empty ZCONNECT port value".into());
+            }
+        }
         match command {
             "SYS" => self.system = parameter,
             "SYSOP" => self.sysop = parameter,
             "SERNR" => self.serial = Some(parameter),
             "POST" => self.post = Some(parameter),
-            "PORT" => self.port = parameter.parse().unwrap_or(1) - 1,
+            "PORT" => self.port = parameter.parse::<usize>()?.checked_sub(1).ok_or("Invalid ZCONNECT active port")?,
             "TEL" => {
                 let mut parts = parameter.splitn(2, ' ');
                 let index: usize = parts.next().unwrap().parse()?;
                 let phone = parts.next().unwrap().to_string();
-                self.phone.insert(index - 1, phone);
+                self.phone.insert(index.wrapping_sub(1), phone);
             }
             "DOMAIN" => self.domains = parameter.split([';', ' ']).map(|s| s.to_string()).collect(),
             "MAPS" => self.maps = Some(parameter),
@@ -532,19 +541,19 @@ impl ZConnectBlock for ZConnectHeaderBlock {
                 let mut parts = parameter.splitn(2, ' ');
                 let index: usize = parts.next().unwrap().parse()?;
                 let iso2 = parts.next().unwrap().to_string();
-                self.iso2.insert(index - 1, iso2);
+                self.iso2.insert(index.wrapping_sub(1), iso2);
             }
             "ISO3" => {
                 let mut parts = parameter.splitn(2, ' ');
                 let index: usize = parts.next().unwrap().parse()?;
                 let iso3 = parts.next().unwrap().to_string();
-                self.iso3.insert(index - 1, iso3);
+                self.iso3.insert(index.wrapping_sub(1), iso3);
             }
             "ARC" => {
                 let mut parts = parameter.splitn(2, ' ');
                 let index: usize = parts.next().unwrap().parse()?;
                 let compressors = parts.next().unwrap().split([';', ' ']).map(Acer::parse).collect();
-                self.acer.insert(index - 1, compressors);
+                self.acer.insert(index.wrapping_sub(1), compressors);
             }
             "PASSWD" => self.password = parameter,
             "TELEFON" => self.voice_phone = Some(parameter),
@@ -552,31 +561,31 @@ impl ZConnectBlock for ZConnectHeaderBlock {
                 let mut parts = parameter.splitn(2, ' ');
                 let index: usize = parts.next().unwrap().parse()?;
                 let protocols = parts.next().unwrap().split([';', ' ']).map(TransferProtocol::parse).collect();
-                self.protocols.insert(index - 1, protocols);
+                self.protocols.insert(index.wrapping_sub(1), protocols);
             }
             "CRYPT" => {
                 let mut parts = parameter.splitn(2, ' ');
                 let index: usize = parts.next().unwrap().parse()?;
                 let crypts = parts.next().unwrap().split([';', ' ']).map(Crypt::parse).collect();
-                self.crypt.insert(index - 1, crypts);
+                self.crypt.insert(index.wrapping_sub(1), crypts);
             }
-            "ACERIN" => self.acer_in = Some(Acer::parse(&parameter)),
-            "ACEROUT" => self.acer_out = Some(Acer::parse(&parameter)),
+            "ACERIN" | "ARCERIN" => self.acer_in = Some(Acer::parse(&parameter)),
+            "ACEROUT" | "ARCEROUT" => self.acer_out = Some(Acer::parse(&parameter)),
             "MAILER" => {
                 let mut parts = parameter.splitn(2, ' ');
                 let index: usize = parts.next().unwrap().parse()?;
                 let mailers = parts.next().unwrap().split([';', ' ']).map(Mailer::parse).collect();
-                self.mailer.insert(index - 1, mailers);
+                self.mailer.insert(index.wrapping_sub(1), mailers);
             }
             "MAILFORMAT" => {
                 let mut parts = parameter.splitn(2, ' ');
                 let index: usize = parts.next().unwrap().parse()?;
                 let mailformats = parts.next().unwrap().split([';', ' ']).map(Mailformat::parse).collect();
-                self.mailformat.insert(index - 1, mailformats);
+                self.mailformat.insert(index.wrapping_sub(1), mailformats);
             }
             "KOORDINATEN" => self.coords = Some(parameter),
             _ => {
-                log::warn!("unknown Z-connect header entry: {}", command)
+                // Extensions are ignored; never log untrusted header text (passwords).
             }
         }
         Ok(())

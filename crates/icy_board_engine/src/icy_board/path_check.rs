@@ -137,6 +137,9 @@ impl IcyBoard {
         if !paths.qwknet_file.as_os_str().is_empty() {
             list.push(("Message networking, QWKnet configuration", paths.qwknet_file.clone(), PathKind::File));
         }
+        if !paths.zconnect_file.as_os_str().is_empty() {
+            list.push(("Message networking, ZCONNECT configuration", paths.zconnect_file.clone(), PathKind::File));
+        }
         list.into_iter().map(|(label, path, kind)| (label.to_string(), path, kind)).collect()
     }
 

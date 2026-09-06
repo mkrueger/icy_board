@@ -2,13 +2,14 @@ use crate::crc;
 
 pub mod commands;
 pub mod header;
+pub mod session;
 
 // const Z_CONNECT_USER: &str = "zconnect";
 // const Z_CONNECT_PWD: &str = "0zconnec";
 
 // const BEGIN : &str = "BEGIN";
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum BlockCode {
     Block1,
     Block2,
@@ -37,7 +38,7 @@ impl std::fmt::Display for BlockCode {
     }
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ProtocolTransition {
     Prot5,
     Prot6,
@@ -52,7 +53,7 @@ impl std::fmt::Display for ProtocolTransition {
     }
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum EndTransmission {
     End1,
     End2,
@@ -75,7 +76,7 @@ impl std::fmt::Display for EndTransmission {
     }
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ZConnectState {
     Block(BlockCode),
     Ack(BlockCode),
@@ -156,13 +157,25 @@ pub trait ZConnectBlock {
         let mut crc = u16::MAX;
         let mut last_crc = crc;
         let mut expected_crc = u16::MAX;
+        let mut saw_crc = false;
+        let mut saw_status = false;
         for c in input.chars() {
             if c == '\r' {
                 is_start = true;
                 if !command.is_empty() {
                     match command.as_str() {
-                        "STATUS" => self.set_state(parse_state(&parameter)?),
+                        "STATUS" => {
+                            if saw_status {
+                                return Err("Duplicate ZCONNECT status".into());
+                            }
+                            saw_status = true;
+                            self.set_state(parse_state(&parameter)?);
+                        }
                         "CRC" => {
+                            if saw_crc || parameter.len() != 4 {
+                                return Err("Invalid ZCONNECT CRC field".into());
+                            }
+                            saw_crc = true;
                             expected_crc = u16::from_str_radix(&parameter, 16)?;
                             crc = last_crc;
                         }
@@ -191,6 +204,9 @@ pub trait ZConnectBlock {
             }
         }
 
+        if !saw_status || !saw_crc || !command.is_empty() || !parameter.is_empty() {
+            return Err("Incomplete ZCONNECT block".into());
+        }
         if crc != expected_crc {
             return Err("CRC mismatch".into());
         }

@@ -13,6 +13,7 @@ use ratatui::{Frame, layout::Rect};
 
 mod ftn;
 mod qwk;
+mod zconnect;
 
 pub struct MsgNetworking {
     pub page: IcbSetupMenuUI,
@@ -25,6 +26,7 @@ impl MsgNetworking {
             page: IcbSetupMenuUI::new(SelectMenu::new(vec![
                 MenuItem::new(0, 'A', get_text("msg_networking_qwk")),
                 MenuItem::new(1, 'B', get_text("msg_networking_ftn")),
+                MenuItem::new(2, 'C', get_text("msg_networking_zconnect")).with_help(get_text("zconnect_menu-help")),
             ]))
             .with_center_title(get_text("msg_networking_title")),
             icy_board,
@@ -45,15 +47,16 @@ impl Page for MsgNetworking {
         if key.code == crossterm::event::KeyCode::Esc {
             return PageMessage::Close;
         }
-        let (_state, opt) = self.page.handle_key_press(key);
+        let (state, opt) = self.page.handle_key_press(key);
 
         if let Some(selected) = opt {
             return match selected {
                 0 => PageMessage::OpenSubPage(Box::new(qwk::QwkSettings::new(self.icy_board.clone()))),
                 1 => PageMessage::OpenSubPage(Box::new(ftn::FidoConfiguration::new(self.icy_board.clone()))),
+                2 => PageMessage::OpenSubPage(Box::new(zconnect::ZconnectSettings::new(self.icy_board.clone()))),
                 _ => PageMessage::None,
             };
         }
-        PageMessage::None
+        PageMessage::ResultState(state)
     }
 }

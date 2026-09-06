@@ -10,6 +10,13 @@ separate program that runs beside the board.
 Run it yourself, from the board's timed events, or from the operating system's
 scheduler.
 
+ZCONNECT is available separately through the ``zconnect-links``,
+``zconnect-scan``, ``zconnect-toss``, ``zconnect-poll`` and ``zconnect-ack``
+commands. Configure it under Messaging & Networking → ZCONNECT in ICBSetup.
+It supports public text boards, ZIP archives and outbound ZMODEM/Telnet calls;
+it is not an FTN transport or a private-mail gateway. See the repository's
+``docs/zconnect.md`` for configuration, retention and interoperability limits.
+
 .. note::
    This chapter assumes you already have a node number from the coordinator of
    the network you are joining, and the host name, port and password of the

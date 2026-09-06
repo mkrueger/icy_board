@@ -633,6 +633,7 @@ impl PCBoardImporter {
                 group_file,
                 ftn_file: PathBuf::from("main/ftn.toml"),
                 qwknet_file: PathBuf::new(),
+                zconnect_file: PathBuf::new(),
 
                 trashcan_upload_files,
                 trashcan_user,

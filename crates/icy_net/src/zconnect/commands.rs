@@ -56,6 +56,7 @@ fn get_mail_attr(attr: u8) -> String {
     mail
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub enum ZConnectCmd {
     Get(u8),
     Put(u8),
@@ -126,9 +127,10 @@ impl ZConnectBlock for ZConnectCommandBlock {
             "PUT" => {
                 self.commands.push(ZConnectCmd::Put(parse_mail_parameter(&parameter)));
             }
-            "DEL" => {
+            "DEL" | "DELETE" => {
                 self.commands.push(ZConnectCmd::Delete(parse_mail_parameter(&parameter)));
             }
+            "FORMAT" => self.commands.push(ZConnectCmd::Format(parameter)),
             "FILEREQ" => {
                 self.commands.push(ZConnectCmd::Filereq(parameter));
             }
@@ -139,7 +141,13 @@ impl ZConnectBlock for ZConnectCommandBlock {
                 self.commands.push(ZConnectCmd::PgpKeyreq);
             }
             "EXECUTE" => {
-                self.commands.push(ZConnectCmd::Execute(Execute::parse(&parameter)));
+                let execute = match parameter.as_str() {
+                    "J" | "Y" => Execute::Yes,
+                    "N" => Execute::No,
+                    "L" => Execute::Later,
+                    _ => return Err("Invalid ZCONNECT EXECUTE value".into()),
+                };
+                self.commands.push(ZConnectCmd::Execute(execute));
             }
             "WAIT" => {
                 let p = match parameter.as_str() {
@@ -161,7 +169,7 @@ impl ZConnectBlock for ZConnectCommandBlock {
                 self.commands.push(ZConnectCmd::Retransmit);
             }
             _ => {
-                log::error!("Unknown zconnect command: {}", command);
+                return Err("Unsupported ZCONNECT command".into());
             }
         }
         Ok(())
@@ -183,6 +191,10 @@ fn parse_mail_parameter(parameter: &str) -> u8 {
 }
 
 impl ZConnectCommandBlock {
+    pub fn commands(&self) -> &[ZConnectCmd] {
+        &self.commands
+    }
+
     pub const EOT4: ZConnectCommandBlock = ZConnectCommandBlock {
         state: ZConnectState::Eot(super::EndTransmission::End4),
         commands: Vec::new(),
@@ -223,7 +235,7 @@ impl ZConnectCommandBlock {
 
     /// Optional Default: ZCONNECT
     pub fn format(mut self) -> Self {
-        self.commands.push(ZConnectCmd::Format("Z_CONNECT".to_string()));
+        self.commands.push(ZConnectCmd::Format("ZCONNECT".to_string()));
         self
     }
 
@@ -287,6 +299,7 @@ impl ZConnectCommandBlock {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Execute {
     Yes,
     No,

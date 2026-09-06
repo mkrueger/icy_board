@@ -1,5 +1,8 @@
 # QWKnet and DOVE-Net
 
+For the separate ZCONNECT public-text network and offline-mailer workflow, see
+[ZCONNECT networking](zconnect.md).
+
 Icy Board can operate as a leaf node of a QWK message network. The initial
 implementation supports Synchronet's HTTP or HTTPS `qwk.ssjs` transport and
 public conference mail. It creates REP packets, downloads QWK packets, maps the

@@ -13,6 +13,7 @@ handbook is built from [`docs/source`](source/) and ships as HTML and PDF.
 | [Migrating from PCBoard](migration.md) | Dry-run an import, map DOS drives, inspect PPEs and validate the result. |
 | [File areas](icbfile.md) | Import, normalize and maintain file bases. |
 | [Upload processing](upload_processing.md) | Quarantine, advertisement cleanup, one own advertisement file or a PPE generator. |
+| [ZCONNECT networking](zconnect.md) | Configure public-board packet exchange and outbound ZCONNECT polling. |
 
 ## Understand compatibility
 
