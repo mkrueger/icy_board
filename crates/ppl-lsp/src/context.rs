@@ -43,6 +43,8 @@ fn is_identifier_char(c: char) -> bool {
 /// Stands for `[...]` in a member chain. It is the collection's own getter, which is
 /// why it cannot collide with anything a source can write.
 pub const INDEXED: &str = "<get>";
+/// Parenthesized call or legacy array indexing; retain it for rank-aware hints.
+pub const CALLED: &str = "<call>";
 
 /// The part of the line that is code, cut off where a string or comment starts.
 /// `None` when the cursor itself sits inside one.
@@ -94,6 +96,8 @@ fn member_chain(chars: &[char], mut end: usize) -> Option<Vec<String>> {
             // An index reads an element, so the chain continues in the element's type.
             if close == ']' {
                 path.push(INDEXED.to_string());
+            } else {
+                path.push(CALLED.to_string());
             }
             let mut depth = 0;
             loop {
@@ -331,7 +335,10 @@ mod tests {
             cursor_context("members[0].Home."),
             CursorContext::Member(vec!["members".to_string(), INDEXED.to_string(), "Home".to_string()])
         );
-        assert_eq!(cursor_context("ConfInfo(CurConf())."), CursorContext::Member(vec!["ConfInfo".to_string()]));
+        assert_eq!(
+            cursor_context("ConfInfo(CurConf())."),
+            CursorContext::Member(vec!["ConfInfo".to_string(), CALLED.to_string()])
+        );
     }
 
     #[test]

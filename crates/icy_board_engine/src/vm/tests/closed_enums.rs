@@ -116,8 +116,6 @@ fn closed_enums_reject_numeric_operations_and_implicit_conversions() {
             "PRINT +value",
             "PRINT !value",
             "PRINT value < Shade.Second",
-            "PRINT value & Shade.Second",
-            "PRINT value | Shade.Second",
             "PRINT value = 7",
             "FOR value = Shade.First TO Shade.Second\n PRINT value\nNEXT",
             "PRINT ABS(value)",
@@ -238,12 +236,14 @@ fn closed_enums_runtime_write_guard_is_atomic_and_nominal() {
 }
 
 #[test]
-fn closed_enums_regex_combinations_are_named_not_arithmetic() {
+fn closed_enums_regex_combinations_are_checked_bitwise_values() {
     assert_eq!(
         "3|1",
-        run_ppl("RegexOptions options = RegexOptions.IgnoreCaseAndMultiLine\nPRINT TOINTEGER(options), \"|\", Regex.Compile(\"^a\", options).IsMatch(\"A\")")
+        run_ppl(
+            "RegexOptions options = RegexOptions.IgnoreCase | RegexOptions.MultiLine\nPRINT TOINTEGER(options), \"|\", Regex.Compile(\"^a\", options).IsMatch(\"A\")"
+        )
     );
-    assert!(!compile_errors("PRINT RegexOptions.IgnoreCase | RegexOptions.MultiLine").is_empty());
+    assert!(compile_errors("PRINT RegexOptions.IgnoreCase | RegexOptions.MultiLine").is_empty());
 }
 
 // Put a non-enum field first: a bad leaf later in the record must not publish it.

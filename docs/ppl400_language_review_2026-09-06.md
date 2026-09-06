@@ -245,8 +245,18 @@ verbieten würde den unbenannten Defaultwert nicht lösen.
 ### V3 · Flags sollten eine Typeigenschaft sein
 
 **Entscheidung:** Kein neuer Flags-Typ. Auch `RegexOptions` ist geschlossen;
-Kombinationen sind benannte Mitglieder wie `IgnoreCaseAndMultiLine`. Die
-nachfolgend beschriebene Sonderausnahme für bitweise Operatoren ist entfernt.
+seine Wertemenge 0–63 ist unabhängig von den sieben sichtbaren Mitgliedern.
+`|` und `&` sind allgemein zwischen Werten desselben Enumtyps erlaubt, sofern
+jedes Ergebnis zur Wertemenge gehört. Vergleiche mit `==`/`!=` erlauben
+Bitprüfungen. Die zwischenzeitlich generierten Kombinationsnamen wurden wieder
+entfernt. Die nachfolgend beschriebene Sonderausnahme ist damit durch eine
+allgemeine, geprüfte Operatorregel ersetzt.
+
+Zusätzlich bietet jeder Enumtyp `value.Has(mask) -> BOOLEAN`: Beide Operanden
+müssen denselben Enumtyp haben; alle Bits der Maske müssen gesetzt sein.
+Die Nullmaske ergibt immer `TRUE`. Anders als beim Enum-Operator `&` entsteht
+dabei kein Enum-Zwischenwert, sodass eine nicht deklarierte Schnittmenge 0
+keinen Fehler verursacht. Empfänger und Maske werden jeweils einmal ausgewertet.
 
 Die [Operatorprüfung](../crates/icy_board_engine/src/semantic/visitor.rs#L186-L192)
 erlaubt `&` und `|` speziell für die ID von `RegexOptions`, nicht allgemein

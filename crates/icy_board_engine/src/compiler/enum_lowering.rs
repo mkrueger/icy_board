@@ -14,6 +14,13 @@ impl<'a> EnumLoweringVisitor<'a> {
 }
 
 impl AstVisitorMut for EnumLoweringVisitor<'_> {
+    fn visit_binary_expression(&mut self, binary: &crate::ast::BinaryExpression) -> Expression {
+        let mut lowered = binary.clone();
+        *lowered.get_left_expression_mut() = binary.get_left_expression().visit_mut(self);
+        *lowered.get_right_expression_mut() = binary.get_right_expression().visit_mut(self);
+        Expression::Binary(lowered)
+    }
+
     fn visit_function_call_expression(&mut self, call: &FunctionCallExpression) -> Expression {
         Expression::FunctionCall(call.preserving_id(
             call.get_expression().visit_mut(self),

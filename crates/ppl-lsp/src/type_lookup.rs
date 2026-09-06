@@ -70,6 +70,16 @@ pub fn type_of_name(visitor: &SemanticVisitor, name: &str) -> Option<VariableTyp
             .or(reference.implementation.as_ref())
             .map(|(_, decl)| unicase::Ascii::new(decl.token.clone()));
         if declared == Some(name.clone()) {
+            if matches!(reference_type, ReferenceType::Function(_)) {
+                return visitor
+                    .function_containers
+                    .iter()
+                    .find(|container| container.name.eq_ignore_ascii_case(name.as_ref()))
+                    .and_then(|container| match &container.functions {
+                        icy_board_engine::semantic::FunctionDeclaration::Function(function) => Some(function.get_return_type()),
+                        _ => None,
+                    });
+            }
             return Some(reference.variable_type);
         }
     }
@@ -94,6 +104,9 @@ pub fn type_of_name(visitor: &SemanticVisitor, name: &str) -> Option<VariableTyp
     }
     if let Some(var_type) = visitor.type_registry.get_board_object(&name) {
         return Some(var_type);
+    }
+    if let Some(definition) = visitor.type_registry.get_enum(&name) {
+        return Some(VariableType::UserData(definition.id));
     }
     fallback
 }
@@ -132,6 +145,9 @@ pub fn type_of_member(registry: &UserTypeRegistry, var_type: VariableType, membe
     };
     let member = unicase::Ascii::new(member.to_string());
 
+    if registry.get_enum_from_id(id).is_some() {
+        return (member == "Has").then_some(VariableType::Boolean);
+    }
     if let Some(def) = registry.get_record_type_from_id(id) {
         return def.field_type(def.field_index(&member)?);
     }
@@ -147,10 +163,19 @@ pub fn type_of_member(registry: &UserTypeRegistry, var_type: VariableType, membe
 pub fn type_of_chain(visitor: &SemanticVisitor, path: &[String]) -> Option<VariableType> {
     let (first, rest) = path.split_first()?;
     let mut var_type = type_of_name(visitor, first)?;
+    let mut namespace = visitor.type_registry.get_enum(&unicase::Ascii::new(first.clone()));
     for member in rest {
+        if member == crate::context::CALLED {
+            namespace = None;
+            continue;
+        }
         // An array indexes into its own type, so a step it does not have is no step.
         if member == crate::context::INDEXED {
             var_type = type_of_member(&visitor.type_registry, var_type, member).unwrap_or(var_type);
+            continue;
+        }
+        if let Some(definition) = namespace.take() {
+            definition.value(&unicase::Ascii::new(member.clone()))?;
             continue;
         }
         var_type = type_of_member(&visitor.type_registry, var_type, member)?;
@@ -158,8 +183,79 @@ pub fn type_of_chain(visitor: &SemanticVisitor, path: &[String]) -> Option<Varia
     Some(var_type)
 }
 
+/// Distinguish an enum scalar from a type namespace or unindexed array. The
+/// generic chain resolver intentionally erases array rank for other hints.
+pub fn enum_instance_type(visitor: &SemanticVisitor, path: &[String]) -> Option<VariableType> {
+    let (first, rest) = path.split_first()?;
+    let mut typ = type_of_name(visitor, first)?;
+    let reference = visitor.references.iter().find(|(kind, reference)| {
+        matches!(kind, ReferenceType::Variable(_) | ReferenceType::Constant(_) | ReferenceType::Function(_))
+            && reference
+                .declaration
+                .as_ref()
+                .or(reference.implementation.as_ref())
+                .is_some_and(|(_, token)| token.token.eq_ignore_ascii_case(first))
+    });
+    let mut namespace = reference.is_none() && visitor.type_registry.get_enum(&unicase::Ascii::new(first.clone())).is_some();
+    let mut callable = reference.is_some_and(|(kind, _)| matches!(kind, ReferenceType::Function(_)));
+    let mut rank = reference.and_then(|(_, reference)| reference.header.as_ref()).map_or(0, |header| header.dim);
+    if callable {
+        rank = visitor
+            .function_containers
+            .iter()
+            .find(|container| container.name.eq_ignore_ascii_case(first))
+            .and_then(|container| match &container.functions {
+                icy_board_engine::semantic::FunctionDeclaration::Function(function) => Some(function.get_return_rank()),
+                _ => None,
+            })
+            .unwrap_or(0);
+    }
+    for member in rest {
+        if member == crate::context::CALLED || member == crate::context::INDEXED {
+            if member == crate::context::INDEXED || (!callable && !namespace) {
+                rank = 0;
+            }
+            callable = false;
+            namespace = false;
+            continue;
+        }
+        if rank > 0 {
+            return None;
+        }
+        let VariableType::UserData(id) = typ else { return None };
+        if namespace {
+            let definition = visitor.type_registry.get_enum_from_id(id)?;
+            definition.value(&unicase::Ascii::new(member.clone()))?;
+            namespace = false;
+            continue;
+        }
+        if let Some(record) = visitor.type_registry.get_record_type_from_id(id) {
+            let field = record.field(record.field_index(&unicase::Ascii::new(member.clone()))?)?;
+            rank = field.dim;
+        } else if let Some(object) = visitor.type_registry.get_type_from_id(id) {
+            let name = unicase::Ascii::new(member.clone());
+            callable = object.functions.contains_key(&name);
+            rank = object
+                .functions
+                .get(&name)
+                .map(|function| function.return_rank)
+                .or_else(|| object.field_ranks.get(&name).copied())
+                .unwrap_or(0);
+        }
+        typ = type_of_member(&visitor.type_registry, typ, member)?;
+    }
+    (!namespace && rank == 0 && visitor.type_registry.is_enum_type(typ)).then_some(typ)
+}
+
 /// Everything that may follow a `.` on a value of this type.
 pub fn members_of(registry: &UserTypeRegistry, var_type: VariableType) -> Vec<Member> {
+    if registry.is_enum_type(var_type) {
+        return vec![Member {
+            name: "Has".to_string(),
+            detail: format!("({} mask) BOOLEAN", type_name(registry, var_type)),
+            kind: MemberKind::Method,
+        }];
+    }
     if matches!(var_type, VariableType::String | VariableType::BigStr | VariableType::UnboundedString) {
         return string_members(false);
     }
@@ -289,6 +385,9 @@ fn named_parameters(registry: &UserTypeRegistry, parameters: &[VariableType], na
 
 /// The parameter list of a callable member, so a signature can read as a call.
 pub fn member_parameters(registry: &UserTypeRegistry, receiver: VariableType, member: &unicase::Ascii<String>) -> Option<String> {
+    if registry.is_enum_type(receiver) && *member == "Has" {
+        return Some(format!("{} mask", type_name(registry, receiver)));
+    }
     let VariableType::UserData(id) = receiver else {
         return None;
     };

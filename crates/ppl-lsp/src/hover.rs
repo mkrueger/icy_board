@@ -182,12 +182,12 @@ impl<'a> AstVisitor<()> for MemberHoverVisitor<'a> {
             return;
         };
         let object = VariableType::UserData(*type_id);
-        let field_type = type_of_member(&self.visitor.type_registry, object, member.get_identifier().as_ref()).or_else(|| {
-            self.visitor
-                .type_registry
-                .get_enum_from_id(*type_id)
-                .and_then(|definition| definition.value(member.get_identifier()).map(|_| object))
-        });
+        let field_type = self
+            .visitor
+            .type_registry
+            .get_enum_from_id(*type_id)
+            .and_then(|definition| definition.value(member.get_identifier()).map(|_| object))
+            .or_else(|| type_of_member(&self.visitor.type_registry, object, member.get_identifier().as_ref()));
         if let Some(field_type) = field_type {
             let rank = self
                 .visitor

@@ -846,10 +846,11 @@ impl PPECompiler {
                     .collect()
             })
             .collect();
-        let needs_enums = variable_table
-            .get_entries()
-            .iter()
-            .any(|entry| self.semantic_visitor.type_registry.is_enum_type(entry.header.variable_type))
+        let needs_enums = !self.semantic_visitor.enum_binary_types.is_empty()
+            || variable_table
+                .get_entries()
+                .iter()
+                .any(|entry| self.semantic_visitor.type_registry.is_enum_type(entry.header.variable_type))
             || user_types
                 .iter()
                 .flatten()
@@ -858,7 +859,7 @@ impl PPECompiler {
                 .semantic_visitor
                 .function_type_lookup
                 .values()
-                .any(|info| matches!(info, SemanticInfo::EnumCast(_)));
+                .any(|info| matches!(info, SemanticInfo::EnumCast(_) | SemanticInfo::EnumHas(_)));
         if needs_enums {
             if self.runtime < 400 {
                 return Err(CompilationErrorType::BuiltinNeedsRuntime(
@@ -871,7 +872,7 @@ impl PPECompiler {
                 .type_registry
                 .enums()
                 .iter()
-                .map(|definition| (definition.id, definition.variants.iter().map(|(_, value)| *value).collect()))
+                .map(|definition| (definition.id, definition.domain.clone()))
                 .collect();
         }
         variable_table.fill_in_records(&user_types);

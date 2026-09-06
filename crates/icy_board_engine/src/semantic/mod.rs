@@ -62,6 +62,7 @@ pub struct SemanticVisitor {
     pub static_receiver_lookup: HashMap<usize, u8>,
 
     pub function_type_lookup: HashMap<CallId, SemanticInfo>,
+    pub enum_binary_types: HashMap<u64, u8>,
     pub call_graph: CallGraph,
     member_array_returns: HashMap<CallId, (VariableType, u8)>,
 
@@ -266,7 +267,17 @@ impl SemanticVisitor {
     fn declared_constant_type(&self, expr: &Expression) -> Option<VariableType> {
         match expr {
             Expression::Parens(value) => self.declared_constant_type(value.get_expression()),
+            Expression::Binary(value) if matches!(value.get_op(), crate::ast::BinOp::And | crate::ast::BinOp::Or) => {
+                let left = self.declared_constant_type(value.get_left_expression())?;
+                (self.type_registry.is_enum_type(left) && Some(left) == self.declared_constant_type(value.get_right_expression())).then_some(left)
+            }
             Expression::Identifier(identifier) => self.lookup_constant(identifier.get_identifier()).map(|(variable_type, _, _)| *variable_type),
+            Expression::FunctionCall(call) => {
+                let Expression::Identifier(name) = call.get_expression() else { return None };
+                self.type_registry
+                    .get_enum(name.get_identifier())
+                    .map(|definition| VariableType::UserData(definition.id))
+            }
             Expression::MemberReference(member) => {
                 let Expression::Identifier(base) = member.get_expression() else {
                     return None;
@@ -277,11 +288,59 @@ impl SemanticVisitor {
             _ => None,
         }
     }
+    fn enum_constant_value(&self, expr: &Expression) -> Option<VariableValue> {
+        crate::ast::const_enum_value(
+            expr,
+            &|name| self.lookup_constant(name).map(|(_, value, _)| value.clone()),
+            &self.type_registry.enums(),
+        )
+    }
+
+    fn check_enum_binary_value(&mut self, binary: &crate::ast::BinaryExpression, id: u8) {
+        let left = self.enum_constant_value(binary.get_left_expression());
+        let right = self.enum_constant_value(binary.get_right_expression());
+        if let (Some(left), Some(right)) = (left, right) {
+            let value = if binary.get_op() == crate::ast::BinOp::And {
+                left.as_int() & right.as_int()
+            } else {
+                left.as_int() | right.as_int()
+            };
+            let definition = self.type_registry.get_enum_from_id(id).unwrap();
+            if !definition.domain.contains(&value) {
+                self.errors.lock().unwrap().report_error(
+                    binary.get_op_token().span.clone(),
+                    CompilationErrorType::InvalidEnumValue(value, definition.name.to_string()),
+                );
+            }
+        }
+    }
+
     /// Validate constant enum operators without visiting runtime expressions or
     /// adding intermediate constants to the emitted variable table.
     fn check_constant_enum_operations(&mut self, expr: &Expression) -> bool {
         match expr {
             Expression::Parens(value) => self.check_constant_enum_operations(value.get_expression()),
+            Expression::FunctionCall(call) => {
+                if let Expression::MemberReference(member) = call.get_expression() {
+                    self.check_constant_enum_operations(member.get_expression());
+                }
+                for argument in call.get_arguments() {
+                    self.check_constant_enum_operations(argument);
+                }
+                if let Some(VariableType::UserData(id)) = self.declared_constant_type(expr) {
+                    let definition = self.type_registry.get_enum_from_id(id).unwrap();
+                    if let Some(value) = self.enum_constant_value(expr) {
+                        if !definition.domain.contains(&value.as_int()) {
+                            self.errors.lock().unwrap().report_error(
+                                expr.get_span(),
+                                CompilationErrorType::InvalidEnumValue(value.as_int(), definition.name.to_string()),
+                            );
+                        }
+                    }
+                    return true;
+                }
+                false
+            }
             Expression::Unary(value) => {
                 if self.check_constant_enum_operations(value.get_expression()) {
                     self.errors
@@ -295,7 +354,10 @@ impl SemanticVisitor {
                 let left = self.check_constant_enum_operations(value.get_left_expression());
                 let right = self.check_constant_enum_operations(value.get_right_expression());
                 if left || right {
-                    if !matches!(value.get_op(), crate::ast::BinOp::Eq | crate::ast::BinOp::NotEq) {
+                    if !matches!(
+                        value.get_op(),
+                        crate::ast::BinOp::Eq | crate::ast::BinOp::NotEq | crate::ast::BinOp::And | crate::ast::BinOp::Or
+                    ) {
                         self.errors
                             .lock()
                             .unwrap()
@@ -308,6 +370,12 @@ impl SemanticVisitor {
                             .lock()
                             .unwrap()
                             .report_error(expr.get_span(), CompilationErrorType::InvalidEnumOperation);
+                    } else if matches!(value.get_op(), crate::ast::BinOp::And | crate::ast::BinOp::Or) {
+                        let Some(VariableType::UserData(id)) = self.declared_constant_type(value.get_left_expression()) else {
+                            unreachable!()
+                        };
+                        self.check_enum_binary_value(value, id);
+                        return true;
                     }
                 }
                 false
@@ -317,6 +385,17 @@ impl SemanticVisitor {
     }
     pub fn is_routine_reference(&self, span_start: usize) -> bool {
         self.allowed_routine_reference_spans.contains(&span_start)
+    }
+
+    fn check_enum_compound_operator(&mut self, token: &Spanned<Token>, target: VariableType, value: VariableType) {
+        if (self.type_registry.is_enum_type(target) || self.type_registry.is_enum_type(value))
+            && !matches!(token.token, Token::Eq | Token::AndAssign | Token::OrAssign)
+        {
+            self.errors
+                .lock()
+                .unwrap()
+                .report_error(token.span.clone(), CompilationErrorType::InvalidEnumOperation);
+        }
     }
 
     pub fn is_function_return_value(&self, span_start: usize) -> bool {
@@ -345,6 +424,7 @@ impl SemanticVisitor {
             instance_provider_lookup: HashMap::new(),
             static_receiver_lookup: HashMap::new(),
             function_type_lookup: HashMap::new(),
+            enum_binary_types: HashMap::new(),
             call_graph: CallGraph::default(),
             member_array_returns: HashMap::new(),
 

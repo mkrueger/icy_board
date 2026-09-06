@@ -303,17 +303,20 @@ fn parameter_completion(visitor: &SemanticVisitor, line_before_cursor: &str) -> 
     let icy_board_engine::executable::VariableType::UserData(receiver_id) = receiver_type else {
         return Vec::new();
     };
-    let Some(object) = visitor.type_registry.get_type_from_id(receiver_id) else {
-        return Vec::new();
-    };
     let name = unicase::Ascii::new(call.name);
-    let parameter_type = object
-        .functions
-        .get(&name)
-        .map(|function| &function.parameters)
-        .or_else(|| object.procedures.get(&name).map(|procedure| &procedure.parameters))
-        .and_then(|parameters| parameters.get(call.argument))
-        .copied();
+    let parameter_type = if visitor.type_registry.is_enum_type(receiver_type) && name == "Has" && call.argument == 0 {
+        crate::type_lookup::enum_instance_type(visitor, &call.receiver)
+    } else {
+        visitor.type_registry.get_type_from_id(receiver_id).and_then(|object| {
+            object
+                .functions
+                .get(&name)
+                .map(|function| &function.parameters)
+                .or_else(|| object.procedures.get(&name).map(|procedure| &procedure.parameters))
+                .and_then(|parameters| parameters.get(call.argument))
+                .copied()
+        })
+    };
     let Some(icy_board_engine::executable::VariableType::UserData(parameter_id)) = parameter_type else {
         return Vec::new();
     };
@@ -377,7 +380,12 @@ fn member_completion(visitor: &SemanticVisitor, path: &[String], language_versio
     if path.len() == 1 && path[0].eq_ignore_ascii_case("BYTES") {
         return completion_items(bytes_members(true), None, &visitor.type_registry);
     }
-    if let Some((property, receiver)) = path.split_last()
+    let property_path = if path.last().is_some_and(|last| last == crate::context::CALLED) {
+        &path[..path.len() - 1]
+    } else {
+        path
+    };
+    if let Some((property, receiver)) = property_path.split_last()
         && let Some(icy_board_engine::executable::VariableType::UserData(type_id)) = type_of_chain(visitor, receiver)
         && let Some(registry) = visitor.type_registry.get_type_from_id(type_id)
         && (registry.field_ranks.contains_key(&unicase::Ascii::new(property.clone()))
@@ -421,6 +429,9 @@ fn member_completion(visitor: &SemanticVisitor, path: &[String], language_versio
     let Some(var_type) = type_of_chain(visitor, path) else {
         return Vec::new();
     };
+    if visitor.type_registry.is_enum_type(var_type) && crate::type_lookup::enum_instance_type(visitor, path).is_none() {
+        return Vec::new();
+    }
     completion_items(members_of(&visitor.type_registry, var_type), Some(var_type), &visitor.type_registry)
 }
 

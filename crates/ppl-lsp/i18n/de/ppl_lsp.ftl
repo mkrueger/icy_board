@@ -127,7 +127,7 @@ hint-type-area=Ein Konferenz-Nachrichtenbereich mit Zugriffs-, Lese- und Suchfun
 hint-type-directory=Ein Konferenz-Dateiverzeichnis mit Download-Zugriffsinformationen.
 hint-type-door=Ein konfiguriertes externes Programm oder Spiel mit Zugriffsanforderung.
 hint-type-contact=Ein Dienst-/Kontopaar aus der schreibgeschützten Kontaktliste eines Benutzers.
-hint-type-enum-400=Ein geschlossener nominaler Enumwert. Nur deklarierte Mitglieder sind gültig; das erste ist der Standardwert. TOINTEGER(wert) und EnumName(integer) ermöglichen explizite geprüfte Konvertierungen. Enum-Speicher benötigt Runtime 400.
+hint-type-enum-400=Ein geschlossener nominaler Enumwert. Werte müssen zur definierten numerischen Wertemenge gehören; das erste Mitglied ist der Standardwert. `|` und `&` liefern bei gleichem Enumtyp geprüfte Enumwerte; `==` und `!=` vergleichen sie. TOINTEGER(wert) und EnumName(integer) konvertieren explizit. Enum-Speicher und geprüfte Operationen benötigen Runtime 400.
 hint-member-terminal-info=Schreibgeschützte Fähigkeiten und Abmessungen, die mit dem Terminal des Anrufers ausgehandelt wurden.
 hint-member-terminal-palette=Steuert die 16 DOS-Paletteneinträge über xterm-kompatible Befehle OSC 4 und OSC 104.
 hint-member-terminal-macros=Zeichnet den an diesen Anrufer gesendeten Rohdatenstrom auf und spielt ihn wieder ab. Slots gelten nur für diese Sitzung.
@@ -243,7 +243,8 @@ hint-enum-error-code=Portables Operationsergebnis aus `Error.Code`: Erfolg, nich
 hint-enum-editor-mode=Benutzerwunsch für den Vollbildeditor: `Yes`, `No` oder `Ask`.
 hint-enum-msg-field=Von `AREA.Find` durchsuchtes Nachrichtenkopffeld: Empfänger, Absender oder Betreff.
 hint-enum-http-method=Von der richtliniengesteuerten Anfrage unterstützte HTTP-Methode: GET, HEAD, POST, PUT, DELETE oder PATCH. GET und HEAD können keinen Body tragen.
-hint-enum-regex-options=Geschlossene Regex-Optionen: `None`, `IgnoreCase`, `MultiLine`, `DotMatchesNewLine`, `IgnoreWhitespace`, `SwapGreed` und `Ascii`. Kombinierte Mitglieder verbinden diese Namen in dieser Reihenfolge mit `And`, etwa `IgnoreCaseAndMultiLine`. Bitweise Enum-Arithmetik ist nicht erlaubt.
+hint-enum-regex-options=Geschlossene Regex-Optionen: `None`, `IgnoreCase`, `MultiLine`, `DotMatchesNewLine`, `IgnoreWhitespace`, `SwapGreed` und `Ascii`. Mit `|` kombinieren; alle Maskenbits mit `options.Has(mask)` oder `(options & mask) == mask` prüfen, mindestens ein Bit mit `(options & mask) != RegexOptions.None`. Die gültige numerische Wertemenge ist 0–63; Kombinationen haben keine zusätzlichen Namen.
+hint-enum-has=Liefert BOOLEAN: wahr, wenn alle Bits der Maske gesetzt sind. Empfänger und Maske müssen denselben Enumtyp haben und werden jeweils einmal ausgewertet, der Empfänger zuerst. Es entsteht kein Enum-Zwischenwert. Eine Nullmaske liefert immer wahr; auf keine gesetzten Bits mit dem Nullmitglied vergleichen. Ab Sprache 350 verfügbar; benötigt Runtime 400.
 hint-enum-string-comparison=Ordinale Unicode-Zeichenfolgenprüfung mit oder ohne Beachtung der Groß-/Kleinschreibung.
 hint-enum-checksum=Algorithmus für `Bytes.GetChecksum`: `CRC32` liefert 4 Rohbytes in Netzwerkreihenfolge, `MD5` 16 Bytes und `SHA256` 32 Bytes. Für Textdarstellung kann `ToHex()` aufgerufen werden.
 hint-member-gfx-init=

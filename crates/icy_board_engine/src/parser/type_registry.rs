@@ -20,6 +20,9 @@ pub struct EnumDefinition {
     pub id: u8,
     pub name: unicase::Ascii<String>,
     pub variants: Vec<(unicase::Ascii<String>, i32)>,
+    /// Ordered valid numeric values, independently of the visible member names.
+    /// The first value is the default; user declarations retain aliases/order.
+    pub domain: Vec<i32>,
 }
 
 impl EnumDefinition {
@@ -256,7 +259,13 @@ impl UserTypeRegistry {
         if id < next_record {
             return None;
         }
-        enums.push(EnumDefinition { id: id as u8, name, variants });
+        let domain = variants.iter().map(|(_, value)| *value).collect();
+        enums.push(EnumDefinition {
+            id: id as u8,
+            name,
+            variants,
+            domain,
+        });
         Some(id as u8)
     }
 
@@ -271,6 +280,7 @@ impl UserTypeRegistry {
         enums.push(EnumDefinition {
             id,
             name: unicase::Ascii::new(name.to_string()),
+            domain: variants.iter().map(|(_, value)| *value).collect(),
             variants: variants
                 .iter()
                 .map(|(variant, value)| (unicase::Ascii::new((*variant).to_string()), *value))
@@ -365,25 +375,18 @@ impl UserTypeRegistry {
                 ("Ascii", 32),
             ],
         );
-        // Every combination is a named member, not an exception to closed-enum
-        // arithmetic. Existing single-option names and numeric values stay fixed.
-        let option_names = ["IgnoreCase", "MultiLine", "DotMatchesNewLine", "IgnoreWhitespace", "SwapGreed", "Ascii"];
-        let mut enums = self.enums.write().unwrap();
-        let options = enums.iter_mut().find(|definition| definition.id == REGEX_OPTIONS_ENUM_ID).unwrap();
-        for bits in 1i32..64 {
-            if bits.count_ones() > 1 {
-                let name = option_names
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(bit, name)| (bits & (1 << bit) != 0).then_some(*name))
-                    .collect::<Vec<_>>()
-                    .join("And");
-                options.variants.push((unicase::Ascii::new(name), bits));
-            }
-        }
-        drop(enums);
+        self.set_enum_domain(REGEX_OPTIONS_ENUM_ID, (0..64).collect());
         self.register_enum(STRING_COMPARISON_ENUM_ID, "StringComparison", &[("Ordinal", 0), ("OrdinalIgnoreCase", 1)]);
         self.register_enum(CHECKSUM_ENUM_ID, "Checksum", &[("CRC32", 0), ("MD5", 1), ("SHA256", 2)]);
+    }
+
+    /// Configure a builtin domain without inventing additional member names.
+    fn set_enum_domain(&self, id: u8, domain: Vec<i32>) {
+        let mut enums = self.enums.write().unwrap();
+        let definition = enums.iter_mut().find(|definition| definition.id == id).expect("registered enum");
+        assert_eq!(domain.first(), definition.variants.first().map(|(_, value)| value));
+        assert!(definition.variants.iter().all(|(_, value)| domain.contains(value)));
+        definition.domain = domain;
     }
 
     /// The position of a field inside a record, which doubles

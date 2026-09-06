@@ -369,9 +369,11 @@ pub enum FuncOpCode {
     StringStripAtx = -354,
     /// Compiler-generated checked integer-to-enum conversion.
     EnumCast = -355,
+    /// Compiler-generated nominal enum containment test (type id, receiver, mask).
+    EnumHas = -356,
 }
 
-pub const LAST_FUNC: i16 = -355;
+pub const LAST_FUNC: i16 = -356;
 
 impl FuncOpCode {
     pub fn get_definition(self) -> &'static FunctionDefinition {
@@ -438,6 +440,7 @@ impl FuncOpCode {
                 | FuncOpCode::StringToMixedCase
                 | FuncOpCode::StringStripAtx
                 | FuncOpCode::EnumCast
+                | FuncOpCode::EnumHas
         ) {
             400
         } else {
@@ -504,7 +507,7 @@ impl FunctionDefinition {
         }
     }
 }
-pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 367]> = std::sync::LazyLock::new(|| {
+pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 368]> = std::sync::LazyLock::new(|| {
     [
         FunctionDefinition {
             name: "END",
@@ -3532,6 +3535,14 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 367]> 
             return_type: VariableType::None,
             args: None,
             signature: FunctionSignature::FixedParameters(2),
+        },
+        FunctionDefinition {
+            name: "<enum has>",
+            version: 350,
+            opcode: FuncOpCode::EnumHas,
+            return_type: VariableType::Boolean,
+            args: None,
+            signature: FunctionSignature::FixedParameters(3),
         },
         // ALIASES (need to be last in the list)
         FunctionDefinition {

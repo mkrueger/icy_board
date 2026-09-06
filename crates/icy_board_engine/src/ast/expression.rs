@@ -749,16 +749,25 @@ impl fmt::Display for UnaryExpression {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Clone)]
 pub struct BinaryExpression {
+    /// Stable across post-semantic lowering, like a function call's identity.
+    pub id: u64,
     left_expression: Box<Expression>,
     op_token: Spanned<Token>,
     right_expression: Box<Expression>,
 }
 
+impl PartialEq for BinaryExpression {
+    fn eq(&self, other: &Self) -> bool {
+        self.left_expression == other.left_expression && self.op_token == other.op_token && self.right_expression == other.right_expression
+    }
+}
+
 impl BinaryExpression {
     pub fn new(left_expression: Expression, op_token: Spanned<Token>, right_expression: Expression) -> Self {
         Self {
+            id: next_func_call_id(),
             left_expression: Box::new(left_expression),
             op_token,
             right_expression: Box::new(right_expression),
@@ -767,6 +776,7 @@ impl BinaryExpression {
 
     pub fn empty(left_expression: Expression, op: BinOp, right_expression: Expression) -> Self {
         Self {
+            id: next_func_call_id(),
             left_expression: Box::new(left_expression),
             op_token: Spanned::create_empty(match op {
                 BinOp::PoW => Token::PoW,

@@ -440,7 +440,17 @@ pub trait AstVisitorMut: Sized {
         ))
     }
     fn visit_record_literal_expression(&mut self, record: &RecordLiteralExpression) -> Expression {
-        Expression::RecordLiteral(record.clone())
+        Expression::RecordLiteral(RecordLiteralExpression::new(
+            record.get_type_token().clone(),
+            record.get_variable_type(),
+            record.get_lbrace_token().clone(),
+            record
+                .get_fields()
+                .iter()
+                .map(|field| crate::ast::RecordLiteralField::new(field.get_identifier_token().clone(), field.get_value().visit_mut(self)))
+                .collect(),
+            record.get_rbrace_token().clone(),
+        ))
     }
 
     fn visit_unary_expression(&mut self, unary: &UnaryExpression) -> Expression {

@@ -17,6 +17,82 @@ use icy_net::{Connection, ConnectionType, channel::ChannelConnection};
 
 const DOMAIN: &str = "ENUM Shade\n First = 7\n Second = -3\n Alias = 7\nENDENUM\n";
 
+#[test]
+fn enum_bitwise_roundtrips_nested_operations_and_unnamed_regex_values() {
+    for language in [350, 400] {
+        let source = r#"
+ENUM Bits
+ Both = 3
+ One = 1
+ Two = 2
+ Zero = 0
+ENDENUM
+Bits a = Bits.One, b = Bits.Two, defaultValue
+CONST RegexOptions Options = RegexOptions.IgnoreCase | RegexOptions.MultiLine
+RegexOptions r = Options, empty
+PRINT a | b, ",", (a | b) & b, ",", a & b, ",", defaultValue, "|"
+PRINT r, ",", r & RegexOptions.MultiLine, ",", empty, ",", RegexOptions(63), "|"
+IF ((a | b) = Bits.Both) PRINT "yes"
+a |= b
+PRINT "|", a
+"#;
+        for text in roundtrip(compile(source, language), language, "3,2,0,3|3,2,0,63|yes|3") {
+            assert!(text.contains(" | ") && text.contains(" & "), "{text}");
+            assert!(!text.contains("IgnoreCaseAnd") && !text.contains("ENUM ENUM244"), "{text}");
+            let registry = UserTypeRegistry::icy_board_registry();
+            let options = registry.get_enum_from_id(icy_board_engine::parser::REGEX_OPTIONS_ENUM_ID).unwrap();
+            assert_eq!(7, options.variants.len());
+            let rebuilt = reload(&compile(&text, language));
+            assert_eq!((0..64).collect::<Vec<_>>(), rebuilt.variable_table.enums[&options.id]);
+        }
+    }
+}
+
+#[test]
+fn enum_bitwise_roundtrip_preserves_invalid_intermediate_checks() {
+    for language in [350, 400] {
+        let source = "ENUM Bits\n One = 1\n Two = 2\nENDENUM\nBits a = Bits.One, b = Bits.Two\nPRINT TOINTEGER((a | b) & a)\n";
+        let executable = reload(&compile(source, language));
+        assert!(run(&executable).unwrap_err().contains("not a member of closed enum"));
+        for raw in [false, true] {
+            let (ast, issues) = decompile(executable.clone(), raw, language).unwrap();
+            assert!(issues.is_empty());
+            let text = source_text(&ast, language);
+            assert!(text.contains(" | ") && text.contains(" & "), "{text}");
+            let error = run(&reload(&compile(&text, language))).unwrap_err();
+            assert!(error.contains("not a member of closed enum") && error.ends_with("output="), "{text}: {error}");
+        }
+    }
+}
+
+#[test]
+fn enum_bitwise_roundtrip_record_literals_and_array_elements() {
+    let source = r#"
+TYPE Boxed
+ RegexOptions Option
+ENDTYPE
+RegexOptions items(1)
+items(0) = RegexOptions.IgnoreCase | RegexOptions.MultiLine
+Boxed box = Boxed { Option = items(0) & RegexOptions.MultiLine }
+PRINT box.Option, "|", items(0)
+"#;
+    roundtrip(compile(source, 400), 400, "2|3");
+}
+
+#[test]
+fn integer_bit_helpers_inside_casts_do_not_gain_invalid_operand_casts() {
+    for language in [350, 400] {
+        roundtrip(
+            compile(
+                "ENUM Bits\n Both = 3\nENDENUM\nINTEGER a = 1, b = 2\nPRINT Bits(OR(a,b)), \"|\", Bits(OR(1,2))\n",
+                language,
+            ),
+            language,
+            "3|3",
+        );
+    }
+}
+
 fn compile(source: &str, language: u16) -> Executable {
     let registry = UserTypeRegistry::icy_board_registry();
     let errors = Arc::new(Mutex::new(ErrorReporter::default()));
@@ -218,7 +294,7 @@ fn invalid_dynamic_cast_still_fails_after_recompilation() {
 #[test]
 fn builtin_enums_keep_names_in_storage_calls_and_comparisons() {
     let source = r#"
-RegexOptions options = RegexOptions.IgnoreCaseAndMultiLine
+RegexOptions options = RegexOptions.IgnoreCase | RegexOptions.MultiLine
 StringComparison comparison = StringComparison.OrdinalIgnoreCase
 MouseButton button = MouseButton.None
 PRINT TOINTEGER(options), "|", Regex.Compile("^a", options).IsMatch("A"), "|"
@@ -227,7 +303,7 @@ PRINT button = MouseButton.None, "|", TOINTEGER(MouseButton(-1))
 "#;
     for text in roundtrip(compile(source, 400), 400, "3|1|1|1|1|-1") {
         assert!(!text.contains("ENDENUM"), "{text}");
-        assert!(text.contains("RegexOptions.IgnoreCaseAndMultiLine"), "{text}");
+        assert!(text.contains("RegexOptions.IgnoreCase | RegexOptions.MultiLine"), "{text}");
         assert!(text.contains("StringComparison.OrdinalIgnoreCase"), "{text}");
         assert!(text.contains("MouseButton.None"), "{text}");
     }

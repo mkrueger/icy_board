@@ -23,6 +23,7 @@ mod control_flow;
 mod dbase;
 mod differential_optimizer;
 mod display_pause;
+mod enum_bitwise;
 mod errors;
 mod events;
 mod file_channels;

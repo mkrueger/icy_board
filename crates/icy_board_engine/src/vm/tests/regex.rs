@@ -47,7 +47,7 @@ fn regex_compiles_tests_and_reports_errors() {
         REGEX pattern = REGEX.Compile("^grüße$", RegexOptions.IgnoreCase)
         PRINTLN pattern.Valid, " ", pattern.Pattern
         PRINTLN pattern.IsMatch("GRÜßE")
-        PRINTLN REGEX.Compile("x", RegexOptions.IgnoreCaseAndMultiLine).Valid
+        PRINTLN REGEX.Compile("x", RegexOptions.IgnoreCase | RegexOptions.MultiLine).Valid
         PRINTLN REGEX.Compile("ü").IsMatch("aü", 1)
         PRINTLN REGEX.Compile("$").IsMatch("", 0), " ", REGEX.Compile("$").Find("abc", 3).Start
         PRINTLN REGEX.Escape("a+b?")

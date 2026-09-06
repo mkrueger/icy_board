@@ -5,13 +5,12 @@ use crate::{
         AstVisitor, CommentAstNode, ConstDeclarationStatement, Constant, ConstantExpression, EnumDeclarationAstNode, Expression, FunctionCallExpression,
         FunctionDeclarationAstNode, FunctionImplementation, GosubStatement, GotoStatement, IdentifierExpression, LabelStatement, LetStatement,
         MemberCallStatement, OnErrorMode, OnErrorStatement, ParameterSpecifier, PredefinedCallStatement, ProcedureCallStatement, ProcedureDeclarationAstNode,
-        ProcedureImplementation, TypeDeclarationAstNode, VariableDeclarationStatement, VariableParameterSpecifier, const_value_with_members,
-        walk_procedure_call_statement,
+        ProcedureImplementation, TypeDeclarationAstNode, VariableDeclarationStatement, VariableParameterSpecifier, walk_procedure_call_statement,
     },
     compiler::{CompilationErrorType, CompilationWarningType, user_data::UserDataMemberRegistry},
     executable::{
         FIRST_RECORD_LITERAL_RUNTIME, FIRST_ROUTINE_REFERENCE_RUNTIME, FIRST_TYPE_TABLE_RUNTIME, FUNCTION_DEFINITIONS, FuncOpCode, FunctionDefinition, OpCode,
-        VariableType, VariableValue,
+        VariableType,
     },
     hir::{CallId, SymbolId},
     parser::{
@@ -198,7 +197,12 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 .report_error(binary.get_left_expression().get_span(), CompilationErrorType::InvalidEnumOperation);
             return VariableType::None;
         }
-        if has_enum && !matches!(binary.get_op(), crate::ast::BinOp::Eq | crate::ast::BinOp::NotEq) {
+        if has_enum
+            && !matches!(
+                binary.get_op(),
+                crate::ast::BinOp::Eq | crate::ast::BinOp::NotEq | crate::ast::BinOp::And | crate::ast::BinOp::Or
+            )
+        {
             self.errors.lock().unwrap().report_error(
                 binary.get_op_token().span.clone(),
                 CompilationErrorType::CustomTypeOperatorNotSupported(binary.get_op()),
@@ -211,6 +215,19 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 CompilationErrorType::EnumComparisonTypeMismatch(self.source_type_name(left), self.source_type_name(right)),
             );
             return VariableType::Boolean;
+        }
+        if has_enum && matches!(binary.get_op(), crate::ast::BinOp::And | crate::ast::BinOp::Or) {
+            let VariableType::UserData(id) = left else { unreachable!() };
+            self.check_enum_binary_value(binary, id);
+            if self.runtime < 400 {
+                self.errors.lock().unwrap().report_error(
+                    binary.get_op_token().span.clone(),
+                    CompilationErrorType::BuiltinNeedsRuntime("Checked enum operation".to_string(), 400),
+                );
+            }
+            self.add_constant(&Constant::Integer(i32::from(id), crate::ast::constant::NumberFormat::Default));
+            self.enum_binary_types.insert(binary.id, id);
+            return left;
         }
         let has_custom_type = matches!(left, VariableType::UserData(_)) || matches!(right, VariableType::UserData(_));
         if has_custom_type && !matches!(binary.get_op(), crate::ast::BinOp::Eq | crate::ast::BinOp::NotEq) {
@@ -432,6 +449,18 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             StaticReceiver::Rejected => return VariableType::None,
         };
         self.reject_bare_array_value(member_reference_expression.get_expression());
+        if self.lang_version >= 350 && self.type_registry.is_enum_type(t) && *member_reference_expression.get_identifier() == "Has" {
+            self.member_receiver_type_lookup
+                .insert(member_reference_expression.get_identifier_token().span.start, t);
+            if !is_called {
+                self.errors.lock().unwrap().report_error(
+                    member_reference_expression.get_identifier_token().span.clone(),
+                    CompilationErrorType::FunctionUsedAsVariable(member_reference_expression.get_identifier().to_string()),
+                );
+                return VariableType::None;
+            }
+            return VariableType::Boolean;
+        }
         if matches!(t, VariableType::String | VariableType::BigStr | VariableType::UnboundedString)
             && let Some(return_type) = string_member_type(member_reference_expression.get_identifier())
         {
@@ -731,8 +760,8 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                         CompilationErrorType::ArgumentTypeMismatch(1, "INTEGER".to_string(), self.source_type_name(actual)),
                     );
                 }
-                if let Some(value) = const_value_with_members(argument, &|id| self.lookup_constant(id).map(|(_, value, _)| value.clone()), &|_, _| None)
-                    && (value.get_type() != VariableType::Integer || definition.variant_name(value.as_int()).is_none())
+                if let Some(value) = self.enum_constant_value(argument)
+                    && (value.get_type() != VariableType::Integer || !definition.domain.contains(&value.as_int()))
                 {
                     self.errors.lock().unwrap().report_error(
                         argument.get_span(),
@@ -930,6 +959,26 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             } else {
                 self.visit_receiver(member.get_expression(), member.get_identifier_token())
             };
+            if self.lang_version >= 350 && self.type_registry.is_enum_type(receiver_type) && *member.get_identifier() == "Has" {
+                if call.get_lpar_token().token != Token::LPar {
+                    self.errors.lock().unwrap().report_error(
+                        member.get_identifier_token().span.clone(),
+                        CompilationErrorType::MemberIsReadOnly(member.get_identifier().to_string()),
+                    );
+                }
+                self.check_expr_arg_count(1, call.get_arguments().len(), call.get_expression());
+                self.check_member_arg_types(&[receiver_type], call.get_arguments());
+                if self.runtime < 400 {
+                    self.errors.lock().unwrap().report_error(
+                        member.get_identifier_token().span.clone(),
+                        CompilationErrorType::BuiltinNeedsRuntime("Enum.Has".to_string(), 400),
+                    );
+                }
+                let VariableType::UserData(id) = receiver_type else { unreachable!() };
+                self.add_constant(&Constant::Integer(i32::from(id), crate::ast::constant::NumberFormat::Default));
+                self.function_type_lookup.insert(CallId(call.id), SemanticInfo::EnumHas(id));
+                return VariableType::Boolean;
+            }
             if matches!(receiver_type, VariableType::String | VariableType::BigStr | VariableType::UnboundedString)
                 && let Some((opcode, return_type, defaults)) = string_member(member.get_identifier(), call.get_arguments().len())
             {
@@ -1143,6 +1192,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                     return VariableType::None;
                 }
                 let expected = registry.fields.get(member.get_identifier()).copied().unwrap_or(VariableType::None);
+                self.check_enum_compound_operator(call.get_lpar_token(), expected, expected);
                 self.check_member_arg_types(&[expected], call.get_arguments());
                 self.function_type_lookup.insert(CallId(call.id), SemanticInfo::MemberSetterCall(member_id));
                 return VariableType::None;
@@ -1443,6 +1493,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 return VariableType::None;
             }
             let value_type = let_stmt.get_value_expression().visit(self);
+            self.check_enum_compound_operator(let_stmt.get_eq_token(), target_type, value_type);
             if let Some(target_shape) = self.array_shape(target) {
                 self.check_array_target_assignment(&target_shape, let_stmt.get_value_expression(), &let_stmt.get_eq_token().span);
                 return VariableType::None;
@@ -1636,6 +1687,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             self.reject_bare_array_value(arg);
         }
         let value_type = let_stmt.get_value_expression().visit(self);
+        self.check_enum_compound_operator(let_stmt.get_eq_token(), target_type, value_type);
         if let Some(target_shape) = target_array_shape {
             self.check_array_target_assignment(&target_shape, let_stmt.get_value_expression(), &let_stmt.get_eq_token().span);
             return VariableType::None;
@@ -1760,16 +1812,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
         }
 
         self.check_constant_enum_operations(const_decl.get_value());
-        let value = const_value_with_members(
-            const_decl.get_value(),
-            &|id| self.lookup_constant(id).map(|(_, value, _)| value.clone()),
-            &|type_name, member| {
-                self.type_registry
-                    .get_enum(type_name)
-                    .and_then(|definition| definition.value(member))
-                    .map(VariableValue::new_int)
-            },
-        );
+        let value = self.enum_constant_value(const_decl.get_value());
         let Some(value) = value else {
             self.errors
                 .lock()

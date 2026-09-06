@@ -317,8 +317,15 @@ releases.
   counters, arithmetic and untyped output writes are rejected. Enum storage
   and checked conversion now require runtime 4.00, which retains numeric domains
   for validation and decompiler roundtrips. Recompile older beta PPEs for these
-  guarantees. Regex option combinations use named members such as
-  `RegexOptions.IgnoreCaseAndMultiLine`, not bitwise enum expressions.
+  guarantees. Same-type enum `|` and `&` operations (including `|=` and `&=`)
+  preserve the enum type and check each result against its domain. Regex options
+  expose only `None` and six individual options, combinable with `|` and testable
+  with `&` and `==`; their domain is 0–63. Artificial combination names are removed.
+  Every enum also provides `value.Has(mask) -> BOOLEAN` to test all mask bits
+  without constructing an intermediate enum value. It requires the same enum
+  type on both sides, evaluates each operand once and returns true for a zero
+  mask. Available from language 3.50 with runtime 4.00; completion, hover,
+  signature help and decompiler roundtrips support the method.
 
 - PPL 4.00 arrays use square-bracket declarations and indexing. Empty brackets
   declare dynamic vectors, matrices or cubes, functions can return dynamic

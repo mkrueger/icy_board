@@ -186,6 +186,17 @@ fn builtin_statement(name: &str) -> Option<SignatureInformation> {
 
 fn member_call(visitor: &SemanticVisitor, call: &CallContext) -> Option<SignatureInformation> {
     let receiver_type = type_of_chain(visitor, &call.receiver)?;
+    if visitor.type_registry.is_enum_type(receiver_type) && call.name.eq_ignore_ascii_case("Has") {
+        crate::type_lookup::enum_instance_type(visitor, &call.receiver)?;
+        let name = type_name(&visitor.type_registry, receiver_type);
+        let mut builder = SignatureBuilder::new(&format!("{name}.Has"), "(");
+        builder.push(&format!("{name} mask"));
+        let mut signature = builder.finish(") BOOLEAN");
+        signature.documentation =
+            crate::documentation::get_member_documentation_with_parameters(&visitor.type_registry, receiver_type, &unicase::Ascii::new("Has".to_string()))
+                .map(Documentation::String);
+        return Some(signature);
+    }
     let VariableType::UserData(receiver_id) = receiver_type else {
         return None;
     };

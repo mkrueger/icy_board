@@ -17,6 +17,56 @@ use icy_net::{Connection, ConnectionType, channel::ChannelConnection};
 
 const COLORS: &str = "MODULE Colors\nENUM Color\n First = 7\n Second = -3\n Zero = 0\n Alias = 7\nENDENUM\nCONST Color Preferred = Color.Second\nColor DefaultValue\nColor Initialized = Color.First\nColor FromConstant = Preferred\nFUNCTION Cast(INTEGER number) Color\n RETURN Color(number)\nENDFUNC\nENDMODULE\n";
 
+#[test]
+fn enum_bitwise_module_aliases_constants_initializers_and_lsp_agree() {
+    let bits = "MODULE FlagsModule\nENUM Bits\n Both = 3\n One = 1\n Two = 2\n Zero = 0\nENDENUM\nCONST Bits Combined = Bits.One | Bits.Two\nBits Initial = Combined & Bits.Two\nBits DefaultValue\nENDMODULE\n";
+    let values = "IMPORT FlagsModule AS F\nMODULE Values\nCONST F.Bits Alias = F.Combined | F.Bits.One\nF.Bits Initial = Alias & F.Bits.One\nCONST RegexOptions Options = RegexOptions.IgnoreCase | RegexOptions.MultiLine\nRegexOptions Configured = Options\nENDMODULE\n";
+    succeeds(
+        &[
+            (
+                "main.pps",
+                "IMPORT FlagsModule AS F\nIMPORT Values AS V\nF.Bits a = V.Alias\na &= F.Bits.Two\nPRINT F.Combined, \"|\", F.Initial, \"|\", F.DefaultValue, \"|\", V.Initial, \"|\", a, \"|\", V.Options, \"|\", V.Configured\nIF ((V.Options & RegexOptions.MultiLine) = RegexOptions.MultiLine) PRINT \"|yes\"\n",
+            ),
+            ("bits.pps", bits),
+            ("values.pps", values),
+        ],
+        "3|2|3|1|2|3|3|yes",
+    );
+}
+
+#[test]
+fn enum_bitwise_module_constants_and_intermediate_domains_are_checked() {
+    let bits = "MODULE BitsModule\nENUM Bits\n One = 1\n Two = 2\nENDENUM\nCONST Bits Alias = Bits.One\nENDMODULE\n";
+    for expression in ["F.Bits.One | F.Bits.Two", "F.Alias & F.Bits.Two", "(F.Alias | F.Bits.Two) & F.Bits.One"] {
+        for declaration in [format!("CONST F.Bits Bad = {expression}"), format!("F.Bits Bad = {expression}")] {
+            let values = format!("IMPORT BitsModule AS F\nMODULE Values\n{declaration}\nENDMODULE\n");
+            rejects(
+                &[("main.pps", "IMPORT Values AS V\nPRINT V.Bad\n"), ("bits.pps", bits), ("values.pps", &values)],
+                "not a declared member",
+            );
+        }
+    }
+}
+
+#[test]
+fn enum_bitwise_compound_and_condition_nominality_match_lsp() {
+    for statement in [
+        "value += Color.First",
+        "value -= Color.First",
+        "value *= Color.First",
+        "value |= 1",
+        "PRINT value & 1",
+        "IF ((value | Color.First) = 1) PRINT 1",
+    ] {
+        let main = format!("ENUM Color\n First = 1\n Both = 3\nENDENUM\nColor value\n{statement}\n");
+        for language in [350, 400] {
+            let sources = [("main.pps", main.as_str())];
+            assert!(compile(&sources, language).is_err(), "compiler accepted {statement}");
+            assert!(!lsp_diagnostics(&sources, language).is_empty(), "LSP accepted {statement}");
+        }
+    }
+}
+
 fn messages(errors: &Arc<Mutex<ErrorReporter>>) -> Vec<String> {
     errors.lock().unwrap().errors.iter().map(|error| error.error.to_string()).collect()
 }

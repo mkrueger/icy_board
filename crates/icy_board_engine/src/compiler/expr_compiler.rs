@@ -114,6 +114,21 @@ impl AstVisitor<HirExpr> for HirExpressionResolver<'_> {
     fn visit_binary_expression(&mut self, bin_expr: &crate::ast::BinaryExpression) -> HirExpr {
         let left = bin_expr.get_left_expression().visit(self);
         let right = bin_expr.get_right_expression().visit(self);
+        if let Some(id) = self.compiler.semantic_visitor.enum_binary_types.get(&bin_expr.id) {
+            let type_id = self
+                .compiler
+                .lookup_table
+                .lookup_constant(&Constant::Integer(i32::from(*id), NumberFormat::Default));
+            let opcode = match bin_expr.get_op() {
+                crate::ast::BinOp::And => FuncOpCode::BAND,
+                crate::ast::BinOp::Or => FuncOpCode::BOR,
+                _ => unreachable!("only bitwise enum operators are lowered"),
+            };
+            return HirExpr::predefined(
+                FuncOpCode::EnumCast,
+                vec![HirExpr::constant(type_id), HirExpr::predefined(opcode, vec![left, right])],
+            );
+        }
         HirExpr::Binary(bin_expr.get_op(), Box::new(left), Box::new(right))
     }
 
@@ -130,6 +145,18 @@ impl AstVisitor<HirExpr> for HirExpressionResolver<'_> {
         };
 
         match function_type {
+            SemanticInfo::EnumHas(id) => {
+                let Expression::MemberReference(member) = call.get_expression() else {
+                    return HirExpr::Invalid;
+                };
+                let type_id = self
+                    .compiler
+                    .lookup_table
+                    .lookup_constant(&Constant::Integer(i32::from(id), NumberFormat::Default));
+                let mut operands = vec![HirExpr::constant(type_id), member.get_expression().visit(self)];
+                operands.extend(arguments);
+                HirExpr::predefined(FuncOpCode::EnumHas, operands)
+            }
             SemanticInfo::EnumCast(id) => {
                 let type_id = self
                     .compiler

@@ -716,6 +716,10 @@ pub fn optional_parameter_label() -> String {
 }
 
 pub fn get_member_documentation_with_parameters(registry: &UserTypeRegistry, receiver: VariableType, member: &unicase::Ascii<String>) -> Option<String> {
+    if registry.is_enum_type(receiver) && *member == "Has" {
+        // Translation prose is supplied separately; keep a usable signature meanwhile.
+        return LANGUAGE_LOADER.has("hint-enum-has").then(|| LANGUAGE_LOADER.get("hint-enum-has"));
+    }
     let mut documentation = get_member_documentation(receiver, member.as_ref()).unwrap_or_default();
     let VariableType::UserData(id) = receiver else {
         return (!documentation.is_empty()).then_some(documentation);

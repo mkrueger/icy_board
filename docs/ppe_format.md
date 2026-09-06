@@ -222,13 +222,16 @@ Format 2 appends the closed enum domains after the record layouts:
 ```text
 u8                  number of enum domains
   u8                enum type id
-  u16               number of members (nonzero)
-    i32             member value, in declaration order
+  u16               number of domain entries (nonzero)
+    i32             valid numeric value, default first
 ```
 
-The first member is the default for scalars, array elements, record fields and
+The first domain entry is the default for scalars, array elements, record fields and
 routine-local/result resets. Duplicate numeric values (aliases) are allowed;
 duplicate enum ids, empty domains and record/enum id collisions are rejected.
+User declarations retain their member order and aliases. Built-in domains need
+not have names for every value: `RegexOptions` stores 0–63 but exposes only
+`None` and six individual options. There are no generated combination names.
 Enum ids are retained in variable and field headers instead of being erased to
 `INTEGER`. Assignments and checked casts validate membership before publishing
 a value. Source language 350 and 400 share this representation; both require
@@ -238,6 +241,19 @@ enum storage need recompilation; their domains cannot be inferred from integers.
 `EnumName(integer)` compiles to the internal `EnumCast(type_id, integer)`
 function. The decompiler restores source casts and synthesizes user enum and
 member names; built-in names are reused when the complete ordered domain matches.
+
+Enum `a | b` and `a & b` compile to `EnumCast(type_id, BOR(a, b))` and
+`EnumCast(type_id, BAND(a, b))`. Each nested operation has its own check, so an
+invalid intermediate result cannot escape through a comparison or a later mask.
+The ordinary logical bytecodes are unchanged. The decompiler restores bitwise
+source operators when their operands belong to the expected enum domain.
+
+`value.Has(mask)` uses the internal runtime-400 `EnumHas(type_id, value, mask)`
+function (opcode -356). It evaluates the receiver and mask once, in that order,
+checks their domain membership and returns the Boolean result of the numeric
+test `(value & mask) == mask`. The numeric intersection need not be an enum
+member. A zero mask always succeeds. The decompiler restores the instance method;
+no additional enum-domain format is needed.
 
 Both counts fit in a byte: ids run 100 to 255, so there can be no more than 156
 types, and a record is capped at 255 fields for exactly this reason. The field

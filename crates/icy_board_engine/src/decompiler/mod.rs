@@ -67,7 +67,7 @@ fn build_type_registry(executable: &Executable) -> Result<(UserTypeRegistry, Has
         if builtin_enums
             .iter()
             .find(|definition| definition.id == id)
-            .is_some_and(|definition| definition.variants.iter().map(|(_, value)| *value).eq(values.iter().copied()))
+            .is_some_and(|definition| definition.domain == *values)
         {
             enum_ids.insert(id, id);
             continue;
@@ -486,6 +486,21 @@ impl Decompiler {
         self.type_registry.get_enum_from_id(id).map(|_| id)
     }
 
+    fn is_enum_bit_operand(&self, expression: &PPEExpr, id: u8) -> bool {
+        if self.expression_type(expression) == Some(VariableType::UserData(id)) {
+            return true;
+        }
+        let PPEExpr::Value(index) = expression else { return false };
+        self.executable.variable_table.try_get_entry(*index).is_some_and(|entry| {
+            entry.entry_type == crate::executable::EntryType::Constant
+                && entry.value.get_type() == VariableType::Integer
+                && self
+                    .type_registry
+                    .get_enum_from_id(id)
+                    .is_some_and(|definition| definition.domain.contains(&entry.value.as_int()))
+        })
+    }
+
     fn member_parameter_type(&self, base: &PPEExpr, member_id: usize, parameter: usize) -> Option<VariableType> {
         let base = if let PPEExpr::Member(inner, _) = base { inner.as_ref() } else { base };
         let VariableType::UserData(type_id) = self.expression_type(base)? else {
@@ -712,8 +727,31 @@ impl Decompiler {
                 IndexerExpression::create_empty_expression(self.get_variable_name(*id), dims.iter().map(|e| self.decompile_expression(e)).collect())
             }
             PPEExpr::PredefinedFunctionCall(f, args) => {
+                if f.opcode == FuncOpCode::EnumHas
+                    && let [PPEExpr::Value(index), receiver, mask] = args.as_slice()
+                    && let Some(entry) = self.executable.variable_table.try_get_entry(*index)
+                    && let Ok(id) = u8::try_from(entry.value.as_int())
+                {
+                    let typ = self.source_type(VariableType::UserData(id));
+                    return FunctionCallExpression::create_empty_expression(
+                        MemberReferenceExpression::create_empty_expression(self.decompile_as(receiver, typ), unicase::Ascii::new("Has".to_string())),
+                        vec![self.decompile_as(mask, typ)],
+                    );
+                }
                 if f.opcode == FuncOpCode::EnumCast {
                     if let Some(type_id) = self.enum_cast_type(expression) {
+                        if let PPEExpr::PredefinedFunctionCall(bits, operands) = &args[1]
+                            && matches!(bits.opcode, FuncOpCode::BAND | FuncOpCode::BOR)
+                            && operands.len() == 2
+                            && operands.iter().all(|operand| self.is_enum_bit_operand(operand, type_id))
+                        {
+                            let op = if bits.opcode == FuncOpCode::BAND { BinOp::And } else { BinOp::Or };
+                            let left = self.decompile_as(&operands[0], VariableType::UserData(type_id));
+                            let right = self.decompile_as(&operands[1], VariableType::UserData(type_id));
+                            // Preserve every checked subtree, including in comparisons:
+                            // PPL comparisons bind more tightly than & and |.
+                            return ParensExpression::create_empty_expression(BinaryExpression::create_empty_expression(op, left, right));
+                        }
                         return FunctionCallExpression::create_empty_expression(
                             IdentifierExpression::create_empty_expression(self.type_name(type_id).unwrap()),
                             vec![self.decompile_expression(&args[1])],

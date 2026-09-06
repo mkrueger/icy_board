@@ -20,7 +20,24 @@ pub fn const_value(expr: &Expression, lookup: ConstantLookup<'_>) -> Option<Vari
 
 /// As `const_value`, but `Enum.Member` is worth what the member stands for.
 pub fn const_value_with_members(expr: &Expression, lookup: ConstantLookup<'_>, member: MemberLookup<'_>) -> Option<VariableValue> {
-    expr.visit(&mut ConstEvaluator { lookup, member })
+    expr.visit(&mut ConstEvaluator { lookup, member, enums: &[] })
+}
+
+/// Nominal constant evaluation, including checked-cast operands. Domain errors
+/// are diagnosed separately at every source operation, never just at the root.
+pub fn const_enum_value(expr: &Expression, lookup: ConstantLookup<'_>, enums: &[crate::parser::EnumDefinition]) -> Option<VariableValue> {
+    expr.visit(&mut ConstEvaluator {
+        lookup,
+        enums,
+        member: &|name, member| {
+            let definition = enums.iter().find(|definition| definition.name == *name)?;
+            Some(VariableValue::new_enum(
+                VariableType::UserData(definition.id),
+                definition.value(member)?,
+                definition.domain[0],
+            ))
+        },
+    })
 }
 
 /// The literal a value is written as, in the type its constant was declared with.
@@ -49,6 +66,7 @@ pub fn const_expression(value: &VariableValue, variable_type: VariableType) -> O
 struct ConstEvaluator<'a> {
     lookup: ConstantLookup<'a>,
     member: MemberLookup<'a>,
+    enums: &'a [crate::parser::EnumDefinition],
 }
 
 impl AstVisitor<Option<VariableValue>> for ConstEvaluator<'_> {
@@ -77,6 +95,9 @@ impl AstVisitor<Option<VariableValue>> for ConstEvaluator<'_> {
 
     fn visit_unary_expression(&mut self, unary: &crate::ast::UnaryExpression) -> Option<VariableValue> {
         let value = unary.get_expression().visit(self)?;
+        if matches!(value.get_type(), VariableType::UserData(_)) {
+            return None;
+        }
         Some(match unary.get_op() {
             UnaryOp::Not => value.not(),
             UnaryOp::Minus => -value,
@@ -87,6 +108,25 @@ impl AstVisitor<Option<VariableValue>> for ConstEvaluator<'_> {
     fn visit_binary_expression(&mut self, binary: &crate::ast::BinaryExpression) -> Option<VariableValue> {
         let left = binary.get_left_expression().visit(self)?;
         let right = binary.get_right_expression().visit(self)?;
+        if matches!(left.get_type(), VariableType::UserData(_)) || matches!(right.get_type(), VariableType::UserData(_)) {
+            if left.get_type() != right.get_type() {
+                return None;
+            }
+            return match binary.get_op() {
+                BinOp::And | BinOp::Or => Some(VariableValue::new_enum(
+                    left.get_type(),
+                    if binary.get_op() == BinOp::And {
+                        left.as_int() & right.as_int()
+                    } else {
+                        left.as_int() | right.as_int()
+                    },
+                    left.emptied().as_int(),
+                )),
+                BinOp::Eq => Some(VariableValue::new_bool(left.as_int() == right.as_int())),
+                BinOp::NotEq => Some(VariableValue::new_bool(left.as_int() != right.as_int())),
+                _ => None,
+            };
+        }
         Some(match binary.get_op() {
             BinOp::Add => left + right,
             BinOp::Sub => left - right,
@@ -106,10 +146,31 @@ impl AstVisitor<Option<VariableValue>> for ConstEvaluator<'_> {
     }
 
     fn visit_function_call_expression(&mut self, call: &FunctionCallExpression) -> Option<VariableValue> {
+        if let Expression::MemberReference(member) = call.get_expression()
+            && *member.get_identifier() == "Has"
+            && let [mask] = call.get_arguments().as_slice()
+        {
+            let receiver = member.get_expression().visit(self)?;
+            let mask = mask.visit(self)?;
+            if self.enums.iter().any(|definition| VariableType::UserData(definition.id) == receiver.get_type()) && receiver.get_type() == mask.get_type() {
+                return Some(VariableValue::new_bool((receiver.as_int() & mask.as_int()) == mask.as_int()));
+            }
+            return None;
+        }
         let Expression::Identifier(identifier) = call.get_expression() else {
             return None;
         };
         let arguments = call.get_arguments().iter().map(|argument| argument.visit(self)).collect::<Option<Vec<_>>>()?;
+        if let Some(definition) = self.enums.iter().find(|definition| definition.name == *identifier.get_identifier()) {
+            return match arguments.as_slice() {
+                [value] if value.get_type() == VariableType::Integer => Some(VariableValue::new_enum(
+                    VariableType::UserData(definition.id),
+                    value.as_int(),
+                    definition.domain[0],
+                )),
+                _ => None,
+            };
+        }
         let alpha = match identifier.get_identifier().as_ref().to_ascii_uppercase().as_str() {
             "RGB" if arguments.len() == 3 => 255,
             "RGB" if arguments.len() == 4 => arguments[3].as_int(),

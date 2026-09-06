@@ -484,10 +484,24 @@ and `REGEX.IsValid(pattern [, options])`. A compiled value exposes `Valid`,
 `Replace(text, replacement [, limit])` and `Split(text [, limit]) -> STRING[]`.
 
 `RegexOptions` members are `None`, `IgnoreCase`, `MultiLine`,
-`DotMatchesNewLine`, `IgnoreWhitespace`, `SwapGreed` and `Ascii`. Every
-combination is also a named member: join selected option names in that order
-with `And`, for example `RegexOptions.IgnoreCaseAndMultiLine`. Enum arithmetic
-with `|` is not allowed. Matching is Unicode-aware unless `Ascii` is selected.
+`DotMatchesNewLine`, `IgnoreWhitespace`, `SwapGreed` and `Ascii`. Combine them
+with `|` and test them with `&` and `==` (or `!=`). There are only these seven
+names; their numeric domain is 0–63, including unnamed combinations. No separate
+flags type is needed. Matching is Unicode-aware unless `Ascii` is selected.
+
+```PPL
+RegexOptions options = RegexOptions.IgnoreCase | RegexOptions.MultiLine
+IF (options.Has(RegexOptions.IgnoreCase)) THEN
+	PRINTLN "Case-insensitive matching enabled"
+ENDIF
+```
+
+`options.Has(mask)` tests whether all options in the mask are set, as does
+`(options & mask) == mask`;
+`(options & mask) != RegexOptions.None` tests whether any are set. Parenthesize
+the bitwise expression because comparisons bind more tightly than `&` and `|`.
+`options.Has(RegexOptions.None)` is always `TRUE`: an empty mask requires no
+bits. Use `options == RegexOptions.None` to test that no options are set.
 Positions, match collections and capture groups are zero-based. A missing match
 or unmatched capture has start position `-1`. Group zero is the complete match.
 
@@ -1862,9 +1876,38 @@ before it. An explicit value must be an integer constant expression. Members
 live under the enum name, so `Color.Green` is valid and `Green` alone is not.
 
 Enums are nominal: different enums and plain integers cannot be assigned to or
-compared with each other. Equality and inequality are supported; arithmetic and
-bitflag behavior are not. Numeric `FOR` counters cannot be enums. These rules
-apply uniformly from language 350 onward, including built-in enums.
+compared with each other. Equality and inequality are supported. `|` and `&`
+perform bitwise integer operations when both operands have the same enum type;
+the result retains that type and must belong to its valid numeric domain.
+This is a general enum rule, not an exception for `RegexOptions`. Ordinary
+integer/boolean `|` and `&` keep their existing logical behavior.
+
+For user-declared enums, the domain consists exactly of the declared member
+values. If only `One = 1` and `Two = 2` are declared, both `One | Two` (3)
+and `One & Two` (0) are invalid; declare members for 3 and 0 to permit those
+results. `RegexOptions` instead defines the domain 0–63 independently of its
+seven visible names. Closed means a fixed valid domain, not that every valid
+value must have a name.
+
+Known invalid results are compilation errors; dynamic invalid results raise a
+runtime error at the operation, including intermediate results in nested
+expressions, before assignment, printing or comparison. Operands are evaluated
+once, left to right. Compound `|=` and `&=` follow the same domain rule.
+Arithmetic, unary negation and numeric `FOR` counters remain forbidden. These
+rules apply uniformly from language 350 onward, including built-in enums.
+
+All enum values also provide `Has(mask) -> BOOLEAN`, where `mask` must have the
+same nominal enum type. It tests whether all bits in the mask are present in
+the receiver. Receiver and mask are evaluated once, in that order; the method
+does not modify either value. A zero mask always returns `TRUE`.
+
+Unlike the enum expression `(value & mask) == mask`, `Has` compares the numeric
+bits without constructing an intermediate enum value. Thus, with only members
+`One = 1` and `Two = 2`, `Bits.One.Has(Bits.Two)` safely returns `FALSE` even
+though the intersection 0 is not in the enum's domain. Invalid casts or bitwise
+operations used to compute either operand still fail normally. `Has` is available
+from language 350 and requires runtime 400; constant-only calls may also be used
+in `CONST` declarations.
 
 An enum must have at least one member. Its **first declared member** is the
 default, not necessarily zero or the smallest value. This includes scalar
@@ -1888,7 +1931,7 @@ unchanged.
 
 Enum variables, arrays, parameters, function results and record fields retain
 their nominal type in runtime 400 PPEs, along with the ordered numeric domain.
-Storage and checked conversions require runtime 400 even in language 350;
+Storage, checked conversions and checked bitwise operations require runtime 400 even in language 350;
 enum declarations and member constants alone can still target classic runtimes.
 The decompiler reconstructs user enum declarations with synthetic type/member
 names and preserves defaults and checked conversions. Original names are not

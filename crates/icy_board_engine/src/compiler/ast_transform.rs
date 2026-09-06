@@ -5,7 +5,7 @@ use crate::{
         Ast, AstNode, AstVisitorMut, BinaryExpression, BlockStatement, CommentAstNode, ConstDeclarationStatement, Constant, ConstantExpression,
         DimensionSpecifier, Expression, ForEachStatement, ForStatement, FunctionImplementation, GotoStatement, IdentifierExpression, IfStatement,
         LabelStatement, LetStatement, MemberReferenceExpression, ParameterSpecifier, ProcedureImplementation, ReturnStatement, SelectStatement, Statement,
-        VariableDeclarationStatement, VariableSpecifier, const_expression, const_value_with_members, constant::NumberFormat,
+        VariableDeclarationStatement, VariableSpecifier, const_enum_value, const_expression, constant::NumberFormat,
     },
     decompiler::evaluation_visitor::{ConstantFolder, OptimizationVisitor},
     executable::{VariableType, VariableValue},
@@ -171,16 +171,17 @@ impl AstTransformationVisitor {
         label
     }
 
-    fn enum_member_value(&self, type_name: &unicase::Ascii<String>, member: &unicase::Ascii<String>) -> Option<VariableValue> {
-        let definition = self.enums.iter().find(|definition| definition.name == *type_name)?;
-        definition.value(member).map(VariableValue::new_int)
-    }
-
     /// The `Enum.Member` a value stands for, so an enum constant keeps its type until
     /// the members are lowered.
     fn enum_member_expression(&self, id: u8, value: i32) -> Option<Expression> {
         let definition = self.enums.iter().find(|definition| definition.id == id)?;
-        let member = definition.variant_name(value)?;
+        let Some(member) = definition.variant_name(value) else {
+            // Unnamed valid values keep their nominal type until semantic checking.
+            return Some(crate::ast::FunctionCallExpression::create_empty_expression(
+                IdentifierExpression::create_empty_expression(definition.name.clone()),
+                vec![const_expression(&VariableValue::new_int(value), VariableType::Integer)?],
+            ));
+        };
         Some(MemberReferenceExpression::create_empty_expression(
             IdentifierExpression::create_empty_expression(definition.name.clone()),
             member.clone(),
@@ -226,10 +227,10 @@ impl AstTransformationVisitor {
             let Statement::ConstDeclaration(const_decl) = statement else {
                 continue;
             };
-            let Some(value) = const_value_with_members(
+            let Some(value) = const_enum_value(
                 const_decl.get_value(),
                 &|id| self.lookup_constant(id).map(|(_, value)| value.clone()),
-                &|type_name, member| self.enum_member_value(type_name, member),
+                &self.enums,
             ) else {
                 continue;
             };
