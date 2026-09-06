@@ -235,6 +235,7 @@ pub struct ListItem<T> {
     editable: bool,
     pub status: String,
     pub text_field_state: TextfieldState,
+    numeric_edit_buffer: Option<String>,
     pub value: ListValue,
     pub help: String,
 
@@ -246,9 +247,15 @@ pub struct ListItem<T> {
 
 impl<T> ListItem<T> {
     pub fn new(title: String, value: ListValue) -> Self {
+        let numeric_edit_buffer = match &value {
+            ListValue::U32(value, _, _) => Some(value.to_string()),
+            ListValue::Color(IcbColor::Dos(value)) => Some(format!("{value:02X}")),
+            _ => None,
+        };
         Self {
             status: title.to_string(),
             text_field_state: TextfieldState::default(),
+            numeric_edit_buffer,
             label_width: title.len() as u16,
             label_alignment: Alignment::Left,
             title,
@@ -627,14 +634,14 @@ impl<T> ListItem<T> {
                 frame.render_stateful_widget(field, area, &mut self.text_field_state);
                 self.text_field_state.set_cursor_position(frame);
             }
-            ListValue::U32(value, _min, max) => {
+            ListValue::U32(_value, _min, max) => {
                 let area = Rect {
                     x: area.x,
                     y: area.y,
                     width: max.ilog10() as u16 + 1,
                     height: 1,
                 };
-                let field = TextField::new().with_value(format!("{}", value));
+                let field = TextField::new().with_value(self.numeric_edit_buffer.clone().unwrap_or_default());
                 frame.render_stateful_widget(field, area, &mut self.text_field_state);
                 self.text_field_state.set_cursor_position(frame);
             }
@@ -758,7 +765,7 @@ impl<T> ListItem<T> {
                         width: 5,
                         height: 1,
                     };
-                    let field = TextField::new().with_value(format!("{:02X}", value));
+                    let field = TextField::new().with_value(self.numeric_edit_buffer.clone().unwrap_or_else(|| format!("{value:02X}")));
                     frame.render_stateful_widget(field, Rect { width: 2, ..area }, &mut self.text_field_state);
                     Text::from(" XX").style(dos_attribute_style(*value)).render(
                         Rect {
@@ -957,10 +964,11 @@ impl<T> ListItem<T> {
                 }
             }
             ListValue::U32(cur, min, max) => {
-                let mut text = format!("{}", *cur);
-                self.need_update |= self.text_field_state.handle_input(key, &mut text);
+                let text = self.numeric_edit_buffer.get_or_insert_with(|| cur.to_string());
+                self.need_update |= self.text_field_state.handle_input(key, text);
                 if let Ok(u) = text.parse::<u32>() {
                     *cur = u.clamp(*min, *max);
+                    *text = cur.to_string();
                 }
             }
             ListValue::Bool(b) => {
@@ -1001,28 +1009,32 @@ impl<T> ListItem<T> {
                     match key.code {
                         KeyCode::Left => {
                             *u = (*u & 0xF0) | u.wrapping_sub(1) & 0x0F;
+                            self.numeric_edit_buffer = Some(format!("{u:02X}"));
                             self.need_update = true;
                             return ResultState::default();
                         }
                         KeyCode::Right => {
                             *u = (*u & 0xF0) | u.wrapping_add(1) & 0x0F;
+                            self.numeric_edit_buffer = Some(format!("{u:02X}"));
                             self.need_update = true;
                             return ResultState::default();
                         }
                         KeyCode::PageUp => {
                             *u = (*u & 0x8F) | (u.wrapping_add(0x10) & 0x70);
+                            self.numeric_edit_buffer = Some(format!("{u:02X}"));
                             self.need_update = true;
                             return ResultState::default();
                         }
                         KeyCode::PageDown => {
                             *u = (*u & 0x8F) | (u.wrapping_sub(0x10) & 0x70);
+                            self.numeric_edit_buffer = Some(format!("{u:02X}"));
                             self.need_update = true;
                             return ResultState::default();
                         }
                         _ => {}
                     }
-                    let mut text = format!("{:02X}", u);
-                    self.need_update |= self.text_field_state.handle_input(key, &mut text);
+                    let text = self.numeric_edit_buffer.get_or_insert_with(|| format!("{u:02X}"));
+                    self.need_update |= self.text_field_state.handle_input(key, text);
                     if let Ok(u) = u8::from_str_radix(&text, 16) {
                         *col = IcbColor::Dos(u);
                     }
@@ -1672,7 +1684,36 @@ impl<'a, T> Iterator for ConfigMenuIter<'a, T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crossterm::event::KeyModifiers;
     use ratatui::{Terminal, backend::TestBackend, buffer::Buffer};
+
+    #[test]
+    fn u32_field_can_be_emptied_with_delete_before_entering_a_replacement() {
+        let mut item: ListItem<()> = ListItem::new("Number".to_string(), ListValue::U32(7, 0, 99));
+        let mut state = ConfigMenuState::default();
+
+        item.handle_key_press(KeyEvent::new(KeyCode::Delete, KeyModifiers::NONE), &mut state);
+        assert_eq!(item.numeric_edit_buffer.as_deref(), Some(""));
+        assert!(matches!(item.value, ListValue::U32(7, 0, 99)));
+
+        item.handle_key_press(KeyEvent::new(KeyCode::Char('4'), KeyModifiers::NONE), &mut state);
+        assert_eq!(item.numeric_edit_buffer.as_deref(), Some("4"));
+        assert!(matches!(item.value, ListValue::U32(4, 0, 99)));
+    }
+
+    #[test]
+    fn color_field_can_be_temporarily_empty_too() {
+        let mut item: ListItem<()> = ListItem::new("Color".to_string(), ListValue::Color(IcbColor::Dos(0x0F)));
+        let mut state = ConfigMenuState::default();
+
+        item.handle_key_press(KeyEvent::new(KeyCode::Delete, KeyModifiers::NONE), &mut state);
+        item.handle_key_press(KeyEvent::new(KeyCode::Delete, KeyModifiers::NONE), &mut state);
+        assert_eq!(item.numeric_edit_buffer.as_deref(), Some(""));
+
+        item.handle_key_press(KeyEvent::new(KeyCode::Char('a'), KeyModifiers::NONE), &mut state);
+        assert_eq!(item.numeric_edit_buffer.as_deref(), Some("a"));
+        assert!(matches!(item.value, ListValue::Color(IcbColor::Dos(0x0A))));
+    }
 
     #[test]
     fn compact_security_fields_stay_inside_their_area() {
