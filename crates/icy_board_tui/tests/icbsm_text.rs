@@ -1,9 +1,30 @@
+use i18n_embed::{
+    LanguageLoader,
+    fluent::{FluentLanguageLoader, fluent_language_loader},
+};
 use icy_board_tui::get_text;
+
+#[derive(rust_embed::RustEmbed)]
+#[folder = "i18n"]
+struct Localizations;
+
+fn loader(locale: &str) -> FluentLanguageLoader {
+    let loader = fluent_language_loader!();
+    loader.load_languages(&Localizations, &[locale.parse().unwrap()]).unwrap();
+    loader.set_use_isolating(false);
+    loader
+}
 
 #[test]
 fn icbsm_confirmation_text_is_available() {
-    assert_eq!("Are you sure?", get_text("icbsm_are_you_sure"));
-    assert_eq!("PGDN=Yes   ESC=Abort", get_text("icbsm_question_keys"));
+    for (locale, question, keys) in [
+        ("en", "Are you sure?", "PGDN=Yes   ESC=Abort"),
+        ("de", "Sind Sie sicher?", "PGDN=Ja   ESC=Abbrechen"),
+    ] {
+        let loader = loader(locale);
+        assert_eq!(question, loader.get("icbsm_are_you_sure"));
+        assert_eq!(keys, loader.get("icbsm_question_keys"));
+    }
 }
 
 #[test]
@@ -27,13 +48,23 @@ fn icbsm_main_menu_text_is_available() {
 
 #[test]
 fn icbsm_table_help_text_parses() {
-    for (key, expected) in [
-        ("icbsm_table_help_file_ratio", "uploads divided by downloads"),
-        ("icbsm_table_help_byte_ratio", "bytes uploaded divided by bytes downloaded"),
-        ("icbsm_table_help_uploads", "Uploads   Security"),
-        ("icbsm_table_help_downloads", "Downloads   Security"),
+    for (key, english, german) in [
+        (
+            "icbsm_table_help_file_ratio",
+            "uploads divided by downloads",
+            "Uploads geteilt durch die Anzahl der Downloads",
+        ),
+        (
+            "icbsm_table_help_byte_ratio",
+            "bytes uploaded divided by bytes downloaded",
+            "hochgeladener Bytes geteilt durch die Anzahl heruntergeladener Bytes",
+        ),
+        ("icbsm_table_help_uploads", "Uploads   Security", "Uploads   Stufe"),
+        ("icbsm_table_help_downloads", "Downloads   Security", "Downloads   Stufe"),
     ] {
-        let text = get_text(key);
-        assert!(text.contains(expected), "{key} did not parse: {text}");
+        for (locale, expected) in [("en", english), ("de", german)] {
+            let text = loader(locale).get(key);
+            assert!(text.contains(expected), "{locale}/{key} did not parse: {text}");
+        }
     }
 }

@@ -11,6 +11,7 @@ use crossterm::{
     style::{Attribute, Color, Print, SetAttribute, SetForegroundColor},
 };
 
+pub mod about;
 pub mod app;
 pub mod cfg_menu_macros;
 pub mod colors;

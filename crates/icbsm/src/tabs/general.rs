@@ -67,7 +67,7 @@ impl GeneralTab {
 
 impl TabPage for GeneralTab {
     fn title(&self) -> String {
-        "Main".to_string()
+        get_text("tui_tab_main")
     }
 
     fn render(&mut self, frame: &mut Frame, area: Rect) {

@@ -13,7 +13,7 @@ pub fn new_main_window(icy_board: Arc<Mutex<IcyBoard>>, full_screen: bool) -> Ap
     let general_tab = GeneralTab::new(icy_board.clone());
     App {
         full_screen,
-        title: " IcyBoard System Manager".to_string(),
+        title: format!(" {}", icy_board_tui::get_text("app_icbsm")),
         mode: Mode::default(),
         tab: 0,
         date_format,
@@ -22,5 +22,19 @@ pub fn new_main_window(icy_board: Arc<Mutex<IcyBoard>>, full_screen: bool) -> Ap
         help_state: HelpViewState::new(),
         save: SaveChoice::default(),
         offers_quick_save: false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use icy_board_tui::get_text;
+
+    #[test]
+    fn window_title_and_tabs_use_the_active_locale() {
+        let app = new_main_window(Arc::new(Mutex::new(IcyBoard::default())), false);
+        assert_eq!(app.title, format!(" {}", get_text("app_icbsm")));
+        assert_eq!(app.tabs[0].title(), get_text("tui_tab_main"));
+        assert_eq!(app.tabs[1].title(), get_text("tui_tab_about"));
     }
 }

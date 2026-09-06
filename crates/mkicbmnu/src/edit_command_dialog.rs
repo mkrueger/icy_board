@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 
@@ -13,6 +14,7 @@ use icy_board_engine::{
 };
 use icy_board_tui::{
     config_menu::{ComboBox, ComboBoxValue, ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, TextFlags},
+    get_text, get_text_args,
     insert_table::{Column, InsertTable},
     pcb_line::{get_styled_pcb_line, get_styled_pcb_line_with_highlight},
     position_editor::PositionEditor,
@@ -30,6 +32,17 @@ use ratatui::{
 enum EditCommandMode {
     Config,
     Table,
+}
+
+fn auto_run_value(auto_run: &AutoRun) -> ComboBoxValue {
+    let key = match auto_run {
+        AutoRun::Disabled => "mnu_editor_autorun_disabled",
+        AutoRun::FirstCmd => "mnu_editor_autorun_first",
+        AutoRun::Every => "mnu_editor_autorun_every",
+        AutoRun::After => "mnu_editor_autorun_after",
+        AutoRun::Loop => "mnu_editor_autorun_loop",
+    };
+    ComboBoxValue::new(get_text(key), format!("{auto_run:?}"))
 }
 
 pub struct EditCommandDialog<'a> {
@@ -73,20 +86,23 @@ impl<'a> EditCommandDialog<'a> {
         let items = vec![
             ConfigEntry::Separator,
             ConfigEntry::Item(
-                ListItem::new("Display Text".to_string(), ListValue::Text(25, TextFlags::None, command.display.clone()))
-                    .with_status("Text displayed.")
-                    .with_label_width(info_width)
-                    .with_update_text_value(&|cmd: &Arc<Mutex<Command>>, value: String| {
-                        cmd.lock().unwrap().display = value;
-                    }),
+                ListItem::new(
+                    get_text("mnu_editor_display_text"),
+                    ListValue::Text(25, TextFlags::None, command.display.clone()),
+                )
+                .with_status(get_text("mnu_editor_display_text_status"))
+                .with_label_width(info_width)
+                .with_update_text_value(&|cmd: &Arc<Mutex<Command>>, value: String| {
+                    cmd.lock().unwrap().display = value;
+                }),
             ),
             ConfigEntry::Separator,
             ConfigEntry::Item(
                 ListItem::new(
-                    "Highlighted Text".to_string(),
+                    get_text("mnu_editor_highlighted_text"),
                     ListValue::Text(25, TextFlags::None, command.lighbar_display.clone()),
                 )
-                .with_status("Text displayed, when highlighted.")
+                .with_status(get_text("mnu_editor_highlighted_text_status"))
                 .with_label_width(info_width)
                 .with_update_text_value(&|cmd: &Arc<Mutex<Command>>, value: String| {
                     cmd.lock().unwrap().lighbar_display = value;
@@ -94,7 +110,7 @@ impl<'a> EditCommandDialog<'a> {
             ),
             ConfigEntry::Item(
                 ListItem::new(
-                    "Position".to_string(),
+                    get_text("mnu_editor_position"),
                     ListValue::Position(
                         Box::new(move |frame, pos| {
                             let size = pos_ed.lock().unwrap().buffer.size();
@@ -128,7 +144,7 @@ impl<'a> EditCommandDialog<'a> {
                         command.position,
                     ),
                 )
-                .with_status("Where the entry is drawn on the menu screen.")
+                .with_status(get_text("mnu_editor_position_status"))
                 .with_label_width(info_width)
                 .with_update_value(Box::new(|cmd: &Arc<Mutex<Command>>, value: &ListValue| {
                     if let ListValue::Position(_, _, pos) = value {
@@ -137,27 +153,28 @@ impl<'a> EditCommandDialog<'a> {
                 })),
             ),
             ConfigEntry::Item(
-                ListItem::new("Keyword".to_string(), ListValue::Text(10, TextFlags::None, command.keyword.to_string()))
-                    .with_status("The keyword that selects this entry.")
-                    .with_label_width(info_width)
-                    .with_update_text_value(&|cmd: &Arc<Mutex<Command>>, value: String| {
-                        cmd.lock().unwrap().keyword = value;
-                    }),
+                ListItem::new(
+                    get_text("command_editor_keyword"),
+                    ListValue::Text(10, TextFlags::None, command.keyword.to_string()),
+                )
+                .with_status(get_text("mnu_editor_keyword_status"))
+                .with_label_width(info_width)
+                .with_update_text_value(&|cmd: &Arc<Mutex<Command>>, value: String| {
+                    cmd.lock().unwrap().keyword = value;
+                }),
             ),
             ConfigEntry::Item(
                 ListItem::new(
-                    "Autorun".to_string(),
+                    get_text("mnu_editor_autorun"),
                     ListValue::ComboBox(ComboBox {
-                        cur_value: ComboBoxValue::new(format!("{:?}", command.auto_run), format!("{:?}", command.auto_run)),
+                        cur_value: auto_run_value(&command.auto_run),
                         selected_item: 0,
                         first_item: 0,
                         is_edit_open: false,
-                        values: AutoRun::iter()
-                            .map(|x| ComboBoxValue::new(format!("{:?}", x), format!("{:?}", x)))
-                            .collect::<Vec<ComboBoxValue>>(),
+                        values: AutoRun::iter().map(|x| auto_run_value(&x)).collect::<Vec<ComboBoxValue>>(),
                     }),
                 )
-                .with_status("The type of the menu.")
+                .with_status(get_text("mnu_editor_autorun_status"))
                 .with_label_width(info_width)
                 .with_update_combobox_value(&|cmd: &Arc<Mutex<Command>>, value: &ComboBox| {
                     if let Ok(auto_run) = AutoRun::from_str(&value.cur_value.value) {
@@ -166,16 +183,16 @@ impl<'a> EditCommandDialog<'a> {
                 }),
             ),
             ConfigEntry::Item(
-                ListItem::new("Time".to_string(), ListValue::U32(command.autorun_time as u32, 0, 3600))
-                    .with_status("Autorun after a specific amount of time.")
+                ListItem::new(get_text("mnu_editor_time"), ListValue::U32(command.autorun_time as u32, 0, 3600))
+                    .with_status(get_text("mnu_editor_time_status"))
                     .with_label_width(info_width)
                     .with_update_u32_value(&|cmd: &Arc<Mutex<Command>>, value: u32| {
                         cmd.lock().unwrap().autorun_time = value as u64;
                     }),
             ),
             ConfigEntry::Item(
-                ListItem::new("Help File".to_string(), ListValue::Text(25, TextFlags::None, command.help.clone()))
-                    .with_status("The help file to display.")
+                ListItem::new(get_text("mnu_editor_help_file"), ListValue::Text(25, TextFlags::None, command.help.clone()))
+                    .with_status(get_text("mnu_editor_help_file_status"))
                     .with_label_width(info_width)
                     .with_update_text_value(&|cmd: &Arc<Mutex<Command>>, value: String| {
                         cmd.lock().unwrap().help = value;
@@ -183,10 +200,10 @@ impl<'a> EditCommandDialog<'a> {
             ),
             ConfigEntry::Item(
                 ListItem::new(
-                    "Security".to_string(),
+                    get_text("command_editor_security"),
                     ListValue::Security(command.security.clone(), command.security.to_string()),
                 )
-                .with_status("The security level required to use this entry.")
+                .with_status(get_text("mnu_editor_security_status"))
                 .with_label_width(info_width)
                 .with_update_sec_value(&|cmd: &Arc<Mutex<Command>>, value: SecurityExpression| {
                     cmd.lock().unwrap().security = value;
@@ -199,7 +216,10 @@ impl<'a> EditCommandDialog<'a> {
         let insert_table = InsertTable {
             scroll_state: ScrollbarState::default().content_length(command_arc.lock().unwrap().actions.len()),
             table_state: TableState::default().with_selected(0),
-            columns: vec![Column::new("Command Type").with_width(20), Column::new("Parameter")],
+            columns: vec![
+                Column::new(get_text("command_editor_command_type")).with_width(20),
+                Column::new(get_text("command_editor_header_parameter")),
+            ],
             numbered: false,
             get_content: Box::new(move |_table, i, j| {
                 if *i >= cmd2.lock().unwrap().actions.len() {
@@ -319,7 +339,7 @@ impl<'a> EditCommandDialog<'a> {
                                 entry: vec![
                                     ConfigEntry::Item(
                                         ListItem::new(
-                                            "Command Type".to_string(),
+                                            get_text("command_editor_command_type"),
                                             ListValue::ComboBox(ComboBox {
                                                 selected_item,
                                                 first_item: 0,
@@ -338,21 +358,26 @@ impl<'a> EditCommandDialog<'a> {
                                         ),
                                     ),
                                     ConfigEntry::Item(
-                                        ListItem::new("Parameter".to_string(), ListValue::Text(10, TextFlags::None, parameter))
-                                            .with_status("The argument passed to the command.")
+                                        ListItem::new(get_text("command_editor_parameter"), ListValue::Text(10, TextFlags::None, parameter))
+                                            .with_status(get_text("mnu_editor_parameter_status"))
                                             .with_label_width(16)
                                             .with_update_text_value(&|(i, cmd): &(usize, Arc<Mutex<Command>>), value: String| {
                                                 cmd.lock().unwrap().actions[*i].parameter = value;
                                             }),
                                     ),
                                     ConfigEntry::Item(
-                                        ListItem::new("Run on Selection".to_string(), ListValue::Bool(action.trigger == ActionTrigger::Selection))
-                                            .with_status("Run when the entry is highlighted instead of when it is chosen.")
-                                            .with_label_width(16)
-                                            .with_update_bool_value(&|(i, cmd): &(usize, Arc<Mutex<Command>>), value: bool| {
+                                        ListItem::new(
+                                            get_text("mnu_editor_run_on_selection"),
+                                            ListValue::Bool(action.trigger == ActionTrigger::Selection),
+                                        )
+                                        .with_status(get_text("mnu_editor_run_on_selection_status"))
+                                        .with_label_width(16)
+                                        .with_update_bool_value(
+                                            &|(i, cmd): &(usize, Arc<Mutex<Command>>), value: bool| {
                                                 cmd.lock().unwrap().actions[*i].trigger =
                                                     if value { ActionTrigger::Selection } else { ActionTrigger::Activation };
-                                            }),
+                                            },
+                                        ),
                                     ),
                                 ],
                             });
@@ -375,7 +400,11 @@ impl<'a> EditCommandDialog<'a> {
         let block = Block::new()
             .title_alignment(Alignment::Center)
             .title(Line::from(
-                Span::from(format!(" Command ID {} ", self.id)).style(get_tui_theme().dialog_box_title),
+                Span::from(format!(
+                    " {} ",
+                    get_text_args("mnu_editor_command_title", HashMap::from([("id".to_string(), self.id.to_string())]))
+                ))
+                .style(get_tui_theme().dialog_box_title),
             ))
             .style(get_tui_theme().dialog_box)
             .padding(Padding::new(2, 2, 1, 1))
@@ -438,7 +467,9 @@ impl<'a> EditCommandDialog<'a> {
             Clear.render(area, frame.buffer_mut());
             let block = Block::new()
                 .title_alignment(Alignment::Center)
-                .title(Line::from(Span::from(" Edit Action ").style(get_tui_theme().dialog_box_title)))
+                .title(Line::from(
+                    Span::from(format!(" {} ", get_text("mnu_editor_edit_action"))).style(get_tui_theme().dialog_box_title),
+                ))
                 .style(get_tui_theme().dialog_box)
                 .padding(Padding::new(2, 2, 1, 1))
                 .borders(Borders::ALL)
@@ -451,6 +482,26 @@ impl<'a> EditCommandDialog<'a> {
                 .unwrap()
                 .text_field_state
                 .set_cursor_position(frame);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn autorun_choices_localize_display_but_preserve_parseable_values() {
+        for (auto_run, key) in AutoRun::iter().zip([
+            "mnu_editor_autorun_disabled",
+            "mnu_editor_autorun_first",
+            "mnu_editor_autorun_every",
+            "mnu_editor_autorun_after",
+            "mnu_editor_autorun_loop",
+        ]) {
+            let value = auto_run_value(&auto_run);
+            assert_eq!(value.display, get_text(key));
+            assert_eq!(AutoRun::from_str(&value.value).unwrap(), auto_run);
         }
     }
 }

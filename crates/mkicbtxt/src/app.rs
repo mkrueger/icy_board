@@ -64,6 +64,24 @@ impl TabPageType {
     }
 }
 
+#[cfg(test)]
+mod localization_tests {
+    use super::*;
+
+    #[test]
+    fn title_bar_renders_localized_application_and_tabs() {
+        let mut text = IcbTextFile::default();
+        let app = App::new(&mut text, PathBuf::from("ICBTEXT"), false);
+        let area = Rect::new(0, 0, 80, 1);
+        let mut buffer = Buffer::empty(area);
+        app.render_title_bar(area, &mut buffer);
+        let rendered: String = (0..80).map(|x| buffer[(x, 0)].symbol()).collect();
+        assert!(rendered.contains(&format!("{} (ICBTEXT)", get_text("app_mkicbtxt"))), "{rendered}");
+        assert!(rendered.contains(&get_text("icbtext_tab_record")), "{rendered}");
+        assert!(rendered.ends_with(&format!(" {} ", get_text("icbtext_tab_about"))), "{rendered}");
+    }
+}
+
 #[derive(Default)]
 pub struct ResultState {
     pub _cursor: Option<(u16, u16)>,
@@ -485,12 +503,21 @@ impl<'a> App<'a> {
     }
 
     fn render_title_bar(&self, area: Rect, buf: &mut Buffer) {
-        let len: u16 = TabPageType::iter().map(|p| TabPageType::title(p).len() as u16).sum();
+        let len: u16 = TabPageType::iter().map(|p| Line::from(p.title()).width() as u16).sum();
         let layout = Layout::horizontal([Constraint::Min(0), Constraint::Length(len)]);
         let [title, tabs] = layout.areas(area);
 
         Span::styled(
-            format!(" ICBTEXT File Generator/Editor ({})", self.file.file_name().unwrap().to_string_lossy()),
+            format!(
+                " {}",
+                get_text_args(
+                    "app_file_title",
+                    HashMap::from([
+                        ("application".to_string(), get_text("app_mkicbtxt")),
+                        ("path".to_string(), self.file.file_name().unwrap().to_string_lossy().into_owned()),
+                    ]),
+                )
+            ),
             get_tui_theme().app_title,
         )
         .render(title, buf);

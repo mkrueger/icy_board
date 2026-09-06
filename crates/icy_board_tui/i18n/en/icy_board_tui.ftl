@@ -1,3 +1,56 @@
+# Application chrome and shared about panel
+app_icbsetup = IcyBoard Setup Utility
+app_icbsm = IcyBoard System Manager
+app_mkicbtxt = ICBTEXT File Generator/Editor
+app_mkicbmnu = MNU File Editor
+app_file_title = { $application } ({ $path })
+tui_tab_main = Main
+tui_tab_about = About
+tui_tab_general = General
+tui_tab_commands = Commands
+about_version = { $application } v{ $version }
+about_author = written { $year } by { $author } as part of the icy_board project
+about_website = visit { $url }
+about_updates = for the latest version & discussions
+
+# Menu editor
+mnu_editor_title = Title
+mnu_editor_title_status = Enter the title of the menu.
+mnu_editor_display_file = Display File
+mnu_editor_display_file_status = The menu background file to display.
+mnu_editor_help_file = Help File
+mnu_editor_help_file_status = The help file to display.
+mnu_editor_menu_type = Menu Type
+mnu_editor_menu_type_status = The type of the menu.
+mnu_editor_prompt = Prompt
+mnu_editor_prompt_status = The prompt for the menu.
+mnu_editor_type_hotkey = Hotkey
+mnu_editor_type_lightbar = Lightbar
+mnu_editor_type_command = Command
+mnu_editor_display = Display
+mnu_editor_display_text = Display Text
+mnu_editor_display_text_status = Text displayed.
+mnu_editor_highlighted_text = Highlighted Text
+mnu_editor_highlighted_text_status = Text displayed when highlighted.
+mnu_editor_position = Position
+mnu_editor_position_status = Where the entry is drawn on the menu screen.
+mnu_editor_keyword_status = The keyword that selects this entry.
+mnu_editor_autorun = Autorun
+mnu_editor_autorun_status = When the entry runs automatically.
+mnu_editor_autorun_disabled = Disabled
+mnu_editor_autorun_first = On First Load
+mnu_editor_autorun_every = Before Display
+mnu_editor_autorun_after = After Display
+mnu_editor_autorun_loop = Repeatedly
+mnu_editor_time = Time
+mnu_editor_time_status = Autorun after a specific amount of time.
+mnu_editor_security_status = The security level required to use this entry.
+mnu_editor_parameter_status = The argument passed to the command.
+mnu_editor_run_on_selection = Run on Selection
+mnu_editor_run_on_selection_status = Run when the entry is highlighted instead of when it is chosen.
+mnu_editor_command_title = Command ID { $id }
+mnu_editor_edit_action = Edit Action
+
 error_cmd_line_label = error:
 error_board_config_not_found = IcyBoard configuration not found: { $path }
 error_board_config_help =

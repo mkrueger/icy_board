@@ -274,7 +274,7 @@ impl App {
 
 impl App {
     fn render_title_bar(&self, area: Rect, buf: &mut Buffer) {
-        let len: u16 = self.tabs.iter().map(|t| t.title().len() as u16 + 1).sum();
+        let len: u16 = self.tabs.iter().map(|t| Line::from(t.title()).width() as u16 + 1).sum();
         let layout = Layout::horizontal([Constraint::Min(0), Constraint::Length(1 + len)]);
         let [title, tabs] = layout.areas(area);
 

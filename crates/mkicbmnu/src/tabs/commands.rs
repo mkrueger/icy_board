@@ -4,6 +4,7 @@ use crossterm::event::{KeyCode, KeyEvent};
 use icy_board_engine::icy_board::{IcyBoard, menu::Menu};
 use icy_board_tui::{
     config_menu::ResultState,
+    get_text,
     insert_table::{Column, InsertTable},
     pcb_line::get_styled_pcb_line,
     tab_page::TabPage,
@@ -32,7 +33,10 @@ impl<'a> CommandsTab<'a> {
         let insert_table = InsertTable {
             scroll_state: ScrollbarState::default().content_length(len),
             table_state: TableState::default().with_selected(0),
-            columns: vec![Column::new("Keyword").with_width(20), Column::new("Display")],
+            columns: vec![
+                Column::new(get_text("command_editor_keyword")).with_width(20),
+                Column::new(get_text("mnu_editor_display")),
+            ],
             numbered: true,
             get_content: Box::new(move |_table, i, j| {
                 if let Ok(mnu2) = mnu2.lock()
@@ -114,7 +118,7 @@ impl<'a> CommandsTab<'a> {
 
 impl<'a> TabPage for CommandsTab<'a> {
     fn title(&self) -> String {
-        "Commands".to_string()
+        get_text("tui_tab_commands")
     }
 
     fn render(&mut self, frame: &mut Frame, area: Rect) {
@@ -172,5 +176,25 @@ impl<'a> TabPage for CommandsTab<'a> {
             }
         }
         ResultState::default()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ratatui::{Terminal, backend::TestBackend};
+
+    #[test]
+    fn commands_tab_uses_localized_title_and_headers() {
+        let mut tab = CommandsTab::new(Arc::new(Mutex::new(IcyBoard::default())), Arc::new(Mutex::new(Menu::default())));
+        assert_eq!(tab.title(), get_text("tui_tab_commands"));
+        let mut terminal = Terminal::new(TestBackend::new(80, 25)).unwrap();
+        terminal.draw(|frame| tab.render(frame, frame.area())).unwrap();
+        let rendered = terminal.backend().buffer().content.iter().map(|cell| cell.symbol()).collect::<String>();
+        for key in ["command_editor_keyword", "mnu_editor_display"] {
+            let text = get_text(key);
+            assert_ne!(text, key, "missing translation: {key}");
+            assert!(rendered.contains(&text), "missing header: {key}");
+        }
     }
 }

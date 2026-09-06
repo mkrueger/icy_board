@@ -1,3 +1,56 @@
+# Programmrahmen und gemeinsame Info-Seite
+app_icbsetup = IcyBoard-Einrichtung
+app_icbsm = IcyBoard-Systemverwaltung
+app_mkicbtxt = ICBTEXT-Dateigenerator/-Editor
+app_mkicbmnu = MNU-Dateieditor
+app_file_title = { $application } ({ $path })
+tui_tab_main = Hauptmenü
+tui_tab_about = Über
+tui_tab_general = Allgemein
+tui_tab_commands = Befehle
+about_version = { $application } v{ $version }
+about_author = entwickelt { $year } von { $author } als Teil des icy_board-Projekts
+about_website = Besuche { $url }
+about_updates = für die aktuelle Version und Diskussionen
+
+# Menüeditor
+mnu_editor_title = Titel
+mnu_editor_title_status = Titel des Menüs eingeben.
+mnu_editor_display_file = Anzeigedatei
+mnu_editor_display_file_status = Datei für den Menühintergrund.
+mnu_editor_help_file = Hilfedatei
+mnu_editor_help_file_status = Hilfedatei, die angezeigt wird.
+mnu_editor_menu_type = Menütyp
+mnu_editor_menu_type_status = Art des Menüs.
+mnu_editor_prompt = Eingabezeile
+mnu_editor_prompt_status = Eingabeaufforderung für das Menü.
+mnu_editor_type_hotkey = Direktwahl
+mnu_editor_type_lightbar = Auswahlbalken
+mnu_editor_type_command = Befehlseingabe
+mnu_editor_display = Anzeige
+mnu_editor_display_text = Anzeigetext
+mnu_editor_display_text_status = Angezeigter Text.
+mnu_editor_highlighted_text = Markierter Text
+mnu_editor_highlighted_text_status = Text bei hervorgehobenem Eintrag.
+mnu_editor_position = Position
+mnu_editor_position_status = Position des Eintrags auf dem Menübildschirm.
+mnu_editor_keyword_status = Schlüsselwort zum Auswählen dieses Eintrags.
+mnu_editor_autorun = Automatik
+mnu_editor_autorun_status = Zeitpunkt der automatischen Ausführung des Eintrags.
+mnu_editor_autorun_disabled = Deaktiviert
+mnu_editor_autorun_first = Beim ersten Laden
+mnu_editor_autorun_every = Vor der Anzeige
+mnu_editor_autorun_after = Nach der Anzeige
+mnu_editor_autorun_loop = Wiederholt
+mnu_editor_time = Zeit
+mnu_editor_time_status = Automatische Ausführung nach einer bestimmten Zeit.
+mnu_editor_security_status = Erforderliche Sicherheitsstufe für diesen Eintrag.
+mnu_editor_parameter_status = Argument, das dem Befehl übergeben wird.
+mnu_editor_run_on_selection = Bei Markierung
+mnu_editor_run_on_selection_status = Beim Hervorheben des Eintrags ausführen statt beim Bestätigen.
+mnu_editor_command_title = Befehls-ID { $id }
+mnu_editor_edit_action = Aktion bearbeiten
+
 error_cmd_line_label = Fehler:
 error_board_config_not_found = IcyBoard-Konfiguration nicht gefunden: { $path }
 error_board_config_help =

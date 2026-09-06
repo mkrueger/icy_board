@@ -74,7 +74,7 @@ impl GeneralTab {
 
 impl TabPage for GeneralTab {
     fn title(&self) -> String {
-        "Main".to_string()
+        get_text("tui_tab_main")
     }
 
     fn is_dirty(&self) -> bool {
