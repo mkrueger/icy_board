@@ -212,7 +212,7 @@ async fn test_recv_ymodem() {
     let state = test_receiver(&mut receiver_conn, &mut protocol).await;
 
     assert_eq!(state.recieve_state.finished_files.len(), 1);
-    assert_eq!(state.recieve_state.total_bytes_transfered, data.len() as u64);
+    assert_eq!(state.recieve_state.total_bytes_transfered, orig_data.len() as u64);
 
     let loaded_data = fs::read(&state.recieve_state.finished_files[0].1).unwrap();
 

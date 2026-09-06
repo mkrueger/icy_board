@@ -95,13 +95,12 @@ async fn test_recv_xmodem1k() {
     let state = test_receiver(&mut receiver_conn, &mut protocol).await;
 
     assert_eq!(state.recieve_state.finished_files.len(), 1);
-    assert_eq!(state.recieve_state.total_bytes_transfered, data.len() as u64);
+    assert_eq!(state.recieve_state.total_bytes_transfered, orig_data.len() as u64);
 
     let loaded_data = fs::read(&state.recieve_state.finished_files[0].1).unwrap();
 
-    // XModem pads files, so the received file will be 1024 bytes
-    // We should compare only the first 900 bytes
-    assert_eq!(loaded_data[..orig_data.len()], orig_data[..]);
+    // The existing CPMEOF heuristic removes final block padding.
+    assert_eq!(loaded_data, orig_data);
 }
 
 #[tokio::test]

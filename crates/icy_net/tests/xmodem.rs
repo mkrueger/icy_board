@@ -103,12 +103,12 @@ async fn test_recv_xmodem_128block_checksum() {
     let state = test_receiver(&mut receiver_conn, &mut protocol).await;
 
     assert_eq!(state.recieve_state.finished_files.len(), 1);
-    assert_eq!(state.recieve_state.total_bytes_transfered, data.len() as u64);
+    assert_eq!(state.recieve_state.total_bytes_transfered, orig_data.len() as u64);
 
     let loaded_data = fs::read(&state.recieve_state.finished_files[0].1).unwrap();
 
-    // XModem pads files to block size, so we need to compare only the original data length
-    assert_eq!(loaded_data[..orig_data.len()], orig_data[..]);
+    // Statistics and stored contents both exclude stripped final-block padding.
+    assert_eq!(loaded_data, orig_data);
 }
 
 #[tokio::test]
@@ -150,12 +150,12 @@ async fn test_recv_xmodem1k_128block_crc16() {
     let state = test_receiver(&mut receiver_conn, &mut protocol).await;
 
     assert_eq!(state.recieve_state.finished_files.len(), 1);
-    assert_eq!(state.recieve_state.total_bytes_transfered, data.len() as u64);
+    assert_eq!(state.recieve_state.total_bytes_transfered, orig_data.len() as u64);
 
     let loaded_data = fs::read(&state.recieve_state.finished_files[0].1).unwrap();
 
-    // XModem pads files to block size, so we need to compare only the original data length
-    assert_eq!(loaded_data[..orig_data.len()], orig_data[..]);
+    // Statistics and stored contents both exclude stripped final-block padding.
+    assert_eq!(loaded_data, orig_data);
 }
 
 #[tokio::test]

@@ -26,6 +26,12 @@ pub enum XYModemError {
     #[error("file is incomplete: expected {0} bytes but received {1}")]
     IncompleteFile(u64, u64),
 
+    #[error("invalid YMODEM file metadata: {0}")]
+    InvalidFileInfo(&'static str),
+
+    #[error("data exceeds the declared file length")]
+    FileTooLong,
+
     #[error("no file open")]
     NoFileOpen,
 

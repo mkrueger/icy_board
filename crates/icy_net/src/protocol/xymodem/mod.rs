@@ -107,6 +107,7 @@ impl super::Protocol for XYmodem {
 
         let mut sy = sy::Sy::new(self.config);
         sy.send(files);
+        self.ry = None;
         self.sy = Some(sy);
         Ok(TransferState::new(self.config.get_protocol_name().to_string()))
     }
@@ -114,13 +115,20 @@ impl super::Protocol for XYmodem {
     async fn initiate_recv(&mut self, com: &mut dyn Connection) -> crate::Result<TransferState> {
         let mut ry = ry::Ry::new(self.config);
         ry.recv(com).await?;
+        self.sy = None;
         self.ry = Some(ry);
 
         Ok(TransferState::new(self.config.get_protocol_name().to_string()))
     }
 
     async fn cancel_transfer(&mut self, com: &mut dyn Connection) -> crate::Result<()> {
-        cancel_xymodem_transfer(com).await
+        if let Some(ry) = &mut self.ry {
+            ry.cancel(com).await
+        } else if let Some(sy) = &mut self.sy {
+            sy.cancel(com).await
+        } else {
+            cancel_xymodem_transfer(com).await
+        }
     }
 }
 
