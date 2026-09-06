@@ -30,7 +30,12 @@ pub struct DescriptionBlockRule {
     /// line. Match it in the original bytes, then validate all normalized lines.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub inline_start: Option<String>,
+    /// Regular expressions applied to normalized lines; mutually exclusive with literal_lines.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub lines: Vec<String>,
+    /// Whole-line literal matches after the same normalization as the description.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub literal_lines: Vec<String>,
     #[serde(default)]
     pub action: RuleAction,
 }
@@ -43,6 +48,7 @@ impl Default for DescriptionBlockRule {
             position: BlockPosition::default(),
             inline_start: None,
             lines: Vec::new(),
+            literal_lines: Vec::new(),
             action: RuleAction::default(),
         }
     }
@@ -52,12 +58,26 @@ fn default_description_member_pattern() -> String {
     "(?i)(^|[/\\\\])(desc\\.sdi|file_id\\.(diz|ans|pcb))$".to_string()
 }
 
+enum LineMatcher {
+    Regex(Regex),
+    Literal(String),
+}
+
+impl LineMatcher {
+    fn is_match(&self, line: &str) -> bool {
+        match self {
+            Self::Regex(pattern) => pattern.is_match(line),
+            Self::Literal(text) => text == line,
+        }
+    }
+}
+
 struct CompiledDescriptionRule {
     id: String,
     member_pattern: Regex,
     position: BlockPosition,
     inline_start: Option<String>,
-    lines: Vec<Regex>,
+    lines: Vec<LineMatcher>,
     action: RuleAction,
 }
 
@@ -82,22 +102,46 @@ pub struct DescriptionCleaner {
 }
 
 impl DescriptionCleaner {
-    pub fn new(rules: &[DescriptionBlockRule]) -> Result<Self, regex::Error> {
-        let mut compiled = Vec::with_capacity(rules.len());
+    pub fn new(rules: &[DescriptionBlockRule]) -> crate::Result<Self> {
+        let mut cleaner = Self {
+            rules: Vec::with_capacity(rules.len()),
+            ansi: Regex::new(r"\x1B\[[0-?]*[ -/]*[@-~]")?,
+        };
         for rule in rules {
-            compiled.push(CompiledDescriptionRule {
+            if rule.lines.is_empty() == rule.literal_lines.is_empty() {
+                return Err(format!("Description rule '{}': specify exactly one nonempty list of lines or literal_lines", rule.id).into());
+            }
+            let lines = if rule.literal_lines.is_empty() {
+                rule.lines
+                    .iter()
+                    .map(|line| Regex::new(line).map(LineMatcher::Regex))
+                    .collect::<Result<_, _>>()?
+            } else {
+                let mut lines = Vec::with_capacity(rule.literal_lines.len());
+                for (index, line) in rule.literal_lines.iter().enumerate() {
+                    let normalized = cleaner.normalize_text(line);
+                    if normalized.is_empty() || line.contains(['\r', '\n', '\x1a']) {
+                        return Err(format!(
+                            "Description rule '{}': literal_lines entry {} must contain nonempty text on one line without CR, LF or DOS EOF",
+                            rule.id,
+                            index + 1
+                        )
+                        .into());
+                    }
+                    lines.push(LineMatcher::Literal(normalized));
+                }
+                lines
+            };
+            cleaner.rules.push(CompiledDescriptionRule {
                 id: rule.id.clone(),
                 member_pattern: Regex::new(&rule.member_pattern)?,
                 position: rule.position,
                 inline_start: rule.inline_start.clone(),
-                lines: rule.lines.iter().map(|line| Regex::new(line)).collect::<Result<_, _>>()?,
+                lines,
                 action: rule.action,
             });
         }
-        Ok(Self {
-            rules: compiled,
-            ansi: Regex::new(r"\x1B\[[0-?]*[ -/]*[@-~]")?,
-        })
+        Ok(cleaner)
     }
 
     pub fn clean(&self, member_name: &str, content: &[u8], max_passes: usize) -> DescriptionCleanResult {
@@ -236,7 +280,11 @@ impl DescriptionCleaner {
         let line = line.strip_suffix(b"\r").unwrap_or(line);
         let normalized = normalize_file(line);
         let text = get_utf8(&normalized);
-        let text = self.ansi.replace_all(&text, "");
+        self.normalize_text(&text)
+    }
+
+    fn normalize_text(&self, text: &str) -> String {
+        let text = self.ansi.replace_all(text, "");
         let chars: Vec<char> = text.chars().collect();
         let mut without_colors = String::new();
         let mut index = 0;
@@ -286,6 +334,136 @@ mod tests {
             lines: lines.iter().map(|line| line.to_string()).collect(),
             action: RuleAction::AutoClean,
             ..Default::default()
+        }
+    }
+
+    fn literal_rule(lines: &[&str]) -> DescriptionBlockRule {
+        DescriptionBlockRule {
+            id: "literal-footer".into(),
+            literal_lines: lines.iter().map(|line| line.to_string()).collect(),
+            action: RuleAction::AutoClean,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn literal_lines_match_whole_lines_without_regex_interpretation() {
+        let cleaner = DescriptionCleaner::new(&[literal_rule(&[r"[BOARD] .* + ? (ad) $ ^ \ end"])]).unwrap();
+        let input = b"Product\n[BOARD] .* + ? (ad) $ ^ \\ end\n";
+        let result = cleaner.clean("FILE_ID.DIZ", input, 8);
+        assert_eq!(b"Product\n", result.content.as_slice());
+        assert_eq!(1, result.changes.len());
+        for text in [
+            "Product\nB anything ad end\n",
+            "Product\nprefix [BOARD] .* + ? (ad) $ ^ \\ end\n",
+            "Product\n[BOARD] .* + ? (ad) $ ^ \\ end extra\n",
+            "Product\n[BOARD] .* + ? (ad) $ ^ \\ end\nLegitimate tail\n",
+        ] {
+            let result = cleaner.clean("FILE_ID.DIZ", text.as_bytes(), 8);
+            assert_eq!(text.as_bytes(), result.content);
+            assert!(result.changes.is_empty());
+            assert!(!result.needs_review);
+        }
+    }
+
+    #[test]
+    fn literal_lines_normalize_both_sides_and_preserve_raw_description_bytes() {
+        let cleaner = DescriptionCleaner::new(&[literal_rule(&[" @X0F\x1b[31m GRÜSSE   vom\tBoard ", "[Download + Support]"])]).unwrap();
+        for ad in [
+            "  grüsse VOM board\r\n\r\n\t[download + support]  \r\n".as_bytes(),
+            b"@X0Fgr\x81sse vom board\r\n \r\n\x1b[32m[DOWNLOAD + SUPPORT]\x1b[0m\r\n".as_slice(),
+        ] {
+            let kept = b"@X0B\xda\xc4\xbf  Original text \r\n";
+            let input = [kept.as_slice(), ad].concat();
+            let result = cleaner.clean("FILE_ID.DIZ", &input, 8);
+            assert_eq!(kept.as_slice(), result.content);
+            assert!(!result.needs_review);
+            let result = cleaner.clean("UNRELATED.TXT", &input, 8);
+            assert_eq!(input, result.content);
+            assert!(result.changes.is_empty());
+        }
+    }
+
+    #[test]
+    fn literal_prefix_requires_complete_block_and_keeps_the_rest() {
+        let mut rule = literal_rule(&["[Board]", "Visit us!"]);
+        rule.position = BlockPosition::Prefix;
+        let cleaner = DescriptionCleaner::new(&[rule]).unwrap();
+        let result = cleaner.clean("DESC.SDI", b"[board]\nVisit us!\nProduct\n", 8);
+        assert_eq!(b"Product\n", result.content.as_slice());
+        assert_eq!((1, 2), (result.changes[0].first_line, result.changes[0].last_line));
+        for input in [b"[Board]\nProduct\n".as_slice(), b"Product\n[Board]\nVisit us!\n".as_slice()] {
+            let result = cleaner.clean("DESC.SDI", input, 8);
+            assert_eq!(input, result.content);
+            assert!(result.changes.is_empty());
+        }
+    }
+
+    #[test]
+    fn literal_inline_footer_requires_the_complete_block_at_the_end() {
+        let mut rule = literal_rule(&["[Board] + Support?", "Visit us!"]);
+        rule.inline_start = Some("[Board]".into());
+        let cleaner = DescriptionCleaner::new(&[rule]).unwrap();
+        let result = cleaner.clean("FILE_ID.DIZ", b"Product\r\n@X0F :---: [BOARD] + Support?\r\nVisit us!\r\n", 8);
+        assert_eq!(b"Product\r\n@X0F :---: \r\n", result.content.as_slice());
+        assert!(!result.needs_review);
+        for input in [
+            b"Product\n :---: [BOARD] + Support?\nUnrelated text\n".as_slice(),
+            b"Product\n :---: [BOARD] + Support?\nVisit us!\nLegitimate tail\n".as_slice(),
+            b"Product\n :---: [BOARD] + Support? extra\nVisit us!\n".as_slice(),
+        ] {
+            let result = cleaner.clean("FILE_ID.DIZ", input, 8);
+            assert_eq!(input, result.content);
+            assert!(result.changes.is_empty());
+        }
+    }
+
+    #[test]
+    fn literal_actions_ambiguity_and_pass_limits_keep_existing_safety_checks() {
+        let input = b"Product\n[Board]\n";
+        for action in [RuleAction::ReportOnly, RuleAction::Review, RuleAction::AutoClean] {
+            let mut rule = literal_rule(&["[Board]"]);
+            rule.action = action;
+            let result = DescriptionCleaner::new(&[rule]).unwrap().clean("FILE_ID.DIZ", input, 8);
+            assert_eq!(
+                if action == RuleAction::AutoClean {
+                    b"Product\n".as_slice()
+                } else {
+                    input.as_slice()
+                },
+                result.content
+            );
+            assert_eq!(action == RuleAction::Review, result.needs_review);
+            assert_eq!(action, result.changes[0].action);
+        }
+        let rule = literal_rule(&["[Board]"]);
+        let ambiguous = DescriptionCleaner::new(&[rule.clone(), suffix_rule("regex", &[r"^\[board\]$"])]).unwrap();
+        let result = ambiguous.clean("FILE_ID.DIZ", input, 8);
+        assert_eq!(input.as_slice(), result.content);
+        assert!(result.needs_review);
+        assert!(result.changes.is_empty());
+        let cleaner = DescriptionCleaner::new(&[rule]).unwrap();
+        let result = cleaner.clean("FILE_ID.DIZ", b"Product\n[Board]\n[Board]\n", 1);
+        assert_eq!(input.as_slice(), result.content);
+        assert!(result.needs_review);
+        let result = cleaner.clean("FILE_ID.DIZ", b"[Board]\n", 8);
+        assert!(result.content.is_empty());
+        assert!(result.needs_review);
+        let result = cleaner.clean("FILE_ID.DIZ", input, 0);
+        assert_eq!(input.as_slice(), result.content);
+        assert!(result.changes.is_empty());
+    }
+
+    #[test]
+    fn literal_rules_reject_ambiguous_empty_and_multiline_definitions() {
+        let mut both = literal_rule(&["Advertisement"]);
+        both.lines.push("^advertisement$".into());
+        assert!(DescriptionCleaner::new(&[both]).is_err());
+        assert!(DescriptionCleaner::new(&[literal_rule(&[])]).is_err());
+        for text in ["", " \t ", "@X0F\x1b[31m", "one\ntwo", "one\rtwo", "one\x1atwo"] {
+            let error = DescriptionCleaner::new(&[literal_rule(&[text])]).err().unwrap().to_string();
+            assert!(error.contains("literal-footer"), "{error}");
+            assert!(error.contains("literal_lines"), "{error}");
         }
     }
 
@@ -364,7 +542,7 @@ mod tests {
     fn shipped_liquid_rule_preserves_the_raw_inline_prefix_and_line_ending() {
         let catalog = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/upload_ad_descriptions.toml");
         let empty = std::path::Path::new("");
-        let rules = super::super::bbstro_fingerprint::FingerprintData::load_split(empty, &catalog, empty).unwrap();
+        let rules = super::super::bbstro_fingerprint::FingerprintData::load_split(empty, &catalog).unwrap();
         for prefix in [
             b" :-----------------------------:".as_slice(),
             b"@X0F \x1b[31m\xda----\xbf  ".as_slice(),

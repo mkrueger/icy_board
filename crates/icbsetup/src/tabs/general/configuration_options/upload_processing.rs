@@ -6,7 +6,7 @@ use std::{
 use crossterm::event::KeyEvent;
 use icy_board_engine::icy_board::{
     IcyBoard,
-    icb_config::{UploadProcessingConfig, UploadPublishPolicy},
+    icb_config::{ArchiveCommentMode, UploadProcessingConfig, UploadPublishPolicy},
 };
 use icy_board_tui::{
     config_menu::{ComboBox, ComboBoxValue, ConfigEntry, ConfigMenu, ListItem, ListValue, ResultState, TextFlags},
@@ -26,6 +26,14 @@ fn policy_name(policy: UploadPublishPolicy) -> String {
         UploadPublishPolicy::AfterProcessing => get_text("upload_processing_policy_after_processing"),
         UploadPublishPolicy::ManualApproval => get_text("upload_processing_policy_manual_approval"),
     }
+}
+
+fn comment_mode_name(mode: ArchiveCommentMode) -> String {
+    get_text(match mode {
+        ArchiveCommentMode::Preserve => "upload_processing_comment_preserve",
+        ArchiveCommentMode::Remove => "upload_processing_comment_remove",
+        ArchiveCommentMode::Replace => "upload_processing_comment_replace",
+    })
 }
 
 fn bool_entry(key: &'static str, label_width: u16, value: bool, update: fn(&mut UploadProcessingConfig, bool)) -> ConfigEntry<Arc<Mutex<IcyBoard>>> {
@@ -171,9 +179,18 @@ impl UploadProcessing {
                         options.remove_advertisements = value;
                     },
                 ),
-                path_entry("upload_processing_rules", label_width, options.advertisement_rules.clone(), |options, value| {
-                    options.advertisement_rules = value;
-                }),
+                path_entry(
+                    "upload_processing_file_rules",
+                    label_width,
+                    options.advertisement_file_rules.clone(),
+                    |options, value| options.advertisement_file_rules = value,
+                ),
+                path_entry(
+                    "upload_processing_description_rules",
+                    label_width,
+                    options.advertisement_description_rules.clone(),
+                    |options, value| options.advertisement_description_rules = value,
+                ),
                 path_entry(
                     "upload_processing_advertisement_file",
                     label_width,
@@ -194,6 +211,31 @@ impl UploadProcessing {
                     |options, value| {
                         options.compression_level = value as i64;
                     },
+                ),
+                ConfigEntry::Item(
+                    ListItem::new(
+                        get_text("upload_processing_comment_mode"),
+                        ListValue::ComboBox(ComboBox {
+                            cur_value: ComboBoxValue::new(comment_mode_name(options.archive_comment_mode), format!("{:?}", options.archive_comment_mode)),
+                            selected_item: 0,
+                            is_edit_open: false,
+                            first_item: 0,
+                            values: [ArchiveCommentMode::Preserve, ArchiveCommentMode::Remove, ArchiveCommentMode::Replace]
+                                .into_iter()
+                                .map(|mode| ComboBoxValue::new(comment_mode_name(mode), format!("{mode:?}")))
+                                .collect(),
+                        }),
+                    )
+                    .with_status(get_text("upload_processing_comment_mode-status"))
+                    .with_help(get_text("upload_processing_comment_mode-help"))
+                    .with_label_width(label_width)
+                    .with_update_combobox_value(&|board: &Arc<Mutex<IcyBoard>>, combo: &ComboBox| {
+                        board.lock().unwrap().config.upload_processing.archive_comment_mode = match combo.cur_value.value.as_str() {
+                            "Remove" => ArchiveCommentMode::Remove,
+                            "Replace" => ArchiveCommentMode::Replace,
+                            _ => ArchiveCommentMode::Preserve,
+                        };
+                    }),
                 ),
                 text_entry(
                     "upload_processing_replacement_comment",
@@ -366,8 +408,11 @@ mod tests {
         }
         let expected: [(&str, &[&str]); 5] = [
             ("publication", &["publish_policy", "notify_sysop", "quarantine"]),
-            ("advertising", &["remove_advertisements", "rules", "advertisement_file"]),
-            ("zip", &["repack_zip", "compression", "replacement_comment"]),
+            (
+                "advertising",
+                &["remove_advertisements", "file_rules", "description_rules", "advertisement_file"],
+            ),
+            ("zip", &["repack_zip", "compression", "comment_mode", "replacement_comment"]),
             (
                 "scanner",
                 &[
@@ -410,6 +455,44 @@ mod tests {
         for enabled in [false, true] {
             item.update_value.as_ref().unwrap()(&board, &ListValue::Bool(enabled));
             assert_eq!(board.lock().unwrap().config.upload_processing.remove_advertisements, enabled);
+        }
+    }
+
+    #[test]
+    fn rule_paths_update_only_their_category_and_preserve_literal_characters() {
+        for (selected, key) in ["file_rules", "description_rules"].iter().enumerate() {
+            let board = Arc::new(Mutex::new(IcyBoard::default()));
+            for path in ["", " rules/board ads; custom.toml "] {
+                let menu = UploadProcessing::build_menu(board.clone(), Arc::new(Mutex::new(None)));
+                let status = get_text(&format!("upload_processing_{key}-status"));
+                let items: Vec<_> = (0..menu.count())
+                    .map(|index| menu.get_item(index).unwrap())
+                    .filter(|item| item.status == status)
+                    .collect();
+                assert_eq!(items.len(), 1);
+                assert!(matches!(&items[0].value, ListValue::Path(_)));
+                let before = board.lock().unwrap().config.upload_processing.clone();
+                let mut expected = [before.advertisement_file_rules, before.advertisement_description_rules];
+                let value = PathBuf::from(path);
+                expected[selected] = value.clone();
+                items[0].update_value.as_ref().unwrap()(&board, &ListValue::Path(value.clone()));
+                {
+                    let lock = board.lock().unwrap();
+                    let options = &lock.config.upload_processing;
+                    assert_eq!(
+                        [options.advertisement_file_rules.clone(), options.advertisement_description_rules.clone(),],
+                        expected
+                    );
+                    assert_eq!(options.advertisement_file, before.advertisement_file);
+                    assert_eq!(options.remove_advertisements, before.remove_advertisements);
+                }
+                let rebuilt = UploadProcessing::build_menu(board.clone(), Arc::new(Mutex::new(None)));
+                let item = (0..rebuilt.count())
+                    .map(|index| rebuilt.get_item(index).unwrap())
+                    .find(|item| item.status == status)
+                    .unwrap();
+                assert!(matches!(&item.value, ListValue::Path(path) if path == &value));
+            }
         }
     }
 
@@ -473,22 +556,51 @@ mod tests {
     }
 
     #[test]
+    fn comment_mode_changes_leave_text_and_advertisement_switch_untouched() {
+        let board = Arc::new(Mutex::new(IcyBoard::default()));
+        board.lock().unwrap().config.upload_processing.replacement_archive_comment = "Saved board text".into();
+        let before = board.lock().unwrap().config.upload_processing.remove_advertisements;
+        for mode in [ArchiveCommentMode::Remove, ArchiveCommentMode::Replace, ArchiveCommentMode::Preserve] {
+            let menu = UploadProcessing::build_menu(board.clone(), Arc::new(Mutex::new(None)));
+            let item = (0..menu.count())
+                .map(|i| menu.get_item(i).unwrap())
+                .find(|item| item.status == get_text("upload_processing_comment_mode-status"))
+                .unwrap();
+            assert!(matches!(&item.value, ListValue::ComboBox(_)));
+            let combo = ComboBox {
+                cur_value: ComboBoxValue::new(comment_mode_name(mode), format!("{mode:?}")),
+                selected_item: 0,
+                is_edit_open: false,
+                first_item: 0,
+                values: Vec::new(),
+            };
+            item.update_value.as_ref().unwrap()(&board, &ListValue::ComboBox(combo));
+            let lock = board.lock().unwrap();
+            assert_eq!(lock.config.upload_processing.archive_comment_mode, mode);
+            assert_eq!(lock.config.upload_processing.replacement_archive_comment, "Saved board text");
+            assert_eq!(lock.config.upload_processing.remove_advertisements, before);
+        }
+    }
+
+    #[test]
     fn catalogs_have_no_obsolete_cleanup_keys() {
         for catalog in [
             include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../icy_board_tui/i18n/en/icy_board_tui.ftl")),
             include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../icy_board_tui/i18n/de/icy_board_tui.ftl")),
         ] {
-            for retired in ["clean_descriptions", "clean_comments", "clean_passes", "additions"] {
+            for retired in ["clean_descriptions", "clean_comments", "clean_passes", "additions", "rules", "comment_rules"] {
                 assert!(!catalog.lines().any(|line| line.starts_with(&format!("upload_processing_{retired}"))));
             }
-            for suffix in ["", "-status", "-help"] {
-                assert_eq!(
-                    catalog
-                        .lines()
-                        .filter(|line| line.starts_with(&format!("upload_processing_advertisement_file{suffix}=")))
-                        .count(),
-                    1
-                );
+            for key in ["advertisement_file", "file_rules", "description_rules", "comment_mode"] {
+                for suffix in ["", "-status", "-help"] {
+                    assert_eq!(
+                        catalog
+                            .lines()
+                            .filter(|line| line.starts_with(&format!("upload_processing_{key}{suffix}=")))
+                            .count(),
+                        1
+                    );
+                }
             }
             for group in ["publication", "advertising", "zip", "scanner", "limits"] {
                 assert_eq!(

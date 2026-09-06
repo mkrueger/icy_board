@@ -663,6 +663,11 @@ fn repack(cmd: &Repack) -> Res<()> {
                 }
             }
             Repacked::Unchanged => {}
+            Repacked::Reported { text_members } => {
+                for finding in text_members {
+                    println!("{}: {}", header.name, finding);
+                }
+            }
             Repacked::NeedsReview { reason } => {
                 println!("{}: needs review, {}", header.name, reason);
             }
@@ -671,7 +676,8 @@ fn repack(cmd: &Repack) -> Res<()> {
                 removed,
                 added,
                 cleaned_descriptions,
-                archive_comment_rules,
+                text_members,
+                archive_comment_changed,
                 before: was,
                 after: is,
             } => {
@@ -680,6 +686,9 @@ fn repack(cmd: &Repack) -> Res<()> {
                 before += was;
                 after += is;
                 println!("{} -> {} ({} -> {} bytes)", header.name, name, was, is);
+                for finding in text_members {
+                    println!("     {}", finding);
+                }
                 for member in &removed {
                     println!("     dropped {}", member);
                 }
@@ -694,8 +703,8 @@ fn repack(cmd: &Repack) -> Res<()> {
                         );
                     }
                 }
-                for rule_id in &archive_comment_rules {
-                    println!("     cleaned archive comment ({})", rule_id);
+                if archive_comment_changed {
+                    println!("     changed archive comment");
                 }
                 if !cmd.dry_run {
                     adopt(&mut base, header, &name)?;

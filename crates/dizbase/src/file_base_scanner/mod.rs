@@ -12,6 +12,7 @@ pub mod repack;
 
 pub mod bbstro_fingerprint;
 pub mod description_cleaner;
+pub mod text_member;
 
 pub fn scan_file(path: &Path) -> crate::Result<Vec<MetadataHeader>> {
     let mut info = Vec::new();

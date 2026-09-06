@@ -10,8 +10,16 @@ releases.
 
 ### Added
 
+- Whole-file text advertisement templates in the existing member rule catalog:
+  `[[text_member_rule]]` supports literal and anchored regex lines, bounded
+  CP437/UTF-8 normalization and `report_only` (default), `review`, `auto_clean`.
+  Reports include rule, encoding and raw SHA-256; ambiguous matches preserve the
+  archive for review. Existing byte fingerprints still take precedence. Four
+  reviewed auto-clean templates and a raw-corpus validation report are included.
+  See the [text-rule guide](docs/upload_processing.md#whole-file-text-templates).
+
 - Uploads can be quarantined, checked for known or patterned BBS advertisements,
-  have appended `FILE_ID.DIZ` footers and known ZIP comments removed, be virus
+  have appended `FILE_ID.DIZ` footers cleaned and ZIP comments managed, be virus
   scanned and repacked as ZIP before publication. SysOps can configure the
   pipeline in `icbsetup`, receive a private mail for each accepted upload, and
   inspect, reprocess, approve or reject quarantined files in `icbadmin`.
@@ -21,6 +29,28 @@ releases.
   receives a private output directory and the archive name, with a 30-second
   timeout and a 16 MiB advertisement limit. See the
   [upload processing guide](docs/upload_processing.md).
+  Rules for complete advertising files and description blocks
+  have two separate catalogs and editable setup paths; an empty path
+  disables just that category. The old `upload_processing.advertisement_rules`
+  key is replaced by `advertisement_file_rules` and `advertisement_description_rules`.
+  Existing combined member/description catalogs can be selected explicitly in
+  both fields. Comment rules and `advertisement_comment_rules` are removed:
+  `archive_comment_mode` now explicitly selects Preserve (default), Remove or
+  Replace, serialized as `preserve`, `remove` or `replace`, independently of
+  advertisement removal. Only Replace uses `replacement_archive_comment`;
+  an empty replacement clears the comment, and the string is ignored otherwise.
+  Remove/Replace enable archive processing even without advertisement removal
+  or unconditional ZIP repacking. Non-ZIP source comments are not available.
+  The offline corpus generator emits only member/description rule catalogs;
+  the upload cleaning demo explicitly removes all ZIP comments. Prior corpus
+  and audit reports retain their historical results.
+
+- Description-advertisement rules accept `literal_lines` for complete plain-text
+  blocks without regex escaping, alongside existing regex-based `lines` rules.
+  Matching uses the same case, whitespace and color normalization; retained
+  description bytes are unchanged. Each rule requires exactly one nonempty
+  list, and invalid literal definitions require upload review. The shipped
+  LiQUiD footer uses the simpler syntax.
 
 - The AREA.LST editor imports `FIDONET.NA` and other networks' `.NA` area
   lists. It previews every tag and name, lets the sysop select what to take,

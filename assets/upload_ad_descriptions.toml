@@ -1,6 +1,8 @@
 # Conservative defaults derived from verified PCBoard archive corpus matches.
 # Add uncertain rules as report_only first and promote them only after reviewing
 # both positive and negative matches.
+# Use literal_lines for whole-line text (case, colors and whitespace normalized),
+# or lines for regular expressions. Specify exactly one nonempty list per rule.
 
 [[description_rule]]
 id = "shogunat-footer"
@@ -10,5 +12,308 @@ action = "auto_clean"
 [[description_rule]]
 id = "liquid-whq-footer"
 inline_start = "I WAS FIRST ON"
-lines = ["^i was first on liquid's whq, @user@$", "^why don't ya ask for japanese boards$"]
+literal_lines = ["I WAS FIRST ON LiQUiD'S WHQ, @USER@", "WHY DON'T YA ASK FOR JAPANESE BOARDS"]
 action = "auto_clean"
+
+# Reviewed PCBoard release DIZ transit advertisements; see pcboard_diz_audit/README.md.
+[[description_rule]]
+id = "critical-strike-transit"
+member_pattern = '(?i)(^|[/\\])(desc\.sdi|file_id\.(diz|ans|pcb))$'
+position = "suffix"
+lines = [
+    "^φ hσy lämεγ! φ$",
+    "^┌────────────────────────── · · · · · ·$",
+    '^│ this file passσd thru \(γiti\[al stγikε$',
+    '^│ üplφadσd φ∩ [0-9]{2}\.[0-9]{2}\.[0-9]{2} at [0-9]{2}:[0-9]{2}$',
+    '^│ call nθw \- \(2o1\)535\-3902$',
+    "^└────────────────────────── · · · · · ·$",
+]
+action = "auto_clean"
+
+[[description_rule]]
+id = "unknown-realm-transit"
+member_pattern = '(?i)(^|[/\\])(desc\.sdi|file_id\.(diz|ans|pcb))$'
+position = "suffix"
+literal_lines = [
+    "This File Passed Thru",
+    "(9o5) -=≡ The Unknown Realm ≡=- (9o5)",
+]
+action = "auto_clean"
+
+[[description_rule]]
+id = "eyes-cream-transit"
+member_pattern = '(?i)(^|[/\\])(desc\.sdi|file_id\.(diz|ans|pcb))$'
+position = "suffix"
+literal_lines = [
+    '.,-²"~~~~~~~~~~"²-,.',
+    "$ fiLe PassEd THru $",
+    "$ eYEs^crE@m [LSD] $",
+    "$ 972-6-6725664 $",
+    "`'-,............,-`'",
+]
+action = "auto_clean"
+
+[[description_rule]]
+id = "lords-couriering-94"
+member_pattern = '(?i)(^|[/\\])(desc\.sdi|file_id\.(diz|ans|pcb))$'
+position = "suffix"
+literal_lines = ["-=[ The L.O.R.D.S. Couriering '94 ]=-"]
+action = "auto_clean"
+
+[[description_rule]]
+id = "white-sands-transit"
+member_pattern = '(?i)(^|[/\\])(desc\.sdi|file_id\.(diz|ans|pcb))$'
+position = "suffix"
+literal_lines = [
+    ".",
+    "Leeched from White Sands",
+    "One of the Fastest on the East Coast!",
+]
+action = "auto_clean"
+
+[[description_rule]]
+id = "blood-pool-transit"
+member_pattern = '(?i)(^|[/\\])(desc\.sdi|file_id\.(diz|ans|pcb))$'
+position = "suffix"
+literal_lines = ["───■[ BLooD PooL ≡ 187 ]■───"]
+action = "auto_clean"
+
+[[description_rule]]
+id = "spaezm-couriers"
+member_pattern = '(?i)(^|[/\\])(desc\.sdi|file_id\.(diz|ans|pcb))$'
+position = "suffix"
+literal_lines = ["<]─────≡] SPÆZM COURiERS [≡─────[>"]
+action = "auto_clean"
+
+[[description_rule]]
+id = "scimitar-spreader"
+member_pattern = '(?i)(^|[/\\])(desc\.sdi|file_id\.(diz|ans|pcb))$'
+position = "suffix"
+literal_lines = ["-* SCIMITAR * -<WWC/PWA>- Spreader *-"]
+action = "auto_clean"
+
+[[description_rule]]
+id = "rts-couriers"
+member_pattern = '(?i)(^|[/\\])(desc\.sdi|file_id\.(diz|ans|pcb))$'
+position = "suffix"
+literal_lines = ["────── Brought to you by RTS Couriers ──────"]
+action = "auto_clean"
+
+[[description_rule]]
+id = "limpy-crack-mark"
+member_pattern = '(?i)(^|[/\\])(desc\.sdi|file_id\.(diz|ans|pcb))$'
+position = "suffix"
+literal_lines = ["[[[[[[[[[ CRACKED BY -=LiMPY=- ]]]]]]]]]]]]]"]
+action = "report_only"
+
+[[description_rule]]
+id = "ambient-hauze-transit"
+member_pattern = '(?i)(^|[/\\])(desc\.sdi|file_id\.(diz|ans|pcb))$'
+position = "suffix"
+literal_lines = ['-/PASSED THRU AMBIENT HAUZE\-']
+action = "auto_clean"
+
+[[description_rule]]
+id = "risc-couriering-94"
+member_pattern = '(?i)(^|[/\\])(desc\.sdi|file_id\.(diz|ans|pcb))$'
+position = "suffix"
+literal_lines = ["──═══ RiSC COURiERiNG '94! ═══──"]
+action = "auto_clean"
+
+[[description_rule]]
+id = "digital-delusions-transit"
+member_pattern = '(?i)(^|[/\\])(desc\.sdi|file_id\.(diz|ans|pcb))$'
+position = "suffix"
+literal_lines = ["Passed Through Digital Delusions -[315]-"]
+action = "auto_clean"
+
+[[description_rule]]
+id = "digital-delusions-transit-315"
+member_pattern = '(?i)(^|[/\\])(desc\.sdi|file_id\.(diz|ans|pcb))$'
+position = "suffix"
+literal_lines = ["-[315]- Passed Thru Digital Delusions -[315]-"]
+action = "auto_clean"
+
+[[description_rule]]
+id = "high-tech-couriers-95"
+member_pattern = '(?i)(^|[/\\])(desc\.sdi|file_id\.(diz|ans|pcb))$'
+position = "suffix"
+literal_lines = ["<< .xXx. HiGH TeCh COURiERS '95 .xXx. >>"]
+action = "auto_clean"
+
+[[description_rule]]
+id = "high-tech-couriers-slash"
+member_pattern = '(?i)(^|[/\\])(desc\.sdi|file_id\.(diz|ans|pcb))$'
+position = "suffix"
+literal_lines = ["-/- High Tech Couriers -/-"]
+action = "auto_clean"
+
+[[description_rule]]
+id = "high-tech-couriers-cross"
+member_pattern = '(?i)(^|[/\\])(desc\.sdi|file_id\.(diz|ans|pcb))$'
+position = "suffix"
+literal_lines = ["┼─∙■ HiGH TeCH CouRieRS ■∙─┼"]
+action = "auto_clean"
+
+[[description_rule]]
+id = "distinct-courier"
+member_pattern = '(?i)(^|[/\\])(desc\.sdi|file_id\.(diz|ans|pcb))$'
+position = "suffix"
+literal_lines = ["[DtC] -[ Courier'd By Distinct ] - [DtC]"]
+action = "auto_clean"
+
+[[description_rule]]
+id = "ufp-couriering"
+member_pattern = '(?i)(^|[/\\])(desc\.sdi|file_id\.(diz|ans|pcb))$'
+position = "suffix"
+literal_lines = ["∙{TAB}·¡Dístributéd By UFP Cóurieríng!·{TAB}∙"]
+action = "auto_clean"
+
+[[description_rule]]
+id = "fate97-courier"
+member_pattern = '(?i)(^|[/\\])(desc\.sdi|file_id\.(diz|ans|pcb))$'
+position = "suffix"
+literal_lines = ["[fATE97] COURiERED BY fATE [fATE97]"]
+action = "auto_clean"
+
+[[description_rule]]
+id = "fate95-courier"
+member_pattern = '(?i)(^|[/\\])(desc\.sdi|file_id\.(diz|ans|pcb))$'
+position = "suffix"
+literal_lines = ["[*] fATE95 COURiERiNG! [*]"]
+action = "auto_clean"
+
+[[description_rule]]
+id = "fate95-courier-slash"
+member_pattern = '(?i)(^|[/\\])(desc\.sdi|file_id\.(diz|ans|pcb))$'
+position = "suffix"
+literal_lines = ['-/[*]\- fATE95 COURiERiNG! -/[*]\-']
+action = "auto_clean"
+
+[[description_rule]]
+id = "rts-whq-transit"
+member_pattern = '(?i)(^|[/\\])(desc\.sdi|file_id\.(diz|ans|pcb))$'
+position = "suffix"
+literal_lines = [".:. Scortched from the RTS/WHQ .:."]
+action = "auto_clean"
+
+[[description_rule]]
+id = "metro-couriers-95"
+member_pattern = '(?i)(^|[/\\])(desc\.sdi|file_id\.(diz|ans|pcb))$'
+position = "suffix"
+literal_lines = ["<<--------[metro couriers 95]"]
+action = "auto_clean"
+
+[[description_rule]]
+id = "rod-bbs-transit"
+member_pattern = '(?i)(^|[/\\])(desc\.sdi|file_id\.(diz|ans|pcb))$'
+position = "suffix"
+literal_lines = ["■ Leeched From: R·O·D BBS ■"]
+action = "auto_clean"
+
+[[description_rule]]
+id = "wild-thing-transit-box"
+member_pattern = '(?i)(^|[/\\])(desc\.sdi|file_id\.(diz|ans|pcb))$'
+position = "suffix"
+literal_lines = [
+    "┌───────────────────────────────────┐",
+    "│ LεεCHεD FRoM The Wild Thing BBs │",
+    "└───────────────────────────────────┘",
+]
+action = "auto_clean"
+
+[[description_rule]]
+id = "wild-thing-euro-connection"
+member_pattern = '(?i)(^|[/\\])(desc\.sdi|file_id\.(diz|ans|pcb))$'
+position = "suffix"
+literal_lines = [
+    "┌»»LεεCHεD FRoM The Wild Thing BBs««┐",
+    "└───¥■Φ ThΣ ΣÜro ÇÖnnεctïon Φ■¥─────┘",
+]
+action = "auto_clean"
+
+[[description_rule]]
+id = "holland-number-one-transit"
+member_pattern = '(?i)(^|[/\\])(desc\.sdi|file_id\.(diz|ans|pcb))$'
+position = "suffix"
+literal_lines = ["(---- went trough holland's bbs no.one ----)"]
+action = "auto_clean"
+
+[[description_rule]]
+id = "kort-whq-upload"
+member_pattern = '(?i)(^|[/\\])(desc\.sdi|file_id\.(diz|ans|pcb))$'
+position = "suffix"
+literal_lines = [
+    "4 Ñodes KORT WHQ*313.699*0530",
+    "Files: 15, Nfo: NONE, Diz: 09.17.94",
+    "Uploaded [16:22] by: Tosh10",
+]
+action = "auto_clean"
+
+[[description_rule]]
+id = "bsbbs-phone"
+member_pattern = '(?i)(^|[/\\])(desc\.sdi|file_id\.(diz|ans|pcb))$'
+position = "suffix"
+literal_lines = ["bsbbs.1.603.889.8903.pcb15"]
+action = "auto_clean"
+
+[[description_rule]]
+id = "bsbbs-phone-obfuscated"
+member_pattern = '(?i)(^|[/\\])(desc\.sdi|file_id\.(diz|ans|pcb))$'
+position = "suffix"
+literal_lines = ["bsbbs.1.6O3.889.89O3.pcb15"]
+action = "auto_clean"
+
+[[description_rule]]
+id = "nostrum-nine-promotion"
+member_pattern = '(?i)(^|[/\\])(desc\.sdi|file_id\.(diz|ans|pcb))$'
+position = "suffix"
+literal_lines = [
+    "\u000F +31(o)317-314125 \u000F",
+    "-=[NoS 9] -=[ NOSTRUM -9- BBS ]=- [NoS 9]=-",
+]
+action = "report_only"
+
+[[description_rule]]
+id = "nexus-project-promotion"
+member_pattern = '(?i)(^|[/\\])(desc\.sdi|file_id\.(diz|ans|pcb))$'
+position = "suffix"
+literal_lines = [
+    '(---/\//[ iMMUNE! tRADERS ]\\/\---)',
+    "[= NP =] -= NEXUS PROJECT BBS =- [= NP =]",
+]
+action = "report_only"
+
+[[description_rule]]
+id = "reckless-life-promotion"
+member_pattern = '(?i)(^|[/\\])(desc\.sdi|file_id\.(diz|ans|pcb))$'
+position = "suffix"
+literal_lines = ["∙[ RΣ¢KLΣS$ LiFΣ BBS:P0RTÜGA¿'$ CΘ0¿Σ2T¡! ]∙"]
+action = "report_only"
+
+[[description_rule]]
+id = "mtnt-hacker-courier"
+member_pattern = '(?i)(^|[/\\])(desc\.sdi|file_id\.(diz|ans|pcb))$'
+position = "suffix"
+literal_lines = [
+    "│ Couriered by : HACKER [MTNT] │",
+    "-─-─--──────────────────────────────-",
+]
+action = "report_only"
+
+[[description_rule]]
+id = "disembodied-lands-promotion"
+member_pattern = '(?i)(^|[/\\])(desc\.sdi|file_id\.(diz|ans|pcb))$'
+position = "suffix"
+literal_lines = [
+    "Disembodied Voices :: 718-279-2766",
+    '<=/\=>·LANDS·OF·CHAOS∙SPHERE!·APP·HQ·<=/\=>',
+]
+action = "report_only"
+
+[[description_rule]]
+id = "nuclear-insemination-promotion"
+member_pattern = '(?i)(^|[/\\])(desc\.sdi|file_id\.(diz|ans|pcb))$'
+position = "suffix"
+literal_lines = ["·∙:|Nuclear Insemination|:∙·"]
+action = "report_only"

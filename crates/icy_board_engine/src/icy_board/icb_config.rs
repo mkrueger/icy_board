@@ -674,6 +674,8 @@ pub struct FileTransferOptions {
     pub stop_uploads_free_space: u32,
 }
 
+pub use dizbase::file_base_scanner::repack::ArchiveCommentMode;
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum UploadPublishPolicy {
@@ -718,14 +720,22 @@ pub struct UploadProcessingConfig {
     pub remove_advertisements: bool,
     #[serde(default)]
     pub repack_to_zip: bool,
-    #[serde(default)]
-    pub advertisement_rules: PathBuf,
+    /// Rules for complete archive members. An empty path disables this category.
+    #[serde(default = "default_advertisement_file_rules")]
+    pub advertisement_file_rules: PathBuf,
+    /// Rules for blocks in archive descriptions. An empty path disables this category.
+    #[serde(default = "default_advertisement_description_rules")]
+    pub advertisement_description_rules: PathBuf,
     #[serde(default)]
     pub quarantine_path: PathBuf,
     /// Empty disables insertion; a case-insensitive .ppe extension selects a trusted generator.
     /// Other paths insert one static file under its basename.
     #[serde(default)]
     pub advertisement_file: PathBuf,
+    /// Independent of advertisement removal; preserve source ZIP comments by default.
+    #[serde(default)]
+    pub archive_comment_mode: ArchiveCommentMode,
+    /// Used only in Replace mode. Empty replacement text clears the comment.
     #[serde(default)]
     pub replacement_archive_comment: String,
     pub compression_level: i64,
@@ -737,6 +747,14 @@ pub struct UploadProcessingConfig {
     pub scanner: UploadScannerConfig,
 }
 
+fn default_advertisement_file_rules() -> PathBuf {
+    PathBuf::from("upload_ad_files.toml")
+}
+
+fn default_advertisement_description_rules() -> PathBuf {
+    PathBuf::from("upload_ad_descriptions.toml")
+}
+
 impl Default for UploadProcessingConfig {
     fn default() -> Self {
         Self {
@@ -744,9 +762,11 @@ impl Default for UploadProcessingConfig {
             notify_sysop: false,
             remove_advertisements: false,
             repack_to_zip: false,
-            advertisement_rules: PathBuf::from("upload_ad_rules.toml"),
+            advertisement_file_rules: default_advertisement_file_rules(),
+            advertisement_description_rules: default_advertisement_description_rules(),
             quarantine_path: PathBuf::from("quarantine/uploads"),
             advertisement_file: PathBuf::new(),
+            archive_comment_mode: ArchiveCommentMode::Preserve,
             replacement_archive_comment: String::new(),
             compression_level: 9,
             max_members: 10_000,
@@ -1510,9 +1530,11 @@ impl Default for QwkSettings {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use super::{
-        ColorConfiguration, CommandType, IcbConfig, PcbScreenColors, PplHttpDestinationPolicy, SecurityExpression, SysopInformation, UploadPublishPolicy,
-        UserCommandLevels, normalize_ppl_http_origins,
+        ArchiveCommentMode, ColorConfiguration, CommandType, IcbConfig, PcbScreenColors, PplHttpDestinationPolicy, SecurityExpression, SysopInformation,
+        UploadProcessingConfig, UploadPublishPolicy, UserCommandLevels, normalize_ppl_http_origins,
     };
 
     #[test]
@@ -1575,6 +1597,58 @@ mod tests {
         value["upload_processing"].as_table_mut().unwrap().remove("advertisement_file");
         let decoded: IcbConfig = toml::from_str(&toml::to_string(&value).unwrap()).unwrap();
         assert!(decoded.upload_processing.advertisement_file.as_os_str().is_empty());
+    }
+
+    #[test]
+    fn upload_processing_rule_paths_round_trip_independently() {
+        let mut config = UploadProcessingConfig::default();
+        config.advertisement_file_rules = "rules/file ads; local.toml".into();
+        config.advertisement_description_rules = PathBuf::new();
+        let encoded = toml::to_string(&config).unwrap();
+        let decoded: UploadProcessingConfig = toml::from_str(&encoded).unwrap();
+        assert_eq!(decoded.advertisement_file_rules, config.advertisement_file_rules);
+        assert!(decoded.advertisement_description_rules.as_os_str().is_empty());
+        assert!(!encoded.contains("advertisement_comment_rules"));
+        assert!(!encoded.contains("advertisement_rules ="));
+    }
+
+    #[test]
+    fn upload_processing_missing_rule_paths_use_shipped_defaults() {
+        let config = UploadProcessingConfig::default();
+        let mut value = toml::Value::try_from(&config).unwrap();
+        for key in ["advertisement_file_rules", "advertisement_description_rules"] {
+            value.as_table_mut().unwrap().remove(key);
+        }
+        let decoded: UploadProcessingConfig = toml::from_str(&toml::to_string(&value).unwrap()).unwrap();
+        assert_eq!(decoded.advertisement_file_rules, config.advertisement_file_rules);
+        assert_eq!(decoded.advertisement_description_rules, config.advertisement_description_rules);
+    }
+
+    #[test]
+    fn upload_comment_modes_round_trip_and_missing_mode_preserves() {
+        for (mode, name) in [
+            (ArchiveCommentMode::Preserve, "preserve"),
+            (ArchiveCommentMode::Remove, "remove"),
+            (ArchiveCommentMode::Replace, "replace"),
+        ] {
+            let config = UploadProcessingConfig {
+                archive_comment_mode: mode,
+                replacement_archive_comment: "Own BBS — Grüße\r\nSecond line".into(),
+                ..Default::default()
+            };
+            let mut value = toml::Value::try_from(&config).unwrap();
+            assert_eq!(value["archive_comment_mode"].as_str(), Some(name));
+            assert!(value.get("advertisement_comment_rules").is_none());
+            let decoded: UploadProcessingConfig = value.clone().try_into().unwrap();
+            assert_eq!(decoded.archive_comment_mode, mode);
+            assert_eq!(decoded.replacement_archive_comment, config.replacement_archive_comment);
+            value.as_table_mut().unwrap().remove("archive_comment_mode");
+            let decoded: UploadProcessingConfig = value.clone().try_into().unwrap();
+            assert_eq!(decoded.archive_comment_mode, ArchiveCommentMode::Preserve);
+            assert_eq!(decoded.replacement_archive_comment, config.replacement_archive_comment);
+            value.as_table_mut().unwrap().insert("archive_comment_mode".into(), "invalid".into());
+            assert!(value.try_into::<UploadProcessingConfig>().is_err());
+        }
     }
 
     #[test]

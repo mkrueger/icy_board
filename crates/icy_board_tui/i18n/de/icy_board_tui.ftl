@@ -138,202 +138,109 @@ upload_processing_group_scanner=Virenscanner
 upload_processing_group_limits=Ressourcen- und Sicherheitsgrenzen
 upload_processing_publish_policy=Veröffentlichung
 upload_processing_publish_policy-status=Legt fest, wann verarbeitete Uploads sichtbar werden.
-upload_processing_publish_policy-help=
-    # Veröffentlichung
-
-    „Sofort“ veröffentlicht Uploads ohne diese Verarbeitung.
-    „Nach erfolgreicher Verarbeitung“ veröffentlicht Dateien automatisch.
-    „Manuelle Sysop-Freigabe“ hält verarbeitete Dateien bis zur Freigabe in Quarantäne.
+upload_processing_publish_policy-help=Sofort veröffentlicht Uploads ohne diese Verarbeitung. Nach erfolgreicher Verarbeitung werden Dateien automatisch veröffentlicht. Manuelle Sysop-Freigabe hält verarbeitete Dateien bis zur Freigabe in Quarantäne.
 upload_processing_policy_immediate=Sofort
 upload_processing_policy_after_processing=Nach erfolgreicher Verarbeitung
 upload_processing_policy_manual_approval=Manuelle Sysop-Freigabe
 upload_processing_notify_sysop=Sysop per Mail benachrichtigen
 upload_processing_notify_sysop-status=Sendet für jeden angenommenen Upload eine private lokale Nachricht.
-upload_processing_notify_sysop-help=
-    # Sysop per Mail benachrichtigen
-
-    Die Nachricht enthält Datei, Uploader, Verarbeitungsstatus und Beschreibung.
-    Ein Mailfehler wird protokolliert, lehnt den Upload aber nicht ab.
+upload_processing_notify_sysop-help=Die Nachricht enthält Datei, Uploader, Verarbeitungsstatus und Beschreibung. Ein Mailfehler wird protokolliert, lehnt den Upload aber nicht ab.
 upload_processing_remove_advertisements=Werbung entfernen
-upload_processing_remove_advertisements-status=Entfernt erkannte Werbedateien und Werbeblöcke in Beschreibungen.
+upload_processing_remove_advertisements-status=Prüft Werbedateien und Beschreibungswerbung anhand der gewählten Regeln; ZIP-Kommentare sind unabhängig.
 upload_processing_remove_advertisements-help=
-    # Werbung entfernen
-
-    Ein Schalter entfernt erkannte Werbedateien anhand von Prüfsummen, Dateinamen
-    und Textmustern sowie begrenzte Werbeblöcke (einschließlich BBS- und Courier-Nachspann)
-    aus kanonischen Beschreibungsdateien.
-
+    Ein Schalter aktiviert Byte-Fingerprints, Ganzdatei-Textregeln und begrenzte Werbeblöcke
+    aus kanonischen Beschreibungsdateien. Textregeln mit report_only melden nur;
+    auto_clean entfernt die ganze erkannte Werbedatei, review verlangt eine Prüfung.
     Die Beschreibungsbereinigung ist intern auf 8 Durchläufe begrenzt; verbleibende Treffer erfordern danach eine Prüfung.
-    ZIP-Kommentare steuert der separate ZIP-Kommentarmodus unabhängig von diesem Schalter und ohne Regeldateien.
+    ZIP-Kommentare folgen ausschließlich dem unabhängigen Kommentarmodus.
+    Kommentare anderer Archivformate werden nicht ausgelesen und bei der ZIP-Konvertierung nicht übernommen.
 upload_processing_repack_zip=Als ZIP neu packen
 upload_processing_repack_zip-status=Schreibt akzeptierte Archive als ZIP-Dateien neu.
-upload_processing_repack_zip-help=
-    # Als ZIP neu packen
-
-    Lesbare Archivformate werden mit dem direkt folgenden Kompressionsgrad
-    nach ZIP konvertiert.
-
-    Kommentare anderer Formate werden nicht ausgelesen und bei der
-    Konvertierung nicht übernommen.
+upload_processing_repack_zip-help=Lesbare Archivformate werden mit dem direkt folgenden Kompressionsgrad nach ZIP konvertiert. Kommentare anderer Formate werden nicht ausgelesen und bei der Konvertierung nicht übernommen.
 upload_processing_file_rules=Regeln für Werbedateien
 upload_processing_file_rules-status=TOML-Regeln für Werbedateien im Archiv; leer deaktiviert diese Kategorie.
 upload_processing_file_rules-help=
-    # Regeln für Werbedateien
-
-    TOML-Datei mit [[fingerprint]]-Abschnitten wählen (Standard: upload_ad_files.toml).
+    TOML-Datei mit [[fingerprint]] und/oder [[text_member_rule]] wählen (Standard: upload_ad_files.toml).
     Leer lassen, um das Entfernen von Werbedateien zu deaktivieren. Relative Pfade beginnen im Board-Stammverzeichnis;
     Leerzeichen und Semikolons sind wörtliche Pfadbestandteile. „Werbung entfernen“ muss aktiviert sein.
-
     Lese-, Syntax- oder Musterfehler der gewählten Regeln erfordern eine Upload-Prüfung statt stillen Überspringens.
-    Fingerprints prüfen Hash und Größe oder Dateinamenmuster mit Schlüsselwörtern; Aktionen und report_only werden nicht unterstützt.
-
-    Dieselbe kombinierte TOML-Datei darf für beide Pfade (Archivdateien und Beschreibungen) gewählt werden; jeder nutzt nur seine eigene Kategorie.
-    ZIP-Kommentare nutzen den separaten ZIP-Kommentarmodus, keine Regeldateien.
+    Fingerprints prüfen unverändert Hash und Größe oder Dateinamenmuster mit rohen Schlüsselwörtern und entfernen zuerst.
+    Textregeln vergleichen vollständige CP437/UTF-8-Texte mit literalen/Regex-Zeilen; Standardaktion ist report_only.
+    Neue Textregeln zuerst im Uploadbericht prüfen, bevor action = "auto_clean" gewählt wird.
+    Mehrdeutige Texttreffer verlangen eine Prüfung. Dieselbe kombinierte TOML-Datei darf für beide Regelpfade gewählt werden.
 upload_processing_description_rules=Regeln für Beschreibungswerbung
 upload_processing_description_rules-status=TOML-Regeln für Beschreibungsblöcke; leer deaktiviert diese Kategorie.
 upload_processing_description_rules-help=
-    # Regeln für Beschreibungswerbung
-
     TOML-Datei mit [[description_rule]]-Abschnitten wählen (Standard: upload_ad_descriptions.toml).
     Leer lassen, um die Beschreibungsbereinigung zu deaktivieren. Relative Pfade beginnen im Board-Stammverzeichnis;
     Leerzeichen und Semikolons sind wörtliche Pfadbestandteile. „Werbung entfernen“ muss aktiviert sein.
-
     Lese-, Syntax- oder Musterfehler der gewählten Regeln erfordern eine Upload-Prüfung statt stillen Überspringens.
-
-    Für einfache Blöcke literal_lines = ["Werbezeile 1", "Werbezeile 2"] verwenden; Regex-Sonderzeichen gelten dort als Text.
-    Groß-/Kleinschreibung, ANSI-/@X-Farbcodes und überzählige Leerzeichen werden beim Vergleich ignoriert.
-    Jede Zeile muss vollständig passen; Leerzeilen im Archiv werden übersprungen. Der ganze Block muss am Ende stehen (Standard),
-    oder mit position = "prefix" am Anfang. Nur mit inline_start darf der Block innerhalb seiner ersten Zeile beginnen.
-
-    Für variable Texte bleibt lines mit regulären Ausdrücken verfügbar. Pro Regel genau eine nichtleere Liste verwenden,
-    entweder literal_lines oder lines; leere Klartextzeilen und eingebettete Zeilenumbrüche sind ungültig.
-    Neue Regeln mit action = "report_only" prüfen (Standard), bevor "auto_clean" aktiviert wird.
-
-    Dieselbe kombinierte TOML-Datei darf für beide Pfade (Archivdateien und Beschreibungen) gewählt werden; jeder nutzt nur seine eigene Kategorie.
-    ZIP-Kommentare nutzen den separaten ZIP-Kommentarmodus, keine Regeldateien.
+    lines enthält reguläre Ausdrücke, alternativ enthält literal_lines Klartextzeilen. Neue Regeln zuerst mit action = "report_only" prüfen.
+    Dieselbe kombinierte TOML-Datei darf für beide Pfade gewählt werden; jeder nutzt nur seine eigene Kategorie.
+upload_processing_comment_mode=ZIP-Kommentarmodus
+upload_processing_comment_mode-status=ZIP-Kommentar unabhängig von Werberegeln beibehalten, entfernen oder ersetzen.
+upload_processing_comment_mode-help=
+    Beibehalten erhält die Originalbytes des ZIP-Kommentars. Entfernen leert den Kommentar.
+    Eigener Kommentar verwendet das folgende Textfeld; ein leerer Text entfernt den Kommentar.
+    Der gespeicherte eigene Text wirkt nur in diesem Modus. Eine Änderung benötigt keine aktivierte ZIP-Neukompression.
+    Kommentare anderer Formate werden nicht ausgelesen. Es gibt keine Kommentar-Regeldatei.
+upload_processing_comment_preserve=Beibehalten
+upload_processing_comment_remove=Entfernen
+upload_processing_comment_replace=Eigener Kommentar
 upload_processing_quarantine=Quarantäneverzeichnis
 upload_processing_quarantine-status=Privates Verzeichnis für Uploads in Verarbeitung oder Freigabe.
-upload_processing_quarantine-help=
-    # Quarantäneverzeichnis
-
-    Dieses Verzeichnis muss außerhalb aller öffentlichen Dateibereiche liegen.
+upload_processing_quarantine-help=Dieses Verzeichnis muss außerhalb aller öffentlichen Dateibereiche liegen.
 upload_processing_advertisement_file=Eigene Werbedatei
 upload_processing_advertisement_file-status=Eine statische Datei oder ein vertrauenswürdiger PPE-Generator; leer deaktiviert das Einfügen.
 upload_processing_advertisement_file-help=
-    # Eigene Werbedatei
-
     Leer lassen, um das Einfügen zu deaktivieren. Ein normaler Pfad fügt eine statische Datei unter ihrem Basisnamen ein.
     Leerzeichen und Semikolons sind wörtliche Bestandteile dieses einzelnen Pfads, keine Listentrenner.
-
     Die Erweiterung .ppe (Groß-/Kleinschreibung beliebig) startet einen Generator, der null oder eine Datei
     im übergebenen temporären Ausgabeverzeichnis (Parameter 1) erzeugen darf. Parameter 2 ist der ursprüngliche
     Archivbasisname. Die Argumente werden wörtlich übergeben und mit GETTOKEN gelesen.
-
     Es steht kein Entpackverzeichnis zur Verfügung, und es gibt keinen Kontext eines angemeldeten Anrufers.
     Nur vertrauenswürdige SysOp-PPE-Programme verwenden: Die Ausführung erfolgt ohne Sandbox.
-
     Die Generatorlaufzeit ist auf 30 Sekunden begrenzt; die Ausgabegröße auf den kleineren Wert
     von max_member_size und 16 MiB. Bereits vorhandene Einträge mit dem Ausgabebasisnamen erfordern eine Prüfung.
     Beschreibungsdateien (FILE_ID.DIZ, FILE_ID.ANS, FILE_ID.PCB, DESC.SDI) dürfen nicht hinzugefügt oder ersetzt werden.
-
     Der konfigurierte Virenscanner läuft nach dem Einfügen und der Archivverarbeitung.
-upload_processing_comment_mode=ZIP-Kommentarmodus
-upload_processing_comment_mode-status=ZIP-Archivkommentar unabhängig von der Werbeentfernung beibehalten, entfernen oder ersetzen.
-upload_processing_comment_mode-help=
-    # ZIP-Kommentarmodus
-
-    Beibehalten (Standard) erhält die ursprünglichen ZIP-Kommentarbytes unverändert, auch bei unbekannter Kodierung.
-    Entfernen löscht jeden ZIP-Archivkommentar, nicht nur Werbekommentare.
-    Eigener Kommentar ersetzt ihn durch den exakten UTF-8-Text unten; leerer Text löscht den Kommentar.
-
-    Bei Beibehalten oder Entfernen wirkt der eigene Text nicht, bleibt aber beim Moduswechsel gespeichert.
-    Entfernen und Eigener Kommentar lösen die Archivverarbeitung auch bei deaktiviertem „Als ZIP neu packen“ aus.
-
-    Der Modus ist unabhängig von „Werbung entfernen“ und gilt nur für die ZIP-Ausgabe.
-    Kommentare aus Nicht-ZIP-Quellen sind nicht verfügbar und können bei der ZIP-Konvertierung nicht erhalten werden.
-upload_processing_comment_mode_preserve=Beibehalten
-upload_processing_comment_mode_remove=Entfernen
-upload_processing_comment_mode_replace=Eigener Kommentar
 upload_processing_replacement_comment=Eigener ZIP-Kommentar
-upload_processing_replacement_comment-status=Exakter UTF-8-Text nur für den Modus Eigener Kommentar; leer löscht den ZIP-Kommentar.
-upload_processing_replacement_comment-help=
-    # Eigener ZIP-Kommentar
-
-    Der Modus „Eigener Kommentar“ ersetzt den ZIP-Ausgabekommentar durch diesen
-    exakten UTF-8-Text; leerer Text löscht ihn.
-
-    Bei „Beibehalten“ oder „Entfernen“ wirkt der Text nicht, bleibt aber beim
-    Moduswechsel gespeichert. Die Einstellung ist unabhängig von „Werbung entfernen“.
-    Kommentare anderer Ausgabeformate werden nicht geschrieben.
+upload_processing_replacement_comment-status=Boardtext, der ausschließlich im Modus „Eigener Kommentar“ verwendet wird.
+upload_processing_replacement_comment-help=Im Modus „Eigener Kommentar“ ersetzt dieser Text den ZIP-Kommentar vollständig; leer entfernt ihn. In anderen Modi bleibt der Text gespeichert, wird aber nicht verwendet.
 upload_processing_compression=ZIP-Kompressionsgrad
 upload_processing_compression-status=Deflate-Kompressionsgrad von 0 bis 9.
-upload_processing_compression-help=
-    # ZIP-Kompressionsgrad
-
-    Höhere Werte können Platz sparen, benötigen aber mehr Rechenzeit.
+upload_processing_compression-help=Höhere Werte können Platz sparen, benötigen aber mehr Rechenzeit.
 upload_processing_max_members=Maximale Archivdateien
 upload_processing_max_members-status=Archive mit mehr Einträgen werden zur Prüfung vorgemerkt.
-upload_processing_max_members-help=
-    # Maximale Archivdateien
-
-    Begrenzt CPU- und Metadatenarbeit durch Archive mit sehr vielen Einträgen.
+upload_processing_max_members-help=Begrenzt CPU- und Metadatenarbeit durch Archive mit sehr vielen Einträgen.
 upload_processing_max_member_size=Maximale Eintragsgröße
 upload_processing_max_member_size-status=Größte erlaubte entpackte Größe eines Archiveintrags.
-upload_processing_max_member_size-help=
-    # Maximale Eintragsgröße
-
-    Der Wert wird in Bytes angegeben.
+upload_processing_max_member_size-help=Der Wert wird in Bytes angegeben.
 upload_processing_max_expanded_size=Maximale entpackte Größe
 upload_processing_max_expanded_size-status=Größte erlaubte entpackte Gesamtgröße eines Archivs.
-upload_processing_max_expanded_size-help=
-    # Maximale entpackte Größe
-
-    Der Wert wird in Bytes angegeben und schützt vor Archivbomben.
+upload_processing_max_expanded_size-help=Der Wert wird in Bytes angegeben und schützt vor Archivbomben.
 upload_processing_max_ratio=Maximales Kompressionsverhältnis
 upload_processing_max_ratio-status=Größtes erlaubtes Verhältnis von entpackter zu gepackter Größe.
-upload_processing_max_ratio-help=
-    # Maximales Kompressionsverhältnis
-
-    Einträge über diesem Verhältnis werden vor dem Entpacken zur Prüfung vorgemerkt.
+upload_processing_max_ratio-help=Einträge über diesem Verhältnis werden vor dem Entpacken zur Prüfung vorgemerkt.
 upload_processing_scanner_enabled=Virenscanner aktivieren
 upload_processing_scanner_enabled-status=Startet nach der Archivverarbeitung einen externen Scanner.
-upload_processing_scanner_enabled-help=
-    # Virenscanner aktivieren
-
-    Das Programm wird direkt und ohne Kommando-Shell gestartet.
+upload_processing_scanner_enabled-help=Das Programm wird direkt und ohne Kommando-Shell gestartet.
 upload_processing_scanner_executable=Scanner-Programm
 upload_processing_scanner_executable-status=Programmname oder absoluter Pfad, zum Beispiel clamscan.
-upload_processing_scanner_executable-help=
-    # Scanner-Programm
-
-    Bei einem reinen Programmnamen wird PATH durchsucht.
+upload_processing_scanner_executable-help=Bei einem reinen Programmnamen wird PATH durchsucht.
 upload_processing_scanner_arguments=Scanner-Argumente
 upload_processing_scanner_arguments-status=Durch Semikolon getrennte Argumente mit genau einem eigenständigen { "{file}" }.
-upload_processing_scanner_arguments-help=
-    # Scanner-Argumente
-
-    Es gibt keine Shell-Ersetzung. Das exakte Argument { "{file}" } wird durch
-    den Quarantänepfad ersetzt.
+upload_processing_scanner_arguments-help=Es gibt keine Shell-Ersetzung. Das exakte Argument { "{file}" } wird durch den Quarantänepfad ersetzt.
 upload_processing_scanner_arguments-invalid=Scanner-Argumente müssen genau ein eigenständiges { "{file}" }-Argument enthalten.
 upload_processing_scanner_timeout=Scanner-Timeout in Sekunden
 upload_processing_scanner_timeout-status=Maximale Laufzeit eines Scanner-Prozesses.
-upload_processing_scanner_timeout-help=
-    # Scanner-Timeout in Sekunden
-
-    Ein Timeout gilt als technischer Fehler und erfordert eine Prüfung.
+upload_processing_scanner_timeout-help=Ein Timeout gilt als technischer Fehler und erfordert eine Prüfung.
 upload_processing_scanner_clean_code=Exitcode für sauber
 upload_processing_scanner_clean_code-status=Exitcode, wenn keine Schadsoftware gefunden wurde.
-upload_processing_scanner_clean_code-help=
-    # Exitcode für sauber
-
-    ClamAV verwendet Exitcode 0 für eine saubere Datei.
+upload_processing_scanner_clean_code-help=ClamAV verwendet Exitcode 0 für eine saubere Datei.
 upload_processing_scanner_infected_code=Exitcode für infiziert
 upload_processing_scanner_infected_code-status=Exitcode, wenn Schadsoftware gefunden wurde.
-upload_processing_scanner_infected_code-help=
-    # Exitcode für infiziert
-
-    ClamAV verwendet Exitcode 1 für eine infizierte Datei.
-    Andere Codes gelten als technische Fehler.
+upload_processing_scanner_infected_code-help=ClamAV verwendet Exitcode 1 für eine infizierte Datei. Andere Codes gelten als technische Fehler.
 
 exit_icy_board_msg = Vielen Dank, dass Sie die professionelle BBS-Software { $name } verwenden!
 

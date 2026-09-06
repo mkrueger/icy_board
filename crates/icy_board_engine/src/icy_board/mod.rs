@@ -197,7 +197,9 @@ impl IcyBoard {
         self.config.paths.ftn_file = get_path(&self.root_path, &self.config.paths.ftn_file);
         self.config.paths.qwknet_file = get_path(&self.root_path, &self.config.paths.qwknet_file);
 
-        self.config.upload_processing.advertisement_rules = get_path(&self.root_path, &self.config.upload_processing.advertisement_rules);
+        self.config.upload_processing.advertisement_file_rules = get_path(&self.root_path, &self.config.upload_processing.advertisement_file_rules);
+        self.config.upload_processing.advertisement_description_rules =
+            get_path(&self.root_path, &self.config.upload_processing.advertisement_description_rules);
         self.config.upload_processing.quarantine_path = get_path(&self.root_path, &self.config.upload_processing.quarantine_path);
         self.config.upload_processing.advertisement_file = get_path(&self.root_path, &self.config.upload_processing.advertisement_file);
 
@@ -1205,6 +1207,27 @@ pub trait PCBoardTextImport: PCBoardImport {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn upload_rule_paths_resolve_independently_and_keep_disabled_categories_empty() {
+        let root = tempfile::tempdir().unwrap();
+        let mut board = IcyBoard::default();
+        board.root_path = root.path().to_path_buf();
+        board.config.upload_processing.advertisement_file_rules = "rules/member ads; custom.toml".into();
+        board.config.upload_processing.advertisement_description_rules = PathBuf::new();
+        for _ in 0..2 {
+            board.resolve_paths();
+            assert_eq!(
+                board.config.upload_processing.advertisement_file_rules,
+                root.path().join("rules/member ads; custom.toml")
+            );
+            assert!(board.config.upload_processing.advertisement_description_rules.as_os_str().is_empty());
+        }
+        let absolute = root.path().join("descriptions.toml");
+        board.config.upload_processing.advertisement_description_rules = absolute.clone();
+        board.resolve_paths();
+        assert_eq!(board.config.upload_processing.advertisement_description_rules, absolute);
+    }
 
     #[test]
     fn upload_advertisement_path_resolution_preserves_empty_and_literal_paths() {

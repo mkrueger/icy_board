@@ -5,19 +5,33 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use serde::{Deserialize, Serialize};
 use unarc_rs::unified::{ArchiveFormat, UnifiedArchive};
 use zip::write::ExtendedFileOptions;
 
 use super::{bbstro_fingerprint::FingerprintData, description_cleaner::DescriptionChange};
+use super::{description_cleaner::RuleAction, text_member::TextMemberMatch};
 
 // Bound stacked advertisement removal without exposing an implementation detail
 // as a SysOp setting.
 const MAX_DESCRIPTION_CLEAN_PASSES: usize = 8;
 
+/// How to handle the archive comment, independently of advertisement removal.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ArchiveCommentMode {
+    /// Preserve the original raw ZIP comment; other formats do not expose comments.
+    #[default]
+    Preserve,
+    Remove,
+    /// Use the exact replacement bytes, including an empty replacement.
+    Replace,
+}
+
 /// What `repack_file` is allowed to do to the archive it is handed.
 pub struct RepackOptions {
     pub lowercase_names: bool,
-    /// Remove recognized ad members, description blocks and archive comments.
+    /// Remove recognized ad members and description blocks.
     pub remove_advertisements: bool,
     /// Rewrite even an otherwise unchanged ZIP using the requested compression.
     pub recompress: bool,
@@ -27,7 +41,9 @@ pub struct RepackOptions {
     pub max_expanded_size: u64,
     pub max_compression_ratio: u64,
     pub additions: Vec<ArchiveAddition>,
-    pub replacement_archive_comment: Option<Vec<u8>>,
+    pub archive_comment_mode: ArchiveCommentMode,
+    /// Used only in Replace mode; Preserve and Remove ignore these bytes.
+    pub replacement_archive_comment: Vec<u8>,
     /// Do all the work and report it, but leave the directory as it was.
     pub dry_run: bool,
 }
@@ -44,7 +60,8 @@ impl Default for RepackOptions {
             max_expanded_size: 2 * 1024 * 1024 * 1024,
             max_compression_ratio: 1_000,
             additions: Vec::new(),
-            replacement_archive_comment: None,
+            archive_comment_mode: ArchiveCommentMode::Preserve,
+            replacement_archive_comment: Vec::new(),
             dry_run: false,
         }
     }
@@ -61,11 +78,30 @@ pub struct CleanedDescription {
     pub changes: Vec<DescriptionChange>,
 }
 
+pub struct TextMemberFinding {
+    pub name: String,
+    pub matched: TextMemberMatch,
+}
+
+impl std::fmt::Display for TextMemberFinding {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "text member {:?}: rule {:?}, {:?}, {}, sha256={}",
+            self.name, self.matched.rule_id, self.matched.action, self.matched.encoding, self.matched.sha256
+        )
+    }
+}
+
 pub enum Repacked {
     /// Nothing was touched, and the reason is worth telling the operator.
     Skipped(&'static str),
     /// Already a zip under the right name, carrying nothing the fingerprints object to.
     Unchanged,
+    /// Report-only findings without an archive rewrite or a forced quarantine.
+    Reported {
+        text_members: Vec<TextMemberFinding>,
+    },
     NeedsReview {
         reason: String,
     },
@@ -74,7 +110,8 @@ pub enum Repacked {
         removed: Vec<String>,
         added: Vec<String>,
         cleaned_descriptions: Vec<CleanedDescription>,
-        archive_comment_rules: Vec<String>,
+        text_members: Vec<TextMemberFinding>,
+        archive_comment_changed: bool,
         before: u64,
         after: u64,
     },
@@ -113,30 +150,19 @@ pub fn repack_file(path: &Path, fingerprints: &FingerprintData, options: &Repack
     };
     // ZIP comments can be read and preserved. UnifiedArchive does not expose
     // comments from other formats, so they are not transferred on conversion.
-    let mut comment_result = if options.remove_advertisements {
-        fingerprints.clean_archive_comment(&original_comment)
-    } else {
-        super::bbstro_fingerprint::ArchiveCommentResult {
-            content: original_comment.clone(),
-            rule_ids: Vec::new(),
-            needs_review: false,
-        }
+    let comment = match options.archive_comment_mode {
+        ArchiveCommentMode::Preserve => original_comment.as_slice(),
+        ArchiveCommentMode::Remove => &[],
+        ArchiveCommentMode::Replace => options.replacement_archive_comment.as_slice(),
     };
-    if comment_result.needs_review {
-        return Ok(Repacked::NeedsReview {
-            reason: "archive comment matches more than one rule or requires review".to_string(),
-        });
-    }
-    if let Some(replacement) = &options.replacement_archive_comment {
-        comment_result.content.clone_from(replacement);
-    }
-    let comment_changed = comment_result.content != original_comment;
+    let comment_changed = comment != original_comment.as_slice();
 
     let mut archive = UnifiedArchive::open_with_format(BufReader::new(fs::File::open(path)?), format)?;
     let temporary = tempfile::NamedTempFile::new_in(directory)?;
     let mut zip = zip::ZipWriter::new(BufWriter::new(temporary.as_file()));
     let mut removed = Vec::new();
     let mut cleaned_descriptions = Vec::new();
+    let mut text_members = Vec::new();
     let mut written = HashSet::new();
     let mut additions: HashMap<String, &ArchiveAddition> = HashMap::new();
     for addition in &options.additions {
@@ -163,8 +189,8 @@ pub fn repack_file(path: &Path, fingerprints: &FingerprintData, options: &Repack
     let mut member_count = 0usize;
     let mut expanded_size = 0u64;
 
-    if !comment_result.content.is_empty() {
-        zip.set_raw_comment(comment_result.content.clone().into_boxed_slice())?;
+    if !comment.is_empty() {
+        zip.set_raw_comment(comment.to_vec().into_boxed_slice())?;
     }
 
     while let Some(entry) = archive.next_entry()? {
@@ -212,6 +238,30 @@ pub fn repack_file(path: &Path, fingerprints: &FingerprintData, options: &Repack
         if options.remove_advertisements && fingerprints.is_match(&name, &content) {
             removed.push(name);
             continue;
+        }
+        if options.remove_advertisements {
+            let matches = fingerprints.match_text_member(&name, &content);
+            if matches.len() > 1 || matches.iter().any(|m| m.action == RuleAction::Review) {
+                return Ok(Repacked::NeedsReview {
+                    reason: format!(
+                        "text member {:?} needs review (ambiguous or review rule): {}",
+                        name,
+                        matches
+                            .iter()
+                            .map(|m| format!("{} sha256={}", m.rule_id, m.sha256))
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    ),
+                });
+            }
+            if let Some(matched) = matches.into_iter().next() {
+                let remove = matched.action == RuleAction::AutoClean;
+                text_members.push(TextMemberFinding { name: name.clone(), matched });
+                if remove {
+                    removed.push(name);
+                    continue;
+                }
+            }
         }
         let description_result = if options.remove_advertisements {
             fingerprints.clean_description(&name, &content, MAX_DESCRIPTION_CLEAN_PASSES)
@@ -274,7 +324,11 @@ pub fn repack_file(path: &Path, fingerprints: &FingerprintData, options: &Repack
         && !comment_changed
         && format == ArchiveFormat::Zip
     {
-        return Ok(Repacked::Unchanged);
+        return Ok(if text_members.is_empty() {
+            Repacked::Unchanged
+        } else {
+            Repacked::Reported { text_members }
+        });
     }
 
     let after = temporary.as_file().metadata()?.len();
@@ -283,7 +337,8 @@ pub fn repack_file(path: &Path, fingerprints: &FingerprintData, options: &Repack
         removed,
         added,
         cleaned_descriptions,
-        archive_comment_rules: comment_result.rule_ids,
+        text_members,
+        archive_comment_changed: comment_changed,
         before,
         after,
     };
@@ -418,17 +473,15 @@ mod tests {
     }
 
     #[test]
-    fn advertisement_switch_controls_members_footers_and_comments() {
+    fn advertisement_switch_controls_members_and_footers_but_preserves_comments() {
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("upload.zip");
         let exact = b"known advertisement";
         let comment = b"known advertising comment";
         let fingerprints = rules(&format!(
-            "[[fingerprint]]\nname = 'known'\nsha256 = '{:x}'\nfile_size = {}\n\n[[fingerprint]]\npattern = '^VARIANT[.]AD$'\nkeywords = ['visit our board']\n\n[[description_rule]]\nid = 'footer'\nlines = ['^visit our board$']\naction = 'auto_clean'\n\n[[archive_comment_rule]]\nid = 'comment'\nsha256 = '{:x}'\nfile_size = {}\naction = 'auto_clean'\n",
+            "[[fingerprint]]\nname = 'known'\nsha256 = '{:x}'\nfile_size = {}\n\n[[fingerprint]]\npattern = '^VARIANT[.]AD$'\nkeywords = ['visit our board']\n\n[[description_rule]]\nid = 'footer'\nlines = ['^visit our board$']\naction = 'auto_clean'\n",
             Sha256::digest(exact),
-            exact.len(),
-            Sha256::digest(comment),
-            comment.len()
+            exact.len()
         ));
         for enabled in [false, true] {
             test_archive(
@@ -453,7 +506,7 @@ mod tests {
             let Repacked::Converted {
                 removed,
                 cleaned_descriptions,
-                archive_comment_rules,
+                archive_comment_changed,
                 ..
             } = result
             else {
@@ -461,9 +514,9 @@ mod tests {
             };
             assert_eq!(if enabled { 2 } else { 0 }, removed.len());
             assert_eq!(usize::from(enabled), cleaned_descriptions.len());
-            assert_eq!(usize::from(enabled), archive_comment_rules.len());
+            assert!(!archive_comment_changed);
             let mut archive = zip::ZipArchive::new(fs::File::open(&path).unwrap()).unwrap();
-            assert_eq!(if enabled { &b""[..] } else { &comment[..] }, archive.comment());
+            assert_eq!(comment, archive.comment());
             let mut description = String::new();
             archive.by_name("FILE_ID.DIZ").unwrap().read_to_string(&mut description).unwrap();
             assert_eq!(if enabled { "Product\n" } else { "Product\nvisit our board\n" }, description);
@@ -474,22 +527,192 @@ mod tests {
     }
 
     #[test]
-    fn repack_preserves_unrecognized_zip_comments() {
+    fn archive_comment_mode_defaults_and_serialization() {
+        #[derive(Serialize, Deserialize, Default)]
+        struct Config {
+            #[serde(default)]
+            mode: ArchiveCommentMode,
+        }
+        assert_eq!(ArchiveCommentMode::Preserve, ArchiveCommentMode::default());
+        assert_eq!(ArchiveCommentMode::Preserve, RepackOptions::default().archive_comment_mode);
+        assert!(RepackOptions::default().replacement_archive_comment.is_empty());
+        assert_eq!(ArchiveCommentMode::Preserve, toml::from_str::<Config>("").unwrap().mode);
+        for (mode, name) in [
+            (ArchiveCommentMode::Preserve, "preserve"),
+            (ArchiveCommentMode::Remove, "remove"),
+            (ArchiveCommentMode::Replace, "replace"),
+        ] {
+            let encoded = toml::to_string(&Config { mode }).unwrap();
+            assert_eq!(format!("mode = \"{name}\"\n"), encoded);
+            assert_eq!(mode, toml::from_str::<Config>(&encoded).unwrap().mode);
+        }
+        assert!(toml::from_str::<Config>("mode = 'invalid'").is_err());
+    }
+
+    #[test]
+    fn archive_comment_modes_are_independent_of_advertisement_removal_and_recompression() {
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("upload.zip");
-        for remove_advertisements in [false, true] {
-            test_archive(&path, b"Release information", &[("PROGRAM.TXT", b"payload")]);
-            repack_file(
+        let raw = b"Release\0\xff\x80\r\n@X0F".as_slice();
+        for archive_comment_mode in [ArchiveCommentMode::Preserve, ArchiveCommentMode::Remove, ArchiveCommentMode::Replace] {
+            for remove_advertisements in [false, true] {
+                for recompress in [false, true] {
+                    for original in [b"".as_slice(), raw] {
+                        for replacement in [b"".as_slice(), raw, b"New\0\xfe\r\n".as_slice()] {
+                            test_archive(&path, original, &[("PROGRAM.TXT", b"payload")]);
+                            let before = fs::read(&path).unwrap();
+                            let expected = match archive_comment_mode {
+                                ArchiveCommentMode::Preserve => original,
+                                ArchiveCommentMode::Remove => b"".as_slice(),
+                                ArchiveCommentMode::Replace => replacement,
+                            };
+                            let result = repack_file(
+                                &path,
+                                &FingerprintData::default(),
+                                &RepackOptions {
+                                    archive_comment_mode,
+                                    replacement_archive_comment: replacement.to_vec(),
+                                    remove_advertisements,
+                                    recompress,
+                                    ..Default::default()
+                                },
+                            )
+                            .unwrap();
+                            let changed = expected != original;
+                            if recompress || changed {
+                                let Repacked::Converted {
+                                    archive_comment_changed,
+                                    removed,
+                                    added,
+                                    cleaned_descriptions,
+                                    ..
+                                } = result
+                                else {
+                                    panic!("expected conversion for {archive_comment_mode:?}, recompress={recompress}, changed={changed}");
+                                };
+                                assert_eq!(changed, archive_comment_changed);
+                                assert!(removed.is_empty() && added.is_empty() && cleaned_descriptions.is_empty());
+                            } else {
+                                assert!(matches!(result, Repacked::Unchanged));
+                                assert_eq!(before, fs::read(&path).unwrap());
+                            }
+                            let mut archive = zip::ZipArchive::new(fs::File::open(&path).unwrap()).unwrap();
+                            assert_eq!(expected, archive.comment());
+                            assert_eq!(1, archive.len());
+                            let mut payload = Vec::new();
+                            archive.by_name("PROGRAM.TXT").unwrap().read_to_end(&mut payload).unwrap();
+                            assert_eq!(b"payload", payload.as_slice());
+                            assert_eq!(1, fs::read_dir(directory.path()).unwrap().count());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn archive_comment_modes_dry_run_leave_source_and_directory_untouched() {
+        for name in ["upload.zip", "UPLOAD.ZIP"] {
+            for archive_comment_mode in [ArchiveCommentMode::Preserve, ArchiveCommentMode::Remove, ArchiveCommentMode::Replace] {
+                for remove_advertisements in [false, true] {
+                    let directory = tempfile::tempdir().unwrap();
+                    let path = directory.path().join(name);
+                    test_archive(&path, b"original\xff", &[("PROGRAM.TXT", b"payload")]);
+                    let before = fs::read(&path).unwrap();
+                    let result = repack_file(
+                        &path,
+                        &FingerprintData::default(),
+                        &RepackOptions {
+                            archive_comment_mode,
+                            replacement_archive_comment: b"replacement\xfe".to_vec(),
+                            remove_advertisements,
+                            recompress: false,
+                            dry_run: true,
+                            ..Default::default()
+                        },
+                    )
+                    .unwrap();
+                    if name == "upload.zip" && archive_comment_mode == ArchiveCommentMode::Preserve {
+                        assert!(matches!(result, Repacked::Unchanged));
+                    } else {
+                        let Repacked::Converted { archive_comment_changed, .. } = result else {
+                            panic!("expected dry-run conversion");
+                        };
+                        assert_eq!(archive_comment_mode != ArchiveCommentMode::Preserve, archive_comment_changed);
+                    }
+                    assert_eq!(before, fs::read(&path).unwrap());
+                    assert_eq!(1, fs::read_dir(directory.path()).unwrap().count());
+                    if name != "upload.zip" {
+                        assert!(!directory.path().join("upload.zip").exists());
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn oversized_replacement_is_rejected_only_in_replace_mode_without_touching_source() {
+        for name in ["upload.zip", "UPLOAD.ZIP"] {
+            for archive_comment_mode in [ArchiveCommentMode::Preserve, ArchiveCommentMode::Remove, ArchiveCommentMode::Replace] {
+                for remove_advertisements in [false, true] {
+                    for dry_run in [false, true] {
+                        let directory = tempfile::tempdir().unwrap();
+                        let path = directory.path().join(name);
+                        test_archive(&path, b"original", &[("PROGRAM.TXT", b"payload")]);
+                        let before = fs::read(&path).unwrap();
+                        let result = repack_file(
+                            &path,
+                            &FingerprintData::default(),
+                            &RepackOptions {
+                                archive_comment_mode,
+                                replacement_archive_comment: vec![b'X'; usize::from(u16::MAX) + 1],
+                                remove_advertisements,
+                                recompress: false,
+                                dry_run,
+                                ..Default::default()
+                            },
+                        );
+                        if archive_comment_mode == ArchiveCommentMode::Replace {
+                            assert!(result.is_err(), "overlength ZIP comment must be rejected");
+                        } else {
+                            assert!(result.is_ok(), "unused replacement must not be validated");
+                        }
+                        if dry_run || archive_comment_mode == ArchiveCommentMode::Replace {
+                            assert_eq!(before, fs::read(&path).unwrap());
+                            if name != "upload.zip" {
+                                assert!(!directory.path().join("upload.zip").exists());
+                            }
+                        }
+                        assert_eq!(1, fs::read_dir(directory.path()).unwrap().count());
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn maximum_length_raw_zip_comment_can_be_replaced_and_preserved() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("upload.zip");
+        test_archive(&path, b"original", &[("PROGRAM.TXT", b"payload")]);
+        let comment = vec![0xff; usize::from(u16::MAX)];
+        for archive_comment_mode in [ArchiveCommentMode::Replace, ArchiveCommentMode::Preserve] {
+            let result = repack_file(
                 &path,
                 &FingerprintData::default(),
                 &RepackOptions {
-                    remove_advertisements,
+                    archive_comment_mode,
+                    replacement_archive_comment: comment.clone(),
                     ..Default::default()
                 },
             )
             .unwrap();
+            let Repacked::Converted { archive_comment_changed, .. } = result else {
+                panic!("expected conversion");
+            };
+            assert_eq!(archive_comment_mode == ArchiveCommentMode::Replace, archive_comment_changed);
             let archive = zip::ZipArchive::new(fs::File::open(&path).unwrap()).unwrap();
-            assert_eq!(b"Release information", archive.comment());
+            assert_eq!(comment.as_slice(), archive.comment());
         }
     }
 
@@ -516,22 +739,26 @@ mod tests {
     }
 
     #[test]
-    fn test_repack_cleans_description_and_known_comment_without_touching_payload() {
+    fn test_repack_cleans_description_and_removes_comment_without_touching_payload() {
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join("UPLOAD.ZIP");
         let comment = b"The BBS Archives";
         test_archive(&path, comment, &[("FILE_ID.DIZ", b"Product\r\nLiQUiD WHQ\r\n"), ("PROGRAM.EXE", b"payload")]);
-        let fingerprints = rules(&format!(
-            "[[description_rule]]\nid = \"liquid\"\nlines = [\"^liquid whq$\"]\naction = \"auto_clean\"\n\n[[archive_comment_rule]]\nid = \"bbs-archives\"\nsha256 = \"{:x}\"\nfile_size = {}\naction = \"auto_clean\"\n",
-            Sha256::digest(comment),
-            comment.len()
-        ));
+        let fingerprints = rules("[[description_rule]]\nid = \"liquid\"\nlines = [\"^liquid whq$\"]\naction = \"auto_clean\"\n");
 
-        let result = repack_file(&path, &fingerprints, &RepackOptions::default()).unwrap();
+        let result = repack_file(
+            &path,
+            &fingerprints,
+            &RepackOptions {
+                archive_comment_mode: ArchiveCommentMode::Remove,
+                ..Default::default()
+            },
+        )
+        .unwrap();
         let Repacked::Converted {
             name,
             cleaned_descriptions,
-            archive_comment_rules,
+            archive_comment_changed,
             ..
         } = result
         else {
@@ -539,7 +766,7 @@ mod tests {
         };
         assert_eq!("upload.zip", name);
         assert_eq!("liquid", cleaned_descriptions[0].changes[0].rule_id);
-        assert_eq!(vec!["bbs-archives"], archive_comment_rules);
+        assert!(archive_comment_changed);
 
         let mut archive = zip::ZipArchive::new(fs::File::open(directory.path().join(name)).unwrap()).unwrap();
         assert!(archive.comment().is_empty());
@@ -691,7 +918,8 @@ mod tests {
                 name: "ICYBOARD.TXT".to_string(),
                 content: b"Visit this board".to_vec(),
             }],
-            replacement_archive_comment: Some(b"IcyBoard".to_vec()),
+            archive_comment_mode: ArchiveCommentMode::Replace,
+            replacement_archive_comment: b"IcyBoard".to_vec(),
             ..Default::default()
         };
 

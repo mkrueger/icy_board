@@ -1,5 +1,9 @@
 //! Offline, copy-only corpus exercise of the upload processor and publisher.
-//! Usage: upload_corpus prepare|process|finish BOARD SOURCE RULES
+//! Usage: upload_corpus prepare|process|finish BOARD SOURCE RULES_DIRECTORY
+//! RULES_DIRECTORY contains upload_ad_files.toml and upload_ad_descriptions.toml
+//! (for example, the repository's assets directory). Archive comment mode: Remove.
+//! Use a disposable test board: prepare changes its configuration and finish publishes copies.
+//! Earlier reports used selective comment rules and remain historical, not results of this mode.
 //! `prepare` durably records SHA-256/size baselines before copying or processing.
 //! `process` repacks into quarantine; `finish` batch-scans, publishes clean
 //! results, verifies the untouched source and writes comparable-pair metrics.
@@ -16,7 +20,7 @@ use icy_board_engine::{
     Res,
     icy_board::{
         file_directory::{DirectoryList, FileDirectory},
-        icb_config::{UploadProcessingConfig, UploadPublishPolicy},
+        icb_config::{ArchiveCommentMode, UploadProcessingConfig, UploadPublishPolicy},
         lock::BoardLock,
         upload_processor::UploadProcessor,
         upload_publish::publish_quarantine_record,
@@ -92,7 +96,9 @@ fn config(board: &Path, run: &Path) -> UploadProcessingConfig {
     let mut config = UploadProcessingConfig {
         publish_policy: UploadPublishPolicy::ManualApproval,
         quarantine_path: run.join("quarantine"),
-        advertisement_rules: board.join("upload_ad_rules.toml"),
+        advertisement_file_rules: board.join("upload_ad_files.toml"),
+        advertisement_description_rules: board.join("upload_ad_descriptions.toml"),
+        archive_comment_mode: ArchiveCommentMode::Remove,
         remove_advertisements: true,
         repack_to_zip: true,
         compression_level: 9,
@@ -104,6 +110,10 @@ fn config(board: &Path, run: &Path) -> UploadProcessingConfig {
 }
 
 fn prepare(board: &Path, source: &Path, rules: &Path, run: &Path) -> Res<()> {
+    dizbase::file_base_scanner::bbstro_fingerprint::FingerprintData::load_split(
+        &rules.join("upload_ad_files.toml"),
+        &rules.join("upload_ad_descriptions.toml"),
+    )?;
     fs::create_dir(run)?; // Refuse to overwrite an earlier experiment.
     let mut baseline = Baseline {
         source: source.to_path_buf(),
@@ -177,11 +187,13 @@ fn prepare(board: &Path, source: &Path, rules: &Path, run: &Path) -> Res<()> {
     }
     write_new(&run.join("directories.pcb"), &menu)?;
     conference["dir_menu"] = toml::Value::String(run.join("directories.pcb").to_string_lossy().into_owned());
-    if board.join("upload_ad_rules.toml").exists() {
-        fs::copy(board.join("upload_ad_rules.toml"), run.join("rules.before.toml"))?;
+    for name in ["upload_ad_files.toml", "upload_ad_descriptions.toml"] {
+        if board.join(name).exists() {
+            fs::copy(board.join(name), run.join(format!("{name}.before")))?;
+        }
+        fs::copy(rules.join(name), board.join(name))?;
+        fs::copy(rules.join(name), run.join(format!("{name}.used")))?;
     }
-    fs::copy(rules, board.join("upload_ad_rules.toml"))?;
-    fs::copy(rules, run.join("rules.used.toml"))?;
     let mut board_config: toml::Value = toml::from_str(&old_config)?;
     let mut processing = config(board, run);
     processing.publish_policy = UploadPublishPolicy::AfterProcessing;
@@ -213,7 +225,7 @@ fn prepare(board: &Path, source: &Path, rules: &Path, run: &Path) -> Res<()> {
     }
     mapping.sync_all()?;
     write_new(&run.join("prepared"), "complete\n")?;
-    println!("PREPARED: original corpus untouched; copies in quarantine; conference 1 configured");
+    println!("PREPARED: original corpus untouched; copies in quarantine; conference 1 configured; two rule files; archive comment mode: Remove");
     Ok(())
 }
 
@@ -230,6 +242,7 @@ fn mapping(run: &Path) -> Res<Vec<(usize, String)>> {
 
 async fn process(board: &Path, run: &Path) -> Res<()> {
     let config = config(board, run);
+    log::info!("Processing with member and description rule files; archive comment mode: Remove (all comments, not selective matching)");
     let quarantine = UploadQuarantine::new(config.quarantine_path.clone());
     let processor = UploadProcessor::new(config);
     for (n, (_, id)) in mapping(run)?.iter().enumerate() {
@@ -374,7 +387,7 @@ fn finish(run: &Path) -> Res<()> {
         }
     }
     let mut report = String::from(
-        "# Upload corpus results\n\nDeflate level 9. Savings combine advertisement/comment cleanup and recompression.\nOnly published before/after pairs are included; retained quarantine data and catalog overhead are excluded.\nClamAV signatures were old; a clean result does not establish current malware freedom.\nOriginal source sizes and SHA-256 verified unchanged after processing.\n\n| Area | Published | Review | Before bytes | After bytes | Savings |\n|---|---:|---:|---:|---:|---:|\n",
+        "# Upload corpus results\n\nDeflate level 9. Two rule files: upload_ad_files.toml and upload_ad_descriptions.toml.\nArchive comment mode: Remove; all ZIP comments are removed, independently of advertisement matching. Non-ZIP source comments are not available.\nSavings combine member/description advertisement cleanup, comment removal and recompression.\nEarlier reports using selective comment rules remain historical and are not results of this mode.\nOnly published before/after pairs are included; retained quarantine data and catalog overhead are excluded.\nClamAV signatures were old; a clean result does not establish current malware freedom.\nOriginal source sizes and SHA-256 verified unchanged after processing.\n\n| Area | Published | Review | Before bytes | After bytes | Savings |\n|---|---:|---:|---:|---:|---:|\n",
     );
     let mut grand = (0, 0, 0, 0);
     for (area, t) in totals {
@@ -402,7 +415,7 @@ fn finish(run: &Path) -> Res<()> {
     ));
     write_new(&run.join("report.md"), &report)?;
     println!(
-        "DONE: published {}, review {}, before {}, after {}, savings {:.2}%",
+        "DONE (two rule files; archive comment mode: Remove): published {}, review {}, before {}, after {}, savings {:.2}%",
         grand.0,
         grand.3,
         grand.1,
@@ -424,7 +437,7 @@ fn savings(before: u64, after: u64) -> f64 {
 async fn main() -> Res<()> {
     let args: Vec<_> = std::env::args().collect();
     if args.len() != 5 {
-        return Err("usage: upload_corpus prepare|process|finish BOARD SOURCE RULES".into());
+        return Err("usage: upload_corpus prepare|process|finish BOARD SOURCE RULES_DIRECTORY".into());
     }
     let board = fs::canonicalize(&args[2])?;
     let source = fs::canonicalize(&args[3])?;
@@ -450,6 +463,20 @@ async fn main() -> Res<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cleaning_demo_uses_two_rule_files_and_explicit_comment_removal() {
+        let board = Path::new("test-board");
+        let config = config(board, &board.join("upload-corpus"));
+        assert_eq!(config.advertisement_file_rules, board.join("upload_ad_files.toml"));
+        assert_eq!(config.advertisement_description_rules, board.join("upload_ad_descriptions.toml"));
+        assert!(matches!(config.archive_comment_mode, ArchiveCommentMode::Remove));
+        assert!(config.replacement_archive_comment.is_empty());
+        assert!(config.remove_advertisements);
+        let encoded = toml::Value::try_from(config).unwrap();
+        assert_eq!(encoded["archive_comment_mode"].as_str(), Some("remove"));
+        assert!(encoded.get("advertisement_comment_rules").is_none());
+    }
 
     #[test]
     fn scan_requires_an_explicit_clean_verdict() {

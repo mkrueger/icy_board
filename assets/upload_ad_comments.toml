@@ -1,9 +1,0 @@
-# Conservative defaults derived from verified PCBoard archive corpus matches.
-# Add uncertain rules as report_only first and promote them only after reviewing
-# both positive and negative matches.
-
-[[archive_comment_rule]]
-id = "the-bbs-archives-comment"
-sha256 = "71d056256e41d4ff70832abfe8c37d449ef45f0265bd1d05e0393a339b37cb4a"
-file_size = 715
-action = "auto_clean"

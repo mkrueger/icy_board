@@ -7,9 +7,115 @@ awarded after transfer, even if processing later fails. Quarantined files can be
 reviewed, reprocessed, approved or rejected in **icbadmin**.
 
 The single **Remove advertisements** switch controls recognized advertising
-members, known description footers and known ZIP advertising comments. It does
-not authorize removing arbitrary release branding. ZIP repacking/compression,
-replacement ZIP comment and the virus scanner remain separate options.
+members, text-member findings and known description footers. It does not
+authorize removing arbitrary release branding. ZIP repacking/compression,
+archive comment mode and the virus scanner remain separate options.
+
+## Two advertisement rule files
+
+The shared switch is `upload_processing.remove_advertisements`. Each category
+has its own editable path in setup and its own shipped TOML catalog:
+
+| Configuration key | Default filename / shipped asset | TOML section |
+| :--- | :--- | :--- |
+| `upload_processing.advertisement_file_rules` | [upload_ad_files.toml](../assets/upload_ad_files.toml) | `[[fingerprint]]`, `[[text_member_rule]]` |
+| `upload_processing.advertisement_description_rules` | [upload_ad_descriptions.toml](../assets/upload_ad_descriptions.toml) | `[[description_rule]]` |
+
+An empty path (`""`) disables only that category. Relative paths resolve against
+the board root, not the current working directory. Spaces and semicolons are
+literal characters in each single path, not list separators. Place the shipped
+catalogs at the configured locations. When removal is enabled, missing or
+unreadable files, malformed TOML and invalid selected patterns are processing
+errors requiring upload review; they are not silently ignored. An intentionally
+empty catalog is accepted, but a file containing only other rule categories is
+a configuration error.
+
+Legacy fingerprints identify complete advertising files using hashes plus sizes,
+or filename regexes plus raw case-sensitive byte keywords. Their semantics are
+unchanged, including filename-independent exact hashes and automatic removal.
+Description rules identify bounded blocks using either regex `lines` or
+`literal_lines`, with `report_only`, `review` or `auto_clean` actions.
+
+A combined TOML catalog can still be used: set **both paths** to that same file.
+Each path selects only its own categories. Loading uses
+`FingerprintData::load_split(member_path, description_path)`. New text examples
+are maintained in the default member catalog, not automatically merged into
+historical combined or generated corpus catalogs. Copy selected text rules into
+a custom member catalog if that is the file configured for the board.
+
+The old `advertisement_rules` and `advertisement_comment_rules` settings are
+removed; no implicit fallback. No comment-rule catalog is used.
+
+### Whole-file text templates
+
+Use `[[text_member_rule]]` in the **existing member rule file**. No third path
+or new setup switch is needed. Each rule has:
+
+| Field | Meaning |
+|---|---|
+| `id` | Nonempty identifier, unique among text rules in this catalog. |
+| `action` | `report_only` (default), `review`, or `auto_clean`. |
+| `max_bytes` | Maximum original byte length, default 16 KiB, hard ceiling 128 KiB. This is a safety limit, not an exact fingerprint size. |
+| `lines` | Ordered list of `{ literal = '...' }` and `{ regex = '...' }` entries; every line of the entire normalized member must match. |
+
+Literal entries are readable text, not regular expressions. Regex entries use
+Rust regex syntax and are implicitly anchored to the entire normalized line.
+Single-quoted TOML strings preserve regex backslashes. A template must contain
+at least twelve literal letters in total, 1–512 line entries and a valid size
+limit. Invalid fields, duplicate IDs, regex-only templates and invalid regexes
+fail catalog loading. The minimum literal count is only a guardrail, not proof
+that a user-authored rule is safe.
+
+Normalization validates UTF-8/BOM first, otherwise assumes CP437; case, horizontal
+whitespace, CRLF/LF/CR, ANSI SGR colors and PCBoard `@Xhh` colors are normalized.
+Leading/trailing empty lines are ignored; internal empty lines are significant
+and use `{ literal = '' }`. Encoding detection is necessarily heuristic for
+legacy text. Other control sequences, NUL, executable headers, malformed BOM
+payloads and non-padding data behind DOS EOF block matching. The implementation
+does not silently skip unknown paragraphs, arbitrary ANSI cursor/erase commands
+or extra documentation. Input is bounded to 512 physical lines.
+
+There is deliberately no filename restriction: renamed copies remain detectable.
+Canonical FILE_ID/DESC.SDI description names are excluded from these whole-member
+rules. Existing byte fingerprints retain their previous behavior.
+
+Processing order and results:
+
+1. Existing byte fingerprints run first; a matching legacy rule still removes
+   its known bytes, even if a text rule would be `report_only`.
+2. Otherwise text templates are matched against the original member bytes.
+3. One `report_only` match keeps the member and records name, rule, encoding and
+   raw SHA-256 in the upload report/log or icbfile output. It does not by itself
+   rewrite an archive or require quarantine review. Other configured steps may
+   still run, and normal publish policy remains in force.
+4. One `auto_clean` match removes the complete member, not selected text lines.
+5. `review`, or multiple matching text rules regardless of action/order, aborts
+   the archive rewrite and preserves the original for review.
+
+The shipped file contains four reviewed **auto_clean** templates: the BBS Archives
+transit banner, one Clipper Workshop layout, one Cutting Edge layout and the
+observed Buggerer Deluxe/Footer PPE template with variable upload stamp.
+These are intentionally not broad rules for all advertisements from those boards.
+Buggerer's copied description is fixed to the observed release, not arbitrary
+software documentation. New rules should start with `report_only`; these four
+templates were approved after reviewing their matches. Existing default hashes continue to remove their
+known variants as before.
+
+See the [historical report-only raw-byte corpus trial](../assets/archive_text_audit/text-rule-trial/README.md)
+and its [individual findings](../assets/archive_text_audit/text-rule-trial/findings.tsv).
+The review example also supports `--text-rules AUDIT MEMBER_CATALOG NEW_REPORT_DIRECTORY`
+to replay a catalog against the audit's original raw blobs without editing archives.
+
+### ZIP archive comments
+
+`upload_processing.archive_comment_mode` explicitly selects `preserve` (default),
+`remove`, or `replace`, independently of advertisement removal. Preserve keeps
+raw ZIP comment bytes. Remove clears them. Replace uses
+`replacement_archive_comment` verbatim; an empty replacement clears the comment.
+Stored replacement text is ignored in the other two modes. A comment change can
+trigger a rewrite even when unconditional repacking is disabled. Non-ZIP source
+comments are not available from the archive reader. No regex/hash comment rules
+are involved.
 
 ## One own advertisement file
 

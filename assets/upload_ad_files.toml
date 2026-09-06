@@ -1,5 +1,120 @@
 # Conservative defaults derived from verified PCBoard archive corpus matches.
 
+# Text templates: every line must match the complete normalized member.
+# These four reviewed templates use auto_clean. Start new, unreviewed rules with report_only.
+# Existing exact fingerprints below still remove their known bytes first.
+# See docs/upload_processing.md and assets/archive_text_audit/README.md.
+
+[[text_member_rule]]
+id = "bbs-archives-passed-banner"
+action = "auto_clean"
+max_bytes = 4096
+lines = [
+	{ literal = '╔═══════════════════════════════════════════════════════════════════════════╗' },
+	{ literal = '║ this archive passed ║' },
+	{ literal = '║ ░▒▓█▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀█▓▒░ ║' },
+	{ literal = '║ ░▒▓█ the bbs archives █▓▒░ ║' },
+	{ literal = '║ ░▒▓█▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄█▓▒░ ║' },
+	{ literal = '║ http://www.pcmicro.com/bbs ║' },
+	{ literal = '║ ║' },
+	{ literal = '║ the nets largest bbs resource ║' },
+	{ literal = '╚═══════════════════════════════════════════════════════════════════════════╝' },
+]
+
+[[text_member_rule]]
+id = "clipper-workshop-filenet-nine-nodes"
+action = "auto_clean"
+max_bytes = 8192
+lines = [
+	{ literal = '╒═══════════════════════════════════════════════════════════════════════╕' },
+	{ literal = '│ clipper workshop bbs ■ 9 nodes ■ 2 x isdn ■ 11 gigabyte │' },
+	{ literal = '├───────────────────────────────────────────────────────────────────────┤' },
+	{ literal = '│ clipper filenet headquarters ■ pcboard filenet headquarters │' },
+	{ literal = '├───────────────────────────────────────────────────────────────────────┤' },
+	{ regex = '│ (?:65|70)\.000\+ files ■ 10\.?000\+ conferences ■ 850\+ file echos │' },
+	{ literal = '│ 600.000+ messages online ■ 100.000 new messages every day! │' },
+	{ regex = '│ 30\+ mb new shareware & public domain every day! (?:900|1000)\+ mb every month! │' },
+	{ literal = '├───────────────────────────────────────────────────────────────────────┤' },
+	{ literal = '│ 1200+ fidonet echos ■ 9250+ internet newsgroups ■ email │' },
+	{ literal = '├───────────────────────────────────────────────────────────────────────┤' },
+	{ literal = '│ best sorted ibm file section ■ fast growing mac/newton file section │' },
+	{ literal = '├───────────────────────────────────────────────────────────────────────┤' },
+	{ literal = '│ running the latest pcboard v15.2 release │' },
+	{ literal = '├───────────────────────────────────────────────────────────────────────┤' },
+	{ literal = '│ +49-40-5358614 (7 lines ringdown us robotics v.34/v.fc/v.terbo/hst) │' },
+	{ literal = '├───────────────────────────────────────────────────────────────────────┤' },
+	{ literal = '│ +49-40-52681744 isdn-creatix ■ +49-40-52681745 diehl scom │' },
+	{ literal = '╘═══════════════════════════════════════════════════════════════════════╛' },
+]
+
+[[text_member_rule]]
+id = "cutting-edge-online-extended-offer"
+action = "auto_clean"
+max_bytes = 4096
+lines = [
+	{ literal = '╒══╕╤ ╤ ═╤═ ═╤═ ╤ ╤╕ ╤╒══╕ ╒══╕╤══╕╒══╕╒══╕ ╒══╕╤╕ ╤ ╤ ╤ ╤╕ ╤╒══╕' },
+	{ literal = '│ │ │ │ │ │ │ \││╒═╕ ╞═ │ ││╒═╕╞═ │ ││ \│ │ │ │ \│╞═' },
+	{ literal = '╘══╛╘══╛ ╧ ╧ ╧ ╧ ╧╘══╛ ╘══╛╧══╛╘══╛╘══╛ ╘══╛╧ ╧ ╧══╛╧ ╧ ╧╘══╛' },
+	{ literal = '' },
+	{ literal = "┌────┤ striving to be louisiana's best online system ├────────────────────┐" },
+	{ literal = '│ cutting edge online (r) * 6372-b kucinski street * fort polk, la 71459 │' },
+	{ literal = '│ 13.2gigs * ibm/amiga/macintosh/commodore/tandy/unix * e-mail │' },
+	{ regex = '│ large adult area! \* no file ratios \* call today!!! \* (?:50|80)\+ doors │' },
+	{ literal = '└───────────┤ call for latest updates * v.34bis: 318-537-7746 ├───────────┘' },
+]
+
+# Narrow Buggerer Deluxe example: only the observed Footer PPE 1.02 description,
+# not arbitrary program text. The upload stamp may vary; layout/identity stay fixed.
+[[text_member_rule]]
+id = "buggerer-stadium-footer-102"
+action = "auto_clean"
+max_bytes = 8192
+lines = [
+	{ literal = '▀▄' },
+	{ literal = '▄ ▄▀ █▀▀▀▄ ▄▀▀▀▄' },
+	{ literal = '▀ █ █ █▄▄▄█' },
+	{ literal = '█ █ █ █' },
+	{ literal = '▀▀▀▀ ▀ ▀' },
+	{ literal = 'a tornado<ice> production.. copyrighted (c) 1994-95' },
+	{ literal = '▄▄▄ ▄▄▄▄▄▄ ▄▄▄▄▄▄▄▄▄▄ ▄▄▄▄▄▄▄ ▄▄ ▄▄ ▄▄ ▄▄ ▄▄▄▄' },
+	{ literal = '█▀ ▄█▀ ▀▀ ▀▀ ██ ▀▀ ▄██ ██ ▀█▄ ▀▄ ██ ██ ███▄ ▄█▀▄ █' },
+	{ literal = '█ ▀▀▀▀▀▀▀██ ██ ▄█▀██ ██ ██ ██ ██ ██ ██ ▀█▀ ██ █' },
+	{ literal = '█ ██ ██ ██ ▄█▀ ██ ██ ██ ██ ██ ██ ██ ██ █' },
+	{ literal = '█ ██ ██ ▀▄█▀ ▄▄██ ██ ██ ██ ██ ▄█▀ ██ ██ █' },
+	{ literal = '█ ██▄▄▄▄▄██ ▄██▀▀▀▀ █▀▄██▄▄▄█▀ ██ ██▄▄█▀▄█ ██ ██ █' },
+	{ literal = '█▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄█' },
+	{ literal = '' },
+	{ literal = "■ 'da stadium · latest pcbored · 2.2 gigs! ■" },
+	{ literal = '■ 3! nodez [16.8/16.8/21.6!] · ibm/console/ansi/ascii/ppe support! ■' },
+	{ literal = '■ users by invite only! · maintaining 99% non-local users · sys: ßronx ßomber ■' },
+	{ literal = '' },
+	{ literal = '' },
+	{ literal = '' },
+	{ literal = 'description:' },
+	{ literal = '█▀▀▀▀▀▀▀\' },
+	{ literal = '█ ▀▀█▀▀\█▀▀█\' },
+	{ literal = '█ █ █▄▄█' },
+	{ literal = '█ ▀▀▀▀▀\▀\ ▀\' },
+	{ literal = '/°∙.▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀\.∙°\' },
+	{ literal = '\─────[footer ppe]──────/' },
+	{ literal = 'version 1.02' },
+	{ literal = 'footer is a pcboard ppe' },
+	{ literal = 'that will make your mail' },
+	{ literal = 'reading more enjoyable.' },
+	{ literal = 'pcboard 15.1+ requiered' },
+	{ literal = 'location bug fixed' },
+	{ literal = "code by al bundy '94" },
+	{ literal = '/°∙. rel.: [01/27/94] .∙°\' },
+	{ literal = '\────────────────────────/' },
+	{ literal = '' },
+	{ literal = 'via: pcbßßiuc [c] 01|25|94 by ßronx ßomber [2oi]' },
+	{ literal = '' },
+	{ literal = '' },
+	{ regex = 'file [a-z0-9_!-]{1,8}\.zip [0-9]{1,10} bytes uploaded at [0-2][0-9]:[0-5][0-9] on [0-1][0-9]-[0-3][0-9]-[0-9]{2} on node [0-9]{1,3}' },
+	{ literal = '' },
+	{ literal = 'this annoying advert was created by buggerer deluxe v.02ß (c) hi.t.moonweed' },
+]
+
 [[fingerprint]]
 name = "WORKSHOP.BBS variant 1"
 sha256 = "e4f856fee590a7a77e2c2b61790ba8855733b49935dcf2b4cf3c6f594ef7f6d7"

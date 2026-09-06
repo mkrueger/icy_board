@@ -12,7 +12,7 @@ use tokio::{
 use crate::Res;
 
 use super::{
-    icb_config::{UploadProcessingConfig, UploadPublishPolicy, UploadScannerConfig},
+    icb_config::{ArchiveCommentMode, UploadProcessingConfig, UploadPublishPolicy, UploadScannerConfig},
     upload_quarantine::{QuarantineRecord, QuarantineStatus, UploadQuarantine},
 };
 
@@ -75,7 +75,7 @@ impl UploadProcessor {
         let mut payload = self.quarantine.payload_path(&record);
         if self.archive_processing_enabled() {
             let rules = if self.config.remove_advertisements {
-                FingerprintData::load(&self.config.advertisement_rules)?
+                FingerprintData::load_split(&self.config.advertisement_file_rules, &self.config.advertisement_description_rules)?
             } else {
                 FingerprintData::default()
             };
@@ -90,8 +90,8 @@ impl UploadProcessor {
                 max_expanded_size: self.config.max_expanded_size,
                 max_compression_ratio: self.config.max_compression_ratio,
                 additions,
-                replacement_archive_comment: (!self.config.replacement_archive_comment.is_empty())
-                    .then(|| self.config.replacement_archive_comment.as_bytes().to_vec()),
+                archive_comment_mode: self.config.archive_comment_mode,
+                replacement_archive_comment: self.config.replacement_archive_comment.as_bytes().to_vec(),
                 ..Default::default()
             };
             let source = payload.clone();
@@ -117,6 +117,14 @@ impl UploadProcessor {
             match result {
                 Repacked::Skipped(reason) => record.processing_report.push(format!("archive skipped: {reason}")),
                 Repacked::Unchanged => record.processing_report.push("archive unchanged".to_string()),
+                Repacked::Reported { text_members } => {
+                    record.processing_report.push("archive unchanged (text rule findings)".to_string());
+                    for finding in text_members {
+                        let message = finding.to_string();
+                        log::info!("{}", upload_log_message(original_name, id, &message));
+                        record.processing_report.push(message);
+                    }
+                }
                 Repacked::NeedsReview { reason } => {
                     log::warn!("{}", upload_log_message(original_name, id, &format!("archive needs review: {reason}")));
                     record.processing_report.push(format!("archive needs review: {reason}"));
@@ -129,7 +137,8 @@ impl UploadProcessor {
                     removed,
                     added,
                     cleaned_descriptions,
-                    archive_comment_rules,
+                    text_members,
+                    archive_comment_changed,
                     ..
                 } => {
                     let converted = converted_payload.ok_or("repacked upload has no payload")?;
@@ -145,6 +154,11 @@ impl UploadProcessor {
                             .to_string();
                     }
                     let mut committed_changes = Vec::new();
+                    for finding in text_members {
+                        let message = finding.to_string();
+                        record.processing_report.push(message.clone());
+                        committed_changes.push(message);
+                    }
                     for member in removed {
                         let message = format!("removed member: {member}");
                         record.processing_report.push(message.clone());
@@ -163,8 +177,13 @@ impl UploadProcessor {
                             committed_changes.push(message);
                         }
                     }
-                    for rule in archive_comment_rules {
-                        let message = format!("cleaned archive comment with {rule}");
+                    if archive_comment_changed {
+                        let message = match self.config.archive_comment_mode {
+                            ArchiveCommentMode::Remove => "removed archive comment",
+                            ArchiveCommentMode::Replace => "replaced archive comment",
+                            ArchiveCommentMode::Preserve => "archive comment changed",
+                        }
+                        .to_string();
                         record.processing_report.push(message.clone());
                         committed_changes.push(message);
                     }
@@ -220,7 +239,7 @@ impl UploadProcessor {
         self.config.remove_advertisements
             || self.config.repack_to_zip
             || !self.config.advertisement_file.as_os_str().is_empty()
-            || !self.config.replacement_archive_comment.is_empty()
+            || self.config.archive_comment_mode != ArchiveCommentMode::Preserve
     }
 }
 
@@ -362,6 +381,236 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn upload_split_rules_clean_only_enabled_categories() {
+        use std::io::Read;
+
+        for enabled in 0..4 {
+            let root = tempfile::tempdir().unwrap();
+            let paths = [root.path().join("members.toml"), root.path().join("descriptions.toml")];
+            for (path, text) in paths.iter().zip([
+                "[[fingerprint]]\nname = 'board ad'\npattern = '^BOARD\\.AD$'\nkeywords = ['ad marker']\n",
+                "[[description_rule]]\nid = 'footer'\nliteral_lines = ['Remove this footer']\naction = 'auto_clean'\n",
+            ]) {
+                std::fs::write(path, text).unwrap();
+            }
+            let config = UploadProcessingConfig {
+                publish_policy: UploadPublishPolicy::AfterProcessing,
+                quarantine_path: root.path().join("quarantine"),
+                remove_advertisements: true,
+                repack_to_zip: true,
+                advertisement_file_rules: if enabled & 1 != 0 { paths[0].clone() } else { Default::default() },
+                advertisement_description_rules: if enabled & 2 != 0 { paths[1].clone() } else { Default::default() },
+                ..Default::default()
+            };
+            let (quarantine, record) = queued_zip(root.path(), &config, false);
+            let mut zip = zip::ZipWriter::new(std::fs::File::create(quarantine.payload_path(&record)).unwrap());
+            for (name, content) in [
+                ("PAYLOAD.TXT", "payload"),
+                ("BOARD.AD", "ad marker"),
+                ("FILE_ID.DIZ", "Description\r\nremove this footer\r\n"),
+            ] {
+                zip.start_file(name, zip::write::SimpleFileOptions::default()).unwrap();
+                zip.write_all(content.as_bytes()).unwrap();
+            }
+            zip.set_comment("ad comment").unwrap();
+            zip.finish().unwrap();
+            let processed = UploadProcessor::new(config).process(&record.id).await.unwrap();
+            assert_eq!(processed.status, QuarantineStatus::ReadyToPublish, "{:?}", processed.processing_report);
+            let mut archive = zip::ZipArchive::new(std::fs::File::open(quarantine.payload_path(&processed)).unwrap()).unwrap();
+            assert_eq!(archive.by_name("BOARD.AD").is_ok(), enabled & 1 == 0, "enabled={enabled}");
+            let mut description = String::new();
+            archive.by_name("FILE_ID.DIZ").unwrap().read_to_string(&mut description).unwrap();
+            assert_eq!(
+                description,
+                if enabled & 2 != 0 {
+                    "Description\r\n"
+                } else {
+                    "Description\r\nremove this footer\r\n"
+                },
+                "enabled={enabled}"
+            );
+            assert_eq!(archive.comment(), b"ad comment");
+            let mut payload = String::new();
+            archive.by_name("PAYLOAD.TXT").unwrap().read_to_string(&mut payload).unwrap();
+            assert_eq!(payload, "payload");
+        }
+    }
+
+    #[tokio::test]
+    async fn upload_text_rules_report_remove_or_require_review() {
+        for action in ["report_only", "auto_clean", "review"] {
+            for repack in [false, true] {
+                let root = tempfile::tempdir().unwrap();
+                let path = root.path().join("members.toml");
+                std::fs::write(
+                    &path,
+                    format!("[[text_member_rule]]\nid = 'text-ad'\naction = '{action}'\nlines = [{{ literal = 'Example Board advertisement' }}]\n"),
+                )
+                .unwrap();
+                let config = UploadProcessingConfig {
+                    publish_policy: UploadPublishPolicy::AfterProcessing,
+                    quarantine_path: root.path().join("quarantine"),
+                    remove_advertisements: true,
+                    repack_to_zip: repack,
+                    advertisement_file_rules: path,
+                    advertisement_description_rules: Default::default(),
+                    ..Default::default()
+                };
+                let (quarantine, record) = queued_zip(root.path(), &config, false);
+                let source = quarantine.payload_path(&record);
+                let mut zip = zip::ZipWriter::new(std::fs::File::create(&source).unwrap());
+                for (name, bytes) in [("random.txt", "Example Board advertisement"), ("README.TXT", "original documentation")] {
+                    zip.start_file(name, zip::write::SimpleFileOptions::default()).unwrap();
+                    zip.write_all(bytes.as_bytes()).unwrap();
+                }
+                zip.finish().unwrap();
+                let before = std::fs::read(&source).unwrap();
+                let processed = UploadProcessor::new(config).process(&record.id).await.unwrap();
+                assert!(
+                    processed
+                        .processing_report
+                        .iter()
+                        .any(|line| line.contains("text-ad") && line.contains("sha256=")),
+                    "{:?}",
+                    processed.processing_report
+                );
+                assert_eq!(
+                    processed.status,
+                    if action == "review" {
+                        QuarantineStatus::NeedsReview
+                    } else {
+                        QuarantineStatus::ReadyToPublish
+                    }
+                );
+                let payload = quarantine.payload_path(&processed);
+                if action == "review" || (action == "report_only" && !repack) {
+                    assert_eq!(std::fs::read(&payload).unwrap(), before);
+                }
+                let mut zip = zip::ZipArchive::new(std::fs::File::open(payload).unwrap()).unwrap();
+                assert_eq!(zip.by_name("random.txt").is_ok(), action != "auto_clean");
+                assert!(zip.by_name("README.TXT").is_ok());
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn upload_comment_modes_are_explicit_and_independent_of_other_steps() {
+        use std::io::Read;
+
+        for mode in [ArchiveCommentMode::Preserve, ArchiveCommentMode::Remove, ArchiveCommentMode::Replace] {
+            for remove_ads in [false, true] {
+                for repack in [false, true] {
+                    for replacement in ["", "Own BBS — Grüße\r\nSecond line"] {
+                        let root = tempfile::tempdir().unwrap();
+                        let config = UploadProcessingConfig {
+                            publish_policy: UploadPublishPolicy::AfterProcessing,
+                            quarantine_path: root.path().join("quarantine"),
+                            remove_advertisements: remove_ads,
+                            repack_to_zip: repack,
+                            // Empty rule paths disable the unrelated categories.
+                            advertisement_file_rules: Default::default(),
+                            advertisement_description_rules: Default::default(),
+                            archive_comment_mode: mode,
+                            replacement_archive_comment: replacement.into(),
+                            ..Default::default()
+                        };
+                        let (quarantine, record) = queued_zip(root.path(), &config, false);
+                        let mut zip = zip::ZipWriter::new(std::fs::File::create(quarantine.payload_path(&record)).unwrap());
+                        zip.start_file("PAYLOAD.TXT", zip::write::SimpleFileOptions::default()).unwrap();
+                        zip.write_all(b"Original program bytes\r\n").unwrap();
+                        let original_comment = b"\xff\xdaAuthor's original comment\r\n";
+                        zip.set_raw_comment(original_comment.to_vec().into_boxed_slice()).unwrap();
+                        zip.finish().unwrap();
+                        let original_bytes = std::fs::read(quarantine.payload_path(&record)).unwrap();
+                        let processor = UploadProcessor::new(config);
+                        assert_eq!(
+                            processor.archive_processing_enabled(),
+                            remove_ads || repack || mode != ArchiveCommentMode::Preserve
+                        );
+                        let processed = processor.process(&record.id).await.unwrap();
+                        assert_eq!(processed.status, QuarantineStatus::ReadyToPublish, "{:?}", processed.processing_report);
+                        let bytes = std::fs::read(quarantine.payload_path(&processed)).unwrap();
+                        let mut archive = zip::ZipArchive::new(std::io::Cursor::new(&bytes)).unwrap();
+                        let expected = match mode {
+                            ArchiveCommentMode::Preserve => original_comment.as_slice(),
+                            ArchiveCommentMode::Remove => b"",
+                            ArchiveCommentMode::Replace => replacement.as_bytes(),
+                        };
+                        assert_eq!(archive.comment(), expected);
+                        let mut payload = Vec::new();
+                        archive.by_name("PAYLOAD.TXT").unwrap().read_to_end(&mut payload).unwrap();
+                        assert_eq!(payload, b"Original program bytes\r\n");
+                        match mode {
+                            ArchiveCommentMode::Preserve => {
+                                assert!(!processed.processing_report.iter().any(|line| line.contains("archive comment")));
+                                if !remove_ads && !repack {
+                                    assert_eq!(bytes, original_bytes);
+                                }
+                            }
+                            ArchiveCommentMode::Remove => assert!(processed.processing_report.iter().any(|line| line == "removed archive comment")),
+                            ArchiveCommentMode::Replace => assert!(processed.processing_report.iter().any(|line| line == "replaced archive comment")),
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn upload_oversized_comment_requires_review_without_losing_payload() {
+        let root = tempfile::tempdir().unwrap();
+        let config = UploadProcessingConfig {
+            quarantine_path: root.path().join("quarantine"),
+            archive_comment_mode: ArchiveCommentMode::Replace,
+            replacement_archive_comment: "x".repeat(65_536),
+            ..Default::default()
+        };
+        let (quarantine, record) = queued_zip(root.path(), &config, false);
+        let original = std::fs::read(quarantine.payload_path(&record)).unwrap();
+        let processed = UploadProcessor::new(config).process(&record.id).await.unwrap();
+        assert_eq!(processed.status, QuarantineStatus::NeedsReview);
+        assert_eq!(std::fs::read(quarantine.payload_path(&processed)).unwrap(), original);
+        assert!(processed.processing_report.iter().any(|line| line.starts_with("error:")));
+    }
+
+    #[tokio::test]
+    async fn upload_rule_file_errors_require_review_without_modifying_payload() {
+        for category in 0..2 {
+            for malformed in [false, true] {
+                let root = tempfile::tempdir().unwrap();
+                let path = root.path().join("invalid rules.toml");
+                if malformed {
+                    std::fs::write(&path, "[[malformed").unwrap();
+                }
+                let mut config = UploadProcessingConfig {
+                    publish_policy: UploadPublishPolicy::AfterProcessing,
+                    quarantine_path: root.path().join("quarantine"),
+                    remove_advertisements: true,
+                    advertisement_file_rules: Default::default(),
+                    advertisement_description_rules: Default::default(),
+                    ..Default::default()
+                };
+                match category {
+                    0 => config.advertisement_file_rules = path.clone(),
+                    _ => config.advertisement_description_rules = path.clone(),
+                }
+                let (quarantine, record) = queued_zip(root.path(), &config, false);
+                let original = std::fs::read(quarantine.payload_path(&record)).unwrap();
+                let processed = UploadProcessor::new(config.clone()).process(&record.id).await.unwrap();
+                assert_eq!(processed.status, QuarantineStatus::NeedsReview);
+                assert!(processed.processing_report.iter().any(|line| line.contains(path.to_str().unwrap())));
+                assert_eq!(std::fs::read(quarantine.payload_path(&processed)).unwrap(), original);
+
+                // The shared switch bypasses every rule file when disabled.
+                config.remove_advertisements = false;
+                config.repack_to_zip = true;
+                let processed = UploadProcessor::new(config).process(&record.id).await.unwrap();
+                assert_eq!(processed.status, QuarantineStatus::ReadyToPublish, "{:?}", processed.processing_report);
+            }
+        }
+    }
+
+    #[tokio::test]
     async fn scanner_capture_is_bounded_and_drains_past_the_limit() {
         for size in [0, SCANNER_OUTPUT_LIMIT, SCANNER_OUTPUT_LIMIT + 8192] {
             let input = vec![b'x'; size];
@@ -469,6 +718,7 @@ mod tests {
             publish_policy: UploadPublishPolicy::AfterProcessing,
             quarantine_path: directory.path().join("quarantine"),
             repack_to_zip: true,
+            archive_comment_mode: ArchiveCommentMode::Replace,
             replacement_archive_comment: "Own BBS".into(),
             ..Default::default()
         };
@@ -487,6 +737,7 @@ mod tests {
             publish_policy: UploadPublishPolicy::AfterProcessing,
             quarantine_path: directory.path().join("quarantine"),
             repack_to_zip: true,
+            archive_comment_mode: ArchiveCommentMode::Replace,
             replacement_archive_comment: "Own BBS".into(),
             scanner: UploadScannerConfig {
                 enabled: true,
@@ -537,6 +788,7 @@ mod tests {
             publish_policy: UploadPublishPolicy::AfterProcessing,
             quarantine_path: directory.path().join("quarantine"),
             repack_to_zip: true,
+            archive_comment_mode: ArchiveCommentMode::Replace,
             replacement_archive_comment: "Own BBS".into(),
             scanner: UploadScannerConfig {
                 enabled: true,
