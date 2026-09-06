@@ -10,6 +10,9 @@ releases.
 
 ### Added
 
+- `ppld --check --strict` fails on unsupported, unimplemented or partially
+  implemented references; ordinary `--check` remains informational.
+
 - Whole-file text advertisement templates in the existing member rule catalog:
   `[[text_member_rule]]` supports literal and anchored regex lines, bounded
   CP437/UTF-8 normalization and `report_only` (default), `review`, `auto_clean`.
@@ -75,6 +78,15 @@ releases.
   a binkp session announced nothing.
 
 ### Fixed
+
+- `ppld` preserves expression grouping (including raw output), fractional
+  arithmetic and function-call side effects. FOR reconstruction validates the
+  counter, step direction and increment target; nested loops retain cross-loop
+  jumps instead of capturing them as an inner BREAK/CONTINUE. Symbolic flag
+  output retains unknown mask bits. Source mode `--output` writes only source
+  to stdout, with its banner and diagnostics on stderr. Regression coverage
+  compares serialized PPE execution before/after decompilation under an
+  instruction budget, including historical fixtures.
 
 - Module-level variable initializers now require constant expressions, including
   recursively constant array and record literals. Calls and mutable reads are
