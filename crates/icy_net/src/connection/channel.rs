@@ -36,23 +36,24 @@ impl Connection for ChannelConnection {
     }
 
     async fn read(&mut self, buf: &mut [u8]) -> crate::Result<usize> {
+        if buf.is_empty() {
+            return Ok(0);
+        }
         if !self.buffer.is_empty() {
             let len = self.buffer.len().min(buf.len());
             buf[..len].copy_from_slice(&self.buffer.drain(..len).collect::<Vec<u8>>());
             return Ok(len);
         }
-        match self.rx.recv().await {
-            Some(data) => {
-                if data.is_empty() {
-                    return Ok(0);
-                }
-                let len = data.len().min(buf.len());
-                buf[..len].copy_from_slice(&data[..len]);
-                self.buffer.extend(data.into_iter().skip(len));
-                Ok(len)
+        while let Some(data) = self.rx.recv().await {
+            if data.is_empty() {
+                continue;
             }
-            None => Ok(0),
+            let len = data.len().min(buf.len());
+            buf[..len].copy_from_slice(&data[..len]);
+            self.buffer.extend(data.into_iter().skip(len));
+            return Ok(len);
         }
+        Ok(0)
     }
 
     async fn try_read(&mut self, buf: &mut [u8]) -> crate::Result<usize> {

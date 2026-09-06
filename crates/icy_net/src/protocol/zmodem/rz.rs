@@ -1,5 +1,9 @@
 #![allow(clippy::unused_self, clippy::wildcard_imports)]
-use std::{cmp::Ordering, io::Write, time::Instant};
+use std::{
+    cmp::Ordering,
+    io::Write,
+    time::{Duration, Instant},
+};
 use tempfile::NamedTempFile;
 
 use crate::{
@@ -237,6 +241,12 @@ impl Rz {
             Ok(None) => Ok(false),
 
             Err(err) => {
+                // A transport EOF/error cannot be repaired by reading another
+                // header. In particular, do not spin after read_u8 reports EOF.
+                if err.downcast_ref::<ZModemError>().is_none() {
+                    self.state = RecvState::Idle;
+                    return Err(err);
+                }
                 if self.can_count >= 5 {
                     transfer_state.recieve_state.log_error("Received 5+ CAN bytes, cancelling session".to_string());
                     self.cancel(com).await?;
@@ -423,14 +433,14 @@ impl Rz {
                     Ok((block, _, _)) => {
                         // Successful file header subpacket: reset per-file retry counters
                         self.errors = 0;
-                        let file_name = str_from_null_terminated_utf8_unchecked(&block).to_string();
-                        let mut file_size = 0;
-                        for b in &block[(file_name.len() + 1)..] {
-                            if *b < b'0' || *b > b'9' {
-                                break;
+                        let (file_name, file_size) = match parse_file_info(&block) {
+                            Ok(info) => info,
+                            Err(err) => {
+                                transfer_state.recieve_state.log_error(err.to_string());
+                                self.cancel(com).await?;
+                                return Err(err.into());
                             }
-                            file_size = file_size * 10 + (*b - b'0') as usize;
-                        }
+                        };
 
                         transfer_state
                             .recieve_state
@@ -438,7 +448,7 @@ impl Rz {
 
                         transfer_state.recieve_state.file_name = file_name;
                         self.cur_out_file = Some(NamedTempFile::new()?);
-                        transfer_state.recieve_state.file_size = file_size as u64;
+                        transfer_state.recieve_state.file_size = file_size;
                         transfer_state.recieve_state.reset_cur_transfer();
 
                         self.state = RecvState::AwaitZDATA;
@@ -571,6 +581,16 @@ impl Rz {
             ZFrameType::Fin => {
                 transfer_state.recieve_state.log_info("ZFIN received, session ending".to_string());
                 Header::empty(ZFrameType::Fin).write(com, HeaderType::Hex, self.can_esc_control).await?;
+                // Section 8.3: briefly await the sender's "OO" before handing
+                // the connection back to the board. Consume no bytes beyond it.
+                // A missing/partial trailer or disconnect must not hang cleanup.
+                let _ = tokio::time::timeout(Duration::from_secs(1), async {
+                    if com.read_u8().await? == b'O' {
+                        com.read_u8().await?;
+                    }
+                    crate::Result::<()>::Ok(())
+                })
+                .await;
                 self.state = RecvState::Idle;
                 Ok(true)
             }
@@ -673,6 +693,35 @@ impl Rz {
             .await?;
         Ok(())
     }
+}
+
+fn parse_file_info(block: &[u8]) -> Result<(String, u64), ZModemError> {
+    // Locate the terminator in the wire bytes, never in the decoded UTF-8
+    // string: legacy 8-bit filenames can expand while decoding.
+    let end = block
+        .iter()
+        .position(|b| *b == 0)
+        .ok_or(ZModemError::InvalidFileInfo("missing filename terminator"))?;
+    if end == 0 {
+        return Err(ZModemError::InvalidFileInfo("empty filename"));
+    }
+    let name = match std::str::from_utf8(&block[..end]) {
+        Ok(name) => name.to_owned(),
+        Err(_) => str_from_null_terminated_utf8_unchecked(&block[..end]),
+    };
+    // Size is optional; subsequent space-separated fields are mtime/mode/etc.
+    let size_field = block[end + 1..].split(|b| *b == 0 || *b == b' ').next().unwrap_or_default();
+    let mut size = 0u64;
+    for byte in size_field {
+        if !byte.is_ascii_digit() {
+            return Err(ZModemError::InvalidFileInfo("invalid decimal size"));
+        }
+        size = size
+            .checked_mul(10)
+            .and_then(|size| size.checked_add(u64::from(*byte - b'0')))
+            .ok_or(ZModemError::InvalidFileInfo("size exceeds u64"))?;
+    }
+    Ok((name, size))
 }
 
 pub async fn read_subpacket(com: &mut dyn Connection, block_length: usize, use_crc32: bool, escape_ctrl_chars: bool) -> crate::Result<(Vec<u8>, bool, bool)> {

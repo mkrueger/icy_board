@@ -238,6 +238,8 @@ impl Header {
         if zpad == 0x18 {
             // CAN
             *can_count += 1;
+        } else {
+            *can_count = 0;
         }
         if zpad != ZPAD {
             return Err(ZModemError::ZPADExected(zpad).into());
@@ -340,6 +342,8 @@ impl Header {
         if zpad == 0x18 {
             // CAN
             *can_count += 1;
+        } else {
+            *can_count = 0;
         }
         if zpad != ZPAD {
             return Err(ZModemError::ZPADExected(zpad).into());

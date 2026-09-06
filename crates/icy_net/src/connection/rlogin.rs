@@ -244,6 +244,9 @@ impl Connection for RloginConnection {
     /// 2. If connection is flagged closed, return 0.
     /// 3. Perform a normal read; on 0 or error mark closed.
     async fn read(&mut self, buf: &mut [u8]) -> crate::Result<usize> {
+        if buf.is_empty() {
+            return Ok(0);
+        }
         let drained = self.buffer_drain_into(buf);
         if drained > 0 {
             return Ok(drained);
@@ -260,7 +263,7 @@ impl Connection for RloginConnection {
             Ok(n) => Ok(n),
             Err(e) if is_disconnection_error(&e) => {
                 self.closed = true;
-                Ok(0)
+                Err(Box::new(e))
             }
             Err(e) => Err(Box::new(e)),
         }

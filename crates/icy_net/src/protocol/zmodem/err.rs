@@ -30,6 +30,9 @@ pub enum ZModemError {
     #[error("no file open")]
     NoFileOpen,
 
+    #[error("invalid ZFILE metadata: {0}")]
+    InvalidFileInfo(&'static str),
+
     #[error("subpacket overflow: length {0} exceeds max {1}")]
     SubpacketOverflow(usize, usize),
 }

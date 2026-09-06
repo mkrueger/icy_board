@@ -329,6 +329,9 @@ impl Connection for SSHConnection {
     }
 
     async fn read(&mut self, buf: &mut [u8]) -> crate::Result<usize> {
+        if buf.is_empty() {
+            return Ok(0);
+        }
         // First check if we have buffered data
         if !self.read_buffer.is_empty() {
             let to_read = buf.len().min(self.read_buffer.len());
@@ -346,6 +349,9 @@ impl Connection for SSHConnection {
 
             match msg {
                 ChannelMsg::Data { data } => {
+                    if data.is_empty() {
+                        continue;
+                    }
                     // We got data, copy what we can to the buffer
                     let to_read = buf.len().min(data.len());
                     buf[..to_read].copy_from_slice(&data[..to_read]);

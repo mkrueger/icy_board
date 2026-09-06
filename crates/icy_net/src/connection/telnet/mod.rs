@@ -384,6 +384,9 @@ impl Connection for TelnetConnection {
     }
 
     async fn read(&mut self, buf: &mut [u8]) -> crate::Result<usize> {
+        if buf.is_empty() {
+            return Ok(0);
+        }
         // First, check if we have buffered data from a previous poll
         if !self.read_buffer.is_empty() {
             let to_read = buf.len().min(self.read_buffer.len());
@@ -392,23 +395,16 @@ impl Connection for TelnetConnection {
             return Ok(to_read);
         }
 
-        // No buffered data, read from the stream
-        match self.tcp_stream.read(buf).await {
-            Ok(size) => {
-                let result = self.parse(&mut buf[0..size]).await?;
-                Ok(result)
+        // Negotiation (including a fragmented IAC command) is not payload or EOF.
+        loop {
+            let size = self.tcp_stream.read(buf).await?;
+            if size == 0 {
+                return Ok(0);
             }
-            Err(e) => match e.kind() {
-                ErrorKind::ConnectionAborted | ErrorKind::NotConnected => {
-                    log::error!("telnet error - connection aborted.");
-                    return Err(std::io::Error::new(ErrorKind::ConnectionAborted, format!("Connection aborted: {e}")).into());
-                }
-                ErrorKind::WouldBlock => Ok(0),
-                _ => {
-                    log::error!("Error {:?} reading from SSH connection: {:?}", e.kind(), e);
-                    Ok(0)
-                }
-            },
+            let parsed = self.parse(&mut buf[..size]).await?;
+            if parsed > 0 {
+                return Ok(parsed);
+            }
         }
     }
 

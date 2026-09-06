@@ -41,7 +41,14 @@ pub enum ConnectionState {
 pub trait Connection: Send + Unpin {
     fn get_connection_type(&self) -> ConnectionType;
 
+    /// Wait for payload bytes, EOF, or an error. For a nonempty buffer, `Ok(0)`
+    /// means EOF, never temporary inactivity or a protocol-only/empty record.
+    /// An empty buffer may return `Ok(0)` without indicating EOF.
     async fn read(&mut self, buf: &mut [u8]) -> crate::Result<usize>;
+
+    /// Read currently available payload without waiting indefinitely for data.
+    /// Unlike `read`, `Ok(0)` may mean no payload is available yet (including
+    /// protocol-only activity); it is not sufficient to identify EOF.
     async fn try_read(&mut self, buf: &mut [u8]) -> crate::Result<usize>;
 
     async fn send(&mut self, buf: &[u8]) -> crate::Result<()>;
@@ -64,12 +71,8 @@ pub trait Connection: Send + Unpin {
 
     async fn read_u8(&mut self) -> crate::Result<u8> {
         let mut buf = [0u8; 1];
-        loop {
-            let size = self.read(&mut buf).await?;
-            if size == 1 {
-                return Ok(buf[0]);
-            }
-        }
+        self.read_exact(&mut buf).await?;
+        Ok(buf[0])
     }
 
     async fn shutdown(&mut self) -> crate::Result<()> {

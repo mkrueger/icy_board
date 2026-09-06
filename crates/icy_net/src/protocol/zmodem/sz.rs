@@ -127,8 +127,16 @@ impl Sz {
         transfer_info.errors = self.errors;
         transfer_info.check_size = format!("Crc32/{}", self.package_len);
 
-        if let Some(header) = Header::try_read(com, &mut self.can_count).await? {
-            return self.handle_header(com, transfer_state, header).await;
+        match Header::try_read(com, &mut self.can_count).await {
+            Ok(None) => {}
+            result => {
+                if let Some(header) = self.process_header_read(com, transfer_state, result).await? {
+                    self.handle_header(com, transfer_state, header).await?;
+                }
+                // A consumed flow-control/noise/CAN byte must not cause a blocking
+                // read (or send more file data) in this otherwise nonblocking poll.
+                return Ok(());
+            }
         }
 
         match self.state {
@@ -186,7 +194,9 @@ impl Sz {
                 let bytes_read = if let Some(cur) = &mut self.cur_buf { cur.read(&mut block)? } else { 0 };
 
                 if bytes_read == 0 {
-                    // EOF reached - send ZEOF
+                    // ZDATA opened a frame even for an empty file or a resume at
+                    // EOF. Terminate that frame before writing the ZEOF header.
+                    com.send(&self.encode_subpacket(ZCRCE, &[])).await?;
                     transfer_state.send_state.log_info("End of file reached, sending ZEOF".to_string());
                     Header::from_number(ZFrameType::Eof, transfer_state.send_state.cur_bytes_transfered as u32)
                         .write(com, self.get_header_type(), self.can_esc_control())
@@ -226,109 +236,116 @@ impl Sz {
             }
 
             SendState::ZEOFSentAwaitZRINIT => {
-                // Try non-blocking read first
-                if let Some(header) = Header::try_read(com, &mut self.can_count).await? {
-                    match header.frame_type {
-                        ZFrameType::RIinit => {
-                            transfer_state
-                                .send_state
-                                .log_info(format!("ZRINIT after ZEOF confirms file: {}", self.cur_file.display()));
-                            transfer_state.send_state.finish_file(self.cur_file.clone());
-                            self.cur_buf = None;
-                            self.transfered_file = true;
-                            self.state = SendState::SendNextFile;
-                        }
-                        ZFrameType::RPos => {
-                            let new_pos = header.number() as u64;
-                            transfer_state.send_state.log_warning(format!("RPOS after ZEOF; resuming at {}", new_pos));
-                            // Reopen and resend tail
-                            if let Some(cur) = &mut self.cur_buf {
-                                cur.seek(std::io::SeekFrom::Start(new_pos))?;
-                                transfer_state.send_state.cur_bytes_transfered = new_pos;
-                                self.state = SendState::SendZDATA;
-                            }
-                        }
-                        ZFrameType::Ack => {
-                            // ACK to ZEOF means continue waiting for ZRINIT
-                            // Don't return here - just continue the loop
-                            transfer_state
-                                .send_state
-                                .log_info("Got ZACK after ZEOF, continuing to wait for ZRINIT".to_string());
-                        }
-                        ZFrameType::Fin => {
-                            transfer_state.send_state.log_info("Receiver sent ZFIN after ZEOF; ending session".to_string());
-                            transfer_state.is_finished = true;
-                        }
-                        _ => {
-                            transfer_state
-                                .send_state
-                                .log_warning(format!("Unexpected header after ZEOF: {:?}", header.frame_type));
-                        }
+                // Incoming headers were already handled above, including ZFIN's OO.
+                self.retries += 1;
+                if self.retries >= 40 {
+                    // ~1 second with 25ms sleep
+                    transfer_state
+                        .send_state
+                        .log_warning("TIMEOUT - No ZRINIT after ZEOF; resending ZEOF".to_string());
+                    if transfer_state.send_state.log_count() > 60 {
+                        transfer_state.send_state.log_error("Too many log entries, cancelling transfer".to_string());
+                        Zmodem::cancel(com).await?;
+                        transfer_state.is_finished = true;
+                        return Ok(());
                     }
-                } else {
-                    // No header yet; consider timed resend
-                    self.retries += 1;
-                    if self.retries >= 40 {
-                        // ~1 second with 25ms sleep
-                        transfer_state
-                            .send_state
-                            .log_warning("TIMEOUT - No ZRINIT after ZEOF; resending ZEOF".to_string());
-                        if transfer_state.send_state.log_count() > 60 {
-                            transfer_state.send_state.log_error("Too many log entries, cancelling transfer".to_string());
-                            Zmodem::cancel(com).await?;
-                            transfer_state.is_finished = true;
-                            return Ok(());
-                        }
-                        Header::from_number(ZFrameType::Eof, transfer_state.send_state.cur_bytes_transfered as u32)
-                            .write(com, self.get_header_type(), self.can_esc_control())
-                            .await?;
-                        self.retries = 0;
-                    }
-                    sleep(Duration::from_millis(25)).await;
+                    Header::from_number(ZFrameType::Eof, transfer_state.send_state.cur_bytes_transfered as u32)
+                        .write(com, self.get_header_type(), self.can_esc_control())
+                        .await?;
+                    self.retries = 0;
                 }
+                sleep(Duration::from_millis(25)).await;
             }
         }
         Ok(())
     }
 
     pub async fn read_next_header(&mut self, com: &mut dyn Connection, transfer_state: &mut TransferState) -> crate::Result<()> {
-        let err = Header::read(com, &mut self.can_count).await;
+        let result = Header::read(com, &mut self.can_count).await;
+        if let Some(header) = self.process_header_read(com, transfer_state, result).await? {
+            self.handle_header(com, transfer_state, header).await?;
+        }
+        Ok(())
+    }
+
+    /// Apply the same recovery policy to blocking and opportunistic header reads.
+    async fn process_header_read(
+        &mut self,
+        com: &mut dyn Connection,
+        transfer_state: &mut TransferState,
+        result: crate::Result<Option<Header>>,
+    ) -> crate::Result<Option<Header>> {
         if self.can_count >= 5 {
             transfer_state.send_state.log_error("Received 5+ CAN bytes, cancelling".to_string());
-            Zmodem::cancel(com).await?;
             transfer_state.is_finished = true;
-            return Ok(());
+            Zmodem::cancel(com).await?;
+            return Ok(None);
         }
-        match err {
+        match result {
             Err(err) => {
+                match err.downcast_ref::<ZModemError>() {
+                    // These bytes are legal between frames. CAN is counted by
+                    // Header, not as a header error: otherwise the error budget
+                    // would abort before the fifth consecutive CAN is seen.
+                    Some(ZModemError::ZPADExected(0x11 | 0x91 | 0x13 | 0x93 | 0x18)) => return Ok(None),
+                    Some(
+                        ZModemError::ZPADExected(_)
+                        | ZModemError::ZLDEExected(_)
+                        | ZModemError::UnknownHeaderType(_)
+                        | ZModemError::InvalidFrameType(_)
+                        | ZModemError::InvalidSubpacket(_)
+                        | ZModemError::HexNumberExpected
+                        | ZModemError::CRC16Mismatch(_, _)
+                        | ZModemError::CRC32Mismatch(_, _),
+                    ) => {}
+                    // A transport failure/EOF is not a corrupt protocol header.
+                    _ => return Err(err),
+                }
                 self.errors += 1;
                 transfer_state
                     .send_state
                     .log_error(format!("Error reading header (error #{}/3): {:?}", self.errors, err));
                 if self.errors > 3 {
                     transfer_state.send_state.log_error("Too many header errors, aborting".to_string());
-                    Zmodem::cancel(com).await?;
                     transfer_state.is_finished = true;
+                    Zmodem::cancel(com).await?;
                     return Err(err);
                 }
-                return Ok(());
+                Ok(None)
             }
-            Ok(Some(res)) => {
-                return self.handle_header(com, transfer_state, res).await;
-            }
-
-            Ok(None) => {
-                transfer_state.send_state.log_warning("No header received".to_string());
+            Ok(header) => {
+                if header.is_some() {
+                    self.errors = 0;
+                }
+                Ok(header)
             }
         }
-        Ok(())
+    }
+
+    /// Handshakes already wait for a response. Skip boundary flow control and
+    /// stale ZRINIT there too, but bound the amount of noise consumed per call.
+    async fn read_handshake_header(&mut self, com: &mut dyn Connection, transfer_state: &mut TransferState) -> crate::Result<Option<Header>> {
+        for _ in 0..32 {
+            let result = Header::read(com, &mut self.can_count).await;
+            if let Some(header) = self.process_header_read(com, transfer_state, result).await? {
+                if header.frame_type != ZFrameType::RIinit {
+                    return Ok(Some(header));
+                }
+            }
+            if transfer_state.is_finished {
+                return Ok(None);
+            }
+        }
+        transfer_state.is_finished = true;
+        Zmodem::cancel(com).await?;
+        Err(ZModemError::GenericError("Too much noise while waiting for handshake".to_string()).into())
     }
 
     async fn handle_header(&mut self, com: &mut dyn Connection, transfer_state: &mut TransferState, res: Header) -> crate::Result<()> {
         self.errors = 0;
         let _: () = match res.frame_type {
             ZFrameType::RIinit => {
-                if self.cur_buf.is_some() {
+                if self.state == SendState::ZEOFSentAwaitZRINIT && self.cur_buf.is_some() {
                     // File transfer completed successfully
                     transfer_state
                         .send_state
@@ -337,6 +354,12 @@ impl Sz {
                     self.transfered_file = true;
                     self.cur_buf = None;
                     self.state = SendState::SendNextFile;
+                    return Ok(());
+                }
+
+                if self.cur_buf.is_some() || self.state == SendState::SendNextFile {
+                    // A queued/duplicate ZRINIT is not a file acknowledgement.
+                    // Preserve position, capabilities and batch accounting.
                     return Ok(());
                 }
 
@@ -380,7 +403,11 @@ impl Sz {
                     packet.extend_from_slice(&Zmodem::encode_subpacket_crc16(ZCRCW, &data, self.can_esc_control()));
                     com.send(&packet).await?;
 
-                    match Header::read(com, &mut self.can_count).await? {
+                    let ack = self.read_handshake_header(com, transfer_state).await?;
+                    if transfer_state.is_finished {
+                        return Ok(());
+                    }
+                    match ack {
                         Some(ack) if ack.frame_type == ZFrameType::Ack => {}
                         Some(ack) => {
                             return Err(ZModemError::GenericError(format!("expected ZACK after ZSINIT, got {:?}", ack.frame_type)).into());
@@ -481,7 +508,10 @@ impl Sz {
 
             b.extend_from_slice(&self.encode_subpacket(ZCRCW, &data));
             com.send(&b).await?;
-            let ack = Header::read(com, &mut self.can_count).await?;
+            let ack = self.read_handshake_header(com, transfer_state).await?;
+            if transfer_state.is_finished {
+                return Ok(());
+            }
             if let Some(header) = ack {
                 match header.frame_type {
                     ZFrameType::Ack => {
@@ -493,6 +523,8 @@ impl Sz {
                         transfer_state
                             .send_state
                             .log_info(format!("File '{}' skipped by receiver", transfer_state.send_state.file_name));
+                        self.cur_buf = None;
+                        transfer_state.send_state.reset_cur_transfer();
                         self.state = SendState::SendNextFile;
                         break; // Exit loop
                     }

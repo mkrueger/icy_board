@@ -69,30 +69,34 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> Connection for WebSocketConnectio
     }
 
     async fn read(&mut self, buf: &mut [u8]) -> crate::Result<usize> {
+        if buf.is_empty() {
+            return Ok(0);
+        }
         if !self.data.is_empty() {
             let len = buf.len().min(self.data.len());
             buf[..len].copy_from_slice(&self.data[..len]);
             self.data = self.data.slice(len..);
             return Ok(len);
         }
-        match self.socket.next().await {
-            Some(Ok(msg)) => {
-                let data = msg.into_data();
-                let len = buf.len().min(data.len());
-                buf[..len].copy_from_slice(&data[..len]);
-                self.data = data.slice(len..);
-                Ok(len)
-            }
-            Some(Err(e)) => match e {
-                tokio_tungstenite::tungstenite::Error::Io(e) => {
-                    if e.kind() == ErrorKind::UnexpectedEof {
-                        return Ok(0);
+        loop {
+            match self.socket.next().await {
+                Some(Ok(msg)) => {
+                    let data = match msg {
+                        Message::Text(_) | Message::Binary(_) => msg.into_data(),
+                        Message::Close(_) => return Ok(0),
+                        Message::Ping(_) | Message::Pong(_) | Message::Frame(_) => continue,
+                    };
+                    if data.is_empty() {
+                        continue;
                     }
-                    return Err(e.into());
+                    let len = buf.len().min(data.len());
+                    buf[..len].copy_from_slice(&data[..len]);
+                    self.data = data.slice(len..);
+                    return Ok(len);
                 }
-                _ => Err(std::io::Error::new(ErrorKind::ConnectionAborted, format!("Connection aborted: {e}")).into()),
-            },
-            None => Err(std::io::Error::new(ErrorKind::ConnectionAborted, "Connection aborted").into()),
+                Some(Err(e)) => return Err(e.into()),
+                None => return Ok(0),
+            }
         }
     }
 
