@@ -25,7 +25,9 @@ impl VirtualMachine<'_> {
         }
     }
 
-    pub(super) fn set_call_parameter(&mut self, parameter: usize, value: VariableValue) {
+    pub(super) fn set_call_parameter(&mut self, parameter: usize, value: VariableValue) -> Res<()> {
+        let expected = self.variable_table.get_var_entry(parameter).header.variable_type;
+        let value = self.variable_table.checked_enum_value(expected, value)?;
         if self.is_legacy_array_parameter(parameter) {
             // SCREXEC assigns through *varLst[id]->data: only element zero,
             // never the parameter array's storage or its persistent tail.
@@ -35,6 +37,7 @@ impl VirtualMachine<'_> {
         } else {
             self.variable_table.set_value(parameter, value);
         }
+        Ok(())
     }
 
     /// The destination parameter header determines whether an argument is an
@@ -64,7 +67,7 @@ impl VirtualMachine<'_> {
             };
             self.save_call_frame(locals, parameters, first);
             if let Some(value) = value {
-                self.set_call_parameter(first, value);
+                self.set_call_parameter(first, value)?;
                 if pass_flags & 1 != 0 {
                     self.write_back_stack.push(arguments[0].clone());
                 }
@@ -79,7 +82,7 @@ impl VirtualMachine<'_> {
         self.save_call_frame(locals, parameters, first);
         for (i, value) in values.into_iter().enumerate() {
             let id = first + i;
-            self.set_call_parameter(id, value);
+            self.set_call_parameter(id, value)?;
 
             if 1u16.checked_shl(i as u32).is_some_and(|mask| mask & pass_flags != 0) {
                 self.write_back_stack.push(arguments[i].clone());
@@ -89,11 +92,12 @@ impl VirtualMachine<'_> {
     }
 
     /// The same, for a call the VM makes itself and so has the arguments of already.
-    pub(super) fn prepare_call_with_values(&mut self, locals: usize, parameters: usize, first: usize, arguments: Vec<VariableValue>) {
+    pub(super) fn prepare_call_with_values(&mut self, locals: usize, parameters: usize, first: usize, arguments: Vec<VariableValue>) -> Res<()> {
         self.save_call_frame(locals, parameters, first);
         for (i, value) in arguments.into_iter().take(parameters).enumerate() {
-            self.set_call_parameter(first + i, value);
+            self.set_call_parameter(first + i, value)?;
         }
+        Ok(())
     }
 
     fn save_call_frame(&mut self, locals: usize, parameters: usize, first: usize) {
@@ -111,8 +115,8 @@ impl VirtualMachine<'_> {
                     if self.variable_table.get_version() >= 400 && entry.header.flags & crate::executable::variable_table::VARIABLE_FLAG_DYNAMIC_ARRAY != 0 {
                         VariableValue {
                             vtype: entry.value.vtype,
+                            data: entry.value.data,
                             generic_data: entry.header.create_generic_data().unwrap_or_default(),
-                            ..Default::default()
                         }
                     } else {
                         entry.value.emptied()

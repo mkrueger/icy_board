@@ -21,7 +21,10 @@ fn string_member_function_ids_are_compact_after_bytes() {
     assert_eq!(FuncOpCode::StringToInt as i16, -352);
     assert_eq!(FuncOpCode::StringToMixedCase as i16, -353);
     assert_eq!(FuncOpCode::StringStripAtx as i16, -354);
-    assert_eq!(crate::executable::LAST_FUNC, -354);
+    assert_eq!(FuncOpCode::EnumCast as i16, -355);
+    assert_eq!(crate::executable::LAST_FUNC, -355);
+    assert_eq!(FuncOpCode::EnumCast.minimum_runtime(), 400);
+    assert_eq!(FuncOpCode::EnumCast.get_definition().parameter_count(), 2);
 
     for (opcode, arity) in [
         (FuncOpCode::StringPadLeft, 2),

@@ -311,10 +311,10 @@ fn the_loader_rejects_a_truncated_type_table() {
 fn the_loader_rejects_an_unknown_type_table_format() {
     let executable = Executable::default();
     let mut bytes = executable.to_buffer().unwrap();
-    bytes[50] = 2;
+    bytes[50] = 3;
     assert!(matches!(
         Executable::from_buffer(&mut bytes, false),
-        Err(error) if error.to_string() == "Unsupported type table format: 2"
+        Err(error) if error.to_string() == "Unsupported type table format: 3"
     ));
 }
 

@@ -166,7 +166,11 @@ impl VarHeader {
 
 /// A record value with every field set up, so a field that is itself a record gets
 /// its own fields too. A type can only name types declared before it, so this ends.
-pub fn create_record_value(type_id: u8, user_types: &[Vec<RecordField>]) -> Option<VariableValue> {
+pub fn create_record_value(type_id: u8, user_types: &[Vec<RecordField>], enums: &std::collections::BTreeMap<u8, Vec<i32>>) -> Option<VariableValue> {
+    if let Some(values) = enums.get(&type_id) {
+        let default = *values.first()?;
+        return Some(VariableValue::new_enum(VariableType::UserData(type_id), default, default));
+    }
     let built_in_fields = match type_id as usize {
         crate::parser::CONTACT_ID => Some(vec![
             RecordField::scalar(VariableType::UnboundedString),
@@ -177,14 +181,12 @@ pub fn create_record_value(type_id: u8, user_types: &[Vec<RecordField>]) -> Opti
     let fields = if let Some(fields) = built_in_fields.as_ref() {
         fields
     } else {
-        user_types.get(type_id as usize - crate::parser::FIRST_USER_TYPE_ID)?
+        user_types.get((type_id as usize).checked_sub(crate::parser::FIRST_USER_TYPE_ID)?)?
     };
     let mut values = Vec::with_capacity(fields.len());
     for field in fields {
         let value = match field.variable_type {
-            VariableType::UserData(id) if crate::parser::is_user_declared_type(id) => {
-                create_record_value(id, user_types).unwrap_or_else(|| field.variable_type.create_empty_value())
-            }
+            VariableType::UserData(id) if crate::parser::is_user_declared_type(id) => create_record_value(id, user_types, enums)?,
             _ => field.variable_type.create_empty_value(),
         };
         let value = if field.dim == 0 {
@@ -199,7 +201,10 @@ pub fn create_record_value(type_id: u8, user_types: &[Vec<RecordField>]) -> Opti
             )?;
             VariableValue {
                 vtype: field.variable_type,
-                data: VariableData::default(),
+                data: enums
+                    .get(&u8::from(field.variable_type))
+                    .and_then(|values| values.first())
+                    .map_or_else(VariableData::default, |value| VariableData::from_int(*value)),
                 generic_data,
             }
         };
@@ -431,9 +436,95 @@ pub struct VariableTable {
     version: u16,
     entries: Vec<TableEntry>,
     has_user_vars: bool,
+    /// Closed integer domains, in declaration order (the first value is the default).
+    pub enums: std::collections::BTreeMap<u8, Vec<i32>>,
 }
 
 impl VariableTable {
+    /// Legacy array reads outside the bounds yield an empty value. For a closed
+    /// enum that value must be its first member, never an untyped numeric zero.
+    pub fn array_value(&self, array: &VariableValue, first: usize, second: usize, third: usize) -> VariableValue {
+        if let VariableType::UserData(id) = array.vtype
+            && let Some(default) = self.enums.get(&id).and_then(|members| members.first())
+        {
+            let value = match &array.generic_data {
+                GenericVariableData::Dim1(values) => values.get(first),
+                GenericVariableData::Dim2(values) => values.get(first).and_then(|row| row.get(second)),
+                GenericVariableData::Dim3(values) => values.get(first).and_then(|plane| plane.get(second)).and_then(|row| row.get(third)),
+                _ => None,
+            };
+            return value.cloned().unwrap_or_else(|| VariableValue::new_enum(array.vtype, *default, *default));
+        }
+        array.get_array_value(first, second, third)
+    }
+
+    /// Check a domain at the write boundary before publishing any part of a value.
+    pub fn checked_enum_value(&self, expected: VariableType, value: VariableValue) -> Res<VariableValue> {
+        let VariableType::UserData(id) = expected else {
+            return Ok(value);
+        };
+        let Some(members) = self.enums.get(&id) else {
+            return Ok(value);
+        };
+        let default = *members.first().ok_or(ExecutableError::InvalidEnumDefinition(id))?;
+        if value.vtype != expected && value.vtype != VariableType::Integer {
+            return Err(super::VMError::InvalidEnumValue(id, value.as_string()).into());
+        }
+        let generic_data = match value.generic_data {
+            GenericVariableData::Dim1(values) => GenericVariableData::Dim1(std::sync::Arc::new(
+                values
+                    .iter()
+                    .cloned()
+                    .map(|value| self.checked_enum_value(expected, value))
+                    .collect::<Res<Vec<_>>>()?,
+            )),
+            GenericVariableData::Dim2(values) => GenericVariableData::Dim2(std::sync::Arc::new(
+                values
+                    .iter()
+                    .map(|row| {
+                        row.iter()
+                            .cloned()
+                            .map(|value| self.checked_enum_value(expected, value))
+                            .collect::<Res<Vec<_>>>()
+                    })
+                    .collect::<Res<Vec<_>>>()?,
+            )),
+            GenericVariableData::Dim3(values) => GenericVariableData::Dim3(std::sync::Arc::new(
+                values
+                    .iter()
+                    .map(|plane| {
+                        plane
+                            .iter()
+                            .map(|row| {
+                                row.iter()
+                                    .cloned()
+                                    .map(|value| self.checked_enum_value(expected, value))
+                                    .collect::<Res<Vec<_>>>()
+                            })
+                            .collect::<Res<Vec<_>>>()
+                    })
+                    .collect::<Res<Vec<_>>>()?,
+            )),
+            GenericVariableData::None | GenericVariableData::Enum(_) => {
+                let number = unsafe { value.data.int_value };
+                if !members.contains(&number) {
+                    return Err(super::VMError::InvalidEnumValue(id, number.to_string()).into());
+                }
+                return Ok(VariableValue::new_enum(expected, number, default));
+            }
+            _ => return Err(super::VMError::InvalidEnumValue(id, "non-integer value".to_string()).into()),
+        };
+        Ok(VariableValue {
+            vtype: expected,
+            data: VariableData::from_int(default),
+            generic_data,
+        })
+    }
+
+    pub fn is_enum(&self, vtype: VariableType) -> bool {
+        matches!(vtype, VariableType::UserData(id) if self.enums.contains_key(&id))
+    }
+
     pub(crate) fn remap_user_types(&mut self, remap: &std::collections::HashMap<u8, u8>) {
         for entry in &mut self.entries {
             if let VariableType::UserData(type_id) = entry.header.variable_type
@@ -479,6 +570,7 @@ impl VariableTable {
                     version,
                     entries: result,
                     has_user_vars: false,
+                    enums: Default::default(),
                 },
             ));
         }
@@ -735,6 +827,7 @@ impl VariableTable {
             version,
             entries: result,
             has_user_vars: false,
+            enums: Default::default(),
         };
         table.analyze_locals();
         table.generate_names();
@@ -1095,15 +1188,21 @@ impl VariableTable {
             if !crate::parser::is_user_declared_type(type_id) && type_id as usize != crate::parser::CONTACT_ID {
                 continue;
             }
-            let Some(value) = create_record_value(type_id, user_types) else {
+            let Some(value) = create_record_value(type_id, user_types, &self.enums) else {
                 continue;
             };
+            let array_data = self
+                .enums
+                .get(&type_id)
+                .and_then(|values| values.first())
+                .map_or_else(VariableData::default, |value| VariableData::from_int(*value));
             if entry.header.dim == 0 {
                 entry.value = value;
             } else if self.version >= 400 && entry.header.flags & VARIABLE_FLAG_DYNAMIC_ARRAY != 0 {
                 // Record layout initialization must not turn an empty dynamic
                 // array into the classic one-element array with upper bound 0.
                 entry.value.generic_data = entry.header.create_generic_data().unwrap_or_default();
+                entry.value.data = array_data;
             } else if let Some(generic_data) = GenericVariableData::create_array(
                 value,
                 entry.header.dim,
@@ -1113,7 +1212,7 @@ impl VariableTable {
             ) {
                 entry.value = VariableValue {
                     vtype: entry.header.variable_type,
-                    data: crate::executable::VariableData::default(),
+                    data: array_data,
                     generic_data,
                 };
             }

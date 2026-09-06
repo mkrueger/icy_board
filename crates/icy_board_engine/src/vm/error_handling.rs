@@ -144,7 +144,7 @@ impl VirtualMachine<'_> {
 
         // The handler takes the error itself or none at all, so there is never a value to write back.
         let arguments = if parameters == 0 { Vec::new() } else { vec![self.last_error.clone().value()] };
-        self.prepare_call_with_values(locals, parameters, first, arguments);
+        self.prepare_call_with_values(locals, parameters, first, arguments)?;
 
         let depth = self.return_addresses.len();
         self.in_handler = true;

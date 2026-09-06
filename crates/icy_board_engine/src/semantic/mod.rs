@@ -240,11 +240,7 @@ impl SemanticVisitor {
     }
 
     pub(crate) fn storage_type(&self, source_type: VariableType) -> VariableType {
-        if self.type_registry.is_enum_type(source_type) {
-            VariableType::Integer
-        } else {
-            source_type
-        }
+        source_type
     }
 
     fn source_type_name(&self, variable_type: VariableType) -> String {
@@ -269,6 +265,7 @@ impl SemanticVisitor {
     /// constant of that type.
     fn declared_constant_type(&self, expr: &Expression) -> Option<VariableType> {
         match expr {
+            Expression::Parens(value) => self.declared_constant_type(value.get_expression()),
             Expression::Identifier(identifier) => self.lookup_constant(identifier.get_identifier()).map(|(variable_type, _, _)| *variable_type),
             Expression::MemberReference(member) => {
                 let Expression::Identifier(base) = member.get_expression() else {
@@ -278,6 +275,44 @@ impl SemanticVisitor {
                 definition.value(member.get_identifier()).map(|_| VariableType::UserData(definition.id))
             }
             _ => None,
+        }
+    }
+    /// Validate constant enum operators without visiting runtime expressions or
+    /// adding intermediate constants to the emitted variable table.
+    fn check_constant_enum_operations(&mut self, expr: &Expression) -> bool {
+        match expr {
+            Expression::Parens(value) => self.check_constant_enum_operations(value.get_expression()),
+            Expression::Unary(value) => {
+                if self.check_constant_enum_operations(value.get_expression()) {
+                    self.errors
+                        .lock()
+                        .unwrap()
+                        .report_error(expr.get_span(), CompilationErrorType::InvalidEnumOperation);
+                }
+                false
+            }
+            Expression::Binary(value) => {
+                let left = self.check_constant_enum_operations(value.get_left_expression());
+                let right = self.check_constant_enum_operations(value.get_right_expression());
+                if left || right {
+                    if !matches!(value.get_op(), crate::ast::BinOp::Eq | crate::ast::BinOp::NotEq) {
+                        self.errors
+                            .lock()
+                            .unwrap()
+                            .report_error(expr.get_span(), CompilationErrorType::InvalidEnumOperation);
+                    } else if !left
+                        || !right
+                        || self.declared_constant_type(value.get_left_expression()) != self.declared_constant_type(value.get_right_expression())
+                    {
+                        self.errors
+                            .lock()
+                            .unwrap()
+                            .report_error(expr.get_span(), CompilationErrorType::InvalidEnumOperation);
+                    }
+                }
+                false
+            }
+            _ => self.declared_constant_type(expr).is_some_and(|kind| self.type_registry.is_enum_type(kind)),
         }
     }
     pub fn is_routine_reference(&self, span_start: usize) -> bool {
@@ -792,6 +827,42 @@ impl SemanticVisitor {
         }
         self.references_are_reachable = outer_reachability;
         true
+    }
+
+    fn check_enum_signature_runtime(&mut self, parameters: &[ParameterSpecifier], result: VariableType, span: std::ops::Range<usize>) {
+        if self.runtime >= 400 {
+            return;
+        }
+        if self.type_registry.is_enum_type(result) {
+            self.errors.lock().unwrap().report_error(
+                span.clone(),
+                CompilationErrorType::BuiltinNeedsRuntime("Closed enum signatures".to_string(), 400),
+            );
+        }
+        for parameter in parameters {
+            match parameter {
+                ParameterSpecifier::Variable(value) => {
+                    if self.type_registry.is_enum_type(value.get_variable_type()) {
+                        self.errors.lock().unwrap().report_error(
+                            span.clone(),
+                            CompilationErrorType::BuiltinNeedsRuntime("Closed enum signatures".to_string(), 400),
+                        );
+                    }
+                }
+                ParameterSpecifier::Function(value) => self.check_enum_signature_runtime(value.get_parameters(), value.get_return_type(), span.clone()),
+                ParameterSpecifier::Procedure(value) => self.check_enum_signature_runtime(value.get_parameters(), VariableType::None, span.clone()),
+            }
+        }
+    }
+
+    fn reject_enum_argument(&mut self, argument: &Expression) {
+        let actual = argument.visit(self);
+        if self.type_registry.is_enum_type(actual) {
+            self.errors
+                .lock()
+                .unwrap()
+                .report_error(argument.get_span(), CompilationErrorType::InvalidEnumOperation);
+        }
     }
 
     fn add_parameters(&mut self, parameters: &[ParameterSpecifier]) {

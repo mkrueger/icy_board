@@ -164,6 +164,9 @@ impl VariableNameGenerator {
 
 #[derive(Error, Debug, Clone, PartialEq)]
 pub enum VMError {
+    #[error("Value {1} is not a member of closed enum type {0}")]
+    InvalidEnumValue(u8, String),
+
     #[error("Array not initialized")]
     GenericDataNotSet,
 

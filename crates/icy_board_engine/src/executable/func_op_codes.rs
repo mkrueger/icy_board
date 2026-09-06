@@ -367,9 +367,11 @@ pub enum FuncOpCode {
     StringToInt = -352,
     StringToMixedCase = -353,
     StringStripAtx = -354,
+    /// Compiler-generated checked integer-to-enum conversion.
+    EnumCast = -355,
 }
 
-pub const LAST_FUNC: i16 = -354;
+pub const LAST_FUNC: i16 = -355;
 
 impl FuncOpCode {
     pub fn get_definition(self) -> &'static FunctionDefinition {
@@ -435,6 +437,7 @@ impl FuncOpCode {
                 | FuncOpCode::StringToInt
                 | FuncOpCode::StringToMixedCase
                 | FuncOpCode::StringStripAtx
+                | FuncOpCode::EnumCast
         ) {
             400
         } else {
@@ -501,7 +504,7 @@ impl FunctionDefinition {
         }
     }
 }
-pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 366]> = std::sync::LazyLock::new(|| {
+pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 367]> = std::sync::LazyLock::new(|| {
     [
         FunctionDefinition {
             name: "END",
@@ -3521,6 +3524,14 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 366]> 
             return_type: VariableType::UnboundedString,
             args: None,
             signature: FunctionSignature::FixedParameters(1),
+        },
+        FunctionDefinition {
+            name: "<enum cast>",
+            version: 350,
+            opcode: FuncOpCode::EnumCast,
+            return_type: VariableType::None,
+            args: None,
+            signature: FunctionSignature::FixedParameters(2),
         },
         // ALIASES (need to be last in the list)
         FunctionDefinition {

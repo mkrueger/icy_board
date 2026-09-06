@@ -336,6 +336,9 @@ pub enum GenericVariableData {
     /// The fields of a value whose type the program declared with TYPE/ENDTYPE.
     Record(std::sync::Arc<Vec<VariableValue>>),
 
+    /// Closed enum scalar; the payload is its declaration-order default.
+    Enum(i32),
+
     /// The object a member expression reads, kept alive by the values that name it.
     UserData(std::sync::Arc<dyn crate::compiler::user_data::UserDataValue>),
 }
@@ -353,6 +356,7 @@ impl fmt::Debug for GenericVariableData {
             // A secret has no business in a log line.
             GenericVariableData::Password(_) => write!(f, "Password(******)"),
             GenericVariableData::Record(fields) => write!(f, "Record({fields:?})"),
+            GenericVariableData::Enum(default) => write!(f, "Enum(default={default})"),
             GenericVariableData::UserData(_) => write!(f, "UserData"),
         }
     }
@@ -465,6 +469,13 @@ impl fmt::Display for VariableValue {
 
 impl PartialEq for VariableValue {
     fn eq(&self, other: &Self) -> bool {
+        // Board APIs and lowered member constants carry the integer payload;
+        // source-level nominal checking has already established the domain.
+        if matches!(self.generic_data, GenericVariableData::Enum(_)) && other.vtype == VariableType::Integer
+            || matches!(other.generic_data, GenericVariableData::Enum(_)) && self.vtype == VariableType::Integer
+        {
+            return self.as_int() == other.as_int();
+        }
         match (&self.generic_data, &other.generic_data) {
             (GenericVariableData::Dim1(left), GenericVariableData::Dim1(right)) => return self.vtype == other.vtype && left == right,
             (GenericVariableData::Dim2(left), GenericVariableData::Dim2(right)) => return self.vtype == other.vtype && left == right,
@@ -478,6 +489,7 @@ impl PartialEq for VariableValue {
             }
             return match (&self.generic_data, &other.generic_data) {
                 (GenericVariableData::Record(left), GenericVariableData::Record(right)) => left == right,
+                (GenericVariableData::Enum(_), GenericVariableData::Enum(_)) => self.as_int() == other.as_int(),
                 _ => false,
             };
         }
@@ -1086,6 +1098,7 @@ impl VariableValue {
     #[must_use]
     pub fn emptied(&self) -> VariableValue {
         match &self.generic_data {
+            GenericVariableData::Enum(default) => Self::new_enum(self.vtype, *default, *default),
             GenericVariableData::Record(fields) => VariableValue {
                 vtype: self.vtype,
                 data: VariableData::default(),
@@ -1093,19 +1106,19 @@ impl VariableValue {
             },
             GenericVariableData::Dim1(values) => VariableValue {
                 vtype: self.vtype,
-                data: VariableData::default(),
+                data: self.data,
                 generic_data: GenericVariableData::Dim1(std::sync::Arc::new(values.iter().map(VariableValue::emptied).collect())),
             },
             GenericVariableData::Dim2(values) => VariableValue {
                 vtype: self.vtype,
-                data: VariableData::default(),
+                data: self.data,
                 generic_data: GenericVariableData::Dim2(std::sync::Arc::new(
                     values.iter().map(|row| row.iter().map(VariableValue::emptied).collect()).collect(),
                 )),
             },
             GenericVariableData::Dim3(values) => VariableValue {
                 vtype: self.vtype,
-                data: VariableData::default(),
+                data: self.data,
                 generic_data: GenericVariableData::Dim3(std::sync::Arc::new(
                     values
                         .iter()
@@ -1122,6 +1135,14 @@ impl VariableValue {
             vtype,
             data,
             generic_data: GenericVariableData::None,
+        }
+    }
+
+    pub fn new_enum(vtype: VariableType, value: i32, default: i32) -> Self {
+        Self {
+            vtype,
+            data: VariableData::from_int(value),
+            generic_data: GenericVariableData::Enum(default),
         }
     }
 
@@ -1492,6 +1513,9 @@ impl VariableValue {
     ///
     /// Panics if .
     pub fn as_int(&self) -> i32 {
+        if matches!(self.generic_data, GenericVariableData::Enum(_)) {
+            return unsafe { self.data.int_value };
+        }
         if let GenericVariableData::String(s) = &self.generic_data {
             // PCBoard converts strings with atol(): skip leading whitespace, take an
             // optional sign, then digits up to the first non-digit. Verified against
@@ -1778,6 +1802,7 @@ impl VariableValue {
         unsafe {
             match &self.generic_data {
                 GenericVariableData::String(s) => s.as_ref().clone(),
+                GenericVariableData::Enum(_) => self.data.int_value.to_string(),
                 GenericVariableData::Bytes(data) => bytes_to_hex(data),
                 GenericVariableData::Password(p) => match p {
                     Password::PlainText(s) => s.clone(),

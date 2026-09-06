@@ -558,12 +558,10 @@ pub fn get_member_documentation(var_type: VariableType, member: &str) -> Option<
         };
     }
     if id == REGEX_OPTIONS_ENUM_ID {
-        return match member.to_ascii_lowercase().as_str() {
-            "none" | "ignorecase" | "multiline" | "dotmatchesnewline" | "ignorewhitespace" | "swapgreed" | "ascii" => {
-                Some(fl!(LANGUAGE_LOADER, "hint-enum-regex-options"))
-            }
-            _ => None,
-        };
+        return icy_board_engine::parser::UserTypeRegistry::icy_board_registry()
+            .get_enum_from_id(id)
+            .and_then(|definition| definition.value(&unicase::Ascii::new(member.to_string())))
+            .map(|_| fl!(LANGUAGE_LOADER, "hint-enum-regex-options"));
     }
     if id == STRING_COMPARISON_ENUM_ID {
         return match member.to_ascii_lowercase().as_str() {

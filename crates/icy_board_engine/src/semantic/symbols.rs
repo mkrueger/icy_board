@@ -31,12 +31,22 @@ pub(super) fn parameter_lists_match(expected: &[ParameterSpecifier], actual: &[P
 
 /// PPL 4.00 requires complete signatures; legacy ordinary parameters remain
 /// permissive while callbacks retain their complete signature checks.
-pub(super) fn declaration_parameters_match(language: u16, expected: &[ParameterSpecifier], actual: &[ParameterSpecifier]) -> bool {
+pub(super) fn declaration_parameters_match(
+    language: u16,
+    expected: &[ParameterSpecifier],
+    actual: &[ParameterSpecifier],
+    registry: &crate::parser::UserTypeRegistry,
+) -> bool {
     if language >= 400 {
         return parameter_lists_match(expected, actual);
     }
     expected.len() == actual.len()
         && expected.iter().zip(actual).all(|(expected, actual)| {
+            if let (ParameterSpecifier::Variable(left), ParameterSpecifier::Variable(right)) = (expected, actual)
+                && (registry.is_enum_type(left.get_variable_type()) || registry.is_enum_type(right.get_variable_type()))
+            {
+                return parameter_signature_matches(expected, actual);
+            }
             matches!((expected, actual), (ParameterSpecifier::Variable(_), ParameterSpecifier::Variable(_))) || parameter_signature_matches(expected, actual)
         })
 }
@@ -74,6 +84,7 @@ fn parameter_signature_matches(expected: &ParameterSpecifier, actual: &Parameter
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum SemanticInfo {
+    EnumCast(u8),
     PredefinedFunc(FuncOpCode),
     MemberFunctionCall(usize),
     MemberSetterCall(usize),

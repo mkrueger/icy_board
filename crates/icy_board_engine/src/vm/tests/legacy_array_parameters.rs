@@ -305,7 +305,7 @@ async fn legacy_bytecode_and_vm_supplied_values_save_only_zero_even_with_static_
         vm.return_addresses.push(ReturnAddress::func_call(0, 1));
 
         // Exercise the synchronous VM-provided argument path on a nested frame.
-        vm.prepare_call_with_values(0, 1, 2, vec![VariableValue::new_int(31)]);
+        vm.prepare_call_with_values(0, 1, 2, vec![VariableValue::new_int(31)]).unwrap();
         vm.variable_table.get_value_mut(2).set_array_value(3, 0, 0, VariableValue::new_int(99)).unwrap();
         vm.write_back_stack.push(PPEExpr::Value(3));
         vm.return_addresses.push(ReturnAddress::func_call(0, 1));

@@ -789,6 +789,9 @@ async fn string_split_values(vm: &mut VirtualMachine<'_>, args: &[PPEExpr], limi
 pub async fn array_value_at(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let array = vm.eval_array_operand(&args[0]).await?;
     let index = vm.eval_expr(&args[1]).await?.as_int();
+    if vm.variable_table.is_enum(array.vtype) {
+        return Ok(vm.variable_table.array_value(&array, index as usize, 0, 0));
+    }
     let GenericVariableData::Dim1(values) = &array.generic_data else {
         return Ok(array.vtype.create_empty_value());
     };

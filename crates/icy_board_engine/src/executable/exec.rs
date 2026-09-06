@@ -14,6 +14,7 @@ use crate::{
 use super::{FIRST_TYPE_TABLE_RUNTIME, LAST_PPE_RUNTIME, RecordField, VariableTable, VariableType, variable_table::MAX_DESERIALIZED_ARRAY_ELEMENTS};
 
 const TYPE_TABLE_FORMAT: u8 = 1;
+const ENUM_TYPE_TABLE_FORMAT: u8 = 2;
 const RECORD_FIELD_SIZE: usize = 8;
 
 #[derive(Error, Debug, Clone, PartialEq)]
@@ -77,6 +78,9 @@ pub enum ExecutableError {
 
     #[error("PPE variable arrays need {0} elements; loading is limited to {1}")]
     ArrayAllocationTooLarge(usize, usize),
+
+    #[error("Invalid closed enum definition for type {0}")]
+    InvalidEnumDefinition(u8),
 }
 
 #[derive(Clone)]
@@ -94,7 +98,12 @@ static PREAMBLE: &[u8] = b"PCBoard Programming Language Executable";
 const HEADER_SIZE: usize = 48;
 
 impl Executable {
-    fn validate_user_types(user_types: &[Vec<RecordField>]) -> Result<(), ExecutableError> {
+    fn validate_user_types(user_types: &[Vec<RecordField>], enums: &std::collections::BTreeMap<u8, Vec<i32>>) -> Result<(), ExecutableError> {
+        for (&id, values) in enums {
+            if (id as usize) < FIRST_USER_TYPE_ID + user_types.len() || values.is_empty() || values.len() > u16::MAX as usize {
+                return Err(ExecutableError::InvalidEnumDefinition(id));
+            }
+        }
         if user_types.len() > MAX_USER_TYPES {
             return Err(ExecutableError::TypeCountExceedsMaximum(user_types.len(), MAX_USER_TYPES));
         }
@@ -108,6 +117,9 @@ impl Executable {
                     return Err(ExecutableError::InvalidTypeFieldDimensions(type_id, field_index));
                 }
                 if let VariableType::UserData(field_type_id) = field.variable_type {
+                    if enums.contains_key(&field_type_id) {
+                        continue;
+                    }
                     if !is_user_declared_type(field_type_id) {
                         return Err(ExecutableError::BoardObjectTypeField(type_id, field_type_id));
                     }
@@ -122,7 +134,7 @@ impl Executable {
 
     /// How many values one instance of each record type allocates, so a corrupt type
     /// table cannot ask a loaded file for an unbounded amount of memory.
-    fn record_footprints(user_types: &[Vec<RecordField>]) -> Result<Vec<usize>, ExecutableError> {
+    fn record_footprints(user_types: &[Vec<RecordField>], enums: &std::collections::BTreeMap<u8, Vec<i32>>) -> Result<Vec<usize>, ExecutableError> {
         let mut footprints: Vec<usize> = Vec::with_capacity(user_types.len());
         for (index, fields) in user_types.iter().enumerate() {
             let type_id = FIRST_USER_TYPE_ID + index;
@@ -130,7 +142,7 @@ impl Executable {
             for (field_index, field) in fields.iter().enumerate() {
                 let elements = field.element_count().ok_or(ExecutableError::InvalidTypeFieldDimensions(type_id, field_index))?;
                 let per_element = match field.variable_type {
-                    VariableType::UserData(field_type_id) if is_user_declared_type(field_type_id) => footprints
+                    VariableType::UserData(field_type_id) if is_user_declared_type(field_type_id) && !enums.contains_key(&field_type_id) => footprints
                         .get(field_type_id as usize - FIRST_USER_TYPE_ID)
                         .copied()
                         .ok_or(ExecutableError::InvalidTypeReference(type_id, field_type_id))?,
@@ -151,13 +163,13 @@ impl Executable {
     }
 
     fn validate_record_allocation(variable_table: &VariableTable, user_types: &[Vec<RecordField>]) -> Result<(), ExecutableError> {
-        let footprints = Self::record_footprints(user_types)?;
+        let footprints = Self::record_footprints(user_types, &variable_table.enums)?;
         let mut total = 0usize;
         for entry in variable_table.get_entries() {
             let VariableType::UserData(type_id) = entry.header.variable_type else {
                 continue;
             };
-            if !is_user_declared_type(type_id) {
+            if !is_user_declared_type(type_id) || variable_table.enums.contains_key(&type_id) {
                 continue;
             }
             let footprint = footprints
@@ -181,6 +193,7 @@ impl Executable {
         for entry in variable_table.get_entries() {
             if let VariableType::UserData(type_id) = entry.header.variable_type
                 && is_user_declared_type(type_id)
+                && !variable_table.enums.contains_key(&type_id)
                 && type_id as usize - FIRST_USER_TYPE_ID >= user_types.len()
             {
                 return Err(ExecutableError::MissingTypeDefinition(type_id));
@@ -227,7 +240,7 @@ impl Executable {
                 return Err(Box::new(ExecutableError::BufferTooShort(buffer.len())));
             };
             i += 1;
-            if format != TYPE_TABLE_FORMAT {
+            if format != TYPE_TABLE_FORMAT && format != ENUM_TYPE_TABLE_FORMAT {
                 return Err(Box::new(ExecutableError::UnsupportedTypeTableFormat(format)));
             }
             let Some(&type_count) = buffer.get(i) else {
@@ -263,7 +276,23 @@ impl Executable {
                 i += field_count * RECORD_FIELD_SIZE;
                 user_types.push(fields);
             }
-            Self::validate_user_types(&user_types)?;
+            if format == ENUM_TYPE_TABLE_FORMAT {
+                let count = *buffer.get(i).ok_or(ExecutableError::BufferTooShort(buffer.len()))? as usize;
+                i += 1;
+                for _ in 0..count {
+                    let header = buffer.get(i..i + 3).ok_or(ExecutableError::BufferTooShort(buffer.len()))?;
+                    let id = header[0];
+                    let count = u16::from_le_bytes([header[1], header[2]]) as usize;
+                    i += 3;
+                    let bytes = buffer.get(i..i + count * 4).ok_or(ExecutableError::BufferTooShort(buffer.len()))?;
+                    let values = bytes.chunks_exact(4).map(|value| i32::from_le_bytes(value.try_into().unwrap())).collect();
+                    if variable_table.enums.insert(id, values).is_some() {
+                        return Err(ExecutableError::InvalidEnumDefinition(id).into());
+                    }
+                    i += count * 4;
+                }
+            }
+            Self::validate_user_types(&user_types, &variable_table.enums)?;
             Self::validate_variable_types(&variable_table, &user_types)?;
             Self::validate_record_allocation(&variable_table, &user_types)?;
             variable_table.fill_in_records(&user_types);
@@ -344,10 +373,10 @@ impl Executable {
         if self.runtime > LAST_PPE_RUNTIME {
             return Err(ExecutableError::UnsupporrtedVersion(self.runtime));
         }
-        if !self.user_types.is_empty() && self.runtime < FIRST_TYPE_TABLE_RUNTIME {
+        if (!self.user_types.is_empty() || !self.variable_table.enums.is_empty()) && self.runtime < FIRST_TYPE_TABLE_RUNTIME {
             return Err(ExecutableError::CustomTypesNotSupported(FIRST_TYPE_TABLE_RUNTIME));
         }
-        Self::validate_user_types(&self.user_types)?;
+        Self::validate_user_types(&self.user_types, &self.variable_table.enums)?;
         Self::validate_variable_types(&self.variable_table, &self.user_types)?;
         let mut buffer = Vec::new();
         buffer.extend_from_slice(PREAMBLE);
@@ -363,7 +392,11 @@ impl Executable {
         self.variable_table.serialize(&mut buffer)?;
 
         if self.runtime >= FIRST_TYPE_TABLE_RUNTIME {
-            buffer.push(TYPE_TABLE_FORMAT);
+            buffer.push(if self.variable_table.enums.is_empty() {
+                TYPE_TABLE_FORMAT
+            } else {
+                ENUM_TYPE_TABLE_FORMAT
+            });
             buffer.push(self.user_types.len() as u8);
             for fields in &self.user_types {
                 buffer.push(fields.len() as u8);
@@ -373,6 +406,16 @@ impl Executable {
                     buffer.extend_from_slice(&field.vector_size.to_le_bytes());
                     buffer.extend_from_slice(&field.matrix_size.to_le_bytes());
                     buffer.extend_from_slice(&field.cube_size.to_le_bytes());
+                }
+            }
+            if !self.variable_table.enums.is_empty() {
+                buffer.push(self.variable_table.enums.len() as u8);
+                for (&id, values) in &self.variable_table.enums {
+                    buffer.push(id);
+                    buffer.extend_from_slice(&(values.len() as u16).to_le_bytes());
+                    for value in values {
+                        buffer.extend_from_slice(&value.to_le_bytes());
+                    }
                 }
             }
         }

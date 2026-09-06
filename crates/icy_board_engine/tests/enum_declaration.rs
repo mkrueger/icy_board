@@ -32,14 +32,16 @@ fn diagnostics(source: &str) -> Vec<String> {
 const COLOR: &str = "ENUM Color\n  Red\n  Green = 5\n  Blue\nENDENUM\n";
 
 #[test]
-fn an_enum_costs_nothing_at_runtime() {
+fn an_enum_retains_its_runtime_domain() {
     let enum_source = format!("{COLOR}Color favorite = Color.Green\nPRINTLN favorite\n");
     let integer_source = "INTEGER favorite = 5\nPRINTLN favorite\n";
 
-    assert_eq!(
+    assert_ne!(
         compile(integer_source).unwrap().to_buffer().unwrap(),
         compile(&enum_source).unwrap().to_buffer().unwrap()
     );
+    let executable = compile(&enum_source).unwrap();
+    assert!(executable.variable_table.enums.values().any(|values| values == &[0, 5, 6]));
 }
 
 #[test]
@@ -74,27 +76,27 @@ fn the_enum_name_is_the_namespace() {
 }
 
 #[test]
-fn enum_parameters_and_returns_lower_to_integer() {
+fn enum_parameters_and_returns_retain_nominal_storage() {
     let enum_source = format!(
         "{COLOR}DECLARE FUNCTION Echo(Color value) Color\nColor color = Echo(Color.Blue)\nPRINTLN color\nFUNCTION Echo(Color value) Color\n  RETURN value\nENDFUNC\n"
     );
     let integer_source =
         "DECLARE FUNCTION Echo(INTEGER value) INTEGER\nINTEGER color = Echo(6)\nPRINTLN color\nFUNCTION Echo(INTEGER value) INTEGER\n  RETURN value\nENDFUNC\n";
 
-    assert_eq!(
+    assert_ne!(
         compile(integer_source).unwrap().to_buffer().unwrap(),
         compile(&enum_source).unwrap().to_buffer().unwrap()
     );
 }
 
 #[test]
-fn var_enum_parameters_lower_to_var_integer_parameters() {
+fn var_enum_parameters_retain_nominal_storage() {
     let enum_source = format!(
         "{COLOR}DECLARE PROCEDURE SetBlue(VAR Color value)\nColor favorite = Color.Red\nSetBlue(favorite)\nPRINTLN favorite\nPROCEDURE SetBlue(VAR Color value)\n  value = Color.Blue\nENDPROC\n"
     );
     let integer_source = "DECLARE PROCEDURE SetBlue(VAR INTEGER value)\nINTEGER favorite = 0\nSetBlue(favorite)\nPRINTLN favorite\nPROCEDURE SetBlue(VAR INTEGER value)\n  value = 6\nENDPROC\n";
 
-    assert_eq!(
+    assert_ne!(
         compile(integer_source).unwrap().to_buffer().unwrap(),
         compile(&enum_source).unwrap().to_buffer().unwrap()
     );
@@ -104,22 +106,22 @@ fn var_enum_parameters_lower_to_var_integer_parameters() {
 }
 
 #[test]
-fn enum_arrays_lower_to_integer_arrays() {
+fn enum_arrays_retain_nominal_storage() {
     let enum_source = format!("{COLOR}Color colors(2)\ncolors(1) = Color.Blue\nPRINTLN colors(1)\n");
     let integer_source = "INTEGER colors(2)\ncolors(1) = 6\nPRINTLN colors(1)\n";
 
-    assert_eq!(
+    assert_ne!(
         compile(integer_source).unwrap().to_buffer().unwrap(),
         compile(&enum_source).unwrap().to_buffer().unwrap()
     );
 }
 
 #[test]
-fn enum_fields_lower_to_integer_fields() {
+fn enum_fields_retain_nominal_storage() {
     let enum_source = format!("{COLOR}TYPE Paint\n  Color Shade\nENDTYPE\nPaint item\nitem.Shade = Color.Green\nPRINTLN item.Shade\n");
     let integer_source = "TYPE Paint\n  INTEGER Shade\nENDTYPE\nPaint item\nitem.Shade = 5\nPRINTLN item.Shade\n";
 
-    assert_eq!(
+    assert_ne!(
         compile(integer_source).unwrap().to_buffer().unwrap(),
         compile(&enum_source).unwrap().to_buffer().unwrap()
     );
@@ -137,20 +139,14 @@ fn duplicate_and_nonconstant_members_are_errors() {
     );
 }
 
-/// A FOR writes its own comparison and step, so it may count over an enum even
-/// though hand-written arithmetic on one stays an error.
+/// Numeric loops cannot manufacture values outside the declared domain.
 #[test]
-fn a_for_loop_may_count_over_an_enum() {
+fn a_for_loop_cannot_count_over_an_enum() {
     let enum_source = format!("{COLOR}Color shade\nFOR shade = Color.Red TO Color.Blue\n  PRINTLN shade\nNEXT\n");
-    let integer_source = "INTEGER shade\nFOR shade = 0 TO 6\n  PRINTLN shade\nNEXT\n";
-
-    assert_eq!(
-        compile(integer_source).unwrap().to_buffer().unwrap(),
-        compile(&enum_source).unwrap().to_buffer().unwrap()
-    );
+    assert!(diagnostics(&enum_source).iter().any(|e| e.contains("numeric FOR")));
 
     let errors = diagnostics(&format!("{COLOR}Color shade\nFOR shade = Color.Red TO 5\n  PRINTLN shade\nNEXT\n"));
-    assert!(errors.iter().any(|e| e == "Can't compare Color with Integer"), "{errors:?}");
+    assert!(errors.iter().any(|e| e.contains("numeric FOR")), "{errors:?}");
 
     let errors = diagnostics(&format!("{COLOR}Color shade = Color.Red\nshade = shade + 1\n"));
     assert!(!errors.is_empty(), "counting an enum up by hand is still an error");
@@ -179,13 +175,13 @@ fn enum_is_a_keyword_from_350_on() {
     assert!(!errors.is_empty(), "ENUM should not be a variable name in 350");
 }
 
-/// The members are gone before anything is emitted, so a 3.50 source may have an enum.
+/// Language 3.50 uses the same closed storage when targeting runtime 4.00.
 #[test]
 fn an_enum_works_in_a_350_source() {
     let enum_source = format!(";$LANGVERSION 350\n{COLOR}Color favorite = Color.Green\nPRINTLN favorite\n");
     let integer_source = ";$LANGVERSION 350\nINTEGER favorite = 5\nPRINTLN favorite\n";
 
-    assert_eq!(
+    assert_ne!(
         compile(integer_source).unwrap().to_buffer().unwrap(),
         compile(&enum_source).unwrap().to_buffer().unwrap()
     );

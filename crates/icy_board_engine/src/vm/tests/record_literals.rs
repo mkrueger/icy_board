@@ -10,7 +10,12 @@ fn ppl400_string_record_fields_use_dynamic_storage() {
     assert_eq!(VariableType::UnboundedString, executable.user_types[0][0].variable_type);
     assert_eq!(VariableType::UnboundedString, executable.user_types[0][1].variable_type);
     assert_eq!(1, executable.user_types[0][1].dim);
-    let direct = crate::executable::create_record_value(crate::parser::FIRST_USER_TYPE_ID as u8, &executable.user_types).unwrap();
+    let direct = crate::executable::create_record_value(
+        crate::parser::FIRST_USER_TYPE_ID as u8,
+        &executable.user_types,
+        &executable.variable_table.enums,
+    )
+    .unwrap();
     let GenericVariableData::Record(direct_fields) = direct.generic_data else {
         panic!("record factory did not initialize fields");
     };

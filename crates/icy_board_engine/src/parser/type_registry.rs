@@ -14,7 +14,7 @@ pub struct UserTypeDefinition {
     pub fields: Vec<(unicase::Ascii<String>, RecordField)>,
 }
 
-/// An integer-backed type that exists in source only.
+/// A closed, nominal integer domain. The first declared member is its default.
 #[derive(Debug, Clone, PartialEq)]
 pub struct EnumDefinition {
     pub id: u8,
@@ -365,6 +365,23 @@ impl UserTypeRegistry {
                 ("Ascii", 32),
             ],
         );
+        // Every combination is a named member, not an exception to closed-enum
+        // arithmetic. Existing single-option names and numeric values stay fixed.
+        let option_names = ["IgnoreCase", "MultiLine", "DotMatchesNewLine", "IgnoreWhitespace", "SwapGreed", "Ascii"];
+        let mut enums = self.enums.write().unwrap();
+        let options = enums.iter_mut().find(|definition| definition.id == REGEX_OPTIONS_ENUM_ID).unwrap();
+        for bits in 1i32..64 {
+            if bits.count_ones() > 1 {
+                let name = option_names
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(bit, name)| (bits & (1 << bit) != 0).then_some(*name))
+                    .collect::<Vec<_>>()
+                    .join("And");
+                options.variants.push((unicase::Ascii::new(name), bits));
+            }
+        }
+        drop(enums);
         self.register_enum(STRING_COMPARISON_ENUM_ID, "StringComparison", &[("Ordinal", 0), ("OrdinalIgnoreCase", 1)]);
         self.register_enum(CHECKSUM_ENUM_ID, "Checksum", &[("CRC32", 0), ("MD5", 1), ("SHA256", 2)]);
     }

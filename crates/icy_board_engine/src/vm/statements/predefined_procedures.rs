@@ -1779,7 +1779,7 @@ pub async fn fgetrec(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
         }
         lines.push(line);
     }
-    match crate::vm::record_io::decode_lines(&template, &lines) {
+    match crate::vm::record_io::decode_lines(&template, &lines, &vm.variable_table) {
         Ok(value) => vm.set_variable(&args[1], value).await?,
         Err(message) => record_io_error(vm, channel, ERR_FORMAT, message),
     }
@@ -1822,7 +1822,7 @@ pub async fn freadrec(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> 
         record_io_error(vm, channel, ERR_FORMAT, "binary record is truncated".to_string());
         return Ok(());
     }
-    match crate::vm::record_io::decode_binary(&template, &payload) {
+    match crate::vm::record_io::decode_binary(&template, &payload, &vm.variable_table) {
         Ok(value) => vm.set_variable(&args[1], value).await?,
         Err(message) => record_io_error(vm, channel, ERR_FORMAT, message),
     }
@@ -1943,7 +1943,16 @@ pub async fn redim(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     let dim3 = if args.len() > 3 { vm.eval_expr(&args[3]).await?.as_int() as usize } else { 0 };
 
     if let PPEExpr::Value(id) = args[0] {
-        vm.variable_table.get_value_mut(id).redim((args.len() - 1) as u8, dim1, dim2, dim3);
+        let vtype = vm.variable_table.get_value(id).vtype;
+        if let VariableType::UserData(type_id) = vtype
+            && let Some(empty) = crate::executable::create_record_value(type_id, &vm.user_types, &vm.variable_table.enums)
+        {
+            let generic_data =
+                GenericVariableData::create_array(empty, (args.len() - 1) as u8, dim1, dim2, dim3).ok_or(crate::executable::VMError::GenericDataNotSet)?;
+            vm.variable_table.get_value_mut(id).generic_data = generic_data;
+        } else {
+            vm.variable_table.get_value_mut(id).redim((args.len() - 1) as u8, dim1, dim2, dim3);
+        }
     } else {
         log::error!("redim arg[0] != variable");
     }

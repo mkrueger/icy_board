@@ -121,6 +121,15 @@ pub enum CompilationErrorType {
     #[error("Can't compare {0} with {1}")]
     EnumComparisonTypeMismatch(String, String),
 
+    #[error("Closed enums do not support arithmetic, unary operators or numeric FOR counters; convert explicitly with TOINTEGER first")]
+    InvalidEnumOperation,
+
+    #[error("{0} is not a declared member of enum {1}")]
+    InvalidEnumValue(i32, String),
+
+    #[error("{0} cannot write an enum through an untyped VAR output; use an INTEGER temporary and an explicit checked enum conversion")]
+    EnumUntypedOutput(String),
+
     #[error("Can't assign {1} to {0}")]
     AssignmentTypeMismatch(VariableType, VariableType),
 
@@ -337,15 +346,25 @@ impl PPECompiler {
         let mut visted = Vec::new();
         // One transformer for the whole package, so its generated labels stay unique across files.
         let mut transformer = AstTransformationVisitor::new(self.optimize, self.semantic_visitor.type_registry.enums());
-        for prg in asts {
+        // Match semantic declaration order so imported constants are available
+        // when transforming root code, even when the root file is listed first.
+        for (index, prg) in asts
+            .iter()
+            .enumerate()
+            .filter(|(_, ast)| ast.module.is_some())
+            .chain(asts.iter().enumerate().filter(|(_, ast)| ast.module.is_none()))
+        {
             self.semantic_visitor.set_file_name(&prg.file_name);
             transformer.set_compound_receiver_types(
                 compound_receiver_types.remove(&prg.file_name).unwrap_or_default(),
                 &self.semantic_visitor.type_registry,
             );
             let prg = prg.visit_mut(&mut transformer);
-            visted.push((prg, transformer.take_loop_counters()));
+            visted.push((index, prg, transformer.take_loop_counters()));
         }
+        // Transformation order must not change the root/function emission order.
+        visted.sort_by_key(|(index, _, _)| *index);
+        let mut visted: Vec<_> = visted.into_iter().map(|(_, prg, counters)| (prg, counters)).collect();
         // Imported module declarations must be known before the root program is
         // checked, but the root file must remain first when code is emitted.
         let mut member_lookups = HashMap::new();
@@ -827,6 +846,34 @@ impl PPECompiler {
                     .collect()
             })
             .collect();
+        let needs_enums = variable_table
+            .get_entries()
+            .iter()
+            .any(|entry| self.semantic_visitor.type_registry.is_enum_type(entry.header.variable_type))
+            || user_types
+                .iter()
+                .flatten()
+                .any(|field| self.semantic_visitor.type_registry.is_enum_type(field.variable_type))
+            || self
+                .semantic_visitor
+                .function_type_lookup
+                .values()
+                .any(|info| matches!(info, SemanticInfo::EnumCast(_)));
+        if needs_enums {
+            if self.runtime < 400 {
+                return Err(CompilationErrorType::BuiltinNeedsRuntime(
+                    "Closed enum storage and checked conversions".to_string(),
+                    400,
+                ));
+            }
+            variable_table.enums = self
+                .semantic_visitor
+                .type_registry
+                .enums()
+                .iter()
+                .map(|definition| (definition.id, definition.variants.iter().map(|(_, value)| *value).collect()))
+                .collect();
+        }
         variable_table.fill_in_records(&user_types);
         let script_buffer = if remap.iter().all(|(old_id, new_id)| old_id == new_id) {
             self.commands.serialize()

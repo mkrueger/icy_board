@@ -123,13 +123,22 @@ impl AstVisitor<HirExpr> for HirExpressionResolver<'_> {
     }
 
     fn visit_function_call_expression(&mut self, call: &crate::ast::FunctionCallExpression) -> HirExpr {
-        let arguments = call.get_arguments().iter().map(|e| e.visit(self)).collect();
+        let arguments: Vec<_> = call.get_arguments().iter().map(|e| e.visit(self)).collect();
         let Some(function_type) = self.compiler.semantic_visitor.function_type_lookup.get(&CallId(call.id)).cloned() else {
             log::error!("function not found at: {} ({})", call.get_expression().get_span().start, call.get_expression());
             return HirExpr::Invalid;
         };
 
         match function_type {
+            SemanticInfo::EnumCast(id) => {
+                let type_id = self
+                    .compiler
+                    .lookup_table
+                    .lookup_constant(&Constant::Integer(i32::from(id), NumberFormat::Default));
+                let mut arguments = arguments;
+                arguments.insert(0, HirExpr::constant(type_id));
+                HirExpr::predefined(FuncOpCode::EnumCast, arguments)
+            }
             SemanticInfo::PredefinedFunc(op_code) | SemanticInfo::ScalarStaticFunc(op_code) => HirExpr::predefined(op_code, arguments),
             SemanticInfo::MemberFunctionCall(idx) => HirExpr::member_call(call.get_expression().visit(self), arguments, idx),
             SemanticInfo::MemberSetterCall(idx) => {

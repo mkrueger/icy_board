@@ -1,6 +1,6 @@
 use std::io::{Cursor, Read};
 
-use crate::executable::{GenericVariableData, VariableData, VariableType, VariableValue};
+use crate::executable::{GenericVariableData, VariableData, VariableTable, VariableType, VariableValue};
 
 pub const MAX_RECORD_FRAME: usize = 16 * 1024 * 1024;
 
@@ -18,12 +18,12 @@ pub fn encode_lines(value: &VariableValue) -> Result<Vec<String>, String> {
     Ok(lines)
 }
 
-pub fn decode_lines(template: &VariableValue, lines: &[String]) -> Result<VariableValue, String> {
+pub fn decode_lines(template: &VariableValue, lines: &[String], table: &VariableTable) -> Result<VariableValue, String> {
     if !is_record(template) {
         return Err("a user-defined record is required".to_string());
     }
     let mut lines = lines.iter();
-    let value = decode_text_value(template, &mut lines)?;
+    let value = decode_text_value(template, &mut lines, table)?;
     if lines.next().is_some() {
         return Err("record has too many fields".to_string());
     }
@@ -54,12 +54,12 @@ pub fn encode_binary(value: &VariableValue) -> Result<Vec<u8>, String> {
     Ok(framed)
 }
 
-pub fn decode_binary(template: &VariableValue, payload: &[u8]) -> Result<VariableValue, String> {
+pub fn decode_binary(template: &VariableValue, payload: &[u8], table: &VariableTable) -> Result<VariableValue, String> {
     if !is_record(template) {
         return Err("a user-defined record is required".to_string());
     }
     let mut cursor = Cursor::new(payload);
-    let value = decode_binary_value(template, &mut cursor)?;
+    let value = decode_binary_value(template, &mut cursor, table)?;
     if cursor.position() as usize != payload.len() {
         return Err("binary record has trailing payload bytes".to_string());
     }
@@ -95,6 +95,7 @@ where
             ensure_scalar_type(value.vtype)?;
             leaf(value);
         }
+        GenericVariableData::Enum(_) => leaf(value),
         _ => return Err(format!("{} cannot be stored in a record file", value.vtype)),
     }
     Ok(())
@@ -128,7 +129,7 @@ where
                 })
                 .collect::<Result<_, _>>()?,
         )),
-        GenericVariableData::None | GenericVariableData::String(_) => return scalar(template),
+        GenericVariableData::None | GenericVariableData::String(_) | GenericVariableData::Enum(_) => return scalar(template),
         _ => return Err(format!("{} cannot be read from a record file", template.vtype)),
     };
     Ok(VariableValue {
@@ -138,13 +139,13 @@ where
     })
 }
 
-fn decode_text_value<'a, I>(template: &VariableValue, lines: &mut I) -> Result<VariableValue, String>
+fn decode_text_value<'a, I>(template: &VariableValue, lines: &mut I, table: &VariableTable) -> Result<VariableValue, String>
 where
     I: Iterator<Item = &'a String>,
 {
     map_shape(template, &mut |leaf| {
         let line = lines.next().ok_or_else(|| "record is truncated".to_string())?;
-        decode_text_scalar(leaf, line)
+        decode_text_scalar(leaf, line, table)
     })
 }
 
@@ -198,8 +199,12 @@ fn encode_text_scalar(value: &VariableValue) -> String {
     }
 }
 
-fn decode_text_scalar(template: &VariableValue, text: &str) -> Result<VariableValue, String> {
+fn decode_text_scalar(template: &VariableValue, text: &str, table: &VariableTable) -> Result<VariableValue, String> {
     let invalid = || format!("invalid {} value {text:?}", template.vtype);
+    if matches!(template.generic_data, GenericVariableData::Enum(_)) {
+        let number = text.parse::<i32>().map_err(|_| invalid())?;
+        return decode_enum_scalar(template, number, table);
+    }
     let data = match template.vtype {
         VariableType::String | VariableType::BigStr | VariableType::UnboundedString => {
             return Ok(VariableValue {
@@ -256,6 +261,10 @@ fn decode_text_scalar(template: &VariableValue, text: &str) -> Result<VariableVa
 }
 
 fn encode_binary_scalar(value: &VariableValue, output: &mut Vec<u8>) {
+    if matches!(value.generic_data, GenericVariableData::Enum(_)) {
+        output.extend_from_slice(&value.as_int().to_le_bytes());
+        return;
+    }
     match value.vtype {
         VariableType::String | VariableType::BigStr | VariableType::UnboundedString => {
             let bytes = value.as_string().into_bytes();
@@ -281,8 +290,19 @@ fn encode_binary_scalar(value: &VariableValue, output: &mut Vec<u8>) {
     }
 }
 
-fn decode_binary_value(template: &VariableValue, input: &mut Cursor<&[u8]>) -> Result<VariableValue, String> {
-    map_shape(template, &mut |leaf| decode_binary_scalar(leaf, input))
+fn decode_binary_value(template: &VariableValue, input: &mut Cursor<&[u8]>, table: &VariableTable) -> Result<VariableValue, String> {
+    map_shape(template, &mut |leaf| decode_binary_scalar(leaf, input, table))
+}
+
+fn decode_enum_scalar(template: &VariableValue, number: i32, table: &VariableTable) -> Result<VariableValue, String> {
+    // The marker carries only the default, not the domain. Validate every leaf
+    // against PPE metadata while building a new record, before publishing it.
+    if !table.is_enum(template.vtype) {
+        return Err(format!("missing closed enum metadata for {}", template.vtype));
+    }
+    table
+        .checked_enum_value(template.vtype, VariableValue::new_int(number))
+        .map_err(|error| error.to_string())
 }
 
 fn read_exact<const N: usize>(input: &mut Cursor<&[u8]>) -> Result<[u8; N], String> {
@@ -291,7 +311,10 @@ fn read_exact<const N: usize>(input: &mut Cursor<&[u8]>) -> Result<[u8; N], Stri
     Ok(bytes)
 }
 
-fn decode_binary_scalar(template: &VariableValue, input: &mut Cursor<&[u8]>) -> Result<VariableValue, String> {
+fn decode_binary_scalar(template: &VariableValue, input: &mut Cursor<&[u8]>, table: &VariableTable) -> Result<VariableValue, String> {
+    if matches!(template.generic_data, GenericVariableData::Enum(_)) {
+        return decode_enum_scalar(template, i32::from_le_bytes(read_exact(input)?), table);
+    }
     let data = match template.vtype {
         VariableType::String | VariableType::BigStr | VariableType::UnboundedString => {
             let length = u32::from_le_bytes(read_exact(input)?) as usize;
@@ -385,6 +408,60 @@ fn ensure_scalar_type(variable_type: VariableType) -> Result<(), String> {
 mod tests {
     use super::*;
 
+    fn enum_record() -> (VariableTable, VariableValue) {
+        let record_id = crate::parser::FIRST_USER_TYPE_ID as u8;
+        let enum_id = record_id + 1;
+        let mut table = VariableTable::default();
+        table.enums.insert(enum_id, vec![7, -3, 7]);
+        let value = VariableValue {
+            vtype: VariableType::UserData(record_id),
+            data: VariableData::default(),
+            generic_data: GenericVariableData::Record(std::sync::Arc::new(vec![VariableValue::new_enum(VariableType::UserData(enum_id), -3, 7)])),
+        };
+        (table, value)
+    }
+
+    #[test]
+    fn enum_record_wire_format_is_signed_i32_and_decoding_restores_the_default() {
+        let (table, value) = enum_record();
+        assert_eq!(1, line_count(&value).unwrap());
+        assert_eq!(vec!["-3"], encode_lines(&value).unwrap());
+        assert_eq!(vec![4, 0, 0, 0, 253, 255, 255, 255], encode_binary(&value).unwrap());
+        for decoded in [
+            decode_lines(&value, &["-3".to_string()], &table).unwrap(),
+            decode_binary(&value, &[253, 255, 255, 255], &table).unwrap(),
+        ] {
+            let GenericVariableData::Record(fields) = decoded.generic_data else {
+                panic!("expected a record")
+            };
+            assert_eq!(-3, fields[0].as_int());
+            assert!(matches!(fields[0].generic_data, GenericVariableData::Enum(7)));
+            assert_eq!(7, fields[0].emptied().as_int());
+        }
+    }
+
+    #[test]
+    fn enum_record_decoding_requires_domain_metadata_and_well_formed_leaves() {
+        let (table, value) = enum_record();
+        for text in ["0", "8", "2147483648", "-2147483649", "1.5", "Shade.First"] {
+            assert!(decode_lines(&value, &[text.to_string()], &table).is_err(), "{text}");
+        }
+        for payload in [&[8, 0, 0, 0][..], &[253, 255, 255], &[253, 255, 255, 255, 0]] {
+            assert!(decode_binary(&value, payload, &table).is_err(), "{payload:?}");
+        }
+        let missing = VariableTable::default();
+        assert!(
+            decode_lines(&value, &["-3".to_string()], &missing)
+                .unwrap_err()
+                .contains("missing closed enum metadata")
+        );
+        assert!(
+            decode_binary(&value, &[253, 255, 255, 255], &missing)
+                .unwrap_err()
+                .contains("missing closed enum metadata")
+        );
+    }
+
     #[test]
     fn message_area_ids_round_trip_through_both_codecs() {
         let template = VariableValue::new_msg_id(0, 0);
@@ -398,9 +475,9 @@ mod tests {
         let source = record(value);
         let empty = record(template);
         let lines = encode_lines(&source).unwrap();
-        let from_text = decode_lines(&empty, &lines).unwrap();
+        let from_text = decode_lines(&empty, &lines, &VariableTable::default()).unwrap();
         let binary = encode_binary(&source).unwrap();
-        let from_binary = decode_binary(&empty, &binary[4..]).unwrap();
+        let from_binary = decode_binary(&empty, &binary[4..], &VariableTable::default()).unwrap();
 
         let GenericVariableData::Record(text_fields) = from_text.generic_data else {
             panic!("record expected");
@@ -420,6 +497,9 @@ mod tests {
             generic_data: GenericVariableData::Record(std::sync::Arc::new(vec![VariableValue::new_bool(false)])),
         };
 
-        assert_eq!(decode_binary(&template, &[2]).unwrap_err(), "invalid BOOLEAN value 2");
+        assert_eq!(
+            decode_binary(&template, &[2], &VariableTable::default()).unwrap_err(),
+            "invalid BOOLEAN value 2"
+        );
     }
 }

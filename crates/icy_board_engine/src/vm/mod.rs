@@ -430,7 +430,14 @@ impl VirtualMachine<'_> {
     /// exactly the ones this refuses.
     fn eval_expr_sync(&mut self, expr: &PPEExpr) -> Option<VariableValue> {
         match expr {
-            PPEExpr::Value(id) | PPEExpr::RoutineReference(id) => Some(decay_array(self.variable_table.get_value(*id).clone())),
+            PPEExpr::Value(id) | PPEExpr::RoutineReference(id) => {
+                let value = self.variable_table.get_value(*id);
+                Some(if value.get_dimensions() > 0 && self.variable_table.is_enum(value.vtype) {
+                    self.variable_table.array_value(value, 0, 0, 0)
+                } else {
+                    decay_array(value.clone())
+                })
+            }
             PPEExpr::UnaryExpression(op, expr) => {
                 let value = self.eval_expr_sync(expr)?;
                 Some(Self::apply_unary_op(*op, value))
@@ -452,7 +459,7 @@ impl VirtualMachine<'_> {
                 } else {
                     0
                 };
-                Some(self.variable_table.get_value(*id).get_array_value(dim_1, dim_2, dim_3))
+                Some(self.variable_table.array_value(self.variable_table.get_value(*id), dim_1, dim_2, dim_3))
             }
             _ => None,
         }
@@ -497,9 +504,10 @@ impl VirtualMachine<'_> {
     async fn eval_expr_async(&mut self, expr: &PPEExpr) -> Res<VariableValue> {
         match expr {
             PPEExpr::Invalid => Err(VMError::InternalVMError.into()),
-            PPEExpr::Value(id) | PPEExpr::RoutineReference(id) => Ok(decay_array(self.variable_table.get_value(*id).clone())),
+            PPEExpr::Value(id) | PPEExpr::RoutineReference(id) => Ok(self.eval_expr_sync(&PPEExpr::Value(*id)).unwrap()),
             PPEExpr::RecordLiteral(type_id, fields) => {
-                let mut value = crate::executable::create_record_value(*type_id, &self.user_types).ok_or(VMError::InternalVMError)?;
+                let mut value =
+                    crate::executable::create_record_value(*type_id, &self.user_types, &self.variable_table.enums).ok_or(VMError::InternalVMError)?;
                 let GenericVariableData::Record(values) = &mut value.generic_data else {
                     return Err(VMError::InternalVMError.into());
                 };
@@ -516,7 +524,7 @@ impl VirtualMachine<'_> {
                     } else {
                         self.eval_expr(expression).await?
                     };
-                    values[*field_id] = field_value.convert_to(field_type);
+                    values[*field_id] = self.variable_table.checked_enum_value(field_type, field_value)?.convert_to(field_type);
                 }
                 Ok(value)
             }
@@ -568,7 +576,7 @@ impl VirtualMachine<'_> {
                 };
                 let field = fields.get(*id).ok_or(VMError::InternalVMError)?;
                 let (dim_1, dim_2, dim_3) = self.eval_array_indices(arguments).await?;
-                Ok(field.get_array_value(dim_1, dim_2, dim_3))
+                Ok(self.variable_table.array_value(field, dim_1, dim_2, dim_3))
             }
 
             PPEExpr::MemberFunctionCall(base_expr, arguments, id) => {
@@ -636,7 +644,7 @@ impl VirtualMachine<'_> {
                 } else {
                     0
                 };
-                Ok(self.variable_table.get_value(*id).get_array_value(dim_1, dim_2, dim_3))
+                Ok(self.variable_table.array_value(self.variable_table.get_value(*id), dim_1, dim_2, dim_3))
             }
 
             PPEExpr::PredefinedFunctionCall(func, arguments) => match run_function(func.opcode, self, arguments).await {
@@ -730,6 +738,7 @@ impl VirtualMachine<'_> {
                 // The caller has already evaluated the RHS, including side effects.
                 // Keep same-kind routine references assignable (also in runtime 400).
                 let target_type = self.variable_table.get_var_entry(*id).header.variable_type;
+                let value = self.variable_table.checked_enum_value(target_type, value)?;
                 if matches!(target_type, VariableType::Function | VariableType::Procedure) && value.get_type() != target_type {
                     return Ok(());
                 }
@@ -760,6 +769,8 @@ impl VirtualMachine<'_> {
                 } else {
                     0
                 };
+                let target_type = self.variable_table.get_var_entry(*id).header.variable_type;
+                let value = self.variable_table.checked_enum_value(target_type, value)?;
                 self.variable_table.get_var_entry_mut(*id).value.set_array_value(dim_1, dim_2, dim_3, value)?;
             }
             PPEExpr::Member(_, _) | PPEExpr::IndexedMember(_, _, _) => {
@@ -809,7 +820,8 @@ impl VirtualMachine<'_> {
                     });
                 }
 
-                let root = &mut self.variable_table.get_var_entry_mut(root_id).value;
+                let mut root_value = self.variable_table.get_value(root_id).clone();
+                let root = &mut root_value;
                 let mut target = if let Some((first, second, third)) = root_indices {
                     root.get_array_value_mut(first, second, third).ok_or(VMError::InternalVMError)?
                 } else {
@@ -830,7 +842,8 @@ impl VirtualMachine<'_> {
                     };
                 }
                 let field_type = target.vtype;
-                *target = value.convert_to(field_type);
+                *target = self.variable_table.checked_enum_value(field_type, value)?.convert_to(field_type);
+                self.variable_table.set_value(root_id, root_value);
             }
             _ => {
                 return Err(VMError::InternalVMError.into());
@@ -914,7 +927,7 @@ impl VirtualMachine<'_> {
                                 };
                                 if id != return_var_id {
                                     if legacy_parameter {
-                                        self.set_call_parameter(id, value);
+                                        self.set_call_parameter(id, value)?;
                                     } else {
                                         *self.variable_table.get_value_mut(id) = value;
                                     }

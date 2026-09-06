@@ -6,7 +6,7 @@ use crate::{
         FunctionDeclarationAstNode, FunctionImplementation, GosubStatement, GotoStatement, IdentifierExpression, LabelStatement, LetStatement,
         MemberCallStatement, OnErrorMode, OnErrorStatement, ParameterSpecifier, PredefinedCallStatement, ProcedureCallStatement, ProcedureDeclarationAstNode,
         ProcedureImplementation, TypeDeclarationAstNode, VariableDeclarationStatement, VariableParameterSpecifier, const_value_with_members,
-        walk_indexer_expression, walk_predefined_call_statement, walk_procedure_call_statement,
+        walk_procedure_call_statement,
     },
     compiler::{CompilationErrorType, CompilationWarningType, user_data::UserDataMemberRegistry},
     executable::{
@@ -45,6 +45,13 @@ impl AstVisitor<VariableType> for SemanticVisitor {
     fn visit_unary_expression(&mut self, unary: &crate::ast::UnaryExpression) -> VariableType {
         let result = unary.get_expression().visit(self);
         self.reject_bare_array_value(unary.get_expression());
+        if self.type_registry.is_enum_type(result) {
+            self.errors
+                .lock()
+                .unwrap()
+                .report_error(unary.get_expression().get_span(), CompilationErrorType::InvalidEnumOperation);
+            return VariableType::None;
+        }
         result
     }
 
@@ -184,26 +191,12 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             return VariableType::None;
         }
         let has_enum = self.type_registry.is_enum_type(left) || self.type_registry.is_enum_type(right);
-        if left == VariableType::UserData(crate::parser::REGEX_OPTIONS_ENUM_ID)
-            && right == left
-            && matches!(binary.get_op(), crate::ast::BinOp::And | crate::ast::BinOp::Or)
-        {
-            return left;
-        }
         if has_enum && self.counts_a_loop(binary.get_left_expression()) {
-            // A FOR writes its own comparison and step, so it may count over an enum.
-            return match binary.get_op() {
-                crate::ast::BinOp::Lower | crate::ast::BinOp::LowerEq | crate::ast::BinOp::Greater | crate::ast::BinOp::GreaterEq => {
-                    if left != right {
-                        self.errors.lock().unwrap().report_error(
-                            binary.get_right_expression().get_span(),
-                            CompilationErrorType::EnumComparisonTypeMismatch(self.source_type_name(left), self.source_type_name(right)),
-                        );
-                    }
-                    VariableType::Boolean
-                }
-                _ => left,
-            };
+            self.errors
+                .lock()
+                .unwrap()
+                .report_error(binary.get_left_expression().get_span(), CompilationErrorType::InvalidEnumOperation);
+            return VariableType::None;
         }
         if has_enum && !matches!(binary.get_op(), crate::ast::BinOp::Eq | crate::ast::BinOp::NotEq) {
             self.errors.lock().unwrap().report_error(
@@ -565,13 +558,37 @@ impl AstVisitor<VariableType> for SemanticVisitor {
 
     fn visit_predefined_call_statement(&mut self, call_stmt: &PredefinedCallStatement) -> VariableType {
         let def = call_stmt.get_func();
-        walk_predefined_call_statement(self, call_stmt);
+        // Visit each argument once: visiting again duplicates references and diagnostics.
+        let argument_types: Vec<_> = call_stmt.get_arguments().iter().map(|argument| argument.visit(self)).collect();
         if def.opcode == OpCode::REDIM
             && let Some(target) = call_stmt.get_arguments().first()
         {
             self.check_redim_target(target, call_stmt.get_arguments().len() - 1);
         }
         for (index, argument) in call_stmt.get_arguments().iter().enumerate() {
+            let actual = argument_types[index];
+            if self.type_registry.is_enum_type(actual) {
+                use crate::executable::StatementSignature;
+                let output = match def.sig {
+                    StatementSignature::ArgumentsWithVariable(v, _) | StatementSignature::VariableArguments(v, _, _) => v > 0 && index == v - 1,
+                    StatementSignature::SpecialCasePop | StatementSignature::SpecialCaseVarSeg => true,
+                    StatementSignature::SpecialCaseSort => index == 1,
+                    StatementSignature::SpecialCaseDlockg => index == 2,
+                    StatementSignature::SpecialCaseDcreate => index == 3,
+                    StatementSignature::Invalid => false,
+                } || matches!(def.opcode, OpCode::SCRFILE);
+                if output && def.opcode != OpCode::REDIM {
+                    self.errors
+                        .lock()
+                        .unwrap()
+                        .report_error(argument.get_span(), CompilationErrorType::EnumUntypedOutput(def.name.to_string()));
+                } else if !(def.opcode == OpCode::REDIM && index == 0) && !matches!(def.opcode, OpCode::PRINT | OpCode::PRINTLN) {
+                    self.errors
+                        .lock()
+                        .unwrap()
+                        .report_error(argument.get_span(), CompilationErrorType::InvalidEnumOperation);
+                }
+            }
             if !takes_whole_array(def.opcode, def.sig, index) {
                 self.reject_bare_array_value(argument);
             }
@@ -700,6 +717,39 @@ impl AstVisitor<VariableType> for SemanticVisitor {
     }
 
     fn visit_function_call_expression(&mut self, call: &FunctionCallExpression) -> VariableType {
+        if self.lang_version >= 350
+            && let Expression::Identifier(name) = call.get_expression()
+            && let Some(definition) = self.type_registry.get_enum(name.get_identifier())
+        {
+            self.check_expr_arg_count(1, call.get_arguments().len(), call.get_expression());
+            for argument in call.get_arguments() {
+                let actual = argument.visit(self);
+                self.reject_bare_array_value(argument);
+                if actual != VariableType::Integer && actual != VariableType::None {
+                    self.errors.lock().unwrap().report_error(
+                        argument.get_span(),
+                        CompilationErrorType::ArgumentTypeMismatch(1, "INTEGER".to_string(), self.source_type_name(actual)),
+                    );
+                }
+                if let Some(value) = const_value_with_members(argument, &|id| self.lookup_constant(id).map(|(_, value, _)| value.clone()), &|_, _| None)
+                    && (value.get_type() != VariableType::Integer || definition.variant_name(value.as_int()).is_none())
+                {
+                    self.errors.lock().unwrap().report_error(
+                        argument.get_span(),
+                        CompilationErrorType::InvalidEnumValue(value.as_int(), definition.name.to_string()),
+                    );
+                }
+            }
+            if self.runtime < 400 {
+                self.errors.lock().unwrap().report_error(
+                    call.get_expression().get_span(),
+                    CompilationErrorType::BuiltinNeedsRuntime("Checked enum conversion".to_string(), 400),
+                );
+            }
+            self.add_constant(&Constant::Integer(i32::from(definition.id), crate::ast::constant::NumberFormat::Default));
+            self.function_type_lookup.insert(CallId(call.id), SemanticInfo::EnumCast(definition.id));
+            return VariableType::UserData(definition.id);
+        }
         let mut res = VariableType::None;
         let is_ident = matches!(call.get_expression(), Expression::Identifier(_));
         if let Expression::MemberReference(member) = call.get_expression()
@@ -708,7 +758,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             self.visit_receiver(member.get_expression(), member.get_identifier_token());
             if self.array_shape(member.get_expression()).is_some() {
                 for argument in call.get_arguments() {
-                    argument.visit(self);
+                    self.reject_enum_argument(argument);
                     self.reject_bare_array_value(argument);
                 }
                 if self.statement_member_call != Some(CallId(call.id)) {
@@ -734,7 +784,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             self.visit_receiver(member.get_expression(), member.get_identifier_token());
             if self.array_shape(member.get_expression()).is_some() {
                 for argument in call.get_arguments() {
-                    argument.visit(self);
+                    self.reject_enum_argument(argument);
                     self.reject_bare_array_value(argument);
                 }
                 let given = call.get_arguments().len();
@@ -760,13 +810,13 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             if let Some(shape) = self.array_shape(member.get_expression())
                 && shape.rank == 1
             {
-                call.get_arguments()[0].visit(self);
+                self.reject_enum_argument(&call.get_arguments()[0]);
                 self.reject_bare_array_value(&call.get_arguments()[0]);
                 self.function_type_lookup.insert(CallId(call.id), SemanticInfo::ArrayValueAt);
                 return shape.element_type;
             }
             if matches!(receiver_type, VariableType::String | VariableType::BigStr | VariableType::UnboundedString) {
-                call.get_arguments()[0].visit(self);
+                self.reject_enum_argument(&call.get_arguments()[0]);
                 self.reject_bare_array_value(&call.get_arguments()[0]);
                 self.function_type_lookup
                     .insert(CallId(call.id), SemanticInfo::ScalarMemberFunc(FuncOpCode::StringCharAt, &[]));
@@ -791,7 +841,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 match member.get_identifier().as_ref().to_ascii_lowercase().as_str() {
                     "join" if call.get_arguments().len() == 2 => {
                         for argument in call.get_arguments() {
-                            argument.visit(self);
+                            self.reject_enum_argument(argument);
                         }
                         self.reject_bare_array_value(&call.get_arguments()[1]);
                         let valid_array = call
@@ -813,7 +863,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                     }
                     "repeat" if call.get_arguments().len() == 2 => {
                         for argument in call.get_arguments() {
-                            argument.visit(self);
+                            self.reject_enum_argument(argument);
                             self.reject_bare_array_value(argument);
                         }
                         self.function_type_lookup
@@ -826,6 +876,12 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                             .iter()
                             .map(|argument| {
                                 let actual = argument.visit(self);
+                                if self.type_registry.is_enum_type(actual) {
+                                    self.errors
+                                        .lock()
+                                        .unwrap()
+                                        .report_error(argument.get_span(), CompilationErrorType::InvalidEnumOperation);
+                                }
                                 self.reject_bare_array_value(argument);
                                 actual
                             })
@@ -858,7 +914,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             ) && member.get_identifier().as_ref().eq_ignore_ascii_case("FromBase64")
                 && call.get_arguments().len() == 1
             {
-                call.get_arguments()[0].visit(self);
+                self.reject_enum_argument(&call.get_arguments()[0]);
                 self.reject_bare_array_value(&call.get_arguments()[0]);
                 self.function_type_lookup
                     .insert(CallId(call.id), SemanticInfo::ScalarStaticFunc(FuncOpCode::BASE64DEC));
@@ -910,6 +966,25 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                         CompilationErrorType::ArgumentTypeMismatch(call.get_arguments().len(), "StringComparison".to_string(), self.source_type_name(actual)),
                     );
                 }
+                for (index, actual) in argument_types.iter().enumerate() {
+                    let comparison = matches!(
+                        opcode,
+                        FuncOpCode::StringFindComparison
+                            | FuncOpCode::StringFindLastComparison
+                            | FuncOpCode::StringContainsComparison
+                            | FuncOpCode::StringStartsWithComparison
+                            | FuncOpCode::StringEndsWithComparison
+                            | FuncOpCode::StringCountComparison
+                            | FuncOpCode::StringEqualsComparison
+                    ) && index + 1 == argument_types.len()
+                        && *actual == VariableType::UserData(crate::parser::STRING_COMPARISON_ENUM_ID);
+                    if self.type_registry.is_enum_type(*actual) && !comparison {
+                        self.errors
+                            .lock()
+                            .unwrap()
+                            .report_error(call.get_arguments()[index].get_span(), CompilationErrorType::InvalidEnumOperation);
+                    }
+                }
                 for value in defaults {
                     self.add_constant(&Constant::Integer(*value, crate::ast::constant::NumberFormat::Default));
                 }
@@ -945,6 +1020,14 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                         CompilationErrorType::ArgumentTypeMismatch(1, "Checksum".to_string(), self.source_type_name(actual)),
                     );
                 }
+                for (index, actual) in argument_types.iter().enumerate() {
+                    if self.type_registry.is_enum_type(*actual) && !(opcode == FuncOpCode::BytesGetChecksum && index == 0) {
+                        self.errors
+                            .lock()
+                            .unwrap()
+                            .report_error(call.get_arguments()[index].get_span(), CompilationErrorType::InvalidEnumOperation);
+                    }
+                }
                 self.function_type_lookup.insert(CallId(call.id), SemanticInfo::ScalarMemberFunc(opcode, &[]));
                 return return_type;
             }
@@ -954,7 +1037,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 && let Some(array_member) = array_member(member.get_identifier())
             {
                 for argument in call.get_arguments() {
-                    argument.visit(self);
+                    self.reject_enum_argument(argument);
                     self.reject_bare_array_value(argument);
                 }
                 let given = call.get_arguments().len();
@@ -975,7 +1058,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 && let Some((_, opcode, arguments)) = array_procedure(member.get_identifier())
             {
                 for argument in call.get_arguments() {
-                    argument.visit(self);
+                    self.reject_enum_argument(argument);
                     self.reject_bare_array_value(argument);
                 }
                 let given = call.get_arguments().len();
@@ -1104,7 +1187,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             }
             Some(SemanticInfo::VariableReference(idx)) => {
                 for argument in call.get_arguments() {
-                    argument.visit(self);
+                    self.reject_enum_argument(argument);
                     self.reject_bare_array_value(argument);
                 }
 
@@ -1126,9 +1209,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 self.check_expr_arg_count(arg_count, call.get_arguments().len(), call.get_expression());
             }
             Some(SemanticInfo::PredefFunctionGroup(funcs)) => {
-                for argument in call.get_arguments() {
-                    argument.visit(self);
-                }
+                let argument_types: Vec<_> = call.get_arguments().iter().map(|argument| argument.visit(self)).collect();
                 let mut funcs = funcs;
                 funcs.sort_by_key(|func| std::cmp::Reverse(FUNCTION_DEFINITIONS[*func].version));
                 for func in &funcs {
@@ -1144,6 +1225,16 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                         }
                         self.function_type_lookup.insert(CallId(call.id), SemanticInfo::PredefinedFunc(def.opcode));
                         for (index, argument) in call.get_arguments().iter().enumerate() {
+                            let actual = argument_types[index];
+                            if self.type_registry.is_enum_type(actual)
+                                && def.opcode != FuncOpCode::TOINTEGER
+                                && !(def.opcode == FuncOpCode::Len_Dim && index == 0 && self.array_shape(argument).is_some())
+                            {
+                                self.errors
+                                    .lock()
+                                    .unwrap()
+                                    .report_error(argument.get_span(), CompilationErrorType::InvalidEnumOperation);
+                            }
                             if def.opcode != FuncOpCode::Len_Dim || index != 0 {
                                 self.reject_bare_array_value(argument);
                             }
@@ -1254,8 +1345,8 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 CompilationErrorType::FunctionNotFound(indexer.get_identifier().to_string()),
             );
         }
-        walk_indexer_expression(self, indexer);
         for argument in indexer.get_arguments() {
+            self.reject_enum_argument(argument);
             self.reject_bare_array_value(argument);
         }
         res
@@ -1361,7 +1452,12 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 return VariableType::None;
             }
             if target_type != value_type && !matches!(target_type, VariableType::None) {
-                let_stmt.get_value_expression().visit(self);
+                if self.type_registry.is_enum_type(target_type) || self.type_registry.is_enum_type(value_type) {
+                    self.errors.lock().unwrap().report_error(
+                        let_stmt.get_value_expression().get_span(),
+                        CompilationErrorType::EnumAssignmentTypeMismatch(self.source_type_name(target_type), self.source_type_name(value_type)),
+                    );
+                }
             }
             return VariableType::None;
         }
@@ -1578,6 +1674,12 @@ impl AstVisitor<VariableType> for SemanticVisitor {
 
     fn visit_for_statement(&mut self, for_stmt: &crate::ast::ForStatement) -> VariableType {
         if let Some(idx) = self.lookup_variable(for_stmt.get_identifier()) {
+            if self.type_registry.is_enum_type(self.references[idx].1.variable_type) {
+                self.errors
+                    .lock()
+                    .unwrap()
+                    .report_error(for_stmt.get_identifier_token().span.clone(), CompilationErrorType::InvalidEnumOperation);
+            }
             if self.references_are_reachable {
                 self.reference_owners.entry(idx).or_default().insert(self.cur_func_impl);
             }
@@ -1591,11 +1693,18 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 CompilationErrorType::VariableNotFound(for_stmt.get_identifier().to_string()),
             );
         }
-        crate::ast::walk_for_stmt(self, for_stmt);
+        // The LSP visits FOR directly; compilation instead visits its desugared
+        // assignments/comparisons/arithmetic, which already reject enum operands.
+        self.reject_enum_argument(for_stmt.get_start_expr());
+        self.reject_enum_argument(for_stmt.get_end_expr());
         self.reject_bare_array_value(for_stmt.get_start_expr());
         self.reject_bare_array_value(for_stmt.get_end_expr());
         if let Some(step) = for_stmt.get_step_expr() {
+            self.reject_enum_argument(step);
             self.reject_bare_array_value(step);
+        }
+        for statement in for_stmt.get_statements() {
+            statement.visit(self);
         }
         VariableType::None
     }
@@ -1650,6 +1759,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             return VariableType::None;
         }
 
+        self.check_constant_enum_operations(const_decl.get_value());
         let value = const_value_with_members(
             const_decl.get_value(),
             &|id| self.lookup_constant(id).map(|(_, value, _)| value.clone()),
@@ -1679,8 +1789,8 @@ impl AstVisitor<VariableType> for SemanticVisitor {
         }
 
         let declared_type = const_decl.get_variable_type();
-        if self.type_registry.is_enum_type(declared_type) {
-            let actual = self.declared_constant_type(const_decl.get_value()).unwrap_or_else(|| value.get_type());
+        let actual = self.declared_constant_type(const_decl.get_value()).unwrap_or_else(|| value.get_type());
+        if self.type_registry.is_enum_type(declared_type) || self.type_registry.is_enum_type(actual) {
             if actual != declared_type {
                 self.errors.lock().unwrap().report_error(
                     const_decl.get_value().get_span(),
@@ -1728,6 +1838,16 @@ impl AstVisitor<VariableType> for SemanticVisitor {
     }
 
     fn visit_variable_declaration_statement(&mut self, var_decl: &VariableDeclarationStatement) -> VariableType {
+        if self.runtime < 400 && self.type_registry.is_enum_type(var_decl.get_variable_type()) {
+            self.errors.lock().unwrap().report_error(
+                var_decl
+                    .get_variables()
+                    .first()
+                    .map(|v| v.get_identifier_token().span.clone())
+                    .unwrap_or_default(),
+                CompilationErrorType::BuiltinNeedsRuntime("Closed enum storage".to_string(), 400),
+            );
+        }
         for v in var_decl.get_variables() {
             if self.has_variable_defined(v.get_identifier()) {
                 self.errors.lock().unwrap().report_error(
@@ -1743,7 +1863,19 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 (1, arr_expr.get_expressions().len().saturating_sub(1))
             } else {
                 if let Some(initializer) = v.get_initalizer() {
-                    initializer.visit(self);
+                    let actual = initializer.visit(self);
+                    let declared = var_decl.get_variable_type();
+                    // Compiler initializer lowering creates a LET and checks
+                    // nominal assignment there. The LSP keeps this declaration.
+                    if v.get_dimensions().is_empty()
+                        && (self.type_registry.is_enum_type(declared) || self.type_registry.is_enum_type(actual))
+                        && actual != declared
+                    {
+                        self.errors.lock().unwrap().report_error(
+                            initializer.get_span(),
+                            CompilationErrorType::EnumAssignmentTypeMismatch(self.source_type_name(declared), self.source_type_name(actual)),
+                        );
+                    }
                 }
                 (v.get_dimensions().len() as u8, v.get_vector_size())
             };
@@ -1838,6 +1970,11 @@ impl AstVisitor<VariableType> for SemanticVisitor {
     }
 
     fn visit_function_declaration(&mut self, func_decl: &FunctionDeclarationAstNode) -> VariableType {
+        self.check_enum_signature_runtime(
+            func_decl.get_parameters(),
+            func_decl.get_return_type(),
+            func_decl.get_identifier_token().span.clone(),
+        );
         if self.has_variable_defined(func_decl.get_identifier()) {
             self.errors.lock().unwrap().report_error(
                 func_decl.get_identifier_token().span.clone(),
@@ -1860,6 +1997,11 @@ impl AstVisitor<VariableType> for SemanticVisitor {
     }
 
     fn visit_function_implementation(&mut self, function: &FunctionImplementation) -> VariableType {
+        self.check_enum_signature_runtime(
+            function.get_parameters(),
+            function.get_return_type(),
+            function.get_identifier_token().span.clone(),
+        );
         if let Some(idx) = self.lookup_variable(function.get_identifier()) {
             // Procedure call may've added a function wrongly as a procedure, fix that here.
             {
@@ -1911,13 +2053,17 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             .or_else(|| function.get_documentation())
             .map(str::to_owned);
             if let FunctionDeclaration::Function(func) = &cont.functions {
-                if !super::symbols::declaration_parameters_match(self.lang_version, func.get_parameters(), function.get_parameters()) {
+                if !super::symbols::declaration_parameters_match(self.lang_version, func.get_parameters(), function.get_parameters(), &self.type_registry) {
                     self.errors.lock().unwrap().report_error(
                         function.get_identifier_token().span.clone(),
                         CompilationErrorType::ParameterMismatch(function.get_identifier().to_string()),
                     );
                 }
-                if self.lang_version >= 400 && (func.get_return_type() != function.get_return_type() || func.get_return_rank() != function.get_return_rank()) {
+                if (self.lang_version >= 400
+                    || self.type_registry.is_enum_type(func.get_return_type())
+                    || self.type_registry.is_enum_type(function.get_return_type()))
+                    && (func.get_return_type() != function.get_return_type() || func.get_return_rank() != function.get_return_rank())
+                {
                     self.errors.lock().unwrap().report_error(
                         function.get_return_type_token().span.clone(),
                         CompilationErrorType::ReturnTypeMismatch(function.get_identifier().to_string()),
@@ -1982,6 +2128,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
     }
 
     fn visit_procedure_declaration(&mut self, proc_decl: &ProcedureDeclarationAstNode) -> VariableType {
+        self.check_enum_signature_runtime(proc_decl.get_parameters(), VariableType::None, proc_decl.get_identifier_token().span.clone());
         if self.has_variable_defined(proc_decl.get_identifier()) {
             self.errors.lock().unwrap().report_error(
                 proc_decl.get_identifier_token().span.clone(),
@@ -2006,6 +2153,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
     }
 
     fn visit_procedure_implementation(&mut self, procedure: &ProcedureImplementation) -> VariableType {
+        self.check_enum_signature_runtime(procedure.get_parameters(), VariableType::None, procedure.get_identifier_token().span.clone());
         if let Some(idx) = self.lookup_variable(procedure.get_identifier()) {
             // Procedure call may've added a function wrongly as a procedure, fix that here.
             {
@@ -2043,7 +2191,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             .or_else(|| procedure.get_documentation())
             .map(str::to_owned);
             if let FunctionDeclaration::Procedure(func) = &cont.functions
-                && !super::symbols::declaration_parameters_match(self.lang_version, func.get_parameters(), procedure.get_parameters())
+                && !super::symbols::declaration_parameters_match(self.lang_version, func.get_parameters(), procedure.get_parameters(), &self.type_registry)
             {
                 self.errors.lock().unwrap().report_error(
                     procedure.get_identifier_token().span.clone(),
