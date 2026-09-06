@@ -1,0 +1,15 @@
+[package]
+name = "icy_board_cli"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
+clap = { workspace = true }
+clap-i18n-richformatter = { workspace = true }
+i18n-embed = { workspace = true }
+rust-embed = { workspace = true }
+
+[dev-dependencies]
+fluent-bundle = { workspace = true }
+fluent-syntax = "0.12.0"

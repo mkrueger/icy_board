@@ -2,8 +2,8 @@
 // callback/closure types are inherently complex; not worth type-aliasing).
 #![allow(clippy::type_complexity)]
 use app::new_main_window;
-use argh::FromArgs;
 use chrono::Local;
+use clap::{Args, Parser, Subcommand};
 use color_eyre::{Result, eyre::eyre};
 use create::IcyBoardCreator;
 use icy_board_engine::icy_board::{
@@ -33,114 +33,172 @@ lazy_static::lazy_static! {
     static ref VERSION: Version = Version::parse(env!("CARGO_PKG_VERSION")).unwrap();
 }
 
-/// IcyBord Setup Utilitiy
-#[derive(FromArgs)]
+#[derive(Parser)]
+#[command(name = "icbsetup", disable_version_flag = true, subcommand_precedence_over_arg = true, about = icy_board_cli::text("icbsetup", "about"))]
 struct Cli {
-    /// default is 80x25
-    #[argh(switch, short = 'f')]
+    #[arg(long = "full-screen", short = 'f', help = icy_board_cli::text("icbsetup", "full-screen"))]
     full_screen: bool,
 
-    /// print the version and exit
-    #[argh(switch)]
+    #[arg(long = "version", help = icy_board_cli::text("icbsetup", "version"))]
     version: bool,
 
-    #[argh(subcommand)]
+    #[command(subcommand)]
     command: Option<Commands>,
 
-    #[argh(positional)]
-    /// path/file name of the icyboard.toml configuration file
+    #[arg(help = icy_board_cli::text("icbsetup", "file"))]
     file: Option<PathBuf>,
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
-#[argh(subcommand)]
+#[derive(Subcommand, PartialEq, Debug)]
 enum Commands {
+    #[command(name = "import", about = icy_board_cli::text("icbsetup", "import-about"))]
     Import(Import),
+    #[command(name = "create", about = icy_board_cli::text("icbsetup", "create-about"))]
     Create(Create),
+    #[command(name = "ppe-convert", about = icy_board_cli::text("icbsetup", "ppe-convert-about"))]
     PPEConvert(PPEConvert),
+    #[command(name = "check", about = icy_board_cli::text("icbsetup", "check-about"))]
     Check(Check),
+    #[command(name = "dos-image", about = icy_board_cli::text("icbsetup", "dos-image-about"))]
     DosImage(DosImage),
+    #[command(name = "dos-copy", about = icy_board_cli::text("icbsetup", "dos-copy-about"))]
     DosCopy(DosCopy),
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
-/// Import PCBDAT.DAT file to IcyBoard
-#[argh(subcommand, name = "import")]
+#[derive(Args, PartialEq, Debug)]
 struct Import {
-    /// PCBOARD.DAT file or the directory of the PCBoard installation to import
-    #[argh(positional)]
+    #[arg(help = icy_board_cli::text("icbsetup", "import-name"))]
     name: PathBuf,
 
-    /// output directory
-    #[argh(positional)]
+    #[arg(help = icy_board_cli::text("icbsetup", "output-directory"))]
     out: PathBuf,
 
-    /// map a dos path to a local one, may be repeated: --map 'D:\FILES=/mnt/files'
-    #[argh(option)]
+    #[arg(long = "map", help = icy_board_cli::text("icbsetup", "map"))]
     map: Vec<String>,
 
-    /// only report what would be imported and which paths can't be resolved
-    #[argh(switch)]
+    #[arg(long = "dry-run", help = icy_board_cli::text("icbsetup", "dry-run"))]
     dry_run: bool,
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
-/// Creates a new IcyBoard configuration#[argh(subcommand, name = "scan")]
-#[argh(subcommand, name = "create")]
+#[derive(Args, PartialEq, Debug)]
 struct Create {
-    /// output directory
-    #[argh(positional)]
+    #[arg(help = icy_board_cli::text("icbsetup", "output-directory"))]
     file: PathBuf,
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
-/// Converts a path to UTF-8
-#[argh(subcommand, name = "ppe-convert")]
+#[derive(Args, PartialEq, Debug)]
 struct PPEConvert {
-    /// directory to convert
-    #[argh(positional)]
+    #[arg(help = icy_board_cli::text("icbsetup", "ppe-convert-path"))]
     path: PathBuf,
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
-/// Reports every path in the configuration that doesn't lead where it says
-#[argh(subcommand, name = "check")]
+#[derive(Args, PartialEq, Debug)]
 struct Check {
-    /// offer to create the directories that are missing
-    #[argh(switch)]
+    #[arg(long = "create-dirs", help = icy_board_cli::text("icbsetup", "create-dirs"))]
     create_dirs: bool,
 
-    /// path/file name of the icyboard.toml configuration file
-    #[argh(positional)]
+    #[arg(help = icy_board_cli::text("icbsetup", "file"))]
     file: Option<PathBuf>,
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
-/// Downloads and prepares the native FreeDOS door image and BIOS files
-#[argh(subcommand, name = "dos-image")]
+#[derive(Args, PartialEq, Debug)]
 struct DosImage {
-    /// board directory that will receive assets/dos
-    #[argh(positional)]
+    #[arg(help = icy_board_cli::text("icbsetup", "dos-image-directory"))]
     directory: PathBuf,
 }
 
-#[derive(FromArgs, PartialEq, Debug)]
-/// Copies a host file into a prepared DOS disk image
-#[argh(subcommand, name = "dos-copy")]
+#[derive(Args, PartialEq, Debug)]
 struct DosCopy {
-    /// prepared raw FreeDOS image
-    #[argh(positional)]
+    #[arg(help = icy_board_cli::text("icbsetup", "dos-copy-image"))]
     image: PathBuf,
-    /// host file to copy
-    #[argh(positional)]
+    #[arg(help = icy_board_cli::text("icbsetup", "dos-copy-source"))]
     source: PathBuf,
-    /// destination path inside DOS, for example DOORS/LORD/LORD.EXE
-    #[argh(positional)]
+    #[arg(help = icy_board_cli::text("icbsetup", "dos-copy-destination"))]
     destination: String,
 }
 
+#[cfg(test)]
+mod cli_tests {
+    use super::*;
+
+    fn parse(args: &[&str]) -> Cli {
+        icy_board_cli::try_parse_from::<Cli, _, _>(std::iter::once("icbsetup").chain(args.iter().copied())).unwrap()
+    }
+
+    #[test]
+    fn cli_defaults_and_positional_file() {
+        let cli = parse(&[]);
+        assert!(!cli.full_screen && !cli.version);
+        assert!(cli.file.is_none() && cli.command.is_none());
+        let cli = parse(&["-f", "--version", "board.toml"]);
+        assert!(cli.full_screen && cli.version && cli.command.is_none());
+        assert_eq!(cli.file, Some(PathBuf::from("board.toml")));
+        assert_eq!(parse(&["--", "check"]).file, Some(PathBuf::from("check")));
+    }
+
+    #[test]
+    fn cli_subcommands_take_precedence_over_the_optional_file() {
+        let cli = parse(&["check"]);
+        assert!(cli.file.is_none());
+        assert_eq!(
+            cli.command,
+            Some(Commands::Check(Check {
+                create_dirs: false,
+                file: None
+            }))
+        );
+        assert_eq!(
+            parse(&["check", "--create-dirs", "board.toml"]).command,
+            Some(Commands::Check(Check {
+                create_dirs: true,
+                file: Some("board.toml".into())
+            }))
+        );
+        assert_eq!(parse(&["create", "board"]).command, Some(Commands::Create(Create { file: "board".into() })));
+        assert_eq!(
+            parse(&["ppe-convert", "scripts"]).command,
+            Some(Commands::PPEConvert(PPEConvert { path: "scripts".into() }))
+        );
+        assert_eq!(
+            parse(&["dos-image", "board"]).command,
+            Some(Commands::DosImage(DosImage { directory: "board".into() }))
+        );
+        assert_eq!(
+            parse(&["dos-copy", "disk.img", "host.exe", "DOORS/HOST.EXE"]).command,
+            Some(Commands::DosCopy(DosCopy {
+                image: "disk.img".into(),
+                source: "host.exe".into(),
+                destination: "DOORS/HOST.EXE".into()
+            }))
+        );
+        assert!(icy_board_cli::try_parse_from::<Cli, _, _>(["icbsetup", "ppe-convert"]).is_err());
+    }
+
+    #[test]
+    fn cli_import_defaults_and_repeated_maps() {
+        assert_eq!(
+            parse(&["import", "PCBOARD.DAT", "board"]).command,
+            Some(Commands::Import(Import {
+                name: "PCBOARD.DAT".into(),
+                out: "board".into(),
+                map: vec![],
+                dry_run: false
+            }))
+        );
+        assert_eq!(
+            parse(&["import", "PCBOARD.DAT", "board", "--map", "C:=/pcb", "--map", "D:=/files", "--dry-run"]).command,
+            Some(Commands::Import(Import {
+                name: "PCBOARD.DAT".into(),
+                out: "board".into(),
+                map: vec!["C:=/pcb".into(), "D:=/files".into()],
+                dry_run: true
+            }))
+        );
+    }
+}
+
 fn main() -> Result<()> {
-    let arguments: Cli = argh::from_env();
+    let arguments = icy_board_cli::parse::<Cli>();
     if arguments.version {
         println!("icbsetup {}", *VERSION);
         return Ok(());

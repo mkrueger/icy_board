@@ -188,7 +188,7 @@ PRINTLN Bytes.FromBase64("YWJj").ToString()
     let from_base64 = hover(source, "FromBase64").unwrap();
     assert!(from_base64.contains("BYTES BYTES.FromBase64"), "{from_base64}");
     assert!(
-        from_base64.contains("malformed input") || from_base64.contains("Ungültige Eingabe"),
+        from_base64.to_ascii_lowercase().contains("malformed input") || from_base64.contains("Ungültige Eingabe"),
         "{from_base64}"
     );
 }

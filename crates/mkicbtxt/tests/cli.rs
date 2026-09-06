@@ -10,7 +10,43 @@ fn temp_file(name: &str) -> std::path::PathBuf {
 }
 
 fn mkicbtxt() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_mkicbtxt"))
+    let mut command = Command::new(env!("CARGO_BIN_EXE_mkicbtxt"));
+    command.env("LANG", "en_US.UTF-8").env("LC_ALL", "en_US.UTF-8").env("LANGUAGE", "en");
+    command
+}
+
+#[test]
+fn cli_help_errors_and_early_version_are_localized() {
+    for (locale, help, error) in [("en", "Use the full screen", "error"), ("de", "Vollbild verwenden", "Fehler")] {
+        let run = |args: &[&str]| {
+            mkicbtxt()
+                .env("LANG", locale)
+                .env("LC_ALL", locale)
+                .env("LANGUAGE", locale)
+                .args(args)
+                .output()
+                .unwrap()
+        };
+        let output = run(&["--help"]);
+        assert!(output.status.success() && output.stderr.is_empty());
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(stdout.contains(help), "{stdout}");
+        for flag in ["--create", "--update", "--full-screen", "--convert", "--force", "--version"] {
+            assert!(stdout.contains(flag), "{stdout}");
+        }
+        for args in [&["--unknown-option"][..], &[]] {
+            let output = run(args);
+            assert_eq!(output.status.code(), Some(1));
+            assert!(output.stdout.is_empty());
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            assert!(stderr.contains(error), "{stderr}");
+        }
+        for args in [&["--version"][..], &["--unknown-option", "--version"], &["--", "--version"]] {
+            let output = run(args);
+            assert!(output.status.success() && output.stderr.is_empty());
+            assert_eq!(String::from_utf8_lossy(&output.stdout), concat!("mkicbtxt ", env!("CARGO_PKG_VERSION"), "\n"));
+        }
+    }
 }
 
 #[test]

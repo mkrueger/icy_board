@@ -10,7 +10,44 @@ fn temp_dir(name: &str) -> std::path::PathBuf {
 }
 
 fn mkicbmnu() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_mkicbmnu"))
+    let mut command = Command::new(env!("CARGO_BIN_EXE_mkicbmnu"));
+    command.env("LANG", "en_US.UTF-8").env("LC_ALL", "en_US.UTF-8").env("LANGUAGE", "en");
+    command
+}
+
+#[test]
+fn cli_help_errors_version_and_no_arguments_keep_their_streams() {
+    for (locale, help, error) in [("en", "Use the full screen", "error"), ("de", "Vollbild verwenden", "Fehler")] {
+        let run = |args: &[&str]| {
+            mkicbmnu()
+                .env("LANG", locale)
+                .env("LC_ALL", locale)
+                .env("LANGUAGE", locale)
+                .args(args)
+                .output()
+                .unwrap()
+        };
+        let output = run(&["--help"]);
+        assert!(output.status.success() && output.stderr.is_empty());
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(stdout.contains(help), "{stdout}");
+        for flag in ["--create", "--full-screen", "--version"] {
+            assert!(stdout.contains(flag), "{stdout}");
+        }
+        let output = run(&[]);
+        assert_eq!(output.status.code(), Some(1));
+        assert!(output.stdout.is_empty());
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(stderr.contains(help), "{stderr}");
+        let output = run(&["--unknown-option"]);
+        assert_eq!(output.status.code(), Some(1));
+        assert!(output.stdout.is_empty());
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(stderr.contains(error) && stderr.contains("--unknown-option"), "{stderr}");
+        let output = run(&["--version"]);
+        assert!(output.status.success() && output.stderr.is_empty());
+        assert_eq!(String::from_utf8_lossy(&output.stdout), concat!("mkicbmnu ", env!("CARGO_PKG_VERSION"), "\n"));
+    }
 }
 
 #[test]

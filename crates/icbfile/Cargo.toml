@@ -9,7 +9,8 @@ dizbase = { workspace = true }
 icy_board_engine = { workspace = true }
 codepages = { workspace = true }
 
-argh = { workspace = true }
+clap = { workspace = true }
+icy_board_cli = { workspace = true }
 chrono = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]

@@ -1,0 +1,13 @@
+about = IcyBoard system manager
+full-screen = Use the full screen (default is 80x25)
+pack = Remove users instead of starting the editor; see the criteria below
+inactive-days = Remove users who have not called in this many days
+never-logged-on = Remove users who never logged on
+no-delete-flagged = Do not remove users marked for deletion
+keep-security = Keep users at or above this security level (defaults to 100 when packing)
+pack-locked-out = Remove locked-out users instead of keeping them
+standardize-phones = Rewrite all phone numbers in one format
+undo = Restore the user file to its state before the last run
+dry-run = Report what would happen without writing anything
+version = Print the version and exit
+file = Path/file name of the icyboard.toml configuration file

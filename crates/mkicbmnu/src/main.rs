@@ -1,6 +1,6 @@
 use app::new_main_window;
-use argh::FromArgs;
 use chrono::Local;
+use clap::Parser;
 use color_eyre::Result;
 use icy_board_engine::{
     DEFAULT_ICYBOARD_FILE,
@@ -25,37 +25,46 @@ lazy_static::lazy_static! {
     static ref VERSION: Version = Version::parse(env!("CARGO_PKG_VERSION")).unwrap();
 }
 
-/// IcyBoard menu utility
-#[derive(FromArgs)]
+#[derive(Parser)]
+#[command(name = "mkicbmnu", disable_version_flag = true, about = icy_board_cli::text("mkicbmnu", "about"))]
 struct Cli {
-    /// create menu file
-    #[argh(switch, short = 'c')]
+    #[arg(long = "create", short = 'c', help = icy_board_cli::text("mkicbmnu", "create"))]
     create: bool,
 
-    /// default is 80x25
-    #[argh(switch, short = 'f')]
+    #[arg(long = "full-screen", short = 'f', help = icy_board_cli::text("mkicbmnu", "full-screen"))]
     full_screen: bool,
 
-    /// print the version and exit
-    #[argh(switch)]
+    #[arg(long = "version", help = icy_board_cli::text("mkicbmnu", "version"))]
     version: bool,
 
-    /// file[.mnu] to edit/create (extension will always be .mnu)
-    #[argh(positional)]
+    #[arg(help = icy_board_cli::text("mkicbmnu", "file"))]
     file: Option<PathBuf>,
 }
 
+#[cfg(test)]
+mod cli_tests {
+    use super::*;
+
+    #[test]
+    fn cli_defaults_and_options() {
+        let cli = icy_board_cli::try_parse_from::<Cli, _, _>(["mkicbmnu"]).unwrap();
+        assert!(!cli.create && !cli.full_screen && !cli.version && cli.file.is_none());
+        let cli = icy_board_cli::try_parse_from::<Cli, _, _>(["mkicbmnu", "-c", "-f", "--version", "main.mnu"]).unwrap();
+        assert!(cli.create && cli.full_screen && cli.version);
+        assert_eq!(cli.file, Some(PathBuf::from("main.mnu")));
+        assert!(icy_board_cli::try_parse_from::<Cli, _, _>(["mkicbmnu", "--create=true"]).is_err());
+    }
+}
+
 fn main() -> Result<()> {
-    let arguments: Cli = argh::from_env();
+    let arguments = icy_board_cli::parse::<Cli>();
     if arguments.version {
         println!("mkicbmnu {}", *VERSION);
         return Ok(());
     }
 
     let Some(menu_file) = arguments.file.clone() else {
-        if let Err(err) = Cli::from_args(&["mkicbmnu"], &["--help"]) {
-            eprintln!("{}", err.output);
-        }
+        eprintln!("{}", icy_board_cli::command::<Cli>().render_help());
         exit(1);
     };
 

@@ -48,25 +48,25 @@ hint-keyword-exit=Beendet das aktuelle PPE. In PPL 400 ersetzt diese kontextabh�
 hint-keyword-usage=Verwendung
 hint-const-builtin=Eine vordefinierte PPL-Konstante.
 
-hint-type-boolean=Unsigned Char (1 Byte) 0 = `FALSE`, sonst `TRUE`
-hint-type-date=Unsigned Integer (2 Bytes) PCBoard julianisches Datum (Anzahl der Tage seit 1/1/1900)
+hint-type-boolean=Vorzeichenloser Zeichentyp (1 Byte): 0 = `FALSE`, sonst `TRUE`
+hint-type-date=Vorzeichenlose Ganzzahl (2 Bytes): julianisches PCBoard-Datum (Anzahl der Tage seit dem 1.1.1900)
 hint-type-ddate=
-    Long Int mit Vorzeichen für julianisches Datum. DDATE ist für die Verwendung mit DBase-Datumsfeldern.
-    Es hält einen langen Integer für julianische Daten. Wenn es in den Zeichenfolgentyp gezwungen wird, ist es im Format CCYYMMDD oder 19940527
-hint-type-integer=Signed long Integer (4 Bytes) Bereich: -2,147,483,648 → +2,147,483,647
-hint-type-money=Signed long Integer (4 Bytes) Bereich: -$21,474,836.48 → +$21,474,836.47
-hint-type-string=Zeichenfolge mit maximaler Länge von 256 Zeichen
-hint-type-string-unbounded=Unbegrenzte Zeichenfolge (unbounded string). Ab PPL 400 ist `STRING` nicht mehr auf 256 Zeichen beschränkt.
-hint-type-time=Signed long Integer (4 Bytes) Anzahl der Sekunden seit Mitternacht
-hint-type-bigstr=Zeichenfolge mit maximaler Länge von 2048 Zeichen. Kann auch CHR(0) Zeichen enthalten.
-hint-type-edate=Julianisches Datum im Earth Datum Format YYMM.DD. Gleicher Bereich wie DATE.
-hint-type-float=4-Byte Fließkommazahl Bereich: +/-3.4E-38 - +/-3.4E+38 (7-Stellen Präzision)
-hint-type-double=8-Byte Fließkommazahl Bereich: +/-1.7E-308 - +/-1.7E+308 (15-Stellen Präzision)
+    Lange Ganzzahl mit Vorzeichen für ein julianisches Datum. DDATE ist zur Verwendung mit DBase-Datumsfeldern vorgesehen.
+    Der Typ speichert julianische Datumswerte als lange Ganzzahl. Bei der Umwandlung in eine Zeichenfolge wird das Format CCYYMMDD verwendet, beispielsweise 19940527.
+hint-type-integer=Lange Ganzzahl mit Vorzeichen (4 Bytes), Wertebereich: -2.147.483.648 → +2.147.483.647
+hint-type-money=Lange Ganzzahl mit Vorzeichen (4 Bytes), Wertebereich: -21.474.836,48 $ → +21.474.836,47 $
+hint-type-string=Ferner Zeichenzeiger (4 Bytes): NULL bezeichnet eine leere Zeichenfolge; ein von NULL verschiedener Wert zeigt auf eine Zeichenfolge mit höchstens 256 Zeichen.
+hint-type-string-unbounded=Unbegrenzte Zeichenfolge. Ab PPL 400 ist `STRING` nicht mehr auf 256 Zeichen beschränkt.
+hint-type-time=Lange Ganzzahl mit Vorzeichen (4 Bytes): Anzahl der Sekunden seit Mitternacht
+hint-type-bigstr=Erlaubt bis zu 2048 Zeichen pro Zeichenfolge statt der 256 Zeichen einer STRING-Variablen. Anders als STRING darf BIGSTR auch CHR(0)-Zeichen innerhalb der Zeichenfolge enthalten.
+hint-type-edate=Julianisches Datum im Earth-Date-Format YYMM.DD. Gleicher Wertebereich wie DATE.
+hint-type-float=4-Byte-Gleitkommazahl, Wertebereich: +/-3.4E-38 bis +/-3.4E+38 (7 Stellen Genauigkeit)
+hint-type-double=8-Byte-Gleitkommazahl, Wertebereich: +/-1.7E-308 bis +/-1.7E+308 (15 Stellen Genauigkeit)
 hint-type-byte=1-Byte-Integer ohne Vorzeichen, Bereich: 0 bis 255
 hint-type-sbyte=1-Byte-Integer mit Vorzeichen, Bereich: -128 bis 127
-hint-type-unsigned=4-Byte unsigned Integer Bereich: 0 - 4,294,967,295
-hint-type-long=8-Byte signed Integer Bereich: -9,223,372,036,854,775,808 - 9,223,372,036,854,775,807
-hint-type-ulong=8-Byte unsigned Integer Bereich: 0 - 18,446,744,073,709,551,615
+hint-type-unsigned=4-Byte-Ganzzahl ohne Vorzeichen, Wertebereich: 0 bis 4.294.967.295
+hint-type-long=8-Byte-Ganzzahl mit Vorzeichen, Wertebereich: -9.223.372.036.854.775.808 bis 9.223.372.036.854.775.807
+hint-type-ulong=8-Byte-Ganzzahl ohne Vorzeichen, Wertebereich: 0 bis 18.446.744.073.709.551.615
 hint-type-bytes=Kompakte, zusammenhängende Binärdaten für Kodierungen, Prüfsummen und binäre Ein-/Ausgabe ohne die Kosten einzelner Elemente eines `BYTE[]`-Arrays.
 hint-bytes-len=Liefert die Anzahl der Bytes in diesem Wert.
 hint-bytes-to-string=Dekodiert diese Bytes als UTF-8-Text. Ungültiges UTF-8 meldet `ErrCode.Format`.
@@ -149,7 +149,7 @@ hint-member-terminfo-cells=Aktuelle Terminalgröße in Textspalten beziehungswei
 hint-member-terminfo-utf8=Gibt an, ob UTF-8 statt einer alten Codepage ausgehandelt wurde.
 hint-member-terminfo-rip=Ausgehandelte RIP-Grafikversion oder eine leere Zeichenfolge ohne RIP.
 hint-member-terminfo-cterm=Erkannte CTerm-Protokollrevision oder null ohne CTerm-Erweiterungen.
-hint-member-terminfo-graphics=Gibt an, ob das Terminal den gewählten Inline-Grafiktransport unterstützt: Sixel, JPEG XL oder allgemeine Inline-Blobs.
+hint-member-terminfo-graphics=Gibt an, ob das Terminal den gewählten Inline-Grafiktransport unterstützt: `Sixel`, JPEG XL oder allgemeine Inline-Blobs.
 hint-member-terminfo-audio=Gibt an, ob terminalseitige Audiowiedergabe verfügbar ist.
 hint-member-terminfo-physical-keys=Gibt an, ob physische Tastenübergänge unabhängig von übersetzter Texteingabe gemeldet werden.
 hint-member-terminfo-pixel-mouse=Gibt an, ob Mauskoordinaten in Pixeln gemeldet werden können (CTerm-Revision mindestens 1330).
@@ -179,7 +179,7 @@ hint-member-audio-set-volume=Setzt die logische Lautstärke von 0 bis 100 und gi
 hint-member-audio-channel=Logischer PPL-Kanal 0–13; er entspricht SyncTERM-/CTerm-Kanal 2–15.
 hint-member-audio-play=Startet die Wiedergabe; optionales `looping` ist standardmäßig `FALSE`. <br><br>**Terminalprotokoll:** sendet `APC SyncTERM:A;Load;S=slot;cache ST`, `…;Volume;C=channel;V=dB ST` und `…;Queue;C=channel;S=slot[;L] ST`. Ohne Schleife folgt `…;Update;C=channel ST`. Benötigt SyncTERM-/CTerm-Audio-APC.
 hint-member-audio-stop=Stoppt diesen Kanal, ohne seine Daten freizugeben. <br><br>**Terminalprotokoll:** sendet `APC SyncTERM:A;Flush;C=channel;O=0 ST` (`APC` = `ESC _`, `ST` = `ESC \`).
-hint-member-audio-fade=Blendet den Kanal in `durationMs` auf `targetVolume`. <br><br>**Terminalprotokoll:** sendet `APC SyncTERM:A;Volume;C=channel;V=dB;T=durationMs ST`; Lautstärke 0–100 wird in Dezibel umgerechnet.
+hint-member-audio-fade=Ändert die Lautstärke des Kanals innerhalb von `durationMs` gleitend auf `targetVolume`. <br><br>**Terminalprotokoll:** sendet `APC SyncTERM:A;Volume;C=channel;V=dB;T=durationMs ST`; Lautstärke 0–100 wird in Dezibel umgerechnet.
 hint-member-audio-free=Stoppt und gibt den Kanal frei. <br><br>**Terminalprotokoll:** sendet `APC SyncTERM:A;Flush;C=channel;O=0 ST`; der Clientcache kann zur Wiederverwendung erhalten bleiben.
 hint-member-audio-load=Lädt eine board-relative WAV-, AIFF-, FLAC-, Ogg/Vorbis- oder Opus-Datei bis 16 MiB. <br><br>**Terminalprotokoll:** prüft mit `APC SyncTERM:Q;libsndfileFormat;major;subtype ST`, erwartet `CSI = 7 ; 101 ; major ; subtype ; supported n` und lädt mit `APC SyncTERM:C;S;cacheName;base64 ST`. Benötigt SyncTERM-/CTerm-Medien- und Audioerweiterungen.
 hint-member-audio-stop-all=Stoppt alle aktiven PPL-Audiokanäle mit `APC SyncTERM:A;Flush;C=channel;O=0 ST` pro Kanal.
@@ -232,7 +232,7 @@ hint-member-board-conferences=Schreibgeschützte `CONFERENCE[]`-Momentaufnahme d
 hint-member-user-editor-mode=Bevorzugte Vollbildeditorrichtlinie: immer verwenden, nie verwenden oder jedes Mal fragen.
 hint-member-user-profile=Benutzerprofil oder Nutzungsstatistik. `Session.User` ist live und soweit unterstützt beschreibbar; Einträge aus `Board.Users` sind schreibgeschützte Momentaufnahmen.
 hint-enum-event-kind-none=Es war kein Ereignis verfügbar, etwa nach einem nicht blockierenden `Poll` oder einem abgelaufenen `Wait`.
-hint-enum-event-kind-value=Wählt die relevante `EVENT`-Eigenschaftsgruppe: übersetzte Taste, physische Tastenkante, Maus, Warteschlangenüberlauf oder Audioende.
+hint-enum-event-kind-value=Wählt die relevante `EVENT`-Eigenschaftsgruppe: übersetzte Taste, physischer Tastenübergang, Maus, Warteschlangenüberlauf oder Audioende.
 hint-enum-mouse-action=Von `EVENT.Action` gemeldeter Mausübergang: keiner, Drücken, Loslassen, Bewegung oder Rad.
 hint-enum-mouse-button=Maustaste oder Radrichtung, die das Ereignis ausgelöst hat; gehaltene Tasten stehen separat als Booleans bereit.
 hint-enum-mouse-mode-text=Meldet Mauskoordinaten in 1-basierten Terminal-Textzellen.
@@ -396,17 +396,15 @@ hint-string-to-lower=Konvertiert den String in Kleinbuchstaben und liefert einen
 hint-string-split=Liefert durch Aufteilen des Strings ein dynamisches BIGSTR-Array. Leere Elemente bleiben erhalten; bei einem Limit landet der unzerlegte Rest im letzten Element.
 hint-string-join=Verbindet ein eindimensionales Stringarray mit einem Trenntext und liefert einen `BIGSTR`.
 hint-string-repeat=Wiederholt einen String wie angegeben und liefert einen `BIGSTR`.
-hint-type-Byte=1-Byte unsigned Integer Bereich: 0 - 255
-hint-type-word=2-Byte unsigned Integer Bereich: 0 - 65,535
-hint-type-sByte=1-Byte signed Integer Bereich: -128 - 127
-hint-type-sword=2-Byte signed Integer Bereich: -32,768 - 32,767
+hint-type-word=2-Byte-Ganzzahl ohne Vorzeichen, Wertebereich: 0 bis 65.535
+hint-type-sword=2-Byte-Ganzzahl mit Vorzeichen, Wertebereich: -32.768 bis 32.767
 hint-function-rgb=Packt Rot, Grün, Blau und optional Alpha in einen RGBA-Farbwert.
 hint-function-tolong=Konvertiert einen Ausdruck in den vorzeichenbehafteten 64-Bit-Typ `LONG`.
 hint-function-toulong=Konvertiert einen Ausdruck in den vorzeichenlosen 64-Bit-Typ `ULONG`.
 hint-function-terminal=Das Terminal des Anrufers und die Wurzel für Grafik, Eingabe, Ränder, Palette, Schriften, Makros, Audio und zwischengespeicherte Fähigkeiten.
 hint-function-board=Eine Momentaufnahme des konfigurierten Boards: Name, Ort, Betreiber, Sysop-Name, Knotenzahl, Konferenzen und registrierte Benutzer.
 hint-function-session=Der laufende Anruf, live gelesen: Konferenz, Bereiche, Anrufer, Sicherheitsstufe, Knoten, verbleibende Minuten und Sprache.
-hint-statement-fgetrec=Liest je ein maskiertes Textfeld pro skalarem Feld aus Kanal @1 in Datensatz @2. Das Ziel wird erst geändert, wenn der vollständige Datensatz gültig ist; nachfolgende Zeilen bleiben ungelesen.
+hint-statement-fgetrec=Liest je eine maskierte Textzeile pro skalarem Feld aus Kanal @1 in Datensatz @2. Das Ziel wird erst geändert, wenn der vollständige Datensatz gültig ist; nachfolgende Zeilen bleiben ungelesen.
 hint-statement-fputrec=Schreibt Datensatz @2 als eine maskierte Textzeile pro skalarem Feld in Kanal @1. Zusätzliche Dokumentation kann danach mit `FPUTLN` geschrieben werden.
 hint-statement-freadrec=Liest einen längengerahmten binären Datensatz aus Kanal @1 in @2. Das Ziel wird erst geändert, wenn der vollständige Rahmen zum Datensatzlayout passt.
 hint-statement-fwriterec=Schreibt Datensatz @2 als kompakten längengerahmten Binärwert in Kanal @1.
@@ -414,7 +412,7 @@ hint-statement-fwriterec=Schreibt Datensatz @2 als kompakten längengerahmten Bi
 hint-statement-end=Beendet die Programmausführung
 hint-statement-cls=Löscht den Bildschirm
 hint-statement-clreol=Löscht bis zum Zeilenende
-hint-statement-more=Pausiert und wartet auf einen Tastendruck (Zeigt eine MEHR?-Eingabeaufforderung an)
+hint-statement-more=Pausiert und wartet auf einen Tastendruck (zeigt eine MORE?-Eingabeaufforderung an).
 hint-statement-wait=Pausiert und wartet auf einen Tastendruck
 hint-statement-color=Setzt die Textfarbe auf @1
 hint-statement-goto=Springt zum angegebenen Label
@@ -427,8 +425,8 @@ hint-statement-println=Geben Sie eine Zeile auf dem Bildschirm aus und hängen S
 
     ### Hinweise
     Diese Anweisung verarbeitet alle @-Codes und zeigt sie wie erwartet an.
-hint-statement-confflag=Aktivieren Sie die durch @2 angegebenen Konferenz-@1-Flags
-hint-statement-confunflag=Deaktivieren Sie die durch @2 angegebenen Konferenz-@1-Flags
+hint-statement-confflag=Aktiviert für Konferenz @1 die durch @2 angegebenen Flags.
+hint-statement-confunflag=Deaktiviert für Konferenz @1 die durch @2 angegebenen Flags.
 hint-statement-dispfile=Datei @1 mit alternativen Dateiflags @2 anzeigen
     ### Gültige Flags
     - `GRAPH`
@@ -455,18 +453,18 @@ hint-statement-fappend=Verwenden Sie den Kanal @1, um im Zugriffsmodus @3 und im
     | Freigabemodi | `S_DN`, `S_DR`, `S_DW`, `S_DB` |
 hint-statement-fclose=Kanal @1 schließen
 
-    Akzeptieren Sie Kanal -1 als `ReadLine()`-Funktion „Kanal“ und schließen Sie ihn
+    Akzeptiert auch Kanal -1 als „Kanal“ der Funktion `ReadLine()` und schließt ihn.
 hint-statement-fget=Lesen Sie eine Zeile vom Kanal @1 und weisen Sie sie @2 zu
-hint-statement-fput=Schreiben Sie einen oder mehrere @2 in den Kanal @1
-hint-statement-fputln=Schreiben Sie ein oder mehrere @2 in den Kanal @1 und schließen Sie mit einem Wagenrücklauf/Zeilenvorschubpaar ab
+hint-statement-fput=Schreibt einen oder mehrere Ausdrücke @2 in Kanal @1.
+hint-statement-fputln=Schreibt einen oder mehrere Ausdrücke @2 in Kanal @1 und schließt mit einem Wagenrücklauf/Zeilenvorschubpaar ab.
 hint-statement-resetdisp=Setzen Sie die Anzeige nach einem Benutzerabbruch zurück
 hint-statement-startdisp=Starten Sie die Anzeigeüberwachung im Modus @1
     ### Gültige Modi
     - `NC`
     - `FNS`
     - `FCL`
-hint-statement-fputpad=Schreiben Sie @2 aus, füllen Sie es nach Bedarf auf oder kürzen Sie es auf die Länge @3, um @1 zu kanalisieren
-hint-statement-hangup=Der Benutzer legt ohne Benachrichtigung auf
+hint-statement-fputpad=Schreibt @2 in Kanal @1 und füllt den Wert bei Bedarf auf die Länge @3 auf oder kürzt ihn entsprechend.
+hint-statement-hangup=Trennt die Verbindung zum Benutzer ohne Benachrichtigung.
 hint-statement-getuser=Füllen Sie die vordefinierten Variablen (U_…) mit aktuellen Informationen aus dem Benutzerdatensatz
 hint-statement-putuser=Schreiben Sie die Informationen aus den vordefinierten Variablen (U_…) in den Benutzerdatensatz
     Diese Anweisung dient nur dazu, Benutzerinformationen zu aktualisieren, wenn zuvor ein erfolgreicher GetUser- oder GetAltUser-Befehl ausgegeben wurde.
@@ -486,7 +484,7 @@ hint-statement-inputint=Zeigen Sie @1 in der Farbe @3 an und erhalten Sie vom Be
 hint-statement-inputcc=Zeigen Sie @1 in der Farbe @3 an und erhalten Sie vom Benutzer eine Zeichenfolge im Kreditkartenformat, die Sie @1 zuweisen (maximal 16 Zeichen, gültige Zeichen `0-9`).
 hint-statement-inputdate=Zeigen Sie @1 in der Farbe @3 an und erhalten Sie vom Benutzer eine datumsformatierte Zeichenfolge, die Sie @1 zuweisen (maximal 8 Zeichen, gültige Zeichen `0-9 - /`).
 hint-statement-inputtime=Zeigen Sie @1 in der Farbe @3 an und erhalten Sie vom Benutzer eine zeitformatierte Zeichenfolge, die Sie @1 zuweisen (maximal 8 Zeichen, gültige Zeichen `0-9 :`).
-hint-statement-gosub=Übertragen Sie die Kontrolle an `LABEL` und markieren Sie den aktuellen PPE-Standort für eine zukünftige Rückgabeerklärung (`GO SUB` ist ein Synonym).
+hint-statement-gosub=Setzt die Ausführung bei `LABEL` fort und merkt sich die aktuelle PPE-Position für eine spätere Return-Anweisung (`GO SUB` ist ein Synonym).
 hint-statement-return=Kehren Sie zur Anweisung nach dem letzten `GoSub` zurück oder beenden Sie die PPE, wenn kein `GoSub` auf einen `RETURN` wartet
 hint-statement-promptstr=Zeigen Sie den PCBTEXT-Eintrag @1 an und holen Sie sich vom Benutzer eine Zeichenfolge (maximale Länge @3, gültige Zeichen @4, Flags @5) und weisen Sie sie @1 zu
     ### Gültige Flags
@@ -494,8 +492,8 @@ hint-statement-promptstr=Zeigen Sie den PCBTEXT-Eintrag @1 an und holen Sie sich
 hint-statement-dtron=Schalten Sie das DTR-Signal ein
 hint-statement-dtroff=Schalten Sie das DTR-Signal aus,
 
-    Hinweis: Bei den meisten Modems führt die Verringerung von DTR dazu, dass das Modem aufhängt. Dies ist eine gute Möglichkeit, wenn Sie eine schlechte Verbindung simulieren möchten.
-    und dann auflegen ohne Abschiedsbildschirme... Das ist der beste Weg für Sie, der nette Sysop, Ihre Leitung schnell freizugeben... :)
+    Hinweis: Bei den meisten Modems führt das Absenken von DTR zum Auflegen. So lässt sich eine schlechte Verbindung simulieren
+    und anschließend ohne Abschiedsbildschirm auflegen. Eine schnelle Möglichkeit für den freundlichen Sysop, die Leitung freizugeben … :)
 hint-statement-cdchkon=Aktivieren Sie die Überprüfung der Trägererkennung
 hint-statement-cdchkoff=Schalten Sie die Überprüfung der Trägererkennung aus
 hint-statement-delay=Pause für @1 Uhrenticks (1 Uhrentick = 1/18,2 Sekunde)
@@ -512,8 +510,8 @@ hint-statement-gettoken=### Rückgabewert
     `GETTOKEN VAR`
 
     Holen Sie sich ein Token von einem früheren Aufruf von Tokenize und weisen Sie es `VAR` zu
-hint-statement-shell=Shell (über COMMAND.COM, wenn @1 `TRUE` ist) zum Programmieren/Befehlen von @2 mit den Argumenten @3, wobei der Rückgabewert in @1 gespeichert wird
-    HINWEIS: Wenn @1 `TRUE` ist, ist der @1 zugewiesene Wert der Rückkehrcode von COMMAND.COM, nicht @3.
+hint-statement-shell=Führt das Programm oder den Befehl @2 mit den Argumenten @3 aus (über COMMAND.COM, wenn @1 `TRUE` ist) und speichert den Rückgabewert in @1.
+    HINWEIS: Wenn @1 `TRUE` ist, erhält @1 den Rückgabecode von COMMAND.COM, nicht von @3.
 hint-statement-disptext=Zeigen Sie die PCBTEXT-Eingabeaufforderung @1 mit den Flags @2 an
 
     ### Gültige Flags
@@ -522,17 +520,17 @@ hint-statement-stop=Brechen Sie die PPE-Ausführung ab, ohne Antworten (Kanal 0)
 hint-statement-inputtext=Zeigen Sie @1 in der Farbe @3 an und erhalten Sie vom Benutzer eine Zeichenfolge (maximale Länge @4), die Sie @1 zuweisen
 hint-statement-beep=Der Lautsprecher piept
 hint-statement-push=Schieben Sie eine Liste ausgewerteter Ausdrücke auf den Stapel
-hint-statement-pop=Fügen Sie Werte (zuvor auf den Stapel verschoben) in eine Liste von Variablen ein
+hint-statement-pop=Entnimmt zuvor abgelegte Werte vom Stapel und weist sie einer Liste von Variablen zu.
 hint-statement-kbdstuff=Füllen Sie den Tastaturpuffer mit dem Inhalt von @1
 hint-statement-call=Laden Sie den durch @1 angegebenen PPE-Dateinamen und führen Sie ihn aus
-hint-statement-join=Führt einen Befehl zum Beitreten zur Konferenz aus und übergibt ihn als Argumente @1
-hint-statement-quest=Erstellen Sie einen Skript-Fragebogen @1
+hint-statement-join=Führt einen Befehl zum Beitreten zu einer Konferenz aus und übergibt @1 als Argumente.
+hint-statement-quest=Führt den skriptgesteuerten Fragebogen @1 aus.
 hint-statement-blt=Bulletin-Nummer @1 anzeigen
-hint-statement-dir=Führt einen Dateiverzeichnisbefehl aus und übergibt ihn als Argumente @1
+hint-statement-dir=Führt einen Dateiverzeichnisbefehl aus und übergibt @1 als Argumente.
 hint-statement-kbdfile=Füllen Sie den Tastaturpuffer mit dem Inhalt der Datei @1
-hint-statement-bye=Das Gleiche gilt, wenn der Benutzer an der Eingabeaufforderung „BYE“ eingibt
-hint-statement-goodbye=Das Gleiche gilt, wenn der Benutzer an der Eingabeaufforderung „G“ eingibt
-hint-statement-broadcast=Broadcast-Nachricht @3 an Knoten von @1 bis einschließlich @2
+hint-statement-bye=Wirkt so, als hätte der Benutzer an der Eingabeaufforderung BYE eingegeben.
+hint-statement-goodbye=Wirkt so, als hätte der Benutzer an der Eingabeaufforderung G eingegeben.
+hint-statement-broadcast=Sendet die Rundnachricht @3 an alle Knoten von @1 bis einschließlich @2.
 hint-statement-waitfor=Warten Sie bis zu @3 Sekunden auf die Zeichenfolge @1. Weisen Sie `TRUE` @1 zu, wenn die Zeichenfolge in der angegebenen Zeit gefunden wird, oder `FALSE`, wenn die Zeichenfolge nicht gefunden wird (`WAIT FOR` ist ein Synonym).
 hint-statement-kbdchkon=Aktivieren Sie die Zeitüberschreitungsprüfung für die Tastatur
 hint-statement-kbdchkoff=Deaktivieren Sie die Tastatur-Timeout-Überprüfung
@@ -554,11 +552,11 @@ hint-statement-ansipos=Bewegen Sie den Cursor auf die Spalte @1 und die Zeile @2
 
     ```
     1 <= @1 <= 80
-    1 <= @2 <= 23 (Because of the status lines)
+    1 <= @2 <= 23 (wegen der Statuszeilen)
     ```
     (1,1) ist die obere linke Ecke des Bildschirms
-hint-statement-backup=Sichern Sie (bewegen Sie den Cursor nach links) @1-Spalten, ohne über Spalte 1 hinauszugehen
-hint-statement-forward=Bewegen Sie den Cursor in den nächsten @1-Spalten, ohne über Spalte 80 hinauszugehen
+hint-statement-backup=Bewegt den Cursor um @1 Spalten nach links, jedoch nicht über Spalte 1 hinaus.
+hint-statement-forward=Bewegt den Cursor um @1 Spalten nach rechts, jedoch nicht über Spalte 80 hinaus.
 hint-statement-freshline=Wenn sich der Cursor nicht in Spalte 1 befindet, führen Sie einen Zeilenumbruch aus
 hint-statement-wrusys=Schreibt (erstellt) eine USERS.SYS-Datei, die von einer SHELL-Anwendung verwendet werden kann
 hint-statement-rdusys=Liest eine USERS.SYS-Datei, falls vorhanden, und aktualisiert den Benutzerdatensatz
@@ -571,10 +569,10 @@ hint-statement-opencap=Öffnen Sie @1 und erfassen Sie alle Bildschirmausgaben d
 hint-statement-closecap=Schließen Sie die zuvor mit OpenCap geöffnete Capture-Datei
 hint-statement-message=Schreiben Sie eine Nachricht in der Konferenz @1 an den Benutzer @2 (eine leere Zeichenfolge ist standardmäßig der aktuelle Anrufer).
     vom Benutzer @3 (leere Zeichenfolge ist standardmäßig der aktuelle Anrufer), Betreff @4,
-    Sicherheit in @5 („N“ oder „R“; „N“ ist die Standardeinstellung),
-    Auspackdatum in @6 (0 für kein Auspackdatum),
+    Sicherheitskennzeichnung in @5 („N“ oder „R“; „N“ ist die Standardeinstellung),
+    Datum zum Entfernen beim Packen in @6 (0 für kein solches Datum),
     @7 True, wenn eine Empfangsbestätigung gewünscht wird,
-    @8 TRUE, wenn die Nachricht wiedergegeben werden soll, und
+    @8 TRUE, wenn die Nachricht als Echomail weitergeleitet werden soll, und
     @9 ist der Dateiname, der für den Nachrichtentext verwendet werden soll
 hint-statement-savescrn=Speichern Sie den aktuellen Bildschirm in einem Puffer zur späteren Wiederherstellung mit RestScrn
 hint-statement-restscrn=Stellen Sie den Bildschirm aus dem zuvor mit SaveScrn gespeicherten Puffer wieder her
@@ -585,23 +583,23 @@ hint-statement-sprintln=Zeigt null oder mehr Zeichenfolgenausdrücke nur auf dem
 hint-statement-mprint=Zeigt einen oder mehrere Zeichenfolgenausdrücke nur auf dem Anruferbildschirm an (diese Anweisung sendet nichts an den BBS-Bildschirm).
 hint-statement-mprintln=Zeigt null oder mehr Zeichenfolgenausdrücke nur auf dem Anruferbildschirm an und folgt mit einer neuen Zeile (diese Anweisung sendet nichts an den BBS-Bildschirm).
 hint-statement-rename=Benennen Sie die Datei @1 in @2 um
-hint-statement-frewind=Spulen Sie den Kanal @1 zurück, nachdem Sie die Puffer geleert und die Datei auf die Festplatte übertragen haben.
+hint-statement-frewind=Setzt Kanal @1 auf den Dateianfang zurück, nachdem die Puffer geschrieben und die Datei auf dem Datenträger gespeichert wurden.
 hint-statement-pokedw=Weisen Sie der Speicheradresse @1 den Wert @2 (-2147483648 - +2147483647) zu
 hint-statement-dbglevel=Weisen Sie @1 die Debug-Ebene zu
 hint-statement-showon=Aktiviert die Anzeige von Informationen auf dem Bildschirm
 hint-statement-showoff=Schaltet die Anzeige von Informationen auf dem Bildschirm aus
 hint-statement-pageon=Schalten Sie die SysOp-Page-Anzeige ein (blinkendes p in der Statuszeile).
 hint-statement-pageoff=Schalten Sie die SysOp-Page-Anzeige aus (blinkendes p in der Statuszeile).
-hint-statement-fseek=Positionieren Sie es an einer beliebigen Stelle innerhalb einer Datei
-    @2 ist die Anzahl der Bytes, die relativ zur Position verschoben werden sollen (+/-).
-    @3 ist der Basisstandort, von dem aus die Suche gestartet werden soll:
+hint-statement-fseek=Setzt den Dateizeiger auf eine beliebige Position innerhalb einer Datei.
+    @2 ist die Anzahl der Bytes, um die der Zeiger relativ zur Ausgangsposition verschoben werden soll (+/-).
+    @3 gibt die Ausgangsposition für die Verschiebung an:
 
     `SEEK_SET (0)` für den Anfang der Datei
 
-    `SEEK_CUR (1)` für den aktuellen Speicherort des Dateizeigers
+    `SEEK_CUR (1)` für die aktuelle Position des Dateizeigers
 
     `SEEK_END (2)` für das Ende der Datei
-hint-statement-fflush=Leeren Sie die Änderungen eines bestimmten Kanals auf der Festplatte
+hint-statement-fflush=Schreibt die gepufferten Änderungen des angegebenen Kanals auf den Datenträger.
 hint-statement-fread=Binärdaten aus einer Datei lesen.
 
     @1 ist die Kanalnummer
@@ -629,7 +627,7 @@ hint-statement-adjbytes=Passen Sie den gesamten und täglichen Download des Benu
     Um Bytes zu subtrahieren, verwenden Sie eine negative Zahl für Bytes.
 
     Um Bytes hinzuzufügen, verwenden Sie eine positive Zahl.
-hint-statement-kbdstring=Stuff-Strings an die Tastatur (genau wie KbdStuff, außer dass „Tastenanschläge“ auf dem Display wiedergegeben werden)
+hint-statement-kbdstring=Fügt Zeichenfolgen in den Tastaturpuffer ein (wie KbdStuff, jedoch werden die „Tastendrücke“ auf dem Bildschirm ausgegeben).
 hint-statement-alias=Aktiviert (`TRUE`) oder deaktiviert (`FALSE`) den Alias des aktuellen Benutzers. Sind Aliase für Benutzer oder Konferenz nicht erlaubt, bleibt der Aufruf wirkungslos. `ALIAS()` liefert den aktuellen Zustand.
 hint-statement-redim=
     Ändert die Größe eines zuvor deklarierten Arrays zur Laufzeit: `REDIM array, dim1 [, dim2 [, dim3]]`.
@@ -637,11 +635,11 @@ hint-statement-redim=
     Die Anzahl der Dimensionen muss der Deklaration entsprechen; nur ihre Grenzen dürfen sich ändern. Werte außerhalb der neuen Grenzen gehen verloren. Arrayfelder in Datensätzen besitzen feste Grenzen und können nicht geändert werden.
 hint-statement-append=Hängen Sie den Inhalt einer Datei an eine andere Datei an.
 hint-statement-copy=Kopieren Sie den Inhalt einer Datei in eine andere Datei.
-hint-statement-kbdflush=Leeren Sie den lokalen Tastaturpuffer und alle überfüllten Tastaturpuffer. Es braucht keine Argumente.
+hint-statement-kbdflush=Leert den lokalen Tastaturpuffer und alle Puffer mit programmgesteuert eingefügten Tastendrücken. Benötigt keine Argumente.
 hint-statement-mdmflush=Leeren Sie den eingehenden Modempuffer. Es braucht keine Argumente.
 hint-statement-keyflush=Leeren Sie sowohl die lokalen Puffer als auch den eingehenden Modempuffer. Es braucht keine Argumente.
 hint-statement-lastin=Legen Sie den Wert für die letzte Konferenz des Benutzers fest. Es kann während des Anmeldevorgangs verwendet werden, um den Benutzer beim Start zu einer bestimmten Konferenz zu zwingen (z. B. über ein Anmeldeskript).
-hint-statement-flag=Ermöglichen Sie den direkten Download von Markierungsdateien von einer PPE.
+hint-statement-flag=Ermöglicht es, Dateien direkt aus einem PPE zum Download zu markieren.
 hint-statement-download=Herunterladen von Dateien von PPL.
 
     Die an DOWNLOAD übergebene Zeichenfolge ist eine Liste von Befehlen im gleichen Format wie das, was ein Benutzer nach einem D- oder DB-Befehl eingeben würde.
@@ -652,19 +650,19 @@ hint-statement-download=Herunterladen von Dateien von PPL.
 hint-statement-wrusysdoor=Schreiben Sie eine USERS.SYS-Datei mit einem TPA-Datensatz für eine DOOR-Anwendung.
 hint-statement-getaltuser=Rufen Sie die Informationen für einen alternativen Benutzer ab.
 
-    Es füllt die Benutzervariablen mit Informationen aus dem angegebenen Benutzerdatensatz und leitet Benutzeranweisungen und -funktionen um.
+    Füllt die Benutzervariablen mit Informationen aus dem angegebenen Benutzerdatensatz und leitet benutzerbezogene Anweisungen und Funktionen auf diesen Benutzer um.
 
-    Wenn versucht wird, eine Datensatznummer abzurufen, die nicht existiert,
-    Die Benutzerfunktionen werden auf den aktuellen Benutzer zurückgesetzt und die Benutzervariablen werden ungültig gemacht, als ob kein GetUser/GetAltUser vorhanden wäre
-    Die Erklärung wurde ausgestellt (allerdings behalten sie weiterhin den gehaltenen Wert bei).
+    Wird eine nicht vorhandene Datensatznummer angefordert, beziehen sich die Benutzerfunktionen wieder auf den aktuellen Benutzer.
+    Die Benutzervariablen werden ungültig, als wäre keine GetUser/GetAltUser-Anweisung ausgeführt worden;
+    ihre bisherigen Werte bleiben jedoch erhalten.
 
-    `PutUser`/`PutAltUser` sollte ausgegeben werden, um alle Variablenänderungen am Benutzerdatensatz festzuschreiben.
-    Darüber hinaus gibt es mindestens eine Anweisung, die keine Auswirkungen auf alternative Benutzer hat: `AdjTime`.
+    `PutUser`/`PutAltUser` sollte aufgerufen werden, um Änderungen an den Variablen im Benutzerdatensatz zu speichern.
+    Mindestens eine Anweisung wirkt nicht auf alternative Benutzer: `AdjTime`.
 
-    Es ist auf den aktuellen Benutzer online beschränkt.
+    Sie ist auf den aktuell angemeldeten Benutzer beschränkt.
 
-    Wenn der alternative Benutzer außerdem online ist, werden Änderungen am Datensatz erst wirksam, nachdem sich der Benutzer abgemeldet hat.
-    Auch wenn nicht genügend Speicher verfügbar ist (hauptsächlich für die Lesezeiger der letzten Nachricht), schlägt diese Anweisung fehl.
+    Ist der alternative Benutzer gerade angemeldet, werden Änderungen an seinem Datensatz erst nach seiner Abmeldung wirksam.
+    Die Anweisung schlägt auch bei unzureichendem Speicher fehl, insbesondere beim Laden der Zeiger auf die zuletzt gelesenen Nachrichten.
 hint-statement-adjdbytes=Passen Sie die täglichen Download-Bytes des Benutzers an.
 
     Um Bytes zu subtrahieren, verwenden Sie eine negative Zahl für Bytes.
@@ -747,16 +745,16 @@ hint-statement-bitset=Setzt ein bestimmtes Bit aus einer Variablen.
     Diese Anweisung ist in erster Linie für die Verwendung mit BIGSTR-Variablen gedacht, die bis zu 2048 Bytes lang sein können.
     Bei Bedarf funktioniert es jedoch auch mit anderen Datentypen.
 
-    Seien Sie sich nur der potenziellen Probleme bewusst, die beim „Bit-Twidling“ von Nicht-String-Puffer entstehen und dann versuchen, später wie „beabsichtigt“ auf sie zuzugreifen.
-    Geben Sie ein, ohne die Variable neu zu initialisieren.
+    Beim direkten Manipulieren von Bits in Puffern anderer Datentypen können Probleme entstehen, wenn später wieder über den ursprünglichen Typ
+    auf die Daten zugegriffen wird, ohne die Variable neu zu initialisieren.
 
     Wenn der Bitparameter (eine Ganzzahl von 0 bis zur Anzahl der Bits im Objekt) ungültig ist, findet keine Verarbeitung statt.
 hint-statement-bitclear=Löscht ein angegebenes Bit aus einer Variablen.
 
     Diese Anweisung ist in erster Linie für die Verwendung mit BIGSTR-Variablen gedacht, die bis zu 2048 Bytes lang sein können.
 
-    Bei Bedarf funktioniert es jedoch auch mit anderen Datentypen. Seien Sie sich nur der potenziellen Probleme beim „Bit Twidling“ bewusst.
-    Nicht-String-Puffer und dann versuchen, später als ihr „beabsichtigter“ Typ auf sie zuzugreifen, ohne die Variable neu zu initialisieren.
+    Bei Bedarf funktioniert die Anweisung auch mit anderen Datentypen. Beim direkten Manipulieren ihrer Bits können jedoch Probleme entstehen,
+    wenn später wieder über den ursprünglichen Typ auf die Daten zugegriffen wird, ohne die Variable neu zu initialisieren.
 
     Wenn der Bitparameter (eine Ganzzahl von 0 bis zur Anzahl der Bits im Objekt) ungültig ist, findet keine Verarbeitung statt.
 hint-statement-brag=Veralteter PCBoard-Befehl für die frühere BRAG-Anzeige. PCBoard 15.3 und IcyBoard akzeptieren ihn aus Kompatibilitätsgründen, führen aber keine Aktion aus.
@@ -774,9 +772,9 @@ hint-statement-setenv=Legen Sie eine Umgebungsvariable fest.
 hint-statement-fcloseall=Schließt alle Dateikanäle
 hint-statement-stackabort=Dadurch kann der Programmierer das Laufzeitmodul anweisen, sein Bestes zu geben, um die Ausführung fortzusetzen, nachdem ein Stapelfehler aufgetreten ist.
 
-    Wenn `FALSE` übergeben wird, wird die Ausführung nach einem Stapelfehler abgebrochen. Wenn `TRUE` bestanden wird, läuft die PPE weiter.
+    Wenn `FALSE` übergeben wird, wird die Ausführung nach einem Stapelfehler abgebrochen. Wenn `TRUE` übergeben wird, läuft das PPE weiter.
 
-    > [!ACHTUNG]
+    > [!CAUTION]
     > Wenn Sie die Ausführung nach einem Stapelfehler fortsetzen, ist die Programmausführung unvorhersehbar.
     > PPL lässt nicht zu, dass der Systemspeicher aufgrund eines Stapelfehlers beschädigt wird.
 hint-statement-dcreate=Erstellen Sie eine DBF-Datei
@@ -788,24 +786,24 @@ hint-statement-dcloseall=Schließen Sie alle NDX-Dateien
 hint-statement-dlock=DBF-Datei sperren
 hint-statement-dlockr=einen Datensatz sperren
 hint-statement-dlockg=Sperren Sie eine Gruppe von Datensätzen
-hint-statement-dunlock=Entsperren Sie alle aktuellen Schlösser
+hint-statement-dunlock=Hebt alle aktuellen Sperren auf.
 hint-statement-dncreate=NDX-Datei erstellen
 hint-statement-dnopen=NDX-Datei öffnen
 hint-statement-dnclose=NDX-Datei schließen
 hint-statement-dncloseall=Schließen Sie alle NDX-Dateien
-hint-statement-dnew=einen neuen Rekord starten
+hint-statement-dnew=Beginnt einen neuen Datensatz.
 hint-statement-dadd=Fügen Sie den neuen Datensatz hinzu
 hint-statement-dappend=einen leeren Datensatz anhängen
 hint-statement-dtop=Gehe zum obersten Datensatz
 hint-statement-dgo=Gehen Sie zu einem bestimmten Datensatz
 hint-statement-dbottom=Gehe zum unteren Datensatz
 hint-statement-dskip=+/- eine Anzahl von Datensätzen überspringen
-hint-statement-dblank=Löschen Sie den Datensatz
+hint-statement-dblank=Leert den Datensatz.
 hint-statement-ddelete=den Datensatz löschen
-hint-statement-drecall=Erinnern Sie sich an die Aufzeichnung
+hint-statement-drecall=Stellt einen zum Löschen markierten Datensatz wieder her.
 hint-statement-dtag=Wählen Sie ein Tag aus
-hint-statement-dseek=gibt den Fehlerstatus zurück ( 0|1 )
-    ; oder Erfolg suchen (0 = Fehler
+hint-statement-dseek=Gibt den Fehlerstatus zurück ( 0|1 )
+    ; oder das Suchergebnis (0 = Fehler
     ; 1 = Erfolg, 2 = folgender Datensatz
     ; 3 = Ende der Datei)
 hint-statement-dfblank=Leeren Sie ein benanntes Feld
@@ -814,10 +812,10 @@ hint-statement-dput=Geben Sie einen Wert in ein benanntes Feld ein
 hint-statement-dfcopy=Kopieren Sie ein Feld in ein Feld
 hint-statement-account=@1 ist ein Wert zwischen 0 und 14. Es wird empfohlen, Systemkonstanten zu verwenden.
 
-    @2 ist die Menge an Credits, die zum Feld hinzugefügt oder abgezogen werden müssen
-hint-statement-recordusage=@1 ist die Feldnummer, auf die zugegriffen werden soll (mit DEB…-Konstanten). Descr1 ist die Beschreibung der Gebühr. Descr2 ist eine Unterbeschreibung der Kosten pro Einheit
-    ist der Kosten-pro-Einheit-Wert die Anzahl der Einheiten. Recordusage aktualisiert Soll-Werte in PCBoard sowie Datensatzbeschreibungen und anderes
-    Informationen in einer Buchhaltungsdatei.
+    @2 ist die Anzahl der Abrechnungseinheiten, die zum Feld addiert oder davon abgezogen werden sollen.
+hint-statement-recordusage=@1 ist die Feldnummer, auf die zugegriffen werden soll (mit DEB…-Konstanten). descr1 beschreibt die Gebühr, descr2 enthält eine ergänzende Beschreibung.
+    unitcost gibt die Kosten pro Einheit an, value die Anzahl der Einheiten. Recordusage aktualisiert die Abbuchungswerte in PCBoard und protokolliert Beschreibungen
+    sowie weitere Informationen in einer Abrechnungsdatei.
 
     Gültige Werte für den Feldparameter sind 2–16. Die diesen Werten entsprechenden Konstanten (DEB???) könnten und sollten hier verwendet werden.
 
@@ -827,7 +825,7 @@ hint-statement-msgtofile=Schreibt eine Nachricht in eine Datei.
     Diese Anweisung nimmt die gegebene Nachricht und schreibt sie in eine Textdatei.
     Die ersten 15 Zeilen der Datei enthalten Standard-Header-Informationen. (Ein Feld pro Zeile) Die Kopfzeilen sind formatiert, um das Parsen zu erleichtern.
     In der 16. Zeile wird angegeben, wie viele erweiterte Header vorhanden sind. Die folgenden Zeilen enthalten erweiterte Header.
-    (eine pro Zeile) Schließlich folgt nach den erweiterten Headern eine Zeile mit „Nachrichtentext:“. Alles danach ist der Hauptteil der Nachricht.
+    (eine pro Zeile) Schließlich folgt nach den erweiterten Headern eine Zeile mit „Message body:“. Alles danach ist der Nachrichtentext.
 hint-statement-qwklimits=Mit dieser Anweisung kann der PPL-Programmierer die QWK-Grenzwerte eines Benutzers ändern. Vier Felder können mit ihrer Anweisung geändert werden.
 hint-statement-command=Verarbeiten Sie einen Befehl so, als ob er an der Eingabeaufforderung eingegeben würde.
 
@@ -836,11 +834,10 @@ hint-statement-command=Verarbeiten Sie einen Befehl so, als ob er an der Eingabe
 
     @2: Ein Zeichenfolgenwert mit dem auszuführenden Befehl und den Parametern. (wie „R A Y O S“)
 
-    HINWEISE!!! Nicht alle Teile von PCBoard sind wiedereintrittsfähig. Sie sollten beispielsweise nicht versuchen, zwei Nachrichteneditorprozesse gleichzeitig aktiv zu haben (mit anderen Worten, Sie sollten den Nachrichteneditor nicht aus einem MNU heraus starten und dann einen PPE über eine Umschalttaste starten, der versucht, eine andere Nachricht einzugeben). Daher müssen Sie bei verschachtelten COMMAND-Aufrufen (oder gleichwertigen Aufrufen) vorsichtig sein. Aber die sequentielle Verarbeitung sollte überhaupt kein Problem darstellen.
-    Wenn sich irgendwann in der Zukunft herausstellt, dass das Zulassen dieser Flexibilität mehr Probleme verursacht als löst, wird die COMMAND-Anweisung zurückgefahren, um sicherzustellen, dass keine Versuche unternommen werden, Code erneut einzugeben. Nutzen Sie es also gut und mit Bedacht!
+    HINWEISE!!! Nicht alle Teile von PCBoard sind reentrant, können also nicht erneut aufgerufen werden, solange ein vorheriger Aufruf noch läuft. Beispielsweise dürfen nicht zwei Nachrichteneditoren gleichzeitig aktiv sein: Starten Sie nicht den Nachrichteneditor aus einem MNU und anschließend über eine Funktionstaste mit Umschalttaste ein PPE, das eine weitere Nachricht eingeben möchte. Verschachtelte COMMAND-Aufrufe oder gleichwertige Aufrufe erfordern daher Vorsicht. Eine nacheinander erfolgende Verarbeitung sollte dagegen problemlos sein.
+    Sollte diese Flexibilität künftig mehr Probleme verursachen als lösen, wird der Funktionsumfang von COMMAND eingeschränkt, um solche erneuten Aufrufe noch aktiven Codes zu verhindern. Verwenden Sie die Anweisung daher mit Bedacht!
 hint-statement-uselmrs=Steuert, ob nachfolgende `GETALTUSER`-Aufrufe die Last-Message-Read-Zeiger des alternativen Benutzers laden. `FALSE` spart Speicher, wenn keine LMR-Daten benötigt werden; `TRUE` aktiviert das Laden wieder. `USELMRS()` liefert den aktuellen Zustand.
-hint-statement-confinfo=Mit dieser Anweisung kann ein Feld in der Konferenz geändert werden
-    Konfiguration.
+hint-statement-confinfo=Ändert ein Feld in der Konferenzkonfiguration.
 
     @1 = Die Konferenznummer, über die Informationen abgerufen werden sollen
 
@@ -848,9 +845,8 @@ hint-statement-confinfo=Mit dieser Anweisung kann ein Feld in der Konferenz geä
 
     @3 = Neuer Wert, der im Feld gespeichert werden soll
 
-    { Conference_access_constants }
-hint-statement-adjtubytes=Diese Anweisung kann verwendet werden, um die gesamten Upload-Bytes eines Benutzers anzupassen
-    nach oben oder unten.
+    { conference_access_constants }
+hint-statement-adjtubytes=Erhöht oder verringert die Gesamtzahl der vom Benutzer hochgeladenen Bytes.
 
     @1 = Anzahl der Bytes, mit denen die Upload-Bytes aktueller Benutzer angepasst werden sollen.
     Dies kann ein positiver oder negativer Wert sein
@@ -869,11 +865,11 @@ hint-statement-adduser=@1 = Name des neuen Benutzers, der hinzugefügt werden so
     unter Verwendung der neuen Benutzerdatensatznummer. FALSE stellt die aktuellen Benutzervariablen wieder her.
 
     ### Hinweise
-    Mit dieser Anweisung kann PPL einen neuen Benutzerdatensatz erstellen und ausfüllen
-    in allen Feldern außer dem Namen mit Platinen-Standardwerten.
-hint-statement-killmsg=@1 = Konferenznummer, in der sich die zum Scheitern verurteilte Nachricht befindet.
-    @2 = zu tötende Nachrichtennummer
-hint-statement-chdir=Änderungen am Verzeichnis
+    Mit dieser Anweisung kann PPL einen neuen Benutzerdatensatz erstellen und alle Felder
+    außer dem Namen mit den PCBoard-Standardwerten füllen.
+hint-statement-killmsg=@1 = Konferenznummer, in der sich die zu löschende Nachricht befindet.
+    @2 = Nummer der zu löschenden Nachricht
+hint-statement-chdir=Wechselt in das angegebene Verzeichnis.
 hint-statement-mkdir=Erstellt ein neues Verzeichnis
 
     @1 = zu erstellendes Verzeichnis
@@ -892,12 +888,12 @@ hint-statement-fdoqmod=Ersetzt einen Eintrag der Ausgangswarteschlange
     @1 = Datensatznummer, gezählt von eins
     @2 = Adresse des Links, für den die Datei bestimmt ist
     @3 = zu sendende Datei
-    @4 = NORMAL oder ABSTURZ, gelesen und ignoriert
+    @4 = NORMAL oder CRASH, wird gelesen und ignoriert
 hint-statement-fdoqadd=Stellt eine Datei in die Ausgangswarteschlange eines Links
 
     @1 = Adresse des Links, für den die Datei bestimmt ist
     @2 = zu sendende Datei
-    @3 = NORMAL oder ABSTURZ, gelesen und ignoriert
+    @3 = NORMAL oder CRASH, wird gelesen und ignoriert
 hint-statement-fdoqdel=Entnimmt einen Eintrag aus der Ausgangswarteschlange
 
     @1 = Datensatznummer, gezählt von eins
@@ -905,7 +901,7 @@ hint-statement-sounddelay=@1 = Frequenz, mit der der PC-Lautsprecher ertönen so
     @2 = Länge in Taktschritten (18 = 1 Sekunde), um den Lautsprecher eingeschaltet zu lassen
 
     ### Hinweise
-    Diese Funktion wurde hinzugefügt, um die zu ersetzen
+    Diese Funktion ersetzt die folgende Kombination:
     ```
     SOUND 500
     SOUND 0
@@ -918,8 +914,8 @@ hint-statement-movemsg=Verschiebt die Nachricht von ihrem aktuellen Speicherort 
 
     @1 = Konferenznummer, in der sich die Nachricht befindet
     @2 = zu verschiebende Nachrichtennummer
-    @3 = Ein boolescher Ausdruck, der angibt, wo die Nachricht sein soll
-    bewegen oder nicht.  TRUE, wenn die Nachricht verschoben werden soll, FALSE, wenn die Nachricht kopiert werden soll.
+    @3 = Ein boolescher Ausdruck, der angibt, ob die Nachricht verschoben werden soll:
+    TRUE zum Verschieben, FALSE zum Kopieren.
 hint-statement-setbankbal=Legt den Wert eines angegebenen Felds fest.
 
     @1 Ein ganzzahliger Ausdruck, der das abzurufende Feld angibt.
@@ -933,7 +929,7 @@ hint-statement-setbankbal=Legt den Wert eines angegebenen Felds fest.
         2 = Letzter Transaktionsbetrag (in Minuten)
         3 = Gesparter Betrag (Zeitguthaben auf dem Konto)
         4 = Max. Auszahlung (das Maximum, das ein Benutzer an einem Tag abheben kann)
-        5 = Max Stored Amount (maximal zulässige Speicherzeit)
+        5 = Maximales Guthaben (höchstens speicherbare Zeit)
 
     Bytefelder (in K Bytes)
     ------------------------
@@ -942,7 +938,7 @@ hint-statement-setbankbal=Legt den Wert eines angegebenen Felds fest.
         8 = Letzter Transaktionsbetrag (in K Bytes)
         9 = Gesparter Betrag (ihr K-Byte-Saldo auf ihrem Konto)
         10 = Max. Auszahlung (das Maximum, das ein Benutzer an einem Tag abheben kann)
-        11 = Max Stored Amount (maximal zulässige K-Bytes, die gespeichert werden dürfen)
+        11 = Maximales Guthaben (höchstens speicherbare K-Bytes)
 hint-function-len=### Rückgabewert
     Gibt die Länge der Zeichenfolge @1 zurück
 hint-function-lower=### Rückgabewert
@@ -959,11 +955,11 @@ hint-function-space=### Rückgabewert
     Gibt eine Zeichenfolge aus @1-Leerzeichen zurück
 hint-function-ferr=Gibt an, ob auf Dateikanal `@1` seit der letzten Prüfung ein Fehler aufgetreten ist. Das Lesen von `FERR()` löscht das Fehlerflag dieses Kanals. Auch das Dateiende nach `FGET` oder `FREAD` setzt das Flag.
 hint-function-chr=### Rückgabewert
-    Gibt eine aus einem Zeichen lange Zeichenfolge des durch die ASCII-Codevariable (0-255) dargestellten Zeichens zurück.
+    Gibt eine Zeichenfolge der Länge eins mit dem Zeichen zurück, das durch den ASCII-Code in var (0–255) dargestellt wird.
 hint-function-asc=### Rückgabewert
     Gibt den ASCII-Wert des ersten Zeichens in @1 zurück
 hint-function-instr=Gibt die Position von @2 in @1 `(1-LEN(@1))` oder `0` zurück, wenn @2 nicht in @1 ist
-hint-function-abort=Gibt ein Flag zurück, das angibt, ob der Benutzer die Anzeige der Daten über ^K / ^X abgebrochen hat oder mit „Nein“ auf ein MEHR? geantwortet hat. prompt
+hint-function-abort=Gibt ein Flag zurück, das angibt, ob der Benutzer die Datenanzeige mit ^K / ^X oder durch eine Nein-Antwort auf die MORE?-Eingabeaufforderung abgebrochen hat.
 hint-function-ltrim=Gibt eine Zeichenfolge von @1 zurück, wobei das erste Zeichen von @2 von links abgeschnitten ist
 hint-function-rtrim=Gibt eine Zeichenfolge von @1 zurück, wobei das erste Zeichen von @2 von rechts abgeschnitten ist
 hint-function-trim=Gibt eine Zeichenfolge von @1 zurück, wobei das erste Zeichen von @2 an beiden Enden abgeschnitten ist
@@ -971,8 +967,8 @@ hint-function-random=Gibt eine Zufallszahl zwischen 0 und @2 einschließlich zur
 hint-function-date=Gibt das heutige Datum zurück
 hint-function-time=Gibt die aktuelle Uhrzeit zurück
 hint-function-u_name=Gibt den aktuellen Benutzernamen zurück
-hint-function-u_ldate=Gibt das letzte Datum des aktuellen Benutzers im System zurück
-hint-function-u_ltime=Gibt die aktuellen Benutzer zurück, die zuletzt auf dem System waren
+hint-function-u_ldate=Gibt das Datum des letzten Besuchs des aktuellen Benutzers im System zurück.
+hint-function-u_ltime=Gibt die Uhrzeit des letzten Besuchs des aktuellen Benutzers im System zurück.
 hint-function-u_ldir=Gibt das Datum des letzten Verzeichnisscans des aktuellen Benutzers zurück
 hint-function-u_logons=Gibt die Anzahl der Anmeldungen des aktuellen Benutzers zurück
 hint-function-u_ful=Gibt die Anzahl der hochgeladenen Dateien des aktuellen Benutzers zurück
@@ -988,14 +984,14 @@ hint-function-dow=Gibt den Wochentag (0 = Sonntag, 6 = Samstag) zurück, auf den
 hint-function-hour=Gibt die Stunde des Tages (0-23) von @1 zurück
 hint-function-min=Gibt die Minute der Stunde (0-59) von @1 zurück
 hint-function-sec=Gibt die Sekunde der Minute (0-59) von @1 zurück
-hint-function-timeap=Gibt eine Zeichenfolge zurück, die die Zeit @1 im zivilen Format darstellt (XX:XX:XX AM).
+hint-function-timeap=Gibt eine Zeichenfolge zurück, die die Uhrzeit @1 im 12-Stunden-Format darstellt (XX:XX:XX AM).
 hint-function-ver=Gibt die Versionsnummer von PCBoard zurück, das ausgeführt wird
-hint-function-nochar=Gibt die aktuelle Sprache ohne Zeichen zurück
+hint-function-nochar=Gibt das Nein-Zeichen der aktuellen Sprache zurück.
 hint-function-yeschar=Gibt das Ja-Zeichen der aktuellen Sprache zurück
 hint-function-stripatx=Gibt eine Zeichenfolge @1 zurück, wobei alle @X-Codes entfernt wurden
 hint-function-replace=Gibt eine Zeichenfolge von @1 zurück, wobei alle Vorkommen des ersten Zeichens von @2 durch das erste Zeichen von @3 ersetzt werden
 hint-function-strip=Gibt eine Zeichenfolge von @1 zurück, wobei alle Vorkommen des ersten Zeichens von @2 entfernt wurden
-hint-function-inkey=Gibt den nächsten Tastendruck als aus einem Zeichen lange Zeichenfolge oder als Zeichenfolge mit dem Namen der Funktions- oder Cursorsteuertaste zurück
+hint-function-inkey=Gibt den nächsten Tastendruck als Zeichenfolge der Länge eins oder als Namen einer Funktions- oder Cursorsteuertaste zurück.
 hint-function-tostring=Konvertiert einen Ausdruck in einen `STRING`-Typ
 hint-function-mask_pwd=Gibt eine gültige Zeichenmaske für Eingabeanweisungen von Passwörtern zurück
 hint-function-mask_alpha=Gibt eine gültige Zeichenmaske für Eingabeanweisungen von A bis Z und a bis z zurück
@@ -1003,7 +999,7 @@ hint-function-mask_num=Gibt eine gültige Zeichenmaske für Eingabeanweisungen v
 hint-function-mask_alnum=Gibt eine gültige Zeichenmaske für Eingabeanweisungen von A bis Z, a bis z und 0 bis 9 zurück
 hint-function-mask_file=Gibt eine gültige Zeichenmaske für Eingabeanweisungen von Dateinamen zurück
 hint-function-mask_path=Gibt eine gültige Zeichenmaske für Eingabeanweisungen von Pfadnamen zurück
-hint-function-mask_ascii=Gibt eine gültige Zeichenmaske für Eingabeanweisungen mit Leerzeichen („“) bis Tilde („~“) zurück.
+hint-function-mask_ascii=Gibt eine Maske der gültigen Zeichen für Eingabeanweisungen zurück, vom Leerzeichen („ “) bis zur Tilde („~“).
 hint-function-curconf=Gibt die aktuelle Konferenznummer zurück
 hint-function-pcbdat=Gibt eine Zeichenfolge mit dem Pfad und Dateinamen von PCBOARD.DAT zurück
 hint-function-ppepath=Gibt eine Zeichenfolge mit dem Pfad (kein Dateiname) der aktuell ausgeführten PPE-Datei zurück
@@ -1013,7 +1009,7 @@ hint-function-u_msgrd=Gibt die Anzahl der Nachrichten zurück, die der Benutzer 
 hint-function-u_msgwr=Gibt die Anzahl der Nachrichten zurück, die der Benutzer geschrieben hat
 hint-function-pcbnode=Gibt die Knotennummer zurück
 hint-function-readline=Zeilennummer @2 aus der Datei @1 lesen und zurückgeben
-hint-function-sysopsec=Gibt die in PCBOARD.DAT definierte SysOp-Sicherheit zurück
+hint-function-sysopsec=Gibt die in PCBOARD.DAT definierte Sysop-Sicherheitsstufe zurück.
 hint-function-onlocal=Gibt `TRUE` zurück, wenn der Benutzer lokal angemeldet ist
 hint-function-un_stat=Gibt einen Knotenstatus von USERNET.XXX nach einer RdUnet-Anweisung zurück
 hint-function-un_name=Gibt einen Knotenbenutzernamen aus USERNET.XXX nach einer RdUnet-Anweisung zurück
@@ -1050,11 +1046,11 @@ hint-function-peekw=Gibt einen Wortwert (0-65535) zurück, der sich an der Speic
 hint-function-mkaddr=Gibt eine segment:offset-Adresse als lange Ganzzahl zurück, die aus zwei wortgroßen Werten nach der Formel besteht:
     `@1*00010000h+@2`
 hint-function-exist=Gibt einen booleschen `TRUE`-Wert zurück, wenn die Datei @1 vorhanden ist
-hint-function-i2s=Gibt eine Zeichenfolge zurück, die den ganzzahligen Wert @1 darstellt, der in den Basiswert @2 konvertiert wurde
+hint-function-i2s=Gibt eine Zeichenfolge zurück, die den ganzzahligen Wert @1 im Zahlensystem zur Basis @2 darstellt.
 hint-function-s2i=Gibt eine Ganzzahl zurück, die die aus der Basis @2 konvertierte Zeichenfolge @1 darstellt
 hint-function-carrier=Gibt die vom Modem gemeldete Trägergeschwindigkeit an PCBoard zurück
 hint-function-tokenstr=Gibt eine zuvor tokenisierte Zeichenfolge zurück, die mit Semikolons rekonstruiert wurde, die die Komponenten-Tokens trennen
-hint-function-cdon=Gibt `TRUE` zurück, wenn das Trägererkennungssignal eingeschaltet ist, `FALSE`
+hint-function-cdon=Gibt `TRUE` zurück, wenn das Trägererkennungssignal aktiv ist, andernfalls `FALSE`.
 hint-function-langext=Gibt die Dateierweiterung für die Sprachauswahl des Benutzers zurück
 hint-function-ansion=Gibt `TRUE` zurück, wenn der Benutzer lokal angemeldet ist
 hint-function-valcc=Gibt `TRUE` zurück, wenn @1 eine gültige Kreditkartennummer ist
@@ -1073,13 +1069,13 @@ hint-function-u_stat=Gibt eine Statistik über den Benutzer zurück, die von PCB
     Gültige Werte für @1 sind 1 bis 15
     |||
     | --- | --- |
-    | 1 | Erster Termin, an dem der Benutzer das System aufgerufen hat |
-    | 2 | Anzahl der SysOp-Seiten, die der Benutzer angefordert hat |
+    | 1 | Datum des ersten Anrufs des Benutzers im System |
+    | 2 | Anzahl der Sysop-Rufe des Benutzers |
     | 3 | Anzahl der Gruppenchats, an denen der Benutzer teilgenommen hat |
     | 4 | Anzahl der Kommentare, die der Benutzer hinterlassen hat |
     | 5 | Anzahl der 300-Bit/s-Verbindungen |
     | 6 | Anzahl der 1200-Bit/s-Verbindungen |
-    | 7 | Bumber von 2400 bps verbindet |
+    | 7 | Anzahl der 2400-Bit/s-Verbindungen |
     | 8 | Anzahl der 9600-Bit/s-Verbindungen |
     | 9 | Anzahl der 14400-Bit/s-Verbindungen |
     | 10 | Anzahl der Sicherheitsverstöße |
@@ -1112,11 +1108,11 @@ hint-function-psa=Gibt den Wert der angegebenen PSA-Variablen zurück
     | | |
     | :--- | :--- |
     | 1 | Alias-Unterstützung aktiviert |
-    | 2 | Überprüfen Sie, ob der Support aktiviert ist |
+    | 2 | Unterstützung für Verifizierung aktiviert |
     | 3 | Adressunterstützung aktiviert |
     | 4 | Passwortunterstützung aktiviert |
     | 5 | Statistikunterstützung aktiviert |
-    | 6 | Notes-Unterstützung aktiviert |
+    | 6 | Unterstützung für Notizen aktiviert |
 hint-function-fileinf=Gibt Informationen über die durch @1 angegebene Datei zurück
 
     @1 = Die Datei, über die Informationen abgerufen werden sollen
@@ -1127,8 +1123,8 @@ hint-function-fileinf=Gibt Informationen über die durch @1 angegebene Datei zur
     | | |
     | :--- | :--- |
     | 1 | Gibt TRUE zurück, wenn die Datei vorhanden ist |
-    | 2 | Datumsstempel der Rücksendedatei |
-    | 3 | Zeitstempel der Rückgabedatei |
+    | 2 | Datumsstempel der Datei zurückgeben |
+    | 3 | Zeitstempel der Datei zurückgeben |
     | 4 | Dateigröße zurückgeben |
     | 5 | Dateiattribute zurückgeben 1) |
     | 6 | Dateilaufwerk zurückgeben |
@@ -1145,9 +1141,9 @@ hint-function-fileinf=Gibt Informationen über die durch @1 angegebene Datei zur
 hint-function-ppename=Gibt den Namen der aktuell ausgeführten PPE-Datei abzüglich Pfad und Erweiterung zurück
 hint-function-mkdate=Gibt ein Datum zurück, wobei das Jahr durch Jahr (1900-2079), den Monat durch Monat (1-12) und den Tag durch Tag (1-31) angegeben wird.
 hint-function-curcolor=Gibt die aktuelle Farbe (0-255) zurück, die vom ANSI-Treiber verwendet wird
-hint-function-kinkey=Gibt den nächsten Tastendruck von der BBS-Tastatur als eine aus einem Zeichen lange Zeichenfolge oder eine Zeichenfolge mit dem Namen der Funktions- oder Cursorsteuertaste zurück
-hint-function-minkey=Gibt den nächsten Tastendruck des Remote-Aufrufers als aus einem Zeichen lange Zeichenfolge oder als Zeichenfolge mit dem Namen der Funktions- oder Cursorsteuertaste zurück
-hint-function-maxnode=Gibt den mit der aktuellen Software maximal möglichen Knoten zurück (d. h. /2 würde 2 zurückgeben, /10 würde 10 zurückgeben usw.)
+hint-function-kinkey=Gibt den nächsten Tastendruck der lokalen BBS-Tastatur als Zeichenfolge der Länge eins oder als Namen einer Funktions- oder Cursorsteuertaste zurück.
+hint-function-minkey=Gibt den nächsten Tastendruck des entfernten Anrufers als Zeichenfolge der Länge eins oder als Namen einer Funktions- oder Cursorsteuertaste zurück.
+hint-function-maxnode=Gibt die mit der aktuellen Software maximal mögliche Knotenzahl zurück (d. h. /2 liefert 2, /10 liefert 10 usw.).
 hint-function-slpath=Gibt den in PCBSetup angegebenen Pfad zu den Anmeldesicherheitsdateien zurück
 hint-function-helppath=Gibt den in PCBSetup angegebenen Pfad zu den Hilfedateien zurück
 hint-function-temppath=Gibt den in PCBSetup angegebenen Pfad zum temporären Arbeitsverzeichnis zurück
@@ -1164,8 +1160,8 @@ hint-function-scrtext=### Rückgabewert
     Gibt eine Zeichenfolge von @3-Zeichen vom Bildschirm bei @1, @2 zurück.
     Wenn @3 `TRUE` ist, wird die Zeichenfolge mit allen intakten @-Codes zurückgegeben.
 hint-function-showstat=Gibt `TRUE` zurück, wenn das Schreiben auf die Anzeige aktiv ist, `FALSE`, wenn das Schreiben auf die Anzeige deaktiviert ist
-hint-function-pagestat=Gibt `TRUE` zurück, wenn der Benutzer den SysOp ausgelagert hat (oder PageOn ausgegeben wurde), andernfalls `FALSE` (oder PageOff ausgegeben wurde).
-hint-function-replacestr=Sie funktioniert genau wie die Funktion „Ersetzen“, mit der Ausnahme, dass sowohl für die Suche als auch für das Ersetzen eine vollständige Teilzeichenfolge angegeben werden kann
+hint-function-pagestat=Gibt `TRUE` zurück, wenn der Benutzer den Sysop gerufen hat (oder PageOn ausgeführt wurde), andernfalls `FALSE` (oder wenn PageOff ausgeführt wurde).
+hint-function-replacestr=Funktioniert wie die Funktion Replace, erlaubt jedoch sowohl für die Suche als auch für die Ersetzung eine vollständige Teilzeichenfolge.
 hint-function-stripstr=Funktioniert genauso wie die Strip-Funktion, außer dass eine vollständige Teilzeichenfolge für die Suche angegeben werden kann
 hint-function-tobigstr=Konvertiert einen Ausdruck in einen `BIGSTR`-Typ
 hint-function-toboolean=Konvertiert einen Ausdruck in einen `BOOLEAN`-Typ
@@ -1187,7 +1183,7 @@ hint-function-confreg=Gibt TRUE zurück, wenn das Flag „Benutzer registriert�
 hint-function-confexp=Gibt TRUE zurück, wenn das Flag „Benutzer abgelaufen“ gesetzt ist, andernfalls FALSE
 hint-function-confsel=Gibt TRUE zurück, wenn der Benutzer die Konferenz ausgewählt hat, andernfalls FALSE
 hint-function-confsys=Gibt TRUE zurück, wenn der Benutzer Konferenz-SysOp-Zugriff hat, andernfalls FALSE
-hint-function-confmw=Gibt TRUE zurück, wenn auf den Benutzer E-Mails in der Konferenzkonferenz warten, andernfalls FALSE
+hint-function-confmw=Gibt TRUE zurück, wenn in der Konferenz confnum Nachrichten auf den Benutzer warten, andernfalls FALSE.
 hint-function-lprinted=Gibt die Anzahl der auf dem Display gedruckten Zeilen zurück
 hint-function-isnonstop=Gibt zurück, ob sich die Anzeige derzeit im Non-Stop-Modus befindet (d. h. ob der Benutzer „NS“ als Teil seiner Befehlszeile eingegeben hat).
 hint-function-errcorrect=Gibt TRUE zurück, wenn festgestellt wird, dass eine Sitzung fehlerkorrigiert ist (oder FALSE für nicht fehlerkorrigierte Sitzungen).
@@ -1217,9 +1213,9 @@ hint-function-pplbufsize=Gibt die Anzahl der im KbdStuff-Puffer ausstehenden Tas
 hint-function-kbdfilused=Liefert `TRUE`, solange die Tastatureingabe aus einem `KBDFILE`-Skript stammt, andernfalls `FALSE`. Dadurch lässt sich dateigesteuerte Eingabe von `KBDSTUFF` und `KBDSTRING` unterscheiden.
 hint-function-lomsgnum=Gibt die niedrige Nachrichtennummer für die aktuelle Konferenz zurück.
 hint-function-himsgnum=Gibt die höchste Nachrichtennummer für die aktuelle Konferenz zurück.
-hint-function-drivespace=Rückgabewert: Von der Laufwerksspezifikation verbleibender Divespace.
+hint-function-drivespace=Gibt den verbleibenden freien Speicherplatz auf dem durch drivespec angegebenen Laufwerk zurück.
 hint-function-outbytes=Gibt die Anzahl der Bytes zurück, die im Ausgabepuffer des Modems warten. Im lokalen Modus nicht verfügbar.
-hint-function-hiconfnum=Gibt die höchste auf der Tafel verfügbare Konferenznummer zurück
+hint-function-hiconfnum=Gibt die höchste auf dem Board verfügbare Konferenznummer zurück.
 hint-function-inbytes=Gibt die Anzahl der im Modem-Eingabepuffer wartenden Bytes zurück. Im lokalen Modus nicht verfügbar.
 hint-function-crc32=Gibt einen UNSIGNED-Wert des CRC einer Datei oder Zeichenfolge zurück.
 hint-function-pcbmac=Gibt einen BIGSTR zurück, der den erweiterten Text eines PCB-MAKROs enthält
@@ -1238,23 +1234,23 @@ hint-function-stackleft=Gibt die Anzahl der auf dem Systemstapel verbleibenden B
 hint-function-stackerr=Gibt einen booleschen Wert zurück, der angibt, dass ein Stapelfehler aufgetreten ist, wenn TRUE.
 hint-function-dgetalias=Gibt den aktuellen Alias ​​zurück
 hint-function-dbof=Liefert `TRUE`, wenn der Datensatzzeiger des ausgewählten DBase-Kanals vor dem ersten Datensatz steht, andernfalls `FALSE`.
-hint-function-dchanged=Gibt das geänderte Flag zurück
-hint-function-ddecimals=Gibt Dezimalzahlen des benannten Feldes zurück
-hint-function-ddeleted=Gibt das gelöschte Flag zurück
-hint-function-deof=Gibt den End-of-File-Status zurück
+hint-function-dchanged=Gibt das Änderungsflag zurück.
+hint-function-ddecimals=Gibt die Anzahl der Nachkommastellen des benannten Felds zurück.
+hint-function-ddeleted=Gibt das Löschflag zurück.
+hint-function-deof=Gibt den Dateiendestatus zurück.
 hint-function-derr=Fehlerflag für den Kanal zurückgeben
 hint-function-dfields=Gibt die Anzahl der Felder zurück
 hint-function-dlength=Gibt die Länge des benannten Felds zurück
 hint-function-dname=Gibt den Namen des nummerierten Feldes zurück
-hint-function-dreccount=Gibt die Anzahl der Datensätze zurück
+hint-function-dreccount=Gibt die Gesamtzahl der Datensätze in der aktiven DBase-Datei zurück.
 hint-function-drecno=Gibt die aktuelle Datensatznummer zurück
-hint-function-dtype=Rückgabetyp des benannten Feldes
+hint-function-dtype=Gibt den Typ des benannten Felds zurück.
 hint-function-fnext=Gibt einen verfügbaren Dateikanal zurück. -1, wenn keine verfügbar sind.
 hint-function-dnext=
     Liefert die nächste unbenutzte DBase-Kanalnummer oder `-1`, wenn kein Kanal verfügbar ist.
 
     Der Kanal wird erst beim Öffnen einer Datei reserviert. Wiederholte `DNEXT()`-Aufrufe liefern daher dieselbe Nummer; sie muss gespeichert und die Datei geöffnet werden, bevor erneut gefragt wird.
-hint-function-toddate=Konvertiert ein Datum in eine Zeichenfolge im Format MM/TT/JJJJ
+hint-function-toddate=Konvertiert ein Datum in eine Zeichenfolge im Format MM/DD/YYYY.
 hint-function-dcloseall=Schließen Sie alle DBF-Dateien
 hint-function-dopen=Öffnen Sie die DBF-Datei
 hint-function-dclose=DBF-Datei schließen
@@ -1263,23 +1259,23 @@ hint-function-dpack=Packen Sie die DBF-Datei
 hint-function-dlockf=DBF-Datei sperren
 hint-function-dlock=DBF-Datei sperren
 hint-function-dlockr=Versucht, einen Datensatz auf dem ausgewählten DBase-Kanal zu sperren, und meldet, ob die Sperre erfolgreich war. Nach der Aktualisierung muss die passende Entsperrfunktion verwendet werden.
-hint-function-dunlock=Entsperren Sie alle aktuellen Schlösser
+hint-function-dunlock=Hebt alle aktuellen Sperren auf.
 hint-function-dnopen=NDX-Datei öffnen
 hint-function-dnclose=NDX-Datei schließen
 hint-function-dncloseall=Schließen Sie alle NDX-Dateien
-hint-function-dnew=einen neuen Rekord starten
+hint-function-dnew=Beginnt einen neuen Datensatz.
 hint-function-dadd=Fügen Sie den neuen Datensatz hinzu
 hint-function-dappend=einen leeren Datensatz anhängen
 hint-function-dtop=Gehe zum obersten Datensatz
 hint-function-dgo=Gehen Sie zu einem bestimmten Datensatz
 hint-function-dbottom=Gehe zum unteren Datensatz
 hint-function-dskip=+/- eine Anzahl von Datensätzen überspringen
-hint-function-dblank=Löschen Sie den Datensatz
+hint-function-dblank=Leert den Datensatz.
 hint-function-ddelete=den Datensatz löschen
-hint-function-drecall=Erinnern Sie sich an die Aufzeichnung
+hint-function-drecall=Stellt einen zum Löschen markierten Datensatz wieder her.
 hint-function-dtag=Wählen Sie ein Tag aus
-hint-function-dseek=gibt den Fehlerstatus zurück ( 0|1 )
-    oder Erfolg suchen (0 = Fehler
+hint-function-dseek=Gibt den Fehlerstatus zurück ( 0|1 )
+    oder das Suchergebnis (0 = Fehler
     1 = Erfolg, 2 = folgender Datensatz
     3 = Ende der Datei)
 hint-function-dfblank=Leeren Sie ein benanntes Feld
@@ -1291,13 +1287,13 @@ hint-function-dchkstat=Liefert `0`, wenn DBase-Kanal `@1` geöffnet ist, und `1`
 hint-function-pcbaccount=Gibt zurück, was PCBoard einem Benutzer für eine bestimmte Aktivität berechnet. Dies sind Werte, die der SysOp in PCBsetup zuweist, wenn die Buchhaltung konfiguriert und aktiviert wird.
     Gültige Werte für den Feldparameter sind 0–14. Die Verwendung der entsprechenden Konstanten wird empfohlen. (siehe Abschnitt Buchhaltung)
 
-    { Buchhaltungskonstanten }
+    { accounting_constants }
 hint-function-pcbaccstat=Gibt den Wert im Statusfeld zurück
-    Diese Funktion kann und sollte in Verbindung mit dem ACC_??? verwendet werden. Konstanten als Feldparameter. Gültige Werte für das Feld sind 0-3.
+    Als Feldparameter können und sollten die Konstanten ACC_??? verwendet werden. Gültige Feldwerte sind 0–3.
 
  | Feld | Dez. | Feldbeschreibung |
  | :--- |  :--- | :--- |
- | `ACC_STAT` | `0` | Gibt den Status des Schalters „Enable Accounting“ in der PWRD-Datei zurück.  |
+ | `ACC_STAT` | `0` | Gibt den Status des Schalters „Enable Accounting“ (Abrechnung aktivieren) in der PWRD-Datei zurück. |
  | `ACC_TIME` | `1` | Die Menge der ZUSÄTZLICH zu berechnenden Einheiten |
  | `ACC_MSGR` | `2` | Der Betrag, der ZUSÄTZLICH für jede gelesene Nachricht in der aktuellen Konferenz berechnet wird. |
  | `ACC_MSGW` | `3` | Der Betrag, der ZUSÄTZLICH für jede in der aktuellen Konferenz eingegebene Nachricht berechnet wird. |
@@ -1312,7 +1308,7 @@ hint-function-qwklimits=
     Liefert eine QWK-Grenze des aktuellen Benutzers. `@1` ist `MAXMSGS`, `CMAXMSGS`, `ATTACH_LIM_U` oder `ATTACH_LIM_P`.
 
     Zuvor muss `GETUSER` aufgerufen werden. Systemweite Grenzen aus PCBSetup begrenzen weiterhin die Werte einzelner Benutzer.
-hint-function-findfirst=Suchen Sie das erste Vorkommen von Dateispezifikation in einem Verzeichnis. Wird in Verbindung mit FindNext verwendet, um eine Verzeichnisliste abzurufen.
+hint-function-findfirst=Sucht die erste Datei in einem Verzeichnis, die der Dateispezifikation entspricht. Zusammen mit FindNext lässt sich damit eine Verzeichnisliste abrufen.
 
     ### Parameter
     @1 = Ein Zeichenfolgenausdruck mit dem Pfad und Dateinamen, über den auf Informationen zugegriffen werden soll.
@@ -1322,57 +1318,48 @@ hint-function-findfirst=Suchen Sie das erste Vorkommen von Dateispezifikation in
     Der erste Dateiname, der den Dateinamenkriterien entspricht.
 
     ### Hinweise
-    Diese Funktion soll dabei helfen, Dateien zu finden, die einer bestimmten Datei entsprechen
-    Kriterien.  Beispielsweise möchten Sie möglicherweise alle Dateien löschen, die mit *.BAK übereinstimmen
-    im aktuellen Verzeichnis.  Das geht ganz einfach, denn
-    FINDFIRST() findet die erste Übereinstimmung, während FINDNEXT() sucht
-    zusätzliche Übereinstimmungen.
+    Diese Funktion hilft beim Suchen nach Dateien, die bestimmten Kriterien entsprechen.
+    Beispielsweise lassen sich damit alle Dateien im aktuellen Verzeichnis ermitteln, die dem Muster *.BAK entsprechen,
+    um sie anschließend zu löschen. FINDFIRST() findet die erste passende Datei,
+    während FINDNEXT() weitere Treffer liefert.
 
-    Es ist zu beachten, dass nur die Dateinamen zurückgegeben werden.  Wenn Sie brauchen
-    Zusätzliche Informationen wie Datum, Uhrzeit oder Größe der Datei verwenden
-    die Funktion FILEINF().
+    Es werden nur die Dateinamen zurückgegeben. Zusätzliche Informationen wie Datum, Uhrzeit oder Dateigröße
+    liefert die Funktion FILEINF().
 hint-function-findnext=Diese Funktion ermittelt, ob weitere Dateien vorhanden sind, die einem angegebenen Muster entsprechen.
 
     ### Rückgabewert
-    Der nächste Dateiname, der den Dateinamenkriterien entspricht, oder ein
+    Der nächste Dateiname, der den Dateinamenkriterien entspricht, oder eine
     leere Zeichenfolge, wenn keine passenden Dateien mehr vorhanden sind.
 
     ### Hinweise
-    Diese Funktion dient dazu, die Funktion FINDFIRST() fortzusetzen
-    bricht ab, da alle weiteren Dateien gefunden werden, die dem Muster entsprechen
-    zuletzt gesucht.  Bei der Rückgabe sind keine passenden Dateien mehr vorhanden
-    Der Wert ist null oder eine leere Zeichenfolge. Weil Sie nicht wissen, wie viele
-    Wenn es passende Dateien gibt, ist das Sammeln normalerweise mit einer WHILE-Schleife verbunden
-    alle Dateinamen.
+    Setzt die mit FINDFIRST() begonnene Suche fort und findet weitere Dateien,
+    die dem zuletzt verwendeten Suchmuster entsprechen. Ein Rückgabewert von null
+    oder eine leere Zeichenfolge bedeutet, dass keine weiteren passenden Dateien vorhanden sind.
+    Da die Anzahl der Treffer im Voraus unbekannt ist, werden die Dateinamen üblicherweise
+    in einer WHILE-Schleife gesammelt.
 
-    Es ist zu beachten, dass nur die Dateinamen zurückgegeben werden.  Wenn Sie brauchen
-    Zusätzliche Informationen wie Datum, Uhrzeit oder Größe der Datei verwenden Sie
-    Funktion FILEINF().
+    Es werden nur die Dateinamen zurückgegeben. Zusätzliche Informationen wie Datum, Uhrzeit oder Dateigröße
+    liefert die Funktion FILEINF().
 hint-function-uselmrs=### Parameter
-    @1 = Weist PCBoard an, das LMRS eines alternativen Benutzers NICHT zu laden
-    wenn ein GETALTUSER ausgeführt wird.
+    @1 = Weist PCBoard an, die LMR-Zeiger eines alternativen Benutzers beim Ausführen von GETALTUSER NICHT zu laden.
 
     ### Hinweise
-    Diese Anweisung kann bei einem GETALTUSER eine erhebliche Menge an Speicher einsparen
-    wird zu einem späteren Zeitpunkt ausgeführt. Wenn GETALTUSER ausgeführt wird, wird es geladen
-    standardmäßig die LMRs des Benutzers. Wenn Sie eine erhebliche Anzahl von Konferenzen haben
-    Auf Ihrem System kann dies sehr viel Speicher beanspruchen. Seit PCBoard
-    ist so reich an Funktionen, dass es die meisten, wenn nicht sogar alle verfügbaren Funktionen aufnehmen kann
-    herkömmlicher Speicher, so dass PSAs nicht trocknen können. Wenn ein alternativer Benutzer
-    LMRs werden von der PPE-Anwendung nicht benötigt, dann können Sie diese verwenden
-    Anweisung, um PCBoard anzuweisen, die LMR-Daten nicht zu laden.
+    Diese Anweisung kann bei einem späteren GETALTUSER-Aufruf erheblich Speicher sparen.
+    GETALTUSER lädt standardmäßig die Zeiger auf die zuletzt gelesenen Nachrichten des Benutzers.
+    Bei vielen Konferenzen kann das sehr viel Speicher beanspruchen. Aufgrund seines großen Funktionsumfangs
+    kann PCBoard bereits den größten Teil oder den gesamten konventionellen Speicher belegen,
+    sodass für PPEs nicht genug übrig bleibt. Benötigt das PPE die LMR-Zeiger des alternativen Benutzers nicht,
+    lässt sich ihr Laden mit dieser Anweisung verhindern.
 
-    Siehe auch die FUNCTION USELMRS, diese gibt den aktuellen Status zurück
-    von USELMRS. Wenn beispielsweise die Funktion USELMRS TRUE zurückgibt, dann ein GETALTUSEr
-    lädt LMRS. Wenn es FALSE zurückgibt, wird LMRS nicht geladen.
-hint-function-confinfo=Mit dieser Anweisung kann auf ein Feld in der Konferenz zugegriffen werden
-    Konfiguration.
+    Siehe auch die FUNCTION USELMRS, die den aktuellen USELMRS-Status zurückgibt.
+    Liefert sie TRUE, lädt GETALTUSER die LMR-Zeiger; bei FALSE werden sie nicht geladen.
+hint-function-confinfo=Ermöglicht den Zugriff auf ein Feld in der Konferenzkonfiguration.
 
     ### Parameter
     @1 = Die Konferenznummer, über die Informationen abgerufen werden sollen
     @2 = Zu änderndes Konferenzfeld. (Siehe Hinweis)
 
-    { Conference_access_constants }
+    { conference_access_constants }
 hint-function-tinkey=### Parameter
     @1 = Anzahl der Takte, die auf die Eingabe gewartet werden sollen.
 
@@ -1383,25 +1370,24 @@ hint-function-tinkey=### Parameter
     Y1 ist die Anzahl der Taktimpulse, die `TINEKY` auf eine Eingabe warten soll
     bevor das Zeitlimit überschritten wird. 1 Sekunde = 18 Ticks (ungefähr)
 
-    Ein Tick-Wert von 0 führt dazu, dass `TINKEY` unbegrenzt auf die Eingabe mit wartet
-    eine maximale Timeout-Zeit von ca. 4 Stunden. Der Verlust des Mobilfunkanbieters endet ebenfalls
-    `TINKEY`.
+    Bei einem Tick-Wert von 0 wartet `TINKEY` ohne vorgegebenes Zeitlimit auf eine Eingabe,
+    höchstens jedoch etwa 4 Stunden. Auch der Verlust des Trägersignals beendet `TINKEY`.
 hint-function-cwd=### Rückgabewert
     Das aktuelle Arbeitsverzeichnis
 hint-function-instrr=Gibt die Position ganz rechts von @2 in @1 `(1-LEN(@1))` oder `0` zurück, wenn @2 nicht in @1 ist
 hint-function-base64enc=Kodiert die Bytes von @1 als Base64-Text. Ein String-Argument steuert seine UTF-8-Bytes bei.
-hint-function-base64dec=Dekodiert Base64-Text in @1 in einen Byte-Blob. Fehlerhafte Eingabeberichte `ErrCode.Format`.
-hint-function-tobytes=Die binäre Darstellung von @1 als Byte-Blob. Zeichenfolgen verwenden UTF-8; Numerische Skalare verwenden Little-Endian-Speicher mit fester Breite.
-hint-statement-on-error=ON ERROR GOTO label | GOSUB-Label | Vorgehensweise | AUS – wohin ein fehlgeschlagener Vorgang das Programm sendet.
-hint-function-fdordaka=Gibt die Adresse zurück, auf die dieses Board antwortet, als zone:net/node mit dem Punkt
-    angehängt, wenn ein solcher Datensatz vorhanden ist, oder eine leere Zeichenfolge, wenn kein solcher Datensatz vorhanden ist
+hint-function-base64dec=Dekodiert den Base64-Text in @1 in einen Byte-Blob. Fehlerhafte Eingaben werden mit `ErrCode.Format` gemeldet.
+hint-function-tobytes=Die binäre Darstellung von @1 als Byte-Blob. Zeichenfolgen verwenden UTF-8; numerische Skalare werden mit fester Breite in Little-Endian-Reihenfolge gespeichert.
+hint-statement-on-error=ON ERROR GOTO label | GOSUB label | Procedure | OFF – legt fest, wohin die Programmausführung bei einer fehlgeschlagenen Operation verzweigt.
+hint-function-fdordaka=Gibt die Adresse zurück, auf die dieses Board antwortet, im Format zone:net/node mit angehängter Point-Nummer,
+    sofern vorhanden. Existiert kein entsprechender Datensatz, wird eine leere Zeichenfolge zurückgegeben.
 
     @1 = Datensatznummer, gezählt von eins
-hint-function-fdordorg=Gibt die Ursprungszeile zurück, die an die hier geschriebene Echomail angehängt ist
+hint-function-fdordorg=Gibt die Origin-Zeile zurück, die an hier geschriebene Echomail angehängt wird.
 
-    @1 = Datensatznummer, gezählt von eins. Es ist nur eine Ursprungslinie konfiguriert,
-    also ist jede zweite Zahl leer
-hint-function-fdordarea=Gibt das Tag eines Nachrichtenbereichs zurück, der am Netzwerk teilnimmt, oder eines
+    @1 = Datensatznummer, gezählt von eins. Es ist nur eine Origin-Zeile konfiguriert,
+    daher liefert jede andere Nummer eine leere Zeichenfolge.
+hint-function-fdordarea=Gibt das Tag eines Nachrichtenbereichs zurück, der am Netzwerk teilnimmt, oder eine
     leere Zeichenfolge, wenn kein solcher Datensatz vorhanden ist
 
     @1 = Datensatznummer, gezählt von eins
@@ -1422,29 +1408,28 @@ hint-function-setdrive=Wählt die DOS-Laufwerksnummer `@1` und liefert die gewä
 hint-function-bs2i=Konvertiert einen 4-Byte-BSreal in eine PPL-Ganzzahl.
 
     ### Parameter
-    @1 ist ein BIGSTR-Typ, da BIGSTR-Typen enthalten können
-    Binärdaten. Für diese Funktion konvertiert PPL die erste
-    4 Bytes des BIGSTR in eine INTEGER-Variable konvertieren und zurücksenden
-    es.
+    @1 hat den Typ BIGSTR, da dieser Binärdaten enthalten kann.
+    Diese Funktion konvertiert die ersten 4 Bytes des BIGSTR in eine INTEGER-Variable
+    und gibt deren Wert zurück.
 
     ### Rückgabewert
     Gibt einen konvertierten 4-Byte-BSrealwert in Form einer 4-Byte-Ganzzahl zurück.
 hint-function-bd2i=Konvertiert ein 8-Byte-Bdreal in eine PPL-Ganzzahl.
 hint-function-i2bs=Konvertiert einen 4-Byte-PPL-INTEGER in einen 4-Byte-BSreal und speichert ihn in einem BIGSTR.
 hint-function-i2bd=Konvertiert einen 4-Byte-PPL-INTEGER in einen 8-Byte-Bdrealwert und speichert ihn.
-hint-function-ftell=`FTELL` gibt den aktuellen Dateizeiger-Offset für die angegebene Datei zurück
-        Dateikanal. Wenn der Kanal nicht geöffnet ist, wird 0 zurückgegeben.
+hint-function-ftell=`FTELL` gibt den aktuellen Dateizeiger-Offset für den angegebenen
+    Dateikanal zurück. Wenn der Kanal nicht geöffnet ist, wird 0 zurückgegeben.
         Andernfalls wird die aktuelle Position in der geöffneten Datei zurückgegeben.
 
         ### Parameter
         @1 – Der zu verarbeitende Dateikanal
 
         ### Rückgabewert
-        4-Byte-Ganzzahl mit Vorzeichen, die den Dateizeiger-Offset enthält
-        der an den Kanal angehängten Datei.
+        4-Byte-Ganzzahl mit Vorzeichen, die den Dateizeiger-Offset
+        der dem Kanal zugeordneten Datei enthält.
 hint-function-os=### Rückgabewert
-        Eine Ganzzahl, die angibt, welches Betriebssystem/ welche Platinenversion verwendet wird
-        die PPE läuft derzeit unter.
+        Eine Ganzzahl, die angibt, unter welchem Betriebssystem bzw. welcher PCBoard-Version
+        das PPE derzeit ausgeführt wird.
         1=DOS, 2 = OS2, 0 = unbekannt.
 hint-function-short_desc=### Rückgabewert
     TRUE, wenn der Benutzer kurze Dateibeschreibungen aktiviert hat, andernfalls wird FALSE zurückgegeben.
@@ -1463,7 +1448,7 @@ hint-function-getbankbal=### Parameter
         2 = Letzter Transaktionsbetrag (in Minuten)
         3 = Gesparter Betrag (Zeitguthaben auf dem Konto)
         4 = Max. Auszahlung (das Maximum, das ein Benutzer an einem Tag abheben kann)
-        5 = Max Stored Amount (maximal zulässige Speicherzeit)
+        5 = Maximales Guthaben (höchstens speicherbare Zeit)
 
     Bytefelder (in K Bytes)
     ------------------------
@@ -1472,10 +1457,10 @@ hint-function-getbankbal=### Parameter
         8 = Letzter Transaktionsbetrag (in K Bytes)
         9 = Gesparter Betrag (ihr K-Byte-Saldo auf ihrem Konto)
         10 = Max. Auszahlung (das Maximum, das ein Benutzer an einem Tag abheben kann)
-        11 = Max Stored Amount (maximal zulässige K-Bytes, die gespeichert werden dürfen)
+        11 = Maximales Guthaben (höchstens speicherbare K-Bytes)
 hint-function-getmsghdr=### Parameter
     @1 = Konferenznummer der Nachrichtenbasis
-    @2 = Ein doppelter Ausdruck, der die Nachrichtennummer der Nachricht angibt, um den Nachrichtenheaderwert zu erhalten.
+    @2 = Ein Ausdruck vom Typ DOUBLE mit der Nummer der Nachricht, deren Kopffeld gelesen werden soll.
     @3 = Das abzurufende Feld.
 
     ### Rückgabewert
@@ -1484,25 +1469,241 @@ hint-function-getmsghdr=### Parameter
     { message_header_constants }
 hint-function-setmsghdr=### Parameter
     @1 = Ein ganzzahliger Ausdruck, der die Konferenznummer der Nachrichtenbasis angibt.
-    @2 = Ein doppelter Ausdruck, der die Nachrichtennummer der Nachricht angibt, um den Nachrichtenheaderwert festzulegen.
+    @2 = Ein Ausdruck vom Typ DOUBLE mit der Nummer der Nachricht, deren Kopffeld gesetzt werden soll.
     @3 = Ein ganzzahliger Ausdruck zwischen 1 und 5, der das abzurufende Feld darstellt.
     @4 = Ein Zeichenfolgenausdruck, der die Daten enthält, die in das angegebene Feld eingefügt werden sollen.
 
     ### Felder
-    1 = Feld „An“.
-    2 = Feld „Von“.
-    3 = Feld „Betreff“.
-    4 = Feld „Passwort“.
+    1 = Feld „To“ (Empfänger)
+    2 = Feld „From“ (Absender)
+    3 = Feld „Subject“ (Betreff)
+    4 = Feld „Password“ (Passwort)
     5 = „Echo“-Flag
 
     ### Rückgabewert
-    Gibt den Wert der Nachrichtennummer zurück.  Wenn die Nachricht so ist
-    Passt es an die gleiche Stelle wie das Original, dann ist es das Gleiche.
-    Eine geänderte Kopfzeile passt nicht in die ursprüngliche Nachricht
-    Header, dann wird die Nachricht am Ende der Nachricht eingefügt
-    Basis.
-hint-function-areaid=Erzeugt eine Tupelkonferenz/einen Tupelbereich zur Identifizierung einer Nachrichtenbasis.
+    Gibt die Nachrichtennummer zurück. Passt die Nachricht an die ursprüngliche Position,
+    bleibt ihre Nummer unverändert. Passt der geänderte Nachrichtenkopf nicht mehr in den
+    ursprünglichen Nachrichtenkopf, wird die Nachricht am Ende der Nachrichtenbasis eingefügt.
+hint-function-areaid=Erzeugt ein Tupel aus Konferenz und Bereich zur Identifizierung einer Nachrichtenbasis.
 hint-function-len_dim=@1 = Das Array, dessen Elementanzahl ermittelt werden soll
     @2 = Nullbasierte Dimensionsnummer (`0`, `1` oder `2`)
     ### Rückgabewert
         Liefert die Elementanzahl in Dimension @2, nicht ihren höchsten Index. Ein mit Grenze `[10]` deklariertes Array hat beispielsweise Länge 11. Eine ungültige Dimension liefert 0.
+
+hint-const-true=BOOLEAN-Wert `TRUE`
+hint-const-false=BOOLEAN-Wert `FALSE`
+hint-const-stk_limit=Mit dieser Konstante lässt sich bei rekursiven Aufrufen feststellen, wie nahe das Programm der Stapelgrenze kommt.
+hint-const-attach_lim_p=Größenlimit für öffentliche Anhänge in Bytes
+hint-const-attach_lim_u=Größenlimit für persönliche Anhänge in Bytes
+hint-const-f_net=Flag für Netzwerknachrichten in einer Konferenz, verwendet mit `CONFFLAG` und `CONFUNFLAG`.
+hint-const-cmaxmsgs=Maximale Nachrichtenanzahl pro Konferenz
+hint-const-maxmsgs=Maximale Nachrichtenanzahl pro QWK-Paket
+hint-const-cur_user=Parameter für `CURUSER()`/Rückgabewert von `GetUser`: Die Benutzervariablen beziehen sich auf den aktuellen Benutzer.
+hint-const-no_user=Rückgabewert von `GetUser`: Die Benutzervariablen sind derzeit nicht definiert.
+hint-const-acc_cur_bal=Wählt den aktuellen, auf dem neuesten Stand befindlichen Kontostand des Benutzers aus.
+hint-const-acc_stat=
+    Liefert den Status des Schalters „Enable Accounting“ (Abrechnung aktivieren) in der PWRD-Datei.
+
+    0=Abrechnung deaktiviert (N)
+    1=Nur Erfassung (T), 2=Abrechnung aktiviert (Y).
+hint-const-acc_time=Anzahl ZUSÄTZLICH zu berechnender Einheiten pro Minute in der aktuellen Konferenz.
+hint-const-acc_msgread=ZUSÄTZLICHER Betrag für jede in der aktuellen Konferenz gelesene Nachricht.
+hint-const-acc_msgwrite=ZUSÄTZLICHER Betrag für jede in der aktuellen Konferenz geschriebene Nachricht.
+hint-const-defs=Parameter für verschiedene Anweisungen zur Verwendung von Standardwerten
+hint-const-bell=Parameter für die Anweisung ``DISPTEXT``: Gibt beim Anzeigen der Eingabeaufforderung einen Signalton aus.
+hint-const-logit=Parameter für die Anweisung `DISPTEXT`: Schreibt den Text in das Anruferprotokoll.
+hint-const-logitleft=Parameter für die Anweisung `DISPTEXT`: Schreibt den Text linksbündig in das Anruferprotokoll.
+hint-const-auto=Parameter für die Anweisungen ``INPUTSTR`` und ``PROMPTSTR``: Betätigt nach 10 Sekunden ohne Benutzereingabe automatisch die Eingabetaste.
+hint-const-echodots=Parameter für die Anweisungen `INPUTSTR` und `PROMPTSTR`: Zeigt Punkte statt der eingegebenen Zeichen an.
+hint-const-eraseline=Parameter für die Anweisungen `INPUTSTR` und `PROMPTSTR`: Löscht die aktuelle Zeile beim Drücken der Eingabetaste.
+hint-const-fieldlen=Parameter für die Anweisungen `INPUTSTR` und `PROMPTSTR`: Zeigt bei aktiviertem ANSI Klammern an, um die Breite des Eingabefelds zu kennzeichnen.
+hint-const-guide=Parameter für die Anweisungen `INPUTSTR` und `PROMPTSTR`: Zeigt Klammern oberhalb der aktuellen Zeile an, wenn FIELDLEN verwendet wird und ANSI nicht aktiviert ist.
+hint-const-highascii=Parameter für die Anweisungen `INPUTSTR` und `PROMPTSTR`: Erlaubt unabhängig vom aktuell gültigen Zeichensatz erweiterte ASCII-Zeichen, sofern die Option zum Abschalten des High-ASCII-Filters auf Ja gesetzt ist.
+hint-const-lfafter=Parameter für die Anweisungen `INPUTSTR`, `PROMPTSTR` und `DISPTEXT`: Sendet nach dem Drücken der Eingabetaste einen zusätzlichen Zeilenvorschub.
+hint-const-lfbefore=Parameter für die Anweisungen `INPUTSTR`, `PROMPTSTR` und `DISPTEXT`: Sendet vor dem Anzeigen der Eingabeaufforderung einen zusätzlichen Zeilenvorschub.
+hint-const-newline=Parameter für die Anweisungen `INPUTSTR`, `PROMPTSTR` und `DISPTEXT`: Sendet nach dem Drücken der Eingabetaste einen Zeilenvorschub.
+hint-const-noclear=Parameter für die Anweisungen `INPUTSTR` und `PROMPTSTR`: Verhindert unabhängig von ANSI das Löschen des Felds beim ersten Tastendruck.
+hint-const-stacked=Parameter für die Anweisungen `INPUTSTR` und `PROMPTSTR`: Erlaubt zusätzlich zum übergebenen gültigen Zeichensatz Semikolons und Leerzeichen.
+hint-const-upcase=Parameter für die Anweisungen `INPUTSTR` und `PROMPTSTR`: Wandelt die Benutzereingabe in Großbuchstaben um.
+hint-const-wordwrap=Parameter für die Anweisungen `INPUTSTR` und `PROMPTSTR`: Speichert beim Erreichen des Zeilenendes den Text am Zeilenende zur späteren Verwendung.
+hint-const-yesno=Parameter für die Anweisungen `INPUTSTR` und `PROMPTSTR`: Erlaubt nur sprachabhängige Ja/Nein-Antworten.
+hint-const-newbalance=Einem neuen Benutzerkonto gutgeschriebene Einheiten
+hint-const-chrg_call=Für einen Anruf berechnete Einheiten
+hint-const-chrg_time=Für die genutzte Zeit berechnete Einheiten (in Minuten)
+hint-const-chrg_peaktime=Für die Nutzung während der Hauptzeit berechnete Einheiten
+hint-const-chrg_chat=Für eine Chatsitzung berechnete Einheiten
+hint-const-chrg_msgread=Für das Lesen einer Nachricht berechnete Einheiten
+hint-const-chrg_msgcap=Für das Mitschneiden einer Nachricht berechnete Einheiten
+hint-const-chrg_msgwrite=Für das Schreiben einer Nachricht berechnete Einheiten
+hint-const-chrg_msgechoed=Für das Schreiben einer Echomail-Nachricht berechnete Einheiten
+hint-const-chrg_msgprivate=Für das Schreiben einer privaten Nachricht berechnete Einheiten
+hint-const-chrg_downfile=Für das Herunterladen einer Datei berechnete Einheiten
+hint-const-chrg_downbytes=Für heruntergeladene Bytes berechnete Einheiten
+hint-const-pay_upfile=Für das Hochladen einer Datei gutgeschriebene Einheiten
+hint-const-pay_upbytes=Für hochgeladene Bytes gutgeschriebene Einheiten
+hint-const-warnlevel=Guthabenschwelle für die Warnung bei niedrigem Kontostand
+hint-const-crc_file=
+    Diese Konstanten vermeiden Unklarheiten bei der Angabe, wovon die Funktion `CRC32` die CRC-Prüfsumme berechnen soll.
+    CRCFILE weist `CRC32` an, die CRC-Prüfsumme der Datei zu berechnen, deren Name im Zeichenfolgenargument steht.
+    CRCFILE hat den Wert 1 (`TRUE`).
+hint-const-crc_str=
+    Diese Konstanten vermeiden Unklarheiten bei der Angabe, wovon die Funktion `CRC32` die CRC-Prüfsumme berechnen soll.
+    CRCSTR weist `CRC32` an, die CRC-Prüfsumme des Zeichenfolgenarguments selbst zu berechnen.
+    CRCSTR hat den Wert 0 (`FALSE`).
+hint-const-start_bal=Anfangskontostand des Benutzers
+hint-const-start_session=Kontostand des Benutzers zu Beginn dieser Sitzung
+hint-const-deb_call=Abbuchung für diesen Anruf
+hint-const-deb_time=Abbuchung für die Online-Zeit
+hint-const-deb_msgread=Abbuchung für das Lesen einer Nachricht
+hint-const-deb_msgcap=Abbuchung für das Mitschneiden einer Nachricht
+hint-const-deb_msgwrite=Abbuchung für das Schreiben einer Nachricht
+hint-const-deb_msgechoed=Abbuchung für eine Echomail-Nachricht
+hint-const-deb_msgprivate=Abbuchung für das Schreiben einer privaten Nachricht
+hint-const-deb_downfile=Abbuchung für das Herunterladen einer Datei
+hint-const-deb_downbytes=Abbuchung für heruntergeladene Bytes
+hint-const-deb_chat=Abbuchung für Chat
+hint-const-deb_tpu=Abbuchung für TPU
+hint-const-deb_special=Sonderabbuchung
+hint-const-cred_upfile=Gutschrift für das Hochladen einer Datei
+hint-const-cred_upbytes=Gutschrift für hochgeladene Bytes
+hint-const-cred_special=Sondergutschrift
+hint-const-sec_drop=Sicherheitsstufe, auf die der Benutzer bei einem Guthaben von 0 herabgestuft wird
+hint-const-f_exp=Flag für erlaubten Zugriff bei abgelaufenem Abonnement, verwendet mit `CONFFLAG` und `CONFUNFLAG`
+hint-const-f_mw=Flag für wartende Nachrichten, verwendet mit `CONFFLAG` und `CONFUNFLAG`
+hint-const-f_reg=Flag für erlaubten Zugriff registrierter Benutzer, verwendet mit `CONFFLAG` und `CONFUNFLAG`
+hint-const-f_sel=Flag für eine ausgewählte Konferenz, verwendet mit `CONFFLAG` und `CONFUNFLAG`
+hint-const-f_sys=Flag für Konferenz-Sysop-Zugriff, verwendet mit `CONFFLAG` und `CONFUNFLAG`
+hint-const-fcl=Parameter für `STARTDISP`, der eine Anzeige mit Zeilenzählung erzwingt
+hint-const-fns=Parameter für `STARTDISP`, der eine ununterbrochene Anzeige erzwingt
+hint-const-nc=Parameter für `STARTDISP`, der den Anzeigemodus unverändert lässt
+hint-const-graph=Parameter für die Anweisung `DISPFILE` zur Suche nach grafikmodusspezifischen Dateien
+hint-const-sec=Parameter für die Anweisung `DISPFILE` zur Suche nach sicherheitsstufenspezifischen Dateien
+hint-const-lang=Parameter für die Anweisung `DISPFILE` zur Suche nach sprachspezifischen Dateien
+hint-const-hdr_active=Flagfeld für eine aktive Nachricht
+hint-const-hdr_blocks=Anzahl der 128-Byte-Blöcke einer Nachricht
+hint-const-hdr_date=Datum, an dem die Nachricht geschrieben wurde
+hint-const-hdr_echo=Flag für eine Echomail-Nachricht
+hint-const-hdr_from=Absender der Nachricht
+hint-const-hdr_msgnum=Nachrichtennummer
+hint-const-hdr_msgref=Wählt das Nachrichtenreferenzfeld im aktuellen Nachrichtenkopf aus.
+hint-const-hdr_pwd=Passwort der Nachricht
+hint-const-hdr_reply=Antwortflag der Nachricht
+hint-const-hdr_rplydate=Datum der Antwortnachricht
+hint-const-hdr_rplytime=Uhrzeit der Antwortnachricht
+hint-const-hdr_status=Nachrichtenstatus
+hint-const-hdr_subj=Betreff der Nachricht
+hint-const-hdr_time=Uhrzeit der Nachricht
+hint-const-hdr_to=Empfängerfeld der Nachricht
+hint-const-o_rd=Parameter für `FCREATE/FOPEN/FAPPEND` zum Öffnen einer Datei im schreibgeschützten Modus
+hint-const-o_rw=Parameter für `FCREATE/FOPEN/FAPPEND` zum Öffnen einer Datei im Lese- und Schreibmodus
+hint-const-o_wr=Parameter für `FCREATE/FOPEN/FAPPEND` zum Öffnen einer Datei im reinen Schreibmodus
+hint-const-seek_cur=Für die aktuelle Position des Dateizeigers
+hint-const-seek_end=Für das Dateiende
+hint-const-seek_set=Für den Dateianfang
+hint-const-s_db=Parameter für `FCREATE/FOPEN/FAPPEND`, der anderen Prozessen sowohl Lese- als auch Schreibzugriff verweigert
+hint-const-s_dn=Parameter für `FCREATE/FOPEN/FAPPEND`, der anderen Prozessen Lese- und Schreibzugriff erlaubt und keinen Zugriff verweigert
+hint-const-s_dr=Parameter für `FCREATE/FOPEN/FAPPEND`, der anderen Prozessen den Lesezugriff verweigert
+hint-const-s_dw=Parameter für `FCREATE/FOPEN/FAPPEND`, der anderen Prozessen den Schreibzugriff verweigert
+
+# Tabellen
+
+message_header_constants=
+    ### Zugriffskonstanten für Nachrichtenkopffelder
+
+    | Feld | Hex. | Dez. | Feldbeschreibung |
+    | :--- | :--- | :--- | :--- |
+    | `HDR_ACTIVE`   | `0x0E` | `14`  | Flagfeld für eine aktive Nachricht |
+    | `HDR_BLOCKS`   | `0x04` | `4`   | Anzahl der 128-Byte-Blöcke einer Nachricht |
+    | `HDR_DATE`     | `0x05` | `5`   | Datum, an dem die Nachricht geschrieben wurde |
+    | `HDR_ECHO`     | `0x0F` | `15`  | Flag für eine Echomail-Nachricht |
+    | `HDR_FROM`     | `0x0B` | `11`  | Absender der Nachricht |
+    | `HDR_MSGNUM`   | `0x02` | `2`   | Nachrichtennummer |
+    | `HDR_MSGREF`   | `0x03` | `3`   | Referenznachricht |
+    | `HDR_PWD`      | `0x0D` | `13`  | Passwort der Nachricht |
+    | `HDR_REPLY`    | `0x0A` | `10`  | Antwortflag der Nachricht |
+    | `HDR_RPLYDATE` | `0x08` | `8`   | Datum der Antwortnachricht |
+    | `HDR_RPLYTIME` | `0x09` | `9`   | Uhrzeit der Antwortnachricht |
+    | `HDR_STATUS`   | `0x01` | `1`   | Nachrichtenstatus |
+    | `HDR_SUBJ`     | `0x0C` | `12`  | Betreff der Nachricht |
+    | `HDR_TIME`     | `0x06` | `6`   | Uhrzeit der Nachricht |
+    | `HDR_TO`       | `0x07` | `7`   | Empfänger der Nachricht |
+
+conference_access_constants=
+    ### Felder
+    | Wert | Bedeutung | Typ |
+    | ---: | :--- | :--- |
+    |1| Konferenzname | STRING |
+    |2| Öffentliche Konferenz | BOOLEAN |
+    |3| Automatisch erneut beitreten | BOOLEAN |
+    |4| Andere Benutzer anzeigen | BOOLEAN |
+    |5| Uploads als privat kennzeichnen | BOOLEAN |
+    |6| Alle Nachrichten als privat kennzeichnen | BOOLEAN |
+    |7| Echomail in der Konferenz | BOOLEAN |
+    |8| Erforderliche Sicherheitsstufe bei öffentlicher Konferenz | INTEGER |
+    |9| Zusätzliche Konferenz-Sicherheitsstufe | INTEGER |
+    |10| Zusätzliche Konferenzzeit | INTEGER |
+    |11| Anzahl der Nachrichtenblöcke | INTEGER |
+    |12| Name/Pfad der MSGS-Datei | STRING |
+    |13| Name/Pfad des Benutzermenüs | STRING |
+    |14| Name/Pfad des Sysop-Menüs | STRING |
+    |15| Name/Pfad der NEWS-Datei | STRING |
+    |16| Sortierung öffentlicher Uploads | INTEGER |
+    |17| Name/Pfad der DIR-Datei für Uploads | STRING |
+    |18| Speicherort öffentlicher Uploads | STRING |
+    |19| Sortierung privater Uploads | INTEGER |
+    |20| Name/Pfad der DIR-Datei für private Uploads | STRING |
+    |21| Speicherort privater Uploads | STRING |
+    |22| Door-Menü | STRING |
+    |23| Door-Datei | STRING |
+    |24| Bulletin-Menü | STRING |
+    |25| Bulletin-Datei | STRING |
+    |26| Skriptmenü | STRING |
+    |27| Skriptdatei | STRING |
+    |28| Dateiverzeichnismenü | STRING |
+    |29| Dateiverzeichnisdatei | STRING |
+    |30| Datei mit Downloadpfaden | STRING |
+    |31| Echomail für alle Nachrichten erzwingen | BOOLEAN |
+    |32| Konferenz schreibgeschützt machen | BOOLEAN |
+    |33| Private Nachrichten verbieten | BOOLEAN |
+    |34| Sicherheitsstufe zum Anfordern einer Empfangsbestätigung | INTEGER |
+    |35| Origin-Informationen in Nachrichten einfügen | BOOLEAN |
+    |36| Routing-Informationen abfragen | BOOLEAN |
+    |37| Verwendung von Aliasnamen erlauben | BOOLEAN |
+    |38| INTRO beim Suchlauf 'R A' anzeigen | BOOLEAN |
+    |39| Sicherheitsstufe zum Schreiben einer Nachricht | INTEGER |
+    |40| Beitrittspasswort bei privater Konferenz | STRING |
+    |41| Name/Pfad der INTRO-Datei der Konferenz | STRING |
+    |42| Speicherort für Anhänge | STRING |
+    |43| Flags für automatische Registrierung | STRING |
+    |44| Sicherheitsstufe zum Speichern eines Dateianhangs | BYTE |
+    |45| Höchstzahl der Empfänger von Nachrichtenkopien | BYTE |
+    |46| Konferenzspezifische CMD.LST-Datei | STRING |
+    |47| Alte MSGS.NDX-Datei weiterführen | BOOLEAN |
+    |48| Lange Internet-Empfängernamen im TO:-Feld erlauben | BOOLEAN |
+    |49| Sicherheitsstufe zum Schreiben an eine Liste von Kopienempfängern | BYTE |
+    |50| Typ der NetMail-Konferenz | BYTE |
+    |51| Zuletzt exportierte Nachricht | INTEGER |
+    |52| Gebühr pro Minute | DREAL |
+    |53| Gebühr pro gelesener Nachricht | DREAL |
+    |54| Gebühr pro geschriebener Nachricht | DREAL |
+
+accounting_constants=
+    ### Abrechnungsinformationen
+
+    | Feld | Dez. | Feldbeschreibung |
+    | :--- | :--- | :--- |
+    | `NEWBALANCE`      | `0`  | Einem neuen Benutzerkonto gutgeschriebene Einheiten |
+    | `CHRG_CALL`       | `1`  | Für einen Anruf berechnete Einheiten |
+    | `CHRG_TIME`       | `2`  | Für die genutzte Zeit berechnete Einheiten (in Minuten) |
+    | `CHRG_PEAKTIME`   | `3`  | Für die Nutzung während der Hauptzeit berechnete Einheiten |
+    | `CHRG_CHAT`       | `4`  | Für eine Chatsitzung berechnete Einheiten |
+    | `CHRG_MSGREAD`    | `5`  | Für das Lesen einer Nachricht berechnete Einheiten |
+    | `CHRG_MSGCAP`     | `6`  | Für das Mitschneiden einer Nachricht berechnete Einheiten |
+    | `CHRG_MSGWRITE`   | `7`  | Für das Schreiben einer Nachricht berechnete Einheiten |
+    | `CHRG_MSGECHOED`  | `8`  | Für das Schreiben einer Echomail-Nachricht berechnete Einheiten |
+    | `CHRG_MSGPRIVATE` | `9`  | Für das Schreiben einer privaten Nachricht berechnete Einheiten |
+    | `CHRG_DOWNFILE`   | `10` | Für das Herunterladen einer Datei berechnete Einheiten |
+    | `CHRG_DOWNBYTES`  | `11` | Für heruntergeladene Bytes berechnete Einheiten |
+    | `PAY_UPFILE`      | `12` | Für das Hochladen einer Datei gutgeschriebene Einheiten |
+    | `PAY_UPBYTES`     | `13` | Für hochgeladene Bytes gutgeschriebene Einheiten |
+    | `WARNLEVEL`       | `14` | Guthabenschwelle für die Warnung bei niedrigem Kontostand |

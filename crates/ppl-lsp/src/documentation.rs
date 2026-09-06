@@ -1491,9 +1491,13 @@ mod test {
         let legacy = text(350);
         assert!(legacy.contains("256"), "{legacy}");
         assert!(!legacy.to_ascii_lowercase().contains("unbounded"), "{legacy}");
+        assert!(!legacy.to_ascii_lowercase().contains("unbegrenzt"), "{legacy}");
 
         let modern = text(400);
-        assert!(modern.to_ascii_lowercase().contains("unbounded"), "{modern}");
+        assert!(
+            modern.to_ascii_lowercase().contains("unbounded") || modern.to_ascii_lowercase().contains("unbegrenzt"),
+            "{modern}"
+        );
         assert!(modern.contains("400"), "{modern}");
     }
 

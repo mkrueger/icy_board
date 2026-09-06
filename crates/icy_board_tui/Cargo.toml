@@ -27,3 +27,6 @@ fluent-bundle = { workspace = true }
 rust-embed = { workspace = true }
 once_cell = { workspace = true }
 md-tui = "0.10.3"
+
+[dev-dependencies]
+fluent-syntax = "0.12.0"

@@ -4,7 +4,7 @@ use std::{
     process::exit,
 };
 
-use argh::FromArgs;
+use clap::{Args, Parser, Subcommand};
 use dizbase::{
     file_base::{FileBase, file_header::FileHeader},
     file_base_scanner::{
@@ -13,220 +13,189 @@ use dizbase::{
         scan_file,
     },
 };
+use icy_board_cli::text;
 use icy_board_engine::icy_board::{IcyBoardSerializer, file_directory::DirectoryList, lookup_case_insensitive};
 
 mod listing;
+
+#[cfg(test)]
+mod cli_tests;
 
 use listing::{Entry, format_files_bbs, parse_files_bbs, parse_pcboard_dir};
 
 type Res<T> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
-#[derive(FromArgs)]
-/// Convert and maintain icy_board file bases
+#[derive(Parser)]
+#[command(name = "icbfile", about = text("icbfile", "about"), disable_version_flag = true)]
 struct Cli {
-    /// print the version and exit
-    #[argh(switch)]
+    #[arg(long, overrides_with = "version", help = text("icbfile", "version"))]
     version: bool,
 
-    #[argh(subcommand)]
+    #[command(subcommand)]
     command: Option<Command>,
 }
 
-#[derive(FromArgs)]
-#[argh(subcommand)]
+#[derive(Subcommand)]
 enum Command {
+    #[command(name = "areas")]
     Areas(Areas),
+    #[command(name = "list")]
     List(List),
+    #[command(name = "scan")]
     Scan(Scan),
+    #[command(name = "check")]
     Check(Check),
+    #[command(name = "import")]
     Import(Import),
+    #[command(name = "export")]
     Export(Export),
+    #[command(name = "set")]
     Set(Set),
+    #[command(name = "repack")]
     Repack(Repack),
+    #[command(name = "fingerprints")]
     Fingerprints(Fingerprints),
 }
 
-#[derive(FromArgs)]
-#[argh(subcommand, name = "areas")]
-/// list the areas defined in a file_areas.toml
+#[derive(Args)]
+#[command(about = text("icbfile", "areas-about"))]
 struct Areas {
-    #[argh(positional)]
-    /// path to the area list
+    #[arg(value_name = "areas", help = text("icbfile", "areas"))]
     areas: PathBuf,
 }
 
-#[derive(FromArgs)]
-#[argh(subcommand, name = "list")]
-/// list the files in an area with their descriptions
+#[derive(Args)]
+#[command(about = text("icbfile", "list-about"))]
 struct List {
-    #[argh(positional)]
-    /// a file directory, or a file_areas.toml together with --area
+    #[arg(value_name = "target", help = text("icbfile", "target"))]
     target: PathBuf,
 
-    #[argh(option, short = 'a')]
-    /// area name or index when the target is a file_areas.toml
+    #[arg(long, short = 'a', value_name = "area", allow_hyphen_values = true, help = text("icbfile", "area"))]
     area: Option<String>,
 
-    #[argh(switch, short = 'l')]
-    /// show size, date and download count as well
+    #[arg(long, short = 'l', overrides_with = "long", help = text("icbfile", "long"))]
     long: bool,
 }
 
-#[derive(FromArgs)]
-#[argh(subcommand, name = "scan")]
-/// derive descriptions from the archives in an area
+#[derive(Args)]
+#[command(about = text("icbfile", "scan-about"))]
 struct Scan {
-    #[argh(positional)]
-    /// a file directory, or a file_areas.toml together with --area or --all
+    #[arg(value_name = "target", help = text("icbfile", "scan-target"))]
     target: PathBuf,
 
-    #[argh(option, short = 'a')]
-    /// area name or index when the target is a file_areas.toml
+    #[arg(long, short = 'a', value_name = "area", allow_hyphen_values = true, help = text("icbfile", "area"))]
     area: Option<String>,
 
-    #[argh(switch)]
-    /// scan every area in a file_areas.toml
+    #[arg(long, overrides_with = "all", help = text("icbfile", "all"))]
     all: bool,
 
-    #[argh(switch, short = 'f')]
-    /// re-derive descriptions that were imported or edited by hand
+    #[arg(long, short = 'f', overrides_with = "force", help = text("icbfile", "force"))]
     force: bool,
 }
 
-#[derive(FromArgs)]
-#[argh(subcommand, name = "check")]
-/// report entries whose file is missing or whose size no longer matches
+#[derive(Args)]
+#[command(about = text("icbfile", "check-about"))]
 struct Check {
-    #[argh(positional)]
-    /// a file directory, or a file_areas.toml together with --area
+    #[arg(value_name = "target", help = text("icbfile", "target"))]
     target: PathBuf,
 
-    #[argh(option, short = 'a')]
-    /// area name or index when the target is a file_areas.toml
+    #[arg(long, short = 'a', value_name = "area", allow_hyphen_values = true, help = text("icbfile", "area"))]
     area: Option<String>,
 
-    #[argh(switch)]
-    /// drop entries whose file is gone
+    #[arg(long, overrides_with = "prune", help = text("icbfile", "prune"))]
     prune: bool,
 }
 
-#[derive(FromArgs)]
-#[argh(subcommand, name = "import")]
-/// read descriptions from PCBoard DIR listings or FILES.BBS files
+#[derive(Args)]
+#[command(about = text("icbfile", "import-about"))]
 struct Import {
-    #[argh(positional)]
-    /// a file directory, or a file_areas.toml together with --area
+    #[arg(value_name = "target", help = text("icbfile", "target"))]
     target: PathBuf,
 
-    #[argh(positional)]
-    /// the listings to read
+    #[arg(value_name = "listings", help = text("icbfile", "listings"))]
     listings: Vec<PathBuf>,
 
-    #[argh(option, short = 'a')]
-    /// area name or index when the target is a file_areas.toml
+    #[arg(long, short = 'a', value_name = "area", allow_hyphen_values = true, help = text("icbfile", "area"))]
     area: Option<String>,
 
-    #[argh(option, short = 'f', default = "Format::Auto")]
-    /// listing format: auto, pcboard or filesbbs
+    #[arg(long, short = 'f', value_name = "format", default_value = "auto", value_parser = clap::value_parser!(Format), allow_hyphen_values = true, help = text("icbfile", "format"))]
     format: Format,
 
-    #[argh(switch, short = 'n')]
-    /// report what would change without writing anything
+    #[arg(long, short = 'n', overrides_with = "dry_run", help = text("icbfile", "dry-run"))]
     dry_run: bool,
 
-    #[argh(switch)]
-    /// replace descriptions that are already there
+    #[arg(long, overrides_with = "overwrite", help = text("icbfile", "overwrite"))]
     overwrite: bool,
 
-    #[argh(switch)]
-    /// also import entries whose file is not in the directory
+    #[arg(long, overrides_with = "keep_missing", help = text("icbfile", "keep-missing"))]
     keep_missing: bool,
 }
 
-#[derive(FromArgs)]
-#[argh(subcommand, name = "export")]
-/// write the descriptions of an area back out as a FILES.BBS
+#[derive(Args)]
+#[command(about = text("icbfile", "export-about"))]
 struct Export {
-    #[argh(positional)]
-    /// a file directory, or a file_areas.toml together with --area
+    #[arg(value_name = "target", help = text("icbfile", "target"))]
     target: PathBuf,
 
-    #[argh(option, short = 'a')]
-    /// area name or index when the target is a file_areas.toml
+    #[arg(long, short = 'a', value_name = "area", allow_hyphen_values = true, help = text("icbfile", "area"))]
     area: Option<String>,
 
-    #[argh(option, short = 'o')]
-    /// write to this file instead of stdout, encoded as cp437
+    #[arg(long, short = 'o', value_name = "output", allow_hyphen_values = true, help = text("icbfile", "output"))]
     output: Option<PathBuf>,
 }
 
-#[derive(FromArgs)]
-#[argh(subcommand, name = "set")]
-/// change the description or the flags of a single file
+#[derive(Args)]
+#[command(about = text("icbfile", "set-about"))]
 struct Set {
-    #[argh(positional)]
-    /// a file directory, or a file_areas.toml together with --area
+    #[arg(value_name = "target", help = text("icbfile", "target"))]
     target: PathBuf,
 
-    #[argh(positional)]
-    /// the file to change
+    #[arg(value_name = "file", help = text("icbfile", "file"))]
     file: String,
 
-    #[argh(option, short = 'a')]
-    /// area name or index when the target is a file_areas.toml
+    #[arg(long, short = 'a', value_name = "area", allow_hyphen_values = true, help = text("icbfile", "area"))]
     area: Option<String>,
 
-    #[argh(option, short = 'd')]
-    /// the new description
+    #[arg(long, short = 'd', value_name = "desc", allow_hyphen_values = true, help = text("icbfile", "desc"))]
     desc: Option<String>,
 
-    #[argh(option)]
-    /// download costs no time: true or false
+    #[arg(long, value_name = "free", allow_hyphen_values = true, help = text("icbfile", "free"))]
     free: Option<bool>,
 
-    #[argh(option)]
-    /// file cannot be downloaded: true or false
+    #[arg(long, value_name = "locked", allow_hyphen_values = true, help = text("icbfile", "locked"))]
     locked: Option<bool>,
 }
 
-#[derive(FromArgs)]
-#[argh(subcommand, name = "repack")]
-/// rewrite the archives of an area as zip files, without the intros they carry
+#[derive(Args)]
+#[command(about = text("icbfile", "repack-about"))]
 struct Repack {
-    #[argh(positional)]
-    /// a file directory, or a file_areas.toml together with --area
+    #[arg(value_name = "target", help = text("icbfile", "target"))]
     target: PathBuf,
 
-    #[argh(option, short = 'a')]
-    /// area name or index when the target is a file_areas.toml
+    #[arg(long, short = 'a', value_name = "area", allow_hyphen_values = true, help = text("icbfile", "area"))]
     area: Option<String>,
 
-    #[argh(option, short = 'p')]
-    /// fingerprints of the intros to drop, as written by the fingerprints command
+    #[arg(long, short = 'p', value_name = "fingerprints", allow_hyphen_values = true, help = text("icbfile", "fingerprints"))]
     fingerprints: Option<PathBuf>,
 
-    #[argh(switch, short = 'n')]
-    /// report what would change without writing anything
+    #[arg(long, short = 'n', overrides_with = "dry_run", help = text("icbfile", "dry-run"))]
     dry_run: bool,
 
-    #[argh(switch)]
-    /// leave the case of the file names as it is
+    #[arg(long, overrides_with = "keep_case", help = text("icbfile", "keep-case"))]
     keep_case: bool,
 }
 
-#[derive(FromArgs)]
-#[argh(subcommand, name = "fingerprints")]
-/// record the files in a directory so that repack can recognise them again
+#[derive(Args)]
+#[command(about = text("icbfile", "fingerprints-about"))]
 struct Fingerprints {
-    #[argh(positional)]
-    /// the directory holding the intros
+    #[arg(value_name = "input", help = text("icbfile", "input"))]
     input: PathBuf,
 
-    #[argh(option, short = 'o', default = "PathBuf::from(\"bbstros.toml\")")]
-    /// where to write the fingerprints
+    #[arg(long, short = 'o', value_name = "output", default_value = "bbstros.toml", allow_hyphen_values = true, help = text("icbfile", "fingerprints-output"))]
     output: PathBuf,
 }
 
+#[derive(Clone, Debug, PartialEq)]
 enum Format {
     Auto,
     PcBoard,
@@ -240,14 +209,14 @@ impl std::str::FromStr for Format {
             "auto" => Ok(Format::Auto),
             "pcboard" | "dir" => Ok(Format::PcBoard),
             "filesbbs" | "files.bbs" | "bbs" => Ok(Format::FilesBbs),
-            _ => Err(format!("unknown format '{}', expected auto, pcboard or filesbbs", s)),
+            _ => Err(format!("{} '{}', {}", text("icbfile", "unknown-format"), s, text("icbfile", "expected-format"))),
         }
     }
 }
 
 fn main() {
     reset_sigpipe();
-    let cli: Cli = argh::from_env();
+    let cli = icy_board_cli::parse::<Cli>();
     if let Err(err) = run(cli) {
         eprintln!("error: {}", err);
         exit(1);
@@ -271,9 +240,7 @@ fn run(cli: Cli) -> Res<()> {
         return Ok(());
     }
     let Some(command) = cli.command else {
-        if let Err(err) = Cli::from_args(&["icbfile"], &["--help"]) {
-            eprintln!("{}", err.output);
-        }
+        eprintln!("{}", icy_board_cli::command::<Cli>().render_help());
         exit(1);
     };
     match command {

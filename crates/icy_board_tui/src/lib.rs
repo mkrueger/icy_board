@@ -193,12 +193,22 @@ mod help_tests {
 
     #[test]
     fn help_explains_the_option_rather_than_naming_it() {
-        assert!(get_text("user_sec_cmd_d-help").contains("batch transfer level"));
-        assert!(get_text("connection_info_port-help").contains("TCP port"));
-        assert!(get_text("paths_trashcan_user-help").contains("may not be registered"));
+        use i18n_embed::LanguageLoader;
 
-        for key in ["user_sec_cmd_d-help", "connection_info_port-help", "paths_trashcan_user-help"] {
-            assert!(get_text(key).lines().count() > 2, "{key} should carry a heading and an explanation");
+        for (locale, expected) in [
+            ("en", ["batch transfer level", "TCP port", "may not be registered"]),
+            ("de", ["Stapelübertragungsstufe", "TCP-Port", "Nicht registrierbare Namen"]),
+        ] {
+            let loader = super::fluent_language_loader!();
+            loader.load_languages(&super::Localizations, &[locale.parse().unwrap()]).unwrap();
+            for (key, explanation) in ["user_sec_cmd_d-help", "connection_info_port-help", "paths_trashcan_user-help"]
+                .into_iter()
+                .zip(expected)
+            {
+                let text = loader.get(key);
+                assert!(text.contains(explanation), "{locale}/{key}: {text}");
+                assert!(text.lines().count() > 2, "{locale}/{key} should carry a heading and an explanation");
+            }
         }
     }
 

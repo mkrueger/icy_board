@@ -1,0 +1,20 @@
+about = IcyBoard-Einrichtungsprogramm
+full-screen = Vollbild verwenden (Standard ist 80x25)
+version = Version anzeigen und beenden
+file = Pfad/Dateiname der Konfigurationsdatei icyboard.toml
+import-about = Eine PCBOARD.DAT-Datei in IcyBoard importieren
+create-about = Eine neue IcyBoard-Konfiguration erstellen
+ppe-convert-about = Ein Verzeichnis nach UTF-8 konvertieren
+check-about = Nicht auflösbare Pfade der Konfiguration melden
+dos-image-about = Natives FreeDOS-Door-Abbild und BIOS-Dateien herunterladen und vorbereiten
+dos-copy-about = Eine Host-Datei in ein vorbereitetes DOS-Datenträgerabbild kopieren
+import-name = PCBOARD.DAT-Datei oder Verzeichnis der zu importierenden PCBoard-Installation
+output-directory = Ausgabeverzeichnis
+map = Einen DOS-Pfad einem lokalen Pfad zuordnen; wiederholbar: --map 'D:\FILES=/mnt/files'
+dry-run = Nur melden, was importiert würde und welche Pfade nicht auflösbar sind
+ppe-convert-path = Zu konvertierendes Verzeichnis
+create-dirs = Das Erstellen fehlender Verzeichnisse anbieten
+dos-image-directory = Mailbox-Verzeichnis, in dem assets/dos angelegt wird
+dos-copy-image = Vorbereitetes FreeDOS-Rohabbild
+dos-copy-source = Zu kopierende Host-Datei
+dos-copy-destination = Zielpfad innerhalb von DOS, zum Beispiel DOORS/LORD/LORD.EXE

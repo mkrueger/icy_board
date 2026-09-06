@@ -14,7 +14,8 @@ lazy_static = { workspace = true }
 thiserror = { workspace = true }
 semver = { workspace = true }
 chrono = { workspace = true }
-argh = { workspace = true }
+clap = { workspace = true }
+icy_board_cli = { workspace = true }
 crossterm = { workspace = true }
 ratatui = { workspace = true }
 tui-input = { workspace = true }

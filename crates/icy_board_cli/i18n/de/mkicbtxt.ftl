@@ -1,0 +1,9 @@
+about = ICBTEXT-Dateigenerator und -Editor
+create = Eine neue ICBTEXT-Datei erstellen
+update = Nummer des Datensatzes, der mit neuem Text aktualisiert wird
+full-screen = Vollbild verwenden (Standard ist 80x25)
+convert = PCBTEXT nach ICBTEXT konvertieren
+force = Eine vorhandene Datei überschreiben
+version = Version anzeigen und beenden
+file = Zu bearbeitende/erstellende Datei
+new-text = Neuer Text für den Datensatz

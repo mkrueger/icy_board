@@ -1,5 +1,5 @@
 use app::App;
-use argh::FromArgs;
+use clap::Parser;
 use color_eyre::Result;
 use crossterm::{
     execute,
@@ -20,49 +20,62 @@ lazy_static::lazy_static! {
     static ref VERSION: Version = Version::parse(env!("CARGO_PKG_VERSION")).unwrap();
 }
 
-#[derive(FromArgs)]
-/// ICBTEXT File Generator/Editor
+#[derive(Parser)]
+#[command(name = "mkicbtxt", disable_version_flag = true, about = icy_board_cli::text("mkicbtxt", "about"))]
 struct Cli {
-    /// create new ICBTEXT file
-    #[argh(switch, short = 'c')]
+    #[arg(long = "create", short = 'c', help = icy_board_cli::text("mkicbtxt", "create"))]
     create: bool,
 
-    /// record number to update with new text,
-    #[argh(option, short = 'i')]
+    #[arg(long = "update", short = 'i', help = icy_board_cli::text("mkicbtxt", "update"))]
     update: Option<usize>,
 
-    /// default is 80x25
-    #[argh(switch, short = 'f')]
+    #[arg(long = "full-screen", short = 'f', help = icy_board_cli::text("mkicbtxt", "full-screen"))]
     full_screen: bool,
 
-    /// convert PCBTEXT to ICBTEXT
-    #[argh(switch)]
+    #[arg(long = "convert", help = icy_board_cli::text("mkicbtxt", "convert"))]
     convert: bool,
 
-    /// overwrite a file that is already there
-    #[argh(switch)]
+    #[arg(long = "force", help = icy_board_cli::text("mkicbtxt", "force"))]
     force: bool,
 
-    /// print the version and exit
-    #[argh(switch)]
+    #[arg(long = "version", help = icy_board_cli::text("mkicbtxt", "version"))]
     version: bool,
 
-    /// file to edit/create
-    #[argh(positional)]
+    #[arg(help = icy_board_cli::text("mkicbtxt", "file"))]
     file: PathBuf,
 
-    /// new text to update record
-    #[argh(positional)]
+    #[arg(help = icy_board_cli::text("mkicbtxt", "new-text"))]
     new_text: Option<String>,
 }
 
+#[cfg(test)]
+mod cli_tests {
+    use super::*;
+
+    #[test]
+    fn cli_defaults_required_file_and_options() {
+        let cli = icy_board_cli::try_parse_from::<Cli, _, _>(["mkicbtxt", "text.toml"]).unwrap();
+        assert!(!cli.create && !cli.full_screen && !cli.convert && !cli.force && !cli.version);
+        assert!(cli.update.is_none() && cli.new_text.is_none());
+        assert_eq!(cli.file, PathBuf::from("text.toml"));
+        assert!(icy_board_cli::try_parse_from::<Cli, _, _>(["mkicbtxt"]).is_err());
+        let cli =
+            icy_board_cli::try_parse_from::<Cli, _, _>(["mkicbtxt", "-c", "-i", "42", "-f", "--convert", "--force", "--version", "text.toml", "new text"])
+                .unwrap();
+        assert!(cli.create && cli.full_screen && cli.convert && cli.force && cli.version);
+        assert_eq!(cli.update, Some(42));
+        assert_eq!(cli.new_text.as_deref(), Some("new text"));
+        assert!(icy_board_cli::try_parse_from::<Cli, _, _>(["mkicbtxt", "--create=true", "text.toml"]).is_err());
+    }
+}
+
 fn main() -> Result<()> {
-    // argh insists on the file argument before it ever looks at the switches.
+    // Preserve the legacy early version exit, even without the required file.
     if std::env::args().skip(1).any(|argument| argument == "--version") {
         println!("mkicbtxt {}", *VERSION);
         return Ok(());
     }
-    let arguments: Cli = argh::from_env();
+    let arguments = icy_board_cli::parse::<Cli>();
     if arguments.version {
         println!("mkicbtxt {}", *VERSION);
         return Ok(());

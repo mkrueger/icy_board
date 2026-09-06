@@ -4,7 +4,8 @@ use std::{
     process::exit,
 };
 
-use argh::FromArgs;
+use clap::{Args, Parser, Subcommand};
+use icy_board_cli::text;
 use icy_board_engine::{
     Res,
     icy_board::{
@@ -26,159 +27,140 @@ use icy_net::binkp::{BinkpIdentity, PollRequest};
 
 mod zconnect_experiment;
 
-#[derive(FromArgs)]
-/// Exchange FTN and QWKnet mail with configured systems
+#[cfg(test)]
+mod cli_tests;
+
+#[derive(Parser)]
+#[command(name = "icbmailer", about = text("icbmailer", "about"), disable_version_flag = true)]
 struct Cli {
-    /// print the version and exit
-    #[argh(switch)]
+    #[arg(long, overrides_with = "version", help = text("icbmailer", "version"))]
     version: bool,
 
-    #[argh(subcommand)]
+    #[command(subcommand)]
     command: Option<Command>,
 }
 
-#[derive(FromArgs)]
-#[argh(subcommand)]
+#[derive(Subcommand)]
 enum Command {
+    #[command(name = "links")]
     Links(Links),
+    #[command(name = "poll")]
     Poll(Poll),
+    #[command(name = "scan")]
     Scan(Scan),
+    #[command(name = "show")]
     Show(Show),
+    #[command(name = "toss")]
     Toss(Toss),
+    #[command(name = "qwk-links")]
     QwkLinks(QwkLinks),
+    #[command(name = "qwk-poll")]
     QwkPoll(QwkPoll),
+    #[command(name = "qwk-scan")]
     QwkScan(QwkScan),
+    #[command(name = "qwk-toss")]
     QwkToss(QwkToss),
 }
 
-#[derive(FromArgs)]
-#[argh(subcommand, name = "qwk-links")]
-/// list configured QWKnet hubs
+#[derive(Args)]
+#[command(about = text("icbmailer", "qwk-links-about"))]
 struct QwkLinks {
-    #[argh(positional)]
-    /// path/file name of the icyboard.toml configuration file
+    #[arg(value_name = "config", help = text("icbmailer", "config"))]
     config: PathBuf,
 }
 
-#[derive(FromArgs)]
-#[argh(subcommand, name = "qwk-poll")]
-/// scan, exchange and import mail for a QWKnet hub
+#[derive(Args)]
+#[command(about = text("icbmailer", "qwk-poll-about"))]
 struct QwkPoll {
-    #[argh(positional)]
-    /// path/file name of the icyboard.toml configuration file
+    #[arg(value_name = "config", help = text("icbmailer", "config"))]
     config: PathBuf,
 
-    #[argh(positional)]
-    /// hub ID, every hub when left out
+    #[arg(value_name = "hub", help = text("icbmailer", "hub"))]
     hub: Option<String>,
 }
 
-#[derive(FromArgs)]
-#[argh(subcommand, name = "qwk-scan")]
-/// create REP packets from locally written messages
+#[derive(Args)]
+#[command(about = text("icbmailer", "qwk-scan-about"))]
 struct QwkScan {
-    #[argh(positional)]
-    /// path/file name of the icyboard.toml configuration file
+    #[arg(value_name = "config", help = text("icbmailer", "config"))]
     config: PathBuf,
 
-    #[argh(positional)]
-    /// hub ID, every hub when left out
+    #[arg(value_name = "hub", help = text("icbmailer", "hub"))]
     hub: Option<String>,
 }
 
-#[derive(FromArgs)]
-#[argh(subcommand, name = "qwk-toss")]
-/// import QWK packets waiting in the inbound directory
+#[derive(Args)]
+#[command(about = text("icbmailer", "qwk-toss-about"))]
 struct QwkToss {
-    #[argh(positional)]
-    /// path/file name of the icyboard.toml configuration file
+    #[arg(value_name = "config", help = text("icbmailer", "config"))]
     config: PathBuf,
 
-    #[argh(positional)]
-    /// hub ID, every hub when left out
+    #[arg(value_name = "hub", help = text("icbmailer", "hub"))]
     hub: Option<String>,
 }
 
-#[derive(FromArgs)]
-#[argh(subcommand, name = "links")]
-/// list the configured links and what is waiting for them
+#[derive(Args)]
+#[command(about = text("icbmailer", "links-about"))]
 struct Links {
-    #[argh(positional)]
-    /// path/file name of the icyboard.toml configuration file
+    #[arg(value_name = "config", help = text("icbmailer", "config"))]
     config: PathBuf,
 }
 
-#[derive(FromArgs)]
-#[argh(subcommand, name = "poll")]
-/// call a link, hand over what is waiting for it and take what it has
+#[derive(Args)]
+#[command(about = text("icbmailer", "poll-about"))]
 struct Poll {
-    #[argh(positional)]
-    /// path/file name of the icyboard.toml configuration file
+    #[arg(value_name = "config", help = text("icbmailer", "config"))]
     config: PathBuf,
 
-    #[argh(positional)]
-    /// the address to call, every link when left out
+    #[arg(value_name = "address", help = text("icbmailer", "address"))]
     address: Option<String>,
 
-    #[argh(switch, short = 'k')]
-    /// leave delivered files in the outbound instead of deleting them
+    #[arg(long, short = 'k', overrides_with = "keep", help = text("icbmailer", "keep"))]
     keep: bool,
 
-    #[argh(switch, short = 'v')]
-    /// report what the session is doing
+    #[arg(long, short = 'v', overrides_with = "verbose", help = text("icbmailer", "poll-verbose"))]
     verbose: bool,
 }
 
-#[derive(FromArgs)]
-#[argh(subcommand, name = "show")]
-/// list what is inside a packet or a mail bundle
+#[derive(Args)]
+#[command(about = text("icbmailer", "show-about"))]
 struct Show {
-    #[argh(positional)]
-    /// the packet or bundle to look into
+    #[arg(value_name = "file", help = text("icbmailer", "file"))]
     file: PathBuf,
 
-    #[argh(switch, short = 't')]
-    /// print the message text as well
+    #[arg(long, short = 't', overrides_with = "text", help = text("icbmailer", "text"))]
     text: bool,
 }
 
-#[derive(FromArgs)]
-#[argh(subcommand, name = "toss")]
-/// read the mail waiting in the inbound into the message bases
+#[derive(Args)]
+#[command(about = text("icbmailer", "toss-about"))]
 struct Toss {
-    #[argh(positional)]
-    /// path/file name of the icyboard.toml configuration file
+    #[arg(value_name = "config", help = text("icbmailer", "config"))]
     config: PathBuf,
 
-    #[argh(switch, short = 'v')]
-    /// report what the tosser is doing
+    #[arg(long, short = 'v', overrides_with = "verbose", help = text("icbmailer", "toss-verbose"))]
     verbose: bool,
 }
 
-#[derive(FromArgs)]
-#[argh(subcommand, name = "scan")]
-/// pack the mail written here into bundles for the links that carry its area
+#[derive(Args)]
+#[command(about = text("icbmailer", "scan-about"))]
 struct Scan {
-    #[argh(positional)]
-    /// path/file name of the icyboard.toml configuration file
+    #[arg(value_name = "config", help = text("icbmailer", "config"))]
     config: PathBuf,
 
-    #[argh(switch, short = 'v')]
-    /// report what the scanner is doing
+    #[arg(long, short = 'v', overrides_with = "verbose", help = text("icbmailer", "scan-verbose"))]
     verbose: bool,
 }
 
 #[tokio::main]
 async fn main() {
-    let arguments: Cli = argh::from_env();
+    let arguments = icy_board_cli::parse::<Cli>();
     if arguments.version {
         println!("icbmailer {}", env!("CARGO_PKG_VERSION"));
         return;
     }
     let Some(command) = arguments.command else {
-        if let Err(err) = Cli::from_args(&["icbmailer"], &["--help"]) {
-            eprintln!("{}", err.output);
-        }
+        eprintln!("{}", icy_board_cli::command::<Cli>().render_help());
         exit(1);
     };
     let result = match command {

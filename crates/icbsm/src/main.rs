@@ -1,6 +1,6 @@
 use app::new_main_window;
-use argh::FromArgs;
 use chrono::{Local, Utc};
+use clap::Parser;
 use color_eyre::Result;
 use icy_board_engine::icy_board::{
     IcyBoard,
@@ -22,55 +22,43 @@ lazy_static::lazy_static! {
     static ref VERSION: Version = Version::parse(env!("CARGO_PKG_VERSION")).unwrap();
 }
 
-/// IcyBoard System Manager
-#[derive(FromArgs)]
+#[derive(Parser)]
+#[command(name = "icbsm", disable_version_flag = true, about = icy_board_cli::text("icbsm", "about"))]
 struct Cli {
-    /// default is 80x25
-    #[argh(switch, short = 'f')]
+    #[arg(long = "full-screen", short = 'f', help = icy_board_cli::text("icbsm", "full-screen"))]
     full_screen: bool,
 
-    /// remove users instead of starting the editor, see the criteria below
-    #[argh(switch)]
+    #[arg(long = "pack", help = icy_board_cli::text("icbsm", "pack"))]
     pack: bool,
 
-    /// pack users that have not called in that many days
-    #[argh(option)]
+    #[arg(long = "inactive-days", help = icy_board_cli::text("icbsm", "inactive-days"))]
     inactive_days: Option<u32>,
 
-    /// pack users that never logged on
-    #[argh(switch)]
+    #[arg(long = "never-logged-on", help = icy_board_cli::text("icbsm", "never-logged-on"))]
     never_logged_on: bool,
 
-    /// do not pack users marked for deletion
-    #[argh(switch)]
+    #[arg(long = "no-delete-flagged", help = icy_board_cli::text("icbsm", "no-delete-flagged"))]
     no_delete_flagged: bool,
 
-    /// keep users at or above that security level (defaults to 100 when packing)
-    #[argh(option)]
+    #[arg(long = "keep-security", help = icy_board_cli::text("icbsm", "keep-security"))]
     keep_security: Option<u8>,
 
-    /// pack users that are locked out instead of keeping them
-    #[argh(switch)]
+    #[arg(long = "pack-locked-out", help = icy_board_cli::text("icbsm", "pack-locked-out"))]
     pack_locked_out: bool,
 
-    /// rewrite all phone numbers in one format
-    #[argh(switch)]
+    #[arg(long = "standardize-phones", help = icy_board_cli::text("icbsm", "standardize-phones"))]
     standardize_phones: bool,
 
-    /// put the user file back the way it was before the last run
-    #[argh(switch)]
+    #[arg(long = "undo", help = icy_board_cli::text("icbsm", "undo"))]
     undo: bool,
 
-    /// report what would happen and write nothing
-    #[argh(switch)]
+    #[arg(long = "dry-run", help = icy_board_cli::text("icbsm", "dry-run"))]
     dry_run: bool,
 
-    /// print the version and exit
-    #[argh(switch)]
+    #[arg(long = "version", help = icy_board_cli::text("icbsm", "version"))]
     version: bool,
 
-    #[argh(positional)]
-    /// path/file name of the icyboard.toml configuration file
+    #[arg(help = icy_board_cli::text("icbsm", "file"))]
     file: Option<PathBuf>,
 }
 
@@ -80,8 +68,45 @@ impl Cli {
     }
 }
 
+#[cfg(test)]
+mod cli_tests {
+    use super::*;
+
+    #[test]
+    fn cli_defaults_and_options() {
+        let cli = icy_board_cli::try_parse_from::<Cli, _, _>(["icbsm"]).unwrap();
+        assert!(!cli.is_batch() && !cli.full_screen && !cli.version && !cli.dry_run);
+        assert!(!cli.never_logged_on && !cli.no_delete_flagged && !cli.pack_locked_out);
+        assert!(cli.inactive_days.is_none() && cli.keep_security.is_none() && cli.file.is_none());
+        let cli = icy_board_cli::try_parse_from::<Cli, _, _>([
+            "icbsm",
+            "-f",
+            "--pack",
+            "--inactive-days",
+            "30",
+            "--never-logged-on",
+            "--no-delete-flagged",
+            "--keep-security",
+            "100",
+            "--pack-locked-out",
+            "--standardize-phones",
+            "--undo",
+            "--dry-run",
+            "--version",
+            "board.toml",
+        ])
+        .unwrap();
+        assert!(cli.full_screen && cli.pack && cli.never_logged_on && cli.no_delete_flagged && cli.pack_locked_out);
+        assert!(cli.standardize_phones && cli.undo && cli.dry_run && cli.version && cli.is_batch());
+        assert_eq!(cli.inactive_days, Some(30));
+        assert_eq!(cli.keep_security, Some(100));
+        assert_eq!(cli.file, Some(PathBuf::from("board.toml")));
+        assert!(icy_board_cli::try_parse_from::<Cli, _, _>(["icbsm", "--pack=true"]).is_err());
+    }
+}
+
 fn main() -> Result<()> {
-    let arguments: Cli = argh::from_env();
+    let arguments = icy_board_cli::parse::<Cli>();
     if arguments.version {
         println!("icbsm {}", *VERSION);
         return Ok(());

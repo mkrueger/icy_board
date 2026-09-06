@@ -266,7 +266,7 @@ version = "1.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "40c48f72fd53cd289104fc64099abca73db4166ad86ea0b4341abe65af83dadc"
 dependencies = [
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -277,7 +277,7 @@ checksum = "291e6a250ff86cd4a820112fb8898808a366d8f9f58ce16d1f538353ad55747d"
 dependencies = [
  "anstyle",
  "once_cell_polyfill",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -328,37 +328,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
-]
-
-[[package]]
-name = "argh"
-version = "0.1.19"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "211818e820cda9ca6f167a64a5c808837366a6dfd807157c64c1304c486cd033"
-dependencies = [
- "argh_derive",
- "argh_shared",
-]
-
-[[package]]
-name = "argh_derive"
-version = "0.1.19"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c442a9d18cef5dde467405d27d461d080d68972d6d0dfd0408265b6749ec427d"
-dependencies = [
- "argh_shared",
- "proc-macro2",
- "quote",
- "syn 2.0.119",
-]
-
-[[package]]
-name = "argh_shared"
-version = "0.1.19"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e5ade012bac4db278517a0132c8c10c6427025868dca16c801087c28d5a411f1"
-dependencies = [
- "serde",
 ]
 
 [[package]]
@@ -1333,6 +1302,32 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "473c7e07f409a8d772161724aa8db6a765a2532a70f9667eeb7b49d3d02fbdca"
 dependencies = [
  "clap_builder",
+ "clap_derive",
+]
+
+[[package]]
+name = "clap-i18n-derive"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "76f2eedef973c0991d9063596f9ea4349f7808a4236c5c06cf4973c8a668e8d9"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "clap-i18n-richformatter"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a562fab0e916f3a594b834a65996cbcb7c14d4d404869a64ab178717e9afefef"
+dependencies = [
+ "clap",
+ "clap-i18n-derive",
+ "i18n-embed",
+ "i18n-embed-fl-no-check-hashmap-on-ra",
+ "rust-embed",
+ "unic-langid",
 ]
 
 [[package]]
@@ -1341,8 +1336,22 @@ version = "4.6.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7b48fea5a88e9ae728a2dcbedbfc0e730f7d60da42e1cb049a83c9fb8b789889"
 dependencies = [
+ "anstream",
  "anstyle",
  "clap_lex",
+ "strsim",
+]
+
+[[package]]
+name = "clap_derive"
+version = "4.6.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d012d2b9d65aca7f18f4d9878a045bc17899bba951561ba5ec3c2ba1eed9a061"
+dependencies = [
+ "heck 0.5.0",
+ "proc-macro2",
+ "quote",
+ "syn 3.0.3",
 ]
 
 [[package]]
@@ -2276,7 +2285,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2589,7 +2598,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3687,6 +3696,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "i18n-embed-fl-no-check-hashmap-on-ra"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5d524e21177294a67b92a768e1a56a136e38d52344f09d1d22d25605320d66a7"
+dependencies = [
+ "find-crate",
+ "fluent",
+ "fluent-syntax",
+ "i18n-config",
+ "i18n-embed",
+ "proc-macro-error3",
+ "proc-macro2",
+ "quote",
+ "strsim",
+ "syn 2.0.119",
+ "unic-langid",
+]
+
+[[package]]
 name = "i18n-embed-impl"
 version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3745,10 +3773,11 @@ dependencies = [
 name = "icbfile"
 version = "0.2.1"
 dependencies = [
- "argh",
  "chrono",
+ "clap",
  "codepages",
  "dizbase",
+ "icy_board_cli",
  "icy_board_engine",
  "libc",
  "tempfile",
@@ -3759,9 +3788,10 @@ dependencies = [
 name = "icbmailer"
 version = "0.2.1"
 dependencies = [
- "argh",
  "chrono",
+ "clap",
  "fern",
+ "icy_board_cli",
  "icy_board_engine",
  "icy_net",
  "log",
@@ -3773,13 +3803,13 @@ dependencies = [
 name = "icboard"
 version = "0.2.1"
 dependencies = [
- "argh",
  "ariadne",
  "async-recursion",
  "async-trait",
  "base64 0.22.1",
  "bstr",
  "chrono",
+ "clap",
  "codepages",
  "color-eyre",
  "crossterm 0.29.0",
@@ -3788,6 +3818,7 @@ dependencies = [
  "fern",
  "http",
  "icbadmin",
+ "icy_board_cli",
  "icy_board_engine",
  "icy_board_tui",
  "icy_engine",
@@ -3824,16 +3855,17 @@ dependencies = [
 name = "icbsetup"
 version = "0.2.1"
 dependencies = [
- "argh",
  "ariadne",
  "bstr",
  "chrono",
+ "clap",
  "codepages",
  "color-eyre",
  "crossterm 0.29.0",
  "dizbase",
  "fastrand",
  "fern",
+ "icy_board_cli",
  "icy_board_engine",
  "icy_board_tui",
  "icy_engine",
@@ -3862,16 +3894,17 @@ dependencies = [
 name = "icbsm"
 version = "0.2.1"
 dependencies = [
- "argh",
  "ariadne",
  "bstr",
  "chrono",
+ "clap",
  "codepages",
  "color-eyre",
  "crossterm 0.29.0",
  "dizbase",
  "fastrand",
  "fern",
+ "icy_board_cli",
  "icy_board_engine",
  "icy_board_tui",
  "icy_net",
@@ -3975,6 +4008,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "icy_board_cli"
+version = "0.2.1"
+dependencies = [
+ "clap",
+ "clap-i18n-richformatter",
+ "fluent-bundle",
+ "fluent-syntax",
+ "i18n-embed",
+ "rust-embed",
+]
+
+[[package]]
 name = "icy_board_engine"
 version = "0.2.1"
 dependencies = [
@@ -4049,6 +4094,7 @@ dependencies = [
  "color-eyre",
  "crossterm 0.29.0",
  "fluent-bundle",
+ "fluent-syntax",
  "i18n-embed",
  "i18n-embed-fl",
  "icy_board_engine",
@@ -5733,12 +5779,13 @@ dependencies = [
 name = "mkicbmnu"
 version = "0.2.1"
 dependencies = [
- "argh",
  "ariadne",
  "chrono",
+ "clap",
  "color-eyre",
  "crossterm 0.29.0",
  "fern",
+ "icy_board_cli",
  "icy_board_engine",
  "icy_board_tui",
  "icy_engine",
@@ -5758,11 +5805,12 @@ dependencies = [
 name = "mkicbtxt"
 version = "0.2.1"
 dependencies = [
- "argh",
  "ariadne",
  "chrono",
+ "clap",
  "color-eyre",
  "crossterm 0.29.0",
+ "icy_board_cli",
  "icy_board_engine",
  "icy_board_tui",
  "itertools 0.15.0",
@@ -7421,11 +7469,12 @@ dependencies = [
 name = "pplc"
 version = "0.2.1"
 dependencies = [
- "argh",
  "ariadne",
+ "clap",
  "codepages",
  "crossterm 0.29.0",
  "diff",
+ "icy_board_cli",
  "icy_board_engine",
  "icy_engine",
  "lazy_static",
@@ -7443,9 +7492,10 @@ dependencies = [
 name = "ppld"
 version = "0.2.1"
 dependencies = [
- "argh",
+ "clap",
  "codepages",
  "crossterm 0.29.0",
+ "icy_board_cli",
  "icy_board_engine",
  "lazy_static",
  "semver",
@@ -7738,7 +7788,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -8737,7 +8787,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -8805,7 +8855,7 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -9506,7 +9556,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3d1e2c7f27f8d4cb10542a02c49005dbd6e93095799d6f3be745fae9f8fedd4"
 dependencies = [
  "libc",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -9652,7 +9702,7 @@ dependencies = [
  "cfg-if",
  "libc",
  "psm",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -10044,7 +10094,7 @@ dependencies = [
  "getrandom 0.4.3",
  "once_cell",
  "rustix 1.1.4",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -10066,7 +10116,7 @@ dependencies = [
  "parking_lot",
  "rustix 1.1.4",
  "signal-hook",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -10979,7 +11029,7 @@ checksum = "f2f6fb2847f6742cd76af783a2a2c49e9375d0a111c7bef6f71cd9e738c72d6e"
 dependencies = [
  "memoffset",
  "tempfile",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -11791,7 +11841,7 @@ dependencies = [
  "ndk-sys",
  "objc",
  "once_cell",
- "ordered-float 4.6.0",
+ "ordered-float 5.5.0",
  "parking_lot",
  "portable-atomic",
  "portable-atomic-util",
@@ -11869,7 +11919,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

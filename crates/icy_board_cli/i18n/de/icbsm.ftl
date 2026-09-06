@@ -1,0 +1,13 @@
+about = IcyBoard-Systemverwaltung
+full-screen = Vollbild verwenden (Standard ist 80x25)
+pack = Benutzer entfernen statt den Editor zu starten; siehe folgende Kriterien
+inactive-days = Benutzer entfernen, die sich seit dieser Anzahl von Tagen nicht angemeldet haben
+never-logged-on = Benutzer entfernen, die sich noch nie angemeldet haben
+no-delete-flagged = Zum Löschen markierte Benutzer nicht entfernen
+keep-security = Benutzer ab dieser Sicherheitsstufe behalten (Standard beim Bereinigen: 100)
+pack-locked-out = Gesperrte Benutzer entfernen statt sie zu behalten
+standardize-phones = Alle Telefonnummern in ein einheitliches Format umschreiben
+undo = Benutzerdatei auf den Stand vor dem letzten Durchlauf zurücksetzen
+dry-run = Geplante Änderungen melden, ohne etwas zu schreiben
+version = Version anzeigen und beenden
+file = Pfad/Dateiname der Konfigurationsdatei icyboard.toml

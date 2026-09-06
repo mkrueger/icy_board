@@ -7,10 +7,10 @@ use std::{
     sync::Arc,
 };
 
-use argh::FromArgs;
 use bbs::await_telnet_connections;
 use call_wait_screen::{CallWaitMessage, CallWaitScreen};
 use chrono::Local;
+use clap::Parser;
 use crossterm::{
     ExecutableCommand, execute,
     style::{Attribute, Print, SetAttribute, SetForegroundColor},
@@ -47,36 +47,61 @@ mod tests;
 
 static mut SHOW_TOTAL_STATS: bool = true;
 
-#[derive(FromArgs)]
-/// IcyBoard BBS
+#[derive(Parser)]
+#[command(name = "icboard", disable_version_flag = true, about = icy_board_cli::text("icboard", "about"))]
 struct Cli {
-    /// default is 80x25
-    #[argh(switch, short = 'f')]
+    #[arg(long = "full-screen", short = 'f', help = icy_board_cli::text("icboard", "full-screen"))]
     full_screen: bool,
 
-    #[argh(switch)]
-    /// login locally to icy board
+    #[arg(long = "localon", help = icy_board_cli::text("icboard", "localon"))]
     localon: bool,
 
-    #[argh(option)]
-    /// execute PPE file
+    #[arg(long = "ppe", help = icy_board_cli::text("icboard", "ppe"))]
     ppe: Option<PathBuf>,
 
-    #[argh(option)]
-    /// run PPE with user login: "first;last;PWRD:password;PPE:file.ppe;param1;param2;..."
+    #[arg(long = "runppe", help = icy_board_cli::text("icboard", "runppe"))]
     runppe: Option<String>,
 
-    #[argh(option)]
-    /// stuffed key chars
+    #[arg(long = "key", help = icy_board_cli::text("icboard", "key"))]
     key: Option<String>,
 
-    /// print the version and exit
-    #[argh(switch)]
+    #[arg(long = "version", help = icy_board_cli::text("icboard", "version"))]
     version: bool,
 
-    /// path/file name of the icyboard.toml configuration file
-    #[argh(positional)]
+    #[arg(help = icy_board_cli::text("icboard", "file"))]
     file: Option<PathBuf>,
+}
+
+#[cfg(test)]
+mod cli_tests {
+    use super::*;
+
+    #[test]
+    fn cli_defaults_and_options() {
+        let cli = icy_board_cli::try_parse_from::<Cli, _, _>(["icboard"]).unwrap();
+        assert!(!cli.full_screen && !cli.localon && !cli.version);
+        assert!(cli.ppe.is_none() && cli.runppe.is_none() && cli.key.is_none() && cli.file.is_none());
+        let cli = icy_board_cli::try_parse_from::<Cli, _, _>([
+            "icboard",
+            "-f",
+            "--localon",
+            "--ppe",
+            "test.ppe",
+            "--runppe",
+            "first;last",
+            "--key",
+            "abc",
+            "--version",
+            "board.toml",
+        ])
+        .unwrap();
+        assert!(cli.full_screen && cli.localon && cli.version);
+        assert_eq!(cli.ppe, Some(PathBuf::from("test.ppe")));
+        assert_eq!(cli.runppe.as_deref(), Some("first;last"));
+        assert_eq!(cli.key.as_deref(), Some("abc"));
+        assert_eq!(cli.file, Some(PathBuf::from("board.toml")));
+        assert!(icy_board_cli::try_parse_from::<Cli, _, _>(["icboard", "--localon=true"]).is_err());
+    }
 }
 
 lazy_static::lazy_static! {
@@ -86,7 +111,7 @@ lazy_static::lazy_static! {
 
 #[tokio::main]
 async fn main() -> Res<()> {
-    let arguments: Cli = argh::from_env();
+    let arguments = icy_board_cli::parse::<Cli>();
     if arguments.version {
         println!("icboard {}", *VERSION);
         return Ok(());

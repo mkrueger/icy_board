@@ -4031,7 +4031,8 @@ fido_bad_netmail=Secure Netmail Base
 fido_bad_netmail-status=Where netmail from an unconfigured node goes
 fido_bad_netmail-help=Only used while Secure Netmail is on.
 
-fido_bad_packets=Dir to store Bad Packetsfido_bad_packets-status=Where a packet that could not be read is put aside
+fido_bad_packets=Dir to store Bad Packets
+fido_bad_packets-status=Where a packet that could not be read is put aside
 fido_bad_packets-help=
     # Dir to store Bad Packets
 

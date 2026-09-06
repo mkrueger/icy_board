@@ -1,4 +1,3 @@
-use argh::FromArgs;
 use ariadne::{Label, Report, ReportKind};
 
 use codepages::tables::UNICODE_TO_CP437;
@@ -34,69 +33,63 @@ use std::{
     sync::{Arc, Mutex, OnceLock},
 };
 
-#[derive(FromArgs)]
-/// PCBoard Programming Language Compiler  
+fn cli_text(key: &str) -> String {
+    icy_board_cli::text("pplc", key)
+}
+
+#[derive(clap::Parser)]
+#[command(name = "pplc", about = cli_text("about"), disable_version_flag = true)]
 struct Cli {
-    /// output the disassembly instead of compiling
-    #[argh(switch, short = 'd')]
+    #[arg(long, short = 'd', help = cli_text("disassemble"))]
     disassemble: bool,
 
-    /// don't report any warnings
-    #[argh(switch)]
+    #[arg(long, help = cli_text("nowarnings"))]
     nowarnings: bool,
 
-    /// print the version and exit
-    #[argh(switch)]
+    #[arg(long, help = cli_text("version"))]
     version: bool,
 
-    /// write plain text, without the ansi escapes that colour the output
-    #[argh(switch)]
+    #[arg(long, help = cli_text("mono"))]
     mono: bool,
 
-    /// version number for the compiled PPE, valid: 100, 200, 300, 310, 320, 330, 340, 400 (default)
-    #[argh(option)]
+    #[arg(long, value_name = "runtime", help = cli_text("runtime"))]
     runtime: Option<u16>,
 
-    /// language version (defaults to the manifest, PPL_LANG_VERSION, then runtime capped at 400)
-    #[argh(option)]
+    #[arg(long, value_name = "lang-version", help = cli_text("lang-version"))]
     lang_version: Option<u16>,
 
-    /// specify the encoding of the file (cp437 = true, utf8 = false), defaults to autodetection
-    #[argh(switch)]
+    // SetTrue supplies Some(false) when absent, which would disable autodetection.
+    // A zero-argument Set preserves argh's None / Some(true) switch semantics.
+    #[arg(long, action = clap::ArgAction::Set, num_args = 0, default_missing_value = "true", overrides_with = "cp437", help = cli_text("cp437"))]
     cp437: Option<bool>,
 
-    /// create & init new ppl package in target directory
-    #[argh(switch)]
+    #[arg(long, help = cli_text("init"))]
     init: bool,
 
-    /// semicolon separated list of pre processor variables
-    #[argh(option)]
+    #[arg(long, value_name = "defines", help = cli_text("defines"))]
     defines: Option<String>,
 
-    /// formats source file instead of compile
-    #[argh(switch)]
+    #[arg(long, help = cli_text("format"))]
     format: bool,
 
-    /// with --format, write the result to stdout and leave the file alone
-    #[argh(switch)]
+    #[arg(long, help = cli_text("stdout"))]
     stdout: bool,
 
-    /// checks source/package for errors without compiling
-    #[argh(switch)]
+    #[arg(long, help = cli_text("check"))]
     check: bool,
 
-    /// prints the effective compiler configuration without compiling
-    #[argh(switch)]
+    #[arg(long, help = cli_text("print-config"))]
     print_config: bool,
 
-    /// prints the effective compiler configuration as json without compiling
-    #[argh(switch)]
+    #[arg(long, help = cli_text("print-config-json"))]
     print_config_json: bool,
 
-    /// file[.pps] to compile (extension defaults to .pps if not specified)
-    #[argh(positional)]
+    #[arg(value_name = "file", help = cli_text("file"))]
     file: Option<PathBuf>,
 }
+
+#[cfg(test)]
+mod cli_tests;
 
 lazy_static::lazy_static! {
     static ref VERSION: Version = Version::parse(env!("CARGO_PKG_VERSION")).unwrap();
@@ -164,7 +157,7 @@ fn print_diff_line(line: usize, sign: char, text: impl std::fmt::Display, color:
 }
 
 fn main() {
-    let arguments: Cli = argh::from_env();
+    let arguments: Cli = icy_board_cli::parse();
     let _ = COLOR.set(decide_color(&arguments));
     if arguments.version {
         println!("pplc {}", *VERSION);
@@ -226,9 +219,7 @@ fn main() {
 
     if !file_name.exists() {
         if arguments.file.is_none() {
-            if let Err(err) = Cli::from_args(&["pplc"], &["--help"]) {
-                eprintln!("{}", err.output);
-            }
+            eprintln!("{}", icy_board_cli::command::<Cli>().render_help());
         } else {
             eprintln!("ERROR: {} not found on disk, aborting...", file_name.display());
         }

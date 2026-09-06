@@ -1,4 +1,3 @@
-use argh::FromArgs;
 use codepages::tables::write_cp437;
 use crossterm::execute;
 use crossterm::style::Attribute;
@@ -25,45 +24,43 @@ use crate::compat_check::check_compatibility;
 #[cfg(test)]
 pub mod tests;
 
+#[cfg(test)]
+mod cli_tests;
+
 pub mod compat_check;
 
-#[derive(FromArgs)]
-/// PCBoard Programming Language Decompiler
+fn cli_text(key: &str) -> String {
+    icy_board_cli::text("ppld", key)
+}
+
+#[derive(clap::Parser)]
+#[command(name = "ppld", about = cli_text("about"), disable_version_flag = true)]
 struct Cli {
-    /// raw ppe without reconstruction control structures
-    #[argh(switch, short = 'r')]
+    #[arg(long, short = 'r', help = cli_text("raw"))]
     raw: bool,
 
-    /// output the disassembly instead of ppl
-    #[argh(switch, short = 'd')]
+    #[arg(long, short = 'd', help = cli_text("disassemble"))]
     disassemble: bool,
 
-    /// output to console instead of writing to file
-    #[argh(switch, short = 'o')]
+    #[arg(long, short = 'o', help = cli_text("output"))]
     output: bool,
 
-    /// checks a .ppe file for compatibility with the current runtime
-    #[argh(switch)]
+    #[arg(long, help = cli_text("check"))]
     check: bool,
 
-    /// write the source as cp437 instead of utf8, for use with the original tooling
-    #[argh(switch)]
+    #[arg(long, help = cli_text("cp437"))]
     cp437: bool,
 
-    #[argh(option)]
-    /// keyword casing style, valid values are u=upper (default), l=lower, c=camel
+    #[arg(long, value_name = "style", help = cli_text("style"))]
     style: Option<char>,
 
-    /// language version the source is written for, defaults to PPL_LANG_VERSION then the newest one
-    #[argh(option)]
+    #[arg(long, value_name = "lang-version", help = cli_text("lang-version"))]
     lang_version: Option<u16>,
 
-    /// print the version and exit
-    #[argh(switch)]
+    #[arg(long, help = cli_text("version"))]
     version: bool,
 
-    /// file[.ppe] to decompile
-    #[argh(positional)]
+    #[arg(value_name = "file", help = cli_text("file"))]
     file: Option<String>,
 }
 
@@ -72,7 +69,7 @@ lazy_static::lazy_static! {
 }
 
 fn main() {
-    let arguments: Cli = argh::from_env();
+    let arguments: Cli = icy_board_cli::parse();
     if arguments.version {
         println!("ppld {}", *VERSION);
         return;
@@ -108,9 +105,7 @@ fn main() {
     }
 
     let Some(mut file_name) = arguments.file else {
-        if let Err(err) = Cli::from_args(&["ppld"], &["--help"]) {
-            eprintln!("{}", err.output);
-        }
+        eprintln!("{}", icy_board_cli::command::<Cli>().render_help());
         std::process::exit(1);
     };
 

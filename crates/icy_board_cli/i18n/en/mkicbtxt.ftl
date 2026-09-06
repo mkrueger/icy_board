@@ -1,0 +1,9 @@
+about = ICBTEXT file generator/editor
+create = Create a new ICBTEXT file
+update = Record number to update with new text
+full-screen = Use the full screen (default is 80x25)
+convert = Convert PCBTEXT to ICBTEXT
+force = Overwrite an existing file
+version = Print the version and exit
+file = File to edit/create
+new-text = New text for the record

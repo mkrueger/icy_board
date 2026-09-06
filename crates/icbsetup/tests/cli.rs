@@ -12,7 +12,93 @@ fn temp_dir(name: &str) -> std::path::PathBuf {
 }
 
 fn icbsetup() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_icbsetup"))
+    let mut command = Command::new(env!("CARGO_BIN_EXE_icbsetup"));
+    command.env("LANG", "en_US.UTF-8").env("LC_ALL", "en_US.UTF-8").env("LANGUAGE", "en");
+    command
+}
+
+#[test]
+fn cli_help_errors_and_version_are_localized() {
+    for (locale, help, error) in [("en", "Use the full screen", "error"), ("de", "Vollbild verwenden", "Fehler")] {
+        let run = |args: &[&str]| {
+            icbsetup()
+                .env("LANG", locale)
+                .env("LC_ALL", locale)
+                .env("LANGUAGE", locale)
+                .args(args)
+                .output()
+                .unwrap()
+        };
+        let output = run(&["--help"]);
+        assert!(output.status.success() && output.stderr.is_empty());
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(stdout.contains(help), "{stdout}");
+        for subcommand in ["import", "create", "ppe-convert", "check", "dos-image", "dos-copy"] {
+            assert!(stdout.contains(subcommand), "{stdout}");
+        }
+        let output = run(&["--unknown-option"]);
+        assert_eq!(output.status.code(), Some(1));
+        assert!(output.stdout.is_empty());
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(stderr.contains(error) && stderr.contains("--unknown-option"), "{stderr}");
+        let output = run(&["--version"]);
+        assert!(output.status.success() && output.stderr.is_empty());
+        assert_eq!(String::from_utf8_lossy(&output.stdout), concat!("icbsetup ", env!("CARGO_PKG_VERSION"), "\n"));
+    }
+}
+
+#[test]
+fn cli_subcommand_help_and_errors_are_localized_recursively() {
+    for (locale, descriptions, error) in [
+        (
+            "en",
+            [
+                "PCBOARD.DAT file",
+                "Output directory",
+                "Directory to convert",
+                "Offer to create",
+                "Board directory",
+                "Host file to copy",
+            ],
+            "error",
+        ),
+        (
+            "de",
+            [
+                "PCBOARD.DAT-Datei",
+                "Ausgabeverzeichnis",
+                "Zu konvertierendes Verzeichnis",
+                "Das Erstellen",
+                "Mailbox-Verzeichnis",
+                "Zu kopierende Host-Datei",
+            ],
+            "Fehler",
+        ),
+    ] {
+        for (subcommand, description) in ["import", "create", "ppe-convert", "check", "dos-image", "dos-copy"]
+            .into_iter()
+            .zip(descriptions)
+        {
+            let run = |arg: &str| {
+                icbsetup()
+                    .env("LANG", locale)
+                    .env("LC_ALL", locale)
+                    .env("LANGUAGE", locale)
+                    .args([subcommand, arg])
+                    .output()
+                    .unwrap()
+            };
+            let output = run("--help");
+            assert!(output.status.success() && output.stderr.is_empty());
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            assert!(stdout.contains(description) && stdout.contains(subcommand), "{stdout}");
+            let output = run("--unknown-option");
+            assert_eq!(output.status.code(), Some(1));
+            assert!(output.stdout.is_empty());
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            assert!(stderr.contains(error) && stderr.contains("--unknown-option"), "{stderr}");
+        }
+    }
 }
 
 #[test]
@@ -26,6 +112,17 @@ fn missing_board_configuration_explains_how_to_start() {
     assert!(stderr.contains("Usage: "));
     assert!(stderr.contains("icbsetup create mybbs"));
     assert!(stderr.contains("docs/gettingstarted.md"));
+}
+
+#[test]
+fn no_arguments_reports_a_missing_board_on_stderr() {
+    let directory = temp_dir("no-arguments");
+    fs::create_dir(&directory).unwrap();
+    let output = icbsetup().current_dir(&directory).env_remove("ICB_PATH").output().unwrap();
+    assert_eq!(output.status.code(), Some(1));
+    assert!(output.stdout.is_empty());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("IcyBoard configuration not found:"));
+    fs::remove_dir(directory).unwrap();
 }
 
 #[test]
