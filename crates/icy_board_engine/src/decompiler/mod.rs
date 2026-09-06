@@ -8,12 +8,12 @@ use reconstruct::strip_unused_labels;
 use crate::{
     Res,
     ast::{
-        Ast, AstNode, BinOp, BinaryExpression, BlockStatement, BreakStatement, CommentAstNode, Constant, ConstantExpression, ContinueStatement, Expression,
-        ForEachStatement, FunctionCallExpression, FunctionDeclarationAstNode, FunctionImplementation, GosubStatement, GotoStatement, IdentifierExpression,
-        IfStatement, IndexerExpression, LabelStatement, LetStatement, MemberCallStatement, MemberReferenceExpression, OnErrorMode, OnErrorStatement,
-        ParameterSpecifier, ParensExpression, PredefinedCallStatement, ProcedureCallStatement, ProcedureDeclarationAstNode, ProcedureImplementation, Statement,
-        TypeDeclarationAstNode, TypeFieldSpecifier, UnaryExpression, UnaryOp, VariableDeclarationStatement, VariableParameterSpecifier, VariableSpecifier,
-        constant::NumberFormat,
+        Ast, AstNode, BinOp, BinaryExpression, BlockStatement, BreakStatement, CommentAstNode, Constant, ConstantExpression, ContinueStatement,
+        EnumDeclarationAstNode, EnumVariantSpecifier, Expression, ForEachStatement, FunctionCallExpression, FunctionDeclarationAstNode, FunctionImplementation,
+        GosubStatement, GotoStatement, IdentifierExpression, IfStatement, IndexerExpression, LabelStatement, LetStatement, MemberCallStatement,
+        MemberReferenceExpression, OnErrorMode, OnErrorStatement, ParameterSpecifier, ParensExpression, PredefinedCallStatement, ProcedureCallStatement,
+        ProcedureDeclarationAstNode, ProcedureImplementation, Statement, TypeDeclarationAstNode, TypeFieldSpecifier, UnaryExpression, UnaryOp,
+        VariableDeclarationStatement, VariableParameterSpecifier, VariableSpecifier, constant::NumberFormat,
     },
     compiler::{user_data::UserDataEntry, workspace::Workspace},
     executable::{
@@ -52,14 +52,53 @@ fn user_field_name(index: usize) -> unicase::Ascii<String> {
     unicase::Ascii::new(format!("FIELD{:03}", index + 1))
 }
 
-/// The board objects, plus a stand-in declaration for every record the PPE carries.
-fn build_type_registry(executable: &Executable) -> UserTypeRegistry {
+/// Reuse builtin enums only when the complete ordered domain matches. Other
+/// domains get source ids allocated by the registry, not their PPE ids.
+fn build_type_registry(executable: &Executable) -> Result<(UserTypeRegistry, HashMap<u8, u8>, Vec<u8>), DeserializationError> {
     let registry = UserTypeRegistry::icy_board_registry();
-    for (i, fields) in executable.user_types.iter().enumerate() {
-        let fields = fields.iter().enumerate().map(|(j, field)| (user_field_name(j), *field)).collect();
-        registry.declare_user_type(user_type_name(i), fields);
+    let builtin_enums = registry.enums();
+    let mut enum_ids = HashMap::new();
+    let mut declared_enums = Vec::new();
+    let no_room = || DeserializationError {
+        error_type: DeserializationErrorType::IndexOutOfBounds,
+        span: 0..0,
+    };
+    for (&id, values) in executable.variable_table.enums.iter().rev() {
+        if builtin_enums
+            .iter()
+            .find(|definition| definition.id == id)
+            .is_some_and(|definition| definition.variants.iter().map(|(_, value)| *value).eq(values.iter().copied()))
+        {
+            enum_ids.insert(id, id);
+            continue;
+        }
+        let name = unicase::Ascii::new(format!("ENUM{id:03}"));
+        let variants = values
+            .iter()
+            .enumerate()
+            .map(|(index, value)| (unicase::Ascii::new(format!("MEMBER{:03}", index + 1)), *value))
+            .collect();
+        let source_id = registry.declare_enum(name, variants).ok_or_else(no_room)?;
+        enum_ids.insert(id, source_id);
+        declared_enums.push(source_id);
     }
-    registry
+    for (i, fields) in executable.user_types.iter().enumerate() {
+        let fields = fields
+            .iter()
+            .enumerate()
+            .map(|(j, field)| {
+                let mut field = *field;
+                if let VariableType::UserData(id) = field.variable_type
+                    && let Some(source_id) = enum_ids.get(&id)
+                {
+                    field.variable_type = VariableType::UserData(*source_id);
+                }
+                (user_field_name(j), field)
+            })
+            .collect();
+        registry.declare_user_type(user_type_name(i), fields).ok_or_else(no_room)?;
+    }
+    Ok((registry, enum_ids, declared_enums))
 }
 
 #[derive(Default)]
@@ -78,6 +117,8 @@ pub struct Decompiler {
     issues: Vec<DecompilerIssue>,
     optimize_output: bool,
     type_registry: UserTypeRegistry,
+    enum_ids: HashMap<u8, u8>,
+    declared_enums: Vec<u8>,
 }
 
 impl Decompiler {
@@ -88,7 +129,7 @@ impl Decompiler {
     /// This function will return an error if .
     pub fn new(executable: Executable, optimize_output: bool, output_language_version: u16) -> Result<Self, DeserializationError> {
         let script = PPEScript::from_ppe_file(&executable)?;
-        let type_registry = build_type_registry(&executable);
+        let (type_registry, enum_ids, declared_enums) = build_type_registry(&executable)?;
         Ok(Self {
             executable,
             script,
@@ -101,6 +142,8 @@ impl Decompiler {
             issues: Vec::new(),
             optimize_output,
             type_registry,
+            enum_ids,
+            declared_enums,
         })
     }
 
@@ -240,8 +283,29 @@ impl Decompiler {
         }
     }
 
-    /// The records the PPE declares, under invented names.
+    /// Enums precede records so enum-typed fields can resolve their declarations.
     fn generate_type_declarations(&self, ast: &mut Ast) {
+        for id in &self.declared_enums {
+            let definition = self.type_registry.get_enum_from_id(*id).unwrap();
+            let variants = definition
+                .variants
+                .into_iter()
+                .map(|(name, value)| {
+                    EnumVariantSpecifier::new(
+                        Spanned::create_empty(Token::Identifier(name)),
+                        Some(Spanned::create_empty(Token::Eq)),
+                        value,
+                        Some(ConstantExpression::create_empty_expression(Constant::Integer(value, NumberFormat::Default))),
+                    )
+                })
+                .collect();
+            ast.nodes.push(AstNode::EnumDeclaration(EnumDeclarationAstNode::new(
+                Spanned::create_empty(Token::Enum),
+                Spanned::create_empty(Token::Identifier(definition.name)),
+                variants,
+                Spanned::create_empty(Token::EndEnum),
+            )));
+        }
         for (i, fields) in self.executable.user_types.iter().enumerate() {
             let fields = fields
                 .iter()
@@ -280,6 +344,11 @@ impl Decompiler {
     }
 
     fn source_type(&self, variable_type: VariableType) -> VariableType {
+        if let VariableType::UserData(id) = variable_type
+            && let Some(source_id) = self.enum_ids.get(&id)
+        {
+            return VariableType::UserData(*source_id);
+        }
         if variable_type != VariableType::UnboundedString {
             return variable_type;
         }
@@ -292,6 +361,9 @@ impl Decompiler {
     }
 
     fn type_name(&self, type_id: u8) -> Option<unicase::Ascii<String>> {
+        if let Some(definition) = self.type_registry.get_enum_from_id(type_id) {
+            return Some(definition.name);
+        }
         if is_user_declared_type(type_id) {
             return self.type_registry.get_user_type_from_id(type_id).map(|def| def.name);
         }
@@ -364,6 +436,56 @@ impl Decompiler {
         convert_argument(self.convert_to_type(expr, arg.arg_type), arg)
     }
 
+    /// Lowered constants have lost their nominal type. Restore it only where
+    /// the bytecode supplies a typed context; dynamic integers need a cast.
+    fn decompile_as(&self, expression: &PPEExpr, expected: VariableType) -> Expression {
+        let expr = self.decompile_expression(expression);
+        if !self.type_registry.is_enum_type(expected) || self.expression_type(expression) == Some(expected) {
+            return expr;
+        }
+        let converted = self.convert_to_type(expr.clone(), expected);
+        if converted != expr {
+            return converted;
+        }
+        let VariableType::UserData(id) = expected else { unreachable!() };
+        FunctionCallExpression::create_empty_expression(IdentifierExpression::create_empty_expression(self.type_name(id).unwrap()), vec![expr])
+    }
+
+    fn routine_argument(&self, routine: usize, index: usize, expression: &PPEExpr) -> Expression {
+        let expected = self.executable.variable_table.try_get_entry(routine).and_then(|entry| unsafe {
+            let (first, count) = match entry.header.variable_type {
+                VariableType::Function => (entry.value.data.function_value.first_var_id, entry.value.data.function_value.parameters),
+                VariableType::Procedure => (entry.value.data.procedure_value.first_var_id, entry.value.data.procedure_value.parameters),
+                _ => return None,
+            };
+            if index >= count as usize {
+                return None;
+            }
+            self.executable
+                .variable_table
+                .try_get_entry(first as usize + 1 + index)
+                .map(|parameter| self.source_type(parameter.header.variable_type))
+        });
+        expected.map_or_else(|| self.decompile_expression(expression), |expected| self.decompile_as(expression, expected))
+    }
+
+    fn enum_cast_type(&self, expression: &PPEExpr) -> Option<u8> {
+        let PPEExpr::PredefinedFunctionCall(definition, arguments) = expression else {
+            return None;
+        };
+        if definition.opcode != FuncOpCode::EnumCast {
+            return None;
+        }
+        let [PPEExpr::Value(id), _] = arguments.as_slice() else {
+            return None;
+        };
+        let id = u8::try_from(self.executable.variable_table.try_get_entry(*id)?.value.as_int()).ok()?;
+        let VariableType::UserData(id) = self.source_type(VariableType::UserData(id)) else {
+            return None;
+        };
+        self.type_registry.get_enum_from_id(id).map(|_| id)
+    }
+
     fn member_parameter_type(&self, base: &PPEExpr, member_id: usize, parameter: usize) -> Option<VariableType> {
         let base = if let PPEExpr::Member(inner, _) = base { inner.as_ref() } else { base };
         let VariableType::UserData(type_id) = self.expression_type(base)? else {
@@ -389,11 +511,14 @@ impl Decompiler {
     /// What an expression evaluates to, as far as the variable table and the type
     /// table can say. Only member access needs this.
     fn expression_type(&self, expr: &PPEExpr) -> Option<VariableType> {
+        if let Some(type_id) = self.enum_cast_type(expr) {
+            return Some(VariableType::UserData(type_id));
+        }
         if let Some(type_id) = self.static_receiver_type(expr) {
             return Some(VariableType::UserData(type_id));
         }
         match expr {
-            PPEExpr::Value(id) | PPEExpr::Dim(id, _) => Some(self.executable.variable_table.try_get_entry(*id)?.header.variable_type),
+            PPEExpr::Value(id) | PPEExpr::Dim(id, _) => Some(self.source_type(self.executable.variable_table.try_get_entry(*id)?.header.variable_type)),
             PPEExpr::Member(base, id) => self.resolve_member(base, *id).map(|(_, t)| t),
             PPEExpr::IndexedMember(base, id, _) => self.resolve_member(base, *id).map(|(_, t)| t),
             PPEExpr::MemberFunctionCall(base, _, id) => {
@@ -407,7 +532,7 @@ impl Decompiler {
                     return None;
                 }
                 let return_var = unsafe { entry.value.data.function_value.return_var } as usize;
-                Some(self.executable.variable_table.try_get_entry(return_var)?.header.variable_type)
+                Some(self.source_type(self.executable.variable_table.try_get_entry(return_var)?.header.variable_type))
             }
             PPEExpr::PredefinedFunctionCall(def, arguments) if def.opcode == FuncOpCode::ArrayValueAt => {
                 arguments.first().and_then(|array| self.expression_type(array))
@@ -474,6 +599,13 @@ impl Decompiler {
                 let Some(entry) = self.executable.variable_table.try_get_entry(*id) else {
                     return ConstantExpression::create_empty_expression(Constant::String(format!("ERROR IN EXPRESSION can't read table index : {:04X}", *id)));
                 };
+                let source_type = self.source_type(entry.header.variable_type);
+                if entry.entry_type == EntryType::Constant && self.type_registry.is_enum_type(source_type) {
+                    return self.convert_to_type(
+                        ConstantExpression::create_empty_expression(Constant::Integer(entry.value.as_int(), NumberFormat::Default)),
+                        source_type,
+                    );
+                }
                 if matches!(entry.value.get_type(), VariableType::UserData(_)) {
                     IdentifierExpression::create_empty_expression(unicase::Ascii::new(entry.name.clone()))
                 } else if entry.entry_type == EntryType::Constant {
@@ -504,7 +636,10 @@ impl Decompiler {
                     .map(|(field_id, value)| {
                         crate::ast::RecordLiteralField::new(
                             Spanned::create_empty(Token::Identifier(user_field_name(*field_id))),
-                            self.decompile_expression(value),
+                            self.type_registry
+                                .get_record_type_from_id(*type_id)
+                                .and_then(|record| record.field_type(*field_id))
+                                .map_or_else(|| self.decompile_expression(value), |expected| self.decompile_as(value, expected)),
                         )
                     })
                     .collect();
@@ -535,9 +670,11 @@ impl Decompiler {
                     args.iter()
                         .enumerate()
                         .map(|(index, argument)| {
-                            let argument = self.decompile_expression(argument);
-                            self.member_parameter_type(expr, *id, index)
-                                .map_or(argument.clone(), |expected| self.convert_member_argument(argument, expected))
+                            if let Some(expected) = self.member_parameter_type(expr, *id, index) {
+                                self.convert_member_argument(self.decompile_as(argument, expected), expected)
+                            } else {
+                                self.decompile_expression(argument)
+                            }
                         })
                         .collect(),
                 )
@@ -559,10 +696,8 @@ impl Decompiler {
             PPEExpr::BinaryExpression(op, left, right) => {
                 let left_type = self.expression_type(left);
                 let right_type = self.expression_type(right);
-                let left = self.decompile_expression(left);
-                let right = self.decompile_expression(right);
-                let left = right_type.map_or(left.clone(), |expected| self.convert_to_type(left, expected));
-                let right = left_type.map_or(right.clone(), |expected| self.convert_to_type(right, expected));
+                let left = right_type.map_or_else(|| self.decompile_expression(left), |expected| self.decompile_as(left, expected));
+                let right = left_type.map_or_else(|| self.decompile_expression(right), |expected| self.decompile_as(right, expected));
                 let left = add_parens_if_required(*op, left);
                 let right = add_parens_if_required(*op, right);
 
@@ -577,6 +712,15 @@ impl Decompiler {
                 IndexerExpression::create_empty_expression(self.get_variable_name(*id), dims.iter().map(|e| self.decompile_expression(e)).collect())
             }
             PPEExpr::PredefinedFunctionCall(f, args) => {
+                if f.opcode == FuncOpCode::EnumCast {
+                    if let Some(type_id) = self.enum_cast_type(expression) {
+                        return FunctionCallExpression::create_empty_expression(
+                            IdentifierExpression::create_empty_expression(self.type_name(type_id).unwrap()),
+                            vec![self.decompile_expression(&args[1])],
+                        );
+                    }
+                    return ConstantExpression::create_empty_expression(Constant::String("ERROR IN EXPRESSION invalid enum cast".to_string()));
+                }
                 if f.opcode == FuncOpCode::ArrayValueAt
                     && let [array, index] = args.as_slice()
                 {
@@ -651,14 +795,14 @@ impl Decompiler {
                             | FuncOpCode::StringCountComparison
                             | FuncOpCode::StringEqualsComparison
                             | FuncOpCode::BytesGetChecksum
-                    ) && let Some(comparison) = arguments.pop()
+                    ) && arguments.pop().is_some()
                     {
                         let enum_type = if f.opcode == FuncOpCode::BytesGetChecksum {
                             crate::parser::CHECKSUM_ENUM_ID
                         } else {
                             crate::parser::STRING_COMPARISON_ENUM_ID
                         };
-                        arguments.push(self.convert_to_type(comparison, VariableType::UserData(enum_type)));
+                        arguments.push(self.decompile_as(args.last().unwrap(), VariableType::UserData(enum_type)));
                     }
                     return FunctionCallExpression::create_empty_expression(
                         MemberReferenceExpression::create_empty_expression(self.decompile_expression(receiver), unicase::Ascii::new(member.to_string())),
@@ -687,20 +831,19 @@ impl Decompiler {
                     args.iter()
                         .enumerate()
                         .map(|(i, e)| {
-                            let expr = self.decompile_expression(e);
                             if let Some(args) = &f.args
                                 && let Some(arg) = args.get(i)
                             {
-                                return self.convert_argument(expr, arg);
+                                return self.convert_argument(self.decompile_as(e, arg.arg_type), arg);
                             }
-                            expr
+                            self.decompile_expression(e)
                         })
                         .collect(),
                 )
             }
             PPEExpr::FunctionCall(f, args) => FunctionCallExpression::create_empty_expression(
                 IdentifierExpression::create_empty_expression(self.get_variable_name(*f)),
-                args.iter().map(|e| self.decompile_expression(e)).collect(),
+                args.iter().enumerate().map(|(index, e)| self.routine_argument(*f, index, e)).collect(),
             ),
         }
     }
@@ -734,22 +877,22 @@ impl Decompiler {
                 self.decompile_expression(collection)
             )),
             PPECommand::NextForEach(start) => CommentAstNode::create_empty_statement(format!(" NEXT FOREACH {start:04X}")),
-            PPECommand::ProcedureCall(p, args) => {
-                ProcedureCallStatement::create_empty_statement(self.get_variable_name(*p), args.iter().map(|e| self.decompile_expression(e)).collect())
-            }
+            PPECommand::ProcedureCall(p, args) => ProcedureCallStatement::create_empty_statement(
+                self.get_variable_name(*p),
+                args.iter().enumerate().map(|(index, e)| self.routine_argument(*p, index, e)).collect(),
+            ),
             PPECommand::MemberCall(expr) => MemberCallStatement::create_empty_statement(self.decompile_expression(expr)),
             PPECommand::PredefinedCall(p, args) => PredefinedCallStatement::create_empty_statement(
                 p,
                 args.iter()
                     .enumerate()
                     .map(|(i, e)| {
-                        let expr = self.decompile_expression(e);
                         if let Some(args) = &p.args
                             && let Some(arg) = args.get(i)
                         {
-                            return self.convert_argument(expr, arg);
+                            return self.convert_argument(self.decompile_as(e, arg.arg_type), arg);
                         }
-                        expr
+                        self.decompile_expression(e)
                     })
                     .collect(),
             ),
@@ -773,7 +916,9 @@ impl Decompiler {
                     // A corrupt PPE can name something that is not a variable as the target.
                     _ => return CommentAstNode::create_empty_statement(" Invalid assignment target".to_string()),
                 };
-                let mut value_expr = self.decompile_expression(expr);
+                let mut value_expr = self
+                    .expression_type(left)
+                    .map_or_else(|| self.decompile_expression(expr), |expected| self.decompile_as(expr, expected));
 
                 if self.expression_type(left) == Some(VariableType::Boolean) {
                     value_expr = Statement::try_boolean_conversion(&value_expr);
