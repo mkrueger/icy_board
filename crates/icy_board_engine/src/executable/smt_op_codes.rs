@@ -469,11 +469,18 @@ fn replace_constants(expr: crate::ast::Expression, consts: &'static [BuiltinCons
                     }
                     return expr;
                 }
-                let mut last = used_consts.pop().unwrap();
-                while !used_consts.is_empty() {
-                    last = BinaryExpression::create_empty_expression(BinOp::Add, used_consts.pop().unwrap(), last);
+                // Preserve bits not covered by this flag table. Decompilation
+                // must not silently turn an unfamiliar mask into known flags.
+                if cur_val != 0 {
+                    used_consts.push(ConstantExpression::create_empty_expression(Constant::Integer(cur_val, NumberFormat::Default)));
                 }
-                return last;
+                // These are disjoint INTEGER flags synthesized from one value,
+                // not arbitrary source expressions. Build their sum in source
+                // associativity so correct grouping needs no extra parentheses.
+                return used_consts
+                    .into_iter()
+                    .reduce(|left, right| BinaryExpression::create_empty_expression(BinOp::Add, left, right))
+                    .unwrap();
             }
         }
         Expression::Binary(bin_op) => {
@@ -486,6 +493,39 @@ fn replace_constants(expr: crate::ast::Expression, consts: &'static [BuiltinCons
         _ => {}
     }
     expr
+}
+
+#[cfg(test)]
+mod decompiler_flag_tests {
+    use super::*;
+    use crate::decompiler::evaluation_visitor::EvaluationVisitor;
+
+    #[test]
+    fn flag_names_preserve_known_unknown_and_signed_mask_bits() {
+        for constants in [&*DISPLAY_FLAGS_CONST, &*INPUT_FLAGS_CONST, &*DISPLAY_TEXT_FLAGS_CONST, &*CONFFLAG_CONST] {
+            let known = constants.iter().fold(0, |mask, constant| mask | constant.value);
+            for value in [0, known, known | (1 << 30), i32::MAX, -1, i32::MIN] {
+                let original = ConstantExpression::create_empty_expression(Constant::Integer(value, NumberFormat::Default));
+                let replaced = replace_constants(original, constants);
+                let actual = replaced.visit(&mut EvaluationVisitor::default()).unwrap().as_int();
+                assert_eq!(value, actual, "{replaced}");
+            }
+        }
+    }
+
+    #[test]
+    fn generated_flag_sums_are_left_associative() {
+        let value = DISPLAY_TEXT_FLAGS_CONST.iter().fold(0, |mask, constant| mask | constant.value);
+        let expression = replace_constants(
+            ConstantExpression::create_empty_expression(Constant::Integer(value, NumberFormat::Default)),
+            &DISPLAY_TEXT_FLAGS_CONST,
+        );
+        let mut node = &expression;
+        while let Expression::Binary(binary) = node {
+            assert!(matches!(binary.get_right_expression(), Expression::Const(_)));
+            node = binary.get_left_expression();
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]

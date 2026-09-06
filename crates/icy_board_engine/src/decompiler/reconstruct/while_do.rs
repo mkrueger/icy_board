@@ -1,6 +1,5 @@
 use crate::{
     ast::{Statement, WhileDoStatement, WhileStatement},
-    decompiler::reconstruct::scan_goto,
     semantic::SemanticVisitor,
 };
 
@@ -56,13 +55,22 @@ pub fn scan_do_while(visitor: &SemanticVisitor, statements: &mut Vec<Statement>,
             continue;
         }
 
+        if super::has_external_entries(visitor, statements, i + 1..matching_goto + 1) {
+            i += 1;
+            continue;
+        }
+
         // reconstruct while…do block
-        let mut while_block = statements.drain((i + 2)..matching_goto).collect();
+        let mut while_block: Vec<Statement> = statements.drain((i + 2)..matching_goto).collect();
         statements.drain(i + 1..i + 3);
 
         let continue_label = super::get_last_label(&statements[i..=i]);
-        super::handle_break_continue(break_label, continue_label, &mut while_block);
+        let tail_label = super::get_last_label(&while_block);
         optimize_block(visitor, &mut while_block, lang_version);
+        // Legacy compilers also target a label immediately before the back
+        // edge. That jump reaches exactly the same condition as the head.
+        super::handle_break_continue(unicase::Ascii::new(String::new()), tail_label, &mut while_block);
+        super::handle_break_continue(break_label, continue_label, &mut while_block);
 
         if while_block.len() == 1 && is_simple_statement(&while_block[0]) {
             statements.insert(
@@ -126,7 +134,7 @@ fn scan_do_while_case2(visitor: &SemanticVisitor, statements: &mut Vec<Statement
             continue;
         }
         // search "loop" goto
-        let Some(matching_goto) = scan_goto(statements, i + 4, &while_continue_label) else {
+        let Some(matching_goto) = super::scan_loop_back_edge(statements, i + 4, &while_continue_label, break_goto.get_label()) else {
             i += 1;
             continue;
         };
@@ -143,16 +151,24 @@ fn scan_do_while_case2(visitor: &SemanticVisitor, statements: &mut Vec<Statement
             i += 1;
             continue;
         }
+        if super::has_external_entries(visitor, statements, i + 1..matching_goto + 1) {
+            i += 1;
+            continue;
+        }
         // reconstruct while…do block
-        let mut while_block: Vec<Statement> = statements.drain((i + 4)..matching_goto).collect();
-        let continue_label = super::get_last_label(&while_block);
-        statements.remove(i + 4);
+        // Keep the body-entry label INSIDE the loop for remaining internal
+        // jumps. Only the head and a label immediately before its back edge
+        // are equivalent CONTINUE targets; a body-entry jump skips the test.
+        let mut while_block: Vec<Statement> = statements.drain((i + 3)..matching_goto).collect();
+        statements.remove(i + 3);
         statements.drain(i + 1..i + 3);
 
+        let tail_label = super::get_last_label(&while_block);
         optimize_block(visitor, &mut while_block, lang_version);
-        super::handle_break_continue(break_label, continue_label, &mut while_block);
+        super::handle_break_continue(unicase::Ascii::new(String::new()), tail_label, &mut while_block);
+        super::handle_break_continue(break_label, while_continue_label, &mut while_block);
 
-        if while_block.len() == 1 {
+        if while_block.len() == 1 && is_simple_statement(&while_block[0]) {
             statements.insert(
                 i + 1,
                 WhileStatement::create_empty_statement(next_loop_if.get_condition().clone(), while_block.pop().unwrap()),

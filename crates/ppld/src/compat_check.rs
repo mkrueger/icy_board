@@ -1,4 +1,4 @@
-use std::{collections::HashMap, io::stdout};
+use std::io::{self, Write};
 
 use crossterm::{
     execute,
@@ -11,6 +11,29 @@ struct UsageHit {
     name: String,
     status: ImplStatus,
     is_function: bool,
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct CompatibilitySummary {
+    pub unimplemented: usize,
+    pub unsupported: usize,
+    pub partial: usize,
+}
+
+impl CompatibilitySummary {
+    pub fn total(self) -> usize {
+        self.unimplemented + self.unsupported + self.partial
+    }
+
+    /// Strict mode rejects every reported category, including partial support.
+    pub fn has_findings(self) -> bool {
+        self.total() != 0
+    }
+}
+
+pub struct CompatibilityReport {
+    pub summary: CompatibilitySummary,
+    hits: Vec<UsageHit>,
 }
 
 // The compatibility tables live in `icy_board_engine::executable::compat` and are
@@ -130,7 +153,8 @@ fn collect_statement_hits(stmt: &icy_board_engine::executable::PPEStatement, hit
     }
 }
 
-pub fn check_compatibility(executable: &Executable) -> Result<(), Box<dyn std::error::Error>> {
+/// Analyze without performing I/O. Findings are successful analysis results, not errors.
+pub fn check_compatibility(executable: &Executable) -> Result<CompatibilityReport, Box<dyn std::error::Error>> {
     let script = PPEScript::from_ppe_file(executable).map_err(|e| format!("Failed to deserialize PPE: {e}"))?;
 
     let mut hits: Vec<UsageHit> = Vec::new();
@@ -138,40 +162,50 @@ pub fn check_compatibility(executable: &Executable) -> Result<(), Box<dyn std::e
         collect_statement_hits(stmt, &mut hits);
     }
 
-    // Deduplicate by (name, status, is_function, span_start) to keep location info separate.
-    // Keep as-is; If you want to collapse locations per name, you can group later.
-    if hits.is_empty() {
+    let mut summary = CompatibilitySummary::default();
+    for hit in &hits {
+        match hit.status {
+            ImplStatus::Unimplemented => summary.unimplemented += 1,
+            ImplStatus::Unsupported => summary.unsupported += 1,
+            ImplStatus::Partial => summary.partial += 1,
+            ImplStatus::Implemented | ImplStatus::Invalid => {}
+        }
+    }
+
+    // Preserve individual references (including repeats at the same location).
+    // Stable offset ordering retains expression traversal order for ties.
+    hits.sort_by_key(|hit| hit.span_start);
+    Ok(CompatibilityReport { summary, hits })
+}
+
+impl CompatibilityReport {
+    /// Render to the caller's stream. Only output failures are returned here.
+    pub fn write_report(&self, mut output: impl Write) -> io::Result<()> {
+        if !self.summary.has_findings() {
+            execute!(
+                output,
+                SetForegroundColor(Color::Green),
+                Print("✓ "),
+                ResetColor,
+                Print("No unsupported / unimplemented features detected.\n")
+            )?;
+            return Ok(());
+        }
+
         execute!(
-            stdout(),
-            SetForegroundColor(Color::Green),
-            Print("✓ "),
+            output,
+            SetAttribute(Attribute::Bold),
+            SetForegroundColor(Color::Yellow),
+            Print("Compatibility Report\n"),
             ResetColor,
-            Print("No unsupported / unimplemented features detected.\n")
+            SetAttribute(Attribute::Reset),
+            Print("--------------------------------------\n")
         )?;
-        return Ok(());
-    }
 
-    // Group by status for nicer output ordering.
-    let mut grouped: HashMap<ImplStatus, Vec<&UsageHit>> = HashMap::new();
-    for h in &hits {
-        grouped.entry(h.status).or_default().push(h);
-    }
-
-    execute!(
-        stdout(),
-        SetAttribute(Attribute::Bold),
-        SetForegroundColor(Color::Yellow),
-        Print("Compatibility Report\n"),
-        ResetColor,
-        SetAttribute(Attribute::Reset),
-        Print("--------------------------------------\n")
-    )?;
-
-    let order = [ImplStatus::Unimplemented, ImplStatus::Unsupported, ImplStatus::Partial];
-
-    for status in order {
-        if let Some(list) = grouped.get(&status) {
-            if list.is_empty() {
+        // Explicit category order, independent of hash iteration or locale.
+        for status in [ImplStatus::Unimplemented, ImplStatus::Unsupported, ImplStatus::Partial] {
+            let mut hits = self.hits.iter().filter(|hit| hit.status == status).peekable();
+            if hits.peek().is_none() {
                 continue;
             }
             let (title, color) = match status {
@@ -182,19 +216,15 @@ pub fn check_compatibility(executable: &Executable) -> Result<(), Box<dyn std::e
                 ImplStatus::Implemented | ImplStatus::Invalid => continue,
             };
             execute!(
-                stdout(),
+                output,
                 SetAttribute(Attribute::Bold),
                 Print(format!("{title}:\n")),
                 SetAttribute(Attribute::Reset),
             )?;
 
-            // Sort by offset for readability
-            let mut sorted = list.clone();
-            sorted.sort_by_key(|h| h.span_start);
-
-            for h in sorted {
+            for h in hits {
                 execute!(
-                    stdout(),
+                    output,
                     Print(format!("  [{:04X}] ", h.span_start)),
                     SetForegroundColor(color),
                     Print(if h.is_function {
@@ -205,37 +235,32 @@ pub fn check_compatibility(executable: &Executable) -> Result<(), Box<dyn std::e
                     ResetColor
                 )?;
             }
-            println!();
+            writeln!(output)?;
         }
+
+        let summary = self.summary;
+        execute!(
+            output,
+            SetAttribute(Attribute::Bold),
+            Print("Summary: ".to_string()),
+            SetAttribute(Attribute::Reset),
+            Print(format!("{} references -> ", summary.total())),
+            SetForegroundColor(Color::Red),
+            Print(format!("{} unimplemented ", summary.unimplemented)),
+            ResetColor,
+            SetForegroundColor(Color::Magenta),
+            Print(format!("{} unsupported ", summary.unsupported)),
+            ResetColor,
+            SetForegroundColor(Color::Yellow),
+            Print(format!("{} partial\n", summary.partial)),
+            ResetColor
+        )?;
+
+        execute!(
+            output,
+            Print("\nRecommendation: Review or replace the above items for full runtime compatibility.\n")
+        )?;
+
+        Ok(())
     }
-
-    // Summary
-    let total = hits.len();
-    let unimpl = grouped.get(&ImplStatus::Unimplemented).map(|v| v.len()).unwrap_or(0);
-    let unsup = grouped.get(&ImplStatus::Unsupported).map(|v| v.len()).unwrap_or(0);
-    let partial = grouped.get(&ImplStatus::Partial).map(|v| v.len()).unwrap_or(0);
-
-    execute!(
-        stdout(),
-        SetAttribute(Attribute::Bold),
-        Print("Summary: ".to_string()),
-        SetAttribute(Attribute::Reset),
-        Print(format!("{total} references -> ")),
-        SetForegroundColor(Color::Red),
-        Print(format!("{unimpl} unimplemented ")),
-        ResetColor,
-        SetForegroundColor(Color::Magenta),
-        Print(format!("{unsup} unsupported ")),
-        ResetColor,
-        SetForegroundColor(Color::Yellow),
-        Print(format!("{partial} partial\n")),
-        ResetColor
-    )?;
-
-    execute!(
-        stdout(),
-        Print("\nRecommendation: Review or replace the above items for full runtime compatibility.\n")
-    )?;
-
-    Ok(())
 }

@@ -51,3 +51,42 @@ fn test_binary() {
 
     test_expr("(0 > 1) & (A < B | B > C)", "FALSE");
 }
+
+#[test]
+fn decompiler_folds_only_complete_constant_subtrees() {
+    use super::evaluation_visitor::ConstantFolder;
+    for input in ["0.5 * A", "0 * Probe()", "FALSE & Probe()", "TRUE | Probe()", "0 / A", "!(0 * Probe())"] {
+        let expression = parse_expression(input);
+        assert_eq!(
+            expression.to_string(),
+            expression.visit_mut(&mut ConstantFolder::default()).to_string(),
+            "{input}"
+        );
+    }
+    assert_eq!("2", parse_expression("0.5 * 4").visit_mut(&mut ConstantFolder::default()).to_string());
+}
+
+#[test]
+fn condition_simplification_keeps_effects_and_faulting_operands() {
+    use super::evaluation_visitor::simplify_condition;
+    for input in [
+        "FALSE & Probe()",
+        "TRUE | Probe()",
+        "FALSE & A[1]",
+        "TRUE | A.Value",
+        "FALSE & 1 / A > 0",
+        "0.5 * A",
+    ] {
+        let expression = parse_expression(input);
+        assert_eq!(expression.to_string(), simplify_condition(&expression).to_string(), "{input}");
+    }
+    for (input, expected) in [
+        ("TRUE & A", "A"),
+        ("FALSE | A", "A"),
+        ("FALSE & A", "FALSE"),
+        ("TRUE | A", "TRUE"),
+        ("(TRUE & A >= 1) | (FALSE & A <= 1)", "A >= 1"),
+    ] {
+        assert_eq!(expected, simplify_condition(&parse_expression(input)).to_string(), "{input}");
+    }
+}

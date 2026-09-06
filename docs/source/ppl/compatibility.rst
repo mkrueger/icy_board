@@ -43,7 +43,11 @@ affected. The decompiler will tell you::
 
 It scans the compiled code and reports every call that is not fully supported,
 grouped by severity, with the code offset it appears at. A PPE that reports
-nothing uses only opcodes that behave like the original.
+nothing has no predefined calls classified as unsupported, unimplemented or
+partial; this is not a proof of full behavioral compatibility. Findings are
+informational by default. For an automated gate, use ``ppld --check --strict``:
+any of those categories causes exit 1, while a clean scan exits 0. Read or
+analysis errors also exit 1.
 
 What the categories mean
 ------------------------

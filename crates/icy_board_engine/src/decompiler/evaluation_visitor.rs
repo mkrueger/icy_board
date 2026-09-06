@@ -220,3 +220,83 @@ fn value_to_expression(value: &VariableValue) -> Option<Expression> {
     }
     None
 }
+
+/// Simplify only an IF's boolean context, never an arbitrary value expression.
+/// This recognizes the constant direction guards emitted by legacy FOR loops
+/// without treating e.g. `0.5 * value` as zero or dropping a call/getter/indexer.
+/// An identity may expose a non-boolean operand here because IF converts the
+/// result to boolean anyway; the same replacement in PRINT/LET would be wrong.
+pub(super) fn simplify_condition(expression: &Expression) -> Expression {
+    fn boolean(value: bool) -> Expression {
+        ConstantExpression::create_empty_expression(Constant::Boolean(value))
+    }
+    fn truth(expression: &Expression) -> Option<bool> {
+        match expression {
+            Expression::Const(value) => Some(value.get_constant_value().get_value().as_bool()),
+            _ => None,
+        }
+    }
+    // Discard only plainly total operations. Arithmetic may overflow or fault;
+    // calls, members and subscripts can have effects or raise runtime errors.
+    fn scalar(expression: &Expression) -> bool {
+        match expression {
+            Expression::Const(_) | Expression::Identifier(_) => true,
+            Expression::Parens(value) => scalar(value.get_expression()),
+            _ => false,
+        }
+    }
+    fn total(expression: &Expression) -> bool {
+        if scalar(expression) {
+            return true;
+        }
+        match expression {
+            Expression::Parens(value) => total(value.get_expression()),
+            Expression::Unary(value) if value.get_op() == UnaryOp::Not => total(value.get_expression()),
+            Expression::Binary(value) => match value.get_op() {
+                BinOp::And | BinOp::Or => total(value.get_left_expression()) && total(value.get_right_expression()),
+                BinOp::Eq | BinOp::NotEq | BinOp::Lower | BinOp::LowerEq | BinOp::Greater | BinOp::GreaterEq => {
+                    scalar(value.get_left_expression()) && scalar(value.get_right_expression())
+                }
+                _ => false,
+            },
+            _ => false,
+        }
+    }
+    match expression {
+        Expression::Parens(value) => simplify_condition(value.get_expression()),
+        Expression::Unary(value) if value.get_op() == UnaryOp::Not => {
+            let inner = simplify_condition(value.get_expression());
+            if let Some(value) = truth(&inner) {
+                boolean(!value)
+            } else {
+                let inner = if matches!(inner, Expression::Binary(_)) {
+                    crate::ast::ParensExpression::create_empty_expression(inner)
+                } else {
+                    inner
+                };
+                UnaryExpression::create_empty_expression(UnaryOp::Not, inner)
+            }
+        }
+        Expression::Binary(value) if matches!(value.get_op(), BinOp::And | BinOp::Or) => {
+            let left = simplify_condition(value.get_left_expression());
+            let right = simplify_condition(value.get_right_expression());
+            let absorbing = value.get_op() == BinOp::Or;
+            for (constant, other) in [(&left, &right), (&right, &left)] {
+                if let Some(value) = truth(constant) {
+                    if value != absorbing {
+                        return other.clone();
+                    }
+                    if total(other) {
+                        return boolean(absorbing);
+                    }
+                }
+            }
+            BinaryExpression::create_empty_expression(
+                value.get_op(),
+                super::add_parens_if_required(value.get_op(), left, false),
+                super::add_parens_if_required(value.get_op(), right, true),
+            )
+        }
+        _ => expression.clone(),
+    }
+}

@@ -305,13 +305,19 @@ Options
 
 ``-o, --output``  
   Write decompiled PPL to stdout instead of creating a ``.ppd`` file.
+  In source mode stdout contains only source; the banner and diagnostics go to
+  stderr. Recoverable decompilation issues still cause exit status 1.
 
 ``--check``  
   Perform a compatibility analysis and exit. Does not emit decompiled source.
   Reports:
   * Unimplemented (stubbed) statements/functions
   * Unsupported (intentionally not implemented) items
-  * Partially implemented features (placeholder category)
+  * Partially implemented features
+
+``--strict``
+  Requires ``--check``. Exit 1 if any unsupported, unimplemented or partially
+  implemented reference is found. Without this flag findings are informational.
 
 ``--style <u|l|c>``  
   Keyword casing: ``u`` = UPPER (default), ``l`` = lower, ``c`` = CamelCase.
@@ -402,7 +408,10 @@ Example output::
 
     Summary: 2 references -> 2 unimplemented 0 unsupported 0 partial
 
-Return code is non-zero only if an internal error occurs (not due to findings).  
+Without ``--strict``, findings alone do not cause a non-zero return code.
+With ``--check --strict``, every reported category causes exit 1; a clean scan
+exits 0. Read, decode and report-write errors also exit 1. Opcode coverage is
+not a proof of full behavioral compatibility.
 Use this before deploying legacy PPEs into an IcyBoard runtime.
 
 Example Workflows
@@ -419,6 +428,10 @@ Run compatibility audit only::
 
     ppld --check doors/league.ppe
 
+Reject compatibility findings in automation::
+
+  ppld --check --strict doors/league.ppe
+
 View disassembly (no source reconstruction)::
 
     ppld -d puzzles
@@ -428,6 +441,8 @@ Combine disassembly with stdout (both honored)::
     ppld -d -o logic
 
 (If ``--check`` is present it runs first and exits before other modes.)
+When combined with ``--output``, the check report goes to stderr and stdout
+remains empty.
 
 Limitations & Notes
 ~~~~~~~~~~~~~~~~~~~

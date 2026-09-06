@@ -33,11 +33,15 @@ pub fn scan_loop(visitor: &SemanticVisitor, statements: &mut Vec<Statement>, lan
         };
         let break_label = break_label.get_label().clone();
 
+        if super::has_external_entries(visitor, statements, i + 1..back_edge + 1) {
+            i += 1;
+            continue;
+        }
         let mut body: Vec<Statement> = statements.drain((i + 1)..back_edge).collect();
         statements.remove(i + 1);
 
-        super::handle_break_continue(break_label, head_label, &mut body);
         optimize_block(visitor, &mut body, lang_version);
+        super::handle_break_continue(break_label, head_label, &mut body);
 
         statements.insert(i + 1, LoopStatement::create_empty_statement(body));
         i += 1;

@@ -21,6 +21,7 @@ mod collection_bench;
 mod contacts;
 mod control_flow;
 mod dbase;
+mod decompiler_roundtrip;
 mod differential_optimizer;
 mod display_pause;
 mod enum_bitwise;

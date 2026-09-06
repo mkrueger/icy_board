@@ -48,6 +48,9 @@ struct Cli {
     #[arg(long, help = cli_text("check"))]
     check: bool,
 
+    #[arg(long, requires = "check", help = cli_text("strict"))]
+    strict: bool,
+
     #[arg(long, help = cli_text("cp437"))]
     cp437: bool,
 
@@ -74,7 +77,9 @@ fn main() {
         println!("ppld {}", *VERSION);
         return;
     }
-    println!("PPLD v{} - PCBoard Programming Language Decompiler", *VERSION);
+    // Keep the historical banner/report stream unless stdout was requested for source.
+    let mut diagnostics: Box<dyn Write> = if arguments.output { Box::new(stderr()) } else { Box::new(stdout()) };
+    let _ = writeln!(diagnostics, "PPLD v{} - PCBoard Programming Language Decompiler", *VERSION);
     if let Some(version) = arguments.lang_version
         && !SUPPORTED_PPL_LANGUAGE_VERSIONS.contains(&version)
     {
@@ -118,30 +123,26 @@ fn main() {
     match Executable::read_file(&file_name, !arguments.output) {
         Ok(mut executable) => {
             if arguments.check {
-                let _ = execute!(
-                    stdout(),
+                let report = match check_compatibility(&executable) {
+                    Ok(report) => report,
+                    Err(err) => {
+                        eprintln!("ERROR during compatibility check: {err}");
+                        std::process::exit(1);
+                    }
+                };
+                let result = execute!(
+                    diagnostics,
                     SetAttribute(Attribute::Bold),
                     Print(format!("\nChecking compatibility for: {}\n", file_name)),
                     SetAttribute(Attribute::Reset),
                     Print(format!("PPE Version: {}\n\n", executable.runtime))
-                );
-
-                match check_compatibility(&executable) {
-                    Ok(()) => {
-                        std::process::exit(0);
-                    }
-                    Err(err) => {
-                        let _ = execute!(
-                            stdout(),
-                            SetAttribute(Attribute::Bold),
-                            SetForegroundColor(Color::Red),
-                            Print("ERROR during compatibility check: ".to_string()),
-                            SetAttribute(Attribute::Reset),
-                            Print(format!("{}\n", err))
-                        );
-                        std::process::exit(1);
-                    }
+                )
+                .and_then(|()| report.write_report(&mut diagnostics));
+                if let Err(err) = result {
+                    eprintln!("ERROR writing compatibility report: {err}");
+                    std::process::exit(1);
                 }
+                std::process::exit(i32::from(arguments.strict && report.summary.has_findings()));
             }
 
             if arguments.disassemble {
@@ -181,7 +182,7 @@ fn main() {
                             std::process::exit(1);
                         }
                         let _ = execute!(
-                            stdout(),
+                            diagnostics,
                             Print("\nSource decompilation complete: ".to_string()),
                             SetAttribute(Attribute::Bold),
                             Print(format!("{file_name}\n")),
@@ -194,11 +195,11 @@ fn main() {
                     }
 
                     if !issues.is_empty() {
-                        println!();
+                        let _ = writeln!(diagnostics);
                     }
                     for issue in &issues {
                         let _ = execute!(
-                            stdout(),
+                            diagnostics,
                             SetAttribute(Attribute::Bold),
                             SetForegroundColor(Color::Yellow),
                             Print("WARNING: ".to_string()),
@@ -209,10 +210,10 @@ fn main() {
                             Print(format!("{}", issue.bug)),
                             SetAttribute(Attribute::Reset),
                         );
-                        println!();
+                        let _ = writeln!(diagnostics);
                     }
                     if !issues.is_empty() {
-                        println!("{0} issues found during decompilation", issues.len());
+                        let _ = writeln!(diagnostics, "{0} issues found during decompilation", issues.len());
                     }
                     // The .ppd is written either way, so the exit code is all a caller has to go on.
                     std::process::exit(if issues.is_empty() { 0 } else { 1 });

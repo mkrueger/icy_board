@@ -27,7 +27,7 @@ use crate::{
     semantic::SemanticVisitor,
 };
 
-use self::evaluation_visitor::OptimizationVisitor;
+use self::evaluation_visitor::ConstantFolder;
 
 pub mod evaluation_visitor;
 pub mod reconstruct;
@@ -36,6 +36,9 @@ pub mod rename_visitor;
 
 #[cfg(test)]
 pub mod test_evaluation_visitor;
+
+#[cfg(test)]
+mod test_expression_output;
 
 pub struct DecompilerIssue {
     pub byte_offset: usize,
@@ -714,7 +717,7 @@ impl Decompiler {
 
                 let expr = UnaryExpression::create_empty_expression(*op, expr);
                 if self.optimize_output {
-                    expr.visit_mut(&mut OptimizationVisitor::default())
+                    expr.visit_mut(&mut ConstantFolder::default())
                 } else {
                     expr
                 }
@@ -724,12 +727,12 @@ impl Decompiler {
                 let right_type = self.expression_type(right);
                 let left = right_type.map_or_else(|| self.decompile_expression(left), |expected| self.decompile_as(left, expected));
                 let right = left_type.map_or_else(|| self.decompile_expression(right), |expected| self.decompile_as(right, expected));
-                let left = add_parens_if_required(*op, left);
-                let right = add_parens_if_required(*op, right);
+                let left = add_parens_if_required(*op, left, false);
+                let right = add_parens_if_required(*op, right, true);
 
                 let expr = BinaryExpression::create_empty_expression(*op, left, right);
                 if self.optimize_output {
-                    expr.visit_mut(&mut OptimizationVisitor::default())
+                    expr.visit_mut(&mut ConstantFolder::default())
                 } else {
                     expr
                 }
@@ -918,6 +921,11 @@ impl Decompiler {
             PPECommand::IfNot(expr, label) => {
                 let expr = self.decompile_expression(expr);
                 let expr = Statement::try_boolean_conversion(&expr);
+                let expr = if self.optimize_output {
+                    evaluation_visitor::simplify_condition(&expr)
+                } else {
+                    expr
+                };
                 IfStatement::create_empty_statement(expr.negate_expression(), GotoStatement::create_empty_statement(self.get_label_name(*label)))
             }
             PPECommand::ForEach(variable, collection, end) => CommentAstNode::create_empty_statement(format!(
@@ -1301,14 +1309,56 @@ fn convert_argument(expr: Expression, arg: &crate::executable::ArgumentDefinitio
     arg.flags.convert_expr(expr)
 }
 
-fn add_parens_if_required(op: BinOp, expr: Expression) -> Expression {
+fn add_parens_if_required(op: BinOp, expr: Expression, right_operand: bool) -> Expression {
+    // Match the source parser, not the bytecode operator table: comparisons
+    // bind more tightly than AND/OR, and every binary level (even POW) is
+    // left-associative. Preserve right-nested trees also for ADD/MUL: numeric
+    // overflow, rounding and string coercion make reassociation unsafe.
+    fn source_priority(op: BinOp) -> u8 {
+        match op {
+            BinOp::Or | BinOp::And => 0,
+            BinOp::Eq | BinOp::NotEq | BinOp::Lower | BinOp::LowerEq | BinOp::Greater | BinOp::GreaterEq => 1,
+            BinOp::Add | BinOp::Sub => 2,
+            BinOp::Mul | BinOp::Div | BinOp::Mod => 3,
+            BinOp::PoW => 4,
+        }
+    }
     let add_parens = if let Expression::Binary(bin_op) = &expr {
-        bin_op.get_op().get_priority() < op.get_priority()
+        let child = source_priority(bin_op.get_op());
+        let parent = source_priority(op);
+        child < parent || (right_operand && child == parent)
     } else {
         false
     };
 
     if add_parens { ParensExpression::create_empty_expression(expr) } else { expr }
+}
+
+/// Reconstruction/negation can introduce new operators after expression
+/// decoding. Restore grouping on the final tree too, including NOT applied to
+/// arithmetic conditions. This runs in raw mode as well.
+#[derive(Default)]
+struct ExpressionParentheses;
+
+impl crate::ast::AstVisitorMut for ExpressionParentheses {
+    fn visit_binary_expression(&mut self, expression: &BinaryExpression) -> Expression {
+        let op = expression.get_op();
+        BinaryExpression::create_empty_expression(
+            op,
+            add_parens_if_required(op, expression.get_left_expression().visit_mut(self), false),
+            add_parens_if_required(op, expression.get_right_expression().visit_mut(self), true),
+        )
+    }
+
+    fn visit_unary_expression(&mut self, expression: &UnaryExpression) -> Expression {
+        let inner = expression.get_expression().visit_mut(self);
+        let inner = if matches!(inner, Expression::Binary(_)) {
+            ParensExpression::create_empty_expression(inner)
+        } else {
+            inner
+        };
+        UnaryExpression::create_empty_expression(expression.get_op(), inner)
+    }
 }
 
 fn generate_variable_declaration(var: &TableEntry, type_token: Spanned<Token>, source_type: VariableType) -> Statement {
@@ -1368,6 +1418,7 @@ pub fn decompile(executable: Executable, raw: bool, lang_version: u16) -> Res<(A
                 ast = relabel_visitor::relabel_ast(&mut ast);
             }
 
+            ast = ast.visit_mut(&mut ExpressionParentheses);
             Ok((ast, d.issues))
         }
         Err(err) => Err(Box::new(err.error_type)),

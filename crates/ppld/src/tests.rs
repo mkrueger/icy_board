@@ -7,49 +7,48 @@ use icy_board_engine::{
     ast::{Ast, OutputFunc, output_visitor},
     compiler::{PPECompiler, workspace::Workspace},
     executable::{Executable, LAST_PPE_RUNTIME, LAST_PPL_LANGUAGE_VERSION},
-    parser::{Encoding, ErrorReporter, UserTypeRegistry, parse_ast},
+    parser::{
+        Encoding, ErrorReporter, UserTypeRegistry,
+        lexer::{Lexer, Token},
+        parse_ast,
+    },
 };
 
 use crate::decompile;
 
 fn is_match(output: &str, original: &str) -> bool {
-    let mut i = 0;
-    let mut j = 0;
-
-    let output = output.as_bytes();
-    let original = original.as_bytes();
-
-    while i < output.len() && j < original.len() {
-        // skip comments - assume that ';' is not inside a string
-        if output[i] == b';' {
-            while output[i] != b'\n' {
-                i += 1;
+    fn tokens(source: &str) -> Option<Vec<Token>> {
+        let errors = Arc::new(Mutex::new(ErrorReporter::default()));
+        let mut workspace = Workspace::default();
+        workspace.set_default_language_version(Some(340));
+        let mut lexer = Lexer::new(PathBuf::from("reference.pps"), &workspace, source, Encoding::Utf8, errors.clone());
+        let mut tokens = Vec::new();
+        while let Some(token) = lexer.next_token() {
+            // Formatting/comments are not part of the golden. String tokens,
+            // token boundaries and the complete remaining output ARE.
+            if !matches!(token, Token::Eol | Token::Comment(_, _)) {
+                tokens.push(token);
             }
         }
+        if errors.lock().unwrap().has_errors() { None } else { Some(tokens) }
+    }
+    match (tokens(output), tokens(original)) {
+        (Some(output), Some(original)) => output == original,
+        _ => false,
+    }
+}
 
-        if output[i] == original[j] {
-            i += 1;
-            j += 1;
-            continue;
-        }
-        if char::is_whitespace(output[i] as char) {
-            i += 1;
-            continue;
-        }
-        if char::is_whitespace(original[j] as char) {
-            j += 1;
-            continue;
-        }
-        return false;
-    }
-    // skip original trailing ws.
-    while j < original.len() && char::is_whitespace(original[j] as char) {
-        j += 1;
-    }
-    if j >= original.len() {
-        return true;
-    }
-    false
+#[test]
+fn reference_comparison_preserves_strings_tokens_and_exhaustion() {
+    assert!(is_match("PRINTLN \"a; b\" ; comment without newline", "PRINTLN \"a; b\"\n"));
+    assert!(is_match("\n ; only a comment", ""));
+    assert!(!is_match("PRINTLN \"a b\"", "PRINTLN \"ab\""));
+    assert!(!is_match("PRINTLN \"a  b\"", "PRINTLN \"a b\""));
+    assert!(!is_match("PRINTLN \"a\"\"; b\"", "PRINTLN \"a\"\";b\""));
+    assert!(!is_match("PRINTLN 1\nPRINTLN 2", "PRINTLN 1"));
+    assert!(!is_match("PRINTLN 1", "PRINTLN 1\nPRINTLN 2"));
+    assert!(!is_match("PRINTLN AB", "PRINTLN A B"));
+    assert!(!is_match("PRINTLN \"unterminated", "PRINTLN \"unterminated"));
 }
 
 #[test]
@@ -57,22 +56,16 @@ fn test_decompiler() {
     use std::fs::{self};
     let mut data_path = env::current_dir().unwrap();
     data_path.push("test_data");
-    //let mut success = 0;
-    //let mut skipped = 0;
-    for entry in fs::read_dir(data_path).expect("Error reading test_data directory.") {
-        let cur_entry = entry.unwrap().path();
-        if cur_entry.extension().unwrap() != "ppe" {
-            continue;
-        }
-
+    let mut entries: Vec<_> = fs::read_dir(data_path)
+        .expect("Error reading test_data directory.")
+        .map(|entry| entry.unwrap().path())
+        .filter(|path| path.extension().is_some_and(|extension| extension == "ppe"))
+        .collect();
+    entries.sort();
+    assert!(!entries.is_empty(), "no PPE reference fixtures");
+    let mut failures = Vec::new();
+    for cur_entry in entries {
         let file_name = cur_entry.as_os_str();
-        /*
-        if ["select_case.ppe"].contains(&cur_entry.file_name().unwrap().to_str().unwrap()) {
-            //skipped += 1;
-            continue;
-        }
-        */
-
         let executable = Executable::read_file(&file_name, false).unwrap();
         // The reference sources are 3.40 era, so no REPEAT/LOOP is reconstructed for them.
         let (d, _) = decompile(executable, false, 340).unwrap();
@@ -85,19 +78,16 @@ fn test_decompiler() {
 
         let are_equal = is_match(&output_visitor.output, &orig_text);
 
-        if are_equal {
-            //success += 1;
-        } else {
-            println!(
+        if !are_equal {
+            failures.push(format!(
                 "'{}' not matched…\n{}-----\n{}",
                 cur_entry.file_name().unwrap().to_str().unwrap(),
                 output_visitor.output,
                 orig_text
-            );
+            ));
         }
-
-        assert!(are_equal);
     }
+    assert!(failures.is_empty(), "{} reference mismatches:\n{}", failures.len(), failures.join("\n"));
 }
 
 fn decompile_to_text(executable: Executable, language_version: u16) -> String {

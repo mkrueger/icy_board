@@ -57,7 +57,7 @@ tooling needs; it also limits the reconstruction to the loops that language has,
 below 350 a `REPEAT`/`LOOP` comes back as labels and jumps.
 
 ```text
-Usage: ppld [-r] [-d] [-o] [--check] [--cp437] [--style <style>] [--lang-version <lang-version>] [--] <file>
+Usage: ppld [-r] [-d] [-o] [--check [--strict]] [--cp437] [--style <style>] [--lang-version <lang-version>] [--] <file>
 
 PCBoard Programming Language Decompiler
 
@@ -67,9 +67,11 @@ Positional Arguments:
 Options:
   -r, --raw         raw ppe without reconstruction control structures
   -d, --disassemble output the disassembly instead of ppl
-  -o, --output      output to console instead of writing to file
+  -o, --output      source to stdout; banner and diagnostics to stderr
   --check           checks a .ppe file for compatibility with the current
                     runtime
+  --strict          requires --check; exit 1 for unsupported, unimplemented
+                    or partially implemented references
   --cp437           write the source as cp437 instead of utf8, for use with the
                     original tooling
   --style           keyword casing style, valid values are u=upper (default),
@@ -81,6 +83,22 @@ Options:
 
 The disassembly output shows what a compiler generated and is useful when a
 reconstructed source cannot express an unusual instruction sequence exactly.
+
+`--check` is informational by default: findings alone do not change its exit
+status. Use `--check --strict` for automated checks; any reported category makes
+it exit 1. Read, decode and report-write failures also exit 1. This is an opcode
+coverage check, not a proof that an arbitrary PPE behaves correctly.
+
+With `--output`, stdout contains only regenerated source in decompilation mode,
+including any source comments about damaged instructions. Warnings go to stderr
+and still cause exit 1; a partial source result is not silently reported as clean.
+`--check` takes precedence over source/disassembly output. Combining it with
+`--output` sends its report to stderr and leaves stdout empty.
+
+Expression grouping and evaluation side effects are preserved in both raw and
+structured modes. Structured reconstruction keeps labels and jumps whenever a
+safe loop transformation cannot be established, including cross-loop jumps.
+Original names and formatting cannot generally be recovered from the bytecode.
 
 ## Compiler
 

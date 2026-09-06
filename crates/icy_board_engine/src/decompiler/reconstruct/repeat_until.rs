@@ -47,12 +47,16 @@ pub fn scan_repeat_until(visitor: &SemanticVisitor, statements: &mut Vec<Stateme
         };
         let break_label = break_label.get_label().clone();
 
+        if super::has_external_entries(visitor, statements, i + 1..back_edge + 1) {
+            i += 1;
+            continue;
+        }
         let mut body: Vec<Statement> = statements.drain((i + 1)..back_edge).collect();
         statements.remove(i + 1);
 
         let continue_label = super::get_last_label(&body);
-        super::handle_break_continue(break_label, continue_label, &mut body);
         optimize_block(visitor, &mut body, lang_version);
+        super::handle_break_continue(break_label, continue_label, &mut body);
 
         statements.insert(
             i + 1,
