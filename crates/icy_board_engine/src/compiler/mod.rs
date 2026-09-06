@@ -73,6 +73,9 @@ pub enum CompilationErrorType {
     #[error("Module {0} may only declare; it has no program of its own to run")]
     StatementInModule(String),
 
+    #[error("Module initializer for '{0}' must be constant; use an explicitly called routine for runtime initialization")]
+    ModuleInitializerMustBeConstant(String),
+
     #[error("Source item is outside MODULE {0}")]
     ItemOutsideModule(String),
 
@@ -306,7 +309,7 @@ impl PPECompiler {
     /// Panics if .
     pub fn compile(&mut self, asts: &[&Ast]) {
         self.semantic_visitor.set_modules(asts);
-        let lowered = modules::lower_modules(asts, self.semantic_visitor.errors.clone());
+        let lowered = modules::lower_modules(asts, self.semantic_visitor.errors.clone(), &self.semantic_visitor.type_registry);
         let asts = lowered.iter().collect::<Vec<_>>();
         // Before introducing typed receiver temporaries, resolve whether a member
         // belongs to a value record or a reference object. Probe diagnostics are

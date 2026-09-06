@@ -172,6 +172,25 @@ A module declares; it has no program of its own. Variables, constants, types and
 routines are allowed, executable statements are not, because the module would
 otherwise run inside whichever program imports it.
 
+Module-level variable initializers must be constant expressions: literals,
+`CONST` references, enum members, parentheses and unary/binary operations on
+these values. Array and record literals are allowed when every supplied element
+or field is constant. Existing constant declaration order and type rules still
+apply. A constant initializer does not make a variable immutable; use `CONST`
+for that. Declarations without an initializer retain normal default values.
+
+Function calls are never allowed in module-level initializers, including pure
+user functions and built-in or member functions. Reading a mutable variable,
+an array element, or a runtime property such as `Session.User.Name` is also
+forbidden. This is checked before optimization, so multiplying a forbidden
+expression by zero does not make it valid.
+
+The rule applies to explicit modules and implicit source-library modules. It
+does not restrict initializers inside functions or procedures, or ordinary
+application globals. Runtime setup belongs in a routine the application calls
+explicitly, such as `MyModule.Initialize(...)`; no routine is called
+automatically because of its name or an import.
+
 One source file defines at most one module. Module and alias names are single PPL
 identifiers. A package may contain ordinary application sources and module sources
 together.

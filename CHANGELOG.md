@@ -34,6 +34,11 @@ releases.
 
 ### Fixed
 
+- Module-level variable initializers now require constant expressions, including
+  recursively constant array and record literals. Calls and mutable reads are
+  rejected by the compiler and language server before optimization, for explicit
+  and implicit library modules. Routine-local initialization remains unrestricted.
+
 - PPL 4.00 dynamic arrays now have per-call local storage and fresh function
   results, including recursion. Whole-array assignments copy all elements and
   adopt bounds; brace initializers preserve explicit dynamic declarations.

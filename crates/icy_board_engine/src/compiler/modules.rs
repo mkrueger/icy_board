@@ -39,7 +39,7 @@ struct ModuleInfo {
 
 type ModuleCatalog = HashMap<Ascii<String>, ModuleInfo>;
 
-pub fn lower_modules(asts: &[&Ast], errors: Arc<Mutex<ErrorReporter>>) -> Vec<Ast> {
+pub fn lower_modules(asts: &[&Ast], errors: Arc<Mutex<ErrorReporter>>, registry: &UserTypeRegistry) -> Vec<Ast> {
     let mut catalog = ModuleCatalog::new();
 
     for (module_index, ast) in asts.iter().enumerate() {
@@ -75,7 +75,8 @@ pub fn lower_modules(asts: &[&Ast], errors: Arc<Mutex<ErrorReporter>>) -> Vec<As
         }
     }
 
-    asts.iter()
+    let lowered: Vec<Ast> = asts
+        .iter()
         .map(|ast| {
             let own = ast
                 .module
@@ -116,7 +117,72 @@ pub fn lower_modules(asts: &[&Ast], errors: Arc<Mutex<ErrorReporter>>) -> Vec<As
                 locals: HashSet::new(),
             })
         })
-        .collect()
+        .collect();
+    validate_module_initializers(asts, &lowered, registry, &errors);
+    lowered
+}
+
+/// Check before optimization or initializer lowering can hide a runtime read or
+/// call. Names are already module-qualified; the ordinary semantic pass checks
+/// CONST definitions, visibility, declaration order and operand types.
+fn validate_module_initializers(original: &[&Ast], lowered: &[Ast], registry: &UserTypeRegistry, errors: &Arc<Mutex<ErrorReporter>>) {
+    let constants: HashSet<_> = lowered
+        .iter()
+        .flat_map(|ast| &ast.nodes)
+        .filter_map(|node| {
+            if let AstNode::TopLevelStatement(Statement::ConstDeclaration(declaration)) = node {
+                Some(declaration.get_identifier().clone())
+            } else {
+                None
+            }
+        })
+        .collect();
+    let enums = registry.enums();
+    fn constant(expression: &Expression, constants: &HashSet<Ascii<String>>, enums: &[crate::parser::EnumDefinition]) -> bool {
+        match expression {
+            Expression::Const(_) => true,
+            Expression::Identifier(identifier) => constants.contains(identifier.get_identifier()),
+            Expression::Parens(value) => constant(value.get_expression(), constants, enums),
+            Expression::Unary(value) => constant(value.get_expression(), constants, enums),
+            Expression::Binary(value) => constant(value.get_left_expression(), constants, enums) && constant(value.get_right_expression(), constants, enums),
+            Expression::MemberReference(member) => {
+                let Expression::Identifier(base) = member.get_expression() else {
+                    return false;
+                };
+                enums
+                    .iter()
+                    .any(|definition| definition.name == *base.get_identifier() && definition.value(member.get_identifier()).is_some())
+            }
+            Expression::ArrayInitializer(array) => array.get_expressions().iter().all(|value| constant(value, constants, enums)),
+            Expression::RecordLiteral(record) => record.get_fields().iter().all(|field| constant(field.get_value(), constants, enums)),
+            _ => false,
+        }
+    }
+    for (source, ast) in original.iter().zip(lowered) {
+        if ast.module.is_none() {
+            continue;
+        }
+        for (source_node, node) in source.nodes.iter().zip(&ast.nodes) {
+            let (
+                AstNode::TopLevelStatement(Statement::VariableDeclaration(source_decl)),
+                AstNode::TopLevelStatement(Statement::VariableDeclaration(declaration)),
+            ) = (source_node, node)
+            else {
+                continue;
+            };
+            for (source_variable, variable) in source_decl.get_variables().iter().zip(declaration.get_variables()) {
+                if let Some(value) = variable.get_initalizer()
+                    && !constant(value, &constants, &enums)
+                {
+                    errors.lock().unwrap().report_error_file(
+                        ast.file_name.clone(),
+                        source_variable.get_initalizer().as_ref().unwrap().get_span(),
+                        CompilationErrorType::ModuleInitializerMustBeConstant(source_variable.get_identifier().to_string()),
+                    );
+                }
+            }
+        }
+    }
 }
 
 struct TypeVisibilityValidator<'a> {
@@ -354,6 +420,20 @@ impl ModuleLowering<'_> {
 }
 
 impl AstVisitorMut for ModuleLowering<'_> {
+    fn visit_record_literal_expression(&mut self, record: &crate::ast::RecordLiteralExpression) -> Expression {
+        Expression::RecordLiteral(crate::ast::RecordLiteralExpression::new(
+            record.get_type_token().clone(),
+            record.get_variable_type(),
+            record.get_lbrace_token().clone(),
+            record
+                .get_fields()
+                .iter()
+                .map(|field| crate::ast::RecordLiteralField::new(field.get_identifier_token().clone(), field.get_value().visit_mut(self)))
+                .collect(),
+            record.get_rbrace_token().clone(),
+        ))
+    }
+
     fn visit_identifier(&mut self, id: &Ascii<String>) -> Ascii<String> {
         if self.locals.contains(id) {
             return id.clone();
@@ -456,6 +536,10 @@ mod tests {
     use std::path::PathBuf;
 
     fn compile(sources: &[(&str, &str)]) -> Arc<Mutex<ErrorReporter>> {
+        compile_with_optimization(sources, true)
+    }
+
+    fn compile_with_optimization(sources: &[(&str, &str)], optimize: bool) -> Arc<Mutex<ErrorReporter>> {
         let errors = Arc::new(Mutex::new(ErrorReporter::default()));
         let registry = UserTypeRegistry::icy_board_registry();
         let workspace = Workspace::default();
@@ -466,12 +550,53 @@ mod tests {
         let records = registry.user_types();
         let enums = registry.enums();
         let registered_types = registry.registered_types.clone();
-        let mut compiler = PPECompiler::new(&workspace, registry, errors.clone());
+        let mut compiler = PPECompiler::new(&workspace, registry, errors.clone()).with_optimization(optimize);
         compiler.compile(&asts.iter().collect::<Vec<_>>());
         assert_eq!(records, compiler.semantic_visitor.type_registry.user_types());
         assert_eq!(enums, compiler.semantic_visitor.type_registry.enums());
         assert_eq!(registered_types, compiler.semantic_visitor.type_registry.registered_types);
         errors
+    }
+
+    #[test]
+    fn module_initializer_rejects_zero_times_user_call_with_or_without_optimization() {
+        for optimize in [false, true] {
+            let errors = compile_with_optimization(
+                &[
+                    (
+                        "values.pps",
+                        "MODULE Values\nINTEGER value = 0 * Answer()\nFUNCTION Answer() INTEGER\n RETURN 42\nENDFUNC\nENDMODULE\n",
+                    ),
+                    ("main.pps", "IMPORT Values AS V\nPRINTLN V.value\n"),
+                ],
+                optimize,
+            );
+            let messages = errors.lock().unwrap().errors.iter().map(|error| error.error.to_string()).collect::<Vec<_>>();
+            assert!(
+                messages
+                    .iter()
+                    .any(|message| message.contains("Module initializer for 'value' must be constant")),
+                "optimize={optimize}: {messages:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn module_initializer_accepts_constant_operands_with_or_without_optimization() {
+        for optimize in [false, true] {
+            let errors = compile_with_optimization(
+                &[
+                    (
+                        "values.pps",
+                        "MODULE Values\nCONST INTEGER Answer = 42\nINTEGER value = 0 * Answer + (2 * -3)\nENDMODULE\n",
+                    ),
+                    ("main.pps", "IMPORT Values AS V\nPRINTLN V.value\n"),
+                ],
+                optimize,
+            );
+            let messages = errors.lock().unwrap().errors.iter().map(|error| error.error.to_string()).collect::<Vec<_>>();
+            assert!(messages.is_empty(), "optimize={optimize}: {messages:?}");
+        }
     }
 
     #[test]
