@@ -524,6 +524,7 @@ impl VirtualMachine<'_> {
                     } else {
                         self.eval_expr(expression).await?
                     };
+                    self.check_record_field_value(field, &field_value)?;
                     values[*field_id] = self.variable_table.checked_enum_value(field_type, field_value)?.convert_to(field_type);
                 }
                 Ok(value)
@@ -647,6 +648,20 @@ impl VirtualMachine<'_> {
                 Ok(self.variable_table.array_value(self.variable_table.get_value(*id), dim_1, dim_2, dim_3))
             }
 
+            PPEExpr::PredefinedFunctionCall(func, arguments)
+                if matches!(
+                    func.opcode,
+                    crate::executable::FuncOpCode::ArrayValueAt2 | crate::executable::FuncOpCode::ArrayValueAt3
+                ) =>
+            {
+                let array = self.eval_array_operand(&arguments[0]).await?;
+                let indices = &arguments[1..];
+                if array.get_dimensions() as usize != indices.len() {
+                    return Err(VMError::InvalidArrayDimensionCount(indices.len()).into());
+                }
+                let (first, second, third) = self.eval_array_indices(indices).await?;
+                Ok(self.variable_table.array_value(&array, first, second, third))
+            }
             PPEExpr::PredefinedFunctionCall(func, arguments) => match run_function(func.opcode, self, arguments).await {
                 Ok(val) => Ok(val),
                 Err(e) => Err(VMError::ErrorInFunctionCall(func.name.to_string(), e.to_string()).into()),
@@ -671,10 +686,12 @@ impl VirtualMachine<'_> {
                     // No room to call; the function's return variable keeps whatever it held.
                     return Ok(self.variable_table.get_value(return_var_id).clone());
                 }
-                // An array result belongs to the current invocation. A recursive
+                // Modern array/record results belong to the current invocation. A recursive
                 // call must return its value without replacing the outer result.
-                let saved_array_result = (self.variable_table.get_version() >= 400 && self.variable_table.get_var_entry(return_var_id).header.dim > 0)
-                    .then(|| self.variable_table.get_value(return_var_id).clone());
+                let saved_value_result = (self.variable_table.get_version() >= 400
+                    && (self.variable_table.get_var_entry(return_var_id).header.dim > 0
+                        || matches!(self.variable_table.get_value(return_var_id).generic_data, GenericVariableData::Record(_))))
+                .then(|| self.variable_table.get_value(return_var_id).clone());
                 self.prepare_call(locals, parameters, first, arguments, 0).await?;
 
                 self.return_addresses.push(ReturnAddress::func_call(self.cur_ptr, *func_id));
@@ -682,7 +699,7 @@ impl VirtualMachine<'_> {
                 self.run().await?;
                 self.fpclear = false;
                 let result = self.variable_table.get_value(return_var_id).clone();
-                if let Some(previous) = saved_array_result {
+                if let Some(previous) = saved_value_result {
                     *self.variable_table.get_value_mut(return_var_id) = previous;
                 }
                 Ok(result)
@@ -842,6 +859,7 @@ impl VirtualMachine<'_> {
                     };
                 }
                 let field_type = target.vtype;
+                self.check_record_field_value(target, &value)?;
                 *target = self.variable_table.checked_enum_value(field_type, value)?.convert_to(field_type);
                 self.variable_table.set_value(root_id, root_value);
             }
@@ -1035,12 +1053,17 @@ impl VirtualMachine<'_> {
             }
             PPECommand::ForEach(variable, collection, end) => {
                 let collection = self.eval_array_operand(collection).await?;
+                let header = &self.variable_table.get_var_entry(*variable).header;
+                if collection.get_dimensions() == 0 || header.dim != 0 || matches!(header.variable_type, VariableType::Function | VariableType::Procedure) {
+                    return Err(VMError::InvalidForEach.into());
+                }
+                self.check_nominal_assignment(header.variable_type, collection.vtype)?;
                 let count = Self::foreach_element_count(&collection);
                 if count == 0 {
                     self.goto(*end)?;
                 } else {
                     let element = Self::foreach_element_at(&collection, 0);
-                    self.variable_table.set_value(*variable, element);
+                    self.set_variable(&PPEExpr::Value(*variable), element).await?;
                     let body_start = self.script.statements.get(self.cur_ptr).map_or(*end, |statement| statement.span.start * 2);
                     self.foreach_stack.push(ForEachFrame {
                         variable: *variable,
@@ -1066,12 +1089,78 @@ impl VirtualMachine<'_> {
                     let variable = frame.variable;
                     let index = frame.index;
                     let element = Self::foreach_element_at(&frame.collection, index);
-                    self.variable_table.set_value(variable, element);
+                    self.set_variable(&PPEExpr::Value(variable), element).await?;
                     self.goto(*start)?;
                 }
             }
         }
 
+        Ok(())
+    }
+
+    fn check_nominal_assignment(&self, expected: VariableType, actual: VariableType) -> Res<()> {
+        if expected != actual && (matches!(expected, VariableType::UserData(_)) || matches!(actual, VariableType::UserData(_))) {
+            return Err(VMError::AssignmentTypeMismatch(expected, actual).into());
+        }
+        Ok(())
+    }
+
+    /// Field templates are fixed values, unlike redimensionable variable slots.
+    /// Validate before publishing either a field replacement or a record literal.
+    fn check_record_field_value(&self, template: &VariableValue, value: &VariableValue) -> Res<()> {
+        // Enum constants lower to INTEGER operands. As at the normal enum write
+        // boundary, accept that representation only after checking its domain.
+        if self.variable_table.is_enum(template.vtype) {
+            if value.get_dimensions() == 0 {
+                self.variable_table.checked_enum_value(template.vtype, value.clone())?;
+            } else if value.vtype != VariableType::Integer {
+                self.check_nominal_assignment(template.vtype, value.vtype)?;
+            }
+        } else {
+            self.check_nominal_assignment(template.vtype, value.vtype)?;
+        }
+        match (&template.generic_data, &value.generic_data) {
+            (GenericVariableData::Dim1(left), GenericVariableData::Dim1(right)) if left.len() == right.len() => {
+                for (left, right) in left.iter().zip(right.iter()) {
+                    self.check_record_field_value(left, right)?;
+                }
+            }
+            (GenericVariableData::Dim2(left), GenericVariableData::Dim2(right)) if left.len() == right.len() => {
+                for (left, right) in left.iter().zip(right.iter()) {
+                    if left.len() != right.len() {
+                        return Err(VMError::RecordFieldShapeMismatch.into());
+                    }
+                    for (left, right) in left.iter().zip(right.iter()) {
+                        self.check_record_field_value(left, right)?;
+                    }
+                }
+            }
+            (GenericVariableData::Dim3(left), GenericVariableData::Dim3(right)) if left.len() == right.len() => {
+                for (left, right) in left.iter().zip(right.iter()) {
+                    if left.len() != right.len() {
+                        return Err(VMError::RecordFieldShapeMismatch.into());
+                    }
+                    for (left, right) in left.iter().zip(right.iter()) {
+                        if left.len() != right.len() {
+                            return Err(VMError::RecordFieldShapeMismatch.into());
+                        }
+                        for (left, right) in left.iter().zip(right.iter()) {
+                            self.check_record_field_value(left, right)?;
+                        }
+                    }
+                }
+            }
+            (GenericVariableData::Record(left), GenericVariableData::Record(right)) if left.len() == right.len() => {
+                for (left, right) in left.iter().zip(right.iter()) {
+                    self.check_record_field_value(left, right)?;
+                }
+            }
+            (GenericVariableData::Dim1(_) | GenericVariableData::Dim2(_) | GenericVariableData::Dim3(_) | GenericVariableData::Record(_), _)
+            | (_, GenericVariableData::Dim1(_) | GenericVariableData::Dim2(_) | GenericVariableData::Dim3(_) | GenericVariableData::Record(_)) => {
+                return Err(VMError::RecordFieldShapeMismatch.into());
+            }
+            _ => {}
+        }
         Ok(())
     }
 
@@ -1151,6 +1240,120 @@ pub async fn run<P: AsRef<Path>>(file_name: &P, prg: &Executable, io: &mut dyn P
         Err(e) => {
             log::error!("Error loading PPE file '{}': {}", file_name.as_ref().display(), e);
             Err(Box::new(VMError::InternalVMError))
+        }
+    }
+}
+
+#[cfg(test)]
+mod followup_invariants {
+    use super::*;
+    use icy_net::{ConnectionType, channel::ChannelConnection};
+
+    async fn state() -> IcyBoardState {
+        let bbs = Arc::new(tokio::sync::Mutex::new(crate::icy_board::bbs::BBS::new(1)));
+        let node = bbs.lock().await.create_new_node(ConnectionType::Channel).await;
+        let nodes = bbs.lock().await.open_connections.clone();
+        let (_peer, connection) = ChannelConnection::create_pair();
+        IcyBoardState::new(
+            bbs,
+            Arc::new(tokio::sync::Mutex::new(crate::icy_board::IcyBoard::new())),
+            nodes,
+            node,
+            Box::new(connection),
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn foreach_bytecode_checks_rank_nominal_type_and_enum_domain() {
+        let mut state = state().await;
+        let registry = UserTypeRegistry::icy_board_registry();
+        let mut io = DiskIO::new(".", None);
+        for invalid in ["scalar source", "array target", "nominal target", "invalid enum"] {
+            let executable = tests::compile("ENUM Bits\n One=1\nENDENUM\nBits values[0]\nBits item\nFOREACH item IN values\nPRINT item\nNEXT\n");
+            let script = PPEScript::from_ppe_file(&executable).unwrap();
+            let command = script
+                .statements
+                .iter()
+                .find_map(|statement| match &statement.command {
+                    PPECommand::ForEach(_, _, _) => Some(statement.command.clone()),
+                    _ => None,
+                })
+                .unwrap();
+            let PPECommand::ForEach(target, collection, _) = &command else {
+                unreachable!()
+            };
+            let PPEExpr::Value(source) = collection.as_ref() else {
+                panic!("unexpected FOREACH lowering")
+            };
+            let mut vm = VirtualMachine::new("foreach.ppe".into(), &registry, &mut io, &mut state);
+            vm.variable_table = executable.variable_table;
+            match invalid {
+                "scalar source" => *vm.variable_table.get_value_mut(*source) = vm.variable_table.get_value(*source).get_array_value(0, 0, 0),
+                "array target" => vm.variable_table.get_var_entry_mut(*target).header.dim = 1,
+                "nominal target" => vm.variable_table.get_var_entry_mut(*target).header.variable_type = VariableType::Integer,
+                "invalid enum" => {
+                    let element = vm.variable_table.get_value_mut(*source).get_array_value_mut(0, 0, 0).unwrap();
+                    *element = VariableValue::new_enum(element.vtype, 99, 1);
+                }
+                _ => unreachable!(),
+            }
+            let before = vm.variable_table.get_value(*target).clone();
+            let error = vm.execute_statement(&command).await.unwrap_err().to_string();
+            assert!(
+                error.contains("FOREACH") || error.contains("assign") || error.contains("closed enum"),
+                "{invalid}: {error}"
+            );
+            assert_eq!(before, *vm.variable_table.get_value(*target), "{invalid}");
+            assert!(vm.foreach_stack.is_empty());
+        }
+    }
+
+    #[tokio::test]
+    async fn nested_fixed_field_failures_leave_root_and_shared_copies_unchanged() {
+        let mut state = state().await;
+        let registry = UserTypeRegistry::icy_board_registry();
+        let mut io = DiskIO::new(".", None);
+        for (rank, bounds) in [(1, "1"), (2, "1,1"), (3, "1,1,1")] {
+            for assignment in [
+                "box.child.items=a",
+                "box.child=Inner {items=a}",
+                "box=Outer {child=Inner {items=a}}",
+                "boxes[0].child.items=a",
+                "box.children[0].items=a",
+            ] {
+                let source = format!(
+                    "TYPE Inner\n INTEGER items[{bounds}]\nENDTYPE\nTYPE Outer\n INTEGER marker\n Inner child\n Inner children[0]\nENDTYPE\nOuter box\nOuter boxes[0]\nINTEGER a[{bounds}]\n{assignment}\n"
+                );
+                let executable = tests::compile(&source);
+                let script = PPEScript::from_ppe_file(&executable).unwrap();
+                let command = script
+                    .statements
+                    .iter()
+                    .rev()
+                    .find_map(|statement| match &statement.command {
+                        PPECommand::Let(_, _) => Some(statement.command.clone()),
+                        _ => None,
+                    })
+                    .unwrap();
+                let mut vm = VirtualMachine::new("atomic.ppe".into(), &registry, &mut io, &mut state);
+                vm.variable_table = executable.variable_table;
+                vm.user_types = executable.user_types;
+                let source_id = vm
+                    .variable_table
+                    .get_entries()
+                    .iter()
+                    .find(|entry| entry.header.variable_type == VariableType::Integer && entry.header.dim == rank)
+                    .unwrap()
+                    .header
+                    .id as usize;
+                vm.variable_table.get_value_mut(source_id).redim(rank, 2, 2, 2);
+                let before: Vec<_> = vm.variable_table.get_entries().iter().map(|entry| entry.value.clone()).collect();
+                let error = vm.execute_statement(&command).await.unwrap_err().to_string();
+                assert!(error.contains("fixed shape"), "{assignment}: {error}");
+                let after: Vec<_> = vm.variable_table.get_entries().iter().map(|entry| entry.value.clone()).collect();
+                assert_eq!(before, after, "rank={rank}, {assignment}");
+            }
         }
     }
 }

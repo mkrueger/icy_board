@@ -310,6 +310,23 @@ releases.
 
 ### Changed
 
+- PPL 4.00 constant declarations reject numeric values outside their declared
+  range (`CONST BYTE N = 257` is an error). Dependent and module constants use
+  converted values consistently, preserve nominal types and DOUBLE precision,
+  and keep STRING unbounded. Constant folding no longer rewrites enum namespaces
+  or bypasses enum argument checks. Older-source wrapping remains unchanged.
+- PPL 4.00 FOREACH validates array sources and scalar targets, including runtime
+  enum/record checks. Fixed record-array fields validate actual shapes before
+  replacement; indexed record targets enforce nominal types. Recursive record
+  results are invocation-local, and computed rank-2/3 results support indexing
+  and decompiler roundtrips, including callback signatures.
+- PPL 4.00 Split evaluates text, separator and limit left-to-right. Regex.FindAll
+  validates limits even outside the text. The modern StripATX member preserves
+  malformed control text without changing the classic opcode. Explicit Ordinal
+  comparisons preserve old errors like their default overloads. LSP completion
+  and signature help retain array ranks, distinguish scalar/array members and
+  offer typed StringComparison/Checksum arguments.
+
 - Enums are closed nominal types consistently from language 3.50 onward.
   Uninitialized values, array elements, record fields and fresh routine locals
   and results use the first declared member. `EnumName(integer)` checks domain

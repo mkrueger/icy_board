@@ -371,9 +371,12 @@ pub enum FuncOpCode {
     EnumCast = -355,
     /// Compiler-generated nominal enum containment test (type id, receiver, mask).
     EnumHas = -356,
+    /// Computed matrix/cube indexing; keep ArrayValueAt's published arity intact.
+    ArrayValueAt2 = -357,
+    ArrayValueAt3 = -358,
 }
 
-pub const LAST_FUNC: i16 = -356;
+pub const LAST_FUNC: i16 = -358;
 
 impl FuncOpCode {
     pub fn get_definition(self) -> &'static FunctionDefinition {
@@ -425,6 +428,8 @@ impl FuncOpCode {
                 | FuncOpCode::StringSplit
                 | FuncOpCode::StringSplitLimit
                 | FuncOpCode::ArrayValueAt
+                | FuncOpCode::ArrayValueAt2
+                | FuncOpCode::ArrayValueAt3
                 | FuncOpCode::StringSubstring
                 | FuncOpCode::BytesToString
                 | FuncOpCode::BytesGetChecksum
@@ -507,7 +512,7 @@ impl FunctionDefinition {
         }
     }
 }
-pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 368]> = std::sync::LazyLock::new(|| {
+pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 370]> = std::sync::LazyLock::new(|| {
     [
         FunctionDefinition {
             name: "END",
@@ -3543,6 +3548,22 @@ pub static FUNCTION_DEFINITIONS: std::sync::LazyLock<[FunctionDefinition; 368]> 
             return_type: VariableType::Boolean,
             args: None,
             signature: FunctionSignature::FixedParameters(3),
+        },
+        FunctionDefinition {
+            name: "<array value at 2>",
+            version: 400,
+            opcode: FuncOpCode::ArrayValueAt2,
+            return_type: VariableType::None,
+            args: None,
+            signature: FunctionSignature::FixedParameters(3),
+        },
+        FunctionDefinition {
+            name: "<array value at 3>",
+            version: 400,
+            opcode: FuncOpCode::ArrayValueAt3,
+            return_type: VariableType::None,
+            args: None,
+            signature: FunctionSignature::FixedParameters(4),
         },
         // ALIASES (need to be last in the list)
         FunctionDefinition {

@@ -570,9 +570,13 @@ pub async fn string_to_mixed_case(vm: &mut VirtualMachine<'_>, args: &[PPEExpr])
 
 fn string_comparison_mode(vm: &mut VirtualMachine<'_>, value: i32) -> Option<bool> {
     match value {
-        0 | 1 => {
+        // Ordinal comparisons are pure, just like the overload without a mode.
+        // Ignore-case comparisons are fallible (regex resource limits) and retain
+        // the operation-success contract, including same-statement protection.
+        0 => Some(false),
+        1 => {
             vm.operation_succeeded();
-            Some(value == 1)
+            Some(true)
         }
         _ => {
             vm.set_error(PplError::new(ERR_KIND_STRING, ERR_INVALID, "invalid StringComparison value"));
@@ -755,17 +759,19 @@ pub async fn string_equals_comparison(vm: &mut VirtualMachine<'_>, args: &[PPEEx
 }
 
 pub async fn string_split(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    string_split_values(vm, args, 0).await
+    let text = vm.eval_expr(&args[0]).await?.as_string();
+    let separator = vm.eval_expr(&args[1]).await?.as_string();
+    string_split_values(vm, text, separator, 0)
 }
 
 pub async fn string_split_limit(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let limit = vm.eval_expr(&args[2]).await?.as_int();
-    string_split_values(vm, args, limit).await
-}
-
-async fn string_split_values(vm: &mut VirtualMachine<'_>, args: &[PPEExpr], limit: i32) -> Res<VariableValue> {
     let text = vm.eval_expr(&args[0]).await?.as_string();
     let separator = vm.eval_expr(&args[1]).await?.as_string();
+    let limit = vm.eval_expr(&args[2]).await?.as_int();
+    string_split_values(vm, text, separator, limit)
+}
+
+fn string_split_values(vm: &mut VirtualMachine<'_>, text: String, separator: String, limit: i32) -> Res<VariableValue> {
     if separator.is_empty() {
         vm.set_error(PplError::new(ERR_KIND_STRING, ERR_INVALID, "STRING.Split separator cannot be empty"));
         return Ok(VariableValue::new_vector(VariableType::UnboundedString, Vec::new()));
@@ -918,8 +924,25 @@ pub async fn stripatx(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Vari
 
 /// `str.StripATX()`: the PPL 400 member form of `STRIPATX`.
 pub async fn string_stripatx(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
-    let str = vm.eval_expr(&args[0]).await?.as_string();
-    Ok(VariableValue::new_unbounded_string(strip_atx_codes(str)))
+    let text = vm.eval_expr(&args[0]).await?.as_string();
+    // PCBoard VAR.CPP cVARVAL::stripatx removes only complete @Xhh tokens.
+    // Keep the released classic opcode's scanner separate from this modern one.
+    // Copy untouched spans, preserving malformed tokens and UTF-8 byte-for-byte.
+    let bytes = text.as_bytes();
+    let mut result = String::with_capacity(text.len());
+    let mut copied = 0;
+    let mut index = 0;
+    while index + 4 <= bytes.len() {
+        if bytes[index] == b'@' && bytes[index + 1] == b'X' && bytes[index + 2].is_ascii_hexdigit() && bytes[index + 3].is_ascii_hexdigit() {
+            result.push_str(&text[copied..index]);
+            index += 4;
+            copied = index;
+        } else {
+            index += 1;
+        }
+    }
+    result.push_str(&text[copied..]);
+    Ok(VariableValue::new_unbounded_string(result))
 }
 
 fn strip_atx_codes(str: String) -> String {

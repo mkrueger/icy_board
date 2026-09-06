@@ -311,6 +311,23 @@ impl UserDataValue for PplRegex {
             };
             let text = arguments[0].as_string();
             let start = arguments.get(1).map_or(0, VariableValue::as_int);
+            let limit = arguments.get(2).map_or(0, VariableValue::as_int);
+            // An out-of-range start means no matches, not permission to bypass
+            // FindAll's argument validation. Find has no limit argument.
+            if *name == *FIND_ALL {
+                if limit < 0 {
+                    vm.set_error(PplError::new(ERR_KIND_REGEX, ERR_INVALID, "REGEX.FindAll limit cannot be negative"));
+                    return Ok(PplRegexMatch::array_value(Vec::new()));
+                }
+                if limit as usize > MAX_REGEX_RESULTS {
+                    vm.set_error(PplError::new(
+                        ERR_KIND_REGEX,
+                        crate::icy_board::state::ppl_error::ERR_LIMIT,
+                        "REGEX.FindAll limit exceeds 100000 matches",
+                    ));
+                    return Ok(PplRegexMatch::array_value(Vec::new()));
+                }
+            }
             let Some(offset) = Self::start_byte(&text, start) else {
                 vm.operation_succeeded();
                 return Ok(if *name == *FIND {
@@ -326,19 +343,6 @@ impl UserDataValue for PplRegex {
                     .unwrap_or_default();
                 vm.operation_succeeded();
                 return Ok(found.value());
-            }
-            let limit = arguments.get(2).map_or(0, VariableValue::as_int);
-            if limit < 0 {
-                vm.set_error(PplError::new(ERR_KIND_REGEX, ERR_INVALID, "REGEX.FindAll limit cannot be negative"));
-                return Ok(PplRegexMatch::array_value(Vec::new()));
-            }
-            if limit as usize > MAX_REGEX_RESULTS {
-                vm.set_error(PplError::new(
-                    ERR_KIND_REGEX,
-                    crate::icy_board::state::ppl_error::ERR_LIMIT,
-                    "REGEX.FindAll limit exceeds 100000 matches",
-                ));
-                return Ok(PplRegexMatch::array_value(Vec::new()));
             }
             let maximum = if limit == 0 { MAX_REGEX_RESULTS } else { limit as usize };
             let take = if limit == 0 { maximum.saturating_add(1) } else { maximum };

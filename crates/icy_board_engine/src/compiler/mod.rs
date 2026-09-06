@@ -97,6 +97,15 @@ pub enum CompilationErrorType {
     #[error("A constant needs a value the compiler can work out")]
     ConstantValueExpected,
 
+    #[error("Constant value is outside the range of {0}")]
+    ConstantOutOfRange(VariableType),
+
+    #[error("FOREACH requires an array source")]
+    ForEachArrayExpected,
+
+    #[error("FOREACH requires an assignable scalar target")]
+    ForEachScalarExpected,
+
     #[error("Compiled program is too large ({0} bytes; maximum is {1})")]
     ProgramTooLarge(usize, usize),
 

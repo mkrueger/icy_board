@@ -235,10 +235,15 @@ impl AstVisitor<HirExpr> for HirExpressionResolver<'_> {
                 let Expression::MemberReference(member) = call.get_expression() else {
                     return HirExpr::Invalid;
                 };
-                HirExpr::predefined(
-                    FuncOpCode::ArrayValueAt,
-                    vec![member.get_expression().visit(self), arguments.into_iter().next().unwrap()],
-                )
+                let opcode = match arguments.len() {
+                    1 => FuncOpCode::ArrayValueAt,
+                    2 => FuncOpCode::ArrayValueAt2,
+                    3 => FuncOpCode::ArrayValueAt3,
+                    _ => return HirExpr::Invalid,
+                };
+                let mut operands = vec![member.get_expression().visit(self)];
+                operands.extend(arguments);
+                HirExpr::predefined(opcode, operands)
             }
             SemanticInfo::FunctionReference(idx) => {
                 let reference_index = self.compiler.semantic_visitor.function_containers[idx].id;

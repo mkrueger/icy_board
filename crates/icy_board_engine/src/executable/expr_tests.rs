@@ -23,11 +23,16 @@ fn string_member_function_ids_are_compact_after_bytes() {
     assert_eq!(FuncOpCode::StringStripAtx as i16, -354);
     assert_eq!(FuncOpCode::EnumCast as i16, -355);
     assert_eq!(FuncOpCode::EnumHas as i16, -356);
-    assert_eq!(crate::executable::LAST_FUNC, -356);
+    assert_eq!(FuncOpCode::ArrayValueAt2 as i16, -357);
+    assert_eq!(FuncOpCode::ArrayValueAt3 as i16, -358);
+    assert_eq!(crate::executable::LAST_FUNC, -358);
     assert_eq!(FuncOpCode::EnumCast.minimum_runtime(), 400);
     assert_eq!(FuncOpCode::EnumCast.get_definition().parameter_count(), 2);
     assert_eq!(FuncOpCode::EnumHas.minimum_runtime(), 400);
     assert_eq!(FuncOpCode::EnumHas.get_definition().parameter_count(), 3);
+    assert_eq!(FuncOpCode::StringStripAtx.minimum_runtime(), 400);
+    assert_eq!(FuncOpCode::STRIPATX as i16, -60);
+    assert_ne!(FuncOpCode::StringStripAtx, FuncOpCode::STRIPATX);
 
     for (opcode, arity) in [
         (FuncOpCode::StringPadLeft, 2),
@@ -41,6 +46,8 @@ fn string_member_function_ids_are_compact_after_bytes() {
         (FuncOpCode::StringToMixedCase, 1),
         (FuncOpCode::StringStripAtx, 1),
         (FuncOpCode::EnumHas, 3),
+        (FuncOpCode::ArrayValueAt2, 3),
+        (FuncOpCode::ArrayValueAt3, 4),
     ] {
         let arguments: Vec<_> = (1..=arity).map(PPEExpr::Value).collect();
         let mut expected: Vec<_> = (1..=arity).flat_map(|id| [id as i16, 0]).collect();

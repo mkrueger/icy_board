@@ -423,6 +423,11 @@ character is also reachable through zero-based indexing (`text[0]`).
 `StringComparison.OrdinalIgnoreCase` as the last argument for Unicode-aware,
 case-insensitive searching or equality.
 
+Pure ordinal comparisons preserve an earlier `Error.Last()` value, both with
+the default overload and with explicit `StringComparison.Ordinal`. The fallible
+`OrdinalIgnoreCase` operations clear an older error on success, but never an
+error raised earlier in the same statement.
+
 The comparison mode does not change overlap semantics: `FindLast` includes
 overlapping occurrences and `EndsWith` tests the actual suffix; `Count` counts
 non-overlapping occurrences. An insensitive comparison whose compiled literal
@@ -438,6 +443,10 @@ first string.
 
 Operations that transform text return `STRING`. A language 400 `STRING` has no
 length limit, so member chains do not truncate.
+
+`StripATX()` removes only complete uppercase `@X` followed by two ASCII hex
+digits. Incomplete or malformed tokens and other `@` text are preserved. This
+is the modern member's rule; the classic `STRIPATX` opcode remains unchanged.
 
 The `STRING` type name also provides operations that do not belong to one value:
 
@@ -456,6 +465,8 @@ number of elements, with the unsplit remainder in the last one. A limit of zero
 means unlimited. Empty separators and negative limits report `ErrKind.String` /
 `ErrCode.Invalid` and return an empty array. Returned arrays may be assigned,
 indexed, queried with `Len()` or consumed directly by `FOREACH`.
+Both `text.Split(separator, limit)` and `STRING.Split(text, separator, limit)`
+evaluate text, separator and limit exactly once, in that order.
 
 `STRING.Join(array, separator)` joins a one-dimensional string array and returns
 `STRING`. `STRING.Repeat(value, count)` returns `STRING`; a negative count is an
@@ -1675,15 +1686,18 @@ ENDFOREACH
 The loop variable is declared like any other and has to be able to hold an
 element. It is a **copy**: assigning to it inside the loop changes the copy, not
 the array. Write through the array itself when a walk should change it.
+The source must be an array, not a scalar treated as a singleton. The target
+must be a writable scalar, not an array, constant or routine. Ordinary scalar
+assignment conversions apply; enum and record element types must match nominally.
+The VM also checks these invariants before writing each element.
 
 `BREAK` and `CONTINUE` work the way they do in every other loop. PPL arrays are
 declared with upper bounds and index from zero, so `STRING names(10)` walks
 eleven elements.
 
-How many elements there are is settled when the loop starts. Resizing an array
-inside its own walk therefore changes neither how many steps it takes nor where
-it stops, and the source is read once per step rather than twice. The board's
-collections cannot change while a PPE runs at all.
+The collection expression is evaluated once and its array value is snapshotted
+when the loop starts. Resizing or modifying the original array inside the loop
+changes neither the visited values nor the number of steps.
 
 `IN` is not a reserved word. Like `TO` and `STEP` it is only read as part of the
 statement, so it stays available as a variable name.
@@ -1725,6 +1739,17 @@ such as `INTEGER values[] = { 1, 2 }` stay dynamic; `{}` initializes an empty
 array. Local dynamic arrays start empty on each routine call and retain separate
 storage across recursive calls. An array function that exits without assigning
 its result returns an empty array, not the result of a previous call.
+
+Array-returning functions and callbacks can be indexed directly at every rank:
+`MakeVector()[i]`, `MakeMatrix()[i, j]`, `MakeCube()[i, j, k]`. The result and
+indices are evaluated once, left to right. Modern record and array function
+results belong to each invocation: a recursive call does not overwrite the
+outer call's assigned result. Historical scalar function-result behavior is
+unchanged.
+
+Record array fields check the source's actual current shape, not just its
+declaration. Assigning a resized incompatible array, including inside a record
+literal or nested field, raises a runtime error before replacing the destination.
 
 Routine parameters can also declare an array rank. In language 4.00 this
 requires runtime 4.00; the argument must be an array with a compatible element
@@ -1841,9 +1866,18 @@ member when the declared type is that enum
 ### Remarks
 A constant stands where a variable would, so it may open a program or a routine,
 and one declared in a routine belongs to it. The value takes the place of the
-name while compiling, so a constant costs nothing at runtime: the PPE is the one
-the value written out by hand would produce, whatever runtime it targets. A
-decompiled PPE therefore shows the value, never the name.
+name while compiling and retains its declared conversion and type. A decompiled
+PPE therefore shows the value or its explicit conversion, never the constant name.
+
+From language 400, a numeric constant initializer must fit its declared type.
+For example, `CONST BYTE N = 257` is a compilation error because `BYTE` ranges
+from 0 to 255; `CONST BYTE N = 255` is valid. Negative unsigned initializers,
+integer-width overflow, nonfinite floating-point values and overflow of `REAL`
+are rejected even for unused constants. Accepted fractional-to-integer conversions
+retain the existing truncation behavior: `CONST INTEGER N = 1.5` becomes 1.
+Dependent constants and module initializers use that converted value, not the raw
+initializer. `CONST STRING` remains unbounded in language 400. Earlier language
+versions and ordinary variable assignments retain their existing conversions.
 
 Writing to a constant is an error. A constant, parameter and variable may not
 share a name in the same scope, but a local declaration may shadow a global

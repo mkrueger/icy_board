@@ -14,7 +14,7 @@ use crate::{
         get_const_hover, get_function_hover, get_keyword_hover, get_member_documentation, get_member_documentation_with_parameters, get_preprocessor_hover,
         get_statement_hover, get_string_member_documentation, get_type_hover,
     },
-    type_lookup::{MemberKind, bytes_members, members_of, record_field_type_name, static_members_of, static_type_of_name, string_members, type_of_chain},
+    type_lookup::{MemberKind, array_members, callable_member, members_of, receiver_type_for_version, record_field_type_name, scalar_type, static_members_of},
 };
 
 pub enum ImCompleteCompletionItem {
@@ -90,7 +90,7 @@ pub fn get_completion(ast: &Ast, semantic_visitor: &SemanticVisitor, line_before
         CursorContext::Other => {}
     }
 
-    let parameter_items = parameter_completion(semantic_visitor, line_before_cursor);
+    let parameter_items = parameter_completion(semantic_visitor, line_before_cursor, ast.language_version);
     if !parameter_items.is_empty() {
         return parameter_items;
     }
@@ -293,30 +293,17 @@ fn hover_documentation(hover: Option<tower_lsp::lsp_types::Hover>) -> Option<Doc
 }
 
 /// Qualified enum values suitable for the member-call argument under the cursor.
-fn parameter_completion(visitor: &SemanticVisitor, line_before_cursor: &str) -> Vec<CompletionItem> {
+fn parameter_completion(visitor: &SemanticVisitor, line_before_cursor: &str, language_version: u16) -> Vec<CompletionItem> {
     let Some(call) = call_context(line_before_cursor) else {
         return Vec::new();
     };
-    let Some(receiver_type) = (!call.receiver.is_empty()).then(|| type_of_chain(visitor, &call.receiver)).flatten() else {
+    let Some(receiver) = receiver_type_for_version(visitor, &call.receiver, language_version) else {
         return Vec::new();
     };
-    let icy_board_engine::executable::VariableType::UserData(receiver_id) = receiver_type else {
+    if language_version < FIRST_BOARD_OBJECT_LANGUAGE_VERSION && scalar_type(receiver.variable_type) && receiver.rank == 0 {
         return Vec::new();
-    };
-    let name = unicase::Ascii::new(call.name);
-    let parameter_type = if visitor.type_registry.is_enum_type(receiver_type) && name == "Has" && call.argument == 0 {
-        crate::type_lookup::enum_instance_type(visitor, &call.receiver)
-    } else {
-        visitor.type_registry.get_type_from_id(receiver_id).and_then(|object| {
-            object
-                .functions
-                .get(&name)
-                .map(|function| &function.parameters)
-                .or_else(|| object.procedures.get(&name).map(|procedure| &procedure.parameters))
-                .and_then(|parameters| parameters.get(call.argument))
-                .copied()
-        })
-    };
+    }
+    let parameter_type = callable_member(&visitor.type_registry, receiver, &call.name).and_then(|method| method.parameters.get(call.argument).copied());
     let Some(icy_board_engine::executable::VariableType::UserData(parameter_id)) = parameter_type else {
         return Vec::new();
     };
@@ -360,49 +347,14 @@ fn declared_type_names(visitor: &SemanticVisitor, lang_version: u16) -> Vec<Stri
 
 /// What may follow the `.` of a member chain.
 fn member_completion(visitor: &SemanticVisitor, path: &[String], language_version: u16) -> Vec<CompletionItem> {
-    if language_version < FIRST_BOARD_OBJECT_LANGUAGE_VERSION {
-        let namespace = path.len() == 1 && matches!(path[0].to_ascii_uppercase().as_str(), "STRING" | "BIGSTR");
-        let value = type_of_chain(visitor, path).is_some_and(|value| {
-            matches!(
-                value,
-                icy_board_engine::executable::VariableType::String
-                    | icy_board_engine::executable::VariableType::BigStr
-                    | icy_board_engine::executable::VariableType::UnboundedString
-            )
-        });
-        if namespace || value {
-            return Vec::new();
-        }
-    }
-    if path.len() == 1 && matches!(path[0].to_ascii_uppercase().as_str(), "STRING" | "BIGSTR") {
-        return completion_items(string_members(true), None, &visitor.type_registry);
-    }
-    if path.len() == 1 && path[0].eq_ignore_ascii_case("BYTES") {
-        return completion_items(bytes_members(true), None, &visitor.type_registry);
-    }
-    let property_path = if path.last().is_some_and(|last| last == crate::context::CALLED) {
-        &path[..path.len() - 1]
-    } else {
-        path
+    let Some(receiver) = receiver_type_for_version(visitor, path, language_version) else {
+        return Vec::new();
     };
-    if let Some((property, receiver)) = property_path.split_last()
-        && let Some(icy_board_engine::executable::VariableType::UserData(type_id)) = type_of_chain(visitor, receiver)
-        && let Some(registry) = visitor.type_registry.get_type_from_id(type_id)
-        && (registry.field_ranks.contains_key(&unicase::Ascii::new(property.clone()))
-            || registry
-                .functions
-                .get(&unicase::Ascii::new(property.clone()))
-                .is_some_and(|function| function.return_rank > 0))
-    {
-        return completion_items(
-            vec![crate::type_lookup::Member {
-                name: "Len".to_string(),
-                detail: "() INTEGER".to_string(),
-                kind: MemberKind::Method,
-            }],
-            None,
-            &visitor.type_registry,
-        );
+    if receiver.rank > 0 {
+        return completion_items(array_members(&visitor.type_registry, receiver), None, &visitor.type_registry);
+    }
+    if language_version < FIRST_BOARD_OBJECT_LANGUAGE_VERSION && scalar_type(receiver.variable_type) {
+        return Vec::new();
     }
     if path.len() == 1
         && let Some(definition) = visitor.type_registry.get_enum(&unicase::Ascii::new(path[0].clone()))
@@ -421,16 +373,9 @@ fn member_completion(visitor: &SemanticVisitor, path: &[String], language_versio
             &visitor.type_registry,
         );
     }
-    if path.len() == 1
-        && let Some(var_type) = static_type_of_name(visitor, &path[0])
-    {
+    let var_type = receiver.variable_type;
+    if receiver.namespace {
         return completion_items(static_members_of(&visitor.type_registry, var_type), Some(var_type), &visitor.type_registry);
-    }
-    let Some(var_type) = type_of_chain(visitor, path) else {
-        return Vec::new();
-    };
-    if visitor.type_registry.is_enum_type(var_type) && crate::type_lookup::enum_instance_type(visitor, path).is_none() {
-        return Vec::new();
     }
     completion_items(members_of(&visitor.type_registry, var_type), Some(var_type), &visitor.type_registry)
 }

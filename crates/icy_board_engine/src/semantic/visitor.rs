@@ -93,7 +93,23 @@ impl AstVisitor<VariableType> for SemanticVisitor {
     fn visit_return_statement(&mut self, return_stmt: &crate::ast::ReturnStatement) -> VariableType {
         crate::ast::walk_return_stmt(self, return_stmt);
         if let Some(expression) = return_stmt.get_expression() {
-            self.reject_bare_array_value(expression);
+            let array_result = self.cur_func_impl.and_then(|index| self.routine_container(index)).and_then(|container| {
+                let FunctionDeclaration::Function(function) = &container.functions else {
+                    return None;
+                };
+                (function.get_return_rank() > 0).then(|| ArrayShape {
+                    element_type: function.get_return_type(),
+                    rank: function.get_return_rank(),
+                    bounds: [0; 3],
+                    resizable: true,
+                    field_name: None,
+                })
+            });
+            if let Some(shape) = array_result {
+                self.check_array_target_assignment(&shape, expression, &expression.get_span());
+            } else {
+                self.reject_bare_array_value(expression);
+            }
         }
         VariableType::None
     }
@@ -283,6 +299,8 @@ impl AstVisitor<VariableType> for SemanticVisitor {
         } else if let Some(idx) = self.lookup_variable(identifier.get_identifier()) {
             if self.cur_func_call == 0
                 && self.cur_func_impl == Some(idx)
+                && !self.allow_routine_reference
+                && !self.allowed_routine_reference_spans.contains(&identifier.get_identifier_token().span.start)
                 && let ReferenceType::Function(container_idx) = self.references[idx].0
                 && let FunctionDeclaration::Function(function) = &self.function_containers[container_idx].functions
             {
@@ -833,18 +851,18 @@ impl AstVisitor<VariableType> for SemanticVisitor {
         if self.lang_version >= 400
             && let Expression::MemberReference(member) = call.get_expression()
             && member.get_identifier().as_ref() == "<get>"
-            && call.get_arguments().len() == 1
         {
             let receiver_type = self.visit_receiver(member.get_expression(), member.get_identifier_token());
-            if let Some(shape) = self.array_shape(member.get_expression())
-                && shape.rank == 1
-            {
-                self.reject_enum_argument(&call.get_arguments()[0]);
-                self.reject_bare_array_value(&call.get_arguments()[0]);
+            if let Some(shape) = self.array_shape(member.get_expression()) {
+                self.check_expr_arg_count(shape.rank as usize, call.get_arguments().len(), call.get_expression());
+                for argument in call.get_arguments() {
+                    self.reject_enum_argument(argument);
+                    self.reject_bare_array_value(argument);
+                }
                 self.function_type_lookup.insert(CallId(call.id), SemanticInfo::ArrayValueAt);
                 return shape.element_type;
             }
-            if matches!(receiver_type, VariableType::String | VariableType::BigStr | VariableType::UnboundedString) {
+            if call.get_arguments().len() == 1 && matches!(receiver_type, VariableType::String | VariableType::BigStr | VariableType::UnboundedString) {
                 self.reject_enum_argument(&call.get_arguments()[0]);
                 self.reject_bare_array_value(&call.get_arguments()[0]);
                 self.function_type_lookup
@@ -1508,6 +1526,13 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                         let_stmt.get_value_expression().get_span(),
                         CompilationErrorType::EnumAssignmentTypeMismatch(self.source_type_name(target_type), self.source_type_name(value_type)),
                     );
+                } else if value_type != VariableType::None
+                    && (matches!(target_type, VariableType::UserData(_)) || matches!(value_type, VariableType::UserData(_)))
+                {
+                    self.errors.lock().unwrap().report_error(
+                        let_stmt.get_value_expression().get_span(),
+                        CompilationErrorType::AssignmentTypeMismatch(target_type, value_type),
+                    );
                 }
             }
             return VariableType::None;
@@ -1762,15 +1787,46 @@ impl AstVisitor<VariableType> for SemanticVisitor {
     }
 
     fn visit_foreach_statement(&mut self, foreach_stmt: &crate::ast::ForEachStatement) -> VariableType {
+        foreach_stmt.get_collection().visit(self);
+        let source = self.array_shape(foreach_stmt.get_collection());
+        if source.is_none() {
+            self.errors
+                .lock()
+                .unwrap()
+                .report_error(foreach_stmt.get_collection().get_span(), CompilationErrorType::ForEachArrayExpected);
+        }
         if let Some(index) = self.lookup_variable(foreach_stmt.get_identifier()) {
             self.add_reference_to(foreach_stmt.get_identifier_token(), index);
+            let reference = &self.references[index];
+            let target_type = reference.1.variable_type;
+            if !matches!(reference.0, ReferenceType::Variable(_)) || reference.1.header.as_ref().is_none_or(|header| header.dim != 0) {
+                self.errors
+                    .lock()
+                    .unwrap()
+                    .report_error(foreach_stmt.get_identifier_token().span.clone(), CompilationErrorType::ForEachScalarExpected);
+            } else if let Some(source) = source
+                && source.element_type != target_type
+                && (matches!(target_type, VariableType::UserData(_)) || matches!(source.element_type, VariableType::UserData(_)))
+            {
+                self.errors.lock().unwrap().report_error(
+                    foreach_stmt.get_identifier_token().span.clone(),
+                    CompilationErrorType::AssignmentTypeMismatch(target_type, source.element_type),
+                );
+            }
+        } else if self.lookup_constant(foreach_stmt.get_identifier()).is_some() {
+            self.errors.lock().unwrap().report_error(
+                foreach_stmt.get_identifier_token().span.clone(),
+                CompilationErrorType::CannotAssignToConstant(foreach_stmt.get_identifier().to_string()),
+            );
         } else {
             self.errors.lock().unwrap().report_error(
                 foreach_stmt.get_identifier_token().span.clone(),
                 CompilationErrorType::VariableNotFound(foreach_stmt.get_identifier().to_string()),
             );
         }
-        crate::ast::walk_foreach_stmt(self, foreach_stmt);
+        for statement in foreach_stmt.get_statements() {
+            statement.visit(self);
+        }
         VariableType::None
     }
 
@@ -1845,13 +1901,14 @@ impl AstVisitor<VariableType> for SemanticVisitor {
 
         let name = const_decl.get_identifier().clone();
         // An enum keeps the value its member stands for; converting to the type itself would mean nothing.
-        let entry = if self.type_registry.is_enum_type(declared_type) {
-            (declared_type, value)
-        } else if self.lang_version >= 400 && declared_type == VariableType::String {
-            (declared_type, value)
-        } else {
-            (declared_type, value.convert_to(declared_type))
+        let Some(value) = crate::ast::convert_const_declaration(value, declared_type, self.lang_version) else {
+            self.errors
+                .lock()
+                .unwrap()
+                .report_error(const_decl.get_value().get_span(), CompilationErrorType::ConstantOutOfRange(declared_type));
+            return VariableType::None;
         };
+        let entry = (declared_type, value);
         let reference_index = self.references.len();
         self.references.push((
             ReferenceType::Constant(reference_index),

@@ -29,6 +29,7 @@ pub struct AstTransformationVisitor {
     compound_receiver_types: HashMap<usize, u8>,
     compound_record_types: HashSet<u8>,
     temporaries: usize,
+    language: u16,
 }
 
 impl AstTransformationVisitor {
@@ -67,6 +68,7 @@ impl AstTransformationVisitor {
             compound_receiver_types: HashMap::new(),
             compound_record_types: HashSet::new(),
             temporaries: 0,
+            language: 400,
         }
     }
 
@@ -232,6 +234,9 @@ impl AstTransformationVisitor {
                 &|id| self.lookup_constant(id).map(|(_, value)| value.clone()),
                 &self.enums,
             ) else {
+                continue;
+            };
+            let Some(value) = crate::ast::convert_const_declaration(value, const_decl.get_variable_type(), self.language) else {
                 continue;
             };
             let entry = (const_decl.get_variable_type(), value);
@@ -733,7 +738,35 @@ impl AstVisitorMut for AstTransformationVisitor {
         }))
     }
 
+    fn visit_member_reference_expression(&mut self, member: &MemberReferenceExpression) -> Expression {
+        let is_enum_namespace = matches!(member.get_expression(), Expression::Identifier(base)
+            if self.enums.iter().any(|definition| definition.name == *base.get_identifier()));
+        Expression::MemberReference(MemberReferenceExpression::new(
+            if is_enum_namespace {
+                member.get_expression().clone()
+            } else {
+                member.get_expression().visit_mut(self)
+            },
+            member.get_dot_token().clone(),
+            member.get_identifier_token().clone(),
+        ))
+    }
+
+    fn visit_function_call_expression(&mut self, call: &crate::ast::FunctionCallExpression) -> Expression {
+        let is_enum_namespace = matches!(call.get_expression(), Expression::Identifier(base)
+            if self.enums.iter().any(|definition| definition.name == *base.get_identifier()));
+        Expression::FunctionCall(call.preserving_id(
+            if is_enum_namespace {
+                call.get_expression().clone()
+            } else {
+                call.get_expression().visit_mut(self)
+            },
+            call.get_arguments().iter().map(|argument| argument.visit_mut(self)).collect(),
+        ))
+    }
+
     fn visit_ast(&mut self, program: &Ast) -> Ast {
+        self.language = program.language_version;
         // A constant may be used before the line that declares it, so they are all
         // known before anything is rewritten.
         for node in &program.nodes {

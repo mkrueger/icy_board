@@ -113,6 +113,10 @@ pub struct Decompiler {
     used_labels: HashSet<usize>,
 
     function_lookup: HashMap<usize, usize>,
+    /// Callback table entries do not store parameter types or the return slot.
+    /// Map them to a concrete routine passed at a call site, without changing
+    /// the callback's identity in the emitted program.
+    callback_signatures: HashMap<usize, usize>,
     cur_ptr: usize,
     issues: Vec<DecompilerIssue>,
     optimize_output: bool,
@@ -136,6 +140,7 @@ impl Decompiler {
             output_language_version,
             label_lookup: HashMap::new(),
             function_lookup: HashMap::new(),
+            callback_signatures: HashMap::new(),
             used_labels: HashSet::new(),
             functions: Vec::new(),
             cur_ptr: 0,
@@ -180,21 +185,24 @@ impl Decompiler {
     pub fn decompile(&mut self) -> Res<Ast> {
         self.label_lookup = self.analyze_labels();
 
-        {
+        let routine_calls = {
             let mut visitor = VariableConstantVisitor {
                 executable: &mut self.executable,
+                routine_calls: Vec::new(),
             };
             self.script.visit(&mut visitor);
-        }
+            visitor.routine_calls
+        };
 
         self.executable.variable_table.analyze_usage(&self.script);
         self.executable.variable_table.analyze_locals();
         self.executable.variable_table.generate_names();
+        self.recover_callback_signatures(&routine_calls);
 
         let mut ast = Ast::default();
 
         self.generate_type_declarations(&mut ast);
-        self.generate_function_declarations(&mut ast);
+        self.generate_function_declarations(&mut ast)?;
         self.generate_global_variable_declarations(&mut ast);
 
         let mut statements = Vec::new();
@@ -207,7 +215,7 @@ impl Decompiler {
             if let Some(func) = self.function_lookup.get(&byte_offset).copied()
                 && self.executable.variable_table.try_get_entry(func).is_some()
             {
-                self.parse_function(func);
+                self.parse_function(func)?;
                 continue;
             }
 
@@ -452,7 +460,7 @@ impl Decompiler {
     }
 
     fn routine_argument(&self, routine: usize, index: usize, expression: &PPEExpr) -> Expression {
-        let expected = self.executable.variable_table.try_get_entry(routine).and_then(|entry| unsafe {
+        let expected = self.signature_entry(routine).and_then(|entry| unsafe {
             let (first, count) = match entry.header.variable_type {
                 VariableType::Function => (entry.value.data.function_value.first_var_id, entry.value.data.function_value.parameters),
                 VariableType::Procedure => (entry.value.data.procedure_value.first_var_id, entry.value.data.procedure_value.parameters),
@@ -542,14 +550,16 @@ impl Decompiler {
                 self.resolve_member(base, *id).map(|(_, t)| t)
             }
             PPEExpr::FunctionCall(id, _) => {
-                let entry = self.executable.variable_table.try_get_entry(*id)?;
+                let entry = self.signature_entry(*id)?;
                 if entry.header.variable_type != VariableType::Function {
                     return None;
                 }
                 let return_var = unsafe { entry.value.data.function_value.return_var } as usize;
                 Some(self.source_type(self.executable.variable_table.try_get_entry(return_var)?.header.variable_type))
             }
-            PPEExpr::PredefinedFunctionCall(def, arguments) if def.opcode == FuncOpCode::ArrayValueAt => {
+            PPEExpr::PredefinedFunctionCall(def, arguments)
+                if matches!(def.opcode, FuncOpCode::ArrayValueAt | FuncOpCode::ArrayValueAt2 | FuncOpCode::ArrayValueAt3) =>
+            {
                 arguments.first().and_then(|array| self.expression_type(array))
             }
             PPEExpr::PredefinedFunctionCall(def, _) => Some(def.return_type),
@@ -557,7 +567,7 @@ impl Decompiler {
         }
     }
 
-    fn generate_function_declarations(&mut self, ast: &mut Ast) {
+    fn generate_function_declarations(&mut self, ast: &mut Ast) -> Res<()> {
         for entry in self.executable.variable_table.get_entries() {
             match entry.entry_type {
                 EntryType::Function | EntryType::Procedure => {
@@ -577,7 +587,7 @@ impl Decompiler {
                         .insert(unsafe { entry.value.data.procedure_value.start_offset as usize }, entry.header.id);
 
                     if entry.header.variable_type == VariableType::Function {
-                        let parameters = self.generate_parameter_list(entry);
+                        let parameters = self.generate_parameter_list(entry)?;
                         let return_value = self
                             .executable
                             .variable_table
@@ -595,7 +605,7 @@ impl Decompiler {
                         );
                         ast.nodes.push(AstNode::FunctionDeclaration(func_decl));
                     } else {
-                        let parameters = self.generate_parameter_list(entry);
+                        let parameters = self.generate_parameter_list(entry)?;
                         let proc_decl = ProcedureDeclarationAstNode::empty(unicase::Ascii::new(entry.name.clone()), parameters);
                         ast.nodes.push(AstNode::ProcedureDeclaration(proc_decl));
                     }
@@ -603,6 +613,7 @@ impl Decompiler {
                 _ => {}
             }
         }
+        Ok(())
     }
 
     fn decompile_expression(&self, expression: &PPEExpr) -> Expression {
@@ -759,12 +770,12 @@ impl Decompiler {
                     }
                     return ConstantExpression::create_empty_expression(Constant::String("ERROR IN EXPRESSION invalid enum cast".to_string()));
                 }
-                if f.opcode == FuncOpCode::ArrayValueAt
-                    && let [array, index] = args.as_slice()
+                if matches!(f.opcode, FuncOpCode::ArrayValueAt | FuncOpCode::ArrayValueAt2 | FuncOpCode::ArrayValueAt3)
+                    && let Some((array, indices)) = args.split_first()
                 {
                     return FunctionCallExpression::create_empty_expression(
                         MemberReferenceExpression::create_empty_expression(self.decompile_expression(array), unicase::Ascii::new("<get>".to_string())),
-                        vec![self.decompile_expression(index)],
+                        indices.iter().map(|index| self.decompile_expression(index)).collect(),
                     );
                 }
                 if f.opcode == FuncOpCode::StringCharAt
@@ -1039,9 +1050,9 @@ impl Decompiler {
         }
     }
 
-    fn parse_function(&mut self, func: usize) {
+    fn parse_function(&mut self, func: usize) -> Res<()> {
         let Some(entry) = self.executable.variable_table.try_get_entry(func).cloned() else {
-            return;
+            return Ok(());
         };
         let mut func_body = self.generate_local_variable_declarations(&entry);
         while self.cur_ptr < self.script.statements.len() {
@@ -1054,7 +1065,7 @@ impl Decompiler {
 
             if matches!(statement.command, PPECommand::EndFunc) || matches!(statement.command, PPECommand::EndProc) {
                 if entry.header.variable_type == VariableType::Function {
-                    let parameters = self.generate_parameter_list(&entry);
+                    let parameters = self.generate_parameter_list(&entry)?;
                     let return_value = self
                         .executable
                         .variable_table
@@ -1074,7 +1085,7 @@ impl Decompiler {
                     );
                     self.functions.push(AstNode::Function(func_impl));
                 } else {
-                    let parameters = self.generate_parameter_list(&entry);
+                    let parameters = self.generate_parameter_list(&entry)?;
                     let proc_impl = ProcedureImplementation::empty(func, unicase::Ascii::new(entry.name.clone()), parameters, func_body);
                     self.functions.push(AstNode::Procedure(proc_impl));
                 }
@@ -1094,6 +1105,7 @@ impl Decompiler {
         if self.cur_ptr < self.script.statements.len() && self.script.statements[self.cur_ptr].command == PPECommand::End {
             self.cur_ptr += 1;
         }
+        Ok(())
     }
 
     fn generate_local_variable_declarations(&self, entry: &TableEntry) -> Vec<Statement> {
@@ -1118,7 +1130,70 @@ impl Decompiler {
         }
     }
 
-    fn generate_parameter_list(&self, entry: &TableEntry) -> Vec<ParameterSpecifier> {
+    fn signature_entry(&self, id: usize) -> Option<&TableEntry> {
+        let id = self.callback_signatures.get(&id).copied().unwrap_or(id);
+        let entry = self.executable.variable_table.try_get_entry(id)?;
+        if !matches!(entry.header.variable_type, VariableType::Function | VariableType::Procedure)
+            || unsafe { entry.value.data.procedure_value.start_offset } == 0
+        {
+            return None;
+        }
+        Some(entry)
+    }
+
+    fn recover_callback_signatures(&mut self, calls: &[(usize, Vec<Option<usize>>)]) {
+        // Repeat to resolve forwarding and calls through other callbacks, even
+        // when their concrete providers occur later in the script.
+        loop {
+            let before = self.callback_signatures.len();
+            for (callee, arguments) in calls {
+                let Some(entry) = self.signature_entry(*callee) else { continue };
+                let (first, count) = unsafe { (entry.value.data.procedure_value.first_var_id, entry.value.data.procedure_value.parameters) };
+                let Ok(first) = usize::try_from(first) else { continue };
+                for (index, argument) in arguments.iter().take(count as usize).enumerate() {
+                    let Some(argument) = argument else { continue };
+                    let parameter_id = first + 1 + index;
+                    let Some(parameter) = self.executable.variable_table.try_get_entry(parameter_id) else {
+                        continue;
+                    };
+                    if parameter.entry_type != EntryType::Parameter
+                        || !matches!(parameter.header.variable_type, VariableType::Function | VariableType::Procedure)
+                    {
+                        continue;
+                    }
+                    // Forwarded parameters share the same signature. Propagate
+                    // either way, but only ever store a concrete provider ID.
+                    let provider = self.signature_entry(*argument).or_else(|| self.signature_entry(parameter_id));
+                    let Some(provider) = provider else { continue };
+                    if provider.header.variable_type != parameter.header.variable_type {
+                        continue;
+                    }
+                    let provider_id = provider.header.id;
+                    self.callback_signatures.entry(parameter_id).or_insert(provider_id);
+                    if self
+                        .executable
+                        .variable_table
+                        .try_get_entry(*argument)
+                        .is_some_and(|entry| entry.entry_type == EntryType::Parameter && entry.header.variable_type == parameter.header.variable_type)
+                    {
+                        self.callback_signatures.entry(*argument).or_insert(provider_id);
+                    }
+                }
+            }
+            if self.callback_signatures.len() == before {
+                break;
+            }
+        }
+    }
+
+    fn generate_parameter_list(&self, entry: &TableEntry) -> Res<Vec<ParameterSpecifier>> {
+        self.generate_parameter_list_inner(entry, &mut HashSet::new())
+    }
+
+    fn generate_parameter_list_inner(&self, entry: &TableEntry, active: &mut HashSet<usize>) -> Res<Vec<ParameterSpecifier>> {
+        if !active.insert(entry.header.id) {
+            return Err(std::io::Error::other(format!("Recursive callback signature for {}", entry.name)).into());
+        }
         unsafe {
             let mut parameters = Vec::new();
 
@@ -1140,6 +1215,40 @@ impl Decompiler {
                 let Some(param) = self.executable.variable_table.try_get_entry(first_var + 1 + i) else {
                     break;
                 };
+                if matches!(param.header.variable_type, VariableType::Function | VariableType::Procedure) {
+                    let provider = self
+                        .signature_entry(param.header.id)
+                        .ok_or_else(|| std::io::Error::other(format!("Cannot recover callback signature for {} from routine arguments", param.name)))?;
+                    let nested = self.generate_parameter_list_inner(provider, active)?;
+                    let identifier = Spanned::create_empty(Token::Identifier(unicase::Ascii::new(param.name.clone())));
+                    parameters.push(if param.header.variable_type == VariableType::Function {
+                        let result = self
+                            .executable
+                            .variable_table
+                            .try_get_entry(provider.value.data.function_value.return_var as usize)
+                            .ok_or_else(|| std::io::Error::other(format!("Invalid callback return slot for {}", param.name)))?;
+                        let return_type = self.source_type(result.header.variable_type);
+                        ParameterSpecifier::Function(crate::ast::FunctionParameterSpecifier::new(
+                            Spanned::create_empty(Token::Function),
+                            identifier,
+                            Spanned::create_empty(Token::LPar),
+                            nested,
+                            Spanned::create_empty(Token::RPar),
+                            self.type_token(return_type),
+                            return_type,
+                            result.header.dim,
+                        ))
+                    } else {
+                        ParameterSpecifier::Procedure(crate::ast::ProcedureParameterSpecifier::new(
+                            Spanned::create_empty(Token::Procedure),
+                            identifier,
+                            Spanned::create_empty(Token::LPar),
+                            nested,
+                            Spanned::create_empty(Token::RPar),
+                        ))
+                    });
+                    continue;
+                }
                 let mut dimensions = Vec::new();
                 match param.header.dim {
                     1 => {
@@ -1157,6 +1266,10 @@ impl Decompiler {
                     _ => {}
                 }
                 let is_var = 1u16.checked_shl(i as u32).is_some_and(|mask| pass_flags & mask != 0);
+                let mut variable = VariableSpecifier::empty(unicase::Ascii::new(param.name.clone()), dimensions);
+                if self.executable.runtime >= 400 && param.header.flags & crate::executable::variable_table::VARIABLE_FLAG_DYNAMIC_ARRAY != 0 {
+                    *variable.get_dimensions_mut() = (0..param.header.dim).map(|_| crate::ast::DimensionSpecifier::dynamic()).collect();
+                }
                 parameters.push(ParameterSpecifier::Variable(VariableParameterSpecifier::new(
                     if is_var {
                         Some(Spanned::create_empty(Token::Identifier(unicase::Ascii::new("VAR".to_string()))))
@@ -1165,11 +1278,12 @@ impl Decompiler {
                     },
                     self.type_token(self.source_type(param.header.variable_type)),
                     self.source_type(param.header.variable_type),
-                    Some(VariableSpecifier::empty(unicase::Ascii::new(param.name.clone()), dimensions)),
+                    Some(variable),
                 )));
             }
 
-            parameters
+            active.remove(&entry.header.id);
+            Ok(parameters)
         }
     }
 }
@@ -1262,6 +1376,22 @@ pub fn decompile(executable: Executable, raw: bool, lang_version: u16) -> Res<(A
 
 struct VariableConstantVisitor<'a> {
     executable: &'a mut Executable,
+    routine_calls: Vec<(usize, Vec<Option<usize>>)>,
+}
+
+impl VariableConstantVisitor<'_> {
+    fn record_routine_call(&mut self, id: usize, arguments: &[PPEExpr]) {
+        self.routine_calls.push((
+            id,
+            arguments
+                .iter()
+                .map(|argument| match argument {
+                    PPEExpr::RoutineReference(id) | PPEExpr::Value(id) => Some(*id),
+                    _ => None,
+                })
+                .collect(),
+        ));
+    }
 }
 
 impl PPEVisitor<()> for VariableConstantVisitor<'_> {
@@ -1304,12 +1434,14 @@ impl PPEVisitor<()> for VariableConstantVisitor<'_> {
             arg.visit(self);
         }
     }
-    fn visit_function_call(&mut self, _id: usize, arguments: &[PPEExpr]) {
+    fn visit_function_call(&mut self, id: usize, arguments: &[PPEExpr]) {
+        self.record_routine_call(id, arguments);
         for arg in arguments {
             arg.visit(self);
         }
     }
-    fn visit_member_function_call(&mut self, _expr: &PPEExpr, arguments: &[PPEExpr], _id: usize) {
+    fn visit_member_function_call(&mut self, expr: &PPEExpr, arguments: &[PPEExpr], _id: usize) {
+        expr.visit(self);
         for arg in arguments {
             arg.visit(self);
         }
@@ -1320,7 +1452,8 @@ impl PPEVisitor<()> for VariableConstantVisitor<'_> {
     fn visit_if(&mut self, cond: &PPEExpr, _label: &usize) {
         cond.visit(self);
     }
-    fn visit_proc_call(&mut self, _id: usize, arguments: &[PPEExpr]) {
+    fn visit_proc_call(&mut self, id: usize, arguments: &[PPEExpr]) {
+        self.record_routine_call(id, arguments);
         for arg in arguments {
             arg.visit(self);
         }

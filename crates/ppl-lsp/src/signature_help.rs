@@ -10,7 +10,7 @@ use tower_lsp::lsp_types::{Documentation, ParameterInformation, ParameterLabel, 
 use crate::{
     context::{CallContext, call_context},
     documentation::get_parameter_documentation,
-    type_lookup::{type_name, type_of_chain},
+    type_lookup::{callable_member, ranked_type_name, receiver_type_for_version, scalar_type, type_name},
 };
 use std::fmt::Write as _;
 
@@ -184,43 +184,45 @@ fn builtin_statement(name: &str) -> Option<SignatureInformation> {
     Some(builder.finish(""))
 }
 
-fn member_call(visitor: &SemanticVisitor, call: &CallContext) -> Option<SignatureInformation> {
-    let receiver_type = type_of_chain(visitor, &call.receiver)?;
-    if visitor.type_registry.is_enum_type(receiver_type) && call.name.eq_ignore_ascii_case("Has") {
-        crate::type_lookup::enum_instance_type(visitor, &call.receiver)?;
-        let name = type_name(&visitor.type_registry, receiver_type);
-        let mut builder = SignatureBuilder::new(&format!("{name}.Has"), "(");
-        builder.push(&format!("{name} mask"));
-        let mut signature = builder.finish(") BOOLEAN");
-        signature.documentation =
-            crate::documentation::get_member_documentation_with_parameters(&visitor.type_registry, receiver_type, &unicase::Ascii::new("Has".to_string()))
-                .map(Documentation::String);
-        return Some(signature);
-    }
-    let VariableType::UserData(receiver_id) = receiver_type else {
+fn member_call(visitor: &SemanticVisitor, call: &CallContext, language_version: u16) -> Option<SignatureInformation> {
+    let receiver = receiver_type_for_version(visitor, &call.receiver, language_version)?;
+    if language_version < icy_board_engine::parser::FIRST_BOARD_OBJECT_LANGUAGE_VERSION && receiver.rank == 0 && scalar_type(receiver.variable_type) {
         return None;
-    };
-    let object = visitor.type_registry.get_type_from_id(receiver_id)?;
-    let member_name = unicase::Ascii::new(call.name.clone());
-    let (parameters, parameter_names, required, return_type) = if let Some(function) = object.functions.get(&member_name) {
-        (&function.parameters, &function.parameter_names, function.required, Some(function.return_type))
+    }
+    let method = callable_member(&visitor.type_registry, receiver, &call.name)?;
+    let member_name = if visitor.type_registry.is_enum_type(receiver.variable_type) && receiver.rank == 0 {
+        "Has"
     } else {
-        let procedure = object.procedures.get(&member_name)?;
-        (&procedure.parameters, &procedure.parameter_names, procedure.required, None)
+        &call.name
     };
-
-    let head = format!("{}.{}", type_name(&visitor.type_registry, receiver_type), call.name);
+    let head = format!(
+        "{}.{}",
+        ranked_type_name(&visitor.type_registry, receiver.variable_type, receiver.rank),
+        member_name
+    );
     let mut builder = SignatureBuilder::new(&head, "(");
-    for (index, parameter) in parameters.iter().enumerate() {
-        let var_type = type_name(&visitor.type_registry, *parameter);
-        let parameter = parameter_names.get(index).map_or(var_type.clone(), |name| format!("{var_type} {name}"));
+    for (index, parameter) in method.parameters.iter().enumerate() {
+        let var_type = ranked_type_name(&visitor.type_registry, *parameter, method.parameter_ranks.get(index).copied().unwrap_or(0));
+        let parameter = method.parameter_names.get(index).map_or(var_type.clone(), |name| format!("{var_type} {name}"));
         builder.push_documented(
-            &if index < required { parameter } else { format!("[{parameter}]") },
-            parameter_names.get(index).and_then(|name| get_parameter_documentation(name)),
+            &if index < method.required { parameter } else { format!("[{parameter}]") },
+            method.parameter_names.get(index).and_then(|name| get_parameter_documentation(name)),
         );
     }
-    let tail = return_type.map_or_else(|| ")".to_string(), |value| format!(") {}", type_name(&visitor.type_registry, value)));
-    Some(builder.finish(&tail))
+    let tail = method.return_type.map_or_else(
+        || ")".to_string(),
+        |value| format!(") {}", ranked_type_name(&visitor.type_registry, value, method.return_rank)),
+    );
+    let mut signature = builder.finish(&tail);
+    if receiver.rank == 0 {
+        signature.documentation = crate::documentation::get_member_documentation_with_parameters(
+            &visitor.type_registry,
+            receiver.variable_type,
+            &unicase::Ascii::new(member_name.to_string()),
+        )
+        .map(Documentation::String);
+    }
+    Some(signature)
 }
 
 /// How a routine the program declares is written out.
@@ -230,10 +232,16 @@ pub fn routine_signature(visitor: &SemanticVisitor, name: &str) -> Option<String
 
 /// The signature help for the call the cursor is writing arguments for.
 pub fn get_signature_help(line_before_cursor: &str, visitor: &SemanticVisitor) -> Option<SignatureHelp> {
+    get_signature_help_for_version(line_before_cursor, visitor, 400)
+}
+
+/// The server has the AST language version; the legacy two-argument helper
+/// remains available for clients that use the current language surface.
+pub fn get_signature_help_for_version(line_before_cursor: &str, visitor: &SemanticVisitor, language_version: u16) -> Option<SignatureHelp> {
     let call = call_context(line_before_cursor)?;
 
     let signatures = if !call.receiver.is_empty() {
-        member_call(visitor, &call).into_iter().collect::<Vec<_>>()
+        member_call(visitor, &call, language_version).into_iter().collect::<Vec<_>>()
     } else if call.bare {
         builtin_statement(&call.name).into_iter().collect::<Vec<_>>()
     } else {

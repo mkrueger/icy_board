@@ -4,7 +4,7 @@
 use icy_board_engine::{
     executable::{FUNCTION_DEFINITIONS, VariableType},
     parser::UserTypeRegistry,
-    semantic::{BYTES_MEMBERS, ReferenceType, STRING_MEMBERS, SemanticVisitor},
+    semantic::{ARRAY_MEMBERS, ARRAY_PROCEDURES, BYTES_MEMBERS, FunctionDeclaration, ReferenceType, STRING_MEMBERS, SemanticVisitor},
 };
 
 /// One member of a record or of a board object.
@@ -70,7 +70,7 @@ pub fn type_of_name(visitor: &SemanticVisitor, name: &str) -> Option<VariableTyp
             .or(reference.implementation.as_ref())
             .map(|(_, decl)| unicase::Ascii::new(decl.token.clone()));
         if declared == Some(name.clone()) {
-            if matches!(reference_type, ReferenceType::Function(_)) {
+            if matches!(reference_type, ReferenceType::Function(_)) || reference.variable_type == VariableType::Function {
                 return visitor
                     .function_containers
                     .iter()
@@ -101,6 +101,9 @@ pub fn type_of_name(visitor: &SemanticVisitor, name: &str) -> Option<VariableTyp
     }
     if name == "BIGSTR" {
         return Some(VariableType::BigStr);
+    }
+    if name == "BYTES" {
+        return Some(VariableType::Bytes);
     }
     if let Some(var_type) = visitor.type_registry.get_board_object(&name) {
         return Some(var_type);
@@ -159,35 +162,36 @@ pub fn type_of_member(registry: &UserTypeRegistry, var_type: VariableType, membe
     object.functions.get(&member).map(|function| function.return_type)
 }
 
-/// Walks a member chain such as `members[0].Home` and answers the type it ends in.
-pub fn type_of_chain(visitor: &SemanticVisitor, path: &[String]) -> Option<VariableType> {
-    let (first, rest) = path.split_first()?;
-    let mut var_type = type_of_name(visitor, first)?;
-    let mut namespace = visitor.type_registry.get_enum(&unicase::Ascii::new(first.clone()));
-    for member in rest {
-        if member == crate::context::CALLED {
-            namespace = None;
-            continue;
-        }
-        // An array indexes into its own type, so a step it does not have is no step.
-        if member == crate::context::INDEXED {
-            var_type = type_of_member(&visitor.type_registry, var_type, member).unwrap_or(var_type);
-            continue;
-        }
-        if let Some(definition) = namespace.take() {
-            definition.value(&unicase::Ascii::new(member.clone()))?;
-            continue;
-        }
-        var_type = type_of_member(&visitor.type_registry, var_type, member)?;
-    }
-    Some(var_type)
+/// Element type and shape must travel together, including through calls. Only
+/// a named mutable array slot can be redimensioned; fields and results cannot.
+#[derive(Clone, Copy, Debug)]
+pub struct ReceiverType {
+    pub variable_type: VariableType,
+    pub rank: u8,
+    pub namespace: bool,
+    pub resizable: bool,
+    callable: bool,
 }
 
-/// Distinguish an enum scalar from a type namespace or unindexed array. The
-/// generic chain resolver intentionally erases array rank for other hints.
-pub fn enum_instance_type(visitor: &SemanticVisitor, path: &[String]) -> Option<VariableType> {
+impl ReceiverType {
+    fn scalar(variable_type: VariableType) -> Self {
+        Self {
+            variable_type,
+            rank: 0,
+            namespace: false,
+            resizable: false,
+            callable: false,
+        }
+    }
+}
+
+pub fn receiver_type(visitor: &SemanticVisitor, path: &[String]) -> Option<ReceiverType> {
+    receiver_type_for_version(visitor, path, 400)
+}
+
+pub fn receiver_type_for_version(visitor: &SemanticVisitor, path: &[String], language_version: u16) -> Option<ReceiverType> {
     let (first, rest) = path.split_first()?;
-    let mut typ = type_of_name(visitor, first)?;
+    let mut result = ReceiverType::scalar(type_of_name(visitor, first)?);
     let reference = visitor.references.iter().find(|(kind, reference)| {
         matches!(kind, ReferenceType::Variable(_) | ReferenceType::Constant(_) | ReferenceType::Function(_))
             && reference
@@ -196,55 +200,264 @@ pub fn enum_instance_type(visitor: &SemanticVisitor, path: &[String]) -> Option<
                 .or(reference.implementation.as_ref())
                 .is_some_and(|(_, token)| token.token.eq_ignore_ascii_case(first))
     });
-    let mut namespace = reference.is_none() && visitor.type_registry.get_enum(&unicase::Ascii::new(first.clone())).is_some();
-    let mut callable = reference.is_some_and(|(kind, _)| matches!(kind, ReferenceType::Function(_)));
-    let mut rank = reference.and_then(|(_, reference)| reference.header.as_ref()).map_or(0, |header| header.dim);
-    if callable {
-        rank = visitor
+    let identifier = unicase::Ascii::new(first.clone());
+    result.namespace = reference.is_none()
+        && (visitor.type_registry.get_enum(&identifier).is_some()
+            || visitor.type_registry.get_board_object(&identifier).is_some()
+            || matches!(first.to_ascii_uppercase().as_str(), "STRING" | "BIGSTR" | "BYTES"));
+    result.callable = reference
+        .is_some_and(|(kind, reference)| matches!(kind, ReferenceType::Function(_)) || reference.variable_type == VariableType::Function)
+        || (!result.namespace && FUNCTION_DEFINITIONS.iter().any(|def| def.name.eq_ignore_ascii_case(first)));
+    result.rank = reference.and_then(|(_, reference)| reference.header.as_ref()).map_or(0, |header| header.dim);
+    result.resizable = reference.is_some_and(|(kind, _)| matches!(kind, ReferenceType::Variable(_))) && !result.callable;
+    if result.callable {
+        result.rank = visitor
             .function_containers
             .iter()
             .find(|container| container.name.eq_ignore_ascii_case(first))
             .and_then(|container| match &container.functions {
-                icy_board_engine::semantic::FunctionDeclaration::Function(function) => Some(function.get_return_rank()),
+                FunctionDeclaration::Function(function) => Some(function.get_return_rank()),
                 _ => None,
             })
             .unwrap_or(0);
     }
     for member in rest {
         if member == crate::context::CALLED || member == crate::context::INDEXED {
-            if member == crate::context::INDEXED || (!callable && !namespace) {
-                rank = 0;
+            if member == crate::context::CALLED && (result.callable || result.namespace) {
+                result.callable = false;
+                result.namespace = false;
+            } else if result.rank > 0 {
+                result.rank = 0;
+            } else {
+                result.variable_type = type_of_member(&visitor.type_registry, result.variable_type, crate::context::INDEXED)?;
             }
-            callable = false;
-            namespace = false;
+            result.resizable = false;
             continue;
         }
-        if rank > 0 {
-            return None;
-        }
-        let VariableType::UserData(id) = typ else { return None };
-        if namespace {
+        if result.namespace
+            && let VariableType::UserData(id) = result.variable_type
+            && visitor.type_registry.is_enum_type(result.variable_type)
+        {
             let definition = visitor.type_registry.get_enum_from_id(id)?;
             definition.value(&unicase::Ascii::new(member.clone()))?;
-            namespace = false;
+            result.namespace = false;
             continue;
         }
-        if let Some(record) = visitor.type_registry.get_record_type_from_id(id) {
-            let field = record.field(record.field_index(&unicase::Ascii::new(member.clone()))?)?;
-            rank = field.dim;
-        } else if let Some(object) = visitor.type_registry.get_type_from_id(id) {
-            let name = unicase::Ascii::new(member.clone());
-            callable = object.functions.contains_key(&name);
-            rank = object
-                .functions
-                .get(&name)
-                .map(|function| function.return_rank)
-                .or_else(|| object.field_ranks.get(&name).copied())
-                .unwrap_or(0);
+        if result.rank == 0 && scalar_type(result.variable_type) && language_version < 400 {
+            return None;
         }
-        typ = type_of_member(&visitor.type_registry, typ, member)?;
+        if let Some(method) = callable_member(&visitor.type_registry, result, member) {
+            result = ReceiverType {
+                callable: true,
+                rank: method.return_rank,
+                ..ReceiverType::scalar(method.return_type?)
+            };
+            continue;
+        }
+        if result.rank > 0 {
+            return None;
+        }
+        let VariableType::UserData(id) = result.variable_type else { return None };
+        let name = unicase::Ascii::new(member.clone());
+        if let Some(record) = visitor.type_registry.get_record_type_from_id(id) {
+            let field = record.field(record.field_index(&name)?)?;
+            result = ReceiverType {
+                rank: field.dim,
+                ..ReceiverType::scalar(field.variable_type)
+            };
+        } else {
+            let object = visitor.type_registry.get_type_from_id(id)?;
+            if result.namespace && object.instance_provider.is_none() {
+                return None;
+            }
+            result = ReceiverType {
+                rank: object.field_ranks.get(&name).copied().unwrap_or(0),
+                ..ReceiverType::scalar(*object.fields.get(&name)?)
+            };
+        }
     }
-    (!namespace && rank == 0 && visitor.type_registry.is_enum_type(typ)).then_some(typ)
+    Some(result)
+}
+
+/// Compatibility helper for hover callers which only need the element type.
+pub fn type_of_chain(visitor: &SemanticVisitor, path: &[String]) -> Option<VariableType> {
+    receiver_type(visitor, path).map(|receiver| receiver.variable_type)
+}
+
+pub fn enum_instance_type(visitor: &SemanticVisitor, path: &[String]) -> Option<VariableType> {
+    let receiver = receiver_type(visitor, path)?;
+    (!receiver.namespace && receiver.rank == 0 && visitor.type_registry.is_enum_type(receiver.variable_type)).then_some(receiver.variable_type)
+}
+
+/// One callable description shared by completion and signature help. Registry
+/// members supply all their own metadata; scalar tables currently omit only
+/// parameter names/types and return rank, supplied by the adapter below.
+pub struct CallableMember {
+    pub parameters: Vec<VariableType>,
+    pub parameter_names: Vec<String>,
+    pub parameter_ranks: Vec<u8>,
+    pub required: usize,
+    pub return_type: Option<VariableType>,
+    pub return_rank: u8,
+}
+
+pub fn ranked_type_name(registry: &UserTypeRegistry, typ: VariableType, rank: u8) -> String {
+    let mut name = type_name(registry, typ);
+    if rank > 0 {
+        name.push_str(&format!("[{}]", ",".repeat(usize::from(rank - 1))));
+    }
+    name
+}
+
+pub fn scalar_type(typ: VariableType) -> bool {
+    matches!(
+        typ,
+        VariableType::String | VariableType::BigStr | VariableType::UnboundedString | VariableType::Bytes
+    )
+}
+
+pub fn callable_member(registry: &UserTypeRegistry, receiver: ReceiverType, member: &str) -> Option<CallableMember> {
+    let typ = receiver.variable_type;
+    let name = unicase::Ascii::new(member.to_string());
+    let mut result = CallableMember {
+        parameters: Vec::new(),
+        parameter_names: Vec::new(),
+        parameter_ranks: Vec::new(),
+        required: 0,
+        return_type: None,
+        return_rank: 0,
+    };
+    if receiver.rank > 0 {
+        if let Some(definition) = ARRAY_MEMBERS.iter().find(|definition| name == definition.name) {
+            result.parameters = vec![VariableType::Integer; *definition.arguments.end()];
+            result.parameter_names = vec!["dimension".into()];
+            result.required = *definition.arguments.start();
+            result.return_type = Some(definition.return_type);
+        } else if receiver.resizable && ARRAY_PROCEDURES.iter().any(|(member, _, _)| name == *member) {
+            result.parameters = vec![VariableType::Integer; receiver.rank as usize];
+            result.parameter_names = ["vector", "matrix", "cube"]
+                .into_iter()
+                .take(receiver.rank as usize)
+                .map(String::from)
+                .collect();
+            result.required = receiver.rank as usize;
+        } else {
+            return None;
+        }
+        return Some(result);
+    }
+    if registry.is_enum_type(typ) {
+        if receiver.namespace || name != "Has" {
+            return None;
+        }
+        result.parameters.push(typ);
+        result.parameter_names.push("mask".into());
+        result.required = 1;
+        result.return_type = Some(VariableType::Boolean);
+        return Some(result);
+    }
+    if scalar_type(typ) {
+        let definitions = if typ == VariableType::Bytes { BYTES_MEMBERS } else { STRING_MEMBERS };
+        let definition = definitions
+            .iter()
+            .find(|definition| definition.is_static == receiver.namespace && name == definition.name)?;
+        result.required = *definition.arguments.start();
+        result.return_type = Some(definition.return_type);
+        // No opcode argument metadata exists for the new scalar opcodes. Keep
+        // this single adapter until the compiler exports typed scalar parameters.
+        use VariableType::{Integer as I, UnboundedString as S, UserData};
+        let comparison = UserData(icy_board_engine::parser::STRING_COMPARISON_ENUM_ID);
+        let parameters: Vec<(&str, VariableType)> = match definition.name {
+            "Find" | "FindLast" => vec![("value", S), ("start", I), ("comparison", comparison)],
+            "Contains" | "StartsWith" | "EndsWith" | "Count" | "Equals" => vec![("value", S), ("comparison", comparison)],
+            "Replace" => vec![("oldValue", S), ("newValue", S)],
+            "Trim" | "TrimStart" | "TrimEnd" => vec![("characters", S)],
+            "Substring" | "Remove" => vec![("start", I), ("length", I)],
+            "Left" | "Right" => vec![("length", I)],
+            "Split" => {
+                result.return_rank = 1;
+                if receiver.namespace {
+                    vec![("text", S), ("separator", S), ("limit", I)]
+                } else {
+                    vec![("separator", S), ("limit", I)]
+                }
+            }
+            "Join" => {
+                result.parameter_ranks = vec![1, 0];
+                vec![("values", S), ("separator", S)]
+            }
+            "Repeat" => vec![("text", S), ("count", I)],
+            "PadLeft" | "PadRight" => vec![("width", I), ("character", S)],
+            "Insert" => vec![("start", I), ("value", S)],
+            "ToInt" => vec![("base", I)],
+            "GetChecksum" => vec![("algorithm", UserData(icy_board_engine::parser::CHECKSUM_ENUM_ID))],
+            "FromBase64" => vec![("text", S)],
+            _ if *definition.arguments.end() == 0 => Vec::new(),
+            _ => return None,
+        };
+        debug_assert_eq!(parameters.len(), *definition.arguments.end());
+        for (name, typ) in parameters {
+            result.parameter_names.push(name.into());
+            result.parameters.push(typ);
+        }
+        return Some(result);
+    }
+    let VariableType::UserData(id) = typ else { return None };
+    let object = registry.get_type_from_id(id)?;
+    if let Some(function) = object.functions.get(&name) {
+        let is_static = object.statics.contains(&name);
+        if is_static != receiver.namespace && !(receiver.namespace && !is_static && object.instance_provider.is_some()) {
+            return None;
+        }
+        result.parameters = function.parameters.clone();
+        result.parameter_names = function.parameter_names.clone();
+        result.required = function.required;
+        result.return_type = Some(function.return_type);
+        result.return_rank = function.return_rank;
+    } else {
+        if receiver.namespace && object.instance_provider.is_none() {
+            return None;
+        }
+        let procedure = object.procedures.get(&name)?;
+        result.parameters = procedure.parameters.clone();
+        result.parameter_names = procedure.parameter_names.clone();
+        result.required = procedure.required;
+    }
+    Some(result)
+}
+
+pub fn array_members(registry: &UserTypeRegistry, receiver: ReceiverType) -> Vec<Member> {
+    ARRAY_MEMBERS
+        .iter()
+        .map(|member| member.name)
+        .chain(ARRAY_PROCEDURES.iter().filter(|_| receiver.resizable).map(|(name, _, _)| *name))
+        .filter_map(|name| {
+            let method = callable_member(registry, receiver, name)?;
+            Some(Member {
+                name: name.into(),
+                detail: callable_detail(registry, &method),
+                kind: MemberKind::Method,
+            })
+        })
+        .collect()
+}
+
+pub fn callable_detail(registry: &UserTypeRegistry, method: &CallableMember) -> String {
+    let parameters = method
+        .parameters
+        .iter()
+        .enumerate()
+        .map(|(index, typ)| {
+            let typ = ranked_type_name(registry, *typ, method.parameter_ranks.get(index).copied().unwrap_or(0));
+            let text = method.parameter_names.get(index).map_or(typ.clone(), |name| format!("{typ} {name}"));
+            if index < method.required { text } else { format!("[{text}]") }
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+    let tail = method
+        .return_type
+        .map_or(String::new(), |typ| format!(" {}", ranked_type_name(registry, typ, method.return_rank)));
+    format!("({parameters}){tail}")
 }
 
 /// Everything that may follow a `.` on a value of this type.
@@ -285,6 +498,9 @@ pub fn members_of(registry: &UserTypeRegistry, var_type: VariableType) -> Vec<Me
 }
 
 pub fn static_members_of(registry: &UserTypeRegistry, var_type: VariableType) -> Vec<Member> {
+    if matches!(var_type, VariableType::String | VariableType::BigStr | VariableType::UnboundedString) {
+        return string_members(true);
+    }
     if var_type == VariableType::Bytes {
         return bytes_members(true);
     }
@@ -303,9 +519,8 @@ fn user_data_members(registry: &UserTypeRegistry, object: &icy_board_engine::com
         members.push(Member {
             name: name.to_string(),
             detail: format!(
-                "{}{}",
-                type_name(registry, *field_type),
-                "[]".repeat(object.field_ranks.get(name).copied().unwrap_or(0) as usize)
+                "{}",
+                ranked_type_name(registry, *field_type, object.field_ranks.get(name).copied().unwrap_or(0))
             ),
             kind: MemberKind::Field,
         });
@@ -316,7 +531,7 @@ fn user_data_members(registry: &UserTypeRegistry, object: &icy_board_engine::com
             detail: format!(
                 "({}) {}",
                 named_parameters(registry, &function.parameters, &function.parameter_names, function.required),
-                format!("{}{}", type_name(registry, function.return_type), "[]".repeat(function.return_rank as usize))
+                ranked_type_name(registry, function.return_type, function.return_rank)
             ),
             kind: MemberKind::Method,
         });
@@ -336,36 +551,29 @@ fn user_data_members(registry: &UserTypeRegistry, object: &icy_board_engine::com
 }
 
 pub fn string_members(statik: bool) -> Vec<Member> {
-    STRING_MEMBERS
-        .iter()
-        .filter(|member| member.is_static == statik)
-        .map(|member| Member {
-            name: member.name.to_string(),
-            detail: format!(
-                "({}..{} args) {}{}",
-                member.arguments.start(),
-                member.arguments.end(),
-                type_name(&UserTypeRegistry::default(), member.return_type),
-                if member.name == "Split" { "[]" } else { "" }
-            ),
-            kind: MemberKind::Method,
-        })
-        .collect()
+    scalar_members(VariableType::UnboundedString, statik)
 }
 
 pub fn bytes_members(statik: bool) -> Vec<Member> {
-    BYTES_MEMBERS
+    scalar_members(VariableType::Bytes, statik)
+}
+
+fn scalar_members(typ: VariableType, statik: bool) -> Vec<Member> {
+    let registry = UserTypeRegistry::icy_board_registry();
+    let receiver = ReceiverType {
+        namespace: statik,
+        ..ReceiverType::scalar(typ)
+    };
+    let definitions = if typ == VariableType::Bytes { BYTES_MEMBERS } else { STRING_MEMBERS };
+    definitions
         .iter()
         .filter(|member| member.is_static == statik)
-        .map(|member| Member {
-            name: member.name.to_string(),
-            detail: format!(
-                "({}..{} args) {}",
-                member.arguments.start(),
-                member.arguments.end(),
-                type_name(&UserTypeRegistry::default(), member.return_type)
-            ),
-            kind: MemberKind::Method,
+        .filter_map(|member| {
+            Some(Member {
+                name: member.name.to_string(),
+                detail: callable_detail(&registry, &callable_member(&registry, receiver, member.name)?),
+                kind: MemberKind::Method,
+            })
         })
         .collect()
 }

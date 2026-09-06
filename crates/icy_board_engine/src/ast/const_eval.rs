@@ -40,6 +40,95 @@ pub fn const_enum_value(expr: &Expression, lookup: ConstantLookup<'_>, enums: &[
     })
 }
 
+/// The one declaration conversion shared by direct semantic analysis and lowering.
+/// Only source 400 CONST declarations check numeric bounds; ordinary assignments
+/// and older source versions retain their historical conversions.
+pub fn convert_const_declaration(value: VariableValue, declared: VariableType, language: u16) -> Option<VariableValue> {
+    if matches!(declared, VariableType::UserData(_)) {
+        return (value.vtype == declared).then_some(value);
+    }
+    if matches!(value.vtype, VariableType::UserData(_)) {
+        return None;
+    }
+    // The parser retains the source STRING name until runtime type lowering.
+    // Do not reintroduce the classic 256-character limit for source 400 CONSTs.
+    if language >= 400 && declared == VariableType::String {
+        return Some(value.convert_to(VariableType::UnboundedString));
+    }
+    if language >= 400 {
+        if matches!(declared, VariableType::Float | VariableType::Double) {
+            let number = value.as_double();
+            if !number.is_finite() || (declared == VariableType::Float && number.abs() > f32::MAX as f64) {
+                return None;
+            }
+        }
+        let bounds = match declared {
+            VariableType::Byte => Some((0, u8::MAX as i128)),
+            VariableType::SByte => Some((i8::MIN as i128, i8::MAX as i128)),
+            VariableType::Word => Some((0, u16::MAX as i128)),
+            VariableType::SWord => Some((i16::MIN as i128, i16::MAX as i128)),
+            VariableType::Integer => Some((i32::MIN as i128, i32::MAX as i128)),
+            VariableType::Unsigned => Some((0, u32::MAX as i128)),
+            VariableType::Long => Some((i64::MIN as i128, i64::MAX as i128)),
+            VariableType::ULong => Some((0, u64::MAX as i128)),
+            // MONEY uses signed 32-bit cents. Text has its own currency parser;
+            // do not reinterpret dollar strings as ordinary integer strings.
+            VariableType::Money if !matches!(value.vtype, VariableType::String | VariableType::BigStr | VariableType::UnboundedString) => {
+                Some((i32::MIN as i128, i32::MAX as i128))
+            }
+            _ => None,
+        };
+        if let Some((min, max)) = bounds {
+            let number = if matches!(value.vtype, VariableType::Float | VariableType::Double) {
+                let number = value.as_double();
+                // Test the untruncated sign too: a negative unsigned initializer
+                // must not silently become zero. Upper bounds are exclusive so
+                // rounded f64 representations of i64/u64 maxima cannot overflow.
+                if !number.is_finite() || number < min as f64 || number >= (max + 1) as f64 {
+                    return None;
+                }
+                number.trunc() as i128
+            } else {
+                integer_constant(&value)?
+            };
+            if !(min..=max).contains(&number) {
+                return None;
+            }
+            return Some(match declared {
+                VariableType::Unsigned => VariableValue::new_unsigned(number as u64),
+                VariableType::Long if value.as_str().is_none() => VariableValue::new_long(number as i64),
+                VariableType::ULong if value.as_str().is_none() => VariableValue::new_ulong(number as u64),
+                // Range validation is not a new rounding/string-parsing policy.
+                _ => value.convert_to(declared),
+            });
+        }
+    }
+    Some(value.convert_to(declared))
+}
+
+fn integer_constant(value: &VariableValue) -> Option<i128> {
+    match value.vtype {
+        VariableType::Unsigned | VariableType::ULong => Some(value.as_unsigned() as i128),
+        VariableType::Long => Some(value.as_long() as i128),
+        VariableType::String | VariableType::BigStr | VariableType::UnboundedString => {
+            let text = value.as_string();
+            let text = text.trim_start();
+            let (negative, digits) = if let Some(rest) = text.strip_prefix('-') {
+                (true, rest)
+            } else {
+                (false, text.strip_prefix('+').unwrap_or(text))
+            };
+            let mut number = 0i128;
+            for digit in digits.chars().take_while(char::is_ascii_digit) {
+                number = number.checked_mul(10)?.checked_add(digit.to_digit(10)? as i128)?;
+            }
+            Some(if negative { -number } else { number })
+        }
+        VariableType::Float | VariableType::Double | VariableType::UserData(_) => None,
+        _ => value.try_as_int().map(i128::from),
+    }
+}
+
 /// The literal a value is written as, in the type its constant was declared with.
 pub fn const_expression(value: &VariableValue, variable_type: VariableType) -> Option<Expression> {
     let value = if matches!(variable_type, VariableType::String | VariableType::BigStr | VariableType::UnboundedString) {
@@ -47,6 +136,37 @@ pub fn const_expression(value: &VariableValue, variable_type: VariableType) -> O
     } else {
         value.clone().convert_to(variable_type)
     };
+    // Preserve the declared type, rather than turning SWORD into INTEGER etc.
+    // This matters for nominal enum casts and all typed argument checks.
+    let conversion = match variable_type {
+        VariableType::Byte => Some("ToByte"),
+        VariableType::SByte => Some("ToSByte"),
+        VariableType::Word => Some("ToWord"),
+        VariableType::SWord => Some("ToSWord"),
+        VariableType::Float => Some("ToReal"),
+        VariableType::Double => Some("ToDReal"),
+        VariableType::Long => Some("ToLong"),
+        VariableType::ULong => Some("ToULong"),
+        VariableType::Date => Some("ToDate"),
+        VariableType::EDate => Some("ToEDate"),
+        VariableType::DDate => Some("ToDDate"),
+        VariableType::Time => Some("ToTime"),
+        _ => None,
+    };
+    if let Some(conversion) = conversion {
+        let literal = match variable_type {
+            // Decimal literals are REAL (f32) in bytecode. A DOUBLE constant
+            // needs a string conversion to preserve its f64 precision/range.
+            VariableType::Double => Constant::String(format!("{:e}", value.as_double())),
+            VariableType::Long | VariableType::ULong => Constant::String(value.as_string()),
+            VariableType::Float => Constant::Double(value.as_double()),
+            _ => Constant::Integer(value.as_int(), NumberFormat::Default),
+        };
+        return Some(FunctionCallExpression::create_empty_expression(
+            crate::ast::IdentifierExpression::create_empty_expression(Ascii::new(conversion.to_string())),
+            vec![ConstantExpression::create_empty_expression(literal)],
+        ));
+    }
     let constant = match variable_type {
         VariableType::Boolean => Constant::Boolean(value.as_bool()),
         VariableType::String | VariableType::BigStr | VariableType::UnboundedString => Constant::String(value.as_string()),
@@ -87,7 +207,7 @@ impl AstVisitor<Option<VariableValue>> for ConstEvaluator<'_> {
             Constant::Integer(i, _) => Some(VariableValue::new_int(*i)),
             Constant::String(s) => Some(VariableValue::new_string(s.clone())),
             Constant::Double(f) => Some(VariableValue::new_double(*f)),
-            Constant::Money(m) => Some(VariableValue::new_int(*m)),
+            Constant::Money(_) => Some(constant.get_constant_value().get_value()),
             Constant::Unsigned(u, _) => Some(VariableValue::new_unsigned(*u)),
             Constant::Builtin(b) => Some(VariableValue::new_int(b.value)),
         }
@@ -97,6 +217,24 @@ impl AstVisitor<Option<VariableValue>> for ConstEvaluator<'_> {
         let value = unary.get_expression().visit(self)?;
         if matches!(value.get_type(), VariableType::UserData(_)) {
             return None;
+        }
+        // Large unsigned literals need a signed representation before checking
+        // LONG's lower bound. Do not erase narrow integer/Boolean operand types.
+        if unary.get_op() == UnaryOp::Minus
+            && matches!(
+                value.vtype,
+                VariableType::Integer | VariableType::Unsigned | VariableType::Long | VariableType::ULong
+            )
+            && let Some(number) = integer_constant(&value)
+        {
+            let number = number.checked_neg()?;
+            return if !matches!(value.vtype, VariableType::Long | VariableType::ULong)
+                && let Ok(number) = i32::try_from(number)
+            {
+                Some(VariableValue::new_int(number))
+            } else {
+                i64::try_from(number).ok().map(VariableValue::new_long)
+            };
         }
         Some(match unary.get_op() {
             UnaryOp::Not => value.not(),
@@ -171,7 +309,22 @@ impl AstVisitor<Option<VariableValue>> for ConstEvaluator<'_> {
                 _ => None,
             };
         }
-        let alpha = match identifier.get_identifier().as_ref().to_ascii_uppercase().as_str() {
+        let name = identifier.get_identifier().as_ref().to_ascii_uppercase();
+        // TOINTEGER is the only ordinary function allowed to erase an enum's
+        // nominal type. Folding must not introduce alternate cast/RGB bypasses.
+        if name != "TOINTEGER" && arguments.iter().any(|argument| matches!(argument.vtype, VariableType::UserData(_))) {
+            return None;
+        }
+        let alpha = match name.as_str() {
+            "TOINTEGER" if arguments.len() == 1 => return Some(arguments[0].clone().convert_to(VariableType::Integer)),
+            "TOSWORD" if arguments.len() == 1 => return Some(arguments[0].clone().convert_to(VariableType::SWord)),
+            "TOSBYTE" if arguments.len() == 1 => return Some(arguments[0].clone().convert_to(VariableType::SByte)),
+            "TOWORD" if arguments.len() == 1 => return Some(arguments[0].clone().convert_to(VariableType::Word)),
+            "TOBYTE" if arguments.len() == 1 => return Some(arguments[0].clone().convert_to(VariableType::Byte)),
+            "TOREAL" if arguments.len() == 1 => return Some(arguments[0].clone().convert_to(VariableType::Float)),
+            "TODREAL" if arguments.len() == 1 => return Some(arguments[0].clone().convert_to(VariableType::Double)),
+            "TOLONG" if arguments.len() == 1 => return Some(arguments[0].clone().convert_to(VariableType::Long)),
+            "TOULONG" if arguments.len() == 1 => return Some(arguments[0].clone().convert_to(VariableType::ULong)),
             "RGB" if arguments.len() == 3 => 255,
             "RGB" if arguments.len() == 4 => arguments[3].as_int(),
             _ => return None,

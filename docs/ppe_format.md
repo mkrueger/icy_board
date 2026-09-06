@@ -295,6 +295,14 @@ Runtime 400's indexed-member expression stores a member id followed by a rank
 and that many index expressions. The rank must be 1 to 3. A missing operand or a
 rank outside that range is rejected as malformed bytecode before the VM runs it.
 
+Computed matrix and cube indexing uses the internal runtime-400 functions
+`ArrayValueAt2` (-357, array plus two indices) and `ArrayValueAt3` (-358,
+array plus three indices). The rank-one `ArrayValueAt` keeps its original
+opcode and argument count. These functions evaluate the array before each index,
+once each, and require the matching runtime rank. No type-table format change is
+needed; the decompiler restores bracket indexing and callback parameter signatures
+when recoverable from concrete bytecode call sites.
+
 Runtime 400 stores `FOREACH` structurally instead of lowering it to hidden
 function calls and temporary variables:
 
@@ -306,6 +314,9 @@ function calls and temporary variables:
 `FOREACH` evaluates the collection once and creates a VM iterator frame.
 `NEXTFOREACH` advances its flat row-major index and jumps to the body while an
 element remains. The stored targets are byte offsets, like `GOTO` targets.
+The collection must be an array and the target a writable scalar. Iteration uses
+the normal checked assignment path, retaining enum domains and nominal record
+types instead of replacing raw variable storage.
 
 `BREAK` needs no opcode of its own: it compiles to a `GOTO` onto the loop end,
 and any jump leaving the body discards the iterator frame.

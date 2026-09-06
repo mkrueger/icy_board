@@ -367,6 +367,8 @@ pub async fn run_function(opcode: FuncOpCode, arg: &mut VirtualMachine<'_>, argu
             arg.variable_table.checked_enum_value(crate::executable::VariableType::UserData(id), value)
         }
         FuncOpCode::END
+        | FuncOpCode::ArrayValueAt2
+        | FuncOpCode::ArrayValueAt3
         | FuncOpCode::CPAR
         | FuncOpCode::UPLUS
         | FuncOpCode::UMINUS

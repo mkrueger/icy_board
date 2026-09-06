@@ -388,11 +388,11 @@ PRINT count
     );
 }
 
-/// A value that is not an array is one element, so the body runs once rather than
-/// not at all. Nothing has to ask what it was handed.
+/// FOREACH accepts collections, not implicit singleton scalar values.
 #[test]
-fn foreach_over_a_plain_value_runs_once() {
-    assert_eq!("42 ", run_ppl("INTEGER a\nLET a = 42\nINTEGER v\nFOREACH v IN a\n  PRINT v, \" \"\nENDFOREACH"));
+fn foreach_over_a_plain_value_is_rejected() {
+    let errors = compile_errors("INTEGER a\nLET a = 42\nINTEGER v\nFOREACH v IN a\n  PRINT v, \" \"\nENDFOREACH");
+    assert!(errors.iter().any(|error| error.contains("FOREACH requires an array source")), "{errors:?}");
 }
 
 /// IN keeps working as a name, so reserving the word costs nobody anything.

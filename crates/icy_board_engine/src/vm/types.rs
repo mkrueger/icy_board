@@ -55,6 +55,15 @@ pub enum VMError {
     #[error("Invalid array dimension count: {0}")]
     InvalidArrayDimensionCount(usize),
 
+    #[error("FOREACH requires an array source and an assignable scalar target")]
+    InvalidForEach,
+
+    #[error("Can't assign {1} to {0}")]
+    AssignmentTypeMismatch(VariableType, VariableType),
+
+    #[error("Record field value does not match its fixed shape")]
+    RecordFieldShapeMismatch,
+
     #[error("PPE call stack exhausted")]
     StackOverflow,
 }

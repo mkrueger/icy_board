@@ -30,7 +30,7 @@ use ppl_lsp::inlay_hints::get_inlay_hints;
 use ppl_lsp::jump_definition::get_definition;
 use ppl_lsp::reference::get_reference;
 use ppl_lsp::semantic_tokens::{get_semantic_tokens, legend_modifiers, legend_types};
-use ppl_lsp::signature_help::get_signature_help;
+use ppl_lsp::signature_help;
 use ppl_lsp::{line_before_cursor, offset_to_position, position_to_offset};
 use ropey::Rope;
 use serde_json::Value;
@@ -548,9 +548,9 @@ impl LanguageServer for Backend {
         let Some(rope) = self.document_map.get(&uri) else {
             return Ok(None);
         };
-        self.get_ast(&uri, |_ast, visitor| {
+        self.get_ast(&uri, |ast, visitor| {
             let line = line_before_cursor(&rope, position)?;
-            get_signature_help(&line, visitor)
+            signature_help::get_signature_help_for_version(&line, visitor, ast.language_version)
         })
     }
 
