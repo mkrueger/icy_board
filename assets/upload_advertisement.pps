@@ -1,0 +1,16 @@
+; Trusted SysOp upload advertisement generator. Compile with pplc.
+; GETTOKEN 1: absolute output directory, including trailing separator.
+; GETTOKEN 2: original archive name, not a path to its contents.
+STRING output_directory, archive_name
+GETTOKEN output_directory
+GETTOKEN archive_name
+
+FCREATE 1, output_directory + "BOARD.AD", O_WR, S_DN
+IF FERR(1) STOP
+FPUTLN 1, "Available from Example BBS"
+IF FERR(1) STOP
+FPUTLN 1, "Archive: ", archive_name
+IF FERR(1) STOP
+FCLOSE 1
+IF FERR(1) STOP
+EXIT

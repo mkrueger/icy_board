@@ -9,9 +9,13 @@ use icy_board_engine::{
     datetime::{IcbDoW, IcbTime},
     icy_board::{
         IcyBoard, IcyBoardSerializer,
+        bbs::BBS,
         conferences::{Conference, ConferenceBase, ConferenceType},
         icb_config::{DisplayNewsBehavior, IcbConfig, PasswordStorageMethod},
         security_expr::SecurityExpression,
+        upload_processor::UploadProcessor,
+        upload_publish::{PublicationConflict, publish_quarantine_record, reject_quarantine_record},
+        upload_quarantine::UploadQuarantine,
         user_base::Password,
     },
 };
@@ -86,6 +90,12 @@ pub trait AdminBackend: Send + Sync {
     async fn create_conference(&self, patch: &ConferenceDto, fingerprint: &str, actor: &str) -> Result<ApplyResultDto>;
     async fn update_conference(&self, index: usize, patch: &ConferenceDto, fingerprint: &str, actor: &str) -> Result<ApplyResultDto>;
     async fn delete_conference(&self, index: usize, fingerprint: &str, actor: &str) -> Result<ApplyResultDto>;
+
+    async fn list_quarantine(&self) -> Result<QuarantineListDto>;
+    async fn get_quarantine(&self, id: &str) -> Result<QuarantineItemDto>;
+    async fn reprocess_quarantine(&self, id: &str, actor: &str, note: &str) -> Result<QuarantineItemDto>;
+    async fn approve_quarantine(&self, id: &str, actor: &str, note: &str) -> Result<QuarantineItemDto>;
+    async fn reject_quarantine(&self, id: &str, actor: &str, note: &str) -> Result<QuarantineItemDto>;
 }
 
 // ---------------------------------------------------------------- live backend
@@ -96,6 +106,7 @@ pub struct LiveAdminBackend {
     board: Arc<Mutex<IcyBoard>>,
     board_file: PathBuf,
     root_path: PathBuf,
+    bbs: Option<Arc<Mutex<BBS>>>,
 }
 
 impl LiveAdminBackend {
@@ -105,7 +116,40 @@ impl LiveAdminBackend {
             return Err(AdminError::NotFound(board_file));
         }
         let root_path = board_file.parent().unwrap_or_else(|| Path::new(".")).to_path_buf();
-        Ok(Self { board, board_file, root_path })
+        Ok(Self {
+            board,
+            board_file,
+            root_path,
+            bbs: None,
+        })
+    }
+
+    pub fn with_bbs<P: AsRef<Path>>(board_file: P, board: Arc<Mutex<IcyBoard>>, bbs: Arc<Mutex<BBS>>) -> Result<Self> {
+        let mut backend = Self::new(board_file, board)?;
+        backend.bbs = Some(bbs);
+        Ok(backend)
+    }
+
+    async fn quarantine(&self) -> UploadQuarantine {
+        UploadQuarantine::new(self.board.lock().await.config.upload_processing.quarantine_path.clone())
+    }
+
+    fn quarantine_error(error: impl std::fmt::Display) -> AdminError {
+        AdminError::Save(error.to_string())
+    }
+
+    fn audit_quarantine(&self, actor: &str, action: &str, id: &str, note: &str) {
+        backup::append_audit(
+            &self.root_path,
+            &serde_json::json!({
+                "time": chrono::Utc::now().to_rfc3339(),
+                "actor": actor,
+                "action": action,
+                "mode": "live",
+                "quarantine_id": id,
+                "note": note,
+            }),
+        );
     }
 
     async fn mutate_live_fn<F>(&self, fingerprint: &str, actor: &str, action: &str, mutator: F) -> Result<ApplyResultDto>
@@ -598,6 +642,61 @@ impl AdminBackend for LiveAdminBackend {
             }])
         })
         .await
+    }
+
+    async fn list_quarantine(&self) -> Result<QuarantineListDto> {
+        let quarantine = self.quarantine().await;
+        let records = quarantine.list().map_err(Self::quarantine_error)?;
+        let items = records
+            .iter()
+            .map(|record| {
+                let size = std::fs::metadata(quarantine.payload_path(record)).map(|metadata| metadata.len()).unwrap_or(0);
+                QuarantineItemDto::from_record(record, size)
+            })
+            .collect();
+        Ok(QuarantineListDto { items })
+    }
+
+    async fn get_quarantine(&self, id: &str) -> Result<QuarantineItemDto> {
+        let quarantine = self.quarantine().await;
+        let record = quarantine.load(id).map_err(Self::quarantine_error)?;
+        let size = std::fs::metadata(quarantine.payload_path(&record)).map(|metadata| metadata.len()).unwrap_or(0);
+        Ok(QuarantineItemDto::from_record(&record, size))
+    }
+
+    async fn reprocess_quarantine(&self, id: &str, actor: &str, note: &str) -> Result<QuarantineItemDto> {
+        let config = self.board.lock().await.config.upload_processing.clone();
+        let record = UploadProcessor::new(config).process(id).await.map_err(Self::quarantine_error)?;
+        self.audit_quarantine(actor, "reprocess_quarantine", id, note);
+        let quarantine = self.quarantine().await;
+        let size = std::fs::metadata(quarantine.payload_path(&record)).map(|metadata| metadata.len()).unwrap_or(0);
+        Ok(QuarantineItemDto::from_record(&record, size))
+    }
+
+    async fn approve_quarantine(&self, id: &str, actor: &str, note: &str) -> Result<QuarantineItemDto> {
+        let quarantine = self.quarantine().await;
+        let published = publish_quarantine_record(&quarantine, id, actor, note).map_err(|error| {
+            if error.is::<PublicationConflict>() {
+                AdminError::Conflict
+            } else {
+                Self::quarantine_error(error)
+            }
+        })?;
+        self.audit_quarantine(actor, "approve_quarantine", id, note);
+        if let Some(bbs) = &self.bbs {
+            bbs.lock().await.invalidate_file_base(published.destination.clone()).await;
+        }
+        Ok(QuarantineItemDto::from_record(&published, 0))
+    }
+
+    async fn reject_quarantine(&self, id: &str, actor: &str, note: &str) -> Result<QuarantineItemDto> {
+        let quarantine = self.quarantine().await;
+        let rejected = reject_quarantine_record(&quarantine, id, actor, note).map_err(|_| AdminError::Conflict)?;
+        self.audit_quarantine(actor, "reject_quarantine", id, note);
+        let size = std::fs::metadata(quarantine.payload_path(&rejected))
+            .map(|metadata| metadata.len())
+            .unwrap_or(0);
+        Ok(QuarantineItemDto::from_record(&rejected, size))
     }
 }
 

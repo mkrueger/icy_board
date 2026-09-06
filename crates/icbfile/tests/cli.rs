@@ -53,7 +53,7 @@ fn every_subcommand_help_is_localized_without_translating_identifiers() {
         ),
         ("export", "encoded as cp437", "als cp437 kodiert"),
         ("set", "the new description", "die neue Beschreibung"),
-        ("repack", "leave the case", "Groß-/Kleinschreibung"),
+        ("repack", "zip deflate compression level", "zip-Deflate-Kompressionsstufe"),
         ("fingerprints", "where to write the fingerprints", "Ausgabepfad für die Fingerabdrücke"),
     ];
     for (command, english, german) in commands {
@@ -74,7 +74,14 @@ fn every_subcommand_help_is_localized_without_translating_identifiers() {
         }
     }
     let help = decoded(&run("de_DE", &["repack", "--help"]).stdout);
-    for identifier in ["--keep-case"] {
+    for identifier in [
+        "--compression-level",
+        "--max-members",
+        "--max-member-size",
+        "--max-expanded-size",
+        "--max-compression-ratio",
+        "--keep-case",
+    ] {
         assert!(help.contains(identifier), "{help}");
     }
     assert!(help.contains("<target>"), "{help}");

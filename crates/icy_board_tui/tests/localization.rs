@@ -142,3 +142,19 @@ fn german_tui_catalog_is_complete_and_formats_without_errors() {
 fn german_lsp_catalog_is_complete_and_formats_without_errors() {
     check_catalog(LSP_EN, LSP_DE);
 }
+
+#[test]
+fn scanner_help_displays_literal_file_placeholder() {
+    for (locale, source) in [("en", TUI_EN), ("de", TUI_DE)] {
+        let mut bundle = FluentBundle::new(vec![locale.parse().unwrap()]);
+        bundle.add_resource(parse(source, locale)).unwrap();
+        for suffix in ["status", "help", "invalid"] {
+            let key = format!("upload_processing_scanner_arguments-{suffix}");
+            let message = bundle.get_message(&key).unwrap();
+            let mut errors = Vec::new();
+            let text = bundle.format_pattern(message.value().unwrap(), None, &mut errors);
+            assert!(errors.is_empty(), "{locale}/{key}: {errors:?}");
+            assert!(text.contains("{file}"), "{locale}/{key}: {text}");
+        }
+    }
+}

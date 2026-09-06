@@ -117,7 +117,7 @@ pub fn escape(text: &str) -> String {
 }
 
 /// Sidebar shared by the settings pages and the conference pages.
-fn nav_links(active: Option<SectionId>, conferences_active: bool) -> String {
+fn nav_links(active: Option<SectionId>, conferences_active: bool, quarantine_active: bool) -> String {
     let mut links = String::from(r#"<a href="/" class="nav-home">Overview</a>"#);
     for (group, sections) in SectionId::groups() {
         let _ = write!(links, r#"<span class="nav-group">{}</span>"#, escape(group));
@@ -129,12 +129,15 @@ fn nav_links(active: Option<SectionId>, conferences_active: bool) -> String {
     links.push_str(r#"<span class="nav-group">Conferences</span>"#);
     let class = if conferences_active { " class=\"active\"" } else { "" };
     let _ = write!(links, r#"<a href="/conferences"{class}>Conferences</a>"#);
+    links.push_str(r#"<span class="nav-group">Operations</span>"#);
+    let class = if quarantine_active { " class=\"active\"" } else { "" };
+    let _ = write!(links, r#"<a href="/quarantine"{class}>Upload Quarantine</a>"#);
     links
 }
 
 fn shell(title: &str, active: Option<SectionId>, body: &str) -> String {
-    let nav = if active.is_some() || title == "Overview" {
-        let links = nav_links(active, false);
+    let nav = if active.is_some() || matches!(title, "Overview" | "Upload Quarantine") {
+        let links = nav_links(active, false, title == "Upload Quarantine");
         format!(
             r#"<div class="layout"><aside class="sidebar"><div class="brand"><span class="brand-mark">IB</span><div><strong>IcyBoard</strong><small>Web Admin</small></div></div><nav class="side-nav">{links}</nav><form class="logout" method="post" action="/logout"><button type="submit">Log out</button></form></aside><div class="content"><header class="topbar"><div><p class="eyebrow">Configuration</p><h1>{title}</h1></div><span class="badge">local</span></header><main>{body}</main><footer>icbadmin {version} · icbsetup and icbsm remain fully supported.</footer></div></div>"#,
             title = escape(title),
@@ -885,7 +888,151 @@ fn conference_shell(title: &str, body: &str) -> String {
 }
 
 fn conference_nav_links() -> String {
-    nav_links(None, true)
+    nav_links(None, true, false)
+}
+
+pub fn quarantine_page(list: &QuarantineListDto, csrf: &str, notice: Option<Notice>) -> String {
+    let mut rows = String::new();
+    for item in &list.items {
+        let _ = write!(
+            rows,
+            r#"<tr><td><a href="/quarantine/{id}">{name}</a></td><td>{uploader}</td><td>{status:?}</td><td>{size}</td><td>{uploaded}</td></tr>"#,
+            id = escape(&item.id),
+            name = escape(&item.original_name),
+            uploader = escape(&item.uploader),
+            status = item.status,
+            size = item.size_bytes,
+            uploaded = escape(&item.uploaded_at),
+        );
+    }
+    if rows.is_empty() {
+        rows.push_str(r#"<tr><td colspan="5">No quarantined uploads.</td></tr>"#);
+    }
+    let body = format!(
+        r#"{notice}<section><p>Uploads awaiting processing, review, or manual approval.</p><table><thead><tr><th>File</th><th>Uploader</th><th>Status</th><th>Bytes</th><th>Uploaded</th></tr></thead><tbody>{rows}</tbody></table></section><input type="hidden" value="{csrf}">"#,
+        notice = notice_html(&notice),
+        rows = rows,
+        csrf = escape(csrf),
+    );
+    shell("Upload Quarantine", None, &body)
+}
+
+pub fn quarantine_detail_page(item: &QuarantineItemDto, csrf: &str, notice: Option<Notice>) -> String {
+    let description = item.description.iter().map(|line| escape(line)).collect::<Vec<_>>().join("<br>");
+    let report = if item.processing_report.is_empty() {
+        "<li>No processing report.</li>".to_string()
+    } else {
+        item.processing_report
+            .iter()
+            .map(|line| format!("<li>{}</li>", escape(line)))
+            .collect::<String>()
+    };
+    let decisions = if item.decisions.is_empty() {
+        "<li>No decisions recorded.</li>".to_string()
+    } else {
+        item.decisions
+            .iter()
+            .map(|decision| {
+                format!(
+                    "<li>{}: {:?} → {:?} by {} — {}</li>",
+                    decision.at.to_rfc3339(),
+                    decision.from,
+                    decision.to,
+                    escape(&decision.actor),
+                    escape(&decision.note)
+                )
+            })
+            .collect::<String>()
+    };
+    let mut actions = String::new();
+    if matches!(item.status, icy_board_engine::icy_board::upload_quarantine::QuarantineStatus::NeedsReview) {
+        let _ = write!(
+            actions,
+            r#"<form method="post" action="/quarantine/{id}/reprocess"><input type="hidden" name="csrf" value="{csrf}"><label>Note<input name="note"></label><button type="submit">Reprocess</button></form>"#,
+            id = escape(&item.id),
+            csrf = escape(csrf),
+        );
+    }
+    if matches!(
+        item.status,
+        icy_board_engine::icy_board::upload_quarantine::QuarantineStatus::AwaitingApproval
+            | icy_board_engine::icy_board::upload_quarantine::QuarantineStatus::ReadyToPublish
+    ) {
+        let _ = write!(
+            actions,
+            r#"<form method="post" action="/quarantine/{id}/approve"><input type="hidden" name="csrf" value="{csrf}"><label>Note<input name="note"></label><button class="primary" type="submit">Approve and publish</button></form>"#,
+            id = escape(&item.id),
+            csrf = escape(csrf),
+        );
+    }
+    if !matches!(
+        item.status,
+        icy_board_engine::icy_board::upload_quarantine::QuarantineStatus::Published
+            | icy_board_engine::icy_board::upload_quarantine::QuarantineStatus::Rejected
+            | icy_board_engine::icy_board::upload_quarantine::QuarantineStatus::Publishing
+    ) {
+        let _ = write!(
+            actions,
+            r#"<form method="post" action="/quarantine/{id}/reject"><input type="hidden" name="csrf" value="{csrf}"><label>Reason<input name="note" required></label><button type="submit">Reject</button></form>"#,
+            id = escape(&item.id),
+            csrf = escape(csrf),
+        );
+    }
+    let body = format!(
+        r#"{notice}<p><a href="/quarantine">← Back to quarantine</a></p><section><dl><dt>File</dt><dd>{name}</dd><dt>Status</dt><dd>{status:?}</dd><dt>Uploader</dt><dd>{uploader}</dd><dt>Uploaded</dt><dd>{uploaded}</dd><dt>Size</dt><dd>{size} bytes</dd><dt>Destination</dt><dd>{destination}</dd><dt>Description</dt><dd>{description}</dd></dl></section><section><h2>Processing report</h2><ul>{report}</ul></section><section><h2>History</h2><ul>{decisions}</ul></section><section class="actions">{actions}</section>"#,
+        notice = notice_html(&notice),
+        name = escape(&item.original_name),
+        status = item.status,
+        uploader = escape(&item.uploader),
+        uploaded = escape(&item.uploaded_at),
+        size = item.size_bytes,
+        destination = escape(&item.destination),
+        description = description,
+        report = report,
+        decisions = decisions,
+        actions = actions,
+    );
+    shell("Upload Quarantine", None, &body)
+}
+
+#[cfg(test)]
+mod quarantine_tests {
+    use icy_board_engine::icy_board::upload_quarantine::QuarantineStatus;
+
+    use super::*;
+
+    fn item(status: QuarantineStatus) -> QuarantineItemDto {
+        QuarantineItemDto {
+            id: "item-1".to_string(),
+            original_name: "<script>.zip".to_string(),
+            destination: "/files".to_string(),
+            uploader: "ALICE".to_string(),
+            description: vec!["<b>unsafe</b>".to_string()],
+            uploaded_at: "2026-09-05T00:00:00Z".to_string(),
+            status,
+            size_bytes: 42,
+            processing_report: vec!["clean".to_string()],
+            decisions: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn quarantine_detail_escapes_uploaded_text_and_offers_approval() {
+        let html = quarantine_detail_page(&item(QuarantineStatus::AwaitingApproval), "csrf", None);
+        assert!(html.contains("&lt;script&gt;.zip"));
+        assert!(html.contains("&lt;b&gt;unsafe&lt;/b&gt;"));
+        assert!(!html.contains("<script>.zip"));
+        assert!(html.contains("Approve and publish"));
+        assert!(html.contains("csrf"));
+    }
+
+    #[test]
+    fn published_quarantine_item_has_no_mutation_buttons() {
+        let html = quarantine_detail_page(&item(QuarantineStatus::Published), "csrf", None);
+        assert!(!html.contains("Approve and publish"));
+        assert!(!html.contains(">Reject<"));
+        assert!(!html.contains(">Reprocess<"));
+    }
 }
 
 pub fn conference_list_page(list: &ConferenceListResponse, csrf: &str, notice: Option<Notice>) -> String {

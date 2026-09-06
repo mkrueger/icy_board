@@ -1,5 +1,5 @@
 use icy_net::ConnectionType;
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 use tokio::sync::{Mutex, mpsc};
 
 use crate::icy_board::state::user_commands::groupchat::{GroupChatEvent, GroupChatState};
@@ -30,6 +30,7 @@ pub enum BBSMessage {
     /// Show the text and drop the caller - sent when an event is about to run.
     Shutdown(String),
     GroupChat(GroupChatEvent),
+    InvalidateFileBase(PathBuf),
 }
 
 pub struct BBS {
@@ -39,6 +40,12 @@ pub struct BBS {
 }
 
 impl BBS {
+    pub async fn invalidate_file_base(&self, path: PathBuf) {
+        for channel in self.bbs_channels.iter().flatten() {
+            let _ = channel.send(BBSMessage::InvalidateFileBase(path.clone())).await;
+        }
+    }
+
     pub async fn clear_closed_connections(&mut self) {
         let list = &mut self.open_connections.lock().await;
         for i in 0..list.len() {

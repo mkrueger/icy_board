@@ -50,6 +50,10 @@ static mut SHOW_TOTAL_STATS: bool = true;
 #[derive(Parser)]
 #[command(name = "icboard", disable_version_flag = true, about = icy_board_cli::text("icboard", "about"))]
 struct Cli {
+    /// Internal worker: PPE path, output directory, original archive name.
+    #[arg(long, hide = true, num_args = 3, allow_hyphen_values = true, value_names = ["PPE", "OUTPUT", "ARCHIVE"])]
+    upload_advertisement_ppe: Vec<String>,
+
     #[arg(long = "full-screen", short = 'f', help = icy_board_cli::text("icboard", "full-screen"))]
     full_screen: bool,
 
@@ -112,6 +116,15 @@ lazy_static::lazy_static! {
 #[tokio::main]
 async fn main() -> Res<()> {
     let arguments = icy_board_cli::parse::<Cli>();
+    if !arguments.upload_advertisement_ppe.is_empty() {
+        let args = &arguments.upload_advertisement_ppe;
+        return icy_board_engine::icy_board::upload_advertisement::run_advertisement_ppe(
+            std::path::Path::new(&args[0]),
+            std::path::Path::new(&args[1]),
+            &args[2],
+        )
+        .await;
+    }
     if arguments.version {
         println!("icboard {}", *VERSION);
         return Ok(());
@@ -161,6 +174,11 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
         Ok(mut icy_board) => {
             icy_board.resolve_paths();
             let mut board_lock = Some(BoardLock::acquire(&icy_board.root_path)?);
+            let recovered = icy_board_engine::icy_board::upload_quarantine::UploadQuarantine::new(icy_board.config.upload_processing.quarantine_path.clone())
+                .recover_interrupted()?;
+            if recovered > 0 {
+                log::warn!("Returned {recovered} interrupted uploads to SysOp review");
+            }
             let mut bbs = Arc::new(Mutex::new(BBS::new(icy_board.config.board.num_nodes as usize)));
             let mut board: Arc<Mutex<IcyBoard>> = Arc::new(tokio::sync::Mutex::new(icy_board));
             if arguments.localon || arguments.ppe.is_some() {
@@ -352,10 +370,15 @@ async fn start_connections(
         });
     }
 
-    start_web_admin(board, config_file, token).await
+    start_web_admin(board, bbs, config_file, token).await
 }
 
-async fn start_web_admin(board: &Arc<Mutex<IcyBoard>>, config_file: &std::path::Path, cancel: CancellationToken) -> Option<WebAdminInfo> {
+async fn start_web_admin(
+    board: &Arc<Mutex<IcyBoard>>,
+    bbs: &Arc<Mutex<BBS>>,
+    config_file: &std::path::Path,
+    cancel: CancellationToken,
+) -> Option<WebAdminInfo> {
     let web_admin = board.lock().await.config.board.web_admin.clone();
     if !web_admin.enabled {
         return None;
@@ -374,7 +397,7 @@ async fn start_web_admin(board: &Arc<Mutex<IcyBoard>>, config_file: &std::path::
         return None;
     }
 
-    let backend = match icbadmin::service::LiveAdminBackend::new(config_file, board.clone()) {
+    let backend = match icbadmin::service::LiveAdminBackend::with_bbs(config_file, board.clone(), bbs.clone()) {
         Ok(backend) => Arc::new(backend),
         Err(err) => {
             log::error!("web admin: could not open live backend: {err}");

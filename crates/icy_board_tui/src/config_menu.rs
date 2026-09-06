@@ -1155,6 +1155,11 @@ impl<T> ConfigMenu<T> {
             height: area.height,
         };
 
+        // Both passes paint content: clear once before either pass so shorter
+        // rows and separators cannot retain text or highlighting underneath.
+        Clear.render(list_area, frame.buffer_mut());
+        Block::new().style(get_tui_theme().background).render(list_area, frame.buffer_mut());
+
         if !Self::display_list(&self.obj, &mut i, &mut self.entry, list_area, &mut y, &mut x, frame, state, false) {
             return;
         }
@@ -1474,17 +1479,21 @@ impl<T> ConfigMenu<T> {
                     }
                 }
                 ConfigEntry::Label(text) => {
-                    let left_area = Rect {
-                        x: area.x + *x,
-                        y: area.y + y.saturating_sub(state.first_row),
-                        width: area.width.saturating_sub(*x + 1),
-                        height: 1,
-                    };
+                    // Offscreen labels must not be clamped onto the first row
+                    // or drawn below the viewport. Draw them only in the base pass.
+                    if !display_editor && *y >= state.first_row && *y < area.height + state.first_row {
+                        let left_area = Rect {
+                            x: area.x + *x,
+                            y: area.y + *y - state.first_row,
+                            width: area.width.saturating_sub(*x + 1),
+                            height: 1,
+                        };
 
-                    Text::from(text.as_str())
-                        .alignment(ratatui::layout::Alignment::Left)
-                        .style(get_tui_theme().menu_label)
-                        .render(left_area, frame.buffer_mut());
+                        Text::from(text.as_str())
+                            .alignment(ratatui::layout::Alignment::Left)
+                            .style(get_tui_theme().menu_label)
+                            .render(left_area, frame.buffer_mut());
+                    }
                     *y += 1;
                 }
 
@@ -1640,6 +1649,117 @@ impl<'a, T> Iterator for ConfigMenuIter<'a, T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ratatui::{Terminal, backend::TestBackend, buffer::Buffer};
+
+    fn scrolling_menu() -> ConfigMenu<()> {
+        ConfigMenu {
+            obj: (),
+            entry: vec![
+                ConfigEntry::Label("A long heading that must disappear".to_string()),
+                ConfigEntry::Item(ListItem::new("First".to_string(), ListValue::U32(123, 0, 999))),
+                ConfigEntry::Separator,
+                ConfigEntry::Label("ZIP".to_string()),
+                ConfigEntry::Item(ListItem::new("Second".to_string(), ListValue::U32(456, 0, 999))),
+                ConfigEntry::Separator,
+                ConfigEntry::Group(
+                    "Scanner".to_string(),
+                    vec![
+                        ConfigEntry::Item(ListItem::new("Enabled".to_string(), ListValue::Bool(true))),
+                        ConfigEntry::Label("Limits".to_string()),
+                        ConfigEntry::Table(
+                            2,
+                            vec![
+                                ConfigEntry::Item(ListItem::new("Max".to_string(), ListValue::U32(100, 0, 999))),
+                                ConfigEntry::Item(ListItem::new("Min".to_string(), ListValue::U32(10, 0, 999))),
+                            ],
+                        ),
+                    ],
+                ),
+                ConfigEntry::Separator,
+                ConfigEntry::Label("End".to_string()),
+            ],
+        }
+    }
+
+    #[test]
+    fn scrolling_clips_every_row_without_overprinting_or_drawing_outside_the_viewport() {
+        let mut menu = scrolling_menu();
+        let mut state = ConfigMenuState::default();
+        let mut reference = Terminal::new(TestBackend::new(44, 18)).unwrap();
+        let full_area = Rect::new(2, 2, 40, 12);
+        reference.draw(|frame| menu.render(full_area, frame, &mut state)).unwrap();
+        let expected = reference.backend().buffer().clone();
+
+        let mut terminal = Terminal::new(TestBackend::new(44, 18)).unwrap();
+        let viewport = Rect::new(2, 2, 40, 4);
+        // Visit every scroll position in both directions, including headings,
+        // separators, ordinary values, the selected editor and table cells.
+        for first_row in (0..=8).chain((0..8).rev()) {
+            state.first_row = first_row;
+            terminal.draw(|frame| menu.render(viewport, frame, &mut state)).unwrap();
+            let actual = terminal.backend().buffer();
+            for y in viewport.top()..viewport.bottom() {
+                // The scrollbar occupies the penultimate column of the area.
+                for x in viewport.left()..viewport.right() - 2 {
+                    assert_eq!(actual[(x, y)], expected[(x, y + first_row)], "scroll row {first_row}, cell ({x}, {y})");
+                }
+            }
+            let blank = Buffer::empty(actual.area);
+            for y in 0..actual.area.height {
+                for x in 0..actual.area.width {
+                    if !viewport.contains((x, y).into()) {
+                        assert_eq!(actual[(x, y)], blank[(x, y)], "drawing outside viewport at ({x}, {y}), scroll row {first_row}");
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn scrolling_clears_entire_rows_including_styles_and_empty_space() {
+        let area = Rect::new(2, 2, 40, 4);
+        let mut menu = ConfigMenu {
+            obj: (),
+            entry: vec![
+                ConfigEntry::Label("A long old heading".to_string()),
+                ConfigEntry::Label("ZIP".to_string()),
+                ConfigEntry::Separator,
+            ],
+        };
+        let mut state = ConfigMenuState {
+            first_row: 1,
+            ..Default::default()
+        };
+        let mut terminal = Terminal::new(TestBackend::new(44, 10)).unwrap();
+        terminal
+            .draw(|frame| {
+                // A previous drawing layer can contain both text and highlighting.
+                for y in 0..frame.area().height {
+                    frame.buffer_mut().set_string(0, y, "#".repeat(44), get_tui_theme().text_field_background);
+                }
+                menu.render(area, frame, &mut state);
+            })
+            .unwrap();
+        let actual = terminal.backend().buffer();
+        for y in area.top()..area.bottom() {
+            for x in area.left()..area.right() - 2 {
+                let symbol = if y == area.top() && x < area.left() + 3 {
+                    ["Z", "I", "P"][(x - area.left()) as usize]
+                } else {
+                    " "
+                };
+                assert_eq!(actual[(x, y)].symbol(), symbol, "cell ({x}, {y}) was not cleared");
+                assert_eq!(actual[(x, y)].bg, get_tui_theme().background.bg.unwrap());
+            }
+        }
+        for y in 0..actual.area.height {
+            for x in 0..actual.area.width {
+                if !area.contains((x, y).into()) {
+                    assert_eq!(actual[(x, y)].symbol(), "#", "cleared outside viewport at ({x}, {y})");
+                }
+            }
+        }
+    }
 
     fn press(item: &mut ListItem<()>, code: KeyCode) -> ResultState {
         item.handle_key_press(KeyEvent::from(code), &mut ConfigMenuState::default())

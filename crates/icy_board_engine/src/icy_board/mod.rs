@@ -61,6 +61,10 @@ pub mod state;
 pub mod statistics;
 pub mod subscription;
 pub mod surveys;
+pub mod upload_advertisement;
+pub mod upload_processor;
+pub mod upload_publish;
+pub mod upload_quarantine;
 pub mod user_base;
 pub mod user_maintenance;
 pub mod xfer_protocols;
@@ -192,6 +196,10 @@ impl IcyBoard {
         self.config.paths.statistics_file = get_path(&self.root_path, &self.config.paths.statistics_file);
         self.config.paths.ftn_file = get_path(&self.root_path, &self.config.paths.ftn_file);
         self.config.paths.qwknet_file = get_path(&self.root_path, &self.config.paths.qwknet_file);
+
+        self.config.upload_processing.advertisement_rules = get_path(&self.root_path, &self.config.upload_processing.advertisement_rules);
+        self.config.upload_processing.quarantine_path = get_path(&self.root_path, &self.config.upload_processing.quarantine_path);
+        self.config.upload_processing.advertisement_file = get_path(&self.root_path, &self.config.upload_processing.advertisement_file);
 
         self.config.event.event_file = get_path(&self.root_path, &self.config.event.event_file);
 
@@ -1197,6 +1205,28 @@ pub trait PCBoardTextImport: PCBoardImport {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn upload_advertisement_path_resolution_preserves_empty_and_literal_paths() {
+        let root = tempfile::tempdir().unwrap();
+        let mut board = IcyBoard::default();
+        board.root_path = root.path().to_path_buf();
+        board.resolve_paths();
+        assert!(board.config.upload_processing.advertisement_file.as_os_str().is_empty());
+
+        for path in [" ads/own board; notice.txt ", "ppe/own board; generator.PpE"] {
+            board.config.upload_processing.advertisement_file = PathBuf::from(path);
+            board.resolve_paths();
+            assert_eq!(board.config.upload_processing.advertisement_file, root.path().join(path));
+            board.resolve_paths();
+            assert_eq!(board.config.upload_processing.advertisement_file, root.path().join(path));
+        }
+
+        let absolute = root.path().join("external ads; generator.PPE");
+        board.config.upload_processing.advertisement_file = absolute.clone();
+        board.resolve_paths();
+        assert_eq!(board.config.upload_processing.advertisement_file, absolute);
+    }
 
     fn board(files: &[&str]) -> tempfile::TempDir {
         let root = tempfile::tempdir().unwrap();

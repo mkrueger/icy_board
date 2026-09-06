@@ -1,6 +1,9 @@
 use crate::icy_board::commands::CommandType;
-use crate::icy_board::icb_config::IcbColor;
+use crate::icy_board::icb_config::{IcbColor, UploadPublishPolicy};
 use crate::icy_board::lookup_case_insensitive;
+use crate::icy_board::upload_processor::UploadProcessor;
+use crate::icy_board::upload_publish::publish_quarantine_record;
+use crate::icy_board::upload_quarantine::{QuarantineStatus, UploadQuarantine};
 use crate::{Res, icy_board::state::IcyBoardState};
 use crate::{
     icy_board::{
@@ -12,6 +15,8 @@ use crate::{
     },
     vm::TerminalTarget,
 };
+use bstr::BString;
+use chrono::Utc;
 use dizbase::file_base::{
     FileBase,
     metadata::{MetadataHeader, MetadataType},
@@ -19,6 +24,8 @@ use dizbase::file_base::{
 use dizbase::file_base_scanner::scan_file;
 use fs4::available_space;
 use icy_net::protocol::{Protocol, TransferProtocolType, XYModemVariant, XYmodem, Zmodem};
+use jamjam::jam::{JamMessage, attributes};
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 fn has_upload_space(path: &std::path::Path, minimum_kib: u32) -> std::io::Result<bool> {
@@ -34,6 +41,83 @@ fn upload_name_exists(base: &FileBase, location: &std::path::Path, name: &str) -
 }
 
 impl IcyBoardState {
+    async fn notify_sysop_about_upload(&mut self, name: &str, uploader: &str, status: &str, description: &[String]) -> Res<()> {
+        let sysop = self.get_board().await.config.sysop.name.clone();
+        let message = upload_notification(&sysop, name, uploader, status, description);
+        let mut message_base = self.get_email_msgbase(&sysop).await?;
+        message_base.write_message(&message)?;
+        message_base.write_jhr_header()?;
+        Ok(())
+    }
+}
+
+fn upload_notification(sysop: &str, name: &str, uploader: &str, status: &str, description: &[String]) -> JamMessage {
+    let subject_name: String = name.chars().filter(|character| !character.is_control()).collect();
+    let description = description.join("\n");
+    let description: String = description
+        .chars()
+        .filter(|character| !character.is_control() || matches!(character, '\n' | '\r' | '\t'))
+        .collect();
+    let body = format!("File: {subject_name}\nUploader: {uploader}\nStatus: {status}\n\n{description}");
+    JamMessage::default()
+        .with_from(BString::from("IcyBoard"))
+        .with_to(BString::from(sysop))
+        .with_subject(BString::from(format!("New upload: {subject_name}")))
+        .with_date_time(Utc::now())
+        .with_attributes(attributes::MSG_LOCAL | attributes::MSG_PRIVATE)
+        .with_text(BString::from(body))
+}
+
+impl IcyBoardState {
+    async fn publish_uploaded_file(
+        &mut self,
+        source: &Path,
+        name: &str,
+        upload_location: &PathBuf,
+        upload_metadata: &PathBuf,
+        description: &[String],
+    ) -> Res<bool> {
+        let dest = upload_location.join(name);
+        let file_base = self.get_filebase(upload_location, upload_metadata).await?;
+        let duplicate = {
+            let base = file_base.lock().await;
+            upload_name_exists(&base, upload_location, name)
+        };
+        if duplicate {
+            self.session.op_text = name.to_string();
+            self.display_text(IceText::DuplicateFile, display_flags::NEWLINE | display_flags::LFBEFORE)
+                .await?;
+            return Ok(false);
+        }
+
+        std::fs::copy(source, &dest)?;
+        let metadata = match scan_file(&dest) {
+            Ok(mut metadata) => {
+                metadata.push(MetadataHeader {
+                    data: self.session.get_username_or_alias().as_bytes().to_vec(),
+                    metadata_type: MetadataType::Uploader,
+                });
+                if !description.is_empty() && !metadata.iter().any(|item| item.metadata_type == MetadataType::FileID) {
+                    metadata.push(MetadataHeader {
+                        data: description.join("\n").as_bytes().to_vec(),
+                        metadata_type: MetadataType::FileID,
+                    });
+                }
+                metadata
+            }
+            Err(error) => {
+                let _ = std::fs::remove_file(&dest);
+                return Err(error);
+            }
+        };
+        if let Err(error) = file_base.lock().await.add_file(&dest, metadata) {
+            let _ = std::fs::remove_file(&dest);
+            return Err(error);
+        }
+        std::fs::remove_file(source)?;
+        Ok(true)
+    }
+
     async fn upload_name_exists_on_system(&mut self, name: &str) -> Res<bool> {
         let conference = self.session.current_conference.clone();
         for location in [&conference.pub_upload_location, &conference.private_upload_location] {
@@ -318,37 +402,68 @@ impl IcyBoardState {
                     self.board.lock().await.statistics.add_upload(&state);
                     self.board.lock().await.save_statistics()?;
 
+                    let upload_processing = self.get_board().await.config.upload_processing.clone();
+
                     for (x, path) in state.recieve_state.finished_files {
-                        let dest = upload_location.join(&x);
-                        let file_base = self.get_filebase(&upload_location, &upload_metadata).await?;
-                        let duplicate = {
-                            let base = file_base.lock().await;
-                            upload_name_exists(&base, &upload_location, &x)
-                        };
-                        if duplicate {
-                            self.session.op_text = x;
-                            self.display_text(IceText::DuplicateFile, display_flags::NEWLINE | display_flags::LFBEFORE)
-                                .await?;
-                            std::fs::remove_file(&path)?;
+                        if upload_processing.publish_policy == UploadPublishPolicy::Immediate {
+                            if self.publish_uploaded_file(&path, &x, &upload_location, &upload_metadata, &description).await? {
+                                if upload_processing.notify_sysop
+                                    && let Err(error) = self
+                                        .notify_sysop_about_upload(&x, &self.session.get_username_or_alias().to_string(), "published", &description)
+                                        .await
+                                {
+                                    log::error!("Unable to notify the SysOp about upload '{x}': {error}");
+                                }
+                            } else {
+                                std::fs::remove_file(&path)?;
+                            }
                             continue;
                         }
-                        std::fs::copy(&path, &dest)?;
 
-                        let mut metadata = scan_file(&dest)?;
-                        metadata.push(MetadataHeader {
-                            data: self.session.get_username_or_alias().as_bytes().to_vec(),
-                            metadata_type: MetadataType::Uploader,
-                        });
-                        // An archive that carries its own FILE_ID.DIZ keeps it.
-                        if !description.is_empty() && !metadata.iter().any(|m| m.metadata_type == MetadataType::FileID) {
-                            metadata.push(MetadataHeader {
-                                data: description.join("\n").as_bytes().to_vec(),
-                                metadata_type: MetadataType::FileID,
-                            });
+                        self.display_text(IceText::BeginUploadTest, display_flags::NEWLINE | display_flags::LFBEFORE)
+                            .await?;
+                        let quarantine = UploadQuarantine::new(upload_processing.quarantine_path.clone());
+                        let record = quarantine.enqueue(
+                            &path,
+                            x,
+                            upload_location.clone(),
+                            upload_metadata.clone(),
+                            self.session.get_username_or_alias().to_string(),
+                            description.clone(),
+                        )?;
+                        let mut processed = UploadProcessor::new(upload_processing.clone()).process(&record.id).await?;
+                        log::info!(
+                            "Upload '{}' entered quarantine as {} with status {:?}",
+                            processed.original_name,
+                            processed.id,
+                            processed.status
+                        );
+                        if processed.status == QuarantineStatus::ReadyToPublish {
+                            match publish_quarantine_record(&quarantine, &processed.id, "system", "published after processing") {
+                                Ok(published) => {
+                                    self.file_bases.remove(&published.destination);
+                                    processed = published;
+                                }
+                                Err(error) => {
+                                    log::warn!("Unable to publish upload '{}': {error}", processed.original_name);
+                                    // Another actor may have rejected/claimed it. Never
+                                    // overwrite that decision with a stale local status.
+                                    processed = quarantine.load(&processed.id)?;
+                                }
+                            }
                         }
-                        file_base.lock().await.add_file(&dest, metadata.clone())?;
-
-                        std::fs::remove_file(&path)?;
+                        if upload_processing.notify_sysop
+                            && let Err(error) = self
+                                .notify_sysop_about_upload(
+                                    &processed.original_name,
+                                    &processed.uploader,
+                                    &format!("{:?}", processed.status),
+                                    &processed.description,
+                                )
+                                .await
+                        {
+                            log::error!("Unable to notify the SysOp about upload '{}': {error}", processed.original_name);
+                        }
                     }
                 }
                 Err(e) => {
@@ -413,9 +528,11 @@ pub fn create_protocol(protocol: &TransferProtocolType) -> Option<Box<dyn Protoc
 
 #[cfg(test)]
 mod option_tests {
+    use bstr::ByteSlice;
+    use jamjam::jam::attributes;
     use tempfile::TempDir;
 
-    use super::{FileBase, enough_upload_space, upload_name_exists};
+    use super::{FileBase, enough_upload_space, upload_name_exists, upload_notification};
 
     #[test]
     fn upload_space_limit_is_in_kib_and_zero_disables_it() {
@@ -437,5 +554,27 @@ mod option_tests {
         let unindexed = FileBase::open(disk_dir.path(), disk_dir.path().join("dir")).unwrap();
         std::fs::write(disk_dir.path().join("OnDisk.ZIP"), b"old").unwrap();
         assert!(upload_name_exists(&unindexed, disk_dir.path(), "ondisk.zip"));
+    }
+
+    #[test]
+    fn upload_notification_is_private_local_mail_with_sanitized_text() {
+        let message = upload_notification(
+            "SYSOP",
+            "BAD\rNAME.ZIP",
+            "ALICE",
+            "AwaitingApproval",
+            &["First line".to_string(), "Second\u{1b} line".to_string()],
+        );
+        assert_eq!(Some("SYSOP"), message.to().map(|value| value.to_str_lossy()).as_deref());
+        assert_eq!(
+            Some("New upload: BADNAME.ZIP"),
+            message.header().subject().map(|value| value.to_str_lossy()).as_deref()
+        );
+        assert_ne!(0, message.header().attributes & attributes::MSG_LOCAL);
+        assert_ne!(0, message.header().attributes & attributes::MSG_PRIVATE);
+        let text = message.text().to_str_lossy();
+        assert!(text.contains("Uploader: ALICE"));
+        assert!(text.contains("First line\nSecond line"));
+        assert!(!text.contains('\u{1b}'));
     }
 }

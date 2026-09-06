@@ -3377,6 +3377,9 @@ impl IcyBoardState {
                         Some(BBSMessage::GroupChat(event)) => {
                             self.handle_group_chat_event(event)?;
                         }
+                        Some(BBSMessage::InvalidateFileBase(path)) => {
+                            self.file_bases.remove(&path);
+                        }
                         _ => {}
                     }
                     return Ok(None);
@@ -3459,6 +3462,9 @@ impl IcyBoardState {
                         }
                         Some(BBSMessage::GroupChat(event)) => {
                             self.handle_group_chat_event(event)?;
+                        }
+                        Some(BBSMessage::InvalidateFileBase(path)) => {
+                            self.file_bases.remove(&path);
                         }
                         _ => {}
                     }

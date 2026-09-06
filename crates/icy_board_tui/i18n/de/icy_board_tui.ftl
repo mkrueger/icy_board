@@ -75,6 +75,93 @@ key_desc_cancel=Abbrechen
 key_desc_filter=Filter
 key_desc_jump=Springen
 key_desc_edit=Bearbeiten
+configuration_options_upload_processing=Upload-Verarbeitung
+
+upload_processing_title=Upload-Verarbeitung
+upload_processing_group_publication=Veröffentlichung und Quarantäne
+upload_processing_group_advertising=Werbung entfernen und eigene Datei
+upload_processing_group_zip=ZIP-Ausgabe
+upload_processing_group_scanner=Virenscanner
+upload_processing_group_limits=Ressourcen- und Sicherheitsgrenzen
+upload_processing_publish_policy=Veröffentlichung
+upload_processing_publish_policy-status=Legt fest, wann verarbeitete Uploads sichtbar werden.
+upload_processing_publish_policy-help=Sofort veröffentlicht Uploads ohne diese Verarbeitung. Nach erfolgreicher Verarbeitung werden Dateien automatisch veröffentlicht. Manuelle Sysop-Freigabe hält verarbeitete Dateien bis zur Freigabe in Quarantäne.
+upload_processing_policy_immediate=Sofort
+upload_processing_policy_after_processing=Nach erfolgreicher Verarbeitung
+upload_processing_policy_manual_approval=Manuelle Sysop-Freigabe
+upload_processing_notify_sysop=Sysop per Mail benachrichtigen
+upload_processing_notify_sysop-status=Sendet für jeden angenommenen Upload eine private lokale Nachricht.
+upload_processing_notify_sysop-help=Die Nachricht enthält Datei, Uploader, Verarbeitungsstatus und Beschreibung. Ein Mailfehler wird protokolliert, lehnt den Upload aber nicht ab.
+upload_processing_remove_advertisements=Werbung entfernen
+upload_processing_remove_advertisements-status=Entfernt erkannte Werbedateien, Werbenachspann in Beschreibungen und bekannte ZIP-Werbekommentare.
+upload_processing_remove_advertisements-help=
+    Ein Schalter entfernt erkannte Werbedateien anhand von Prüfsummen, Dateinamen
+    und Textmustern, begrenzte Werbeblöcke (einschließlich BBS- und Courier-Nachspann)
+    aus kanonischen Beschreibungsdateien sowie bekannte ZIP-Werbekommentare anhand von Regeln.
+    Die Beschreibungsbereinigung ist intern auf 8 Durchläufe begrenzt; verbleibende Treffer erfordern danach eine Prüfung.
+    Unbekannte ZIP-Kommentare bleiben erhalten, sofern kein eigener ZIP-Kommentar sie ausdrücklich ersetzt.
+    Kommentare anderer Archivformate werden nicht ausgelesen und bei der ZIP-Konvertierung nicht übernommen.
+upload_processing_repack_zip=Als ZIP neu packen
+upload_processing_repack_zip-status=Schreibt akzeptierte Archive als ZIP-Dateien neu.
+upload_processing_repack_zip-help=Lesbare Archivformate werden mit dem direkt folgenden Kompressionsgrad nach ZIP konvertiert. Kommentare anderer Formate werden nicht ausgelesen und bei der Konvertierung nicht übernommen.
+upload_processing_rules=Werberegeln
+upload_processing_rules-status=TOML-Datei mit Regeln für Werbedateien, Beschreibungsblöcke und ZIP-Kommentare.
+upload_processing_rules-help=Neue Muster zunächst nur protokollieren und Treffer prüfen, bevor automatisch bereinigt wird.
+upload_processing_quarantine=Quarantäneverzeichnis
+upload_processing_quarantine-status=Privates Verzeichnis für Uploads in Verarbeitung oder Freigabe.
+upload_processing_quarantine-help=Dieses Verzeichnis muss außerhalb aller öffentlichen Dateibereiche liegen.
+upload_processing_advertisement_file=Eigene Werbedatei
+upload_processing_advertisement_file-status=Eine statische Datei oder ein vertrauenswürdiger PPE-Generator; leer deaktiviert das Einfügen.
+upload_processing_advertisement_file-help=
+    Leer lassen, um das Einfügen zu deaktivieren. Ein normaler Pfad fügt eine statische Datei unter ihrem Basisnamen ein.
+    Leerzeichen und Semikolons sind wörtliche Bestandteile dieses einzelnen Pfads, keine Listentrenner.
+    Die Erweiterung .ppe (Groß-/Kleinschreibung beliebig) startet einen Generator, der null oder eine Datei
+    im übergebenen temporären Ausgabeverzeichnis (Parameter 1) erzeugen darf. Parameter 2 ist der ursprüngliche
+    Archivbasisname. Die Argumente werden wörtlich übergeben und mit GETTOKEN gelesen.
+    Es steht kein Entpackverzeichnis zur Verfügung, und es gibt keinen Kontext eines angemeldeten Anrufers.
+    Nur vertrauenswürdige SysOp-PPE-Programme verwenden: Die Ausführung erfolgt ohne Sandbox.
+    Die Generatorlaufzeit ist auf 30 Sekunden begrenzt; die Ausgabegröße auf den kleineren Wert
+    von max_member_size und 16 MiB. Bereits vorhandene Einträge mit dem Ausgabebasisnamen erfordern eine Prüfung.
+    Beschreibungsdateien (FILE_ID.DIZ, FILE_ID.ANS, FILE_ID.PCB, DESC.SDI) dürfen nicht hinzugefügt oder ersetzt werden.
+    Der konfigurierte Virenscanner läuft nach dem Einfügen und der Archivverarbeitung.
+upload_processing_replacement_comment=Eigener ZIP-Kommentar
+upload_processing_replacement_comment-status=Optionaler Boardtext für den ZIP-Archivkommentar.
+upload_processing_replacement_comment-help=Ein nichtleerer Text ersetzt den ZIP-Ausgabekommentar ausdrücklich, auch unbekannte Kommentare. Leer lassen, um unbekannte ZIP-Kommentare zu erhalten; bekannte Werbekommentare werden nur bei aktiviertem „Werbung entfernen“ gelöscht. Diese Einstellung schreibt nur ZIP-Kommentare, keine Kommentare anderer Formate.
+upload_processing_compression=ZIP-Kompressionsgrad
+upload_processing_compression-status=Deflate-Kompressionsgrad von 0 bis 9.
+upload_processing_compression-help=Höhere Werte können Platz sparen, benötigen aber mehr Rechenzeit.
+upload_processing_max_members=Maximale Archivdateien
+upload_processing_max_members-status=Archive mit mehr Einträgen werden zur Prüfung vorgemerkt.
+upload_processing_max_members-help=Begrenzt CPU- und Metadatenarbeit durch Archive mit sehr vielen Einträgen.
+upload_processing_max_member_size=Maximale Eintragsgröße
+upload_processing_max_member_size-status=Größte erlaubte entpackte Größe eines Archiveintrags.
+upload_processing_max_member_size-help=Der Wert wird in Bytes angegeben.
+upload_processing_max_expanded_size=Maximale entpackte Größe
+upload_processing_max_expanded_size-status=Größte erlaubte entpackte Gesamtgröße eines Archivs.
+upload_processing_max_expanded_size-help=Der Wert wird in Bytes angegeben und schützt vor Archivbomben.
+upload_processing_max_ratio=Maximales Kompressionsverhältnis
+upload_processing_max_ratio-status=Größtes erlaubtes Verhältnis von entpackter zu gepackter Größe.
+upload_processing_max_ratio-help=Einträge über diesem Verhältnis werden vor dem Entpacken zur Prüfung vorgemerkt.
+upload_processing_scanner_enabled=Virenscanner aktivieren
+upload_processing_scanner_enabled-status=Startet nach der Archivverarbeitung einen externen Scanner.
+upload_processing_scanner_enabled-help=Das Programm wird direkt und ohne Kommando-Shell gestartet.
+upload_processing_scanner_executable=Scanner-Programm
+upload_processing_scanner_executable-status=Programmname oder absoluter Pfad, zum Beispiel clamscan.
+upload_processing_scanner_executable-help=Bei einem reinen Programmnamen wird PATH durchsucht.
+upload_processing_scanner_arguments=Scanner-Argumente
+upload_processing_scanner_arguments-status=Durch Semikolon getrennte Argumente mit genau einem eigenständigen { "{file}" }.
+upload_processing_scanner_arguments-help=Es gibt keine Shell-Ersetzung. Das exakte Argument { "{file}" } wird durch den Quarantänepfad ersetzt.
+upload_processing_scanner_arguments-invalid=Scanner-Argumente müssen genau ein eigenständiges { "{file}" }-Argument enthalten.
+upload_processing_scanner_timeout=Scanner-Timeout in Sekunden
+upload_processing_scanner_timeout-status=Maximale Laufzeit eines Scanner-Prozesses.
+upload_processing_scanner_timeout-help=Ein Timeout gilt als technischer Fehler und erfordert eine Prüfung.
+upload_processing_scanner_clean_code=Exitcode für sauber
+upload_processing_scanner_clean_code-status=Exitcode, wenn keine Schadsoftware gefunden wurde.
+upload_processing_scanner_clean_code-help=ClamAV verwendet Exitcode 0 für eine saubere Datei.
+upload_processing_scanner_infected_code=Exitcode für infiziert
+upload_processing_scanner_infected_code-status=Exitcode, wenn Schadsoftware gefunden wurde.
+upload_processing_scanner_infected_code-help=ClamAV verwendet Exitcode 1 für eine infizierte Datei. Andere Codes gelten als technische Fehler.
+
 exit_icy_board_msg = Vielen Dank, dass Sie die professionelle BBS-Software { $name } verwenden!
 
 # Anruf-Warteschirm

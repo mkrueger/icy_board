@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use icy_board_engine::icy_board::upload_quarantine::{QuarantineDecision, QuarantineRecord, QuarantineStatus};
+
 #[derive(Serialize)]
 pub struct OverviewDto {
     pub board_file: String,
@@ -71,6 +73,48 @@ pub struct ApplyResultDto {
     pub changed_fields: Vec<String>,
     pub backup: Option<String>,
     pub fingerprint: String,
+}
+
+#[derive(Serialize, Clone)]
+pub struct QuarantineItemDto {
+    pub id: String,
+    pub original_name: String,
+    pub destination: String,
+    pub uploader: String,
+    pub description: Vec<String>,
+    pub uploaded_at: String,
+    pub status: QuarantineStatus,
+    pub size_bytes: u64,
+    pub processing_report: Vec<String>,
+    pub decisions: Vec<QuarantineDecision>,
+}
+
+#[derive(Serialize)]
+pub struct QuarantineListDto {
+    pub items: Vec<QuarantineItemDto>,
+}
+
+#[derive(Deserialize, Default)]
+pub struct QuarantineActionDto {
+    #[serde(default)]
+    pub note: String,
+}
+
+impl QuarantineItemDto {
+    pub fn from_record(record: &QuarantineRecord, size_bytes: u64) -> Self {
+        Self {
+            id: record.id.clone(),
+            original_name: record.original_name.clone(),
+            destination: record.destination.display().to_string(),
+            uploader: record.uploader.clone(),
+            description: record.description.clone(),
+            uploaded_at: record.uploaded_at.to_rfc3339(),
+            status: record.status,
+            size_bytes,
+            processing_report: record.processing_report.clone(),
+            decisions: record.decisions.clone(),
+        }
+    }
 }
 
 pub const DATE_FORMATS: &[(&str, &str)] = &[

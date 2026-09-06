@@ -10,6 +10,18 @@ releases.
 
 ### Added
 
+- Uploads can be quarantined, checked for known or patterned BBS advertisements,
+  have appended `FILE_ID.DIZ` footers and known ZIP comments removed, be virus
+  scanned and repacked as ZIP before publication. SysOps can configure the
+  pipeline in `icbsetup`, receive a private mail for each accepted upload, and
+  inspect, reprocess, approve or reject quarantined files in `icbadmin`.
+  One optional own advertisement file (or a trusted PPE generating that file)
+  and ZIP comments are supported; archive descriptions can only be cleaned,
+  never inserted or replaced with board advertising. The headless generator
+  receives a private output directory and the archive name, with a 30-second
+  timeout and a 16 MiB advertisement limit. See the
+  [upload processing guide](docs/upload_processing.md).
+
 - The AREA.LST editor imports `FIDONET.NA` and other networks' `.NA` area
   lists. It previews every tag and name, lets the sysop select what to take,
   skips tags already present, and chooses a new path rather than overwriting

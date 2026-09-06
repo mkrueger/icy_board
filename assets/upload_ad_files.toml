@@ -1,0 +1,61 @@
+# Conservative defaults derived from verified PCBoard archive corpus matches.
+
+[[fingerprint]]
+name = "WORKSHOP.BBS variant 1"
+sha256 = "e4f856fee590a7a77e2c2b61790ba8855733b49935dcf2b4cf3c6f594ef7f6d7"
+file_size = 1467
+
+[[fingerprint]]
+name = "WORKSHOP.BBS variant 2"
+sha256 = "8ff6fdf2ffaf02d0f2fc4b263570fa9606486744f43703c57a2372f9ca77e6fc"
+file_size = 1467
+
+[[fingerprint]]
+name = "WORKSHOP.BBS variant 3"
+sha256 = "9af3256d1421c2c9b98bbc84a83a0b8a43e1fa161e14a99d9ba4f98819e3d2f5"
+file_size = 1468
+
+[[fingerprint]]
+name = "WORKSHOP.BBS variant 4"
+sha256 = "2f4b8d91ccffda3dabb7c1bc772a654b2d276d709314374f5fe4cfd7f51450b4"
+file_size = 1468
+
+[[fingerprint]]
+name = "CEOS.AD variant 1"
+sha256 = "957670b246e8f195679523ed17260ed6b64acb6906c6c762f3e4ed3dbfc34ccb"
+file_size = 633
+
+[[fingerprint]]
+name = "CEOS.AD variant 2"
+sha256 = "f93ffe640a8e93bd5fb2fe71ef2cf3a9661aa5db4a86d5120931fb42bdd17fc3"
+file_size = 634
+
+[[fingerprint]]
+name = "CEOS.AD variant 3"
+sha256 = "cc00bf9a4514504ee9cd18b57be99121e3b005c9a3ae41c0bbf0bbb12302e8c6"
+file_size = 629
+
+[[fingerprint]]
+name = "CEOS.AD variant 4"
+sha256 = "92f578fc78c98656c1a4047f5a5d8372de43251c4c602cd4a0ea83552ed3b7f7"
+file_size = 552
+
+[[fingerprint]]
+name = "FSW.AD variant 1"
+sha256 = "c6a9ff9be5e2c0911df01c57f1c5349ba7e5a0d91de360572085b632a5a839fd"
+file_size = 1958
+
+[[fingerprint]]
+name = "FSW.AD variant 2"
+sha256 = "5f206d132d22027771d16465b35107bb7dfedb4b8fe30c4909683c82fff3274d"
+file_size = 2001
+
+[[fingerprint]]
+name = "NC!.AD"
+sha256 = "439ff9f49b2907f30edb8a2b7ff6adbd17544dc5710bde6473103ba49a3d5c70"
+file_size = 1069
+
+[[fingerprint]]
+name = "ARCHIVES.BBS"
+sha256 = "bdd77835139905931b1c72ea47d5a306fce7cb991aa51e9d353f2a5e9262064b"
+file_size = 715

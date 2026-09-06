@@ -34,6 +34,11 @@ pub fn router(state: AppState) -> Router {
         .route("/conferences/new", get(page_conference_new).post(page_conference_create))
         .route("/conferences/{index}", get(page_conference).post(page_conference_submit))
         .route("/conferences/{index}/delete", post(page_conference_delete))
+        .route("/quarantine", get(page_quarantine))
+        .route("/quarantine/{id}", get(page_quarantine_detail))
+        .route("/quarantine/{id}/reprocess", post(page_quarantine_reprocess))
+        .route("/quarantine/{id}/approve", post(page_quarantine_approve))
+        .route("/quarantine/{id}/reject", post(page_quarantine_reject))
         .route("/login", get(page_login).post(login_submit))
         .route("/logout", post(logout_submit))
         .route("/style.css", get(stylesheet))
@@ -46,6 +51,11 @@ pub fn router(state: AppState) -> Router {
             "/api/conferences/{index}",
             get(api_get_conference).put(api_update_conference).delete(api_delete_conference),
         )
+        .route("/api/quarantine", get(api_list_quarantine))
+        .route("/api/quarantine/{id}", get(api_get_quarantine))
+        .route("/api/quarantine/{id}/reprocess", post(api_reprocess_quarantine))
+        .route("/api/quarantine/{id}/approve", post(api_approve_quarantine))
+        .route("/api/quarantine/{id}/reject", post(api_reject_quarantine))
         .layer(middleware::from_fn(security_headers))
         .with_state(state)
 }
@@ -1120,3 +1130,145 @@ async fn api_delete_conference(
         Err(e) => json_error(&e),
     }
 }
+
+async fn render_quarantine(state: &AppState, csrf: &str, notice: Option<Notice>) -> Response {
+    match state.backend.list_quarantine().await {
+        Ok(list) => html(ui::quarantine_page(&list, csrf, notice)),
+        Err(error) => (status_for(&error), html_body(ui::error_page("Upload Quarantine", &error.to_string()))).into_response(),
+    }
+}
+
+async fn render_quarantine_detail(state: &AppState, id: &str, csrf: &str, notice: Option<Notice>) -> Response {
+    match state.backend.get_quarantine(id).await {
+        Ok(item) => html(ui::quarantine_detail_page(&item, csrf, notice)),
+        Err(error) => (status_for(&error), html_body(ui::error_page("Upload Quarantine", &error.to_string()))).into_response(),
+    }
+}
+
+async fn page_quarantine(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    let Some(Principal::Session { csrf }) = session_principal(&state, &headers) else {
+        return Redirect::to("/login").into_response();
+    };
+    render_quarantine(&state, &csrf, None).await
+}
+
+async fn page_quarantine_detail(State(state): State<AppState>, headers: HeaderMap, AxumPath(id): AxumPath<String>) -> Response {
+    let Some(Principal::Session { csrf }) = session_principal(&state, &headers) else {
+        return Redirect::to("/login").into_response();
+    };
+    render_quarantine_detail(&state, &id, &csrf, None).await
+}
+
+async fn quarantine_form_action<F, Fut>(state: AppState, addr: SocketAddr, headers: HeaderMap, id: String, form: HashMap<String, String>, action: F) -> Response
+where
+    F: FnOnce(Arc<dyn AdminBackend>, String, String, String) -> Fut,
+    Fut: std::future::Future<Output = crate::error::Result<QuarantineItemDto>>,
+{
+    let (principal, csrf) = match session_or_redirect(&state, &headers, &form) {
+        Ok(value) => value,
+        Err(response) => return *response,
+    };
+    let note = text(&form, "note");
+    let notice = match action(state.backend.clone(), id.clone(), actor(&principal, addr), note).await {
+        Ok(_) => Notice::Success("Quarantine item updated.".to_string()),
+        Err(error) => Notice::Failure(error.to_string()),
+    };
+    render_quarantine_detail(&state, &id, &csrf, Some(notice)).await
+}
+
+async fn page_quarantine_reprocess(
+    State(state): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+    AxumPath(id): AxumPath<String>,
+    Form(form): Form<HashMap<String, String>>,
+) -> Response {
+    quarantine_form_action(state, addr, headers, id, form, |backend, id, actor, note| async move {
+        backend.reprocess_quarantine(&id, &actor, &note).await
+    })
+    .await
+}
+
+async fn page_quarantine_approve(
+    State(state): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+    AxumPath(id): AxumPath<String>,
+    Form(form): Form<HashMap<String, String>>,
+) -> Response {
+    quarantine_form_action(state, addr, headers, id, form, |backend, id, actor, note| async move {
+        backend.approve_quarantine(&id, &actor, &note).await
+    })
+    .await
+}
+
+async fn page_quarantine_reject(
+    State(state): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+    AxumPath(id): AxumPath<String>,
+    Form(form): Form<HashMap<String, String>>,
+) -> Response {
+    quarantine_form_action(state, addr, headers, id, form, |backend, id, actor, note| async move {
+        backend.reject_quarantine(&id, &actor, &note).await
+    })
+    .await
+}
+
+async fn api_list_quarantine(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    if authenticate(&state, &headers).is_none() {
+        return unauthorized();
+    }
+    match state.backend.list_quarantine().await {
+        Ok(list) => Json(list).into_response(),
+        Err(error) => json_error(&error),
+    }
+}
+
+async fn api_get_quarantine(State(state): State<AppState>, headers: HeaderMap, AxumPath(id): AxumPath<String>) -> Response {
+    if authenticate(&state, &headers).is_none() {
+        return unauthorized();
+    }
+    match state.backend.get_quarantine(&id).await {
+        Ok(item) => Json(item).into_response(),
+        Err(error) => json_error(&error),
+    }
+}
+
+async fn quarantine_api_action<F, Fut>(state: AppState, addr: SocketAddr, headers: HeaderMap, id: String, body: QuarantineActionDto, action: F) -> Response
+where
+    F: FnOnce(Arc<dyn AdminBackend>, String, String, String) -> Fut,
+    Fut: std::future::Future<Output = crate::error::Result<QuarantineItemDto>>,
+{
+    let Some(principal) = authenticate(&state, &headers) else {
+        return unauthorized();
+    };
+    if !check_csrf(&principal, csrf_header(&headers).as_deref()) {
+        return forbidden("missing or invalid CSRF token");
+    }
+    match action(state.backend, id, actor(&principal, addr), body.note).await {
+        Ok(item) => Json(item).into_response(),
+        Err(error) => json_error(&error),
+    }
+}
+
+macro_rules! quarantine_api_handler {
+    ($name:ident, $method:ident) => {
+        async fn $name(
+            State(state): State<AppState>,
+            ConnectInfo(addr): ConnectInfo<SocketAddr>,
+            headers: HeaderMap,
+            AxumPath(id): AxumPath<String>,
+            Json(body): Json<QuarantineActionDto>,
+        ) -> Response {
+            quarantine_api_action(state, addr, headers, id, body, |backend, id, actor, note| async move {
+                backend.$method(&id, &actor, &note).await
+            })
+            .await
+        }
+    };
+}
+
+quarantine_api_handler!(api_reprocess_quarantine, reprocess_quarantine);
+quarantine_api_handler!(api_approve_quarantine, approve_quarantine);
+quarantine_api_handler!(api_reject_quarantine, reject_quarantine);

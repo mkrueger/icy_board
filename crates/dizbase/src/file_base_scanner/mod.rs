@@ -11,6 +11,7 @@ use crate::file_base::{
 pub mod repack;
 
 pub mod bbstro_fingerprint;
+pub mod description_cleaner;
 
 pub fn scan_file(path: &Path) -> crate::Result<Vec<MetadataHeader>> {
     let mut info = Vec::new();

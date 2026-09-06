@@ -13,6 +13,7 @@ use icy_board_engine::icy_board::{
     conferences::{Conference, ConferenceBase},
     icb_config::IcbConfig,
     lock::LOCK_FILE_NAME,
+    upload_quarantine::{QuarantineRecord, QuarantineStatus, UploadQuarantine},
 };
 use tokio::sync::Mutex;
 
@@ -46,6 +47,72 @@ fn fixture() -> Fixture {
 
 fn patch_from(settings: &GeneralSettingsDto) -> GeneralSettingsDto {
     settings.clone()
+}
+
+fn quarantined_upload(fixture: &Fixture, status: QuarantineStatus) -> QuarantineRecord {
+    let root = fixture._dir.path().join("quarantine/uploads");
+    let quarantine = UploadQuarantine::new(root);
+    let source = fixture._dir.path().join("upload.bin");
+    fs::write(&source, b"payload").unwrap();
+    let record = quarantine
+        .enqueue(
+            &source,
+            "UPLOAD.BIN".to_string(),
+            fixture._dir.path().join("files"),
+            fixture._dir.path().join("metadata"),
+            "ALICE".to_string(),
+            vec!["Description".to_string()],
+        )
+        .unwrap();
+    if status != QuarantineStatus::Pending {
+        quarantine
+            .transition(&record.id, &[QuarantineStatus::Pending], status, "system", "test state")
+            .unwrap()
+    } else {
+        record
+    }
+}
+
+#[tokio::test]
+async fn quarantine_list_and_detail_show_pending_upload() {
+    let fixture = fixture();
+    let record = quarantined_upload(&fixture, QuarantineStatus::Pending);
+
+    let list = fixture.backend.list_quarantine().await.unwrap();
+    assert_eq!(1, list.items.len());
+    assert_eq!(record.id, list.items[0].id);
+    assert_eq!(b"payload".len() as u64, list.items[0].size_bytes);
+
+    let detail = fixture.backend.get_quarantine(&record.id).await.unwrap();
+    assert_eq!("UPLOAD.BIN", detail.original_name);
+    assert_eq!(QuarantineStatus::Pending, detail.status);
+}
+
+#[tokio::test]
+async fn approving_quarantine_publishes_and_audits() {
+    let fixture = fixture();
+    let record = quarantined_upload(&fixture, QuarantineStatus::AwaitingApproval);
+
+    let approved = fixture.backend.approve_quarantine(&record.id, "test", "looks good").await.unwrap();
+    assert_eq!(QuarantineStatus::Published, approved.status);
+    assert_eq!(b"payload", fs::read(fixture._dir.path().join("files/UPLOAD.BIN")).unwrap().as_slice());
+    let audit = fs::read_to_string(fixture._dir.path().join("icbadmin-audit.log")).unwrap();
+    assert!(audit.contains("approve_quarantine"));
+    assert!(audit.contains("looks good"));
+}
+
+#[tokio::test]
+async fn rejecting_quarantine_keeps_payload_and_audits() {
+    let fixture = fixture();
+    let record = quarantined_upload(&fixture, QuarantineStatus::NeedsReview);
+
+    let rejected = fixture.backend.reject_quarantine(&record.id, "test", "bad file").await.unwrap();
+    assert_eq!(QuarantineStatus::Rejected, rejected.status);
+    let quarantine = UploadQuarantine::new(fixture.board.lock().await.config.upload_processing.quarantine_path.clone());
+    assert!(quarantine.payload_path(&record).exists());
+    assert!(!fixture._dir.path().join("files/UPLOAD.BIN").exists());
+    let audit = fs::read_to_string(fixture._dir.path().join("icbadmin-audit.log")).unwrap();
+    assert!(audit.contains("reject_quarantine"));
 }
 
 #[test]

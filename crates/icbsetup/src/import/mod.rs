@@ -696,6 +696,7 @@ impl PCBoardImporter {
                 disable_drive_size_check: self.data.disable_drive_check,
                 stop_uploads_free_space: self.data.stop_free_space.max(0) as u32,
             },
+            upload_processing: Default::default(),
             system_control: SystemControlOptions {
                 disable_ns_logon: self.data.disable_quick,
                 disable_full_record_updating: self.data.allow_pwrd_only,

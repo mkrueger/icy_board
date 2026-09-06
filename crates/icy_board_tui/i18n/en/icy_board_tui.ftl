@@ -1186,6 +1186,92 @@ configuration_options_limits=Limits
 configuration_options_colors=Colors
 configuration_options_func_keys=Function Keys
 configuration_options_ppl_http=PPL HTTP
+configuration_options_upload_processing=Upload Processing
+
+upload_processing_title=Upload Processing
+upload_processing_group_publication=Publication and quarantine
+upload_processing_group_advertising=Advertisement removal and own file
+upload_processing_group_zip=ZIP output
+upload_processing_group_scanner=Virus scanner
+upload_processing_group_limits=Resource and security limits
+upload_processing_publish_policy=Publication policy
+upload_processing_publish_policy-status=Choose when processed uploads become visible.
+upload_processing_publish_policy-help=Immediate publishes uploads without this processing. After successful processing publishes files automatically. Manual SysOp approval keeps processed files in quarantine until approved.
+upload_processing_policy_immediate=Immediate
+upload_processing_policy_after_processing=After successful processing
+upload_processing_policy_manual_approval=Manual SysOp approval
+upload_processing_notify_sysop=Notify SysOp by mail
+upload_processing_notify_sysop-status=Send a private local message for every accepted upload.
+upload_processing_notify_sysop-help=The message names the file, uploader, processing status and description. Notification failures are logged but do not reject the upload.
+upload_processing_remove_advertisements=Remove advertisements
+upload_processing_remove_advertisements-status=Remove recognized ad files, description footers and known ZIP advertising comments.
+upload_processing_remove_advertisements-help=
+    One switch removes recognized advertisement members using checksums, filenames
+    and text patterns, bounded advertising blocks (including BBS and courier footers)
+    from canonical description files, and known ZIP advertising comments matched by rules.
+    Description cleanup is internally limited to 8 passes; any remaining matches then require review.
+    Unknown ZIP comments are retained unless an explicit replacement ZIP comment is set.
+    Comments in other archive formats are not exposed and are not transferred during ZIP conversion.
+upload_processing_repack_zip=Repack as ZIP
+upload_processing_repack_zip-status=Rewrite accepted archives as ZIP files.
+upload_processing_repack_zip-help=Readable archive formats are converted to ZIP using the adjacent compression level. Comments from non-ZIP formats are not exposed and are not transferred during conversion.
+upload_processing_rules=Advertisement rules
+upload_processing_rules-status=TOML file containing ad-member, description-block and ZIP-comment rules.
+upload_processing_rules-help=Start new pattern rules as report-only and review their matches before enabling automatic cleanup.
+upload_processing_quarantine=Quarantine directory
+upload_processing_quarantine-status=Private staging directory for uploads awaiting processing or approval.
+upload_processing_quarantine-help=Keep this directory outside every public file area.
+upload_processing_advertisement_file=Own advertisement file
+upload_processing_advertisement_file-status=One static file or trusted PPE generator; leave empty to disable insertion.
+upload_processing_advertisement_file-help=
+    Leave empty to disable insertion. A normal path adds one static file under its basename.
+    Spaces and semicolons are literal parts of this single path, not list separators.
+    A .ppe extension (case insensitive) runs a generator that may create zero or one file
+    in the supplied temporary output directory (parameter 1). Parameter 2 is the original
+    archive basename. Read these arguments with GETTOKEN; they are supplied literally.
+    No unpack directory is available, and there is no logged-in caller context.
+    Only use trusted SysOp PPE programs: execution is not sandboxed.
+    Generator runtime is limited to 30 seconds; output size is limited to the smaller
+    of max_member_size and 16 MiB. Existing members with the output basename require review.
+    Description files (FILE_ID.DIZ, FILE_ID.ANS, FILE_ID.PCB, DESC.SDI) cannot be added or replaced.
+    The configured virus scanner runs after insertion and archive processing.
+upload_processing_replacement_comment=Replacement ZIP comment
+upload_processing_replacement_comment-status=Optional board text written as the ZIP archive comment.
+upload_processing_replacement_comment-help=Nonempty text explicitly replaces the output ZIP comment, including unknown comments. Leave empty to retain unknown ZIP comments; known advertising comments are removed only when Remove advertisements is enabled. This setting writes ZIP comments only, not comments in other formats.
+upload_processing_compression=ZIP compression level
+upload_processing_compression-status=Deflate compression level from 0 through 9.
+upload_processing_compression-help=Higher values can reduce size but require more CPU time.
+upload_processing_max_members=Maximum archive members
+upload_processing_max_members-status=Mark archives containing more entries than this limit for review.
+upload_processing_max_members-help=Limits CPU and metadata work caused by archives with excessive entry counts.
+upload_processing_max_member_size=Maximum member bytes
+upload_processing_max_member_size-status=Largest permitted expanded size of one archive member.
+upload_processing_max_member_size-help=The value is specified in bytes.
+upload_processing_max_expanded_size=Maximum expanded bytes
+upload_processing_max_expanded_size-status=Largest permitted combined expanded size of an archive.
+upload_processing_max_expanded_size-help=The value is specified in bytes and protects against archive bombs.
+upload_processing_max_ratio=Maximum compression ratio
+upload_processing_max_ratio-status=Largest permitted expanded-to-compressed ratio.
+upload_processing_max_ratio-help=Members exceeding this ratio are sent to review before extraction.
+upload_processing_scanner_enabled=Enable virus scanner
+upload_processing_scanner_enabled-status=Run an external scanner after archive processing.
+upload_processing_scanner_enabled-help=The executable is started directly without a command shell.
+upload_processing_scanner_executable=Scanner executable
+upload_processing_scanner_executable-status=Executable name or absolute path, for example clamscan.
+upload_processing_scanner_executable-help=PATH lookup is used for a bare command name.
+upload_processing_scanner_arguments=Scanner arguments
+upload_processing_scanner_arguments-status=Semicolon-separated process arguments containing one standalone { "{file}" }.
+upload_processing_scanner_arguments-help=No shell expansion occurs. The exact { "{file}" } argument is replaced with the quarantined path.
+upload_processing_scanner_arguments-invalid=Scanner arguments must contain exactly one standalone { "{file}" } argument.
+upload_processing_scanner_timeout=Scanner timeout seconds
+upload_processing_scanner_timeout-status=Maximum runtime allowed for one scanner process.
+upload_processing_scanner_timeout-help=A timeout is treated as a technical failure and requires review.
+upload_processing_scanner_clean_code=Scanner clean exit code
+upload_processing_scanner_clean_code-status=Exit code returned when no malware was found.
+upload_processing_scanner_clean_code-help=ClamAV uses exit code 0 for a clean file.
+upload_processing_scanner_infected_code=Scanner infected exit code
+upload_processing_scanner_infected_code-status=Exit code returned when malware was found.
+upload_processing_scanner_infected_code-help=ClamAV uses exit code 1 for an infected file. Other codes are technical failures.
 
 ppl_http_title=PPL HTTP Policy
 ppl_http_policy=Destination policy

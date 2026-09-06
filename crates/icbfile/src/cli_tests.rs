@@ -89,6 +89,57 @@ fn cli_import_preserves_optional_listings_and_all_format_synonyms() {
 }
 
 #[test]
+fn cli_repack_preserves_every_limit_and_accepts_negative_compression() {
+    let Some(Command::Repack(cmd)) = parse(&["repack", "files"]).command else {
+        panic!()
+    };
+    assert_eq!(cmd.compression_level, 9);
+    assert_eq!(cmd.max_members, 10_000);
+    assert_eq!(cmd.max_member_size, 512 * 1024 * 1024);
+    assert_eq!(cmd.max_expanded_size, 2 * 1024 * 1024 * 1024);
+    assert_eq!(cmd.max_compression_ratio, 1_000);
+    assert!(!cmd.dry_run && !cmd.keep_case);
+    assert!(cmd.area.is_none() && cmd.fingerprints.is_none());
+    let Some(Command::Repack(cmd)) = parse(&[
+        "repack",
+        "areas.toml",
+        "-a",
+        "Games",
+        "-p",
+        "rules.toml",
+        "-n",
+        "--keep-case",
+        "--compression-level",
+        "-1",
+        "--max-members",
+        "3",
+        "--max-member-size",
+        "1024",
+        "--max-expanded-size",
+        "2048",
+        "--max-compression-ratio",
+        "5",
+    ])
+    .command
+    else {
+        panic!()
+    };
+    assert_eq!(cmd.area.as_deref(), Some("Games"));
+    assert_eq!(cmd.fingerprints.as_deref(), Some(Path::new("rules.toml")));
+    assert!(cmd.dry_run && cmd.keep_case);
+    assert_eq!(
+        (
+            cmd.compression_level,
+            cmd.max_members,
+            cmd.max_member_size,
+            cmd.max_expanded_size,
+            cmd.max_compression_ratio
+        ),
+        (-1, 3, 1024, 2048, 5)
+    );
+}
+
+#[test]
 fn cli_option_values_may_start_with_hyphens_but_positionals_need_separator() {
     let Some(Command::Set(cmd)) = parse(&["set", "files", "test.zip", "-d", "--not-a-flag", "-a", "-1"]).command else {
         panic!()

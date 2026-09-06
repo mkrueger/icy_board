@@ -183,6 +183,21 @@ struct Repack {
 
     #[arg(long, overrides_with = "keep_case", help = text("icbfile", "keep-case"))]
     keep_case: bool,
+
+    #[arg(long, value_name = "compression-level", default_value_t = 9, allow_hyphen_values = true, help = text("icbfile", "compression-level"))]
+    compression_level: i64,
+
+    #[arg(long, value_name = "max-members", default_value_t = 10_000, allow_hyphen_values = true, help = text("icbfile", "max-members"))]
+    max_members: usize,
+
+    #[arg(long, value_name = "max-member-size", default_value_t = 512 * 1024 * 1024, allow_hyphen_values = true, help = text("icbfile", "max-member-size"))]
+    max_member_size: u64,
+
+    #[arg(long, value_name = "max-expanded-size", default_value_t = 2 * 1024 * 1024 * 1024, allow_hyphen_values = true, help = text("icbfile", "max-expanded-size"))]
+    max_expanded_size: u64,
+
+    #[arg(long, value_name = "max-compression-ratio", default_value_t = 1_000, allow_hyphen_values = true, help = text("icbfile", "max-compression-ratio"))]
+    max_compression_ratio: u64,
 }
 
 #[derive(Args)]
@@ -614,7 +629,13 @@ fn repack(cmd: &Repack) -> Res<()> {
     }
     let options = RepackOptions {
         lowercase_names: !cmd.keep_case,
+        compression_level: cmd.compression_level,
+        max_members: cmd.max_members,
+        max_member_size: cmd.max_member_size,
+        max_expanded_size: cmd.max_expanded_size,
+        max_compression_ratio: cmd.max_compression_ratio,
         dry_run: cmd.dry_run,
+        ..Default::default()
     };
 
     let mut base = open(&cmd.target, &cmd.area)?;
@@ -642,9 +663,15 @@ fn repack(cmd: &Repack) -> Res<()> {
                 }
             }
             Repacked::Unchanged => {}
+            Repacked::NeedsReview { reason } => {
+                println!("{}: needs review, {}", header.name, reason);
+            }
             Repacked::Converted {
                 name,
                 removed,
+                added,
+                cleaned_descriptions,
+                archive_comment_rules,
                 before: was,
                 after: is,
             } => {
@@ -655,6 +682,20 @@ fn repack(cmd: &Repack) -> Res<()> {
                 println!("{} -> {} ({} -> {} bytes)", header.name, name, was, is);
                 for member in &removed {
                     println!("     dropped {}", member);
+                }
+                for member in &added {
+                    println!("     added or replaced {}", member);
+                }
+                for description in &cleaned_descriptions {
+                    for change in &description.changes {
+                        println!(
+                            "     cleaned {} lines {}-{} ({})",
+                            description.name, change.first_line, change.last_line, change.rule_id
+                        );
+                    }
+                }
+                for rule_id in &archive_comment_rules {
+                    println!("     cleaned archive comment ({})", rule_id);
                 }
                 if !cmd.dry_run {
                     adopt(&mut base, header, &name)?;

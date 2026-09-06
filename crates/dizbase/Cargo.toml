@@ -12,6 +12,7 @@ bstr = { workspace = true }
 serde = { workspace = true }
 toml = { workspace = true }
 regex = { workspace = true }
+sha2 = { workspace = true }
 
 zip = { workspace = true }
 unarc-rs = { git = "https://github.com/mkrueger/unarc-rs" }

@@ -59,6 +59,7 @@ allow_remote = false
 - **Accounting Configuration** – accounting mode and peak windows.
 - **New User Options** – default security/groups and NewAsk questions.
 - **Conferences** – create, edit and delete conferences.
+- **Upload Quarantine** – inspect processing reports, reprocess, approve and reject uploads.
 
 The sidebar follows the order `icbsetup` uses for the same settings.
 
@@ -79,6 +80,11 @@ process list or the shell history.
 | GET    | `/api/settings/{section}`                 | Current values plus fingerprint  |
 | PUT    | `/api/settings/{section}`                 | Apply changes                    |
 | POST   | `/api/settings/{section}/preview`         | Show what a change would do      |
+| GET    | `/api/quarantine`                         | List quarantined uploads         |
+| GET    | `/api/quarantine/{id}`                    | Upload details and audit history |
+| POST   | `/api/quarantine/{id}/reprocess`          | Run processing again             |
+| POST   | `/api/quarantine/{id}/approve`            | Publish an approved upload       |
+| POST   | `/api/quarantine/{id}/reject`             | Reject an upload                 |
 
 `{section}` is one of:
 
@@ -97,6 +103,8 @@ A `PUT` must echo back the `fingerprint` from the preceding `GET`. If the file
 changed in the meantime the request is rejected with `409 Conflict`.
 
 Browser form posts use the same backend with a session cookie and CSRF token.
+Quarantine API actions accept `{"note":"..."}` and require the same CSRF header
+as other state-changing API requests when session authentication is used.
 
 ## Save behaviour
 

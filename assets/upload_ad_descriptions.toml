@@ -1,0 +1,14 @@
+# Conservative defaults derived from verified PCBoard archive corpus matches.
+# Add uncertain rules as report_only first and promote them only after reviewing
+# both positive and negative matches.
+
+[[description_rule]]
+id = "shogunat-footer"
+lines = ['^.*fucking fast shareware.*$', '^.*shogunat 030 746 67 93.*$']
+action = "auto_clean"
+
+[[description_rule]]
+id = "liquid-whq-footer"
+inline_start = "I WAS FIRST ON"
+lines = ["^i was first on liquid's whq, @user@$", "^why don't ya ask for japanese boards$"]
+action = "auto_clean"

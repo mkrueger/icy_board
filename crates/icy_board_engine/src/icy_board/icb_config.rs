@@ -570,6 +570,7 @@ pub struct ConfigPaths {
     /// name and location of the QWK network configuration
     #[serde(default)]
     pub qwknet_file: PathBuf,
+
     /// home directory for user files
     pub user_file: PathBuf,
 
@@ -671,6 +672,90 @@ pub struct FileTransferOptions {
 
     pub disable_drive_size_check: bool,
     pub stop_uploads_free_space: u32,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum UploadPublishPolicy {
+    #[default]
+    Immediate,
+    AfterProcessing,
+    ManualApproval,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct UploadScannerConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    pub executable: PathBuf,
+    #[serde(default)]
+    pub arguments: Vec<String>,
+    pub timeout_seconds: u64,
+    pub clean_exit_code: i32,
+    pub infected_exit_code: i32,
+}
+
+impl Default for UploadScannerConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            executable: PathBuf::from("clamscan"),
+            arguments: vec!["--no-summary".to_string(), "{file}".to_string()],
+            timeout_seconds: 120,
+            clean_exit_code: 0,
+            infected_exit_code: 1,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct UploadProcessingConfig {
+    #[serde(default)]
+    pub publish_policy: UploadPublishPolicy,
+    #[serde(default)]
+    pub notify_sysop: bool,
+    #[serde(default)]
+    pub remove_advertisements: bool,
+    #[serde(default)]
+    pub repack_to_zip: bool,
+    #[serde(default)]
+    pub advertisement_rules: PathBuf,
+    #[serde(default)]
+    pub quarantine_path: PathBuf,
+    /// Empty disables insertion; a case-insensitive .ppe extension selects a trusted generator.
+    /// Other paths insert one static file under its basename.
+    #[serde(default)]
+    pub advertisement_file: PathBuf,
+    #[serde(default)]
+    pub replacement_archive_comment: String,
+    pub compression_level: i64,
+    pub max_members: usize,
+    pub max_member_size: u64,
+    pub max_expanded_size: u64,
+    pub max_compression_ratio: u64,
+    #[serde(default)]
+    pub scanner: UploadScannerConfig,
+}
+
+impl Default for UploadProcessingConfig {
+    fn default() -> Self {
+        Self {
+            publish_policy: UploadPublishPolicy::Immediate,
+            notify_sysop: false,
+            remove_advertisements: false,
+            repack_to_zip: false,
+            advertisement_rules: PathBuf::from("upload_ad_rules.toml"),
+            quarantine_path: PathBuf::from("quarantine/uploads"),
+            advertisement_file: PathBuf::new(),
+            replacement_archive_comment: String::new(),
+            compression_level: 9,
+            max_members: 10_000,
+            max_member_size: 512 * 1024 * 1024,
+            max_expanded_size: 2 * 1024 * 1024 * 1024,
+            max_compression_ratio: 1_000,
+            scanner: UploadScannerConfig::default(),
+        }
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -1054,6 +1139,8 @@ pub struct IcbConfig {
 
     pub message: MessageOptions,
     pub file_transfer: FileTransferOptions,
+    #[serde(default)]
+    pub upload_processing: UploadProcessingConfig,
     pub system_control: SystemControlOptions,
     pub switches: ConfigSwitches,
     pub limits: LimitOptions,
@@ -1286,6 +1373,7 @@ impl IcbConfig {
                 disable_drive_size_check: false,
                 stop_uploads_free_space: 1024,
             },
+            upload_processing: UploadProcessingConfig::default(),
             system_control: SystemControlOptions {
                 disable_ns_logon: false,
                 disable_full_record_updating: false,
@@ -1423,8 +1511,8 @@ impl Default for QwkSettings {
 #[cfg(test)]
 mod tests {
     use super::{
-        ColorConfiguration, CommandType, IcbConfig, PcbScreenColors, PplHttpDestinationPolicy, SecurityExpression, SysopInformation, UserCommandLevels,
-        normalize_ppl_http_origins,
+        ColorConfiguration, CommandType, IcbConfig, PcbScreenColors, PplHttpDestinationPolicy, SecurityExpression, SysopInformation, UploadPublishPolicy,
+        UserCommandLevels, normalize_ppl_http_origins,
     };
 
     #[test]
@@ -1446,8 +1534,65 @@ mod tests {
         assert_eq!(config.ppl_http.max_concurrent_per_node, 2);
 
         let encoded = toml::to_string(&config).unwrap();
+        assert!(!encoded.contains("clean_descriptions"));
+        assert!(!encoded.contains("clean_archive_comments"));
+        assert!(!encoded.contains("max_description_clean_passes"));
         let decoded: IcbConfig = toml::from_str(&encoded).unwrap();
         assert_eq!(decoded.ppl_http, config.ppl_http);
+    }
+
+    #[test]
+    fn old_configuration_without_upload_processing_gets_safe_defaults() {
+        let encoded = toml::to_string(&IcbConfig::default()).unwrap();
+        let mut value: toml::Value = toml::from_str(&encoded).unwrap();
+        value.as_table_mut().unwrap().remove("upload_processing");
+
+        let decoded: IcbConfig = toml::from_str(&toml::to_string(&value).unwrap()).unwrap();
+        assert_eq!(UploadPublishPolicy::Immediate, decoded.upload_processing.publish_policy);
+        assert!(!decoded.upload_processing.remove_advertisements);
+        assert!(!decoded.upload_processing.scanner.enabled);
+        assert!(decoded.upload_processing.advertisement_file.as_os_str().is_empty());
+        assert_eq!(9, decoded.upload_processing.compression_level);
+    }
+
+    #[test]
+    fn upload_processing_advertisement_file_round_trips_as_one_literal_path() {
+        for path in ["", " ads/own board; notice.txt ", "ppe/own board; generator.PpE"] {
+            let mut config = IcbConfig::default();
+            config.upload_processing.advertisement_file = path.into();
+            let encoded = toml::to_string(&config).unwrap();
+            let value: toml::Value = toml::from_str(&encoded).unwrap();
+            assert_eq!(value["upload_processing"]["advertisement_file"].as_str(), Some(path));
+            assert!(value["upload_processing"].get("additions").is_none());
+            let decoded: IcbConfig = toml::from_str(&encoded).unwrap();
+            assert_eq!(decoded.upload_processing.advertisement_file, config.upload_processing.advertisement_file);
+        }
+    }
+
+    #[test]
+    fn upload_processing_without_advertisement_file_defaults_to_disabled() {
+        let mut value = toml::Value::try_from(IcbConfig::default()).unwrap();
+        value["upload_processing"].as_table_mut().unwrap().remove("advertisement_file");
+        let decoded: IcbConfig = toml::from_str(&toml::to_string(&value).unwrap()).unwrap();
+        assert!(decoded.upload_processing.advertisement_file.as_os_str().is_empty());
+    }
+
+    #[test]
+    fn upload_processing_configuration_round_trips() {
+        let mut config = IcbConfig::default();
+        config.upload_processing.publish_policy = UploadPublishPolicy::ManualApproval;
+        config.upload_processing.notify_sysop = true;
+        config.upload_processing.remove_advertisements = true;
+        config.upload_processing.scanner.enabled = true;
+        config.upload_processing.scanner.arguments = vec!["--fdpass".to_string(), "{file}".to_string()];
+
+        let encoded = toml::to_string(&config).unwrap();
+        let decoded: IcbConfig = toml::from_str(&encoded).unwrap();
+        assert_eq!(UploadPublishPolicy::ManualApproval, decoded.upload_processing.publish_policy);
+        assert!(decoded.upload_processing.notify_sysop);
+        assert!(decoded.upload_processing.remove_advertisements);
+        assert!(decoded.upload_processing.scanner.enabled);
+        assert_eq!(vec!["--fdpass", "{file}"], decoded.upload_processing.scanner.arguments);
     }
 
     #[test]

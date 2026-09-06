@@ -12,6 +12,7 @@ handbook is built from [`docs/source`](source/) and ships as HTML and PDF.
 | [Installation](../INSTALL.md) | Prebuilt packages, source builds and editor setup. |
 | [Migrating from PCBoard](migration.md) | Dry-run an import, map DOS drives, inspect PPEs and validate the result. |
 | [File areas](icbfile.md) | Import, normalize and maintain file bases. |
+| [Upload processing](upload_processing.md) | Quarantine, advertisement cleanup, one own advertisement file or a PPE generator. |
 
 ## Understand compatibility
 
