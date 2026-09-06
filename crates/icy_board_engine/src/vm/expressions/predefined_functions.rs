@@ -570,8 +570,10 @@ pub async fn string_to_mixed_case(vm: &mut VirtualMachine<'_>, args: &[PPEExpr])
 
 fn string_comparison_mode(vm: &mut VirtualMachine<'_>, value: i32) -> Option<bool> {
     match value {
-        0 => Some(false),
-        1 => Some(true),
+        0 | 1 => {
+            vm.operation_succeeded();
+            Some(value == 1)
+        }
         _ => {
             vm.set_error(PplError::new(ERR_KIND_STRING, ERR_INVALID, "invalid StringComparison value"));
             None
@@ -579,11 +581,25 @@ fn string_comparison_mode(vm: &mut VirtualMachine<'_>, value: i32) -> Option<boo
     }
 }
 
-fn ignore_case_regex(pattern: &str) -> regex::Regex {
-    regex::RegexBuilder::new(&regex::escape(pattern))
-        .case_insensitive(true)
-        .build()
-        .expect("an escaped string is always a valid regex")
+fn ignore_case_regex(vm: &mut VirtualMachine<'_>, pattern: &str, anchor_end: bool) -> Option<regex::Regex> {
+    let mut pattern = regex::escape(pattern);
+    if anchor_end {
+        pattern.push_str(r"\z");
+    }
+    match regex::RegexBuilder::new(&pattern).case_insensitive(true).build() {
+        Ok(regex) => Some(regex),
+        Err(error) => {
+            // Escaping guarantees valid syntax, not that the compiled literal fits
+            // the regex engine's resource limits.
+            let code = if matches!(error, regex::Error::CompiledTooBig(_)) {
+                ERR_LIMIT
+            } else {
+                ERR_INVALID
+            };
+            vm.set_error(PplError::new(ERR_KIND_STRING, code, format!("case-insensitive comparison failed: {error}")));
+            None
+        }
+    }
 }
 
 pub async fn string_find_comparison(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
@@ -603,9 +619,10 @@ pub async fn string_find_comparison(vm: &mut VirtualMachine<'_>, args: &[PPEExpr
     let Some(offset) = char_offset(&text, start) else {
         return Ok(VariableValue::new_int(-1));
     };
-    let result = ignore_case_regex(&search)
-        .find_at(&text, offset)
-        .map_or(-1, |found| text[..found.start()].chars().count() as i32);
+    let Some(regex) = ignore_case_regex(vm, &search, false) else {
+        return Ok(VariableValue::new_int(-1));
+    };
+    let result = regex.find_at(&text, offset).map_or(-1, |found| text[..found.start()].chars().count() as i32);
     Ok(VariableValue::new_int(result))
 }
 
@@ -624,10 +641,17 @@ pub async fn string_find_last_comparison(vm: &mut VirtualMachine<'_>, args: &[PP
         return Ok(VariableValue::new_int(-1));
     }
     let end = string_find_last_end(&text, start);
-    let result = ignore_case_regex(&search)
-        .find_iter(&text[..end])
-        .last()
-        .map_or(-1, |found| text[..found.start()].chars().count() as i32);
+    // A forward, non-overlapping iterator can miss the rightmost occurrence.
+    // Literal matching with Unicode simple case folding is reversible by scalar
+    // value, so the first reversed match is the last original match.
+    let reversed_search: String = search.chars().rev().collect();
+    let Some(regex) = ignore_case_regex(vm, &reversed_search, false) else {
+        return Ok(VariableValue::new_int(-1));
+    };
+    let reversed_text: String = text[..end].chars().rev().collect();
+    let result = regex
+        .find(&reversed_text)
+        .map_or(-1, |found| reversed_text[found.end()..].chars().count() as i32);
     Ok(VariableValue::new_int(result))
 }
 
@@ -640,7 +664,10 @@ pub async fn string_contains_comparison(vm: &mut VirtualMachine<'_>, args: &[PPE
     };
     let found = !search.is_empty()
         && if ignore_case {
-            ignore_case_regex(&search).is_match(&text)
+            let Some(regex) = ignore_case_regex(vm, &search, false) else {
+                return Ok(VariableValue::new_bool(false));
+            };
+            regex.is_match(&text)
         } else {
             text.contains(&search)
         };
@@ -655,7 +682,10 @@ pub async fn string_starts_with_comparison(vm: &mut VirtualMachine<'_>, args: &[
         return Ok(VariableValue::new_bool(false));
     };
     let found = if ignore_case {
-        ignore_case_regex(&prefix).find(&text).is_some_and(|found| found.start() == 0)
+        let Some(regex) = ignore_case_regex(vm, &prefix, false) else {
+            return Ok(VariableValue::new_bool(false));
+        };
+        regex.find(&text).is_some_and(|found| found.start() == 0)
     } else {
         text.starts_with(&prefix)
     };
@@ -670,10 +700,10 @@ pub async fn string_ends_with_comparison(vm: &mut VirtualMachine<'_>, args: &[PP
         return Ok(VariableValue::new_bool(false));
     };
     let found = if ignore_case {
-        ignore_case_regex(&suffix)
-            .find_iter(&text)
-            .last()
-            .is_some_and(|found| found.end() == text.len())
+        let Some(regex) = ignore_case_regex(vm, &suffix, true) else {
+            return Ok(VariableValue::new_bool(false));
+        };
+        regex.is_match(&text)
     } else {
         text.ends_with(&suffix)
     };
@@ -690,7 +720,10 @@ pub async fn string_count_comparison(vm: &mut VirtualMachine<'_>, args: &[PPEExp
     let count = if search.is_empty() {
         0
     } else if ignore_case {
-        ignore_case_regex(&search).find_iter(&text).count() as i32
+        let Some(regex) = ignore_case_regex(vm, &search, false) else {
+            return Ok(VariableValue::new_int(0));
+        };
+        regex.find_iter(&text).count() as i32
     } else {
         text.matches(&search).count() as i32
     };
@@ -711,9 +744,10 @@ pub async fn string_equals_comparison(vm: &mut VirtualMachine<'_>, args: &[PPEEx
         return Ok(VariableValue::new_bool(false));
     };
     let equal = if ignore_case {
-        ignore_case_regex(&right)
-            .find(&left)
-            .is_some_and(|found| found.start() == 0 && found.end() == left.len())
+        let Some(regex) = ignore_case_regex(vm, &right, false) else {
+            return Ok(VariableValue::new_bool(false));
+        };
+        regex.find(&left).is_some_and(|found| found.start() == 0 && found.end() == left.len())
     } else {
         left == right
     };

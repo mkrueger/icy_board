@@ -1,4 +1,46 @@
-use crate::vm::tests::run_ppl;
+use crate::vm::tests::{compile_errors, run_ppl};
+
+#[test]
+fn forward_array_functions_preserve_all_return_ranks() {
+    for (rank, bounds, index) in [("[]", "1", "1"), ("[,]", "1, 2", "1, 2"), ("[,,]", "1, 2, 3", "1, 2, 3")] {
+        for declare in [false, true] {
+            let declaration = if declare {
+                format!("DECLARE FUNCTION MakeValues() INTEGER{rank}\n")
+            } else {
+                String::new()
+            };
+            let source = format!(
+                r#";$LANGVERSION 400
+{declaration}
+INTEGER values{rank} = MakeValues()
+PRINT values[{index}]
+FUNCTION MakeValues() INTEGER{rank}
+    INTEGER result[{bounds}]
+    result[{index}] = 23
+    RETURN result
+ENDFUNC
+"#
+            );
+            assert_eq!("23", run_ppl(&source), "rank {rank}, declare {declare}");
+        }
+    }
+}
+
+#[test]
+fn explicit_function_declarations_still_check_return_rank() {
+    for expected in ["", "[]", "[,]", "[,,]"] {
+        for actual in ["", "[]", "[,]", "[,,]"] {
+            let errors = compile_errors(&format!(
+                ";$LANGVERSION 400\nDECLARE FUNCTION Make() INTEGER{expected}\nFUNCTION Make() INTEGER{actual}\nENDFUNC\n"
+            ));
+            if expected == actual {
+                assert!(errors.is_empty(), "{errors:?}");
+            } else {
+                assert!(errors.iter().any(|error| error.contains("return type does not match")), "{errors:?}");
+            }
+        }
+    }
+}
 
 #[test]
 fn test_a_function_can_be_called_before_the_file_defines_it() {

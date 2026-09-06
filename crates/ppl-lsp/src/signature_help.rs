@@ -56,6 +56,14 @@ impl SignatureBuilder {
     }
 }
 
+fn return_type_name(visitor: &SemanticVisitor, variable_type: VariableType, rank: u8) -> String {
+    let mut name = type_name(&visitor.type_registry, variable_type);
+    if rank > 0 {
+        let _ = write!(name, "[{}]", ",".repeat(usize::from(rank - 1)));
+    }
+    name
+}
+
 fn render_parameter(visitor: &SemanticVisitor, parameter: &ParameterSpecifier) -> String {
     match parameter {
         ParameterSpecifier::Variable(variable) => {
@@ -85,7 +93,7 @@ fn render_parameter(visitor: &SemanticVisitor, parameter: &ParameterSpecifier) -
                 "FUNCTION {}({}) {}",
                 function.get_identifier(),
                 parameters,
-                type_name(&visitor.type_registry, function.get_return_type())
+                return_type_name(visitor, function.get_return_type(), function.get_return_rank())
             )
         }
         ParameterSpecifier::Procedure(procedure) => {
@@ -109,7 +117,10 @@ fn user_routine(visitor: &SemanticVisitor, name: &str) -> Option<SignatureInform
                 let text = render_parameter(visitor, parameter);
                 builder.push(&text);
             }
-            let mut signature = builder.finish(&format!(") {}", type_name(&visitor.type_registry, function.get_return_type())));
+            let mut signature = builder.finish(&format!(
+                ") {}",
+                return_type_name(visitor, function.get_return_type(), function.get_return_rank())
+            ));
             signature.documentation = function.get_documentation().map(|documentation| {
                 Documentation::MarkupContent(tower_lsp::lsp_types::MarkupContent {
                     kind: tower_lsp::lsp_types::MarkupKind::Markdown,

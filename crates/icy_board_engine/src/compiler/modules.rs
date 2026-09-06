@@ -463,8 +463,14 @@ mod tests {
             .iter()
             .map(|(name, source)| parse_ast(PathBuf::from(name), errors.clone(), source, &registry, Encoding::Utf8, &workspace))
             .collect::<Vec<_>>();
+        let records = registry.user_types();
+        let enums = registry.enums();
+        let registered_types = registry.registered_types.clone();
         let mut compiler = PPECompiler::new(&workspace, registry, errors.clone());
         compiler.compile(&asts.iter().collect::<Vec<_>>());
+        assert_eq!(records, compiler.semantic_visitor.type_registry.user_types());
+        assert_eq!(enums, compiler.semantic_visitor.type_registry.enums());
+        assert_eq!(registered_types, compiler.semantic_visitor.type_registry.registered_types);
         errors
     }
 
@@ -475,6 +481,61 @@ mod tests {
             ("main.pps", "IMPORT Greeter AS G\nG.Hello()\n"),
         ]);
         assert!(errors.lock().unwrap().errors.is_empty(), "public import should compile");
+    }
+
+    #[test]
+    fn compound_assignment_probe_keeps_receiver_types_per_file() {
+        // The member tokens deliberately start at the same byte in both files.
+        // One receiver is a record path; the other is an object returned by a call.
+        let record =
+            "MODULE One\nTYPE Item\n INTEGER SecurityLevel\nENDTYPE\nItem items[0]\nPROCEDURE Update()\n items[0].SecurityLevel += 1\nENDPROC\nENDMODULE\n";
+        let prefix = "MODULE Two\nPROCEDURE Update()\n ";
+        let padding = " ".repeat(record.find("SecurityLevel +=").unwrap() - prefix.len() - "Receiver().".len());
+        let object = format!("{prefix}{padding}Receiver().SecurityLevel += 1\nENDPROC\nFUNCTION Receiver() USER\n RETURN Session.User\nENDFUNC\nENDMODULE\n");
+        assert_eq!(record.find("SecurityLevel +="), object.find("SecurityLevel +="));
+        for sources in [
+            vec![("one.pps", record), ("two.pps", object.as_str())],
+            vec![("two.pps", object.as_str()), ("one.pps", record)],
+        ] {
+            let mut sources = sources;
+            sources.push(("main.pps", "IMPORT One AS A\nIMPORT Two AS B\nA.Update()\nB.Update()\n"));
+            let errors = compile(&sources);
+            let messages = errors.lock().unwrap().errors.iter().map(|error| error.error.to_string()).collect::<Vec<_>>();
+            assert!(messages.is_empty(), "{messages:?}");
+        }
+    }
+
+    #[test]
+    fn compound_assignment_probe_preserves_imported_records_and_enums() {
+        let errors = compile(&[
+            (
+                "types.pps",
+                "MODULE Types\nTYPE Item\n INTEGER Value\nENDTYPE\nENUM Kind\n First = 1\nENDENUM\nENDMODULE\n",
+            ),
+            (
+                "main.pps",
+                "IMPORT Types AS T\nT.Item item\nT.Kind kind = T.Kind.First\nitem.Value += 1\nSession.User.SecurityLevel += item.Value\nPRINT kind, item.Value\n",
+            ),
+        ]);
+        let messages = errors.lock().unwrap().errors.iter().map(|error| error.error.to_string()).collect::<Vec<_>>();
+        assert!(messages.is_empty(), "{messages:?}");
+    }
+
+    #[test]
+    fn compound_assignment_has_no_registered_writable_object_indexers() {
+        let registry = UserTypeRegistry::icy_board_registry();
+        for (id, members) in &registry.types {
+            for name in members.member_id_lookup.keys() {
+                assert_ne!(name.as_str(), "<get>", "type {id}");
+                assert_ne!(name.as_str(), "<set>", "type {id}");
+            }
+        }
+        // Array-valued getters and string indexing are reads, not writable object
+        // indexers. Do not silently accept their parser-generated <set> calls.
+        for source in ["Session.User.Contacts[0] += 1", "STRING text = \"abc\"\ntext.Substring(0)[0] += \"x\""] {
+            let errors = compile(&[("main.pps", source)]);
+            assert!(errors.lock().unwrap().has_errors(), "{source}");
+        }
     }
 
     #[test]

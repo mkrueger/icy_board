@@ -131,24 +131,27 @@ impl OutputVisitor {
 
             ParameterSpecifier::Function(call) => {
                 self.output_keyword("Function");
+                self.output.push(' ');
                 self.output(call.get_identifier());
                 self.output.push('(');
                 for (i, arg) in call.get_parameters().iter().enumerate() {
-                    arg.visit(self);
+                    self.print_parameter(arg);
                     if i < call.get_parameters().len() - 1 {
                         self.output.push_str(", ");
                     }
                 }
-                self.output.push(')');
+                self.output.push_str(") ");
                 self.output_type(call.get_return_type(), call.get_return_type_token());
+                self.output_return_rank(call.get_return_rank());
             }
 
             ParameterSpecifier::Procedure(call) => {
                 self.output_keyword("Procedure");
+                self.output.push(' ');
                 self.output(call.get_identifier());
                 self.output.push('(');
                 for (i, arg) in call.get_parameters().iter().enumerate() {
-                    arg.visit(self);
+                    self.print_parameter(arg);
                     if i < call.get_parameters().len() - 1 {
                         self.output.push_str(", ");
                     }

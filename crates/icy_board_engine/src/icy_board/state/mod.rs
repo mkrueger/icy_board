@@ -1795,14 +1795,17 @@ impl IcyBoardState {
             let mut board = self.get_board().await;
             for u in 0..board.users.len() {
                 if board.users[u].get_name() == user.get_name() {
-                    board.users[u] = user.clone();
-                    board.save_userbase()?;
+                    let previous = std::mem::replace(&mut board.users[u], user.clone());
+                    if let Err(error) = board.save_userbase() {
+                        board.users[u] = previous;
+                        return Err(error);
+                    }
                     return Ok(());
                 }
             }
-            log::error!("User not found in user list");
+            return Err("User not found in user list".into());
         }
-        Ok(())
+        Err("No current user to persist".into())
     }
 
     fn find_more_specific_file(&self, base_name: String) -> PathBuf {

@@ -663,13 +663,21 @@ impl VirtualMachine<'_> {
                     // No room to call; the function's return variable keeps whatever it held.
                     return Ok(self.variable_table.get_value(return_var_id).clone());
                 }
+                // An array result belongs to the current invocation. A recursive
+                // call must return its value without replacing the outer result.
+                let saved_array_result = (self.variable_table.get_version() >= 400 && self.variable_table.get_var_entry(return_var_id).header.dim > 0)
+                    .then(|| self.variable_table.get_value(return_var_id).clone());
                 self.prepare_call(locals, parameters, first, arguments, 0).await?;
 
                 self.return_addresses.push(ReturnAddress::func_call(self.cur_ptr, *func_id));
                 self.goto(proc_offset)?;
                 self.run().await?;
                 self.fpclear = false;
-                Ok(self.variable_table.get_value(return_var_id).clone())
+                let result = self.variable_table.get_value(return_var_id).clone();
+                if let Some(previous) = saved_array_result {
+                    *self.variable_table.get_value_mut(return_var_id) = previous;
+                }
+                Ok(result)
             }
         }
     }
@@ -890,7 +898,7 @@ impl VirtualMachine<'_> {
                         // write back locals + parameters
                         for i in (0..(locals + parameters)).rev() {
                             let id = first + i;
-                            if self.variable_table.get_var_entry(id).header.flags & 0x1 == 0x0 {
+                            if self.variable_table.get_var_entry(id).header.flags & crate::executable::variable_table::VARIABLE_FLAG_STATIC == 0 {
                                 let Some(value) = self.call_local_value_stack.pop() else {
                                     return Err(VMError::PushPopStackEmpty.into());
                                 };
@@ -985,13 +993,10 @@ impl VirtualMachine<'_> {
                 };
             }
             PPECommand::Let(variable, expr) => {
-                let whole_dynamic_array = match variable.as_ref() {
-                    PPEExpr::Value(id) => {
-                        self.variable_table.get_var_entry(*id).header.flags & crate::executable::variable_table::VARIABLE_FLAG_DYNAMIC_ARRAY != 0
-                    }
-                    _ => false,
-                };
-                let val = if whole_dynamic_array {
+                // 4.00 type-checks whole-array operands before emitting LET.
+                // Preserve the RHS value for bounded targets and record fields
+                // too; classic PPEs retain their historical bare-array decay.
+                let val = if self.variable_table.get_version() >= 400 {
                     self.eval_array_operand(expr).await?
                 } else {
                     match self.eval_expr_sync(expr) {

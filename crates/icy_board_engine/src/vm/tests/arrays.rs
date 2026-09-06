@@ -468,7 +468,7 @@ fn an_array_can_be_redimmed_through_its_member() {
 
 #[test]
 fn redim_as_a_member_takes_one_bound_per_dimension() {
-    assert_eq!("3 4", run_ppl("INTEGER a(1)\na.Redim(2, 3)\nPRINT a.Len(0), \" \", a.Len(1)"));
+    assert_eq!("3 4", run_ppl("INTEGER a(1, 1)\na.Redim(2, 3)\nPRINT a.Len(0), \" \", a.Len(1)"));
 }
 
 /// The member is the same statement, so it agrees with the written out form.

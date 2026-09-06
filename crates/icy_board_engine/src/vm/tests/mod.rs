@@ -7,6 +7,8 @@
 
 #![cfg(test)]
 
+mod array_type_checks;
+mod array_values;
 mod arrays;
 mod board_objects;
 mod board_session;
@@ -267,6 +269,10 @@ fn run_ppl_collecting<P: Fn(&mut IcyBoard)>(
             security_level: 255,
             ..Default::default()
         });
+        // USER mutations persist immediately. Give the normal fixture a writable
+        // destination; individual tests may override it to inject write failures.
+        let user_file = board.resolve_file(&board.config.paths.user_file);
+        std::fs::create_dir_all(user_file.parent().unwrap()).unwrap();
         init_fn(&mut board);
         for conference in board.conferences.iter_mut() {
             if conference.areas.is_none() {

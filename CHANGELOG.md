@@ -34,6 +34,29 @@ releases.
 
 ### Fixed
 
+- PPL 4.00 dynamic arrays now have per-call local storage and fresh function
+  results, including recursion. Whole-array assignments copy all elements and
+  adopt bounds; brace initializers preserve explicit dynamic declarations.
+- Array-returning functions no longer require explicit `DECLARE`. Callback
+  signatures check and display the complete return type, including array rank.
+  Array results are rejected consistently in scalar expressions, and 4.00
+  `REDIM` preserves the declared rank in both statement and member notation.
+- Compound assignments evaluate target indices and object receivers once,
+  including nested record fields, recursive calls and module-qualified code.
+  Recompile beta 4.00 PPEs using dynamic arrays: their storage flag is now
+  distinct from the classic static-variable flag. Pre-4.00 PPE behavior is
+  unchanged.
+
+- PPL 4.00 case-insensitive string comparisons report oversized search literals
+  through `Error.Last()` instead of panicking. `FindLast` and `EndsWith` handle
+  overlapping matches correctly, and `Regex.FindAll` starts at the requested
+  character position while preserving anchor, word-boundary and empty-match
+  semantics.
+- PPL 4.00 user mutations roll back the caller and in-memory user record when
+  saving fails, return failure and publish `ErrKind.User` / `ErrCode.Io`.
+  Invalid user and text-margin mutations now publish errors consistently;
+  successful mutations clear errors left by earlier statements.
+
 - Echomail for a point is no longer discarded as already travelled merely
   because its two-dimensional `PATH` names the point's boss. This could make a
   rescan report every message as a duplicate, remove the inbound bundle and

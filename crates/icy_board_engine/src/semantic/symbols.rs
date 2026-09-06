@@ -29,6 +29,15 @@ pub(super) fn parameter_lists_match(expected: &[ParameterSpecifier], actual: &[P
             .all(|(expected, actual)| parameter_signature_matches(expected, actual))
 }
 
+/// Keep the legacy DECLARE rules for ordinary parameters, but validate complete
+/// callback signatures before the implementation replaces the declaration.
+pub(super) fn declaration_parameters_match(expected: &[ParameterSpecifier], actual: &[ParameterSpecifier]) -> bool {
+    expected.len() == actual.len()
+        && expected.iter().zip(actual).all(|(expected, actual)| {
+            matches!((expected, actual), (ParameterSpecifier::Variable(_), ParameterSpecifier::Variable(_))) || parameter_signature_matches(expected, actual)
+        })
+}
+
 fn parameter_signature_matches(expected: &ParameterSpecifier, actual: &ParameterSpecifier) -> bool {
     match (expected, actual) {
         (ParameterSpecifier::Variable(expected), ParameterSpecifier::Variable(actual)) => {
@@ -49,7 +58,9 @@ fn parameter_signature_matches(expected: &ParameterSpecifier, actual: &Parameter
             }
         }
         (ParameterSpecifier::Function(expected), ParameterSpecifier::Function(actual)) => {
-            expected.get_return_type() == actual.get_return_type() && parameter_lists_match(expected.get_parameters(), actual.get_parameters())
+            expected.get_return_type() == actual.get_return_type()
+                && expected.get_return_rank() == actual.get_return_rank()
+                && parameter_lists_match(expected.get_parameters(), actual.get_parameters())
         }
         (ParameterSpecifier::Procedure(expected), ParameterSpecifier::Procedure(actual)) => {
             parameter_lists_match(expected.get_parameters(), actual.get_parameters())

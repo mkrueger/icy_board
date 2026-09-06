@@ -1,6 +1,101 @@
 use crate::vm::tests::{compile_errors, run_ppl, run_ppl_on};
 
 #[test]
+fn api_review_user_mutations_roll_back_when_persistence_fails() {
+    use crate::icy_board::user_base::{Password, UserContact};
+
+    for operation in [
+        "BOOLEAN changed = Session.User.SetNote(0, \"changed\")\nPRINTLN changed",
+        "BOOLEAN changed = Session.User.SetPassword(\"changed\")\nPRINTLN changed",
+        "BOOLEAN changed = Session.User.AddContact(\"new\", \"changed\")\nPRINTLN changed",
+        "BOOLEAN changed = Session.User.RemoveContact(0)\nPRINTLN changed",
+        "Session.User.City = \"changed\"\nPRINTLN FALSE",
+    ] {
+        let output = run_ppl_on(
+            &format!(
+                r#"
+Error.Clear()
+{operation}
+PRINTLN Error.Last().Kind = ErrKind.User, "|", Error.Last().Code = ErrCode.Io
+PRINTLN Session.User.Notes[0], "|", Session.User.City, "|", Session.User.Contacts.Len(), "|", Session.User.Contacts[0].Account
+PRINTLN Board.Users[0].Notes[0], "|", Board.Users[0].City, "|", Board.Users[0].Contacts.Len(), "|", Board.Users[0].Contacts[0].Account
+GETUSER
+PRINTLN U_PWD = "original"
+"#,
+            ),
+            |board| {
+                board.config.paths.user_file = board.root_path.clone();
+                board.users[0].custom_comment1 = "original".to_string();
+                board.users[0].city_or_state = "original".to_string();
+                board.users[0].password.password = Password::PlainText("original".to_string());
+                board.users[0].contacts.push(UserContact {
+                    service: "original".to_string(),
+                    account: "original".to_string(),
+                });
+            },
+        );
+        assert_eq!(output, "0\n1|1\noriginal|original|1|original\noriginal|original|1|original\n1\n", "{operation}");
+    }
+}
+
+#[test]
+fn api_review_user_mutation_errors_and_successes_publish_their_result() {
+    for operation in [
+        "Session.User.SetNote(-1, \"bad\")",
+        "Session.User.SetNote(5, \"bad\")",
+        "Session.User.SetPassword(\"\")",
+        "Session.User.AddContact(\" \", \"value\")",
+        "Session.User.AddContact(\"service\", \" \")",
+        "Session.User.RemoveContact(-1)",
+        "Session.User.RemoveContact(0)",
+    ] {
+        let output = run_ppl(&format!(
+            r#"
+Error.Clear()
+BOOLEAN changed = {operation}
+PRINTLN changed, "|", Error.Last().Kind = ErrKind.User, "|", Error.Last().Code = ErrCode.Invalid
+"#,
+        ));
+        assert_eq!(output, "0|1|1\n", "{operation}");
+    }
+    for operation in [
+        "Session.User.SetNote(0, \"ok\")",
+        "Session.User.SetPassword(\"ok\")",
+        "Session.User.AddContact(\"service\", \"ok\")",
+        "Session.User.AddContact(\"service\", \"ok\")\nREGEX badAgain = REGEX.Compile(\"[\")\nSession.User.RemoveContact(0)",
+        "Session.User.City = \"ok\"",
+    ] {
+        let output = run_ppl_on(
+            &format!(
+                r#"
+REGEX bad = REGEX.Compile("[")
+{operation}
+PRINTLN Error.Last().OK
+"#,
+            ),
+            |board| board.config.paths.user_file = board.root_path.join("users.toml"),
+        );
+        assert_eq!(output, "1\n", "{operation}");
+    }
+}
+
+#[test]
+fn api_review_user_persistence_failure_enters_the_error_handler() {
+    let output = run_ppl_on(
+        r#"
+ON ERROR GOTO Failed
+Session.User.City = "not saved"
+PRINTLN "not reached"
+EXIT
+:Failed
+PRINTLN Error.Last().Kind = ErrKind.User, "|", Error.Last().Code = ErrCode.Io
+"#,
+        |board| board.config.paths.user_file = board.root_path.clone(),
+    );
+    assert_eq!(output, "1|1\n");
+}
+
+#[test]
 fn cumulative_statistics_keep_their_full_unsigned_width() {
     let output = run_ppl_on(
         r#"
@@ -17,6 +112,54 @@ PRINT Session.User.TimesOn, " ", Session.User.MessagesRead, " ", Session.User.Me
     );
 
     assert_eq!(output, "4294967296 4294967297 4294967298 4294967299 4294967300");
+}
+
+#[test]
+fn api_review_user_mutations_are_persisted_without_changing_other_users() {
+    use crate::icy_board::{
+        IcyBoardSerializer,
+        user_base::{User, UserBase},
+    };
+
+    let directory = tempfile::tempdir().unwrap();
+    let user_file = directory.path().join("users.toml");
+    let output = run_ppl_on(
+        r#"
+Session.User.City = "Berlin"
+Session.User.SetNote(0, "saved")
+Session.User.AddContact("Matrix", "@sysop:example.org")
+Session.User.SetPassword("saved-password")
+PRINTLN Error.Last().OK
+"#,
+        |board| {
+            board.config.paths.user_file = user_file.clone();
+            board.users.new_user(User {
+                name: "OTHER".to_string(),
+                city_or_state: "unchanged".to_string(),
+                ..Default::default()
+            });
+        },
+    );
+    assert_eq!(output, "1\n");
+    let saved = UserBase::load(&user_file).unwrap();
+    assert_eq!(saved[0].city_or_state, "Berlin");
+    assert_eq!(saved[0].custom_comment1, "saved");
+    assert_eq!(saved[0].contacts[0].service, "matrix");
+    assert_eq!(saved[0].contacts[0].account, "@sysop:example.org");
+    assert!(saved[0].password.password.is_valid("saved-password"));
+    assert_eq!(saved[1].name, "OTHER");
+    assert_eq!(saved[1].city_or_state, "unchanged");
+}
+
+#[test]
+fn api_review_user_success_preserves_an_error_from_the_same_statement() {
+    let output = run_ppl(
+        r#"
+PRINTLN Session.User.SetNote(5, "bad"), "|", Session.User.SetNote(0, "ok"), "|", Error.Last().Kind = ErrKind.User
+PRINTLN Session.User.Notes[0]
+"#,
+    );
+    assert_eq!(output, "0|1|1\nok\n");
 }
 
 /// What `PUTUSER` used to write is writable on the object, and it lands right away

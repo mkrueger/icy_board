@@ -1,6 +1,49 @@
 use super::run_ppl;
 
 #[test]
+fn api_review_ignore_case_searches_preserve_overlapping_matches() {
+    let output = run_ppl(
+        r#"
+PRINTLN "aaa".FindLast("aa"), "|", "aaa".FindLast("aa", 2, StringComparison.OrdinalIgnoreCase)
+PRINTLN "aaa".EndsWith("aa"), "|", "aaa".EndsWith("aa", StringComparison.OrdinalIgnoreCase)
+PRINTLN "äÄä".FindLast("Ää", 2, StringComparison.OrdinalIgnoreCase)
+PRINTLN "äÄä".FindLast("Ää", 1, StringComparison.OrdinalIgnoreCase)
+PRINTLN "äÄä".EndsWith("Ää", StringComparison.OrdinalIgnoreCase)
+PRINTLN "ababa".FindLast("ABA", 4, StringComparison.OrdinalIgnoreCase)
+PRINTLN "ababa".Count("ABA", StringComparison.OrdinalIgnoreCase)
+PRINTLN "a.*".EndsWith(".*", StringComparison.OrdinalIgnoreCase)
+PRINTLN "anything".EndsWith("", StringComparison.OrdinalIgnoreCase)
+PRINTLN "ababa".EndsWith("BAB", StringComparison.OrdinalIgnoreCase)
+"#,
+    );
+    assert_eq!(output, "1|1\n1|1\n1\n0\n1\n2\n1\n1\n1\n0\n");
+}
+
+#[test]
+fn api_review_ignore_case_size_limits_are_recoverable() {
+    for (expression, fallback) in [
+        ("\"a\".Find(needle, 0, StringComparison.OrdinalIgnoreCase)", -1),
+        ("\"a\".FindLast(needle, 0, StringComparison.OrdinalIgnoreCase)", -1),
+        ("\"a\".Contains(needle, StringComparison.OrdinalIgnoreCase)", 0),
+        ("\"a\".StartsWith(needle, StringComparison.OrdinalIgnoreCase)", 0),
+        ("\"a\".EndsWith(needle, StringComparison.OrdinalIgnoreCase)", 0),
+        ("\"a\".Count(needle, StringComparison.OrdinalIgnoreCase)", 0),
+        ("\"a\".Equals(needle, StringComparison.OrdinalIgnoreCase)", 0),
+    ] {
+        let output = run_ppl(&format!(
+            r#"
+STRING needle = STRING.Repeat("a", 1000000)
+INTEGER result = {expression}
+PRINTLN result, "|", Error.Last().Kind = ErrKind.String, "|", Error.Last().Code = ErrCode.Limit
+BOOLEAN recovered = "abc".Contains("B", StringComparison.OrdinalIgnoreCase)
+PRINTLN recovered, "|", Error.Last().OK
+"#,
+        ));
+        assert_eq!(output, format!("{fallback}|1|1\n1|1\n"), "{expression}");
+    }
+}
+
+#[test]
 fn ppl400_string_pad_left_and_right_pad_with_space_or_a_given_character() {
     let output = run_ppl(
         r#";$LANGVERSION 400

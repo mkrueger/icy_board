@@ -50,8 +50,18 @@ impl VirtualMachine<'_> {
     fn save_call_frame(&mut self, locals: usize, parameters: usize, first: usize) {
         for i in 0..(locals + parameters) {
             let id = first + i;
-            if self.variable_table.get_var_entry(id).header.flags & 0x1 == 0x0 {
-                let empty = self.variable_table.get_value(id).emptied();
+            let entry = self.variable_table.get_var_entry(id);
+            if entry.header.flags & crate::executable::variable_table::VARIABLE_FLAG_STATIC == 0 {
+                let empty =
+                    if self.variable_table.get_version() >= 400 && entry.header.flags & crate::executable::variable_table::VARIABLE_FLAG_DYNAMIC_ARRAY != 0 {
+                        VariableValue {
+                            vtype: entry.value.vtype,
+                            generic_data: entry.header.create_generic_data().unwrap_or_default(),
+                            ..Default::default()
+                        }
+                    } else {
+                        entry.value.emptied()
+                    };
                 let value = std::mem::replace(self.variable_table.get_value_mut(id), empty);
                 self.call_local_value_stack.push(value);
             }

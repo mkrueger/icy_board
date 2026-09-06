@@ -16,7 +16,8 @@ use crate::{
 
 use super::{ExecutableError, GenericVariableData, LAST_PPE_RUNTIME, PPEExpr, PPEScript, VariableData, VariableNameGenerator, VariableType, VariableValue};
 
-pub const VARIABLE_FLAG_DYNAMIC_ARRAY: u8 = 0x01;
+pub const VARIABLE_FLAG_STATIC: u8 = 0x01;
+pub const VARIABLE_FLAG_DYNAMIC_ARRAY: u8 = 0x02;
 pub(crate) const MAX_DESERIALIZED_ARRAY_ELEMENTS: usize = 1_000_000;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -489,7 +490,13 @@ impl VariableTable {
             decrypt_chunks(cur_block, version, false);
             i += 11;
             let header = VarHeader::from_bytes(&buf[i - 11..i])?;
-            let elements = header
+            // Dynamic storage is a 4.00 feature. Preserve legacy header bits
+            // on disk without interpreting them as a new array-storage flag.
+            let mut storage_header = header.clone();
+            if version < 400 {
+                storage_header.flags &= !VARIABLE_FLAG_DYNAMIC_ARRAY;
+            }
+            let elements = storage_header
                 .allocated_elements()
                 .ok_or(ExecutableError::ArrayAllocationTooLarge(usize::MAX, MAX_DESERIALIZED_ARRAY_ELEMENTS))?;
             let total_elements = allocated_elements
@@ -527,7 +534,7 @@ impl VariableTable {
                     };
                     decrypt_chunks(string_bytes, version, false);
                     let generic_data = if header.dim > 0 {
-                        header.create_generic_data()
+                        storage_header.create_generic_data()
                     } else {
                         // The stored length counts the terminating NUL, an empty constant has none.
                         let text_end = if string_length > 0 { string_end - 1 } else { i };
@@ -617,7 +624,7 @@ impl VariableTable {
                         variable = VariableValue {
                             vtype,
                             data,
-                            generic_data: header.create_generic_data().unwrap_or(GenericVariableData::None),
+                            generic_data: storage_header.create_generic_data().unwrap_or(GenericVariableData::None),
                         };
                         i += 4;
                     } else {
@@ -651,7 +658,7 @@ impl VariableTable {
                         variable = VariableValue {
                             vtype,
                             data,
-                            generic_data: header.create_generic_data().unwrap_or(GenericVariableData::None),
+                            generic_data: storage_header.create_generic_data().unwrap_or(GenericVariableData::None),
                         };
                         i += 8;
                     }
@@ -1090,6 +1097,10 @@ impl VariableTable {
             };
             if entry.header.dim == 0 {
                 entry.value = value;
+            } else if self.version >= 400 && entry.header.flags & VARIABLE_FLAG_DYNAMIC_ARRAY != 0 {
+                // Record layout initialization must not turn an empty dynamic
+                // array into the classic one-element array with upper bound 0.
+                entry.value.generic_data = entry.header.create_generic_data().unwrap_or_default();
             } else if let Some(generic_data) = GenericVariableData::create_array(
                 value,
                 entry.header.dim,

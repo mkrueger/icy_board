@@ -438,6 +438,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             StaticReceiver::NotAType => self.visit_receiver(member_reference_expression.get_expression(), member_reference_expression.get_identifier_token()),
             StaticReceiver::Rejected => return VariableType::None,
         };
+        self.reject_bare_array_value(member_reference_expression.get_expression());
         if matches!(t, VariableType::String | VariableType::BigStr | VariableType::UnboundedString)
             && let Some(return_type) = string_member_type(member_reference_expression.get_identifier())
         {
@@ -564,33 +565,11 @@ impl AstVisitor<VariableType> for SemanticVisitor {
 
     fn visit_predefined_call_statement(&mut self, call_stmt: &PredefinedCallStatement) -> VariableType {
         let def = call_stmt.get_func();
-        if def.opcode == OpCode::REDIM && !call_stmt.get_arguments().is_empty() {
-            call_stmt.get_arguments()[0].visit(self);
-        }
+        walk_predefined_call_statement(self, call_stmt);
         if def.opcode == OpCode::REDIM
-            && let Some(shape) = call_stmt.get_arguments().first().and_then(|argument| self.array_shape(argument))
-            && !shape.resizable
+            && let Some(target) = call_stmt.get_arguments().first()
         {
-            for argument in call_stmt.get_arguments().iter().skip(1) {
-                argument.visit(self);
-            }
-            self.errors.lock().unwrap().report_error(
-                call_stmt.get_arguments()[0].get_span(),
-                CompilationErrorType::FixedRecordArrayCannotBeRedimmed(shape.field_name.unwrap_or_default()),
-            );
-            self.add_reference(
-                ReferenceType::PredefinedProc(def.opcode),
-                VariableType::Procedure,
-                call_stmt.get_identifier_token(),
-            );
-            return VariableType::None;
-        }
-        if def.opcode != OpCode::REDIM {
-            walk_predefined_call_statement(self, call_stmt);
-        } else {
-            for argument in call_stmt.get_arguments().iter().skip(1) {
-                argument.visit(self);
-            }
+            self.check_redim_target(target, call_stmt.get_arguments().len() - 1);
         }
         for (index, argument) in call_stmt.get_arguments().iter().enumerate() {
             if !takes_whole_array(def.opcode, def.sig, index) {
@@ -727,9 +706,10 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             && let Some((_, opcode, arguments)) = array_procedure(member.get_identifier())
         {
             self.visit_receiver(member.get_expression(), member.get_identifier_token());
-            if let Some(shape) = self.array_shape(member.get_expression()) {
+            if self.array_shape(member.get_expression()).is_some() {
                 for argument in call.get_arguments() {
                     argument.visit(self);
+                    self.reject_bare_array_value(argument);
                 }
                 if self.statement_member_call != Some(CallId(call.id)) {
                     self.errors
@@ -738,14 +718,8 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                         .report_error(member.get_identifier_token().span.clone(), CompilationErrorType::ProcedureUsedAsFunction);
                     return VariableType::None;
                 }
-                if !shape.resizable {
-                    self.errors.lock().unwrap().report_error(
-                        member.get_expression().get_span(),
-                        CompilationErrorType::FixedRecordArrayCannotBeRedimmed(shape.field_name.unwrap_or_default()),
-                    );
-                    return VariableType::None;
-                }
                 let given = call.get_arguments().len();
+                self.check_redim_target(member.get_expression(), given);
                 if !arguments.contains(&given) {
                     self.check_expr_arg_range(*arguments.start(), *arguments.end(), given, call.get_expression());
                     return VariableType::None;
@@ -761,6 +735,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             if self.array_shape(member.get_expression()).is_some() {
                 for argument in call.get_arguments() {
                     argument.visit(self);
+                    self.reject_bare_array_value(argument);
                 }
                 let given = call.get_arguments().len();
                 if !array_member.arguments.contains(&given) {
@@ -786,11 +761,13 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 && shape.rank == 1
             {
                 call.get_arguments()[0].visit(self);
+                self.reject_bare_array_value(&call.get_arguments()[0]);
                 self.function_type_lookup.insert(CallId(call.id), SemanticInfo::ArrayValueAt);
                 return shape.element_type;
             }
             if matches!(receiver_type, VariableType::String | VariableType::BigStr | VariableType::UnboundedString) {
                 call.get_arguments()[0].visit(self);
+                self.reject_bare_array_value(&call.get_arguments()[0]);
                 self.function_type_lookup
                     .insert(CallId(call.id), SemanticInfo::ScalarMemberFunc(FuncOpCode::StringCharAt, &[]));
                 return VariableType::UnboundedString;
@@ -816,6 +793,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                         for argument in call.get_arguments() {
                             argument.visit(self);
                         }
+                        self.reject_bare_array_value(&call.get_arguments()[1]);
                         let valid_array = call
                             .get_arguments()
                             .first()
@@ -836,13 +814,22 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                     "repeat" if call.get_arguments().len() == 2 => {
                         for argument in call.get_arguments() {
                             argument.visit(self);
+                            self.reject_bare_array_value(argument);
                         }
                         self.function_type_lookup
                             .insert(CallId(call.id), SemanticInfo::ScalarStaticFunc(FuncOpCode::StringRepeat));
                         return VariableType::UnboundedString;
                     }
                     "split" if (2..=3).contains(&call.get_arguments().len()) => {
-                        let argument_types: Vec<_> = call.get_arguments().iter().map(|argument| argument.visit(self)).collect();
+                        let argument_types: Vec<_> = call
+                            .get_arguments()
+                            .iter()
+                            .map(|argument| {
+                                let actual = argument.visit(self);
+                                self.reject_bare_array_value(argument);
+                                actual
+                            })
+                            .collect();
                         let opcode = if call.get_arguments().len() == 2 {
                             FuncOpCode::StringSplit
                         } else {
@@ -872,6 +859,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 && call.get_arguments().len() == 1
             {
                 call.get_arguments()[0].visit(self);
+                self.reject_bare_array_value(&call.get_arguments()[0]);
                 self.function_type_lookup
                     .insert(CallId(call.id), SemanticInfo::ScalarStaticFunc(FuncOpCode::BASE64DEC));
                 return VariableType::Bytes;
@@ -889,7 +877,15 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             if matches!(receiver_type, VariableType::String | VariableType::BigStr | VariableType::UnboundedString)
                 && let Some((opcode, return_type, defaults)) = string_member(member.get_identifier(), call.get_arguments().len())
             {
-                let argument_types: Vec<_> = call.get_arguments().iter().map(|argument| argument.visit(self)).collect();
+                let argument_types: Vec<_> = call
+                    .get_arguments()
+                    .iter()
+                    .map(|argument| {
+                        let actual = argument.visit(self);
+                        self.reject_bare_array_value(argument);
+                        actual
+                    })
+                    .collect();
                 if opcode == FuncOpCode::StringSplitLimit && argument_types.last() != Some(&VariableType::Integer) {
                     let actual = argument_types.last().copied().unwrap_or(VariableType::None);
                     self.errors.lock().unwrap().report_error(
@@ -933,7 +929,15 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             if receiver_type == VariableType::Bytes
                 && let Some((opcode, return_type)) = bytes_member(member.get_identifier(), call.get_arguments().len())
             {
-                let argument_types: Vec<_> = call.get_arguments().iter().map(|argument| argument.visit(self)).collect();
+                let argument_types: Vec<_> = call
+                    .get_arguments()
+                    .iter()
+                    .map(|argument| {
+                        let actual = argument.visit(self);
+                        self.reject_bare_array_value(argument);
+                        actual
+                    })
+                    .collect();
                 if opcode == FuncOpCode::BytesGetChecksum && argument_types.first() != Some(&VariableType::UserData(crate::parser::CHECKSUM_ENUM_ID)) {
                     let actual = argument_types.first().copied().unwrap_or(VariableType::None);
                     self.errors.lock().unwrap().report_error(
@@ -951,6 +955,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             {
                 for argument in call.get_arguments() {
                     argument.visit(self);
+                    self.reject_bare_array_value(argument);
                 }
                 let given = call.get_arguments().len();
                 if !array_member.arguments.contains(&given) {
@@ -971,8 +976,10 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             {
                 for argument in call.get_arguments() {
                     argument.visit(self);
+                    self.reject_bare_array_value(argument);
                 }
                 let given = call.get_arguments().len();
+                self.check_redim_target(member.get_expression(), given);
                 if !arguments.contains(&given) {
                     self.check_expr_arg_range(*arguments.start(), *arguments.end(), given, call.get_expression());
                     return VariableType::None;
@@ -992,6 +999,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             {
                 for argument in call.get_arguments() {
                     argument.visit(self);
+                    self.reject_bare_array_value(argument);
                 }
                 if field.dim as usize != call.get_arguments().len() {
                     self.errors.lock().unwrap().report_error(
@@ -1135,8 +1143,8 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                             return res;
                         }
                         self.function_type_lookup.insert(CallId(call.id), SemanticInfo::PredefinedFunc(def.opcode));
-                        if def.opcode != FuncOpCode::Len_Dim {
-                            for argument in call.get_arguments() {
+                        for (index, argument) in call.get_arguments().iter().enumerate() {
+                            if def.opcode != FuncOpCode::Len_Dim || index != 0 {
                                 self.reject_bare_array_value(argument);
                             }
                         }
@@ -1529,6 +1537,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
         }
         for arg in let_stmt.get_arguments() {
             arg.visit(self);
+            self.reject_bare_array_value(arg);
         }
         let value_type = let_stmt.get_value_expression().visit(self);
         if let Some(target_shape) = target_array_shape {
@@ -1892,7 +1901,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             .or_else(|| function.get_documentation())
             .map(str::to_owned);
             if let FunctionDeclaration::Function(func) = &cont.functions {
-                if func.get_parameters().len() != function.get_parameters().len() {
+                if !super::symbols::declaration_parameters_match(func.get_parameters(), function.get_parameters()) {
                     self.errors.lock().unwrap().report_error(
                         function.get_identifier_token().span.clone(),
                         CompilationErrorType::ParameterMismatch(function.get_identifier().to_string()),
@@ -1933,6 +1942,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
                 id,
                 functions: FunctionDeclaration::Function(
                     FunctionDeclarationAstNode::empty(function.get_identifier().clone(), function.get_parameters().clone(), function.get_return_type())
+                        .with_return_rank(function.get_return_rank())
                         .with_documentation(function.get_documentation()),
                 ),
                 lookup: VariableLookups::default(),
@@ -2023,7 +2033,7 @@ impl AstVisitor<VariableType> for SemanticVisitor {
             .or_else(|| procedure.get_documentation())
             .map(str::to_owned);
             if let FunctionDeclaration::Procedure(func) = &cont.functions
-                && func.get_parameters().len() != procedure.get_parameters().len()
+                && !super::symbols::declaration_parameters_match(func.get_parameters(), procedure.get_parameters())
             {
                 self.errors.lock().unwrap().report_error(
                     procedure.get_identifier_token().span.clone(),

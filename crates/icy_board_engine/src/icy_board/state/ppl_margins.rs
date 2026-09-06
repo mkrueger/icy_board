@@ -3,6 +3,7 @@ use async_trait::async_trait;
 use crate::{
     compiler::user_data::{UserData, UserDataMemberRegistry, UserDataValue, user_data_value},
     executable::{VariableType, VariableValue},
+    icy_board::state::ppl_error::{ERR_INVALID, ERR_KIND_TERM, PplError},
     parser::MARGINS_ID,
 };
 
@@ -101,25 +102,32 @@ impl UserDataValue for PplMargins {
         use crate::vm::statements::predefined_procedures as procedures;
 
         let integer = |index: usize| arguments.get(index).map_or(0, VariableValue::as_int);
-        if *name == *SET_VERTICAL {
-            return Ok(VariableValue::new_bool(procedures::margins_set_vertical(vm, integer(0), integer(1)).await?));
-        }
-        if *name == *SET_HORIZONTAL {
-            return Ok(VariableValue::new_bool(procedures::margins_set_horizontal(vm, integer(0), integer(1)).await?));
-        }
-        if *name == *RESET_VERTICAL {
+        let succeeded = if *name == *SET_VERTICAL {
+            procedures::margins_set_vertical(vm, integer(0), integer(1)).await?
+        } else if *name == *SET_HORIZONTAL {
+            procedures::margins_set_horizontal(vm, integer(0), integer(1)).await?
+        } else if *name == *RESET_VERTICAL {
             procedures::reset_v_margins(vm, &[]).await?;
-            return Ok(VariableValue::new_bool(true));
-        }
-        if *name == *RESET_HORIZONTAL {
+            true
+        } else if *name == *RESET_HORIZONTAL {
             procedures::reset_h_margins(vm, &[]).await?;
-            return Ok(VariableValue::new_bool(true));
-        }
-        if *name == *RESET {
+            true
+        } else if *name == *RESET {
             procedures::reset_margins(vm, &[]).await?;
-            return Ok(VariableValue::new_bool(true));
+            true
+        } else {
+            return Err(format!("Unknown MARGINS function {name}").into());
+        };
+        if succeeded {
+            vm.operation_succeeded();
+        } else {
+            vm.set_error(PplError::new(
+                ERR_KIND_TERM,
+                ERR_INVALID,
+                format!("{name} requires a positive, increasing margin region"),
+            ));
         }
-        Err(format!("Unknown MARGINS function {name}").into())
+        Ok(VariableValue::new_bool(succeeded))
     }
 
     async fn call_method(&mut self, _vm: &mut crate::vm::VirtualMachine<'_>, _name: &unicase::Ascii<String>, _arguments: &[VariableValue]) -> crate::Res<()> {

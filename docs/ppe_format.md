@@ -90,6 +90,16 @@ The header is encrypted on its own, separately from the payload that follows it.
 A dimension count above 3 is treated as corrupt and clamped to 3 rather than
 trusted.
 
+Flag `0x01` retains the static call-frame behavior. In runtime 4.00 only,
+`0x02` marks dynamic array storage: the initial value has the declared rank but
+zero elements, rather than allocating from the stored upper bounds. The flags
+are independent; dynamic storage does not make a local variable static.
+Pre-4.00 readers do not interpret `0x02` as dynamic storage.
+
+The unpublished 4.00 implementation previously reused `0x01` for dynamic
+arrays. Recompile those beta PPEs with the corrected compiler; this does not
+change the classic PCBoard PPE formats.
+
 ### Type byte
 
 | Byte | Type | Byte | Type |

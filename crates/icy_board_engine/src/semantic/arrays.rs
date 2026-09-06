@@ -100,26 +100,65 @@ impl SemanticVisitor {
             .is_some_and(|shape| matches!(shape.element_type, VariableType::UserData(_)))
     }
 
-    /// A bare array is not a value: `PCBoard` wanted one subscript per dimension
-    /// everywhere a variable was read (`wrVIDSUB`), and only the statements that take a
-    /// whole array saw one.
+    /// Scalar contexts require an element, regardless of how an array was produced.
+    /// Keep PCBoard's missing-subscript diagnostic for (possibly parenthesized)
+    /// identifiers; other array expressions use the whole-array diagnostic.
     pub(super) fn reject_bare_array_value(&mut self, expression: &Expression) {
         let Some(shape) = self.array_shape(expression) else {
             return;
         };
-        if shape.field_name.is_some() {
-            self.errors
-                .lock()
-                .unwrap()
-                .report_error(expression.get_span(), CompilationErrorType::WholeArrayUsedAsScalar);
-            return;
-        }
+        let span = expression.get_span();
         let mut expression = expression;
         while let Expression::Parens(parens) = expression {
             expression = parens.get_expression();
         }
         if let Expression::Identifier(identifier) = expression {
             self.check_arg_count(shape.rank as usize, 0, identifier.get_identifier_token());
+        } else {
+            self.errors.lock().unwrap().report_error(span, CompilationErrorType::WholeArrayUsedAsScalar);
+        }
+    }
+
+    /// REDIM writes a variable-table slot, not a computed array value or property.
+    /// Language 400 changes bounds only; legacy rank-changing REDIM remains valid.
+    pub(super) fn check_redim_target(&mut self, target: &Expression, bounds: usize) {
+        let shape = self.array_shape(target);
+        if let Some(shape) = &shape
+            && !shape.resizable
+        {
+            self.errors.lock().unwrap().report_error(
+                target.get_span(),
+                CompilationErrorType::FixedRecordArrayCannotBeRedimmed(shape.field_name.clone().unwrap_or_default()),
+            );
+            return;
+        }
+        if self.lang_version < 400 {
+            return;
+        }
+        let mut variable = target;
+        while let Expression::Parens(parens) = variable {
+            variable = parens.get_expression();
+        }
+        let actual_variable = if let Expression::Identifier(identifier) = variable {
+            self.lookup_constant(identifier.get_identifier()).is_none()
+                && self
+                    .lookup_variable(identifier.get_identifier())
+                    .is_some_and(|index| matches!(self.references[index].0, super::ReferenceType::Variable(_)))
+        } else {
+            false
+        };
+        let Some(shape) = shape.filter(|_| actual_variable) else {
+            self.errors
+                .lock()
+                .unwrap()
+                .report_error(target.get_span(), CompilationErrorType::RedimArrayVariableExpected);
+            return;
+        };
+        if bounds != shape.rank as usize {
+            self.errors
+                .lock()
+                .unwrap()
+                .report_error(target.get_span(), CompilationErrorType::RedimRankMismatch(shape.rank, bounds));
         }
     }
 

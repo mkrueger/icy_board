@@ -1,5 +1,9 @@
 # PPL 4.00 API review
 
+> **API-only follow-up, 2026-09-05:** See the
+> [implementation and contract review](ppl400_api_review_2026-09-05.md).
+> It excludes language design and supersedes this document's API freeze verdict.
+
 > **Note:** This is the earlier sector-level review. The current, registry-backed
 > itemized findings and pre-freeze recommendations are in the
 > [PPL 4.00 API and language audit](ppl400_api_audit.md).

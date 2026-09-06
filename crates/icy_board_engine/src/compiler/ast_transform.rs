@@ -8,7 +8,7 @@ use crate::{
         VariableDeclarationStatement, VariableSpecifier, const_expression, const_value_with_members, constant::NumberFormat,
     },
     decompiler::evaluation_visitor::{ConstantFolder, OptimizationVisitor},
-    executable::VariableValue,
+    executable::{VariableType, VariableValue},
     parser::{
         EnumDefinition,
         lexer::{Spanned, Token},
@@ -26,9 +26,32 @@ pub struct AstTransformationVisitor {
     local_bindings: Option<HashSet<unicase::Ascii<String>>>,
     enums: Vec<EnumDefinition>,
     loop_counters: HashSet<usize>,
+    compound_receiver_types: HashMap<usize, u8>,
+    compound_record_types: HashSet<u8>,
+    temporaries: usize,
 }
 
 impl AstTransformationVisitor {
+    pub(crate) fn needs_compound_receiver_types(program: &Ast) -> bool {
+        #[derive(Default)]
+        struct FindMemberCompound(bool);
+        impl crate::ast::AstVisitor<()> for FindMemberCompound {
+            fn visit_let_statement(&mut self, statement: &LetStatement) {
+                self.0 |= AstTransformationVisitor::compound_operator(statement.get_let_variant()).is_some()
+                    && (!statement.get_members().is_empty() || statement.get_target_expression().is_some());
+            }
+
+            fn visit_member_call_statement(&mut self, statement: &crate::ast::MemberCallStatement) {
+                if let Expression::FunctionCall(call) = statement.get_expression() {
+                    self.0 |= AstTransformationVisitor::compound_operator(&call.get_lpar_token().token).is_some();
+                }
+            }
+        }
+        let mut visitor = FindMemberCompound::default();
+        program.visit(&mut visitor);
+        visitor.0
+    }
+
     pub fn new(optimize_output: bool, enums: Vec<EnumDefinition>) -> Self {
         Self {
             continue_break_labels: Vec::new(),
@@ -41,6 +64,99 @@ impl AstTransformationVisitor {
             local_bindings: None,
             enums,
             loop_counters: HashSet::new(),
+            compound_receiver_types: HashMap::new(),
+            compound_record_types: HashSet::new(),
+            temporaries: 0,
+        }
+    }
+
+    /// Receiver types come from a non-emitting semantic pass. Records must keep
+    /// their storage path; reference objects must instead keep their identity.
+    pub(crate) fn set_compound_receiver_types(&mut self, types: HashMap<usize, u8>, registry: &crate::parser::UserTypeRegistry) {
+        self.compound_record_types = types.values().copied().filter(|id| registry.is_record_type(*id)).collect();
+        self.compound_receiver_types = types;
+    }
+
+    fn capture_compound_value(&mut self, value: Expression, variable_type: VariableType, statements: &mut Vec<Statement>) -> Expression {
+        let name = unicase::Ascii::new(format!("*(compound{})", self.temporaries));
+        self.temporaries += 1;
+        statements.push(Statement::VariableDeclaration(VariableDeclarationStatement::empty(
+            variable_type,
+            vec![VariableSpecifier::empty(name.clone(), Vec::new())],
+        )));
+        statements.push(LetStatement::create_empty_statement(name.clone(), Token::Eq, Vec::new(), value));
+        IdentifierExpression::create_empty_expression(name)
+    }
+
+    fn capture_compound_indices(&mut self, arguments: &[Expression], statements: &mut Vec<Statement>) -> Vec<Expression> {
+        arguments
+            .iter()
+            .map(|argument| {
+                if matches!(argument, Expression::Const(_)) {
+                    argument.clone()
+                } else {
+                    // Snapshot even a plain variable: a later index or the RHS
+                    // may change it. Make the VM's integer index conversion
+                    // explicit so enum indices don't become illegal enum-to-int
+                    // assignments merely because lowering introduced a temp.
+                    let index = crate::ast::FunctionCallExpression::create_empty_expression(
+                        IdentifierExpression::create_empty_expression(unicase::Ascii::new("ToInteger".to_string())),
+                        vec![argument.clone()],
+                    );
+                    self.capture_compound_value(index, VariableType::Integer, statements)
+                }
+            })
+            .collect()
+    }
+
+    fn compound_object_receiver_type(&self, member: &MemberReferenceExpression) -> Option<VariableType> {
+        self.compound_receiver_types
+            .get(&member.get_identifier_token().span.start)
+            .filter(|id| !self.compound_record_types.contains(id))
+            .map(|id| VariableType::UserData(*id))
+    }
+
+    fn capture_compound_target(&mut self, target: Expression, statements: &mut Vec<Statement>) -> Expression {
+        match target {
+            Expression::Indexer(mut indexer) => {
+                let arguments = self.capture_compound_indices(indexer.get_arguments(), statements);
+                indexer.set_arguments(arguments);
+                Expression::Indexer(indexer)
+            }
+            Expression::MemberReference(member) => {
+                let base = if let Some(variable_type) = self.compound_object_receiver_type(&member) {
+                    self.capture_compound_value(member.get_expression().clone(), variable_type, statements)
+                } else {
+                    self.capture_compound_target(member.get_expression().clone(), statements)
+                };
+                Expression::MemberReference(MemberReferenceExpression::new(
+                    base,
+                    member.get_dot_token().clone(),
+                    member.get_identifier_token().clone(),
+                ))
+            }
+            Expression::FunctionCall(call) => {
+                // In an assignable record path a call is an indexed field (or
+                // legacy array notation), not a record value to copy to a temp.
+                let base = self.capture_compound_target(call.get_expression().clone(), statements);
+                let arguments = self.capture_compound_indices(call.get_arguments(), statements);
+                Expression::FunctionCall(call.preserving_id(base, arguments))
+            }
+            target => target,
+        }
+    }
+
+    fn compound_operator(token: &Token) -> Option<crate::ast::BinOp> {
+        use crate::ast::BinOp;
+        match token {
+            Token::AddAssign => Some(BinOp::Add),
+            Token::SubAssign => Some(BinOp::Sub),
+            Token::MulAssign => Some(BinOp::Mul),
+            Token::DivAssign => Some(BinOp::Div),
+            Token::ModAssign => Some(BinOp::Mod),
+            Token::AndAssign => Some(BinOp::And),
+            Token::OrAssign => Some(BinOp::Or),
+            _ => None,
         }
     }
 
@@ -473,29 +589,21 @@ impl AstVisitorMut for AstTransformationVisitor {
             }
         }
 
-        match let_stmt.get_let_variant() {
-            Token::MulAssign => {
-                val_expr = BinaryExpression::create_empty_expression(crate::ast::BinOp::Mul, target, val_expr);
+        let mut statements = Vec::new();
+        let compound = Self::compound_operator(let_stmt.get_let_variant());
+        if let Some(op) = compound {
+            target = self.capture_compound_target(target, &mut statements);
+            val_expr = BinaryExpression::create_empty_expression(op, target.clone(), val_expr);
+            if let Expression::MemberReference(member) = &target
+                && self.compound_object_receiver_type(member).is_some()
+            {
+                // Keep object writes on the setter path, including its normal
+                // writable-property/type diagnostics.
+                statements.push(Statement::MemberCall(crate::ast::MemberCallStatement::new(Expression::FunctionCall(
+                    crate::ast::FunctionCallExpression::new(target, Spanned::create_empty(Token::Eq), vec![val_expr], Spanned::create_empty(Token::Eq)),
+                ))));
+                return Statement::Block(BlockStatement::empty(statements));
             }
-            Token::DivAssign => {
-                val_expr = BinaryExpression::create_empty_expression(crate::ast::BinOp::Div, target, val_expr);
-            }
-            Token::ModAssign => {
-                val_expr = BinaryExpression::create_empty_expression(crate::ast::BinOp::Mod, target, val_expr);
-            }
-            Token::AddAssign => {
-                val_expr = BinaryExpression::create_empty_expression(crate::ast::BinOp::Add, target, val_expr);
-            }
-            Token::SubAssign => {
-                val_expr = BinaryExpression::create_empty_expression(crate::ast::BinOp::Sub, target, val_expr);
-            }
-            Token::AndAssign => {
-                val_expr = BinaryExpression::create_empty_expression(crate::ast::BinOp::And, target, val_expr);
-            }
-            Token::OrAssign => {
-                val_expr = BinaryExpression::create_empty_expression(crate::ast::BinOp::Or, target, val_expr);
-            }
-            _ => {}
         }
 
         let statement = LetStatement::new(
@@ -511,11 +619,39 @@ impl AstVisitorMut for AstTransformationVisitor {
             Spanned::create_empty(Token::Eq),
             val_expr,
         );
-        Statement::Let(if let Some(target) = transformed_target {
+        let statement = Statement::Let(if compound.is_some() && !matches!(target, Expression::Identifier(_)) {
+            statement.with_target_expression(target)
+        } else if let Some(target) = transformed_target {
             statement.with_target_expression(target)
         } else {
             statement
-        })
+        });
+        if statements.is_empty() {
+            statement
+        } else {
+            statements.push(statement);
+            Statement::Block(BlockStatement::empty(statements))
+        }
+    }
+
+    fn visit_member_call_statement(&mut self, statement: &crate::ast::MemberCallStatement) -> Statement {
+        let expression = statement.get_expression().visit_mut(self);
+        if let Expression::FunctionCall(call) = &expression
+            && let Some(op) = Self::compound_operator(&call.get_lpar_token().token)
+            && let Expression::MemberReference(member) = call.get_expression()
+            && !member.get_identifier().starts_with('<')
+            && self.compound_object_receiver_type(member).is_some()
+            && call.get_arguments().len() == 1
+        {
+            let mut statements = Vec::new();
+            let target = self.capture_compound_target(call.get_expression().clone(), &mut statements);
+            let value = BinaryExpression::create_empty_expression(op, target.clone(), call.get_arguments()[0].clone());
+            statements.push(Statement::MemberCall(crate::ast::MemberCallStatement::new(Expression::FunctionCall(
+                crate::ast::FunctionCallExpression::new(target, Spanned::create_empty(Token::Eq), vec![value], Spanned::create_empty(Token::Eq)),
+            ))));
+            return Statement::Block(BlockStatement::empty(statements));
+        }
+        Statement::MemberCall(crate::ast::MemberCallStatement::new(expression))
     }
 
     fn visit_function_implementation(&mut self, function: &FunctionImplementation) -> AstNode {
@@ -646,19 +782,61 @@ impl AstVisitorMut for AstTransformationVisitor {
         for var in var_decl.get_variables() {
             if let Some(init) = var.get_initalizer() {
                 if let Expression::ArrayInitializer(array) = init {
+                    let dynamic = var.get_dimensions().first().is_some_and(DimensionSpecifier::is_dynamic);
                     let stmt = Statement::VariableDeclaration(VariableDeclarationStatement::new(
                         var_decl.get_type_token().clone(),
                         var_decl.get_variable_type(),
                         vec![VariableSpecifier::new(
                             var.get_identifier_token().clone(),
                             None,
-                            vec![DimensionSpecifier::empty(array.get_expressions().len().saturating_sub(1))],
+                            if dynamic {
+                                var.get_dimensions().clone()
+                            } else {
+                                vec![DimensionSpecifier::empty(array.get_expressions().len().saturating_sub(1))]
+                            },
                             None,
                             None,
                             None,
                         )],
                     ));
                     statements.push(stmt);
+
+                    if dynamic && !array.get_expressions().is_empty() {
+                        statements.push(crate::ast::PredefinedCallStatement::create_empty_statement(
+                            crate::executable::OpCode::REDIM.get_definition(),
+                            vec![
+                                Expression::Identifier(IdentifierExpression::new(var.get_identifier_token().clone())),
+                                ConstantExpression::create_empty_expression(Constant::Integer(
+                                    (array.get_expressions().len() - 1) as i32,
+                                    NumberFormat::Default,
+                                )),
+                            ],
+                        ));
+                    } else if dynamic {
+                        // A declaration may execute repeatedly (for example in a
+                        // loop). Copy a never-written empty array each time, not
+                        // just the storage allocated when this frame was created.
+                        let empty_name = unicase::Ascii::new(format!("*(empty_array{})", self.temporaries));
+                        self.temporaries += 1;
+                        statements.push(Statement::VariableDeclaration(VariableDeclarationStatement::new(
+                            var_decl.get_type_token().clone(),
+                            var_decl.get_variable_type(),
+                            vec![VariableSpecifier::new(
+                                Spanned::create_empty(Token::Identifier(empty_name.clone())),
+                                None,
+                                var.get_dimensions().clone(),
+                                None,
+                                None,
+                                None,
+                            )],
+                        )));
+                        statements.push(LetStatement::create_empty_statement(
+                            var.get_identifier().clone(),
+                            Token::Eq,
+                            Vec::new(),
+                            IdentifierExpression::create_empty_expression(empty_name),
+                        ));
+                    }
 
                     for (idx, expr) in array.get_expressions().iter().enumerate() {
                         statements.push(Statement::Let(LetStatement::new(

@@ -1,6 +1,46 @@
 use super::{compile_errors, compile_errors_with_runtime, run_ppl};
 
 #[test]
+fn api_review_find_all_starts_inside_a_match_and_keeps_full_text_context() {
+    let output = run_ppl(
+        r#"
+REGEX pattern = REGEX.Compile("a+")
+REGEXMATCH one = pattern.Find("aaa", 1)
+REGEXMATCH all[] = pattern.FindAll("aaa", 1)
+PRINTLN one.Start, "|", one.Value, "|", all.Len(), "|", all[0].Start, "|", all[0].Value
+all = REGEX.Compile("ä+").FindAll("äää ää", 1)
+PRINTLN all.Len(), "|", all[0].Start, "|", all[0].Value, "|", all[1].Start
+all = REGEX.Compile("^a").FindAll("aaa", 1)
+PRINTLN all.Len()
+all = REGEX.Compile("\ba").FindAll("aaa a", 1)
+PRINTLN all.Len(), "|", all[0].Start
+all = pattern.FindAll("aaa aaa aaa", 1, 2)
+PRINTLN all.Len(), "|", all[0].Value, "|", all[1].Start
+"#,
+    );
+    assert_eq!(output, "1|aa|1|1|aa\n2|1|ää|4\n0\n1|4\n2|aa|4\n");
+}
+
+#[test]
+fn api_review_find_all_empty_matches_advance_on_unicode_boundaries() {
+    let output = run_ppl(
+        r#"
+REGEXMATCH all[] = REGEX.Compile("").FindAll("äβ", 1)
+PRINTLN all.Len(), "|", all[0].Start, "|", all[1].Start
+all = REGEX.Compile("a*").FindAll("aaä", 1)
+PRINTLN all.Len(), "|", all[0].Start, "|", all[0].Value, "|", all[1].Start
+all = REGEX.Compile("$").FindAll("äβ", 2)
+PRINTLN all.Len(), "|", all[0].Start
+all = REGEX.Compile("").FindAll("", 0)
+PRINTLN all.Len(), "|", all[0].Start
+all = REGEX.Compile("").FindAll("äβ", 3)
+PRINTLN all.Len()
+"#,
+    );
+    assert_eq!(output, "2|1|2\n2|1|a|3\n1|2\n1|0\n0\n");
+}
+
+#[test]
 fn regex_compiles_tests_and_reports_errors() {
     let output = run_ppl(
         r#"

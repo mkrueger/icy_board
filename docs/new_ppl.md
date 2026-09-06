@@ -84,6 +84,11 @@ INTEGER values = { 10, 20, 30 }
 values[0] += count
 ```
 
+Compound assignments evaluate their target indices from left to right exactly
+once, then read the target, evaluate the right-hand side, and write back to the
+same target. An object-property target also retains the original receiver even
+if the right-hand side reassigns the variable that held it.
+
 The brace initializer declares the array and determines its size. Parenthesis
 indexing remains valid for old source; brackets are recommended because they
 cannot be mistaken for a function call. Below 350 all three bracket kinds were
@@ -231,7 +236,10 @@ ENDPROC
 ```
 
 The compiler checks routine kind, parameter types and dimensions, `VAR` flags
-and function return type. A routine parameter is callable and can be passed on
+and function return type including array rank, also for nested callback
+signatures. For example, `FUNCTION read() INTEGER[]` declares a vector-returning
+callback; `INTEGER[,]` and `INTEGER[,,]` declare matrix and cube results.
+A routine parameter is callable and can be passed on
 to another routine. The callable reference is stored in the PPE, so it needs
 runtime 4.00.
 
@@ -356,6 +364,13 @@ character is also reachable through zero-based indexing (`text[0]`).
 `StringComparison.OrdinalIgnoreCase` as the last argument for Unicode-aware,
 case-insensitive searching or equality.
 
+The comparison mode does not change overlap semantics: `FindLast` includes
+overlapping occurrences and `EndsWith` tests the actual suffix; `Count` counts
+non-overlapping occurrences. An insensitive comparison whose compiled literal
+exceeds the regex engine's size limit reports `ErrKind.String` /
+`ErrCode.Limit` instead of aborting execution. Its fallback is `-1` for
+`Find`/`FindLast`, `0` for `Count`, and `FALSE` for the boolean comparisons.
+
 Scalar strings support zero-based Unicode character indexing in language 400.
 `text[0]` returns the first character as a `STRING`; a negative or out-of-range
 index returns an empty string. String arrays keep their normal array semantics,
@@ -421,11 +436,19 @@ or unmatched capture has start position `-1`. Group zero is the complete match.
 `FindAll` returns a dynamic `REGEXMATCH[]` array. Access matches with
 `matches[index]`; `matches.Len()` reports the number of matches.
 
+`Find`, `IsMatch` and `FindAll` search at or after the zero-based Unicode
+character position `start`, even if it lies inside a match that would have
+started earlier. The whole text still supplies the context for anchors and
+word boundaries: `start` is not a new beginning for `^`. `FindAll` returns
+non-overlapping matches and suppresses an empty match immediately following
+the preceding match at the same position. Empty matches advance on Unicode
+character boundaries and cannot make iteration stall.
+
 Replacement strings expand `$1` and `$name`. A zero limit means unlimited;
 negative limits report `ErrKind.Regex` / `ErrCode.Invalid`. `Split` preserves
-empty fields and replaces only dynamic one-dimensional `STRING` (or legacy
-`BIGSTR`) arrays, transactionally. Results are limited to 100,000 matches and replacement
-output to 16 MiB.
+empty fields and returns a dynamic `STRING[]`; on failure it returns an empty
+array. `FindAll` results are limited to 100,000 matches and replacement output
+to 16 MiB.
 
 The engine guarantees linear-time matching and deliberately does not support
 look-around or backreferences. Unicode case-insensitive matching does not apply
@@ -748,6 +771,11 @@ current virtual-screen state. `ResetVertical()` and `ResetHorizontal()` reset on
 axis; `ResetAll()` restores both. PPE cleanup independently remembers whether the
 PPE changed margins, so a caller is restored even if the virtual screen and
 physical terminal disagree.
+
+A non-positive start coordinate or an end coordinate that is not greater than
+the start is rejected with `FALSE` and `ErrKind.Term` / `ErrCode.Invalid`.
+Successful set/reset operations clear an older error. These failures also
+enter an installed `ON ERROR` handler.
 
 ### Fonts
 
@@ -1240,6 +1268,15 @@ board's to keep, so both stay read-only; writing one is a compile error.
 logged in reads as an empty user with `Valid` false rather than failing, so a
 member is always safe to read.
 
+Mutations are committed only when the user file is saved successfully. A save
+failure restores both the live caller and the board's in-memory user record,
+reports `ErrKind.User` / `ErrCode.Io`, and returns `FALSE` from mutating
+methods. Property assignments publish the same error without changing their
+old value. Invalid arguments report `ErrCode.Invalid`; a missing current user
+reports `ErrCode.Unavailable`. Successful mutations clear an older error, but
+never hide an error already raised within the same statement. Failures enter
+an installed `ON ERROR` handler.
+
 The cumulative statistics `TimesOn`, `MessagesRead`, `MessagesLeft`, `Uploads`
 and `Downloads`, together with the byte totals `UploadBytes`, `DownloadBytes`
 and `DownloadBytesToday`, are 64-bit `ULONG`, so they preserve the full counters
@@ -1251,8 +1288,8 @@ through 255. An out-of-range write leaves the old value intact and reports
 `EditorMode` is one `EDITORMODE` value — `Yes`, `No` or `Ask` — rather than the
 two overlapping flags `PCBoard` kept. `SetNote(index, text)` writes one of the
 five note slots, for an index from 0 to 4. `SetPassword()` hashes
-the text the way the board is configured to, so the plain text is never stored;
-an empty password is refused and it answers `FALSE` rather than failing.
+the text the way the board is configured to; an empty password is refused with
+`FALSE` and `ErrCode.Invalid`.
 
 ### Notes and contacts
 
@@ -1286,10 +1323,11 @@ Session.User.RemoveContact(0)
 
 `AddContact()` trims and normalizes the service name, trims the account and
 appends the contact. Duplicate services are allowed. A blank service or account
-is refused and answers `FALSE`. A user may hold at most 100 contacts; a further
+is refused with `FALSE` and `ErrCode.Invalid`. A user may hold at most 100 contacts; a further
 `AddContact()` is refused with `ErrCode.Limit`. `RemoveContact(index)` removes
-the entry at the zero-based index and answers whether it succeeded. An index no
-contact has answers with an empty `CONTACT`.
+the entry at the zero-based index and answers whether it succeeded; an invalid
+index returns `FALSE` and `ErrCode.Invalid`. Reading an out-of-range index from
+the `Contacts` snapshot instead answers with an empty `CONTACT`.
 
 The returned array is a snapshot. Adding or removing contacts does not mutate an
 array already held by the PPE; read `User.Contacts` again to get the new list.
@@ -1606,7 +1644,14 @@ PRINTLN values[0]
 ```
 
 Whole-array assignment copies the value and adopts its bounds when element type
-and rank match. Existing 4.00 source that declares arrays with parentheses is
+and rank match, including ordinary variables declared with an initial upper
+bound. Record array fields remain fixed in shape. Explicit dynamic declarations
+such as `INTEGER values[] = { 1, 2 }` stay dynamic; `{}` initializes an empty
+array. Local dynamic arrays start empty on each routine call and retain separate
+storage across recursive calls. An array function that exits without assigning
+its result returns an empty array, not the result of a previous call.
+
+Existing 4.00 source that declares arrays with parentheses is
 accepted with a migration warning; newly formatted and decompiled 4.00 source
 always writes square brackets. Older language versions retain the classic
 parenthesis syntax.
@@ -1633,7 +1678,10 @@ values.Redim(20)
 Only a declared array has these members. An array's type is its element's, so it
 is the declaration that says it has them; asking a plain value for `.Len()` is a
 compile error. `Redim` is a statement rather than a function, so it stands on a
-line of its own the way `REDIM` does. Array-valued record fields have the fixed
+line of its own the way `REDIM` does. In language 400 both forms require a
+declared array variable and exactly one bound per declared dimension: they
+change bounds, not rank. Computed arrays and read-only properties cannot be
+redimensioned. Array-valued record fields have the fixed
 bounds stored in their record type and cannot use either spelling of `REDIM`.
 `Len()` reports the element count; after `Redim(20)`, it returns 21 and valid
 indices are 0 through 20. Empty dynamic arrays report zero.

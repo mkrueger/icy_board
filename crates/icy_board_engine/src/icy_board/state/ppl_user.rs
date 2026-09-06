@@ -5,7 +5,7 @@ use crate::{
     datetime::IcbDate,
     executable::{VariableType, VariableValue},
     icy_board::{
-        state::ppl_error::{ERR_INVALID, ERR_KIND_USER, ERR_LIMIT, PplError},
+        state::ppl_error::{ERR_INVALID, ERR_IO, ERR_KIND_USER, ERR_LIMIT, ERR_UNAVAILABLE, PplError},
         user_base::{FSEMode, MAX_CONTACTS, User, UserContact},
     },
     parser::{CONTACT_ID, EDITOR_MODE_ENUM_ID, USER_ID},
@@ -111,6 +111,36 @@ impl PplUser {
         match self {
             Self::Current => vm.icy_board_state.session.current_user.is_some(),
             Self::Snapshot { valid, .. } => *valid,
+        }
+    }
+
+    /// Stage mutations on a copy so rejected arguments cannot alter the live user.
+    fn writable_user(&self, vm: &mut crate::vm::VirtualMachine<'_>) -> Option<User> {
+        if matches!(self, Self::Snapshot { .. }) {
+            vm.set_error(PplError::new(ERR_KIND_USER, ERR_INVALID, "Board.Users entries are read-only"));
+            return None;
+        }
+        let user = vm.icy_board_state.session.current_user.clone();
+        if user.is_none() {
+            vm.set_error(PplError::new(ERR_KIND_USER, ERR_UNAVAILABLE, "no current user"));
+        }
+        user
+    }
+
+    async fn save_user(vm: &mut crate::vm::VirtualMachine<'_>, mut user: User) -> bool {
+        user.flags.is_dirty = true;
+        let previous = vm.icy_board_state.session.current_user.replace(user);
+        match vm.icy_board_state.persist_current_user().await {
+            Ok(()) => {
+                vm.operation_succeeded();
+                true
+            }
+            Err(error) => {
+                // persist_current_user also restores the board's in-memory entry.
+                vm.icy_board_state.session.current_user = previous;
+                vm.set_error(PplError::new(ERR_KIND_USER, ERR_IO, format!("failed to save user: {error}")));
+                false
+            }
         }
     }
 }
@@ -383,10 +413,9 @@ impl UserDataValue for PplUser {
     }
 
     async fn set_property_value(&self, vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, val: VariableValue) -> crate::Res<()> {
-        if matches!(self, Self::Snapshot { .. }) {
-            vm.set_error(PplError::new(ERR_KIND_USER, ERR_INVALID, "Board.Users entries are read-only"));
+        let Some(mut user) = self.writable_user(vm) else {
             return Ok(());
-        }
+        };
         let number = val.as_int();
         let invalid_range = if *name == *PAGE_LENGTH && u16::try_from(number).is_err() {
             Some("PageLength must be between 0 and 65535")
@@ -399,9 +428,6 @@ impl UserDataValue for PplUser {
             vm.set_error(PplError::new(ERR_KIND_USER, ERR_INVALID, message));
             return Ok(());
         }
-        let Some(user) = vm.icy_board_state.session.current_user.as_mut() else {
-            return Ok(());
-        };
         let text = || val.as_string();
         let date = || IcbDate::from_pcboard(val.as_int() as u32).to_utc_date_time();
 
@@ -466,10 +492,7 @@ impl UserDataValue for PplUser {
         } else {
             return Err(format!("USER property {name} is read-only").into());
         }
-        user.flags.is_dirty = true;
-        if let Err(err) = vm.icy_board_state.persist_current_user().await {
-            log::error!("failed to persist Session.User write: {err}");
-        }
+        Self::save_user(vm, user).await;
         Ok(())
     }
 
@@ -479,41 +502,29 @@ impl UserDataValue for PplUser {
         name: &unicase::Ascii<String>,
         arguments: &[VariableValue],
     ) -> crate::Res<VariableValue> {
+        if *name != *SET_PASSWORD && *name != *ADD_CONTACT && *name != *REMOVE_CONTACT && *name != *SET_NOTE {
+            return Err(format!("Unknown USER function {name}").into());
+        }
+        let Some(mut user) = self.writable_user(vm) else {
+            return Ok(VariableValue::new_bool(false));
+        };
         if *name == *SET_PASSWORD {
-            if matches!(self, Self::Snapshot { .. }) {
-                vm.set_error(PplError::new(ERR_KIND_USER, ERR_INVALID, "Board.Users entries are read-only"));
-                return Ok(VariableValue::new_bool(false));
-            }
             let plain = arguments[0].as_string();
             if plain.is_empty() {
+                vm.set_error(PplError::new(ERR_KIND_USER, ERR_INVALID, "password cannot be empty"));
                 return Ok(VariableValue::new_bool(false));
             }
             // Hashing depends on board configuration, so ask the board rather than
             // storing whatever the PPE handed us.
             let password = vm.icy_board_state.create_password(plain).await;
-            let Some(user) = vm.icy_board_state.session.current_user.as_mut() else {
-                return Ok(VariableValue::new_bool(false));
-            };
             user.password.password = password;
-            user.flags.is_dirty = true;
-            if let Err(err) = vm.icy_board_state.persist_current_user().await {
-                log::error!("failed to persist Session.User password: {err}");
-            }
-            return Ok(VariableValue::new_bool(true));
-        }
-        if *name == *ADD_CONTACT {
-            if matches!(self, Self::Snapshot { .. }) {
-                vm.set_error(PplError::new(ERR_KIND_USER, ERR_INVALID, "Board.Users entries are read-only"));
-                return Ok(VariableValue::new_bool(false));
-            }
+        } else if *name == *ADD_CONTACT {
             let service = normalize_service(&arguments[0].as_string());
             let account = arguments[1].as_string().trim().to_string();
             if service.is_empty() || account.is_empty() {
+                vm.set_error(PplError::new(ERR_KIND_USER, ERR_INVALID, "contact service and account cannot be empty"));
                 return Ok(VariableValue::new_bool(false));
             }
-            let Some(user) = vm.icy_board_state.session.current_user.as_mut() else {
-                return Ok(VariableValue::new_bool(false));
-            };
             if !user.add_contact(UserContact { service, account }) {
                 vm.set_error(PplError::new(
                     ERR_KIND_USER,
@@ -522,59 +533,33 @@ impl UserDataValue for PplUser {
                 ));
                 return Ok(VariableValue::new_bool(false));
             }
-            user.flags.is_dirty = true;
-            if let Err(err) = vm.icy_board_state.persist_current_user().await {
-                log::error!("failed to persist added contact: {err}");
-            }
-            return Ok(VariableValue::new_bool(true));
-        }
-        if *name == *REMOVE_CONTACT {
-            if matches!(self, Self::Snapshot { .. }) {
-                vm.set_error(PplError::new(ERR_KIND_USER, ERR_INVALID, "Board.Users entries are read-only"));
-                return Ok(VariableValue::new_bool(false));
-            }
+        } else if *name == *REMOVE_CONTACT {
             let Ok(index) = usize::try_from(arguments[0].as_int()) else {
-                return Ok(VariableValue::new_bool(false));
-            };
-            let Some(user) = vm.icy_board_state.session.current_user.as_mut() else {
+                vm.set_error(PplError::new(ERR_KIND_USER, ERR_INVALID, "contact index is out of range"));
                 return Ok(VariableValue::new_bool(false));
             };
             if index >= user.contacts.len() {
+                vm.set_error(PplError::new(ERR_KIND_USER, ERR_INVALID, "contact index is out of range"));
                 return Ok(VariableValue::new_bool(false));
             }
             user.contacts.remove(index);
-            user.flags.is_dirty = true;
-            if let Err(err) = vm.icy_board_state.persist_current_user().await {
-                log::error!("failed to persist removed contact: {err}");
-            }
-            return Ok(VariableValue::new_bool(true));
-        }
-        if *name == *SET_NOTE {
-            if matches!(self, Self::Snapshot { .. }) {
-                vm.set_error(PplError::new(ERR_KIND_USER, ERR_INVALID, "Board.Users entries are read-only"));
-                return Ok(VariableValue::new_bool(false));
-            }
+        } else if *name == *SET_NOTE {
             let index = arguments[0].as_int();
             let text = arguments[1].as_string();
-            let Some(user) = vm.icy_board_state.session.current_user.as_mut() else {
-                return Ok(VariableValue::new_bool(false));
-            };
             let note = match index {
                 0 => &mut user.custom_comment1,
                 1 => &mut user.custom_comment2,
                 2 => &mut user.custom_comment3,
                 3 => &mut user.custom_comment4,
                 4 => &mut user.custom_comment5,
-                _ => return Ok(VariableValue::new_bool(false)),
+                _ => {
+                    vm.set_error(PplError::new(ERR_KIND_USER, ERR_INVALID, "note index must be between 0 and 4"));
+                    return Ok(VariableValue::new_bool(false));
+                }
             };
             *note = text;
-            user.flags.is_dirty = true;
-            if let Err(err) = vm.icy_board_state.persist_current_user().await {
-                log::error!("failed to persist note: {err}");
-            }
-            return Ok(VariableValue::new_bool(true));
         }
-        Err(format!("Unknown USER function {name}").into())
+        Ok(VariableValue::new_bool(Self::save_user(vm, user).await))
     }
 
     async fn call_method(&mut self, _vm: &mut crate::vm::VirtualMachine<'_>, name: &unicase::Ascii<String>, _arguments: &[VariableValue]) -> crate::Res<()> {

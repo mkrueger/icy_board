@@ -902,6 +902,7 @@ pub struct FunctionParameterSpecifier {
     rightpar_token: Spanned<Token>,
     return_type_token: Spanned<Token>,
     return_type: VariableType,
+    return_rank: u8,
 }
 
 impl FunctionParameterSpecifier {
@@ -914,6 +915,7 @@ impl FunctionParameterSpecifier {
         rightpar_token: Spanned<Token>,
         return_type_token: Spanned<Token>,
         return_type: VariableType,
+        return_rank: u8,
     ) -> Self {
         Self {
             function_token,
@@ -923,6 +925,7 @@ impl FunctionParameterSpecifier {
             rightpar_token,
             return_type_token,
             return_type,
+            return_rank,
         }
     }
 
@@ -935,6 +938,7 @@ impl FunctionParameterSpecifier {
             rightpar_token: Spanned::create_empty(Token::RPar),
             return_type_token: Spanned::create_empty(Token::Identifier(unicase::Ascii::new(return_type.to_string()))),
             return_type,
+            return_rank: 0,
         }
     }
 
@@ -988,8 +992,17 @@ impl FunctionParameterSpecifier {
         self.return_type
     }
 
+    pub fn get_return_rank(&self) -> u8 {
+        self.return_rank
+    }
+
+    pub fn with_return_rank(mut self, return_rank: u8) -> Self {
+        self.return_rank = return_rank;
+        self
+    }
+
     fn is_similar(&self, check_func: &FunctionParameterSpecifier) -> bool {
-        if self.get_return_type() != check_func.get_return_type() {
+        if self.get_return_type() != check_func.get_return_type() || self.get_return_rank() != check_func.get_return_rank() {
             return false;
         }
         if self.get_parameters().len() != check_func.get_parameters().len() {

@@ -136,6 +136,12 @@ pub enum CompilationErrorType {
     #[error("Record array field '{0}' has a fixed size and cannot be redimensioned")]
     FixedRecordArrayCannotBeRedimmed(String),
 
+    #[error("REDIM requires an assignable array variable")]
+    RedimArrayVariableExpected,
+
+    #[error("REDIM cannot change declared rank {0}; got {1} bounds")]
+    RedimRankMismatch(u8, usize),
+
     #[error("Record array field '{0}' requires an array value with the same shape")]
     RecordArrayValueExpected(String),
 
@@ -255,10 +261,12 @@ pub struct PPECompiler {
 
     hir_program: HirProgram,
     commands: PPEScript,
+    compound_type_probe: SemanticVisitor,
 }
 
 impl PPECompiler {
     pub fn new(workspace: &Workspace, type_registry: UserTypeRegistry, errors: Arc<Mutex<ErrorReporter>>) -> Self {
+        let compound_type_probe = SemanticVisitor::new(workspace, Arc::new(Mutex::new(ErrorReporter::default())), UserTypeRegistry::default());
         let semantic_visitor = SemanticVisitor::new(workspace, errors, type_registry);
         Self {
             lookup_table: LookupVariabeleTable::default(),
@@ -271,6 +279,7 @@ impl PPECompiler {
             runtime: workspace.runtime(),
             hir_program: HirProgram::default(),
             commands: PPEScript::default(),
+            compound_type_probe,
         }
     }
 
@@ -299,16 +308,42 @@ impl PPECompiler {
         self.semantic_visitor.set_modules(asts);
         let lowered = modules::lower_modules(asts, self.semantic_visitor.errors.clone());
         let asts = lowered.iter().collect::<Vec<_>>();
+        // Before introducing typed receiver temporaries, resolve whether a member
+        // belongs to a value record or a reference object. Probe diagnostics are
+        // discarded: the transformed AST receives the normal, authoritative check.
+        // Keep each file's span map separate, just as generated names stay unique
+        // across the whole package.
+        let mut compound_receiver_types = HashMap::new();
+        if asts.iter().any(|program| AstTransformationVisitor::needs_compound_receiver_types(program)) {
+            std::mem::swap(&mut self.compound_type_probe.type_registry, &mut self.semantic_visitor.type_registry);
+            self.compound_type_probe.set_modules(&asts);
+            for program in asts
+                .iter()
+                .filter(|program| program.module.is_some())
+                .chain(asts.iter().filter(|program| program.module.is_none()))
+            {
+                self.compound_type_probe.set_file_name(&program.file_name);
+                self.compound_type_probe.user_type_lookup.clear();
+                program.visit(&mut self.compound_type_probe);
+                compound_receiver_types.insert(program.file_name.clone(), self.compound_type_probe.user_type_lookup.clone());
+            }
+            std::mem::swap(&mut self.compound_type_probe.type_registry, &mut self.semantic_visitor.type_registry);
+        }
         let mut visted = Vec::new();
         // One transformer for the whole package, so its generated labels stay unique across files.
         let mut transformer = AstTransformationVisitor::new(self.optimize, self.semantic_visitor.type_registry.enums());
         for prg in asts {
             self.semantic_visitor.set_file_name(&prg.file_name);
+            transformer.set_compound_receiver_types(
+                compound_receiver_types.remove(&prg.file_name).unwrap_or_default(),
+                &self.semantic_visitor.type_registry,
+            );
             let prg = prg.visit_mut(&mut transformer);
             visted.push((prg, transformer.take_loop_counters()));
         }
         // Imported module declarations must be known before the root program is
         // checked, but the root file must remain first when code is emitted.
+        let mut member_lookups = HashMap::new();
         for (prg, loop_counters) in visted
             .iter()
             .filter(|(program, _)| program.module.is_some())
@@ -317,6 +352,17 @@ impl PPECompiler {
             self.semantic_visitor.set_file_name(&prg.file_name);
             self.semantic_visitor.set_loop_counters(loop_counters.clone());
             prg.visit(&mut self.semantic_visitor);
+            // These keys are file-local source offsets. Keep the authoritative
+            // maps with their file until that file's statements/routines emit.
+            member_lookups.insert(
+                prg.file_name.clone(),
+                (
+                    std::mem::take(&mut self.semantic_visitor.user_type_lookup),
+                    std::mem::take(&mut self.semantic_visitor.member_receiver_type_lookup),
+                    std::mem::take(&mut self.semantic_visitor.instance_provider_lookup),
+                    std::mem::take(&mut self.semantic_visitor.static_receiver_lookup),
+                ),
+            );
         }
         self.semantic_visitor.finish();
 
@@ -326,10 +372,20 @@ impl PPECompiler {
 
         self.lookup_table = self.semantic_visitor.generate_variable_table();
         for (program, _) in visted.iter().filter(|(program, _)| program.module.is_some()) {
+            let (types, receivers, instances, statics) = &member_lookups[&program.file_name];
+            self.semantic_visitor.user_type_lookup.clone_from(types);
+            self.semantic_visitor.member_receiver_type_lookup.clone_from(receivers);
+            self.semantic_visitor.instance_provider_lookup.clone_from(instances);
+            self.semantic_visitor.static_receiver_lookup.clone_from(statics);
             self.compile_program_statements(program);
         }
         for (prg, _) in visted {
             self.semantic_visitor.set_file_name(&prg.file_name);
+            let (types, receivers, instances, statics) = member_lookups.remove(&prg.file_name).unwrap();
+            self.semantic_visitor.user_type_lookup = types;
+            self.semantic_visitor.member_receiver_type_lookup = receivers;
+            self.semantic_visitor.instance_provider_lookup = instances;
+            self.semantic_visitor.static_receiver_lookup = statics;
             if prg.module.is_none() {
                 self.compile_program_statements(&prg);
             }
@@ -555,9 +611,8 @@ impl PPECompiler {
                     }
                 }
 
-                let whole_dynamic_array =
-                    decl.header.flags & crate::executable::variable_table::VARIABLE_FLAG_DYNAMIC_ARRAY != 0 && let_smt.get_arguments().is_empty();
-                if decl.header.dim != let_smt.get_arguments().len() as u8 && !whole_dynamic_array {
+                let whole_array = self.runtime >= 400 && decl.header.dim > 0 && let_smt.get_arguments().is_empty();
+                if decl.header.dim != let_smt.get_arguments().len() as u8 && !whole_array {
                     log::error!("Invalid dimensions for variable: {var_name}");
                     return None;
                 }
@@ -568,7 +623,7 @@ impl PPECompiler {
                 };
                 let variable_type = decl.header.variable_type;
                 let dim = decl.header.dim;
-                let variable = if dim == 0 || whole_dynamic_array {
+                let variable = if dim == 0 || whole_array {
                     HirExpr::variable(decl_id)
                 } else {
                     let mut arguments = Vec::new();

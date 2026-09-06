@@ -116,6 +116,8 @@ pub struct SemanticVisitor {
 
 impl SemanticVisitor {
     pub fn set_file_name(&mut self, file_name: &std::path::Path) {
+        // Receiver cache keys are source offsets, not package-wide identities.
+        self.receiver_types.clear();
         self.current_file = Arc::new(file_name.to_path_buf());
         self.errors.lock().unwrap().set_file_name(file_name);
     }
@@ -781,11 +783,10 @@ impl SemanticVisitor {
                         name: func.get_identifier().clone(),
                         parameter_index: Some(i),
                         id,
-                        functions: FunctionDeclaration::Function(FunctionDeclarationAstNode::empty(
-                            func.get_identifier().clone(),
-                            func.get_parameters().clone(),
-                            func.get_return_type(),
-                        )),
+                        functions: FunctionDeclaration::Function(
+                            FunctionDeclarationAstNode::empty(func.get_identifier().clone(), func.get_parameters().clone(), func.get_return_type())
+                                .with_return_rank(func.get_return_rank()),
+                        ),
                         lookup: VariableLookups::default(),
                         parameters: 0..0,
                         local_variables: 0..0,
@@ -981,11 +982,10 @@ impl SemanticVisitor {
             name: function.get_identifier().clone(),
             parameter_index: None,
             id,
-            functions: FunctionDeclaration::Function(FunctionDeclarationAstNode::empty(
-                function.get_identifier().clone(),
-                function.get_parameters().clone(),
-                function.get_return_type(),
-            )),
+            functions: FunctionDeclaration::Function(
+                FunctionDeclarationAstNode::empty(function.get_identifier().clone(), function.get_parameters().clone(), function.get_return_type())
+                    .with_return_rank(function.get_return_rank()),
+            ),
             lookup: VariableLookups::default(),
             parameters: 0..0,
             local_variables: 0..0,
@@ -1103,7 +1103,9 @@ impl SemanticVisitor {
                         let container = self.routine_container(self.last_lookup_index);
                         let matches = container.is_some_and(|container| match &container.functions {
                             FunctionDeclaration::Function(declaration) => {
-                                f.get_return_type() == declaration.get_return_type() && parameter_lists_match(f.get_parameters(), declaration.get_parameters())
+                                f.get_return_type() == declaration.get_return_type()
+                                    && f.get_return_rank() == declaration.get_return_rank()
+                                    && parameter_lists_match(f.get_parameters(), declaration.get_parameters())
                             }
                             FunctionDeclaration::Procedure(_) => false,
                         });

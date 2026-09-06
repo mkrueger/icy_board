@@ -1,6 +1,51 @@
 use super::{compile_errors_with_runtime, run_ppl, run_ppl_with_input};
 
 #[test]
+fn api_review_margin_mutations_publish_failure_and_success() {
+    let output = run_ppl(
+        r#"
+Error.Clear()
+BOOLEAN changed = Terminal.Margins.SetVertical(0, 10)
+PRINTLN changed, "|", Error.Last().Kind = ErrKind.Term, "|", Error.Last().Code = ErrCode.Invalid
+changed = Terminal.Margins.SetVertical(1, 10)
+PRINTLN changed, "|", Error.Last().OK
+changed = Terminal.Margins.SetHorizontal(5, 5)
+PRINTLN changed, "|", Error.Last().Kind = ErrKind.Term, "|", Error.Last().Code = ErrCode.Invalid
+changed = Terminal.Margins.SetHorizontal(1, 20)
+PRINTLN changed, "|", Error.Last().OK
+Terminal.Margins.SetVertical(0, 10)
+Terminal.Margins.ResetVertical()
+PRINTLN Error.Last().OK
+Terminal.Margins.SetHorizontal(0, 10)
+Terminal.Margins.ResetHorizontal()
+PRINTLN Error.Last().OK
+Terminal.Margins.SetVertical(0, 10)
+Terminal.Margins.ResetAll()
+PRINTLN Error.Last().OK
+"#,
+    );
+    assert_eq!(
+        output,
+        "0|1|1\n\x1b[1;10r1|1\n0|1|1\n\x1b[?69h\x1b[1;20s1|1\n\x1b[r1\n\x1b[?69l1\n\x1b[r\x1b[?69l1\n"
+    );
+}
+
+#[test]
+fn api_review_invalid_margin_region_enters_the_error_handler() {
+    let output = run_ppl(
+        r#"
+ON ERROR GOTO Failed
+Terminal.Margins.SetHorizontal(-1, 10)
+PRINTLN "not reached"
+EXIT
+:Failed
+PRINTLN Error.Last().Kind = ErrKind.Term, "|", Error.Last().Code = ErrCode.Invalid
+"#,
+    );
+    assert_eq!(output, "1|1\n");
+}
+
+#[test]
 fn margin_api_requires_runtime_400() {
     for runtime in [330, 340] {
         let errors = compile_errors_with_runtime(

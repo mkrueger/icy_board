@@ -342,12 +342,30 @@ impl UserDataValue for PplRegex {
             }
             let maximum = if limit == 0 { MAX_REGEX_RESULTS } else { limit as usize };
             let take = if limit == 0 { maximum.saturating_add(1) } else { maximum };
-            let matches: Vec<_> = compiled
-                .captures_iter(&text)
-                .skip_while(|captures| captures.get(0).is_some_and(|found| found.start() < offset))
-                .take(take)
-                .map(|captures| PplRegexMatch::from_captures(compiled, &text, &captures, 0))
-                .collect();
+            let mut matches = Vec::new();
+            let mut position = offset;
+            let mut last_match_end = None;
+            // Search the complete haystack from the requested position so anchors
+            // and word boundaries retain their context. Filtering an iterator that
+            // started at zero would miss matches that begin inside an earlier one.
+            while let Some(captures) = compiled.captures_at(&text, position) {
+                let found = captures.get(0).expect("captures always include the whole match");
+                if found.is_empty() && last_match_end == Some(found.end()) {
+                    // Like captures_iter, suppress an empty match immediately after
+                    // the preceding match and advance by a whole Unicode scalar.
+                    let Some(character) = text[found.end()..].chars().next() else {
+                        break;
+                    };
+                    position = found.end() + character.len_utf8();
+                    continue;
+                }
+                position = found.end();
+                last_match_end = Some(found.end());
+                matches.push(PplRegexMatch::from_captures(compiled, &text, &captures, 0));
+                if matches.len() == take {
+                    break;
+                }
+            }
             if limit == 0 && matches.len() > maximum {
                 vm.set_error(PplError::new(
                     ERR_KIND_REGEX,

@@ -650,6 +650,7 @@ impl<'a> Parser<'a> {
             rightpar_token,
             return_type_token,
             return_type,
+            self.parse_dynamic_array_rank(),
         ))
     }
     fn parse_procedure_parameter_specifier(&mut self) -> ParameterSpecifier {
@@ -1198,6 +1199,22 @@ impl Parser<'_> {
                     self.report_error(self.lex.span(), ParserErrorType::MissingCloseParens(self.save_token()));
 
                     return None;
+                }
+                if self.lang_version >= FIRST_ROUTINE_PARAMETER_LANGUAGE_VERSION {
+                    if let Some(Token::Function) = self.get_cur_token() {
+                        parameters.push(self.parse_function_parameter_specifier());
+                        if self.get_cur_token() == Some(Token::Comma) {
+                            self.next_token();
+                        }
+                        continue;
+                    }
+                    if let Some(Token::Procedure) = self.get_cur_token() {
+                        parameters.push(self.parse_procedure_parameter_specifier());
+                        if self.get_cur_token() == Some(Token::Comma) {
+                            self.next_token();
+                        }
+                        continue;
+                    }
                 }
                 if let Some(Token::Identifier(id)) = self.get_cur_token()
                     && id == Ascii::new("VAR".to_string())
