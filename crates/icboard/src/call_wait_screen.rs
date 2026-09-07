@@ -225,6 +225,7 @@ impl CallWaitScreen {
         let area = get_screen_size(frame, full_screen);
         let mut args = std::collections::HashMap::new();
         let mut failed = false;
+        let mut failure_hint = "event_runtime_repair_hint";
         let (description, phase) = if let Some(error) = &runtime.failure {
             failed = true;
             (get_text("event_runtime_scheduler_stopped"), error.clone())
@@ -246,6 +247,12 @@ impl CallWaitScreen {
                     args.insert("error".to_string(), error.clone());
                     "event_runtime_reload_failed"
                 }
+                EventMaintenancePhase::ListenerFailed(error) => {
+                    failed = true;
+                    failure_hint = "event_runtime_listener_failed_hint";
+                    args.insert("error".to_string(), error.clone());
+                    "event_runtime_listener_failed"
+                }
                 EventMaintenancePhase::Restarting => "event_runtime_restarting",
             };
             (status.description.clone(), get_text_args(key, args))
@@ -255,8 +262,8 @@ impl CallWaitScreen {
         let mut text = if runtime.failure.is_some() {
             format!("{description}\n\n{}\n\n{phase}", get_text("event_runtime_failed_hint"))
         } else if failed {
-            // Keep repair instructions visible even when a parser error is very long.
-            format!("{description}\n\n{}\n\n{phase}", get_text("event_runtime_repair_hint"))
+            // Keep phase-specific recovery instructions visible even when an error is very long.
+            format!("{description}\n\n{}\n\n{phase}", get_text(failure_hint))
         } else {
             format!("{description}\n\n{phase}\n\n{}", get_text("event_runtime_offline_hint"))
         };

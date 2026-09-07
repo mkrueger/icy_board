@@ -37,7 +37,7 @@ pub enum BBSMessage {
     InvalidateFileBase(PathBuf),
 }
 
-/// Read-only UI snapshot, published only by the event scheduler.
+/// Read-only UI snapshot, published by the event scheduler and main's listener restart helper.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EventMaintenanceStatus {
     pub description: String,
@@ -52,6 +52,9 @@ pub enum EventMaintenancePhase {
     Running,
     Reloading,
     ReloadFailed(String),
+    /// Listener preparation retries with admission closed and BoardLock retained;
+    /// neither the event command nor the configuration reload is repeated.
+    ListenerFailed(String),
     Restarting,
 }
 

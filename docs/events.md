@@ -208,9 +208,11 @@ This lifecycle applies to **Maintenance**, not Online execution.
 5. Reacquire `BoardLock`, call `IcyBoard::load()` and `resolve_paths()`, and replace
    the complete object behind the existing shared board `Arc`. Resize the empty
    node table without replacing its shared identity. Clear the restart request.
-6. Main starts listeners/admin from the newly loaded configuration and recreates
-   call-wait UI state. The original scheduler continues and recomputes the gate
-   for tied/pending events before admitting callers again.
+6. Main prepares and binds all enabled listeners/admin from the newly loaded
+  configuration before starting any service tasks. Preparation fails as a unit:
+  already-bound listeners are dropped on failure. Only after successful startup
+  does main recreate call-wait UI state and acknowledge the restart. The original
+  scheduler recomputes the gate for tied/pending events before admitting callers.
 
 This is a **same-process service restart**, not OS `exec`, process replacement,
 or an executable upgrade. The scheduler and shared BBS identities survive.
@@ -255,9 +257,19 @@ retries once per second. Reload errors release the lock for offline repair. The
 nonempty event-file path is loaded strictly during maintenance reload, unlike
 ordinary startup's logged empty-list fallback. Other existing loader fallbacks
 remain (for example statistics, groups, FTN and QWKnet); full replacement does not
-mean every ancillary load error is fatal. Listener bind failures are logged, but
-there is no automatic bind-retry/rollback transaction guaranteeing every configured
-endpoint reopened successfully.
+mean every ancillary load error is fatal.
+
+All **enabled** Telnet, SSH, secure WebSocket and web-admin endpoints are required:
+startup preparation must succeed for all of them before any service task starts.
+If preparation fails, RAII drops already-bound listeners; initial startup returns
+the error rather than running a partial service set. After maintenance or an
+operator tool, the restart helper instead keeps admission closed and retains
+`BoardLock`, retrying **listener preparation only every two seconds**. It does not
+rerun the event command or reload configuration during these retries. Call-wait
+shows the actual listener error with a dedicated retry hint, not reload-repair
+instructions. Release an occupied port, or correct configuration and restart the
+process; changing configuration on disk alone does not update the retry's loaded
+configuration.
 
 Sources: [board fields and loader](../crates/icy_board_engine/src/icy_board/mod.rs),
 [email path/opening](../crates/icy_board_engine/src/icy_board/state/functions.rs#L728-L745),

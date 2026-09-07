@@ -32,6 +32,15 @@ pub async fn serve(addr: SocketAddr, state: AppState) -> std::io::Result<()> {
 /// event runner must not race a detached live-admin save with its disk command.
 pub async fn serve_until(addr: SocketAddr, state: AppState, shutdown: impl std::future::Future<Output = ()> + Send + 'static) -> std::io::Result<()> {
     let listener = tokio::net::TcpListener::bind(addr).await?;
+    serve_listener_until(listener, state, shutdown).await
+}
+
+/// Serve an already-bound listener, draining every in-flight request on shutdown.
+pub async fn serve_listener_until(
+    listener: tokio::net::TcpListener,
+    state: AppState,
+    shutdown: impl std::future::Future<Output = ()> + Send + 'static,
+) -> std::io::Result<()> {
     axum::serve(listener, router(state).into_make_service_with_connect_info::<SocketAddr>())
         .with_graceful_shutdown(shutdown)
         .await

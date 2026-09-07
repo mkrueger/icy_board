@@ -188,9 +188,19 @@ Session-owned mail handles have already been dropped.
 
 This is a listener/service restart in the same process, not OS ``exec``. A failed
 reload leaves the board offline and retries loading, not the completed command.
-Shell failures are logged and still followed by reload; listener bind failures
-are logged without an automatic retry/rollback guarantee. Command completion
-uses runtime logs, not the localized EventRan/EventFinished texts.
+Shell failures are logged and still followed by reload. Command completion uses
+runtime logs, not the localized EventRan/EventFinished texts.
+
+All enabled Telnet, SSH, secure WebSocket and web-admin endpoints must prepare
+and bind successfully before any service task starts. Preparation fails as a
+unit: already-bound listeners are dropped on failure. Initial startup returns
+the error; after maintenance or an operator tool, the restart helper keeps
+admission closed and retains ``BoardLock`` while retrying listener preparation
+every two seconds. These retries never rerun the event or reload configuration.
+Call-wait displays the actual listener error and a dedicated automatic-retry hint,
+not reload-repair instructions. Release an occupied port, or correct configuration
+and restart the process; disk configuration changes alone are not loaded by this
+retry loop.
 
 Only one foreground event command runs at a time. Maintenance may gate/drain
 callers during an Online command, but waits for it before stopping services or

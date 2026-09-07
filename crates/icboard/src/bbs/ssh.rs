@@ -7,6 +7,7 @@ use icy_net::{Connection, ConnectionType};
 use rand::rngs::StdRng;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
+    net::TcpListener,
     sync::Mutex,
     time::timeout,
 };
@@ -21,85 +22,102 @@ use super::handle_client;
 use tokio_util::sync::CancellationToken;
 
 pub async fn await_ssh_connections(ssh: SSH, board: Arc<tokio::sync::Mutex<IcyBoard>>, bbs: Arc<Mutex<BBS>>, generation: CancellationToken) -> Res<()> {
-    let mut rng: StdRng = rand::make_rng();
-    let config = russh::server::Config {
-        inactivity_timeout: Some(std::time::Duration::from_secs(3600)),
-        auth_rejection_time: std::time::Duration::from_secs(3),
-        auth_rejection_time_initial: Some(std::time::Duration::from_secs(0)),
-        keys: vec![russh::keys::PrivateKey::random(&mut rng, russh::keys::Algorithm::Ed25519).unwrap()],
-        preferred: Preferred {
-            kex: Cow::Owned(kex::ALL_KEX_ALGORITHMS.iter().map(|k| **k).collect()),
-            cipher: Cow::Owned(cipher::ALL_CIPHERS.iter().map(|k| **k).collect()),
-            ..Preferred::default()
-        },
-        ..Default::default()
-    };
-    let config = Arc::new(config);
-    let configured_addr = if ssh.address.trim().is_empty() {
-        "0.0.0.0".to_string()
-    } else {
-        ssh.address.clone()
-    };
+    PreparedSsh::bind(ssh).await?.run(board, bbs, generation).await
+}
 
-    let listener = match tokio::net::TcpListener::bind((configured_addr.as_str(), ssh.port)).await {
-        Ok(listener) => listener,
-        Err(e) => {
-            log::error!("SSH bind failed on {}:{} -> {e}; kind={:?}", configured_addr, ssh.port, e);
-            // Only attempt fallback if user supplied a non-wildcard that failed
-            if configured_addr != "0.0.0.0" && e.kind() == std::io::ErrorKind::AddrNotAvailable {
-                let fallback = "0.0.0.0";
-                log::warn!("Retrying SSH listener on fallback {}:{}", fallback, ssh.port);
-                tokio::net::TcpListener::bind((fallback, ssh.port)).await?
-            } else {
-                return Err(e.into());
+/// An SSH listener and server configuration prepared without starting transports.
+pub struct PreparedSsh {
+    listener: TcpListener,
+    config: Arc<russh::server::Config>,
+}
+
+impl PreparedSsh {
+    pub async fn bind(ssh: SSH) -> Res<Self> {
+        let mut rng: StdRng = rand::make_rng();
+        let config = russh::server::Config {
+            inactivity_timeout: Some(std::time::Duration::from_secs(3600)),
+            auth_rejection_time: std::time::Duration::from_secs(3),
+            auth_rejection_time_initial: Some(std::time::Duration::from_secs(0)),
+            keys: vec![russh::keys::PrivateKey::random(&mut rng, russh::keys::Algorithm::Ed25519)?],
+            preferred: Preferred {
+                kex: Cow::Owned(kex::ALL_KEX_ALGORITHMS.iter().map(|k| **k).collect()),
+                cipher: Cow::Owned(cipher::ALL_CIPHERS.iter().map(|k| **k).collect()),
+                ..Preferred::default()
+            },
+            ..Default::default()
+        };
+        let config = Arc::new(config);
+        let configured_addr = if ssh.address.trim().is_empty() {
+            "0.0.0.0".to_string()
+        } else {
+            ssh.address.clone()
+        };
+
+        let listener = match TcpListener::bind((configured_addr.as_str(), ssh.port)).await {
+            Ok(listener) => listener,
+            Err(e) => {
+                log::error!("SSH bind failed on {}:{} -> {e}; kind={:?}", configured_addr, ssh.port, e);
+                // Only attempt fallback if user supplied a non-wildcard that failed
+                if configured_addr != "0.0.0.0" && e.kind() == std::io::ErrorKind::AddrNotAvailable {
+                    let fallback = "0.0.0.0";
+                    log::warn!("Retrying SSH listener on fallback {}:{}", fallback, ssh.port);
+                    TcpListener::bind((fallback, ssh.port)).await?
+                } else {
+                    return Err(e.into());
+                }
             }
-        }
-    };
-    log::info!("SSH listening on {}", listener.local_addr()?);
-    // Own transport tasks as well as the accept loop. russh's convenience server
-    // spawns detached transports; dropping it is not a completed shutdown.
-    let mut transports = tokio::task::JoinSet::new();
-    let result = loop {
-        tokio::select! {
-            _ = generation.cancelled() => break Ok(()),
-            result = transports.join_next(), if !transports.is_empty() => {
-                if let Some(Err(err)) = result { log::error!("SSH transport failed: {err}"); }
-            }
-            accepted = listener.accept() => {
-                let (stream, _) = match accepted {
-                    Ok(accepted) => accepted,
-                    Err(err) => break Err(err.into()),
-                };
-                let handler = SshSession { board: board.clone(), bbs: bbs.clone(), generation: generation.clone() };
-                let config = config.clone();
-                let cancel = generation.clone();
-                transports.spawn(async move {
-                    let mut session = tokio::select! {
-                        _ = cancel.cancelled() => return,
-                        result = server::run_stream(config, stream, handler) => match result {
-                            Ok(session) => session,
-                            Err(err) => { log::debug!("SSH setup failed: {err}"); return; }
-                        }
-                    };
-                    tokio::select! {
-                        result = &mut session => { if let Err(err) = result { log::debug!("SSH session ended: {err}"); } },
-                        _ = cancel.cancelled() => {
-                            let _ = session.handle().disconnect(russh::Disconnect::ByApplication, "Board maintenance".into(), String::new()).await;
-                            let _ = session.await;
-                        }
-                    }
-                });
-            }
-        }
-    };
-    drop(listener);
-    generation.cancel();
-    while let Some(result) = transports.join_next().await {
-        if let Err(err) = result {
-            log::error!("SSH transport shutdown failed: {err}");
-        }
+        };
+        log::info!("SSH listening on {}", listener.local_addr()?);
+        Ok(Self { listener, config })
     }
-    result
+
+    pub async fn run(self, board: Arc<tokio::sync::Mutex<IcyBoard>>, bbs: Arc<Mutex<BBS>>, generation: CancellationToken) -> Res<()> {
+        let Self { listener, config } = self;
+        // Own transport tasks as well as the accept loop. russh's convenience server
+        // spawns detached transports; dropping it is not a completed shutdown.
+        let mut transports = tokio::task::JoinSet::new();
+        let result = loop {
+            tokio::select! {
+                _ = generation.cancelled() => break Ok(()),
+                result = transports.join_next(), if !transports.is_empty() => {
+                    if let Some(Err(err)) = result { log::error!("SSH transport failed: {err}"); }
+                }
+                accepted = listener.accept() => {
+                    let (stream, _) = match accepted {
+                        Ok(accepted) => accepted,
+                        Err(err) => break Err(err.into()),
+                    };
+                    let handler = SshSession { board: board.clone(), bbs: bbs.clone(), generation: generation.clone() };
+                    let config = config.clone();
+                    let cancel = generation.clone();
+                    transports.spawn(async move {
+                        let mut session = tokio::select! {
+                            _ = cancel.cancelled() => return,
+                            result = server::run_stream(config, stream, handler) => match result {
+                                Ok(session) => session,
+                                Err(err) => { log::debug!("SSH setup failed: {err}"); return; }
+                            }
+                        };
+                        tokio::select! {
+                            result = &mut session => { if let Err(err) = result { log::debug!("SSH session ended: {err}"); } },
+                            _ = cancel.cancelled() => {
+                                let _ = session.handle().disconnect(russh::Disconnect::ByApplication, "Board maintenance".into(), String::new()).await;
+                                let _ = session.await;
+                            }
+                        }
+                    });
+                }
+            }
+        };
+        drop(listener);
+        generation.cancel();
+        while let Some(result) = transports.join_next().await {
+            if let Err(err) = result {
+                log::error!("SSH transport shutdown failed: {err}");
+            }
+        }
+        result
+    }
 }
 
 struct SshSession {

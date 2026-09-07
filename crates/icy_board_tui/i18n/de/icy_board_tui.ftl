@@ -288,6 +288,9 @@ event_runtime_running = Ereignisbefehl läuft. Warte auf sein Ende; ein blockier
 event_runtime_reloading = Befehl beendet. Board-Sperre wird erneut angefordert, Konfiguration und Daten werden neu geladen.
 event_runtime_reload_failed = Neuladen blockiert — automatischer Wiederholungsversuch; der Befehl wird NICHT erneut ausgeführt.
     { $error }
+event_runtime_listener_failed = Listener-Start fehlgeschlagen — die Vorbereitung wird alle 2 Sekunden automatisch wiederholt; das Ereignis wird NICHT erneut ausgeführt.
+    { $error }
+event_runtime_listener_failed_hint = Der Zugang bleibt gesperrt und die Board-Sperre bleibt gehalten. Den belegten Port freigeben oder die Konfiguration korrigieren und den Prozess neu starten. Wiederholungsversuche bereiten nur Listener vor; sie laden keine Konfiguration neu und führen das Ereignis nicht erneut aus.
 event_runtime_restarting = Neuladen erfolgreich. Dienste werden neu gestartet; der Zugang bleibt bis zur erneuten Prüfung anstehender Ereignisse gesperrt.
 event_runtime_offline_hint = Neue Anrufer sind gesperrt. Die Anzeige aktualisiert sich automatisch; Bedienereingaben werden nicht gelesen. Bei Stillstand Protokoll / blockierte Sitzung oder Prozess prüfen. Kein Timeout öffnet die Board.
 event_runtime_repair_hint = Diesen Prozess weiterlaufen lassen. In einem anderen Terminal die gemeldete Konfiguration/Daten reparieren oder den Besitzer der Board-Sperre prüfen; Details stehen im Protokoll. Neuladen wird automatisch wiederholt. Die Board nicht mit veralteten Daten öffnen.

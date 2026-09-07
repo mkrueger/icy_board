@@ -34,6 +34,11 @@ pub async fn await_telnet_connections(con: Telnet, board: Arc<tokio::sync::Mutex
         format!("{}:{}", con.address, con.port)
     };
     let listener = TcpListener::bind(addr).await?;
+    serve_telnet_connections(listener, board, bbs).await
+}
+
+/// Accept Telnet connections on an already-bound listener.
+pub async fn serve_telnet_connections(listener: TcpListener, board: Arc<tokio::sync::Mutex<IcyBoard>>, bbs: Arc<Mutex<BBS>>) -> Res<()> {
     loop {
         let (stream, _addr) = listener.accept().await?;
         let bbs2 = bbs.clone();
@@ -121,6 +126,11 @@ pub async fn await_securewebsocket_connections(con: SecureWebsocket, board: Arc<
         format!("{}:{}", con.address, con.port)
     };
     let listener = TcpListener::bind(&addr).await?;
+    serve_securewebsocket_connections(listener, board, bbs).await
+}
+
+/// Accept secure WebSocket connections on an already-bound listener.
+pub async fn serve_securewebsocket_connections(listener: TcpListener, board: Arc<tokio::sync::Mutex<IcyBoard>>, bbs: Arc<Mutex<BBS>>) -> Res<()> {
     loop {
         let (stream, _addr) = listener.accept().await?;
         let bbs2 = bbs.clone();

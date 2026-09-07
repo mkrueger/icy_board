@@ -1,16 +1,15 @@
 use std::{
     fmt::Display,
     io::{stderr, stdout},
-    net::SocketAddr,
     path::PathBuf,
     process::{self, Command, exit},
     sync::Arc,
 };
 
-use bbs::await_telnet_connections;
 use call_wait_screen::{CallWaitMessage, CallWaitScreen};
 use chrono::Local;
 use clap::Parser;
+use connections::{restart_connections, start_connections, stop_connections};
 use crossterm::{
     ExecutableCommand, execute,
     style::{Attribute, Print, SetAttribute, SetForegroundColor},
@@ -29,12 +28,11 @@ use tokio::{sync::Mutex, task::JoinSet};
 use tokio_util::sync::CancellationToken;
 use tui::{Tui, print_exit_screen};
 
-use crate::bbs::await_securewebsocket_connections;
-
 const WEB_ADMIN_TOKEN_ENV: &str = "ICBADMIN_TOKEN";
 
 pub mod bbs;
 mod call_wait_screen;
+mod connections;
 mod event_scheduler;
 mod event_screen;
 pub mod menu_runner;
@@ -215,11 +213,11 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
             // Keep the scheduler (and its occurrence watermark) alive across every
             // listener restart. Dropping this set on exit cancels it explicitly.
             let mut scheduler = JoinSet::new();
-            scheduler.spawn(supervise_event_scheduler(board.clone(), bbs.clone(), board_lock.clone()));
             // Every fallible foreground UI/tool path passes this boundary before
             // dropping the runtime. An error must not abandon a live shell.
             let result: Res<()> = async {
-                let mut web_admin = start_connections(&bbs, &board, &config_file, connection_token.clone(), &mut services).await;
+                let mut web_admin = start_connections(&bbs, &board, &config_file, connection_token.clone(), &mut services).await?;
+                scheduler.spawn(supervise_event_scheduler(board.clone(), bbs.clone(), board_lock.clone()));
                 let mut app = CallWaitScreen::new(&board).await?;
                 let mut terminal = init_terminal()?;
                 loop {
@@ -250,11 +248,10 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
                                         } {
                                             tokio::time::sleep(std::time::Duration::from_millis(100)).await;
                                         }
-                                        connection_token = CancellationToken::new();
-                                        let admin = start_connections(&bbs, &board, &config_file, connection_token.clone(), &mut services).await;
+                                        let admin = restart_connections(&bbs, &board, &config_file, &mut connection_token, &mut services).await;
                                         let app = CallWaitScreen::new(&board).await?;
                                         bbs.lock().await.event_listeners_stopped = false;
-                                        log::info!("Event maintenance: service restart requested; scheduler retains admission gate");
+                                        log::info!("Event maintenance: listeners ready; scheduler retains admission gate");
                                         Ok::<_, Box<dyn std::error::Error + Send + Sync>>((admin, app))
                                     })
                                     .await??;
@@ -306,8 +303,14 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
                                         *board.lock().await = loaded;
                                         bbs.lock().await.resize_idle_nodes(nodes).await;
                                         app = CallWaitScreen::new(&board).await?;
-                                        connection_token = CancellationToken::new();
-                                        web_admin = start_connections(&bbs, &board, &config_file, connection_token.clone(), &mut services).await;
+                                        web_admin = app
+                                            .during_event(
+                                                &mut terminal,
+                                                &bbs,
+                                                arguments.full_screen,
+                                                restart_connections(&bbs, &board, &config_file, &mut connection_token, &mut services),
+                                            )
+                                            .await?;
                                         bbs.lock().await.operator_maintenance = false;
                                         continue;
                                     }
@@ -316,8 +319,14 @@ async fn start_icy_board(arguments: &Cli, file: PathBuf) -> Res<()> {
                                     log::error!("while processing call wait screen message: {}", err);
                                     app.show_error(err.to_string());
                                     if launches_board_tool {
-                                        connection_token = CancellationToken::new();
-                                        web_admin = start_connections(&bbs, &board, &config_file, connection_token.clone(), &mut services).await;
+                                        web_admin = app
+                                            .during_event(
+                                                &mut terminal,
+                                                &bbs,
+                                                arguments.full_screen,
+                                                restart_connections(&bbs, &board, &config_file, &mut connection_token, &mut services),
+                                            )
+                                            .await?;
                                         bbs.lock().await.operator_maintenance = false;
                                     }
                                     continue;
@@ -455,149 +464,6 @@ mod event_operator_tests {
             assert_eq!(result.unwrap_err().to_string(), icy_board_tui::get_text("event_runtime_exit_blocked"));
         }
     }
-}
-
-async fn stop_connections(token: &CancellationToken, services: &mut JoinSet<()>) {
-    token.cancel();
-    while let Some(result) = services.join_next().await {
-        if let Err(err) = result {
-            log::error!("Listener task failed: {err}");
-        }
-    }
-}
-
-async fn start_connections(
-    bbs: &Arc<Mutex<BBS>>,
-    board: &Arc<Mutex<IcyBoard>>,
-    config_file: &std::path::Path,
-    token: CancellationToken,
-    services: &mut JoinSet<()>,
-) -> Option<WebAdminInfo> {
-    let telnet_connection: icy_board_engine::icy_board::login_server::Telnet = board.lock().await.config.login_server.telnet.clone();
-    if telnet_connection.is_enabled {
-        let bbs = bbs.clone();
-        let board: Arc<Mutex<IcyBoard>> = board.clone();
-        let token = token.clone();
-        services.spawn(async move {
-            tokio::select! {
-                result = await_telnet_connections(telnet_connection, board, bbs) => {
-                    if let Err(err) = result { log::error!("Telnet listener stopped: {err}"); }
-                },
-                _ = token.cancelled() => {
-                }
-            }
-        });
-    }
-
-    let ssh_connection = board.lock().await.config.login_server.ssh.clone();
-    if ssh_connection.is_enabled {
-        let bbs: Arc<Mutex<BBS>> = bbs.clone();
-        let board = board.clone();
-        let token = token.clone();
-        services.spawn(async move {
-            if let Err(err) = bbs::ssh::await_ssh_connections(ssh_connection, board, bbs, token.child_token()).await {
-                log::error!("SSH listener stopped: {err}");
-            }
-        });
-    }
-    /*
-    let websocket_connection = board.lock().await.config.login_server.websocket.clone();
-    if websocket_connection.is_enabled {
-        let bbs = bbs.clone();
-        let board = board.clone();
-        std::thread::Builder::new()
-            .name("Websocket connect".to_string())
-            .spawn(move || {
-                tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
-                    let _ = await_websocket_connections(websocket_connection, board, bbs).await;
-                });
-            })
-            .unwrap();
-    }*/
-    let secure_websocket_connection = board.lock().await.config.login_server.secure_websocket.clone();
-    if secure_websocket_connection.is_enabled {
-        let bbs = bbs.clone();
-        let board = board.clone();
-        let token = token.clone();
-        services.spawn(async move {
-            tokio::select! {
-                result = await_securewebsocket_connections(secure_websocket_connection, board, bbs) => {
-                    if let Err(err) = result { log::error!("Secure WebSocket listener stopped: {err}"); }
-                },
-                _ = token.cancelled() => {
-                }
-            }
-        });
-    }
-
-    start_web_admin(board, bbs, config_file, token, services).await
-}
-
-async fn start_web_admin(
-    board: &Arc<Mutex<IcyBoard>>,
-    bbs: &Arc<Mutex<BBS>>,
-    config_file: &std::path::Path,
-    cancel: CancellationToken,
-    services: &mut JoinSet<()>,
-) -> Option<WebAdminInfo> {
-    let web_admin = board.lock().await.config.board.web_admin.clone();
-    if !web_admin.enabled {
-        return None;
-    }
-
-    let addr: SocketAddr = match format!("{}:{}", web_admin.address.trim(), web_admin.port).parse() {
-        Ok(addr) => addr,
-        Err(_) => {
-            log::error!("web admin: invalid listen address '{}:{}'", web_admin.address, web_admin.port);
-            return None;
-        }
-    };
-
-    if let Err(err) = icbadmin::check_bind_address(&addr, web_admin.allow_remote) {
-        log::error!("web admin: {err}");
-        return None;
-    }
-
-    let backend = match icbadmin::service::LiveAdminBackend::with_bbs(config_file, board.clone(), bbs.clone()) {
-        Ok(backend) => Arc::new(backend),
-        Err(err) => {
-            log::error!("web admin: could not open live backend: {err}");
-            return None;
-        }
-    };
-
-    let (token, from_env) = match std::env::var(WEB_ADMIN_TOKEN_ENV) {
-        Ok(token) if !token.trim().is_empty() => (token, true),
-        _ => (icbadmin::auth::random_hex(24), false),
-    };
-
-    let state = icbadmin::api::AppState {
-        backend,
-        auth: Arc::new(icbadmin::auth::AuthState::new(token.clone())),
-    };
-
-    let url = format!("http://{addr}/");
-    log::info!("web admin listening on {url}");
-    if from_env {
-        log::info!("web admin token taken from {WEB_ADMIN_TOKEN_ENV}");
-    } else {
-        log::info!("web admin token: {token}");
-    }
-    if !addr.ip().is_loopback() {
-        log::warn!("web admin is listening on a non-loopback address; put a TLS reverse proxy in front of it");
-    }
-
-    let info = WebAdminInfo {
-        url: url.clone(),
-        token: token.clone(),
-    };
-    services.spawn(async move {
-        if let Err(err) = icbadmin::serve_until(addr, state, cancel.cancelled_owned()).await {
-            log::error!("web admin server stopped: {err}");
-        }
-    });
-
-    Some(info)
 }
 
 async fn run_message<B: Backend>(

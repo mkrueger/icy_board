@@ -137,6 +137,9 @@ event_runtime_running = Running event command. Waiting for it to exit; a blocked
 event_runtime_reloading = Command finished. Reacquiring the board lock and reloading configuration and data.
 event_runtime_reload_failed = Reload blocked — automatic retry; the command will NOT run again.
     { $error }
+event_runtime_listener_failed = Listener start failed — automatically retrying preparation every 2 seconds; the event will NOT run again.
+    { $error }
+event_runtime_listener_failed_hint = Admission stays closed and the board lock is retained. Release the occupied port, or correct the configuration and restart the process. Retries prepare listeners only; they do not reload configuration or rerun the event.
 event_runtime_restarting = Reload succeeded. Restarting services; admission stays closed until the scheduler rechecks pending events.
 event_runtime_offline_hint = New callers are blocked. Progress refreshes automatically; operator keys are not read. Check the log / blocked session or process if this stage does not finish. No timeout reopens the board.
 event_runtime_repair_hint = Keep this process running. In another terminal, repair the reported configuration/data or resolve the board-lock owner; check the log for details. Reload retries automatically. Do not force the board online with stale data.
