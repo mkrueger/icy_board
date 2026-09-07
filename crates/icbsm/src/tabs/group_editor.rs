@@ -7,15 +7,16 @@ use crossterm::event::KeyEvent;
 use icy_board_engine::icy_board::IcyBoard;
 use icy_board_engine::icy_board::group_list::Group;
 use icy_board_engine::icy_board::group_list::GroupList;
+use icy_board_tui::chrome::{dim_background, dirty_title, key_hint};
 use icy_board_tui::config_menu::ConfigEntry;
 use icy_board_tui::config_menu::ConfigMenu;
 use icy_board_tui::config_menu::ConfigMenuState;
 use icy_board_tui::config_menu::ListItem;
 use icy_board_tui::config_menu::ListValue;
 use icy_board_tui::config_menu::TextFlags;
-use icy_board_tui::get_text_args;
 use icy_board_tui::tab_page::{InfoState, Page, PageMessage};
 use icy_board_tui::theme::{config_title, get_tui_theme};
+use icy_board_tui::{get_text, get_text_args};
 use ratatui::widgets::Block;
 use ratatui::widgets::BorderType;
 use ratatui::widgets::Borders;
@@ -23,7 +24,7 @@ use ratatui::widgets::Padding;
 use ratatui::{
     Frame,
     layout::{Constraint, Margin, Rect},
-    text::Text,
+    text::{Span, Text},
     widgets::{Cell, Clear, HighlightSpacing, Row, Scrollbar, ScrollbarOrientation, ScrollbarState, Table, TableState, Widget},
 };
 
@@ -84,10 +85,11 @@ impl GroupEditor {
         let l = self.icy_board.lock().unwrap();
         let rows = l.groups.iter().enumerate().map(|(i, group)| {
             Row::new(vec![
-                Cell::from(format!("{:-3})", i + 1)).style(get_tui_theme().item),
-                Cell::from(group.name.clone()).style(get_tui_theme().item),
-                Cell::from(group.members.len().to_string()).style(get_tui_theme().item),
+                Cell::from(format!("{:-3})", i + 1)),
+                Cell::from(group.name.clone()),
+                Cell::from(group.members.len().to_string()),
             ])
+            .style(get_tui_theme().table)
         });
         let bar = " █ ";
         let table = Table::new(
@@ -102,7 +104,6 @@ impl GroupEditor {
         .header(header)
         .row_highlight_style(get_tui_theme().selected_item)
         .highlight_symbol(Text::from(vec!["".into(), bar.into(), bar.into(), "".into()]))
-        //.bg(THEME.content.bg.unwrap())
         .highlight_spacing(HighlightSpacing::Always);
         frame.render_stateful_widget(table, area, &mut self.table_state);
     }
@@ -236,30 +237,52 @@ impl Page for GroupEditor {
         let area = area.inner(Margin { vertical: 1, horizontal: 2 });
         Clear.render(area, frame.buffer_mut());
 
-        let block = Block::new()
+        let mut block = Block::new()
             .style(get_tui_theme().dialog_box)
             .padding(Padding::new(2, 2, 1, 1))
             .borders(Borders::ALL)
-            .border_type(BorderType::Double);
+            .border_type(BorderType::Double)
+            .title(Span::styled(get_text("icbsm_menu_groups"), get_tui_theme().dialog_box_title));
+        if !self.in_edit_mode {
+            block = block.title_bottom(key_hint(get_text("icbsm_menu_keys")));
+        }
         block.render(area, frame.buffer_mut());
         let area = area.inner(Margin { vertical: 1, horizontal: 1 });
 
-        if self.in_edit_mode {
-            self.render_editor(frame, area);
-            //self.set_cursor_position(frame);
-            return;
-        }
-
         self.render_table(frame, area);
         self.render_scrollbar(frame, area);
-    } /*
-    fn set_cursor_position(&self, frame: &mut Frame) {
-    self.conference_config
-    .get_item(self.state.selected)
-    .unwrap()
-    .text_field_state
-    .set_cursor_position(frame);
-    }*/
+
+        if self.in_edit_mode {
+            // Paint the list first; dim it before clearing and painting the form.
+            let backdrop = frame.area();
+            dim_background(frame.buffer_mut(), backdrop);
+            let popup = super::preferences::centered(area, area.width, 6.min(area.height));
+            let dirty = self
+                .edit_backup
+                .as_ref()
+                .and_then(|backup| backup.get(self.edit_conference))
+                .is_some_and(|backup| {
+                    self.icy_board
+                        .lock()
+                        .unwrap()
+                        .groups
+                        .get(self.edit_conference)
+                        .is_some_and(|group| group.name != backup.name || group.members != backup.members)
+                });
+            Clear.render(popup, frame.buffer_mut());
+            Block::new()
+                .style(get_tui_theme().dialog_box)
+                .borders(Borders::ALL)
+                .border_type(BorderType::Double)
+                .title(Span::styled(
+                    dirty_title(get_text("icbsm_menu_groups"), dirty),
+                    get_tui_theme().dialog_box_title,
+                ))
+                .title_bottom(key_hint(format!("␛ {}", get_text("key_desc_back"))))
+                .render(popup, frame.buffer_mut());
+            self.render_editor(frame, popup);
+        }
+    }
 
     fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
         if self.in_edit_mode {
@@ -301,5 +324,44 @@ impl Page for GroupEditor {
             _ => {}
         }
         PageMessage::None
+    }
+}
+
+#[cfg(test)]
+mod rendering_tests {
+    use super::*;
+    use ratatui::{Terminal, backend::TestBackend};
+
+    #[test]
+    fn group_form_is_painted_above_a_dimmed_list_at_classic_size() {
+        let mut board = IcyBoard::default();
+        board.groups.push(Group {
+            name: "Sysops".into(),
+            members: vec!["Alice".into()],
+            ..Default::default()
+        });
+        let mut editor = GroupEditor::new(Arc::new(Mutex::new(board)));
+        let mut terminal = Terminal::new(TestBackend::new(80, 25)).unwrap();
+        terminal.draw(|frame| editor.render(frame, frame.area())).unwrap();
+        let mut expected = terminal.backend().buffer().clone();
+        let theme = get_tui_theme();
+        assert_eq!(expected[(12, 4)].fg, theme.selected_item.fg.unwrap());
+        assert_eq!(expected[(12, 4)].bg, theme.selected_item.bg.unwrap());
+        let area = expected.area;
+        dim_background(&mut expected, area);
+
+        assert!(editor.open_editor(0));
+        editor.in_edit_mode = true;
+        terminal.draw(|frame| editor.render(frame, frame.area())).unwrap();
+        let actual = terminal.backend().buffer();
+        for x in 3..77 {
+            assert_eq!(actual[(x, 4)], expected[(x, 4)]);
+        }
+        // The six-row form is centered in the existing 74×21 list interior.
+        assert_eq!(actual[(3, 9)].style(), theme.dialog_box.underline_color(ratatui::style::Color::Reset));
+        let text: String = (0..80).map(|x| actual[(x, 10)].symbol()).collect();
+        assert!(text.contains("Sysops"));
+        let footer: String = (0..80).map(|x| actual[(x, 14)].symbol()).collect();
+        assert!(footer.contains(&format!("␛ {}", get_text("key_desc_back"))));
     }
 }

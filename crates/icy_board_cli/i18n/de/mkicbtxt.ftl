@@ -5,5 +5,6 @@ full-screen = Vollbild verwenden (Standard ist 80x25)
 convert = PCBTEXT nach ICBTEXT konvertieren
 force = Eine vorhandene Datei überschreiben
 version = Version anzeigen und beenden
+board = Boardkonfiguration, aus der die Farben übernommen werden
 file = Zu bearbeitende/erstellende Datei
 new-text = Neuer Text für den Datensatz

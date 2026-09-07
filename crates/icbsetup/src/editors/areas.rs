@@ -24,7 +24,7 @@ use icy_board_tui::{
 use ratatui::{
     Frame,
     layout::{Margin, Rect},
-    text::{Line, Span, Text},
+    text::{Line, Text},
     widgets::{Clear, Paragraph, ScrollbarState, TableState, Widget},
 };
 
@@ -275,7 +275,7 @@ impl<'a> Page for MessageAreasEditor<'a> {
             let area = area.inner(margin);
             Clear.render(area, frame.buffer_mut());
             super::popup_frame(get_text("area_import_preview_title"))
-                .title_bottom(Span::styled(get_text("area_import_preview_help"), get_tui_theme().key_binding))
+                .title_bottom(icy_board_tui::chrome::key_hint(get_text("area_import_preview_help")))
                 .render(area, frame.buffer_mut());
             let inner = area.inner(Margin { vertical: 2, horizontal: 2 });
             let height = inner.height as usize;

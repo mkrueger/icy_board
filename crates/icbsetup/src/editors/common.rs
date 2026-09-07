@@ -1,5 +1,6 @@
 use crossterm::event::{KeyEvent, KeyEventKind};
 use icy_board_tui::{
+    chrome::{dim_background, key_hint},
     config_menu::{ConfigMenu, ConfigMenuState, EditMessage, ListValue, ResultState},
     save_changes_dialog::{SaveChangesDialog, SaveChangesMessage},
     tab_page::PageMessage,
@@ -8,7 +9,7 @@ use icy_board_tui::{
 use ratatui::{
     Frame,
     layout::{Alignment, Margin, Rect},
-    text::{Line, Span},
+    text::Line,
     widgets::{Block, Borders, Clear, Padding, Widget},
 };
 
@@ -58,6 +59,8 @@ impl EditorSaveChanges {
 
     pub fn render(&self, frame: &mut Frame, area: Rect) {
         if let Some(dialog) = &self.dialog {
+            let backdrop = frame.area();
+            dim_background(frame.buffer_mut(), backdrop);
             dialog.render(frame, area);
         }
     }
@@ -126,10 +129,10 @@ impl<T> EditorDialog<T> {
         } else {
             [hint, browse].into_iter().filter(|text| !text.is_empty()).collect::<Vec<_>>().join("  ")
         };
+        let backdrop = frame.area();
+        dim_background(frame.buffer_mut(), backdrop);
         Clear.render(area, frame.buffer_mut());
-        super::popup_frame(title)
-            .title_bottom(Span::styled(hint, get_tui_theme().key_binding))
-            .render(area, frame.buffer_mut());
+        super::popup_frame(title).title_bottom(key_hint(hint)).render(area, frame.buffer_mut());
         render_config_form(frame, area.inner(Margin { horizontal: 1, vertical: 1 }), menu, &mut self.state);
     }
 }
@@ -169,18 +172,19 @@ pub(crate) fn standalone_editor_frame(hint: String, modal: bool) -> Block<'stati
 }
 
 fn editor_frame_hint(block: Block<'static>, hint: String, modal: bool) -> Block<'static> {
-    if modal {
-        block
-    } else {
-        block.title_bottom(Span::styled(hint, get_tui_theme().key_binding))
-    }
+    if modal { block } else { block.title_bottom(key_hint(hint)) }
 }
 
 /// Multi-line legends use the same visibility policy as border shortcuts.
 pub(crate) fn render_editor_footer(frame: &mut Frame, area: Rect, lines: Vec<Line<'static>>, modal: bool) {
     if !modal {
         for (line, row) in lines.into_iter().zip(area.rows()) {
-            line.centered().render(row, frame.buffer_mut());
+            if line.style == get_tui_theme().key_binding {
+                let text: String = line.spans.into_iter().map(|span| span.content.into_owned()).collect();
+                key_hint(text).centered().render(row, frame.buffer_mut());
+            } else {
+                line.centered().render(row, frame.buffer_mut());
+            }
         }
     }
 }
@@ -190,6 +194,48 @@ mod tests {
     use super::*;
     use crossterm::event::KeyCode;
     use icy_board_tui::config_menu::{ConfigEntry, ListItem, TextFlags};
+    use ratatui::{Terminal, backend::TestBackend, buffer::Buffer};
+
+    #[test]
+    fn footer_keeps_shortcut_characters_and_hides_inactive_hints() {
+        let area = Rect::new(0, 0, 80, 8);
+        let hint = "↑ Up  ↓ Down  F1 Help  ␛ Back";
+        let mut visible = Buffer::empty(area);
+        list_editor_frame("Title".into(), hint.into(), false).render(area, &mut visible);
+        let footer: String = (0..area.width).map(|x| visible[(x, 7)].symbol()).collect();
+        assert!(footer.contains(hint));
+
+        let mut hidden = Buffer::empty(area);
+        list_editor_frame("Title".into(), hint.into(), true).render(area, &mut hidden);
+        let footer: String = (0..area.width).map(|x| hidden[(x, 7)].symbol()).collect();
+        assert!(!footer.contains("F1"));
+    }
+
+    #[test]
+    fn form_popup_dims_the_finished_background_not_its_own_frame() {
+        let mut terminal = Terminal::new(TestBackend::new(80, 25)).unwrap();
+        let popup = Rect::new(12, 6, 56, 10);
+        let mut dialog = EditorDialog::default();
+        dialog.open(menu());
+        let mut expected = Buffer::empty(Rect::new(0, 0, 80, 25));
+        terminal
+            .draw(|frame| {
+                frame.buffer_mut().set_string(0, 0, "Background", get_tui_theme().table);
+                expected = frame.buffer_mut().clone();
+                let area = frame.area();
+                dim_background(&mut expected, area);
+                dialog.render(frame, popup, "Form".into(), "F1 Help  ␛ Back".into());
+            })
+            .unwrap();
+        let actual = terminal.backend().buffer();
+        for (x, y) in [(0, 0), (9, 0), (79, 24)] {
+            assert_eq!(actual[(x, y)], expected[(x, y)]);
+        }
+        assert_eq!(
+            actual[(popup.x, popup.y)].style(),
+            get_tui_theme().dialog_box.underline_color(ratatui::style::Color::Reset)
+        );
+    }
 
     fn menu() -> ConfigMenu<()> {
         ConfigMenu {

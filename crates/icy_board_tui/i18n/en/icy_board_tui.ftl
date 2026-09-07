@@ -336,6 +336,7 @@ icbsm_color_default_1=Default Color Set #1
 icbsm_color_default_2=Default Color Set #2
 icbsm_color_bw=Default B&W Colors
 icbsm_color_customize=Customize Colors
+icbsm_color_polished=Classic Polished
 
 icb_setup_main_acc_cfg=Accounting Configuration
 icb_setup_main_acc_cfg-help=

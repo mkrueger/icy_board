@@ -33,7 +33,7 @@ use ratatui::{
 pub(crate) fn list_frame(title: String) -> Block<'static> {
     Block::new()
         .title_alignment(Alignment::Center)
-        .title(Line::from(Span::from(title).style(get_tui_theme().dialog_box_title)))
+        .title(Line::from(Span::from(format!(" {title} ")).style(get_tui_theme().dialog_box_title)))
         .style(get_tui_theme().dialog_box)
         .padding(Padding::new(2, 2, 1, 1))
         .borders(Borders::ALL)
@@ -44,7 +44,7 @@ pub(crate) fn list_frame(title: String) -> Block<'static> {
 pub(crate) fn popup_frame(title: String) -> Block<'static> {
     Block::new()
         .title_alignment(Alignment::Center)
-        .title(Line::from(Span::from(title).style(get_tui_theme().dialog_box_title)))
+        .title(Line::from(Span::from(format!(" {title} ")).style(get_tui_theme().dialog_box_title)))
         .style(get_tui_theme().dialog_box)
         .padding(Padding::new(2, 2, 1, 1))
         .borders(Borders::ALL)
@@ -100,6 +100,16 @@ pub fn save_file(path: &Path, save: impl FnOnce() -> icy_board_engine::Res<()>) 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn editor_frame_titles_have_space_between_text_and_border() {
+        for block in [list_frame("Event Editor".into()), popup_frame("Edit Event".into())] {
+            let mut buffer = ratatui::buffer::Buffer::empty(ratatui::layout::Rect::new(0, 0, 40, 3));
+            ratatui::widgets::Widget::render(block, buffer.area, &mut buffer);
+            let top: String = (0..40).map(|x| buffer[(x, 0)].symbol()).collect();
+            assert!(top.contains(" Event Editor ") || top.contains(" Edit Event "), "unpadded title: {top}");
+        }
+    }
 
     #[test]
     fn save_file_reports_an_error_instead_of_panicking() {

@@ -7,6 +7,7 @@ use icy_board_engine::icy_board::{
 };
 use icy_board_tui::{
     BORDER_SET,
+    chrome::key_hint,
     config_menu::ResultState,
     get_text, get_text_args,
     select_menu::{MenuItem, SelectMenu, SelectMenuState},
@@ -53,7 +54,7 @@ impl Page for MenuPage {
             .padding(Padding::new(2, 2, 1, 0))
             .title_alignment(Alignment::Center)
             .title(Span::styled(self.title.clone(), get_tui_theme().menu_box_title))
-            .title_bottom(Span::styled(get_text("icbsm_menu_keys"), get_tui_theme().key_binding));
+            .title_bottom(key_hint(get_text("icbsm_menu_keys")));
         block.render(area, frame.buffer_mut());
 
         frame.buffer_mut().set_string(
@@ -220,7 +221,7 @@ impl Page for SortPage {
             .padding(Padding::new(2, 2, 1, 0))
             .title_alignment(Alignment::Center)
             .title(Span::styled(get_text("icbsm_sort_run_title"), get_tui_theme().dialog_box_title))
-            .title_bottom(Span::styled(bottom, get_tui_theme().key_binding));
+            .title_bottom(key_hint(bottom));
 
         Paragraph::new(Text::from(lines))
             .style(get_tui_theme().item)

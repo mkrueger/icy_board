@@ -69,6 +69,19 @@ pub fn set_tui_theme(colors: &PcbScreenColors) {
     *TUI_THEME.write().unwrap() = Theme::from_pcboard(colors);
 }
 
+/// Apply the saved admin theme selection without reinterpreting PCB palettes.
+pub fn set_admin_theme(name: &str, colors: &PcbScreenColors) {
+    *TUI_THEME.write().unwrap() = admin_theme(name, colors);
+}
+
+fn admin_theme(name: &str, colors: &PcbScreenColors) -> Theme {
+    if name.eq_ignore_ascii_case("POLISHED") {
+        POLISHED_THEME
+    } else {
+        Theme::from_pcboard(colors)
+    }
+}
+
 pub(crate) const DOS_ANSI_INDEX: [u8; 16] = [0, 4, 2, 6, 1, 5, 3, 7, 8, 12, 10, 14, 9, 13, 11, 15];
 
 fn dos_color(index: u8) -> Color {
@@ -93,8 +106,10 @@ impl Theme {
             app_title: dos_attribute_style(colors[2]).add_modifier(Modifier::BOLD),
             tabs: dos_attribute_style(colors[1]),
             tabs_selected: dos_attribute_style(colors[6]).add_modifier(Modifier::BOLD),
-            key_binding: dos_attribute_style(colors[7]),
-            key_binding_description: dos_attribute_style(colors[14]),
+            // PCBoard painted one instruction bar in a single colour; keys are
+            // only emphasised inside it.
+            key_binding: dos_attribute_style(colors[7]).add_modifier(Modifier::BOLD),
+            key_binding_description: dos_attribute_style(colors[7]),
             status_line: dos_attribute_style(colors[1]),
             status_line_text: dos_attribute_style(colors[20]),
             menu_title: dos_attribute_style(colors[4]),
@@ -232,6 +247,45 @@ pub static DEFAULT_THEME: Theme = Theme {
     swatch: true,
 };
 
+/// A restrained sixteen-colour DOS desktop. Opted into by administration tools,
+/// never substituted for the runtime's classic theme or saved into board data.
+pub const POLISHED_THEME: Theme = Theme {
+    background: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_GRAY),
+    title_bar: Style::new().bg(DOS_CYAN).fg(DOS_WHITE),
+    app_title: Style::new().bg(DOS_CYAN).fg(DOS_WHITE).add_modifier(Modifier::BOLD),
+    tabs: Style::new().bg(DOS_CYAN).fg(DOS_LIGHT_GRAY),
+    tabs_selected: Style::new().bg(DOS_LIGHT_GRAY).fg(DOS_BLUE).add_modifier(Modifier::BOLD),
+    key_binding: Style::new().bg(DOS_BLUE).fg(DOS_YELLOW),
+    key_binding_description: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_GRAY),
+    status_line: Style::new().bg(DOS_BLACK).fg(DOS_CYAN),
+    status_line_text: Style::new().bg(DOS_BLACK).fg(DOS_WHITE),
+    menu_title: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_CYAN).add_modifier(Modifier::BOLD),
+    menu_label: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_GRAY),
+    item_separator: Style::new().bg(DOS_BLUE).fg(DOS_CYAN),
+    item: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_GRAY),
+    selected_item: Style::new().bg(DOS_LIGHT_GRAY).fg(DOS_BLUE).add_modifier(Modifier::BOLD),
+    value: Style::new().bg(DOS_BLUE).fg(DOS_WHITE),
+    true_value: Style::new().bg(DOS_BLUE).fg(DOS_WHITE),
+    false_value: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_GRAY),
+    edit_value: Style::new().bg(DOS_CYAN).fg(DOS_WHITE).add_modifier(Modifier::BOLD),
+    dialog_box: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_CYAN),
+    dialog_box_title: Style::new().bg(DOS_BLUE).fg(DOS_WHITE).add_modifier(Modifier::BOLD),
+    dialog_box_scrollbar: Style::new().bg(DOS_BLUE).fg(DOS_CYAN),
+    menu_box: Style::new().bg(DOS_BLUE).fg(DOS_CYAN),
+    menu_box_title: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_CYAN),
+    config_title: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_CYAN),
+    filter_text: Style::new().bg(DOS_BLUE).fg(DOS_YELLOW),
+    description_text: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_GRAY),
+    text_field_text: Style::new().bg(DOS_CYAN).fg(DOS_WHITE),
+    text_field_background: Style::new().bg(DOS_CYAN).fg(DOS_WHITE),
+    text_field_filler_char: ' ',
+    table: Style::new().bg(DOS_BLUE).fg(DOS_WHITE),
+    table_inactive: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_GRAY),
+    help_box: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_GRAY),
+    help_header: Style::new().bg(DOS_BLUE).fg(DOS_LIGHT_CYAN).add_modifier(Modifier::BOLD),
+    swatch: false,
+};
+
 /// Builds the common two-row heading used inside all configuration tools.
 /// Keeping the text, underline character, and style here prevents section
 /// headings and table headings from drifting apart.
@@ -298,5 +352,35 @@ mod tests {
 
         assert_eq!(theme.table, dos_attribute_style(palette.colors[11]));
         assert_ne!(theme.table, dos_attribute_style(palette.colors[5]));
+    }
+
+    #[test]
+    fn shortcut_bars_stay_in_one_palette_colour() {
+        for colors in [PcbScreenColors::DEFAULT_1, PcbScreenColors::DEFAULT_2, PcbScreenColors::BLACK_AND_WHITE] {
+            let theme = Theme::from_pcboard(&PcbScreenColors { colors });
+            let bar = dos_attribute_style(colors[7]);
+            assert_eq!(theme.key_binding.bg, bar.bg);
+            assert_eq!(theme.key_binding_description, bar);
+            assert_eq!(theme.key_binding.fg, bar.fg);
+        }
+    }
+
+    #[test]
+    fn admin_theme_honors_explicit_selection_even_with_default_colors() {
+        assert_eq!(admin_theme("POLISHED", &PcbScreenColors::default()).background, POLISHED_THEME.background);
+        for name in ["DEFAULT1", "CUSTOM", "DEFAULT", ""] {
+            let palette = PcbScreenColors::default();
+            let theme = admin_theme(name, &palette);
+            assert_eq!(theme.background, Theme::from_pcboard(&palette).background);
+            assert_eq!(theme.table, Theme::from_pcboard(&palette).table);
+            assert_ne!(theme.background, POLISHED_THEME.background);
+        }
+        let mut palette = PcbScreenColors::default();
+        palette.colors[11] = 0x1e;
+        assert_eq!(admin_theme("CUSTOM", &palette).table, Theme::from_pcboard(&palette).table);
+        assert_eq!(
+            Theme::from_pcboard(&PcbScreenColors::default()).table,
+            dos_attribute_style(PcbScreenColors::default().colors[11])
+        );
     }
 }

@@ -67,12 +67,12 @@ impl Page for EventSetup {
         };
         Block::new()
             .title_alignment(Alignment::Center)
-            .title(get_text("event_setup_title"))
-            .title_bottom(Span::styled(hint, get_tui_theme().key_binding))
+            .title(Span::styled(get_text("event_setup_title"), get_tui_theme().dialog_box_title))
+            .title_bottom(icy_board_tui::chrome::key_hint(hint))
             .style(get_tui_theme().background)
             .borders(Borders::ALL)
             .border_set(icy_board_tui::BORDER_SET)
-            .border_style(get_tui_theme().menu_box)
+            .border_style(get_tui_theme().dialog_box)
             .render(area, frame.buffer_mut());
         let content = area.inner(Margin { horizontal: 2, vertical: 1 });
         if content.width > 1 && content.height > 0 {

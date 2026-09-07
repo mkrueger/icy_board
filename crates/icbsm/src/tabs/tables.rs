@@ -8,6 +8,7 @@ use icy_board_engine::icy_board::{
 };
 use icy_board_tui::{
     BORDER_SET,
+    chrome::{dim_background, key_hint},
     config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, EditMessage, ListItem, ListValue, ResultState},
     get_text, get_text_args,
     select_menu::MenuItem,
@@ -207,7 +208,7 @@ impl Page for TableEditPage {
             .padding(Padding::new(2, 2, 1, 0))
             .title_alignment(Alignment::Center)
             .title(Span::styled(edit_title(self.kind), get_tui_theme().dialog_box_title))
-            .title_bottom(Span::styled(get_text("icbsm_table_keys"), get_tui_theme().key_binding));
+            .title_bottom(key_hint(get_text("icbsm_table_keys")));
         block.render(area, frame.buffer_mut());
 
         let inner = area.inner(Margin { vertical: 1, horizontal: 2 });
@@ -350,6 +351,8 @@ impl Page for TableApplyPage {
 /// One question in a box of its own, the way the original asked when a screen
 /// had nothing to fill in.
 pub fn render_question(frame: &mut Frame, disp_area: Rect, question: &str, bottom: &str) {
+    let backdrop = frame.area();
+    dim_background(frame.buffer_mut(), backdrop);
     let content_width = question.chars().count().max(bottom.chars().count()) as u16;
     // A narrow terminal decides the width, so the box never asks for more than there is.
     let available = disp_area.width.saturating_sub(4);
@@ -368,7 +371,7 @@ pub fn render_question(frame: &mut Frame, disp_area: Rect, question: &str, botto
         .border_set(BORDER_SET)
         .border_style(get_tui_theme().menu_box)
         .padding(Padding::new(2, 2, 1, 0))
-        .title_bottom(Span::styled(bottom.to_string(), get_tui_theme().key_binding));
+        .title_bottom(key_hint(bottom));
 
     Paragraph::new(Text::from(question.to_string()))
         .style(get_tui_theme().item)
@@ -386,7 +389,7 @@ fn render_box(frame: &mut Frame, area: Rect, title: String, bottom: String, line
         .padding(Padding::new(2, 2, 1, 0))
         .title_alignment(Alignment::Center)
         .title(Span::styled(title, get_tui_theme().dialog_box_title))
-        .title_bottom(Span::styled(bottom, get_tui_theme().key_binding));
+        .title_bottom(key_hint(bottom));
 
     Paragraph::new(Text::from(lines))
         .style(get_tui_theme().item)

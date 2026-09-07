@@ -12,7 +12,7 @@ use icy_board_engine::icy_board::{
     path_check::{PathKind, PathProblem, PathReport},
     read_with_encoding_detection, write_atomic,
 };
-use icy_board_tui::{app::SaveChoice, print_error, term, theme::set_tui_theme};
+use icy_board_tui::{app::SaveChoice, print_error, term, theme::set_admin_theme};
 use import::{PCBoardImporter, console_logger::ConsoleLogger};
 use semver::Version;
 use std::{
@@ -350,7 +350,7 @@ fn main() -> Result<()> {
     };
     match IcyBoard::load(&file) {
         Ok(icy_board) => {
-            set_tui_theme(&icy_board.config.sysop.config_color_configuration);
+            set_admin_theme(&icy_board.config.sysop.config_color_theme, &icy_board.config.sysop.config_color_configuration);
             let terminal = &mut term::init()?;
             let icy_board = Arc::new(Mutex::new(icy_board));
             let mut app = new_main_window(icy_board.clone(), arguments.full_screen);

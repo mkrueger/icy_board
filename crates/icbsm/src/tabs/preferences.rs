@@ -12,7 +12,7 @@ use icy_board_tui::{
     icbsetupmenu::IcbSetupMenuUI,
     select_menu::{MenuItem, SelectMenu},
     tab_page::{Page, PageMessage},
-    theme::{dos_attribute_style, set_tui_theme},
+    theme::{dos_attribute_style, set_admin_theme},
 };
 use ratatui::{
     Frame,
@@ -92,6 +92,7 @@ impl ColorCustomization {
                 MenuItem::new(1, 'B', get_text("icbsm_color_default_2")),
                 MenuItem::new(2, 'C', get_text("icbsm_color_bw")),
                 MenuItem::new(3, 'D', get_text("icbsm_color_customize")),
+                MenuItem::new(4, 'E', get_text("icbsm_color_polished")),
             ]))
             .with_center_title(get_text("icbsm_color_title")),
             icy_board,
@@ -102,7 +103,7 @@ impl ColorCustomization {
         let mut board = self.icy_board.lock().unwrap();
         board.config.sysop.config_color_theme = name.to_string();
         board.config.sysop.config_color_configuration = palette.clone();
-        set_tui_theme(&palette);
+        set_admin_theme(&board.config.sysop.config_color_theme, &palette);
     }
 }
 
@@ -121,6 +122,7 @@ impl Page for ColorCustomization {
             Some(1) => self.apply_preset("DEFAULT2", PcbScreenColors::default_2()),
             Some(2) => self.apply_preset("BLACK_AND_WHITE", PcbScreenColors::black_and_white()),
             Some(3) => return PageMessage::OpenSubPage(Box::new(CustomColorEditor::new(self.icy_board.clone()))),
+            Some(4) => self.apply_preset("POLISHED", PcbScreenColors::default()),
             _ => {}
         }
         PageMessage::ResultState(state)
@@ -152,14 +154,14 @@ impl CustomColorEditor {
         let mut board = self.icy_board.lock().unwrap();
         board.config.sysop.config_color_theme = "CUSTOM".to_string();
         board.config.sysop.config_color_configuration.colors[self.selected] = color;
-        set_tui_theme(&board.config.sysop.config_color_configuration);
+        set_admin_theme(&board.config.sysop.config_color_theme, &board.config.sysop.config_color_configuration);
     }
 
     fn reset_colors(&self) {
         let mut board = self.icy_board.lock().unwrap();
         board.config.sysop.config_color_theme = "DEFAULT1".to_string();
         board.config.sysop.config_color_configuration = PcbScreenColors::default();
-        set_tui_theme(&board.config.sysop.config_color_configuration);
+        set_admin_theme(&board.config.sysop.config_color_theme, &board.config.sysop.config_color_configuration);
     }
 
     fn preview_area(area: Rect) -> Rect {

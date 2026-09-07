@@ -3,7 +3,7 @@ use icy_board_engine::icy_board::icb_text::{DEFAULT_DISPLAY_TEXT, IcbTextFile, I
 use icy_board_tui::{
     get_text,
     pcb_line::get_styled_pcb_line,
-    theme::{DOS_BLACK, DOS_BLUE, DOS_LIGHT_BLUE, DOS_LIGHT_CYAN, DOS_LIGHT_GRAY, DOS_LIGHT_GREEN, DOS_LIGHT_MAGENTA, DOS_LIGHT_RED, DOS_WHITE, DOS_YELLOW},
+    theme::{DOS_LIGHT_BLUE, DOS_LIGHT_CYAN, DOS_LIGHT_GRAY, DOS_LIGHT_GREEN, DOS_LIGHT_MAGENTA, DOS_LIGHT_RED, DOS_WHITE, DOS_YELLOW, get_tui_theme},
 };
 use itertools::Itertools;
 use ratatui::{
@@ -82,8 +82,8 @@ impl<'a> RecordTab<'a> {
                 Constraint::Fill(0),
             ],
         )
-        .row_highlight_style(Style::default().fg(DOS_BLUE).bg(DOS_LIGHT_GRAY))
-        .style(Style::default().fg(DOS_YELLOW).bg(DOS_BLACK))
+        .row_highlight_style(get_tui_theme().selected_item)
+        .style(get_tui_theme().background)
         .highlight_spacing(HighlightSpacing::Always);
         frame.render_stateful_widget(table, area, &mut self.table_state);
     }
@@ -98,6 +98,7 @@ impl<'a> RecordTab<'a> {
         frame.render_stateful_widget(
             Scrollbar::default()
                 .orientation(ScrollbarOrientation::VerticalRight)
+                .style(get_tui_theme().dialog_box_scrollbar)
                 .begin_symbol(Some("▲"))
                 .thumb_symbol("█")
                 .track_symbol(Some("░"))
@@ -155,8 +156,12 @@ pub fn convert_style(text_style: icy_board_engine::icy_board::icb_text::IcbTextS
 
 impl<'a> TabPage for RecordTab<'a> {
     fn render(&mut self, frame: &mut Frame, area: Rect) {
+        if area.is_empty() {
+            return;
+        }
         if self.filtered_entries.is_empty() {
-            Line::from(Span::styled(get_text("icbtext_no_entries"), Style::default().fg(DOS_LIGHT_RED))).render(area, frame.buffer_mut());
+            Line::from(Span::styled(get_text("icbtext_no_entries"), get_tui_theme().description_text)).render(area, frame.buffer_mut());
+            return;
         }
 
         self.render_table(frame, area);
@@ -229,7 +234,47 @@ impl<'a> TabPage for RecordTab<'a> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use icy_board_tui::theme::{DOS_BLACK, DOS_CYAN};
+    use ratatui::{Terminal, backend::TestBackend};
+
+    #[test]
+    fn selected_record_uses_shared_focus_style_even_over_pcb_colors() {
+        let mut text = DEFAULT_DISPLAY_TEXT.clone();
+        text.get_mut(1).unwrap().text = "@X03Selected".to_string();
+        let mut tab = RecordTab::new(&mut text);
+        let mut terminal = Terminal::new(TestBackend::new(80, 25)).unwrap();
+        terminal.draw(|frame| tab.render(frame, frame.area())).unwrap();
+        let buffer = terminal.backend().buffer();
+        let selected = get_tui_theme().selected_item;
+        let line: String = (0..79).map(|x| buffer[(x, 0)].symbol()).collect();
+        assert!(line.contains("Selected"), "{line}");
+        for x in 0..8 {
+            if let Some(fg) = selected.fg {
+                assert_eq!(buffer[(x, 0)].fg, fg);
+            }
+            if let Some(bg) = selected.bg {
+                assert_eq!(buffer[(x, 0)].bg, bg);
+            }
+        }
+    }
+
+    #[test]
+    fn empty_search_message_survives_table_rendering_and_tiny_areas() {
+        let mut text = DEFAULT_DISPLAY_TEXT.clone();
+        let mut tab = RecordTab::new(&mut text);
+        tab.set_filter("no-match-for-this-polished-ui-test");
+        assert_eq!(tab.entries(), 0);
+        for (width, height) in [(0, 0), (1, 1), (80, 25)] {
+            let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+            terminal.draw(|frame| tab.render(frame, frame.area())).unwrap();
+            if width == 80 {
+                let buffer = terminal.backend().buffer();
+                let line: String = (0..width).map(|x| buffer[(x, 0)].symbol()).collect();
+                assert!(line.contains(&get_text("icbtext_no_entries")), "{line}");
+            }
+        }
+    }
 
     #[test]
     fn test_pcb_line() {

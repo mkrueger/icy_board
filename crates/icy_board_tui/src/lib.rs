@@ -14,6 +14,7 @@ use crossterm::{
 pub mod about;
 pub mod app;
 pub mod cfg_menu_macros;
+pub mod chrome;
 pub mod colors;
 pub mod config_menu;
 pub mod help_view;

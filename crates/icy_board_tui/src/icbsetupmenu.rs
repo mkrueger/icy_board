@@ -2,12 +2,13 @@ use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     Frame,
     layout::{Margin, Rect},
-    text::{Line, Span},
+    text::Line,
     widgets::{Block, Borders, Clear, Padding, Widget},
 };
 
 use crate::{
     BORDER_SET,
+    chrome::key_hint,
     config_menu::{EditMessage, ResultState},
     get_text,
     message_box::MessageBox,
@@ -23,6 +24,70 @@ pub struct IcbSetupMenuUI {
     left_title: Option<String>,
     center_title: Option<String>,
     right_title: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{select_menu::MenuItem, tab_page::InfoState};
+    use ratatui::{Terminal, backend::TestBackend, buffer::Buffer};
+
+    fn menu() -> IcbSetupMenuUI {
+        IcbSetupMenuUI::new(SelectMenu::new(vec![
+            MenuItem::new(1, 'A', "First".into()).with_help("First help".into()),
+            MenuItem::new(2, 'B', "Second".into()).with_help("Second help".into()),
+        ]))
+        .with_left_title("Left".into())
+        .with_center_title("Settings".into())
+        .with_right_title("Right".into())
+    }
+
+    fn row_text(buffer: &Buffer, y: u16) -> String {
+        (0..buffer.area.width).map(|x| buffer[(x, y)].symbol()).collect()
+    }
+
+    #[test]
+    fn classic_menu_keeps_geometry_focus_symbols_help_and_modal_footer_policy() {
+        let mut menu = menu();
+        let mut terminal = Terminal::new(TestBackend::new(80, 25)).unwrap();
+        terminal.draw(|frame| menu.render(frame, frame.area())).unwrap();
+        let buffer = terminal.backend().buffer();
+        assert_eq!(buffer[(25, 5)].symbol(), "A");
+        assert_eq!(buffer[(25, 6)].symbol(), "B");
+        assert_eq!(
+            buffer[(28, 5)].style(),
+            get_tui_theme()
+                .background
+                .patch(get_tui_theme().selected_item)
+                .underline_color(ratatui::style::Color::Reset)
+        );
+        assert!(row_text(buffer, 2).contains("Settings"));
+        assert!(row_text(buffer, 24).contains(&get_text("icb_setup_key_menu_help")));
+        assert_eq!(row_text(buffer, 3).chars().filter(|ch| *ch == '─').count(), 76);
+        menu.handle_key_press(KeyCode::Down.into());
+        let (state, _) = menu.handle_key_press(KeyCode::F(1).into());
+        assert!(matches!(state.edit_msg, EditMessage::DisplayHelp(ref text) if text == "Second help"));
+        assert_eq!(menu.handle_key_press(KeyCode::Enter.into()).1, Some(2));
+        menu.open_sup_page(Box::new(MessageBox::new(InfoState::Info, "Modal".into())));
+        terminal.draw(|frame| menu.render(frame, frame.area())).unwrap();
+        assert!(!row_text(terminal.backend().buffer(), 24).contains("F1"));
+        assert_eq!(terminal.backend().buffer()[(25, 5)].symbol(), "A");
+        menu.handle_key_press(KeyCode::Esc.into());
+        terminal.draw(|frame| menu.render(frame, frame.area())).unwrap();
+        assert!(row_text(terminal.backend().buffer(), 24).contains(&get_text("icb_setup_key_menu_help")));
+        assert_eq!(menu.state.selected, 1);
+    }
+
+    #[test]
+    fn menu_titles_and_footers_are_safe_on_tiny_screens() {
+        for (width, height) in [(0, 0), (1, 1), (2, 2), (4, 10), (8, 3), (20, 5), (80, 25)] {
+            let mut menu = menu().with_center_title("界 e\u{301} Settings".into());
+            let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+            terminal.draw(|frame| menu.render(frame, frame.area())).unwrap();
+            menu.open_sup_page(Box::new(MessageBox::new(InfoState::Warning, "Modal".into())));
+            terminal.draw(|frame| menu.render(frame, frame.area())).unwrap();
+        }
+    }
 }
 
 impl IcbSetupMenuUI {
@@ -59,61 +124,66 @@ impl IcbSetupMenuUI {
             return;
         }
 
-        let block: Block<'_> = Block::new()
+        let mut block: Block<'_> = Block::new()
             .style(get_tui_theme().background)
             .padding(Padding::new(2, 2, 1 + 4, 0))
             .borders(Borders::ALL)
             .border_set(BORDER_SET)
             .border_style(get_tui_theme().menu_box)
-            .title_alignment(ratatui::layout::Alignment::Center)
-            .title_bottom(Span::styled(get_text("icb_setup_key_menu_help"), get_tui_theme().key_binding));
+            .title_alignment(ratatui::layout::Alignment::Center);
+        if self.sub_pages.is_empty() {
+            block = block.title_bottom(key_hint(get_text("icb_setup_key_menu_help")));
+        }
         block.render(disp_area, frame.buffer_mut());
 
+        let title_area = disp_area.inner(Margin { horizontal: 1, vertical: 1 });
         if let Some(val) = &self.center_title {
-            let width = val.len() as u16;
+            let width = Line::raw(val).width().min(title_area.width as usize) as u16;
             Line::raw(val).style(get_tui_theme().menu_title).render(
                 Rect {
-                    x: disp_area.x + 1 + disp_area.width.saturating_sub(width) / 2,
-                    y: disp_area.y + 1,
+                    x: (disp_area.x + 1 + disp_area.width.saturating_sub(width) / 2).min(title_area.right().saturating_sub(width)),
+                    y: title_area.y,
                     width,
-                    height: 1,
+                    height: title_area.height.min(1),
                 },
                 frame.buffer_mut(),
             );
         }
 
         if let Some(val) = &self.left_title {
-            let width = val.len() as u16;
+            let width = Line::raw(val).width().min(title_area.width as usize) as u16;
             Line::raw(val).style(get_tui_theme().item).render(
                 Rect {
-                    x: disp_area.x + 1,
-                    y: disp_area.y + 1,
+                    x: title_area.x,
+                    y: title_area.y,
                     width,
-                    height: 1,
+                    height: title_area.height.min(1),
                 },
                 frame.buffer_mut(),
             );
         }
 
         if let Some(val) = &self.right_title {
-            let width = val.chars().count() as u16;
+            let width = Line::raw(val).width().min(title_area.width as usize) as u16;
             Line::raw(val).style(get_tui_theme().item).render(
                 Rect {
-                    x: disp_area.x + disp_area.width.saturating_sub(width + 1),
-                    y: disp_area.y + 1,
+                    x: title_area.right().saturating_sub(width),
+                    y: title_area.y,
                     width,
-                    height: 1,
+                    height: title_area.height.min(1),
                 },
                 frame.buffer_mut(),
             );
         }
 
-        frame.buffer_mut().set_string(
-            disp_area.x + 1,
-            disp_area.y + 2,
-            "─".repeat((disp_area.width as usize).saturating_sub(2)),
-            get_tui_theme().menu_box,
-        );
+        if disp_area.height > 3 && disp_area.width > 2 {
+            frame.buffer_mut().set_string(
+                disp_area.x + 1,
+                disp_area.y + 2,
+                "─".repeat((disp_area.width as usize).saturating_sub(2)),
+                get_tui_theme().menu_box,
+            );
+        }
 
         let menu_width = self.menu.preferred_width();
         let mut menu_area = disp_area.inner(Margin {
@@ -122,7 +192,9 @@ impl IcbSetupMenuUI {
         });
         menu_area.y += 4;
         menu_area.height = menu_area.height.saturating_sub(4);
-        self.menu.render(menu_area, frame, &mut self.state);
+        if menu_area.width >= 3 && menu_area.height > 0 {
+            self.menu.render(menu_area, frame, &mut self.state);
+        }
 
         for page in self.sub_pages.iter_mut() {
             page.render(frame, area);

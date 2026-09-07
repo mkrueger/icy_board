@@ -7,11 +7,12 @@ use icy_board_engine::icy_board::icb_text::{IcbTextFile, IcbTextStyle, TextEntry
 use icy_board_tui::{
     TerminalType,
     app::get_screen_size,
+    chrome::{dim_background, dirty_title, key_hint, status_line},
     get_text, get_text_args,
     pcb_line::get_styled_pcb_line,
     term::next_event,
     text_field::{TextField, TextfieldState},
-    theme::{DOS_DARK_GRAY, DOS_LIGHT_CYAN, DOS_LIGHT_GRAY, DOS_WHITE, get_tui_theme},
+    theme::{Theme, get_tui_theme},
 };
 use itertools::Itertools;
 use ratatui::{prelude::*, widgets::*};
@@ -67,6 +68,23 @@ impl TabPageType {
 #[cfg(test)]
 mod localization_tests {
     use super::*;
+    use crossterm::event::KeyModifiers;
+    use icy_board_engine::icy_board::icb_text::DEFAULT_DISPLAY_TEXT;
+    use ratatui::backend::TestBackend;
+
+    fn render(app: &mut App<'_>, width: u16, height: u16) -> Buffer {
+        let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+        terminal.draw(|frame| app.ui(frame, frame.area())).unwrap();
+        terminal.backend().buffer().clone()
+    }
+
+    fn row(buffer: &Buffer, y: u16) -> String {
+        (0..buffer.area.width).map(|x| buffer[(x, y)].symbol()).collect()
+    }
+
+    fn press(app: &mut App<'_>, code: KeyCode) {
+        app.handle_key_press(KeyEvent::new(code, KeyModifiers::NONE));
+    }
 
     #[test]
     fn title_bar_renders_localized_application_and_tabs() {
@@ -79,6 +97,121 @@ mod localization_tests {
         assert!(rendered.contains(&format!("{} (ICBTEXT)", get_text("app_mkicbtxt"))), "{rendered}");
         assert!(rendered.contains(&get_text("icbtext_tab_record")), "{rendered}");
         assert!(rendered.ends_with(&format!(" {} ", get_text("icbtext_tab_about"))), "{rendered}");
+        // The band must not sink into the records below it.
+        let (band, _) = title_band(&get_tui_theme());
+        assert_ne!(band.bg, get_tui_theme().background.bg);
+        assert!((0..80).all(|x| buffer[(x, 0)].bg == band.bg.unwrap() || buffer[(x, 0)].bg == get_tui_theme().tabs_selected.bg.unwrap()));
+    }
+
+    #[test]
+    fn every_palette_gives_the_title_its_own_background() {
+        use icy_board_engine::icy_board::icb_config::PcbScreenColors;
+        use icy_board_tui::theme::{POLISHED_THEME, Theme};
+
+        for colors in [PcbScreenColors::DEFAULT_1, PcbScreenColors::DEFAULT_2, PcbScreenColors::BLACK_AND_WHITE] {
+            let theme = Theme::from_pcboard(&PcbScreenColors { colors });
+            let (band, title) = title_band(&theme);
+            assert_ne!(band.bg, theme.background.bg, "{colors:?}");
+            assert_ne!(title.fg, band.bg, "{colors:?}");
+            assert_eq!(band.bg, title.bg, "{colors:?}");
+        }
+        let (band, title) = title_band(&POLISHED_THEME);
+        assert_eq!(band, POLISHED_THEME.title_bar);
+        assert_eq!(title, POLISHED_THEME.app_title);
+        assert_ne!(band.bg, POLISHED_THEME.background.bg);
+    }
+
+    #[test]
+    fn dirty_title_tracks_accepted_model_not_draft_or_filter() {
+        let mut text = DEFAULT_DISPLAY_TEXT.clone();
+        let theme = get_tui_theme();
+        let mut app = App::new(&mut text, PathBuf::from("ICBTEXT"), false);
+        assert_eq!(get_tui_theme().selected_item, theme.selected_item);
+        assert!(!row(&render(&mut app, 80, 25), 0).contains(" *"));
+
+        press(&mut app, KeyCode::Enter);
+        app.edit_entry.text.push_str(" changed");
+        assert!(!row(&render(&mut app, 80, 25), 0).contains(" *"));
+        press(&mut app, KeyCode::Esc);
+        assert!(!app.record_tab.is_dirty(&app.orig));
+
+        press(&mut app, KeyCode::Enter);
+        app.edit_entry.text.push_str(" changed");
+        press(&mut app, KeyCode::Enter);
+        assert!(row(&render(&mut app, 80, 25), 0).contains("(ICBTEXT) *"));
+        press(&mut app, KeyCode::F(4));
+        assert!(!row(&render(&mut app, 80, 25), 0).contains(" *"));
+
+        // Style-only edits also differ from the loaded model.
+        press(&mut app, KeyCode::Enter);
+        press(&mut app, KeyCode::F(2));
+        press(&mut app, KeyCode::Enter);
+        assert!(row(&render(&mut app, 80, 25), 0).contains(" *"));
+        press(&mut app, KeyCode::F(4));
+        press(&mut app, KeyCode::F(2));
+        render(&mut app, 80, 25);
+        press(&mut app, KeyCode::Char('z'));
+        assert!(!row(&render(&mut app, 80, 25), 0).contains(" *"));
+    }
+
+    #[test]
+    fn restoring_builtin_text_is_dirty_when_loaded_text_was_custom() {
+        let mut text = DEFAULT_DISPLAY_TEXT.clone();
+        text.get_mut(1).unwrap().text.push_str(" custom");
+        let mut app = App::new(&mut text, PathBuf::from("ICBTEXT"), false);
+        assert!(!app.record_tab.is_dirty(&app.orig));
+        press(&mut app, KeyCode::F(4));
+        assert!(row(&render(&mut app, 80, 25), 0).contains(" *"));
+        let loaded = app.orig.get(1).unwrap().clone();
+        *app.record_tab.get_selected_entry_mut().unwrap() = loaded;
+        assert!(!row(&render(&mut app, 80, 25), 0).contains(" *"));
+    }
+
+    #[test]
+    fn dos_layout_keeps_active_keys_and_labeled_previews_visible() {
+        let mut text = DEFAULT_DISPLAY_TEXT.clone();
+        let mut app = App::new(&mut text, PathBuf::from("ICBTEXT"), false);
+        for (mode, keys) in [
+            (Mode::Command, vec!["F2", "F3", "F4", "Enter", "Q/Esc"]),
+            (Mode::Edit, vec!["F2/F3", "F4", "Enter", "Esc"]),
+            (Mode::Filter, vec!["Enter/Esc"]),
+            (Mode::Jump, vec!["Enter", "Esc"]),
+            (Mode::RequestQuit, vec!["←/→", "Enter", "Esc"]),
+        ] {
+            app.mode = mode;
+            let buffer = render(&mut app, 80, 25);
+            let footer = row(&buffer, 23);
+            for key in keys {
+                assert!(footer.contains(key), "{mode:?}: {footer}");
+            }
+            if mode == Mode::Edit {
+                let screen = (0..25).map(|y| row(&buffer, y)).join("\n");
+                for label in [
+                    "icbtext_edit_original_text_title",
+                    "icbtext_edit_preview_text_title",
+                    "icbtext_edit_edit_text_title",
+                ] {
+                    assert!(screen.contains(&get_text(label)), "{screen}");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn tiny_screens_are_safe_and_status_keeps_context_before_clock() {
+        let mut text = DEFAULT_DISPLAY_TEXT.clone();
+        let mut app = App::new(&mut text, PathBuf::from("ICBTEXT"), false);
+        for (width, height) in [(0, 0), (1, 1), (2, 2), (8, 3), (23, 12), (40, 10), (80, 25)] {
+            for mode in [Mode::Command, Mode::Edit, Mode::Filter, Mode::Jump, Mode::RequestQuit] {
+                app.mode = mode;
+                let buffer = render(&mut app, width, height);
+                assert_eq!(buffer.area, Rect::new(0, 0, width, height));
+            }
+        }
+        app.mode = Mode::Command;
+        let buffer = render(&mut app, 20, 5);
+        assert!(row(&buffer, 4).trim_start().starts_with("1/"));
+        assert!(row(&buffer, 3).contains("F2 F3 F4 Enter Q/Esc"));
     }
 }
 
@@ -130,7 +263,8 @@ impl<'a> App<'a> {
                 let screen = get_screen_size(frame, self.full_screen);
                 self.ui(frame, screen);
                 match self.mode {
-                    Mode::Jump | Mode::Edit => self.edit_state.set_cursor_position(frame),
+                    Mode::Edit if screen.height >= 13 && screen.width >= 24 => self.edit_state.set_cursor_position(frame),
+                    Mode::Jump => self.edit_state.set_cursor_position(frame),
                     Mode::Filter => self.filter_state.set_cursor_position(frame),
                     _ => {}
                 }
@@ -298,7 +432,7 @@ impl<'a> App<'a> {
         let vertical = Layout::vertical([Constraint::Length(1), Constraint::Fill(1), Constraint::Length(1), Constraint::Length(1)]);
         let [title_bar, mut tab, key_bar, status_line] = vertical.areas(area);
 
-        Block::new().style(get_tui_theme().title_bar).render(area, frame.buffer_mut());
+        Block::new().style(get_tui_theme().background).render(area, frame.buffer_mut());
         self.render_title_bar(title_bar, frame.buffer_mut());
 
         if !self.filter.is_empty() && tab.height > 0 {
@@ -309,8 +443,6 @@ impl<'a> App<'a> {
         }
 
         self.render_selected_tab(frame, tab);
-        self.render_key_help_view(key_bar, frame.buffer_mut());
-        self.render_status_line(status_line, frame.buffer_mut());
 
         match self.mode {
             // The dialog fills twelve lines and cannot be folded; below that the list stays.
@@ -319,6 +451,7 @@ impl<'a> App<'a> {
                 let edit_height = 12;
                 let edit_area = centered(area, area.width.saturating_sub(3), edit_height);
 
+                dim_background(frame.buffer_mut(), area);
                 Clear.render(edit_area, frame.buffer_mut());
                 let edit_title = get_text_args(
                     "icbtext_edit_title",
@@ -356,7 +489,7 @@ impl<'a> App<'a> {
                 area.height = 1;
 
                 Line::from(get_text("icbtext_edit_original_text_title"))
-                    .style(Style::default().fg(DOS_LIGHT_CYAN).italic())
+                    .style(get_tui_theme().menu_label)
                     .render(area, frame.buffer_mut());
 
                 if let Some(entry) = self.record_tab.get_original_entry() {
@@ -375,13 +508,13 @@ impl<'a> App<'a> {
                     .render(style_area, frame.buffer_mut());
                     area.y += 1;
 
-                    Line::from(entry.text.clone())
+                    Text::from(get_styled_pcb_line(&entry.text))
                         .style(convert_style(entry.style))
                         .render(area, frame.buffer_mut());
                 }
                 area.y += 2;
                 Line::from(get_text("icbtext_edit_preview_text_title"))
-                    .style(Style::default().fg(DOS_LIGHT_CYAN).italic())
+                    .style(get_tui_theme().menu_label)
                     .render(area, frame.buffer_mut());
                 area.y += 1;
                 Text::from(get_styled_pcb_line(&self.edit_entry.text))
@@ -390,7 +523,7 @@ impl<'a> App<'a> {
                 area.y += 2;
 
                 Line::from(get_text("icbtext_edit_edit_text_title"))
-                    .style(Style::default().fg(DOS_LIGHT_CYAN).italic())
+                    .style(get_tui_theme().config_title.bold())
                     .render(area, frame.buffer_mut());
 
                 let mut style_area = area;
@@ -422,6 +555,7 @@ impl<'a> App<'a> {
             Mode::Filter => {
                 let filter_area = centered(area, area.width.saturating_sub(5), 3);
 
+                dim_background(frame.buffer_mut(), area);
                 Clear.render(filter_area, frame.buffer_mut());
 
                 Block::new()
@@ -442,6 +576,7 @@ impl<'a> App<'a> {
                 let jump_size = 31;
                 let jump_area = centered(area, jump_size, 3);
 
+                dim_background(frame.buffer_mut(), area);
                 Clear.render(jump_area, frame.buffer_mut());
 
                 Block::new()
@@ -460,8 +595,9 @@ impl<'a> App<'a> {
             }
             Mode::RequestQuit => {
                 let save_text = format!("{} ", get_text("icbtext_save_changes"));
-                let mut save_area = centered(area, save_text.len() as u16 + 10, 3);
+                let save_area = centered(area, Line::from(save_text.as_str()).width().saturating_add(10).min(u16::MAX as usize) as u16, 3);
 
+                dim_background(frame.buffer_mut(), area);
                 Clear.render(save_area, frame.buffer_mut());
 
                 Block::new()
@@ -471,17 +607,18 @@ impl<'a> App<'a> {
                     .render(save_area, frame.buffer_mut());
 
                 let field = Line::from(vec![
-                    Span::styled(save_text, Style::default().fg(DOS_LIGHT_GRAY)),
-                    Span::styled(get_text("yes"), Style::default().fg(if self.save { DOS_WHITE } else { DOS_DARK_GRAY })),
-                    Span::styled("/", Style::default().fg(DOS_LIGHT_GRAY)),
-                    Span::styled(get_text("no"), Style::default().fg(if !self.save { DOS_WHITE } else { DOS_DARK_GRAY })),
+                    Span::styled(save_text, get_tui_theme().menu_label),
+                    Span::styled(get_text("yes"), if self.save { get_tui_theme().selected_item } else { get_tui_theme().item }),
+                    Span::styled("/", get_tui_theme().menu_label),
+                    Span::styled(get_text("no"), if !self.save { get_tui_theme().selected_item } else { get_tui_theme().item }),
                 ]);
-                save_area.y += 1;
-                save_area.x += 1;
-                field.render(save_area.inner(Margin { horizontal: 1, vertical: 0 }), frame.buffer_mut());
+                field.render(save_area.inner(Margin { horizontal: 1, vertical: 1 }), frame.buffer_mut());
             }
             _ => {}
         }
+        // Keep active controls legible above the dimmed background, even on a tiny terminal.
+        self.render_key_help_view(key_bar, frame.buffer_mut());
+        self.render_status_line(status_line, frame.buffer_mut());
     }
 
     fn get_style_description(style: IcbTextStyle) -> String {
@@ -503,27 +640,32 @@ impl<'a> App<'a> {
     }
 
     fn render_title_bar(&self, area: Rect, buf: &mut Buffer) {
+        let (band, title_style) = title_band(&get_tui_theme());
+        Block::new().style(band).render(area, buf);
         let len: u16 = TabPageType::iter().map(|p| Line::from(p.title()).width() as u16).sum();
         let layout = Layout::horizontal([Constraint::Min(0), Constraint::Length(len)]);
         let [title, tabs] = layout.areas(area);
 
         Span::styled(
-            format!(
-                " {}",
-                get_text_args(
-                    "app_file_title",
-                    HashMap::from([
-                        ("application".to_string(), get_text("app_mkicbtxt")),
-                        ("path".to_string(), self.file.file_name().unwrap().to_string_lossy().into_owned()),
-                    ]),
-                )
+            dirty_title(
+                format!(
+                    " {}",
+                    get_text_args(
+                        "app_file_title",
+                        HashMap::from([
+                            ("application".to_string(), get_text("app_mkicbtxt")),
+                            ("path".to_string(), self.file.file_name().unwrap_or_default().to_string_lossy().into_owned()),
+                        ]),
+                    )
+                ),
+                self.record_tab.is_dirty(&self.orig),
             ),
-            get_tui_theme().app_title,
+            title_style,
         )
         .render(title, buf);
         let titles = TabPageType::iter().map(TabPageType::title);
         Tabs::new(titles)
-            .style(get_tui_theme().tabs)
+            .style(band)
             .highlight_style(get_tui_theme().tabs_selected)
             .select(self.tab as usize)
             .divider("")
@@ -542,12 +684,19 @@ impl<'a> App<'a> {
 
     fn render_selected_tab(&mut self, frame: &mut Frame, area: Rect) {
         Clear.render(area, frame.buffer_mut());
+        Block::new().style(get_tui_theme().background).render(area, frame.buffer_mut());
         self.get_tab_mut().render(frame, area);
     }
 
     fn render_key_help_view(&self, area: Rect, buf: &mut Buffer) {
         let keys = match self.mode {
-            Mode::RequestQuit => vec![("Enter", get_text("key_desc_quit")), ("Q/Esc", get_text("key_desc_back"))],
+            Mode::RequestQuit => vec![
+                ("←/→", format!("{}/{}", get_text("yes"), get_text("no"))),
+                ("Enter", get_text("key_desc_quit")),
+                ("Esc", get_text("key_desc_back")),
+            ],
+            Mode::Filter => vec![("Enter/Esc", get_text("key_desc_back"))],
+            Mode::Jump => vec![("Enter", get_text("key_desc_accept")), ("Esc", get_text("key_desc_cancel"))],
             Mode::Edit => vec![
                 ("F2/F3", get_text("key_desc_next_prev_style")),
                 ("F4", get_text("key_desc_restore")),
@@ -562,33 +711,32 @@ impl<'a> App<'a> {
                 ("Q/Esc", get_text("key_desc_quit")),
             ],
         };
-        let spans = keys
-            .iter()
-            .flat_map(|(key, desc)| {
-                let key = Span::styled(format!(" {key} "), get_tui_theme().key_binding);
-                let desc = Span::styled(format!(" {desc} "), get_tui_theme().key_binding_description);
-                [key, desc]
-            })
-            .collect_vec();
-        Line::from(spans).centered().style((Color::Indexed(236), Color::Indexed(232))).render(area, buf);
+        let hints = keys.iter().map(|(key, desc)| format!("{key} {desc}")).join("  ");
+        // On narrow screens retain every key before spending space on descriptions.
+        let hints = if Line::from(hints.as_str()).width() > usize::from(area.width) {
+            keys.iter().map(|(key, _)| *key).join(" ")
+        } else {
+            hints
+        };
+        Block::new().style(get_tui_theme().key_binding_description).render(area, buf);
+        key_hint(hints).render(area, buf);
     }
 
     fn render_status_line(&self, area: Rect, buf: &mut Buffer) {
         let now = Local::now();
-        let time_status = format!(" {} {} |", now.time().with_nanosecond(0).unwrap(), now.date_naive().format("%m-%d-%y"));
-        let time_len = time_status.len() as u16;
-        Line::from(time_status).left_aligned().style(get_tui_theme().status_line).render(area, buf);
-
-        if self.mode == Mode::RequestQuit {
-            return;
-        }
-        let mut area = area;
-        area.x += time_len + 1;
-        area.width = area.width.saturating_sub(time_len + 1);
-        Line::from(self.status_line.clone())
-            .left_aligned()
-            .style(get_tui_theme().status_line_text)
-            .render(area, buf);
+        let time_status = format!("{} {}", now.time().with_nanosecond(0).unwrap(), now.date_naive().format("%m-%d-%y"));
+        let context = match self.mode {
+            Mode::RequestQuit => get_text("icbtext_save_changes"),
+            Mode::Filter => get_text("icbtext_filter_title"),
+            Mode::Jump => get_text("icbtext_jump_to_title"),
+            Mode::Edit => get_text_args(
+                "icbtext_edit_title",
+                HashMap::from([("number".to_string(), self.record_tab.selected_record().to_string())]),
+            ),
+            _ if self.tab == TabPageType::Record => self.record_tab.request_status().status_line,
+            _ => self.status_line.clone(),
+        };
+        status_line(buf, area, &context, &time_status);
     }
 }
 
@@ -619,4 +767,14 @@ fn centered(area: Rect, width: u16, height: u16) -> Rect {
     let width = width.min(area.width);
     let height = height.min(area.height);
     Rect::new(area.x + (area.width - width) / 2, area.y + (area.height - height) / 2, width, height)
+}
+
+/// The records start right below the title, so it needs a band of its own.
+/// PCBoard palettes paint the outer box in the page's own background.
+fn title_band(theme: &Theme) -> (Style, Style) {
+    if theme.title_bar.bg == theme.background.bg {
+        (theme.key_binding_description, theme.key_binding)
+    } else {
+        (theme.title_bar, theme.app_title)
+    }
 }

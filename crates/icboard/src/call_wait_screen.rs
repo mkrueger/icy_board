@@ -17,7 +17,7 @@ use icy_board_engine::icy_board::{
 use icy_board_tui::{
     app::get_screen_size,
     get_text, get_text_args,
-    theme::{DOS_BLACK, DOS_BLUE, DOS_CYAN, DOS_LIGHT_GRAY, DOS_RED, DOS_WHITE},
+    theme::{DOS_BLACK, DOS_BLUE, DOS_CYAN, DOS_LIGHT_GRAY, DOS_RED, DOS_WHITE, DOS_YELLOW},
 };
 use ratatui::{
     Frame, Terminal,
@@ -32,6 +32,17 @@ use ratatui::{
 use tokio::sync::Mutex;
 
 use crate::VERSION;
+
+/// Set by build.rs, empty when the binary was not built from a checkout.
+const GIT_HASH: &str = env!("ICBOARD_GIT_HASH");
+
+fn program_title(version: &str, hash: &str) -> String {
+    if hash.is_empty() {
+        format!("  IcyBoard v{version}  ")
+    } else {
+        format!("  IcyBoard v{version} ({hash})  ")
+    }
+}
 
 #[derive(Clone)]
 pub enum CallWaitMessage {
@@ -430,7 +441,7 @@ impl CallWaitScreen {
 
         let b = Block::default()
             .title_top(Line::from(format!(" {} ", dt)).style(Style::new().white()).left_aligned())
-            .title_top(Line::from(format!("  IcyBoard v{}  ", ver)).fg(Color::Yellow).centered())
+            .title_top(Line::from(program_title(&ver, GIT_HASH)).fg(DOS_YELLOW).centered())
             .title(
                 Line::from(format!(" {} ", now.time().with_nanosecond(0).unwrap()))
                     .style(Style::new().white())
@@ -739,6 +750,12 @@ impl<'a> Widget for PcbButton<'a> {
 mod tests {
     use super::*;
     use ratatui::backend::TestBackend;
+
+    #[test]
+    fn the_title_names_the_commit_when_it_is_known() {
+        assert_eq!(program_title("0.2.1", "a1b2c3d"), "  IcyBoard v0.2.1 (a1b2c3d)  ");
+        assert_eq!(program_title("0.2.1", ""), "  IcyBoard v0.2.1  ");
+    }
 
     #[test]
     fn offline_gate_and_sticky_failure_render_without_a_phase() {

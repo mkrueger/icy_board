@@ -8,6 +8,7 @@ use ratatui::{prelude::*, widgets::*};
 
 use crate::{
     TerminalType,
+    chrome::{dim_background, dirty_title, status_line},
     colors::RgbSwatch,
     config_menu::EditMessage,
     get_text,
@@ -15,7 +16,7 @@ use crate::{
     tab_page::TabPage,
     term::next_event,
     text_field::set_cursor_mode,
-    theme::{DOS_DARK_GRAY, DOS_LIGHT_GRAY, DOS_WHITE, get_tui_theme},
+    theme::get_tui_theme,
 };
 
 pub struct App {
@@ -197,23 +198,27 @@ impl App {
         self.render_status_line(status_line, frame.buffer_mut());
 
         if self.mode == Mode::RequestQuit {
+            let backdrop = frame.area();
+            dim_background(frame.buffer_mut(), backdrop);
+            let theme = get_tui_theme();
             let save_text = format!("{} ", get_text("icbtext_save_changes"));
-            let mut spans = vec![Span::styled(save_text.clone(), Style::default().fg(DOS_LIGHT_GRAY))];
+            let mut spans = vec![Span::styled(save_text, theme.item)];
             for (at, choice) in self.choices().iter().enumerate() {
                 if at > 0 {
-                    spans.push(Span::styled("/", Style::default().fg(DOS_LIGHT_GRAY)));
+                    spans.push(Span::styled("/", theme.item));
                 }
                 let label = match choice {
                     SaveChoice::Save => get_text("yes"),
                     SaveChoice::QuickSave => get_text("quick_save"),
                     SaveChoice::Discard => get_text("no"),
                 };
-                let color = if *choice == self.save { DOS_WHITE } else { DOS_DARK_GRAY };
-                spans.push(Span::styled(label, Style::default().fg(color)));
+                let style = if *choice == self.save { theme.selected_item } else { theme.item };
+                spans.push(Span::styled(format!(" {label} "), style));
             }
-            let width = spans.iter().map(|span| span.content.chars().count()).sum::<usize>() as u16 + 4;
-
-            let mut save_area = Rect::new(area.x + (area.width.saturating_sub(width)) / 2, area.y + (area.height - 3) / 2, width, 3);
+            let field = Line::from(spans);
+            let width = field.width().saturating_add(4).min(area.width as usize) as u16;
+            let height = area.height.min(3);
+            let save_area = Rect::new(area.x + (area.width - width) / 2, area.y + (area.height - height) / 2, width, height);
 
             Clear.render(save_area, frame.buffer_mut());
 
@@ -223,10 +228,7 @@ impl App {
                 .border_type(BorderType::Double)
                 .render(save_area, frame.buffer_mut());
 
-            let field = Line::from(spans);
-            save_area.y += 1;
-            save_area.x += 1;
-            field.render(save_area.inner(Margin { horizontal: 1, vertical: 0 }), frame.buffer_mut());
+            field.render(save_area.inner(Margin { horizontal: 2, vertical: 1 }), frame.buffer_mut());
         }
     }
 
@@ -274,11 +276,14 @@ impl App {
 
 impl App {
     fn render_title_bar(&self, area: Rect, buf: &mut Buffer) {
-        let len: u16 = self.tabs.iter().map(|t| Line::from(t.title()).width() as u16 + 1).sum();
-        let layout = Layout::horizontal([Constraint::Min(0), Constraint::Length(1 + len)]);
+        let len = self
+            .tabs
+            .iter()
+            .fold(1usize, |len, t| len.saturating_add(Line::from(t.title()).width()).saturating_add(1));
+        let layout = Layout::horizontal([Constraint::Min(0), Constraint::Length(len.min(u16::MAX as usize) as u16)]);
         let [title, tabs] = layout.areas(area);
 
-        Span::styled(&self.title, get_tui_theme().app_title).render(title, buf);
+        Span::styled(dirty_title(&self.title, self.tabs.iter().any(|tab| tab.is_dirty())), get_tui_theme().app_title).render(title, buf);
         let titles = self.tabs.iter().enumerate().map(|(i, t)| {
             if i == self.tab {
                 format!(" {} ", t.title())
@@ -314,16 +319,8 @@ impl App {
 
     fn render_status_line(&self, area: Rect, buf: &mut Buffer) {
         let now = Local::now();
-        let time_status = format!(" {} {} |", now.time().with_nanosecond(0).unwrap(), now.date_naive().format(&self.date_format));
-        let time_len = time_status.len() as u16;
-        Line::from(time_status).left_aligned().style(get_tui_theme().status_line).render(area, buf);
-        let mut area = area;
-        area.x += time_len + 1;
-        area.width -= time_len + 1;
-        Line::from(self.status_line.clone())
-            .left_aligned()
-            .style(get_tui_theme().status_line_text)
-            .render(area, buf);
+        let clock = format!("{} {}", now.time().with_nanosecond(0).unwrap(), now.date_naive().format(&self.date_format));
+        status_line(buf, area, &self.status_line, &clock);
     }
 }
 
@@ -343,6 +340,105 @@ pub fn get_screen_size(frame: &Frame, is_full_screen: bool) -> Rect {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ratatui::backend::TestBackend;
+    use std::{cell::Cell, rc::Rc};
+
+    struct TestTab(Rc<Cell<bool>>);
+
+    impl TabPage for TestTab {
+        fn render(&mut self, frame: &mut Frame, area: Rect) {
+            Line::styled("Background", get_tui_theme().item).render(area, frame.buffer_mut());
+        }
+
+        fn title(&self) -> String {
+            "Tab".into()
+        }
+
+        fn is_dirty(&self) -> bool {
+            self.0.get()
+        }
+    }
+
+    fn row_text(buffer: &Buffer, y: u16) -> String {
+        (0..buffer.area.width).map(|x| buffer[(x, y)].symbol()).collect()
+    }
+
+    #[test]
+    fn header_tracks_all_tabs_and_status_keeps_context_first() {
+        let dirty = Rc::new(Cell::new(false));
+        let mut app = dialog(false);
+        app.mode = Mode::Command;
+        app.title = "Setup".into();
+        app.status_line = "F1 Help: selected field".into();
+        app.date_format = "%Y-%m-%d".into();
+        app.tabs = vec![Box::new(TestTab(Rc::new(Cell::new(false)))), Box::new(TestTab(dirty.clone()))];
+        let mut terminal = Terminal::new(TestBackend::new(80, 25)).unwrap();
+        for changed in [false, true, false] {
+            dirty.set(changed);
+            terminal.draw(|frame| app.ui(frame, frame.area())).unwrap();
+            let buffer = terminal.backend().buffer();
+            assert!(row_text(buffer, 0).starts_with(&dirty_title("Setup", changed)));
+            assert_eq!(row_text(buffer, 0).contains('*'), changed);
+            assert!(row_text(buffer, 24).starts_with(" F1 Help: selected field"));
+        }
+        for (width, height) in [(0, 0), (1, 1), (2, 2), (8, 3), (20, 5)] {
+            let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+            terminal.draw(|frame| app.ui(frame, frame.area())).unwrap();
+            if width >= 8 {
+                assert!(row_text(terminal.backend().buffer(), height - 1).starts_with(" F1 Help"));
+            }
+        }
+    }
+
+    #[test]
+    fn quit_popup_dims_background_and_pads_the_focused_choice() {
+        for quick in [false, true] {
+            let mut app = dialog(quick);
+            app.tabs.push(Box::new(TestTab(Rc::new(Cell::new(true)))));
+            let mut terminal = Terminal::new(TestBackend::new(80, 25)).unwrap();
+            app.mode = Mode::Command;
+            terminal.draw(|frame| app.ui(frame, frame.area())).unwrap();
+            let mut expected = terminal.backend().buffer().clone();
+            let area = expected.area;
+            dim_background(&mut expected, area);
+            app.mode = Mode::RequestQuit;
+            for choice in app.choices() {
+                app.save = *choice;
+                terminal.draw(|frame| app.ui(frame, frame.area())).unwrap();
+                let buffer = terminal.backend().buffer();
+                assert_eq!(buffer[(0, 1)], expected[(0, 1)]);
+                let labels = [
+                    (SaveChoice::Save, get_text("yes")),
+                    (SaveChoice::QuickSave, get_text("quick_save")),
+                    (SaveChoice::Discard, get_text("no")),
+                ];
+                for (value, label) in labels {
+                    if !app.choices().contains(&value) {
+                        continue;
+                    }
+                    let text = row_text(buffer, 12);
+                    let label = format!(" {label} ");
+                    let start = text.find(&label).unwrap();
+                    let x = Line::raw(&text[..start]).width() as u16;
+                    let style = if value == app.save {
+                        get_tui_theme().selected_item
+                    } else {
+                        get_tui_theme().item
+                    };
+                    for offset in 0..Line::raw(&label).width() as u16 {
+                        assert_eq!(
+                            buffer[(x + offset, 12)].style(),
+                            get_tui_theme().dialog_box.patch(style).underline_color(ratatui::style::Color::Reset)
+                        );
+                    }
+                }
+            }
+            for (width, height) in [(0, 0), (1, 1), (2, 2), (8, 3), (20, 5)] {
+                let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+                terminal.draw(|frame| app.ui(frame, frame.area())).unwrap();
+            }
+        }
+    }
 
     fn dialog(offers_quick_save: bool) -> App {
         App {

@@ -9,6 +9,7 @@ use icy_board_engine::icy_board::{
 };
 use icy_board_tui::{
     BORDER_SET,
+    chrome::key_hint,
     config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, EditMessage, ListItem, ListValue, ResultState},
     get_text, get_text_args,
     tab_page::{Page, PageMessage},
@@ -694,7 +695,7 @@ impl MaintenancePage {
             .padding(Padding::new(2, 2, 1, 0))
             .title_alignment(Alignment::Center)
             .title(Span::styled(title, get_tui_theme().dialog_box_title))
-            .title_bottom(Span::styled(bottom, get_tui_theme().key_binding));
+            .title_bottom(key_hint(bottom));
 
         Paragraph::new(Text::from(lines))
             .style(get_tui_theme().item)
@@ -728,7 +729,7 @@ impl Page for MaintenancePage {
                     .padding(Padding::new(2, 2, 1, 0))
                     .title_alignment(Alignment::Center)
                     .title(Span::styled(self.op.title(), get_tui_theme().dialog_box_title))
-                    .title_bottom(Span::styled(get_text("icbsm_criteria_keys"), get_tui_theme().key_binding));
+                    .title_bottom(key_hint(get_text("icbsm_criteria_keys")));
                 block.render(area, frame.buffer_mut());
 
                 let inner = area.inner(Margin { vertical: 1, horizontal: 2 });
@@ -904,7 +905,7 @@ impl Page for UndoPage {
             .padding(Padding::new(2, 2, 1, 0))
             .title_alignment(Alignment::Center)
             .title(Span::styled(get_text("icbsm_undo_title"), get_tui_theme().dialog_box_title))
-            .title_bottom(Span::styled(bottom, get_tui_theme().key_binding));
+            .title_bottom(key_hint(bottom));
 
         Paragraph::new(Text::from(lines))
             .style(get_tui_theme().item)

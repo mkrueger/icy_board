@@ -3,13 +3,14 @@ use std::sync::{Arc, Mutex};
 use crossterm::event::KeyEvent;
 use icy_board_engine::icy_board::IcyBoard;
 use ratatui::{
-    layout::Rect,
-    text::{Line, Span},
+    layout::{Margin, Rect},
+    text::Line,
     widgets::{Block, Borders, Padding, Widget},
 };
 
 use crate::{
     BORDER_SET,
+    chrome::key_hint,
     config_menu::{ConfigMenu, ConfigMenuState, EditMessage, ListValue, ResultState},
     get_text,
     tab_page::{InfoState, PageMessage},
@@ -54,42 +55,55 @@ impl ICBConfigMenuUI {
             }
         }
 
-        let block: Block<'_> = Block::new()
+        let mut block: Block<'_> = Block::new()
             .style(get_tui_theme().background)
             .padding(Padding::new(2, 2, 1 + 4, 0))
             .borders(Borders::ALL)
             .border_set(BORDER_SET)
+            // A settings page is not a menu, so it keeps the outer box colour.
             .title_alignment(ratatui::layout::Alignment::Center)
-            .title_bottom(Span::styled(bottom_text, get_tui_theme().key_binding))
-            .border_style(get_tui_theme().menu_box);
+            .border_style(get_tui_theme().dialog_box);
+        let modal = self.state.is_path_browser_open()
+            || self
+                .menu
+                .get_item(self.state.selected)
+                .is_some_and(|item| matches!(&item.value, ListValue::ComboBox(combo) if combo.is_edit_open));
+        if !modal {
+            block = block.title_bottom(key_hint(bottom_text));
+        }
         block.render(area, frame.buffer_mut());
 
-        let width = self.title.len() as u16;
-        Line::raw(&self.title).style(get_tui_theme().menu_title).render(
+        let title_area = area.inner(Margin { horizontal: 1, vertical: 1 });
+        let width = Line::raw(&self.title).width().min(title_area.width as usize) as u16;
+        Line::raw(&self.title).style(get_tui_theme().dialog_box_title).render(
             Rect {
-                x: area.x + 1 + area.width.saturating_sub(width) / 2,
-                y: area.y + 1,
+                x: (area.x + 1 + area.width.saturating_sub(width) / 2).min(title_area.right().saturating_sub(width)),
+                y: title_area.y,
                 width,
-                height: 1,
+                height: title_area.height.min(1),
             },
             frame.buffer_mut(),
         );
 
-        frame.buffer_mut().set_string(
-            area.x + 1,
-            area.y + 2,
-            "─".repeat((area.width as usize).saturating_sub(2)),
-            get_tui_theme().menu_box,
-        );
+        if area.height > 3 && area.width > 2 {
+            frame.buffer_mut().set_string(
+                area.x + 1,
+                area.y + 2,
+                "─".repeat((area.width as usize).saturating_sub(2)),
+                get_tui_theme().dialog_box,
+            );
+        }
 
         let area = Rect {
             x: disp_area.x + 3,
             y: area.y + 3,
             // Keep the menu's clearing pass and scrollbar inside the border.
             width: disp_area.width.saturating_sub(5),
-            height: area.height - 4,
+            height: area.height.saturating_sub(4),
         };
-        self.menu.render(area, frame, &mut self.state);
+        if area.width > 0 && area.height > 0 {
+            self.menu.render(area, frame, &mut self.state);
+        }
     }
 
     pub fn request_status(&self) -> ResultState {
@@ -179,6 +193,92 @@ fn create_empty_file(path: &std::path::Path) -> std::io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::{can_create_file, uses_graphics_editor};
+
+    #[test]
+    fn config_footer_preserves_text_geometry_and_help_and_hides_during_browse() {
+        use super::*;
+        use crate::config_menu::{ConfigEntry, ListItem};
+        use crossterm::event::KeyCode;
+        use ratatui::{Terminal, backend::TestBackend};
+
+        let root = tempfile::tempdir().unwrap();
+        let mut board = IcyBoard::default();
+        board.root_path = root.path().to_path_buf();
+        let mut ui = ICBConfigMenuUI::new(
+            "Files".into(),
+            ConfigMenu {
+                obj: Arc::new(Mutex::new(board)),
+                entry: vec![ConfigEntry::Item(
+                    ListItem::new("Path".into(), ListValue::Path("missing.txt".into())).with_help("Path help"),
+                )],
+            },
+        );
+        let mut terminal = Terminal::new(TestBackend::new(80, 25)).unwrap();
+        terminal.draw(|frame| ui.render(frame, frame.area())).unwrap();
+        let row = |buffer: &ratatui::buffer::Buffer, y| (0..80).map(|x| buffer[(x, y)].symbol()).collect::<String>();
+        let buffer = terminal.backend().buffer();
+        assert!(row(buffer, 2).contains("Files"));
+        assert_eq!(buffer[(3, 4)].symbol(), "P");
+        assert_eq!(row(buffer, 3).chars().filter(|ch| *ch == '─').count(), 76);
+        assert!(row(buffer, 24).contains(&get_text("icb_setup_key_menu_create_help")));
+        assert!(
+            matches!(ui.handle_key_press(KeyCode::F(1).into()), PageMessage::ResultState(state) if matches!(state.edit_msg, EditMessage::DisplayHelp(ref text) if text == "Path help"))
+        );
+        ui.handle_key_press(KeyCode::F(4).into());
+        terminal.draw(|frame| ui.render(frame, frame.area())).unwrap();
+        assert!(!row(terminal.backend().buffer(), 24).contains("F1"));
+        ui.handle_key_press(KeyCode::Esc.into());
+        terminal.draw(|frame| ui.render(frame, frame.area())).unwrap();
+        assert!(row(terminal.backend().buffer(), 24).contains(&get_text("icb_setup_key_menu_create_help")));
+        assert!(matches!(&ui.menu.get_item(0).unwrap().value, ListValue::Path(path) if path == std::path::Path::new("missing.txt")));
+        assert!(!root.path().join("missing.txt").exists());
+    }
+
+    #[test]
+    fn a_settings_page_is_not_framed_like_a_menu() {
+        use super::*;
+        use crate::config_menu::{ConfigEntry, ListItem};
+        use ratatui::{Terminal, backend::TestBackend};
+
+        let root = tempfile::tempdir().unwrap();
+        let mut board = IcyBoard::default();
+        board.root_path = root.path().to_path_buf();
+        let mut ui = ICBConfigMenuUI::new(
+            "Files".into(),
+            ConfigMenu {
+                obj: Arc::new(Mutex::new(board)),
+                entry: vec![ConfigEntry::Item(ListItem::new("Path".into(), ListValue::Path("missing.txt".into())))],
+            },
+        );
+        let mut terminal = Terminal::new(TestBackend::new(80, 25)).unwrap();
+        terminal.draw(|frame| ui.render(frame, frame.area())).unwrap();
+        let buffer = terminal.backend().buffer();
+        let theme = get_tui_theme();
+        assert_ne!(theme.dialog_box.fg, theme.menu_box.fg);
+        for cell in [&buffer[(1, 1)], &buffer[(40, 1)], &buffer[(3, 3)]] {
+            assert_eq!(cell.fg, theme.dialog_box.fg.unwrap());
+        }
+        assert_eq!(buffer[(38, 2)].fg, theme.dialog_box_title.fg.unwrap());
+    }
+
+    #[test]
+    fn config_chrome_is_bounded_at_small_sizes() {
+        use super::*;
+        use crate::config_menu::{ConfigEntry, ListItem};
+        use ratatui::{Terminal, backend::TestBackend};
+
+        for (width, height) in [(0, 0), (1, 1), (2, 2), (4, 10), (8, 3), (20, 5), (80, 25)] {
+            let mut ui = ICBConfigMenuUI::new(
+                "界 e\u{301} Configuration".into(),
+                ConfigMenu {
+                    obj: Arc::new(Mutex::new(IcyBoard::default())),
+                    entry: vec![ConfigEntry::Item(ListItem::new("Value".into(), ListValue::Bool(false)))],
+                },
+            );
+            let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+            terminal.draw(|frame| ui.render(frame, frame.area())).unwrap();
+        }
+    }
 
     #[test]
     fn browse_uses_board_root_and_blocks_editor_and_create_shortcuts() {

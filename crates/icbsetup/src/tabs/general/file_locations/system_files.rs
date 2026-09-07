@@ -17,10 +17,13 @@ pub struct SystemFiles {
     menu: ICBConfigMenuUI,
 }
 
-fn edit_icbtext(_board: Arc<Mutex<IcyBoard>>, path: PathBuf) -> PageMessage {
+fn edit_icbtext(board: Arc<Mutex<IcyBoard>>, path: PathBuf) -> PageMessage {
     let mkicbtxt = std::env::current_exe().unwrap().with_file_name("mkicbtxt");
+    let board_file = board.lock().unwrap().file_name.clone();
     let started = icy_board_tui::term::with_terminal(|| {
         std::process::Command::new(mkicbtxt)
+            .arg("--board")
+            .arg(&board_file)
             .arg(format!("{}", path.display()))
             .spawn()
             .and_then(|mut child| child.wait())

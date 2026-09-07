@@ -6,6 +6,7 @@ use crossterm::event::KeyCode;
 use crossterm::event::KeyEvent;
 use icy_board_engine::icy_board::IcyBoard;
 use icy_board_engine::icy_board::user_base::UserBase;
+use icy_board_tui::chrome::{dim_background, dirty_title, key_hint};
 use icy_board_tui::save_changes_dialog::SaveChangesDialog;
 use icy_board_tui::save_changes_dialog::SaveChangesMessage;
 use icy_board_tui::tab_page::{InfoState, Page, PageMessage};
@@ -18,7 +19,7 @@ use ratatui::widgets::Padding;
 use ratatui::{
     Frame,
     layout::{Constraint, Margin, Rect},
-    text::Text,
+    text::{Line, Span, Text},
     widgets::{Cell, Clear, HighlightSpacing, Row, Scrollbar, ScrollbarOrientation, ScrollbarState, Table, TableState, Widget},
 };
 
@@ -163,13 +164,14 @@ impl UserList {
                 marker.push('X');
             }
             Row::new(vec![
-                Cell::from(format!("{:-3})", i + 1)).style(get_tui_theme().item),
-                Cell::from(user.name.clone()).style(get_tui_theme().item),
-                Cell::from(user.alias.clone()).style(get_tui_theme().item),
-                Cell::from(user.security_level.to_string()).style(get_tui_theme().item),
-                Cell::from(last_on).style(get_tui_theme().item),
-                Cell::from(marker).style(get_tui_theme().item),
+                Cell::from(format!("{:-3})", i + 1)),
+                Cell::from(user.name.clone()),
+                Cell::from(user.alias.clone()),
+                Cell::from(user.security_level.to_string()),
+                Cell::from(last_on),
+                Cell::from(marker),
             ])
+            .style(get_tui_theme().table)
         });
         let bar = " █ ";
         let table = Table::new(
@@ -187,7 +189,6 @@ impl UserList {
         .header(header)
         .row_highlight_style(get_tui_theme().selected_item)
         .highlight_symbol(Text::from(vec!["".into(), bar.into(), bar.into(), "".into()]))
-        //.bg(THEME.content.bg.unwrap())
         .highlight_spacing(HighlightSpacing::Always);
         frame.render_stateful_widget(table, area, &mut self.table_state);
     }
@@ -295,6 +296,20 @@ impl UserList {
         }
     }
 
+    /// Border-only context: never take a row away from the list or search.
+    fn selection_summary(&self, available_width: usize) -> Option<Line<'static>> {
+        let index = self.selected_user()?;
+        let board = self.icy_board.lock().unwrap();
+        let user = board.users.get(index)?;
+        let mut text = format!(" #{} · {}", index + 1, user.get_name());
+        if !user.city_or_state.is_empty() {
+            text.push_str(&format!(" · {}", user.city_or_state));
+        }
+        text.push(' ');
+        let line = Line::styled(text, get_tui_theme().description_text);
+        (line.width() <= available_width).then_some(line.right_aligned())
+    }
+
     fn handle_search_keys(&mut self, key: KeyEvent) -> bool {
         if !self.searching {
             return false;
@@ -374,12 +389,20 @@ impl Page for UserList {
         let area = area.inner(Margin { vertical: 1, horizontal: 2 });
         Clear.render(area, frame.buffer_mut());
 
-        let block = Block::new()
+        let title = dirty_title(get_text("icbsm_menu_edit_users"), self.has_changes);
+        let summary_width = (area.width as usize).saturating_sub(Line::raw(title.clone()).width() + 4);
+        let mut block = Block::new()
             .style(get_tui_theme().dialog_box)
             .padding(Padding::new(2, 2, 1, 1))
             .borders(Borders::ALL)
             .border_type(BorderType::Double)
-            .title_bottom(self.footer());
+            .title(Span::styled(title, get_tui_theme().dialog_box_title));
+        if let Some(summary) = self.selection_summary(summary_width) {
+            block = block.title(summary);
+        }
+        if self.save_dialog.is_none() {
+            block = block.title_bottom(key_hint(self.footer()));
+        }
         block.render(area, frame.buffer_mut());
 
         let inner = area.inner(Margin { vertical: 1, horizontal: 1 });
@@ -387,6 +410,8 @@ impl Page for UserList {
         self.render_scrollbar(frame, inner);
 
         if let Some(dlg) = &mut self.save_dialog {
+            let backdrop = frame.area();
+            dim_background(frame.buffer_mut(), backdrop);
             dlg.render(frame, area);
         }
     }
@@ -454,5 +479,85 @@ impl Page for UserList {
             }
             _ => PageMessage::None,
         }
+    }
+}
+
+#[cfg(test)]
+mod rendering_tests {
+    use super::*;
+    use icy_board_engine::icy_board::user_base::User;
+    use ratatui::{Terminal, backend::TestBackend, buffer::Buffer};
+
+    fn list() -> UserList {
+        let mut board = IcyBoard::default();
+        for name in ["Alice", "Bob"] {
+            board.users.new_user(User {
+                name: name.into(),
+                city_or_state: "Berlin".into(),
+                ..Default::default()
+            });
+        }
+        UserList::new(Arc::new(Mutex::new(board)))
+    }
+
+    fn row_text(buffer: &Buffer, y: u16) -> String {
+        (0..buffer.area.width).map(|x| buffer[(x, y)].symbol()).collect()
+    }
+
+    #[test]
+    fn classic_size_keeps_rows_search_and_theme_selection() {
+        let mut list = list();
+        let mut terminal = Terminal::new(TestBackend::new(80, 25)).unwrap();
+        terminal.draw(|frame| list.render(frame, frame.area())).unwrap();
+        let buffer = terminal.backend().buffer();
+        assert!(row_text(buffer, 4).contains("Alice"));
+        assert!(row_text(buffer, 5).contains("Bob"));
+        // The first record stays on the original first data row; the summary
+        // shares the top border rather than introducing another heading row.
+        let theme = get_tui_theme();
+        assert_eq!(buffer[(12, 4)].fg, theme.selected_item.fg.unwrap());
+        assert_eq!(buffer[(12, 4)].bg, theme.selected_item.bg.unwrap());
+        assert_eq!(buffer[(12, 5)].fg, theme.table.fg.unwrap());
+
+        list.handle_key_press(KeyEvent::from(KeyCode::F(3)));
+        list.handle_key_press(KeyEvent::from(KeyCode::Char('B')));
+        terminal.draw(|frame| list.render(frame, frame.area())).unwrap();
+        let buffer = terminal.backend().buffer();
+        assert_eq!(list.selected_user(), Some(1));
+        assert!(row_text(buffer, 4).contains("Bob"));
+        assert!(row_text(buffer, 23).contains(&list.footer()));
+    }
+
+    #[test]
+    fn selection_summary_is_optional_and_measured_in_cells() {
+        let mut list = list();
+        let summary = list.selection_summary(80).unwrap();
+        let text: String = summary.spans.iter().map(|span| span.content.as_ref()).collect();
+        assert_eq!(text, " #1 · Alice · Berlin ");
+        assert!(list.selection_summary(summary.width()).is_some());
+        assert!(list.selection_summary(summary.width() - 1).is_none());
+        list.search = "no match".into();
+        list.rebuild_view();
+        assert!(list.selection_summary(80).is_none());
+    }
+
+    #[test]
+    fn save_modal_dims_the_painted_list_and_hides_its_shortcuts() {
+        let mut list = list();
+        let mut terminal = Terminal::new(TestBackend::new(80, 25)).unwrap();
+        terminal.draw(|frame| list.render(frame, frame.area())).unwrap();
+        let mut expected = terminal.backend().buffer().clone();
+        let area = expected.area;
+        dim_background(&mut expected, area);
+        list.open_save_dialog();
+        terminal.draw(|frame| list.render(frame, frame.area())).unwrap();
+        let actual = terminal.backend().buffer();
+        // Both data rows are outside the centered confirmation box.
+        for y in [4, 5] {
+            for x in 3..77 {
+                assert_eq!(actual[(x, y)], expected[(x, y)]);
+            }
+        }
+        assert!(!row_text(actual, 23).contains("F3"));
     }
 }

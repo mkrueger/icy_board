@@ -7,6 +7,7 @@ use icy_board_engine::icy_board::{
 };
 use icy_board_tui::{
     BORDER_SET,
+    chrome::{dim_background, dirty_title, key_hint},
     config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, ResultState, TextFlags},
     get_text, get_text_args,
     save_changes_dialog::SaveChangesDialog,
@@ -510,16 +511,20 @@ impl Page for UserEditor {
             height: disp_area.height,
         };
 
-        let bottom_text = get_text("icb_setup_key_menu_help");
+        let dirty = *self.menu.obj.lock().unwrap() != self.icy_board.lock().unwrap().users[self.num_user];
+        let title = dirty_title(format!("{} #{}", get_text("icbsm_menu_edit_users"), self.num_user + 1), dirty);
 
-        let block: Block<'_> = Block::new()
+        let mut block: Block<'_> = Block::new()
             .style(get_tui_theme().background)
             .padding(Padding::new(2, 2, 1 + 4, 0))
             .borders(Borders::ALL)
             .border_set(BORDER_SET)
             .title_alignment(ratatui::layout::Alignment::Center)
-            .title_bottom(Span::styled(bottom_text, get_tui_theme().key_binding))
+            .title(Span::styled(title, get_tui_theme().dialog_box_title))
             .border_style(get_tui_theme().dialog_box);
+        if self.save_dialog.is_none() {
+            block = block.title_bottom(key_hint(get_text("icb_setup_key_menu_help")));
+        }
         block.render(area, frame.buffer_mut());
 
         let area = Rect {
@@ -530,6 +535,8 @@ impl Page for UserEditor {
         };
         self.menu.render(area, frame, &mut self.state);
         if let Some(save_changes) = &self.save_dialog {
+            let backdrop = frame.area();
+            dim_background(frame.buffer_mut(), backdrop);
             save_changes.render(frame, area);
         }
     }
@@ -580,5 +587,50 @@ impl Page for UserEditor {
             return PageMessage::None;
         }
         PageMessage::ResultState(res)
+    }
+}
+
+#[cfg(test)]
+mod rendering_tests {
+    use super::*;
+    use ratatui::{Terminal, backend::TestBackend, buffer::Buffer};
+
+    fn row_text(buffer: &Buffer, y: u16) -> String {
+        (0..buffer.area.width).map(|x| buffer[(x, y)].symbol()).collect()
+    }
+
+    #[test]
+    fn dirty_title_and_save_backdrop_leave_the_user_form_geometry_unchanged() {
+        let mut board = IcyBoard::default();
+        board.users.new_user(User {
+            name: "Alice".into(),
+            ..Default::default()
+        });
+        let board = Arc::new(Mutex::new(board));
+        let mut editor = UserEditor::new(board.clone(), 0);
+        let mut terminal = Terminal::new(TestBackend::new(80, 25)).unwrap();
+        terminal.draw(|frame| editor.render(frame, frame.area())).unwrap();
+        let clean_title = format!("{} #1", get_text("icbsm_menu_edit_users"));
+        assert!(row_text(terminal.backend().buffer(), 0).contains(&clean_title));
+        assert!(!row_text(terminal.backend().buffer(), 0).contains('*'));
+        assert!(row_text(terminal.backend().buffer(), 24).contains(&get_text("icb_setup_key_menu_help")));
+
+        editor.menu.obj.lock().unwrap().sysop_comment = "Unsaved draft".into();
+        terminal.draw(|frame| editor.render(frame, frame.area())).unwrap();
+        assert!(row_text(terminal.backend().buffer(), 0).contains(&format!("{clean_title} *")));
+        let mut expected = terminal.backend().buffer().clone();
+        let area = expected.area;
+        dim_background(&mut expected, area);
+
+        editor.save_dialog = Some(SaveChangesDialog::new());
+        terminal.draw(|frame| editor.render(frame, frame.area())).unwrap();
+        let actual = terminal.backend().buffer();
+        for y in 0..5 {
+            for x in 0..80 {
+                assert_eq!(actual[(x, y)], expected[(x, y)]);
+            }
+        }
+        assert!(!row_text(actual, 24).contains("F1"));
+        assert!(board.lock().unwrap().users[0].sysop_comment.is_empty());
     }
 }

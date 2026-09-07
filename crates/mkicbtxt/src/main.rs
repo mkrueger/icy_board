@@ -7,11 +7,17 @@ use crossterm::{
 };
 use icy_board_tui::{print_error, term};
 use semver::Version;
-use std::{io::stdout, path::PathBuf, process::exit};
+use std::{
+    io::stdout,
+    path::{Path, PathBuf},
+    process::exit,
+};
 mod app;
 mod tabs;
 
 use icy_board_engine::icy_board::{
+    IcyBoardSerializer,
+    icb_config::{IcbConfig, PcbScreenColors},
     icb_text::{DEFAULT_DISPLAY_TEXT, IcbTextFile, IcbTextFormat},
     write_atomic,
 };
@@ -41,6 +47,9 @@ struct Cli {
     #[arg(long = "version", help = icy_board_cli::text("mkicbtxt", "version"))]
     version: bool,
 
+    #[arg(long = "board", short = 'b', help = icy_board_cli::text("mkicbtxt", "board"))]
+    board: Option<PathBuf>,
+
     #[arg(help = icy_board_cli::text("mkicbtxt", "file"))]
     file: PathBuf,
 
@@ -58,6 +67,7 @@ mod cli_tests {
         assert!(!cli.create && !cli.full_screen && !cli.convert && !cli.force && !cli.version);
         assert!(cli.update.is_none() && cli.new_text.is_none());
         assert_eq!(cli.file, PathBuf::from("text.toml"));
+        assert!(cli.board.is_none());
         assert!(icy_board_cli::try_parse_from::<Cli, _, _>(["mkicbtxt"]).is_err());
         let cli =
             icy_board_cli::try_parse_from::<Cli, _, _>(["mkicbtxt", "-c", "-i", "42", "-f", "--convert", "--force", "--version", "text.toml", "new text"])
@@ -66,6 +76,29 @@ mod cli_tests {
         assert_eq!(cli.update, Some(42));
         assert_eq!(cli.new_text.as_deref(), Some("new text"));
         assert!(icy_board_cli::try_parse_from::<Cli, _, _>(["mkicbtxt", "--create=true", "text.toml"]).is_err());
+    }
+
+    #[test]
+    fn colours_come_from_the_board_the_text_file_belongs_to() {
+        let dir = tempfile::tempdir().unwrap();
+        let text = dir.path().join("main").join("icbtext.toml");
+        std::fs::create_dir_all(text.parent().unwrap()).unwrap();
+        std::fs::write(&text, "").unwrap();
+        assert_eq!(board_palette(&Some(dir.path().join("nothing.toml")), &text).0, "DEFAULT1");
+        assert_eq!(board_palette(&None, &text), ("DEFAULT1".to_string(), PcbScreenColors::default()));
+
+        let board = dir.path().join("icboard.toml");
+        let mut config = IcbConfig::default();
+        config.sysop.config_color_theme = "DEFAULT2".into();
+        config.sysop.config_color_configuration = PcbScreenColors::default_2();
+        config.save(&board).unwrap();
+        // Found beside the edited file, whatever the working directory is.
+        let (theme, palette) = board_palette(&None, &text);
+        assert_eq!(theme, "DEFAULT2");
+        assert_eq!(palette, PcbScreenColors::default_2());
+        assert_eq!(board_palette(&Some(board.clone()), &text).0, "DEFAULT2");
+        assert_eq!(board_palette(&Some(dir.path().to_path_buf()), &text).0, "DEFAULT2");
+        assert_eq!(board_palette(&None, &dir.path().join("gone.toml")).0, "DEFAULT2");
     }
 }
 
@@ -142,6 +175,9 @@ fn main() -> Result<()> {
                 return Ok(());
             }
 
+            // Match the board's own colours when the editor belongs to one.
+            let (theme, palette) = board_palette(&arguments.board, &file);
+            icy_board_tui::theme::set_admin_theme(&theme, &palette);
             let terminal = &mut term::init()?;
             let mut app = App::new(&mut icb_txt, file.clone(), arguments.full_screen);
             app.run(terminal)?;
@@ -156,6 +192,32 @@ fn main() -> Result<()> {
             exit(1);
         }
     }
+}
+
+/// A board's palette is only read for presentation, so an unreadable board
+/// costs colours, never the edit session.
+fn board_palette(board: &Option<PathBuf>, file: &Path) -> (String, PcbScreenColors) {
+    board
+        .as_ref()
+        .and_then(|path| icy_board_engine::lookup_icyboard_file(&Some(path.clone())))
+        .or_else(|| board_above(file))
+        .or_else(|| icy_board_engine::lookup_icyboard_file(&None))
+        .and_then(|path| IcbConfig::load(&path).ok())
+        .map_or_else(
+            || ("DEFAULT1".to_string(), PcbScreenColors::default()),
+            |config| (config.sysop.config_color_theme, config.sysop.config_color_configuration),
+        )
+}
+
+/// Text files live inside their board, a few directories below its config.
+fn board_above(file: &Path) -> Option<PathBuf> {
+    let directory = file.parent().filter(|parent| !parent.as_os_str().is_empty()).unwrap_or(Path::new("."));
+    let directory = directory.canonicalize().ok()?;
+    directory
+        .ancestors()
+        .take(4)
+        .map(|directory| directory.join(icy_board_engine::DEFAULT_ICYBOARD_FILE))
+        .find(|candidate| candidate.is_file())
 }
 
 fn save_file(file: &PathBuf, icb_txt: &IcbTextFile) {

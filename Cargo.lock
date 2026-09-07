@@ -5856,6 +5856,7 @@ dependencies = [
  "strum",
  "strum_macros",
  "substring",
+ "tempfile",
  "thiserror 2.0.20",
  "tui-input",
  "unicase",

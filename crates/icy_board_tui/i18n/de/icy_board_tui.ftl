@@ -425,6 +425,7 @@ icbsm_color_default_1=Standardfarbsatz #1
 icbsm_color_default_2=Standardfarbsatz #2
 icbsm_color_bw=Standard-S/W-Farben
 icbsm_color_customize=Farben anpassen
+icbsm_color_polished=Classic Polished
 icb_setup_main_acc_cfg=Abrechnung
 icb_setup_main_acc_cfg-help=
     # Abrechnung

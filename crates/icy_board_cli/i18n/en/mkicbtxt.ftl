@@ -5,5 +5,6 @@ full-screen = Use the full screen (default is 80x25)
 convert = Convert PCBTEXT to ICBTEXT
 force = Overwrite an existing file
 version = Print the version and exit
+board = Board configuration to take the colours from
 file = File to edit/create
 new-text = New text for the record
