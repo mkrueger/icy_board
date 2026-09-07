@@ -8,7 +8,7 @@ use crate::Res;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_with::{DisplayFromStr, serde_as};
 
-use super::{IcyBoardSerializer, PCBoardRecordImporter, is_null_64, security_expr::SecurityExpression};
+use super::{IcyBoardSerializer, PCBoardRecordImporter, is_null_64, is_null_f64, security_expr::SecurityExpression};
 
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Debug, Default)]
 pub enum CommandType {
@@ -843,6 +843,13 @@ pub struct Command {
     #[serde_as(as = "DisplayFromStr")]
     pub security: SecurityExpression,
 
+    /// Optional command surcharge, independent of any door/activity it invokes.
+    #[serde(default, skip_serializing_if = "is_null_f64")]
+    pub charge_per_use: f64,
+
+    #[serde(default, skip_serializing_if = "is_null_f64")]
+    pub charge_per_minute: f64,
+
     #[serde(default)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub actions: Vec<CommandAction>,
@@ -928,6 +935,9 @@ impl PCBoardRecordImporter<Command> for CommandList {
     }
 
     fn load_pcboard_record(data: &[u8]) -> Res<Command> {
+        if data.len() != Self::RECORD_SIZE {
+            return Err("Invalid PCBoard command record size".into());
+        }
         let name = crate::tables::import_cp437_string(&data[..15], true);
         let security = data[15];
 
@@ -956,6 +966,10 @@ impl PCBoardRecordImporter<Command> for CommandList {
                 trigger: ActionTrigger::Activation,
             }],
             security: SecurityExpression::from_req_security(security),
+            // PCB.H's packed cmdtype: Name[15], SecLevel, File[40], then
+            // two little-endian IEEE single precision rates (use, minute).
+            charge_per_use: f32::from_le_bytes(data[56..60].try_into().unwrap()) as f64,
+            charge_per_minute: f32::from_le_bytes(data[60..64].try_into().unwrap()) as f64,
         })
     }
 }

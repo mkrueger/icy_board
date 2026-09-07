@@ -42,7 +42,7 @@ If something is missing just let me know.
 | Built in Message Editor | 80% | I consider line & fse done but needs 1-2 test passes to the real one to make it 100% | 
 | PPE Runtime  | 90% | Every existing PPE not running is considered as a bug. Due to the Nature the PPE runtime it won't reach 100% since it's not running on DOS anymore. dBase III statements and functions are in. |
 | Conferences  | 90% | Basically works, INTRO and NEWS are displayed on join |
-| @ Macro support | 80% | Most work; accounting credits, event/off-hours, free-space and a few caller/password macros remain stubs |
+| @ Macro support | 80% | Most work, including accounting credit macros; event/off-hours, free-space and a few caller/password macros remain stubs |
 | File Bases  | 90% | SQLite base with the metadata the archives do not carry, long file names, archives read through unarc-rs |
 | Mail Bases | 80% | JAM base, search, QWK and an FTN leaf; netmail still lands in one dump base |
 | FTN Mailer | 70% | Leaf/point scan, poll and toss over BinkP work; no answering side, AreaFix, per-user netmail or setup UI for AKA/links |
@@ -54,7 +54,7 @@ If something is missing just let me know.
 | Limits | 85% | PWRD time, ratios, credits and daily/total byte/file limits work; FSEC `NOTIME` and per-file `FREE` are not imported |
 | Events | 80% | The nightly event runs, clears the board and can suspend callers; PCBoard's per node and expedited modes are missing | 
 | Subscriptions | 90% | New-user periods, warning/expired files, temporary expired security, R/X conference access, macros and sysop renewal work; no payment-driven renewal exists |
-| Accounting | 20% | Config plus PPL `ACCOUNT`/`RECORDUSAGE` and tracking work; built-in actions do not charge, balance enforcement, peak rates, credit macros and display files are missing |
+| Accounting | Implemented with limits | Activity charges/credits, N/T/Y modes, balance enforcement, peak/holiday rates, command/door tariffs, credit macros, display files and ASCII/DBF tracking; NoTime monetary refunds and transactional durability remain unsupported. See [Accounting](accounting.md). |
 
 ## PCBoard Commands
 

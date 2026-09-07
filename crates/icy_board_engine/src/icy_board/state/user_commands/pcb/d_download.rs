@@ -17,6 +17,70 @@ use crate::{
 };
 
 impl IcyBoardState {
+    /// Both the directory exemption and the file header's FREE flag apply.
+    /// There is no persisted NOTIME or FSEC multiplier in the current schema.
+    /// TRANSFER.C's FILETIME CREDIT additionally needs successful per-file CPS:
+    /// finished_files only retains names/paths and resets its timing at finish.
+    /// Batch CPS includes partial files, so it cannot safely fund that rebate.
+    pub(crate) async fn accounting_download_free(&mut self, path: &Path) -> Res<bool> {
+        let mut directory = self.session.current_conference.directories.as_ref()
+            .and_then(|directories| directories.iter().find(|area| Some(area.path.as_path()) == path.parent()))
+            .cloned();
+        if directory.is_none() {
+            // A caller can queue files, then join another conference.
+            directory = self.get_board().await.conferences.iter()
+                .filter_map(|conference| conference.directories.as_ref())
+                .flat_map(|directories| directories.iter())
+                .find(|area| Some(area.path.as_path()) == path.parent()).cloned();
+        }
+        let Some(directory) = directory else { return Ok(false); };
+        if directory.is_free { return Ok(true); }
+        let files = self.get_filebase(&directory.path, &directory.metadata_path).await?;
+        let files = files.lock().await;
+        let name = path.file_name().unwrap_or_default().to_string_lossy();
+        Ok(files.iter().any(|file| file.name().eq_ignore_ascii_case(&name) && file.is_free()))
+    }
+
+    /// TRANSFER.C estimates fractional KiB and normal-rate time, including
+    /// earlier queued files. A free file still consumes online time.
+    pub(crate) async fn accounting_download_estimate(&mut self, path: &Path, bytes: u64) -> Res<f64> {
+        if !self.accounting_active() { return Ok(0.0); }
+        let free = self.accounting_download_free(path).await?;
+        let seconds = limits::seconds_for_transfer(bytes, self.get_bps().max(0) as u32);
+        Ok(download_estimate(&self.accounting_rates(), bytes, seconds, free))
+    }
+
+    pub(crate) async fn accounting_queued_download_cost(&mut self, except: &Path) -> Res<f64> {
+        let mut reserved = 0.0;
+        let mut seen = std::collections::HashSet::new();
+        for path in self.session.flagged_files.clone() {
+            if path == except || !seen.insert(path.clone()) { continue; }
+            if let Ok(metadata) = path.metadata() {
+                reserved += self.accounting_download_estimate(&path, metadata.len()).await?;
+            }
+        }
+        Ok(reserved)
+    }
+
+    /// TRANSFER.C's generated MSGCAP/QWKCAP packets are NOCOST/FreeFile.
+    /// They still cost online time; StopClockOnCap is not in the live schema.
+    pub(crate) fn accounting_capture_transfer_estimate(&self, bytes: u64) -> f64 {
+        if !self.accounting_active() { return 0.0; }
+        let seconds = limits::seconds_for_transfer(bytes, self.get_bps().max(0) as u32);
+        download_estimate(&self.accounting_rates(), bytes, seconds, true)
+    }
+
+    /// Called once per confirmed file, never for partial protocol wire bytes.
+    /// Legacy byte rates use whole KiB PER FILE, not a rounded batch total.
+    pub(crate) fn accounting_record_download(&mut self, name: &str, bytes: u64, free: bool) -> Res<()> {
+        if !free {
+            let rates = self.accounting_rates();
+            self.accounting_record(9, "DNLD FILE", name, rates.charge_per_download_file, 1)?;
+            self.accounting_record(10, "DNLD BYTES", name, rates.charge_per_download_bytes, (bytes / 1024) as i64)?;
+        }
+        Ok(())
+    }
+
     pub async fn download(&mut self, ask_flagged_files: bool) -> Res<()> {
         self.download_files(ask_flagged_files, false).await
     }
@@ -289,11 +353,16 @@ impl IcyBoardState {
         if completed.is_empty() {
             return Ok(());
         }
-        let free_areas = self.free_download_areas();
-        let (charged_files, charged_bytes) = completed
-            .iter()
-            .filter(|(path, _)| !path.parent().is_some_and(|dir| free_areas.iter().any(|area| area == dir)))
-            .fold((0u64, 0u64), |(files, bytes), (_, size)| (files.saturating_add(1), bytes.saturating_add(*size)));
+        let (mut charged_files, mut charged_bytes) = (0u64, 0u64);
+        for (path, size) in &completed {
+            let free = self.accounting_download_free(path).await?;
+            let name = path.file_name().unwrap_or_default().to_string_lossy();
+            self.accounting_record_download(&name, *size, free)?;
+            if !free {
+                charged_files = charged_files.saturating_add(1);
+                charged_bytes = charged_bytes.saturating_add(*size);
+            }
+        }
         if let Some(user) = &mut self.session.current_user {
             user.stats.num_downloads = user.stats.num_downloads.saturating_add(charged_files);
             user.stats.today_num_downloads = user.stats.today_num_downloads.saturating_add(charged_files);
@@ -317,6 +386,7 @@ impl IcyBoardState {
         }
         // Commit completed-file accounting even if the connection subsequently
         // fails while printing the summary or caller log.
+        self.accounting_check_balance().await?;
         self.log_transfer(false, &sent, protocol, state.send_state.errors, cps).await?;
         self.display_text(IceText::BatchTransferEnded, display_flags::LFBEFORE).await?;
         self.display_text(IceText::BatchSend, display_flags::LFBEFORE).await?;
@@ -368,10 +438,10 @@ impl IcyBoardState {
         // PPL can move the allowance around during the session, so take the live figure.
         limits.bytes_remaining = (self.session.bytes_remaining >= 0).then_some(self.session.bytes_remaining);
 
-        let free_areas = self.free_download_areas();
         let bps = self.get_bps().max(0) as u32;
         let minutes_left = self.minutes_left();
         let mut seconds_so_far = 0i64;
+        let mut reserved = 0.0;
         let mut so_far = BatchSoFar::default();
         let mut allowed = Vec::new();
         let mut names = std::collections::HashSet::new();
@@ -386,7 +456,7 @@ impl IcyBoardState {
                 continue;
             }
             let size = metadata.len();
-            let free = path.parent().is_some_and(|dir| free_areas.iter().any(|area| area == dir));
+            let free = self.accounting_download_free(&path).await?;
             let verdict = if enforce_transfer_limits {
                 history
                     .as_ref()
@@ -421,20 +491,15 @@ impl IcyBoardState {
                     continue;
                 }
             }
+            let charge = self.accounting_download_estimate(&path, size).await?;
+            if self.accounting_insufficient(charge, reserved).await? { continue; }
+            reserved += charge;
             seconds_so_far += seconds;
             so_far.accept(size, free);
             names.insert(path.file_name().unwrap_or_default().to_string_lossy().to_ascii_uppercase());
             allowed.push(path);
         }
         Ok(allowed)
-    }
-
-    /// Directories the sysop marked free, which `PCBoard`'s FSEC file did with a password.
-    fn free_download_areas(&mut self) -> Vec<PathBuf> {
-        let Some(directories) = &self.session.current_conference.directories else {
-            return Vec::new();
-        };
-        directories.iter().filter(|area| area.is_free).map(|area| area.path.clone()).collect()
     }
 
     /// Tells the caller which limit stopped the file, in the order `PCBoard` prints it:
@@ -566,6 +631,42 @@ impl IcyBoardState {
 const DL_LISTMASK: &str = "AEGLP";
 const DL_EDITMASK: &str = "ARL";
 
+fn download_estimate(rates: &crate::icy_board::accounting_cfg::AccountingConfig, bytes: u64, seconds: i64, free: bool) -> f64 {
+    let files = if free { 0.0 } else { rates.charge_per_download_file + rates.charge_per_download_bytes * (bytes as f64 / 1024.0) };
+    files + rates.charge_per_time * seconds as f64 / 60.0
+}
+
+#[cfg(test)]
+pub(crate) async fn enable_activity_accounting(state: &mut IcyBoardState, rates: crate::icy_board::accounting_cfg::AccountingConfig) {
+    let security = state.session.cur_security;
+    let password = state.session.last_password.clone();
+    {
+        let mut board = state.get_board().await;
+        board.sec_levels.clear();
+        board.sec_levels.push(crate::icy_board::sec_levels::SecurityLevel {
+            security,
+            password,
+            is_enabled: true,
+            ..Default::default()
+        });
+        board.config.accounting.enabled = true;
+        board.config.accounting.concurrent_tracking = false;
+        board.config.accounting.ignore_empty_sec_level = false;
+        board.config.accounting.accounting_config = Some(rates);
+        board.config.accounting.info_file = PathBuf::new();
+        board.config.accounting.warning_file = PathBuf::new();
+        board.config.accounting.logoff_file = PathBuf::new();
+        board.config.accounting.tracking_file = PathBuf::new();
+    }
+    state.session.current_user.as_mut().unwrap().account = Some(crate::icy_board::pcb::user_inf::AccountUserInf {
+        starting_balance: 100_000.0,
+        start_this_session: 100_000.0,
+        ..Default::default()
+    });
+    state.accounting_start().await.unwrap();
+    assert!(state.accounting_active());
+}
+
 #[cfg(test)]
 #[path = "download_tests.rs"]
 mod download_compatibility_tests;
@@ -597,6 +698,19 @@ fn downloads_per_area(offered: &[PathBuf], sent: &[String]) -> HashMap<PathBuf, 
 mod download_counter_tests {
     use super::downloads_per_area;
     use std::path::PathBuf;
+
+    #[test]
+    fn accounting_estimates_fractional_kib_and_free_files_still_cost_time() {
+        let rates = crate::icy_board::accounting_cfg::AccountingConfig {
+            charge_per_download_file: 3.0,
+            charge_per_download_bytes: 2.0,
+            charge_per_time: 4.0,
+            ..Default::default()
+        };
+        assert_eq!(super::download_estimate(&rates, 1536, 30, false), 8.0);
+        assert_eq!(super::download_estimate(&rates, 1536, 30, true), 2.0);
+        assert_eq!(super::download_estimate(&rates, 512, 0, false), 4.0);
+    }
 
     #[test]
     fn only_finished_files_are_counted() {

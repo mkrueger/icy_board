@@ -1,6 +1,7 @@
 use std::{process::Stdio, time::Duration};
 
 use crate::icy_board::commands::CommandType;
+use crate::icy_board::state::menu_runner::ActivityUsage;
 use crate::{Res, icy_board::state::IcyBoardState};
 
 use crate::icy_board::{
@@ -21,6 +22,22 @@ use thiserror::Error;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 static DOS_MACHINE_LOCK: std::sync::LazyLock<tokio::sync::Mutex<()>> = std::sync::LazyLock::new(|| tokio::sync::Mutex::new(()));
+
+/// An explicitly priced command opening a priced door is two configured
+/// activities, never an implicit duplicate of the door's own surcharge.
+struct DoorUsage<'a> {
+    door: ActivityUsage,
+    command: Option<&'a mut ActivityUsage>,
+}
+
+impl DoorUsage<'_> {
+    fn start(&mut self, state: &mut IcyBoardState) -> Res<()> {
+        if let Some(command) = self.command.as_deref_mut() {
+            command.start(state)?;
+        }
+        self.door.start(state)
+    }
+}
 
 fn dos_runtime_remaining(login_date: chrono::DateTime<chrono::Utc>, time_limit: i32, max_runtime_seconds: u32) -> Option<Duration> {
     let maximum = Duration::from_secs(
@@ -108,6 +125,10 @@ impl IcyBoardState {
     /// Runs the door whose name `name` begins, matched as a prefix the way
     /// `searchdoorlist` does. Returns false when no door answers to the name.
     pub async fn run_named_door(&mut self, name: &str) -> Res<bool> {
+        self.run_named_door_with_usage(name, None).await
+    }
+
+    pub(crate) async fn run_named_door_with_usage(&mut self, name: &str, usage: Option<&mut ActivityUsage>) -> Res<bool> {
         let Some(doors) = self.session.current_conference.doors.clone() else {
             return Ok(false);
         };
@@ -115,7 +136,7 @@ impl IcyBoardState {
         for (i, door) in doors.doors.iter().enumerate() {
             if door.name.to_uppercase().starts_with(&needle) {
                 self.set_activity(NodeStatus::RunningDoor).await;
-                self.run_door(&doors, door, i).await?;
+                self.run_door_with_usage(&doors, door, i, usage).await?;
                 return Ok(true);
             }
         }
@@ -123,8 +144,12 @@ impl IcyBoardState {
     }
 
     pub async fn open_door(&mut self) -> Res<()> {
+        self.open_door_with_usage(None).await
+    }
+
+    pub(crate) async fn open_door_with_usage(&mut self, usage: Option<&mut ActivityUsage>) -> Res<()> {
         self.set_activity(NodeStatus::RunningDoor).await;
-        let doors = self.session.current_conference.doors.as_ref().unwrap().clone();
+        let doors = self.session.current_conference.doors.clone().unwrap_or_default();
         if doors.is_empty() {
             self.display_text(
                 IceText::NoDOORSAvailable,
@@ -166,14 +191,14 @@ impl IcyBoardState {
             if number > 0
                 && let Some(b) = doors.get(number - 1)
             {
-                self.run_door(&doors, b, number).await?;
+                self.run_door_with_usage(&doors, b, number, usage).await?;
                 //                    self.display_current_menu = true;
                 return Ok(());
             }
         } else {
             for (i, d) in doors.doors.iter().enumerate() {
                 if d.name.to_uppercase().starts_with(&text.to_uppercase()) {
-                    self.run_door(&doors, d, i).await?;
+                    self.run_door_with_usage(&doors, d, i, usage).await?;
                     //                    self.display_current_menu = true;
                     return Ok(());
                 }
@@ -186,6 +211,10 @@ impl IcyBoardState {
     }
 
     pub async fn run_door(&mut self, door_list: &DoorList, door: &Door, door_number: usize) -> Res<()> {
+        self.run_door_with_usage(door_list, door, door_number, None).await
+    }
+
+    async fn run_door_with_usage(&mut self, door_list: &DoorList, door: &Door, door_number: usize, command: Option<&mut ActivityUsage>) -> Res<()> {
         if !door.securiy_level.session_can_access(&self.session) {
             self.display_text(
                 IceText::DOORNotAvailable,
@@ -234,29 +263,62 @@ impl IcyBoardState {
             }
         }
 
-        match door.door_type {
-            DoorType::BBSlink => {
-                let DoorServerAccount::BBSLink(bbslink) = &door_list.accounts[0];
-                self.run_bbslink_door(bbslink, door).await?;
-            }
-            DoorType::Local => {
-                self.run_local_door(door, door_number).await?;
-            }
-            DoorType::Dos => {
-                self.run_dos_door(door, door_number).await?;
-            }
+        if self.session.request_logoff {
+            return Ok(());
         }
-        Ok(())
+        let usage = ActivityUsage::new("DOOR USAGE", "DOOR USAGE MIN", &door.name, door.charge_per_use, door.charge_per_minute);
+        let reserved = command.as_ref().map_or(0.0, |usage| usage.pending_cost());
+        if !usage.allowed_with_reserved(self, reserved).await? {
+            return Ok(());
+        }
+        let mut usage = DoorUsage { door: usage, command };
+        // Selection, password/security, confirmation and admission have all
+        // succeeded. Each backend marks its actual launch, not setup attempts.
+        let result = match door.door_type {
+            DoorType::BBSlink => {
+                if let Some(DoorServerAccount::BBSLink(bbslink)) = door_list.accounts.first() {
+                    self.run_bbslink_door_started(bbslink, door, &mut usage).await
+                } else {
+                    Err("BBSLink door has no server account".into())
+                }
+            }
+            DoorType::Local => self.run_local_door(door, door_number, &mut usage).await,
+            DoorType::Dos => self.run_dos_door(door, door_number, &mut usage).await,
+        };
+        usage.door.finish(self, result).await
     }
 
-    async fn run_local_door(&mut self, door: &crate::icy_board::doors::Door, door_number: usize) -> Res<()> {
+    async fn run_local_door(&mut self, door: &crate::icy_board::doors::Door, door_number: usize, usage: &mut DoorUsage<'_>) -> Res<()> {
         let file_name = self.resolve_path(&door.path);
-        if door.path.ends_with("ppe") {
-            self.run_ppe(&file_name, None).await?;
+        if file_name.extension().is_some_and(|extension| extension.eq_ignore_ascii_case("ppe")) {
+            // Load before posting: a missing/corrupt PPE never started. Reuse
+            // the loaded executable rather than racing a second file read.
+            let executable = match crate::executable::Executable::read_file(&file_name, false) {
+                Ok(executable) => executable,
+                Err(error) => {
+                    self.session.op_text = error.to_string();
+                    let result = self
+                        .display_text(IceText::ErrorLoadingPPE, display_flags::LFBEFORE | display_flags::LFAFTER)
+                        .await;
+                    self.session.tokens.clear();
+                    return result;
+                }
+            };
+            if self.ppe_nesting >= 16 {
+                self.session.tokens.clear();
+                return Ok(());
+            }
+            let file_name = file_name.canonicalize()?;
+            usage.start(self)?;
+            let result = self.run_executable_with_color_restore(&file_name, None, executable, true).await;
+            self.session.tokens.clear();
+            result?;
             return Ok(());
         }
         let working_directory = file_name.parent().unwrap();
         door.create_drop_file(self, working_directory, door_number).await?;
+        // Shell execution is considered started when the shell spawns; a later
+        // shell error/nonzero exit is billable, just like a game's runtime error.
         let mut cmd = if door.use_shell_execute {
             tokio::process::Command::new("sh")
                 .arg("-c")
@@ -264,14 +326,17 @@ impl IcyBoardState {
                 .current_dir(working_directory)
                 .stdin(Stdio::piped())
                 .stdout(Stdio::piped())
+                .kill_on_drop(true)
                 .spawn()?
         } else {
             tokio::process::Command::new(&file_name)
                 .current_dir(working_directory)
                 .stdin(Stdio::piped())
                 .stdout(Stdio::piped())
+                .kill_on_drop(true)
                 .spawn()?
         };
+        usage.start(self)?;
 
         let mut write_buf = vec![0; 32 * 1024];
         let mut read_buf = vec![0; 128 * 1024];
@@ -309,6 +374,10 @@ impl IcyBoardState {
                 read_data = self.connection.read(&mut write_buf) => {
                     match read_data {
                         Ok(size) => {
+                            if size == 0 {
+                                self.session.request_logoff = true;
+                                break;
+                            }
                             if stidn.write_all(&write_buf[0..size]).await.is_err() {
                                 break;
                             }
@@ -330,7 +399,7 @@ impl IcyBoardState {
         Ok(())
     }
 
-    async fn run_dos_door(&mut self, door: &crate::icy_board::doors::Door, door_number: usize) -> Res<()> {
+    async fn run_dos_door(&mut self, door: &crate::icy_board::doors::Door, door_number: usize, usage: &mut DoorUsage<'_>) -> Res<()> {
         let _machine_guard = DOS_MACHINE_LOCK.lock().await;
         let source_path = self.resolve_path(&door.path);
         let assets = self.resolve_path(&"assets/dos");
@@ -375,6 +444,9 @@ impl IcyBoardState {
         let runtime_remaining = dos_runtime_remaining(self.session.login_date, self.session.time_limit, door.dos_max_runtime_seconds)
             .expect("DOS doors always have a hard runtime limit");
         let mut session = crate::icy_board::doors::dos::start_session(&image_path, &bios_path, &vga_bios_path, door.dos_memory_mb, runtime_remaining)?;
+        // Native DOS has started once its emulator worker was successfully
+        // launched. Guest boot/game failures after this point are billable.
+        usage.start(self)?;
         let mut input = vec![0; 32 * 1024];
         let mut input_encoder = DosInputEncoder::default();
         let startup_timeout = tokio::time::sleep(Duration::from_secs(30));
@@ -454,6 +526,15 @@ impl IcyBoardState {
     }
 
     pub async fn run_bbslink_door(&mut self, bbslink: &BBSLink, door: &Door) -> Res<()> {
+        // Keep direct callers on the same gates and billing path as OPEN.
+        let list = DoorList {
+            accounts: vec![DoorServerAccount::BBSLink(bbslink.clone())],
+            doors: Vec::new(),
+        };
+        self.run_door(&list, door, door.number).await
+    }
+
+    async fn run_bbslink_door_started(&mut self, bbslink: &BBSLink, door: &Door, usage: &mut DoorUsage<'_>) -> Res<()> {
         log::info!("Running door: {}, requesting token", door.path);
         let x_key: String = (0..12)
             .map(|_| {
@@ -513,6 +594,7 @@ impl IcyBoardState {
                     )
                     .await?;
                     log::info!("Connected to door server");
+                    usage.start(self)?;
                     let () = execute_door(&mut connection, self).await?;
                     return Ok(());
                 }
@@ -574,6 +656,9 @@ async fn execute_door(door_connection: &mut dyn Connection, state: &mut crate::i
                                     door_connection.send(&read_buf[0..size]).await?;
                                 }
                             }
+                        } else {
+                            state.session.request_logoff = true;
+                            return Ok(());
                         }
                     }
                     Err(e) => {

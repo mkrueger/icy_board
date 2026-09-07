@@ -92,10 +92,16 @@ pub struct SecurityLevel {
     #[serde(skip_serializing_if = "is_false")]
     pub is_demo_account: bool,
 
+    /// PCBoard PWRD accounting flag Y (enforce), not a general level enable switch.
     #[serde(default)]
     #[serde(rename = "enabled")]
     #[serde(skip_serializing_if = "is_false")]
     pub is_enabled: bool,
+
+    /// PCBoard PWRD accounting flag T. Takes precedence over `is_enabled`;
+    /// the runtime only activates tracking when a tracking file is configured.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub accounting_tracking: bool,
 }
 
 #[derive(Serialize, Deserialize, Default, Clone, PartialEq)]
@@ -149,7 +155,13 @@ impl SecurityLevelDefinitions {
                 if level.is_demo_account { "Y" } else { "N" }, // unused
                 level.file_credit,
                 level.file_kb_credit,
-                if level.is_enabled { "Y" } else { "N" }
+                if level.accounting_tracking {
+                    "T"
+                } else if level.is_enabled {
+                    "Y"
+                } else {
+                    "N"
+                }
             );
         }
         std::fs::write(file, data)?;
@@ -191,6 +203,7 @@ impl PCBoardTextImport for SecurityLevelDefinitions {
             let file_kb_credit = splitted_line[16].parse::<u64>().unwrap_or(0);
 
             let is_enabled = splitted_line[17] == "Y";
+            let accounting_tracking = splitted_line[17] == "T";
 
             // new settings
             let calls_per_day = 0;
@@ -198,6 +211,7 @@ impl PCBoardTextImport for SecurityLevelDefinitions {
 
             res.levels.push(SecurityLevel {
                 is_enabled,
+                accounting_tracking,
                 password,
                 security,
                 time_per_day,

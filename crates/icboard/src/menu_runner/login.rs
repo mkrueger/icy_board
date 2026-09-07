@@ -8,6 +8,7 @@ use icy_board_engine::{
     icy_board::{
         icb_config::DEFAULT_PCBOARD_DATE_FORMAT,
         icb_text::IceText,
+        pcb::user_inf::AccountUserInf,
         security_expr::SecurityExpression,
         state::{
             NodeStatus,
@@ -579,6 +580,15 @@ impl PcbBoardCommand {
             self.register_public_conferences(&mut new_user).await;
         }
 
+        // Only genuine registration receives the opening grant. Loading an
+        // existing user with no account must not mint new-user credit.
+        if let Some(rates) = &self.state.get_board().await.config.accounting.accounting_config {
+            rates.validate()?;
+            new_user.account = Some(AccountUserInf {
+                starting_balance: rates.new_user_balance,
+                ..Default::default()
+            });
+        }
         let user_name = new_user.get_name().clone();
         let id = self.state.get_board().await.users.new_user(new_user);
         {
@@ -588,7 +598,7 @@ impl PcbBoardCommand {
             board.groups.save(&board.config.paths.group_file)?;
             board.save_userbase()?;
         }
-        self.state.set_current_user(id, true).await?;
+        self.state.set_current_user(id, false).await?;
 
         log::info!("NEW USER: '{}'", self.state.session.user_name);
         self.state.log_logon_to_caller_log().await;
@@ -599,6 +609,11 @@ impl PcbBoardCommand {
         }
         self.state.display_news(false).await?;
         self.logon_questions().await?;
+        if self.state.session.request_logoff {
+            return Ok(false);
+        }
+        self.start_login_accounting().await?;
+        self.state.join_conference(0, false, false).await?;
 
         Ok(true)
     }
@@ -783,6 +798,11 @@ impl PcbBoardCommand {
         if self.state.session.request_logoff {
             return Ok(false);
         }
+        self.logon_questions().await?;
+        if self.state.session.request_logoff {
+            return Ok(false);
+        }
+        self.start_login_accounting().await?;
         let last_conference = if let Some(user) = &self.state.session.current_user {
             user.last_conference
         } else {
@@ -790,8 +810,23 @@ impl PcbBoardCommand {
         };
         self.state.join_conference(last_conference, false, false).await?;
 
-        self.logon_questions().await?;
         Ok(true)
+    }
+
+    /// NODE/LOGIN.C: after LOGON preprocessing, before ordinary conference
+    /// screens. Direct /PPE mode intentionally does not use this entry point.
+    pub(crate) async fn start_login_accounting(&mut self) -> Res<()> {
+        self.state.accounting_start().await?;
+        if self.state.accounting_active() {
+            let info = self.state.session.accounting.options.info_file.clone();
+            if !info.as_os_str().is_empty() {
+                self.state.display_file(&info).await?;
+            }
+            // The runtime owns the warning latch and enforced-vs-tracking
+            // distinction; subsequent command/input checks cannot replay it.
+            self.state.accounting_check_balance().await?;
+        }
+        Ok(())
     }
 
     async fn deny_login_for_event(&mut self) -> Res<bool> {

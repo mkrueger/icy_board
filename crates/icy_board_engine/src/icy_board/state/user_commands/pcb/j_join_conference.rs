@@ -162,6 +162,10 @@ impl IcyBoardState {
                 return Ok(());
             }
 
+            self.accounting_settle_conference().await?;
+            if self.session.request_logoff {
+                return Ok(());
+            }
             if conf_num == 0 {
                 self.session.op_text = format!("{} ({})", self.session.current_conference.name, self.session.current_conference_number);
                 self.join_conference(conf_num as u16, quick_join, true).await?;

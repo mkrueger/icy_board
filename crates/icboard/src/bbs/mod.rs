@@ -182,7 +182,27 @@ pub async fn handle_client(
 }
 
 #[async_recursion(?Send)]
-pub async fn internal_handle_client(mut state: IcyBoardState, login_options: Option<LoginOptions>, stuffed_chars: &str) -> Res<()> {
+pub async fn internal_handle_client(state: IcyBoardState, login_options: Option<LoginOptions>, stuffed_chars: &str) -> Res<()> {
+    let mut cmd = PcbBoardCommand::new(state);
+    let result = run_client_session(&mut cmd, login_options, stuffed_chars).await;
+    // This is deliberately independent of socket shutdown/display. It is a
+    // no-op until accounting_start authenticated the caller, even when login
+    // loaded a user record before a failed password. Finish is retry-safe when
+    // normal logoff/save already settled the account.
+    let finalized = cmd.state.accounting_finish().await;
+    match (result, finalized) {
+        (Err(error), cleanup) => {
+            if let Err(cleanup) = cleanup {
+                log::error!("Accounting finalization also failed: {cleanup}");
+            }
+            Err(error)
+        }
+        (Ok(()), finalized) => finalized,
+    }
+}
+
+async fn run_client_session(cmd: &mut PcbBoardCommand, login_options: Option<LoginOptions>, stuffed_chars: &str) -> Res<()> {
+    let state = &mut cmd.state;
     let mut logged_in = false;
     let mut local = false;
 
@@ -195,7 +215,9 @@ pub async fn internal_handle_client(mut state: IcyBoardState, login_options: Opt
         if login_options.login_sysop {
             logged_in = true;
             state.session.is_sysop = true;
-            state.set_current_user(0, true).await.unwrap();
+            // Defer conference presentation until accounting has begun, and
+            // never show it for /PPE (even with the local-sysop shortcut).
+            state.set_current_user(0, false).await?;
         }
 
         if let Some(ppe) = &login_options.ppe {
@@ -236,8 +258,6 @@ pub async fn internal_handle_client(mut state: IcyBoardState, login_options: Opt
         local = login_options.local;
     }
 
-    let mut cmd = PcbBoardCommand::new(state);
-
     cmd.state.session.disp_options.force_count_lines();
     cmd.state.session.is_local = local;
     if local {
@@ -271,6 +291,15 @@ pub async fn internal_handle_client(mut state: IcyBoardState, login_options: Opt
                 return Err(err);
             }
         }
+    } else {
+        cmd.start_login_accounting().await?;
+        let conference = cmd.state.session.current_user.as_ref().map_or(0, |user| user.last_conference);
+        let conference = if cmd.state.subscription_can_access_conference(conference) {
+            conference
+        } else {
+            0
+        };
+        cmd.state.join_conference(conference, false, false).await?;
     }
 
     let mut press_enter = cmd.state.session.disp_options.num_lines_printed > 3;

@@ -13,7 +13,7 @@ use icy_board_engine::{
     },
 };
 use icy_board_tui::{
-    config_menu::{ConfigEntry, ConfigMenu, ListItem, ListValue, ResultState, TextFlags},
+    config_menu::{ComboBox, ComboBoxValue, ConfigEntry, ConfigMenu, ListItem, ListValue, ResultState, TextFlags},
     get_text,
     insert_table::{Column, InsertTable},
     tab_page::{Page, PageMessage},
@@ -34,6 +34,16 @@ pub struct SecurityLevelEditor<'a> {
 
     detail: super::EditorDialog<(usize, Arc<Mutex<SecurityLevelDefinitions>>)>,
     save_changes: super::EditorSaveChanges,
+}
+
+fn accounting_mode(level: &SecurityLevel) -> &'static str {
+    if level.accounting_tracking {
+        "tracking"
+    } else if level.is_enabled {
+        "enforce"
+    } else {
+        "disabled"
+    }
 }
 
 impl<'a> SecurityLevelEditor<'a> {
@@ -64,6 +74,7 @@ impl<'a> SecurityLevelEditor<'a> {
                         enforce_read_mail: false,
                         is_demo_account: false,
                         is_enabled: true,
+                        accounting_tracking: false,
                     },
                     SecurityLevel {
                         password: "".to_string(),
@@ -86,6 +97,7 @@ impl<'a> SecurityLevelEditor<'a> {
                         enforce_read_mail: false,
                         is_demo_account: false,
                         is_enabled: true,
+                        accounting_tracking: false,
                     },
                     SecurityLevel {
                         password: "".to_string(),
@@ -108,6 +120,7 @@ impl<'a> SecurityLevelEditor<'a> {
                         enforce_read_mail: false,
                         is_demo_account: false,
                         is_enabled: true,
+                        accounting_tracking: false,
                     },
                 ],
             }
@@ -218,6 +231,7 @@ impl<'a> Page for SecurityLevelEditor<'a> {
                             enforce_read_mail: false,
                             is_demo_account: false,
                             is_enabled: true,
+                            accounting_tracking: false,
                         },
                     );
                 }
@@ -365,11 +379,42 @@ impl<'a> Page for SecurityLevelEditor<'a> {
                                         }),
                                 ),
                                 ConfigEntry::Item(
-                                    ListItem::new(get_text("sec_level_enable_acc"), ListValue::Bool(action.is_enabled))
-                                        .with_label_width(16)
-                                        .with_update_bool_value(&|(i, list): &(usize, Arc<Mutex<SecurityLevelDefinitions>>), value: bool| {
-                                            list.lock().unwrap()[*i].is_enabled = value;
+                                    ListItem::new(
+                                        get_text("accounting_level_mode"),
+                                        ListValue::ComboBox(ComboBox {
+                                            cur_value: ComboBoxValue::new(
+                                                get_text(&format!("accounting_level_mode_{}", accounting_mode(action))),
+                                                accounting_mode(action),
+                                            ),
+                                            selected_item: 0,
+                                            is_edit_open: false,
+                                            first_item: 0,
+                                            values: ["disabled", "tracking", "enforce"]
+                                                .into_iter()
+                                                .map(|mode| ComboBoxValue::new(get_text(&format!("accounting_level_mode_{mode}")), mode))
+                                                .collect(),
                                         }),
+                                    )
+                                    .with_label_width(16)
+                                    .with_status(get_text("accounting_level_mode-status"))
+                                    .with_help(get_text("accounting_level_mode-help"))
+                                    .with_update_combobox_value(
+                                        &|(i, list): &(usize, Arc<Mutex<SecurityLevelDefinitions>>), value: &ComboBox| {
+                                            let mut levels = list.lock().unwrap();
+                                            let level = &mut levels[*i];
+                                            // Closed combo boxes also update during rendering. Preserve unchanged
+                                            // legacy flags, including T+Y, until a different mode is selected.
+                                            if accounting_mode(level) == value.cur_value.value {
+                                                return;
+                                            }
+                                            match value.cur_value.value.as_str() {
+                                                "disabled" => (level.is_enabled, level.accounting_tracking) = (false, false),
+                                                "tracking" => (level.is_enabled, level.accounting_tracking) = (false, true),
+                                                "enforce" => (level.is_enabled, level.accounting_tracking) = (true, false),
+                                                _ => {}
+                                            }
+                                        },
+                                    ),
                                 ),
                             ],
                         }));
@@ -389,4 +434,102 @@ impl<'a> Page for SecurityLevelEditor<'a> {
 
 pub fn edit_sec(_board: Arc<Mutex<IcyBoard>>, path: PathBuf) -> PageMessage {
     PageMessage::OpenSubPage(Box::new(SecurityLevelEditor::new(&path).unwrap()))
+}
+
+#[cfg(test)]
+mod accounting_tests {
+    use super::*;
+
+    #[test]
+    fn accounting_modes_preserve_legacy_flags_and_roundtrip_changes() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("levels.toml");
+        for (enabled, tracking) in [(false, false), (true, false), (false, true), (true, true)] {
+            for (mode, expected_enabled, expected_tracking) in [("disabled", false, false), ("tracking", false, true), ("enforce", true, false)] {
+                let mut editor = SecurityLevelEditor::new(&path).unwrap();
+                {
+                    let mut levels = editor.sec_levels.lock().unwrap();
+                    levels[0].is_enabled = enabled;
+                    levels[0].accounting_tracking = tracking;
+                }
+                editor.handle_key_press(KeyEvent::from(KeyCode::Enter));
+                let menu = editor.detail.menu.as_ref().unwrap();
+                assert_eq!(menu.entry.len(), 16, "all fields must fit without scrolling");
+                let item = menu.get_item(15).unwrap();
+                let ListValue::ComboBox(combo) = &item.value else {
+                    panic!("accounting mode must be a combo box");
+                };
+                let initial_mode = if tracking {
+                    "tracking"
+                } else if enabled {
+                    "enforce"
+                } else {
+                    "disabled"
+                };
+                assert_eq!(combo.cur_value.value, initial_mode);
+                let update = item.update_value.as_ref().unwrap();
+                update(&menu.obj, &item.value);
+                {
+                    let levels = editor.sec_levels.lock().unwrap();
+                    assert_eq!((levels[0].is_enabled, levels[0].accounting_tracking), (enabled, tracking));
+                }
+                let selected = combo.values.iter().find(|value| value.value == mode).unwrap().clone();
+                update(
+                    &menu.obj,
+                    &ListValue::ComboBox(ComboBox {
+                        cur_value: selected,
+                        values: combo.values.clone(),
+                        selected_item: 0,
+                        first_item: 0,
+                        is_edit_open: false,
+                    }),
+                );
+                let expected = if mode == initial_mode {
+                    (enabled, tracking)
+                } else {
+                    (expected_enabled, expected_tracking)
+                };
+                let levels = editor.sec_levels.lock().unwrap();
+                assert_eq!((levels[0].is_enabled, levels[0].accounting_tracking), expected);
+                levels.save(&path).unwrap();
+                let loaded = SecurityLevelDefinitions::load(&path).unwrap();
+                assert_eq!((loaded[0].is_enabled, loaded[0].accounting_tracking), expected);
+            }
+        }
+    }
+
+    #[test]
+    fn accounting_mode_dropdown_is_visible_and_selectable_at_80_by_25() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("levels.toml");
+        let mut editor = SecurityLevelEditor::new(&path).unwrap();
+        editor.handle_key_press(KeyEvent::from(KeyCode::Enter));
+        let mut terminal = ratatui::Terminal::new(ratatui::backend::TestBackend::new(80, 25)).unwrap();
+        let viewport = Rect::new(0, 1, 80, 23);
+        terminal.draw(|frame| editor.render(frame, viewport)).unwrap();
+        for _ in 0..15 {
+            editor.handle_key_press(KeyEvent::from(KeyCode::Down));
+        }
+        terminal.draw(|frame| editor.render(frame, viewport)).unwrap();
+        editor.handle_key_press(KeyEvent::from(KeyCode::Enter));
+        terminal.draw(|frame| editor.render(frame, viewport)).unwrap();
+        let rows: Vec<String> = (0..25)
+            .map(|y| (0..80).map(|x| terminal.backend().buffer()[(x, y)].symbol()).collect())
+            .collect();
+        for mode in ["disabled", "tracking", "enforce"] {
+            let label = get_text(&format!("accounting_level_mode_{mode}"));
+            assert!(
+                rows.iter().any(|row| row.contains(&label)),
+                "clipped accounting choice: {label}\n{}",
+                rows.join("\n")
+            );
+        }
+        editor.handle_key_press(KeyEvent::from(KeyCode::Home));
+        editor.handle_key_press(KeyEvent::from(KeyCode::Down));
+        editor.handle_key_press(KeyEvent::from(KeyCode::Enter));
+        terminal.draw(|frame| editor.render(frame, viewport)).unwrap();
+        let levels = editor.sec_levels.lock().unwrap();
+        assert!(!levels[0].is_enabled);
+        assert!(levels[0].accounting_tracking);
+    }
 }

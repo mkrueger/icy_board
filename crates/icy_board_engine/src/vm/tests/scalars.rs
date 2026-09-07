@@ -208,13 +208,72 @@ ENDFUNC
     assert_eq!(run_ppl(source), "5\nABCDEFGHIJKLMNOPQ\n");
 }
 
-/// PCBACCSTAT field 0 answers 0 when accounting is off and 2 when it is on;
-/// `icy_board` has no separate tracking mode, so an enabled system is fully on.
+/// PCBACCSTAT field 0 reports the session mode, not the global enable flag:
+/// 0 is disabled, 1 is tracking, and 2 requires a started, enforced session.
 #[test]
 fn test_pcbaccstat_reports_the_accounting_status() {
+    use std::sync::Arc;
+
+    use crate::{
+        icy_board::{
+            IcyBoard, accounting_cfg::AccountingConfig, bbs::BBS, pcb::user_inf::AccountUserInf, sec_levels::SecurityLevel, state::IcyBoardState,
+            user_base::User,
+        },
+        vm::{DiskIO, run},
+    };
+    use icy_net::{Connection, ConnectionType, channel::ChannelConnection};
+
     assert_eq!(run_ppl("PRINT PCBACCSTAT(0)"), "0");
-    let enabled = run_ppl_on("PRINT PCBACCSTAT(0)", |board| {
+    let configured_only = run_ppl_on("PRINT PCBACCSTAT(0)", |board| {
         board.config.accounting.enabled = true;
+    });
+    assert_eq!(configured_only, "0");
+
+    let enabled = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
+        let bbs = Arc::new(tokio::sync::Mutex::new(BBS::new(1)));
+        let node = bbs.lock().await.create_new_node(ConnectionType::Channel).await;
+        let nodes = bbs.lock().await.open_connections.clone();
+        let (mut peer, connection) = ChannelConnection::create_pair();
+        let mut board = IcyBoard::new();
+        board.config.accounting.enabled = true;
+        board.config.accounting.accounting_config = Some(AccountingConfig::default());
+        board.sec_levels.levels.push(SecurityLevel {
+            security: 10,
+            is_enabled: true,
+            ..Default::default()
+        });
+        board.users.new_user(User {
+            name: "CALLER".into(),
+            security_level: 10,
+            account: Some(AccountUserInf {
+                starting_balance: 100.0,
+                ..Default::default()
+            }),
+            ..Default::default()
+        });
+        let user = board.users[0].clone();
+        let mut state = IcyBoardState::new(bbs, Arc::new(tokio::sync::Mutex::new(board)), nodes, node, Box::new(connection)).await;
+        state.session.current_user = Some(user);
+        state.session.cur_user_id = 0;
+        state.session.cur_security = 10;
+        state.session.user_name = "CALLER".into();
+        assert!(!state.accounting_active());
+        state.accounting_start().await.unwrap();
+        assert!(state.accounting_active());
+
+        let executable = compile("PRINT PCBACCSTAT(0)");
+        let mut io = DiskIO::new(".", None);
+        run(&std::path::PathBuf::from("test.ppe"), &executable, &mut io, &mut state).await.unwrap();
+        drop(state);
+        let mut output = Vec::new();
+        let mut buffer = [0; 64];
+        while let Ok(size) = peer.read(&mut buffer).await {
+            if size == 0 {
+                break;
+            }
+            output.extend_from_slice(&buffer[..size]);
+        }
+        String::from_utf8(output).unwrap()
     });
     assert_eq!(enabled, "2");
 }

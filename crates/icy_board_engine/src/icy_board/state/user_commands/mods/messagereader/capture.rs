@@ -105,6 +105,7 @@ struct ReadEffect {
     path: PathBuf,
     conference: u16,
     area: usize,
+    read_charge: f64,
     header: JamMessageHeader,
 }
 
@@ -529,10 +530,23 @@ impl IcyBoardState {
                             to.to_string().trim().eq_ignore_ascii_case(&self.session.user_name)
                                 || (!self.session.alias_name.is_empty() && to.to_string().trim().eq_ignore_ascii_case(&self.session.alias_name))
                         });
+                        let own = header.from().is_some_and(|from| {
+                            let from = from.to_string();
+                            from.trim().eq_ignore_ascii_case(&self.session.user_name)
+                                || (!self.session.alias_name.is_empty() && from.trim().eq_ignore_ascii_case(&self.session.alias_name))
+                        });
+                        // Same accounting count as the online reader: past the
+                        // last-read pointer, and not the caller's own message.
+                        let read_charge = if header.message_number > pointer && !own {
+                            self.accounting_rates().charge_per_msg_read_captured + conf.charge_msg_read
+                        } else {
+                            0.0
+                        };
                         let effect = ReadEffect {
                             path: base.path().to_path_buf(),
                             conference: number,
                             area: area_number,
+                            read_charge,
                             header,
                         };
                         capture.append(
@@ -595,9 +609,24 @@ impl IcyBoardState {
             return Ok(());
         }
         let packet = capture.packet()?;
+        let size = std::fs::metadata(&packet.path)?.len();
+        let read_charge = capture.effects.iter().map(|effect| effect.read_charge).sum::<f64>();
+        let charge = self.accounting_capture_transfer_estimate(size) + read_charge;
+        let reserved = self.accounting_queued_download_cost(&packet.path).await?;
+        if self.accounting_insufficient(charge, reserved).await? {
+            return Ok(());
+        }
         if !self.send_reader_capture(&packet.path).await? {
             self.display_text(IceText::TransferAborted, display_flags::NEWLINE).await?;
             return Ok(());
+        }
+        // Deferred charges replace PCBoard's charge/refund transaction: aborts
+        // never debit (or manufacture credits), and delivered bodies count once,
+        // even if a later read-pointer update fails or a message was replaced.
+        for effect in &capture.effects {
+            if effect.read_charge != 0.0 {
+                self.accounting_record(5, "MSG READ CAP", "", effect.read_charge, 1)?;
+            }
         }
         let update_pointer = options.update_pointers && self.get_board().await.config.message.update_last_read_pointer;
         self.display_text(IceText::TransferSuccessful, display_flags::NEWLINE).await?;
@@ -641,6 +670,7 @@ impl IcyBoardState {
                 }
             }
         }
+        self.accounting_check_balance().await?;
         if capture.bye && effects_complete {
             self.goodbye().await?;
         }
@@ -649,7 +679,7 @@ impl IcyBoardState {
 
     /// Deliberately not download(): that method drains unrelated flagged files
     /// and returns Ok even for failed transfers, so it cannot commit read effects.
-    async fn send_reader_capture(&mut self, path: &Path) -> Res<bool> {
+    pub(crate) async fn send_reader_capture(&mut self, path: &Path) -> Res<bool> {
         let Some(user) = self.session.current_user.as_ref() else {
             return Ok(false);
         };
@@ -664,6 +694,11 @@ impl IcyBoardState {
         };
         let default = user.protocol.clone();
         let size = std::fs::metadata(path)?.len();
+        let charge = self.accounting_capture_transfer_estimate(size);
+        let reserved = self.accounting_queued_download_cost(path).await?;
+        if self.accounting_insufficient(charge, reserved).await? {
+            return Ok(false);
+        }
         let mut limits = self.session.transfer_limits.clone();
         limits.bytes_remaining = (self.session.bytes_remaining >= 0).then_some(self.session.bytes_remaining);
         if self.get_board().await.config.system_control.enforce_transfer_limits && !limits.check_file(&history, BatchSoFar::default(), size, false).is_allowed()
@@ -774,10 +809,8 @@ impl IcyBoardState {
         if let Err(error) = &statistics_result {
             log::error!("Delivered capture: statistics save failed: {error}");
         }
-        if log_result.is_err() || statistics_result.is_err() {
-            self.println(TerminalTarget::Both, "Download completed, but transfer logging/statistics could not be saved.")
-                .await?;
-        }
+        // Do not perform fallible terminal output here: callers still have to
+        // commit accounting for this confirmed delivery.
         Ok(true)
     }
 }
@@ -900,6 +933,7 @@ mod tests {
                 path: PathBuf::from("unused-test-base"),
                 conference: 0,
                 area: 0,
+                read_charge: 0.0,
                 header,
             },
             body,
@@ -1044,6 +1078,19 @@ mod tests {
                 let root = tempfile::tempdir().unwrap();
                 let destination = tempfile::tempdir().unwrap();
                 let (mut state, mut peer, mut picker) = fixture(root.path()).await;
+                crate::icy_board::state::user_commands::pcb::d_download::enable_activity_accounting(
+                    &mut state,
+                    crate::icy_board::accounting_cfg::AccountingConfig {
+                        charge_per_msg_read_captured: 7.0,
+                        charge_per_download_file: 100.0,
+                        charge_per_download_bytes: 100.0,
+                        ..Default::default()
+                    },
+                )
+                .await;
+                let account = state.session.current_user.as_mut().unwrap().account.as_mut().unwrap();
+                account.debit_msg_read = 13.0;
+                account.debit_msg_read_capture = 11.0;
                 let flags = state.session.flagged_files.clone();
                 let mut base = JamMessageBase::create(root.path().join("mail")).unwrap();
                 for body in ["selected café", "unrelated message"] {
@@ -1059,7 +1106,11 @@ mod tests {
                 base.write_jhr_header().unwrap();
                 let mut capture = capture(false, false);
                 append(&mut capture, base.read_header(1).unwrap(), "selected café", true).unwrap();
+                // This test exercises finish/commit, not the DownloadTagged
+                // prompt. The picker is its only source of interactive input.
+                capture.ask = false;
                 capture.effects[0].path = base.path().to_path_buf();
+                capture.effects[0].read_charge = 7.0 + 3.0; // Captured rate + source conference surcharge.
                 let expected = capture.data.clone();
                 let options = ReaderOptions {
                     update_status: status,
@@ -1074,14 +1125,36 @@ mod tests {
                     "error" => Some(destination.path().join("missing-directory")),
                     _ => Some(destination.path().to_path_buf()),
                 };
-                let (result, ()) = timeout(Duration::from_secs(5), async {
+                let finished = timeout(Duration::from_secs(5), async {
                     tokio::join!(state.finish_reader_capture(capture, &options), answer(&mut picker, chosen))
                 })
-                .await
-                .expect("local capture finish stalled");
+                .await;
+                if finished.is_err() {
+                    let mut bytes = [0u8; 8192];
+                    let mut text = String::new();
+                    loop {
+                        let count = peer.try_read(&mut bytes).await.unwrap();
+                        if count == 0 {
+                            break;
+                        }
+                        text.push_str(&String::from_utf8_lossy(&bytes[..count]));
+                    }
+                    panic!(
+                        "local capture finish stalled ({outcome}, status={status}, pointer={pointer}): {text}; logoff={}, balance={}, time={:?}",
+                        state.session.request_logoff,
+                        state.session.calculate_balance(),
+                        state.minutes_left()
+                    );
+                }
+                let (result, ()) = finished.unwrap();
                 result.unwrap();
                 let success = outcome == "success";
-                let mut base = JamMessageBase::open(base.path()).unwrap();
+                let account = state.session.current_user.as_ref().unwrap().account.as_ref().unwrap();
+                assert_eq!(account.debit_msg_read, 13.0, "capture never refunds normal reads");
+                assert_eq!(account.debit_msg_read_capture, if success { 21.0 } else { 11.0 });
+                assert_eq!(account.debit_download_file, 0.0, "generated captures are NOCOST");
+                assert_eq!(account.debit_download_bytes, 0.0);
+                let base = JamMessageBase::open(base.path()).unwrap();
                 let selected = base.read_header(1).unwrap();
                 assert_eq!(selected.is_read(), success && status);
                 assert_eq!(selected.is_receipt_req(), !(success && status));

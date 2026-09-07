@@ -34,6 +34,32 @@ impl AccountingConfig {
         Self::default()
     }
 
+    /// Negative rates are valid (custom credits); non-finite amounts are not.
+    pub fn validate(&self) -> Res<()> {
+        for (name, value) in [
+            ("new_user_balance", self.new_user_balance),
+            ("warn_level", self.warn_level),
+            ("charge_per_logon", self.charge_per_logon),
+            ("charge_per_time", self.charge_per_time),
+            ("charge_per_peak_time", self.charge_per_peak_time),
+            ("charge_per_group_chat_time", self.charge_per_group_chat_time),
+            ("charge_per_msg_read", self.charge_per_msg_read),
+            ("charge_per_msg_read_captured", self.charge_per_msg_read_captured),
+            ("charge_per_msg_written", self.charge_per_msg_written),
+            ("charge_per_msg_write_echoed", self.charge_per_msg_write_echoed),
+            ("charge_per_msg_write_private", self.charge_per_msg_write_private),
+            ("charge_per_download_file", self.charge_per_download_file),
+            ("charge_per_download_bytes", self.charge_per_download_bytes),
+            ("pay_back_for_upload_file", self.pay_back_for_upload_file),
+            ("pay_back_for_upload_bytes", self.pay_back_for_upload_bytes),
+        ] {
+            if !value.is_finite() {
+                return Err(format!("Accounting rate {name} must be finite").into());
+            }
+        }
+        Ok(())
+    }
+
     pub fn export_pcboard(&self) -> Vec<u8> {
         let mut res = Vec::new();
 
@@ -64,6 +90,9 @@ impl PCBoardBinImporter for AccountingConfig {
     const SIZE: usize = 15 * 8;
 
     fn import_data(mut data: &[u8]) -> Res<Self> {
+        if data.len() != Self::SIZE {
+            return Err(format!("Invalid accounting configuration size: expected {}, got {}", Self::SIZE, data.len()).into());
+        }
         let new_user_balance = f64::from_le_bytes([data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]]);
         data = &data[8..];
         let charge_per_logon = f64::from_le_bytes([data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]]);
@@ -93,7 +122,7 @@ impl PCBoardBinImporter for AccountingConfig {
         let pay_back_for_upload_bytes = f64::from_le_bytes([data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]]);
         data = &data[8..];
         let warn_level = f64::from_le_bytes([data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]]);
-        Ok(AccountingConfig {
+        let config = AccountingConfig {
             new_user_balance,
             charge_per_logon,
             charge_per_time,
@@ -109,7 +138,9 @@ impl PCBoardBinImporter for AccountingConfig {
             pay_back_for_upload_file,
             pay_back_for_upload_bytes,
             warn_level,
-        })
+        };
+        config.validate()?;
+        Ok(config)
     }
 }
 

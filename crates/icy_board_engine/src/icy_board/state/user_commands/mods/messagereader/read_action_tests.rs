@@ -778,13 +778,25 @@ async fn actual_move_rolls_back_attachment_copies_on_destination_open_or_append_
 
 #[tokio::test]
 async fn appended_attachment_survives_cancellation_during_post_save_bookkeeping() {
+    struct PendingOutput;
+    #[async_trait::async_trait]
+    impl icy_net::Connection for PendingOutput {
+        fn get_connection_type(&self) -> icy_net::ConnectionType { icy_net::ConnectionType::Channel }
+        async fn read(&mut self, _buf: &mut [u8]) -> icy_net::Result<usize> { std::future::pending().await }
+        async fn try_read(&mut self, _buf: &mut [u8]) -> icy_net::Result<usize> { Ok(0) }
+        async fn send(&mut self, _buf: &[u8]) -> icy_net::Result<()> { std::future::pending().await }
+        async fn shutdown(&mut self) -> icy_net::Result<()> { Ok(()) }
+    }
     let temp = tempfile::tempdir().unwrap();
     let (mut state, _peer, source, target) = attachment_action_state(temp.path()).await;
+    crate::icy_board::state::user_commands::pcb::d_download::enable_activity_accounting(&mut state,
+        crate::icy_board::accounting_cfg::AccountingConfig { charge_per_msg_write_private: 5.0, ..Default::default() }).await;
     std::fs::write(source.join("file.zip"), b"enclosure").unwrap();
     let message = enclosed_message(&["file.zip"]);
     let mut copies = state.copy_action_attachments(&message, 1, 0).await.unwrap();
-    let board = state.board.clone();
-    let blocked_statistics = board.lock().await;
+    // Authorization now consults the board before append. Suspend on the
+    // notification instead, after real storage/accounting have committed.
+    state.connection = Box::new(PendingOutput);
     let target_path = temp.path().join("target");
     {
         let mut save = std::pin::pin!(state.send_action_message(1, 0, &target_path, message, IceText::MessageCopied, &mut copies));
@@ -794,8 +806,9 @@ async fn appended_attachment_survives_cancellation_during_post_save_bookkeeping(
         }).await;
         // Dropping this suspended future simulates a disconnect/cancellation.
     }
-    drop(blocked_statistics);
     assert!(copies.files.is_empty(), "append must commit before the first bookkeeping await");
+    assert!(state.session.request_logoff, "cancelled completion must not offer a save retry");
+    assert_eq!(state.session.current_user.as_ref().unwrap().account.as_ref().unwrap().debit_msg_write_private, 5.0);
     drop(copies);
     assert!(JamMessageBase::open(&target_path).unwrap().read_header(1).is_ok());
     assert_eq!(std::fs::read(target.join("file.zip")).unwrap(), b"enclosure");

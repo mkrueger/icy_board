@@ -106,6 +106,12 @@ impl IcyBoardState {
             return Ok(());
         }
         let size = if let Ok(md) = file.metadata() { md.len() } else { 0 };
+        let charge = self.accounting_download_estimate(&file, size).await?;
+        let reserved = self.accounting_queued_download_cost(&file).await?;
+        self.session.op_text = name.clone();
+        if self.accounting_insufficient(charge, reserved).await? {
+            return Ok(());
+        }
         self.session.flagged_files.push(file);
 
         let count = self.session.flagged_files.len();

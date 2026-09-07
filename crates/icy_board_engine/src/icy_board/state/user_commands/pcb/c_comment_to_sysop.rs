@@ -161,6 +161,8 @@ impl IcyBoardState {
             message = message.with_sub_field(MessageSubfield::new(SubfieldType::AddressD, BString::from(to)));
         }
         if let Err(error) = self.write_message_context(conf, area, message, Vec::new(), text, true).await {
+            if error.is::<super::message_attachment::MessageCreditDenied>() { return Ok(()); }
+            if error.is::<super::message_attachment::MessagePersistedError>() { return Err(error); }
             // The interactive compose command acknowledges a failed save;
             // storage callers such as MOVE must never wait here or see success.
             self.press_enter().await?;
@@ -228,6 +230,7 @@ impl IcyBoardState {
         text: IceText,
         allow_carbon_copy: bool,
     ) -> Res<EditResult> {
+        if !self.message_write_allowed(conf, &message).await? { return Ok(EditResult::Abort); }
         let mut attachments = self.message_attachment_cleanup(&message);
         let result = self.edit_message_context(&mut message, quote_text).await?;
         attachments.track(&message)?;

@@ -322,11 +322,38 @@ records use 0.0 and security zero; omission in a present TOML table is an error.
   ``debit_msg_write_private``, ``debit_download_file``, ``debit_download_bytes``,
   ``debit_group_chat``, ``debit_tpu``, ``debit_special``.
 * Credits: ``credit_upload_file``, ``credit_upload_bytes``, ``credit_special``.
-* ``drop_sec_level``: ``u8``, security level to drop to.
+* ``drop_sec_level``: ``u8``, lower session security ceiling when enforced funds
+  run out (unless ``ignore_empty_sec_level``). Does not permanently change the
+  user's normal level or promote them.
 
 The site defines accounting value/currency conventions. There is no currency
 code, decimal scale or rounding rule stored in this user record. Board accounting
-rate tables are a separate component format.
+rate tables are a separate component format. Display uses comma-grouped credits
+with up to six decimal places and trailing zeros trimmed, or deterministic
+US-dollar-style money with exactly two decimals (``$1,234.50``), independent
+of the host locale. Display rounding does not change the stored f64 values.
+
+Balance is ``starting_balance - sum(debits) + sum(credits)``, or subtracts only
+the maximum debit category with ``concurrent_tracking``. Pending global time
+joins ``debit_time`` before that maximum. Positive credits add funds.
+``start_this_session`` remembers the opening balance, not a second source of funds.
+``CREDNOW`` is session net usage, ``CREDUSED`` cumulative net usage,
+``CREDSTART`` the stored starting balance, and ``CREDLEFT`` the enforced balance.
+
+New-user grants apply at registration only. Existing users without an account
+start at zero. The current system-manager editor has no monetary funding fields;
+use a controlled PPE ``ACCOUNT START_BAL, amount`` adjustment followed by
+``PUTUSER`` with a verified selected identity. The statement adds to the balance;
+it does not assign the requested final balance. See ``docs/accounting.md`` for
+the safe current/alternate-user workflow and persistence boundaries.
+
+Runtime saves merge monetary deltas against the latest shared-board record,
+but this is neither a cross-process user-file lock nor a funds reservation.
+Audit appends and user saves are separate operations, not a crash-atomic ledger.
+Mid-call profile saves (W/LANG) leave accounting active. Logoff finalization waits
+for enclosing command/door usage to settle, then posts pending time and persists
+the account before displaying final summaries. Settlement or final-save errors
+suppress those summaries; terminal output is not a financial durability guarantee.
 
 Bank information
 ~~~~~~~~~~~~~~~~
@@ -808,10 +835,16 @@ Other non-TOML or unimplemented formats
   compatibility data. Exporting users to PCBoard does not write ``users.toml``.
 * Group lists, FILES.BBS/PCBoard DIR listings, caller/event logs, FTN packet/TIC/
   request data, payload archives and lock files are not generic TOML documents.
-* Setup assigns a conventional ``main/holidays.toml`` path to
-  ``accounting.peak_holiday_list_file``, but this checkout has no corresponding
-  holiday TOML loader/serializer. A filename alone is not a verified schema;
-  no holiday-table format is specified here.
+* ``accounting.peak_holiday_list_file`` is plain text, one MM-DD-YY pattern per
+  line, with uppercase X matching one digit (``12-25-XX`` means every Christmas).
+  A matching local date suppresses peak rates for that whole day. Setup's
+  conventional ``main/holidays.toml`` filename does **not** make it TOML.
+* Accounting tracking selects dBase III for a case-insensitive .DBF extension;
+  otherwise it writes fixed-width ASCII with CRLF. Fields are Date, Time, Name,
+  NodeNumber, ConfNumber, Activity, SubAct, UnitCost, Quantity and Value. Audit
+  amounts use four decimal places; controls become spaces and non-ASCII becomes
+  ``?``. A persistent sibling .lock coordinates cooperating writers, not arbitrary
+  DBF editors/PPE writes. Errors are logged without rolling back monetary posts.
 
 The tool-file reference inventories audit ``manifest.toml``, ``audit.toml`` and
 ``baseline.toml`` outputs separately from live board state. No schema here is

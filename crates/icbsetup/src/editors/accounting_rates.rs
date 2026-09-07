@@ -8,7 +8,7 @@ use icy_board_engine::icy_board::{IcyBoard, IcyBoardSerializer, accounting_cfg::
 use icy_board_tui::{
     config_menu::{ConfigEntry, ConfigMenu, ConfigMenuState, ListItem, ListValue, ResultState},
     get_text,
-    tab_page::{Page, PageMessage},
+    tab_page::{InfoState, Page, PageMessage},
     theme::get_tui_theme,
 };
 use ratatui::{layout::Rect, text::Span, widgets::Widget};
@@ -23,13 +23,17 @@ pub struct AccountingRatesEditor {
 }
 
 impl AccountingRatesEditor {
-    pub fn new(path: PathBuf) -> Self {
-        let orig = AccountingConfig::load(&path).unwrap_or_else(|_| AccountingConfig::default());
+    pub fn new(path: PathBuf) -> icy_board_engine::Res<Self> {
+        let orig = if path.exists() {
+            AccountingConfig::load(&path)?
+        } else {
+            AccountingConfig::default()
+        };
         let menu = {
             let config = Arc::new(Mutex::new(orig.clone()));
             let label_width = 33;
             let lock = config.lock().unwrap();
-            let entry = vec![
+            let mut entry = vec![
                 ConfigEntry::Separator,
                 ConfigEntry::Item(
                     ListItem::new(
@@ -201,16 +205,43 @@ impl AccountingRatesEditor {
                     }),
                 ),
             ];
-            ConfigMenu { obj: config.clone(), entry }
+            // ListItem does not automatically load Fluent help. Keep the keys
+            // in the same order as the editable rate fields above.
+            let mut keys = [
+                "accounting_start_balance",
+                "accounting_warning_level",
+                "accounting_per_logon",
+                "accounting_per_minute",
+                "accounting_per_minute_peak",
+                "accounting_per_minute_grpChat",
+                "accounting_per_message_read",
+                "accounting_per_message_captured",
+                "accounting_per_message_written",
+                "accounting_per_message_written_echoed",
+                "accounting_per_message_written_private",
+                "accounting_per_file_downloaded",
+                "accounting_per_file_bytes_downloaded",
+                "accounting_payback_per_file",
+                "accounting_payback_per_file_bytes",
+            ]
+            .into_iter();
+            for item in &mut entry {
+                if let ConfigEntry::Item(item) = item {
+                    let key = keys.next().expect("one help key per accounting rate");
+                    item.help = get_text(&format!("{key}-help"));
+                    item.status = get_text(&format!("{key}-status"));
+                }
+            }
+            ConfigMenu { obj: config.clone(), entry }.with_aligned_labels()
         };
 
-        Self {
+        Ok(Self {
             menu,
             orig,
             state: ConfigMenuState::default(),
             path,
             save_changes: super::EditorSaveChanges::default(),
-        }
+        })
     }
 }
 
@@ -248,10 +279,13 @@ impl Page for AccountingRatesEditor {
     }
 
     fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
-        if let Some(message) = self
-            .save_changes
-            .handle_key(key, || super::save_file(&self.path, || self.menu.obj.lock().unwrap().save(&self.path)))
-        {
+        if let Some(message) = self.save_changes.handle_key(key, || {
+            super::save_file(&self.path, || {
+                let config = self.menu.obj.lock().unwrap();
+                config.validate()?;
+                config.save(&self.path)
+            })
+        }) {
             return message;
         }
 
@@ -264,7 +298,17 @@ impl Page for AccountingRatesEditor {
 }
 
 pub fn edit_account_config(_board: Arc<Mutex<IcyBoard>>, path: PathBuf) -> PageMessage {
-    PageMessage::OpenSubPage(Box::new(AccountingRatesEditor::new(path)))
+    match AccountingRatesEditor::new(path) {
+        Ok(editor) => PageMessage::OpenSubPage(Box::new(editor)),
+        Err(error) => PageMessage::InfoBox(InfoState::Error, error.to_string()),
+    }
+}
+
+pub(super) fn validate_activity_rates(per_use: f64, per_minute: f64) -> icy_board_engine::Res<()> {
+    if [per_use, per_minute].iter().any(|rate| !rate.is_finite() || *rate < 0.0) {
+        return Err(get_text("accounting_activity_invalid").into());
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -273,12 +317,58 @@ mod tests {
     use crossterm::event::KeyCode;
 
     #[test]
+    fn accounting_rates_have_help_and_malformed_files_are_not_replaced() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("rates.toml");
+        let editor = AccountingRatesEditor::new(path.clone()).unwrap();
+        let mut count = 0;
+        for entry in &editor.menu.entry {
+            if let ConfigEntry::Item(item) = entry {
+                assert!(!item.help.is_empty());
+                assert!(!item.status.is_empty());
+                count += 1;
+            }
+        }
+        assert_eq!(count, 15);
+        std::fs::write(&path, "new_user_balance = 100.0\n").unwrap();
+        assert!(AccountingRatesEditor::new(path.clone()).is_err());
+        assert_eq!(std::fs::read_to_string(path).unwrap(), "new_user_balance = 100.0\n");
+    }
+
+    #[test]
+    fn activity_rates_require_finite_nonnegative_values() {
+        assert!(validate_activity_rates(0.0, 0.25).is_ok());
+        for invalid in [-1.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(validate_activity_rates(invalid, 0.0).is_err());
+            assert!(validate_activity_rates(0.0, invalid).is_err());
+        }
+    }
+
+    #[test]
+    fn nonfinite_rate_save_keeps_the_existing_file() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("rates.toml");
+        AccountingConfig::default().save(&path).unwrap();
+        let before = std::fs::read(&path).unwrap();
+        let mut editor = AccountingRatesEditor::new(path.clone()).unwrap();
+        editor.menu.obj.lock().unwrap().charge_per_time = f64::INFINITY;
+        editor.handle_key_press(KeyEvent::from(KeyCode::Esc));
+        editor.handle_key_press(KeyEvent::from(KeyCode::Right));
+        assert!(matches!(
+            editor.handle_key_press(KeyEvent::from(KeyCode::Enter)),
+            PageMessage::InfoBox(InfoState::Error, _)
+        ));
+        assert_eq!(std::fs::read(&path).unwrap(), before);
+        assert!(!editor.save_changes.is_open());
+    }
+
+    #[test]
     fn save_hides_form_hint_and_failure_allows_correction_and_retry() {
         let directory = tempfile::tempdir().unwrap();
         let parent = directory.path().join("blocked");
         std::fs::write(&parent, b"not a directory").unwrap();
         let path = parent.join("accounting.toml");
-        let mut editor = AccountingRatesEditor::new(path.clone());
+        let mut editor = AccountingRatesEditor::new(path.clone()).unwrap();
         let mut terminal = ratatui::Terminal::new(ratatui::backend::TestBackend::new(80, 25)).unwrap();
         let mut assert_hint = |editor: &mut AccountingRatesEditor, visible: bool| {
             terminal.draw(|frame| editor.render(frame, Rect::new(0, 1, 80, 23))).unwrap();

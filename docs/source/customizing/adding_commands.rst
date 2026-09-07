@@ -136,6 +136,12 @@ in TOML; keyword **matching at runtime** is ASCII-case-insensitive.
    * - ``security``
      - security-expression string / ``"0"``
      - Access gate for activation and autorun
+   * - ``charge_per_use``
+     - f64 / 0.0
+     - Finite, non-negative accounting units per command invocation
+   * - ``charge_per_minute``
+     - f64 / 0.0
+     - Finite, non-negative accounting units per elapsed minute; rounds up at 30 seconds
    * - ``actions``
      - array of CommandAction records / empty
      - Ordered actions; ``[[command.actions]]`` in a list file
@@ -147,10 +153,20 @@ calling the terminal's one-based positioning function. This storage format
 is different from the comma-separated **parameter** of the ``GotoXY`` action.
 
 Saving suppresses empty display/help strings, the default position and
-autorun mode, zero time and empty actions. ``keyword`` is still written when
-empty. ``security`` uses the special expression serialization described in
+autorun mode, zero time, zero charge rates and empty actions. ``keyword`` is
+still written when empty. ``security`` uses the special expression serialization described in
 :ref:`component-security-expressions`: an omitted value means ``"0"``;
 boolean ``true`` is suppressed on save, not the integer default.
+
+Charge rates belong to the Command, not its actions; multiple actions do not
+multiply the per-use fee. Zero is free. With accounting active, command fees
+post to the TPU debit category, independently of any invoked door's fees and
+global/conference time. Enforced admission checks the per-use fee plus one
+minute; this is neither a minimum one-minute bill nor a funds reservation.
+Elapsed usage is settled on invocation unwind even after a handler error.
+Logoff waits for all enclosing command/door invocations to settle before final
+account persistence and summaries. See :ref:`component-configuration` and the
+operator guide ``docs/accounting.md`` for accounting modes and limitations.
 
 Complete CommandAction schema
 -----------------------------
@@ -572,8 +588,10 @@ The command importer reads:
      - u8 minimum security
    * - 16--55
      - 40-byte CP437 parameter
-   * - 56--63
-     - Not used by this importer
+   * - 56--59 (0x38--0x3B)
+     - Packed little-endian IEEE 754 f32 ``charge_per_use``, converted to f64
+   * - 60--63 (0x3C--0x3F)
+     - Packed little-endian IEEE 754 f32 ``charge_per_minute``, converted to f64
 
 Each record becomes one Command with one Activation action. A parameter
 whose path extension is MNU becomes ``Menu``; otherwise a parameter

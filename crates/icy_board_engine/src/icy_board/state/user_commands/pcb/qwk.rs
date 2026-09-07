@@ -352,6 +352,8 @@ impl IcyBoardState {
         fs::create_dir_all(&output_path).await?;
         let mut qwk_package = output_path.join("mail.qwk");
         let (_number_to_msgid, msgid_to_number) = self.get_number_to_msgid().await;
+        let rates = self.accounting_rates();
+        let mut read_charges: HashMap<u16, (f64, i64)> = HashMap::new();
 
         {
             let board = self.board.lock().await;
@@ -465,6 +467,10 @@ impl IcyBoardState {
                                             net_tag: b' ',
                                         };
                                         let blocks = qwk_msg.write(&mut msg_writer, is_extended)?;
+                                        let entry = read_charges
+                                            .entry(conference_number)
+                                            .or_insert((rates.charge_per_msg_read_captured + conf.charge_msg_read, 0));
+                                        entry.1 += 1;
                                         ndx_data.get_mut(&conference_number).unwrap().push(BasicReal::from(cur_block));
                                         control_dat.message_count += 1;
                                         cur_block += blocks as i32;
@@ -502,10 +508,28 @@ impl IcyBoardState {
             }
             zip.finish()?;
         }
-        self.add_flagged_file(&qwk_package, true, false).await?;
-        self.download(false).await?;
-        self.session.flagged_files.retain(|f| f != &qwk_package);
-        fs::remove_dir_all(output_path).await?;
+        // Use a confirmed, packet-only transfer. download() can return Ok for
+        // an abort and would also drain unrelated files in the user's queue.
+        let result: Res<()> = async {
+            let size = std::fs::metadata(&qwk_package)?.len();
+            let reads = read_charges.values().map(|(rate, count)| rate * *count as f64).sum::<f64>();
+            let charge = self.accounting_capture_transfer_estimate(size) + reads;
+            let reserved = self.accounting_queued_download_cost(&qwk_package).await?;
+            if self.accounting_insufficient(charge, reserved).await? {
+                return Ok(());
+            }
+            if self.send_reader_capture(&qwk_package).await? {
+                for (rate, count) in read_charges.values() {
+                    self.accounting_record(5, "MSG READ CAP", "", *rate, *count)?;
+                }
+                self.accounting_check_balance().await?;
+            }
+            Ok(())
+        }
+        .await;
+        let cleanup = fs::remove_dir_all(output_path).await;
+        result?;
+        cleanup?;
         Ok(())
     }
 
@@ -571,13 +595,23 @@ impl IcyBoardState {
 
                         while let Ok(msg) = QwkMessage::read(&mut cursor, true) {
                             if let Some((conf, area)) = number_to_msgid.get(msg.msg_number as usize) {
+                                let private = matches!(msg.status, b'*' | b'+');
+                                let echoed = conferences[*conf].echo_mail_in_conference;
+                                let attributes = if private { jamjam::jam::attributes::MSG_PRIVATE } else { 0 }
+                                    | if echoed {
+                                        jamjam::jam::attributes::MSG_TYPEECHO
+                                    } else {
+                                        jamjam::jam::attributes::MSG_TYPELOCAL
+                                    };
                                 let jam_msg = JamMessage::default()
                                     .with_from(msg.from)
                                     .with_to(msg.to)
                                     .with_subject(msg.subj)
+                                    .with_attributes(attributes)
                                     .with_date_time(Utc::now())
                                     .with_text(msg.text);
-                                self.send_message(*conf as i32, *area as i32, jam_msg, IceText::ReplySuccessful).await?;
+                                self.send_accounted_message(*conf as i32, *area as i32, jam_msg, IceText::ReplySuccessful)
+                                    .await?;
                             } else {
                                 self.display_text(IceText::ReplyFailed, display_flags::NEWLINE).await?;
                             }

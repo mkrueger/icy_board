@@ -160,6 +160,8 @@ impl Menu {
                 position: super::commands::Position::default(),
                 auto_run: AutoRun::Disabled,
                 autorun_time: 0,
+                charge_per_use: 0.0,
+                charge_per_minute: 0.0,
                 security: SecurityExpression::from_req_security(security),
                 help: String::new(),
                 actions: vec![CommandAction {

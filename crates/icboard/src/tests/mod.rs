@@ -27,6 +27,7 @@ fn failed_board_tool_status_is_reported() {
     assert_eq!(error.to_string(), "icbsetup exited with exit status: 7");
 }
 
+mod accounting;
 mod cmd_3;
 mod cmd_7;
 mod cmd_a;
@@ -267,6 +268,9 @@ fn test_session_output<P: Fn(&mut IcyBoard)>(cmd: String, init_fn: P, login_syso
         let board_dir = test_dir();
         icy_board.root_path = board_dir.clone();
         icy_board.file_name = board_dir.join("icboard.toml");
+        // Authenticated logoff now really persists, including when accounting
+        // is disabled. Do not leave the default missing main/ parent here.
+        icy_board.config.paths.user_file = board_dir.join("users.toml");
         icy_board.config.paths.statistics_file = PathBuf::from("statistics.toml");
         icy_board.resolve_paths();
 

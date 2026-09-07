@@ -15,6 +15,10 @@ tracks the larger remaining directions; it is not a release-date promise.
   the [options audit](../compat/OPTIONS_AUDIT.md).
 - Complete the English and German operator documentation and help files.
 - Continue compatibility testing against the PCBoard source and DOSBox oracle.
+- Harden [accounting](accounting.md) reconciliation and crash recovery; add
+  per-file NoTime/FSEC monetary time refunds when transfer metadata supports
+  them, and configurable currency formatting. Charging and setup are already
+  implemented; a transactional ledger is not yet provided.
 
 ## After the first beta
 

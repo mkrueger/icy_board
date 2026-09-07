@@ -2338,29 +2338,33 @@ accounting_enabled-help=
     # Abrechnung aktivieren
 
     Aktiviert das Guthabenkonto jedes Benutzers. Gebühren und Vergütungen
-    stammen aus der Tarifdatei. Eine Sicherheitsstufe nimmt nur teil,
-    wenn ihr Eintrag in der PWRD-Datei das Konto aktiviert.
+    stammen aus der Tarifdatei. Der passende PWRD-Eintrag wählt Erzwingen (Y)
+    oder reine Erfassung (T). T hat Vorrang und braucht einen Protokollpfad.
+    Globales Aktivieren allein schaltet nicht alle Sicherheitsstufen frei.
 accounting_use_money=Geld statt Punkte anzeigen
 accounting_use_money-status=Geldbeträge statt Guthabenpunkten anzeigen
 accounting_use_money-help=
     # Geld statt Punkte anzeigen
 
-    Zeigt Guthaben und Gebühren mit einem Währungssymbol statt als
-    einfache Punkte an. Geeignet für Boards, die tatsächlich Geld berechnen.
-accounting_concurrent_tracking=Gebühren laufend abrechnen
-accounting_concurrent_tracking-status=Gebühren während der Sitzung abrechnen
+    Zeigt Beträge im festen US-Dollar-Format ($1,234.50), nicht in der
+    Währung des Betriebssystems. Ändert nur die Anzeige, nicht Tarife oder Salden.
+accounting_concurrent_tracking=Nur höchste Gebührenkategorie
+accounting_concurrent_tracking-status=Ja: höchste Kategorie; Nein: Summe aller Gebühren
 accounting_concurrent_tracking-help=
-    # Gebühren laufend abrechnen
+    # Nur höchste Gebührenkategorie
 
-    Aktualisiert das Guthaben während der Sitzung statt erst am Ende.
-    So kann ein Benutzer innerhalb eines Anrufs sein Konto nicht überziehen.
+    Ja zieht nur die höchste aufsummierte Gebührenkategorie ab; Nein deren
+    Summe. Noch offene Onlinezeit zählt vor dem Vergleich zur Zeitkategorie.
+    Positive Upload- und Sondergutschriften erhöhen in beiden Fällen den Saldo.
+    Dies bedeutet weder mehrere gleichzeitige Anrufer noch Live-Protokollierung.
 accounting_ignore_empty_sec_level=Stufe bei leerem Konto ignorieren
 accounting_ignore_empty_sec_level-status=Sicherheitsstufe bei leerem Guthaben beibehalten
 accounting_ignore_empty_sec_level-help=
     # Stufe bei leerem Konto ignorieren
 
     Normalerweise fällt ein Benutzer bei leerem Konto auf die dafür im
-    Datensatz festgelegte Stufe zurück. Diese Option behält stattdessen die normale Stufe bei.
+    Datensatz festgelegte Stufe zurück, nur für diese Sitzung. Diese Option
+    behält die normale Stufe bei; Guthabenprüfungen und Zeitgrenzen bleiben aktiv.
 accounting_peak_usage_start=Beginn der Hauptzeit
 accounting_peak_usage_start-status=Beginn der Hauptnutzungszeit
 accounting_peak_usage_start-help=
@@ -2373,7 +2377,8 @@ accounting_peak_usage_end-status=Ende der Hauptnutzungszeit
 accounting_peak_usage_end-help=
     # Ende der Hauptzeit
 
-    Ende der Hauptnutzungszeit im 24-Stunden-Format.
+    Lokale Zeit im 24-Stunden-Format; beide Grenzen sind einschließlich.
+    Ein früheres Ende reicht über Mitternacht. Gleiche Grenzen gelten ganztägig.
 accounting_peak_days_of_week=Hauptzeit-Wochentage
 accounting_peak_days_of_week-status=Wochentage mit Hauptzeittarif
 accounting_peak_days_of_week-help=
@@ -2386,22 +2391,27 @@ accounting_peak_holiday_list_file-status=Name/Pfad der Feiertagsliste für den H
 accounting_peak_holiday_list_file-help=
     # Feiertagsliste
 
-    Daten, an denen der Hauptzeittarif ausgesetzt wird. So gilt an
-    Feiertagen der günstigere Tarif, auch wenn sie auf einen Hauptzeittag fallen.
+    Klartext mit einem Datum MM-DD-YY je Zeile. Großes X ersetzt eine Ziffer:
+    12-25-XX gilt jedes Jahr am 25. Dezember. Der Normaltarif gilt für den ganzen
+    lokalen Tag, auch innerhalb der Hauptzeit. Leerer Pfad: keine Feiertage.
 accounting_cfg_file=Tarifdatei
 accounting_cfg_file-status=Name/Pfad der Abrechnungskonfiguration
 accounting_cfg_file-help=
     # Tarifdatei
 
     Gebühren und Vergütungen für Onlinezeit, Nachrichten, Uploads
-    und Downloads. F2 öffnet die Tarifbearbeitung.
+    und Downloads. F2 öffnet die Tarifbearbeitung. Separate TOML-Datei mit allen
+    15 Werten auf oberster Ebene, ohne [accounting]-Tabelle. Für aktive
+    Abrechnung erforderlich; null bedeutet keine Gebühr.
 accounting_tracking_file=Buchungsprotokoll
 accounting_tracking_file-status=Name/Pfad des Buchungsprotokolls
 accounting_tracking_file-help=
     # Buchungsprotokoll
 
-    Erfasst jede Buchung auf Benutzerkonten, damit sich ein
-    Kontostand später nachvollziehen lässt.
+    Die Endung .DBF wählt dBase III, andere Endungen festbreites ASCII. Reine Erfassung
+    braucht einen nichtleeren Pfad. Das Elternverzeichnis muss beschreibbar sein.
+    Eine .lock-Nebendatei koordiniert kooperierende Schreiber; nicht live löschen.
+    Schreibfehler werden protokolliert, Gebühren bleiben. Kein atomares Journal.
 accounting_info_file=Kontoinformation
 accounting_info_file-status=Name/Pfad der Kontoinformationsdatei
 accounting_info_file-help=
@@ -2413,8 +2423,9 @@ accounting_warning_file-status=Name/Pfad der Kontowarndatei
 accounting_warning_file-help=
     # Kontowarnung
 
-    Wird bei der Anmeldung angezeigt, sobald das Guthaben die Warnschwelle
-    erreicht. So kann rechtzeitig vor einem leeren Konto aufgeladen werden.
+    Bei erzwungener Abrechnung an oder unter der Warnschwelle angezeigt,
+    bei Anmeldung und späteren Prüfungen. Nach Aufladung über die Schwelle
+    kann erneut gewarnt werden.
 accounting_logoff_file=Abmeldeabrechnung
 accounting_logoff_file-status=Name/Pfad der Abrechnungsdatei zur Abmeldung
 accounting_logoff_file-help=
@@ -2674,14 +2685,16 @@ accounting_start_balance-status=Startguthaben neuer Benutzer
 accounting_start_balance-help=
     # Startguthaben neuer Benutzer
 
-    Guthaben bei Eröffnung eines Benutzerkontos. Damit können neue
-    Benutzer sich umsehen, bevor sie etwas bezahlt haben.
+    Einmalige Gutschrift nur für neu registrierte Benutzer. Bestehende Benutzer
+    erhalten nichts, auch ohne bisherigen Kontodatensatz. Bestehende Konten
+    mit einer betreiberkontrollierten PPE aufladen. Einheit: Punkte oder Geld.
 accounting_warning_level=Guthaben-Warnschwelle
 accounting_warning_level-status=Warnschwelle für niedriges Guthaben
 accounting_warning_level-help=
     # Guthaben-Warnschwelle
 
-    Ab diesem Kontostand wird bei der Anmeldung vor knappem Guthaben gewarnt.
+    Bei erzwungener Abrechnung an oder unter diesem Saldo warnen, bei Anmeldung
+    und späteren Prüfungen. Gleiche Einheit wie die Tarife, kein Prozentwert.
 accounting_charges_label=Gebühren:
 accounting_per_logon=Pro Anmeldung
 accounting_per_logon-status=Pro Anmeldung
@@ -2750,26 +2763,67 @@ accounting_per_file_downloaded-help=
     # Pro heruntergeladener Datei
 
     Gebühr je heruntergeladener Datei, unabhängig von ihrer Größe.
-accounting_per_file_bytes_downloaded=Pro 1 KB Download
-accounting_per_file_bytes_downloaded-status=Pro 1 KB Download
+accounting_per_file_bytes_downloaded=Pro KiB Download
+accounting_per_file_bytes_downloaded-status=Gebühr je 1024 Bytes, pro fertiger Datei abgerundet
 accounting_per_file_bytes_downloaded-help=
-    # Pro 1 KB Download
+    # Pro KiB Download
 
-    Gebühr je heruntergeladenem Kilobyte. Große Dateien kosten dadurch mehr als kleine.
+    Ein KiB sind 1024 Bytes. Pro fertig übertragener, nicht freier Datei werden
+    ganze KiB abgerundet gebucht. Die Vorabprüfung verwendet anteilige KiB und
+    geschätzte Onlinezeit; sie kann höher ausfallen als die spätere Dateigebühr.
 accounting_payback_label=Vergütungen:
 accounting_payback_per_file=Pro hochgeladener Datei
 accounting_payback_per_file-status=Pro hochgeladener Datei
 accounting_payback_per_file-help=
     # Pro hochgeladener Datei
 
-    Vergütung je hochgeladener Datei. So verdienen Uploads das
-    Guthaben, das Downloads verbrauchen.
-accounting_payback_per_file_bytes=Pro 1 KB Upload
-accounting_payback_per_file_bytes-status=Pro 1 KB Upload
+    Positive Werte erhöhen das Guthaben je angenommenem Upload; Vergütungen
+    nicht negieren. Abgewiesene oder unveröffentlichte Dateien verdienen nichts.
+accounting_payback_per_file_bytes=Pro KiB Upload
+accounting_payback_per_file_bytes-status=Positive Gutschrift je ganzem KiB pro angenommenem Upload
 accounting_payback_per_file_bytes-help=
-    # Pro 1 KB Upload
+    # Pro KiB Upload
 
-    Vergütung je hochgeladenem Kilobyte. Größere Beiträge bringen damit mehr Guthaben.
+    Ein KiB sind 1024 Bytes, pro angenommener Datei getrennt abgerundet.
+    Positive Werte erhöhen das Guthaben, negative ziehen Guthaben ab.
+
+accounting_level_mode=Abrechnungsmodus
+accounting_level_mode_disabled=Deaktiviert
+accounting_level_mode_tracking=Erfassen
+accounting_level_mode_enforce=Erzwingen
+accounting_level_mode-status=Deaktiviert (N), nur erfassen (T) oder Guthabengrenzen erzwingen (Y)
+accounting_level_mode-help=
+    # Abrechnungsmodus (PWRD N/T/Y)
+
+    Deaktiviert: keine automatische Abrechnung für diese Stufe. Erfassen:
+    Nutzung ohne Guthabengrenzen buchen; braucht einen nichtleeren Protokollpfad.
+    Erzwingen: Gebühren buchen und verfügbares Guthaben prüfen. Erfassen und
+    Erzwingen benötigen global aktive Abrechnung und geladene gültige Tarife.
+    Das gespeicherte Feld enabled steuert das Erzwingen, nicht den Stufenzugang.
+    accounting_tracking hat Vorrang, wenn beide gespeicherten Felder gesetzt sind;
+    dies wird als Erfassen angezeigt und ist bei leerem Protokollpfad aus.
+
+accounting_activity_per_use=Gebühr pro Aufruf
+accounting_activity_per_use-status=Nichtnegative Punkte oder Geld pro Aufruf; null ist kostenlos
+accounting_activity_per_use-help=
+    # Gebühr pro Aufruf
+
+    Einmal je Befehlsaufruf, nicht je Aktion; Doors erst nach erfolgreichem
+    Start oder Verbindungsaufbau. Door und aufrufender Befehl können beide
+    kosten. Globale Online- und Konferenzzeit laufen weiter. Aktive Abrechnung
+    erforderlich. Endlichen, nichtnegativen Wert eingeben; null schaltet ab.
+
+accounting_activity_per_minute=Gebühr pro Minute
+accounting_activity_per_minute-status=Ab 30 Sekunden aufrunden; zusätzlich zu anderen Tarifen
+accounting_activity_per_minute-help=
+    # Gebühr pro Minute
+
+    Punkte oder Geld je verstrichener Minute, ab 30 Sekunden aufgerundet.
+    Buchung bei Rückkehr, auch nach Fehlern nach dem Start. Vorabprüfung:
+    Aufrufgebühr plus eine Minute, keine Mindestgebühr oder Reservierung.
+    Online- und Konferenzzeit laufen weiter. Endlichen, nichtnegativen Wert wählen.
+
+accounting_activity_invalid=Befehls-/Door-Tarife müssen endlich und nichtnegativ sein (null ist kostenlos).
 
 # IcyBoard System Manager
 icbsm_main_menu_title=Hauptmenü
@@ -3627,14 +3681,6 @@ sec_level_demo_acc-help=
 
     Kennzeichnet diese Stufe als Konto zum Umsehen. Besucher können
     das Board ansehen, ohne dass dies als echte Registrierung zählt.
-sec_level_enable_acc=Abrechnungskonto aktivieren
-sec_level_enable_acc-status=Abrechnungskonto aktivieren
-sec_level_enable_acc-help=
-    # Abrechnungskonto aktivieren
-
-    Legt fest, ob Benutzer dieser Stufe an der Abrechnung teilnehmen.
-    Ohne diese Option wird ihr Guthaben weder belastet noch geprüft.
-
 protocol_editor_title=Übertragungsprotokolle
 protocol_editor_editor=Protokoll bearbeiten
 protocol_editor_header_char_code=Taste

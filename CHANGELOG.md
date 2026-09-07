@@ -10,6 +10,11 @@ releases.
 
 ### Added
 
+- Accounting setup and operator documentation, with per-use/per-minute command
+  and door rates, legacy CMD.LST rate import, and credit for accepted uploads
+  including successful intake awaiting manual approval. See the
+  [accounting guide](docs/accounting.md) for modes, funding and limits.
+
 - `ppld --check --strict` fails on unsupported, unimplemented or partially
   implemented references; ordinary `--check` remains informational.
 
@@ -78,6 +83,12 @@ releases.
   a binkp session announced nothing.
 
 ### Fixed
+
+- W/LANG profile saves no longer finalize accounting. Logoff waits for enclosing
+  command/door usage and successful final account persistence before summaries;
+  settlement or final-save errors suppress them. Credit display retains up to
+  six decimals with trailing zeros trimmed; money uses fixed dollar formatting
+  with two decimals. Account saves and audit writes are not an atomic ledger.
 
 - PPL compiler and language server now share source-level semantic analysis
   before executable lowering and constant folding. Invalid expressions and

@@ -162,6 +162,13 @@ pub struct Door {
     pub description: String,
     pub password: String,
 
+    /// Optional door surcharge, separate from the invoking command's rates.
+    #[serde(default, skip_serializing_if = "super::is_null_f64")]
+    pub charge_per_use: f64,
+
+    #[serde(default, skip_serializing_if = "super::is_null_f64")]
+    pub charge_per_minute: f64,
+
     /// Set when the door is handed to a PPE, so the object can report where it sits.
     #[serde(skip)]
     pub number: usize,
@@ -323,8 +330,10 @@ impl DoorList {
             let path = split[5];
             // let _login= split[6] != "0";
             let use_shell = split[7] != "N";
-            // let per_use=  split[8].parse::<f32>().unwrap_or_default();
-            // let charges_minute=  split[9].parse::<f32>().unwrap_or_default();
+            // DOORS.C reads optional comma-separated use/minute rates after
+            // the shell parameter. Older eight-column lists remain free.
+            let charge_per_use = split.get(8).and_then(|value| value.trim().parse::<f64>().ok()).unwrap_or_default();
+            let charge_per_minute = split.get(9).and_then(|value| value.trim().parse::<f64>().ok()).unwrap_or_default();
             // let os_2= split[10] != "0";
 
             let door = Door {
@@ -333,6 +342,8 @@ impl DoorList {
                 name: file.to_string(),
                 description: file.to_string(),
                 password: password.to_string(),
+                charge_per_use,
+                charge_per_minute,
                 securiy_level: SecurityExpression::from_str(security)?,
                 door_type: DoorType::Local,
                 path: path.to_string(),

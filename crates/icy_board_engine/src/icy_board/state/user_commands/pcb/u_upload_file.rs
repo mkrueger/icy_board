@@ -880,7 +880,18 @@ impl IcyBoardState {
         Ok(accepted)
     }
 
+    /// Accepted file or attachment intake, not text uploaded into an editor.
+    pub(crate) fn accounting_record_upload(&mut self, name: &str, bytes: u64) -> Res<()> {
+        let rates = self.accounting_rates();
+        self.accounting_record(14, "UPLD FILE", name, rates.pay_back_for_upload_file, 1)?;
+        self.accounting_record(15, "UPLD BYTES", name, rates.pay_back_for_upload_bytes, (bytes / 1024) as i64)?;
+        Ok(())
+    }
+
     async fn credit_completed_upload(&mut self, name: &str, bytes: u64, cps: u64) -> Res<()> {
+        // Accepted intake only. Credit fields take positive paybacks; the
+        // separate byte/time ratio allowances below are not monetary credits.
+        self.accounting_record_upload(name, bytes)?;
         let config = self.get_board().await.config.file_transfer.clone();
         let (credit, seconds) = upload_credits(bytes, cps, config.upload_credit_bytes, config.upload_credit_time);
         let credit = credit.min(i64::MAX as u64) as i64;
@@ -908,6 +919,8 @@ impl IcyBoardState {
         let mut board = self.get_board().await;
         board.statistics.add_upload(&state);
         board.save_statistics()?;
+        drop(board);
+        self.accounting_check_balance().await?;
         Ok(())
     }
 

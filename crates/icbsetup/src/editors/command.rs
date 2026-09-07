@@ -111,7 +111,7 @@ impl<'a> Page for CommandsEditor<'a> {
         self.insert_table.render_list(frame, area);
 
         if self.detail.is_open() {
-            let area = area.inner(Margin { vertical: 7, horizontal: 3 });
+            let area = area.inner(Margin { vertical: 5, horizontal: 3 });
             self.detail.render(frame, area, get_text("command_editor_editor"), String::new());
         }
 
@@ -120,7 +120,13 @@ impl<'a> Page for CommandsEditor<'a> {
 
     fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
         if let Some(message) = self.save_changes.handle_key(key, || {
-            crate::editors::save_file(&self.path, || self.command_list.lock().unwrap().save(&self.path))
+            crate::editors::save_file(&self.path, || {
+                let list = self.command_list.lock().unwrap();
+                for command in list.iter() {
+                    super::accounting_rates::validate_activity_rates(command.charge_per_use, command.charge_per_minute)?;
+                }
+                list.save(&self.path)
+            })
         }) {
             return message;
         }
@@ -157,7 +163,7 @@ impl<'a> Page for CommandsEditor<'a> {
                         if cur_prot.actions.is_empty() {
                             cur_prot.actions.push(CommandAction::default());
                         }
-                        self.detail.open(ConfigMenu {
+                        self.detail.open(super::align_editor_labels(ConfigMenu {
                             obj: (selected_item, self.command_list.clone()),
                             entry: vec![
                                 ConfigEntry::Item(
@@ -226,8 +232,30 @@ impl<'a> Page for CommandsEditor<'a> {
                                         },
                                     ),
                                 ),
+                                ConfigEntry::Item(
+                                    ListItem::new(
+                                        get_text("accounting_activity_per_use"),
+                                        ListValue::Float(cur_prot.charge_per_use, cur_prot.charge_per_use.to_string()),
+                                    )
+                                    .with_status(get_text("accounting_activity_per_use-status"))
+                                    .with_help(get_text("accounting_activity_per_use-help"))
+                                    .with_update_float_value(&|(i, list): &(usize, Arc<Mutex<CommandList>>), value| {
+                                        list.lock().unwrap()[*i].charge_per_use = value;
+                                    }),
+                                ),
+                                ConfigEntry::Item(
+                                    ListItem::new(
+                                        get_text("accounting_activity_per_minute"),
+                                        ListValue::Float(cur_prot.charge_per_minute, cur_prot.charge_per_minute.to_string()),
+                                    )
+                                    .with_status(get_text("accounting_activity_per_minute-status"))
+                                    .with_help(get_text("accounting_activity_per_minute-help"))
+                                    .with_update_float_value(&|(i, list): &(usize, Arc<Mutex<CommandList>>), value| {
+                                        list.lock().unwrap()[*i].charge_per_minute = value;
+                                    }),
+                                ),
                             ],
-                        });
+                        }));
                     } else {
                         self.insert_table.handle_key_press(key).unwrap();
                     }

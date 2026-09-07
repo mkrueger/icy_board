@@ -32,6 +32,8 @@ use crate::{
     icy_board::IcyBoardError,
     vm::{DiskIO, TerminalTarget, run},
 };
+pub mod accounting;
+pub use accounting::AccountingSession;
 pub mod functions;
 pub mod local_transfer;
 pub mod menu_runner;
@@ -225,6 +227,7 @@ impl TransferStatistics {
 
 #[derive(Clone)]
 pub struct Session {
+    pub accounting: AccountingSession,
     pub disp_options: DisplayOptions,
     pub current_conference_number: u16,
     pub current_message_area: usize,
@@ -241,6 +244,8 @@ pub struct Session {
     pub sysop_command_level: SysopCommandLevels,
 
     pub login_date: DateTime<Utc>,
+    /// Whole session minutes already included in the current user's stats.
+    saved_session_minutes: i64,
 
     pub current_user: Option<User>,
     pub cur_user_id: i32,
@@ -260,6 +265,10 @@ pub struct Session {
     pub last_new_line_y: i32,
 
     pub request_logoff: bool,
+    /// Guards logoff displays/survey, including recursive @HANGUP@ in files.
+    pub(crate) logoff_started: bool,
+    /// Deferred summary (automatic or regular), displayed before socket close.
+    pub(crate) logoff_pending: Option<bool>,
 
     pub time_limit: i32,
     /// Sub-minute upload credit carried between transfers; never a caller/PPL environment value.
@@ -335,6 +344,7 @@ pub struct Session {
 impl Session {
     pub fn new() -> Self {
         Self {
+            accounting: AccountingSession::default(),
             user_command_level: UserCommandLevels::default(),
             sysop_command_level: SysopCommandLevels::default(),
             disp_options: DisplayOptions::default(),
@@ -342,6 +352,7 @@ impl Session {
             current_conference: Conference::default(),
             start_conf: 0,
             login_date: Utc::now(),
+            saved_session_minutes: 0,
             current_user: None,
             cur_user_id: -1,
             cur_security: 0,
@@ -364,6 +375,8 @@ impl Session {
             keyboard_timer_check: true,
             keyboard_timer_started: Instant::now(),
             request_logoff: false,
+            logoff_started: false,
+            logoff_pending: None,
             tokens: VecDeque::new(),
             last_password: String::new(),
             more_requested: false,
@@ -447,11 +460,6 @@ impl Session {
     }
     pub fn seconds_left(&self) -> i32 {
         self.time_limit * 60
-    }
-
-    pub(crate) fn calculate_balance(&self) -> f64 {
-        // TODO implement balance calculation
-        0.0
     }
 }
 
@@ -923,7 +931,12 @@ impl IcyBoardState {
     /// its keyboard loop, so the check sits in front of every prompt. It watches it for
     /// everyone, sysop included - an unlimited sysop holds a level that says so.
     async fn check_time_left(&mut self) {
-        if self.session.request_logoff {
+        if self.session.request_logoff || self.session.accounting.checking {
+            return;
+        }
+        if let Err(error) = self.accounting_check_balance().await {
+            log::error!("Accounting balance check failed: {error}");
+            self.shutdown_connections().await;
             return;
         }
         let online = (Utc::now() - self.session.login_date).num_minutes();
@@ -999,6 +1012,10 @@ impl IcyBoardState {
         // The level hands out a fresh limit every time it is read, so the event has to be
         // taken off again afterwards or a conference join would undo it.
         self.limit_time_for_event().await;
+        if let Err(error) = self.accounting_refresh().await {
+            log::error!("Accounting security refresh failed: {error}");
+            self.session.request_logoff = true;
+        }
     }
 
     async fn apply_pwrd_limits(&mut self) {
@@ -1101,12 +1118,17 @@ impl IcyBoardState {
         } as i32;
         let adjusted = (base + self.session.current_conference.add_conference_security + i32::from(self.session.temporary_security_adjustment))
             .clamp(0, u8::MAX as i32) as u8;
+        let adjusted = self.session.accounting.security_override.map_or(adjusted, |ceiling| adjusted.min(ceiling));
         if adjusted == self.session.cur_security {
             return;
         }
         self.session.cur_security = adjusted;
         if self.get_board().await.config.system_control.reread_sec_level_on_join {
             self.apply_security_level_limits().await;
+        }
+        if let Err(error) = self.accounting_refresh().await {
+            log::error!("Accounting conference security refresh failed: {error}");
+            self.session.request_logoff = true;
         }
     }
 
@@ -1116,6 +1138,7 @@ impl IcyBoardState {
         if (conference as usize) >= self.get_board().await.conferences.len() {
             return Ok(false);
         }
+        self.accounting_settle_conference().await?;
         self.session.current_conference_number = conference;
         let mut c = self.get_board().await.conferences[conference as usize].clone();
         c.number = conference as usize;
@@ -1697,14 +1720,22 @@ impl IcyBoardState {
     }
 
     pub async fn set_current_user(&mut self, user_number: usize, join_conference: bool) -> Res<()> {
+        if user_number >= self.get_board().await.users.len() {
+            log::error!("User number {user_number} is out of range");
+            return Err(IcyBoardError::UserNumberInvalid(user_number).into());
+        }
+        if self.session.cur_user_id != user_number as i32 {
+            self.accounting_finish().await?;
+            self.session.accounting = AccountingSession::default();
+        } else if self.session.accounting.begun {
+            // Reloading the same authenticated caller must not discard local
+            // account deltas that have not reached the shared user base yet.
+            self.persist_current_user().await?;
+        }
         self.session.cur_user_id = user_number as i32;
         if let Some(state) = self.node_state.lock().await[self.node].as_mut() {
             state.cur_user = user_number as i32;
             state.graphics_mode = self.session.disp_options.grapics_mode;
-        }
-        if user_number >= self.get_board().await.users.len() {
-            log::error!("User number {user_number} is out of range");
-            return Err(IcyBoardError::UserNumberInvalid(user_number).into());
         }
         let mut user = self.get_board().await.users[user_number].clone();
 
@@ -1740,12 +1771,16 @@ impl IcyBoardState {
         } else {
             user.security_level
         };
+        if let Some(ceiling) = self.session.accounting.security_override {
+            self.session.cur_security = self.session.cur_security.min(ceiling);
+        }
         self.session.page_len = user.page_len;
         self.session.user_name.clone_from(user.get_name());
         self.session.alias_name.clone_from(&user.alias);
         self.session.fse_mode = user.flags.fse_mode.clone();
 
         self.session.current_user = Some(user);
+        self.accounting_mark_saved();
         self.apply_security_level_limits().await;
         if self.session.language != old_language {
             self.update_language().await;
@@ -1762,6 +1797,8 @@ impl IcyBoardState {
     }
 
     pub async fn save_current_user(&mut self) -> Res<()> {
+        // W/LANG save profiles during a call; only explicit logoff/final cleanup
+        // may stop accounting clocks.
         let old_language = self.session.language.clone();
         self.session.date_format = if let Some(user) = &self.session.current_user {
             self.session.language.clone_from(&user.language);
@@ -1783,20 +1820,18 @@ impl IcyBoardState {
             if user.stats.last_on.date_naive() != login_date.date_naive() {
                 user.stats.minutes_today = 0;
             }
-            user.stats.minutes_today += (Utc::now() - login_date).num_minutes() as u16;
+            let minutes = (Utc::now() - login_date).num_minutes().max(0);
+            let delta = (minutes - self.session.saved_session_minutes).max(0).min(u16::MAX as i64) as u16;
+            user.stats.minutes_today = user.stats.minutes_today.saturating_add(delta);
+            // Keep the cursor with the local mutation even on persistence
+            // failure: retrying saves that same snapshot, not another duration.
+            self.session.saved_session_minutes = self.session.saved_session_minutes.max(minutes);
 
             user.stats.last_on = login_date;
         }
 
-        if let Some(user) = &self.session.current_user {
-            let mut board = self.get_board().await;
-            for u in 0..board.users.len() {
-                if board.users[u].get_name() == user.get_name() {
-                    board.users[u] = user.clone();
-                    board.save_userbase()?;
-                    return Ok(());
-                }
-            }
+        if self.session.current_user.is_some() {
+            return self.persist_current_user().await;
         }
         log::error!("User not found in user list");
         Ok(())
@@ -1809,11 +1844,17 @@ impl IcyBoardState {
             let mut board = self.get_board().await;
             for u in 0..board.users.len() {
                 if board.users[u].get_name() == user.get_name() {
-                    let previous = std::mem::replace(&mut board.users[u], user.clone());
+                    let merged = self.accounting_merge_for_save(user, &board.users[u])?;
+                    let previous = std::mem::replace(&mut board.users[u], merged);
                     if let Err(error) = board.save_userbase() {
                         board.users[u] = previous;
                         return Err(error);
                     }
+                    drop(board);
+                    // Keep this call's local snapshot (notably START_SESSION).
+                    // Only its deltas were posted; the next save must compare
+                    // against this snapshot, not adopt another node's deltas.
+                    self.accounting_mark_saved();
                     return Ok(());
                 }
             }
@@ -2194,6 +2235,7 @@ impl IcyBoardState {
                 }
             }
         }
+        self.accounting_refresh().await?;
         Ok(())
     }
 
@@ -2894,11 +2936,10 @@ impl IcyBoardState {
             MacroCommand::ConfName => result = self.session.current_conference.name.clone(),
             MacroCommand::ConfNum => result = self.session.current_conference_number.to_string(),
 
-            MacroCommand::CredLeft
-            | MacroCommand::CredNow
-            | MacroCommand::CredStart
-            | MacroCommand::CredUsed
-            | MacroCommand::Event
+            MacroCommand::CredLeft | MacroCommand::CredNow | MacroCommand::CredStart | MacroCommand::CredUsed => {
+                result = self.accounting_macro(&id.command);
+            }
+            MacroCommand::Event
             | MacroCommand::FreeSpace
             | MacroCommand::IName
             | MacroCommand::LastCallerNode
@@ -3307,6 +3348,12 @@ impl IcyBoardState {
 
     #[async_recursion(?Send)]
     async fn get_char_with_timeout(&mut self, target: TerminalTarget, wait: Duration) -> Res<Option<KeyChar>> {
+        // Check even with a continuously stuffed/typeahead buffer, not only when
+        // the terminal is idle. Accounting display recursion is guarded inside.
+        self.check_time_left().await;
+        if self.session.request_logoff {
+            return Ok(None);
+        }
         self.drain_raw_input();
         self.drain_stale_protocol_input();
         let stale = self.ppl_mouse.take_stale_keyboard();
@@ -3342,7 +3389,6 @@ impl IcyBoardState {
         if self.keyboard_timed_out().await? {
             return Ok(None);
         }
-        self.check_time_left().await;
         if self.session.request_logoff {
             return Ok(None);
         }
@@ -4353,6 +4399,8 @@ fn convert_cmd(cmd_type: CommandType) -> Option<Command> {
         help: String::new(),
         auto_run: AutoRun::Disabled,
         autorun_time: 0,
+        charge_per_use: 0.0,
+        charge_per_minute: 0.0,
         position: crate::icy_board::commands::Position::default(),
         actions: vec![CommandAction {
             command_type: cmd_type,

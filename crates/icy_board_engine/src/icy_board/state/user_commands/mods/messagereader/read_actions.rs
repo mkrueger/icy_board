@@ -13,6 +13,7 @@ use crate::icy_board::state::IcyBoardState;
 use crate::icy_board::state::functions::{MASK_ASCII, MASK_NUM, display_flags};
 use crate::icy_board::state::user_commands::mods::editor::EditResult;
 use crate::icy_board::state::user_commands::pcb::select_conferences::SelectMode;
+use crate::icy_board::state::user_commands::pcb::message_attachment::{MessageCreditDenied, MessagePersistedError};
 use crate::icy_board::user_base::ConferenceFlags;
 use crate::vm::TerminalTarget;
 
@@ -414,11 +415,15 @@ impl IcyBoardState {
         // both success and error, without joining or acquiring its security bonus.
         let saved = self.session.current_conference.clone();
         let target_conf = self.get_board().await.conferences[conference as usize].clone();
+        self.accounting_settle_conference().await?;
+        if self.session.request_logoff { return Ok(AfterAction::Redisplay); }
         self.session.current_conference = target_conf;
         self.session.current_conference_number = conference;
         let recipient = self.get_message_recipient(IceText::MessageTo, old_to, false).await;
+        let settled = self.accounting_settle_conference().await;
         self.session.current_conference = saved;
         self.session.current_conference_number = source_conf;
+        settled?;
         let Some(recipient) = recipient? else { return Ok(AfterAction::Redisplay) };
         if recipient.eq_ignore_ascii_case("@LIST@") || self.session.request_logoff { return Ok(AfterAction::Redisplay); }
         let draft = transfer_draft(original, same_message_base(base.path(), &target));
@@ -442,6 +447,8 @@ impl IcyBoardState {
             }
         };
         if let Err(error) = self.send_action_message(conference, area, &target, draft, IceText::MessageCopied, &mut attachments).await {
+            if error.is::<MessagePersistedError>() { return Err(error); }
+            if error.is::<MessageCreditDenied>() { return Ok(AfterAction::Redisplay); }
             log::error!("Could not forward message {number}; original retained: {error}");
             self.display_text(IceText::MessageBaseError, display_flags::NEWLINE).await?;
         }
@@ -475,25 +482,16 @@ impl IcyBoardState {
 
     /// send_message can fail after append (statistics or terminal output). For
     /// new enclosure copies, adopt them at the append, not at its UI result.
-    async fn send_action_message(&mut self, conference: u16, area: usize, target: &Path, message: JamMessage, text: IceText,
+    async fn send_action_message(&mut self, conference: u16, area: usize, _target: &Path, message: JamMessage, text: IceText,
         attachments: &mut ActionAttachments) -> Res<()> {
         if attachments.files.is_empty() {
-            return self.send_message(conference as i32, area as i32, message, text).await;
+            return self.send_accounted_message(conference as i32, area as i32, message, text).await;
         }
-        let mut base = if target.with_extension("jhr").exists() {
-            JamMessageBase::open(target)?
-        } else {
-            JamMessageBase::create(target)?
-        };
+        let charge = self.preflight_message_write(conference as i32, &message).await?;
+        let mut base = self.open_accounted_message_base(conference as i32, area as i32, &message).await?;
         let number = base.write_message(&message)?;
         attachments.commit();
-        if let Some(user) = &mut self.session.current_user { user.stats.messages_left += 1; }
-        self.get_board().await.statistics.add_message();
-        self.get_board().await.save_statistics()?;
-        self.display_text(text, display_flags::DEFAULT).await?;
-        self.println(TerminalTarget::Both, &number.to_string()).await?;
-        self.new_line().await?;
-        Ok(())
+        self.finish_accounted_message(&mut base, charge, &message, number, text).await
     }
 
     async fn read_attachment(&mut self, action: MsgFunc, base: &mut JamMessageBase, number: u32) -> Res<AfterAction> {
@@ -797,7 +795,11 @@ impl IcyBoardState {
         match result {
             Ok(()) => Ok(true),
             Err(error) => {
+                if let TransferFailure::Destination(error) = &error {
+                    if error.is::<MessageCreditDenied>() { return Ok(false); }
+                }
                 match error {
+                    TransferFailure::Destination(error) if error.is::<MessagePersistedError>() => return Err(error),
                     TransferFailure::Destination(error) => log::error!("Message {number} destination failed; source retained: {error}"),
                     TransferFailure::Source(error) => log::error!("Message {number} copied but source deletion failed; both copies retained: {error}"),
                 }

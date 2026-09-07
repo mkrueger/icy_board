@@ -587,7 +587,12 @@ false. Saving suppresses these empty/zero/false values.
      - Time enforcement, alias and required-mail-reading flags
    * - ``demo_account``, ``enabled``
      - bool
-     - Exact serialized names (not ``is_demo_account`` / ``is_enabled``)
+     - Exact serialized names (not ``is_demo_account`` / ``is_enabled``).
+       ``enabled`` is PWRD accounting Y (enforce), not a general level switch.
+   * - ``accounting_tracking``
+     - bool
+     - PWRD accounting T: tracking without balance enforcement. Takes precedence
+       over ``enabled`` and requires a nonempty board tracking path.
 
 Input aliases ``uldl_ratio`` and ``uldl_kb_ratio`` are accepted for
 ``uldl_ratio_tenths`` and ``uldl_kb_ratio_tenths``. The writer uses the latter
@@ -598,6 +603,10 @@ zero blocks non-free downloads, not unlimited downloads.
 Level lookup selects the **first** exact security match whose password is
 empty or matches without regard to ASCII case. It is not a highest-level
 less-than-or-equal search. An empty list is not populated automatically.
+
+Global accounting must also be enabled. With T selected but an empty tracking
+path, accounting is off even if Y is set. With neither flag (or no level match),
+automatic accounting is off. Both active modes require a valid rate configuration.
 
 Setup creates levels 10, 20, 100 and 110 with time allowances 60, 90, 540
 and 999, and both ratio fields 10, 90, 150 and 250 respectively. All four
@@ -612,6 +621,7 @@ Standalone security-level file:
    description = "Regular caller"
    security = 20
    enabled = true
+  accounting_tracking = false
    time_per_day = 90
    allow_alias = true
    daily_file_kb_limit = 32767
@@ -705,6 +715,21 @@ door list is ``account = []`` followed by ``door = []``.
    * - ``dos_max_runtime_seconds``
      - u32 / **3600**
      - DOS wall-clock runtime limit; explicit 0 uses the safe runtime default
+   * - ``charge_per_use``, ``charge_per_minute``
+     - f64 / **0.0** each
+     - Finite, non-negative accounting units per successful launch/connect and
+       per elapsed minute (rounded up at 30 seconds). Zero is free.
+
+Door and invoking-command rates can both apply; neither replaces global or
+conference time. Admission checks the per-use charge plus one minute, not a
+minimum bill or a funds reservation. A failed launch is not charged; errors
+after launch still settle elapsed usage. The same optional ``charge_per_use``
+and ``charge_per_minute`` keys exist on Command records (including menu commands),
+not on CommandAction records. A multi-action command charges once per invocation.
+Both rates are omitted on save when zero. Setup's Commands and Doors detail forms
+expose both fields and validate on save. See :ref:`adding-commands` for the complete
+command schema and binary CMD.LST rate layout. Logoff waits for enclosing
+command/door usage to settle before final account persistence and summaries.
 
 ``number`` and ``valid`` are skipped. A Rust ``Door::default()`` uses Local
 and zero-valued DOS integer fields; that is distinct from TOML's required
@@ -802,23 +827,47 @@ Every field below is a required ``f64``. Rust's default constructor and
 setup both produce all-zero rates, but omitting a rate from a hand-written
 file fails deserialization.
 
-* ``new_user_balance``: starting balance.
+* ``new_user_balance``: one-time registration grant for new users only;
+  does not fund an existing user even when their account was previously absent.
 * ``warn_level``: balance warning threshold.
 * ``charge_per_logon``: per-logon charge.
 * ``charge_per_time``, ``charge_per_peak_time``,
-  ``charge_per_group_chat_time``: normal, peak and group-chat time rates.
+  ``charge_per_group_chat_time``: normal and peak units per online minute;
+  group-chat units per rounded elapsed minute, additional to online time.
 * ``charge_per_msg_read``, ``charge_per_msg_read_captured``: read and
   captured-message read charges.
 * ``charge_per_msg_written``, ``charge_per_msg_write_echoed``,
   ``charge_per_msg_write_private``: ordinary, echoed and private posting charges.
 * ``charge_per_download_file``, ``charge_per_download_bytes``: download
-  file/byte rates.
+  file and **KiB** rates (1 KiB = 1024 bytes), despite the legacy bytes key.
 * ``pay_back_for_upload_file``, ``pay_back_for_upload_bytes``: upload
-  file/byte credits.
+  file and **KiB** credits. Positive values increase balance, not decrease it.
 
-These are the stored rate fields; enabling accounting, peak-time settings,
-display files and tracking files are separate board settings. Do not infer
-that every rate is applied by every command simply because it is stored.
+Enabling accounting, peak-time settings, display files and tracking files are
+separate board settings. All rate fields must be finite; negative global rates
+are supported for intentional adjustments (unlike command/door rates). Setup
+validates before saving and reports malformed existing files instead of
+substituting a zero draft. F1 help explains every rate.
+
+Successful downloads and accepted uploads post **whole KiB rounded down per
+file**. Download preflight uses fractional KiB plus estimated normal-rate online
+time; this is not an upload-receive affordability check. Successful manual-approval
+intake (``AwaitingApproval``) earns upload credit before publication or approval;
+later administrative rejection does not automatically reverse it. Scanner-rejected
+uploads and failed publication earn no credit.
+Free files/directories waive file/KiB debits, not time. NoTime/FSEC monetary
+transfer-time refunds are not implemented. Read/capture rates add the conference
+read surcharge. Writes select private, else echoed, else ordinary rate, then
+add the conference write surcharge. Conference time also adds to global time.
+
+Global time bills calendar-minute boundaries; balance preview waives one normal
+minute (or one peak minute if no normal minute exists), final settlement does not.
+Activity and conference minutes round up at 30 seconds. Peak windows include both
+HH:MM endpoints and can cross midnight. Each minute uses its local date's
+Sunday-first day mask and MM-DD-YY holiday patterns with uppercase X wildcards.
+See the operator guide ``docs/accounting.md`` for a funded minimal setup and the
+sum-versus-maximum debit policy; the all-zero file below alone charges nothing.
+
 PCBoard's corresponding binary import is 15 little-endian 64-bit floats
 (120 bytes), not TOML; use import rather than renaming that file.
 

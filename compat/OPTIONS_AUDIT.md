@@ -137,12 +137,15 @@ no equivalent.
 
 | Option | Status | Note |
 |---|---|---|
-| `enabled`, `cfg_file`, `tracking_file`, `accounting_config` | ✅ | PPL accounting statements use these |
-| `use_money` | ❌ | amounts are always shown as units |
-| `concurrent_tracking` | ❌ | |
-| `ignore_empty_sec_level` | ❌ | |
-| `peak_usage_start`, `peak_usage_end`, `peak_days_of_week`, `peak_holiday_list_file` | ❌ | peak rates are never applied |
-| `warning_file`, `info_file`, `logoff_file` | ❌ | stored and editable, but none is displayed |
+| `enabled`, `cfg_file`, `tracking_file`, `accounting_config` | ✅ | Native activity and PPE accounting; per-level N/T/Y modes; ASCII or DBF tracking |
+| `use_money` | ✅ | Fixed US-dollar display with two decimals; no host currency selection |
+| `concurrent_tracking` | ✅ | Highest accumulated debit category instead of sum; not concurrent-session control |
+| `ignore_empty_sec_level` | ✅ | Suppresses the empty-account session security drop, not affordability checks |
+| `peak_usage_start`, `peak_usage_end`, `peak_days_of_week`, `peak_holiday_list_file` | ✅ | Local-time peak windows and MM-DD-YY/X holiday patterns |
+| `warning_file`, `info_file`, `logoff_file` | ✅ | Login, low-balance and ordinary logoff displays |
+
+See [Accounting](../docs/accounting.md) for setup, exact posting rules and
+remaining limits (notably NoTime monetary refunds and transactional durability).
 
 ## subs — subscription mode
 
@@ -321,9 +324,9 @@ Three answers are defensible per option, and each needs a deliberate choice:
 2. **Remove it.** An option that describes a DOS-era problem the port does not
    have should not be offered. Candidates:
    `switches.default_graphics_at_login`.
-3. **Mark it.** Where the feature is planned but distant — the peak-rate half
-   of `accounting` — ICBSetup should say so rather than presenting a
-   live-looking toggle.
+3. **Mark it.** Where a feature is planned but distant, ICBSetup should say
+   so rather than presenting a live-looking toggle. Accounting peak rates
+   are now implemented and no longer belong to this category.
 
 ## Verification
 

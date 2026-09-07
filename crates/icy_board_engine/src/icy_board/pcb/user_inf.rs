@@ -729,6 +729,106 @@ impl AccountUserInf {
     pub const NAME: &'static str = "PCBACCOUNT";
     const REC_SIZE: usize = 137;
 
+    /// Validate all monetary storage, including the two balance snapshots.
+    pub fn validate(&self) -> Res<()> {
+        let values = [
+            self.starting_balance,
+            self.start_this_session,
+            self.debit_call,
+            self.debit_time,
+            self.debit_msg_read,
+            self.debit_msg_read_capture,
+            self.debit_msg_write,
+            self.debit_msg_write_echoed,
+            self.debit_msg_write_private,
+            self.debit_download_file,
+            self.debit_download_bytes,
+            self.debit_group_chat,
+            self.debit_tpu,
+            self.debit_special,
+            self.credit_upload_file,
+            self.credit_upload_bytes,
+            self.credit_special,
+        ];
+        for (field, value) in values.into_iter().enumerate() {
+            if !value.is_finite() {
+                return Err(format!("Accounting field {field} must be finite").into());
+            }
+        }
+        Ok(())
+    }
+
+    /// Remaining balance, including unposted global time charges.
+    /// Concurrent tracking bills the largest debit category, not concurrent sessions.
+    /// Invalid storage/pending time or arithmetic overflow returns NaN;
+    /// callers should validate at input boundaries.
+    pub fn balance(&self, concurrent: bool, pending_time: f64) -> f64 {
+        if self.validate().is_err() || !pending_time.is_finite() {
+            return f64::NAN;
+        }
+        let debits = [
+            self.debit_time + pending_time,
+            self.debit_call,
+            self.debit_msg_read,
+            self.debit_msg_read_capture,
+            self.debit_msg_write,
+            self.debit_msg_write_echoed,
+            self.debit_msg_write_private,
+            self.debit_download_file,
+            self.debit_download_bytes,
+            self.debit_group_chat,
+            self.debit_tpu,
+            self.debit_special,
+        ];
+        // Check after adding pending time: max could hide negative overflow.
+        if debits.iter().any(|debit| !debit.is_finite()) {
+            return f64::NAN;
+        }
+        let spending = if concurrent {
+            debits.into_iter().fold(f64::NEG_INFINITY, f64::max)
+        } else {
+            debits.into_iter().sum()
+        };
+        if !spending.is_finite() {
+            return f64::NAN;
+        }
+        let balance = self.starting_balance - (spending - self.credit_upload_file - self.credit_upload_bytes - self.credit_special);
+        if balance.is_finite() { balance } else { f64::NAN }
+    }
+
+    /// Add a signed amount to a PPL accounting debit/credit field (2 through 16).
+    /// Invalid fields, invalid existing storage and overflow leave the account unchanged.
+    pub fn apply_charge(&mut self, field: usize, amount: f64) -> Res<()> {
+        self.validate()?;
+        if !amount.is_finite() {
+            return Err("Accounting charge must be finite".into());
+        }
+        let storage = match field {
+            2 => &mut self.debit_call,
+            3 => &mut self.debit_time,
+            4 => &mut self.debit_msg_read,
+            5 => &mut self.debit_msg_read_capture,
+            6 => &mut self.debit_msg_write,
+            7 => &mut self.debit_msg_write_echoed,
+            8 => &mut self.debit_msg_write_private,
+            9 => &mut self.debit_download_file,
+            10 => &mut self.debit_download_bytes,
+            11 => &mut self.debit_group_chat,
+            12 => &mut self.debit_tpu,
+            13 => &mut self.debit_special,
+            14 => &mut self.credit_upload_file,
+            15 => &mut self.credit_upload_bytes,
+            16 => &mut self.credit_special,
+            _ => return Err(format!("Accounting charge field {field} is outside 2..=16").into()),
+        };
+        let total = *storage + amount;
+        if !total.is_finite() {
+            return Err("Accounting charge overflows its storage field".into());
+        }
+        *storage = total;
+        Ok(())
+    }
+
     pub fn read(data: &[u8]) -> Res<Self> {
         if Self::REC_SIZE != data.len() {
             return Err(Box::new(IcyBoardError::InvalidUserInfRecordSize(Self::NAME, Self::REC_SIZE, data.len())));
@@ -755,7 +855,7 @@ impl AccountUserInf {
         let credit_special = cursor.read_f64::<LittleEndian>()?;
         let drop_sec_level = cursor.read_u8()?;
 
-        Ok(Self {
+        let account = Self {
             starting_balance,
             start_this_session,
             debit_call,
@@ -774,12 +874,15 @@ impl AccountUserInf {
             credit_upload_bytes,
             credit_special,
             drop_sec_level,
-        })
+        };
+        account.validate()?;
+        Ok(account)
     }
 
     fn write(&self, writer: &mut impl std::io::Write) -> Res<()> {
         use byteorder::{LittleEndian, WriteBytesExt};
 
+        self.validate()?;
         writer.write_f64::<LittleEndian>(self.starting_balance)?;
         writer.write_f64::<LittleEndian>(self.start_this_session)?;
         writer.write_f64::<LittleEndian>(self.debit_call)?;

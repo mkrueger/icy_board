@@ -868,6 +868,8 @@ impl IcyBoardState {
                 if self.session.request_logoff || self.session.disp_options.abort_printout { return Ok(ReaderExit::Stop); }
                 // Authorization must use the original context, not a security
                 // bonus acquired while visiting the previous conference.
+                self.accounting_settle_conference().await?;
+                if self.session.request_logoff { return Ok(ReaderExit::Stop); }
                 self.session.current_conference_number = original;
                 self.session.current_conference = original_conf.clone();
                 self.session.cur_security = original_security;
@@ -884,6 +886,8 @@ impl IcyBoardState {
                     continue;
                 }
                 if command.mail_wait_conf && !flags.contains(ConferenceFlags::MailWaiting) { continue; }
+                self.accounting_settle_conference().await?;
+                if self.session.request_logoff { return Ok(ReaderExit::Stop); }
                 self.set_current_conference(number).await?;
                 if !self.session.user_command_level.cmd_r.session_can_access(&self.session) { continue; }
                 let Some(areas) = conf.areas.as_ref() else { continue; };
@@ -912,6 +916,8 @@ impl IcyBoardState {
             self.session.start_conf = 0;
             Ok(ReaderExit::Done)
         }.await;
+        // Always restore the original reader context, even if settlement fails.
+        let settled = self.accounting_settle_conference().await;
         self.session.current_conference_number = original;
         self.session.current_conference = original_conf;
         self.session.current_message_area = original_area;
@@ -923,6 +929,7 @@ impl IcyBoardState {
         (self.session.time_limit, self.session.batch_limit, self.session.bytes_remaining, self.session.transfer_limits) = original_limits;
         if let (Some(user), Some(last)) = (&mut self.session.current_user, original_user_conf) { user.last_conference = last; }
         if let Some(state) = self.node_state.lock().await[self.node].as_mut() { state.cur_conference = original; }
+        settled?;
         result
     }
 
@@ -1040,6 +1047,19 @@ impl IcyBoardState {
                     return Ok(ReaderExit::Stop);
                 }
                 shown += 1;
+                // Body output, not header scans, password failures or actions.
+                // Captures bypass this loop and are billed on delivery instead.
+                // MSGREAD.C counts a read for accounting only beyond the caller's
+                // last-read pointer, and never for a message they wrote.
+                let own = snapshot.header.from().is_some_and(|from| {
+                    let from = from.to_string();
+                    from.trim().eq_ignore_ascii_case(&self.session.user_name)
+                        || (!self.session.alias_name.is_empty() && from.trim().eq_ignore_ascii_case(&self.session.alias_name))
+                });
+                if snapshot.header.message_number > self.session.last_msg_read && !own {
+                    let rate = self.accounting_rates().charge_per_msg_read + self.session.current_conference.charge_msg_read;
+                    self.accounting_record(4, "MSG READ", "", rate, 1)?;
+                }
                 let (receipt, pointers) = commit_displayed_read(
                     message_base, &snapshot, &self.session.user_name, &self.session.alias_name, self.session.cur_user_id as u32,
                     options.update_status && !command.quick_scan,
@@ -1048,6 +1068,7 @@ impl IcyBoardState {
                 if let Some(pointers) = pointers {
                     (self.session.last_msg_read, self.session.highest_msg_read) = pointers;
                 }
+                self.accounting_check_balance().await?;
                 if receipt {
                     self.display_text(IceText::ReturnReceiptRequired, display_flags::LFBEFORE).await?;
                     self.display_text(IceText::GenerateReceipt, display_flags::LFBEFORE).await?;
@@ -1347,6 +1368,67 @@ mod persistence_tests {
                 assert!(!output.contains("READER-OUTER"), "N reprompted outside: {output}");
             }
         }
+    }
+
+    /// MSGREAD.C counts a read for accounting only beyond the caller's last-read
+    /// pointer and never for a message they wrote themselves.
+    #[tokio::test]
+    async fn accounting_bills_new_messages_but_not_own_ones_or_re_reads() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("mail");
+        let mut base = JamMessageBase::create(&path).unwrap();
+        for (from, to) in [("SENDER", "READER"), ("READER", "SENDER"), ("SENDER", "READER")] {
+            base.write_message(
+                &JamMessage::default()
+                    .with_from(from.into())
+                    .with_to(to.into())
+                    .with_subject("SUBJECT".into())
+                    .with_text("DISPLAYED-BODY".into()),
+            )
+            .unwrap();
+        }
+        base.write_jhr_header().unwrap();
+
+        let (mut state, mut peer) = reader_state().await;
+        crate::icy_board::state::user_commands::pcb::d_download::enable_activity_accounting(
+            &mut state,
+            crate::icy_board::accounting_cfg::AccountingConfig {
+                charge_per_msg_read: 4.0,
+                ..Default::default()
+            },
+        )
+        .await;
+        state.session.current_conference.charge_msg_read = 1.0;
+
+        state.session.push_tokens("1+");
+        let (result, ()) = timeout(Duration::from_secs(5), async {
+            tokio::join!(state.read_msgs_from_base(JamMessageBase::open(&path).unwrap(), false), async {
+                for message in 0..3 {
+                    read_until(&mut peer, "READER-END").await;
+                    // Advance through the range, then leave the reader instead
+                    // of waiting at the outer prompt.
+                    peer.send(if message == 2 { b"N\r" } else { b"\r" }).await.unwrap();
+                }
+            })
+        })
+        .await
+        .expect("reader stalled while reading the range");
+        result.unwrap();
+        let debit = |state: &IcyBoardState| state.session.current_user.as_ref().unwrap().account.as_ref().unwrap().debit_msg_read;
+        assert_eq!(debit(&state), 10.0, "two foreign messages at rate plus conference surcharge");
+        assert_eq!(state.session.last_msg_read, 3);
+
+        state.session.push_tokens("1");
+        let (result, ()) = timeout(Duration::from_secs(5), async {
+            tokio::join!(state.read_msgs_from_base(JamMessageBase::open(&path).unwrap(), false), async {
+                read_until(&mut peer, "READER-END").await;
+                peer.send(b"N\r").await.unwrap();
+            })
+        })
+        .await
+        .expect("reader stalled while re-reading");
+        result.unwrap();
+        assert_eq!(debit(&state), 10.0, "re-reading behind the pointer is not billed again");
     }
 
     #[test]

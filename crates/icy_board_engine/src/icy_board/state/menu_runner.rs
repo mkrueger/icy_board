@@ -18,6 +18,107 @@ use crate::{
 
 use super::{IcyBoardState, functions::MASK_COMMAND, user_commands::pcb::select_conferences::SelectMode};
 
+/// A single configured invocation, not one charge per action. Normal online
+/// accounting clocks are deliberately left running. Doors call `start` only
+/// after launch/connect succeeds, unlike PCBoard's pre-spawn posting.
+pub(crate) struct ActivityUsage {
+    activity: &'static str,
+    minute_activity: &'static str,
+    name: String,
+    per_use: f64,
+    per_minute: f64,
+    started: Option<Instant>,
+    billable: bool,
+}
+
+impl ActivityUsage {
+    pub(crate) fn new(activity: &'static str, minute_activity: &'static str, name: &str, per_use: f64, per_minute: f64) -> Self {
+        Self {
+            activity,
+            minute_activity,
+            name: name.into(),
+            per_use,
+            per_minute,
+            started: None,
+            billable: false,
+        }
+    }
+
+    pub(crate) async fn allowed(&self, state: &mut IcyBoardState) -> Res<bool> {
+        self.allowed_with_reserved(state, 0.0).await
+    }
+
+    pub(crate) fn pending_cost(&self) -> f64 {
+        self.per_minute + if self.started.is_none() { self.per_use } else { 0.0 }
+    }
+
+    pub(crate) async fn allowed_with_reserved(&self, state: &mut IcyBoardState, reserved: f64) -> Res<bool> {
+        if !state.accounting_active() {
+            return Ok(true);
+        }
+        if !self.per_use.is_finite() || !self.per_minute.is_finite() || self.per_use < 0.0 || self.per_minute < 0.0 {
+            return Err("Command/door charges must be finite and non-negative".into());
+        }
+        // Admission requires the use charge plus the first minute; this is
+        // not a minimum bill. Elapsed time still rounds to the nearest minute.
+        Ok(!state.accounting_insufficient(self.per_use + self.per_minute + reserved, 0.0).await?)
+    }
+
+    pub(crate) fn start(&mut self, state: &mut IcyBoardState) -> Res<()> {
+        if self.started.is_some() {
+            return Ok(());
+        }
+        self.billable = state.accounting_active() && (self.per_use != 0.0 || self.per_minute != 0.0);
+        if self.billable {
+            state.accounting_record(12, self.activity, &self.name, self.per_use, 1)?;
+        }
+        // Even free invocations may enclose a priced command/door or logoff.
+        state.accounting_begin_invocation();
+        self.started = Some(Instant::now());
+        Ok(())
+    }
+
+    /// Capture the handler result instead of using `?` before settlement.
+    /// Posting and cleanup are attempted even after I/O failure or logoff;
+    /// preserve the original handler error if either also fails.
+    /// Deferred finish/summary runs only after the last invocation has posted.
+    pub(crate) async fn finish(self, state: &mut IcyBoardState, result: Res<()>) -> Res<()> {
+        let Some(started) = self.started else { return result };
+        let duration = chrono::Duration::from_std(started.elapsed()).unwrap_or(chrono::Duration::MAX);
+        let minutes = crate::icy_board::accounting::minutes_used(duration);
+        let posted = if self.billable && minutes > 0 {
+            state
+                .accounting_record(12, self.minute_activity, &self.name, self.per_minute, minutes)
+                .map(|_| ())
+        } else {
+            Ok(())
+        };
+        if posted.is_err() {
+            // A later enclosing invocation must not show an incomplete total
+            // as the final bill, even if its own settlement succeeds.
+            state.session.accounting.invocation_settlement_failed = true;
+        }
+        // A logoff must settle all enclosing usage before any security change
+        // can disable posting. No further admission is needed while leaving.
+        let checked = if self.billable && !state.session.request_logoff {
+            state.accounting_check_balance().await
+        } else {
+            Ok(())
+        };
+        let finalized = state.accounting_end_invocation().await;
+        let settled = posted.and(checked);
+        if let Err(error) = &finalized {
+            log::error!("Error finalizing {} for {}: {error}", self.activity, self.name);
+        }
+        if result.is_err()
+            && let Err(error) = &settled
+        {
+            log::error!("Error settling {} for {}: {error}", self.activity, self.name);
+        }
+        result.and(settled).and(finalized)
+    }
+}
+
 impl IcyBoardState {
     #[async_recursion(?Send)]
     pub async fn run_single_command(&mut self, via_cmd_list: bool) -> Res<bool> {
@@ -174,11 +275,44 @@ impl IcyBoardState {
         if !self.check_sec(command_str, &command.security).await? {
             return Ok(true);
         }
-        for cmd_action in &command.actions {
-            self.run_action(command, cmd_action, false).await?;
+        if self.session.request_logoff {
+            return Ok(true);
         }
+        let actions: Vec<_> = command
+            .actions
+            .iter()
+            .filter(|action| {
+                action.trigger == ActionTrigger::Activation && !matches!(action.command_type, CommandType::Disabled | CommandType::DisableMenuOption)
+            })
+            .collect();
+        if actions.is_empty() {
+            self.session.tokens.clear();
+            return Ok(true);
+        }
+        let mut usage = ActivityUsage::new(
+            "CMD USAGE",
+            "CMD USAGE MIN",
+            &command.keyword,
+            command.charge_per_use,
+            command.charge_per_minute,
+        );
+        if !usage.allowed(self).await? {
+            self.session.tokens.clear();
+            return Ok(true);
+        }
+        let result = async {
+            for cmd_action in actions {
+                self.run_action(command, cmd_action, false, Some(&mut usage)).await?;
+                if self.session.request_logoff {
+                    break;
+                }
+            }
+            Ok(())
+        }
+        .await;
+        let result = usage.finish(self, result).await;
         self.session.tokens.clear();
-
+        result?;
         Ok(true)
     }
 
@@ -197,7 +331,16 @@ impl IcyBoardState {
         Ok(())
     }
 
-    async fn run_action(&mut self, command: &Command, cmd_action: &CommandAction, check_security: bool) -> Res<()> {
+    async fn run_action(&mut self, command: &Command, cmd_action: &CommandAction, check_security: bool, mut usage: Option<&mut ActivityUsage>) -> Res<()> {
+        // Door/menu/script selection can still fail. Defer the command's
+        // posting until that selection (and, for doors, launch) succeeds.
+        if !matches!(
+            cmd_action.command_type,
+            CommandType::Door | CommandType::OpenDoor | CommandType::Menu | CommandType::Script | CommandType::Disabled | CommandType::DisableMenuOption
+        ) && let Some(usage) = usage.as_deref_mut()
+        {
+            usage.start(self)?;
+        }
         match cmd_action.command_type {
             // A menu option kept in place but turned off.
             CommandType::Disabled | CommandType::DisableMenuOption => {}
@@ -211,6 +354,9 @@ impl IcyBoardState {
                     return Ok(());
                 }
                 let mnu = Menu::load(&file)?;
+                if let Some(usage) = usage.as_deref_mut() {
+                    usage.start(self)?;
+                }
                 self.run_menu(&mnu).await?;
             }
             CommandType::QuitMenu => {
@@ -227,6 +373,9 @@ impl IcyBoardState {
                 let surveys = self.session.current_conference.surveys.clone().unwrap_or_default();
                 let number = cmd_action.parameter.trim().parse::<usize>().unwrap_or_default();
                 if let Some(survey) = number.checked_sub(1).and_then(|index| surveys.get(index)).cloned() {
+                    if let Some(usage) = usage.as_deref_mut() {
+                        usage.start(self)?;
+                    }
                     self.start_survey(&survey).await?;
                 } else {
                     log::error!(
@@ -562,7 +711,7 @@ impl IcyBoardState {
                     return Ok(());
                 }
                 // DOOR/OPEN
-                self.open_door().await?;
+                self.open_door_with_usage(usage).await?;
             }
             CommandType::Door => {
                 let sec = self.session.user_command_level.cmd_open_door.clone();
@@ -571,8 +720,8 @@ impl IcyBoardState {
                 }
                 // The door the action names, which is what a menu entry of type 4 selects.
                 if cmd_action.parameter.is_empty() {
-                    self.open_door().await?;
-                } else if !self.run_named_door(&cmd_action.parameter).await? {
+                    self.open_door_with_usage(usage).await?;
+                } else if !self.run_named_door_with_usage(&cmd_action.parameter, usage).await? {
                     log::warn!(
                         "Command {} opens the door {}, which the conference {} does not offer",
                         command.keyword,
@@ -876,7 +1025,7 @@ impl IcyBoardState {
 
             for a in &cmd.actions {
                 if a.trigger == ActionTrigger::Selection {
-                    self.run_action(cmd, a, true).await?;
+                    self.run_action(cmd, a, true, None).await?;
                 }
             }
             self.print(TerminalTarget::Both, "\x1b[u").await?;
@@ -942,3 +1091,7 @@ impl IcyBoardState {
         Ok(output)
     }
 }
+
+#[cfg(test)]
+#[path = "command_door_accounting_tests.rs"]
+mod command_door_accounting_tests;

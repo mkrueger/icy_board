@@ -2649,13 +2649,11 @@ pub async fn pcbaccstat(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Va
     let field = vm.eval_expr(&args[0]).await?.as_int();
     match field {
         0 => {
-            // ACC_STAT: 0=disabled, 1=tracking, 2=enabled. icy_board models the
-            // system as on or off, not a separate tracking mode, so an enabled
-            // system reports fully enabled.
-            let status = if vm.icy_board_state.get_board().await.config.accounting.enabled {
-                2
-            } else {
-                0
+            use crate::icy_board::accounting::AccountingMode;
+            let status = match vm.icy_board_state.session.accounting.mode {
+                AccountingMode::Disabled => 0,
+                AccountingMode::Tracking => 1,
+                AccountingMode::Enforced => 2,
             };
             Ok(VariableValue::new_int(status))
         }
@@ -2679,6 +2677,7 @@ pub async fn derrmsg(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
 
 pub async fn account(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<VariableValue> {
     let field = vm.eval_expr(&args[0]).await?.as_int();
+    crate::vm::statements::predefined_procedures::refresh_accounting_user(vm);
 
     // Get or initialize user accounting data
     if vm.user.account.is_none() {
@@ -2690,32 +2689,24 @@ pub async fn account(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<Varia
     };
 
     let value = match field {
-        0 => accounting.starting_balance,        // START_BAL - User's starting balance
-        1 => accounting.start_this_session,      // START_SESSION - Balance at the start of this session
-        2 => accounting.debit_call,              // DEB_CALL - Debit for this call
-        3 => accounting.debit_time,              // DEB_TIME - Debit for time online
-        4 => accounting.debit_msg_read,          // DEB_MSGREAD - Debit for reading messages
-        5 => accounting.debit_msg_read_capture,  // DEB_MSGCAP - Debit for capturing messages
-        6 => accounting.debit_msg_write,         // DEB_MSGWRITE - Debit for writing messages
-        7 => accounting.debit_msg_write_echoed,  // DEB_MSGECHOED - Debit for echoed messages
-        8 => accounting.debit_msg_write_private, // DEB_MSGPRIVATE - Debit for private messages
-        9 => accounting.debit_download_file,     // DEB_DOWNFILE - Debit for downloading files
-        10 => accounting.debit_download_bytes,   // DEB_DOWNBYTES - Debit for downloading bytes
-        11 => accounting.debit_group_chat,       // DEB_CHAT - Debit for chat time
-        12 => accounting.debit_tpu,              // DEB_TPU - Debit for TPU
-        13 => accounting.debit_special,          // DEB_SPECIAL - Special debit
-        14 => accounting.credit_upload_file,     // CRED_UPFILE - Credit for uploading files
-        15 => accounting.credit_upload_bytes,    // CRED_UPBYTES - Credit for uploading bytes
-        16 => accounting.credit_special,         // CRED_SPECIAL - Special credit
-        17 => {
-            // SEC_DROP - Security level to drop to at 0 credits
-            let level = if let Some(config) = &vm.icy_board_state.get_board().await.config.accounting.accounting_config {
-                accounting.drop_sec_level as i32
-            } else {
-                0
-            };
-            return Ok(VariableValue::new_int(level));
-        }
+        0 => accounting.starting_balance,           // START_BAL - User's starting balance
+        1 => accounting.start_this_session,         // START_SESSION - Balance at the start of this session
+        2 => accounting.debit_call,                 // DEB_CALL - Debit for this call
+        3 => accounting.debit_time,                 // DEB_TIME - Debit for time online
+        4 => accounting.debit_msg_read,             // DEB_MSGREAD - Debit for reading messages
+        5 => accounting.debit_msg_read_capture,     // DEB_MSGCAP - Debit for capturing messages
+        6 => accounting.debit_msg_write,            // DEB_MSGWRITE - Debit for writing messages
+        7 => accounting.debit_msg_write_echoed,     // DEB_MSGECHOED - Debit for echoed messages
+        8 => accounting.debit_msg_write_private,    // DEB_MSGPRIVATE - Debit for private messages
+        9 => accounting.debit_download_file,        // DEB_DOWNFILE - Debit for downloading files
+        10 => accounting.debit_download_bytes,      // DEB_DOWNBYTES - Debit for downloading bytes
+        11 => accounting.debit_group_chat,          // DEB_CHAT - Debit for chat time
+        12 => accounting.debit_tpu,                 // DEB_TPU - Debit for TPU
+        13 => accounting.debit_special,             // DEB_SPECIAL - Special debit
+        14 => accounting.credit_upload_file,        // CRED_UPFILE - Credit for uploading files
+        15 => accounting.credit_upload_bytes,       // CRED_UPBYTES - Credit for uploading bytes
+        16 => accounting.credit_special,            // CRED_SPECIAL - Special credit
+        17 => f64::from(accounting.drop_sec_level), // SEC_DROP is independent of accounting configuration.
         _ => {
             log::error!("ACCOUNT: Invalid field number: {field}");
             0.0

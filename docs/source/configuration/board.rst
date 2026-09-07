@@ -927,23 +927,30 @@ under that key. ``cfg_file`` references its separate file.
    * - ``enabled``
      - boolean
      - false
-     - Enable accounting.
+     - Global accounting switch; the matching PWRD level still chooses off,
+       tracking-only (T), or enforced (Y).
    * - ``use_money``
      - boolean
      - false
-     - Use monetary units instead of accounting credits.
+     - Display fixed US-dollar-style amounts with two decimals instead of
+       credits with up to six decimals and trailing zeros trimmed. Both use
+       comma grouping; not host-locale currency selection.
    * - ``concurrent_tracking``
      - boolean
      - false
-     - Concurrent tracking switch.
+     - Subtract the maximum accumulated debit category, not their sum.
+       Pending global time joins the time category first; positive credits
+       increase the balance. Not a simultaneous-session switch.
    * - ``ignore_empty_sec_level``
      - boolean
      - false
-     - Ignore empty security-level accounting entries.
+     - Suppress the empty-account session security drop. Affordability checks
+       and accounting time caps remain active in enforced mode.
    * - ``peak_usage_start``, ``peak_usage_end``
      - time each
      - ``00:00:00`` each
-     - Local peak-period start and end.
+     - Local peak-period start and end, inclusive to the minute. Earlier end
+       crosses midnight; equal endpoints cover all day on selected dates.
    * - ``peak_days_of_week``
      - string
      - ``"NNNNNNN"``
@@ -952,23 +959,48 @@ under that key. ``cfg_file`` references its separate file.
    * - ``peak_holiday_list_file``
      - path
      - ``""``
-     - Holiday list.
+     - Plain text MM-DD-YY patterns, one per line; uppercase X matches a digit.
+       A matching local date uses normal rates all day. Empty disables holidays.
    * - ``cfg_file``
      - path
      - ``""``
-     - Accounting rates/configuration file.
+     - Separate TOML root record with all 15 required finite rate fields.
+       Active accounting requires successfully loaded rates.
    * - ``tracking_file``
      - path
      - ``""``
-     - Accounting tracking file.
+     - Case-insensitive .DBF selects dBase III; other extensions select fixed-width
+       ASCII. A nonempty path is required for tracking-only mode. Audit failures
+       are logged without undoing posted charges; no transactional ledger.
    * - ``info_file``, ``warning_file``, ``logoff_file``
      - path each
      - ``""`` each
-     - Accounting information, warning, and logoff displays.
+     - Login information, enforced low-balance warning, and ordinary logoff
+       displays. Empty paths omit them. Warning re-arms after balance recovery.
 
 The day-mask parser does not validate seven-character Y/N input: only
 uppercase Y sets bits, and excess characters are unsafe. Always supply
 exactly seven characters. This is not an integer mask or array of weekdays.
+
+Accounting is off unless globally enabled and selected by the first matching
+PWRD record. Its ``accounting_tracking = true`` takes precedence over
+``enabled = true``; without a tracking path, T selects off rather than Y.
+``new_user_balance`` in the separate rates file grants funds only at registration,
+not to existing accounts at login. Fund existing callers explicitly before
+enforcing charges. The Markdown operator guide ``docs/accounting.md`` includes
+a complete minimal board section, rate file, level record and PPE funding procedure.
+
+Relative accounting paths resolve from the board root. The rates file is TOML,
+but the holiday file is plain text even if setup supplied a .toml extension.
+An unreadable holiday file logs a warning and provides no holiday exemptions.
+Tracking uses a persistent sibling .lock for cooperating writers; account saves
+and tracking appends are not a crash-atomic transaction.
+
+Profile saves such as W/LANG do not finalize accounting or stop its clocks.
+Ordinary logoff defers finalization until enclosing command/door usage has settled.
+The accounting logoff display and final summaries follow successful final account
+persistence; settlement or final-save errors suppress them. Disconnected callers
+may not receive output. This ordering is not a financial-grade durability guarantee.
 
 .. list-table:: [subs]
    :header-rows: 1

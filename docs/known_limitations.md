@@ -17,7 +17,7 @@ procedure and this page as its risk checklist.
 | Area | What is missing |
 | :--- | :--- |
 | Modem | Callers reach the board over telnet, SSH and websockets. There is no serial or modem support, and no FOSSIL driver. |
-| Accounting | PPL `ACCOUNT`/`RECORDUSAGE` and tracking work, but normal board activity is not charged. Balance enforcement, peak rates, money display, credit macros and the warning/info/logoff files are missing. |
+| Accounting | Activity charging, enforcement, peak/holiday rates, credit macros, display files and setup controls are implemented; see the [operator guide](accounting.md). No per-file NoTime/FSEC monetary transfer-time refund, transactional ledger, crash-atomic account/audit commit or cross-process funds reservation. Currency display is fixed US-dollar style, not locale-selected. Audit failures are logged without undoing posted charges. |
 | Upload credits | Uploading earns configured byte credit but not time credit, and uploads are not test-extracted. The configured free-space threshold is enforced before a transfer starts. |
 | FTN | icy_board is a leaf or point over BinkP: scan, poll and toss. There is no BinkP answering side, netmail arrives in a single dump base, AreaFix is missing and the AKA and link setup is hand-edited TOML. |
 | Web | There is no web frontend: nothing serves the board over HTTP. A sysop may enable policy-controlled outbound HTTP for PPL 4.00 scripts. |

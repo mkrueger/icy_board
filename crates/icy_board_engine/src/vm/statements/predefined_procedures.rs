@@ -303,9 +303,26 @@ pub async fn getuser(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> 
 /// # Errors
 /// Errors if the variable is not found.
 pub async fn putuser(vm: &mut VirtualMachine<'_>, _args: &[PPEExpr]) -> Res<()> {
-    if let Some(mut user) = vm.icy_board_state.session.current_user.take() {
+    if refresh_accounting_user(vm) {
+        // Start with the live record: runtime actions since GETUSER may have
+        // changed balances and statistics not represented by U_* variables.
+        let mut user = vm.icy_board_state.session.current_user.clone().unwrap();
         vm.put_user_variables(&mut user).await;
+        vm.user = user.clone();
         vm.icy_board_state.session.current_user = Some(user);
+    } else {
+        // PUTUSER writes the record selected by GETALTUSER, including ACCOUNT
+        // and RECORDUSAGE adjustments, without touching the logged-in caller.
+        let mut user = vm.user.clone();
+        vm.put_user_variables(&mut user).await;
+        let mut board = vm.icy_board_state.get_board().await;
+        let index = board.users.iter().position(|stored| stored.get_name() == user.get_name());
+        if let Some(index) = index {
+            board.users[index] = user.clone();
+            board.save_userbase()?;
+            drop(board);
+            vm.user = user;
+        }
     }
     Ok(())
 }
@@ -2025,6 +2042,7 @@ pub async fn getaltuser(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()
         return Ok(());
     }
     vm.user = vm.icy_board_state.get_board().await.users[user_record as usize - 1].clone();
+    refresh_accounting_user(vm);
     log::info!("PPE getaltuser: switched to user #{} ({})", user_record, vm.user.name);
     vm.set_user_variables()?;
     Ok(())
@@ -2500,67 +2518,59 @@ pub async fn dfcopy(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
     Ok(())
 }
 
-pub async fn account(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    use crate::icy_board::pcb::user_inf::AccountUserInf;
+/// Runtime actions mutate the session account, not the PPE's user snapshot.
+/// Refresh only that account, and only when the PPE selected the logged-in user.
+pub(crate) fn refresh_accounting_user(vm: &mut VirtualMachine<'_>) -> bool {
+    if let Some(user) = &vm.icy_board_state.session.current_user
+        && user.get_name() == vm.user.get_name()
+    {
+        vm.user.account.clone_from(&user.account);
+        true
+    } else {
+        false
+    }
+}
 
-    // ACCOUNT(INTEGER field, INTEGER value)
+#[cfg(test)]
+#[path = "accounting_tests.rs"]
+mod accounting_tests;
+
+pub async fn account(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
+    // ACCOUNT(INTEGER field, DOUBLE value) is an adjustment, even when disabled.
     let field = vm.eval_expr(&args[0]).await?.as_int();
     let value = vm.eval_expr(&args[1]).await?.as_double();
-
-    // Initialize accounting if not present
-    if vm.user.account.is_none() {
-        vm.user.account = Some(AccountUserInf::default());
-    }
-
-    let Some(account) = &mut vm.user.account else {
+    if !(0..=17).contains(&field) {
+        log::error!("ACCOUNT statement: Invalid field number: {field}");
         return Ok(());
-    };
+    }
+    if !value.is_finite() {
+        return Err("ACCOUNT amount must be finite".into());
+    }
 
-    // Update the specified accounting field
+    let current = refresh_accounting_user(vm);
+    let mut account = vm.user.account.clone().unwrap_or_default();
+    account.validate()?;
     match field {
-        0 => account.starting_balance += value,        // START_BAL
-        1 => account.start_this_session += value,      // START_SESSION
-        2 => account.debit_call += value,              // DEB_CALL
-        3 => account.debit_time += value,              // DEB_TIME
-        4 => account.debit_msg_read += value,          // DEB_MSGREAD
-        5 => account.debit_msg_read_capture += value,  // DEB_MSGCAP
-        6 => account.debit_msg_write += value,         // DEB_MSGWRITE
-        7 => account.debit_msg_write_echoed += value,  // DEB_MSGECHOED
-        8 => account.debit_msg_write_private += value, // DEB_MSGPRIVATE
-        9 => account.debit_download_file += value,     // DEB_DOWNFILE
-        10 => account.debit_download_bytes += value,   // DEB_DOWNBYTES
-        11 => account.debit_group_chat += value,       // DEB_CHAT
-        12 => account.debit_tpu += value,              // DEB_TPU
-        13 => account.debit_special += value,          // DEB_SPECIAL
-        14 => account.credit_upload_file += value,     // CRED_UPFILE
-        15 => account.credit_upload_bytes += value,    // CRED_UPBYTES
-        16 => account.credit_special += value,         // CRED_SPECIAL
-        17 => {
-            // SEC_DROP - Security level to drop to (stored as u8)
-            account.drop_sec_level = value.clamp(0.0, 255.0) as u8;
-        }
-        _ => {
-            log::error!("ACCOUNT statement: Invalid field number: {field}");
-        }
+        0 => account.starting_balance += value,
+        1 => account.start_this_session += value,
+        2..=16 => account.apply_charge(field as usize, value)?,
+        // Preserve the existing safe clamp for the byte-sized SEC_DROP field.
+        17 => account.drop_sec_level = value.clamp(0.0, 255.0) as u8,
+        _ => unreachable!(),
     }
-
-    // Update session user if this is the current user
-    if let Some(session_user) = &mut vm.icy_board_state.session.current_user
-        && session_user.get_name() == vm.user.get_name()
-    {
-        session_user.account.clone_from(&vm.user.account);
+    // Validate the snapshots too; overflow must not partially update either copy.
+    account.validate()?;
+    vm.user.account = Some(account);
+    if current && let Some(user) = &mut vm.icy_board_state.session.current_user {
+        user.account.clone_from(&vm.user.account);
     }
-
     Ok(())
 }
 
 pub async fn recordusage(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<()> {
-    use crate::icy_board::pcb::user_inf::AccountUserInf;
-    use chrono::Utc;
-    use std::fs::OpenOptions;
-    use std::io::Write;
+    use crate::icy_board::accounting::{AccountingMode, TrackingEntry, append_tracking};
 
-    // RECORDUSAGE(INTEGER field, STRING desc1, STRING desc2, DWORD unitcost, INTEGER value)
+    // RECORDUSAGE(INTEGER field, STRING desc1, STRING desc2, DOUBLE unitcost, INTEGER quantity)
     let field = vm.eval_expr(&args[0]).await?.as_int();
     let desc1 = vm.eval_expr(&args[1]).await?.as_string();
     let desc2 = vm.eval_expr(&args[2]).await?.as_string();
@@ -2573,86 +2583,55 @@ pub async fn recordusage(vm: &mut VirtualMachine<'_>, args: &[PPEExpr]) -> Res<(
         return Ok(());
     }
 
-    // Calculate total charge
     let total_charge = unitcost * value as f64;
-
-    // Initialize accounting if not present
-    if vm.user.account.is_none() {
-        vm.user.account = Some(AccountUserInf::default());
+    if !unitcost.is_finite() || !total_charge.is_finite() {
+        return Err("RECORDUSAGE amounts must be finite".into());
     }
 
-    let Some(account) = &mut vm.user.account else {
+    if refresh_accounting_user(vm) {
+        let result = vm.icy_board_state.accounting_record(field as usize, &desc1, &desc2, unitcost, i64::from(value));
+        // Refresh even on failure: audit I/O must never cause a stale PPE copy
+        // to overwrite a charge that the runtime has already posted.
+        refresh_accounting_user(vm);
+        return result.map(|_| ());
+    }
+
+    // PCBoard gates usage on the caller's mode, but posts through ptrUData to
+    // the selected user. Never substitute the caller for a GETALTUSER account.
+    if !vm.icy_board_state.accounting_active() || (total_charge == 0.0 && vm.icy_board_state.session.accounting.mode == AccountingMode::Enforced) {
         return Ok(());
-    };
-
-    // Update the accounting field (same as ACCOUNT statement)
-    match field {
-        2 => account.debit_call += total_charge,              // DEB_CALL
-        3 => account.debit_time += total_charge,              // DEB_TIME
-        4 => account.debit_msg_read += total_charge,          // DEB_MSGREAD
-        5 => account.debit_msg_read_capture += total_charge,  // DEB_MSGCAP
-        6 => account.debit_msg_write += total_charge,         // DEB_MSGWRITE
-        7 => account.debit_msg_write_echoed += total_charge,  // DEB_MSGECHOED
-        8 => account.debit_msg_write_private += total_charge, // DEB_MSGPRIVATE
-        9 => account.debit_download_file += total_charge,     // DEB_DOWNFILE
-        10 => account.debit_download_bytes += total_charge,   // DEB_DOWNBYTES
-        11 => account.debit_group_chat += total_charge,       // DEB_CHAT
-        12 => account.debit_tpu += total_charge,              // DEB_TPU
-        13 => account.debit_special += total_charge,          // DEB_SPECIAL
-        14 => account.credit_upload_file += total_charge,     // CRED_UPFILE
-        15 => account.credit_upload_bytes += total_charge,    // CRED_UPBYTES
-        16 => account.credit_special += total_charge,         // CRED_SPECIAL
-        _ => {
-            log::error!("RECORDUSAGE: Invalid field number: {field}");
-            return Ok(());
-        }
     }
+    let mut account = vm.user.account.clone().unwrap_or_default();
+    account.apply_charge(field as usize, total_charge)?;
+    vm.user.account = Some(account);
 
-    // Update session user if this is the current user
-    if let Some(session_user) = &mut vm.icy_board_state.session.current_user
-        && session_user.get_name() == vm.user.get_name()
-    {
-        session_user.account.clone_from(&vm.user.account);
-    }
-
-    // Write to accounting tracking file if configured
+    // Audit attribution is the logged-in caller (UsersData in PCBoard), even
+    // when the storage belongs to the alternate user selected by the PPE.
     let board = vm.icy_board_state.get_board().await;
-    if board.config.accounting.enabled && !board.config.accounting.tracking_file.as_os_str().is_empty() {
+    if !board.config.accounting.tracking_file.as_os_str().is_empty() {
         let tracking_file = board.resolve_file(&board.config.accounting.tracking_file);
-        drop(board); // Release lock before file I/O
-
-        // Format: timestamp, username, field, desc1, desc2, unitcost, quantity, total
-        let timestamp = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
-        let username = vm.user.get_name();
-
-        let field_name = match field {
-            2 => "DEB_CALL",
-            3 => "DEB_TIME",
-            4 => "DEB_MSGREAD",
-            5 => "DEB_MSGCAP",
-            6 => "DEB_MSGWRITE",
-            7 => "DEB_MSGECHOED",
-            8 => "DEB_MSGPRIVATE",
-            9 => "DEB_DOWNFILE",
-            10 => "DEB_DOWNBYTES",
-            11 => "DEB_CHAT",
-            12 => "DEB_TPU",
-            13 => "DEB_SPECIAL",
-            14 => "CRED_UPFILE",
-            15 => "CRED_UPBYTES",
-            16 => "CRED_SPECIAL",
-            _ => "UNKNOWN",
+        drop(board);
+        let entry = TrackingEntry {
+            at: chrono::Local::now(),
+            user: vm
+                .icy_board_state
+                .session
+                .current_user
+                .as_ref()
+                .map(|user| user.name.clone())
+                .unwrap_or_default(),
+            node: (vm.icy_board_state.node + 1) as u16,
+            conference: vm.icy_board_state.session.current_conference_number,
+            activity: desc1,
+            sub_activity: desc2,
+            unit_cost: unitcost,
+            quantity: i64::from(value),
+            value: total_charge,
         };
-
-        let log_line = format!("{timestamp}\t{username}\t{field_name}\t{desc1}\t{desc2}\t{unitcost:.2}\t{value}\t{total_charge:.2}\n");
-
-        // Append to tracking file
-        if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(tracking_file) {
-            if let Err(e) = file.write_all(log_line.as_bytes()) {
-                log::error!("RECORDUSAGE: Failed to write to tracking file: {e}");
-            }
-        } else {
-            log::error!("RECORDUSAGE: Failed to open tracking file");
+        // Posting succeeded. Do not report a retryable statement failure for
+        // audit I/O and thereby invite a second debit/credit for the same usage.
+        if let Err(error) = append_tracking(&tracking_file, &entry) {
+            log::error!("RECORDUSAGE: charge posted, tracking failed: {error}");
         }
     }
 

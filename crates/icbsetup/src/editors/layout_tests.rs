@@ -206,7 +206,7 @@ fn security_popup_labels_fit_at_80_columns() {
             "sec_level_editor_allow_alias",
             "sec_level_force_read_mail",
             "sec_level_demo_acc",
-            "sec_level_enable_acc",
+            "accounting_level_mode",
         ],
     );
 }

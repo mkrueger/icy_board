@@ -194,80 +194,94 @@ impl IcyBoardState {
             }
         };
         self.session.group_chat.current_room = Some(room);
-        self.dispatch_group_chat_events(events)?;
-        self.display_text(IceText::NodeChatEntered, display_flags::LFBEFORE | display_flags::NEWLINE)
-            .await?;
-        if let Some(user) = &mut self.session.current_user {
-            user.stats.num_group_chats = user.stats.num_group_chats.saturating_add(1);
-        }
-        let mut mode = ChatLoopMode::Chat;
-        let mut buffer = String::new();
-        loop {
-            if self.session.request_logoff {
-                break;
+        let started = chrono::Utc::now();
+        let rate = self.accounting_rates().charge_per_group_chat_time;
+        // Settle on quit, disconnect and terminal errors alike. Rejected room
+        // joins never start the timer, and room changes do not restart it.
+        let result: Res<()> = async {
+            self.dispatch_group_chat_events(events)?;
+            self.display_text(IceText::NodeChatEntered, display_flags::LFBEFORE | display_flags::NEWLINE)
+                .await?;
+            if let Some(user) = &mut self.session.current_user {
+                user.stats.num_group_chats = user.stats.num_group_chats.saturating_add(1);
             }
-            match mode {
-                ChatLoopMode::Chat => {
-                    let Some(ch) = self.get_char(TerminalTarget::Both).await? else {
-                        continue;
-                    };
-                    match ch.ch {
-                        '\r' | '\n' => {
-                            if !buffer.is_empty() {
-                                let events = {
-                                    let guard = manager.lock().await;
-                                    guard.send_public_message(node_id, &buffer)
-                                };
-                                match events {
-                                    Ok(events) => self.dispatch_group_chat_events(events)?,
-                                    Err(err) => self.show_chat_error(err).await?,
+            let mut mode = ChatLoopMode::Chat;
+            let mut buffer = String::new();
+            loop {
+                if self.session.request_logoff {
+                    break;
+                }
+                match mode {
+                    ChatLoopMode::Chat => {
+                        let Some(ch) = self.get_char(TerminalTarget::Both).await? else {
+                            continue;
+                        };
+                        match ch.ch {
+                            '\r' | '\n' => {
+                                if !buffer.is_empty() {
+                                    let events = {
+                                        let guard = manager.lock().await;
+                                        guard.send_public_message(node_id, &buffer)
+                                    };
+                                    match events {
+                                        Ok(events) => self.dispatch_group_chat_events(events)?,
+                                        Err(err) => self.show_chat_error(err).await?,
+                                    }
+                                    buffer.clear();
                                 }
-                                buffer.clear();
+                                self.new_line().await?;
                             }
-                            self.new_line().await?;
-                        }
-                        '\x08' | '\u{7f}' => {
-                            if !buffer.is_empty() {
-                                buffer.pop();
-                                self.print(TerminalTarget::Both, "\x08 \x08").await?;
+                            '\x08' | '\u{7f}' => {
+                                if !buffer.is_empty() {
+                                    buffer.pop();
+                                    self.print(TerminalTarget::Both, "\x08 \x08").await?;
+                                }
                             }
-                        }
-                        '\x1b' => {
-                            mode = ChatLoopMode::Command;
-                            self.new_line().await?;
-                        }
-                        c => {
-                            buffer.push(c);
-                            if self.session.group_chat.echo {
-                                self.print(TerminalTarget::Both, &c.to_string()).await?;
+                            '\x1b' => {
+                                mode = ChatLoopMode::Command;
+                                self.new_line().await?;
+                            }
+                            c => {
+                                buffer.push(c);
+                                if self.session.group_chat.echo {
+                                    self.print(TerminalTarget::Both, &c.to_string()).await?;
+                                }
                             }
                         }
                     }
-                }
-                ChatLoopMode::Command => {
-                    let command = self.prompt_chat_command().await?;
-                    if command.trim().is_empty() {
-                        mode = ChatLoopMode::Chat;
-                        continue;
-                    }
-                    match self.handle_chat_command(&manager, command.trim()).await? {
-                        ChatCommandResult::Continue => mode = ChatLoopMode::Chat,
-                        ChatCommandResult::ExitChat | ChatCommandResult::Logoff => break,
+                    ChatLoopMode::Command => {
+                        let command = self.prompt_chat_command().await?;
+                        if command.trim().is_empty() {
+                            mode = ChatLoopMode::Chat;
+                            continue;
+                        }
+                        match self.handle_chat_command(&manager, command.trim()).await? {
+                            ChatCommandResult::Continue => mode = ChatLoopMode::Chat,
+                            ChatCommandResult::ExitChat | ChatCommandResult::Logoff => break,
+                        }
                     }
                 }
             }
+            Ok(())
         }
-        {
+        .await;
+        let minutes = crate::icy_board::accounting::minutes_used(chrono::Utc::now() - started);
+        let charged = self.accounting_record(11, "CHAT TIME", "", rate, minutes);
+        let cleanup = {
             let mut guard = manager.lock().await;
             let events = guard.leave_room(node_id);
             guard.clear_monitoring(node_id);
-            self.dispatch_group_chat_events(events)?;
-        }
+            self.dispatch_group_chat_events(events)
+        };
         self.session.group_chat.current_room = None;
         self.session.group_chat.monitor_rooms.clear();
+        self.set_activity(NodeStatus::Available).await;
+        charged?;
+        result?;
+        cleanup?;
+        self.accounting_check_balance().await?;
         self.display_text(IceText::NodeChatEnded, display_flags::LFBEFORE | display_flags::NEWLINE)
             .await?;
-        self.set_activity(NodeStatus::Available).await;
         Ok(())
     }
 

@@ -73,6 +73,7 @@ pub mod zconnect;
 
 pub use pcb::*;
 
+pub mod accounting;
 pub mod accounting_cfg;
 
 #[derive(Error, Debug)]

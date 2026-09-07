@@ -91,6 +91,35 @@ fn completed(name: &str, bytes: &[u8]) -> CompletedUpload {
     }
 }
 
+#[tokio::test]
+async fn accounting_upload_paybacks_are_positive_and_rejections_are_not_credited() {
+    let (_root, mut state, _peer) = fixture("").await;
+    super::super::d_download::enable_activity_accounting(
+        &mut state,
+        crate::icy_board::accounting_cfg::AccountingConfig {
+            pay_back_for_upload_file: 3.0,
+            pay_back_for_upload_bytes: 2.0,
+            ..Default::default()
+        },
+    )
+    .await;
+    let requests = [request("ONE.BIN", false, "Accepted upload")];
+    for _ in 0..2 {
+        // The second intake has the same name and is rejected, even though
+        // the protocol completed. Fractional KiB is truncated per file.
+        let receipt = UploadReceipt {
+            files: vec![completed("ONE.BIN", &[0; 1536])],
+            ..Default::default()
+        };
+        finish_bounded(&mut state, receipt, &requests, true).await;
+    }
+    let account = state.session.current_user.as_ref().unwrap().account.as_ref().unwrap();
+    assert_eq!(account.credit_upload_file, 3.0);
+    assert_eq!(account.credit_upload_bytes, 2.0);
+    assert_eq!(account.debit_download_file, 0.0);
+    assert_eq!(account.debit_download_bytes, 0.0);
+}
+
 async fn finish_bounded(state: &mut IcyBoardState, receipt: UploadReceipt, requests: &[UploadRequest], retain_requested_name: bool) {
     timeout(Duration::from_secs(3), state.finish_uploads(receipt, requests, retain_requested_name, "Z"))
         .await

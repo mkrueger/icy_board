@@ -28,7 +28,7 @@ pub mod k_delete_message;
 pub mod l_find_files;
 pub mod lang_set_language;
 pub mod m_toggle_graphics;
-mod message_attachment;
+pub(crate) mod message_attachment;
 pub mod n_find_new_files;
 pub mod news_display_news;
 pub mod o_page_sysop;

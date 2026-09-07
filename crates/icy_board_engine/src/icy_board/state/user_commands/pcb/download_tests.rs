@@ -77,6 +77,115 @@ async fn fixture(input: &str) -> (TempDir, IcyBoardState, ChannelConnection) {
     (root, state, peer)
 }
 
+#[tokio::test]
+async fn accounting_only_finished_paid_files_and_per_file_whole_kib() {
+    let (root, mut state, _peer) = fixture("").await;
+    enable_activity_accounting(
+        &mut state,
+        crate::icy_board::accounting_cfg::AccountingConfig {
+            charge_per_download_file: 3.0,
+            charge_per_download_bytes: 2.0,
+            ..Default::default()
+        },
+    )
+    .await;
+    let a = root.path().join("paid/A.ZIP");
+    let b = root.path().join("paid/B.ZIP");
+    let c = root.path().join("paid/C.ZIP");
+    let base = state.get_filebase(&root.path().join("paid"), &root.path().join("paid-metadata")).await.unwrap();
+    base.lock().await.iter_mut().find(|header| header.name() == "C.ZIP").unwrap().set_free(true);
+    state.session.flagged_files = vec![a.clone(), b.clone(), c.clone()];
+    let offered = vec![(a.clone(), 1536), (b.clone(), 1536), (c.clone(), 2048)];
+    let mut transfer = TransferState::new("Accounting test".into());
+    // Aborted with no completed files must not debit or refund anything.
+    state.finish_download_batch(&offered, &transfer, "Z", 10).await.unwrap();
+    assert_eq!(state.session.current_user.as_ref().unwrap().account.as_ref().unwrap().debit_download_file, 0.0);
+    transfer.send_state.finished_files = vec![("A.ZIP".into(), a), ("C.ZIP".into(), c)];
+    transfer.send_state.total_bytes_transfered = 50_000; // Includes failed wire bytes.
+    state.finish_download_batch(&offered, &transfer, "Z", 10).await.unwrap();
+    let account = state.session.current_user.as_ref().unwrap().account.as_ref().unwrap();
+    assert_eq!(account.debit_download_file, 3.0);
+    assert_eq!(account.debit_download_bytes, 2.0); // 1536 / 1024, not 1.5 KiB.
+    assert_eq!(account.credit_special, 0.0);
+    assert_eq!(account.debit_time, 0.0); // FREE is not NOTIME.
+    assert_eq!(state.session.flagged_files, [b]);
+}
+
+#[tokio::test]
+async fn accounting_queue_preflight_reserves_prior_files_without_debiting() {
+    let (root, mut state, _peer) = fixture("").await;
+    enable_activity_accounting(
+        &mut state,
+        crate::icy_board::accounting_cfg::AccountingConfig {
+            charge_per_download_file: 3.0,
+            charge_per_download_bytes: 2.0,
+            ..Default::default()
+        },
+    )
+    .await;
+    state.session.current_user.as_mut().unwrap().account.as_mut().unwrap().starting_balance = 10.0;
+    let a = root.path().join("paid/A.ZIP");
+    let b = root.path().join("paid/B.ZIP");
+    state.add_flagged_file(&a, false, false).await.unwrap();
+    state.add_flagged_file(&b, false, false).await.unwrap();
+    assert_eq!(state.session.flagged_files, [a.clone()]);
+    assert_eq!(state.accounting_queued_download_cost(&b).await.unwrap(), 7.0);
+    assert_eq!(state.accounting_queued_download_cost(&a).await.unwrap(), 0.0);
+    assert_eq!(state.session.current_user.as_ref().unwrap().account.as_ref().unwrap().debit_download_file, 0.0);
+}
+
+#[tokio::test]
+async fn accounting_command_writes_use_target_surcharge_and_one_category() {
+    use crate::icy_board::message_area::{AreaList, MessageArea};
+    use jamjam::jam::{JamMessage, JamMessageBase, attributes};
+    let (root, mut state, _peer) = fixture("").await;
+    enable_activity_accounting(
+        &mut state,
+        crate::icy_board::accounting_cfg::AccountingConfig {
+            charge_per_msg_written: 2.0,
+            charge_per_msg_write_echoed: 5.0,
+            charge_per_msg_write_private: 7.0,
+            ..Default::default()
+        },
+    )
+    .await;
+    state.session.current_conference.charge_msg_write = 100.0;
+    {
+        let mut board = state.get_board().await;
+        board.conferences[0].charge_msg_write = 3.0;
+        board.conferences[0].areas = Some(Arc::new(AreaList::new(vec![MessageArea {
+            path: root.path().join("messages"),
+            ..Default::default()
+        }])));
+    }
+    for flags in [
+        attributes::MSG_TYPELOCAL,
+        attributes::MSG_TYPEECHO,
+        attributes::MSG_PRIVATE | attributes::MSG_TYPEECHO,
+    ] {
+        let message = JamMessage::default()
+            .with_from("AUTHOR".into())
+            .with_to("READER".into())
+            .with_subject("Accounting".into())
+            .with_text("Body".into())
+            .with_attributes(flags);
+        state.send_accounted_message(0, 0, message, IceText::SavingMessage).await.unwrap();
+    }
+    // Bad destinations must neither append nor charge.
+    assert!(
+        state
+            .send_accounted_message(0, 99, JamMessage::default(), IceText::SavingMessage)
+            .await
+            .is_err()
+    );
+    let account = state.session.current_user.as_ref().unwrap().account.as_ref().unwrap();
+    assert_eq!(account.debit_msg_write, 5.0);
+    assert_eq!(account.debit_msg_write_echoed, 8.0);
+    assert_eq!(account.debit_msg_write_private, 10.0);
+    assert_eq!(state.session.current_conference.charge_msg_write, 100.0);
+    assert_eq!(JamMessageBase::open(root.path().join("messages")).unwrap().highest_message_number(), 3);
+}
+
 async fn output(peer: &mut ChannelConnection) -> String {
     let mut bytes = Vec::new();
     let mut buffer = [0u8; 4096];
@@ -87,6 +196,229 @@ async fn output(peer: &mut ChannelConnection) -> String {
         }
         bytes.extend_from_slice(&buffer[..count]);
     }
+}
+
+async fn accounting_message_fixture(balance: f64) -> (TempDir, IcyBoardState, ChannelConnection) {
+    use crate::icy_board::{
+        accounting_cfg::AccountingConfig,
+        message_area::{AreaList, MessageArea},
+    };
+    let (root, mut state, peer) = fixture("").await;
+    enable_activity_accounting(
+        &mut state,
+        AccountingConfig {
+            charge_per_msg_written: 2.0,
+            charge_per_msg_write_echoed: 5.0,
+            charge_per_msg_write_private: 7.0,
+            ..Default::default()
+        },
+    )
+    .await;
+    state.session.current_user.as_mut().unwrap().account.as_mut().unwrap().starting_balance = balance;
+    {
+        let mut board = state.get_board().await;
+        board.config.paths.user_file = root.path().join("users.toml");
+        board.config.paths.email_msgbase = root.path().join("mail");
+        board.conferences[0].charge_msg_write = 3.0;
+        board.conferences[0].areas = Some(Arc::new(AreaList::new(vec![MessageArea {
+            path: root.path().join("messages"),
+            ..Default::default()
+        }])));
+    }
+    state.session.current_conference.charge_msg_write = 20.0;
+    (root, state, peer)
+}
+
+fn accounting_message(flags: u32) -> jamjam::jam::JamMessage {
+    jamjam::jam::JamMessage::default()
+        .with_from("AUTHOR".into())
+        .with_to("READER".into())
+        .with_subject("Accounting".into())
+        .with_text("Body".into())
+        .with_attributes(flags)
+}
+
+#[tokio::test]
+async fn accounting_message_preflight_denies_before_composition_and_rechecks_each_save() {
+    use crate::icy_board::state::user_commands::{mods::editor::EditResult, pcb::message_attachment::MessageCreditDenied};
+    use jamjam::jam::{JamMessageBase, attributes};
+    for (flags, cost) in [
+        (0, 5.0),
+        (attributes::MSG_TYPEECHO, 8.0),
+        (attributes::MSG_PRIVATE | attributes::MSG_TYPEECHO, 10.0),
+    ] {
+        let (root, mut state, mut peer) = accounting_message_fixture(cost - 1.0).await;
+        let result = tokio::time::timeout(
+            Duration::from_secs(2),
+            state.write_message_context(0, 0, accounting_message(flags), Vec::new(), IceText::SavingMessage, false),
+        )
+        .await
+        .expect("insufficient balance must not enter editor")
+        .unwrap();
+        assert_eq!(result, EditResult::Abort);
+        assert!(!root.path().join("messages.jhr").exists());
+        assert!(output(&mut peer).await.contains("Insufficient Credits"));
+        // Balance can change while composing. A successful entry preflight is
+        // not authority to save later, including forward/copy/QWK adapters.
+        state.session.current_user.as_mut().unwrap().account.as_mut().unwrap().starting_balance = cost + 1.0;
+        assert!(state.message_write_allowed(0, &accounting_message(flags)).await.unwrap());
+        state.session.current_user.as_mut().unwrap().account.as_mut().unwrap().starting_balance = cost - 1.0;
+        let error = state
+            .send_accounted_message(0, 0, accounting_message(flags), IceText::SavingMessage)
+            .await
+            .unwrap_err();
+        assert!(error.is::<MessageCreditDenied>());
+        assert!(!root.path().join("messages.jhr").exists());
+        assert_eq!(state.session.current_user.as_ref().unwrap().stats.messages_left, 0);
+        state.session.current_user.as_mut().unwrap().account.as_mut().unwrap().starting_balance = cost + 1.0;
+        state
+            .send_accounted_message(0, 0, accounting_message(flags), IceText::SavingMessage)
+            .await
+            .unwrap();
+        let error = state
+            .send_accounted_message(0, 0, accounting_message(flags), IceText::SavingMessage)
+            .await
+            .unwrap_err();
+        assert!(error.is::<MessageCreditDenied>(), "each additional copy needs fresh authorization");
+        assert_eq!(JamMessageBase::open(root.path().join("messages")).unwrap().highest_message_number(), 1);
+        assert_eq!(state.session.calculate_balance(), 1.0);
+        assert_eq!(state.session.current_conference.charge_msg_write, 20.0);
+    }
+}
+
+#[tokio::test]
+async fn accounting_message_open_and_create_errors_display_failure_without_save_or_debit() {
+    use crate::icy_board::message_area::{AreaList, MessageArea};
+    for (email, existing) in [(false, false), (false, true), (true, false), (true, true)] {
+        let (root, mut state, mut peer) = accounting_message_fixture(100.0).await;
+        let blocker = root.path().join("blocker");
+        std::fs::write(&blocker, b"unchanged").unwrap();
+        let path = if existing { root.path().join("corrupt") } else { blocker.join("messages") };
+        if existing {
+            std::fs::write(path.with_extension("jhr"), b"bad header").unwrap();
+        }
+        {
+            let mut board = state.get_board().await;
+            board.config.paths.email_msgbase = path.clone();
+            board.conferences[0].areas = Some(Arc::new(AreaList::new(vec![MessageArea { path, ..Default::default() }])));
+        }
+        let error = state
+            .send_accounted_message(if email { -1 } else { 0 }, 0, accounting_message(0), IceText::SavingMessage)
+            .await;
+        assert!(error.is_err());
+        let text = output(&mut peer).await;
+        assert!(text.contains(state.get_display_text(IceText::MessageBaseError).unwrap().trim()), "{text}");
+        assert!(!text.contains("Saving Message"), "{text}");
+        assert_eq!(state.session.calculate_balance(), 100.0);
+        assert_eq!(state.session.current_user.as_ref().unwrap().stats.messages_left, 0);
+        assert_eq!(std::fs::read(blocker).unwrap(), b"unchanged");
+    }
+}
+
+#[tokio::test]
+async fn accounting_message_exact_balance_is_allowed_and_tracking_does_not_enforce() {
+    use crate::icy_board::accounting::AccountingMode;
+    use jamjam::jam::JamMessageBase;
+    for mode in [AccountingMode::Enforced, AccountingMode::Tracking, AccountingMode::Disabled] {
+        let (root, mut state, mut peer) = accounting_message_fixture(if mode == AccountingMode::Enforced { 5.0 } else { 1.0 }).await;
+        {
+            let mut board = state.get_board().await;
+            board.config.accounting.enabled = mode != AccountingMode::Disabled;
+            board.sec_levels[0].accounting_tracking = mode == AccountingMode::Tracking;
+            board.config.accounting.tracking_file = root.path().join("accounting.dbf");
+        }
+        state.accounting_refresh().await.unwrap();
+        assert_eq!(state.session.accounting.mode, mode);
+        state.send_accounted_message(0, 0, accounting_message(0), IceText::SavingMessage).await.unwrap();
+        assert_eq!(JamMessageBase::open(root.path().join("messages")).unwrap().highest_message_number(), 1);
+        assert_eq!(
+            state.session.current_user.as_ref().unwrap().account.as_ref().unwrap().debit_msg_write,
+            if mode == AccountingMode::Disabled { 0.0 } else { 5.0 }
+        );
+        assert!(!output(&mut peer).await.contains("Insufficient Credits"));
+    }
+}
+
+#[tokio::test]
+async fn accounting_message_post_save_error_commits_once_and_blocks_retry() {
+    use crate::icy_board::state::user_commands::pcb::message_attachment::{MessageCreditDenied, MessagePersistedError};
+    use jamjam::jam::JamMessageBase;
+    let (root, mut state, peer) = accounting_message_fixture(100.0).await;
+    // save_statistics logs rather than returns failures. A closed receiver
+    // deterministically fails the saved-message notification after the append.
+    drop(peer);
+    let error = state
+        .send_accounted_message(0, 0, accounting_message(0), IceText::SavingMessage)
+        .await
+        .unwrap_err();
+    assert!(error.is::<MessagePersistedError>());
+    assert!(state.session.request_logoff);
+    assert_eq!(state.session.calculate_balance(), 95.0);
+    assert_eq!(state.session.current_user.as_ref().unwrap().stats.messages_left, 1);
+    let error = state
+        .send_accounted_message(0, 0, accounting_message(0), IceText::SavingMessage)
+        .await
+        .unwrap_err();
+    assert!(error.is::<MessageCreditDenied>());
+    assert_eq!(state.session.calculate_balance(), 95.0);
+    assert_eq!(JamMessageBase::open(root.path().join("messages")).unwrap().highest_message_number(), 1);
+}
+
+#[tokio::test]
+async fn accounting_logoff_displays_once_after_pending_activity_settles() {
+    let (root, mut state, mut peer) = accounting_message_fixture(100.0).await;
+    let file = root.path().join("account-logoff");
+    std::fs::write(&file, b"ACCOUNT-LOGOFF @HANGUP@\r\n").unwrap();
+    state.session.accounting.options.logoff_file = file;
+    state.accounting_begin_invocation();
+    state.logoff_user(false).await.unwrap();
+    state.logoff_user(false).await.unwrap();
+    assert!(state.accounting_active(), "G must not finish an enclosing command's accounting");
+    assert!(output(&mut peer).await.is_empty(), "no premature final summary");
+    state.accounting_record(12, "COMMAND", "G", 4.0, 1).unwrap();
+    state.accounting_end_invocation().await.unwrap();
+    let text = output(&mut peer).await;
+    for marker in ["ACCOUNT-LOGOFF", "Credits Used:", "Credits Left:", "Minutes Used"] {
+        assert_eq!(text.matches(marker).count(), 1, "{marker}: {text}");
+    }
+    assert!(text.find("ACCOUNT-LOGOFF").unwrap() < text.find("Credits Used:").unwrap());
+    state.accounting_finish().await.unwrap();
+    state.accounting_finish().await.unwrap();
+    assert!(!state.accounting_active());
+    assert_eq!(state.session.current_user.as_ref().unwrap().account.as_ref().unwrap().debit_tpu, 4.0);
+}
+
+#[tokio::test]
+async fn accounting_logoff_auto_skips_file_and_disabled_skips_all_credit_output() {
+    for active in [false, true] {
+        let (root, mut state, mut peer) = accounting_message_fixture(100.0).await;
+        let file = root.path().join("account-logoff");
+        std::fs::write(&file, b"ACCOUNT-LOGOFF\r\n").unwrap();
+        state.session.accounting.options.logoff_file = file;
+        if !active {
+            state.session.accounting = Default::default();
+        }
+        state.logoff_user(true).await.unwrap();
+        let text = output(&mut peer).await;
+        assert!(!text.contains("ACCOUNT-LOGOFF"));
+        assert_eq!(text.matches("Credits Used:").count(), usize::from(active));
+        assert_eq!(text.matches("Credits Left:").count(), usize::from(active));
+    }
+}
+
+#[tokio::test]
+async fn accounting_logoff_tracking_shows_used_but_not_enforced_balance() {
+    let (root, mut state, mut peer) = accounting_message_fixture(100.0).await;
+    {
+        let mut board = state.get_board().await;
+        board.sec_levels[0].accounting_tracking = true;
+        board.config.accounting.tracking_file = root.path().join("accounting.dbf");
+    }
+    state.accounting_refresh().await.unwrap();
+    state.logoff_user(false).await.unwrap();
+    let text = output(&mut peer).await;
+    assert_eq!(text.matches("Credits Used:").count(), 1);
+    assert!(!text.contains("Credits Left:"));
 }
 
 async fn command(state: &mut IcyBoardState, line: &str) {

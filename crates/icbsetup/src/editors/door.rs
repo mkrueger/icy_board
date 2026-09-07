@@ -173,6 +173,8 @@ impl<'a> DoorEditor<'a> {
             dos_command: String::new(),
             dos_memory_mb: 64,
             dos_max_runtime_seconds: icy_board_engine::icy_board::doors::DEFAULT_DOS_MAX_RUNTIME_SECONDS,
+            charge_per_use: 0.0,
+            charge_per_minute: 0.0,
         });
         self.insert_table.sync_rows(door_list.len(), Some(selected));
         self.mode = EditCommandMode::Table;
@@ -229,10 +231,15 @@ impl<'a> Page for DoorEditor<'a> {
     }
 
     fn handle_key_press(&mut self, key: KeyEvent) -> PageMessage {
-        if let Some(message) = self
-            .save_changes
-            .handle_key(key, || super::save_file(&self.path, || self.door_list.lock().unwrap().save(&self.path)))
-        {
+        if let Some(message) = self.save_changes.handle_key(key, || {
+            super::save_file(&self.path, || {
+                let list = self.door_list.lock().unwrap();
+                for door in list.iter() {
+                    super::accounting_rates::validate_activity_rates(door.charge_per_use, door.charge_per_minute)?;
+                }
+                list.save(&self.path)
+            })
+        }) {
             return message;
         }
 
@@ -322,6 +329,32 @@ impl<'a> Page for DoorEditor<'a> {
                                         .with_update_sec_value(
                                             &|(i, list): &(usize, Arc<Mutex<DoorList>>), value: SecurityExpression| {
                                                 list.lock().unwrap()[*i].securiy_level = value;
+                                            },
+                                        ),
+                                    ),
+                                    ConfigEntry::Item(
+                                        ListItem::new(
+                                            get_text("accounting_activity_per_use"),
+                                            ListValue::Float(action.charge_per_use, action.charge_per_use.to_string()),
+                                        )
+                                        .with_status(get_text("accounting_activity_per_use-status"))
+                                        .with_help(get_text("accounting_activity_per_use-help"))
+                                        .with_update_float_value(
+                                            &|(i, list): &(usize, Arc<Mutex<DoorList>>), value| {
+                                                list.lock().unwrap()[*i].charge_per_use = value;
+                                            },
+                                        ),
+                                    ),
+                                    ConfigEntry::Item(
+                                        ListItem::new(
+                                            get_text("accounting_activity_per_minute"),
+                                            ListValue::Float(action.charge_per_minute, action.charge_per_minute.to_string()),
+                                        )
+                                        .with_status(get_text("accounting_activity_per_minute-status"))
+                                        .with_help(get_text("accounting_activity_per_minute-help"))
+                                        .with_update_float_value(
+                                            &|(i, list): &(usize, Arc<Mutex<DoorList>>), value| {
+                                                list.lock().unwrap()[*i].charge_per_minute = value;
                                             },
                                         ),
                                     ),

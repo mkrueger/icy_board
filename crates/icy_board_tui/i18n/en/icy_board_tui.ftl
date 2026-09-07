@@ -2617,24 +2617,27 @@ accounting_enabled-help=
     # Enable Accounting Features
 
     Turns on the credit account each caller carries. Charges and rewards come
-    from the rates file, and a security level only takes part when its entry in
-    the PWRD file enables the account.
+    from the rates file. The matching PWRD entry selects enforced accounting
+    (Y) or tracking-only (T); T takes precedence and requires a tracking path.
+    A global enable alone does not enable accounting for every level.
 
 accounting_use_money=Display Money instead of Credits
 accounting_use_money-status=Display Money instead of Credits
 accounting_use_money-help=
     # Display Money instead of Credits
 
-    Shows balances and charges with a currency symbol rather than as plain
-    credits, which suits a board that really is charging money.
+    Shows deterministic US-dollar-style amounts ($1,234.50), not the host
+    locale's currency. This changes display only, not rates or stored balances.
 
-accounting_concurrent_tracking=Concurrent Tracking of Charges
-accounting_concurrent_tracking-status=Concurrent Tracking of Charges
+accounting_concurrent_tracking=Highest Debit Category Only
+accounting_concurrent_tracking-status=Yes: maximum debit category; No: sum of debits
 accounting_concurrent_tracking-help=
-    # Concurrent Tracking of Charges
+    # Highest Debit Category Only
 
-    Keeps the balance up to date while the caller is online instead of settling
-    up at the end, so a caller cannot outspend their account within one call.
+    Yes subtracts only the largest accumulated debit category; No subtracts
+    their sum. Pending online time belongs to the time category before taking
+    the maximum. Positive upload/special credits increase the balance in both
+    modes. This does not mean multiple simultaneous callers or live tracking.
 
 accounting_ignore_empty_sec_level=Ignore Empty Security Level
 accounting_ignore_empty_sec_level-status=Ignore Empty Security Level
@@ -2642,7 +2645,8 @@ accounting_ignore_empty_sec_level-help=
     # Ignore Empty Security Level
 
     A caller whose account runs empty normally drops to the security level their
-    record names for that case. This keeps them on their usual level instead.
+    record names for that case, for this session only. This keeps them on their
+    usual level instead; it does not disable affordability checks or time caps.
 
 accounting_peak_usage_start=Peak Usage Start Time
 accounting_peak_usage_start-status=Peak Usage Start Time
@@ -2657,7 +2661,8 @@ accounting_peak_usage_end-status=Peak Usage End Time
 accounting_peak_usage_end-help=
     # Peak Usage End Time
 
-    When peak hours end, in 24-hour time.
+    Local 24-hour time; both endpoints are inclusive. An earlier end crosses
+    midnight; identical start/end times cover the whole selected day.
 
 accounting_peak_days_of_week=Peak Days of the Week
 accounting_peak_days_of_week-status=Peak Days of the Week
@@ -2672,8 +2677,9 @@ accounting_peak_holiday_list_file-status=Name/Loc of Peak Holidays List File
 accounting_peak_holiday_list_file-help=
     # Name/Loc of Peak Holidays List File
 
-    Dates on which peak charging is suspended, so a public holiday is billed at
-    the cheaper rate even when it falls on a peak day.
+    Plain text, one MM-DD-YY date per line. Uppercase X matches one digit:
+    12-25-XX disables peak on Christmas every year. The normal rate applies
+    for that whole local date, even in a peak window. Empty path: no holidays.
 
 accounting_cfg_file=Name/Loc of Account Configuration File
 accounting_cfg_file-status=Name/Loc of Accounting Configuration File
@@ -2682,14 +2688,18 @@ accounting_cfg_file-help=
 
     The file holding the charges and rewards for the things a caller does:
     time online, messages, uploads and downloads. Press F2 to edit the rates.
+    Use a separate TOML root record with all 15 rates, not an [accounting]
+    table. Rates are required for active accounting; zero means no charge.
 
 accounting_tracking_file=Name/Loc of Account Tracking File
 accounting_tracking_file-status=Name/Loc of Accounting Tracking File
 accounting_tracking_file-help=
     # Name/Loc of Account Tracking File
 
-    Where each posting against a caller's account is recorded, so a balance can
-    be explained afterwards.
+    The .DBF extension selects dBase III; other extensions select fixed-width ASCII.
+    Tracking-only levels require a nonempty path. Keep the parent writable.
+    A sibling .lock coordinates cooperating writers; do not remove it live.
+    Audit write failures are logged but do not undo charges. No atomic ledger.
 
 accounting_info_file=Name/Loc of Accounting Info File
 accounting_info_file-status=Name/Loc of Accounting Info File
@@ -2703,8 +2713,8 @@ accounting_warning_file-status=Name/Loc of Accounting Warning File
 accounting_warning_file-help=
     # Name/Loc of Accounting Warning File
 
-    Shown at login when the balance has fallen to the warning level, so a caller
-    can top up before the account runs empty.
+    Shown in enforced mode at or below the warning balance during login and
+    later balance checks. Re-arms after the balance rises above the threshold.
 
 accounting_logoff_file=Name/Loc of Accounting Logoff File
 accounting_logoff_file-status=Name/Loc of Accounting Logoff File
@@ -3005,16 +3015,17 @@ accounting_start_balance-status=New User Starting Balance
 accounting_start_balance-help=
     # New User Starting Balance
 
-    The credit a new caller's account opens with, which is what lets somebody
-    look around before they have paid anything.
+    One-time grant for newly registered users only. It does not fund existing
+    users, even if they have no account record. Use an operator-controlled PPE
+    adjustment to fund an existing account. Amounts use credits or money units.
 
 accounting_warning_level=Balance Warning Level
 accounting_warning_level-status=Balance Warning Level
 accounting_warning_level-help=
     # Balance Warning Level
 
-    The balance at which the caller starts being warned at login that the account
-    is running low.
+    In enforced mode, warn at or below this balance during login and subsequent
+    checks. Amounts use the same units as the rates, not a percentage.
 
 accounting_charges_label=Charges:
 
@@ -3096,13 +3107,14 @@ accounting_per_file_downloaded-help=
 
     Charged for each file downloaded, whatever its size.
 
-accounting_per_file_bytes_downloaded=Per 1K-Bytes Downloaded
-accounting_per_file_bytes_downloaded-status=Per 1K-Bytes Downloaded
+accounting_per_file_bytes_downloaded=Per KiB Downloaded
+accounting_per_file_bytes_downloaded-status=Charge per 1024 bytes, rounded down per completed file
 accounting_per_file_bytes_downloaded-help=
-    # Per 1K-Bytes Downloaded
+    # Per KiB Downloaded
 
-    Charged for every kilobyte downloaded, so a large file costs more than a
-    small one.
+    One KiB is 1024 bytes. Posting uses whole KiB rounded down separately for
+    each completed non-free file. Admission estimates use fractional KiB and
+    estimated online time, so they can be higher than the eventual file debit.
 
 accounting_payback_label=Pay Back:
 
@@ -3111,15 +3123,54 @@ accounting_payback_per_file-status=Per File Uploaded
 accounting_payback_per_file-help=
     # Per File Uploaded
 
-    Paid back for each file uploaded, which is how uploading earns the credit
-    that downloading spends.
+    Positive values increase the balance for each accepted upload; do not
+    negate a reward. Rejected/unpublished files earn nothing.
 
-accounting_payback_per_file_bytes=Per 1K-Bytes Uploaded
-accounting_payback_per_file_bytes-status=Per 1K-Bytes Uploaded
+accounting_payback_per_file_bytes=Per KiB Uploaded
+accounting_payback_per_file_bytes-status=Positive credit per whole KiB of each accepted upload
 accounting_payback_per_file_bytes-help=
-    # Per 1K-Bytes Uploaded
+    # Per KiB Uploaded
 
-    Paid back for every kilobyte uploaded, so a big contribution earns more.
+    One KiB is 1024 bytes, rounded down separately per accepted file.
+    Positive values increase the balance; negative values remove credit.
+
+accounting_level_mode=Accounting Mode
+accounting_level_mode_disabled=Disabled
+accounting_level_mode_tracking=Tracking
+accounting_level_mode_enforce=Enforce
+accounting_level_mode-status=Disabled (N), tracking only (T), or balance enforcement (Y)
+accounting_level_mode-help=
+    # Accounting mode (PWRD N/T/Y)
+
+    Disabled: no automatic accounting for this level. Tracking: record usage
+    without balance enforcement; requires a nonempty tracking file path.
+    Enforce: charge callers and check their available balance. Global
+    accounting must be on and valid rates loaded for Tracking or Enforce.
+    The stored enabled flag controls enforcement, not access to this level.
+    The accounting_tracking flag takes precedence if both stored flags are set;
+    this is shown as Tracking and is off if the tracking path is empty.
+
+accounting_activity_per_use=Charge per Use
+accounting_activity_per_use-status=Non-negative credits or money per invocation; zero is free
+accounting_activity_per_use-help=
+    # Charge per use
+
+    One charge per command invocation, not per action; a door is charged only
+    after launch/connect succeeds. Door and invoking-command charges may both
+    apply. Global online and conference time continue. Requires active accounting.
+    Enter a finite, non-negative amount; zero disables this charge.
+
+accounting_activity_per_minute=Charge per Minute
+accounting_activity_per_minute-status=Elapsed minutes round at 30 seconds; added to other rates
+accounting_activity_per_minute-help=
+    # Charge per minute
+
+    Credits or money per elapsed minute, rounded up at 30 seconds. Posted when
+    the invocation returns, including errors after it started. Admission checks
+    the use charge plus one minute; this is not a minimum bill or a reservation.
+    Global/conference time continues. Use a finite, non-negative rate.
+
+accounting_activity_invalid=Command/door rates must be finite and non-negative (zero is free).
 
 # ICBord System Manager
 
@@ -4117,14 +4168,6 @@ sec_level_demo_acc-help=
 
     Marks this level as a look-around account, so a visitor can see the board
     without it counting as a real registration.
-
-sec_level_enable_acc=Enable Account
-sec_level_enable_acc-status=Enable Account
-sec_level_enable_acc-help=
-    # Enable Account
-
-    Whether callers on this level take part in accounting. Without it their
-    balance is neither charged nor checked.
 
 protocol_editor_title=Transfer Protocols
 protocol_editor_editor=Edit Protocol

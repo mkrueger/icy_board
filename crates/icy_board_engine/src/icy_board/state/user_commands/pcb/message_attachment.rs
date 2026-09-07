@@ -32,6 +32,41 @@ use crate::{
 const MAX_ATTACHMENT_BYTES: u64 = 16 * 1024 * 1024;
 const STORED_PREFIX: &str = "icb-attach-";
 
+/// A denial is not a storage failure and must never authorize a MOVE delete.
+#[derive(Debug, thiserror::Error)]
+#[error("Insufficient credits to save message")]
+pub(crate) struct MessageCreditDenied;
+
+/// The append already happened. Do not offer a save retry on this error.
+#[derive(Debug, thiserror::Error)]
+#[error("Message {number} was saved, but completion failed: {source}")]
+pub(crate) struct MessagePersistedError {
+    number: u32,
+    #[source]
+    source: Box<dyn std::error::Error + Send + Sync>,
+}
+
+pub(crate) struct MessageCharge {
+    field: usize,
+    activity: &'static str,
+    rate: f64,
+}
+
+/// Once storage commits, cancellation is no more retryable than an output
+/// error. Keep this guard alive across every bookkeeping/output suspension.
+struct MessageCommitGuard<'a> {
+    state: &'a mut IcyBoardState,
+    completed: bool,
+}
+
+impl Drop for MessageCommitGuard<'_> {
+    fn drop(&mut self) {
+        if !self.completed {
+            self.state.session.request_logoff = true;
+        }
+    }
+}
+
 fn safe_name(name: &str) -> bool {
     !name.is_empty() && name.len() <= 255 && name != "." && name != ".." && !name.chars().any(|ch| ch.is_control() || "/\\:*?[]".contains(ch))
 }
@@ -279,17 +314,166 @@ impl IcyBoardState {
         if self.session.request_logoff {
             return Ok(false);
         }
+        let bytes = std::fs::metadata(&owned)?.len();
+        let name = field
+            .content()
+            .split(|byte| *byte == 0)
+            .nth(1)
+            .map(|name| String::from_utf8_lossy(name).into_owned())
+            .unwrap_or_default();
         let mut header = message.header().clone();
         header.sub_fields.push(field);
         header.attributes |= attributes::MSG_FILEATTACH;
         *message = JamMessage::from_stored(header, message.text().clone());
         owned.disable_cleanup(true);
+        // PCBoard credits accepted attachments, but not editor body uploads.
+        // This runs at intake, never again when saving/copying the message.
+        self.accounting_record_upload(&name, bytes)?;
+        self.accounting_check_balance().await?;
         Ok(true)
     }
 
-    /// Only the attachment path needs this adapter. send_message currently
-    /// swallows base-open failures and can fail AFTER a successful JAM append.
-    /// Commit cleanup at the actual append, not at its later UI/statistics result.
+    /// MSGENTER.C selects a single global category, then adds the destination
+    /// conference rate. Resolve before append, not during post-save output.
+    async fn message_charge(&mut self, conf: i32, message: &JamMessage) -> Res<MessageCharge> {
+        let surcharge = if conf < 0 {
+            self.session.current_conference.charge_msg_write
+        } else {
+            self.get_board()
+                .await
+                .conferences
+                .get(conf as usize)
+                .ok_or("Invalid message conference")?
+                .charge_msg_write
+        };
+        let rates = self.accounting_rates();
+        let (field, activity, rate) = if conf < 0 || message.header().is_private() {
+            (8, "MSG WRITE PRIV", rates.charge_per_msg_write_private)
+        } else if message.header().attributes & attributes::MSG_TYPEECHO != 0 {
+            (7, "MSG WRITE ECHO", rates.charge_per_msg_write_echoed)
+        } else {
+            (6, "MSG WRITE", rates.charge_per_msg_written)
+        };
+        let rate = if self.accounting_active() { rate + surcharge } else { 0.0 };
+        if !rate.is_finite() {
+            return Err("Non-finite message charge".into());
+        }
+        Ok(MessageCharge { field, activity, rate })
+    }
+
+    pub(crate) async fn message_write_allowed(&mut self, conf: i32, message: &JamMessage) -> Res<bool> {
+        let charge = self.message_charge(conf, message).await?;
+        Ok(!self.session.request_logoff && !self.accounting_insufficient(charge.rate, 0.0).await?)
+    }
+
+    pub(crate) async fn preflight_message_write(&mut self, conf: i32, message: &JamMessage) -> Res<MessageCharge> {
+        let charge = self.message_charge(conf, message).await?;
+        if self.session.request_logoff || self.accounting_insufficient(charge.rate, 0.0).await? {
+            return Err(MessageCreditDenied.into());
+        }
+        Ok(charge)
+    }
+
+    /// Preserve send_message's MessageBaseError notification for open/create
+    /// failures, including private mail, without claiming a successful save.
+    pub(crate) async fn open_accounted_message_base(&mut self, conf: i32, area: i32, message: &JamMessage) -> Res<JamMessageBase> {
+        let opened: Res<JamMessageBase> = async {
+            if conf < 0 {
+                let to = message.to().ok_or_else(|| std::io::Error::other("Message has no recipient"))?.to_string();
+                self.get_email_msgbase(&to).await
+            } else {
+                let path = self
+                    .get_board()
+                    .await
+                    .conferences
+                    .get(conf as usize)
+                    .and_then(|conference| conference.areas.as_ref())
+                    .and_then(|areas| usize::try_from(area).ok().and_then(|area| areas.get(area)))
+                    .map(|area| area.path.clone())
+                    .filter(|path| !path.as_os_str().is_empty())
+                    .ok_or_else(|| std::io::Error::other("Invalid message destination"))?;
+                let path = self.resolve_path(&path);
+                (if path.with_extension("jhr").exists() {
+                    JamMessageBase::open(path)
+                } else {
+                    JamMessageBase::create(path)
+                })
+                .map_err(Into::into)
+            }
+        }
+        .await;
+        match opened {
+            Ok(base) => Ok(base),
+            Err(error) => {
+                log::error!("while opening message base: {error}");
+                self.display_text(IceText::MessageBaseError, display_flags::NEWLINE).await?;
+                Err(error)
+            }
+        }
+    }
+
+    /// User-command writer. Recheck after editing and separately for each copy
+    /// or QWK reply, before any append or debit.
+    pub(crate) async fn send_accounted_message(&mut self, conf: i32, area: i32, message: JamMessage, text: IceText) -> Res<()> {
+        let charge = self.preflight_message_write(conf, &message).await?;
+        let mut base = self.open_accounted_message_base(conf, area, &message).await?;
+        let number = base.write_message(&message)?;
+        self.finish_accounted_message(&mut base, charge, &message, number, text).await
+    }
+
+    pub(crate) async fn finish_accounted_message(
+        &mut self,
+        base: &mut JamMessageBase,
+        charge: MessageCharge,
+        message: &JamMessage,
+        number: u32,
+        text: IceText,
+    ) -> Res<()> {
+        let mut guard = MessageCommitGuard { state: self, completed: false };
+        let result = guard.state.complete_accounted_message(base, charge, message, number, text).await;
+        guard.completed = result.is_ok();
+        result.map_err(|source| Box::new(MessagePersistedError { number, source }) as Box<dyn std::error::Error + Send + Sync>)
+    }
+
+    async fn complete_accounted_message(
+        &mut self,
+        base: &mut JamMessageBase,
+        charge: MessageCharge,
+        message: &JamMessage,
+        number: u32,
+        text: IceText,
+    ) -> Res<()> {
+        // No await between append and debit/attachment adoption. A failed audit
+        // can follow a committed debit; never invoke the charge a second time.
+        // MSGENTER.C leaves no audit trail for a message that costs nothing.
+        let charged = if charge.rate == 0.0 {
+            Ok(0.0)
+        } else {
+            self.accounting_record(
+                charge.field,
+                charge.activity,
+                &message.to().map(ToString::to_string).unwrap_or_default(),
+                charge.rate,
+                1,
+            )
+        };
+        // Attempt header persistence even if accounting/audit output failed.
+        let flushed = base.write_jhr_header();
+        if let Some(user) = &mut self.session.current_user {
+            user.stats.messages_left += 1;
+        }
+        self.get_board().await.statistics.add_message();
+        charged?;
+        flushed?;
+        self.get_board().await.save_statistics()?;
+        self.accounting_check_balance().await?;
+        self.display_text(text, display_flags::DEFAULT).await?;
+        self.println(TerminalTarget::Both, &number.to_string()).await?;
+        self.new_line().await?;
+        Ok(())
+    }
+
+    /// Adopt attachments at the actual append, before accounting or UI can fail.
     pub(crate) async fn send_message_with_attachment_cleanup(
         &mut self,
         conf: i32,
@@ -299,12 +483,9 @@ impl IcyBoardState {
         cleanup: &mut MessageAttachmentCleanup,
     ) -> Res<()> {
         if cleanup.files.is_empty() {
-            return self.send_message(conf, area, message, text).await;
+            return self.send_accounted_message(conf, area, message, text).await;
         }
-        let mut base = if conf < 0 {
-            let to = message.to().map(ToString::to_string).unwrap_or_default();
-            self.get_email_msgbase(&to).await?
-        } else {
+        if conf >= 0 {
             let board = self.get_board().await;
             let target = board
                 .conferences
@@ -322,25 +503,12 @@ impl IcyBoardState {
             {
                 return Err(std::io::Error::other("Attachment destination does not match its conference").into());
             }
-            let path = target_area.path.clone();
-            drop(board);
-            if path.with_extension("jhr").exists() {
-                JamMessageBase::open(path)?
-            } else {
-                JamMessageBase::create(path)?
-            }
-        };
+        }
+        let charge = self.preflight_message_write(conf, &message).await?;
+        let mut base = self.open_accounted_message_base(conf, area, &message).await?;
         let number = base.write_message(&message)?;
         cleanup.commit();
-        if let Some(user) = &mut self.session.current_user {
-            user.stats.messages_left += 1;
-        }
-        self.get_board().await.statistics.add_message();
-        self.get_board().await.save_statistics()?;
-        self.display_text(text, display_flags::DEFAULT).await?;
-        self.println(TerminalTarget::Both, &number.to_string()).await?;
-        self.new_line().await?;
-        Ok(())
+        self.finish_accounted_message(&mut base, charge, &message, number, text).await
     }
 }
 
