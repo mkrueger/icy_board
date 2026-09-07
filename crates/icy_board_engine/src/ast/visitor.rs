@@ -662,7 +662,8 @@ pub trait AstVisitorMut: Sized {
         ))
     }
     fn visit_predefined_call_statement(&mut self, call: &PredefinedCallStatement) -> Statement {
-        Statement::PredifinedCall(PredefinedCallStatement::empty(
+        Statement::PredifinedCall(PredefinedCallStatement::new(
+            call.get_identifier_token().clone(),
             call.get_func(),
             call.get_arguments().iter().map(|arg| arg.visit_mut(self)).collect(),
         ))

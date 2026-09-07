@@ -48,6 +48,35 @@ fn an_unformatted_source_fails() {
 }
 
 #[test]
+fn statement_argument_errors_point_to_the_statement() {
+    let dir = tempfile::tempdir().unwrap();
+    let source = dir.path().join("statement.pps");
+    for first_line in [";$LANGVERSION 400", ";RUBBELDIEKATZ"] {
+        for (statement, message) in [
+            ("Log \"Foobar\"", "Not enough arguments passed (Log:1:2)"),
+            ("Log", "Not enough arguments passed (Log:0:2)"),
+            ("Log \"Foobar\", 1, 2", "Too many arguments passed (Log:3:2)"),
+            ("Print", "Too few arguments (Print:1)"),
+        ] {
+            fs::write(&source, format!("{first_line}\n\nBEGIN\n  {statement}\nEND\n")).unwrap();
+            for check_only in [false, true] {
+                let mut command = pplc();
+                command.args(["--lang-version", "400"]);
+                if check_only {
+                    command.arg("--check");
+                }
+                let output = command.arg(&source).output().unwrap();
+                let text = String::from_utf8_lossy(&output.stdout).to_string() + &String::from_utf8_lossy(&output.stderr);
+                assert_eq!(output.status.code(), Some(1), "{text}");
+                assert!(text.contains(message), "{text}");
+                assert!(text.contains("statement.pps:4:3"), "{text}");
+                assert!(!source.with_extension("ppe").exists());
+            }
+        }
+    }
+}
+
+#[test]
 fn invalid_versions_fail() {
     for option in ["--runtime", "--lang-version"] {
         let output = pplc().args([option, "999", "ignored.pps"]).output().unwrap();

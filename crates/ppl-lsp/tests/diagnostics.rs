@@ -72,6 +72,34 @@ fn an_unused_variable_is_reported_as_a_warning() {
 }
 
 #[test]
+fn statement_argument_errors_underline_the_statement_name() {
+    let (mut server, _) = Server::ready();
+    for (prefix_index, first_line) in [";$LANGVERSION 400", ";RUBBELDIEKATZ"].iter().enumerate() {
+        for (case_index, (statement, message, name_length)) in [
+            ("Log \"Foobar\"", "Not enough arguments passed (Log:1:2)", 3),
+            ("Log", "Not enough arguments passed (Log:0:2)", 3),
+            ("Log \"Foobar\", 1, 2", "Too many arguments passed (Log:3:2)", 3),
+            ("Print", "Too few arguments (Print:1)", 5),
+        ]
+        .iter()
+        .enumerate()
+        {
+            let uri = format!("file:///tmp/statement-argument-{prefix_index}-{case_index}.pps");
+            server.open(&uri, &format!("{first_line}\n\nBEGIN\n  {statement}\nEND\n"));
+            let diagnostics = server.diagnostics(&uri);
+            let errors = of_severity(&diagnostics, 1);
+            assert_eq!(errors.len(), 1, "{diagnostics}");
+            assert_eq!(errors[0]["message"], *message, "{diagnostics}");
+            assert_eq!(
+                errors[0]["range"],
+                json!({"start": {"line": 3, "character": 2}, "end": {"line": 3, "character": 2 + name_length}}),
+                "{diagnostics}"
+            );
+        }
+    }
+}
+
+#[test]
 fn routines_referenced_only_from_dead_code_are_reported_as_unused() {
     let (mut server, _) = Server::ready();
     let uri = "file:///tmp/dead-routines.pps";
