@@ -238,10 +238,339 @@ fn test_cmd_r_skip_leaves_the_read_loop() {
     assert!(!after_skip.contains("Invalid Entry"), "SKIP was not handled:\n{output}");
 }
 
-/// A command the reader parses but cannot run has to answer. Silence reads as a
-/// broken board rather than a missing feature. X is the export PCBoard had.
+/// X uses the transfer UI. Cancelling its protocol prompt must return to the
+/// reader, not reject the implemented command or start a transfer.
 #[test]
-fn test_cmd_r_an_unrunnable_command_still_answers() {
-    let output = test_output("R\n1\nX\n\n\n\n".to_string(), crate::tests::setup_conference_with_messages);
-    assert!(output.contains("Invalid Entry"), "the reader stayed silent:\n{output}");
+fn test_cmd_r_export_protocol_prompt_can_be_cancelled() {
+    let (output, base) = persisted_read("R\nO 1\nX\nN\n\n\n", |board| {
+        // No usable default: exercise the export protocol prompt, not an
+        // actual transfer (which would need a remote protocol peer).
+        board.users[0].protocol = "?".to_string();
+        board.config.sysop_command_level.read_all_mail = icy_board_engine::icy_board::security_expr::SecurityExpression::from_req_security(0);
+    });
+    assert!(output.contains("Protocol Type for Transfer"), "the export prompt is missing:\n{output}");
+    assert!(!output.contains("Invalid Entry"), "X was rejected:\n{output}");
+    assert!(!output.contains("Sending File(s)"), "cancel started a transfer:\n{output}");
+    assert_eq!(output.matches("Body of message 1").count(), 2, "cancel must redisplay the message:\n{output}");
+    assert_eq!(output.matches("End of Message Command?").count(), 2, "cancel must return to the reader:\n{output}");
+    assert!(base.read_last_read_file().unwrap().is_empty());
+}
+
+/// Keep the base path, not the running session, so these assert disk state after
+/// the reader has returned to the main command prompt.
+fn persisted_read(input: &str, setup: impl Fn(&mut icy_board_engine::icy_board::IcyBoard)) -> (String, jamjam::jam::JamMessageBase) {
+    let path = std::sync::Mutex::new(None);
+    let output = test_output(input.to_string(), |board| {
+        crate::tests::setup_conference_with_messages(board);
+        board.config.message.update_last_read_pointer = true;
+        setup(board);
+        *path.lock().unwrap() = Some(board.conferences[0].areas.as_ref().unwrap()[0].path.clone());
+    });
+    (output, jamjam::jam::JamMessageBase::open(path.into_inner().unwrap().unwrap()).unwrap())
+}
+
+fn last_pointer(base: &jamjam::jam::JamMessageBase) -> u32 {
+    base.read_last_read_file().unwrap().into_iter().map(|last| last.last_read_msg).max().unwrap_or(0)
+}
+
+#[test]
+fn test_cmd_r_successful_range_advances_pointer_but_backwards_never_lowers_it() {
+    let (output, base) = persisted_read("R\n1+\n\n\n\n3-1\n\n\n\n\n", |_| {});
+    assert!(output.contains("Body of message 3"), "{output}");
+    assert_eq!(last_pointer(&base), 3);
+}
+
+#[test]
+fn test_cmd_r_no_matches_and_disjoint_ranges_do_not_create_read_records() {
+    let (output, base) = persisted_read("R\nTS XYZZY 1+\n99\n\n", |_| {});
+    assert!(!output.contains("Body of message"), "{output}");
+    assert!(base.read_last_read_file().unwrap().is_empty());
+}
+
+#[test]
+fn test_cmd_r_o_sticks_across_inner_and_outer_commands() {
+    let (output, base) = persisted_read("R\nO 1\n2\n\n3\n\n\n", |_| {});
+    assert!(output.contains("Body of message 3"), "{output}");
+    assert!(base.read_last_read_file().unwrap().is_empty());
+}
+
+#[test]
+fn test_cmd_r_config_can_disable_pointer_updates() {
+    let (output, base) = persisted_read("R\n1+\n\n\n\n\n", |board| board.config.message.update_last_read_pointer = false);
+    assert!(output.contains("Body of message 3"), "{output}");
+    assert!(base.read_last_read_file().unwrap().is_empty());
+}
+
+fn address_first_to_sysop(board: &mut icy_board_engine::icy_board::IcyBoard) {
+    let mut base = jamjam::jam::JamMessageBase::open(&board.conferences[0].areas.as_ref().unwrap()[0].path).unwrap();
+    let mut header = base.read_header(1).unwrap();
+    header.set_from(bstr::BString::from("TEST USER"));
+    header.set_to(bstr::BString::from("SYSOP"));
+    header.attributes |= jamjam::jam::attributes::MSG_PRIVATE | jamjam::jam::attributes::MSG_RECEIPTREQ;
+    jamjam::jam::raw::update_header(&mut base, 1, &header).unwrap();
+}
+
+#[test]
+fn test_cmd_r_recipient_read_sets_date_and_delivers_one_receipt_on_redisplay() {
+    let (output, base) = persisted_read("R\n1\n/\n\n\n", address_first_to_sysop);
+    assert!(output.contains("Body of message 1"), "{output}");
+    let original = base.read_header(1).unwrap();
+    assert!(original.is_read());
+    assert_ne!(original.date_received, 0);
+    assert!(!original.is_receipt_req());
+    assert_eq!(base.highest_message_number(), 4);
+    assert_eq!(base.read_header(4).unwrap().reply_to, 1);
+}
+
+#[test]
+fn test_cmd_r_privileged_o_preserves_status_and_receipt_request() {
+    let (_, base) = persisted_read("R\nO 1\n\n\n", |board| {
+        address_first_to_sysop(board);
+        board.config.sysop_command_level.not_update_msg_read = icy_board_engine::icy_board::security_expr::SecurityExpression::from_req_security(0);
+    });
+    let header = base.read_header(1).unwrap();
+    assert!(!header.is_read());
+    assert_eq!(header.date_received, 0);
+    assert!(header.is_receipt_req());
+    assert_eq!(base.highest_message_number(), 3);
+    assert_eq!(last_pointer(&base), 0);
+}
+
+#[test]
+fn test_cmd_r_unread_filter_uses_header_status_even_below_last_read() {
+    let (output, _) = persisted_read("R\nSET 3\nU 1+\n\n\n\n", |board| {
+        let mut base = jamjam::jam::JamMessageBase::open(&board.conferences[0].areas.as_ref().unwrap()[0].path).unwrap();
+        jamjam::jam::raw::set_attributes(&mut base, 2, jamjam::jam::attributes::MSG_READ, 0).unwrap();
+    });
+    assert!(output.contains("Body of message 1"), "{output}");
+    assert!(!output.contains("Body of message 2"), "{output}");
+    assert!(output.contains("Body of message 3"), "{output}");
+}
+
+#[test]
+fn test_cmd_r_inner_search_rebuilds_filter_and_supports_multiple_ranges() {
+    let (output, _) = persisted_read("R\n1\nTS BANANA 2 3\n\n\n", |_| {});
+    assert!(output.contains("Body of message 2"), "{output}");
+    assert!(!output.contains("Body of message 3"), "{output}");
+    let (output, _) = persisted_read("R\n1\n2 3\n\n\n\n", |_| {});
+    assert!(output.contains("Body of message 2"), "{output}");
+    assert!(output.contains("Body of message 3"), "{output}");
+}
+
+#[test]
+fn test_cmd_r_thread_uses_displayed_subject_and_skips_unrelated_messages() {
+    let (output, _) = persisted_read("R\n1\nT+\n\n\n", |board| {
+        let mut base = jamjam::jam::JamMessageBase::open(&board.conferences[0].areas.as_ref().unwrap()[0].path).unwrap();
+        let mut header = base.read_header(3).unwrap();
+        header.set_subject(bstr::BString::from("Re: Subject 1"));
+        jamjam::jam::raw::update_header(&mut base, 3, &header).unwrap();
+    });
+    assert!(output.contains("Body of message 3"), "{output}");
+    assert!(!output.contains("Body of message 2"), "{output}");
+}
+
+fn second_conference_message(board: &mut icy_board_engine::icy_board::IcyBoard) {
+    let mut base = jamjam::jam::JamMessageBase::create(&board.conferences[1].areas.as_ref().unwrap()[0].path).unwrap();
+    base.write_message(&jamjam::jam::JamMessage::default().with_from(bstr::BString::from("SYSOP"))
+        .with_to(bstr::BString::from("ALL")).with_subject(bstr::BString::from("Other conference"))
+        .with_text(bstr::BString::from("OTHER-CONFERENCE-BODY"))).unwrap();
+    base.write_jhr_header().unwrap();
+}
+
+#[test]
+fn test_cmd_r_all_traverses_and_restores_original_conference() {
+    let (output, base) = persisted_read("R\nALL 1\n\n\n1\n\n\n", second_conference_message);
+    assert!(output.contains("OTHER-CONFERENCE-BODY"), "{output}");
+    assert_eq!(output.matches("Body of message 1").count(), 2, "{output}");
+    assert_eq!(last_pointer(&base), 1);
+}
+
+#[test]
+fn test_cmd_r_a_only_visits_selected_conferences_and_wait_only_mail_waiting() {
+    use icy_board_engine::icy_board::user_base::ConferenceFlags;
+    let (output, _) = persisted_read("R\nA 1\n\n\n", second_conference_message);
+    assert!(!output.contains("OTHER-CONFERENCE-BODY"), "{output}");
+    let (output, _) = persisted_read("R\nA 1\n\n\n\n", |board| {
+        second_conference_message(board);
+        board.users[0].conference_flags.insert(1, ConferenceFlags::Selected);
+    });
+    assert!(output.contains("OTHER-CONFERENCE-BODY"), "{output}");
+    let (output, _) = persisted_read("R\nWAIT 1\n\n\n", |board| {
+        second_conference_message(board);
+        board.users[0].conference_flags.insert(1, ConferenceFlags::MailWaiting);
+    });
+    assert!(output.contains("OTHER-CONFERENCE-BODY"), "{output}");
+    assert!(!output.contains("Body of message 1"), "{output}");
+}
+
+#[test]
+fn test_cmd_r_n_stops_remaining_conferences_and_restores_context() {
+    let (output, _) = persisted_read("R\nALL 1\nN\nR\n1\n\n\n", second_conference_message);
+    assert!(!output.contains("OTHER-CONFERENCE-BODY"), "{output}");
+    assert_eq!(output.matches("Body of message 1").count(), 2, "{output}");
+}
+
+#[test]
+fn test_cmd_r_body_read_failure_does_not_advance_pointer_or_mark_read() {
+    let (output, base) = persisted_read("R\n1\n\n", |board| {
+        address_first_to_sysop(board);
+        std::fs::write(board.conferences[0].areas.as_ref().unwrap()[0].path.with_extension("jdt"), b"").unwrap();
+    });
+    assert!(!output.contains("Body of message"), "{output}");
+    assert_eq!(last_pointer(&base), 0);
+    assert!(!base.read_header(1).unwrap().is_read());
+    assert!(base.read_header(1).unwrap().is_receipt_req());
+}
+
+fn password_first(board: &mut icy_board_engine::icy_board::IcyBoard) {
+    address_first_to_sysop(board);
+    let mut base = jamjam::jam::JamMessageBase::open(&board.conferences[0].areas.as_ref().unwrap()[0].path).unwrap();
+    let mut header = base.read_header(1).unwrap();
+    header.password_crc = jamjam::jam::JamMessageBase::crc(&bstr::BString::from("SECRET"));
+    jamjam::jam::raw::update_header(&mut base, 1, &header).unwrap();
+}
+
+#[test]
+fn test_cmd_r_failed_group_password_has_no_read_side_effects() {
+    use icy_board_engine::icy_board::security_expr::{SecurityExpression, Value};
+    let (output, base) = persisted_read("R\n1\nWRONG\nWRONG\nWRONG\n\n", |board| {
+        password_first(board);
+        board.config.sysop_command_level.read_all_mail = SecurityExpression::Constant(Value::Bool(false));
+    });
+    assert!(!output.contains("Body of message 1"), "{output}");
+    assert_eq!(last_pointer(&base), 0);
+    assert!(!base.read_header(1).unwrap().is_read());
+    assert_eq!(base.read_header(1).unwrap().date_received, 0);
+    assert!(base.read_header(1).unwrap().is_receipt_req());
+    assert_eq!(base.highest_message_number(), 3);
+}
+
+#[test]
+fn test_cmd_r_group_password_text_search_reveals_no_hit_and_preserves_pointer() {
+    use icy_board_engine::icy_board::security_expr::{SecurityExpression, Value};
+    // Body hit, no hit, and header hit must all skip the protected message
+    // without a password prompt that would reveal whether the text matched.
+    for term in ["BODY", "XYZZY", "SUBJECT"] {
+        let (output, base) = persisted_read(&format!("R\nSET 2\nTS {term} 1\n\n"), |board| {
+            password_first(board);
+            board.config.sysop_command_level.read_all_mail = SecurityExpression::Constant(Value::Bool(false));
+        });
+        assert!(output.contains("no mail found to read"), "protected search reported a hit:\n{output}");
+        assert!(!output.contains("Password to Read"), "search leaked a hit through authorization:\n{output}");
+        assert!(!output.contains("Subject 1"), "search disclosed the matching header:\n{output}");
+        assert!(!output.contains("Body of message"), "search disclosed a body:\n{output}");
+        assert!(!output.contains("End of Message Command?"), "search entered a protected message:\n{output}");
+        let pointers = base.read_last_read_file().unwrap();
+        assert_eq!(pointers.len(), 1);
+        assert_eq!(pointers[0].last_read_msg, 2);
+        // SET changes last_read_msg only; the search must not raise high_read_msg.
+        assert_eq!(pointers[0].high_read_msg, 0);
+        let header = base.read_header(1).unwrap();
+        assert!(!header.is_read());
+        assert_eq!(header.date_received, 0);
+        assert!(header.is_receipt_req());
+        assert_eq!(base.highest_message_number(), 3);
+    }
+}
+
+#[test]
+fn test_cmd_r_read_all_mail_bypasses_group_password() {
+    let (output, base) = persisted_read("R\n1\n\n\n", |board| {
+        password_first(board);
+        board.config.sysop_command_level.read_all_mail = icy_board_engine::icy_board::security_expr::SecurityExpression::from_req_security(0);
+    });
+    assert!(output.contains("Body of message 1"), "{output}");
+    assert!(!output.contains("Password to Read"), "{output}");
+    assert_eq!(last_pointer(&base), 1);
+    assert!(base.read_header(1).unwrap().is_read());
+}
+
+#[test]
+fn test_cmd_r_o_without_status_privilege_still_marks_recipient_mail_read() {
+    use icy_board_engine::icy_board::security_expr::{SecurityExpression, Value};
+    let (_, base) = persisted_read("R\nO 1\n\n\n", |board| {
+        address_first_to_sysop(board);
+        board.config.sysop_command_level.not_update_msg_read = SecurityExpression::Constant(Value::Bool(false));
+    });
+    assert_eq!(last_pointer(&base), 0);
+    assert!(base.read_header(1).unwrap().is_read());
+    assert_eq!(base.highest_message_number(), 4);
+}
+
+#[test]
+fn test_cmd_r_all_skips_denied_conferences_and_areas_even_for_sysop() {
+    use icy_board_engine::icy_board::security_expr::{SecurityExpression, Value};
+    for deny_conference in [true, false] {
+        let (output, _) = persisted_read("R\nALL 1\n\n\n", |board| {
+            second_conference_message(board);
+            if deny_conference {
+                board.conferences[1].required_security = SecurityExpression::Constant(Value::Bool(false));
+            } else {
+                std::sync::Arc::make_mut(board.conferences[1].areas.as_mut().unwrap())[0].req_level_to_list = SecurityExpression::Constant(Value::Bool(false));
+            }
+        });
+        assert!(!output.contains("OTHER-CONFERENCE-BODY"), "{output}");
+    }
+}
+
+#[test]
+fn test_cmd_r_short_long_and_help_execute_inside_reader() {
+    let (output, _) = persisted_read("R\nSHORT 1\nLONG\nH\n\n\n", |board| {
+        let path = board.root_path.join("reader-help");
+        std::fs::create_dir_all(&path).unwrap();
+        std::fs::write(path.join("hlpendr"), b"READER-HELP-MARKER\r\n").unwrap();
+        board.config.paths.help_path = path;
+    });
+    assert!(output.contains("READER-HELP-MARKER"), "{output}");
+    let (short, long) = output.split_once("LONG").unwrap();
+    assert!(!short.contains("Status:"), "{output}");
+    assert!(long.contains("Status:"), "{output}");
+}
+
+#[test]
+fn test_cmd_r_capture_can_be_cancelled_without_body_or_read_effects() {
+    for option in ["C", "D", "Z", "QWK"] {
+        let (output, base) = persisted_read(&format!("R\n1 {option}\nN\n\n"), address_first_to_sysop);
+        assert!(output.contains("Total Messages Captured for Download"), "capture did not run:\n{output}");
+        assert!(!output.contains("Invalid Entry"), "capture was rejected:\n{output}");
+        if option == "C" {
+            assert!(output.contains("Download Flagged Files"), "capture confirmation is missing:\n{output}");
+            assert!(!output.contains("Protocol Type for Transfer"), "declined capture reached transfer:\n{output}");
+        } else {
+            assert!(output.contains("Protocol Type for Transfer"), "capture protocol prompt is missing:\n{output}");
+            assert!(output.contains("Transfer Aborted"), "protocol cancellation was ignored:\n{output}");
+        }
+        assert!(!output.contains("Sending File(s)"), "cancel started a transfer:\n{output}");
+        assert!(!output.contains("Body of message"), "{output}");
+        assert!(base.read_last_read_file().unwrap().is_empty());
+        let header = base.read_header(1).unwrap();
+        assert!(!header.is_read());
+        assert_eq!(header.date_received, 0);
+        assert!(header.is_receipt_req());
+        assert_eq!(base.highest_message_number(), 3);
+    }
+}
+
+#[test]
+fn test_cmd_r_outer_kill_uses_its_number_instead_of_reading_it() {
+    let (output, base) = persisted_read("R\nK 2\n\n", |_| {});
+    assert!(output.contains("Message Killed"), "{output}");
+    assert!(!output.contains("Body of message 2"), "{output}");
+    assert!(base.read_header(2).map_or(true, |header| header.is_deleted()));
+    assert_eq!(last_pointer(&base), 0);
+}
+
+#[test]
+fn test_cmd_r_deselect_is_not_the_interactive_select_menu() {
+    let (output, _) = persisted_read("R\n1\nDESELECT\n\n\n\n", |_| {});
+    assert!(output.to_ascii_lowercase().contains("deselected"), "{output}");
+    assert!(!output.contains("Conference Numbers"), "{output}");
+    // READNEXT retains the original one-message range, rather than widening it.
+    assert!(!output.contains("Body of message 2"), "{output}");
+}
+
+#[test]
+fn test_cmd_r_inner_all_handoff_reaches_other_conferences() {
+    let (output, _) = persisted_read("R\n1\nALL 1\n\n\n\n", second_conference_message);
+    assert!(output.contains("OTHER-CONFERENCE-BODY"), "{output}");
 }

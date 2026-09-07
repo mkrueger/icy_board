@@ -14,6 +14,11 @@ impl IcyBoardState {
 
     pub async fn read_messages_in_area(&mut self, msg_area: usize) -> Res<()> {
         self.set_activity(NodeStatus::HandlingMail).await;
+        if !self.session.user_command_level.cmd_r.session_can_access(&self.session)
+            || self.session.current_conference.areas.as_ref().and_then(|areas| areas.get(msg_area))
+                .is_some_and(|area| !area.req_level_to_list.session_can_access(&self.session)) {
+            return Ok(());
+        }
         let Some(message_base_file) = self.message_area_path(msg_area) else {
             self.display_text(IceText::PathErrorInSystemConfiguration, display_flags::NEWLINE | display_flags::LFAFTER)
                 .await?;
@@ -26,8 +31,14 @@ impl IcyBoardState {
             let message_base_file = message_base_file.clone();
             match JamMessageBase::open(&message_base_file) {
                 Ok(message_base) => {
-                    self.read_msgs_from_base(message_base, false).await?;
-                    return Ok(());
+                    let previous_area = self.session.current_message_area;
+                    self.session.current_message_area = msg_area;
+                    let conference = self.session.current_conference_number;
+                    let result = self.read_msgs_from_base(message_base, false).await;
+                    if self.session.current_conference_number == conference {
+                        self.session.current_message_area = previous_area;
+                    }
+                    return result;
                 }
                 Err(err) => {
                     if !message_base_file.with_extension("jhr").exists() {

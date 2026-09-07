@@ -58,6 +58,7 @@ mod cmd_y;
 mod command_actions;
 mod display_file;
 mod login_options;
+mod session_recovery;
 mod statistics;
 mod subscriptions;
 mod sysop_security;

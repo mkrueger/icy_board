@@ -72,6 +72,9 @@ fn keyboard_timeout_elapsed(is_local: bool, enabled: bool, minutes: u16, elapsed
 }
 
 #[cfg(test)]
+mod edit_key_tests;
+
+#[cfg(test)]
 mod option_tests {
     use super::{Duration, keyboard_timeout_elapsed};
 
@@ -3828,53 +3831,69 @@ impl IcyBoardState {
     }
 
     pub async fn get_char_edit(&mut self) -> Res<Option<KeyChar>> {
-        let ch = self.get_char(TerminalTarget::Both).await?;
-        if ch.is_none() {
+        let Some(mut ch) = self.get_char(TerminalTarget::Both).await? else {
             return Ok(None);
-        }
-        let mut ch: KeyChar = ch.unwrap();
+        };
         match ch.ch {
             control_codes::DEL_HIGH => {
                 ch.ch = control_codes::DEL;
             }
-            '\x1B' => {
-                if let Some(key_char) = self.get_edit_sequence_char(ch.source).await? {
-                    if key_char.ch != '[' {
-                        self.char_buffer.push_front(key_char);
-                        return Ok(Some(ch));
-                    }
-                    let Some(key_char) = self.get_edit_sequence_char(ch.source).await? else {
-                        return Ok(Some(ch));
+            control_codes::ESC => {
+                // One deadline for the whole sequence, not a fresh wait per byte.
+                let deadline = Instant::now() + Duration::from_millis(250);
+                let Some(introducer) = self.get_edit_sequence_char(ch.source, deadline).await? else {
+                    return Ok((!self.session.request_logoff).then_some(ch));
+                };
+                if !matches!(introducer.ch, '[' | 'O') {
+                    self.char_buffer.push_front(introducer);
+                    return Ok(Some(ch));
+                }
+                let prefix = introducer.ch;
+                let mut pending = vec![introducer];
+                let mut sequence = String::new();
+                // Bound buffered input too, including malformed streams of parameters.
+                for _ in 0..16 {
+                    let Some(next) = self.get_edit_sequence_char(ch.source, deadline).await? else {
+                        break;
                     };
-                    match key_char.ch {
-                        'A' => ch.ch = control_codes::UP,
-                        'B' => ch.ch = control_codes::DOWN,
-                        'C' => ch.ch = control_codes::RIGHT,
-                        'D' => ch.ch = control_codes::LEFT,
-
-                        'H' => ch.ch = control_codes::HOME,
-                        'K' | 'F' => ch.ch = control_codes::END,
-
-                        'V' => ch.ch = control_codes::PG_UP,
-                        'U' => ch.ch = control_codes::PG_DN,
-                        '@' | '2' => {
-                            self.get_edit_sequence_char(ch.source).await?;
-                            ch.ch = control_codes::INS;
-                        }
-
-                        '6' => {
-                            self.get_edit_sequence_char(ch.source).await?;
-                            ch.ch = control_codes::PG_UP;
-                        }
-                        '5' => {
-                            self.get_edit_sequence_char(ch.source).await?;
-                            ch.ch = control_codes::PG_DN;
-                        }
-                        _ => {
-                            // don't pass ctrl codes
-                            return Ok(None);
-                        }
+                    let byte = next.ch;
+                    sequence.push(byte);
+                    pending.push(next);
+                    // Linux console F1 is CSI [ A, unlike xterm's SS3 P / CSI 11~.
+                    if prefix == '[' && sequence == "[" {
+                        continue;
                     }
+                    if ('@'..='~').contains(&byte) {
+                        ch.ch = match (prefix, sequence.as_str()) {
+                            (_, "A") => control_codes::UP,
+                            (_, "B") => control_codes::DOWN,
+                            (_, "C") => control_codes::RIGHT,
+                            (_, "D") => control_codes::LEFT,
+                            (_, "H") | ('[', "1~" | "7~") => control_codes::HOME,
+                            (_, "F") | ('[', "K" | "4~" | "8~") => control_codes::END,
+                            ('[', "@" | "2~") => control_codes::INS,
+                            ('[', "3~") => control_codes::DEL,
+                            ('[', "V" | "5~") => control_codes::PG_UP,
+                            ('[', "U" | "6~") => control_codes::PG_DN,
+                            ('[', "1;5D") => control_codes::CTRL_LEFT,
+                            ('[', "1;5C") => control_codes::CTRL_RIGHT,
+                            (_, "P") | ('[', "11~" | "[A") => control_codes::CTRL_Z,
+                            // Consume an unsupported *complete* control sequence, not
+                            // its following printable character or an editor command.
+                            _ => return Ok(None),
+                        };
+                        return Ok(Some(ch));
+                    }
+                    if !(' '..='?').contains(&byte) {
+                        break;
+                    }
+                }
+                if self.session.request_logoff {
+                    return Ok(None);
+                }
+                // Incomplete/malformed escape: keep the literal suffix in order.
+                for key in pending.into_iter().rev() {
+                    self.char_buffer.push_front(key);
                 }
             }
             _ => {}
@@ -3883,11 +3902,33 @@ impl IcyBoardState {
         Ok(Some(ch))
     }
 
-    async fn get_edit_sequence_char(&mut self, source: KeySource) -> Res<Option<KeyChar>> {
-        if source == KeySource::Sysop {
-            self.get_char(TerminalTarget::Both).await
-        } else {
-            Ok(self.char_buffer.pop_front())
+    async fn get_edit_sequence_char(&mut self, source: KeySource, deadline: Instant) -> Res<Option<KeyChar>> {
+        loop {
+            if self.session.request_logoff || Instant::now() >= deadline {
+                return Ok(None);
+            }
+            let key = if let Some(key) = self.char_buffer.pop_front() {
+                Some(key)
+            } else if source.is_stuffed() {
+                // Stuffed input is already buffered; never borrow a live key for it.
+                return Ok(None);
+            } else {
+                // Let get_char handle protocol filtering, node events and EOF. Do not
+                // cancel it with an outer timeout: it temporarily owns node channels.
+                self.get_char_with_timeout(TerminalTarget::Both, deadline.saturating_duration_since(Instant::now()))
+                    .await?
+            };
+            if let Some(key) = key {
+                if key.source == source {
+                    return Ok(Some(key));
+                }
+                // Never combine a remote escape with a sysop/stuffed continuation.
+                self.char_buffer.push_front(key);
+                return Ok(None);
+            }
+            // Protocol filters can consume a byte without producing a key. Keep
+            // reading fragmented input, but allow other tasks to run between reads.
+            tokio::task::yield_now().await;
         }
     }
 

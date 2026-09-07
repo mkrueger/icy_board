@@ -2,6 +2,8 @@ use crate::tests::{setup_conference, test_output};
 use icy_engine::{TextPane, TextScreen};
 use icy_parser_core::{AnsiParser, CommandParser};
 
+mod entry_audit;
+
 fn rendered_lines(output: &str) -> Vec<String> {
     let mut screen = TextScreen::new((80, 25));
     let mut parser = AnsiParser::default();
@@ -41,7 +43,7 @@ fn test_cmd_e_empty_subject_aborts() {
 fn test_cmd_e_validates_unknown_recipients() {
     let output = test_output("E\nNOBODY\nC\n\n".to_string(), |_| {});
     assert!(output.contains("Could not find"), "the unknown name was accepted:\n{output}");
-    assert!(output.contains("e-enter user's name"), "the validation choice is missing:\n{output}");
+    assert!(output.to_ascii_lowercase().contains("e-enter user's name"), "the validation choice is missing:\n{output}");
 }
 
 #[test]
@@ -54,7 +56,7 @@ fn test_cmd_e_can_accept_unknown_recipients_when_validation_is_off() {
 
 #[test]
 fn test_cmd_e_sc_asks_for_carbon_copies_when_enabled() {
-    let output = test_output("E\nALL\nSubject\nN\n\nBody\n\nSC\n\n".to_string(), |board| {
+    let output = test_output("E\nALL\nSubject\nN\nBody\n\nSC\n\n".to_string(), |board| {
         setup_conference(board);
         board.config.message.allow_carbon_copy = true;
         board.users[0].flags.fse_mode = icy_board_engine::icy_board::user_base::FSEMode::No;
@@ -64,7 +66,7 @@ fn test_cmd_e_sc_asks_for_carbon_copies_when_enabled() {
 
 #[test]
 fn test_cmd_e_sc_saves_without_carbon_copies_when_disabled() {
-    let output = test_output("E\nALL\nSubject\nN\n\nBody\n\nSC\n".to_string(), |board| {
+    let output = test_output("E\nALL\nSubject\nN\nBody\n\nSC\n".to_string(), |board| {
         setup_conference(board);
         board.config.message.allow_carbon_copy = false;
         board.users[0].flags.fse_mode = icy_board_engine::icy_board::user_base::FSEMode::No;

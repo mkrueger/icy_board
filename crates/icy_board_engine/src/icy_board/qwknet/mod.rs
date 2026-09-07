@@ -407,7 +407,9 @@ fn next_packet_name(inbound: &Path, hub_id: &str) -> PathBuf {
 }
 
 fn written_here(value: u32) -> bool {
-    value & attributes::MSG_LOCAL != 0 || value & (attributes::MSG_TYPEECHO | attributes::MSG_TYPENET) == 0
+    // An explicit local-only type overrides local authorship (Echo N), while
+    // legacy messages without a type remain eligible.
+    value & attributes::MSG_TYPELOCAL == 0 && (value & attributes::MSG_LOCAL != 0 || value & (attributes::MSG_TYPEECHO | attributes::MSG_TYPENET) == 0)
 }
 
 /// QWK separates lines with 0xE3, which `jamjam` encodes from and decodes to
@@ -602,6 +604,80 @@ mod tests {
         fs::remove_file(root.path().join("outbound").join("VERT.rep")).unwrap();
         let rescan = scan(&config, root.path(), "VERT").unwrap();
         assert_eq!(rescan.messages, 0, "mail taken from the hub must not travel back to it");
+    }
+
+    #[test]
+    fn local_only_messages_are_skipped_without_blocking_later_exports() {
+        let root = tempfile::tempdir().unwrap();
+        let mut base = JamMessageBase::create(root.path().join("source")).unwrap();
+        let config = QwkNetworkConfig {
+            enabled: true,
+            local_id: "ICYTEST".into(),
+            inbound: "inbound".into(),
+            outbound: "outbound".into(),
+            hubs: vec![QwkHub {
+                id: "VERT".into(),
+                areas: vec![QwkHubArea {
+                    remote_conference: 2001,
+                    local_area: "source".into(),
+                    read_only: false,
+                }],
+                ..Default::default()
+            }],
+        };
+        for flags in [attributes::MSG_TYPELOCAL, attributes::MSG_LOCAL | attributes::MSG_TYPELOCAL] {
+            base.write_message(
+                &JamMessage::default()
+                    .with_subject(BString::from("Declined echo"))
+                    .with_text(BString::from("Must stay local"))
+                    .with_attributes(flags),
+            )
+            .unwrap();
+        }
+        base.write_jhr_header().unwrap();
+        let skipped = scan(&config, root.path(), "VERT").unwrap();
+        assert_eq!(skipped.messages, 0);
+        assert!(skipped.packet.is_none());
+        assert!(!root.path().join("outbound/VERT.rep").exists());
+
+        for (subject, flags) in [
+            ("Declined before", attributes::MSG_LOCAL | attributes::MSG_TYPELOCAL),
+            ("Echoed", attributes::MSG_LOCAL | attributes::MSG_TYPEECHO),
+            ("Legacy zero", 0),
+            ("Legacy local", attributes::MSG_LOCAL),
+            ("Declined after", attributes::MSG_LOCAL | attributes::MSG_TYPELOCAL),
+        ] {
+            base.write_message(
+                &JamMessage::default()
+                    .with_subject(BString::from(subject))
+                    .with_text(BString::from(subject))
+                    .with_attributes(flags),
+            )
+            .unwrap();
+        }
+        base.write_jhr_header().unwrap();
+        let report = scan(&config, root.path(), "VERT").unwrap();
+        assert_eq!(report.messages, 3);
+        let rep = report.packet.unwrap();
+        let mut archive = zip::ZipArchive::new(fs::File::open(&rep).unwrap()).unwrap();
+        let mut data = Vec::new();
+        archive.by_name("VERT.MSG").unwrap().read_to_end(&mut data).unwrap();
+        let mut cursor = Cursor::new(data);
+        cursor.set_position(QwkMessage::HEADER_SIZE as u64);
+        for subject in ["Echoed", "Legacy zero", "Legacy local"] {
+            let message = QwkMessage::read(&mut cursor, true).unwrap();
+            assert_eq!(message.subj, subject);
+            assert_eq!(message.conference_number, 2001);
+        }
+        assert_eq!(cursor.position() as usize, cursor.get_ref().len());
+        let state_path = root.path().join("outbound/VERT.state.toml");
+        assert_eq!(load_state(&state_path).unwrap().conferences["2001"], 7);
+        drop(archive);
+        fs::remove_file(rep).unwrap();
+        let rescan = scan(&config, root.path(), "VERT").unwrap();
+        assert_eq!(rescan.messages, 0);
+        assert!(rescan.packet.is_none());
+        assert_eq!(load_state(&state_path).unwrap().conferences["2001"], 7);
     }
 
     #[test]

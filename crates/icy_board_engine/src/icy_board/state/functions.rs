@@ -681,12 +681,16 @@ impl IcyBoardState {
 
     pub async fn send_message(&mut self, conf: i32, area: i32, msg: JamMessage, text: IceText) -> Res<()> {
         let msg_base = if conf < 0 {
-            let user_name = msg.to().unwrap().to_string();
+            let user_name = msg.to().ok_or_else(|| std::io::Error::other("Message has no recipient"))?.to_string();
             self.get_email_msgbase(&user_name).await
         } else {
-            let msg_base = self.get_board().await.conferences[conf as usize].areas.as_ref().unwrap()[area as usize]
-                .path
-                .clone();
+            let path = self.get_board().await.conferences.get(conf as usize)
+                .and_then(|conference| conference.areas.as_ref())
+                .and_then(|areas| usize::try_from(area).ok().and_then(|area| areas.get(area)))
+                .map(|area| area.path.clone())
+                .filter(|path| !path.as_os_str().is_empty())
+                .ok_or_else(|| std::io::Error::other("Invalid message destination"))?;
+            let msg_base = self.resolve_path(&path);
             if msg_base.with_extension("jhr").exists() {
                 JamMessageBase::open(msg_base)
             } else {
@@ -713,6 +717,7 @@ impl IcyBoardState {
             Err(err) => {
                 log::error!("while opening message base: {err}");
                 self.display_text(IceText::MessageBaseError, display_flags::NEWLINE).await?;
+                return Err(err);
             }
         }
 

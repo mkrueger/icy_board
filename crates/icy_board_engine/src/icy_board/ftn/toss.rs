@@ -845,7 +845,8 @@ pub fn scan_outbound(config: &FtnConfig, areas: &AreaMap, now: &NaiveDateTime) -
             };
             // Only what was written on this board goes out, which is what stops
             // mail going back the way it came.
-            if !written_here(header.attributes) {
+            // An explicit local-only type overrides local authorship (Echo N).
+            if header.attributes & attributes::MSG_TYPELOCAL != 0 || !written_here(header.attributes) {
                 continue;
             }
             let msgid = if let Some(id) = subfield(&header, SubfieldType::MsgID) {
@@ -2079,6 +2080,63 @@ mod tests {
         base.write_jhr_header().unwrap();
 
         assert_eq!(scan_outbound(&config, &areas, &when()).unwrap().exported, 1);
+    }
+
+    #[test]
+    fn test_local_only_echomail_is_skipped_without_blocking_later_exports() {
+        let directory = tempfile::tempdir().unwrap();
+        let config = config(directory.path());
+        let path = directory.path().join("bases/general");
+        let mut base = open_base(&path).unwrap();
+        let areas = vec![EchoArea::new("FSX_GEN", path)];
+        scan_outbound(&config, &areas, &when()).unwrap();
+
+        for flags in [attributes::MSG_TYPELOCAL, attributes::MSG_LOCAL | attributes::MSG_TYPELOCAL] {
+            base.write_message(
+                &JamMessage::default()
+                    .with_subject(BString::from("Declined echo"))
+                    .with_text(BString::from("Must stay local"))
+                    .with_attributes(flags),
+            )
+            .unwrap();
+        }
+        base.write_jhr_header().unwrap();
+        let skipped = scan_outbound(&config, &areas, &when()).unwrap();
+        assert_eq!(skipped.exported, 0);
+        assert!(skipped.bundles.is_empty());
+        assert_eq!(ScanState::load(&config).unwrap().exported["FSX_GEN"], 2);
+
+        for (subject, flags) in [
+            ("Declined before", attributes::MSG_LOCAL | attributes::MSG_TYPELOCAL),
+            ("Echoed", attributes::MSG_LOCAL | attributes::MSG_TYPEECHO),
+            ("Legacy zero", 0),
+            ("Legacy local", attributes::MSG_LOCAL),
+            ("Declined after", attributes::MSG_LOCAL | attributes::MSG_TYPELOCAL),
+        ] {
+            base.write_message(
+                &JamMessage::default()
+                    .with_subject(BString::from(subject))
+                    .with_text(BString::from(subject))
+                    .with_attributes(flags),
+            )
+            .unwrap();
+        }
+        base.write_jhr_header().unwrap();
+        let report = scan_outbound(&config, &areas, &when()).unwrap();
+        assert_eq!(report.exported, 3);
+        assert_eq!(report.bundles.len(), 1);
+        let unpacked = tempfile::tempdir().unwrap();
+        let packets = bundle::unpack(&report.bundles[0], unpacked.path()).unwrap();
+        assert_eq!(packets.len(), 1);
+        let packet = Packet::load(&packets[0]).unwrap();
+        assert_eq!(
+            packet.messages.iter().map(|message| message.subject.as_str()).collect::<Vec<_>>(),
+            ["Echoed", "Legacy zero", "Legacy local"]
+        );
+        assert_eq!(ScanState::load(&config).unwrap().exported["FSX_GEN"], 7);
+        let rescan = scan_outbound(&config, &areas, &when()).unwrap();
+        assert_eq!(rescan.exported, 0);
+        assert!(rescan.bundles.is_empty());
     }
 
     /// What the tosser imported is not marked local, and sending it back out

@@ -7,8 +7,10 @@ use regex::Regex;
 use crate::icy_board::state::Session;
 
 use super::read_command::{ReadCommand, user_search};
+use super::message_security::{may_read_header, requires_read_password};
 
 /// The default lets every message through.
+#[derive(Clone)]
 pub struct MessageFilter {
     any_msgs: bool,
     your_msgs: bool,
@@ -83,8 +85,8 @@ impl MessageFilter {
             && self.text.is_none()
     }
 
-    pub fn matches(&self, header: &JamMessageHeader, body: &str, last_read: u32) -> bool {
-        if !self.may_read(header) {
+    pub fn matches(&self, header: &JamMessageHeader, body: &str, _last_read: u32) -> bool {
+        if !self.may_read(header) || !self.may_search(header, self.may_read_all_mail) {
             return false;
         }
         let to = field(header.to());
@@ -94,7 +96,7 @@ impl MessageFilter {
         if !(self.any_msgs || self.your_msgs && self.is_own(&to) || self.from_msgs && self.is_own(&from) || self.msgs_to_all && to == "ALL") {
             return false;
         }
-        if self.unread_only && header.message_number <= last_read {
+        if self.unread_only && header.is_read() {
             return false;
         }
         if let Some(after) = self.written_after
@@ -125,10 +127,24 @@ impl MessageFilter {
         true
     }
 
+    /// Searches have no password authorization. Skip group-password mail before
+    /// testing even the public fields: a hit-dependent password prompt leaks
+    /// whether the protected body contains the search text. Sender passwords
+    /// protect modification only; read-all-mail privilege still bypasses both.
+    pub(super) fn may_search(&self, header: &JamMessageHeader, may_read_all_mail: bool) -> bool {
+        self.text.is_none() || !requires_read_password(header, may_read_all_mail)
+    }
+
     /// `readstatus` in `PCBoard`: a receiver-only message belongs to its two ends,
     /// and to whoever may read all mail.
     pub fn may_read(&self, header: &JamMessageHeader) -> bool {
-        !header.is_private() || self.may_read_all_mail || self.is_own(&field(header.to())) || self.is_own(&field(header.from()))
+        !header.is_deleted()
+            && may_read_header(
+                header,
+                self.own_names.first().map(String::as_str).unwrap_or_default(),
+                self.own_names.get(1).map(String::as_str).unwrap_or_default(),
+                self.may_read_all_mail,
+            )
     }
 
     fn is_own(&self, name: &str) -> bool {
@@ -142,7 +158,7 @@ fn field(value: Option<&bstr::BString>) -> String {
 
 fn strip_re(subject: &str) -> &str {
     let subject = subject.trim();
-    if subject.len() >= 4 && subject[..4].eq_ignore_ascii_case("re: ") {
+    if subject.get(..4).is_some_and(|prefix| prefix.eq_ignore_ascii_case("re: ")) {
         subject[4..].trim_start()
     } else {
         subject
@@ -240,12 +256,14 @@ mod tests {
     }
 
     #[test]
-    fn unread_only_skips_what_the_pointer_has_passed() {
+    fn unread_only_uses_recipient_status_not_the_scan_pointer() {
         let filter = filter(|f| f.unread_only = true);
         let mut msg = header("ALL", "SYSOP", "");
         msg.message_number = 5;
-        assert!(!filter.matches(&msg, "", 5));
+        assert!(filter.matches(&msg, "", 100));
         assert!(filter.matches(&msg, "", 4));
+        msg.attributes |= jamjam::jam::attributes::MSG_READ;
+        assert!(!filter.matches(&msg, "", 0));
     }
 
     #[test]
@@ -275,6 +293,7 @@ mod tests {
         assert!(filter.matches(&header("ALL", "SYSOP", "Hello"), "", 0));
         assert!(filter.matches(&header("ALL", "SYSOP", "Re: Hello"), "", 0));
         assert!(!filter.matches(&header("ALL", "SYSOP", "Goodbye"), "", 0));
+        assert!(!filter.matches(&header("ALL", "SYSOP", "日付"), "", 0));
     }
 
     #[test]
@@ -283,6 +302,32 @@ mod tests {
         assert!(filter.matches(&header("ALL", "SYSOP", "a needle"), "", 0));
         assert!(filter.matches(&header("ALL", "SYSOP", ""), "hay needle hay", 0));
         assert!(!filter.matches(&header("ALL", "SYSOP", ""), "only hay", 0));
+    }
+
+    #[test]
+    fn text_search_skips_group_password_mail_without_testing_for_a_hit() {
+        let search = filter(|f| {
+            f.text = Some(Regex::new("(?i)needle").unwrap());
+            f.may_read_all_mail = false;
+        });
+        let mut protected = header("ALL", "SYSOP", "ordinary subject");
+        protected.password_crc = jamjam::jam::JamMessageBase::crc(&bstr::BString::from("SECRET"));
+        assert!(!search.may_search(&protected, false));
+        assert!(!search.matches(&protected, "hidden needle", 0));
+        assert!(!search.matches(&protected, "only hay", 0));
+        protected.set_subject(bstr::BString::from("needle"));
+        assert!(!search.matches(&protected, "only hay", 0));
+
+        // Ordinary reading still reaches the reader's password prompt.
+        assert!(filter(|f| f.may_read_all_mail = false).matches(&protected, "hidden needle", 0));
+        // A caller-supplied privileged filter cannot bypass the actual session.
+        let privileged = filter(|f| f.text = search.text.clone());
+        assert!(!privileged.may_search(&protected, false));
+        assert!(privileged.matches(&protected, "hidden needle", 0));
+
+        super::super::message_security::set_security_kind(&mut protected, true);
+        assert!(search.may_search(&protected, false));
+        assert!(search.matches(&protected, "hidden needle", 0));
     }
 
     #[test]

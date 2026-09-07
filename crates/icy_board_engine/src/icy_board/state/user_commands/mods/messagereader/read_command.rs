@@ -93,6 +93,8 @@ pub struct ParseContext {
 #[derive(Clone, Debug)]
 pub struct ReadCommand {
     pub func: MsgFunc,
+    /// Arguments belonging to a dispatched outer command, not message ranges.
+    pub action_args: Vec<String>,
     pub numbers: Vec<MsgRange>,
     pub all_conf: bool,
     pub mail_wait_conf: bool,
@@ -150,6 +152,7 @@ impl Default for ReadCommand {
     fn default() -> Self {
         Self {
             func: MsgFunc::None,
+            action_args: Vec::new(),
             numbers: Vec::new(),
             all_conf: false,
             mail_wait_conf: false,
@@ -326,6 +329,7 @@ pub fn parse(tokens: &[String], flag: ReadLoop, ctx: &ParseContext) -> ReadComma
                 cmd.keep_going = true;
             } else if let Some(rest) = token.split_once('-').map(|(_, rest)| rest) {
                 range.last = if rest.is_empty() { 1 } else { rest.parse().unwrap_or(1) };
+                cmd.keep_going = true;
             }
             cmd.func = MsgFunc::None;
             cmd.push_range(range);
@@ -425,12 +429,17 @@ pub fn parse(tokens: &[String], flag: ReadLoop, ctx: &ParseContext) -> ReadComma
                 }
                 'J' => {
                     cmd.func = MsgFunc::Join;
+                    cmd.action_args = tokens[index + 1..].to_vec();
                     cmd.valid_cmd = true;
                     break;
                 }
                 'K' => {
                     cmd.func = MsgFunc::Kill;
                     cmd.valid_cmd = true;
+                    if flag == ReadLoop::Outside {
+                        cmd.action_args = tokens[index + 1..].to_vec();
+                        break;
+                    }
                 }
                 'M' => {
                     cmd.memorize = true;
@@ -526,7 +535,7 @@ pub fn parse(tokens: &[String], flag: ReadLoop, ctx: &ParseContext) -> ReadComma
             }
             O_ALIAS => {
                 if ctx.alias_support {
-                    cmd.toggle_alias = Some(if remaining > 1 {
+                    cmd.toggle_alias = Some(if iter.peek().is_some_and(|(_, t)| matches!(t.as_str(), "ON" | "OFF")) {
                         match iter.next().map(|(_, t)| t.as_str()) {
                             Some("ON") => AliasToggle::On,
                             Some("OFF") => AliasToggle::Off,
@@ -606,6 +615,10 @@ pub fn parse(tokens: &[String], flag: ReadLoop, ctx: &ParseContext) -> ReadComma
             O_KILL => {
                 cmd.func = MsgFunc::Kill;
                 cmd.valid_cmd = true;
+                if flag == ReadLoop::Outside {
+                    cmd.action_args = tokens[index + 1..].to_vec();
+                    break;
+                }
             }
             O_LONG => {
                 cmd.header_len = Some(HeaderLength::Long);
@@ -782,9 +795,7 @@ fn append_search_text(cmd: &mut ReadCommand, last_search_cmd: Option<usize>, tok
 /// been read and any missing search terms have been prompted for.
 pub fn finalize(cmd: &mut ReadCommand) {
     if !cmd.numbers.is_empty() {
-        if cmd.all_conf {
-            cmd.numbers.truncate(1);
-        }
+        cmd.keep_going |= cmd.numbers.iter().any(|range| range.first != range.last);
         return;
     }
     if cmd.all_conf && !cmd.new_msgs {
@@ -1123,5 +1134,22 @@ mod tests {
         context.may_read_only = true;
         let cmd = parse(&tokens("O"), ReadLoop::Outside, &context);
         assert!(!cmd.update_msg_status);
+    }
+
+    #[test]
+    fn all_keeps_multiple_ranges_and_alias_does_not_swallow_a_number() {
+        assert_eq!(parse_outside("ALL 1 3").numbers.len(), 2);
+        let alias = parse_outside("ALIAS 3");
+        assert_eq!(alias.toggle_alias, Some(AliasToggle::Flip));
+        assert_eq!(alias.numbers, vec![MsgRange { first: 3, last: 3 }]);
+    }
+
+    #[test]
+    fn outer_kill_and_join_keep_their_arguments_out_of_reader_ranges() {
+        let kill = parse_outside("K 3");
+        assert_eq!(kill.func, MsgFunc::Kill);
+        assert_eq!(kill.action_args, ["3"]);
+        assert!(kill.numbers.is_empty());
+        assert_eq!(parse_inside("J 2").action_args, ["2"]);
     }
 }
