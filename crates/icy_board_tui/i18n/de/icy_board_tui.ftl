@@ -2186,6 +2186,12 @@ event_editor_interval-help=
     - Starts bleiben am gewählten Tag und innerhalb der spätesten Startzeit
     - Leer plant einen Start je gewähltem Tag
     - Null ist ungültig
+
+    Bei Rückstau bleibt je stabiler ID nur der jüngste fällige, noch nicht
+    beanspruchte geplante Lauf. Ältere fällige Läufe erhalten ohne Ausführung
+    den Status Überholt. Zukünftige Termine, manuelle Starts und beanspruchte/laufende Jobs
+    bleiben unverändert. Ablauf und Leerlauf bei aktiven Anrufern haben Vorrang.
+    Ohne Intervall keine Zusammenfassung; kein Nachholen von Offline-Zeiten.
 event_editor_warning=Warnung (Min)
 event_editor_warning-status=Positive ganze Minuten; leer ohne Laufzeitwarnung. Beendet niemals Prozesse.
 event_editor_warning-help=
@@ -2242,6 +2248,7 @@ event_editor_result_wait_error=Wartefehler
 event_editor_result_interrupted=Unterbrochen
 event_editor_result_skipped_busy=Übersprungen (belegt)
 event_editor_result_expired=Abgelaufen
+event_editor_result_superseded=Überholt
 event_editor_history_help=
     # Ereignisverlauf
 
@@ -4148,6 +4155,7 @@ event_runtime_wait_error = Wartefehler
 event_runtime_interrupted = Unterbrochen
 event_runtime_skipped_busy = Überspr.: belegt
 event_runtime_expired = Abgelaufen
+event_runtime_superseded = Überholt
 event_runtime_queued_active = Geplant / aktiv
 event_runtime_history_title = Letzter Lauf — Cache; F5/R lädt neu
 event_runtime_history_error = Ereignisverlauf nicht lesbar

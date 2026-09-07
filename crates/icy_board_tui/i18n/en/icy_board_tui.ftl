@@ -2461,6 +2461,11 @@ event_editor_interval-help=
     - Starts stay within the selected day and the latest-start bound
     - Blank schedules one start per selected day
     - Zero is invalid
+
+    On backlog, keep only the newest due, unclaimed scheduled run per stable ID.
+    Older due runs become Superseded without execution. Future slots, manual
+    starts and claimed/running jobs stay unchanged. Expiry and busy Idle skips
+    take precedence. No interval means no coalescing; no downtime catch-up.
 event_editor_warning=Warning (min)
 event_editor_warning-status=Positive whole minutes; blank disables the running-long warning. Never kills.
 event_editor_warning-help=
@@ -2516,6 +2521,7 @@ event_editor_result_wait_error=Wait error
 event_editor_result_interrupted=Interrupted
 event_editor_result_skipped_busy=Skipped (busy)
 event_editor_result_expired=Expired
+event_editor_result_superseded=Superseded
 event_editor_history_help=
     # Event history
 
@@ -4716,6 +4722,7 @@ event_runtime_wait_error = Wait error
 event_runtime_interrupted = Interrupted
 event_runtime_skipped_busy = Skipped: busy
 event_runtime_expired = Expired
+event_runtime_superseded = Superseded
 event_runtime_queued_active = Queued / active
 event_runtime_history_title = Last run — cached; F5/R refresh
 event_runtime_history_error = Cannot read event history

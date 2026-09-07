@@ -59,6 +59,7 @@ fn result_label(result: &EventResult) -> String {
         EventResult::Interrupted => "interrupted",
         EventResult::SkippedBusy => "skipped_busy",
         EventResult::Expired => "expired",
+        EventResult::Superseded => "superseded",
     };
     get_text(&format!("event_editor_result_{suffix}"))
 }

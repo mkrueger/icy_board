@@ -90,11 +90,21 @@ Sources: [setup entry](../crates/icbsetup/src/tabs/general/event_setup.rs),
 The current `Schedule` retains occurrences across ticks using a monotonic scan
 watermark and pending `(stable ID, run_at)` entries. It ticks at one-second
 intervals, retains due work even when execution is delayed, orders ties by file
-position, and removes an occurrence when taken or when a busy Idle is skipped.
+position, and removes an occurrence when taken, skipped, expired or superseded.
 Pending entries pick up command/description/mode/execution/restriction changes
 after reload; removed, disabled, or retimed entries are dropped. Backward clock movement does
 not move the watermark backward. Session restrictions prefer the next Maintenance
 Fixed window, so a nearer Online or Slide/Idle event does not hide it.
+
+For events with `interval_minutes`, a backlog is coalesced **per stable event ID**:
+only the newest due, **not yet claimed** scheduled occurrence is retained. Older
+due, unclaimed occurrences are journaled as `Superseded` without an attempted
+start, command log or execution. Future slots remain scheduled. Manual starts
+and events without an interval are unchanged; already claimed or running jobs
+are neither displaced nor cancelled. An exceeded `end_time` takes precedence
+and produces `Expired`; Idle with active callers still produces `SkippedBusy`
+rather than `Superseded`. This changes retained interval backlog only, not the
+startup policy: there is still no catch-up for offline time.
 
 For `execution = "maintenance"`:
 
@@ -134,10 +144,18 @@ An independent exclusive journal lock survives release of `BoardLock`. Pending
 claims are persisted **before spawn**, using a synced temporary file and atomic
 replacement (with directory sync on Unix). On scheduler startup, leftover
 `pending` claims become `interrupted`, never automatically retried. Busy Idle
-skips, expired slots, success, nonzero exits, spawn/wait errors, timestamps, exit
+skips, expired and superseded slots, success, nonzero exits, spawn/wait errors, timestamps, exit
 codes and log paths are recorded. An attempted-start timestamp is not proof that
 a process actually ran. Journal failures latch admission closed and require
 repair/restart, not command replay.
+
+`Superseded` is displayed as **Superseded** in English and **Überholt** in German
+in both setup history and the runtime Events menu. It means an older unclaimed
+interval slot was replaced by a newer due slot, not that a command was started
+or aborted; its journal entry has no attempted-start timestamp or log path.
+New binaries read old journals unchanged. Older binaries do not recognize the
+serialized result `superseded`, so journals containing it are not backward
+compatible with those binaries; account for this before downgrading.
 
 Commands run foreground through `sh -c` (`cmd /C` on Windows), in the board root,
 with null stdin and stdout/stderr captured together in a unique file under

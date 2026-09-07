@@ -106,6 +106,7 @@ fn result_text(result: &EventResult) -> String {
         EventResult::Interrupted => "event_runtime_interrupted",
         EventResult::SkippedBusy => "event_runtime_skipped_busy",
         EventResult::Expired => "event_runtime_expired",
+        EventResult::Superseded => "event_runtime_superseded",
     })
 }
 

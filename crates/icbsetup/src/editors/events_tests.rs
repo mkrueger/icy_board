@@ -794,6 +794,7 @@ fn event_editor_history_result_labels_are_localized() {
         EventResult::Interrupted,
         EventResult::SkippedBusy,
         EventResult::Expired,
+        EventResult::Superseded,
     ] {
         let label = result_label(&result);
         assert!(!label.is_empty());

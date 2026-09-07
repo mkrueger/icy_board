@@ -47,6 +47,7 @@ pub enum EventResult {
     Interrupted,
     SkippedBusy,
     Expired,
+    Superseded,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

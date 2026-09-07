@@ -88,6 +88,15 @@ Left/Right or Shift-Tab/Tab cycle mode and execution; Enter only moves down.
    does not shift the slots. Omit for one slot per selected day. Monthly/date-mask
    schedules are not implemented.
 
+   On backlog, only the newest due, not-yet-claimed scheduled occurrence per
+   stable event ID is retained. Older due, unclaimed slots are journaled as
+   ``Superseded`` without an attempted start, command log or execution. Future
+   slots remain scheduled. Manual starts and events without an interval are
+   unchanged; claimed or running jobs are never displaced or cancelled.
+   An exceeded ``end_time`` takes precedence as ``Expired``; Idle with active
+   callers still produces ``SkippedBusy`` rather than ``Superseded``. This does
+   not change the startup policy: there is no catch-up for offline time.
+
 ``warning_minutes``
    Optional positive elapsed-command duration. Logs ``Running long`` and marks
    Online status, but never kills the command or its descendants.
@@ -200,12 +209,21 @@ scheduler startup leftover ``pending`` entries become ``interrupted`` and are
 never automatically retried. Startup scans forward: there is no downtime catch-up
 and no exactly-once guarantee for command effects.
 
-History includes busy skips, expiry, results, attempted start/finish timestamps,
+History includes busy skips, expiry, superseded slots, results, attempted start/finish timestamps,
 exit codes and log paths. Attempted start is not proof that a process ran; a
 planned log may be missing after a preparation error. Journal failure closes
 admission and requires repair/restart, not command replay. History and logs have
 unbounded retention: rotate logs separately and retain journal occurrence keys
 as the replay barrier.
+
+``Superseded`` appears as **Superseded** in English and **Überholt** in German
+in setup history and the runtime Events menu. It marks an older unclaimed
+interval slot replaced by a newer due slot, not a started or aborted command.
+Its journal entry has no attempted-start timestamp or log path.
+
+New binaries read old journals unchanged. Older binaries do not recognize the
+serialized result ``superseded``: journals containing it are not backward
+compatible with those binaries. Account for this before downgrading.
 
 Manual execution at call-wait
 ----------------------------

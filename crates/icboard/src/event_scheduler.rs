@@ -6,6 +6,7 @@
 //!
 //! Startup scans forward from now (no retrospective offline catch-up). Observed
 //! occurrences are retained while busy; an explicit end bound expires them.
+//! For interval events only the latest due, unclaimed slot survives a backlog.
 //! The journal claims each observed scheduled occurrence or manual run before
 //! spawn. Pending recovery is interrupted, never retried. Journal errors latch
 //! admission closed and require repair/restart, including errors AFTER a command.
@@ -19,7 +20,11 @@
 //! long (and marks the Online snapshot). A stalled command may hold maintenance
 //! indefinitely; its waiting status is visible, and no new Online jobs start.
 
-use std::{collections::VecDeque, process::Stdio, sync::Arc};
+use std::{
+    collections::{HashMap, VecDeque},
+    process::Stdio,
+    sync::Arc,
+};
 
 use chrono::{DateTime, Duration, Local, Utc};
 use icy_board_engine::icy_board::{
@@ -132,12 +137,23 @@ impl Schedule {
     }
 
     fn discard(&mut self, now: DateTime<Local>, online: bool) -> Vec<(Occurrence, EventResult)> {
+        let mut latest_due = HashMap::new();
+        for (id, window) in &self.pending {
+            if window.event.interval_minutes.is_some() && window.run_at <= now {
+                latest_due
+                    .entry(id.clone())
+                    .and_modify(|latest: &mut DateTime<Local>| *latest = (*latest).max(window.run_at))
+                    .or_insert(window.run_at);
+            }
+        }
         let mut discarded = Vec::new();
-        self.pending.retain(|(_, w)| {
+        self.pending.retain(|(id, w)| {
             let result = if w.event.expired(w.run_at, now) {
                 Some(EventResult::Expired)
             } else if online && w.event.mode == EventMode::Idle && w.run_at <= now {
                 Some(EventResult::SkippedBusy)
+            } else if latest_due.get(id).is_some_and(|latest| w.run_at < *latest) {
+                Some(EventResult::Superseded)
             } else {
                 None
             };
@@ -921,6 +937,179 @@ mod tests {
         assert!(!warning_due(Some(2), Duration::from_secs(119)));
         assert!(warning_due(Some(2), Duration::from_secs(120)));
         assert!(!warning_due(Some(u32::MAX), Duration::from_secs(u64::from(u32::MAX))));
+    }
+
+    #[test]
+    fn interval_backlog_stays_bounded_while_a_foreground_job_blocks_execution() {
+        for execution in [EventExecution::Maintenance, EventExecution::Online] {
+            for mode in [EventMode::Fixed, EventMode::Slide, EventMode::Idle] {
+                let mut events = events(mode);
+                events[0].execution = execution;
+                events[0].interval_minutes = Some(30);
+                let mut schedule = Schedule::new(at(2, 59, 0));
+                let mut superseded = Vec::new();
+                for (hour, minute) in [(3, 0), (3, 30), (4, 0), (4, 30)] {
+                    let now = at(hour, minute, 0);
+                    schedule.refresh(&options(), &events, now);
+                    superseded.extend(schedule.discard(now, false));
+                    assert!(schedule.take_ready(now, false, true).is_none());
+                    assert_eq!(schedule.pending.iter().filter(|(_, w)| w.run_at <= now).count(), 1);
+                    assert!(schedule.pending.len() <= 2, "only latest due and next future slot");
+                }
+                assert_eq!(superseded.len(), 3);
+                assert!(superseded.iter().all(|(o, result)| !o.manual && *result == EventResult::Superseded));
+                assert_eq!(schedule.take_ready(at(4, 30, 0), false, false).unwrap().window.run_at, at(4, 30, 0));
+                assert!(schedule.take_ready(at(4, 30, 0), false, false).is_none());
+                assert_eq!(schedule.pending[0].1.run_at, at(5, 0, 0));
+            }
+        }
+    }
+
+    #[test]
+    fn sliding_intervals_keep_latest_due_after_callers_leave_and_future_does_not_supersede_it() {
+        for execution in [EventExecution::Maintenance, EventExecution::Online] {
+            let mut events = events(EventMode::Slide);
+            events[0].execution = execution;
+            events[0].interval_minutes = Some(30);
+            let mut schedule = Schedule::new(at(2, 59, 0));
+            schedule.refresh(&options(), &events, at(3, 0, 0));
+            assert!(schedule.discard(at(3, 0, 0), true).is_empty());
+            assert!(schedule.take_ready(at(3, 0, 0), true, false).is_none());
+            schedule.refresh(&options(), &events, at(4, 45, 0));
+            let discarded = schedule.discard(at(4, 45, 0), true);
+            assert_eq!(discarded.len(), 3);
+            assert!(discarded.iter().all(|(_, result)| *result == EventResult::Superseded));
+            assert_eq!(schedule.maintenance_due(at(4, 45, 0)), execution == EventExecution::Maintenance);
+            assert!(schedule.take_ready(at(4, 45, 0), true, false).is_none());
+            assert_eq!(schedule.take_ready(at(4, 45, 0), false, false).unwrap().window.run_at, at(4, 30, 0));
+            assert!(schedule.take_ready(at(4, 59, 59), false, false).is_none());
+            assert!(schedule.discard(at(4, 59, 59), false).is_empty());
+            assert_eq!(schedule.pending[0].1.run_at, at(5, 0, 0));
+        }
+    }
+
+    #[test]
+    fn coalescing_is_per_id_and_leaves_manual_and_non_interval_runs_alone() {
+        let mut events = events(EventMode::Slide);
+        events[0].interval_minutes = Some(30);
+        let mut second = events[0].clone();
+        second.id = BoardEvent::new_id();
+        events.push(second);
+        let mut daily = events[0].clone();
+        daily.id = BoardEvent::new_id();
+        daily.interval_minutes = None;
+        events.push(daily);
+        let mut schedule = Schedule::new(at(2, 59, 0));
+        schedule.refresh(&options(), &events, at(4, 30, 0));
+        schedule.manual.push_back(event_window(&options(), events[0].clone(), at(3, 0, 0)));
+        let discarded = schedule.discard(at(4, 30, 0), false);
+        assert_eq!(discarded.len(), 6);
+        assert!(
+            discarded
+                .iter()
+                .all(|(o, result)| o.window.event.id != events[2].id && *result == EventResult::Superseded)
+        );
+        assert!(schedule.take_ready(at(4, 30, 0), false, false).unwrap().manual);
+        assert_eq!(schedule.take_ready(at(4, 30, 0), false, false).unwrap().window.event.id, events[2].id);
+        for event in events.iter().take(2) {
+            let occurrence = schedule.take_ready(at(4, 30, 0), false, false).unwrap();
+            assert_eq!(occurrence.window.event.id, event.id);
+            assert_eq!(occurrence.window.run_at, at(4, 30, 0));
+        }
+        assert!(schedule.take_ready(at(4, 30, 0), false, false).is_none());
+
+        let now = at(4, 30, 0) + Duration::days(1);
+        let mut schedule = Schedule::new(at(2, 59, 0));
+        schedule.refresh(&options(), &events, now);
+        schedule.discard(now, false);
+        assert_eq!(
+            schedule.pending.iter().filter(|(_, w)| w.event.id == events[2].id && w.run_at <= now).count(),
+            2
+        );
+        assert_eq!(
+            schedule.pending.iter().filter(|(_, w)| w.event.id == events[0].id && w.run_at <= now).count(),
+            1
+        );
+    }
+
+    #[test]
+    fn interval_expiry_and_busy_idle_keep_their_existing_results() {
+        let mut events = events(EventMode::Idle);
+        events[0].interval_minutes = Some(30);
+        events[0].end_time = Some(IcbTime::parse("04:30:00"));
+        for (now, online, expected, count) in [
+            (at(4, 30, 0), true, EventResult::SkippedBusy, 4),
+            (at(4, 30, 1), true, EventResult::Expired, 4),
+            (at(4, 30, 1), false, EventResult::Expired, 4),
+            (at(4, 30, 0), false, EventResult::Superseded, 3),
+        ] {
+            let mut schedule = Schedule::new(at(2, 59, 0));
+            schedule.refresh(&options(), &events, now);
+            let discarded = schedule.discard(now, online);
+            assert_eq!(discarded.len(), count);
+            assert!(discarded.iter().all(|(_, result)| *result == expected));
+            assert_eq!(schedule.take_ready(now, false, false).is_some(), expected == EventResult::Superseded);
+        }
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn superseded_slots_are_durable_and_only_latest_command_runs() {
+        use icy_board_engine::icy_board::events::event_history::LOG_DIRECTORY;
+
+        let dir = tempfile::tempdir().unwrap();
+        let now = at(4, 30, 0);
+        let mut history = EventHistory::open(dir.path(), now.with_timezone(&Utc)).unwrap();
+        let mut events = events(EventMode::Slide);
+        events[0].interval_minutes = Some(30);
+        events[0].command = "printf once >> runs".into();
+        let mut schedule = Schedule::new(at(2, 59, 0));
+        schedule.refresh(&options(), &events, now);
+        for (occurrence, result) in schedule.discard(now, false) {
+            let entry = history
+                .claim(&occurrence.window.event, occurrence.window.run_at.with_timezone(&Utc), false)
+                .unwrap()
+                .unwrap();
+            history.finish(&entry.key, now.with_timezone(&Utc), result, None, None).unwrap();
+        }
+        drop(history);
+        let entries = EventHistory::read_entries(dir.path()).unwrap();
+        assert_eq!(entries.len(), 3);
+        assert!(
+            entries
+                .iter()
+                .all(|e| e.result == EventResult::Superseded && e.start.is_none() && e.log_file.is_none() && e.finish.is_some())
+        );
+        assert!(!dir.path().join("runs").exists());
+        assert!(!dir.path().join(LOG_DIRECTORY).exists());
+
+        let history = Arc::new(Mutex::new(EventHistory::open(dir.path(), now.with_timezone(&Utc)).unwrap()));
+        let mut restarted = Schedule::new(at(2, 59, 0));
+        restarted.refresh(&options(), &events, now);
+        restarted.forget_claimed(&*history.lock().await);
+        assert!(restarted.discard(now, false).is_empty());
+        let occurrence = restarted.take_ready(now, false, false).unwrap();
+        assert_eq!(occurrence.window.run_at, now);
+        let entry = history
+            .lock()
+            .await
+            .claim(&occurrence.window.event, now.with_timezone(&Utc), false)
+            .unwrap()
+            .unwrap();
+        let bbs = Arc::new(Mutex::new(BBS::new(1)));
+        run_event(history.clone(), bbs, occurrence.window, entry, None).await.unwrap();
+        assert_eq!(std::fs::read_to_string(dir.path().join("runs")).unwrap(), "once");
+        assert_eq!(std::fs::read_dir(dir.path().join(LOG_DIRECTORY)).unwrap().count(), 1);
+        drop(history);
+
+        let history = EventHistory::open(dir.path(), now.with_timezone(&Utc)).unwrap();
+        assert_eq!(history.entries().len(), 4);
+        assert_eq!(history.entries()[3].result, EventResult::Success);
+        let mut rolled_back = Schedule::new(at(2, 59, 0));
+        rolled_back.refresh(&options(), &events, now);
+        rolled_back.forget_claimed(&history);
+        assert!(rolled_back.take_ready(now, false, false).is_none());
+        assert!(rolled_back.discard(now, false).is_empty());
     }
 
     async fn wait_bbs(bbs: &Arc<Mutex<BBS>>, predicate: impl Fn(&BBS) -> bool) {
